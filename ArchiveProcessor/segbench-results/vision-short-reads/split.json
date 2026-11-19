@@ -1,0 +1,166 @@
+{
+ "baselines": {
+  "owner": {
+   "pair": [
+    "ocr-panel-local/vision-26.6",
+    "ocr-panel-local/vision-27.2"
+   ],
+   "longer": 53,
+   "within slack": 44,
+   "shorter": 41,
+   "identical": 1
+  },
+  "owner lines": {
+   "pair": [
+    "enh-dewarp/lines/raw-26.6",
+    "enh-dewarp/lines/raw-27.2"
+   ],
+   "longer": 31,
+   "shorter": 32,
+   "within slack": 35,
+   "identical": 1
+  },
+  "reference set": {
+   "pair": [
+    "bench-corpus/routes/vision-26.6",
+    "bench-corpus/routes/vision-27.2"
+   ],
+   "shorter": 173,
+   "longer": 108,
+   "within slack": 39
+  }
+ },
+ "batches": [
+  {
+   "cache": "enh-dewarp",
+   "folder": "docres",
+   "made": "2026-10-22",
+   "baseline": "owner lines",
+   "longer": 27,
+   "within slack": 34,
+   "identical": 12,
+   "shorter": 26
+  },
+  {
+   "cache": "enh-dewarp",
+   "folder": "enc-1600-q90",
+   "made": "2026-10-22",
+   "baseline": "owner lines",
+   "longer": 41,
+   "within slack": 29,
+   "shorter": 28,
+   "identical": 1
+  },
+  {
+   "cache": "enh-dewarp",
+   "folder": "enc-2048-q85",
+   "made": "2026-10-22",
+   "baseline": "owner lines",
+   "longer": 37,
+   "shorter": 26,
+   "within slack": 34,
+   "identical": 2
+  },
+  {
+   "cache": "enh-dewarp",
+   "folder": "enc-2400-q90",
+   "made": "2026-10-22",
+   "baseline": "owner lines",
+   "longer": 36,
+   "within slack": 34,
+   "shorter": 28,
+   "identical": 1
+  },
+  {
+   "cache": "enh-dewarp",
+   "folder": "hand",
+   "made": "2026-10-22",
+   "baseline": "owner lines",
+   "shorter": 2,
+   "within slack": 2
+  },
+  {
+   "cache": "enh-dewarp",
+   "folder": "quad",
+   "made": "2026-10-22",
+   "baseline": "owner lines",
+   "longer": 34,
+   "shorter": 32,
+   "within slack": 32,
+   "identical": 1
+  },
+  {
+   "cache": "enh-dewarp",
+   "folder": "quad-quarter",
+   "made": "2026-10-22",
+   "baseline": "owner lines",
+   "within slack": 4,
+   "shorter": 5,
+   "longer": 11
+  },
+  {
+   "cache": "enh-dewarp",
+   "folder": "quarter",
+   "made": "2026-10-22",
+   "baseline": "owner lines",
+   "within slack": 4,
+   "longer": 9,
+   "shorter": 7
+  },
+  {
+   "cache": "enh-dewarp",
+   "folder": "raw",
+   "made": "2026-11-04",
+   "baseline": "owner lines",
+   "identical": 95,
+   "within slack": 1
+  },
+  {
+   "cache": "enh-dewarp",
+   "folder": "uvdoc",
+   "made": "2026-10-22",
+   "baseline": "owner lines",
+   "longer": 30,
+   "within slack": 42,
+   "shorter": 26,
+   "identical": 1
+  },
+  {
+   "cache": "enh-dewarp",
+   "folder": "uvdoc-quarter",
+   "made": "2026-10-22",
+   "baseline": "owner lines",
+   "longer": 11,
+   "shorter": 6,
+   "within slack": 3
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "folder": "vision",
+   "made": "2026-10-29",
+   "baseline": "owner",
+   "longer": 4,
+   "within slack": 9,
+   "shorter": 2
+  },
+  {
+   "cache": "bench-corpus sample",
+   "folder": "vision",
+   "made": "2026-10-17",
+   "baseline": "reference set",
+   "shorter": 165,
+   "longer": 110,
+   "within slack": 43
+  },
+  {
+   "cache": "bench-corpus sample",
+   "folder": "vision",
+   "made": "2026-10-18",
+   "baseline": "reference set",
+   "shorter": 177,
+   "longer": 107,
+   "within slack": 49,
+   "identical": 4
+  }
+ ]
+}

@@ -14,17 +14,29 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import vision_guard as G  # noqa: E402
 
 # Writes N lines of five words per job (N from FAKE_LINES), as text or as segbench-dewarp lines' JSON; with FAKE_SHORT
-# set, the jobs after the first FAKE_SHORT read one line, as the 04:49 run read part of its pages.
+# set, the jobs after the first FAKE_SHORT read one line, as the 04:49 run read part of its pages. FAKE_FLIP names one
+# image whose k-th reading has FAKE_SEQ[k] lines; from the FAKE_FAULT_CALL-th process on, every job reads one line.
 FAKE = r'''#!/usr/bin/env python3
 import json, os, sys
 args = sys.argv[1:]
 mode = args[0] if len(args) == 2 else None
 n, short = int(os.environ['FAKE_LINES']), int(os.environ.get('FAKE_SHORT', '-1'))
+state = os.environ['FAKE_STATE']
+def bump(name):
+    f = os.path.join(state, name)
+    c = int(open(f).read()) if os.path.exists(f) else 0
+    open(f, 'w').write(str(c + 1))
+    return c
+call = bump('calls')
+fault = 0 < int(os.environ.get('FAKE_FAULT_CALL', '0')) <= call + 1
+seq = [int(x) for x in os.environ.get('FAKE_SEQ', '').split(',') if x]
 for i, row in enumerate(l for l in open(args[-1]).read().splitlines() if l.strip()):
     src, out = row.split('\t')[:2]
     if os.path.exists(out):
         continue
-    k = 1 if 0 <= short <= i else n
+    k = 1 if fault or 0 <= short <= i else n
+    if os.path.basename(src) == os.environ.get('FAKE_FLIP'):
+        k = seq[min(bump('flip'), len(seq) - 1)]
     lines = [f'w{j} a b c d' for j in range(k)]
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, 'w') as f:
@@ -54,7 +66,16 @@ class GuardTest(unittest.TestCase):
         self.outs = [self.t / 'out' / f'{k}.txt' for k in range(5)]
         self.jobs.write_text(''.join(f'/img/{k}.jpg\t{o}\n' for k, o in enumerate(self.outs)))
         os.environ['FAKE_LINES'] = '10'
-        os.environ.pop('FAKE_SHORT', None)
+        (self.t / 'state').mkdir()
+        os.environ['FAKE_STATE'] = str(self.t / 'state')
+        for k in ('FAKE_SHORT', 'FAKE_FLIP', 'FAKE_SEQ', 'FAKE_FAULT_CALL'):
+            os.environ.pop(k, None)
+
+    def calls(self):
+        return int((self.t / 'state' / 'calls').read_text())
+
+    def lines(self, out):
+        return len(out.read_text().splitlines())
 
     def tearDown(self):
         self.patch.stop()
@@ -102,6 +123,41 @@ class GuardTest(unittest.TestCase):
         with mock.patch.object(G.subprocess, 'run') as r:
             G.run(self.bin, self.jobs, 'quad')
         r.assert_called_once_with([str(self.bin), 'quad', str(self.jobs)], check=True)
+
+    def test_every_written_page_is_read_a_second_time(self):
+        G.run(self.bin, self.jobs)
+        self.assertEqual(self.calls(), 2)
+        G.run(self.bin, self.jobs)                      # nothing new to write, nothing to read again
+        self.assertEqual(self.calls(), 3)
+        G.run(self.bin, self.jobs, twice=False)
+        self.assertEqual(self.calls(), 4)
+
+    def test_short_first_reading_is_replaced_by_the_agreeing_pair(self):
+        os.environ.update(FAKE_FLIP='2.jpg', FAKE_SEQ='7,10,10')
+        G.run(self.bin, self.jobs)
+        self.assertEqual(self.lines(self.outs[2]), 10)
+        self.assertEqual(self.calls(), 3)
+        self.assertTrue(all(self.lines(o) == 10 for o in self.outs))
+
+    def test_a_page_flipping_between_two_readings_keeps_the_first(self):
+        os.environ.update(FAKE_FLIP='2.jpg', FAKE_SEQ='12,8,12')   # a handwritten page's two readings
+        G.run(self.bin, self.jobs)
+        self.assertEqual(self.lines(self.outs[2]), 12)
+        self.assertFalse((self.t / 'q').exists())
+
+    def test_a_page_that_never_settles_is_quarantined_and_refused(self):
+        os.environ.update(FAKE_FLIP='2.jpg', FAKE_SEQ='10,13,16,19,22,25')
+        with self.assertRaisesRegex(G.VisionRunFault, 'never read 1 page'):
+            G.run(self.bin, self.jobs)
+        self.assertFalse(self.outs[2].exists())
+        self.assertTrue(all(o.exists() for o in self.outs if o != self.outs[2]))
+        self.assertEqual(self.calls(), 1 + G.ROUNDS + 1)
+
+    def test_a_fault_on_the_second_read_quarantines_the_first_reads_too(self):
+        os.environ['FAKE_FAULT_CALL'] = '2'
+        with self.assertRaisesRegex(G.VisionRunFault, 'outputs moved .* as well'):
+            G.run(self.bin, self.jobs)
+        self.assertFalse(any(o.exists() for o in self.outs))
 
     def test_nonzero_exit_still_raises_when_checked(self):
         bad = self.t / 'bad'

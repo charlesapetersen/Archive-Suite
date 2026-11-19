@@ -1,0 +1,12 @@
+{
+ "groups": 419,
+ "readings": 850,
+ "readings_by_cache": {
+  "colour-dropout": 96,
+  "dewarp-guard": 310,
+  "enh-dewarp": 134,
+  "place-geom-real5": 310
+ },
+ "short": [],
+ "identical_groups": 417
+}

@@ -50,6 +50,7 @@ sys.path.insert(0, str(HERE))
 from place_geom import (PT, angle_spread, deskew_map, identity_map, page_angle,  # noqa: E402
                         quad_bbox, run_tool)
 from enh_dewarp import angle_residual  # noqa: E402
+import vision_guard  # noqa: E402
 
 RESULTS = HERE.parents[1] / 'segbench-results'
 REH = Path.home() / 'Library/Caches/ArchiveSuiteRehearsal'
@@ -205,16 +206,20 @@ def cmd_survey(a):
         imgs = imgs[:a.limit]
     todo = [(p, lines_path(k)) for k, p, _, _ in imgs if not lines_path(k).exists()]
     (CACHE / 'lines').mkdir(parents=True, exist_ok=True)
-    # a few Vision processes side by side, each over its own share; dewarp.swift skips what exists, so it resumes
-    procs = []
+    # a few guarded Vision processes side by side, each over its own share; dewarp.swift skips what exists, so it resumes
+    shares = []
     for w in range(a.workers):
         share = todo[w::a.workers]
         if not share:
             continue
         jf = CACHE / f'lines-jobs-{w}.tsv'
         jf.write_text(''.join(f'{p}\t{o}\n' for p, o in share))
-        procs.append(subprocess.Popen([str(VISION), 'lines', str(jf)], stdout=subprocess.DEVNULL))
-    bad = sum(p.wait() != 0 for p in procs)
+        shares.append(jf)
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max(1, len(shares))) as ex:
+        rcs = list(ex.map(lambda jf: vision_guard.run(VISION, jf, 'lines', check=False,
+                                                      stdout=subprocess.DEVNULL).returncode, shares))
+    bad = sum(rc != 0 for rc in rcs)
     rows = []
     for k, p, coll, rel in imgs:
         f = lines_path(k)
@@ -348,7 +353,7 @@ def cmd_truth(a):
         jobs.append(f'{up_image(k)}\t{up_lines(k)}\n')
     jf = CACHE / 'lines-up-jobs.tsv'
     jf.write_text(''.join(jobs))
-    subprocess.run([str(VISION), 'lines', str(jf)], check=True, stdout=subprocess.DEVNULL)
+    vision_guard.run(VISION, jf, 'lines', stdout=subprocess.DEVNULL)
     xml_dir = CACHE / 'blla-xml'
     xml_dir.mkdir(parents=True, exist_ok=True)
     (CACHE / 'blla').mkdir(parents=True, exist_ok=True)

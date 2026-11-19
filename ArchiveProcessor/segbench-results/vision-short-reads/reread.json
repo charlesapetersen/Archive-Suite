@@ -1,0 +1,6046 @@
+{
+ "os_build": "26B131",
+ "read_at": "2026-11-19 02:08:59",
+ "power_now": "AC",
+ "sample": 20,
+ "rows": [
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/raw/p015.json",
+   "cached": {
+    "lines": 45,
+    "words": 214,
+    "sha256_16": "47733ae8e131d4c5"
+   },
+   "a": {
+    "lines": 45,
+    "words": 214,
+    "sha256_16": "47733ae8e131d4c5"
+   },
+   "b": {
+    "lines": 45,
+    "words": 214,
+    "sha256_16": "47733ae8e131d4c5"
+   },
+   "made": "2026-11-04 12:24:03",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/quad/p033.json",
+   "cached": {
+    "lines": 33,
+    "words": 407,
+    "sha256_16": "483251e096b36826"
+   },
+   "a": {
+    "lines": 40,
+    "words": 405,
+    "sha256_16": "05881d3d3500b1af"
+   },
+   "b": {
+    "lines": 40,
+    "words": 405,
+    "sha256_16": "05881d3d3500b1af"
+   },
+   "made": "2026-10-22 05:18:06",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/enc-2048-q85/p032.json",
+   "cached": {
+    "lines": 32,
+    "words": 327,
+    "sha256_16": "c6f8005940519549"
+   },
+   "a": {
+    "lines": 32,
+    "words": 329,
+    "sha256_16": "1368f2ed7003fe7b"
+   },
+   "b": {
+    "lines": 32,
+    "words": 329,
+    "sha256_16": "1368f2ed7003fe7b"
+   },
+   "made": "2026-10-22 05:26:10",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/docres/p074.json",
+   "cached": {
+    "lines": 40,
+    "words": 446,
+    "sha256_16": "f275715e720de4a7"
+   },
+   "a": {
+    "lines": 39,
+    "words": 444,
+    "sha256_16": "905426e3bc818085"
+   },
+   "b": {
+    "lines": 39,
+    "words": 444,
+    "sha256_16": "905426e3bc818085"
+   },
+   "made": "2026-10-22 05:19:49",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/docres/p030.json",
+   "cached": {
+    "lines": 31,
+    "words": 272,
+    "sha256_16": "9c4776378ba8dc8c"
+   },
+   "a": {
+    "lines": 31,
+    "words": 265,
+    "sha256_16": "ff366daf2ede25cc"
+   },
+   "b": {
+    "lines": 31,
+    "words": 265,
+    "sha256_16": "ff366daf2ede25cc"
+   },
+   "made": "2026-10-22 05:19:34",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/enc-1600-q90/p095.json",
+   "cached": {
+    "lines": 38,
+    "words": 394,
+    "sha256_16": "8d980f1fe5cbeefe"
+   },
+   "a": {
+    "lines": 37,
+    "words": 394,
+    "sha256_16": "c6a1d58a560f9a53"
+   },
+   "b": {
+    "lines": 37,
+    "words": 394,
+    "sha256_16": "c6a1d58a560f9a53"
+   },
+   "made": "2026-10-22 05:28:12",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/uvdoc/p094.json",
+   "cached": {
+    "lines": 5,
+    "words": 15,
+    "sha256_16": "e3d0c53ad5df6e9d"
+   },
+   "a": {
+    "lines": 8,
+    "words": 13,
+    "sha256_16": "9ebdf8a194dae24a"
+   },
+   "b": {
+    "lines": 8,
+    "words": 13,
+    "sha256_16": "9ebdf8a194dae24a"
+   },
+   "made": "2026-10-22 05:19:21",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/enc-1600-q90/p033.json",
+   "cached": {
+    "lines": 32,
+    "words": 407,
+    "sha256_16": "4826a1be9a8bcd73"
+   },
+   "a": {
+    "lines": 39,
+    "words": 407,
+    "sha256_16": "9c0223f4957a5d4e"
+   },
+   "b": {
+    "lines": 39,
+    "words": 407,
+    "sha256_16": "9c0223f4957a5d4e"
+   },
+   "made": "2026-10-22 05:27:42",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/uvdoc-quarter/p075.json",
+   "cached": {
+    "lines": 42,
+    "words": 139,
+    "sha256_16": "adf92078cec9df95"
+   },
+   "a": {
+    "lines": 26,
+    "words": 121,
+    "sha256_16": "cb3c4a540b48d853"
+   },
+   "b": {
+    "lines": 26,
+    "words": 121,
+    "sha256_16": "cb3c4a540b48d853"
+   },
+   "made": "2026-10-22 05:28:22",
+   "power": null,
+   "cached_vs_a": "longer",
+   "cached_vs_b": "longer",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/enc-2048-q85/p063.json",
+   "cached": {
+    "lines": 50,
+    "words": 589,
+    "sha256_16": "3b12702cc264cb84"
+   },
+   "a": {
+    "lines": 48,
+    "words": 587,
+    "sha256_16": "8d3e732488231108"
+   },
+   "b": {
+    "lines": 48,
+    "words": 587,
+    "sha256_16": "8d3e732488231108"
+   },
+   "made": "2026-10-22 05:26:23",
+   "power": null,
+   "cached_vs_a": "longer",
+   "cached_vs_b": "longer",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/quarter/p066.json",
+   "cached": {
+    "lines": 48,
+    "words": 74,
+    "sha256_16": "846ff29467562643"
+   },
+   "a": {
+    "lines": 44,
+    "words": 72,
+    "sha256_16": "69e92d820725aba2"
+   },
+   "b": {
+    "lines": 44,
+    "words": 72,
+    "sha256_16": "69e92d820725aba2"
+   },
+   "made": "2026-10-22 05:28:26",
+   "power": null,
+   "cached_vs_a": "longer",
+   "cached_vs_b": "longer",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/enc-2400-q90/p046.json",
+   "cached": {
+    "lines": 14,
+    "words": 76,
+    "sha256_16": "6b47511a35430dd6"
+   },
+   "a": {
+    "lines": 14,
+    "words": 79,
+    "sha256_16": "0b33e4f415d2eb8f"
+   },
+   "b": {
+    "lines": 14,
+    "words": 79,
+    "sha256_16": "0b33e4f415d2eb8f"
+   },
+   "made": "2026-10-22 05:27:03",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/enc-2048-q85/p004.json",
+   "cached": {
+    "lines": 26,
+    "words": 283,
+    "sha256_16": "49e712147f60fbbb"
+   },
+   "a": {
+    "lines": 27,
+    "words": 280,
+    "sha256_16": "61bdca5e169249ff"
+   },
+   "b": {
+    "lines": 27,
+    "words": 280,
+    "sha256_16": "61bdca5e169249ff"
+   },
+   "made": "2026-10-22 05:25:59",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/enc-2048-q85/p030.json",
+   "cached": {
+    "lines": 37,
+    "words": 274,
+    "sha256_16": "3762197e4dbcc8bc"
+   },
+   "a": {
+    "lines": 35,
+    "words": 270,
+    "sha256_16": "7b39debc6e1cd9c1"
+   },
+   "b": {
+    "lines": 35,
+    "words": 270,
+    "sha256_16": "7b39debc6e1cd9c1"
+   },
+   "made": "2026-10-22 05:26:09",
+   "power": null,
+   "cached_vs_a": "longer",
+   "cached_vs_b": "longer",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/uvdoc/p057.json",
+   "cached": {
+    "lines": 68,
+    "words": 76,
+    "sha256_16": "acfb40e9ab047e55"
+   },
+   "a": {
+    "lines": 67,
+    "words": 75,
+    "sha256_16": "199a3e429cf21a5f"
+   },
+   "b": {
+    "lines": 67,
+    "words": 75,
+    "sha256_16": "199a3e429cf21a5f"
+   },
+   "made": "2026-10-22 05:19:01",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/quad/p067.json",
+   "cached": {
+    "lines": 19,
+    "words": 81,
+    "sha256_16": "a3a1bcab3448795c"
+   },
+   "a": {
+    "lines": 17,
+    "words": 81,
+    "sha256_16": "3eab5a54cbdf9825"
+   },
+   "b": {
+    "lines": 17,
+    "words": 81,
+    "sha256_16": "3eab5a54cbdf9825"
+   },
+   "made": "2026-10-22 05:18:19",
+   "power": null,
+   "cached_vs_a": "longer",
+   "cached_vs_b": "longer",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/enc-2048-q85/p007.json",
+   "cached": {
+    "lines": 17,
+    "words": 56,
+    "sha256_16": "c4282264e89c6270"
+   },
+   "a": {
+    "lines": 19,
+    "words": 68,
+    "sha256_16": "c5103dbd5b3e824f"
+   },
+   "b": {
+    "lines": 19,
+    "words": 68,
+    "sha256_16": "c5103dbd5b3e824f"
+   },
+   "made": "2026-10-22 05:26:00",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/quad/p043.json",
+   "cached": {
+    "lines": 97,
+    "words": 834,
+    "sha256_16": "c2d9cd182639a10e"
+   },
+   "a": {
+    "lines": 101,
+    "words": 831,
+    "sha256_16": "528bb80737fb5806"
+   },
+   "b": {
+    "lines": 101,
+    "words": 831,
+    "sha256_16": "528bb80737fb5806"
+   },
+   "made": "2026-10-22 05:18:11",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/uvdoc/p060.json",
+   "cached": {
+    "lines": 34,
+    "words": 214,
+    "sha256_16": "ea6790cd3ca4b641"
+   },
+   "a": {
+    "lines": 31,
+    "words": 214,
+    "sha256_16": "f2796ee26a01708f"
+   },
+   "b": {
+    "lines": 31,
+    "words": 214,
+    "sha256_16": "f2796ee26a01708f"
+   },
+   "made": "2026-10-22 05:19:02",
+   "power": null,
+   "cached_vs_a": "longer",
+   "cached_vs_b": "longer",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "enh-dewarp",
+   "feeds": "enh-dewarp, capture ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "enh-dewarp/lines/raw/p009.json",
+   "cached": {
+    "lines": 51,
+    "words": 162,
+    "sha256_16": "0c29dd9edb0c8723"
+   },
+   "a": {
+    "lines": 51,
+    "words": 162,
+    "sha256_16": "0c29dd9edb0c8723"
+   },
+   "b": {
+    "lines": 51,
+    "words": 162,
+    "sha256_16": "0c29dd9edb0c8723"
+   },
+   "made": "2026-11-04 12:24:02",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p058-original.txt",
+   "cached": {
+    "lines": 58,
+    "words": 318,
+    "sha256_16": "f07f378856624a01"
+   },
+   "a": {
+    "lines": 58,
+    "words": 318,
+    "sha256_16": "f07f378856624a01"
+   },
+   "b": {
+    "lines": 58,
+    "words": 318,
+    "sha256_16": "f07f378856624a01"
+   },
+   "made": "2026-11-04 12:22:32",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p064-quarter.txt",
+   "cached": {
+    "lines": 34,
+    "words": 159,
+    "sha256_16": "dea32786aeeac0b4"
+   },
+   "a": {
+    "lines": 34,
+    "words": 159,
+    "sha256_16": "dea32786aeeac0b4"
+   },
+   "b": {
+    "lines": 34,
+    "words": 159,
+    "sha256_16": "dea32786aeeac0b4"
+   },
+   "made": "2026-11-04 12:22:33",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p085-original.txt",
+   "cached": {
+    "lines": 53,
+    "words": 309,
+    "sha256_16": "0c7d35116ccbb3d2"
+   },
+   "a": {
+    "lines": 53,
+    "words": 309,
+    "sha256_16": "0c7d35116ccbb3d2"
+   },
+   "b": {
+    "lines": 53,
+    "words": 309,
+    "sha256_16": "0c7d35116ccbb3d2"
+   },
+   "made": "2026-11-04 12:22:38",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p088-quarter.txt",
+   "cached": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "a": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "b": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "made": "2026-11-04 12:22:39",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p012-original.txt",
+   "cached": {
+    "lines": 62,
+    "words": 403,
+    "sha256_16": "09af9cd4a9ffb833"
+   },
+   "a": {
+    "lines": 62,
+    "words": 403,
+    "sha256_16": "09af9cd4a9ffb833"
+   },
+   "b": {
+    "lines": 62,
+    "words": 403,
+    "sha256_16": "09af9cd4a9ffb833"
+   },
+   "made": "2026-11-04 12:22:24",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p020-half.txt",
+   "cached": {
+    "lines": 26,
+    "words": 266,
+    "sha256_16": "d158e47b5ce14e24"
+   },
+   "a": {
+    "lines": 26,
+    "words": 266,
+    "sha256_16": "d158e47b5ce14e24"
+   },
+   "b": {
+    "lines": 26,
+    "words": 266,
+    "sha256_16": "d158e47b5ce14e24"
+   },
+   "made": "2026-11-04 12:22:26",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p066-quarter.txt",
+   "cached": {
+    "lines": 44,
+    "words": 72,
+    "sha256_16": "69e92d820725aba2"
+   },
+   "a": {
+    "lines": 44,
+    "words": 72,
+    "sha256_16": "69e92d820725aba2"
+   },
+   "b": {
+    "lines": 44,
+    "words": 72,
+    "sha256_16": "69e92d820725aba2"
+   },
+   "made": "2026-11-04 12:22:34",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p095-original.txt",
+   "cached": {
+    "lines": 37,
+    "words": 394,
+    "sha256_16": "c6a1d58a560f9a53"
+   },
+   "a": {
+    "lines": 37,
+    "words": 394,
+    "sha256_16": "c6a1d58a560f9a53"
+   },
+   "b": {
+    "lines": 37,
+    "words": 394,
+    "sha256_16": "c6a1d58a560f9a53"
+   },
+   "made": "2026-11-04 12:22:41",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p076-original.txt",
+   "cached": {
+    "lines": 66,
+    "words": 478,
+    "sha256_16": "f91bb5816a7fcb37"
+   },
+   "a": {
+    "lines": 66,
+    "words": 478,
+    "sha256_16": "f91bb5816a7fcb37"
+   },
+   "b": {
+    "lines": 66,
+    "words": 478,
+    "sha256_16": "f91bb5816a7fcb37"
+   },
+   "made": "2026-11-04 12:22:36",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p003-original.txt",
+   "cached": {
+    "lines": 132,
+    "words": 584,
+    "sha256_16": "1603963f34e2a1ef"
+   },
+   "a": {
+    "lines": 132,
+    "words": 584,
+    "sha256_16": "1603963f34e2a1ef"
+   },
+   "b": {
+    "lines": 132,
+    "words": 584,
+    "sha256_16": "1603963f34e2a1ef"
+   },
+   "made": "2026-11-04 12:22:22",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p044-original.txt",
+   "cached": {
+    "lines": 104,
+    "words": 686,
+    "sha256_16": "cd4c19860c7e7f61"
+   },
+   "a": {
+    "lines": 104,
+    "words": 686,
+    "sha256_16": "cd4c19860c7e7f61"
+   },
+   "b": {
+    "lines": 104,
+    "words": 686,
+    "sha256_16": "cd4c19860c7e7f61"
+   },
+   "made": "2026-11-04 12:22:30",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p060-original.txt",
+   "cached": {
+    "lines": 30,
+    "words": 222,
+    "sha256_16": "4c1bcae353feaecb"
+   },
+   "a": {
+    "lines": 30,
+    "words": 222,
+    "sha256_16": "4c1bcae353feaecb"
+   },
+   "b": {
+    "lines": 30,
+    "words": 222,
+    "sha256_16": "4c1bcae353feaecb"
+   },
+   "made": "2026-11-04 12:22:32",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p032-original.txt",
+   "cached": {
+    "lines": 31,
+    "words": 332,
+    "sha256_16": "f811de4fec288021"
+   },
+   "a": {
+    "lines": 31,
+    "words": 332,
+    "sha256_16": "f811de4fec288021"
+   },
+   "b": {
+    "lines": 31,
+    "words": 332,
+    "sha256_16": "f811de4fec288021"
+   },
+   "made": "2026-11-04 12:22:28",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p041-original.txt",
+   "cached": {
+    "lines": 47,
+    "words": 388,
+    "sha256_16": "ac33dd191c8692c0"
+   },
+   "a": {
+    "lines": 47,
+    "words": 388,
+    "sha256_16": "ac33dd191c8692c0"
+   },
+   "b": {
+    "lines": 47,
+    "words": 388,
+    "sha256_16": "ac33dd191c8692c0"
+   },
+   "made": "2026-11-04 12:22:29",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p015-original.txt",
+   "cached": {
+    "lines": 45,
+    "words": 214,
+    "sha256_16": "47733ae8e131d4c5"
+   },
+   "a": {
+    "lines": 45,
+    "words": 214,
+    "sha256_16": "47733ae8e131d4c5"
+   },
+   "b": {
+    "lines": 45,
+    "words": 214,
+    "sha256_16": "47733ae8e131d4c5"
+   },
+   "made": "2026-11-04 12:22:25",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p042-original.txt",
+   "cached": {
+    "lines": 105,
+    "words": 796,
+    "sha256_16": "d5636057954ea617"
+   },
+   "a": {
+    "lines": 105,
+    "words": 796,
+    "sha256_16": "d5636057954ea617"
+   },
+   "b": {
+    "lines": 105,
+    "words": 796,
+    "sha256_16": "d5636057954ea617"
+   },
+   "made": "2026-11-04 12:22:29",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p087-quarter.txt",
+   "cached": {
+    "lines": 96,
+    "words": 535,
+    "sha256_16": "8b0fbf3ab939c069"
+   },
+   "a": {
+    "lines": 96,
+    "words": 535,
+    "sha256_16": "8b0fbf3ab939c069"
+   },
+   "b": {
+    "lines": 96,
+    "words": 535,
+    "sha256_16": "8b0fbf3ab939c069"
+   },
+   "made": "2026-11-04 12:22:39",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p067-quarter.txt",
+   "cached": {
+    "lines": 18,
+    "words": 81,
+    "sha256_16": "8c1a0b50bdd586cc"
+   },
+   "a": {
+    "lines": 18,
+    "words": 81,
+    "sha256_16": "8c1a0b50bdd586cc"
+   },
+   "b": {
+    "lines": 18,
+    "words": 81,
+    "sha256_16": "8c1a0b50bdd586cc"
+   },
+   "made": "2026-11-04 12:22:34",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p012-quarter.txt",
+   "cached": {
+    "lines": 37,
+    "words": 209,
+    "sha256_16": "04c284311d3ea1f1"
+   },
+   "a": {
+    "lines": 37,
+    "words": 209,
+    "sha256_16": "04c284311d3ea1f1"
+   },
+   "b": {
+    "lines": 37,
+    "words": 209,
+    "sha256_16": "04c284311d3ea1f1"
+   },
+   "made": "2026-11-04 12:22:24",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-local",
+   "feeds": "the owner panel (ocr-panel)",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-local/vision/p048-original.txt",
+   "cached": {
+    "lines": 43,
+    "words": 113,
+    "sha256_16": "e81f39839f3a101f"
+   },
+   "a": {
+    "lines": 43,
+    "words": 113,
+    "sha256_16": "e81f39839f3a101f"
+   },
+   "b": {
+    "lines": 43,
+    "words": 113,
+    "sha256_16": "e81f39839f3a101f"
+   },
+   "made": "2026-11-04 12:22:30",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p088-original.txt",
+   "cached": {
+    "lines": 60,
+    "words": 428,
+    "sha256_16": "23d734ed7b5771d5"
+   },
+   "a": {
+    "lines": 51,
+    "words": 421,
+    "sha256_16": "81d938b07dde9588"
+   },
+   "b": {
+    "lines": 51,
+    "words": 421,
+    "sha256_16": "81d938b07dde9588"
+   },
+   "made": "2026-10-29 02:37:31",
+   "power": null,
+   "cached_vs_a": "longer",
+   "cached_vs_b": "longer",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p025-original.txt",
+   "cached": {
+    "lines": 42,
+    "words": 138,
+    "sha256_16": "7a8f93c4bc364d72"
+   },
+   "a": {
+    "lines": 35,
+    "words": 148,
+    "sha256_16": "82cbf70283b612f6"
+   },
+   "b": {
+    "lines": 35,
+    "words": 148,
+    "sha256_16": "82cbf70283b612f6"
+   },
+   "made": "2026-10-29 02:37:26",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p062-original.txt",
+   "cached": {
+    "lines": 83,
+    "words": 541,
+    "sha256_16": "84ad58abb1c73997"
+   },
+   "a": {
+    "lines": 84,
+    "words": 542,
+    "sha256_16": "fab1918b56f2c3dd"
+   },
+   "b": {
+    "lines": 84,
+    "words": 542,
+    "sha256_16": "fab1918b56f2c3dd"
+   },
+   "made": "2026-10-29 02:37:28",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p023-original.txt",
+   "cached": {
+    "lines": 30,
+    "words": 205,
+    "sha256_16": "a994a1753c69cc7f"
+   },
+   "a": {
+    "lines": 30,
+    "words": 205,
+    "sha256_16": "71bffd32e922c945"
+   },
+   "b": {
+    "lines": 30,
+    "words": 205,
+    "sha256_16": "71bffd32e922c945"
+   },
+   "made": "2026-10-29 02:37:26",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p028-original.txt",
+   "cached": {
+    "lines": 23,
+    "words": 204,
+    "sha256_16": "8bbdfca5458a0f3d"
+   },
+   "a": {
+    "lines": 23,
+    "words": 205,
+    "sha256_16": "735de286bf6c439b"
+   },
+   "b": {
+    "lines": 23,
+    "words": 205,
+    "sha256_16": "735de286bf6c439b"
+   },
+   "made": "2026-10-29 02:37:27",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p093-original.txt",
+   "cached": {
+    "lines": 52,
+    "words": 400,
+    "sha256_16": "752fbd674dff5f18"
+   },
+   "a": {
+    "lines": 51,
+    "words": 401,
+    "sha256_16": "a9dd8fe2732d3c31"
+   },
+   "b": {
+    "lines": 51,
+    "words": 401,
+    "sha256_16": "a9dd8fe2732d3c31"
+   },
+   "made": "2026-10-29 02:37:32",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p077-original.txt",
+   "cached": {
+    "lines": 39,
+    "words": 323,
+    "sha256_16": "8d6678f7abf38ca1"
+   },
+   "a": {
+    "lines": 39,
+    "words": 325,
+    "sha256_16": "fa9d30f8fad20488"
+   },
+   "b": {
+    "lines": 39,
+    "words": 325,
+    "sha256_16": "fa9d30f8fad20488"
+   },
+   "made": "2026-10-29 02:37:29",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p098-original.txt",
+   "cached": {
+    "lines": 25,
+    "words": 160,
+    "sha256_16": "47169bd0b96e51b1"
+   },
+   "a": {
+    "lines": 25,
+    "words": 159,
+    "sha256_16": "d665c74b6a39d965"
+   },
+   "b": {
+    "lines": 25,
+    "words": 159,
+    "sha256_16": "d665c74b6a39d965"
+   },
+   "made": "2026-10-29 02:37:33",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p091-original.txt",
+   "cached": {
+    "lines": 66,
+    "words": 661,
+    "sha256_16": "71015a93be24e9a4"
+   },
+   "a": {
+    "lines": 77,
+    "words": 576,
+    "sha256_16": "13457dd3db5b726f"
+   },
+   "b": {
+    "lines": 77,
+    "words": 576,
+    "sha256_16": "13457dd3db5b726f"
+   },
+   "made": "2026-10-29 02:37:32",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p061-original.txt",
+   "cached": {
+    "lines": 32,
+    "words": 392,
+    "sha256_16": "32c8e23fc3a7aedd"
+   },
+   "a": {
+    "lines": 31,
+    "words": 390,
+    "sha256_16": "a9ea44bc8479afbc"
+   },
+   "b": {
+    "lines": 31,
+    "words": 390,
+    "sha256_16": "a9ea44bc8479afbc"
+   },
+   "made": "2026-10-29 02:37:27",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p008-original.txt",
+   "cached": {
+    "lines": 47,
+    "words": 471,
+    "sha256_16": "c59628b71c284033"
+   },
+   "a": {
+    "lines": 23,
+    "words": 162,
+    "sha256_16": "85f2173fdfeee49c"
+   },
+   "b": {
+    "lines": 23,
+    "words": 162,
+    "sha256_16": "85f2173fdfeee49c"
+   },
+   "made": "2026-10-29 02:37:26",
+   "power": null,
+   "cached_vs_a": "longer",
+   "cached_vs_b": "longer",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p058-original.txt",
+   "cached": {
+    "lines": 57,
+    "words": 318,
+    "sha256_16": "dbaf911f6239cad8"
+   },
+   "a": {
+    "lines": 57,
+    "words": 318,
+    "sha256_16": "5e16f13c000eda00"
+   },
+   "b": {
+    "lines": 57,
+    "words": 318,
+    "sha256_16": "5e16f13c000eda00"
+   },
+   "made": "2026-10-29 02:37:27",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p083-original.txt",
+   "cached": {
+    "lines": 108,
+    "words": 646,
+    "sha256_16": "7c9f3a9215337ad5"
+   },
+   "a": {
+    "lines": 104,
+    "words": 638,
+    "sha256_16": "e356b2b1b33307d1"
+   },
+   "b": {
+    "lines": 104,
+    "words": 638,
+    "sha256_16": "e356b2b1b33307d1"
+   },
+   "made": "2026-10-29 02:37:30",
+   "power": null,
+   "cached_vs_a": "longer",
+   "cached_vs_b": "longer",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p084-original.txt",
+   "cached": {
+    "lines": 100,
+    "words": 566,
+    "sha256_16": "e73302828140671f"
+   },
+   "a": {
+    "lines": 98,
+    "words": 571,
+    "sha256_16": "3b15e467b485420b"
+   },
+   "b": {
+    "lines": 98,
+    "words": 571,
+    "sha256_16": "3b15e467b485420b"
+   },
+   "made": "2026-10-29 02:37:31",
+   "power": null,
+   "cached_vs_a": "longer",
+   "cached_vs_b": "longer",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "ocr-panel-jpeg",
+   "feeds": "ocr-panel-jpeg",
+   "tool": "segbench-ocr",
+   "key": "ocr-panel-jpeg/vision/p063-original.txt",
+   "cached": {
+    "lines": 48,
+    "words": 586,
+    "sha256_16": "c1363bdbb342a36d"
+   },
+   "a": {
+    "lines": 49,
+    "words": 589,
+    "sha256_16": "b1a5a521cae9a342"
+   },
+   "b": {
+    "lines": 49,
+    "words": 589,
+    "sha256_16": "b1a5a521cae9a342"
+   },
+   "made": "2026-10-29 02:37:29",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/aug-ReflectedLight/p011.json",
+   "cached": {
+    "lines": 35,
+    "words": 68,
+    "sha256_16": "c74049d88cb9bfdf"
+   },
+   "a": {
+    "lines": 35,
+    "words": 68,
+    "sha256_16": "c74049d88cb9bfdf"
+   },
+   "b": {
+    "lines": 35,
+    "words": 68,
+    "sha256_16": "c74049d88cb9bfdf"
+   },
+   "made": "2026-11-03 20:06:46",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/defocus-1.5/p041.json",
+   "cached": {
+    "lines": 36,
+    "words": 394,
+    "sha256_16": "078616d7fc3d3877"
+   },
+   "a": {
+    "lines": 36,
+    "words": 394,
+    "sha256_16": "078616d7fc3d3877"
+   },
+   "b": {
+    "lines": 36,
+    "words": 394,
+    "sha256_16": "078616d7fc3d3877"
+   },
+   "made": "2026-11-03 20:08:01",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/aug-ReflectedLight/p088.json",
+   "cached": {
+    "lines": 46,
+    "words": 256,
+    "sha256_16": "fb2554217c7724a3"
+   },
+   "a": {
+    "lines": 46,
+    "words": 256,
+    "sha256_16": "fb2554217c7724a3"
+   },
+   "b": {
+    "lines": 46,
+    "words": 256,
+    "sha256_16": "fb2554217c7724a3"
+   },
+   "made": "2026-11-03 20:06:57",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/jpeg-75/p081.json",
+   "cached": {
+    "lines": 79,
+    "words": 253,
+    "sha256_16": "97d5dc7932b3f040"
+   },
+   "a": {
+    "lines": 79,
+    "words": 253,
+    "sha256_16": "97d5dc7932b3f040"
+   },
+   "b": {
+    "lines": 79,
+    "words": 253,
+    "sha256_16": "97d5dc7932b3f040"
+   },
+   "made": "2026-11-03 20:09:52",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/defocus-3/p091.json",
+   "cached": {
+    "lines": 43,
+    "words": 241,
+    "sha256_16": "7fa10308736f8fdf"
+   },
+   "a": {
+    "lines": 43,
+    "words": 241,
+    "sha256_16": "7fa10308736f8fdf"
+   },
+   "b": {
+    "lines": 43,
+    "words": 241,
+    "sha256_16": "7fa10308736f8fdf"
+   },
+   "made": "2026-11-03 20:08:24",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/jpeg-85/p002.json",
+   "cached": {
+    "lines": 23,
+    "words": 138,
+    "sha256_16": "bd54433e6c311c48"
+   },
+   "a": {
+    "lines": 23,
+    "words": 138,
+    "sha256_16": "bd54433e6c311c48"
+   },
+   "b": {
+    "lines": 23,
+    "words": 138,
+    "sha256_16": "bd54433e6c311c48"
+   },
+   "made": "2026-11-03 20:09:56",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/aug-ReflectedLight/p042.json",
+   "cached": {
+    "lines": 107,
+    "words": 782,
+    "sha256_16": "1e6ff2e48a876047"
+   },
+   "a": {
+    "lines": 107,
+    "words": 782,
+    "sha256_16": "1e6ff2e48a876047"
+   },
+   "b": {
+    "lines": 107,
+    "words": 782,
+    "sha256_16": "1e6ff2e48a876047"
+   },
+   "made": "2026-11-03 20:06:50",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/jpeg-75/p082.json",
+   "cached": {
+    "lines": 43,
+    "words": 143,
+    "sha256_16": "e63952294ee6c53e"
+   },
+   "a": {
+    "lines": 43,
+    "words": 143,
+    "sha256_16": "e63952294ee6c53e"
+   },
+   "b": {
+    "lines": 43,
+    "words": 143,
+    "sha256_16": "e63952294ee6c53e"
+   },
+   "made": "2026-11-03 20:09:52",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/motion-17/p033.json",
+   "cached": {
+    "lines": 12,
+    "words": 121,
+    "sha256_16": "7b88f5fe1b8bdd47"
+   },
+   "a": {
+    "lines": 12,
+    "words": 121,
+    "sha256_16": "7b88f5fe1b8bdd47"
+   },
+   "b": {
+    "lines": 12,
+    "words": 121,
+    "sha256_16": "7b88f5fe1b8bdd47"
+   },
+   "made": "2026-11-03 20:07:34",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/jpeg-60/p099.json",
+   "cached": {
+    "lines": 28,
+    "words": 259,
+    "sha256_16": "bc9be0e9eddeb11d"
+   },
+   "a": {
+    "lines": 28,
+    "words": 259,
+    "sha256_16": "bc9be0e9eddeb11d"
+   },
+   "b": {
+    "lines": 28,
+    "words": 259,
+    "sha256_16": "bc9be0e9eddeb11d"
+   },
+   "made": "2026-11-03 20:09:39",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/tilt-20/p064.json",
+   "cached": {
+    "lines": 34,
+    "words": 164,
+    "sha256_16": "e14f089f1c2eb1f3"
+   },
+   "a": {
+    "lines": 34,
+    "words": 164,
+    "sha256_16": "e14f089f1c2eb1f3"
+   },
+   "b": {
+    "lines": 34,
+    "words": 164,
+    "sha256_16": "e14f089f1c2eb1f3"
+   },
+   "made": "2026-11-03 20:09:18",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/tilt-20/p081.json",
+   "cached": {
+    "lines": 54,
+    "words": 216,
+    "sha256_16": "fff8874c3ce522c0"
+   },
+   "a": {
+    "lines": 54,
+    "words": 216,
+    "sha256_16": "fff8874c3ce522c0"
+   },
+   "b": {
+    "lines": 54,
+    "words": 216,
+    "sha256_16": "fff8874c3ce522c0"
+   },
+   "made": "2026-11-03 20:09:21",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/defocus-3/p008.json",
+   "cached": {
+    "lines": 28,
+    "words": 128,
+    "sha256_16": "5b5fce8bbc9f6dea"
+   },
+   "a": {
+    "lines": 28,
+    "words": 128,
+    "sha256_16": "5b5fce8bbc9f6dea"
+   },
+   "b": {
+    "lines": 28,
+    "words": 128,
+    "sha256_16": "5b5fce8bbc9f6dea"
+   },
+   "made": "2026-11-03 20:08:12",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/aug-LightingGradient/p077.json",
+   "cached": {
+    "lines": 39,
+    "words": 328,
+    "sha256_16": "9ceab59f9662beb6"
+   },
+   "a": {
+    "lines": 39,
+    "words": 328,
+    "sha256_16": "9ceab59f9662beb6"
+   },
+   "b": {
+    "lines": 39,
+    "words": 328,
+    "sha256_16": "9ceab59f9662beb6"
+   },
+   "made": "2026-11-03 20:06:40",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/motion-31/p035.json",
+   "cached": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "a": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "b": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "made": "2026-11-03 20:07:48",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/tilt-5/p062.json",
+   "cached": {
+    "lines": 84,
+    "words": 538,
+    "sha256_16": "d5e7c9be9d92cdc0"
+   },
+   "a": {
+    "lines": 84,
+    "words": 538,
+    "sha256_16": "d5e7c9be9d92cdc0"
+   },
+   "b": {
+    "lines": 84,
+    "words": 538,
+    "sha256_16": "d5e7c9be9d92cdc0"
+   },
+   "made": "2026-11-03 20:08:45",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/defocus-1.5/p099.json",
+   "cached": {
+    "lines": 28,
+    "words": 260,
+    "sha256_16": "2ee0d2cd74ce0962"
+   },
+   "a": {
+    "lines": 28,
+    "words": 260,
+    "sha256_16": "2ee0d2cd74ce0962"
+   },
+   "b": {
+    "lines": 28,
+    "words": 260,
+    "sha256_16": "2ee0d2cd74ce0962"
+   },
+   "made": "2026-11-03 20:08:10",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/defocus-1.5/p079.json",
+   "cached": {
+    "lines": 32,
+    "words": 273,
+    "sha256_16": "a1322339e5342878"
+   },
+   "a": {
+    "lines": 32,
+    "words": 273,
+    "sha256_16": "a1322339e5342878"
+   },
+   "b": {
+    "lines": 32,
+    "words": 273,
+    "sha256_16": "a1322339e5342878"
+   },
+   "made": "2026-11-03 20:08:07",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/defocus-3/p042.json",
+   "cached": {
+    "lines": 112,
+    "words": 801,
+    "sha256_16": "942d45c4a91155ae"
+   },
+   "a": {
+    "lines": 112,
+    "words": 801,
+    "sha256_16": "942d45c4a91155ae"
+   },
+   "b": {
+    "lines": 112,
+    "words": 801,
+    "sha256_16": "942d45c4a91155ae"
+   },
+   "made": "2026-11-03 20:08:16",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "capture-ladder",
+   "feeds": "capture-ladder",
+   "tool": "segbench-dewarp lines",
+   "key": "capture-ladder/lines/defocus-1.5/p061.json",
+   "cached": {
+    "lines": 31,
+    "words": 390,
+    "sha256_16": "0a718d28487fd8c1"
+   },
+   "a": {
+    "lines": 31,
+    "words": 390,
+    "sha256_16": "0a718d28487fd8c1"
+   },
+   "b": {
+    "lines": 31,
+    "words": 390,
+    "sha256_16": "0a718d28487fd8c1"
+   },
+   "made": "2026-11-03 20:08:04",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p079.json",
+   "cached": {
+    "lines": 32,
+    "words": 273,
+    "sha256_16": "b829dd807190c107"
+   },
+   "a": {
+    "lines": 32,
+    "words": 273,
+    "sha256_16": "b829dd807190c107"
+   },
+   "b": {
+    "lines": 32,
+    "words": 273,
+    "sha256_16": "b829dd807190c107"
+   },
+   "made": "2026-11-11 05:39:30",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p056.json",
+   "cached": {
+    "lines": 31,
+    "words": 123,
+    "sha256_16": "ac117eaa8946d209"
+   },
+   "a": {
+    "lines": 31,
+    "words": 123,
+    "sha256_16": "ac117eaa8946d209"
+   },
+   "b": {
+    "lines": 31,
+    "words": 123,
+    "sha256_16": "ac117eaa8946d209"
+   },
+   "made": "2026-11-11 05:39:27",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p041.json",
+   "cached": {
+    "lines": 47,
+    "words": 388,
+    "sha256_16": "ac33dd191c8692c0"
+   },
+   "a": {
+    "lines": 47,
+    "words": 388,
+    "sha256_16": "ac33dd191c8692c0"
+   },
+   "b": {
+    "lines": 47,
+    "words": 388,
+    "sha256_16": "ac33dd191c8692c0"
+   },
+   "made": "2026-11-11 05:39:24",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p053.json",
+   "cached": {
+    "lines": 26,
+    "words": 151,
+    "sha256_16": "2a9b8a519c064512"
+   },
+   "a": {
+    "lines": 26,
+    "words": 151,
+    "sha256_16": "2a9b8a519c064512"
+   },
+   "b": {
+    "lines": 25,
+    "words": 142,
+    "sha256_16": "18c6e0ea6290f696"
+   },
+   "made": "2026-11-11 05:39:26",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "longer",
+   "a_vs_b": "longer"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p026.json",
+   "cached": {
+    "lines": 46,
+    "words": 428,
+    "sha256_16": "cecc3af82ec56d28"
+   },
+   "a": {
+    "lines": 46,
+    "words": 428,
+    "sha256_16": "cecc3af82ec56d28"
+   },
+   "b": {
+    "lines": 46,
+    "words": 428,
+    "sha256_16": "cecc3af82ec56d28"
+   },
+   "made": "2026-11-11 05:39:22",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p080.json",
+   "cached": {
+    "lines": 144,
+    "words": 680,
+    "sha256_16": "4c5bd166338618aa"
+   },
+   "a": {
+    "lines": 144,
+    "words": 680,
+    "sha256_16": "4c5bd166338618aa"
+   },
+   "b": {
+    "lines": 144,
+    "words": 680,
+    "sha256_16": "4c5bd166338618aa"
+   },
+   "made": "2026-11-11 05:39:31",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p019.json",
+   "cached": {
+    "lines": 26,
+    "words": 126,
+    "sha256_16": "2948466cfcab231d"
+   },
+   "a": {
+    "lines": 26,
+    "words": 126,
+    "sha256_16": "2948466cfcab231d"
+   },
+   "b": {
+    "lines": 26,
+    "words": 126,
+    "sha256_16": "2948466cfcab231d"
+   },
+   "made": "2026-11-11 05:39:21",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p072.json",
+   "cached": {
+    "lines": 181,
+    "words": 1072,
+    "sha256_16": "39d9fcaec35e1a56"
+   },
+   "a": {
+    "lines": 181,
+    "words": 1072,
+    "sha256_16": "39d9fcaec35e1a56"
+   },
+   "b": {
+    "lines": 181,
+    "words": 1072,
+    "sha256_16": "39d9fcaec35e1a56"
+   },
+   "made": "2026-11-11 05:39:29",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p078.json",
+   "cached": {
+    "lines": 111,
+    "words": 925,
+    "sha256_16": "ae604b04e2a2d4ea"
+   },
+   "a": {
+    "lines": 111,
+    "words": 925,
+    "sha256_16": "ae604b04e2a2d4ea"
+   },
+   "b": {
+    "lines": 111,
+    "words": 925,
+    "sha256_16": "ae604b04e2a2d4ea"
+   },
+   "made": "2026-11-11 05:39:30",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p048.json",
+   "cached": {
+    "lines": 43,
+    "words": 113,
+    "sha256_16": "e81f39839f3a101f"
+   },
+   "a": {
+    "lines": 43,
+    "words": 113,
+    "sha256_16": "00871a4d29023d5b"
+   },
+   "b": {
+    "lines": 43,
+    "words": 113,
+    "sha256_16": "e81f39839f3a101f"
+   },
+   "made": "2026-11-11 05:39:25",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "identical",
+   "a_vs_b": "within slack"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p083.json",
+   "cached": {
+    "lines": 110,
+    "words": 639,
+    "sha256_16": "140e49b545a91ace"
+   },
+   "a": {
+    "lines": 110,
+    "words": 639,
+    "sha256_16": "140e49b545a91ace"
+   },
+   "b": {
+    "lines": 110,
+    "words": 639,
+    "sha256_16": "140e49b545a91ace"
+   },
+   "made": "2026-11-11 05:39:31",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p093.json",
+   "cached": {
+    "lines": 40,
+    "words": 396,
+    "sha256_16": "ea3a99b78f238408"
+   },
+   "a": {
+    "lines": 40,
+    "words": 396,
+    "sha256_16": "ea3a99b78f238408"
+   },
+   "b": {
+    "lines": 40,
+    "words": 396,
+    "sha256_16": "ea3a99b78f238408"
+   },
+   "made": "2026-11-11 05:39:33",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p089.json",
+   "cached": {
+    "lines": 34,
+    "words": 298,
+    "sha256_16": "3bf131cc5693033c"
+   },
+   "a": {
+    "lines": 34,
+    "words": 298,
+    "sha256_16": "3bf131cc5693033c"
+   },
+   "b": {
+    "lines": 34,
+    "words": 298,
+    "sha256_16": "3bf131cc5693033c"
+   },
+   "made": "2026-11-11 05:39:32",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p097.json",
+   "cached": {
+    "lines": 47,
+    "words": 319,
+    "sha256_16": "28a1d9e7203f5379"
+   },
+   "a": {
+    "lines": 47,
+    "words": 319,
+    "sha256_16": "28a1d9e7203f5379"
+   },
+   "b": {
+    "lines": 47,
+    "words": 319,
+    "sha256_16": "28a1d9e7203f5379"
+   },
+   "made": "2026-11-11 05:39:33",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p029.json",
+   "cached": {
+    "lines": 42,
+    "words": 309,
+    "sha256_16": "ed8014458bad69c4"
+   },
+   "a": {
+    "lines": 42,
+    "words": 309,
+    "sha256_16": "ed8014458bad69c4"
+   },
+   "b": {
+    "lines": 42,
+    "words": 309,
+    "sha256_16": "ed8014458bad69c4"
+   },
+   "made": "2026-11-11 05:39:22",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p071.json",
+   "cached": {
+    "lines": 52,
+    "words": 530,
+    "sha256_16": "e3d36eb6f90a6452"
+   },
+   "a": {
+    "lines": 52,
+    "words": 530,
+    "sha256_16": "e3d36eb6f90a6452"
+   },
+   "b": {
+    "lines": 52,
+    "words": 530,
+    "sha256_16": "e3d36eb6f90a6452"
+   },
+   "made": "2026-11-11 05:39:29",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p098.json",
+   "cached": {
+    "lines": 25,
+    "words": 158,
+    "sha256_16": "69797f324dbc9524"
+   },
+   "a": {
+    "lines": 25,
+    "words": 158,
+    "sha256_16": "69797f324dbc9524"
+   },
+   "b": {
+    "lines": 25,
+    "words": 158,
+    "sha256_16": "69797f324dbc9524"
+   },
+   "made": "2026-11-11 05:39:33",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p022.json",
+   "cached": {
+    "lines": 19,
+    "words": 127,
+    "sha256_16": "19b21da903daebc1"
+   },
+   "a": {
+    "lines": 19,
+    "words": 127,
+    "sha256_16": "19b21da903daebc1"
+   },
+   "b": {
+    "lines": 19,
+    "words": 127,
+    "sha256_16": "19b21da903daebc1"
+   },
+   "made": "2026-11-11 05:39:21",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p069.json",
+   "cached": {
+    "lines": 29,
+    "words": 145,
+    "sha256_16": "778d2202b7d55036"
+   },
+   "a": {
+    "lines": 29,
+    "words": 145,
+    "sha256_16": "778d2202b7d55036"
+   },
+   "b": {
+    "lines": 29,
+    "words": 145,
+    "sha256_16": "778d2202b7d55036"
+   },
+   "made": "2026-11-11 05:39:29",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "colour-dropout",
+   "feeds": "ocr-colour-dropout",
+   "tool": "segbench-dewarp lines",
+   "key": "colour-dropout/lines/raw/p009.json",
+   "cached": {
+    "lines": 51,
+    "words": 162,
+    "sha256_16": "0c29dd9edb0c8723"
+   },
+   "a": {
+    "lines": 51,
+    "words": 162,
+    "sha256_16": "0c29dd9edb0c8723"
+   },
+   "b": {
+    "lines": 51,
+    "words": 162,
+    "sha256_16": "0c29dd9edb0c8723"
+   },
+   "made": "2026-11-11 05:39:19",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/64117d354c333101.json",
+   "cached": {
+    "lines": 124,
+    "words": 156,
+    "sha256_16": "fb5b67989178fa0c"
+   },
+   "a": {
+    "lines": 124,
+    "words": 156,
+    "sha256_16": "fb5b67989178fa0c"
+   },
+   "b": {
+    "lines": 124,
+    "words": 156,
+    "sha256_16": "fb5b67989178fa0c"
+   },
+   "made": "2026-11-18 00:19:54",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/4db0b8ea75ef6877.json",
+   "cached": {
+    "lines": 32,
+    "words": 268,
+    "sha256_16": "d63c5cbcb425ae00"
+   },
+   "a": {
+    "lines": 32,
+    "words": 268,
+    "sha256_16": "d63c5cbcb425ae00"
+   },
+   "b": {
+    "lines": 32,
+    "words": 268,
+    "sha256_16": "d63c5cbcb425ae00"
+   },
+   "made": "2026-11-18 00:19:51",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/7e58f2ff4314cf90.json",
+   "cached": {
+    "lines": 271,
+    "words": 1334,
+    "sha256_16": "684940f0f4ec8431"
+   },
+   "a": {
+    "lines": 271,
+    "words": 1334,
+    "sha256_16": "684940f0f4ec8431"
+   },
+   "b": {
+    "lines": 271,
+    "words": 1334,
+    "sha256_16": "684940f0f4ec8431"
+   },
+   "made": "2026-11-18 00:20:28",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/397edb71e52c3ea4.json",
+   "cached": {
+    "lines": 101,
+    "words": 386,
+    "sha256_16": "1efa5b419ca70e03"
+   },
+   "a": {
+    "lines": 101,
+    "words": 386,
+    "sha256_16": "1efa5b419ca70e03"
+   },
+   "b": {
+    "lines": 101,
+    "words": 386,
+    "sha256_16": "1efa5b419ca70e03"
+   },
+   "made": "2026-11-18 00:19:53",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/e21507e4eb834cb8.json",
+   "cached": {
+    "lines": 27,
+    "words": 215,
+    "sha256_16": "7bcc3673e6613add"
+   },
+   "a": {
+    "lines": 27,
+    "words": 215,
+    "sha256_16": "7bcc3673e6613add"
+   },
+   "b": {
+    "lines": 27,
+    "words": 215,
+    "sha256_16": "7bcc3673e6613add"
+   },
+   "made": "2026-11-18 00:19:55",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/f2361fb7c3748af0.json",
+   "cached": {
+    "lines": 25,
+    "words": 176,
+    "sha256_16": "acc673cf85ee54b5"
+   },
+   "a": {
+    "lines": 25,
+    "words": 176,
+    "sha256_16": "acc673cf85ee54b5"
+   },
+   "b": {
+    "lines": 25,
+    "words": 176,
+    "sha256_16": "acc673cf85ee54b5"
+   },
+   "made": "2026-11-18 00:19:56",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/0f07eb322116341e.json",
+   "cached": {
+    "lines": 42,
+    "words": 260,
+    "sha256_16": "a719c532e26526ab"
+   },
+   "a": {
+    "lines": 42,
+    "words": 260,
+    "sha256_16": "a719c532e26526ab"
+   },
+   "b": {
+    "lines": 42,
+    "words": 260,
+    "sha256_16": "a719c532e26526ab"
+   },
+   "made": "2026-11-18 00:20:02",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/6708b29afbde6067.json",
+   "cached": {
+    "lines": 52,
+    "words": 413,
+    "sha256_16": "866fb96a0b1b828a"
+   },
+   "a": {
+    "lines": 52,
+    "words": 413,
+    "sha256_16": "866fb96a0b1b828a"
+   },
+   "b": {
+    "lines": 52,
+    "words": 413,
+    "sha256_16": "866fb96a0b1b828a"
+   },
+   "made": "2026-11-18 00:19:51",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/fab7da2879653ddb.json",
+   "cached": {
+    "lines": 47,
+    "words": 341,
+    "sha256_16": "efe9ef64b3803084"
+   },
+   "a": {
+    "lines": 47,
+    "words": 341,
+    "sha256_16": "efe9ef64b3803084"
+   },
+   "b": {
+    "lines": 47,
+    "words": 341,
+    "sha256_16": "efe9ef64b3803084"
+   },
+   "made": "2026-11-18 00:20:04",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/7b21515653861195.json",
+   "cached": {
+    "lines": 37,
+    "words": 353,
+    "sha256_16": "6b46a092ab965033"
+   },
+   "a": {
+    "lines": 37,
+    "words": 353,
+    "sha256_16": "6b46a092ab965033"
+   },
+   "b": {
+    "lines": 37,
+    "words": 353,
+    "sha256_16": "6b46a092ab965033"
+   },
+   "made": "2026-11-18 00:20:26",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/b0d19f3db2253082.json",
+   "cached": {
+    "lines": 67,
+    "words": 341,
+    "sha256_16": "ad8b2c540ad4c72d"
+   },
+   "a": {
+    "lines": 67,
+    "words": 341,
+    "sha256_16": "ad8b2c540ad4c72d"
+   },
+   "b": {
+    "lines": 67,
+    "words": 341,
+    "sha256_16": "ad8b2c540ad4c72d"
+   },
+   "made": "2026-11-18 00:19:54",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/f7f1bc5c48e22197.json",
+   "cached": {
+    "lines": 62,
+    "words": 464,
+    "sha256_16": "10dea81d452ad099"
+   },
+   "a": {
+    "lines": 62,
+    "words": 464,
+    "sha256_16": "10dea81d452ad099"
+   },
+   "b": {
+    "lines": 62,
+    "words": 464,
+    "sha256_16": "10dea81d452ad099"
+   },
+   "made": "2026-11-18 00:20:12",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/93b631a105550df8.json",
+   "cached": {
+    "lines": 26,
+    "words": 224,
+    "sha256_16": "f87282a1479a9cf7"
+   },
+   "a": {
+    "lines": 26,
+    "words": 224,
+    "sha256_16": "f87282a1479a9cf7"
+   },
+   "b": {
+    "lines": 26,
+    "words": 224,
+    "sha256_16": "f87282a1479a9cf7"
+   },
+   "made": "2026-11-18 00:20:27",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/1cf3268fd23e9c89.json",
+   "cached": {
+    "lines": 42,
+    "words": 486,
+    "sha256_16": "9796ae5a823b4cce"
+   },
+   "a": {
+    "lines": 42,
+    "words": 486,
+    "sha256_16": "9796ae5a823b4cce"
+   },
+   "b": {
+    "lines": 42,
+    "words": 486,
+    "sha256_16": "9796ae5a823b4cce"
+   },
+   "made": "2026-11-18 00:20:08",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/e41b7dddbe95d4d3.json",
+   "cached": {
+    "lines": 32,
+    "words": 418,
+    "sha256_16": "5629ea33c0f7b138"
+   },
+   "a": {
+    "lines": 32,
+    "words": 418,
+    "sha256_16": "5629ea33c0f7b138"
+   },
+   "b": {
+    "lines": 32,
+    "words": 418,
+    "sha256_16": "5629ea33c0f7b138"
+   },
+   "made": "2026-11-18 00:20:15",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/6a48cf2053ba60b3.json",
+   "cached": {
+    "lines": 15,
+    "words": 48,
+    "sha256_16": "1504d0c637ba7210"
+   },
+   "a": {
+    "lines": 15,
+    "words": 48,
+    "sha256_16": "1504d0c637ba7210"
+   },
+   "b": {
+    "lines": 15,
+    "words": 48,
+    "sha256_16": "1504d0c637ba7210"
+   },
+   "made": "2026-11-18 00:20:22",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/d2844efef1722655.json",
+   "cached": {
+    "lines": 48,
+    "words": 525,
+    "sha256_16": "5be82727ded40fe6"
+   },
+   "a": {
+    "lines": 48,
+    "words": 525,
+    "sha256_16": "5be82727ded40fe6"
+   },
+   "b": {
+    "lines": 48,
+    "words": 525,
+    "sha256_16": "5be82727ded40fe6"
+   },
+   "made": "2026-11-18 00:20:23",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/949e9b1527f4c30b.json",
+   "cached": {
+    "lines": 28,
+    "words": 257,
+    "sha256_16": "4f01fb6b285b04a5"
+   },
+   "a": {
+    "lines": 28,
+    "words": 257,
+    "sha256_16": "4f01fb6b285b04a5"
+   },
+   "b": {
+    "lines": 28,
+    "words": 257,
+    "sha256_16": "4f01fb6b285b04a5"
+   },
+   "made": "2026-11-18 00:20:04",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/28bbc188bf31ffed.json",
+   "cached": {
+    "lines": 123,
+    "words": 791,
+    "sha256_16": "90916f178eb362a4"
+   },
+   "a": {
+    "lines": 123,
+    "words": 791,
+    "sha256_16": "90916f178eb362a4"
+   },
+   "b": {
+    "lines": 123,
+    "words": 791,
+    "sha256_16": "90916f178eb362a4"
+   },
+   "made": "2026-11-18 00:19:55",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "owner-set-grow",
+   "feeds": "owner-set-grow",
+   "tool": "segbench-dewarp lines",
+   "key": "owner-set-grow/lines/145577ab2ddaffd9.json",
+   "cached": {
+    "lines": 10,
+    "words": 38,
+    "sha256_16": "3dbdbf375e65a927"
+   },
+   "a": {
+    "lines": 10,
+    "words": 38,
+    "sha256_16": "3dbdbf375e65a927"
+   },
+   "b": {
+    "lines": 10,
+    "words": 38,
+    "sha256_16": "3dbdbf375e65a927"
+   },
+   "made": "2026-11-18 00:20:01",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D21-2.json",
+   "cached": {
+    "lines": 98,
+    "words": 846,
+    "sha256_16": "d98dc34c70962b81"
+   },
+   "a": {
+    "lines": 98,
+    "words": 846,
+    "sha256_16": "d98dc34c70962b81"
+   },
+   "b": {
+    "lines": 98,
+    "words": 846,
+    "sha256_16": "d98dc34c70962b81"
+   },
+   "made": "2026-11-18 01:39:08",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D06-1.json",
+   "cached": {
+    "lines": 24,
+    "words": 177,
+    "sha256_16": "198ac274e39dedaf"
+   },
+   "a": {
+    "lines": 24,
+    "words": 177,
+    "sha256_16": "198ac274e39dedaf"
+   },
+   "b": {
+    "lines": 24,
+    "words": 177,
+    "sha256_16": "198ac274e39dedaf"
+   },
+   "made": "2026-11-18 01:39:05",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D30-1.json",
+   "cached": {
+    "lines": 37,
+    "words": 356,
+    "sha256_16": "1835e266b305059b"
+   },
+   "a": {
+    "lines": 37,
+    "words": 356,
+    "sha256_16": "1835e266b305059b"
+   },
+   "b": {
+    "lines": 37,
+    "words": 356,
+    "sha256_16": "1835e266b305059b"
+   },
+   "made": "2026-11-18 01:39:09",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D25-1.json",
+   "cached": {
+    "lines": 153,
+    "words": 740,
+    "sha256_16": "29a3c2fafcd61ddb"
+   },
+   "a": {
+    "lines": 153,
+    "words": 740,
+    "sha256_16": "29a3c2fafcd61ddb"
+   },
+   "b": {
+    "lines": 153,
+    "words": 740,
+    "sha256_16": "29a3c2fafcd61ddb"
+   },
+   "made": "2026-11-18 01:39:09",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D15-1.json",
+   "cached": {
+    "lines": 18,
+    "words": 47,
+    "sha256_16": "be10806f0e720628"
+   },
+   "a": {
+    "lines": 18,
+    "words": 47,
+    "sha256_16": "be10806f0e720628"
+   },
+   "b": {
+    "lines": 18,
+    "words": 47,
+    "sha256_16": "be10806f0e720628"
+   },
+   "made": "2026-11-18 01:39:06",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D19-1.json",
+   "cached": {
+    "lines": 30,
+    "words": 169,
+    "sha256_16": "7867e097951db853"
+   },
+   "a": {
+    "lines": 30,
+    "words": 169,
+    "sha256_16": "7867e097951db853"
+   },
+   "b": {
+    "lines": 30,
+    "words": 169,
+    "sha256_16": "7867e097951db853"
+   },
+   "made": "2026-11-18 01:39:07",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D03-1.json",
+   "cached": {
+    "lines": 141,
+    "words": 577,
+    "sha256_16": "3b25c6bf9a1d87e8"
+   },
+   "a": {
+    "lines": 141,
+    "words": 577,
+    "sha256_16": "3b25c6bf9a1d87e8"
+   },
+   "b": {
+    "lines": 141,
+    "words": 577,
+    "sha256_16": "3b25c6bf9a1d87e8"
+   },
+   "made": "2026-11-18 01:39:05",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D29-1.json",
+   "cached": {
+    "lines": 229,
+    "words": 1055,
+    "sha256_16": "119115209ce1efe7"
+   },
+   "a": {
+    "lines": 229,
+    "words": 1055,
+    "sha256_16": "119115209ce1efe7"
+   },
+   "b": {
+    "lines": 229,
+    "words": 1055,
+    "sha256_16": "119115209ce1efe7"
+   },
+   "made": "2026-11-18 01:39:09",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D22-1.json",
+   "cached": {
+    "lines": 34,
+    "words": 166,
+    "sha256_16": "78131afb97efbd72"
+   },
+   "a": {
+    "lines": 34,
+    "words": 166,
+    "sha256_16": "78131afb97efbd72"
+   },
+   "b": {
+    "lines": 34,
+    "words": 166,
+    "sha256_16": "78131afb97efbd72"
+   },
+   "made": "2026-11-18 01:39:08",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D36-1.json",
+   "cached": {
+    "lines": 26,
+    "words": 129,
+    "sha256_16": "46cac17ab549a3b5"
+   },
+   "a": {
+    "lines": 26,
+    "words": 129,
+    "sha256_16": "46cac17ab549a3b5"
+   },
+   "b": {
+    "lines": 26,
+    "words": 129,
+    "sha256_16": "46cac17ab549a3b5"
+   },
+   "made": "2026-11-18 01:39:10",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D05-1.json",
+   "cached": {
+    "lines": 70,
+    "words": 156,
+    "sha256_16": "1a18216f4a17f325"
+   },
+   "a": {
+    "lines": 70,
+    "words": 156,
+    "sha256_16": "1a18216f4a17f325"
+   },
+   "b": {
+    "lines": 70,
+    "words": 156,
+    "sha256_16": "1a18216f4a17f325"
+   },
+   "made": "2026-11-18 01:39:05",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D16-1.json",
+   "cached": {
+    "lines": 53,
+    "words": 418,
+    "sha256_16": "8c7ec07a64f841e6"
+   },
+   "a": {
+    "lines": 53,
+    "words": 418,
+    "sha256_16": "8c7ec07a64f841e6"
+   },
+   "b": {
+    "lines": 53,
+    "words": 418,
+    "sha256_16": "8c7ec07a64f841e6"
+   },
+   "made": "2026-11-18 01:39:07",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D20-1.json",
+   "cached": {
+    "lines": 28,
+    "words": 283,
+    "sha256_16": "f7cf22ab6f972284"
+   },
+   "a": {
+    "lines": 28,
+    "words": 283,
+    "sha256_16": "f7cf22ab6f972284"
+   },
+   "b": {
+    "lines": 28,
+    "words": 283,
+    "sha256_16": "f7cf22ab6f972284"
+   },
+   "made": "2026-11-18 01:39:07",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D34-1.json",
+   "cached": {
+    "lines": 89,
+    "words": 501,
+    "sha256_16": "cb7b582cde0267e4"
+   },
+   "a": {
+    "lines": 89,
+    "words": 501,
+    "sha256_16": "cb7b582cde0267e4"
+   },
+   "b": {
+    "lines": 89,
+    "words": 501,
+    "sha256_16": "cb7b582cde0267e4"
+   },
+   "made": "2026-11-18 01:39:10",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D23-1.json",
+   "cached": {
+    "lines": 177,
+    "words": 1164,
+    "sha256_16": "f8b13008066289e9"
+   },
+   "a": {
+    "lines": 177,
+    "words": 1164,
+    "sha256_16": "f8b13008066289e9"
+   },
+   "b": {
+    "lines": 177,
+    "words": 1164,
+    "sha256_16": "f8b13008066289e9"
+   },
+   "made": "2026-11-18 01:39:08",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D20-2.json",
+   "cached": {
+    "lines": 29,
+    "words": 300,
+    "sha256_16": "01a02f7b5dbf1d51"
+   },
+   "a": {
+    "lines": 29,
+    "words": 300,
+    "sha256_16": "01a02f7b5dbf1d51"
+   },
+   "b": {
+    "lines": 29,
+    "words": 300,
+    "sha256_16": "01a02f7b5dbf1d51"
+   },
+   "made": "2026-11-18 01:39:07",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D15-2.json",
+   "cached": {
+    "lines": 47,
+    "words": 472,
+    "sha256_16": "8bafe5fa38272c4c"
+   },
+   "a": {
+    "lines": 47,
+    "words": 472,
+    "sha256_16": "8bafe5fa38272c4c"
+   },
+   "b": {
+    "lines": 47,
+    "words": 472,
+    "sha256_16": "8bafe5fa38272c4c"
+   },
+   "made": "2026-11-18 01:39:07",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D32-2.json",
+   "cached": {
+    "lines": 96,
+    "words": 845,
+    "sha256_16": "d3e32036444772dc"
+   },
+   "a": {
+    "lines": 96,
+    "words": 845,
+    "sha256_16": "d3e32036444772dc"
+   },
+   "b": {
+    "lines": 96,
+    "words": 845,
+    "sha256_16": "d3e32036444772dc"
+   },
+   "made": "2026-11-18 01:39:10",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D04-1.json",
+   "cached": {
+    "lines": 40,
+    "words": 297,
+    "sha256_16": "958a171f1a04a451"
+   },
+   "a": {
+    "lines": 40,
+    "words": 297,
+    "sha256_16": "958a171f1a04a451"
+   },
+   "b": {
+    "lines": 40,
+    "words": 297,
+    "sha256_16": "958a171f1a04a451"
+   },
+   "made": "2026-11-18 01:39:05",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "date-full-date",
+   "feeds": "date-full-date sheet",
+   "tool": "segbench-dewarp lines",
+   "key": "date-full-date/sheet/lines/D08-1.json",
+   "cached": {
+    "lines": 25,
+    "words": 200,
+    "sha256_16": "16c9c042cdbbcc02"
+   },
+   "a": {
+    "lines": 25,
+    "words": 200,
+    "sha256_16": "16c9c042cdbbcc02"
+   },
+   "b": {
+    "lines": 25,
+    "words": 200,
+    "sha256_16": "16c9c042cdbbcc02"
+   },
+   "made": "2026-11-18 01:39:05",
+   "power": "AC",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/btp__mss11049012-137.txt",
+   "cached": {
+    "lines": 25,
+    "words": 150,
+    "sha256_16": "ebfcc0bef78cc6ce"
+   },
+   "a": {
+    "lines": 29,
+    "words": 135,
+    "sha256_16": "46e2864ff8c5cc20"
+   },
+   "b": {
+    "lines": 29,
+    "words": 135,
+    "sha256_16": "46e2864ff8c5cc20"
+   },
+   "made": "2026-10-18 02:50:02",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/koenigsfelden__U-17_1009_s10.txt",
+   "cached": {
+    "lines": 17,
+    "words": 35,
+    "sha256_16": "eef294a6bd134c66"
+   },
+   "a": {
+    "lines": 16,
+    "words": 40,
+    "sha256_16": "16a88f8f512a5d35"
+   },
+   "b": {
+    "lines": 16,
+    "words": 40,
+    "sha256_16": "16a88f8f512a5d35"
+   },
+   "made": "2026-10-17 03:56:19",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/kurrent__Senatsprotokolle_UAT_047_15_877.txt",
+   "cached": {
+    "lines": 12,
+    "words": 33,
+    "sha256_16": "b2ca2988242fd72b"
+   },
+   "a": {
+    "lines": 13,
+    "words": 36,
+    "sha256_16": "b6ccb1f7156102e9"
+   },
+   "b": {
+    "lines": 13,
+    "words": 36,
+    "sha256_16": "b6ccb1f7156102e9"
+   },
+   "made": "2026-10-17 03:55:46",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/si__NMAAHC-007630088_00281.txt",
+   "cached": {
+    "lines": 27,
+    "words": 47,
+    "sha256_16": "6707d1ae7f7de240"
+   },
+   "a": {
+    "lines": 24,
+    "words": 50,
+    "sha256_16": "24d60b0f3482793e"
+   },
+   "b": {
+    "lines": 24,
+    "words": 50,
+    "sha256_16": "24d60b0f3482793e"
+   },
+   "made": "2026-10-18 02:51:16",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/koenigsfelden__U-17_0955_s04.txt",
+   "cached": {
+    "lines": 12,
+    "words": 21,
+    "sha256_16": "6f012d29597d39ba"
+   },
+   "a": {
+    "lines": 16,
+    "words": 25,
+    "sha256_16": "fdab6fda05402943"
+   },
+   "b": {
+    "lines": 16,
+    "words": 25,
+    "sha256_16": "fdab6fda05402943"
+   },
+   "made": "2026-10-17 03:56:19",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/btp__mss1288000521-8.txt",
+   "cached": {
+    "lines": 3,
+    "words": 6,
+    "sha256_16": "d3fb3efc7f6ceb96"
+   },
+   "a": {
+    "lines": 11,
+    "words": 45,
+    "sha256_16": "aa7150f6eaf5e4da"
+   },
+   "b": {
+    "lines": 11,
+    "words": 45,
+    "sha256_16": "aa7150f6eaf5e4da"
+   },
+   "made": "2026-10-18 02:50:04",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/btp__afc1945001_ms02030-17.txt",
+   "cached": {
+    "lines": 32,
+    "words": 239,
+    "sha256_16": "cc632a8bc4453ab9"
+   },
+   "a": {
+    "lines": 35,
+    "words": 239,
+    "sha256_16": "581d4f390461ed2d"
+   },
+   "b": {
+    "lines": 35,
+    "words": 239,
+    "sha256_16": "581d4f390461ed2d"
+   },
+   "made": "2026-10-18 02:50:46",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/ocrd__nn_mirabilia_1500_nn_mirabilia_1500_0009.txt",
+   "cached": {
+    "lines": 11,
+    "words": 70,
+    "sha256_16": "0595c0f33d16c509"
+   },
+   "a": {
+    "lines": 11,
+    "words": 69,
+    "sha256_16": "bb51d8533133813c"
+   },
+   "b": {
+    "lines": 11,
+    "words": 69,
+    "sha256_16": "bb51d8533133813c"
+   },
+   "made": "2026-10-17 03:56:41",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/btp__mgw432848-6.txt",
+   "cached": {
+    "lines": 6,
+    "words": 23,
+    "sha256_16": "7767a331ea9a0756"
+   },
+   "a": {
+    "lines": 18,
+    "words": 41,
+    "sha256_16": "d34b02d3013ec827"
+   },
+   "b": {
+    "lines": 18,
+    "words": 41,
+    "sha256_16": "d34b02d3013ec827"
+   },
+   "made": "2026-10-18 02:50:29",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/ocrd__luther_babstum_1526_luther_babstum_1526_0011.txt",
+   "cached": {
+    "lines": 17,
+    "words": 88,
+    "sha256_16": "ec6411b03cf85a01"
+   },
+   "a": {
+    "lines": 17,
+    "words": 99,
+    "sha256_16": "9c9027dae2738231"
+   },
+   "b": {
+    "lines": 17,
+    "words": 99,
+    "sha256_16": "9c9027dae2738231"
+   },
+   "made": "2026-10-17 03:56:38",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/castilian__in_domain_Mad_A_Hand_A_IB_15304-271r.txt",
+   "cached": {
+    "lines": 85,
+    "words": 420,
+    "sha256_16": "480ef2a183a2b8eb"
+   },
+   "a": {
+    "lines": 90,
+    "words": 433,
+    "sha256_16": "71e9d44e9003dc94"
+   },
+   "b": {
+    "lines": 90,
+    "words": 433,
+    "sha256_16": "71e9d44e9003dc94"
+   },
+   "made": "2026-10-17 03:54:52",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/btp__mss184240263-125.txt",
+   "cached": {
+    "lines": 16,
+    "words": 105,
+    "sha256_16": "b325f038fa2f36c0"
+   },
+   "a": {
+    "lines": 20,
+    "words": 122,
+    "sha256_16": "1fbcfad4d40fbf3b"
+   },
+   "b": {
+    "lines": 20,
+    "words": 122,
+    "sha256_16": "1fbcfad4d40fbf3b"
+   },
+   "made": "2026-10-18 02:50:18",
+   "power": null,
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/ocrd__euler_rechenkunst01_1738_euler_rechenkunst01_1738_0041.txt",
+   "cached": {
+    "lines": 51,
+    "words": 185,
+    "sha256_16": "f3774d38ba313bd4"
+   },
+   "a": {
+    "lines": 50,
+    "words": 185,
+    "sha256_16": "0f8a924d6f9b05a1"
+   },
+   "b": {
+    "lines": 50,
+    "words": 185,
+    "sha256_16": "0f8a924d6f9b05a1"
+   },
+   "made": "2026-10-17 03:56:32",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/read2017__Train-A_000018.txt",
+   "cached": {
+    "lines": 21,
+    "words": 191,
+    "sha256_16": "b59bab8aa991d0d7"
+   },
+   "a": {
+    "lines": 22,
+    "words": 195,
+    "sha256_16": "087e119199bd6ba2"
+   },
+   "b": {
+    "lines": 22,
+    "words": 195,
+    "sha256_16": "087e119199bd6ba2"
+   },
+   "made": "2026-10-17 03:55:57",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/btp__afc1945001_ms03045-15.txt",
+   "cached": {
+    "lines": 26,
+    "words": 136,
+    "sha256_16": "889e0c6dfb267709"
+   },
+   "a": {
+    "lines": 27,
+    "words": 135,
+    "sha256_16": "5e8f4ff7dac797fa"
+   },
+   "b": {
+    "lines": 27,
+    "words": 135,
+    "sha256_16": "5e8f4ff7dac797fa"
+   },
+   "made": "2026-10-18 02:50:50",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/ocrd__schiller_raeuber_1781_schiller_raeuber_1781_0009.txt",
+   "cached": {
+    "lines": 23,
+    "words": 53,
+    "sha256_16": "0e79d9e2e50f0819"
+   },
+   "a": {
+    "lines": 23,
+    "words": 52,
+    "sha256_16": "d850b748a83d68a6"
+   },
+   "b": {
+    "lines": 23,
+    "words": 52,
+    "sha256_16": "d850b748a83d68a6"
+   },
+   "made": "2026-10-17 03:56:47",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/si__NMAAHC-007630087_00385.txt",
+   "cached": {
+    "lines": 25,
+    "words": 117,
+    "sha256_16": "3bba706e5c9fa792"
+   },
+   "a": {
+    "lines": 21,
+    "words": 119,
+    "sha256_16": "f79ef99df603ea99"
+   },
+   "b": {
+    "lines": 21,
+    "words": 119,
+    "sha256_16": "f79ef99df603ea99"
+   },
+   "made": "2026-10-18 02:51:07",
+   "power": null,
+   "cached_vs_a": "longer",
+   "cached_vs_b": "longer",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/castilian__in_domain_Mad_A_Hand_A_IB_15304-240r.txt",
+   "cached": {
+    "lines": 104,
+    "words": 489,
+    "sha256_16": "14a955d2713643fd"
+   },
+   "a": {
+    "lines": 94,
+    "words": 466,
+    "sha256_16": "fed51313369751c7"
+   },
+   "b": {
+    "lines": 94,
+    "words": 466,
+    "sha256_16": "fed51313369751c7"
+   },
+   "made": "2026-10-17 03:54:48",
+   "power": null,
+   "cached_vs_a": "longer",
+   "cached_vs_b": "longer",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/btp__mss184240187-23.txt",
+   "cached": {
+    "lines": 41,
+    "words": 282,
+    "sha256_16": "9e0a937933881e4e"
+   },
+   "a": {
+    "lines": 41,
+    "words": 283,
+    "sha256_16": "6531b32242c89a54"
+   },
+   "b": {
+    "lines": 41,
+    "words": 283,
+    "sha256_16": "6531b32242c89a54"
+   },
+   "made": "2026-10-18 02:50:16",
+   "power": null,
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "within slack",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus sample",
+   "feeds": "the 440 reference set (corpus sample)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/sample/vision/koenigsfelden__U-17_0565_v.txt",
+   "cached": {
+    "lines": 17,
+    "words": 35,
+    "sha256_16": "0bfcb9eb6edb6dd8"
+   },
+   "a": {
+    "lines": 15,
+    "words": 23,
+    "sha256_16": "4faadf1e912b1147"
+   },
+   "b": {
+    "lines": 15,
+    "words": 23,
+    "sha256_16": "4faadf1e912b1147"
+   },
+   "made": "2026-10-17 03:56:10",
+   "power": null,
+   "cached_vs_a": "longer",
+   "cached_vs_b": "longer",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/koenigsfelden__U-17_0801_r.txt",
+   "cached": {
+    "lines": 12,
+    "words": 19,
+    "sha256_16": "f47598d2b84d5108"
+   },
+   "a": {
+    "lines": 12,
+    "words": 19,
+    "sha256_16": "f47598d2b84d5108"
+   },
+   "b": {
+    "lines": 12,
+    "words": 19,
+    "sha256_16": "f47598d2b84d5108"
+   },
+   "made": "2026-11-04 12:23:12",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/koenigsfelden__U-17_0682_v.txt",
+   "cached": {
+    "lines": 22,
+    "words": 35,
+    "sha256_16": "746fc5f1c5fd8b71"
+   },
+   "a": {
+    "lines": 22,
+    "words": 35,
+    "sha256_16": "746fc5f1c5fd8b71"
+   },
+   "b": {
+    "lines": 22,
+    "words": 35,
+    "sha256_16": "746fc5f1c5fd8b71"
+   },
+   "made": "2026-11-04 12:23:27",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/koenigsfelden__U-17_0105_r.txt",
+   "cached": {
+    "lines": 48,
+    "words": 523,
+    "sha256_16": "be378a4478b03509"
+   },
+   "a": {
+    "lines": 48,
+    "words": 523,
+    "sha256_16": "be378a4478b03509"
+   },
+   "b": {
+    "lines": 48,
+    "words": 523,
+    "sha256_16": "be378a4478b03509"
+   },
+   "made": "2026-11-04 12:23:25",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/ocrd__kant_aufklaerung_1784_kant_aufklaerung_1784_0017.txt",
+   "cached": {
+    "lines": 23,
+    "words": 120,
+    "sha256_16": "a53bf51b67feb50e"
+   },
+   "a": {
+    "lines": 23,
+    "words": 120,
+    "sha256_16": "a53bf51b67feb50e"
+   },
+   "b": {
+    "lines": 23,
+    "words": 120,
+    "sha256_16": "a53bf51b67feb50e"
+   },
+   "made": "2026-11-04 12:22:58",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/koenigsfelden__U-17_0799_r.txt",
+   "cached": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "a": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "b": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "made": "2026-11-04 12:23:06",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/kurrent__ErbkamTagebuch_erbkam_georg_gustav_tagebuch_egyptischer_reise_teil_1_1842_1843_Seite_50.txt",
+   "cached": {
+    "lines": 35,
+    "words": 304,
+    "sha256_16": "f75fdfa1b5284aa3"
+   },
+   "a": {
+    "lines": 35,
+    "words": 304,
+    "sha256_16": "f75fdfa1b5284aa3"
+   },
+   "b": {
+    "lines": 35,
+    "words": 304,
+    "sha256_16": "f75fdfa1b5284aa3"
+   },
+   "made": "2026-11-04 12:23:07",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/iforal__foral_de_castreicao_1222_1.txt",
+   "cached": {
+    "lines": 60,
+    "words": 370,
+    "sha256_16": "76a2337d2e97b95e"
+   },
+   "a": {
+    "lines": 60,
+    "words": 370,
+    "sha256_16": "76a2337d2e97b95e"
+   },
+   "b": {
+    "lines": 60,
+    "words": 370,
+    "sha256_16": "76a2337d2e97b95e"
+   },
+   "made": "2026-11-04 12:23:08",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/ocrd__glauber_opera01_1658_glauber_opera01_1658_0072.txt",
+   "cached": {
+    "lines": 55,
+    "words": 464,
+    "sha256_16": "a2e163caded6abdb"
+   },
+   "a": {
+    "lines": 55,
+    "words": 464,
+    "sha256_16": "a2e163caded6abdb"
+   },
+   "b": {
+    "lines": 55,
+    "words": 464,
+    "sha256_16": "a2e163caded6abdb"
+   },
+   "made": "2026-11-04 12:23:10",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/koenigsfelden__U-17_0483_r.txt",
+   "cached": {
+    "lines": 18,
+    "words": 53,
+    "sha256_16": "2b13f39900e2ee1a"
+   },
+   "a": {
+    "lines": 18,
+    "words": 53,
+    "sha256_16": "2b13f39900e2ee1a"
+   },
+   "b": {
+    "lines": 18,
+    "words": 53,
+    "sha256_16": "2b13f39900e2ee1a"
+   },
+   "made": "2026-11-04 12:22:49",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/iforal__foral_de_estremoz_2_1258_1.txt",
+   "cached": {
+    "lines": 68,
+    "words": 457,
+    "sha256_16": "700a49a53c8bf103"
+   },
+   "a": {
+    "lines": 68,
+    "words": 457,
+    "sha256_16": "700a49a53c8bf103"
+   },
+   "b": {
+    "lines": 68,
+    "words": 457,
+    "sha256_16": "700a49a53c8bf103"
+   },
+   "made": "2026-11-04 12:23:23",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/castilian__in_domain_Val_S_Hand_B_pg_10.txt",
+   "cached": {
+    "lines": 72,
+    "words": 521,
+    "sha256_16": "81784015a188fe9c"
+   },
+   "a": {
+    "lines": 72,
+    "words": 521,
+    "sha256_16": "81784015a188fe9c"
+   },
+   "b": {
+    "lines": 72,
+    "words": 521,
+    "sha256_16": "81784015a188fe9c"
+   },
+   "made": "2026-11-04 12:22:48",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/castilian__in_domain_Sal_L_unit_2_47.txt",
+   "cached": {
+    "lines": 63,
+    "words": 300,
+    "sha256_16": "75cd97beb2e13498"
+   },
+   "a": {
+    "lines": 63,
+    "words": 300,
+    "sha256_16": "75cd97beb2e13498"
+   },
+   "b": {
+    "lines": 63,
+    "words": 300,
+    "sha256_16": "75cd97beb2e13498"
+   },
+   "made": "2026-11-04 12:22:54",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/koenigsfelden__U-17_0933_r.txt",
+   "cached": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "a": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "b": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "made": "2026-11-04 12:23:25",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/ocrd__loeber_heuschrecken_1693_loeber_heuschrecken_1693_0009.txt",
+   "cached": {
+    "lines": 38,
+    "words": 273,
+    "sha256_16": "2c9479a1df1b91ae"
+   },
+   "a": {
+    "lines": 38,
+    "words": 273,
+    "sha256_16": "2c9479a1df1b91ae"
+   },
+   "b": {
+    "lines": 38,
+    "words": 273,
+    "sha256_16": "2c9479a1df1b91ae"
+   },
+   "made": "2026-11-04 12:23:16",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/kurrent__ErbkamTagebuch_erbkam_georg_gustav_tagebuch_egyptischer_reise_teil_1_1842_1843_Seite_18.txt",
+   "cached": {
+    "lines": 2,
+    "words": 15,
+    "sha256_16": "7292b67ebd50a2d9"
+   },
+   "a": {
+    "lines": 2,
+    "words": 15,
+    "sha256_16": "7292b67ebd50a2d9"
+   },
+   "b": {
+    "lines": 2,
+    "words": 15,
+    "sha256_16": "7292b67ebd50a2d9"
+   },
+   "made": "2026-11-04 12:23:19",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/ocrd__praetorius_verrichtung_1668_praetorius_verrichtung_1668_0026.txt",
+   "cached": {
+    "lines": 44,
+    "words": 239,
+    "sha256_16": "0e7de79f5cc34bdb"
+   },
+   "a": {
+    "lines": 44,
+    "words": 239,
+    "sha256_16": "0e7de79f5cc34bdb"
+   },
+   "b": {
+    "lines": 44,
+    "words": 239,
+    "sha256_16": "0e7de79f5cc34bdb"
+   },
+   "made": "2026-11-04 12:23:11",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/koenigsfelden__U-17_0123a_v.txt",
+   "cached": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "a": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "b": {
+    "lines": 0,
+    "words": 0,
+    "sha256_16": "e3b0c44298fc1c14"
+   },
+   "made": "2026-11-04 12:22:58",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/koenigsfelden__U-17_0816_v.txt",
+   "cached": {
+    "lines": 13,
+    "words": 23,
+    "sha256_16": "dc51e3bb442d8e15"
+   },
+   "a": {
+    "lines": 13,
+    "words": 23,
+    "sha256_16": "dc51e3bb442d8e15"
+   },
+   "b": {
+    "lines": 13,
+    "words": 23,
+    "sha256_16": "dc51e3bb442d8e15"
+   },
+   "made": "2026-11-04 12:22:58",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/ocrd__hohberg_georgica01_1682_teil2_hohberg_georgica01_1682_0011.txt",
+   "cached": {
+    "lines": 44,
+    "words": 473,
+    "sha256_16": "651c1786622974eb"
+   },
+   "a": {
+    "lines": 44,
+    "words": 473,
+    "sha256_16": "651c1786622974eb"
+   },
+   "b": {
+    "lines": 44,
+    "words": 473,
+    "sha256_16": "651c1786622974eb"
+   },
+   "made": "2026-11-04 12:23:01",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "bench-corpus routes",
+   "feeds": "the 440 reference set (routes)",
+   "tool": "segbench-ocr",
+   "key": "bench-corpus/routes/vision/castilian__in_domain_Val_S_Hand_D_pg_17.txt",
+   "cached": {
+    "lines": 85,
+    "words": 578,
+    "sha256_16": "b312f261c40c9d9a"
+   },
+   "a": {
+    "lines": 85,
+    "words": 578,
+    "sha256_16": "b312f261c40c9d9a"
+   },
+   "b": {
+    "lines": 85,
+    "words": 578,
+    "sha256_16": "b312f261c40c9d9a"
+   },
+   "made": "2026-11-04 12:22:49",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s01335.json",
+   "cached": {
+    "lines": 28,
+    "words": 283,
+    "sha256_16": "f32084099c72623d"
+   },
+   "a": {
+    "lines": 28,
+    "words": 283,
+    "sha256_16": "f32084099c72623d"
+   },
+   "b": {
+    "lines": 28,
+    "words": 283,
+    "sha256_16": "f32084099c72623d"
+   },
+   "made": "2026-11-10 23:54:58",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s00052.json",
+   "cached": {
+    "lines": 49,
+    "words": 513,
+    "sha256_16": "828df03d61b23b8d"
+   },
+   "a": {
+    "lines": 49,
+    "words": 513,
+    "sha256_16": "828df03d61b23b8d"
+   },
+   "b": {
+    "lines": 49,
+    "words": 513,
+    "sha256_16": "828df03d61b23b8d"
+   },
+   "made": "2026-11-10 23:55:03",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s01667.json",
+   "cached": {
+    "lines": 64,
+    "words": 345,
+    "sha256_16": "63afba5fb6b7d64c"
+   },
+   "a": {
+    "lines": 64,
+    "words": 345,
+    "sha256_16": "63afba5fb6b7d64c"
+   },
+   "b": {
+    "lines": 64,
+    "words": 345,
+    "sha256_16": "63afba5fb6b7d64c"
+   },
+   "made": "2026-11-10 23:54:56",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s01517.json",
+   "cached": {
+    "lines": 33,
+    "words": 143,
+    "sha256_16": "75256700f5bdc84f"
+   },
+   "a": {
+    "lines": 33,
+    "words": 143,
+    "sha256_16": "75256700f5bdc84f"
+   },
+   "b": {
+    "lines": 33,
+    "words": 143,
+    "sha256_16": "75256700f5bdc84f"
+   },
+   "made": "2026-11-10 23:54:55",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s03044.json",
+   "cached": {
+    "lines": 89,
+    "words": 416,
+    "sha256_16": "e8cc814fc8c430d0"
+   },
+   "a": {
+    "lines": 89,
+    "words": 416,
+    "sha256_16": "e8cc814fc8c430d0"
+   },
+   "b": {
+    "lines": 89,
+    "words": 416,
+    "sha256_16": "e8cc814fc8c430d0"
+   },
+   "made": "2026-11-10 23:55:00",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s02141.json",
+   "cached": {
+    "lines": 69,
+    "words": 640,
+    "sha256_16": "147be2f3c8d5992a"
+   },
+   "a": {
+    "lines": 69,
+    "words": 640,
+    "sha256_16": "147be2f3c8d5992a"
+   },
+   "b": {
+    "lines": 69,
+    "words": 640,
+    "sha256_16": "147be2f3c8d5992a"
+   },
+   "made": "2026-11-10 23:54:57",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s00571.json",
+   "cached": {
+    "lines": 44,
+    "words": 383,
+    "sha256_16": "ac5ba05c299235b1"
+   },
+   "a": {
+    "lines": 44,
+    "words": 383,
+    "sha256_16": "ac5ba05c299235b1"
+   },
+   "b": {
+    "lines": 44,
+    "words": 383,
+    "sha256_16": "ac5ba05c299235b1"
+   },
+   "made": "2026-11-10 23:54:57",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s01323.json",
+   "cached": {
+    "lines": 31,
+    "words": 197,
+    "sha256_16": "71272ce8bfd0c088"
+   },
+   "a": {
+    "lines": 31,
+    "words": 197,
+    "sha256_16": "71272ce8bfd0c088"
+   },
+   "b": {
+    "lines": 31,
+    "words": 197,
+    "sha256_16": "71272ce8bfd0c088"
+   },
+   "made": "2026-11-10 23:55:01",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s03050.json",
+   "cached": {
+    "lines": 189,
+    "words": 1151,
+    "sha256_16": "2965e3f8f5e4fb7f"
+   },
+   "a": {
+    "lines": 189,
+    "words": 1151,
+    "sha256_16": "2965e3f8f5e4fb7f"
+   },
+   "b": {
+    "lines": 189,
+    "words": 1151,
+    "sha256_16": "2965e3f8f5e4fb7f"
+   },
+   "made": "2026-11-10 23:54:55",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s02881.json",
+   "cached": {
+    "lines": 43,
+    "words": 174,
+    "sha256_16": "8d809c68ae0ef4cd"
+   },
+   "a": {
+    "lines": 43,
+    "words": 174,
+    "sha256_16": "8d809c68ae0ef4cd"
+   },
+   "b": {
+    "lines": 43,
+    "words": 174,
+    "sha256_16": "8d809c68ae0ef4cd"
+   },
+   "made": "2026-11-10 23:55:04",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s00747.json",
+   "cached": {
+    "lines": 40,
+    "words": 252,
+    "sha256_16": "ed0ffb6ffdb923b7"
+   },
+   "a": {
+    "lines": 40,
+    "words": 252,
+    "sha256_16": "ed0ffb6ffdb923b7"
+   },
+   "b": {
+    "lines": 40,
+    "words": 252,
+    "sha256_16": "ed0ffb6ffdb923b7"
+   },
+   "made": "2026-11-10 23:55:01",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s01716.json",
+   "cached": {
+    "lines": 23,
+    "words": 68,
+    "sha256_16": "67062ce40ea20805"
+   },
+   "a": {
+    "lines": 23,
+    "words": 68,
+    "sha256_16": "67062ce40ea20805"
+   },
+   "b": {
+    "lines": 23,
+    "words": 68,
+    "sha256_16": "67062ce40ea20805"
+   },
+   "made": "2026-11-10 23:54:58",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s01776.json",
+   "cached": {
+    "lines": 142,
+    "words": 818,
+    "sha256_16": "a16afb425ffaed84"
+   },
+   "a": {
+    "lines": 142,
+    "words": 818,
+    "sha256_16": "a16afb425ffaed84"
+   },
+   "b": {
+    "lines": 142,
+    "words": 818,
+    "sha256_16": "a16afb425ffaed84"
+   },
+   "made": "2026-11-10 23:54:54",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/uiuc-00032.json",
+   "cached": {
+    "lines": 38,
+    "words": 339,
+    "sha256_16": "84d633c2dcc96833"
+   },
+   "a": {
+    "lines": 38,
+    "words": 339,
+    "sha256_16": "84d633c2dcc96833"
+   },
+   "b": {
+    "lines": 38,
+    "words": 339,
+    "sha256_16": "84d633c2dcc96833"
+   },
+   "made": "2026-11-10 23:54:59",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s02113.json",
+   "cached": {
+    "lines": 19,
+    "words": 220,
+    "sha256_16": "d1773706751b9799"
+   },
+   "a": {
+    "lines": 19,
+    "words": 220,
+    "sha256_16": "d1773706751b9799"
+   },
+   "b": {
+    "lines": 19,
+    "words": 220,
+    "sha256_16": "d1773706751b9799"
+   },
+   "made": "2026-11-10 23:55:02",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/uiuc-00149.json",
+   "cached": {
+    "lines": 37,
+    "words": 241,
+    "sha256_16": "ef11cd649bf55c9d"
+   },
+   "a": {
+    "lines": 37,
+    "words": 241,
+    "sha256_16": "ef11cd649bf55c9d"
+   },
+   "b": {
+    "lines": 37,
+    "words": 241,
+    "sha256_16": "ef11cd649bf55c9d"
+   },
+   "made": "2026-11-10 23:54:53",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s03370.json",
+   "cached": {
+    "lines": 15,
+    "words": 36,
+    "sha256_16": "94affa6b2604b70c"
+   },
+   "a": {
+    "lines": 15,
+    "words": 36,
+    "sha256_16": "94affa6b2604b70c"
+   },
+   "b": {
+    "lines": 15,
+    "words": 36,
+    "sha256_16": "94affa6b2604b70c"
+   },
+   "made": "2026-11-10 23:54:53",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s01668.json",
+   "cached": {
+    "lines": 33,
+    "words": 341,
+    "sha256_16": "530fb55b9ffa3278"
+   },
+   "a": {
+    "lines": 33,
+    "words": 341,
+    "sha256_16": "530fb55b9ffa3278"
+   },
+   "b": {
+    "lines": 33,
+    "words": 341,
+    "sha256_16": "530fb55b9ffa3278"
+   },
+   "made": "2026-11-10 23:54:55",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s01721.json",
+   "cached": {
+    "lines": 43,
+    "words": 283,
+    "sha256_16": "8885a8b9d31ec6ab"
+   },
+   "a": {
+    "lines": 43,
+    "words": 283,
+    "sha256_16": "8885a8b9d31ec6ab"
+   },
+   "b": {
+    "lines": 43,
+    "words": 283,
+    "sha256_16": "8885a8b9d31ec6ab"
+   },
+   "made": "2026-11-10 23:55:02",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "cache": "place-curved-owner",
+   "feeds": "place-curved-owner, dewarp-placement route",
+   "tool": "segbench-dewarp lines",
+   "key": "place-curved-owner/lines-up/s02009.json",
+   "cached": {
+    "lines": 62,
+    "words": 400,
+    "sha256_16": "87d2b6f1efdcc533"
+   },
+   "a": {
+    "lines": 62,
+    "words": 400,
+    "sha256_16": "87d2b6f1efdcc533"
+   },
+   "b": {
+    "lines": 62,
+    "words": 400,
+    "sha256_16": "87d2b6f1efdcc533"
+   },
+   "made": "2026-11-10 23:55:00",
+   "power": null,
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "p086",
+   "cached": {
+    "lines": 60,
+    "words": 287,
+    "sha256_16": "cefaf6cb97dcad27"
+   },
+   "a": {
+    "lines": 60,
+    "words": 287,
+    "sha256_16": "cefaf6cb97dcad27"
+   },
+   "b": {
+    "lines": 60,
+    "words": 287,
+    "sha256_16": "cefaf6cb97dcad27"
+   },
+   "made": "2026-11-03 19:15:13",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "p048",
+   "cached": {
+    "lines": 44,
+    "words": 114,
+    "sha256_16": "0201ef56772a3b60"
+   },
+   "a": {
+    "lines": 44,
+    "words": 115,
+    "sha256_16": "9012d5bd5c13b9f9"
+   },
+   "b": {
+    "lines": 44,
+    "words": 114,
+    "sha256_16": "0201ef56772a3b60"
+   },
+   "made": "2026-11-03 19:15:05",
+   "cached_vs_a": "within slack",
+   "cached_vs_b": "identical",
+   "a_vs_b": "within slack"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "116_287_001",
+   "cached": {
+    "lines": 35,
+    "words": 307,
+    "sha256_16": "46ab4737aeba13a1"
+   },
+   "a": {
+    "lines": 35,
+    "words": 307,
+    "sha256_16": "46ab4737aeba13a1"
+   },
+   "b": {
+    "lines": 35,
+    "words": 307,
+    "sha256_16": "46ab4737aeba13a1"
+   },
+   "made": "2026-11-03 19:14:49",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "115_087_004",
+   "cached": {
+    "lines": 32,
+    "words": 321,
+    "sha256_16": "d5f4054ed9085e2d"
+   },
+   "a": {
+    "lines": 32,
+    "words": 321,
+    "sha256_16": "d5f4054ed9085e2d"
+   },
+   "b": {
+    "lines": 32,
+    "words": 321,
+    "sha256_16": "d5f4054ed9085e2d"
+   },
+   "made": "2026-11-03 19:14:47",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "pyarelala1914/01",
+   "cached": null,
+   "a": null,
+   "b": null,
+   "made": null,
+   "cached_vs_a": "missing",
+   "cached_vs_b": "missing",
+   "a_vs_b": "missing"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "p008",
+   "cached": {
+    "lines": 24,
+    "words": 160,
+    "sha256_16": "b57a007ddde49fb0"
+   },
+   "a": {
+    "lines": 24,
+    "words": 160,
+    "sha256_16": "b57a007ddde49fb0"
+   },
+   "b": {
+    "lines": 24,
+    "words": 160,
+    "sha256_16": "b57a007ddde49fb0"
+   },
+   "made": "2026-11-03 19:14:57",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "p098",
+   "cached": {
+    "lines": 25,
+    "words": 159,
+    "sha256_16": "10b3ef70842980ed"
+   },
+   "a": {
+    "lines": 25,
+    "words": 159,
+    "sha256_16": "10b3ef70842980ed"
+   },
+   "b": {
+    "lines": 25,
+    "words": 159,
+    "sha256_16": "10b3ef70842980ed"
+   },
+   "made": "2026-11-03 19:15:17",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "p080",
+   "cached": {
+    "lines": 154,
+    "words": 688,
+    "sha256_16": "b1578102f596b90f"
+   },
+   "a": {
+    "lines": 154,
+    "words": 688,
+    "sha256_16": "b1578102f596b90f"
+   },
+   "b": {
+    "lines": 154,
+    "words": 688,
+    "sha256_16": "b1578102f596b90f"
+   },
+   "made": "2026-11-03 19:15:12",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "p019",
+   "cached": {
+    "lines": 25,
+    "words": 124,
+    "sha256_16": "b3d2787d727d4633"
+   },
+   "a": {
+    "lines": 25,
+    "words": 124,
+    "sha256_16": "b3d2787d727d4633"
+   },
+   "b": {
+    "lines": 25,
+    "words": 124,
+    "sha256_16": "b3d2787d727d4633"
+   },
+   "made": "2026-11-03 19:14:58",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "115_075_004",
+   "cached": {
+    "lines": 31,
+    "words": 329,
+    "sha256_16": "2ecc05837de20260"
+   },
+   "a": {
+    "lines": 31,
+    "words": 329,
+    "sha256_16": "2ecc05837de20260"
+   },
+   "b": {
+    "lines": 31,
+    "words": 329,
+    "sha256_16": "2ecc05837de20260"
+   },
+   "made": "2026-11-03 19:14:46",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "p045",
+   "cached": {
+    "lines": 13,
+    "words": 94,
+    "sha256_16": "2e10f6a99da30df6"
+   },
+   "a": {
+    "lines": 13,
+    "words": 94,
+    "sha256_16": "2e10f6a99da30df6"
+   },
+   "b": {
+    "lines": 13,
+    "words": 94,
+    "sha256_16": "2e10f6a99da30df6"
+   },
+   "made": "2026-11-03 19:15:04",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "p006",
+   "cached": {
+    "lines": 7,
+    "words": 41,
+    "sha256_16": "4b87cef937631f51"
+   },
+   "a": {
+    "lines": 7,
+    "words": 41,
+    "sha256_16": "4b87cef937631f51"
+   },
+   "b": {
+    "lines": 7,
+    "words": 41,
+    "sha256_16": "4b87cef937631f51"
+   },
+   "made": "2026-11-03 19:14:56",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "116_244_001",
+   "cached": {
+    "lines": 14,
+    "words": 69,
+    "sha256_16": "9b39274b2df5288c"
+   },
+   "a": {
+    "lines": 14,
+    "words": 69,
+    "sha256_16": "9b39274b2df5288c"
+   },
+   "b": {
+    "lines": 14,
+    "words": 69,
+    "sha256_16": "9b39274b2df5288c"
+   },
+   "made": "2026-11-03 19:14:48",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "paramananda1924/06",
+   "cached": null,
+   "a": null,
+   "b": null,
+   "made": null,
+   "cached_vs_a": "missing",
+   "cached_vs_b": "missing",
+   "a_vs_b": "missing"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "p005",
+   "cached": {
+    "lines": 50,
+    "words": 570,
+    "sha256_16": "ca5c9c6f8cec66aa"
+   },
+   "a": {
+    "lines": 50,
+    "words": 570,
+    "sha256_16": "ca5c9c6f8cec66aa"
+   },
+   "b": {
+    "lines": 50,
+    "words": 570,
+    "sha256_16": "ca5c9c6f8cec66aa"
+   },
+   "made": "2026-11-03 19:14:56",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "p097",
+   "cached": {
+    "lines": 40,
+    "words": 301,
+    "sha256_16": "f046c7a19668829d"
+   },
+   "a": {
+    "lines": 40,
+    "words": 301,
+    "sha256_16": "f046c7a19668829d"
+   },
+   "b": {
+    "lines": 40,
+    "words": 301,
+    "sha256_16": "f046c7a19668829d"
+   },
+   "made": "2026-11-03 19:15:17",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "p022",
+   "cached": {
+    "lines": 16,
+    "words": 111,
+    "sha256_16": "8ee2aadbe24b274a"
+   },
+   "a": {
+    "lines": 16,
+    "words": 111,
+    "sha256_16": "8ee2aadbe24b274a"
+   },
+   "b": {
+    "lines": 16,
+    "words": 111,
+    "sha256_16": "8ee2aadbe24b274a"
+   },
+   "made": "2026-11-03 19:14:59",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "p056",
+   "cached": {
+    "lines": 36,
+    "words": 127,
+    "sha256_16": "880573b632e91ff0"
+   },
+   "a": {
+    "lines": 36,
+    "words": 127,
+    "sha256_16": "880573b632e91ff0"
+   },
+   "b": {
+    "lines": 36,
+    "words": 127,
+    "sha256_16": "880573b632e91ff0"
+   },
+   "made": "2026-11-03 19:15:07",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "sriramastavarajah1898/11",
+   "cached": null,
+   "a": null,
+   "b": null,
+   "made": null,
+   "cached_vs_a": "missing",
+   "cached_vs_b": "missing",
+   "a_vs_b": "missing"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print accurate",
+   "key": "072_099_001",
+   "cached": {
+    "lines": 22,
+    "words": 181,
+    "sha256_16": "a5b82b6bc08f48a2"
+   },
+   "a": {
+    "lines": 22,
+    "words": 181,
+    "sha256_16": "a5b82b6bc08f48a2"
+   },
+   "b": {
+    "lines": 22,
+    "words": 181,
+    "sha256_16": "a5b82b6bc08f48a2"
+   },
+   "made": "2026-11-03 19:14:44",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "p086",
+   "cached": {
+    "lines": 74,
+    "words": 236,
+    "sha256_16": "99957c8b6ed42077"
+   },
+   "a": {
+    "lines": 74,
+    "words": 236,
+    "sha256_16": "99957c8b6ed42077"
+   },
+   "b": {
+    "lines": 74,
+    "words": 236,
+    "sha256_16": "99957c8b6ed42077"
+   },
+   "made": "2026-11-03 19:15:14",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "p048",
+   "cached": {
+    "lines": 40,
+    "words": 107,
+    "sha256_16": "c9b54a00edc63451"
+   },
+   "a": {
+    "lines": 41,
+    "words": 112,
+    "sha256_16": "4fb4f2a0bc50c383"
+   },
+   "b": {
+    "lines": 41,
+    "words": 112,
+    "sha256_16": "4fb4f2a0bc50c383"
+   },
+   "made": "2026-11-03 19:15:05",
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "shorter",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "116_287_001",
+   "cached": {
+    "lines": 29,
+    "words": 277,
+    "sha256_16": "1fb736d1230c8eb9"
+   },
+   "a": {
+    "lines": 29,
+    "words": 277,
+    "sha256_16": "1fb736d1230c8eb9"
+   },
+   "b": {
+    "lines": 29,
+    "words": 277,
+    "sha256_16": "1fb736d1230c8eb9"
+   },
+   "made": "2026-11-03 19:14:49",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "115_087_004",
+   "cached": {
+    "lines": 31,
+    "words": 316,
+    "sha256_16": "a3fad2e1bdc306d8"
+   },
+   "a": {
+    "lines": 31,
+    "words": 316,
+    "sha256_16": "a3fad2e1bdc306d8"
+   },
+   "b": {
+    "lines": 31,
+    "words": 316,
+    "sha256_16": "a3fad2e1bdc306d8"
+   },
+   "made": "2026-11-03 19:14:48",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "pyarelala1914/01",
+   "cached": null,
+   "a": null,
+   "b": null,
+   "made": null,
+   "cached_vs_a": "missing",
+   "cached_vs_b": "missing",
+   "a_vs_b": "missing"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "p008",
+   "cached": {
+    "lines": 24,
+    "words": 160,
+    "sha256_16": "cb11dc7b8640835e"
+   },
+   "a": {
+    "lines": 24,
+    "words": 160,
+    "sha256_16": "cb11dc7b8640835e"
+   },
+   "b": {
+    "lines": 24,
+    "words": 160,
+    "sha256_16": "cb11dc7b8640835e"
+   },
+   "made": "2026-11-03 19:14:57",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "p098",
+   "cached": {
+    "lines": 25,
+    "words": 158,
+    "sha256_16": "8a562914ad47decd"
+   },
+   "a": {
+    "lines": 25,
+    "words": 158,
+    "sha256_16": "8a562914ad47decd"
+   },
+   "b": {
+    "lines": 25,
+    "words": 158,
+    "sha256_16": "8a562914ad47decd"
+   },
+   "made": "2026-11-03 19:15:17",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "p080",
+   "cached": {
+    "lines": 137,
+    "words": 663,
+    "sha256_16": "7d60cc0881f9059c"
+   },
+   "a": {
+    "lines": 137,
+    "words": 663,
+    "sha256_16": "7d60cc0881f9059c"
+   },
+   "b": {
+    "lines": 137,
+    "words": 663,
+    "sha256_16": "7d60cc0881f9059c"
+   },
+   "made": "2026-11-03 19:15:13",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "p019",
+   "cached": {
+    "lines": 27,
+    "words": 126,
+    "sha256_16": "c662abc8aca76523"
+   },
+   "a": {
+    "lines": 27,
+    "words": 126,
+    "sha256_16": "c662abc8aca76523"
+   },
+   "b": {
+    "lines": 27,
+    "words": 126,
+    "sha256_16": "c662abc8aca76523"
+   },
+   "made": "2026-11-03 19:14:59",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "115_075_004",
+   "cached": {
+    "lines": 31,
+    "words": 327,
+    "sha256_16": "4422b543a24357b2"
+   },
+   "a": {
+    "lines": 31,
+    "words": 327,
+    "sha256_16": "4422b543a24357b2"
+   },
+   "b": {
+    "lines": 31,
+    "words": 327,
+    "sha256_16": "4422b543a24357b2"
+   },
+   "made": "2026-11-03 19:14:47",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "p045",
+   "cached": {
+    "lines": 14,
+    "words": 89,
+    "sha256_16": "d1d44ade82a6c4b8"
+   },
+   "a": {
+    "lines": 14,
+    "words": 89,
+    "sha256_16": "d1d44ade82a6c4b8"
+   },
+   "b": {
+    "lines": 14,
+    "words": 89,
+    "sha256_16": "d1d44ade82a6c4b8"
+   },
+   "made": "2026-11-03 19:15:04",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "p006",
+   "cached": {
+    "lines": 9,
+    "words": 45,
+    "sha256_16": "82c60e198be8e9da"
+   },
+   "a": {
+    "lines": 9,
+    "words": 45,
+    "sha256_16": "82c60e198be8e9da"
+   },
+   "b": {
+    "lines": 9,
+    "words": 45,
+    "sha256_16": "82c60e198be8e9da"
+   },
+   "made": "2026-11-03 19:14:56",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "116_244_001",
+   "cached": {
+    "lines": 7,
+    "words": 27,
+    "sha256_16": "ae63e3f5d59ee116"
+   },
+   "a": {
+    "lines": 24,
+    "words": 158,
+    "sha256_16": "80ca553eeba78397"
+   },
+   "b": {
+    "lines": 7,
+    "words": 27,
+    "sha256_16": "ae63e3f5d59ee116"
+   },
+   "made": "2026-11-03 19:14:48",
+   "cached_vs_a": "shorter",
+   "cached_vs_b": "identical",
+   "a_vs_b": "longer"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "paramananda1924/06",
+   "cached": null,
+   "a": null,
+   "b": null,
+   "made": null,
+   "cached_vs_a": "missing",
+   "cached_vs_b": "missing",
+   "a_vs_b": "missing"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "p005",
+   "cached": {
+    "lines": 70,
+    "words": 572,
+    "sha256_16": "e47a27142bbdf198"
+   },
+   "a": {
+    "lines": 70,
+    "words": 572,
+    "sha256_16": "e47a27142bbdf198"
+   },
+   "b": {
+    "lines": 70,
+    "words": 572,
+    "sha256_16": "e47a27142bbdf198"
+   },
+   "made": "2026-11-03 19:14:56",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "p097",
+   "cached": {
+    "lines": 54,
+    "words": 286,
+    "sha256_16": "0db8cc6c82185a41"
+   },
+   "a": {
+    "lines": 54,
+    "words": 286,
+    "sha256_16": "0db8cc6c82185a41"
+   },
+   "b": {
+    "lines": 54,
+    "words": 286,
+    "sha256_16": "0db8cc6c82185a41"
+   },
+   "made": "2026-11-03 19:15:17",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "p022",
+   "cached": {
+    "lines": 13,
+    "words": 79,
+    "sha256_16": "404581858045a402"
+   },
+   "a": {
+    "lines": 13,
+    "words": 79,
+    "sha256_16": "404581858045a402"
+   },
+   "b": {
+    "lines": 13,
+    "words": 79,
+    "sha256_16": "404581858045a402"
+   },
+   "made": "2026-11-03 19:14:59",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "p056",
+   "cached": {
+    "lines": 33,
+    "words": 129,
+    "sha256_16": "d4f47a2f41688db8"
+   },
+   "a": {
+    "lines": 33,
+    "words": 129,
+    "sha256_16": "d4f47a2f41688db8"
+   },
+   "b": {
+    "lines": 33,
+    "words": 129,
+    "sha256_16": "d4f47a2f41688db8"
+   },
+   "made": "2026-11-03 19:15:07",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "sriramastavarajah1898/11",
+   "cached": null,
+   "a": null,
+   "b": null,
+   "made": null,
+   "cached_vs_a": "missing",
+   "cached_vs_b": "missing",
+   "a_vs_b": "missing"
+  },
+  {
+   "feeds": "place-print",
+   "tool": "place_print_vision",
+   "power": null,
+   "cache": "place-print documents",
+   "key": "072_099_001",
+   "cached": {
+    "lines": 19,
+    "words": 150,
+    "sha256_16": "f62975d7074b9cd5"
+   },
+   "a": {
+    "lines": 19,
+    "words": 150,
+    "sha256_16": "f62975d7074b9cd5"
+   },
+   "b": {
+    "lines": 19,
+    "words": 150,
+    "sha256_16": "f62975d7074b9cd5"
+   },
+   "made": "2026-11-03 19:14:44",
+   "cached_vs_a": "identical",
+   "cached_vs_b": "identical",
+   "a_vs_b": "identical"
+  }
+ ]
+}

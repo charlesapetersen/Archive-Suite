@@ -16734,3 +16734,27 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   Defects filed: `W40.fix-processor-review-keys` (S3: the per-page review's 1-4, X, ↓ and Return do nothing; clicks work), `W40.fix-processor-review-classification-stale` (S3, Tier-2: page 2's Classification keeps the proposal in both runs), `W40.fix-processor-pending-run-caption` (S4: the Interrupted Run box names the stored provider for a Local Agent run). The test records the first two as expected failures naming their fix tags, so each fix removes its `XCTExpectFailure`. W40.g3 now waits on the first two. Ledger: P-32 → broken, P-38 and P-40 → works, P-23, P-25, P-35 and P-37 gain evidence and stay where they were (count unproven 39, works 10, broken 3).
   Not driven: the flagged-boundary review (needs a window approach), `ManualTaggingSheet`, the final review's Redo and edit sheet, rotation detection (Local Vision fails in the guest). No bench cache scratch: the six photos are copied onto the guest disk per run (`~/w40d2-review-dialogs`), the output stays in the UI-test runner's temporary folder in the guest.
   <!-- /W40.d2 -->
+- [x] **W46.vision-short-reads — why Vision once read about 15% fewer lines in a batch, and whether other cached reads are short [S]** · §Document processing review — W46 (lane: segbench) (uses: light,machine) · SHIPPED 2026-11-19
+  No committed result rests on a short Vision reading that could be found (`segbench-results/vision-short-reads.md`).
+  Cross check: 419 images read more than once in the caches (incl. the 310 Real5 photographs of place-geom-real5 and
+  dewarp-guard), 850 readings, none short. Seeded samples of 20 read again twice: every 27.2 cache (ocr-panel-local,
+  capture-ladder, bench-corpus routes, place-curved-owner, colour-dropout, owner-set-grow, date-full-date, and all 121
+  place-print pages) re-reads identically except handwritten pages that move run to run (p053; RecognizeDocumentsRequest
+  on p048, p054, 116_244_001, the cached reading the commoner one). The 26.6 caches (enh-dewarp arms, ocr-panel-jpeg,
+  bench-corpus sample) read whole: none of 13 batches leans short beyond the OS update's own split (owner lines 32:31,
+  440 set 173:108). Not checkable: dewarp-placement (scratch deleted; its figures rest on read-twice runs) and
+  enh-ocr-input (nothing cached). Cause not found: the 18 Nov batch ran on battery with Low Power Mode, but so did the
+  good 11:37 prep; no E5RT errors in it; background QoS, four readers, torch CPU or GPU load beside it do not reproduce it
+  on the 96. A third fault seen during the item: a guarded segbench-ocr run hit ~500 TextRecognition `E5RT Error` (Code
+  13) at 02:12:38, stopped writing after 160 of 655 pages and exited; refused by the guard, its 160 pages match a clean
+  run, so it leaves pages missing, not short.
+  Guard: `vision_guard.run` reads every written page a second time and keeps it once two readings agree within slack
+  (five readings at most, then quarantine and refuse; a re-read whose references fail quarantines the first reads too);
+  the fault exit code is in the message; quarantine folders are unique per call. Newly guarded: `dewarp_placement`
+  (each pass of its byte-for-byte read-twice), `place_curved` (survey readers, upright re-read), `date_undated` (both
+  Vision calls), `licence_sweep` (BLN600 pilot). Tests: test_vision_guard 12 pass (5 new); test_dewarp_placement,
+  test_place_curved, test_date_undated pass. Code: `scripts/segbench/vision_short_reads.py`; counts and hashes in
+  `segbench-results/vision-short-reads/*.json`. $0, CPU/ANE under the heavy lock; not an OCR score, so ArchiveOCRBench
+  is unchanged. Bench cache: the item wrote only temporary directories (removed) and one guard quarantine folder of
+  its own temp readings, moved to the Trash.
+  <!-- /W46.vision-short-reads -->

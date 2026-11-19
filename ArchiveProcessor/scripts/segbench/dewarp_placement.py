@@ -46,6 +46,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import place_curved as PC  # noqa: E402
 import dewarp_curved_select as DCS  # noqa: E402
+import vision_guard  # noqa: E402
 from place_geom import (PT, carried_layer, deskew_map, identity_map, lattice_inverse, page_angle,  # noqa: E402
                         quad_bbox, run_tool)
 
@@ -144,7 +145,9 @@ def read_lines(d, keys, rounds=3):
     """Vision's lines on d's flattened images, each read twice and kept only when the two reads agree.
     W46.p16-dewarp-floor: during one prep batch on 18-19 Nov Vision returned about 15% fewer lines on most flattened
     images than a lone read of the same JPEG, a strict subset, on every dewarper; later reads agreed with each other.
-    So a page is read again until two reads in a row match, and prep stops if one never does."""
+    So a page is read again until two reads in a row match, and prep stops if one never does. Each pass is also
+    guarded by vision_guard's reference pages (W46.vision-short-reads); its own second read is off, since this one is
+    stricter (byte for byte)."""
     todo = list(keys)
     for _ in range(rounds + 1):
         if not todo:
@@ -154,7 +157,7 @@ def read_lines(d, keys, rounds=3):
                 (ddir(d, sub) / f'{k}.json').unlink(missing_ok=True)
             jobs = CACHE / f'{d}-{sub}-jobs.tsv'
             jobs.write_text(''.join(f"{ddir(d, 'out') / (k + '.jpg')}\t{ddir(d, sub) / (k + '.json')}\n" for k in todo))
-            subprocess.run([str(DCS.DEWARP_BIN), 'lines', str(jobs)], check=True)
+            vision_guard.run(DCS.DEWARP_BIN, jobs, 'lines', twice=False)
         left = []
         for k in todo:
             a, b = ddir(d, 'lines-a') / f'{k}.json', ddir(d, 'lines-b') / f'{k}.json'

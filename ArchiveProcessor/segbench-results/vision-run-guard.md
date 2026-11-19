@@ -24,6 +24,10 @@ read them 11, 7, 12 and 16 lines, 65-75% fewer words, so it would have been refu
 Not guarded: `segbench-dewarp quad` and `encode` (no text), `segbench-ocr-orient`, `segbench-ocr-lines`
 (item_fields_retruth) and `layout_photo_vision`, which have other output forms and were not part of the fault.
 
+**Since W46.vision-short-reads (2026-11-19):** `run()` also reads every page a run writes a second time and keeps a page
+only once two readings agree, and `dewarp_placement`, `place_curved`, `date_undated` and `licence_sweep` are guarded too
+(`vision-short-reads.md`, "The guard, widened").
+
 ## One attempt to reproduce
 
 The 96 read 20 times by `segbench-dewarp lines` (sha256 `8c0741beaa66c9b4`), one process each, under the heavy lock,

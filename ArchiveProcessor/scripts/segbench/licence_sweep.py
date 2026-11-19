@@ -216,7 +216,8 @@ def bln600(n: int = 40, seed: int = 20261118) -> int:
     for i in pick:
         jobs.append(f"{images[i]}\t{work / (i + '.vision.txt')}")
     (work / "jobs.tsv").write_text("\n".join(jobs) + "\n")
-    subprocess.run([str(SEGBENCH_OCR), str(work / "jobs.tsv")], check=True)
+    import vision_guard
+    vision_guard.run(SEGBENCH_OCR, work / "jobs.tsv")
     rows = []
     for i in pick:
         t = truth[i].read_text(encoding="utf-8", errors="replace")

@@ -15,6 +15,16 @@ run (W46.dewarp-bin-reread: 1,532 of 1,536 identical, every difference a handwri
 character), so the slack is a margin, not a measured spread; the faulty run lost 65-75% of these pages' words. Other
 `segbench-dewarp` modes (quad, encode) read no text and run unguarded.
 
+W46.vision-short-reads added the second read (`twice`, on by default). The references only see the ends of a run, and
+on 2026-11-18 a batch read 37-45 of 64 flattened photographs short while no reference page was in it. So every page a
+run writes is read again in a separate guarded process, and a page is settled once two of its readings agree (neither
+short of the other, by the slack above). The kept reading is the first of that agreeing pair, copied into the run's
+output if it was a later one. A page still unsettled after ROUNDS + 2 readings in all is a fault: its output is quarantined and
+the run refused. Handwritten pages can flip between two readings past the slack (p053: 26 lines / 151 words or 25 / 142),
+which the third read settles. A fault that lasts longer than the run (the 18 November batch lasted about 20 minutes)
+gives two agreeing short reads, so the two checks are complementary: references for a fault that lasts, the second read
+for one that comes and goes.
+
 The frozen file holds counts and hashes only (the repo is public; the texts stay in the cache). It names the OS build it
 was frozen on; on another build the guard refuses until it is frozen again, since an OS update may change Vision's text.
 
@@ -47,6 +57,7 @@ RESULTS = HERE.parents[1] / 'segbench-results'
 REFERENCE = ('p004', 'p014', 'p035', 'p068')
 LINE_SLACK = 1
 WORD_SLACK = 0.03
+ROUNDS = 3          # reads after the second, for a page whose first two readings disagree
 TOOLS = {'segbench-ocr': None, 'segbench-dewarp lines': 'lines'}
 
 
@@ -84,9 +95,14 @@ def _jobs(path: Path) -> list[list[str]]:
     return [l.split('\t') for l in path.read_text(encoding='utf-8').splitlines() if l.strip()]
 
 
-def run(binary, jobs, mode=None, check=True, **kw):
+def agree(a: dict | None, b: dict | None) -> bool:
+    return a is not None and b is not None and not short(a, b) and not short(b, a)
+
+
+def run(binary, jobs, mode=None, check=True, twice=True, **kw):
     """subprocess.run([binary, (mode,) jobs], check=check, **kw), with the reference pages read before and after the
-    run's own jobs in the same process. Raises VisionRunFault when a reference reading comes back short."""
+    run's own jobs in the same process, and (twice) every page it writes read again until two readings agree. Raises
+    VisionRunFault when a reference reading comes back short or a page never settles."""
     cmd = [str(binary), *([mode] if mode else [])]
     tool = tool_name(mode)
     if tool is None:
@@ -124,14 +140,57 @@ def run(binary, jobs, mode=None, check=True, **kw):
                              f'run it again.')
     if check and result.returncode:
         raise subprocess.CalledProcessError(result.returncode, result.args)
+    if twice:
+        settle(binary, mode, tool, [(Path(r[0]), Path(r[1])) for r in rows if len(r) >= 2 and Path(r[1]) in pending
+                                    and Path(r[1]).exists()], kw)
     return result
+
+
+def settle(binary, mode, tool, written: list[tuple[Path, Path]], kw):
+    """Read each (image, output) the run wrote again, in guarded processes of their own, until two of its readings
+    agree; keep the first of the agreeing pair in the output. Quarantine and refuse what never settles."""
+    if not written:
+        return
+    kw = {k: v for k, v in kw.items() if k != 'check'}
+    reads = {out: [out] for _, out in written}
+    todo = list(written)
+    with tempfile.TemporaryDirectory(prefix='vision-twice-') as t:
+        for n in range(1, ROUNDS + 2):
+            d = Path(t) / f'r{n}'
+            d.mkdir()
+            again = {out: d / f'{i:05d}{out.suffix}' for i, (_, out) in enumerate(todo)}
+            (d / 'jobs.tsv').write_text(''.join(f'{img}\t{again[out]}\n' for img, out in todo), encoding='utf-8')
+            try:
+                run(binary, d / 'jobs.tsv', mode, check=False, twice=False, **kw)
+            except VisionRunFault as e:
+                # the references read short on a later read: the fault may have covered the first one too
+                moved = quarantine([out for _, out in written if out.exists()], tool)
+                raise VisionRunFault(f'{e} The run\'s own {len(moved)} outputs moved to '
+                                     f'{moved and moved[0].parent} as well.') from None
+            left = []
+            for img, out in todo:
+                new = counts(again[out]) if again[out].exists() else None
+                match = next((p for p in reads[out] if agree(counts(p), new)), None)
+                if match is None:
+                    reads[out].append(again[out])
+                    left.append((img, out))
+                elif match != out:
+                    shutil.copyfile(match, out)
+            todo = left
+            if not todo:
+                return
+    moved = quarantine([out for _, out in todo], tool)
+    raise VisionRunFault(f'vision_guard: {tool} never read {len(todo)} page(s) the same way twice in {ROUNDS + 2} reads '
+                         f'({", ".join(str(img) for img, _ in todo[:5])}{" …" if len(todo) > 5 else ""}), so the run '
+                         f'is refused. {len(moved)} outputs moved to {moved and moved[0].parent}; run it again.')
 
 
 def quarantine(files: list[Path], tool: str) -> list[Path]:
     if not files:
         return []
-    d = QUARANTINE / time.strftime('%Y%m%d-%H%M%S')
-    d.mkdir(parents=True, exist_ok=True)
+    QUARANTINE.mkdir(parents=True, exist_ok=True)
+    # one folder per call, so two quarantines in the same second (a re-read's and its run's) keep their own records
+    d = Path(tempfile.mkdtemp(prefix=time.strftime('%Y%m%d-%H%M%S-'), dir=QUARANTINE))
     moved = []
     for i, f in enumerate(files):
         dest = d / f'{i:05d}-{f.name}'

@@ -73,6 +73,7 @@ sys.path.insert(0, str(HERE))
 import date_image as DI
 import date_tagging as DT
 import gateway_gemini as G
+import vision_guard
 
 CACHE = Path(os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/date-undated"))
 RESULTS = HERE.parent.parent / "segbench-results" / "date-undated.md"
@@ -237,7 +238,7 @@ def cmd_vision(a):
             img, txt = page_files(p)
             if img.exists() and not txt.exists():
                 fh.write(f"{img}\t{txt}\n")
-    subprocess.run([str(tool), str(jobs)], check=False)
+    vision_guard.run(tool, jobs, check=False)
     print(f"{sum(page_files(p)[1].exists() for p in pages)} of {len(pages)} pages have Vision text; "
           f"{dict(collections.Counter(v.get('why', 'ok') for v in orient.values()))}")
 
@@ -837,7 +838,7 @@ def cmd_sheet(a):
                 pages.append({"page": p, "img": None, "why": o.get("why", "no JPEG paired")})
         plan.append((name, d, group, pages))
     (SHEET / "lines-jobs.tsv").write_text("".join(jobs))
-    subprocess.run([str(build_dewarp_tool()), "lines", str(SHEET / "lines-jobs.tsv")], check=True)
+    vision_guard.run(build_dewarp_tool(), SHEET / "lines-jobs.tsv", "lines")
     data, key = [], {}
     for name, d, group, pages in plan:
         shown = []
