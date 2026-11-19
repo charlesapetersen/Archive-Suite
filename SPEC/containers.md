@@ -359,6 +359,24 @@ into `note` as a line, never dropped.
   (no year, or a day with no month) is `Month: <name>` / `Day: <n>` in `note`. A covering letter's date is
   `Sent with: <wire value>` in `note`, with ` (uncertain)` when its uncertain tag is set.
 - **Subjects** (the tags' subjects, less `OCR Poor` and `OCR Failed`) as `keyword` for other CSL tools and as
-  `Subjects: <a>; <b>` in `note`, which Zotero keeps.
+  `Subjects: <a>; <b>` in `note`, which Zotero keeps. Add to Zotero (below) also sends them as tags.
 - **`note`** lines, in order: `archive_collection: …` and `archive-place: …` (CSL variables Zotero reads from Extra),
   `accession: …`, `series: …`, then the lines above, and last `File: <file name>`. Notes adds the source link as `URL`.
+
+### Add to Zotero (W47.ct-zotero-tags)
+
+Selection ▸ Add to Zotero in the Reader and Add to Zotero on a Notes source block send the same items to the Zotero
+running on this Mac, with the subjects as tags. `ZoteroConnector` posts them to Zotero's connector endpoint,
+`POST http://127.0.0.1:23119/connector/saveItems` (the one the browser connector uses; no key, no setting), 50 items
+a request, each with its own `sessionID`; Zotero saves them into the library or collection selected in it, and
+answers 201. Nothing else is contacted.
+
+- **The items** (`ZoteroExport.connectorItems`) are in the translator form: what Zotero's importer
+  (`itemFromCSLJSON`) makes of the export's CSL-JSON item, field for field (base field names, `creators` as
+  `{creatorType, lastName, fieldMode: 1}`, `date` as Zotero writes it: "1959", "March 1959", "March 12, 1959" or the
+  literal), checked against Zotero 10.0.9's importer for every document kind; plus `tags`, one `{tag}` per subject.
+  Extra keeps its `Subjects:` line, so the two routes carry the same text.
+- **Not running** (nothing answers on the port) and **refused** (any status but 201) are reported; a refused batch
+  stops the rest. The Reader's export file stays the route when Zotero is not open.
+- **Checked live** on the VM's scratch Zotero (`packages/ArchiveCore/Tools/zotero-import/vm-zotero-live.sh`): every
+  kind saved, read back through the local API with its fields and tags.

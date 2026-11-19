@@ -102,7 +102,8 @@ macOS/Sources/ArchiveNotes/
     ReaderRootStore.swift          @MainActor — GUID-keyed security-scoped bookmarks to Reader roots
                                    (grant / look-up / stop-scope); the only writer of readerRootBookmarks
     SourceArchiveInfo.swift        W47.ct-zotero: a Reader source's archival location for its chip and its
-                                   CSL-JSON for Copy for Zotero (ArchiveCore ZoteroExport); the exact granted
+                                   CSL-JSON for Copy for Zotero (ArchiveCore ZoteroExport) and the source Add
+                                   to Zotero sends with its subjects as tags (ZoteroConnector); the exact granted
                                    path only, its own short scope, read off main
     ReaderLinkResolver.swift       THE archivereader:// resolve seam, in TWO stages (W23.m14): resolveExact
                                    is the walk-free main-actor stage (unknown root / containment refusal /

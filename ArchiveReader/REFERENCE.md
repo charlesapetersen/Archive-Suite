@@ -553,6 +553,9 @@ Views/
   NavigationModel+Zotero.swift  W47.ct-zotero: Selection ▸ Export to Zotero… — one CSL-JSON file (ArchiveCore
                               ZoteroExport) from the Container column's values, the tags, the page-2 header and the
                               sidecar, read off main; saved where the user picks, never inside the archive folder.
+                              W47.ct-zotero-tags: Selection ▸ Add to Zotero sends the same items with the subjects
+                              as tags to the running Zotero (ArchiveCore ZoteroConnector, 127.0.0.1 only; the
+                              network.client entitlement is for this alone).
   NavigationModel+ContainerEdits.swift  W47.ct-reader-edit: each edit read fresh, worked out and written off main
                               with the read's stamp (ContainerFileStore), one at a time; links inside the tree refused.
   ContainerSection.swift      The Inspector's Container section (FieldStatusRow per value with its Edit menu,

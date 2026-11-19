@@ -321,7 +321,7 @@ final class ZoteroExportTests: XCTestCase {
     // MARK: Add to Zotero (W47.ct-zotero-tags)
 
     /// One document of every kind, with every variable the export writes.
-    private var everyKind: [ZoteroSource] {
+    private func everyKind(subjects: [String] = ["Trotskyism", "Labor"]) -> [ZoteroSource] {
         var side = ZoteroSidecar()
         side.authors = ["Max Shachtman"]
         side.recipients = ["Albert Glotzer"]
@@ -331,17 +331,18 @@ final class ZoteroExportTests: XCTestCase {
                      "magazine article", "newsletter", "journal article", "photograph", "other", nil]
         let dates = [["1959", "3 March", "Day 12"], ["1959", "3 March"], ["1959"], ["1970s"], ["1959", "Date Uncertain"]]
         return kinds.enumerated().map { n, kind in
-            ZoteroSource(fileName: "\(n).pdf", tags: tags(dates[n % dates.count] + ["Trotskyism", "Labor", "OCR Poor"]),
-                         itemFields: PDFItemFields(documentKind: kind, title: "Title \(n)", byline: n % 2 == 0 ? nil : "A. Reporter",
-                                                   publication: "The Militant", publicationDate: "June 3, 1946",
-                                                   recipientPlace: "Chicago"),
-                         sidecar: side, container: glotzer, link: "archivereader://reveal?n=\(n)")
+            let fields = PDFItemFields(documentKind: kind, title: "Title \(n)", byline: n % 2 == 0 ? nil : "A. Reporter",
+                                       publication: "The Militant", publicationDate: "June 3, 1946",
+                                       recipientPlace: "Chicago")
+            return ZoteroSource(fileName: "\(n).pdf", tags: tags(dates[n % dates.count] + subjects + ["OCR Poor"]),
+                                itemFields: fields, sidecar: side, container: glotzer,
+                                link: "archivereader://reveal?n=\(n)")
         }
     }
 
     /// The connector item is what Zotero's own importer makes of the CSL-JSON item, field for field, plus the tags.
     func testConnectorItemsAreWhatZoteroImportsPlusTags() throws {
-        let sources = everyKind
+        let sources = everyKind()
         let imported = try zoteroImport(ZoteroExport.export(sources))
         let sent = ZoteroExport.connectorItems(sources)
         XCTAssertEqual(imported.count, sent.count)
@@ -419,6 +420,57 @@ final class ZoteroExportTests: XCTestCase {
             XCTFail("no Zotero throws")
         } catch let failure as ZoteroConnector.Failure {
             XCTAssertEqual(failure, .notRunning)
+        }
+    }
+
+    /// Add to Zotero into a real Zotero: every kind is saved, and read back through Zotero's local API with its
+    /// fields and its subjects as tags. Runs only where `ARCHIVE_ZOTERO_LIVE=1`: the VM's scratch Zotero
+    /// (`Tools/zotero-import/vm-zotero-live.sh`), never a library anyone keeps.
+    func testLiveZoteroKeepsFieldsAndTags() async throws {
+        guard ProcessInfo.processInfo.environment["ARCHIVE_ZOTERO_LIVE"] == "1" else {
+            throw XCTSkip("needs the VM's scratch Zotero (ARCHIVE_ZOTERO_LIVE=1)")
+        }
+        let marker = "W47 Live \(UUID().uuidString.prefix(8))"
+        let sources = everyKind(subjects: ["Trotskyism", "Labor", marker])
+        let connector = ZoteroConnector()
+        let running = await connector.isRunning()
+        XCTAssertTrue(running)
+        try await connector.save(sources)
+
+        var query = URLComponents(string: "http://127.0.0.1:\(ZoteroConnector.defaultPort)/api/users/0/items")!
+        query.queryItems = [URLQueryItem(name: "tag", value: marker), URLQueryItem(name: "format", value: "json"),
+                            URLQueryItem(name: "limit", value: "100")]
+        var saved: [[String: Any]] = []
+        for _ in 0..<30 {
+            let (data, _) = try await URLSession.shared.data(from: query.url!)
+            saved = (try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []).compactMap {
+                $0["data"] as? [String: Any]
+            }
+            if saved.count >= sources.count { break }
+            try await Task.sleep(nanoseconds: 500_000_000)
+        }
+        XCTAssertEqual(saved.count, sources.count)
+        // The API names a base field by the type's own name (Letter Type, Manuscript Type, Artwork's Medium).
+        let ownNames = ["type": ["letterType", "manuscriptType"], "medium": ["artworkMedium"]]
+        for sent in ZoteroExport.connectorItems(sources) {
+            let title = sent["title"] as? String
+            guard let got = saved.first(where: { $0["title"] as? String == title }) else {
+                XCTFail("\(title ?? "?") was not saved")
+                continue
+            }
+            XCTAssertEqual(got["itemType"] as? String, sent["itemType"] as? String, title ?? "")
+            for (field, value) in sent {
+                guard let value = value as? String, !["id", "itemType"].contains(field) else { continue }
+                let stored = (ownNames[field] ?? [field]).lazy.compactMap { got[$0] as? String }.first { !$0.isEmpty }
+                XCTAssertEqual(stored, value, "\(title ?? ""): \(field)")
+            }
+            let names = (got["creators"] as? [[String: Any]] ?? []).map { "\($0["creatorType"] ?? ""): \($0["name"] ?? "")" }
+            let sentNames = (sent["creators"] as? [[String: Any]] ?? []).map {
+                "\($0["creatorType"] ?? ""): \($0["lastName"] ?? "")"
+            }
+            XCTAssertEqual(names, sentNames, title ?? "")
+            let tags = Set((got["tags"] as? [[String: Any]] ?? []).compactMap { $0["tag"] as? String })
+            XCTAssertEqual(tags, ["Trotskyism", "Labor", marker], title ?? "")
         }
     }
 }
