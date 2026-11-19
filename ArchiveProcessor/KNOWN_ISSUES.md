@@ -402,8 +402,16 @@ What remains: a box with many such pages has more gaps to check than the figures
 - **No propagation fallback.** 08-dating.md §3 step 4 names propagation (the nearest earlier dated document, t=3) for a
   route with no model for the step; the app has no such route yet (every tagging run has a text model), so a failed
   dating call writes no year, the rule's explicit year standing where there is one (the stage's Fallback rule).
-- **The folder's date (step 3b)** is `W47.ct-folder-date`'s; a document in a dated folder is estimated from its
-  neighbours meanwhile.
+- **The folder's date (step 3b, W47.ct-folder-date) dates only files tagged in place.** Process Files takes a
+  folder run's confirmed date only for the pre-OCRed route (output = source), whose names the runs were set on; a new
+  output would sort into another batch's run, and collection organisation renames and moves it. The label reads a run
+  records are proposals and date nothing, so a folder date confirmed in the Reader afterwards does not re-date the
+  documents already written (queued: W47.ct-folder-date-reader).
+- **Live Capture and the manual tagging modes do not take a folder's date yet**, though Live Capture's marker card
+  confirms one on Save; their documents keep the route's own date (queued: W47.ct-folder-date-live).
+- **A document the dating route does not run on takes no folder date**: one with no text, a Mac-tagged one, one whose
+  OCR failed, or one the phone dates (the phone's date wins anyway) (queued: W47.ct-folder-date-reader, which dates
+  a run's undated documents from the Reader, those with no text included).
 
 ## ⚠️ LIMITATION (W44.reocr-processor, 2026-11-12): what Improve OCR does not do yet
 

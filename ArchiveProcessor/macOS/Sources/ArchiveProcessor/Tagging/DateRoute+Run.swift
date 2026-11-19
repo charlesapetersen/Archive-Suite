@@ -192,6 +192,13 @@ extension DateRoute.Decision {
     func apply(to tags: inout GeneratedTags) {
         let taggerYear = tags.year
         tags.dateUncertain = dateUncertain
+        // W47.ct-folder-date: the folder's year or decade, and its month (owner call 3), never a day.
+        if evidenceClass == .folder {
+            tags.year = decade.map { "\($0)s" } ?? year.map(String.init)
+            tags.month = month.flatMap { GeneratedTags.monthTag($0) }
+            tags.day = nil
+            return
+        }
         if let year, evidenceClass == .stamp {
             tags.year = String(year)
             tags.month = month.flatMap { GeneratedTags.monthTag($0) }
@@ -238,18 +245,40 @@ extension DateRoute.Decision {
         quote = nil; line = nil; page = nil; place = nil; sourceFile = coverFile
     }
 
+    /// Step 3b (W47.ct-folder-date; owner, 2026-11-19): a document with no explicit date of its own and none from a
+    /// cover takes the confirmed date of the folder run it is in, by `ContainerFolderDate.inherited`: a single year with
+    /// its month and no `Date Uncertain`, a range's mid-point year or decade with it, nothing for 20 years or more.
+    /// Like the cover's year, it stands ahead of a stamp's and the neighbour estimate. A cover's year wins, except where
+    /// it is the folder's own single year (the cover took it from the same folder): then the folder's form stands, with
+    /// its month and no `Date Uncertain`, as for any other document in the folder.
+    mutating func inherit(fromFolder folder: ContainerFolderDate) {
+        guard evidenceClass != .text, evidenceClass != .image, let got = folder.inherited else { return }
+        if evidenceClass == .inherited {
+            guard case .year(let y, _, false) = got, y == year else { return }
+        }
+        switch got {
+        case .year(let y, let m, let uncertain): year = y; decade = nil; month = m; dateUncertain = uncertain
+        case .decade(let d): year = nil; decade = d; month = nil; dateUncertain = true
+        }
+        day = nil; evidenceClass = .folder; step = 3; modelFlagAdded = false
+        quote = folder.text; line = nil; page = nil; place = nil
+        sourceFile = folder.start.isEmpty ? nil : folder.start
+    }
+
     /// W46.date-route-header — the PDF header's `Date evidence:` value (owner call 9): for a non-explicit date only (read
     /// off the page image, taken from a stamp on it, estimated, or inherited from the cover), its class, source, place and quote, and the 90%
     /// interval where the route measured it. Nil for an explicit text year and for no year. One line, never holding the
     /// provenance separator, the quote cut to `headerQuoteChars`.
     var headerEvidence: String? {
-        guard year != nil else { return nil }
+        guard year != nil || decade != nil else { return nil }
         var parts: [String]
         switch evidenceClass {
         case .text, .none:
             return nil
         case .inherited:
             parts = ["inherited", "from " + Self.headerSafe(sourceFile ?? "the covering letter", limit: 80)]
+        case .folder:
+            parts = ["folder", "from " + Self.headerSafe(sourceFile ?? "the folder", limit: 80)]
         case .image, .stamp:
             parts = [evidenceClass.rawValue]
             if let page { parts.append("page \(page)") }
@@ -291,6 +320,10 @@ extension DateRoute.Decision {
             o["reason"] = trace.parsed ? "no year with checked evidence" : "the dating call gave no reply"
         case .inherited:
             o["source"] = sourceFile ?? "the covering letter"
+        case .folder:
+            o["source"] = sourceFile ?? "the folder"
+            if let quote { o["folder_date"] = quote }
+            if let decade { o["decade"] = "\(decade)s" }
         default:
             if let quote { o["quote"] = quote }
             if let line { o["line"] = line }

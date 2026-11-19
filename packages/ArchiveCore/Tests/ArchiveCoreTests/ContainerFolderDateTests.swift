@@ -22,12 +22,14 @@ final class ContainerFolderDateTests: XCTestCase {
         XCTAssertEqual(parsed("february 12, 1970"), [1970, 1970, 2])
         XCTAssertEqual(parsed("Sept 1970"), [1970, 1970, 9])
         XCTAssertEqual(parsed("2/1970"), [1970, 1970, 2])
+        XCTAssertEqual(parsed("10/11/1904"), [1904, 1904, 10])
         XCTAssertEqual(parsed("6/2/61"), [1961, 1961, 6])
         XCTAssertEqual(parsed("13/2/61"), [1961, 1961, nil], "no 13th month")
     }
 
     func testAnythingElseDatesNothing() {
-        for s in ["", "Correspondence", "1967-1965", "1684", "2045", "Reports 1959", "ca. 1965", "Flob 1970"] {
+        for s in ["", "Correspondence", "1967-1965", "1684", "2045", "Reports 1959", "ca. 1965", "Flob 1970",
+                  "6/12", "10/20", "1/10"] {
             XCTAssertNil(ContainerFolderDate.parse(s), s)
         }
     }
@@ -64,7 +66,7 @@ final class ContainerFolderDateTests: XCTestCase {
                     run("0012", .box), run("0014", .folder, date: ContainerValue("", source: .user))]
         func at(_ f: String) -> String? { ContainerFolderDate.confirmed(at: f, in: runs)?.text }
         XCTAssertNil(at("0001"), "a box run's date dates nothing")
-        XCTAssertNil(at("0002"), "the folder photo itself is a label")
+        XCTAssertEqual(at("0002"), "1965-1967", "a run's first file is covered: a run the user split starts at a document")
         XCTAssertEqual(at("0003"), "1965-1967")
         XCTAssertEqual(ContainerFolderDate.confirmed(at: "0004", in: runs)?.start, "0002")
         XCTAssertNil(at("0006"), "a label read nobody confirmed dates nothing")

@@ -48,7 +48,7 @@ key is the JSON name; the segbench name is `ct_truth.py` `FIELDS_REV`.
 - `container` is the type and its own number: "Box 34" for "Box 34 of 201". `folder` is the folder's number
   alone; a folder marked "5-9" is container "Box 5", folder "9".
 - `date` and `other` describe the container they were read from, not its items; they are kept for the user and the
-  folder-date rule (`W47.ct-folder-date`, unsettled) and are not exported to Zotero.
+  folder-date rule (§The folder-date rule) and are not exported to Zotero.
 
 ## A value and its source
 
@@ -112,6 +112,34 @@ folder run with no fields). The user may start a run anywhere ("set for selectio
   five) (owner, 2026-11-13).
 
 One correction to a run fixes every item under it.
+
+### The folder-date rule (`W47.ct-folder-date`)
+
+Owner, 2026-10-31: a dated folder dates the otherwise undated documents inside it; the form, 2026-11-19
+(`W47.ct-folder-date-owner-ok`). `ContainerFolderDate`:
+
+- **Only a confirmed date.** A file takes the `date` of the folder run live at it only where that value's source is
+  `user` (set or confirmed). A label read nobody confirmed dates nothing: Vision + parser's own single-year read held
+  for 44% of the documents inside, the owner-checked date for 88% (`segbench-results/folder-date.md`). A box or
+  collection run's date and a user's empty value date nothing. The run's first file is covered (a run the user split
+  starts at a document); a folder photo is never dated as a document.
+- **Reading the value.** A year (`1953`), a range (`1965-1967`, `1966-70`, `1965 to 1967`; a two-digit end before the
+  start is the start year alone), a decade (`1960s`), a month and year (`Feb. 1970`, `February 12, 1970`) or a numeric
+  date, month first (`6/2/61`, `2/1970`; a two-digit year only with a day, so `6/12` dates nothing). Anything else
+  dates nothing. Years 1800 to 2030.
+- **What a document takes**, by the span in years, inclusive: one year as it is, with its month (never a day), and no
+  `Date Uncertain`; 2 to 7 years the mid-point year (an even span the earlier middle year) with `Date Uncertain`;
+  8 to 19 the decade holding most of its years, a tie going to the earlier, with `Date Uncertain`; 20 or more nothing.
+- **Precedence.** A document's own date, from its text or its page image, always wins; then a covering letter's year
+  (step 3a), except a cover's year that is the folder's own single year, where the folder's form stands; then the
+  folder's (step 3b), ahead of a stamp's year and the neighbour estimate. A dated document in the folder does not date
+  its neighbours by this rule. The Live Capture phone date still wins over all; a decade takes no phone month.
+- **Where.** Process Files' automatic dating route, for a file tagged where it already is (the pre-OCRed route,
+  output = source), from its folder's container file, read and never written. A new output is not dated by it: its
+  name was never in the runs, it would sort into another batch's run, and collection organisation renames and moves
+  it. Its `Date evidence:` line is `folder; from <the run's first file>; "<the date>"` (`SPEC/tag-format.md`). A date
+  confirmed after the run dates nothing already written (`W47.ct-folder-date-reader`); Live Capture and the manual
+  tagging modes do not take it yet (`W47.ct-folder-date-live`).
 
 ## The container file
 

@@ -8,8 +8,8 @@ import Foundation
 ///   2. *explicit, from the image*: only where the own text has no year candidate (call 7.3), the image pass on the first
 ///      two pages; its document date counts when that year is written in a date it quoted;
 ///   3. *inherited*: an established enclosure takes its cover's year with `Date Uncertain` when it has no explicit date
-///      of its own (applied by `OCRProcessor.applyGeneratedTags`, beside `Sent With`); the dated folder is
-///      `W47.ct-folder-date`'s;
+///      of its own (applied by `OCRProcessor.applyGeneratedTags`, beside `Sent With`); then a document with neither
+///      takes its folder run's confirmed date (`inherit(fromFolder:)`, W47.ct-folder-date);
 ///   4. *estimated from neighbours*: the same trace reply, written only when its evidence passes `evidenceCheck`, always
 ///      with `Date Uncertain`; a reply whose evidence fails writes no year and is not shown (owner call 9).
 ///
@@ -770,11 +770,14 @@ enum DateRoute {
     // MARK: The decision (date_route_pipeline.route)
 
     enum EvidenceClass: String, Sendable, Codable {
-        case text, image, stamp, estimate, inherited, none
+        /// `folder`: the confirmed date of the folder run the document is in (W47.ct-folder-date).
+        case text, image, stamp, estimate, inherited, folder, none
     }
 
     struct Decision: Equatable, Sendable, Codable {
         var year: Int?
+        /// W47.ct-folder-date: a decade's first year (1960 for the 1960s) taken from a folder's range, with no year.
+        var decade: Int? = nil
         var month: Int?
         /// W46.date-full-date: the day of the date an explicit year rests on, with its month.
         var day: Int? = nil

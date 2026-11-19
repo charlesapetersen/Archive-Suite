@@ -111,6 +111,9 @@ public enum FieldStatusPolicy {
         case "inherited":
             source = "Inherited from the covering letter by the Processor’s dating route"
             figure = "not measured on its own"
+        case "folder":
+            source = "Taken from the folder’s confirmed date by the Processor’s dating route"
+            figure = "a checked folder date held for 49 of 56 dated documents inside it (folder-date.md), not scored as an exact year"
         case .some:
             source = "From the Processor’s dating route"
             figure = "not measured for this evidence"

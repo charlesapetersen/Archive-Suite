@@ -84,7 +84,7 @@ recognized **before** the bare-number year test, so `Q2`, `P7`, or `Day 25` is n
 | **Year** | bare digits, e.g. `1980` | 0–1 | Processor's LLM prompt forces a **4-digit** year and never null for a dated doc. Reader's `parseYear` accepts **3–4 digits** (medieval-friendly: `800`, `1215`). See discrepancy #1. |
 | **Month** | `M Month`, e.g. `3 March` | 0–1 | Written with no leading zero (`3 March`, `10 October`; owner, 2026-11-13). Read as 1–12 in one or two ASCII digits (`3` or `03`; no sign, no longer zero run), so `03 March` still reads; the name must match that month (case-insensitive). Processor applies `capitalizeFirstLetters`, so it is emitted title-cased. An app that orders Month tags orders them by the month's number, never as text (`3 March` sorts after `10 October` as text). Month is written **only when explicit in the doc**, never inferred. |
 | **Day** | `Day N` (unpadded), e.g. `Day 25`, `Day 1` | 0–1 | N = 1–31, one or two ASCII digits (a reader also takes `Day 05`; `Day 013`, `Day +5` stay subjects). Often absent. |
-| **Decade** | `NNNNs`, e.g. `1970s` (a 3–4 ASCII-digit run, no sign, whose **last digit is `0`**, then a **lowercase** `s`; medieval-friendly `970s`) | 0–1 | An **approximate** date spanning ten years. **Mutually exclusive with Year** — a concrete Year supersedes a Decade. Recognized alongside the bare-number Year test (the trailing `s` means it can never match the digits-only Year test, so order is immaterial). Written by the Processor **only** when the user types it into the manual tag dialog's Year field; the LLM tagger never emits it. Reader parser: `DocumentTags.parseDecade`. |
+| **Decade** | `NNNNs`, e.g. `1970s` (a 3–4 ASCII-digit run, no sign, whose **last digit is `0`**, then a **lowercase** `s`; medieval-friendly `970s`) | 0–1 | An **approximate** date spanning ten years. **Mutually exclusive with Year** — a concrete Year supersedes a Decade. Recognized alongside the bare-number Year test (the trailing `s` means it can never match the digits-only Year test, so order is immaterial). Written by the Processor when the user types it into the manual tag dialog's Year field, and by its dating route for a document that takes a folder's confirmed 8-to-19-year range (W47.ct-folder-date, with `Date Uncertain`); the LLM tagger never emits it. Reader parser: `DocumentTags.parseDecade`. |
 | **Date Uncertain** | literal `Date Uncertain` | 0–1 | Flags a **speculative year** — the file _usually still carries a Year tag_. Not "no date." |
 | **Sent With** *(W37.dual-date)* | `Sent With 1958`, `Sent With 1958-03`, `Sent With 1958-03-12` or `Sent With 1950s` | 0–1 | The **covering letter's** date on an enclosure that has its own date. ONE whole-value token so its precision never cross-pairs with the item's own Year/Month/Day. Exact, case-sensitive prefix `Sent With `; 3–4 ASCII year digits, no leading zero; zero-padded month/day that must exist (Gregorian); decade `NNN0s`. Anything else (`sent with 1958`, `Sent With 1958-02-30`, `Sent With Love`) stays a verbatim subject. Two valid tokens: last wins, the earlier is demoted to a subject and flagged (`dateAmbiguities`, below), never combined. Core: `ArchiveDate` / `SentWithTag` (`Tags/ArchiveDate.swift`). |
 | **Sent With Date Uncertain** | literal `Sent With Date Uncertain` (exact case) | 0–1 | Speculative sent-with date. Independent of `Date Uncertain`; written only beside a `Sent With` value, and cleared with it. |
@@ -136,7 +136,8 @@ the container file (`SPEC/containers.md`).
   [0.86, 0.94] after its last look, W47.item-fields-title); no evidence
   class of the dating route clears it (text 139/158 exact, image 10/12, estimate 35/51;
   `segbench-results/date-route-pipeline.md`; stamp 1/1 where it fired, a stamp's year 25/25 on documents carrying
-  one, most also dated in their text, `segbench-results/date-stamp-fallback.md`), and the class comes from the page's `Date evidence:` line (none: text
+  one, most also dated in their text, `segbench-results/date-stamp-fallback.md`; a folder's checked date held for 49 of
+  56 dated documents inside it, not scored as an exact year, `segbench-results/folder-date.md`), and the class comes from the page's `Date evidence:` line (none: text
   or not recorded); the covering letter's date is not measured on its own. Of the container label reads
   (`segbench-results/ct-read.md`) only Vision + parser's box number on a box photo clears it (70 of 71, upright photos);
   its box number on a folder photo is 28 of 35, and every other field and reader falls short. Path values are not
@@ -394,11 +395,11 @@ Recipient place: <place>; <place>
 - **Date evidence (W46.date-route-header; owner call 9, 2026-11-06).** The evidence behind a NON-explicit document
   year: one line, exact case-sensitive prefix `Date evidence: `, after the source-date lines in the same ordered
   header block (a source-date line after it starts the body). Written only for a year read off the page image,
-  taken from a stamp or postmark on it (W46.date-stamp-fallback), estimated from a neighbour, or inherited from the
-  covering letter; never for an explicit year in the document's
-  own text, nor when there is no year. The value is `; `-separated parts, class first:
+  taken from a stamp or postmark on it (W46.date-stamp-fallback), estimated from a neighbour, inherited from the
+  covering letter, or taken from the folder's confirmed date (W47.ct-folder-date, a year or a decade); never for an
+  explicit year in the document's own text, nor when there is no year. The value is `; `-separated parts, class first:
   `image; page <n>; <place>; "<quote>"`, `stamp; page <n>; <place>; "<quote>"`, `estimate; from <file>; line <n>; "<quote>"; 90% interval <lo>-<hi>`,
-  `inherited; from <file>` (parts absent when unknown). The interval appears only where the route measured it
+  `inherited; from <file>`, `folder; from <the folder run's first file>; "<the folder's date>"` (parts absent when unknown). The interval appears only where the route measured it
   (the gateway's Gemini 3.7 Flash). Control characters and runs of white space become one space, the middle dot a
   comma, the quote is cut to 60 characters with `…`, and the line is fitted to one physical line, so it never
   holds the provenance separator nor wraps into the body. It goes with the Finder-tag year (an output-time

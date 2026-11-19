@@ -16,11 +16,11 @@ public struct ContainerFolderDate: Equatable, Sendable {
     public let month: Int?
     /// The value as the run holds it, for the evidence line.
     public let text: String
-    /// The run's `start`: the folder photo's file name.
+    /// The run's `start`: the folder photo's file name, or the first file of a run the user started.
     public let start: String
 
     public init(lo: Int, hi: Int, month: Int? = nil, text: String, start: String = "") {
-        self.lo = lo; self.hi = hi; self.month = lo == hi ? month : nil; self.text = text; self.start = start
+        self.lo = lo; self.hi = hi; self.month = lo == hi && (1...12).contains(month ?? 0) ? month : nil; self.text = text; self.start = start
     }
 
     /// The years a folder date may name (the dating route's `DateRoute.yearRange`).
@@ -66,7 +66,8 @@ public struct ContainerFolderDate: Equatable, Sendable {
     }
     private static let range = rx(#"^(\d{4})\s*(?:[-–—/]|to)\s*(\d{4}|\d\d)$"#)
     private static let decade = rx(#"^(\d{3}0)['’]?s$"#)
-    private static let numeric = rx(#"^(\d{1,2})/(?:(\d{1,2})/)?(\d{4}|\d\d)$"#)
+    private static let numeric = rx(#"^(\d{1,2})/(\d{1,2})/(\d{4}|\d\d)$"#)
+    private static let numericMonth = rx(#"^(\d{1,2})/(\d{4})$"#)
     private static let year = rx(#"^(\d{4})$"#)
     private static let monthYear = rx(#"^([a-z]+)\.?,?\s+(?:\d{1,2},?\s+)?(\d{4})$"#)
 
@@ -78,7 +79,7 @@ public struct ContainerFolderDate: Equatable, Sendable {
 
     /// The value read as a date, or nil when it is none of: a year ("1953"), a range ("1965-1967", "1966-70",
     /// "1939- 78", "1965 to 1967"), a decade ("1960s"), a month and year ("Feb. 1970", "February 12, 1970"), or a
-    /// numeric date ("2/1970", "6/2/61", month first). As `folder_date.parse_range`, which the figures were measured
+    /// numeric date, month first ("6/2/61", "2/1970"; a two-digit year only with a day, so "6/12" dates nothing). As `folder_date.parse_range`, which the figures were measured
     /// with, plus the month forms the owner's call 3 needs. A two-digit end before the start ("1958-02") is the start
     /// year alone. Anything else (a title, a note) dates nothing: the document keeps its own route.
     public static func parse(_ value: String, start: String = "") -> ContainerFolderDate? {
@@ -98,6 +99,10 @@ public struct ContainerFolderDate: Equatable, Sendable {
             if g[2].count == 2 { y += 1900 }
             return make(y, y, (1...12).contains(m) ? m : nil)
         }
+        // A month and a four-digit year only: "6/12" is a day, not June 1912.
+        if let g = groups(numericMonth, s), let m = Int(g[0]), let y = Int(g[1]) {
+            return make(y, y, (1...12).contains(m) ? m : nil)
+        }
         if let g = groups(monthYear, s), let y = Int(g[1]),
            let m = monthNames.first(where: { $0.0 == g[0].lowercased() })?.1 {
             return make(y, y, m)
@@ -109,10 +114,11 @@ public struct ContainerFolderDate: Equatable, Sendable {
 
     /// The date of the folder run live at `fileName` in its directory's `runs`, only where the user set or confirmed
     /// it (source `user`): a label read that nobody confirmed dates nothing. A box or collection run's date does not
-    /// date documents, and a dated document never dates its neighbours by this rule. Pure: the caller loads the file.
+    /// date documents, and a dated document never dates its neighbours by this rule. The run's first file is covered
+    /// too: a run the user split starts at a document ("set for selection"); a folder photo is never dated as a
+    /// document by the caller. Pure: the caller loads the file.
     public static func confirmed(at fileName: String, in runs: [ContainerRun]) -> ContainerFolderDate? {
         guard let folder = ContainerResolver.liveRuns(at: fileName, in: runs).last, folder.level == .folder,
-              folder.start != fileName,   // the folder photo itself is a label, never dated as a document
               let value = folder.fields[.date], value.source == .user, let shown = value.shown else { return nil }
         return parse(shown, start: folder.start)
     }

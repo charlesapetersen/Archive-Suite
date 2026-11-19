@@ -1130,6 +1130,20 @@ extension OCRProcessor {
         let datingInputs: [DateRoute.Input?] = (0..<total).map {
             datingInput(for: $0, in: snapshot, jobBySource: jobBySource)
         }
+        // W47.ct-folder-date: the confirmed date of the folder run each dated segment falls in, from the container file
+        // of its folder (`ContainerFolderDate.confirmed`; each folder's file read once). Only for a file tagged where it
+        // already is (the pre-OCRed route, output = source), whose name the runs were set on: a new output written into
+        // a folder with runs would sort into another batch's run, and collection organisation renames and moves it.
+        var runsByFolder: [URL: [ContainerRun]] = [:]
+        var folderDates: [ContainerFolderDate?] = Array(repeating: nil, count: total)
+        for i in 0..<total where datingInputs[i] != nil {
+            guard let first = snapshot[i].pdfURLs.first, let output = outputURLMap[first],
+                  output.standardizedFileURL == first.standardizedFileURL else { continue }
+            let folder = output.deletingLastPathComponent().standardizedFileURL
+            let runs = runsByFolder[folder] ?? ContainerFileStore.load(directory: folder).document?.runs ?? []
+            runsByFolder[folder] = runs
+            folderDates[i] = ContainerFolderDate.confirmed(at: output.lastPathComponent, in: runs)
+        }
         // W47.item-fields-build: every page's text and image, for the item-field call where it runs on this backend.
         let itemFieldGateway = ItemFieldPolicy.skipReason(gateway: gateway, localAgent: localAgent,
                                                          sidecars: enableSegmentJSON) == nil ? gateway : nil
@@ -1213,7 +1227,8 @@ extension OCRProcessor {
                                                            enableSegmentJSON: enableSegmentJSON,
                                                            outputDirectory: outputDirectory,
                                                            runConfig: runConfig, entities: names,
-                                                           dating: dating, itemFields: fields,
+                                                           dating: dating, folderDate: folderDates[i],
+                                                           itemFields: fields,
                                                            taggingSenderWithheld: senderWithheld[i])
                 }
                 completed += 1
@@ -1236,8 +1251,8 @@ extension OCRProcessor {
                                                    enableSegmentJSON: enableSegmentJSON,
                                                    outputDirectory: outputDirectory,
                                                    runConfig: runConfig, coverTags: cover ?? GeneratedTags(),
-                                                   entities: names, dating: dating, itemFields: fields,
-                                                   taggingSenderWithheld: senderWithheld[i])
+                                                   entities: names, dating: dating, folderDate: folderDates[i],
+                                                   itemFields: fields, taggingSenderWithheld: senderWithheld[i])
         }
     }
     /// W46.date-route — what segment `i`'s dating route reads, or nil when no dating call is made: a box or folder
@@ -1289,7 +1304,8 @@ extension OCRProcessor {
                                     enableSegmentJSON: Bool, outputDirectory: URL,
                                     runConfig: SessionProcessingConfig?,
                                     coverTags: GeneratedTags? = nil, entities: EntityResult? = nil,
-                                    dating: DateRoute.Decision? = nil, itemFields: ItemFieldResult? = nil,
+                                    dating: DateRoute.Decision? = nil, folderDate: ContainerFolderDate? = nil,
+                                    itemFields: ItemFieldResult? = nil,
                                     taggingSenderWithheld: Bool = false) -> GeneratedTags {
         guard i < snapshot.count else { return rawTags }
         let segment = snapshot[i]
@@ -1299,6 +1315,8 @@ extension OCRProcessor {
         if dating != nil, let coverTags, let c = Self.validCoverIndex(of: i, in: snapshot) {
             dating?.inherit(fromCover: coverTags, coverFile: snapshot[c].pdfURLs.first?.lastPathComponent)
         }
+        // W47.ct-folder-date: then, with no date of its own nor a cover's, the folder's confirmed date (step 3b).
+        if let folderDate { dating?.inherit(fromFolder: folderDate) }
         dating?.apply(to: &tags)
         // W46.date-route-header: the evidence of a non-explicit year, for the outputs' header line.
         var headerEvidence = dating?.headerEvidence
@@ -1306,7 +1324,8 @@ extension OCRProcessor {
         if let firstURL = segment.pdfURLs.first,
            let fileIdx = jobs.firstIndex(where: { $0.sourceURL == firstURL }) {
             if let y = phoneYearTag(at: fileIdx) { tags.year = y; tags.dateUncertain = false; headerEvidence = nil }
-            if let mo = phoneMonthTag(at: fileIdx) { tags.month = mo }
+            // A decade takes no month (SPEC/tag-format.md); only the folder rule writes one here (W47.ct-folder-date).
+            if let mo = phoneMonthTag(at: fileIdx), tags.year?.hasSuffix("s") != true { tags.month = mo }
         }
         // W47.item-fields-build: the filled item fields, for the outputs' header lines.
         let headerFields = itemFields?.headerFields ?? PDFItemFields()

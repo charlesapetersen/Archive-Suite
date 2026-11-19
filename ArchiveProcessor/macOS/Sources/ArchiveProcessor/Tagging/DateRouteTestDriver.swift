@@ -272,6 +272,57 @@ enum DateRouteTestDriver {
         check("2 stamp: a covering document's year wins over a stamp (step 3a)",
               stampCovered.year == 1958 && stampCovered.evidenceClass == .inherited && stampCovered.quote == nil)
 
+        // W47.ct-folder-date (owner, 2026-11-19): the folder run's confirmed date, step 3b.
+        func folder(_ s: String) -> ContainerFolderDate { ContainerFolderDate.parse(s, start: "00012.pdf")! }
+        var single = failed
+        single.inherit(fromFolder: folder("Feb. 1970"))
+        var t8 = GeneratedTags(year: "1958", month: "1 January", day: "Day 9")
+        single.apply(to: &t8)
+        let fo8 = single.with(measured: true).sidecarObject()
+        check("2 folder: a single year with its month, no Date Uncertain, no day; the folder photo and its date as evidence",
+              t8.year == "1970" && t8.month == "2 February" && t8.day == nil && !t8.dateUncertain
+              && single.evidenceClass == .folder && fo8["class"] as? String == "folder"
+              && fo8["source"] as? String == "00012.pdf" && fo8["folder_date"] as? String == "Feb. 1970"
+              && single.headerEvidence == "folder; from 00012.pdf; \"Feb. 1970\"",
+              "\(t8.allTags) \(fo8) \(String(describing: single.headerEvidence))")
+        var mid = byStamp
+        mid.inherit(fromFolder: folder("1965-1967"))
+        var t9 = GeneratedTags()
+        mid.apply(to: &t9)
+        check("2 folder: a range under 8 years is its mid-point year with Date Uncertain, over a stamp's year",
+              t9.year == "1966" && t9.dateUncertain && t9.month == nil && t9.day == nil && mid.evidenceClass == .folder)
+        var dec = failed
+        dec.inherit(fromFolder: folder("1958-1969"))
+        var t10 = GeneratedTags(year: "1958")
+        dec.apply(to: &t10)
+        check("2 folder: 8 to 19 years is the decade with Date Uncertain",
+              t10.year == "1960s" && t10.dateUncertain && t10.month == nil && dec.year == nil
+              && dec.headerEvidence == "folder; from 00012.pdf; \"1958-1969\""
+              && dec.sidecarObject()["decade"] as? String == "1960s")
+        var wide = failed
+        wide.inherit(fromFolder: folder("1939-1978"))
+        check("2 folder: 20 years or more dates nothing", wide == failed)
+        var ownWins = explicit
+        ownWins.inherit(fromFolder: folder("1971"))
+        var coverWins = inherited
+        coverWins.inherit(fromFolder: folder("1971"))
+        var imageWins = byImage
+        imageWins.inherit(fromFolder: folder("1971"))
+        check("2 folder: the document's own date, from its text or image, and a cover's year win",
+              ownWins == explicit && coverWins == inherited && imageWins == byImage)
+        var sameFolder = failed
+        sameFolder.inherit(fromCover: GeneratedTags(year: "1970", month: "2 February"), coverFile: "L.pdf")
+        sameFolder.inherit(fromFolder: folder("Feb. 1970"))
+        var t11 = GeneratedTags()
+        sameFolder.apply(to: &t11)
+        var rangeCover = failed
+        rangeCover.inherit(fromCover: GeneratedTags(year: "1966"), coverFile: "L.pdf")
+        rangeCover.inherit(fromFolder: folder("1965-1967"))
+        check("2 folder: an enclosure whose cover took the folder's single year takes the folder's form (month, no flag); "
+              + "a range's mid-point through the cover stays the cover's",
+              t11.year == "1970" && t11.month == "2 February" && !t11.dateUncertain && sameFolder.evidenceClass == .folder
+              && rangeCover.evidenceClass == .inherited && rangeCover.year == 1966 && rangeCover.dateUncertain)
+
         let url = URL(fileURLWithPath: "/scratch/page1.jpg")
         let tags = GeneratedTags(year: "1958", subjectTags: ["Harbours"], format: "letter")
         check("2 no dating object: the sidecar is unchanged",
@@ -613,6 +664,59 @@ enum DateRouteTestDriver {
         check("3 E: the sidecar names the cover as the source", (ed["dating"] as? [String: Any])?["class"] as? String
               == "inherited" && (ed["dating"] as? [String: Any])?["source"] as? String == "gateway-DOCA.jpg"
               && ed["enclosure_of"] != nil)
+
+        // W47.ct-folder-date: a folder's container file holds a folder run from just after A, dated 1965-1967 by the user,
+        // then one from just after C whose date is a label read nobody confirmed. Read, never written. The PDFs are
+        // tagged where they are (the pre-OCRed route, output = source), as the runs were set on their names.
+        func withFolderRuns(_ dir: URL) -> (URL, Data?) {
+            let runs = [ContainerRun(start: "DOCAz.pdf", level: .folder,
+                                     fields: ContainerFieldSet([.date: ContainerValue("1965-1967", source: .user)])),
+                        ContainerRun(start: "DOCCz.pdf", level: .folder,
+                                     fields: ContainerFieldSet([.date: ContainerValue("Feb. 1970", source: .label,
+                                                                                      reader: "vision+parser")]))]
+            _ = try? ContainerFileStore.write(ContainerFile(runs: runs), directory: dir, expecting: nil)
+            let url = ContainerFileStore.containerFileURL(in: dir)
+            return (url, try? Data(contentsOf: url))
+        }
+        wire.lock.withLock { wire.tagging = 0; wire.trace = []; wire.images = []; wire.models = [] }
+        let (fd, _, _) = processor(gateway: gw, out: "folderdate")
+        let fdDir = tmp.appendingPathComponent("folderdate", isDirectory: true)
+        let fdPDFs = markers.map { fdDir.appendingPathComponent("\($0).pdf") }
+        fd.jobs = fd.jobs.enumerated().map { i, job in
+            var inPlace = OCRJob(sourceURL: fdPDFs[i])
+            inPlace.result = job.result
+            inPlace.classification = job.classification
+            return inPlace
+        }
+        fd.outputURLMap = Dictionary(uniqueKeysWithValues: fdPDFs.map { ($0, $0) })
+        fd.rebuildSegments(files: fdPDFs)
+        let (containerURL, before) = withFolderRuns(fdDir)
+        await fd.performTaggingPhase(provider: .gemini, model: route.model, apiKey: "", outputDirectory: fdDir,
+                                     enableSegmentJSON: true)
+        let fdA = applied(fd, fdPDFs[0]), fdB = applied(fd, fdPDFs[2]), fdC = applied(fd, fdPDFs[3])
+        let fdD = applied(fd, fdPDFs[4]), fdE = applied(fd, fdPDFs[1])
+        let fdCTags = (try? MacOSTagger.readTags(from: fdPDFs[3])) ?? []
+        check("3 folder, in place: B and C, undated of their own, take the confirmed folder's mid-point 1966 with Date Uncertain",
+              before != nil && fd.segments.count == 5 && fdC.contains("1966") && fdC.contains("Date Uncertain")
+              && !fdC.contains("1947") && fdB.contains("1966") && fdB.contains("Date Uncertain")
+              && fdCTags.contains("1966") && fdCTags.contains("Date Uncertain"), "\(fdB) \(fdC) \(fdCTags)")
+        check("3 folder, in place: A (before the run, its own text) and E (its cover, in the unconfirmed run) keep theirs",
+              fdA.contains("1947") && !fdA.contains("Date Uncertain") && fdE.contains("1947") && fdE.contains("Date Uncertain")
+              && !fdE.contains("1966"), "\(fdA) \(fdE)")
+        check("3 folder, in place: D, in a folder run whose date nobody confirmed, takes no folder date",
+              !fdD.contains("1970") && !fdD.contains("1966") && !fdD.contains("2 February"), "\(fdD)")
+        check("3 folder: the container file is read, never written",
+              before != nil && (try? Data(contentsOf: containerURL)) == before)
+
+        // A new output written into a folder with runs takes no folder date: its name was never in them.
+        wire.lock.withLock { wire.tagging = 0; wire.trace = []; wire.images = []; wire.models = [] }
+        let (fresh, freshFiles, _) = processor(gateway: gw, out: "freshfolder")
+        _ = withFolderRuns(tmp.appendingPathComponent("freshfolder", isDirectory: true))
+        await fresh.performTaggingPhase(provider: .gemini, model: route.model, apiKey: "", outputDirectory: tmp,
+                                        enableSegmentJSON: true)
+        let freshC = applied(fresh, freshFiles[3])
+        check("3 folder: a new output in a folder with confirmed runs keeps its own route (C's estimate)",
+              freshC.contains("1947") && !freshC.contains("1966"), "\(freshC)")
 
         // The switch on: the image pass on A too, for its stamp; A's text year stands.
         wire.lock.withLock { wire.tagging = 0; wire.trace = []; wire.images = []; wire.models = [] }
