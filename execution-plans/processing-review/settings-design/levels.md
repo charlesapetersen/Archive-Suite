@@ -4,7 +4,10 @@ Owner, 2026-11-19, on the withheld-features sheet (`../13-stage-rules/14-owner-c
 to revise the Settings panel in Processor. Things like this should be in an Advanced panel or similar. The whole panel
 likely needs to be broken out into multiple panels and also into multiple levels depending on user sophistication."
 
-This is the design that goes to him before anything is built. The settings design in `../12-settings-design.md`
+**Approved as written by the owner, 2026-11-19** (W47.settings-levels-owner-ok; `../13-stage-rules/14-owner-calls.md`
+call 15): eight panels and three levels; all twelve control groups in section 4 move to Advanced; the trained
+segmentation models under the kit minimums and post-correction at Advanced; a new user starts at Basic. Built by
+W47.settings-panels (section 2) and W47.settings-level-switch (sections 3-5). The settings design in `../12-settings-design.md`
 (the two interviews, the limits-first sheet with the range one tab away, the three layers with every value's source
 shown) and his six calls there stand; this note changes only where the controls sit and who sees them. Nothing here
 changes a default, a route, a figure or a solver pick.
@@ -70,7 +73,7 @@ layers call (every value shows its source):
 ## 4. Where each setting sits
 
 B Basic, S Standard, A Advanced. Rows marked "moves to A" are controls a user can see today and would not see below
-Advanced; under call 13 they are listed here for the owner, not decided by this note.
+Advanced; under call 13 they were listed for the owner, who moved all twelve groups (2026-11-19).
 
 ### Existing settings
 
@@ -137,8 +140,8 @@ That is 12 groups moved to Advanced, about 23 controls. "No bench figure" means 
 | Mac Qwen3-VL 8B image pass for dating (W47.wh-date-8b-image) | Dates and names | A, rule (b), owner's word | "no measured gain": 32 of 55 against 33; false years on 20 to 21 of the 90 undated |
 | Names on small Macs and on pre-modern material (W47.wh-names-small-mac) | Dates and names | A, rule (c), owner's word | sender F1 GLiNER2.5 0.24, NLTagger 0.14 on 138 documents; 0.02-0.37 on L5 and L7; every name marked low confidence |
 
-The trained-model and post-correction placements are this design's reading of the owner's three rules; the readers,
-the 8B pass and the small-Mac names are his own words.
+The trained-model and post-correction placements were this design's reading of the owner's three rules, and he approved
+them on 2026-11-19; the readers, the 8B pass and the small-Mac names are his own words.
 
 ## 5. Decided here, not put to the owner
 
@@ -148,10 +151,10 @@ the 8B pass and the small-Mac names are his own words.
   this Mac" for a skipped interview).
 - The level belongs to the general layer, not the collection: it describes the person, not the material.
 
-## 6. The build, once the owner answers
+## 6. The build
 
-Filed from his answer, roughly: (1) the panels, moving every control and the stage cards into them, one owner per key,
-the window's UITest in the VM; (2) the level mechanism, its interview question and the "set at a higher level" rule,
-with a unit test that every catalog key and every route row has a level; then W47.wh-readers-lost,
-W47.wh-post-correction, W47.wh-date-8b-image and W47.wh-names-small-mac, which wait on it, put their rows at the level
-he sets.
+Filed from his answer (2026-11-19): W47.settings-panels (the eight panels, every control and stage card moved, one
+owner per key, the window's UITest in the VM), then W47.settings-level-switch (the levels, the interview question, the
+"set at a higher level" rule, a unit test that every catalog key and every route row has a level). W47.wh-readers-lost,
+W47.wh-post-correction, W47.wh-date-8b-image and W47.wh-names-small-mac wait on the level switch and put their rows at
+Advanced.

@@ -20,4 +20,5 @@ python3 execution-plans/processing-review/settings-design/inject.py execution-pl
 ```
 
 `levels.md` (W47.settings-levels, 2026-11-19) is the later design that splits the Settings window into panels and
-three levels, with where each existing setting and each feature released by call 15 sits. It waits on the owner.
+three levels, with where each existing setting and each feature released by call 15 sits. Approved by the owner on
+2026-11-19; built by W47.settings-panels and W47.settings-level-switch.
