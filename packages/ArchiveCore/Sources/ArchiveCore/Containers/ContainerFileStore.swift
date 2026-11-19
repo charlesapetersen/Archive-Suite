@@ -57,6 +57,14 @@ public enum ContainerWriteError: Error, Equatable {
     case io(String, Int32)
 }
 
+/// A write made on the user's say-so to set aside the document on disk (`writeSettingAside`).
+public struct ContainerSetAsideWrite: Equatable, Sendable {
+    /// The document as written, as `write` returns it.
+    public let stamp: ContainerFileStamp
+    /// The name the old document now has in `.archivesuite`; nil when there was none to set aside.
+    public let setAsideName: String?
+}
+
 public enum ContainerFileStore {
     /// How long a writer waits for another's lock before giving up with `.busy`.
     public static let lockWait: TimeInterval = 5
@@ -93,14 +101,23 @@ public enum ContainerFileStore {
     public static func write(_ file: ContainerFile, directory: URL, expecting: ContainerFileStamp?,
                              settingAside: Bool = false) throws -> ContainerFileStamp {
         try write(file, in: directory, name: ContainerFile.fileName, version: ContainerFile.schemaVersion,
-                  expecting: expecting, settingAside: settingAside)
+                  expecting: expecting, settingAside: settingAside).stamp
+    }
+
+    /// `write(…, settingAside: true)`, saying what the set-aside document is now called, so an undo can put it back
+    /// (`putBackSetAside`). Only on the user's explicit say-so.
+    public static func writeSettingAside(_ file: ContainerFile, directory: URL, expecting: ContainerFileStamp?) throws
+        -> ContainerSetAsideWrite {
+        let (stamp, aside) = try write(file, in: directory, name: ContainerFile.fileName,
+                                       version: ContainerFile.schemaVersion, expecting: expecting, settingAside: true)
+        return ContainerSetAsideWrite(stamp: stamp, setAsideName: aside)
     }
 
     @discardableResult
     public static func writeLevelMap(_ map: ContainerLevelMap, root: URL, expecting: ContainerFileStamp?) throws
         -> ContainerFileStamp {
         try write(map, in: root, name: ContainerLevelMap.fileName, version: ContainerLevelMap.schemaVersion,
-                  expecting: expecting)
+                  expecting: expecting).stamp
     }
 
     public static func namesURL(in root: URL) -> URL {
@@ -116,7 +133,76 @@ public enum ContainerFileStore {
     public static func writeNames(_ names: ContainerNames, root: URL, expecting: ContainerFileStamp?) throws
         -> ContainerFileStamp {
         try write(names, in: root, name: ContainerNames.fileName, version: ContainerNames.schemaVersion,
-                  expecting: expecting)
+                  expecting: expecting).stamp
+    }
+
+    /// `writeSettingAside` for the standard names: an unreadable `container-names.json` is set aside, never deleted.
+    public static func writeNamesSettingAside(_ names: ContainerNames, root: URL, expecting: ContainerFileStamp?)
+        throws -> ContainerSetAsideWrite {
+        let (stamp, aside) = try write(names, in: root, name: ContainerNames.fileName,
+                                       version: ContainerNames.schemaVersion, expecting: expecting, settingAside: true)
+        return ContainerSetAsideWrite(stamp: stamp, setAsideName: aside)
+    }
+
+    /// Undoes a set-aside: swaps `aside` (a `<name>.set-aside-…` file in `directory`'s `.archivesuite`) with `name`,
+    /// so the set-aside document is `name` again and the one written over it takes the set-aside name. Nothing is
+    /// deleted, and a second call swaps them back (Redo). Refused unless `name` is still the file `expecting`
+    /// describes (inode, size and modification time) and both are ordinary files. Returns the stamp of the file now
+    /// at `name`, which a later call passes back.
+    @discardableResult
+    public static func putBackSetAside(_ aside: String, as name: String, in directory: URL,
+                                       expecting: ContainerFileStamp) throws -> ContainerFileStamp {
+        guard [ContainerFile.fileName, ContainerNames.fileName].contains(name), aside.hasPrefix("\(name).set-aside-"),
+              !aside.contains("/") else { throw ContainerWriteError.notOrdinary(aside) }
+        let sfd: Int32
+        switch openSuiteFolder(directory, create: false) {
+        case .success(let fd): sfd = fd
+        case .failure(.missing): throw ContainerWriteError.changedSinceRead
+        case .failure(.notOrdinary(let what)): throw ContainerWriteError.notOrdinary(what)
+        case .failure(.io(let what, let e)): throw ContainerWriteError.io(what, e)
+        }
+        defer { close(sfd) }
+        try lock(sfd)
+        defer { flock(sfd, LOCK_UN) }
+
+        var current = stat()
+        guard fstatat(sfd, name, &current, AT_SYMLINK_NOFOLLOW) == 0 else { throw ContainerWriteError.changedSinceRead }
+        guard (current.st_mode & S_IFMT) == S_IFREG else { throw ContainerWriteError.notOrdinary(name) }
+        let now = makeStamp(current, dropped: false)
+        guard now.inode == expecting.inode, now.size == expecting.size,
+              now.modifiedSeconds == expecting.modifiedSeconds,
+              now.modifiedNanoseconds == expecting.modifiedNanoseconds else {
+            throw ContainerWriteError.changedSinceRead
+        }
+        var old = stat()
+        guard fstatat(sfd, aside, &old, AT_SYMLINK_NOFOLLOW) == 0 else { throw ContainerWriteError.changedSinceRead }
+        guard (old.st_mode & S_IFMT) == S_IFREG else { throw ContainerWriteError.notOrdinary(aside) }
+
+        if renameatx_np(sfd, aside, sfd, name, UInt32(RENAME_SWAP)) != 0 {
+            let e = errno
+            guard e == ENOTSUP || e == EOPNOTSUPP || e == EINVAL else { throw ContainerWriteError.io("swap", e) }
+            // A volume without an atomic swap: three exclusive renames under the lock, the first undone on failure.
+            let parked = ".\(name).\(UUID().uuidString).swap"
+            guard renameatx_np(sfd, name, sfd, parked, UInt32(RENAME_EXCL)) == 0 else {
+                throw ContainerWriteError.io("swap", errno)
+            }
+            guard renameatx_np(sfd, aside, sfd, name, UInt32(RENAME_EXCL)) == 0 else {
+                let e = errno
+                renameatx_np(sfd, parked, sfd, name, UInt32(RENAME_EXCL))
+                throw ContainerWriteError.io("swap", e)
+            }
+            guard renameatx_np(sfd, parked, sfd, aside, UInt32(RENAME_EXCL)) == 0 else {
+                // All or nothing: both go back where they were.
+                let e = errno
+                if renameatx_np(sfd, name, sfd, aside, UInt32(RENAME_EXCL)) == 0 {
+                    renameatx_np(sfd, parked, sfd, name, UInt32(RENAME_EXCL))
+                }
+                throw ContainerWriteError.io("swap", e)
+            }
+        }
+        var back = stat()
+        guard fstatat(sfd, name, &back, AT_SYMLINK_NOFOLLOW) == 0 else { throw ContainerWriteError.io("stat", errno) }
+        return makeStamp(back, dropped: false)
     }
 
     /// The nearest folder at or above `directory` holding a level map, stopping at `root` (inclusive); nil outside it.
@@ -224,11 +310,12 @@ public enum ContainerFileStore {
 
     // MARK: Writing
 
+    /// Writes `document`; returns its stamp and, where the old one was set aside, the name it now has.
     @discardableResult
     static func write<D: Codable & Equatable & Sendable>(
         _ document: D, in directory: URL, name: String, version: Int, expecting: ContainerFileStamp?,
         settingAside: Bool = false
-    ) throws -> ContainerFileStamp {
+    ) throws -> (stamp: ContainerFileStamp, setAside: String?) {
         let data = try encoder.encode(document)
         guard data.count <= ContainerFile.maxFileBytes else { throw ContainerWriteError.tooBig }
 
@@ -242,17 +329,13 @@ public enum ContainerFileStore {
         defer { close(sfd) }
 
         // Held from the check to the rename; advisory, and every writer goes through here.
-        let deadline = Date().addingTimeInterval(lockWait)
-        while flock(sfd, LOCK_EX | LOCK_NB) != 0 {
-            let e = errno
-            if e == ENOTSUP || e == EOPNOTSUPP { break }   // a volume without locks: the checks below still hold
-            guard e == EWOULDBLOCK || e == EINTR else { throw ContainerWriteError.io("flock", e) }
-            guard Date() < deadline else { throw ContainerWriteError.busy }
-            usleep(20_000)
-        }
+        try lock(sfd)
         defer { flock(sfd, LOCK_UN) }
 
         var exists = true
+        // A set-aside happens only once the new document is written and synced, so a failed write leaves the old
+        // one where it was.
+        var settingAsideNow = false
         let current: ContainerLoad<D> = read(sfd, name, version: version)
         switch current {
         case .missing:
@@ -264,8 +347,7 @@ public enum ContainerFileStore {
                 guard settingAside else {
                     throw ContainerWriteError.refusedExisting("holds values this build does not read")
                 }
-                try setAside(sfd, name)
-                exists = false
+                settingAsideNow = true
             }
         case .newer:
             throw ContainerWriteError.refusedExisting("of a newer schemaVersion")
@@ -275,8 +357,7 @@ public enum ContainerFileStore {
                 throw ContainerWriteError.notOrdinary(name)
             }
             guard settingAside else { throw ContainerWriteError.refusedExisting(why) }
-            try setAside(sfd, name)
-            exists = false
+            settingAsideNow = true
         }
 
         let temp = ".\(name).\(UUID().uuidString).tmp"
@@ -300,10 +381,21 @@ public enum ContainerFileStore {
             // inode, size and modification time.
             guard fstat(fd, &written) == 0 else { throw ContainerWriteError.io("stat", errno) }
         }
+        var asideName: String?
+        if settingAsideNow {
+            asideName = try setAside(sfd, name)
+            exists = false
+        }
         // A first document is put in place only if none appeared meanwhile, even from a writer that skips the lock.
         var flags: UInt32 = exists ? 0 : UInt32(RENAME_EXCL)
         while renameatx_np(sfd, temp, sfd, name, flags) != 0 {
             let e = errno
+            if let asideName {
+                // The set-aside document goes back if the new one could not take its place; no retry without the
+                // exclusive flag (`setAside` needed it, so the volume has it).
+                renameatx_np(sfd, asideName, sfd, name, UInt32(RENAME_EXCL))
+                throw e == EEXIST ? ContainerWriteError.changedSinceRead : ContainerWriteError.io("rename", e)
+            }
             if e == EEXIST { throw ContainerWriteError.changedSinceRead }
             // A volume without exclusive rename: the check above, under the lock where there is one, stands in.
             guard flags != 0, e == ENOTSUP || e == EOPNOTSUPP || e == EINVAL else {
@@ -314,11 +406,23 @@ public enum ContainerFileStore {
             flags = 0
         }
         renamed = true
-        return makeStamp(written, dropped: false)
+        return (makeStamp(written, dropped: false), asideName)
     }
 
-    /// Renames the document in place to `<name>.set-aside-<UTC stamp>-<id>`, never over another file.
-    private static func setAside(_ sfd: Int32, _ name: String) throws {
+    /// Takes the exclusive `flock` on `.archivesuite`, waiting up to `lockWait`; a volume without locks goes ahead.
+    private static func lock(_ sfd: Int32) throws {
+        let deadline = Date().addingTimeInterval(lockWait)
+        while flock(sfd, LOCK_EX | LOCK_NB) != 0 {
+            let e = errno
+            if e == ENOTSUP || e == EOPNOTSUPP { return }   // a volume without locks: the checks still hold
+            guard e == EWOULDBLOCK || e == EINTR else { throw ContainerWriteError.io("flock", e) }
+            guard Date() < deadline else { throw ContainerWriteError.busy }
+            usleep(20_000)
+        }
+    }
+
+    /// Renames the document in place to `<name>.set-aside-<UTC stamp>-<id>`, never over another file; returns that name.
+    private static func setAside(_ sfd: Int32, _ name: String) throws -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeZone(identifier: "UTC")
@@ -327,6 +431,7 @@ public enum ContainerFileStore {
         guard renameatx_np(sfd, name, sfd, aside, UInt32(RENAME_EXCL)) == 0 else {
             throw ContainerWriteError.io("set aside", errno)
         }
+        return aside
     }
 
     // MARK: Helpers

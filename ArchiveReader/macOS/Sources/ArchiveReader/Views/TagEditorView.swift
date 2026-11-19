@@ -108,6 +108,7 @@ struct TagEditorView: View {
             }
         }
         .modifier(FolderDatingAlert(model: model, window: undoManager.map(ObjectIdentifier.init)))
+        .modifier(ContainerSetAsideAlert(model: model, window: undoManager.map(ObjectIdentifier.init)))
     }
 
     /// The file whose collection record the inspector shows (W46.settings-reader-notes): the selection's when every
@@ -474,6 +475,30 @@ private struct FolderDatingAlert: ViewModifier {
             Button("Not Now", role: .cancel) { model.folderDatingOffer = nil }
         } message: { offer in
             Text(offer.message)
+        }
+    }
+}
+
+/// W49.reader-ct-set-aside: the offer to set aside a container file the last edit could not overwrite, asked in the
+/// window whose Inspector the edit was made in.
+private struct ContainerSetAsideAlert: ViewModifier {
+    let model: NavigationModel
+    let window: ObjectIdentifier?
+
+    private var offer: ContainerSetAsideOffer? {
+        guard let offer = model.containerSetAsideOffer, offer.window == nil || offer.window == window else { return nil }
+        return offer
+    }
+
+    func body(content: Content) -> some View {
+        content.alert(offer?.title ?? "", isPresented: Binding(
+            get: { offer != nil },
+            set: { if !$0, offer != nil { model.containerSetAsideOffer = nil } }), presenting: offer) { offer in
+            Button("Set Aside and Save") { model.acceptContainerSetAside(offer) }
+                .accessibilityIdentifier("ar.containerSetAside.confirm")
+            Button("Leave It", role: .cancel) { model.containerSetAsideOffer = nil }
+        } message: { offer in
+            Text(offer.needed.offerMessage)
         }
     }
 }

@@ -259,13 +259,20 @@ final class ContainerEditTests: XCTestCase {
         let suite = box.appendingPathComponent(ContainerFile.folderName, isDirectory: true)
         try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: true)
         let doc = suite.appendingPathComponent(ContainerFile.fileName)
-        for bytes in [#"{"schemaVersion": 2, "runs": []}"#, #"{"schemaVersion": 1, "runs": [], "future": 1}"#, "{ no"] {
+        // W49.reader-ct-set-aside: a newer document is refused outright; the others are offered for setting aside.
+        let cases: [(String, (Error) -> Bool)] = [
+            (#"{"schemaVersion": 2, "runs": []}"#, { ($0 as? ContainerWriteError) == .refusedExisting(ContainerFile.fileName) }),
+            (#"{"schemaVersion": 1, "runs": [], "future": 1}"#,
+             { ($0 as? ContainerSetAsideNeeded)?.reason == .drops(runs: 0, values: 0) }),
+            ("{ no", { ($0 as? ContainerSetAsideNeeded)?.reason == .unreadable("no schemaVersion") }),
+        ]
+        for (bytes, expected) in cases {
             try Data(bytes.utf8).write(to: doc)
             var called = false
             XCTAssertThrowsError(try NavigationModel.editContainerFile(at: box) { file in
                 called = true
                 return ContainerEdits.set(.container, to: self.user("Box 9"), at: .directory, in: file)
-            }) { XCTAssertEqual($0 as? ContainerWriteError, .refusedExisting(ContainerFile.fileName)) }
+            }) { XCTAssertTrue(expected($0), "\(bytes): \($0)") }
             XCTAssertFalse(called)
             XCTAssertEqual(try String(contentsOf: doc, encoding: .utf8), bytes, "untouched")
         }
@@ -418,6 +425,178 @@ final class ContainerEditTests: XCTestCase {
             XCTAssertEqual($0 as? ContainerWriteError, .refusedExisting(ContainerFile.fileName))
         }
         XCTAssertEqual(try snapshot(), before, "the first folder was not written either")
+    }
+
+    // MARK: Setting aside (W49.reader-ct-set-aside)
+
+    /// A document holding a value this build drops, beside one run it reads.
+    private let dropping = #"{"schemaVersion": 1, "future": {"x": 1}, "runs": [{"start": "a.pdf", "level": "box", "#
+        + #""fields": {"container": {"value": "Box 1", "source": "label"}}}]}"#
+
+    private func consenting<T>(_ directory: URL, _ name: String = ContainerFile.fileName,
+                               _ work: () throws -> T) rethrows -> T {
+        try ContainerSetAsideConsent.$paths.withValue([ContainerSetAsideNeeded.documentPath(directory, name)]) {
+            try work()
+        }
+    }
+
+    /// The files in `.archivesuite` and their bytes.
+    private func suiteFiles(_ directory: URL) throws -> [String: String] {
+        let suite = directory.appendingPathComponent(ContainerFile.folderName, isDirectory: true)
+        var out: [String: String] = [:]
+        for name in try FileManager.default.contentsOfDirectory(atPath: suite.path) {
+            out[name] = try String(contentsOf: suite.appendingPathComponent(name), encoding: .utf8)
+        }
+        return out
+    }
+
+    /// Every file outside any `.archivesuite`, from `snapshot`.
+    private func outsideSuite() throws -> [String: String] {
+        try snapshot().filter { !$0.key.contains("/\(ContainerFile.folderName)") }
+    }
+
+    func testWithConsentADroppingDocumentIsSetAsideAndWhatReadsIsKept() throws {
+        let box = try makeBox()
+        let suite = box.appendingPathComponent(ContainerFile.folderName, isDirectory: true)
+        try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: true)
+        try Data(dropping.utf8).write(to: suite.appendingPathComponent(ContainerFile.fileName))
+        let outside = try outsideSuite()
+        XCTAssertThrowsError(try NavigationModel.editContainerFile(at: box) { file in
+            ContainerEdits.set(.folder, to: self.user("3"), at: .directory, in: file)
+        }) { XCTAssertEqual(($0 as? ContainerSetAsideNeeded)?.reason, .drops(runs: 1, values: 1)) }
+        // Consent for another folder's file is not consent for this one.
+        try consenting(root) {
+            XCTAssertThrowsError(try NavigationModel.editContainerFile(at: box) { file in
+                ContainerEdits.set(.folder, to: self.user("3"), at: .directory, in: file)
+            })
+        }
+        XCTAssertEqual(try suiteFiles(box), [ContainerFile.fileName: dropping], "untouched")
+
+        let restore = try XCTUnwrap(try consenting(box) {
+            try NavigationModel.editContainerFile(at: box) { file in
+                ContainerEdits.set(.folder, to: self.user("3"), at: .directory, in: file)
+            }
+        })
+        let files = try suiteFiles(box)
+        XCTAssertEqual(files.count, 2)
+        let aside = try XCTUnwrap(files.keys.first { $0.hasPrefix("\(ContainerFile.fileName).set-aside-") })
+        XCTAssertEqual(files[aside], dropping, "the old document is renamed, not deleted")
+        let written = try XCTUnwrap(ContainerFileStore.load(directory: box).document)
+        XCTAssertEqual(written.directory[.folder]?.value, "3")
+        XCTAssertEqual(written.runs.first?.fields[.container]?.value, "Box 1", "what reads carries over")
+        XCTAssertEqual(try outsideSuite(), outside, "nothing outside .archivesuite changed")
+
+        // Undo puts the set-aside document back (the one written takes its name); Redo swaps them again.
+        let undone = ContainerUndoStep(restores: [restore]).apply()
+        XCTAssertTrue(undone.failures.isEmpty)
+        let afterUndo = try suiteFiles(box)
+        XCTAssertEqual(afterUndo[ContainerFile.fileName], dropping)
+        XCTAssertEqual(afterUndo[aside], files[ContainerFile.fileName])
+        XCTAssertEqual(afterUndo.count, 2)
+        let redone = undone.inverse.apply()
+        XCTAssertTrue(redone.failures.isEmpty)
+        XCTAssertEqual(try suiteFiles(box), files)
+        XCTAssertTrue(redone.inverse.apply().failures.isEmpty)
+        XCTAssertEqual(try suiteFiles(box)[ContainerFile.fileName], dropping)
+    }
+
+    func testANewerDocumentIsNeverSetAsideEvenWithConsent() throws {
+        let box = try makeBox()
+        let suite = box.appendingPathComponent(ContainerFile.folderName, isDirectory: true)
+        try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: true)
+        let newer = #"{"schemaVersion": 2, "runs": []}"#
+        try Data(newer.utf8).write(to: suite.appendingPathComponent(ContainerFile.fileName))
+        try consenting(box) {
+            XCTAssertThrowsError(try NavigationModel.editContainerFile(at: box) { file in
+                ContainerEdits.set(.folder, to: self.user("3"), at: .directory, in: file)
+            }) { XCTAssertEqual($0 as? ContainerWriteError, .refusedExisting(ContainerFile.fileName)) }
+        }
+        XCTAssertEqual(try suiteFiles(box), [ContainerFile.fileName: newer])
+    }
+
+    func testUndoOfASetAsideStillWorksAfterALaterEditIsUndone() throws {
+        let box = try makeBox()
+        let suite = box.appendingPathComponent(ContainerFile.folderName, isDirectory: true)
+        try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: true)
+        try Data("{ no".utf8).write(to: suite.appendingPathComponent(ContainerFile.fileName))
+        let first = try XCTUnwrap(try consenting(box) {
+            try NavigationModel.editContainerFile(at: box) { file in
+                ContainerEdits.set(.folder, to: self.user("3"), at: .directory, in: file)
+            }
+        })
+        let second = try XCTUnwrap(try NavigationModel.editContainerFile(at: box) { file in
+            ContainerEdits.set(.folder, to: self.user("4"), at: .directory, in: file)
+        })
+        XCTAssertTrue(ContainerUndoStep(restores: [second]).apply().failures.isEmpty)
+        XCTAssertTrue(ContainerUndoStep(restores: [first]).apply().failures.isEmpty,
+                      "the file holds what the set-aside edit wrote, under a new stamp")
+        XCTAssertEqual(try suiteFiles(box)[ContainerFile.fileName], "{ no")
+        XCTAssertEqual(try suiteFiles(box).count, 2, "nothing deleted")
+    }
+
+    func testUndoOfASetAsideLeavesAFileAnotherAppChangedAlone() throws {
+        let box = try makeBox()
+        let suite = box.appendingPathComponent(ContainerFile.folderName, isDirectory: true)
+        try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: true)
+        try Data("{ no".utf8).write(to: suite.appendingPathComponent(ContainerFile.fileName))
+        let restore = try XCTUnwrap(try consenting(box) {
+            try NavigationModel.editContainerFile(at: box) { file in
+                ContainerEdits.set(.folder, to: self.user("3"), at: .directory, in: file)
+            }
+        })
+        guard case let .loaded(_, stamp) = ContainerFileStore.load(directory: box) else { return XCTFail() }
+        try ContainerFileStore.write(boxAndFolder, directory: box, expecting: stamp)
+        let before = try suiteFiles(box)
+        let undone = ContainerUndoStep(restores: [restore]).apply()
+        XCTAssertEqual(undone.failures.count, 1)
+        XCTAssertEqual(undone.failures.first?.error as? ContainerWriteError, .changedSinceRead)
+        XCTAssertEqual(try suiteFiles(box), before)
+    }
+
+    func testAnUnreadableStandardNamesFileNearerTheFolderIsOfferedAndPutBack() throws {
+        let tree = root.resolvingSymlinksInPath()
+        let box = try makeBox()
+        try ContainerFileStore.writeNames(ContainerNames(), root: tree, expecting: nil)
+        let suite = box.appendingPathComponent(ContainerFile.folderName, isDirectory: true)
+        try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: true)
+        let strict = #"{"schemaVersion": 1, "names": [], "colour": "red"}"#
+        try Data(strict.utf8).write(to: suite.appendingPathComponent(ContainerNames.fileName))
+        let near = try NavigationModel.nearestNamesRoot(tree, ["Box 17"])
+        XCTAssertEqual(near.path, box.path, "the nearer file, not the root's")
+
+        XCTAssertThrowsError(try NavigationModel.setStandardName("Box 1", for: "B. 1", field: .container,
+                                                                 root: near, at: now)) {
+            let needed = $0 as? ContainerSetAsideNeeded
+            XCTAssertEqual(needed?.fileName, ContainerNames.fileName)
+            XCTAssertEqual(needed?.directory.path, box.path)
+        }
+        let step = try XCTUnwrap(try consenting(box, ContainerNames.fileName) {
+            try NavigationModel.setStandardName("Box 1", for: "B. 1", field: .container, root: near, at: now)
+        })
+        XCTAssertEqual(ContainerFileStore.loadNames(root: box).document?.names.count, 1)
+        let aside = try XCTUnwrap(try suiteFiles(box).first { $0.key.hasPrefix("\(ContainerNames.fileName).set-aside-") })
+        XCTAssertEqual(aside.value, strict)
+        XCTAssertTrue(step.apply().failures.isEmpty)
+        XCTAssertEqual(try suiteFiles(box)[ContainerNames.fileName], strict)
+    }
+
+    func testTheOfferNamesTheFileWhatReadsAndTheRename() {
+        let dir = URL(fileURLWithPath: "/tmp/Box 17")
+        let drops = ContainerSetAsideNeeded(directory: dir, fileName: ContainerFile.fileName,
+                                            reason: .drops(runs: 2, values: 5))
+        XCTAssertTrue(drops.offerMessage.contains("“Box 17/.archivesuite/containers.json”"))
+        XCTAssertTrue(drops.offerMessage.contains("2 runs and 5 values"))
+        XCTAssertTrue(drops.offerMessage.contains("containers.json.set-aside-"))
+        XCTAssertTrue(drops.offerMessage.contains("never deleted"))
+        XCTAssertTrue(drops.offerMessage.contains("Undo puts it back"))
+        let unreadable = ContainerSetAsideNeeded(directory: dir, fileName: ContainerNames.fileName,
+                                                 reason: .unreadable("no schemaVersion"))
+        XCTAssertTrue(unreadable.offerMessage.contains("no schemaVersion"))
+        XCTAssertTrue(unreadable.offerMessage.contains("None of it carries over"))
+        let failure = ContainerEditFailure(unreadable)
+        XCTAssertEqual(failure.setAside, unreadable)
+        XCTAssertEqual(failure.message, unreadable.refusal)
+        XCTAssertNil(ContainerEditFailure(ContainerWriteError.refusedExisting(ContainerFile.fileName)).setAside)
     }
 
     func testSetForSelectionAcrossFoldersUndoesAsOneStep() throws {

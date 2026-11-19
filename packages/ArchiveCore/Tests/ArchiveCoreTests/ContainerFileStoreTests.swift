@@ -212,6 +212,61 @@ final class ContainerFileStoreTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: target), newer)
     }
 
+    /// W49.reader-ct-set-aside: the write names the set-aside file, and putting it back swaps the two, deleting nothing;
+    /// a second put-back is the redo.
+    func testPuttingBackASetAsideDocumentSwapsItWithTheOneWritten() throws {
+        try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: false)
+        let junk = Data("not json".utf8)
+        try junk.write(to: target)
+        let wrote = try ContainerFileStore.writeSettingAside(sample(), directory: dir, expecting: nil)
+        let aside = try XCTUnwrap(wrote.setAsideName)
+        XCTAssertTrue(aside.hasPrefix("containers.json.set-aside-"))
+        XCTAssertEqual(try Data(contentsOf: suite.appendingPathComponent(aside)), junk)
+        let written = try Data(contentsOf: target)
+
+        let back = try ContainerFileStore.putBackSetAside(aside, as: ContainerFile.fileName, in: dir,
+                                                          expecting: wrote.stamp)
+        XCTAssertEqual(try Data(contentsOf: target), junk, "the set-aside document is the container file again")
+        XCTAssertEqual(try Data(contentsOf: suite.appendingPathComponent(aside)), written, "and nothing was deleted")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: suite.path).count, 2)
+
+        // The redo swaps them again; a stale stamp is refused and changes nothing.
+        XCTAssertThrowsError(try ContainerFileStore.putBackSetAside(aside, as: ContainerFile.fileName, in: dir,
+                                                                    expecting: wrote.stamp)) {
+            XCTAssertEqual($0 as? ContainerWriteError, .changedSinceRead)
+        }
+        XCTAssertEqual(try Data(contentsOf: target), junk)
+        try ContainerFileStore.putBackSetAside(aside, as: ContainerFile.fileName, in: dir, expecting: back)
+        XCTAssertEqual(ContainerFileStore.load(directory: dir).document, sample())
+
+        // Only a set-aside name of the document itself, and never a link.
+        XCTAssertThrowsError(try ContainerFileStore.putBackSetAside("../x", as: ContainerFile.fileName, in: dir,
+                                                                    expecting: back))
+        let link = "containers.json.set-aside-link"
+        try FileManager.default.createSymbolicLink(atPath: suite.appendingPathComponent(link).path,
+                                                   withDestinationPath: "/etc/hosts")
+        let now = try XCTUnwrap(ContainerFileStore.load(directory: dir).stamp)
+        XCTAssertThrowsError(try ContainerFileStore.putBackSetAside(link, as: ContainerFile.fileName, in: dir,
+                                                                    expecting: now)) {
+            XCTAssertEqual($0 as? ContainerWriteError, .notOrdinary(link))
+        }
+        XCTAssertEqual(ContainerFileStore.load(directory: dir).document, sample())
+    }
+
+    func testAnUnreadableStandardNamesFileIsSetAsideOnlyOnRequest() throws {
+        try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: false)
+        let url = ContainerFileStore.namesURL(in: dir)
+        let strict = Data(#"{"schemaVersion": 1, "names": [], "colour": "red"}"#.utf8)
+        try strict.write(to: url)
+        XCTAssertThrowsError(try ContainerFileStore.writeNames(ContainerNames(), root: dir, expecting: nil))
+        let wrote = try ContainerFileStore.writeNamesSettingAside(ContainerNames(), root: dir, expecting: nil)
+        let aside = try XCTUnwrap(wrote.setAsideName)
+        XCTAssertTrue(aside.hasPrefix("container-names.json.set-aside-"))
+        XCTAssertEqual(try Data(contentsOf: suite.appendingPathComponent(aside)), strict)
+        try ContainerFileStore.putBackSetAside(aside, as: ContainerNames.fileName, in: dir, expecting: wrote.stamp)
+        XCTAssertEqual(try Data(contentsOf: url), strict)
+    }
+
     func testADocumentWithoutAnIntegerSchemaVersionIsUnreadable() throws {
         try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: false)
         for body in ["{}", #"{"schemaVersion": "1", "runs": []}"#, #"{"schemaVersion": 0}"#] {

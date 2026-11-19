@@ -45,10 +45,10 @@ What it does not do, deliberately or not yet:
   place; a folder another app holds locked can delay one by up to 5 s (accepted: the files are small and the lock
   short). The history is the window's; an edit made under another archive root is not undone after the root
   changes (accepted: the step names files of the old root).
-- **A container file this build cannot overwrite is left alone.** That covers a newer version, one it cannot read,
-  or one holding values it drops. The edit is refused with the reason, and the SPEC's "set aside on the user's
-  say-so" (`write(…, settingAside: true)`) is not offered yet. The same holds for an unreadable standard-names file
-  nearer the folder than the root's. (queued: W49.reader-ct-set-aside).
+- **A newer container file is never set aside.** A `containers.json` or `container-names.json` of a newer
+  `schemaVersion` stays refused with the reason, and no set-aside is offered for it, so an older build cannot erase a
+  newer one's values. An unreadable or dropping one is offered for setting aside (W49.reader-ct-set-aside).
+  (accepted: SPEC/containers.md §Setting aside, a newer document is never set aside).
 - **An edit to the folder's own values reaches the folders inside it** and outranks their label reads, as the SPEC's
   precedence says (user, then label, then path). The row says "every file in this folder and the folders inside
   it". It is chosen only where the folder has no run of that field's level. (accepted: the SPEC's precedence, user then label then path, SPEC/containers.md).

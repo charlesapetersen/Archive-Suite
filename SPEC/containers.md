@@ -188,7 +188,11 @@ one version. The run order in a file does not matter; readers sort.
 **Setting aside.** A document that is unreadable or holds values this build drops is shown as far as it reads, and
 is replaced only on the user's explicit say-so (`write(…, settingAside: true)`): it is renamed, never deleted, to
 `containers.json.set-aside-<yyyyMMdd-HHmmss UTC>-<id>` in `.archivesuite`, and the new document written in its place.
-A newer document is never set aside.
+A newer document is never set aside. The same holds for an unreadable `container-names.json` (`writeNamesSettingAside`).
+An undo puts the set-aside document back by swapping the two names (`putBackSetAside`, under the lock, only while the
+file is still the one written), so the document written takes the set-aside name and nothing is deleted. The Reader
+offers it in the Inspector when an edit is refused, naming the file, what reads and the rename
+(`W49.reader-ct-set-aside`).
 
 Writing (`ContainerFileStore.write`):
 - opens the directory and `.archivesuite` without following a link at either, creating `.archivesuite` if it is

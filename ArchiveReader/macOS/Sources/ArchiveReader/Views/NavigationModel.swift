@@ -216,6 +216,8 @@ final class NavigationModel: ObservableObject {
     @Published var itemFieldEditError: String?
     /// W47.ct-folder-date-reader: the offer to date a folder run's undated documents by its confirmed date.
     @Published var folderDatingOffer: FolderDatingOffer?
+    /// W49.reader-ct-set-aside: the offer to set aside a container file the last edit could not overwrite.
+    @Published var containerSetAsideOffer: ContainerSetAsideOffer?
     /// The file the last item-field edit was for; its error is shown only with that file (nil: with any).
     var itemFieldEditPath: String?
     /// Bumped after each `.archivesuite` edit, undo or redo, so the Checks section reads the user's values again.
@@ -2339,6 +2341,7 @@ final class NavigationModel: ObservableObject {
             containerLevelsDraft = nil     // a sheet for the old root must not save into this one
             containerLevelsError = nil
             containerEditError = nil       // the old root's refusal
+            containerSetAsideOffer = nil   // and its offer
             itemFieldEditError = nil
             filterSearchText = filter.searchText   // sync debounced field
             // R-3: an OCR search active over the OLD corpus leaves ftsPaths holding old-root paths; once

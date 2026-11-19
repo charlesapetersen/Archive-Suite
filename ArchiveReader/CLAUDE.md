@@ -36,7 +36,9 @@ Archival image files are **irreplaceable** and their tagging was **extremely tim
 - **One named write class beside the files: `.archivesuite`** (W47.ct-reader-edit, W40.reader-item-field-edit).
   A deliberate container or item-field edit writes only `<folder>/.archivesuite/containers.json`, `item-fields.json`
   and the tree's `container-names.json`, whole-document, through ArchiveCore's `ContainerFileStore` (no link followed,
-  `flock`, the read's stamp checked; a newer or unreadable document is refused; nothing deleted). No archive file's
+  `flock`, the read's stamp checked; a newer or unreadable document is refused; nothing deleted). An unreadable or
+  dropping one is set aside (renamed in `.archivesuite`) only when the user accepts the Inspector's offer, and undo
+  swaps it back (W49.reader-ct-set-aside, `NavigationModel+ContainerSetAside`). No archive file's
   bytes, tags or location change. Contract: `SPEC/containers.md` §File safety.
 - Everything else — discovery, filtering, viewing, ordinary copying — is strictly **read-only**.
 

@@ -8,7 +8,8 @@ import ArchiveCore
 // `ContainerFileStore` (no link followed, `flock`, the stamp of the read checked before the rename). Every edit reads
 // the document fresh off the main thread, works the change out on it (`ContainerEdits`) and writes it with that read's
 // stamp, so another app's change in between is refused, never overwritten. A document this build cannot read, of a
-// newer version or holding values it drops is left alone and the Inspector says so. No document is touched.
+// newer version or holding values it drops is left alone and the Inspector says so; one the SPEC lets the user set
+// aside is offered for it (`NavigationModel+ContainerSetAside`). No document is touched.
 //
 // Undo (W47.ct-reader-edit-undo): each edit hands the window's undo manager what every file it wrote held before and
 // the stamp of what it wrote. Undo reads each file fresh, puts the old document back only where the file is still the
@@ -162,20 +163,44 @@ extension NavigationModel {
         let removing = standard.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         runContainerEdit(done: removing ? "Standard name removed." : "Standard name saved.",
                          action: removing ? "Stop Using the Standard Name" : "Standard Name", undo: undo) {
-            let root = try Self.nearestNamesRoot(tree, dir)
-            let names: ContainerNames
-            let stamp: ContainerFileStamp?
-            switch ContainerFileStore.loadNames(root: root) {
-            case .missing: (names, stamp) = (ContainerNames(), nil)
-            case let .loaded(doc, s) where !s.droppedOnReading: (names, stamp) = (doc, s)
-            default: throw ContainerWriteError.refusedExisting(ContainerNames.fileName)
+            try Self.setStandardName(standard, for: written, field: field,
+                                     root: try Self.nearestNamesRoot(tree, dir), at: now)
+        }
+    }
+
+    /// The standard-names edit on `root`'s `container-names.json`: read fresh, changed, written with the read's stamp.
+    /// An unreadable file is set aside only with the user's consent (W49.reader-ct-set-aside).
+    nonisolated static func setStandardName(_ standard: String, for written: String, field: ContainerField,
+                                            root: URL, at now: Date) throws -> ContainerUndoStep? {
+        let names: ContainerNames
+        let stamp: ContainerFileStamp?
+        var settingAside = false
+        switch ContainerFileStore.loadNames(root: root) {
+        case .missing: (names, stamp) = (ContainerNames(), nil)
+        case let .loaded(doc, s) where !s.droppedOnReading: (names, stamp) = (doc, s)
+        case .unreadable(let why):
+            // W49.reader-ct-set-aside: the names are strict, so a file this build drops from reads as unreadable.
+            guard ContainerSetAsideConsent.given(root, ContainerNames.fileName) else {
+                throw ContainerSetAsideNeeded(directory: root, fileName: ContainerNames.fileName,
+                                              reason: .unreadable(why))
             }
-            let edited = ContainerEdits.setStandardName(standard, for: written, field: field, in: names, at: now)
-            guard edited.names != names.names else { return nil }
+            (names, stamp, settingAside) = (ContainerNames(), nil, true)
+        default: throw ContainerWriteError.refusedExisting(ContainerNames.fileName)
+        }
+        let edited = ContainerEdits.setStandardName(standard, for: written, field: field, in: names, at: now)
+        guard edited.names != names.names else { return nil }
+        guard settingAside else {
             let wrote = try ContainerFileStore.writeNames(edited, root: root, expecting: stamp)
             return ContainerUndoStep(restores: [ContainerDocumentRestore(folder: root, restore: .names(names),
                                                                          expecting: wrote, written: .names(edited))])
         }
+        let wrote = try ContainerFileStore.writeNamesSettingAside(edited, root: root, expecting: stamp)
+        let restore: ContainerDocumentRestore.Document = wrote.setAsideName.map {
+            .putBack(file: ContainerNames.fileName, aside: $0)
+        } ?? .names(names)
+        return ContainerUndoStep(restores: [ContainerDocumentRestore(folder: root, restore: restore,
+                                                                     expecting: wrote.stamp,
+                                                                     written: .names(edited))])
     }
 
     // MARK: Undo
@@ -281,7 +306,10 @@ extension NavigationModel {
 
     /// Runs one edit off the main thread, one at a time, then reads the container files again.
     /// What it wrote is registered with `undo` as `action`; `onSaved` runs on the main thread after a save that worked.
+    /// `consent`: the documents the user has said may be set aside (W49.reader-ct-set-aside); a refusal that one could
+    /// lift is offered as `containerSetAsideOffer`, whose acceptance runs the same edit again with it added.
     func runContainerEdit(done: String, action: String, undo: UndoManager?, document: EditedDocument = .containers,
+                          consent: Set<String> = [],
                           _ work: @escaping @Sendable () throws -> ContainerUndoStep?,
                           onSaved: (@MainActor () -> Void)? = nil) {
         guard !containerEditSaving else {
@@ -289,18 +317,29 @@ extension NavigationModel {
             return
         }
         containerEditSaving = true
+        containerSetAsideOffer = nil
         setEditError(nil, document)
         let treePath = containerTree?.path
         Task { [weak self] in
             let outcome: Result<ContainerUndoStep?, ContainerEditFailure> = await Task.detached(priority: .userInitiated) {
-                do { return .success(try work()) } catch { return .failure(ContainerEditFailure(error, document)) }
+                do { return .success(try ContainerSetAsideConsent.$paths.withValue(consent) { try work() }) }
+                catch { return .failure(ContainerEditFailure(error, document)) }
             }.value
             guard let self else { return }
             guard treePath == self.containerTree?.path else { self.containerEditSaving = false; return }
             var failure: String?
             switch outcome {
             case .success(let step): if let step { self.registerContainerUndo(step, action: action, on: undo) }
-            case .failure(let error): failure = error.message
+            case .failure(let error):
+                failure = error.message
+                if let needed = error.setAside {
+                    self.containerSetAsideOffer = ContainerSetAsideOffer(
+                        needed: needed, treePath: treePath, window: undo.map { ObjectIdentifier($0) },
+                        retry: { [weak self] consent in
+                            self?.runContainerEdit(done: done, action: action, undo: undo, document: document,
+                                                   consent: consent, work, onSaved: onSaved)
+                        }, consent: consent)
+                }
             }
             if let failure {
                 self.setEditError(failure, document)
@@ -366,14 +405,31 @@ extension NavigationModel {
         -> PreparedContainerEdit? {
         let file: ContainerFile
         let stamp: ContainerFileStamp?
+        var settingAside = false
+        let consented = ContainerSetAsideConsent.given(directory, ContainerFile.fileName)
         switch ContainerFileStore.load(directory: directory) {
         case .missing: (file, stamp) = (ContainerFile(), nil)
         case let .loaded(doc, s) where !s.droppedOnReading: (file, stamp) = (doc, s)
-        default: throw ContainerWriteError.refusedExisting(ContainerFile.fileName)
+        case let .loaded(doc, s):
+            // W49.reader-ct-set-aside: what reads is edited and kept; the file itself only on the user's say-so.
+            guard consented else {
+                let values = doc.directory.values.count + doc.runs.reduce(0) { $0 + $1.fields.values.count }
+                throw ContainerSetAsideNeeded(directory: directory, fileName: ContainerFile.fileName,
+                                              reason: .drops(runs: doc.runs.count, values: values))
+            }
+            (file, stamp, settingAside) = (doc, s, true)
+        case .unreadable(let why):
+            guard consented else {
+                throw ContainerSetAsideNeeded(directory: directory, fileName: ContainerFile.fileName,
+                                              reason: .unreadable(why))
+            }
+            (file, stamp, settingAside) = (ContainerFile(), nil, true)
+        case .newer: throw ContainerWriteError.refusedExisting(ContainerFile.fileName)
         }
         guard var edited = change(file), edited != file else { return nil }
         edited.updatedAt = Date()
-        return PreparedContainerEdit(directory: directory, before: file, stamp: stamp, edited: edited)
+        return PreparedContainerEdit(directory: directory, before: file, stamp: stamp, edited: edited,
+                                     settingAside: settingAside)
     }
 }
 
@@ -384,11 +440,21 @@ struct PreparedContainerEdit: Sendable {
     let before: ContainerFile
     let stamp: ContainerFileStamp?
     let edited: ContainerFile
+    /// The user said the file on disk may be set aside (W49.reader-ct-set-aside).
+    var settingAside = false
 
-    /// Writes it with the read's stamp; what undoes it.
+    /// Writes it with the read's stamp; what undoes it. A set-aside file is put back by the undo, not overwritten.
     func commit() throws -> ContainerDocumentRestore {
-        let wrote = try ContainerFileStore.write(edited, directory: directory, expecting: stamp)
-        return ContainerDocumentRestore(folder: directory, restore: .containers(before), expecting: wrote,
+        guard settingAside else {
+            let wrote = try ContainerFileStore.write(edited, directory: directory, expecting: stamp)
+            return ContainerDocumentRestore(folder: directory, restore: .containers(before), expecting: wrote,
+                                            written: .containers(edited))
+        }
+        let wrote = try ContainerFileStore.writeSettingAside(edited, directory: directory, expecting: stamp)
+        let restore: ContainerDocumentRestore.Document = wrote.setAsideName.map {
+            .putBack(file: ContainerFile.fileName, aside: $0)
+        } ?? .containers(before)
+        return ContainerDocumentRestore(folder: directory, restore: restore, expecting: wrote.stamp,
                                         written: .containers(edited))
     }
 }
@@ -402,6 +468,10 @@ struct ContainerDocumentRestore: Sendable {
         case names(ContainerNames)
         /// `<folder>/.archivesuite/item-fields.json` (W40.reader-item-field-edit).
         case itemFields(UserItemFields)
+        /// The document set aside as `aside` goes back to being `file` (W49.reader-ct-set-aside): the two are
+        /// swapped, so the one written takes the set-aside name and nothing is deleted. As `written`, the file is
+        /// matched by its stamp alone.
+        case putBack(file: String, aside: String)
     }
     let folder: URL
     let restore: Document
@@ -426,6 +496,7 @@ extension ContainerDocumentRestore.Document {
         case .containers(let d): return .containers(ContainerFileStore.asStored(d) ?? d)
         case .names(let d): return .names(ContainerFileStore.asStored(d) ?? d)
         case .itemFields(let d): return .itemFields(ContainerFileStore.asStored(d) ?? d)
+        case .putBack: return self
         }
     }
 }
@@ -470,12 +541,26 @@ struct ContainerUndoStep: Sendable {
                     let wrote = try ContainerFileStore.writeItemFields(doc, directory: r.folder, expecting: stamp)
                     inverse.append(.init(folder: r.folder, restore: .itemFields(current), expecting: wrote,
                                          written: r.restore))
+                case let .putBack(file, aside):
+                    let back = try ContainerFileStore.putBackSetAside(aside, as: file, in: r.folder,
+                                                                      expecting: try Self.putBackStamp(r))
+                    inverse.append(.init(folder: r.folder, restore: r.restore, expecting: back, written: r.restore))
                 }
             } catch {
                 failures.append((r.folder, error))
             }
         }
         return (ContainerUndoStep(restores: inverse), failures)
+    }
+
+    /// The stamp a put-back checks the file against: the one written, or (after an undo of a later edit in the folder
+    /// rewrote it) that of the same content read now. A put-back's own redo has only the stamp.
+    private static func putBackStamp(_ r: ContainerDocumentRestore) throws -> ContainerFileStamp {
+        switch r.written {
+        case .containers: return try current(ContainerFileStore.load(directory: r.folder), r) { .containers($0) }.1
+        case .names: return try current(ContainerFileStore.loadNames(root: r.folder), r) { .names($0) }.1
+        case .itemFields, .putBack: return r.expecting
+        }
     }
 
     /// The document on disk and its stamp, when it is still the one `restore`'s edit wrote: the same stamp, or (after
@@ -504,8 +589,11 @@ struct ContainerSelectionRolledBack: Error {
 /// An edit's error, as the Inspector words it (carried off the detached task as text).
 struct ContainerEditFailure: Error {
     let message: String
+    /// The file the user could set aside to save the edit (W49.reader-ct-set-aside).
+    let setAside: ContainerSetAsideNeeded?
     init(_ error: Error, _ document: EditedDocument = .containers) {
         message = document == .containers ? containerEditWriteMessage(error) : itemFieldEditWriteMessage(error)
+        setAside = error as? ContainerSetAsideNeeded
     }
 }
 
@@ -546,6 +634,7 @@ func containerEditWriteMessage(_ error: Error) -> String {
         return "Not every folder could be saved, and \(names) could not be put back as it was. "
             + containerUndoMessage(partial.notRestored[0].error) + " " + reason
     }
+    if let needed = error as? ContainerSetAsideNeeded { return needed.refusal }
     switch error as? ContainerWriteError {
     case .changedSinceRead?: return "Another app changed this folder's containers just now. Look again and redo the change."
     case .busy?: return "Another app is writing this folder's containers. Try again in a moment."

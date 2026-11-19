@@ -169,6 +169,6 @@ extension ContainerFileStore {
     public static func writeItemFields(_ fields: UserItemFields, directory: URL, expecting: ContainerFileStamp?) throws
         -> ContainerFileStamp {
         try write(fields, in: directory, name: UserItemFields.fileName, version: UserItemFields.schemaVersion,
-                  expecting: expecting)
+                  expecting: expecting).stamp
     }
 }
