@@ -312,6 +312,10 @@ footer p { font-size: 13px; }
     <p class="note">Routed by the model guide's first pick for the kind each classifier says, on the 96 accuracy pages; lost is the mean NES below routing by the true kind:</p>
     <div class="tbl"><table><thead><tr><th>Classifier</th><th>Routed as labelled</th><th>Mean NES</th><th>Lost</th></tr></thead><tbody id="kind-clf-route"></tbody></table></div>
     <div class="tbl"><table><thead><tr><th>Step</th><th>Seconds a page</th><th>Peak memory</th></tr></thead><tbody id="kind-clf-speed"></tbody></table></div>
+    <div id="kind-floor" hidden>
+    <p class="note" id="kind-floor-note"></p>
+    <div class="tbl"><table><thead><tr><th>Run model</th><th>Keep it for every page</th><th>Floor 0.8 (the app)</th><th>Route every page (cut 0)</th><th>Cut 0 against the floor</th><th>Floor with a folder prior</th><th>True kinds</th></tr></thead><tbody id="kind-floor-rows"></tbody></table></div>
+    </div>
   </section>
 
   <section class="panel" id="page-kinds" hidden>
@@ -1062,6 +1066,16 @@ if (KC) {
   document.getElementById('kind-clf-route').innerHTML = '<tr><td>True kinds</td><td>—</td><td>' + f2(KC.oracle_nes) + '</td><td>—</td></tr>' + KC.routing.map(r => '<tr><td>' + r.classifier + '</td><td>' + r.as_labelled + ' of ' + r.n + '</td><td>' + f2(r.mean_nes) + '</td><td>' + (r.lost >= 0 ? '−' : '+') + Math.abs(r.lost).toFixed(2) + '</td></tr>').join('');
   document.getElementById('kind-clf-speed').innerHTML = KC.speed.map(s => '<tr><td>' + s.step + '</td><td>' + s.s_page.toFixed(2) + '</td><td>' + (s.peak_gb ? s.peak_gb.toFixed(1) + ' GB' : 'OS model') + '</td></tr>').join('');
 } else document.getElementById('kind-clf').hidden = true;
+const KF = DATA.kind_floor;
+if (KF) {
+  document.getElementById('kind-floor').hidden = false;
+  const c8 = KF.calibration.find(c => c.cut === KF.floor), u = KF.routing_under_floor;
+  const at = (r, c, p) => r.cuts.find(x => x.cut === c && x.prior === p);
+  const iv = x => (x.vs_floor >= 0 ? '+' : '') + x.vs_floor.toFixed(2) + ' [' + x.vs_floor_ci.map(v => (v >= 0 ? '+' : '') + v.toFixed(2)).join(', ') + ']';
+  document.getElementById('kind-floor-note').textContent = 'The app routes a page by its kind only when the classifier\'s top class is at least ' + KF.floor + ', and keeps the run\'s model otherwise. Held out by folder, the top class is right on ' + c8.sure_right + ' of ' + c8.sure + ' labelled pages at or over the floor and ' + c8.unsure_right + ' of ' + c8.unsure + ' under it; ' + u.pages + ' of the ' + KF.routing_pages + ' accuracy pages are under it. Mean NES on those ' + KF.routing_pages + ' pages, with paired bootstrap 95% intervals against the floor (an interval reaching zero is a tie). Detail: segbench-results/kind-floor.md (W47.wh-kinds-floor).';
+  document.getElementById('kind-floor-rows').innerHTML = KF.routing.map(r => { const f = at(r, KF.floor, false), z = at(r, 0, false), p = at(r, KF.floor, true);
+    return '<tr><td>' + r.run_model + '</td><td>' + f2(r.keep) + '</td><td>' + f2(f.mean) + '</td><td>' + f2(z.mean) + '</td><td>' + iv(z) + '</td><td>' + f2(p.mean) + ' (' + iv(p) + ')</td><td>' + f2(r.true_kinds) + '</td></tr>'; }).join('');
+}
 const PK = DATA.page_kinds;
 if (PK) {
   document.getElementById('page-kinds').hidden = false;

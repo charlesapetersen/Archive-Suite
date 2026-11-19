@@ -147,8 +147,9 @@ All five are decided (section "Owner's calls (2026-11-06)").
 - ~~Look up ATRIUM's weight licence~~ done 2026-11-11 (W46.stale-figures): the fine-tuned weights and the dataset
   are CC BY-NC 4.0, the code MIT (the `ufal/vit-historical-page` card and the repository README); recorded in
   `kind-atrium.md` §7 and K-kinds §4 and §8, whose "weights MIT" was wrong.
-- Document prior below the floor (S): measure on the five boxes whether it fixes any of the 16 under-floor minority
-  pages (needs per-page kind truth). Waits on nothing; priority is the owner's.
+- ~~Document prior below the floor (S)~~ measured 2026-11-19 (W47.wh-kinds-floor, `kind-floor.md`): a folder prior
+  gains nothing measurable on the 96; on the boxes it would change 20 of 79 unsure pages, unscored (no kind truth).
+  Routing the unsure pages by their top class ties the floor for every run model. Put to the owner (call 13).
 
 ## 9. Profile test expectations
 

@@ -17024,3 +17024,17 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   containers.md §Zotero "Type", "Places", "note" updated. ArchiveCore's public API is unchanged (internal types only),
   so the app bundles were not rebuilt. $0 spent. No bench cache used. No migration: nothing to migrate.
   <!-- /W47.ct-zotero-types -->
+- [x] **W47.wh-kinds-floor — the kind classifier's 0.8 floor measured, with the document prior [S]** · §The withheld features — the owner's calls of 2026-11-19 (W47.wh) (lane: segbench) (uses: light) — Owner, 2026-11-19 (call 15): ask again after the named work. On the pages in hand (`kind-churn.md`: 78 of 848 under the floor, 17 of the 29 odd-hand pages among them), score routing on the top class at each cut and with the document prior, against keeping the general reader. $0. W46.kinds-mixed-truth keeps the mixed-page truth behind nice-to-have. It ends by asking the owner in the Daemon Report (needs you) with the new figures and what the user would gain or lose (call 13); nothing is released or withheld by the item itself. SHIPPED 2026-11-19.
+  `scripts/segbench/kind_floor.py` → `segbench-results/kind-floor.md`/`.json`; on the bench page under the kind
+  classifier. Held out by folder, the top class is right on 125 of 127 labelled pages at or over 0.8 and 12 of 17
+  under it. On the 96, routing the unsure pages by their top class (cut 0) against the floor: Apple Vision as the run
+  model +1.31 [-0.03, +3.44], Gemini 3.1 Flash Lite +1.05 [+0.00, +3.05], Qwen3.6 27B +0.05, Gemini 3.8 Flash +1.67
+  [-0.00, +4.23], Claude Sonnet 5.5 +0.01: ties, none falls. A folder prior (the 96 are single pages, not documents)
+  is right on 5 of 8 unsure pages with a neighbour against 6 for the top class, and adds +0.00 to +0.13 in reading. A
+  0.9 cut's apparent +1.0 is one page (p024, typewritten called forms at 0.859, its Qwen3.6 27B reading a stored
+  transport failure). On the five boxes a document prior would change 20 of the 79 pages under 0.8 (mostly
+  typewritten and printed swapping), with no kind truth to say whether rightly. The owner is asked in the Daemon
+  Report (call 13); nothing released or withheld by the item. The box pages' Vision signals were measured again into
+  `~/Library/Caches/ArchiveSuiteRehearsal/segbench/kind-churn/` (reproduced kind-churn.md exactly) and kept there
+  (6 MB) for the answer's follow-up. $0.
+  <!-- /W47.wh-kinds-floor -->
