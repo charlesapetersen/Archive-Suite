@@ -8,8 +8,8 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b3`, 2026-10-21.
   checklist §2.0-2.14, Tier 2D driver list), `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md` (Runs A-C, Mac side
   only), and `SPEC/tag-format.md` (§Invariants 3, 5, 6, 7 and §2-page PDF structure).
 - **Sources read at:** `8a03097c`; code traced at the same commit.
-- **Count:** `unproven 42 · works 8 · broken 2 · unverifiable-here 1` (2026-11-18, after `W40.d1`; works: P-19, P-27,
-  P-33, P-34, P-45, P-47, P-50, P-53; broken: P-23, P-29).
+- **Count:** `unproven 39 · works 10 · broken 3 · unverifiable-here 1` (2026-11-19, after `W40.d2`; works: P-19, P-27,
+  P-33, P-34, P-38, P-40, P-45, P-47, P-50, P-53; broken: P-23, P-29, P-32).
 
 **Order of work (rule 3).** The *Promise* and *Promised in* of every row were committed first, before any
 implementation file was opened (`d3db14f3`). The rest was traced afterwards by four read-only passes, and every
@@ -519,10 +519,13 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Runtime evidence:** W40.d1, 2026-11-18: 113 two-page PDFs from the whole RG 165 box (OpenRouter, Qwen3.8 Flash), all with the
   sentinel and provenance line; the 18 that got a `Date evidence:` line have their source-name line changed (U+00A0
   to a space) and a broken xref entry ([`evidence/processor/W40.d1-bulk-ocr.md`](evidence/processor/W40.d1-bulk-ocr.md)).
-- **Status:** `broken` — `W40.fix-processor-evidence-rewrite-name` (S3)
+  W40.d2, 2026-11-19: a class changed in a review (Box, Folder, Continuation) reaches the tags but not page 2, whose
+  `Classification:` keeps the reader's proposal, in the per-page review and in Segment & Tag alike ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)).
+- **Status:** `broken` — `W40.fix-processor-evidence-rewrite-name` (S3), `W40.fix-processor-review-classification-stale` (S3)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-18 W40.d1 — `unproven` → `broken`: the date-evidence rewrite changes the source-name line on 18 of 113 outputs.
+  - 2026-11-19 W40.d2 — stays `broken`: page 2's Classification is not rewritten after a review.
 
 ### P-24 · Multi-page documents merged into one PDF
 
@@ -552,11 +555,14 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   `detectRotation` (`OCR/OCRProcessor+OCR.swift:1732`, defined `:1827`) → `RotationDetector` or
   `LLMRotationDetector` → `mergeRotation` (`:1856`) → `PDFGenerator.makeImagePage`. Folder-tab rule in the prompt
   (`OCR/OCRPrompt.swift:42`). The manual rotation pass: P-32.
-- **Real-path test:** none.
-- **Runtime evidence:** none.
+- **Real-path test:** the manual pass only: `ReviewDialogsJourneyUITests` (W40.d2, VM).
+- **Runtime evidence:** W40.d2, 2026-11-19: the Review rotation pass, 90° clicked on one photo, is baked into its
+  PDF's page 1 (the photo drawn landscape, portrait with rotation off) ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)). Detection itself is not shown: Local
+  Vision fails in the guest, so every photo was proposed 0°.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-19 W40.d2 — stays `unproven`: the manual pass works by click; detection is unproven.
 - **Notes:** **Drift.** `TESTING.md` says the gateway greys rotation out; it is disabled only for pre-OCRed input,
   and gateway, Local Agent and Mistral fall back to local Vision (`OCR/OCRProcessor+OCR.swift:1841-1851`), which the
   app's own help calls about 60% accurate (`Models/ProviderModels.swift:155`). Suspect `S-029`.
@@ -695,12 +701,16 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   (`OCR/OCRProcessor+ReviewFlows.swift:433`) → `.reviewWindow` (`Views/OCRView.swift:415`) →
   `DocumentSegmentReviewSheet`: slider 60-800 (`Views/OCRView+DocumentSegmentReviewSheet.swift:74`), keys 1-4
   (`:171-200`), arrows (`:150-157`), Return (`:216`).
-- **Real-path test:** none. `scripts/test-segmentation-review.sh` waits on `awaitingDocumentReview` but never draws
-  the sheet or sends keys.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Real-path test:** `ReviewDialogsJourneyUITests` (W40.d2, VM: `scripts/journey-review-dialogs.sh`), the real Start on
+  six rehearsal photos, keys then clicks. `scripts/test-segmentation-review.sh` waits on `awaitingDocumentReview` but
+  never draws the sheet or sends keys.
+- **Runtime evidence:** W40.d2, 2026-11-19: the dialog opens on every photo; the slider works; by click, Box, Continuation
+  and the trash reach the output (the removed photo has no PDF, the Continuation carries its document's tags). The keys
+  3, ↓, 2, X and Return changed nothing and did not confirm ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)).
+- **Status:** `broken` — `W40.fix-processor-review-keys` (S3)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-19 W40.d2 — `unproven` → `broken`: the promised keys do nothing; the clicks work.
 - **Notes:** **Drift.** The rotation radios and `[`/`]` are not in this dialog: they appear only in the separate,
   opt-in Review rotation pass (`rotationOnly`, `:15-16`, `:201-213`; enabled by `reviewRotation` with rotation on,
   `OCR/OCRProcessor+Pipeline.swift:3084`). Keys 1 and 2 work only when document classes are shown (`:171-181`). The
@@ -763,11 +773,13 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   (`Models/ProviderModels.swift:122`).
 - **Real-path test:** `scripts/test-tier2.sh` cases 01-02 (`none`, `copySource`; paid) with `tier2_assert.py:97-102`;
   `scripts/test-tag-vocabulary.sh` (copy-source verbatim). Auto date and Human have no headless run
-  (`Capture/ProcessFilesTestDriver.swift:124` refuses them).
-- **Runtime evidence:** none.
+  (`Capture/ProcessFilesTestDriver.swift:124` refuses them); `ReviewDialogsJourneyUITests` runs Human (W40.d2, VM).
+- **Runtime evidence:** W40.d2, 2026-11-19: Human with the Manual approach writes only the typed tags and `Unread` ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)).
+  Automatic: W40.d1. Auto date, No tagging and Copy source not run here.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-19 W40.d2 — stays `unproven`: Human and Automatic shown, the other three not.
 - **Notes:** **Drift.** `TESTING.md` §2.5 still names "Auto date + manual seg", folded into Auto date by
   `W36.seg-opt-review`. Suspect `S-034` (with collection segmentation on, No tagging and Copy source still write
   `Box`/`Folder` and a colour).
@@ -798,11 +810,14 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   (`Views/OCRView.swift:968`); double-click or Return → `SegmentationEditSheet` (`:978-981`, `:1027-1030`); Redo
   Segmentation & Tagging (`:863`) / Complete (`:868`) → `redoTagging` / `confirmFinalReview`
   (`OCR/OCRProcessor+ReviewFlows.swift:305-315`).
-- **Real-path test:** none. `ProcessFilesTestDriver` answers the gate with `confirmFinalReview` and draws nothing.
-- **Runtime evidence:** none.
+- **Real-path test:** `ReviewDialogsJourneyUITests` presses Complete (W40.d2, VM). `ProcessFilesTestDriver` answers the
+  gate with `confirmFinalReview` and draws nothing.
+- **Runtime evidence:** W40.d2, 2026-11-19: the review shows each file's class, rotation and tags and the segment list;
+  Complete finishes the run ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)). Redo and the double-click edit sheet were not driven.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-19 W40.d2 — stays `unproven`: Complete works; Redo and the edit sheet unproven.
 - **Notes:** the button is "Redo Segmentation & Tagging"; it rebuilds segments from the edited classifications
   (`OCR/OCRProcessor+Tagging.swift:493-497`). Only Automatic mode reaches this review; a resumed batch skips it on
   purpose (`OCR/OCRProcessor+Pipeline.swift:1572`) — see S-035.
@@ -818,11 +833,15 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   (`Views/OCRView.swift:424`; autocomplete `Views/ManualSegmentTagView.swift:463`). With a proposing approach, or
   Live Capture Auto date groups → `performManualTaggingPhase` (`OCR/OCRProcessor+Tagging.swift:503`) →
   `ManualTaggingSheet` (`Views/OCRView.swift:421`).
-- **Real-path test:** none.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Real-path test:** `ReviewDialogsJourneyUITests` run B drives Segment & Tag (W40.d2, VM). `ManualTaggingSheet`: none
+  here (the Live Capture tag cards, W40.d5, are the nearest).
+- **Runtime evidence:** W40.d2, 2026-11-19: B, F, X, → and Return on the canvas; two documents tagged by typing a date, a
+  subject and a quality; every output carries exactly its own document's tags in the SPEC's tokens ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)).
+  Autocomplete was not exercised.
+- **Status:** `works` (Segment & Tag)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-19 W40.d2 — `unproven` → `works` for Segment & Tag; `ManualTaggingSheet` and autocomplete still unproven.
 
 ### P-39 · Collections identified, named and numbered
 
@@ -854,13 +873,15 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Reached by:** Start → `showBoxFolderConfirmation` (`OCR/OCRProcessor+ReviewFlows.swift:495`; from the per-page
   path `OCR/OCRProcessor+Pipeline.swift:3110`, the window stage `OCR/OCRProcessor+WindowSegmentation.swift:62`,
   pre-OCRed `OCR/OCRProcessor+OCR.swift:181`) → `BoxFolderConfirmSheet` (`Views/OCRView.swift:418`).
-- **Real-path test:** `scripts/test-segmentation-review.sh` covers it as the window stage's first step. The per-page
-  path and the sheet itself are untested.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Real-path test:** `ReviewDialogsJourneyUITests` drives the sheet after the per-page review (W40.d2, VM).
+  `scripts/test-segmentation-review.sh` covers it as the window stage's first step.
+- **Runtime evidence:** W40.d2, 2026-11-19: two photos marked Box in the review arrive as Box; the second, turned to
+  Folder by its radio, carries `Folder` and no `Box` ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)). Page 2 does not follow (P-23).
+- **Status:** `works`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-18 W40.d1 — stays `unproven`: the headless driver answers the gate with no sheet drawn; `W40.d2` drives the dialogs.
+  - 2026-11-19 W40.d2 — `unproven` → `works` on the per-page path (tags; page 2 is P-23's defect).
 - **Notes:** it lists only pages already classed box or folder, so a box photo misread as a document is caught only
   by the per-page dialog. Skipped in the manual window, for Live Capture pre-grouped runs and in a resumed batch
   (S-035).

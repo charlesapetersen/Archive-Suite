@@ -127,6 +127,13 @@ on the Stanford gateway; cap $5 by default, never above $7). `--route fake` is t
 `scripts/fake_gateway.py` in the guest, which refuses a wrong key and can inflate usage to test the cap. Apple
 Vision cannot be the free route: it fails inside the macOS 27.2 guest (`KNOWN_ISSUES.md`).
 
+**The W40.d2 journey (`scripts/journey-review-dialogs.sh`)** is the review dialogs by hand, in the VM
+(`PROCESSOR_JOURNEY=reviews`, `ReviewDialogsJourneyUITests`, $0): the real window and Start on six rehearsal photos
+(DEBUG `-APUITestInputImages`), read by `scripts/fake_local_agent.py`, a stand-in `claude` CLI on the Local Agent
+backend that proposes New Document and upright for every photo. It answers Review rotation, the per-page review, the
+box/folder confirmation and the final review (Automatic tagging), then Segment & Tag (Manual tagging), and reads every
+PDF and tag xattr back against the choices. Its two `XCTExpectFailure`s name the fix items for known defects.
+
 ---
 
 ## Tier 2B — GUI functional checklist (manual; the interactive UI itself)

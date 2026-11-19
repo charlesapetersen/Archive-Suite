@@ -190,6 +190,8 @@ where it can.
   and compare page 2 and the tags against `SPEC/tag-format.md`.
 - **`W40.d2` — Processor review dialogs by hand [M].** In the VM, drive segmentation review, box/folder confirm,
   manual tagging and rotation review with real choices (not the auto-pilot), and check the output reflects them.
+  *(SHIPPED 2026-11-19: evidence `verification/evidence/processor/W40.d2-review-dialogs.md`; filed
+  `W40.fix-processor-review-keys`, `W40.fix-processor-review-classification-stale`, `W40.fix-processor-pending-run-caption`.)*
 - **`W40.d3` — every provider through the app's own client [S-M].** Anthropic, Mistral, OpenAI and Apple Vision
   on two to five real images each; Local Agent if a CLI is installed, otherwise `unverifiable-here`. *(SHIPPED
   2026-11-18: evidence `verification/evidence/processor/W40.d3-providers.md`; OpenAI and Local Agent
