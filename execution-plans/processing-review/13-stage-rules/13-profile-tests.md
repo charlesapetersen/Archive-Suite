@@ -93,7 +93,8 @@ and `gemini3.5-flash-lite` is picked. The card's "What a better figure would nee
 the $0.61 shortfall. Segmentation the 2B or `manual`. Entities: `gemini-entity-feature` ($2.37) does not fit
 what the ceiling leaves, so names fall to `qwen3-vl-8b-mac` on typed correspondence and `none` on handwriting.
 
-**D3. The Claude plan only.** Reading `claude-sonnet5.5` (96.48, no money, the plan's window share by `usage.md`);
+**D3. The Claude plan only.** Reading `claude-sonnet5.5` (96.48, no money, the plan's window share by `usage.md`; read
+by the Local Agent's `claude`, and "Read with this" switches the plan on, W41.app-claude-plan-reading);
 handwritten 92.50 labelled a drafter family. Segmentation `claude-sonnet5.5` (88.9%, 10.2 checks). Dating and entities:
 no plan rows (the Claude arms were dropped, owner 2026-10-30), so the Mac route of B1 with the card saying why.
 
@@ -104,7 +105,8 @@ With Anthropic, OpenAI and OpenRouter keys but no Gemini key, GLM-5.3 Flash (82.
 7.4 points ahead, but their paired interval holds 0 (+7.4 [−1.0, +16.9]; sign test on the 9 documents only one has
 right, 7 to 2, p 0.18), so the cheaper route wins the tie (W46.seg-truth-audit; ChatGPT under the old 5.0 floor).
 
-**D5. A Claude plan and a Gemini key, preference "cheapest within a point".** Segmentation: `claude-sonnet5.5`
+**D5. A Claude plan and a Gemini key, preference "cheapest within a point".** Reading: `claude-sonnet5.5` on the
+plan, at no money (W41.app-claude-plan-reading). Segmentation: `claude-sonnet5.5`
 still wins on money. Claude's 88.9 and Gemini text's 87.7 tie (+1.2 [−4.8, +7.9] paired), as do Claude and the
 image g2 route (+1.5 [−4.0, +7.7]).
 

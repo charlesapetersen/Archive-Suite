@@ -78,8 +78,12 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
   $0 under the actual CLI's name; only `claude` is validated (`gemini`/`codex` are `VERIFY` placeholders);
   `runAsync` signals exit via `terminationHandler` (`waitUntilExit()` on GCD missed exits) and kills its child on
   cancel. Precedence localAgent > gateway > direct; concurrency 1–2 + usage-window pacing; the header/history keep
-  the model override or `CLI default` and never price the direct-provider fallback. $0 harness:
-  `scripts/localagent-fake-cli.sh`, `[3.5]` in `scripts/test-smoke.sh`.
+  the model override or `CLI default` and never price the direct-provider fallback. `claude`'s result is read from
+  its JSON envelope (`classifyClaude`: an `is_error` envelope is never page text); at the plan's usage limit a page
+  waits for the reset and is read on the plan again (`invokePaced`, `UsageWindowPacing`, caption
+  `Views/PlanPauseCaption.swift`), never on a key; Stop ends the wait and the page is not recorded. The Claude
+  reading row is this route by plan (W41.app-claude-plan-reading). $0 harness: `scripts/localagent-fake-cli.sh`,
+  `scripts/test-localagent.sh` (`--live`: the fixture pages on the real plan), `[3.5]` in `scripts/test-smoke.sh`.
 - **Requirements:** Low/High thinking where supported; a cost estimate before processing, standard vs batch side
   by side, updated as files are added, **reflecting the batch discount** (batch total only with batch on, a direct provider and no pre-OCRed
   input; Vision / Local Agent / an unpriced gateway show a note, never a dollar figure); batch toggle; parallel workers. Input:

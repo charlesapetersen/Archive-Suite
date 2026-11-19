@@ -34,9 +34,12 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   has none, so an Anthropic key's overnight batch is priced at the standard rate there.
 - **Not the mix.** "Claude and ChatGPT together" stays on the keys and plans: its ChatGPT half (GPT-6.1 Sol through
   Codex) is not a measured OpenRouter route. Claude as the Mac 2B's partner does go through OpenRouter.
-- **The plan alone does not reach its reading row.** The route table's reading row is read by key only (an Anthropic
-  or OpenRouter key, always money); the app's Local Agent reader is not the route the bench measured, so the settings
-  sheet never prices Claude's reading as free. Its windows still go by the plan where `claude` is there.
+- **The plan reaches its reading row (W41.app-claude-plan-reading, 2026-11-19).** A Claude plan reads with it at no
+  money, through the Local Agent backend (`claude -p` at `claude-sonnet-5-5`, the way the bench read the 96, so the
+  figure is this route's own; owner, 2026-11-19). The app sends its own OCR prompt with the page as a file the CLI's Read
+  tool opens, where the panel sent its own prompt; no parity check. Where the plan reaches the row the sheet's "Read
+  with this" switches on the plan, even when an Anthropic key is there too, because the row is then priced at nothing.
+  By key it stays money. Its windows go by the plan where `claude` is there, as before.
 - **Thinking at High is not capped by a budget.** Claude 4.7 and later think adaptively (a `budget_tokens` is a 400),
   so High is `effort: high` inside the same `max_tokens` (8,192 plus 8,000 for a page). A page that thinks past that
   fails as cut off rather than returning short text, and the estimate counts no Anthropic thinking tokens.

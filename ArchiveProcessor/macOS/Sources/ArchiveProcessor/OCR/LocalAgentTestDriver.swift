@@ -217,6 +217,45 @@ enum LocalAgentTestDriver {
             note("LOCALAGENT_FAKE_CLI unset/not executable → CLI functional checks skipped (run via scripts/test-localagent.sh)")
         }
 
+        // ── W41.app-claude-plan-reading: the live check, only when asked (`LOCALAGENT_LIVE_PAGES`, a folder of
+        // non-corpus fixture pages; `scripts/test-localagent.sh --live`). The real `claude` on the user's plan at the
+        // reading row's model, through the same client and limiter Process Files uses: how long a page takes, one and
+        // two at once. Uses the plan's usage window, never money (the key variables are stripped).
+        if let dir = ProcessInfo.processInfo.environment["LOCALAGENT_LIVE_PAGES"], !dir.isEmpty {
+            let pages = ((try? fm.contentsOfDirectory(at: URL(fileURLWithPath: dir), includingPropertiesForKeys: nil)) ?? [])
+                .filter { ["jpg", "jpeg", "png"].contains($0.pathExtension.lowercased()) }
+                .sorted { $0.lastPathComponent < $1.lastPathComponent }
+            let live = LocalAgentClient(config: LocalAgentConfig(tool: .claude, modelOverride: "claude-sonnet-5-5"))
+            check("live: \(pages.count) fixture pages", !pages.isEmpty)
+            func read(_ url: URL) async -> (String, Double, OCRResult?) {
+                let t0 = Date()
+                let r = try? await live.ocr(imageURL: url)
+                return (url.lastPathComponent, Date().timeIntervalSince(t0), r)
+            }
+            func report(_ label: String, _ rows: [(String, Double, OCRResult?)], wall: Double) {
+                for (name, s, r) in rows {
+                    note("live \(label): \(name) \(String(format: "%.1f", s)) s, \(r?.text?.count ?? 0) chars, "
+                         + "kind \(r?.classification.map { "\($0)" } ?? "none"), error \(r?.errorCode ?? "none")")
+                }
+                let ok = rows.filter { $0.2?.text?.isEmpty == false }.count
+                note("live \(label): \(ok)/\(rows.count) read in \(String(format: "%.1f", wall)) s wall, "
+                     + String(format: "%.0f pages an hour", wall > 0 ? Double(ok) / wall * 3600 : 0))
+                check("live \(label): every page read", ok == rows.count)
+            }
+            var t0 = Date()
+            var one: [(String, Double, OCRResult?)] = []
+            for p in pages { one.append(await read(p)) }
+            report("one at a time", one, wall: Date().timeIntervalSince(t0))
+            t0 = Date()
+            let two = await withTaskGroup(of: (String, Double, OCRResult?).self) { group in
+                for p in pages { group.addTask { await read(p) } }
+                var out: [(String, Double, OCRResult?)] = []
+                for await r in group { out.append(r) }
+                return out.sorted { $0.0 < $1.0 }
+            }
+            report("two at once (the client's limit)", two, wall: Date().timeIntervalSince(t0))
+        }
+
         // ── REAL PendingRun resume-safety of the localAgent carrier. ─────────────────────────────
         let files = [root.appendingPathComponent("src0.jpg")]
         let outDir = root.appendingPathComponent("out", isDirectory: true)
