@@ -1,0 +1,101 @@
+{
+ "gemini3.7-flash-gw": {
+  "owner": {
+   "documents": 272,
+   "no_year_written": 11,
+   "failed_with_year": 31,
+   "failed_where_another_step_wrote": 22,
+   "newly_shown": 9,
+   "newly_shown_reasons": {
+    "quote does not carry the year given": 9
+   },
+   "newly_shown_year_truth": {
+    "right": 3,
+    "wrong": 2,
+    "wrong_by_years": [
+     1,
+     5
+    ]
+   },
+   "newly_shown_decade_truth": {
+    "n": 4,
+    "in_decade": 4
+   },
+   "right_years_refused": 12,
+   "right_refused_by_reason": {
+    "cited document is not in the context given": 3,
+    "quote does not carry the year given": 8,
+    "quote is not in the cited document's text": 1
+   },
+   "right_refused_no_year_in_quote_by_digits": {
+    "digits, not the year": 1,
+    "another four-digit year": 4,
+    "the year's two digits, not in a date form the checker reads": 2,
+    "three of the year's digits": 1
+   }
+  },
+  "undated": {
+   "documents": 90,
+   "no_year_written": 7,
+   "failed_with_year": 15,
+   "failed_where_another_step_wrote": 8,
+   "newly_shown": 7,
+   "newly_shown_reasons": {
+    "quote does not carry the year given": 7
+   },
+   "newly_shown_false_years": 7
+  }
+ },
+ "qwen3.6-27b": {
+  "owner": {
+   "documents": 272,
+   "no_year_written": 25,
+   "failed_with_year": 44,
+   "failed_where_another_step_wrote": 21,
+   "newly_shown": 23,
+   "newly_shown_reasons": {
+    "quote does not carry the year given": 22,
+    "quote is not in the cited document's text": 1
+   },
+   "newly_shown_year_truth": {
+    "right": 8,
+    "wrong": 7,
+    "wrong_by_years": [
+     1,
+     1,
+     1,
+     2,
+     2,
+     4,
+     4
+    ]
+   },
+   "newly_shown_decade_truth": {
+    "n": 8,
+    "in_decade": 5
+   },
+   "right_years_refused": 15,
+   "right_refused_by_reason": {
+    "quote does not carry the year given": 13,
+    "quote is not in the cited document's text": 2
+   },
+   "right_refused_no_year_in_quote_by_digits": {
+    "three of the year's digits": 1,
+    "digits, not the year": 5,
+    "another four-digit year": 3,
+    "the year's two digits, not in a date form the checker reads": 4
+   }
+  },
+  "undated": {
+   "documents": 90,
+   "no_year_written": 12,
+   "failed_with_year": 18,
+   "failed_where_another_step_wrote": 10,
+   "newly_shown": 8,
+   "newly_shown_reasons": {
+    "quote does not carry the year given": 8
+   },
+   "newly_shown_false_years": 8
+  }
+ }
+}

@@ -426,6 +426,9 @@ gains 1 and loses 2 (p 1.0 both), its 10 image years 7 right, with wrong explici
 the user as an unwritten suggestion is not settled. Evidence: 45 of 131 Gemini trace-neigh replies fail the check,
 and of the 27B's failures many are right years whose quotes carry OCR damage (49 of 101, `date-traceable.md`).
 Recommendation: not shown until item 8.3 fixes the checker's false refusals [I]. Decided as recommended (owner call 9).
+After 8.3 (W47.wh-date-evidence-shown, `date-failed-estimates.md`): at most 3 of Gemini's 12 right-year refusals and 5
+of the 27B's 15 could be checker misses; showing the rest on Gemini adds a year on 9 owner documents (3 right, 2 wrong,
+4 in the decade) and 7 false years on the undated 90. Asked at W47.wh-date-suggest-owner-ok; hidden until answered.
 
 ## 8. Items to file
 
