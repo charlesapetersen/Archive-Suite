@@ -99,6 +99,17 @@ enum ProcessorUITestConfiguration {
         return urls
     }
 
+    /// W40.d2: the images in `-APUITestInputImages <dir>`, in name order, admitted like a drop so the review-dialog
+    /// journey runs the real Start on real photos. The VM runner fills the folder in the guest with copies of a
+    /// rehearsal box; the UI-test runner could not hand the app files of its own. Never a corpus folder.
+    static var droppedImages: [URL]? {
+        guard isActive, let dir = urlValue(after: "-APUITestInputImages"),
+              let names = try? FileManager.default.contentsOfDirectory(atPath: dir.path) else { return nil }
+        let images = names.filter { ["jpg", "jpeg", "png", "tif", "tiff", "heic"].contains(($0 as NSString).pathExtension.lowercased()) }
+            .sorted().map { dir.appendingPathComponent($0) }
+        return images.isEmpty ? nil : images
+    }
+
     /// Apply deterministic, no-key defaults before SwiftUI creates any `@AppStorage` view. This is a
     /// launch argument rather than a scheme default so ordinary Debug launches remain unchanged.
     static func installScratchDefaults() {

@@ -33,6 +33,18 @@ def prompt_text(body):
     return '\n'.join(out)
 
 
+def answer(text, cls, page):
+    """The stand-in's reply to one prompt, as (kind, text): an OCR transcription with the given classification, the
+    tag JSON, or 'ok'. Shared with fake_local_agent.py (W40.d2)."""
+    if 'TRANSCRIBE' in text:
+        return 'ocr', f'[{cls}]\n[rotate_0]\nW40.d1 stand-in transcription, page {page}.'
+    if 'subject_tags' in text:
+        return 'tags', json.dumps({'year': '1918', 'month': '3', 'day': '12', 'date_uncertain': False,
+                                   'subject_tags': ['War Department', 'Military Intelligence'],
+                                   'format': 'Letter'})
+    return 'other', 'ok'
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
@@ -48,18 +60,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         text = prompt_text(body)
         with lock:
-            if 'TRANSCRIBE' in text:
-                kind = 'ocr'
-                cls = CYCLE[count['ocr'] % len(CYCLE)]
-                reply = f'[{cls}]\n[rotate_0]\nW40.d1 stand-in transcription, page {count["ocr"] + 1}.'
-            elif 'subject_tags' in text:
-                kind = 'tags'
-                reply = json.dumps({'year': '1918', 'month': '3', 'day': '12', 'date_uncertain': False,
-                                    'subject_tags': ['War Department', 'Military Intelligence'],
-                                    'format': 'Letter'})
-            else:
-                kind = 'other'
-                reply = 'ok'
+            kind, reply = answer(text, CYCLE[count['ocr'] % len(CYCLE)], count['ocr'] + 1)
             count[kind] += 1
             with open(LOG, 'a', encoding='utf-8') as f:
                 head = ' '.join(text.split())[:90].replace('\t', ' ')

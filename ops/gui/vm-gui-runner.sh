@@ -26,6 +26,9 @@
 #                PROCESSOR_JOURNEY=bulkocr (W40.d1: Process Files on a guest copy of a rehearsal box, through the
 #                  app's headless driver; run it through ArchiveProcessor/scripts/journey-bulk-ocr.sh, which states the
 #                  cost, hands over the key file (W40D1_KEY_FILE, a host path) and checks the output).
+#                PROCESSOR_JOURNEY=reviews (W40.d2: the review dialogs answered by hand in the real Process Files
+#                  window, on six photos of a rehearsal box, read by the stand-in CLI scripts/fake_local_agent.py;
+#                  run it through ArchiveProcessor/scripts/journey-review-dialogs.sh).
 #                VISUAL_REVIEW=1 (W40.e10/e11 screenshot tour; pair with ONLY_TESTING=<App>UITests/VisualReviewUITests).
 #                TRANSIENT_VIDEO=1 (W40.e13: record the guest screen across the run; scan with transient-frames.py).
 #                VM_KEEP=1 (W40.vm-macos27-runtime (4)): leave the guest booted for the next call, for a run of
@@ -224,6 +227,8 @@ PROCESSOR_BULKOCR=0
 BULK_GDIR="$GUEST_HOME/w40d1-bulk-ocr"
 FAKE_GW_PID=""
 LIVE_GDIR="$GUEST_HOME/w40d5-live-capture"
+PROCESSOR_REVIEWS=0
+REVIEWS_GDIR="$GUEST_HOME/w40d2-review-dialogs"
 if [ "${PROCESSOR_JOURNEY:-}" = "livecapture" ]; then
   [ "$APP" = processor ] || die "PROCESSOR_JOURNEY is supported only for processor."
   [ "$LANE" = xcuitest ] || die "PROCESSOR_JOURNEY=livecapture runs on the xcuitest lane only."
@@ -245,8 +250,19 @@ elif [ "${PROCESSOR_JOURNEY:-}" = "bulkocr" ]; then
   BULK_SET="$REHEARSAL/processor-set/${W40D1_COLLECTION:-RG 165 — War Department}"
   [ -d "$BULK_SET" ] || die "no rehearsal box at $BULK_SET (python3 ArchiveProcessor/scripts/make-processor-rehearsal.py)"
   if [ -n "${W40D1_KEY_FILE:-}" ]; then [ -r "$W40D1_KEY_FILE" ] || die "W40D1_KEY_FILE is not readable"; fi
+elif [ "${PROCESSOR_JOURNEY:-}" = "reviews" ]; then
+  [ "$APP" = processor ] || die "PROCESSOR_JOURNEY is supported only for processor."
+  [ "$LANE" = xcuitest ] || die "PROCESSOR_JOURNEY=reviews runs on the xcuitest lane only."
+  [ -n "$CORRUPT_TEST_SELECTOR" ] && die "PROCESSOR_JOURNEY and CORRUPT_INDEX_FIXTURE cannot be combined."
+  PROCESSOR_REVIEWS=1
+  CORRUPT_TEST_SELECTOR="ArchiveProcessorUITests/ReviewDialogsJourneyUITests"
+  if [ -n "${ONLY_TESTING:-}" ] && [ "$ONLY_TESTING" != "$CORRUPT_TEST_SELECTOR" ]; then
+    die "PROCESSOR_JOURNEY=reviews runs only ONLY_TESTING=$CORRUPT_TEST_SELECTOR"
+  fi
+  REVIEWS_SET="$REHEARSAL/processor-set/${W40D2_COLLECTION:-RG 165 — War Department}"
+  [ -d "$REVIEWS_SET" ] || die "no rehearsal box at $REVIEWS_SET (python3 ArchiveProcessor/scripts/make-processor-rehearsal.py)"
 elif [ -n "${PROCESSOR_JOURNEY:-}" ]; then
-  die "unknown PROCESSOR_JOURNEY '$PROCESSOR_JOURNEY' (use: livecapture, bulkocr)"
+  die "unknown PROCESSOR_JOURNEY '$PROCESSOR_JOURNEY' (use: livecapture, bulkocr, reviews)"
 fi
 ONLY_TESTING="${ONLY_TESTING:-${CORRUPT_TEST_SELECTOR:-$(archive_app_field "$APP" tests)}}"
 TEST_ARGS="$(archive_xcode_test_args "$ONLY_TESTING")" \
@@ -618,6 +634,7 @@ run_xcuitest() {
   TEST_ENV=""
   if [ "$PROCESSOR_LIVECAPTURE" = 1 ]; then start_phone_leg; TEST_ENV="TEST_RUNNER_W40D5_DIR='$LIVE_GDIR'"; fi
   [ "$PROCESSOR_BULKOCR" = 1 ] && prepare_bulk_ocr
+  [ "$PROCESSOR_REVIEWS" = 1 ] && prepare_review_dialogs
   rm -f "$APP_ART"/sampler-*.tsv "$APP_ART"/chunk*.log
   if [ "$VM_SPLIT" -gt 0 ]; then
     run_split
@@ -781,6 +798,26 @@ collect_bulk_ocr() {
       done > tags-guest.tsv; ditto '$BULK_GDIR/out' '/Volumes/My Shared Files/out/$APP/bulk-ocr'" \
     || warn "could not bring the bulk OCR output back (guest: $BULK_GDIR/out)"
   log "bulk OCR output: $dest"
+}
+
+# --- PROCESSOR_JOURNEY=reviews: six photos and the stand-in CLI onto the guest disk ---
+# The first six photos of the box, by name, copied with `ditto` from the read-only share; the stand-in CLI and the
+# fake_gateway.py it borrows its replies from beside them, executable, since the app runs the CLI by path. The test
+# reads its output back itself (it lands in the runner's own temporary folder), so nothing is collected here.
+prepare_review_dialogs() {
+  local name photos; name="$(basename "$REVIEWS_SET")"
+  photos="$(cd "$REVIEWS_SET" && ls | grep -iE '\.(jpe?g|png|tiff?|heic)$' | sort | head -6 | paste -sd '|' -)"
+  [ "$(printf '%s' "$photos" | tr '|' '\n' | grep -c .)" = 6 ] || die "fewer than six photos in $REVIEWS_SET"
+  case "$photos" in *[\'\"\$\`\\]*) die "photo names this runner will not pass on: $photos" ;; esac
+  tart exec "$VM" bash -lc "rm -rf '$REVIEWS_GDIR' && mkdir -p '$REVIEWS_GDIR/in' \
+      && IFS='|' && for f in \$(printf '%s' '$photos'); do \
+           ditto \"/Volumes/My Shared Files/rehearsal/processor-set/$name/\$f\" \"$REVIEWS_GDIR/in/\$f\"; done \
+      && cp '$GUEST_REPO/ArchiveProcessor/scripts/fake_local_agent.py' '$GUEST_REPO/ArchiveProcessor/scripts/fake_gateway.py' \
+           '$REVIEWS_GDIR/' && chmod 755 '$REVIEWS_GDIR/fake_local_agent.py' \
+      && test \$(ls '$REVIEWS_GDIR/in' | wc -l) -eq 6" \
+    || die "could not copy the photos and the stand-in CLI into $REVIEWS_GDIR in the guest"
+  TEST_ENV="TEST_RUNNER_W40D2_DIR='$REVIEWS_GDIR' TEST_RUNNER_W40D2_PHOTOS='$photos'"
+  log "review dialogs: six photos of $name copied to $REVIEWS_GDIR/in in the guest"
 }
 
 # --- bring the tests' screenshots back to the host (STEP 3.5's "READ the screenshot") ---------------
