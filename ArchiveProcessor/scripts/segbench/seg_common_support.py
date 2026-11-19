@@ -148,7 +148,10 @@ def render_result(result, opts):
     lines += ["", "## Offset floors and picks", "",
               f"On this same support g1 spans {spread['g1']:.3f} points (rounded 2.5, previously 2.4), g2 "
               f"{spread['g2']:.3f} (rounded 5.2). The owner's per-pair construction is unchanged: twice the larger "
-              "own range, borrowing g1 only when absent. Thus unmeasured pairs use 5.0 points, g2 pairs 10.4. "
+              "own range, borrowing g1 only when absent. Thus unmeasured pairs used 5.0 points, g2 pairs 10.4, when "
+              "this item shipped. That floor is superseded: the paired rule (seg-pair-ties.md, W46.seg-truth-audit, "
+              "with the students' rerun floor since W46.p16-seg-tie-floor) now decides a tie, and both pairs that "
+              "move below tie under it, so both picks stand (W46.p16-score-hygiene). "
               "The numerical borrowing change follows the common denominator; it is not a new tie policy. "
               "Documented profiles keep their picks. Two move on one 16-page gap: text alone has 285 of 325 exact, "
               "GLM-5.3 Flash and the cluster 4B 269 each, 4.9 points against the 5.0 floor (on 330 pages, 4.85 against "

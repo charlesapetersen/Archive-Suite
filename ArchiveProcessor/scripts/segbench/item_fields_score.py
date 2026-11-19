@@ -1022,7 +1022,10 @@ def report(o):
           "candidate.", "",
           "## Measurement card", "",
           "- **Truth:** W47.item-fields-retruth's (Gemini 3.7 and GPT 5.6 Luna drafting, Gemini 3.7 ruling) with "
-          "both owner sheets' answers and notes folded in. The random controls' error above covers the agreed cells "
+          "the four owner sheets' answers and notes folded in. Sheets 2-4 (W47.item-fields-more-checks, "
+          "-more-score, -title) showed the image prompt's own value to confirm or correct, so an answer there starts "
+          "from the scored route's reading, which leans title's truth toward it (a disclosure, not a defect: pass 11 "
+          "accepted the design; W46.p16-score-hygiene). The random controls' error above covers the agreed cells "
           f"only. The disputes no sheet asked keep the judge's ruling: in scope, sideways documents out, {udn} pairs "
           "(" + ", ".join(f"{f} {v[0]}" for f, v in ud.items() if v[0]) + f"), {udb} of them in base, where the "
           f"non-drafter routes score. The owner upheld the judge on {tot['judge right']} of the {tot['answered']} "

@@ -189,6 +189,13 @@ def render_record(r) -> str:
         L[-1] += (f" **{f['differs']} of {f['ruled']} differ from the truth**. Weighted by N/n, the truth is wrong on "
                   f"an estimated **{100 * f['weighted_truth_error']:.1f}%** of the agreed pool (95% interval about "
                   f"{100 * lo:.1f}-{100 * hi:.1f}%, n {f['ruled']}).")
+        if not f["differs"]:
+            ex = exact_upper(f, r["strata"])
+            L[-1] += (f" That interval is a normal approximation; the exact one-sided 95% upper bound is about "
+                      f"{100 * ex['proportional']:.1f}% if errors spread over the strata in proportion to their size, "
+                      f"and {ex['concentrated_max']} of {ex['pool']} gaps ({100 * ex['concentrated_max'] / ex['pool']:.1f}%; "
+                      f"{ex['concentrated_max'] + 1} would be excluded, "
+                      f"{100 * (ex['concentrated_max'] + 1) / ex['pool']:.1f}%) if they all sat in {ex['concentrated_stratum']}.")
         rc = f.get("recheck", [])
         if rc:
             same = sum(x["answer"] == x["earlier"] for x in rc)
@@ -220,7 +227,8 @@ def render_record(r) -> str:
                 f"None of {f['ruled']} answers differs: the estimate is zero and its upper bound is what the audit "
                 "measures.") +
                " The interval is a normal one on the weighted rate, each stratum's variance from its Wilson interval, "
-               "with a finite-pool correction. The sheet's answers on one-page documents proved unreliable (3 of 6 "
+               "with a finite-pool correction" + ("; at zero differences the exact hypergeometric bound above is the one "
+               "to quote." if not f["differs"] else ".") + " The sheet's answers on one-page documents proved unreliable (3 of 6 "
                "reversed); every other answer agrees with the truth, so the layout could not have made a false "
                "difference among them" + (f", and the {len(f['recheck'])} continues it could have caused were "
                "re-asked on the fixed layout and all stood." if f.get("recheck") else
@@ -501,6 +509,31 @@ def stratified_interval(folded: dict, strata: list[dict], z: float = 1.96) -> tu
         var += (W * half / z) ** 2 * (1 - n / s["N"])
     sd = var ** 0.5
     return max(0.0, rate - z * sd), min(1.0, rate + z * sd)
+
+
+def exact_upper(folded: dict, strata: list[dict], alpha: float = 0.05) -> dict:
+    """Exact one-sided upper bounds on the pool's truth errors when no answer differs, each stratum drawn without
+    replacement (hypergeometric): errors spread in proportion to the strata (continuous in the count), and all of them
+    in the one stratum that hides the most (W46.p16-score-hygiene; the normal interval above is an approximation)."""
+    from math import exp, lgamma
+
+    def none_drawn(N: int, K: float, n: int) -> float:
+        ch = lambda a, b: lgamma(a + 1) - lgamma(b + 1) - lgamma(a - b + 1)
+        return 0.0 if N - K < n else exp(ch(N - K, n) - ch(N, n))
+
+    sizes = [(s["stratum"], s["N"], folded["strata"][s["stratum"]]["ruled"]) for s in strata]
+    total = sum(N for _, N, _ in sizes)
+    lo, hi = 0.0, float(total)
+    for _ in range(60):
+        m = (lo + hi) / 2
+        p = 1.0
+        for _, N, n in sizes:
+            p *= none_drawn(N, m * N / total, n)
+        lo, hi = (m, hi) if p >= alpha else (lo, m)
+    worst = max(((name, max(k for k in range(N + 1) if none_drawn(N, k, n) >= alpha)) for name, N, n in sizes),
+                key=lambda x: x[1])
+    return {"proportional": round(lo / total, 4), "concentrated_stratum": worst[0], "concentrated_max": worst[1],
+            "pool": total}
 
 
 def cmd_apply(_a):

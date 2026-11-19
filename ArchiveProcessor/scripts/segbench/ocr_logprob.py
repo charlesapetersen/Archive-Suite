@@ -277,8 +277,8 @@ def seg_report(res):
               'thousandths is inside what one more box could move.',
               'Whether the 2B\'s stated confidence ranks its own errors on these boxes, and whether isotonic calibration '
               'improves its probabilities there. It does not measure OCR, other segmenters, page-level exactness or '
-              'any route ranking; segment-level figures elsewhere are conditional at unsure gaps (P15-1, '
-              'W46.seg-unsure-mask).')
+              'any route ranking; segment-level figures elsewhere are scored on one common support of known gaps (P15-1, '
+              'W46.seg-common-support).')
     return '\n'.join(L)
 
 
@@ -620,8 +620,28 @@ def render(out):
                 L.append(f"| {sig} | {_f(v['auc_escalation_poor'])} | {100 * v['gain_riskiest_fifth']:+.2f} | "
                          f"{100 * v['gain_rest']:+.2f} |")
         L.append('')
-    return '\n'.join(L + CONCLUSION)
+    from seg_card import card
+    return '\n'.join(L + CONCLUSION + [''] + card(*OCR_CARD))
 
+
+# W46.p16-score-hygiene (measurement review pass 16, P16-9): the OCR report's card, written by its generator.
+OCR_CARD = (
+    'The owner\'s 96: their adjudicated truth (`ocr_truth`), drafted by Gemini 3.8 Flash with Claude Opus 5.5; the '
+    'owner\'s blind check found the typed-page truth fit for ranking (measurement audit, 2026-10-30). The public 440 '
+    'and 455 use their datasets\' own truth. A reading is poor under 70 or under 90 NES against it, and failed on a cap '
+    'or an error. Neither scored reader drafted the truth.',
+    'All 96 pages and the frozen 895, split into the open sweep\'s original strata (the 440) and the rest (the 455); '
+    'no page was chosen by a signal, a reader or ABBYY text.',
+    'Every signal ranks the same reading of the same page, one reading per route at temperature 0; disagreement is '
+    'scored against the other reader\'s reading of that page; the escalation route is Qwen3.6-27B\'s cached readings. '
+    'The Mac (mlx-vlm) and Sherlock (vLLM) rows are two runtimes of the same two readers, not paired with each other.',
+    'One reading per route and no interval on any AUC. The 96 hold 17-27 poor readings per reader, so an AUC there '
+    'moves by several hundredths with a few pages. The cascade threshold is chosen on the 96 and applied once to the '
+    '455. A rescore on 2026-11-18 could not rebuild the Sherlock rows (their readings are no longer on this Mac) and '
+    'moved the Mac rows\' 96 NES by 0.02-0.04 points (scorer changes since 2026-10-28), so the committed report stands.',
+    'Two readers and one escalation route. It says whether a reader\'s token log-probabilities rank its own errors; '
+    'it does not set the app\'s cascade (W41.app-ocr-cascade is unchanged), price a route, or speak for readers it did '
+    'not run. Calibration was fitted on the 440 alone.')
 
 CONCLUSION = [
     '## Conclusion (scored 2026-10-28: the Mac runs and the Sherlock collection of 2026-10-24)', '',

@@ -19,10 +19,10 @@ spent.
 | LayoutReader | reading order | CC BY-NC-SA 4.0 | the three layout-order panels in full | ties the free rows-first XY-cut on lines, loses on regions: no pick changes |
 | HunyuanOCR-1.5 | Mac reader | Tencent Hunyuan community licence, not for users in the EU, UK or South Korea | 25 of the 96, then the 96 in full | ties Apple Vision, behind LightOnOCR-3 4B 8-bit and Xiaomi-OCR-0: no pick changes |
 | FastVLM 0.5B | Mac reader | Apple AMLR (research only) | the 96 | 45 of 96 run to the token cap; strict NES 0.281: no |
-| GutenOCR-3B | placement lines | CC BY-NC 4.0 | the 41 place-hands pages | on its card's runtime (W46.gutenocr-lines-ref) it ties the shipped placer with the app's line writer and stays behind PP-OCRv6 on Bentham; at 12 times blla's time a page: no pick changes |
+| GutenOCR-3B | placement lines | CC BY-NC 4.0 | run on the 41 place-hands pages, scored on the 20 owner-hand and 14 Bentham pages with truth lines | on its card's runtime (W46.gutenocr-lines-ref) it ties the shipped placer with the app's line writer and stays behind PP-OCRv6 on Bentham; at 12 times blla's time a page: no pick changes |
 | Surya-2 | placement lines | OpenRAIL-M | none possible | surya-ocr 0.24 has no line detector: no |
 | DocScanner-L, DocGeoNet | dewarp | the authors' non-commercial licence | the 64 dewarp-placement pages in full | both crop the page; the guard holds them back: no |
-| tech4humans signature detector | marks | YOLOv8s AGPL-3.0, gated | an ungated sibling from the same authors, Apache-2.0 | ties the YOLO11m marks detector on recall, worse at IoU 0.5: no |
+| tech4humans signature detector | marks | YOLOv8s AGPL-3.0, gated | an ungated sibling from the same authors, Apache-2.0 | not measured; the stand-in ties the YOLO11m marks detector (recall, and IoU 0.5 inside noise): no |
 | LensVLM-9B | reader | Apple AMLR | not run | a Qwen3.5-9B fine-tune for questions over compressed text images, not an OCR model; Qwen3.5-9B is measured, and the family rule (call 12) counts it as one |
 | LayoutLMv3 (layout) | layout regions | CC BY-NC-SA 4.0 | not run | filed behind W46.nice-to-have (W46.licence-freed-rest) |
 | DE-GAN, DocEnTr, DocDiff | restorers | various non-commercial | not run | low priority after the enhancement null; filed behind W46.nice-to-have |
@@ -99,7 +99,8 @@ Peak memory 2.1 GB; 3.7 s a page median.
 ## Placement lines: GutenOCR-3B and Surya-2
 
 **GutenOCR-3B** (bevaya/GutenOCR-3B @fd16c80c, Qwen2.5-VL-3B fine-tuned for grounded OCR; CC BY-NC 4.0) was asked for
-its LINES output (text plus a box for each line) on the 41 place-hands pages: 21 owner hand pages and 20 Bentham. The
+its LINES output (text plus a box for each line) on the 41 place-hands pages: 21 owner hand pages and 20 Bentham. The line pass is scored on the pages with truth lines,
+20 owner hand and 14 Bentham (`licence-sweep-gutenocr.json`, W46.p16-score-hygiene). The
 page went in at 1,792 px on its longer side, each side a multiple of 28. Each box became a line piece, pieces on one
 row were joined as for the other box detectors, and the lines were aligned with McCATMuS CTC (`place_hands.py align
 gutenocr ctc-mccatmus`). They were then dragged and scored like every place-hands hypothesis.
@@ -189,8 +190,10 @@ marks), matched class-agnostic as marks-detect scores the YOLO11m arm.
 | 0.25 | 18 | 8/45 = 18% (7 to 31) | 44% | 2/45 |
 | 0.5 | 7 | 4/45 = 9% (2 to 21) | 57% | 2/45 |
 
-At its default floor it ties YOLO11m (AnnoPage plus SignverOD: 8/45 = 18%, precision 53%) on loose-hit recall and is
-worse at IoU 0.5 (2/45 against 6/45). It finds 2 of the 4 signatures and initials. A request for the gated model is
+At its default floor it ties YOLO11m (AnnoPage plus SignverOD: 8/45 = 18%, precision 53%) on loose-hit recall, and
+at IoU 0.5 its 2/45 against 6/45 is a tie too (Fisher p 0.27; an earlier wording called it worse, corrected by
+W46.p16-score-hygiene). Only 4 of the 45 marks are signatures or initials, and it finds 2 of them, so this set says
+little about a signature detector. The named model itself is not measured. A request for the gated model is
 not worth the owner's time unless he wants it measured as named.
 
 ## Test material
@@ -233,8 +236,10 @@ not worth the owner's time unless he wants it measured as named.
   No tested route and no ABBYY text chose anything.
 - **Comparison.** Each new arm sees the same inputs and settings as the incumbents beside it. Incumbents were rerun in
   the same process (layout order, dewarp) or read from their committed per-page rows (readers, placement, marks).
-- **Noise.** Every arm here is deterministic on one machine (greedy decoding, CPU, MLX or MPS), so the rerun floor is 0 and
-  the paired interval alone tests a gap.
+- **Noise.** Every arm here decodes greedily on one machine (CPU, MLX or MPS), so the rerun floor is taken as 0 and
+  the paired interval alone tests a gap. That is assumed, not shown: no new arm was read twice (the replay above only
+  re-drags stored placer rows), and for GutenOCR on transformers bf16 on MPS in particular the rerun floor is
+  unmeasured (W46.p16-score-hygiene; an earlier wording said every arm is deterministic).
 - **Scope.**
   - The readers ran on the 96 only. HunyuanOCR-1.5's 895 half was not run, since the 96 show it changes no pick.
   - FastVLM's prompt is ours, since it has none of its own.
