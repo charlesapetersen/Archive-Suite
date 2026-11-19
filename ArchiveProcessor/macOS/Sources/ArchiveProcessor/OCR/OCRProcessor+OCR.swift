@@ -264,9 +264,9 @@ extension OCRProcessor {
             statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
             do {
                 try segmenter2.organizeOutput(
-                    collections: collectionSegments,
+                    collections: collectionsOutsideTrees,
                     outputDirectory: outputDirectory,
-                    outputURLMap: outputURLMap,
+                    outputURLMap: outputURLMapOutsideTrees,
                     moveSiblingImages: runOutputSettings.exportOriginals
                 )
                 statusMessage = "Collections organized into \(collectionSegments.count) folders."
@@ -567,7 +567,8 @@ extension OCRProcessor {
         if _takenOutputPaths.isEmpty && !outputURLMap.isEmpty {
             _takenOutputPaths = Set(outputURLMap.values.map(OutputFileSafety.pathKey))
         }
-        let preferred = dir.appendingPathComponent(baseName + "." + ext)
+        // W47.ct-processor-intake: a source from a tree goes in its folder below `dir`.
+        let preferred = outputFolder(for: sourceURL, in: dir).appendingPathComponent(baseName + "." + ext)
         return OutputFileSafety.reserveUniqueDestination(
             preferred: preferred,
             reservedPaths: &_takenOutputPaths
@@ -793,6 +794,7 @@ extension OCRProcessor {
             initialPendingBatch.newspaperParts = [:]
         }
         initialPendingBatch.cascade = Self.ocrCallValues(for: runConfig).cascade
+        initialPendingBatch.outputSubfolders = outputSubfolders.isEmpty ? nil : outputSubfolders   // W47.ct-processor-intake
         initialPendingBatch.resolvedSettings = activeResolvedSettings
         guard let persistedInitialBatch = Self.savePendingBatch(initialPendingBatch) else {
             statusMessage = "Could not create a safe paid-batch journal. No batch requests were sent."

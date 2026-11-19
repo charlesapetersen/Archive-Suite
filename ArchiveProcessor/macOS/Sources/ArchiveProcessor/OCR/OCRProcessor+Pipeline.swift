@@ -145,6 +145,7 @@ extension OCRProcessor {
         let mixedPDFOutcomes: [MixedPDFOutcome]?
         let newspaperManifest: NewspaperBatch.Manifest?
         let newspaperParts: [String: OCRResult]?
+        let outputSubfolders: [String: String]?
 
         init(batch: PendingBatch) {
             batchId = batch.batchId
@@ -173,6 +174,7 @@ extension OCRProcessor {
             mixedPDFOutcomes = batch.mixedPDFOutcomes
             newspaperManifest = batch.newspaperManifest
             newspaperParts = batch.newspaperParts
+            outputSubfolders = batch.outputSubfolders
         }
     }
 
@@ -317,7 +319,8 @@ extension OCRProcessor {
             segmentationApproach: runConfig?.segmentationApproach ?? SegmentationApproach.stored(),
             cascade: runConfig?.cascade ?? OCRCascade.fromDefaults(),
             pageReaders: runConfig.map { $0.pageReaders.isEmpty ? nil : $0.pageReaders } ?? nil,
-            institutionalComputeFolder: runConfig?.institutionalComputeImport?.folder.path
+            institutionalComputeFolder: runConfig?.institutionalComputeImport?.folder.path,
+            outputSubfolders: outputSubfolders.isEmpty ? nil : outputSubfolders
         )
     }
 
@@ -1616,6 +1619,7 @@ extension OCRProcessor {
         outputURLMap = [:]
         _takenOutputPaths = []
         exportedImageMap = [:]
+        outputSubfolders = pending.outputSubfolders ?? [:]   // W47.ct-processor-intake
         currentModel = pending.model
         // The run's own frozen settings, not the last started run's: the PDFs it still writes read them
         // (W42.int-s5 `textLayerOptions`, the dating route's switch). nil (a run recorded before them) is the defaults.
@@ -1814,9 +1818,9 @@ extension OCRProcessor {
             statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
             do {
                 organizedMoves = try segmenter.organizeOutput(
-                    collections: collectionSegments,
+                    collections: collectionsOutsideTrees,
                     outputDirectory: pending.outputDirectory,
-                    outputURLMap: outputURLMap,
+                    outputURLMap: outputURLMapOutsideTrees,
                     moveSiblingImages: runOutputSettings.exportOriginals,
                     exportedImageMap: exportedImageMap
                 )
@@ -1845,6 +1849,7 @@ extension OCRProcessor {
         // placeholder instead of the scan. Both are silent failures otherwise: the file is
         // there and looks processed, but tag search will not find it / the scan is missing.
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
+        statusMessage += treeFallbackSuffix   // W47.ct-processor-intake
         if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
         if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
@@ -1891,6 +1896,7 @@ extension OCRProcessor {
         _takenOutputPaths = []
         exportedImageMap = [:]
         pdfToImageMap = [:]
+        outputSubfolders = pending.runtimeConfig?.outputSubfolders ?? [:]   // W47.ct-processor-intake
         currentModel = pending.model
         // The run's own frozen settings, not the last started run's: the PDFs it still writes read them
         // (W42.int-s5 `textLayerOptions`, the dating route's switch). nil (a run recorded before them) is the defaults.
@@ -2085,6 +2091,7 @@ extension OCRProcessor {
                 // placeholder instead of the scan. Both are silent failures otherwise: the file is
                 // there and looks processed, but tag search will not find it / the scan is missing.
                 statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
+                statusMessage += treeFallbackSuffix   // W47.ct-processor-intake
                 postCompletionNotification()
                 return
             }
@@ -2222,9 +2229,9 @@ extension OCRProcessor {
             statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
             do {
                 organizedMoves = try segmenter.organizeOutput(
-                    collections: collectionSegments,
+                    collections: collectionsOutsideTrees,
                     outputDirectory: pending.outputDirectory,
-                    outputURLMap: outputURLMap,
+                    outputURLMap: outputURLMapOutsideTrees,
                     moveSiblingImages: runOutputSettings.exportOriginals,
                     exportedImageMap: exportedImageMap
                 )
@@ -2258,6 +2265,7 @@ extension OCRProcessor {
         // placeholder instead of the scan. Both are silent failures otherwise: the file is
         // there and looks processed, but tag search will not find it / the scan is missing.
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
+        statusMessage += treeFallbackSuffix   // W47.ct-processor-intake
         if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
         if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
@@ -2863,7 +2871,14 @@ extension OCRProcessor {
         pageReaders = .empty
         let plannedImport = institutionalComputeImport
         institutionalComputeImport = nil
+        let plannedSubfolders = plannedOutputSubfolders   // W47.ct-processor-intake
+        plannedOutputSubfolders = [:]
         guard !files.isEmpty else { return }
+        if resumingMixedPDF == nil, !preOCRedInput,
+           let tree = ProcessFilesTree.treeHoldingOutput(subfolders: plannedSubfolders, outputDirectory: outputDirectory) {
+            statusMessage = ProcessFilesTree.overlapMessage(tree)
+            return
+        }
         // Never overwrite recovery state from a different interrupted run. The UI surfaces explicit
         // Resume/Dismiss controls, but keep the invariant here as well for shortcuts and programmatic
         // callers. A paid batch may still exist even when its manifest is malformed or has no received ID.
@@ -2912,7 +2927,8 @@ extension OCRProcessor {
         var incrementalSkipped = 0
         if resumingMixedPDF == nil && skipAlreadyProcessed && preGroupedBoundaries.isEmpty
             && !enableCollectionSegmentation && !mergeDocuments {
-            let decision = IncrementalSkip.partition(inputs: files, outputDirectory: outputDirectory)
+            let decision = Self.incrementalPartition(files, outputDirectory: outputDirectory,
+                                                     subfolders: preOCRedInput ? [:] : plannedSubfolders)
             incrementalSkipped = decision.skipped.count
             files = decision.toProcess
             guard !files.isEmpty else {
@@ -2970,6 +2986,9 @@ extension OCRProcessor {
         exportedImageMap = [:]
         pdfToImageMap = [:]
         removedSourceURLs = []
+        // W47.ct-processor-intake: the pre-OCRed route tags its inputs where they are, so it has no tree.
+        outputSubfolders = resumingMixedPDF.map { $0.runtimeConfig.outputSubfolders ?? [:] }
+            ?? (preOCRedInput ? [:] : Self.keyedSubfolders(plannedSubfolders))
         var runConfig = SessionProcessingConfig.fromProcessFilesRunStart()
         // The Process Files controller/arguments are the authoritative run input (headless drivers
         // intentionally configure them without mutating UserDefaults), so every explicitly-threaded
@@ -3441,9 +3460,9 @@ extension OCRProcessor {
                 statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
                 do {
                     organizedMoves = try segmenter2.organizeOutput(
-                        collections: collectionSegments,
+                        collections: collectionsOutsideTrees,
                         outputDirectory: outputDirectory,
-                        outputURLMap: outputURLMap,
+                        outputURLMap: outputURLMapOutsideTrees,
                         moveSiblingImages: runOutputSettings.exportOriginals,
                         exportedImageMap: exportedImageMap
                     )
@@ -3486,6 +3505,7 @@ extension OCRProcessor {
         // placeholder instead of the scan. Both are silent failures otherwise: the file is
         // there and looks processed, but tag search will not find it / the scan is missing.
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
+        statusMessage += treeFallbackSuffix   // W47.ct-processor-intake
         if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
         if incrementalSkipped > 0 {
             statusMessage += " \(incrementalSkipped) already-processed skipped."

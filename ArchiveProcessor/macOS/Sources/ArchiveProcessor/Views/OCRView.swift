@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 import PDFKit
 import ImageIO
+import ArchiveCore
 
 struct OCRView: View {
     // MARK: - State
@@ -106,6 +107,23 @@ struct OCRView: View {
 
     // Transient
     @State private var droppedFiles: [URL] = []
+    /// W47.ct-processor-intake: for each file from a folder read as a tree, its folder below the output folder.
+    @State private var droppedSubfolders: [URL: String] = [:]
+    /// The level map offered at Start for a tree, and why saving it was refused.
+    @State private var containerLevels: ContainerLevelsDraft?
+    @State private var containerLevelsError: String?
+    /// A drop or Add Files whose folders hold folders: whether to read those too is asked first.
+    @State private var treeQuestion: TreeQuestion?
+    /// A tree being read in the background, and the file list's generation: Clear and Start bump it, so a walk that
+    /// ends after either adds nothing.
+    @State private var readingTree = false
+    @State private var intakeGeneration = 0
+    struct TreeQuestion: Identifiable {
+        let id = UUID()
+        let urls: [URL]
+        let sortAll: Bool
+        let names: [String]
+    }
     /// Whether any dropped file is a multi-page PDF (recomputed on droppedFiles change, so PDFs aren't
     /// re-opened on every render). Combined with `!preOCRedInput` this is the auto re-OCR routing the
     /// pipeline applies — surfaced here only to grey out the (inapplicable) Tagging controls.
@@ -515,6 +533,31 @@ struct OCRView: View {
         }
         .modifier(SegmentationStagePresentations(processor: processor))
         .modifier(TrainingWarningPresentation(warning: $trainingWarning) { beginProcessing() })
+        .alert("Read the folders inside?", isPresented: Binding(get: { treeQuestion != nil },
+                                                                 set: { if !$0 { treeQuestion = nil } }),
+               presenting: treeQuestion) { question in
+            Button("Read Folders Inside") { answer(question, readSubfolders: true) }
+            Button("Only Its Own Files") { answer(question, readSubfolders: false) }
+            Button("Cancel", role: .cancel) { treeQuestion = nil }
+        } message: { question in
+            Text("“\(question.names.joined(separator: "”, “"))” \(question.names.count == 1 ? "holds" : "hold") folders. "
+                 + "Process Files can read the photos in them too and file each PDF in the same folders inside the "
+                 + "output folder, so Archive Reader shows its collection, box and folder. Or it reads only the "
+                 + "photos directly inside, as before.")
+        }
+        .sheet(item: $containerLevels) { draft in
+            ContainerLevelsSheet(draft: draft, error: containerLevelsError, onSave: { edited in
+                if let failure = ProcessFilesTree.saveLevels(edited) {
+                    containerLevelsError = failure
+                    return
+                }
+                containerLevels = nil
+                runProcessing()
+            }, onSkip: {
+                containerLevels = nil
+                runProcessing()
+            }, onCancel: { containerLevels = nil })
+        }
         .modifier(InstitutionalComputeResumePresentation(processor: processor) { mixedPDF in
             if mixedPDF { resumePendingMixedPDF(readWithoutClusterText: true) }
             else { resumePendingRun(readWithoutClusterText: true) }
@@ -971,7 +1014,7 @@ struct OCRView: View {
     /// state and the ⌘R "Start Processing" shortcut (so the shortcut can never start a run the button
     /// wouldn't allow: no files, no key, no output folder, already busy, or mid-review).
     private var canStartProcessing: Bool {
-        !droppedFiles.isEmpty && (!runNeedsAPIKey || !apiKey.isEmpty) && visionWorkflowIsSupported && outputDirectory != nil
+        !droppedFiles.isEmpty && !readingTree && (!runNeedsAPIKey || !apiKey.isEmpty) && visionWorkflowIsSupported && outputDirectory != nil
             && !processor.isProcessing && !isInReviewMode
             && processor.pendingBatchInfo == nil && processor.pendingRunInfo == nil
             && processor.pendingMixedPDFInfo == nil
@@ -987,6 +1030,7 @@ struct OCRView: View {
         if processor.pendingRunInfo != nil { return "Resume or dismiss the interrupted run above first." }
         if processor.pendingMixedPDFInfo != nil { return "Resume or dismiss the interrupted PDF run above first." }
         if droppedFiles.isEmpty { return "Add images or PDFs to process." }
+        if readingTree { return "Reading the folders inside…" }   // W47.ct-processor-intake
         if !visionWorkflowIsSupported {
             return "Apple Vision only transcribes: set Tagging to No tagging or Copy source file tags"
                 + (enableCollectionSegmentation ? ", and turn off Collection ID in Settings." : ".")
@@ -1023,11 +1067,17 @@ struct OCRView: View {
                     .buttonStyle(.bordered)
                     .disabled(processor.isProcessing)   // don't mutate the input set mid-run
                     if !droppedFiles.isEmpty {
-                        Button("Clear") { droppedFiles = []; captureBoundaries = []; captureTypes = []; captureQualities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = []; processor.progress = 0; processor.statusMessage = ""; processor.failedFiles = [] }
+                        Button("Clear") { droppedFiles = []; droppedSubfolders = [:]; intakeGeneration += 1; readingTree = false; captureBoundaries = []; captureTypes = []; captureQualities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = []; processor.progress = 0; processor.statusMessage = ""; processor.failedFiles = [] }
                             .buttonStyle(.bordered)
                             .disabled(processor.isProcessing)   // Clear mid-run would wipe processor.jobs out from under the running task (wasted paid calls, discarded output)
                     }
                 }
+            }
+            if !droppedSubfolders.isEmpty && !preOCRedInput {
+                // W47.ct-processor-intake
+                Text("Folders kept: each PDF is filed in the same folders inside the output folder.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("ap.files.treeNote")
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -1406,17 +1456,43 @@ struct OCRView: View {
     // MARK: - Actions
 
     private func handleDroppedURLs(_ urls: [URL]) {
-        var imageURLs: [URL] = []
-        for url in urls {
-            var isDir: ObjCBool = false
-            if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
-                let contents = (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
-                imageURLs.append(contentsOf: contents.filter { isImageFile($0) })
-            } else if isImageFile(url) {
-                imageURLs.append(url)
-            }
+        admit(urls, sortAll: true)
+    }
+
+    /// W47.ct-processor-intake: a folder holding folders is read as a tree only when the user says so; otherwise, and
+    /// for every other drop, its own files as before (`ProcessFilesTree.collect`).
+    private func admit(_ urls: [URL], sortAll: Bool) {
+        let holding = urls.filter(ProcessFilesTree.hasSubfolders)
+        guard holding.isEmpty else {
+            treeQuestion = TreeQuestion(urls: urls, sortAll: sortAll, names: holding.map(\.lastPathComponent))
+            return
         }
-        droppedFiles.append(contentsOf: imageURLs.sorted { $0.lastPathComponent < $1.lastPathComponent })
+        add(ProcessFilesTree.collect(urls, accept: isImageFile, sortAll: sortAll, readSubfolders: false))
+    }
+
+    private func add(_ intake: ProcessFilesTree.Intake) {
+        droppedFiles.append(contentsOf: intake.files)
+        droppedSubfolders.merge(intake.subfolders) { $1 }
+    }
+
+    /// The answer to `treeQuestion`. Reading a whole tree is done off the main thread.
+    private func answer(_ question: TreeQuestion, readSubfolders: Bool) {
+        treeQuestion = nil
+        guard readSubfolders else {
+            add(ProcessFilesTree.collect(question.urls, accept: isImageFile, sortAll: question.sortAll, readSubfolders: false))
+            return
+        }
+        let preOCRed = preOCRedInput, urls = question.urls, sortAll = question.sortAll
+        let generation = intakeGeneration
+        readingTree = true
+        Task {
+            let intake = await Task.detached(priority: .userInitiated) {
+                ProcessFilesTree.collect(urls, accept: { ProcessFilesTree.isInput($0, preOCRed: preOCRed) }, sortAll: sortAll)
+            }.value
+            guard generation == intakeGeneration else { return }
+            readingTree = false
+            if !processor.isProcessing { add(intake) }
+        }
     }
 
     private func selectFiles() {
@@ -1426,17 +1502,7 @@ struct OCRView: View {
         panel.canChooseDirectories = true
         panel.allowedContentTypes = [.image, .jpeg, .png, .tiff, .pdf]
         if panel.runModal() == .OK {
-            var urls: [URL] = []
-            for url in panel.urls {
-                var isDir: ObjCBool = false
-                if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
-                    let contents = (try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
-                    urls.append(contentsOf: contents.filter { isImageFile($0) }.sorted { $0.lastPathComponent < $1.lastPathComponent })
-                } else if isImageFile(url) {
-                    urls.append(url)
-                }
-            }
-            droppedFiles.append(contentsOf: urls)
+            admit(panel.urls, sortAll: false)   // W47.ct-processor-intake
         }
     }
 
@@ -1452,12 +1518,10 @@ struct OCRView: View {
     }
 
     private func isImageFile(_ url: URL) -> Bool {
-        let ext = url.pathExtension.lowercased()
         // Pre-OCRed input is the PDF-only tagging path. Otherwise accept images AND PDFs: images OCR
         // normally, a multi-page PDF auto-routes to the re-OCR transform, and a single-page PDF is
         // OCR'd like an image. A wrong-type file is still rejected at the door.
-        if preOCRedInput { return ext == "pdf" }
-        return ext == "pdf" || ImageEncoding.acceptedImageExtensions.contains(ext)
+        ProcessFilesTree.isInput(url, preOCRed: preOCRedInput)
     }
 
     private func resumePendingBatch() {
@@ -1573,8 +1637,33 @@ struct OCRView: View {
         return SettingsTraining.runWarning(ways, resources: resources)
     }
 
+    /// W47.ct-processor-intake: the tree's folders for the files listed now (a file removed from the list is not).
+    private var plannedSubfolders: [URL: String] {
+        guard !droppedSubfolders.isEmpty, !preOCRedInput else { return [:] }
+        let listed = Set(droppedFiles)
+        return droppedSubfolders.filter { listed.contains($0.key) }
+    }
+
+    /// Start, once a tree's level map has been offered for the output folder (W47.ct-processor-intake).
     private func beginProcessing() {
         guard let outDir = outputDirectory else { return }
+        if let tree = ProcessFilesTree.treeHoldingOutput(subfolders: plannedSubfolders, outputDirectory: outDir) {
+            processor.statusMessage = ProcessFilesTree.overlapMessage(tree)
+            return
+        }
+        if let draft = ProcessFilesTree.levelsToOffer(files: droppedFiles, subfolders: plannedSubfolders,
+                                                      outputDirectory: outDir) {
+            containerLevelsError = nil
+            containerLevels = draft
+            return
+        }
+        runProcessing()
+    }
+
+    private func runProcessing() {
+        guard let outDir = outputDirectory else { return }
+        intakeGeneration += 1   // a tree still being read is not added to a started run
+        readingTree = false
         let trimmedPrompt = customOCRPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let context = SegmentationContext(
             previousTextCharCount: Int(contextCharCount),
@@ -1607,6 +1696,7 @@ struct OCRView: View {
         processor.mergeDocuments = mergeDocuments
         processor.pageReaders = pageReaderPlan   // W41.app-page-kind; the run ignores it where it does not apply
         processor.institutionalComputeImport = institutionalComputeActive ? institutionalComputeImport : nil   // W41.app-institutional-compute
+        processor.plannedOutputSubfolders = plannedSubfolders   // W47.ct-processor-intake
         processor.tagVocabulary = tagVocabulary
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }

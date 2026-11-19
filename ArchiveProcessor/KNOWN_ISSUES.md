@@ -23,6 +23,23 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   (W41.app-openrouter-claude), and the listing skips its id. Opus 5.5 and Haiku 4.5 have narrow measurements that do
   not make routes (`LLMModel.anthropicModels` says which).
 
+## ⚠️ LIMITATION (W47.ct-processor-intake, 2026-11-19): what reading a folder tree in Process Files does not do
+- **The level map is offered once per output folder.** A map already there (an earlier run's, or one the Reader saved),
+  readable or not, is used as it stands, even when the new tree is deeper or named differently; edit it in Archive
+  Reader (File ▸ Container Levels… on that archive). A map above the output folder is not looked for: with the output
+  inside a Reader archive, Save writes a map for the output folder's subtree, and Start Without Saving leaves the
+  outer map reading the new folders from its own root.
+- **Documents are found across the whole run.** Segmentation and tagging see the run's pages in order and may treat
+  pages from two folders as one document; merging splits it at the folder change, but the pieces keep the tags the
+  whole document was given.
+- **Depth.** Folders more than 12 below the given folder are not read, and nothing says so. A given folder whose own
+  name starts with "." is read but filed flat.
+- **Collection organisation is skipped for a tree's outputs**, by design: the tree says where they go. Its status line
+  still counts every collection the run found.
+- **The Files tab's sheet and question were not run in the VM**: the logic behind them is in the driver
+  (`test-collection-organize.sh`) and a real Apple Vision run on a scratch tree (`PROCESSFILES_TREE=1`); the two SwiftUI
+  views follow the Reader's levels sheet, which the VM checked (W47.ct-reader-view).
+
 ## ⚠️ LIMITATION (W47.ct-processor-capture, 2026-11-19): what reading box and folder labels does not do
 - **Gemma needs a server already running on this Mac** (W47.ct-capture-gemma). With the gateway off or a local model on
   it, repository, collection title and number and date come from Gemma 3 12B only when LM Studio, Ollama or mlx-vlm

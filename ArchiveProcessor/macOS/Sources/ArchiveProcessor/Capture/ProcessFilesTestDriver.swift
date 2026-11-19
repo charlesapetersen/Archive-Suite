@@ -116,12 +116,20 @@ enum ProcessFilesTestDriver {
         let cap = max(1, Int(env["PROCESSFILES_MAXIMAGES"] ?? "") ?? 8)
         let mixedRoute = env["PROCESSFILES_TEST_MIXED"] == "1"
         let all = (try? FileManager.default.contentsOfDirectory(at: inDir, includingPropertiesForKeys: nil)) ?? []
-        let inputs = all
+        var inputs = all
             .filter { imageExts.contains($0.pathExtension.lowercased())
                 || (mixedRoute && $0.pathExtension.lowercased() == "pdf") }
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
             .prefix(cap)
             .map { $0 }
+        // W47.ct-processor-intake: PROCESSFILES_TREE=1 takes TESTIN as a folder dropped on Process Files, read as a
+        // tree (`ProcessFilesTree.collect`), so each output is filed in its folders below the run dir.
+        if env["PROCESSFILES_TREE"] == "1" {
+            let intake = ProcessFilesTree.collect([inDir], accept: { imageExts.contains($0.pathExtension.lowercased()) },
+                                                  sortAll: true)
+            inputs = Array(intake.files.prefix(cap))
+            processor.plannedOutputSubfolders = intake.subfolders
+        }
         guard !inputs.isEmpty else { return fail("no accepted inputs in \(inDir.path)", marker: donePath) }
 
         // --- config (rejecting modes that need real human input) ---

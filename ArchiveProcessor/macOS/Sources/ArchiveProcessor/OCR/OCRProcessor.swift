@@ -80,6 +80,16 @@ class OCRProcessor: ObservableObject {
     /// The next run's institutional-computing import (W41.app-institutional-compute), set by the Files tab just before Start; frozen
     /// into the run's config and cleared there, where the page readers apply.
     var institutionalComputeImport: InstitutionalComputeImport? = nil
+    /// The next run's tree (W47.ct-processor-intake): for each source from a folder Process Files read as a tree, the
+    /// folder below the output folder its output goes in ("Glotzer papers/Box 17/Folder 8"). Set by the Files tab just
+    /// before Start; taken into `outputSubfolders` and cleared there. A source not listed goes in the output folder.
+    var plannedOutputSubfolders: [URL: String] = [:]
+    /// The running run's tree, keyed by the source's standardized path. Frozen into the resume snapshot, so a resumed
+    /// run files each output where it began to.
+    var outputSubfolders: [String: String] = [:]
+    /// The sources (standardized paths) whose tree folder could not be made (a file or link in its place), so their output went in the
+    /// output folder itself; named in the run's summary. Reset with the other output warnings.
+    var outputsOutsideTheirTree: [String] = []
     /// When true (and rotation detection is on), pause for a dedicated rotation-review pass — separate
     /// from the tagging/segmentation review, and run in every tagging mode. Set from the UI before a run.
     var reviewRotation = false
@@ -452,6 +462,8 @@ class OCRProcessor: ObservableObject {
         var mixedPDFOutcomes: [MixedPDFOutcome]?
         var newspaperManifest: NewspaperBatch.Manifest? = nil
         var newspaperParts: [String: OCRResult]? = nil
+        /// The batch's tree (W47.ct-processor-intake, `OCRProcessor.outputSubfolders`); nil reads as none.
+        var outputSubfolders: [String: String]? = nil
 
         init(batchId: String, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
              fileURLs: [URL], outputDirectory: URL, enableTagging: Bool,
@@ -627,6 +639,10 @@ class OCRProcessor: ObservableObject {
         /// The institutional-computing bulk folder the run imports text from (W41.app-institutional-compute), reloaded on resume.
         /// Nil reads as none.
         var institutionalComputeFolder: String? = nil
+
+        /// The run's tree (W47.ct-processor-intake, `OCRProcessor.outputSubfolders`), so a resumed run files each output
+        /// in the folder it began to. Nil reads as none: every output in the output folder.
+        var outputSubfolders: [String: String]? = nil
     }
 
     struct PendingRun: Codable {

@@ -1,6 +1,7 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 import ArchiveCore
+import PDFKit
 
 /// Headless, $0 self-test of `CollectionSegmenter.organizeOutput`, gated by `COLLECTIONORGANIZE_TEST=1`
 /// (inert in normal use). No OCR, no network, no cost, no GUI — synthetic files in a temp dir.
@@ -292,6 +293,172 @@ enum CollectionOrganizeTestDriver {
                   && (try? String(contentsOf: folder.appendingPathComponent("00003 Glotzer.pdf"), encoding: .utf8))
                       == "PDF folder.pdf")
             try? fm.removeItem(at: out)
+        }
+
+        // ============================================================================================
+        // W47.ct-processor-intake — Route B in Process Files: a dropped tree is read recursively, each output is
+        // filed in the same folders below the output folder, the level map is offered once and written there, a
+        // merged document stays in its folder, organisation leaves the tree's outputs alone, a resume keeps the tree.
+        // ============================================================================================
+        do {
+            let base = fm.temporaryDirectory.appendingPathComponent("APOrgTest-tree-\(UUID().uuidString)", isDirectory: true)
+            let input = base.appendingPathComponent("in", isDirectory: true)
+            let out = base.appendingPathComponent("out", isDirectory: true)
+            let elsewhere = base.appendingPathComponent("elsewhere", isDirectory: true)
+            for dir in [out, elsewhere] { try? fm.createDirectory(at: dir, withIntermediateDirectories: true) }
+            func put(_ path: String) -> URL {
+                let url = input.appendingPathComponent(path)
+                try? fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                writeFile(url, "src \(path)")
+                return url
+            }
+            func writePDF(_ url: URL) {
+                var box = CGRect(x: 0, y: 0, width: 72, height: 72)
+                guard let consumer = CGDataConsumer(url: url as CFURL),
+                      let context = CGContext(consumer: consumer, mediaBox: &box, nil) else { return }
+                context.beginPDFPage(nil); context.endPDFPage(); context.closePDF()
+            }
+            let made = ["Glotzer papers/label.jpg", "Glotzer papers/Box 17/Folder 8/0001.jpg",
+                        "Glotzer papers/Box 17/Folder 8/0002.jpg", "Glotzer papers/Box 17/Folder 9/0001.jpg"].map(put)
+            _ = put("Glotzer papers/Box 17/.archivesuite/x.jpg")
+            let loose = put("loose.jpg")
+            // Sources older than any output, set before anything reads their dates (a URL caches what it read).
+            for url in made + [loose] {
+                try? fm.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -3600)], ofItemAtPath: url.path)
+            }
+            let flat = input.appendingPathComponent("Flat", isDirectory: true)
+            try? fm.createDirectory(at: flat, withIntermediateDirectories: true)
+            for n in ["b.jpg", "a.jpg"] { writeFile(flat.appendingPathComponent(n), "flat") }
+            let sources = Set((made + [loose]).map(\.path))
+            let isJPEG: (URL) -> Bool = { $0.pathExtension == "jpg" }
+
+            let flatOnly = ProcessFilesTree.collect([flat], accept: isJPEG, sortAll: true)
+            check("tree: a folder with no subfolders is read flat, as before",
+                  flatOnly.files.map(\.lastPathComponent) == ["a.jpg", "b.jpg"] && flatOnly.subfolders.isEmpty)
+            let intake = ProcessFilesTree.collect([input.appendingPathComponent("Glotzer papers"), loose],
+                                                  accept: isJPEG, sortAll: true)
+            // The tree's own URLs from here on (the walk may spell the scratch path with /private).
+            let found = intake.files.count == 5 ? intake.files : made + [loose]
+            let (label, a, b, c) = (found[0], found[1], found[2], found[3])
+            check("tree: a folder with subfolders is read depth-first, each file with its folders",
+                  intake.files.map { $0.pathComponents.suffix(2).joined(separator: "/") }
+                    == ["Glotzer papers/label.jpg", "Folder 8/0001.jpg", "Folder 8/0002.jpg", "Folder 9/0001.jpg", "in/loose.jpg"]
+                  && intake.files[4] == loose
+                  && intake.subfolders[a] == "Glotzer papers/Box 17/Folder 8"
+                  && intake.subfolders[label] == "Glotzer papers" && intake.subfolders[loose] == nil)
+
+            let glotzer = input.appendingPathComponent("Glotzer papers")
+            check("tree: a folder holding folders is asked about, a flat one is not",
+                  ProcessFilesTree.hasSubfolders(glotzer) && !ProcessFilesTree.hasSubfolders(flat)
+                  && !ProcessFilesTree.hasSubfolders(loose))
+            let ownOnly = ProcessFilesTree.collect([glotzer], accept: isJPEG, sortAll: true, readSubfolders: false)
+            check("tree: answering “only its own files” reads it flat, as before",
+                  ownOnly.files.map(\.lastPathComponent) == ["label.jpg"] && ownOnly.subfolders.isEmpty)
+            // Nothing is filed among the sources: an output folder that is the tree, inside it, or holds it is refused.
+            check("tree: an output folder that holds the given folder is refused",
+                  ProcessFilesTree.treeHoldingOutput(subfolders: intake.subfolders, outputDirectory: input) == "Glotzer papers")
+            check("tree: an output folder inside the given folder is refused",
+                  ProcessFilesTree.treeHoldingOutput(subfolders: intake.subfolders,
+                                                     outputDirectory: glotzer.appendingPathComponent("Box 17")) == "Glotzer papers"
+                  && ProcessFilesTree.treeHoldingOutput(subfolders: intake.subfolders, outputDirectory: glotzer) == "Glotzer papers")
+            check("tree: an output folder apart from it is accepted",
+                  ProcessFilesTree.treeHoldingOutput(subfolders: intake.subfolders, outputDirectory: out) == nil
+                  && ProcessFilesTree.treeHoldingOutput(subfolders: intake.subfolders, outputDirectory: base) == nil)
+
+            // The level map: offered for a tree's files while the output folder has none, then written there.
+            let offered = ProcessFilesTree.levelsToOffer(files: intake.files, subfolders: intake.subfolders,
+                                                         outputDirectory: out)
+            check("tree: the level map is offered, pre-filled from the folder names",
+                  offered?.map.levels == [.collection, .box, .folder])
+            check("tree: no map is offered for files not from a tree",
+                  ProcessFilesTree.levelsToOffer(files: [loose], subfolders: [:], outputDirectory: out) == nil)
+            check("tree: Save writes the map at the output folder", offered.flatMap(ProcessFilesTree.saveLevels) == nil
+                  && ContainerFileStore.loadLevelMap(root: out).document?.levels == [.collection, .box, .folder])
+            check("tree: with a map there, it is not offered again",
+                  ProcessFilesTree.levelsToOffer(files: intake.files, subfolders: intake.subfolders,
+                                                 outputDirectory: out) == nil)
+
+            // Placement: in the tree's folders, made as needed; a base name shared across folders does not collide.
+            let processor = OCRProcessor()
+            processor.outputSubfolders = OCRProcessor.keyedSubfolders(intake.subfolders)
+            let outputs = intake.files.map {
+                processor.uniqueOutputURL(baseName: $0.deletingPathExtension().lastPathComponent, ext: "pdf", in: out, for: $0)
+            }
+            let tree = out.appendingPathComponent("Glotzer papers/Box 17")
+            check("tree: each output goes in its folders below the output folder",
+                  outputs == [out.appendingPathComponent("Glotzer papers/label.pdf"),
+                              tree.appendingPathComponent("Folder 8/0001.pdf"), tree.appendingPathComponent("Folder 8/0002.pdf"),
+                              tree.appendingPathComponent("Folder 9/0001.pdf"), out.appendingPathComponent("loose.pdf")]
+                  && fm.fileExists(atPath: tree.appendingPathComponent("Folder 9").path))
+            // A link in the tree's place is never followed: that output goes in the output folder itself.
+            try? fm.createSymbolicLink(at: out.appendingPathComponent("Linked"), withDestinationURL: elsewhere)
+            let linkedSource = input.appendingPathComponent("Linked/Box 1/0001.jpg")
+            processor.outputSubfolders[linkedSource.standardizedFileURL.path] = "Linked/Box 1"
+            let linked = processor.uniqueOutputURL(baseName: "0009", ext: "pdf", in: out, for: linkedSource)
+            check("tree: a link in the way is not followed, and the summary names the output",
+                  linked == out.appendingPathComponent("0009.pdf")
+                  && ((try? fm.contentsOfDirectory(atPath: elsewhere.path)) ?? ["?"]).isEmpty
+                  && processor.outputsOutsideTheirTree == [linkedSource.standardizedFileURL.path] && processor.treeFallbackSuffix.contains("0001.jpg"))
+            processor.clearOutputWarnings()
+            processor.outputSubfolders[linkedSource.standardizedFileURL.path] = nil
+            check("tree: a folder name that would leave the output folder is refused",
+                  OCRProcessor.keyedSubfolders([loose: "../escape"]).isEmpty)
+
+            // Organisation leaves the tree's outputs; merging stays within a folder and beside its pages.
+            processor.outputURLMap = Dictionary(uniqueKeysWithValues: zip(intake.files, outputs))
+            processor.collectionSegments = [CollectionSegment(collectionName: "Glotzer", fileURLs: [a, b, c]),
+                                            CollectionSegment(collectionName: "Loose", fileURLs: [label, loose])]
+            check("tree: collection organisation is given only the outputs and collections outside the tree",
+                  processor.outputURLMapOutsideTrees == [loose: out.appendingPathComponent("loose.pdf")]
+                  && processor.collectionsOutsideTrees.map(\.collectionName) == ["Loose"]
+                  && processor.treeFallbackSuffix.isEmpty)
+            for pdf in outputs { writePDF(pdf) }
+            var job = OCRJob(sourceURL: a)
+            job.appliedTags = ["Subject"]
+            processor.jobs = [job, OCRJob(sourceURL: b), OCRJob(sourceURL: c)]
+            processor.segments = [DocumentSegment(pdfURLs: [a, b, c])]
+            processor.performDocumentMerging(files: [a, b, c], outputDirectory: out) { _, _, _, _ in }
+            let merged = tree.appendingPathComponent("Folder 8/0001_merged.pdf")
+            check("tree: a document is merged within its folder, beside its pages",
+                  processor.outputURLMap[a] == merged && processor.outputURLMap[b] == merged
+                  && PDFDocument(url: merged)?.pageCount == 2
+                  && processor.outputURLMap[c] == tree.appendingPathComponent("Folder 9/0001.pdf")
+                  && fm.fileExists(atPath: tree.appendingPathComponent("Folder 9/0001.pdf").path))
+
+            // Incremental skip looks in each source's own folder: Folder 9's 0001.pdf is there, Folder 8's is not
+            // (merged), and the output folder's own 0001.pdf never stands in for either.
+            writePDF(out.appendingPathComponent("0001.pdf"))
+            let partition = OCRProcessor.incrementalPartition([a, c, loose], outputDirectory: out,
+                                                               subfolders: intake.subfolders)
+            check("tree: incremental skip checks each source's own folder",
+                  partition.skipped == [c, loose] && partition.toProcess == [a])
+
+            // A resume keeps the tree: the snapshot carries it, and a run without one records nothing new.
+            let config = processor.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil)
+            let encoded = try? JSONEncoder().encode(config)
+            let decoded = encoded.flatMap { try? JSONDecoder().decode(OCRProcessor.PendingRunRuntimeConfig.self, from: $0) }
+            check("tree: the resume snapshot carries the tree", decoded?.outputSubfolders == processor.outputSubfolders)
+            let plain = OCRProcessor().makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil)
+            let plainJSON = (try? JSONEncoder().encode(plain)).flatMap { String(data: $0, encoding: .utf8) } ?? "outputSubfolders"
+            check("tree: a run with no tree writes the snapshot as before", !plainJSON.contains("outputSubfolders"))
+
+            // A box label filed in the tree: its run is written beside it, in the tree's folder.
+            processor.jobs = [{ var j = OCRJob(sourceURL: label); j.status = .succeeded; j.classification = .boxLabel
+                                j.result = OCRResult(text: "BOX 17", classification: .boxLabel, errorMessage: nil, errorCode: nil)
+                                return j }()]
+            let problem = await processor.recordContainerLabels(moves: [:], outputDirectory: out, preOCRedInput: false)
+            let labelFile = ContainerFileStore.load(directory: out.appendingPathComponent("Glotzer papers")).document
+            check("tree: a label filed in the tree is recorded in its folder",
+                  problem == nil && labelFile?.runs.first?.start == "label.pdf")
+
+            let left = (fm.enumerator(atPath: input.path)?.allObjects as? [String] ?? [])
+                .map { input.appendingPathComponent($0).path }
+                .filter { var d: ObjCBool = false; return fm.fileExists(atPath: $0, isDirectory: &d) && !d.boolValue }
+            check("tree: no source is changed, moved or added to",
+                  Set(left) == sources.union([flat.appendingPathComponent("a.jpg").path, flat.appendingPathComponent("b.jpg").path,
+                                              input.appendingPathComponent("Glotzer papers/Box 17/.archivesuite/x.jpg").path])
+                  && (made + [loose]).allSatisfy { (try? String(contentsOf: $0, encoding: .utf8))?.hasPrefix("src ") == true })
+            try? fm.removeItem(at: base)
         }
 
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }

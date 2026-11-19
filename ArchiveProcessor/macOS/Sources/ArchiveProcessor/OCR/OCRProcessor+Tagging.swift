@@ -229,6 +229,7 @@ extension OCRProcessor {
         placeholderOutputs = []
         textPageOnlyOutputs = []
         searchableFormNotes = []
+        outputsOutsideTheirTree = []
     }
 
     /// W42.int-s5 — a page whose image page got no searchable layer, and why, for the run log (05-placement.md §3:
@@ -276,7 +277,7 @@ extension OCRProcessor {
         }
         return suffix
     }
-    private nonisolated static func namesForWarning(_ names: [String]) -> String {
+    nonisolated static func namesForWarning(_ names: [String]) -> String {
         let shown = names.prefix(3).joined(separator: ", ")
         return names.count > 3 ? "\(shown) +\(names.count - 3) more" : shown
     }
@@ -1531,7 +1532,9 @@ extension OCRProcessor {
             segs = segments
         }
 
-        let multiPageSegments = segs.filter { $0.pdfURLs.count > 1 && !$0.isBox && !$0.isFolder }
+        // W47.ct-processor-intake: a document never spans two of a tree's folders, so it is merged within each.
+        let multiPageSegments = segs.filter { !$0.isBox && !$0.isFolder }.flatMap(splitAtOutputFolders)
+            .filter { $0.pdfURLs.count > 1 }
         guard !multiPageSegments.isEmpty else { return }
 
         statusMessage = "Merging \(multiPageSegments.count) multi-page documents…"
@@ -1553,15 +1556,18 @@ extension OCRProcessor {
             // Reserve the merged PDF and its optional JSON sidecar as one basename. A JSON-only prior-run
             // collision must advance the PDF too, or downstream organization cannot keep the pair aligned.
             var mergedBaseName = baseName + "_merged"
-            var mergedURL = outputDirectory.appendingPathComponent(mergedBaseName + ".pdf")
-            var mergedJSONURL = outputDirectory.appendingPathComponent(mergedBaseName + ".json")
+            // In the output folder, or for a tree's pages beside them, in its folder (W47.ct-processor-intake).
+            let mergeDirectory = outputSubfolders[segment.pdfURLs[0].standardizedFileURL.path] == nil
+                ? outputDirectory : firstOutputPDF.deletingLastPathComponent()
+            var mergedURL = mergeDirectory.appendingPathComponent(mergedBaseName + ".pdf")
+            var mergedJSONURL = mergeDirectory.appendingPathComponent(mergedBaseName + ".json")
             var mergeN = 2
             while _takenOutputPaths.contains(OutputFileSafety.pathKey(mergedURL))
                   || FileManager.default.fileExists(atPath: mergedURL.path)
                   || (hasJSON && FileManager.default.fileExists(atPath: mergedJSONURL.path)) {
                 mergedBaseName = "\(baseName)_merged (\(mergeN))"
-                mergedURL = outputDirectory.appendingPathComponent(mergedBaseName + ".pdf")
-                mergedJSONURL = outputDirectory.appendingPathComponent(mergedBaseName + ".json")
+                mergedURL = mergeDirectory.appendingPathComponent(mergedBaseName + ".pdf")
+                mergedJSONURL = mergeDirectory.appendingPathComponent(mergedBaseName + ".json")
                 mergeN += 1
             }
             _takenOutputPaths.insert(OutputFileSafety.pathKey(mergedURL))

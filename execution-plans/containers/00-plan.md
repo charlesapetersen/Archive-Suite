@@ -193,7 +193,9 @@ The measurement comes first and the build waits on the owner's look at it (`W47.
    selection splits runs, standard names, the folder's warnings (`ArchiveReader/KNOWN_ISSUES.md` "Editing
    containers").
 10. `W47.ct-processor-capture` — label reading at capture and the confirm card (waits on `W46.review-done`).
-11. `W47.ct-processor-intake` — Route B in Process Files: nested directories read with the level map.
+11. `W47.ct-processor-intake` — Route B in Process Files: nested directories read with the level map. Done
+    2026-11-19: a dropped tree is mirrored below the output folder and the level map is offered there at Start
+    (`SPEC/containers.md` §The level map, "Route B in Process Files").
 12. `W47.ct-backfill` — read the corpus's marker photos and propose runs for review.
 13. `W47.item-fields-truth` — title, byline, publication name and date, document type and recipient place: a truth
     set extending W46's entity set with clippings and reports, and how well the current tagging fills them.

@@ -155,7 +155,7 @@ Writing (`ContainerFileStore.write`):
 ## The level map (Route B)
 
 `<root>/.archivesuite/container-levels.json`, in the folder a user chose as the root of a tree (a Reader archive
-root, a folder dropped on Process Files). It applies to the tree under that folder; the nearest map above a
+root, the output folder of a Process Files run given a tree). It applies to the tree under that folder; the nearest map above a
 directory wins. Written only when the user confirms the pre-filled map, once per root; same writing rules as the
 container file. Reading is strict: a role this build does not know makes the map unreadable, so it is left alone.
 
@@ -171,6 +171,23 @@ granted, or its "Archival Photos" folder when it holds one. It offers the pre-fi
 root's scan has settled, and from File ▸ Container Levels…, and writes it only on Save, only into the tree the sheet
 was made for. The nearest map above a directory wins even when this build cannot read it: that subtree then has no
 path values, rather than an outer map's.
+
+**Route B in Process Files** (`W47.ct-processor-intake`, `ContainerTree`). A folder given to Process Files (dropped
+or chosen) that holds accepted files in subfolders is read as a tree: its files depth-first, each folder's own files
+in `ContainerOrder` and then its subfolders in the same order; hidden folders (`.archivesuite` among them), packages,
+links to folders and depths past 12 are not entered. A folder holding folders is read so only when the user says so
+(Process Files asks); then every folder of that drop is read as a tree, and otherwise a folder gives its own files,
+as before. Each file keeps its folders from the given folder
+down, that folder's own name first ("Glotzer papers/Box 17/Folder 8"), and its output is filed in the same folders
+below the run's output folder, so the path values come from the output's own tree and are never stored. Each folder
+on the way is made inside the one before it and must be a real folder, not a link; where one cannot be, the output
+goes in the output folder itself and the run's summary names it. A run whose output folder is the given folder, inside
+it or the folder holding it does not start, since its outputs would land among the sources. At Start, when the output folder has no level map, the map pre-filled from the
+tree's folders (each file's, the given folder as level 1) is offered once; Save writes it there, and the run may
+start without saving. Nothing is written into the given folder: the sources stay as they are. The pre-OCRed route
+tags its inputs where they are and takes no tree. Collection organisation leaves a tree's outputs where the tree
+put them, a merged document is merged within one folder and written beside its pages, and a label photo's run is
+written in the folder its PDF was filed in (§Reading a label). A resumed run files each output where it began to.
 
 - In `levels`, `ignore` occupies its depth and names no field ("ignore this level").
 - An override with role `ignore` is a workflow folder ("05 Final Tagging"): it names no field and does not count, so
