@@ -12,6 +12,14 @@ For every route in the settings table with a `test-boxes` figure this rebuilds t
 flags from cached answers at the route's own frozen rule and level, checks the count against the table's figure, and
 bootstraps every pair over the 325 common-support document pages (the documents touching no unknown gap).
 
+W46.p16-seg-tie-floor (measurement review pass 16, P16-1): the paired interval covers document sampling only. A
+byte-identical vLLM rerun of the self-hosted students moved a box's pages exact by 1.4 to 3.2 points (SEG-10,
+seg-kit-gate.md, seg-window-modality.md), so each pair also carries `tie_floor`: a tie unless the interval clears 0 and
+its near end clears the larger recorded rerun floor of the two routes. The cloud routes have no recorded rerun floor
+(an identical-window rerun was never scored for one), which counts as 0 here and is said on the card. The rule in force
+(`tie`, which the settings table reads) is unchanged until the owner answers. `seg11` counts, per differing pair, the
+discordant documents whose deciding gaps the owner never re-judged (SEG-11).
+
     python3 ops/autonomous/heavy-run.py run -- python3 seg_pair_ties.py   # -> segbench-results/seg-pair-ties.{json,md}
 
 No model call, upload or key: `rescore.no_network()` refuses any.
@@ -37,6 +45,12 @@ OPTIONS = {"gemini3.8-flash": "gemini", "gemini3.8-flash-text": "gemini-text", "
 RESCORE = {"seg-qwen3.5-2b-bf16-cluster": "window-or-fs-seg-2b", "seg-qwen3.5-4b-cluster": "window-or-fs-seg-4b",
            "qwen3.5-27b-teacher": "window-or-fs-qwen3.5-27b"}
 GATEWAY = "gemini3.7-flash-gateway"
+# The recorded rerun floor, points of pages exact a box: the top of SEG-10's 1.4-3.2 between byte-identical vLLM reruns
+# (the 2B on Stanton 75.3, 76.1, 78.6: seg-window-modality.md; seg-kit-gate.md §Reading). Measured on the 2B and the
+# teacher; the 4B is the same family on the same server and carries it too. The Mac 2B row's test-box answers are the
+# FarmShare bf16 run (method_openrouter.LOCAL_SEG_KEY), so its floor is the bf16 run's.
+RERUN_FLOOR = {"seg-qwen3.5-2b-8bit": 3.2, "seg-qwen3.5-2b-bf16-cluster": 3.2, "seg-qwen3.5-4b-cluster": 3.2,
+               "qwen3.5-27b-teacher": 3.2}
 
 
 def table_routes():
@@ -115,10 +129,10 @@ def route_flags():
         off += len(cols[n].labels)
     flags = {tid: sum((exact_in_support(cols[n].labels, by[n], support[n]) for n in data.TEST), [])
              for tid, by in labels.items()}
-    return flags, docs
+    return flags, docs, labels, cols
 
 
-def bootstrap(fa, fb, docs):
+def bootstrap(fa, fb, docs, floor=0.0):
     """The paired interval (the tie), and beside it, for reference only, gap accuracy's own form: McNemar's exact sign
     test on the documents exactly right in one route and not the other, unweighted by pages."""
     import seg_window_gateway as SWG
@@ -128,12 +142,53 @@ def bootstrap(fa, fb, docs):
     return {k: round(100 * r[k], 2) for k in ("delta", "lo", "hi")} | {
         "pages": r["pages"], "documents": r["runs"], "docs_only_a": sign["only first right"],
         "docs_only_b": sign["only second right"], "sign_p": round(sign["sign test p"], 4),
-        "tie": r["lo"] <= 0 <= r["hi"]}   # on the unrounded interval
+        "tie": r["lo"] <= 0 <= r["hi"],   # on the unrounded interval
+        "floor": floor, "tie_floor": r["lo"] <= 0 <= r["hi"] or min(abs(r["lo"]), abs(r["hi"])) * 100 < floor}
+
+
+def rejudged() -> set[str]:
+    """"<box> <left>|<right>" of every test-box gap the owner has looked at again since his capture labels: the 92 the
+    app's Gemini route flagged (13 Nov), Stanton's magazine rulings, and the 50 agreed gaps of the audit."""
+    import seg_truth_audit as A
+    return A.answered() | set(json.loads(A.RECORD.read_text())["keys"])
+
+
+def seg11(a, b, flags, labels, cols, winner):
+    """SEG-11 for one pair: the discordant documents (exact in one route only) and those among them decided at a gap the
+    owner never re-judged, a gap in or bounding the document where the two routes' calls differ. `neutral` is the
+    winner's edge with those documents set to the loser's flags (as if each such gap's truth were wrong)."""
+    from score import resolved_documents, segment_ids
+    done = rejudged()
+    loser = b if winner == a else a
+    out = {"discordant": 0, "unrejudged": 0, "unrejudged_for_winner": 0, "gaps": []}
+    neutral = list(flags[winner])
+    off = 0
+    for n in data.TEST:
+        col = cols[n]
+        ia, ib = segment_ids(labels[a][n]), segment_ids(labels[b][n])
+        for d in resolved_documents(col.labels):
+            k = sorted(d)
+            ea, eb = bool(flags[a][k[0] + off]), bool(flags[b][k[0] + off])
+            if ea == eb:
+                continue
+            out["discordant"] += 1
+            open_ = [f"{n} {col.pages[i].n}|{col.pages[i + 1].n}" for i in range(max(k[0] - 1, 0), min(k[-1] + 1,
+                     len(col.labels) - 1)) if (ia[i] != ia[i + 1]) != (ib[i] != ib[i + 1])]
+            open_ = [g for g in open_ if g not in done]
+            if open_:
+                out["unrejudged"] += 1
+                out["gaps"] += open_
+                if (ea if winner == a else eb):
+                    out["unrejudged_for_winner"] += 1
+                    for i in k:
+                        neutral[i + off] = flags[loser][i + off]
+        off += len(col.labels)
+    return out, neutral
 
 
 def main():
     want = table_routes()
-    flags, docs = route_flags()
+    flags, docs, labels, cols = route_flags()
     if set(flags) != set(want):
         raise SystemExit(f"routes differ from the table: {sorted(set(flags) ^ set(want))}")
     pages = sum(len(d) for d in docs)
@@ -146,18 +201,30 @@ def main():
     ids = sorted(flags, key=lambda k: -exact[k]["exact_pages"])
     pairs = []
     for a, b in itertools.combinations(ids, 2):
-        p = bootstrap(flags[a], flags[b], docs)
+        p = bootstrap(flags[a], flags[b], docs, max(RERUN_FLOOR.get(a, 0), RERUN_FLOOR.get(b, 0)))
+        if not p["tie"]:   # the differing pairs: what the owner never re-judged could move
+            w = a if p["delta"] > 0 else b
+            s11, neutral = seg11(a, b, flags, labels, cols, w)
+            l = b if w == a else a
+            q = bootstrap(neutral, flags[l], docs, p["floor"])
+            s11["neutral"] = {k: q[k] for k in ("delta", "lo", "hi", "tie", "tie_floor")}
+            p["seg11"] = s11
         pairs.append({"a": a, "b": b, **p})
     out = {"tag": TAG, "date": dt.date.today().isoformat(), "set": "test-boxes", "pages": pages,
            "documents": len(docs), "rounds": ROUNDS, "seed": SEED, "routes": exact,
            "rule": "a tie when the paired 95% percentile interval of a minus b, resampling truth documents, holds 0",
+           "rule_floor": "tie_floor: a tie unless the interval clears 0 and its near end clears the larger recorded "
+                         "rerun floor of the two routes (W46.p16-seg-tie-floor; not in force until the owner answers)",
+           "rerun_floor": RERUN_FLOOR,
            "pairs": pairs}
     OUT_JSON.write_text(json.dumps(out, indent=1) + "\n")
     OUT_JSON.with_suffix(".md").write_text(render(out))
     ties = sum(p["tie"] for p in pairs)
-    print(f"{len(ids)} routes, {len(pairs)} pairs, {ties} ties; {pages} pages in {len(docs)} documents")
+    print(f"{len(ids)} routes, {len(pairs)} pairs, {ties} ties, {sum(p['tie_floor'] for p in pairs)} with the floor; "
+          f"{pages} pages in {len(docs)} documents")
     for p in pairs:
-        print(f"  {p['a']:28} {p['b']:28} {p['delta']:+6.2f} [{p['lo']:+6.2f}, {p['hi']:+6.2f}] {'tie' if p['tie'] else ''}")
+        print(f"  {p['a']:28} {p['b']:28} {p['delta']:+6.2f} [{p['lo']:+6.2f}, {p['hi']:+6.2f}] "
+              f"{'tie' if p['tie'] else 'differs'} / {'tie' if p['tie_floor'] else 'differs'}")
 
 
 def render(out) -> str:
@@ -171,22 +238,46 @@ def render(out) -> str:
          f"({out['rounds']:,} rounds, seed {out['seed']}). **A pair ties when its interval holds 0**; the settings "
          "solver then takes the cheaper route. This replaces the floor of twice the larger window-offset range "
          "(5.0 points, or 10.4 for a pair with g2; owner review of the pipeline doc, 2026-11-17).", "",
-         "| route | exact pages | pages exact |", "|---|---:|---:|"]
+         "**The rerun floor (W46.p16-seg-tie-floor, not in force until the owner answers).** The interval does not "
+         "cover a rerun. Byte-identical vLLM reruns of the self-hosted students moved a box's pages exact by 1.4 to "
+         "3.2 points (SEG-10; the 2B on Stanton 75.3, 76.1 and 78.6%, seg-window-modality.md; seg-kit-gate.md "
+         "§Reading). The column *with the floor* calls a pair different only when its interval clears 0 and its near "
+         "end also clears the larger recorded floor of its two routes (" + ", ".join(
+             f"{k} {v}" for k, v in out["rerun_floor"].items()) + " points; a cloud route has none recorded, so 0).", "",
+         "| route | exact pages | pages exact | rerun floor |", "|---|---:|---:|---:|"]
     for k, v in sorted(r.items(), key=lambda kv: -kv[1]["exact_pages"]):
-        L.append(f"| {k} | {v['exact_pages']} | {v['pct']:.1f}% |")
+        fl = out["rerun_floor"].get(k)
+        L.append(f"| {k}{' (test-box answers: the FarmShare bf16 run)' if k == 'seg-qwen3.5-2b-8bit' else ''} | "
+                 f"{v['exact_pages']} | {v['pct']:.1f}% | {fl if fl else 'none recorded'} |")
+    L += ["", "The two 2B rows are the same answers: the Mac row's test-box figure is the full-precision FarmShare run "
+          "(`method_openrouter.py` `LOCAL_SEG_KEY = \"fs-seg-2b\"`; the Mac's 8-bit build matched it on the development "
+          "boxes, 90.3% against 90.5%, seg-students.md §On the Mac). Their identical figures say nothing about rerun "
+          "noise."]
     L += ["", "## Every pair, a minus b, in points of pages exact", "",
           "The last two columns are for reference only: gap accuracy's paired form, McNemar's exact sign test, applied "
           "to the documents exactly right in one route and not the other (unweighted by pages). It does not decide.", "",
-          "| a | b | a − b | 95% paired interval | tie | documents only a / only b right | sign test p |",
-          "|---|---|---:|---|---|---:|---:|"]
+          "| a | b | a − b | 95% paired interval | tie (in force) | with the floor | documents only a / only b right | sign test p |",
+          "|---|---|---:|---|---|---|---:|---:|"]
     for p in out["pairs"]:
         L.append(f"| {p['a']} | {p['b']} | {p['delta']:+.2f} | [{p['lo']:+.2f}, {p['hi']:+.2f}] | "
-                 f"{'tie' if p['tie'] else 'differs'} | {p['docs_only_a']} / {p['docs_only_b']} | {p['sign_p']:.3f} |")
-    n_tie = sum(p["tie"] for p in out["pairs"])
-    split = sum(p["tie"] and p["sign_p"] < 0.05 for p in out["pairs"])
-    L += ["", f"{n_tie} of {len(out['pairs'])} pairs tie. The sign test would separate {split} of the tied pairs "
-          "(p under 0.05): it counts documents, so a long document weighs no more than a one-page letter, while pages "
-          "exact, the figure the settings show, weighs each document by its pages.", ""]
+                 f"{'tie' if p['tie'] else 'differs'} | {'tie' if p['tie_floor'] else 'differs'} | "
+                 f"{p['docs_only_a']} / {p['docs_only_b']} | {p['sign_p']:.3f} |")
+    P = out["pairs"]
+    n_tie, n_fl = sum(p["tie"] for p in P), sum(p["tie_floor"] for p in P)
+    split = sum(p["tie"] and p["sign_p"] < 0.05 for p in P)
+    diff = [p for p in P if not p["tie"]]
+    unsep = [p for p in diff if p["sign_p"] >= 0.05]
+    moved = [p for p in diff if p["tie_floor"]]
+    still = [f"{p['a']} over {p['b']} ({p['delta']:+.2f} [{p['lo']:+.2f}, {p['hi']:+.2f}])" for p in diff
+             if not p["tie_floor"]]
+    L += ["", f"{n_tie} of {len(P)} pairs tie under the interval alone; {n_fl} with the floor. The sign test both ways: "
+          f"it separates {split} of the {n_tie} tied pairs, and leaves {len(unsep)} of the {len(diff)} differing pairs "
+          f"unseparated (p {', '.join(f'{p['sign_p']:.3f}' for p in sorted(unsep, key=lambda p: p['sign_p']))}), so "
+          "the two methods agree on the ties only. It counts documents, so a long document weighs no more than a "
+          "one-page letter, while pages exact, the figure the settings show, weighs each document by its pages.", "",
+          f"With the floor, {len(moved)} of the {len(diff)} differing pairs become ties: each has the 2B, the 4B or the "
+          f"teacher on a side and a near end inside {max(out['rerun_floor'].values())} points. {len(still)} still "
+          f"differ: {'; '.join(still)}.", ""]
     edge = [f"{p['a']} against {p['b']}" for p in out["pairs"] if p["tie"] and (p["lo"] == 0 or p["hi"] == 0)
             and p["docs_only_a"] + p["docs_only_b"]]
     if edge:
@@ -195,8 +286,28 @@ def render(out) -> str:
     same = [f"{p['a']} and {p['b']}" for p in out["pairs"] if p["docs_only_a"] == p["docs_only_b"] == 0]
     if same:
         L += [f"Identical page by page (no document right in one and not the other): {'; '.join(same)}; each pair is the "
-              "same model's answers at temperature 0 (the mix keeps ChatGPT's calls at its level; the 2B on the Mac and "
-              "its bf16 cluster run), built from separate cached sources.", ""]
+              "same answers (the mix keeps ChatGPT's calls at its level; the 2B on the Mac row is scored from the "
+              "bf16 FarmShare run, the same answers as the cluster row), not two runs.", ""]
+    L += ["## The differing pairs and the gaps no one re-judged (SEG-11)", "",
+          "Truth was re-judged only where models disagreed with it: the 92 gaps the app's Gemini route flagged (13 Nov), "
+          "Stanton's magazine rulings and the 50 agreed gaps of the audit. For each pair the interval separates, the "
+          "documents exactly right in one route only, and how many of them are decided at a gap the owner never looked "
+          "at again (a gap in or bounding the document where the two routes' calls differ). *Neutralised* sets the "
+          "winner's flags on those documents to the loser's, as if the truth were wrong at every such gap against "
+          "the winner: the pair's edge if none of them counted.", "",
+          "| a | b | discordant documents | decided at an un-re-judged gap (for the winner) | neutralised a − b | "
+          "interval / with the floor |", "|---|---|---:|---:|---|---|"]
+    for p in diff:
+        s, q = p["seg11"], p["seg11"]["neutral"]
+        sign = 1 if p["delta"] > 0 else -1
+        L.append(f"| {p['a']} | {p['b']} | {s['discordant']} | {s['unrejudged']} ({s['unrejudged_for_winner']}) | "
+                 f"{sign * q['delta']:+.2f} [{min(sign * q['lo'], sign * q['hi']):+.2f}, "
+                 f"{max(sign * q['lo'], sign * q['hi']):+.2f}] | {'tie' if q['tie'] else 'differs'} / "
+                 f"{'tie' if q['tie_floor'] else 'differs'} |")
+    flip = [f"{p['a']} over {p['b']}" for p in diff if p["seg11"]["neutral"]["tie"]]
+    L += ["", (f"Neutralised, {len(flip)} of the {len(diff)} pairs would tie under the interval alone: "
+               f"{'; '.join(flip)}." if flip else f"Neutralised, every one of the {len(diff)} pairs still clears 0.")
+          + " These are the verdicts an owner look at those gaps could move; no truth is changed here.", ""]
     L += seg_card.card(
         truth="Owner-ruled Stanton and RG165 (truth photo labels), with W46.seg-truth-owner-fixes' eight corrections; "
               "the two unknown RG165 gaps leave 325 of 330 document pages. Truth has been re-judged only where models "
@@ -205,9 +316,12 @@ def render(out) -> str:
         comparison="Same pages, same windows (offset 0), each route's own frozen rule and level, as in the settings "
                    "table; each route's count is checked against its table figure before any pair is formed.",
         noise="The paired interval covers document sampling on these two boxes. It does not cover window placement "
-              "(Gemini 3.7's offsets move pages exact 2.5 points on g1, 5.2 on g2: seg-g2-offsets.md) or a rerun; at "
-              "temperature 0 a fixed window gives a fixed answer, so pairing on the same windows removes placement "
-              "from the comparison rather than adding it to the floor.",
+              "(Gemini 3.7's offsets move pages exact 2.5 points on g1, 5.2 on g2: seg-g2-offsets.md), which pairing on "
+              "the same windows takes out of the comparison, nor a rerun: a fixed window does not give a fixed answer. "
+              "Byte-identical vLLM reruns of the self-hosted students moved a box 1.4-3.2 points (SEG-10), and the "
+              "'with the floor' column carries the 3.2 for every pair with a student. No cloud route has an "
+              "identical-window rerun scored, so its floor is unmeasured and counted 0; a g2 rerun of the 363 pages "
+              "(about $1.3 at list) would measure one. Every differing pair has a student on a side.",
         scope="Pages exact with no checking only. Not a forecast for other material; per-box intervals are not formed "
               "(two boxes); checking cost and after-checking figures are compared as before.")
     return "\n".join(L) + "\n"

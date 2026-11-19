@@ -53,6 +53,13 @@
   }
  },
  "rule": "a tie when the paired 95% percentile interval of a minus b, resampling truth documents, holds 0",
+ "rule_floor": "tie_floor: a tie unless the interval clears 0 and its near end clears the larger recorded rerun floor of the two routes (W46.p16-seg-tie-floor; not in force until the owner answers)",
+ "rerun_floor": {
+  "seg-qwen3.5-2b-8bit": 3.2,
+  "seg-qwen3.5-2b-bf16-cluster": 3.2,
+  "seg-qwen3.5-4b-cluster": 3.2,
+  "qwen3.5-27b-teacher": 3.2
+ },
  "pairs": [
   {
    "a": "chatgpt-gpt6.1-sol",
@@ -65,7 +72,9 @@
    "docs_only_a": 0,
    "docs_only_b": 0,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "chatgpt-gpt6.1-sol",
@@ -78,7 +87,9 @@
    "docs_only_a": 3,
    "docs_only_b": 1,
    "sign_p": 0.625,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "chatgpt-gpt6.1-sol",
@@ -91,7 +102,9 @@
    "docs_only_a": 4,
    "docs_only_b": 2,
    "sign_p": 0.6875,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "chatgpt-gpt6.1-sol",
@@ -104,7 +117,9 @@
    "docs_only_a": 6,
    "docs_only_b": 5,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "chatgpt-gpt6.1-sol",
@@ -117,7 +132,9 @@
    "docs_only_a": 5,
    "docs_only_b": 4,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "chatgpt-gpt6.1-sol",
@@ -130,7 +147,9 @@
    "docs_only_a": 7,
    "docs_only_b": 2,
    "sign_p": 0.1797,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "chatgpt-gpt6.1-sol",
@@ -143,7 +162,9 @@
    "docs_only_a": 10,
    "docs_only_b": 5,
    "sign_p": 0.3018,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "chatgpt-gpt6.1-sol",
@@ -156,7 +177,24 @@
    "docs_only_a": 9,
    "docs_only_b": 3,
    "sign_p": 0.146,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": true,
+   "seg11": {
+    "discordant": 12,
+    "unrejudged": 1,
+    "unrejudged_for_winner": 1,
+    "gaps": [
+     "Stanton 20|21"
+    ],
+    "neutral": {
+     "delta": 8.31,
+     "lo": 1.56,
+     "hi": 16.11,
+     "tie": false,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "chatgpt-gpt6.1-sol",
@@ -169,7 +207,28 @@
    "docs_only_a": 15,
    "docs_only_b": 5,
    "sign_p": 0.0414,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": false,
+   "seg11": {
+    "discordant": 20,
+    "unrejudged": 5,
+    "unrejudged_for_winner": 5,
+    "gaps": [
+     "Stanton 12|13",
+     "Stanton 20|21",
+     "Stanton 170|171",
+     "Stanton 227|228",
+     "Stanton 232|233"
+    ],
+    "neutral": {
+     "delta": 7.69,
+     "lo": 1.4,
+     "hi": 14.89,
+     "tie": false,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "chatgpt-gpt6.1-sol",
@@ -182,7 +241,28 @@
    "docs_only_a": 15,
    "docs_only_b": 5,
    "sign_p": 0.0414,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": false,
+   "seg11": {
+    "discordant": 20,
+    "unrejudged": 5,
+    "unrejudged_for_winner": 5,
+    "gaps": [
+     "Stanton 12|13",
+     "Stanton 20|21",
+     "Stanton 170|171",
+     "Stanton 227|228",
+     "Stanton 232|233"
+    ],
+    "neutral": {
+     "delta": 7.69,
+     "lo": 1.4,
+     "hi": 14.89,
+     "tie": false,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "mix-claude-chatgpt",
@@ -195,7 +275,9 @@
    "docs_only_a": 3,
    "docs_only_b": 1,
    "sign_p": 0.625,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "mix-claude-chatgpt",
@@ -208,7 +290,9 @@
    "docs_only_a": 4,
    "docs_only_b": 2,
    "sign_p": 0.6875,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "mix-claude-chatgpt",
@@ -221,7 +305,9 @@
    "docs_only_a": 6,
    "docs_only_b": 5,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "mix-claude-chatgpt",
@@ -234,7 +320,9 @@
    "docs_only_a": 5,
    "docs_only_b": 4,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "mix-claude-chatgpt",
@@ -247,7 +335,9 @@
    "docs_only_a": 7,
    "docs_only_b": 2,
    "sign_p": 0.1797,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "mix-claude-chatgpt",
@@ -260,7 +350,9 @@
    "docs_only_a": 10,
    "docs_only_b": 5,
    "sign_p": 0.3018,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "mix-claude-chatgpt",
@@ -273,7 +365,24 @@
    "docs_only_a": 9,
    "docs_only_b": 3,
    "sign_p": 0.146,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": true,
+   "seg11": {
+    "discordant": 12,
+    "unrejudged": 1,
+    "unrejudged_for_winner": 1,
+    "gaps": [
+     "Stanton 20|21"
+    ],
+    "neutral": {
+     "delta": 8.31,
+     "lo": 1.56,
+     "hi": 16.11,
+     "tie": false,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "mix-claude-chatgpt",
@@ -286,7 +395,28 @@
    "docs_only_a": 15,
    "docs_only_b": 5,
    "sign_p": 0.0414,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": false,
+   "seg11": {
+    "discordant": 20,
+    "unrejudged": 5,
+    "unrejudged_for_winner": 5,
+    "gaps": [
+     "Stanton 12|13",
+     "Stanton 20|21",
+     "Stanton 170|171",
+     "Stanton 227|228",
+     "Stanton 232|233"
+    ],
+    "neutral": {
+     "delta": 7.69,
+     "lo": 1.4,
+     "hi": 14.89,
+     "tie": false,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "mix-claude-chatgpt",
@@ -299,7 +429,28 @@
    "docs_only_a": 15,
    "docs_only_b": 5,
    "sign_p": 0.0414,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": false,
+   "seg11": {
+    "discordant": 20,
+    "unrejudged": 5,
+    "unrejudged_for_winner": 5,
+    "gaps": [
+     "Stanton 12|13",
+     "Stanton 20|21",
+     "Stanton 170|171",
+     "Stanton 227|228",
+     "Stanton 232|233"
+    ],
+    "neutral": {
+     "delta": 7.69,
+     "lo": 1.4,
+     "hi": 14.89,
+     "tie": false,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "claude-sonnet5.5",
@@ -312,7 +463,9 @@
    "docs_only_a": 3,
    "docs_only_b": 3,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "claude-sonnet5.5",
@@ -325,7 +478,9 @@
    "docs_only_a": 5,
    "docs_only_b": 6,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "claude-sonnet5.5",
@@ -338,7 +493,9 @@
    "docs_only_a": 4,
    "docs_only_b": 5,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "claude-sonnet5.5",
@@ -351,7 +508,9 @@
    "docs_only_a": 4,
    "docs_only_b": 1,
    "sign_p": 0.375,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "claude-sonnet5.5",
@@ -364,7 +523,9 @@
    "docs_only_a": 7,
    "docs_only_b": 4,
    "sign_p": 0.5488,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "claude-sonnet5.5",
@@ -377,7 +538,24 @@
    "docs_only_a": 7,
    "docs_only_b": 3,
    "sign_p": 0.3438,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": true,
+   "seg11": {
+    "discordant": 10,
+    "unrejudged": 1,
+    "unrejudged_for_winner": 1,
+    "gaps": [
+     "Stanton 20|21"
+    ],
+    "neutral": {
+     "delta": 7.08,
+     "lo": 0.33,
+     "hi": 14.93,
+     "tie": false,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "claude-sonnet5.5",
@@ -390,7 +568,28 @@
    "docs_only_a": 13,
    "docs_only_b": 5,
    "sign_p": 0.0963,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": true,
+   "seg11": {
+    "discordant": 18,
+    "unrejudged": 5,
+    "unrejudged_for_winner": 5,
+    "gaps": [
+     "Stanton 12|13",
+     "Stanton 20|21",
+     "Stanton 170|171",
+     "Stanton 227|228",
+     "Stanton 232|233"
+    ],
+    "neutral": {
+     "delta": 6.46,
+     "lo": 0.29,
+     "hi": 13.64,
+     "tie": false,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "claude-sonnet5.5",
@@ -403,7 +602,28 @@
    "docs_only_a": 13,
    "docs_only_b": 5,
    "sign_p": 0.0963,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": true,
+   "seg11": {
+    "discordant": 18,
+    "unrejudged": 5,
+    "unrejudged_for_winner": 5,
+    "gaps": [
+     "Stanton 12|13",
+     "Stanton 20|21",
+     "Stanton 170|171",
+     "Stanton 227|228",
+     "Stanton 232|233"
+    ],
+    "neutral": {
+     "delta": 6.46,
+     "lo": 0.29,
+     "hi": 13.64,
+     "tie": false,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "gemini3.7-flash-gateway",
@@ -416,7 +636,9 @@
    "docs_only_a": 5,
    "docs_only_b": 6,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "gemini3.7-flash-gateway",
@@ -429,7 +651,9 @@
    "docs_only_a": 3,
    "docs_only_b": 4,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "gemini3.7-flash-gateway",
@@ -442,7 +666,9 @@
    "docs_only_a": 6,
    "docs_only_b": 3,
    "sign_p": 0.5078,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "gemini3.7-flash-gateway",
@@ -455,7 +681,9 @@
    "docs_only_a": 7,
    "docs_only_b": 4,
    "sign_p": 0.5488,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "gemini3.7-flash-gateway",
@@ -468,7 +696,24 @@
    "docs_only_a": 7,
    "docs_only_b": 3,
    "sign_p": 0.3438,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": true,
+   "seg11": {
+    "discordant": 10,
+    "unrejudged": 1,
+    "unrejudged_for_winner": 1,
+    "gaps": [
+     "Stanton 20|21"
+    ],
+    "neutral": {
+     "delta": 7.08,
+     "lo": 0.0,
+     "hi": 15.26,
+     "tie": true,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "gemini3.7-flash-gateway",
@@ -481,7 +726,28 @@
    "docs_only_a": 13,
    "docs_only_b": 5,
    "sign_p": 0.0963,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": true,
+   "seg11": {
+    "discordant": 18,
+    "unrejudged": 5,
+    "unrejudged_for_winner": 5,
+    "gaps": [
+     "Stanton 12|13",
+     "Stanton 20|21",
+     "Stanton 170|171",
+     "Stanton 227|228",
+     "Stanton 232|233"
+    ],
+    "neutral": {
+     "delta": 6.46,
+     "lo": -0.32,
+     "hi": 14.03,
+     "tie": true,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "gemini3.7-flash-gateway",
@@ -494,7 +760,28 @@
    "docs_only_a": 13,
    "docs_only_b": 5,
    "sign_p": 0.0963,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": true,
+   "seg11": {
+    "discordant": 18,
+    "unrejudged": 5,
+    "unrejudged_for_winner": 5,
+    "gaps": [
+     "Stanton 12|13",
+     "Stanton 20|21",
+     "Stanton 170|171",
+     "Stanton 227|228",
+     "Stanton 232|233"
+    ],
+    "neutral": {
+     "delta": 6.46,
+     "lo": -0.32,
+     "hi": 14.03,
+     "tie": true,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "gemini3.8-flash-text",
@@ -507,7 +794,9 @@
    "docs_only_a": 3,
    "docs_only_b": 3,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "gemini3.8-flash-text",
@@ -520,7 +809,9 @@
    "docs_only_a": 9,
    "docs_only_b": 5,
    "sign_p": 0.424,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "gemini3.8-flash-text",
@@ -533,7 +824,9 @@
    "docs_only_a": 10,
    "docs_only_b": 6,
    "sign_p": 0.4545,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "gemini3.8-flash-text",
@@ -546,7 +839,9 @@
    "docs_only_a": 9,
    "docs_only_b": 4,
    "sign_p": 0.2668,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "gemini3.8-flash-text",
@@ -559,7 +854,28 @@
    "docs_only_a": 12,
    "docs_only_b": 3,
    "sign_p": 0.0352,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": true,
+   "seg11": {
+    "discordant": 15,
+    "unrejudged": 5,
+    "unrejudged_for_winner": 5,
+    "gaps": [
+     "Stanton 12|13",
+     "Stanton 20|21",
+     "Stanton 170|171",
+     "Stanton 227|228",
+     "Stanton 232|233"
+    ],
+    "neutral": {
+     "delta": 5.23,
+     "lo": 0.0,
+     "hi": 11.31,
+     "tie": true,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "gemini3.8-flash-text",
@@ -572,7 +888,28 @@
    "docs_only_a": 12,
    "docs_only_b": 3,
    "sign_p": 0.0352,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": true,
+   "seg11": {
+    "discordant": 15,
+    "unrejudged": 5,
+    "unrejudged_for_winner": 5,
+    "gaps": [
+     "Stanton 12|13",
+     "Stanton 20|21",
+     "Stanton 170|171",
+     "Stanton 227|228",
+     "Stanton 232|233"
+    ],
+    "neutral": {
+     "delta": 5.23,
+     "lo": 0.0,
+     "hi": 11.31,
+     "tie": true,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "gemini3.8-flash",
@@ -585,7 +922,9 @@
    "docs_only_a": 7,
    "docs_only_b": 3,
    "sign_p": 0.3438,
-   "tie": true
+   "tie": true,
+   "floor": 0,
+   "tie_floor": true
   },
   {
    "a": "gemini3.8-flash",
@@ -598,7 +937,9 @@
    "docs_only_a": 8,
    "docs_only_b": 4,
    "sign_p": 0.3877,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "gemini3.8-flash",
@@ -611,7 +952,9 @@
    "docs_only_a": 8,
    "docs_only_b": 3,
    "sign_p": 0.2266,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "gemini3.8-flash",
@@ -624,7 +967,28 @@
    "docs_only_a": 11,
    "docs_only_b": 2,
    "sign_p": 0.0225,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": true,
+   "seg11": {
+    "discordant": 13,
+    "unrejudged": 5,
+    "unrejudged_for_winner": 5,
+    "gaps": [
+     "Stanton 12|13",
+     "Stanton 20|21",
+     "Stanton 170|171",
+     "Stanton 227|228",
+     "Stanton 232|233"
+    ],
+    "neutral": {
+     "delta": 4.92,
+     "lo": 0.0,
+     "hi": 11.01,
+     "tie": true,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "gemini3.8-flash",
@@ -637,7 +1001,28 @@
    "docs_only_a": 11,
    "docs_only_b": 2,
    "sign_p": 0.0225,
-   "tie": false
+   "tie": false,
+   "floor": 3.2,
+   "tie_floor": true,
+   "seg11": {
+    "discordant": 13,
+    "unrejudged": 5,
+    "unrejudged_for_winner": 5,
+    "gaps": [
+     "Stanton 12|13",
+     "Stanton 20|21",
+     "Stanton 170|171",
+     "Stanton 227|228",
+     "Stanton 232|233"
+    ],
+    "neutral": {
+     "delta": 4.92,
+     "lo": 0.0,
+     "hi": 11.01,
+     "tie": true,
+     "tie_floor": true
+    }
+   }
   },
   {
    "a": "glm5.3-flash",
@@ -650,7 +1035,9 @@
    "docs_only_a": 6,
    "docs_only_b": 6,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "glm5.3-flash",
@@ -663,7 +1050,9 @@
    "docs_only_a": 6,
    "docs_only_b": 5,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "glm5.3-flash",
@@ -676,7 +1065,9 @@
    "docs_only_a": 12,
    "docs_only_b": 7,
    "sign_p": 0.3593,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "glm5.3-flash",
@@ -689,7 +1080,9 @@
    "docs_only_a": 12,
    "docs_only_b": 7,
    "sign_p": 0.3593,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "seg-qwen3.5-4b-cluster",
@@ -702,7 +1095,9 @@
    "docs_only_a": 3,
    "docs_only_b": 2,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "seg-qwen3.5-4b-cluster",
@@ -715,7 +1110,9 @@
    "docs_only_a": 9,
    "docs_only_b": 4,
    "sign_p": 0.2668,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "seg-qwen3.5-4b-cluster",
@@ -728,7 +1125,9 @@
    "docs_only_a": 9,
    "docs_only_b": 4,
    "sign_p": 0.2668,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "qwen3.5-27b-teacher",
@@ -741,7 +1140,9 @@
    "docs_only_a": 8,
    "docs_only_b": 4,
    "sign_p": 0.3877,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "qwen3.5-27b-teacher",
@@ -754,7 +1155,9 @@
    "docs_only_a": 8,
    "docs_only_b": 4,
    "sign_p": 0.3877,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   },
   {
    "a": "seg-qwen3.5-2b-8bit",
@@ -767,7 +1170,9 @@
    "docs_only_a": 0,
    "docs_only_b": 0,
    "sign_p": 1.0,
-   "tie": true
+   "tie": true,
+   "floor": 3.2,
+   "tie_floor": true
   }
  ]
 }
