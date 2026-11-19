@@ -248,7 +248,9 @@ Files writes them as proposals, for the Reader.
 `ContainerInference.applyMarkers` and `.warnings` give the warnings; they are shown, never acted on.
 
 - **Disagreement**: a file's candidates for a field name different values (`ContainerDisplay.disagreements`, so
-  wordings under one standard name agree). Consecutive files with the same fields in disagreement are one warning.
+  wordings under one standard name agree). Consecutive files with the same fields in disagreement are one warning. A
+  field whose value is the user's is settled and not a disagreement: correcting or confirming a value in the Reader
+  ends its warning (W47.ct-reader-edit).
 - **A read against the user**: a label read names a different value from the user's on the run it falls in or
   starts; the user's value stands.
 - **A photo inside the user's run**: a box or folder photo inside a run the user set, of its level or deeper; no run

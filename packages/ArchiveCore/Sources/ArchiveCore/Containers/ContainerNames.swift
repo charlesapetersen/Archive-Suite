@@ -193,9 +193,12 @@ public enum ContainerDisplay {
     }
 
     /// `ResolvedContainer.disagreements`, with two wordings under one standard name, or differing only in case,
-    /// punctuation or spacing, taken as agreeing.
+    /// punctuation or spacing, taken as agreeing. A field whose value the user set or confirmed is settled, not a
+    /// disagreement (W47.ct-reader-edit): the user chose among the candidates, and a later read that differs is its own
+    /// warning (`ContainerWarning.Kind.readDisagreesWithUser`).
     public static func disagreements(_ record: ResolvedContainer, names: ContainerNames? = nil) -> [ContainerField] {
         ContainerField.allCases.filter { field in
+            if record.values[field]?.source == .user { return false }
             let named = Set((record.candidates[field] ?? []).compactMap { value -> String? in
                 guard let written = value.shown else { return nil }
                 if let i = names?.index(for: field, matching: written) { return "#\(i)" }

@@ -208,6 +208,10 @@ final class NavigationModel: ObservableObject {
     @Published var containerLevelsError: String?
     /// Whether a level-map save is being written; the sheet's Save waits for it.
     @Published var containerLevelsSaving = false
+    /// W47.ct-reader-edit: why the last container edit was refused, for the Inspector; nil once one succeeds.
+    @Published var containerEditError: String?
+    /// A container edit is being written (`NavigationModel+ContainerEdits`); one at a time.
+    @Published var containerEditSaving = false
     var containerGeneration = 0
     /// `LibraryChangeSignature.containers` of the catalog last published (W47.ct-reader-facet-rules).
     private var containerValuesSig = 0
@@ -2326,6 +2330,7 @@ final class NavigationModel: ObservableObject {
             containerPrefilledDraft = nil
             containerLevelsDraft = nil     // a sheet for the old root must not save into this one
             containerLevelsError = nil
+            containerEditError = nil       // the old root's refusal
             filterSearchText = filter.searchText   // sync debounced field
             // R-3: an OCR search active over the OLD corpus leaves ftsPaths holding old-root paths; once
             // the new library loads, recompute would AND the new files against those → empty/wrong

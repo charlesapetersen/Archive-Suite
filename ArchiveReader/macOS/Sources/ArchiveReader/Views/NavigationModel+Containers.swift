@@ -39,6 +39,7 @@ extension NavigationModel {
             containerSignature = nil
             containerBuiltSignature = nil
             containerPrefilledDraft = nil
+            containerEditSaving = false
             if !containerCatalog.isEmpty { containerCatalog = .empty }
             return
         }
@@ -72,6 +73,7 @@ extension NavigationModel {
             self.containerBuildInFlight = false
             if generation == self.containerGeneration {
                 self.containerCatalog = catalog
+                self.containerEditSaving = false   // an edit's catalog is published (W47.ct-reader-edit)
                 self.containerBuiltSignature = signature
                 self.containerPrefilledDraft = draft
                 let scopeTestsContainers = self.containerValuesChanged(signature: valuesSig)

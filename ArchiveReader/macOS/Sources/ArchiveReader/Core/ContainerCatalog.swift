@@ -123,6 +123,48 @@ struct ContainerDetail: Equatable, Sendable {
     let disagreements: [ContainerDisagreement]
 }
 
+/// One file's editor state (`ContainerCatalog.editor(forPath:)`).
+struct ContainerEditorInfo: Equatable, Sendable {
+    /// The file's directory below the tree's root, and as the library spells its path.
+    let directory: [String]
+    let directoryPath: String
+    let name: String
+    /// Per field, which files an edit reaches: "the box from “doc-04.pdf” on, 2 listed files".
+    let scopes: [ContainerField: String]
+    /// The record's values as written (not as shown), for confirming one and naming its wording.
+    let written: [ContainerField: String]
+    /// Fields whose value is a read or a folder name, not yet the user's.
+    let unconfirmed: Set<ContainerField>
+    /// Fields where the edit's target holds the user's own value, which Remove takes away.
+    let userHeld: Set<ContainerField>
+    /// Fields shown under the user's standard name.
+    let byStandardName: Set<ContainerField>
+    /// The warnings of the file's folder.
+    let warnings: [ContainerWarningRow]
+}
+
+/// A warning as the Inspector lists it, with the file it starts at.
+struct ContainerWarningRow: Equatable, Sendable {
+    let text: String
+    let startPath: String
+    let start: String
+
+    init(_ w: ContainerWarning, directoryPath: String) {
+        start = w.start
+        startPath = directoryPath + "/" + w.start
+        let files = w.files == 1 ? "“\(w.start)”" : "\(w.files) files from “\(w.start)”"
+        func list(_ fields: [ContainerField]) -> String { fields.map { $0.label.lowercased() }.joined(separator: ", ") }
+        switch w.kind {
+        case .disagreement(let fields): text = "The sources disagree on \(list(fields)): \(files)."
+        case .readDisagreesWithUser(let fields): text = "A label read differs from your \(list(fields)): \(files)."
+        case .markerInsideUserRun: text = "A box or folder photo inside a run you set: \(files)."
+        case .markerWithoutRead: text = "A box or folder photo with nothing read from it: \(files)."
+        case .longUnmarkedRun(let count):
+            text = "\(count) files in a row from “\(w.start)” with no box or folder starting among them."
+        }
+    }
+}
+
 struct ContainerCatalog: Sendable {
     /// The path of the tree's root (the archive's main folder), spelled as the library spells paths.
     let rootPath: String
@@ -141,6 +183,10 @@ struct ContainerCatalog: Sendable {
     struct DirectoryContext: Sendable {
         let scopes: [ContainerScope]
         let names: ContainerNames?
+        /// The directory's listed files, by name.
+        var files: [String] = []
+        /// `ContainerInference.warnings` for those files (W47.ct-reader-edit).
+        var warnings: [ContainerWarning] = []
     }
 
     struct FacetValue: Equatable, Sendable {
@@ -219,6 +265,48 @@ struct ContainerCatalog: Sendable {
         return ContainerDetail(rows: rows, disagreements: disagreements)
     }
 
+    /// What the editor needs for `path`: where each field's edit goes and how many files follow it, the values as
+    /// written, and the warnings of its folder (W47.ct-reader-edit). Nil for a file outside the tree. Worked out from
+    /// the container file as last read; the edit itself is worked out again on the file as it is on disk.
+    func editor(forPath path: String) -> ContainerEditorInfo? {
+        guard let (dir, name) = Self.split(path, under: rootPath), let context = contexts[dir.joined(separator: "/")]
+        else { return nil }
+        let file = context.scopes.first?.file ?? ContainerFile()
+        let record = ContainerResolver.resolve(fileName: name, scopes: context.scopes,
+                                               fileFields: ContainerPatterns.fields(ofFileName: name))
+        let shown = ContainerDisplay.values(record, names: context.names)
+        var scopes: [ContainerField: String] = [:]
+        var userHeld: Set<ContainerField> = []
+        var counts: [ContainerEditTarget: Int] = [:]
+        for field in ContainerField.allCases {
+            let target = ContainerEdits.target(for: field, at: name, in: file)
+            switch target {
+            case .directory:
+                scopes[field] = "every file in this folder and the folders inside it"
+            case let .newRun(start, level):
+                let n = counts[target] ?? ContainerEdits.covered(by: target, in: file, fileNames: context.files)
+                counts[target] = n
+                scopes[field] = "a new \(level.rawValue) from “\(start)” to the next, \(n) listed file\(n == 1 ? "" : "s")"
+            case let .run(start, level):
+                let n = counts[target] ?? ContainerEdits.covered(by: target, in: file, fileNames: context.files)
+                counts[target] = n
+                scopes[field] = "the \(level.rawValue) from “\(start)” on, \(n) listed file\(n == 1 ? "" : "s")"
+                if let run = file.runs.first(where: { $0.start == start && $0.level == level }),
+                   run.fields[field]?.source == .user { userHeld.insert(field) }
+            }
+            if target == .directory, file.directory[field]?.source == .user { userHeld.insert(field) }
+        }
+        let directoryPath = ([rootPath.hasSuffix("/") ? String(rootPath.dropLast()) : rootPath] + dir)
+            .joined(separator: "/")
+        return ContainerEditorInfo(
+            directory: dir, directoryPath: directoryPath, name: name, scopes: scopes,
+            written: record.values.compactMapValues { $0.shown },
+            unconfirmed: Set(record.values.compactMap { $0.value.source == .user || $0.value.shown == nil ? nil : $0.key }),
+            userHeld: userHeld,
+            byStandardName: Set(shown.compactMap { $0.value.byStandardName && $0.value.asWritten != nil ? $0.key : nil }),
+            warnings: context.warnings.map { ContainerWarningRow($0, directoryPath: directoryPath) })
+    }
+
     static func sourceName(_ source: ContainerSource) -> String {
         switch source {
         case .user: return "set by you"
@@ -293,8 +381,14 @@ struct ContainerCatalog: Sendable {
             } else {
                 scopes = (0...dir.count).reversed().map { ContainerScope(file: containerFile(Array(dir[0..<$0]))) }
             }
-            let context = DirectoryContext(scopes: scopes,
+            var context = DirectoryContext(scopes: scopes,
                                            names: nameDepth.flatMap { names(Array(dir[0..<$0])).document })
+            context.files = entry.files.map(\.name)
+            // A directory with no container file and no folder values above it has nothing to disagree about.
+            if scopes.contains(where: { $0.file != nil || !$0.pathFields.isEmpty }) {
+                context.warnings = ContainerInference.warnings(fileNames: context.files, scopes: scopes,
+                                                               names: context.names)
+            }
             contexts[key] = context
             for (name, path) in entry.files {
                 let record = ContainerResolver.resolve(fileName: name, scopes: scopes,

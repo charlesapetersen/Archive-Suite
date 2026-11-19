@@ -62,6 +62,14 @@ final class ContainerNamesTests: XCTestCase {
         XCTAssertEqual(ContainerDisplay.disagreements(three, names: names), [.repository])
     }
 
+    func testAValueTheUserSetIsSettledNotADisagreement() {
+        let settled = ResolvedContainer(values: [.container: ContainerValue("Box 13", source: .user)],
+                                        candidates: [.container: [ContainerValue("Box 13", source: .user),
+                                                                  ContainerValue("Box 12", source: .path)]])
+        XCTAssertEqual(settled.disagreements, [.container], "the candidates still differ")
+        XCTAssertEqual(ContainerDisplay.disagreements(settled), [], "but the user chose (W47.ct-reader-edit)")
+    }
+
     func testAStandardNameSaysWhichPartsGoIntoWhichField() {
         var names = ContainerNames()
         names.set(ContainerStandardName(field: .repository, variants: ["Example Archives, Example City"],

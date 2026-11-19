@@ -54,7 +54,7 @@ public enum ContainerResolver {
     }
 
     /// The unmasked values of the live runs, per field, deepest run first.
-    static func runValues(_ live: [ContainerRun]) -> [ContainerField: [ContainerValue]] {
+    public static func runValues(_ live: [ContainerRun]) -> [ContainerField: [ContainerValue]] {
         // Each entry remembers the level of the run that gave it, for masking `date` and `other`.
         var held: [ContainerField: [(ContainerLevel, ContainerValue)]] = [:]
         for run in live {

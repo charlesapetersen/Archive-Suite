@@ -47,9 +47,23 @@ struct TagEditorView: View {
                     Divider()
                     FieldStatusSection(files: files, apply: apply)
                     Divider()
-                    // W47.ct-reader-view: shown for one file, once any file in the library has a container value.
-                    if files.count == 1, let file = files.first, !model.containerCatalog.isEmpty {
-                        ContainerSection(detail: model.containerCatalog.detail(forPath: file.path))
+                    // W47.ct-reader-view, W47.ct-reader-edit: shown for one file under the archive's main folder,
+                    // where it is edited; for several, "set for selection".
+                    if hasContainerTree, files.count == 1, let file = files.first,
+                       let editor = model.containerCatalog.editor(forPath: file.path) {
+                        ContainerSection(detail: model.containerCatalog.detail(forPath: file.path), editor: editor,
+                                         error: model.containerEditError, saving: model.containerEditSaving,
+                                         onEdit: { model.editContainerField($0, $1, forPath: file.path) },
+                                         onName: { model.setContainerStandardName($2, for: $1, field: $0,
+                                                                                  forPath: file.path) },
+                                         onShowWarning: { model.selectContainerWarning($0) })
+                            .id(file.path)
+                        Divider()
+                    } else if hasContainerTree, files.count > 1, files.count <= Self.maxContainerSelection {
+                        ContainerSelectionSection(count: files.count, error: model.containerEditError,
+                                                  saving: model.containerEditSaving,
+                                                  onSet: { model.setContainerFieldForSelection($0, $1,
+                                                                                               paths: files.map(\.path)) })
                         Divider()
                     }
                     qualitySection(s)
@@ -91,6 +105,15 @@ struct TagEditorView: View {
     }
 
     private static let maxCollectionCheck = 500
+
+    /// The most files "set for selection" is offered for at once.
+    private static let maxContainerSelection = 5000
+
+    /// The catalog is the open tree's, so its files can be edited (W47.ct-reader-edit).
+    private var hasContainerTree: Bool {
+        let path = model.containerCatalog.rootPath
+        return !path.isEmpty && path == model.containerTree?.path
+    }
 
     // MARK: Subjects
 

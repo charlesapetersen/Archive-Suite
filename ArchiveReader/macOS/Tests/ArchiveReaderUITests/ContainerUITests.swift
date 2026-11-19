@@ -2,7 +2,8 @@ import XCTest
 
 /// W47.ct-reader-view: the folder levels offered when a root is first added, the Container column, the Containers
 /// facet menu and the Inspector's Container section, on a scratch corpus built here. The only file the app writes is
-/// the level map, in the scratch corpus's `.archivesuite` folder, when the test presses Save.
+/// the level map, in the scratch corpus's `.archivesuite` folder, when the test presses Save, and (W47.ct-reader-edit)
+/// the box folders' container files, when the test edits a container.
 @MainActor
 final class ContainerUITests: XCTestCase {
     private var scratch: URL!
@@ -106,5 +107,71 @@ final class ContainerUITests: XCTestCase {
         waitForRows(again, 5)
         RunLoop.current.run(until: Date().addingTimeInterval(3))
         XCTAssertFalse(again.buttons["ar.containerLevels.save"].exists, "a root with a map is not asked")
+    }
+
+    /// W47.ct-reader-edit: a value changed in the Inspector reaches every file of its run, and "set for selection"
+    /// gives the selected files a box of their own while the others keep theirs. Only the box folder's
+    /// `.archivesuite/containers.json` is written.
+    func testTheInspectorEditsARunAndSetsABoxForTheSelection() throws {
+        let suite = corpus.appendingPathComponent(".archivesuite", isDirectory: true)
+        try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: true)
+        try Data(#"{"levels":["repository","collection","box"],"overrides":{},"schemaVersion":1}"#.utf8)
+            .write(to: suite.appendingPathComponent("container-levels.json"))
+        let box17 = corpus.appendingPathComponent("Hoover Institution Archives/Glotzer papers, Mss 1036/Box 17",
+                                                  isDirectory: true)
+        let written = box17.appendingPathComponent(".archivesuite/containers.json")
+
+        let app = launch()
+        waitForRows(app, 5)
+        let table = app.tables["ar.table"]
+        XCTAssertTrue(table.staticTexts["Box 17"].firstMatch.waitForExistence(timeout: 30))
+
+        // One file: Change… the container. Box 17 comes from the folder name, so the edit is the folder's own value.
+        func rows(_ box: String) -> XCUIElementQuery {
+            table.tableRows.containing(NSPredicate(format: "label == %@ OR value == %@", box, box))
+        }
+        rows("Box 17").element(boundBy: 0).click()
+        if !app.buttons["ar.tagEditor.done"].exists { app.typeKey("i", modifierFlags: [.command, .option]) }
+        let edit = app.descendants(matching: .any)["ar.container.container.edit"].firstMatch
+        XCTAssertTrue(edit.waitForExistence(timeout: 15), "each value has an Edit menu")
+        edit.click()
+        let change = app.menuItems["Change…"].firstMatch
+        XCTAssertTrue(change.waitForExistence(timeout: 5))
+        change.click()
+        let field = app.textFields["ar.container.container.field"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        let scope = app.staticTexts["ar.container.container.scope"].firstMatch
+        XCTAssertTrue(scope.accessibilityText.contains("every file in this folder"), scope.accessibilityText)
+        _ = captureScreenshot("containers-edit-field")
+        field.click()
+        field.typeKey("a", modifierFlags: .command)
+        field.typeText("Box 99\r")
+        XCTAssertTrue(table.staticTexts["Box 99"].firstMatch.waitForExistence(timeout: 20), "the list follows the edit")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: written.path), "the box folder's container file")
+        let value = app.staticTexts["ar.container.container.value"].firstMatch
+        XCTAssertTrue(value.waitForExistence(timeout: 10))
+        XCTAssertEqual(value.accessibilityText, "Box 99")
+        let status = app.descendants(matching: .any)["ar.container.container.status"].firstMatch
+        XCTAssertTrue(status.accessibilityText.lowercased().contains("checked"), status.accessibilityText)
+        _ = captureScreenshot("containers-edited")
+
+        XCTAssertEqual(rows("Box 99").count, 3, "every file of the folder follows")
+
+        // Two files: set a box for the selection.
+        rows("Box 99").element(boundBy: 0).click()
+        XCUIElement.perform(withKeyModifiers: .command) { rows("Box 99").element(boundBy: 1).click() }
+        let input = app.textFields["ar.containerSelection.value"].firstMatch
+        XCTAssertTrue(input.waitForExistence(timeout: 10), "several files: set for selection")
+        input.click()
+        input.typeText("Box 5")
+        app.buttons["ar.containerSelection.set"].firstMatch.click()
+        let deadline = Date().addingTimeInterval(20)
+        while rows("Box 5").count < 2, Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.25)) }
+        XCTAssertEqual(rows("Box 5").count, 2, "the selected files show their box")
+        XCTAssertEqual(rows("Box 99").count, 1, "the third file of the folder keeps the edit")
+        XCTAssertEqual(rows("Box 18").count, 2, "the other folder is untouched")
+        _ = captureScreenshot("containers-set-for-selection")
+        let json = try String(contentsOf: written, encoding: .utf8)
+        XCTAssertTrue(json.contains("Box 5") && json.contains("Box 99"), json)
     }
 }
