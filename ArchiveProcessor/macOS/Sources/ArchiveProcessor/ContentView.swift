@@ -103,6 +103,7 @@ struct ContentView: View {
             SegmentationChooserTestDriver.runIfRequested()   // $0 W36 approach chooser rows + render guard
             SettingsSolverTestDriver.runIfRequested()        // $0 W46 settings solver on the profile cases
             SettingsSheetTestDriver.runIfRequested()         // $0 W46 settings sheet: its words and its offscreen pages
+            SettingsPanelsTestDriver.runIfRequested()        // $0 W47 Settings panels: one owning panel per key
             EntityFeatureTestDriver.runIfRequested()         // $0 W46 entity feature: prompt, evidence, policy, sidecar
             DateRouteTestDriver.runIfRequested()             // $0 W46 dating route: bench cases, decision, sidecar
             ItemFieldsTestDriver.runIfRequested()            // $0 W47 item fields: parse, fill policy, sidecar
