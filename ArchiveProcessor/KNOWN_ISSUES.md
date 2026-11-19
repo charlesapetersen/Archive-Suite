@@ -83,8 +83,6 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 - **Vision reads the page as stored.** No turn is tried, so a label photographed sideways may read nothing and is
   listed as a marker with no read; the PDF's own text layer is never a fallback (accepted: owner, 2026-10-30, no
   ABBYY text; `ct-read.md` read the corpus's markers at their stored turn, and trying the others doubled the time).
-- **The gateway calls are counted only in the window.** The estimate and the footer use the measured $0.00084 a
-  photo, not the gateway's own charge, and the processing history does not record them (queued: W47.ct-label-cost).
 - **Proposals last as long as the window.** Closing it keeps the reads but not the answers; reading the folder again
   proposes the unaccepted folders again at no cost (accepted: a folder's container file is the record; one already
   written proposes "Nothing new").
