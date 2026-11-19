@@ -96,7 +96,7 @@ granted to Notes with Choose Archive Folder…. The sandbox gives Notes the pick
 so in the shipping app the first sign is usually unreadable. An **empty** folder inside an archive that was
 never granted to Notes is therefore accepted as a new store. Nothing already in the archive is changed then:
 the store's marker, `items/` and `organization.json` are added inside that empty folder. Granting the archive
-to Notes first closes the gap.
+to Notes first closes the gap (accepted: the sandbox gives Notes the picked folder only, not its parents).
 
 ## ⚠️ LIMIT (W40.root-marker-auto, 2026-11-06) — Choose Archive Folder… gives a plain folder an archive identity
 
@@ -110,7 +110,7 @@ grant writes nothing. With a link in hand (the preview popover) Notes never crea
 could not be the one the link names, so a folder without one is "not the archive this link was copied from".
 The sandbox limit above applies: a subfolder of an archive never granted to Notes cannot be recognised, so
 picking one gives that subfolder an identity of its own. No existing file is changed; the small file can be
-deleted. Tests: `ReaderRootChooserTests` (scratch folders).
+deleted. Tests: `ReaderRootChooserTests` (scratch folders) (accepted: the sandbox limit above; nothing existing is changed).
 
 ## ✅ FIXED (W40.fix-notes-stale-body-on-switch, 2026-10-25) — the outgoing editor remained writable during loading
 
@@ -208,19 +208,19 @@ typed blank line was gone and a deleted one came back. List items drew no marker
 
 Now:
 - One Return is saved as a line break (`\` at the end of the line). Two are a paragraph break, and each past two
-  is a line break that starts the next paragraph, so the note reopens with the lines it showed.
+  is a line break that starts the next paragraph, so the note reopens with the lines it showed. (accepted: fixed, W40.fix-notes-editor-lines; how the editor behaves now).
 - Headings, lists, quotes and code blocks show one newline from what borders them. The file keeps a blank line
-  there.
-- Lists draw •/◦/▪ and numbers.
+  there. (accepted: fixed, W40.fix-notes-editor-lines; how the editor behaves now).
+- Lists draw •/◦/▪ and numbers. (accepted: fixed, W40.fix-notes-editor-lines; how the editor behaves now).
 
 Evidence: `verification/evidence/notes/W40.fix-notes-editor-lines.md`. These limits remain, because Markdown
 has no form for them:
 - **Blank lines typed at the end of text, right before a heading, list, quote or code block, are not kept.**
-  The boundary is written as one blank line.
-- **An empty line between two list items is not kept.**
+  The boundary is written as one blank line. (accepted: Markdown has no form for it, W40.fix-notes-editor-lines).
+- **An empty line between two list items is not kept.** (accepted: Markdown has no form for it, W40.fix-notes-editor-lines).
 - **A list toggled on an empty last line is lost if the caret moves away before anything is typed.** The line
-  holds no character to carry the kind.
-- **A file with several blank lines between a heading and its text shows one newline there.**
+  holds no character to carry the kind. (accepted: Markdown has no form for it, W40.fix-notes-editor-lines).
+- **A file with several blank lines between a heading and its text shows one newline there.** (accepted: Markdown has no form for it, W40.fix-notes-editor-lines).
 
 ## ✅ FIXED (W40.d9, 2026-10-15) — writing-session defects, reproduced in the VM
 
@@ -236,7 +236,7 @@ or code syntax is escaped so it reopens as typed.)
   image <name> in “<note>”. It shows as Missing; paste it again." on the sidebar status line. The reference stays
   in the note, drawn as the Missing placeholder, so the user can see which image to paste again; its name stays
   reserved, so a later paste cannot land under it and make the old reference show a different image. This closes
-  residual (a) of the W7-S5 entry below.
+  residual (a) of the W7-S5 entry below. (accepted: fixed, W40.fix-notes-asset-write-silent).
 
 ## ✅ FIXED (W40.fix-notes-zotero-fetch, 2026-11-05) — Zotero citations and Auto-fill failed against a large, running Zotero
 
@@ -838,13 +838,13 @@ than "not found in the archive". Two boundaries worth not re-litigating:
 - The bound is `1_000_000` entries — an order of magnitude clear of the real corpus (~102k PDFs plus JPEG
   partners plus folders). It exists to stop a pathological mount from searching forever, **not** to cap a
   legitimate archive, so it must stay far above any plausible corpus. Shrinking it to something "reasonable"
-  would silently turn real fallback hits into `.searchIncomplete`.
+  would silently turn real fallback hits into `.searchIncomplete`. (accepted: by design, W23.m14; a bound against a pathological mount, kept far above any real archive).
 - A root directory that **does not exist** still reports `.notFound`, because nothing can be under a
   directory that isn't there. That keeps the shipped W8-S9 computer-move contract (a stale root reports the
   file missing, never a wrong file) — `DurableLinkE2ETests` caught the first attempt, which reported the
   vanished root as an incomplete search. **W23.m14-fu re-confirmed the narrower unplugged-volume case is
   already handled:** `ReaderRootStore.root(for:)` returns `nil` when its scope cannot start, before any
-  basename scan, and the resolver returns `.needsRootGrant` rather than `.notFound`.
+  basename scan, and the resolver returns `.needsRootGrant` rather than `.notFound`. (accepted: by design, W23.m14; keeps the W8-S9 rule that a stale root reports the file missing).
 
 Pinned by 10 scratch tests (`ReaderLinkScanTests`). The off-actor proof is structural rather than
 timing-based: the raw progress callback runs on the scanning thread, so `Thread.isMainThread` inside it
@@ -878,11 +878,11 @@ between BEGIN and COMMIT, and `OrganizationStore` is `@MainActor`, which is reen
 **Two decisions worth not re-litigating:**
 - `move` keeps the insert **before** the delete inside the transaction. That is not incidental ordering — it
   is what guarantees the item is never transiently member-less, so a move can still never trip the §3.6
-  delete-last-instance guard. The old code bought the same property with a `try?`, which is what broke it.
+  delete-last-instance guard. The old code bought the same property with a `try?`, which is what broke it. (accepted: by design, W23.m13; the order the atomic operation needs).
 - `deleteTemplate` now trashes **first**, the reverse of the order its own comment argued for. A refused trash
   changes nothing at all; the opposite failure leaves only a dangling assignment, which
   `TemplateResolution.resolve` already skips and `effectiveTemplate` lazily clears. The old order traded an
-  unrecoverable loss of every assignment for a tidiness the fallback already provided.
+  unrecoverable loss of every assignment for a tidiness the fallback already provided. (accepted: by design, W23.m13; the order the atomic operation needs).
 
 Pinned by 16 scratch tests (`OrganizationAtomicityTests`) using real SQLite fault injection — a
 `BEFORE DELETE … RAISE(ABORT)` trigger, **targeted by row** where a batch needs its first delete to succeed
@@ -904,10 +904,10 @@ the disk (`NoteStore.itemExists`) rather than by classifying the error. That dis
 directions:
 
 - the disk **refused** → the directory is still there → keep the row, so the note stays under All Notes
-  (0 memberships), and put a message on the sidebar status line naming where it still is;
+  (0 memberships), and put a message on the sidebar status line naming where it still is; (accepted: fixed, W23.m12; the two cases the fix tells apart).
 - the directory was **already gone** → `delete` throws `StoreError.notFound` too (the other window got
   there first, or the operator emptied it by hand) → the row must still go, or All Notes keeps offering a
-  phantom note that opens on nothing.
+  phantom note that opens on nothing. (accepted: fixed, W23.m12; the two cases the fix tells apart).
 
 `trashItems` now returns the surviving ids, so a caller can react. Same seam, opposite direction: a failing
 `NotesIndex.deleteItems` is no longer swallowed by a bare `try?` either — files that went to the Trash while
@@ -986,16 +986,16 @@ memory. `cached: false` skips the stat entirely.
 - **`stat(2)`, NOT `URL.resourceValues(forKeys:)`.** `URL` caches resource values on its backing `NSURL`:
   rewriting a file 100 → 250 bytes between two calls *on the same `URL` value* read back **unchanged on
   both fields**. The idiomatic Foundation call would have defeated this fix silently.
-  `FileManager.attributesOfItem` is honest but builds a whole attribute dictionary (~437 µs vs ~15 µs).
+  `FileManager.attributesOfItem` is honest but builds a whole attribute dictionary (~437 µs vs ~15 µs). (accepted: fixed, W23.m11; why the fix is built this way).
 - **The `stat` makes a hit cheaper, not dearer.** It costs ~15 µs and *replaces* the `standardizedFileURL`
   normalization (~53 µs, itself file-system-touching), so key construction goes ~76 µs → ~17 µs. The item
   asked for the cost to be measured before it was paid, on the premise that a hit did no disk I/O; the
   measurement showed the hit was already doing more I/O than the fix adds. The decode a hit avoids is
-  ~3,200 µs.
+  ~3,200 µs. (accepted: fixed, W23.m11; why the fix is built this way).
 - **Nanosecond mtime is sharp enough to be worth having:** 20 back-to-back same-size rewrites of one file
   produced 20 distinct versions on APFS. The one rewrite this still cannot see is same-length *and*
   same-timestamp, which needs a coarser-timestamp volume (an SMB share) — strictly narrower than the bug
-  it replaces, and it still recovers on eviction or relaunch exactly as before.
+  it replaces, and it still recovers on eviction or relaunch exactly as before. (accepted: fixed, W23.m11; why the fix is built this way).
 
 Deliberately **not** the other candidate fix (drop an item's entries when the store observes an external
 change): the store observes nothing — Notes has no file-system watcher, as W23.m9-fu2 records for the
@@ -1094,28 +1094,28 @@ dead index nor a repaired one. (The item said "`search`/`summary(for:)`"; `Notes
 - it delegates to `NotesIndexer.openForQuery()` (internal, not private, for exactly this) whenever there is a
   driver, so the driver stays the single owner of `failure` and the model only mirrors it; a model injected
   with a bare index (tests, previews) opens directly under the same all-or-nothing contract and publishes the
-  same typed failure itself — **the report must not depend on which initializer ran**;
+  same typed failure itself — **the report must not depend on which initializer ran**; (accepted: fixed, W23.m9; a design note on the fix).
 - a **failed `reloadItems` publishes nothing.** `allSummaries()` answers `[]` for an unopenable index exactly
   as for an empty one, so publishing it erased the visible library on the strength of a query that never ran.
-  A *successful* read still publishes what it found, empty included — the guard must not freeze the list;
+  A *successful* read still publishes what it found, empty included — the guard must not freeze the list; (accepted: fixed, W23.m9; a design note on the fix).
 - the **blank-query check stays first** in `search`: not searching is not a failed search, and must raise no
-  banner.
+  banner. (accepted: fixed, W23.m9; a design note on the fix).
 
 Other notes:
 - `adoptIndexFailure` **re-posts** its line on every read that hits a degraded index — that is what makes a
   dismissed banner come back instead of leaving the next empty result unexplained (W23.m9-fu). The
   `@Published indexFailure` assignment is change-guarded, because search is 150 ms-debounced and would
-  otherwise republish an identical value per keystroke.
+  otherwise republish an identical value per keystroke. (accepted: fixed, W23.m9; a design note on the fix).
 - It also **retracts** that line when the index recovers, but only if its own message is still the one
   showing (`postedIndexMessage`): `statusMessage` is shared with every other degradation, so clearing a line
   it didn't post would swallow another subsystem's report. Without the retraction a recovered index leaves a
   now-false "unavailable" banner up for the session; without the guard, recovery silently ate the trash-failure
-  line. Both directions are held by a test.
+  line. Both directions are held by a test. (accepted: fixed, W23.m9; a design note on the fix).
 - **Writes are deliberately NOT routed through the seam.** `upsertBatch`/`deleteItems` already throw on a nil
   handle and every call site reports it, so they were never the silent path; an accessor that can return nil
-  would turn that loud failure into a skipped write nobody hears about.
+  would turn that loud failure into a skipped write nobody hears about. (accepted: fixed, W23.m9; a design note on the fix).
 - `pruneIfSettled`'s `try?` is deliberate: a failed open makes `allIndexedIDs()` empty, `pruneDecision` finds
-  nothing absent, and the prune degrades to a no-op.
+  nothing absent, and the prune degrades to a no-op. (accepted: fixed, W23.m9; a design note on the fix).
 - `Failure` is deliberately NOT shared with Reader's `ContentIndexer.Failure`: this driver is a fork, the copy
   differs (notes vs files), and hoisting a UI-facing type into ArchiveCore would couple both apps' wording to
   a third module (and make every such tweak a three-app rebuild).
@@ -1124,7 +1124,7 @@ correct but incomplete: re-opening a repaired index made it *queryable* again wh
 rows are written only by the launch-time `buildIndexFromDisk()` (or one at a time by a later mutation's
 `upsertBatch`). A mid-session repair (the operator replaces the bad file, a sync client heals it, the volume
 returns) therefore traded one silent wrong answer — "no matches", because nothing could be read — for another
-— "no matches", because nothing has been written yet — and this time with no banner to explain it.
+— "no matches", because nothing has been written yet — and this time with no banner to explain it. (accepted: fixed, W23.m9; a design note on the fix).
 
 `openIndexForQuery()` now reads the prior health *before* it opens, and the `unavailable → open` **edge**
 schedules `repopulateIndexAfterRecovery()`. Three properties are the design, and each is a way the obvious
@@ -1133,11 +1133,11 @@ implementation goes wrong:
   than once per keystroke of a 150 ms-debounced search. This is the objection that made m9-fu *file* this
   instead of fixing it, and the edge is what answers it. (`.incomplete` deliberately does not trigger a
   rebuild: unlike `.unavailable` it is not cleared by a successful open, so triggering on it would be
-  state-triggered by the back door — a walk per read for as long as the writes keep failing.)
+  state-triggered by the back door — a walk per read for as long as the writes keep failing.) (accepted: fixed, W23.m9; a design note on the fix).
 - **Off the read's critical path.** The read that notices returns its (still empty) result at once and the
-  rows land on a later read, exactly as after a launch build. A search must never block on a store walk.
+  rows land on a later read, exactly as after a launch build. A search must never block on a store walk. (accepted: fixed, W23.m9; a design note on the fix).
 - **One at a time.** The pass re-enters the accessor through `reloadItems()`, and a flapping file would
-  otherwise stack rebuilds on each other.
+  otherwise stack rebuilds on each other. (accepted: fixed, W23.m9; a design note on the fix).
 
 It reuses `buildIndexFromDisk()` verbatim rather than a bespoke recovery path: the two cannot drift, its
 upserts are mtime-skipped (a volume that came back with its rows intact costs one directory walk and no
@@ -1180,16 +1180,16 @@ gate's warn tier, so a Notes UITest failure REDs the gate again.
 
 - The guest's screen was **1024×768**. `tart run --no-graphics` attaches no display, so the guest's
   WindowServer boots at that headless default *regardless of the VM's configured `Display`* — `tart get`
-  read `1920x1200` the whole time. (The old note below guessed "1920×1200 display"; it was wrong.)
-- The browser window opened at **exactly 900×612** — its declared `.frame(minWidth: 900, minHeight: 560)`.
+  read `1920x1200` the whole time. (The old note below guessed "1920×1200 display"; it was wrong.) (accepted: fixed, W21.vmgui-c; the diagnosis).
+- The browser window opened at **exactly 900×612** — its declared `.frame(minWidth: 900, minHeight: 560)`. (accepted: fixed, W21.vmgui-c; the diagnosis).
 - Its three panes need **1084 pt** (tree 220 + list 490 + detail 360 + two 7 pt dividers). A frame minimum
   *below* the content's own minimum does not shrink the content: SwiftUI centred 1084 pt inside 900 and
   **~92 pt was clipped off each side**. The sidebar's "Add folder" button sat at x = **−19**; the editor's
-  raw toggle at x = **1033** with the window ending at 962. Off-window ⇒ `isHittable == false`.
+  raw toggle at x = **1033** with the window ending at 962. Off-window ⇒ `isHittable == false`. (accepted: fixed, W21.vmgui-c; the diagnosis).
 - Every failure follows from that, which is why they looked like four unrelated bugs: G3's `an.editor.rawToggle`
   and G8's `an.locations.remove` are the two right-most *production* controls in the detail pane; G6/G11's
   `an.editor.test.reveal` / `.zoteroOpen` are the two right-most buttons of the DEBUG control strip (the ones
-  to their left — `select`, `pasteImage`, `jump` — are inside 962 and always passed).
+  to their left — `select`, `pasteImage`, `jump` — are inside 962 and always passed). (accepted: fixed, W21.vmgui-c; the diagnosis).
 
 **The two fixes, both needed** (the window is now 1121 pt wide and all four controls are hittable):
 1. `NotesBrowserView` drops the false `minWidth: 900` and lets SwiftUI derive the shell's real minimum from
@@ -1227,13 +1227,13 @@ that actually drive membership writes, passed in the same run that flaked.
 *mechanism* was wrong, and only measuring settled it):
 - ✅ "Both *not hittable* elements are tiny and both at **x ≈ 1033** — the same horizontal band, so this
   smells like window geometry, not five independent bugs." Exactly right, and the reason the fix is one
-  change rather than four.
+  change rather than four. (accepted: W21.vmgui-c's check of the diagnosis, kept as the record).
 - ❌ "…under the VM's **1920×1200** display." The VM is *configured* 1920×1200 but the guest was **running
   1024×768** — `--no-graphics` attaches no display, so the WindowServer takes its own headless default.
-  `tart get` agreeing with the doc is not evidence about the guest; `NSScreen.screens` in the runner is.
+  `tart get` agreeing with the doc is not evidence about the guest; `NSScreen.screens` in the runner is. (accepted: W21.vmgui-c's check of the diagnosis, kept as the record).
 - ❌ "Check the persisted `@AppStorage` panel widths in the guest container first." A dead end by
   construction: the gate wipes the container every run (the `prerun` hook), so the widths were always the
-  defaults. The window *size* was the variable, and it came from the view's own `minWidth`.
+  defaults. The window *size* was the variable, and it came from the view's own `minWidth`. (accepted: W21.vmgui-c's check of the diagnosis, kept as the record).
 - ⚖️ "The *seam must be drivable* failures mean the a11y probes aren't queryable — plausibly editor focus /
   first-responder." Half right: they were queryable (`waitForExistence` succeeded, then `isHittable` stayed
   false for the full 10 s poll) and focus was never involved — they were simply off-window. The log
@@ -1247,13 +1247,13 @@ cause was the harness, not the app: the gate built the scratch fixture only *whe
 `NotesGUITests.swift:81-88` states the fixture is "(re)built EXTERNALLY … before each GUI run". So G5 could
 pass exactly once and failed forever after. With a per-run rebuild the count is a steady 4 and G5 passes.
 Infra masquerading as a product bug is the thing to watch for here — an adversarial audit caught it, not the
-gate.
+gate. (accepted: W21.vmgui-c's check of the diagnosis, kept as the record).
 
 **What the green lane was FOR — three owner-eye checks discharged with it (suite 12/12 → 15/15).** These had
 shipped with unit proof and a "live GUI drive → Daemon Report" tail, i.e. behaviour never once driven through
 the real UI:
 - **G12** — W14.4 (d) per-window Sources column. Asserts the *same* cell identifier present in the Extracts
-  window and absent in the Note window, so the negative half cannot pass on a mistyped id.
+  window and absent in the Note window, so the negative half cannot pass on a mistyped id. (accepted: done, W21.vmgui-c; a regression check it added).
 - **G13** — W14.3 live copy→paste. Asserts the imported file is **byte-identical** to the source note's asset,
   not merely referenced — a reference without the bytes is precisely the bug W14.3 fixed. Self-contained: the
   fixture's only `![](assets/…)` line belongs to a reader-page block (it is that block's thumbnail line), so
@@ -1261,12 +1261,12 @@ the real UI:
   order runs it before G4 anyway). ⚠️ This said "a reader-page thumbnail **the chip consumes**" until
   2026-08-12: the chip has never consumed that line — `BlockHeaderChipView` draws a label and buttons, never
   the image — and `W3.notes-thumb-line-duplicates` settled the body as its one home. The test's own reasoning
-  is unaffected either way.
+  is unaffected either way. (accepted: done, W21.vmgui-c; a regression check it added).
 - **G14** — W14.4 (b) raise **and** focus, for both triggers: ⌘⌥E raises the Extracts window, then
   Jump-to-Source raises the Note window back. Via a new DEBUG `an.status.keyWindow` probe, since XCUITest
   exposes no `isKeyWindow`/`isMainWindow` on a window element; without it the check could only assert the
   *selection* half and would be claiming a raise it never observed. Non-vacuous by construction: the test
-  asserts both polarities on both windows, so a probe stuck at either value fails it.
+  asserts both polarities on both windows, so a probe stuck at either value fails it. (accepted: done, W21.vmgui-c; a regression check it added).
 
 New DEBUG seams for G13: `an.editor.test.copyPassage` / `.pastePassage`, because ⌘C/⌘V route to the first
 responder and XCUITest cannot reliably make the styled TextKit-2 text view first responder — the same reason
@@ -1328,11 +1328,11 @@ green, no new warnings.
 - A **hand-authored reference outside `assets/`** — an image at the item root (`![](photo.png)`), or a
   mis-cased `Assets/x.png` — now renders "Blocked" instead of loading. Deliberate: `<item>/assets/` is the
   boundary this item specifies, every in-app writer (`addAsset` / `importAsset` / block thumbs) emits
-  `assets/<name>`, and it is fully recoverable — move the file into `assets/`; nothing is rewritten or lost.
+  `assets/<name>`, and it is fully recoverable — move the file into `assets/`; nothing is rewritten or lost. (accepted: deliberate, W23.m3; `assets/` is the boundary, and moving the file in recovers it).
 - **Hard links are undetectable** by any path-containment rule. An `assets/x.png` hard-linked to another
-  item's file still reads those bytes. Nothing in the app creates one.
+  item's file still reads those bytes. Nothing in the app creates one. (accepted: no path rule can see a hard link, and nothing in the app makes one).
 - **`W23.m11` (the cache key) was the deliberate leftover** — this item did not change it, because
-  `resolved`'s canonical URL is exactly the key it needed. Now fixed; see its entry above.
+  `resolved`'s canonical URL is exactly the key it needed. Now fixed; see its entry above. (accepted: fixed since, W23.m11).
 
 ## ✅ FIXED (W23.h3): confirming a STALE folder-removal alert trashed a live note — Tier-2
 
@@ -1400,10 +1400,10 @@ and save in either order. The later whole-item save silently dropped the other's
 source blocks, with no error surfaced anywhere.
 
 **Measured before the fix** (scratch `mktemp` store, `NotesItemTransactionTests`) — worse than reported:
-- 24 concurrent same-item appends via the raw pattern → **1 survivor. 23 edits destroyed.**
-- A body autosave racing a quality edit → the **body edit vanished entirely** (`"before"`, not `"after"`).
-- A date edit racing a quality edit → the **date vanished entirely** (`nil`).
-- `ExtractBuilder.append` racing a quality edit → the **appended source block vanished** (1 block, not 2).
+- 24 concurrent same-item appends via the raw pattern → **1 survivor. 23 edits destroyed.** (accepted: fixed, W23.h2; what was measured before the fix).
+- A body autosave racing a quality edit → the **body edit vanished entirely** (`"before"`, not `"after"`). (accepted: fixed, W23.h2; what was measured before the fix).
+- A date edit racing a quality edit → the **date vanished entirely** (`nil`). (accepted: fixed, W23.h2; what was measured before the fix).
+- `ExtractBuilder.append` racing a quality edit → the **appended source block vanished** (1 block, not 2). (accepted: fixed, W23.h2; what was measured before the fix).
 
 **Fix — the transaction is now the unit of serialization.** `NoteStore.withItem(_:_:)` /
 `withTemplate(_:_:)` run load → mutate → save inside **one actor-isolated call**, and because `mutate` is
@@ -1473,17 +1473,17 @@ Closes the two remaining W8-S8 items → **Wave 8 (Notes tests + GUI harness) CO
   tree; its `accessibilityValue` carries the bare generation token (empty until settle) and the label mirrors
   it (`building` → `ready:<gen>`), and the helper accepts either. New **G0**
   (`testG0_IndexReadyProbeResolvesAfterInitialBuild`) asserts the probe both exists and flips to a non-empty
-  token once the initial index build settles — so a later FTS/relevance check can safely gate on it.
+  token once the initial index build settles — so a later FTS/relevance check can safely gate on it. (accepted: done, W8-S8b).
 - **Owner-eye harness README shipped** — `ArchiveNotes/scripts/GUI-HARNESS.md`: how to run the suite, the full
   G0–G11 catalog (auto vs owner-eye), and the exact human steps for the checks XCUITest can't fully assert
   (**G2** typing into the styled NSTextView, **G6/G11** the real Reader/Zotero launch, and the un-hit-testable
-  **chip-button click** gestures). Linked from `ArchiveNotes/CLAUDE.md`.
+  **chip-button click** gestures). Linked from `ArchiveNotes/CLAUDE.md`. (accepted: done, W8-S8b).
 - **Verified live GUI-on:** full `ArchiveNotesUITests` suite **TEST EXECUTE SUCCEEDED — 13/13** (G0 + G1/G3/G4/
   G5/G6/G7/G8/G9/G10/G11 + SmokeUITest), 0 failures; `build-for-testing` clean, **0 new warnings**; Release build
   proves the DEBUG probe compiles out (`#else` → `EmptyView`). **Tier-2 gate met:** adversarial self-review
   (display-only a11y element, no write path, no normal-run/Release behavior change) + live scratch functional
   run + post-run file-safety (real `Store` **absent**, `notesStoreRootBookmark` not persisted, real
-  `notes-index-v1.sqlite3` untouched — UITest used `notes-index-uitest.sqlite3`, writes confined to `AN-GUI-Fixture`).
+  `notes-index-v1.sqlite3` untouched — UITest used `notes-index-uitest.sqlite3`, writes confined to `AN-GUI-Fixture`). (accepted: done, W8-S8b).
 
 ## GUI harness (W8-S8 pass 7): G6 reveal → Reader + G11 Zotero chip open green — one `NSWorkspace.open` spy serves both (2026-07-15) — Tier-2
 
@@ -1498,18 +1498,18 @@ failures; ~13 s each); 189 XCTest + Swift-Testing green; **Release build clean (
   In Release and a normal DEBUG run it calls `NSWorkspace.shared.open` exactly as before; **only** under a UITest
   launch (`-ANUITestStorePath`) the DEBUG `WorkspaceOpenSpy` **records** the URL and skips the real open — so the
   harness asserts the dispatched URL WITHOUT launching Reader/Zotero (Zotero may not even be installed on the run
-  machine). The spy branch is `#if DEBUG` + launch-arg-gated (verified compiled out by a Release build).
+  machine). The spy branch is `#if DEBUG` + launch-arg-gated (verified compiled out by a Release build). (accepted: done, W8-S8 pass 7).
 - **Chip buttons `an.chip.reveal` / `an.chip.zoteroOpen` are NOT XCUITest-hittable** (same TextKit-2 attachment-view
   limit confirmed for `an.chip.jump` in pass 6), so — as with G4/G9/G10 — DEBUG seams fire the real callbacks:
   `EditorTextView.uiTestRevealFirstSource()` (fires the reader-page chip's real `onReveal` → `openExternalURL`) and
   `uiTestOpenFirstZotero()` (runs the real zotero-open dispatch). The harness reads the dispatched URL back from a
   visible control-strip static text `an.editor.test.lastOpenedURL` (deliberately NOT a 1×1 hidden element — that's
   the `an.status.indexReady` queryability hazard). Only the button CLICK gesture is bypassed; the **real
-  Reader/Zotero launch stays owner-eye** (like G2's typing).
+  Reader/Zotero launch stays owner-eye** (like G2's typing). (accepted: TextKit-2 attachment subviews may not be reachable by XCUITest or VoiceOver; the DEBUG seams cover the tests, and making the chips reachable is a wish in ArchiveNotes/POTENTIAL_FEATURES.md).
 - File-safe (read-only dispatch, no store/corpus writes): post-run the real `Store` is **absent**, real
-  `notes-index-v1.sqlite3` untouched, `notesStoreRootBookmark` not persisted; all writes confined to the scratch fixture.
+  `notes-index-v1.sqlite3` untouched, `notesStoreRootBookmark` not persisted; all writes confined to the scratch fixture. (accepted: done, W8-S8 pass 7).
 - **RESOLVED (W8-S8b, above):** the `an.status.indexReady` probe queryability fix + the G2/G6/G11 owner-eye
-  harness docs both landed → **W8-S8 complete, SUITE_TODO W8 flipped.**
+  harness docs both landed → **W8-S8 complete, SUITE_TODO W8 flipped.** (accepted: resolved, W8-S8b).
 
 ## GUI harness (W8-S8 pass 6): G10 jump-to-source green — chip button confirmed NOT XCUITest-hittable → DEBUG jump seam (2026-07-15) — Tier-2
 
@@ -1526,7 +1526,7 @@ SUCCEEDED**, 0 failures); 189 XCTest + Swift-Testing green; Release build clean 
   attempt clicking it timed out at `waitForExistence`). The chip is a TextKit-2 attachment-view-provider
   subview (`BlockHeaderChipView` inside `BlockHeaderAttachment.viewProvider`); such subviews aren't hit-testable
   by XCUITest (same class of limit as PDFView content panes in the Reader harness). This is exactly why the
-  plan's ORIGINAL G10 spec (08-testing §Design) said **cliclick**, not XCUITest.
+  plan's ORIGINAL G10 spec (08-testing §Design) said **cliclick**, not XCUITest. (accepted: TextKit-2 attachment subviews may not be reachable by XCUITest or VoiceOver; the DEBUG seams cover the tests, and making the chips reachable is a wish in ArchiveNotes/POTENTIAL_FEATURES.md).
 - **Drove the jump through a DEBUG seam** (same plan-blessed precedent as G4/G9): `EditorTextView.uiTestJumpFirstPassage()`
   scans the text storage for the first note-passage `BlockHeaderAttachment` and fires its **real `onJump`
   callback with the real `SourceAnchor`** — the identical closure + anchor the chip button's `jumpClicked`
@@ -1534,14 +1534,14 @@ SUCCEEDED**, 0 failures); 189 XCTest + Swift-Testing green; Release build clean 
   → select+load). Only the button-CLICK gesture is bypassed; the literal chip click is **owner-eye** (like G2's
   typing). Surfaced via hidden control-strip button `an.editor.test.jump` (→ `EditorTestBox.jumpFirstPassage`
   → coordinator `uiTestJumpFirstPassage`). All additions `#if DEBUG`, compiled out of Release (verified).
-  Read-only navigation (no write-back, no store/corpus write).
+  Read-only navigation (no write-back, no store/corpus write). (accepted: done, W8-S8 pass 6; the seam is DEBUG-only).
 - **Future (low-pri, owner-eye today):** making the chip buttons (`an.chip.{jump,reveal,preview,zoteroOpen}`)
   XCUITest-hittable would also help VoiceOver — may not be possible for TextKit-2 attachment subviews; not
-  attempted this pass. Logged to Daemon Report.
+  attempted this pass. Logged to Daemon Report. (accepted: TextKit-2 attachment subviews may not be reachable by XCUITest or VoiceOver; the DEBUG seams cover the tests, and making the chips reachable is a wish in ArchiveNotes/POTENTIAL_FEATURES.md).
 - **REMAINING (W8-S8 still open — oversized, recommend re-split):** G6 (reveal → Reader) + G11 (Zotero chip
   open), both needing a DEBUG `NSWorkspace.open` spy (assert the dispatched URL; real external launch owner-eye);
   the `an.status.indexReady` probe queryability fix; G2/G6/G11 owner-eye docs in the harness README. Only then
-  tick W8-S8 + flip SUITE_TODO W8.
+  tick W8-S8 + flip SUITE_TODO W8. (accepted: all of it done since, W8-S8 passes 2-7 and W8-S8b; W8 is complete).
 
 ## GUI harness (W8-S8 pass 5): G4 paste-image green — the last un-GUI-verified file-WRITE path — via a DEBUG paste seam (2026-07-15) — Tier-2
 
@@ -1563,15 +1563,15 @@ real `Store` **absent**; `notesStoreRootBookmark` not persisted).
   write + attachment insert + serialize run verbatim; nothing stubbed), surfaced via the hidden control-strip
   button `an.editor.test.pasteImage` (→ `EditorTestBox.pasteImage` → coordinator `uiTestPasteImage` +
   `flushWriteBack`). Only the ⌘V **gesture routing** is bypassed — that gesture is **owner-eye** (like G2's
-  typing). All additions are `#if DEBUG` and compile out of Release (verified by a Release build).
+  typing). All additions are `#if DEBUG` and compile out of Release (verified by a Release build). (accepted: XCUITest cannot route ⌘V into the styled text view; the DEBUG paste seam calls the real handler).
 - **Plan reconciliation:** the plan lists G4 as a *cliclick* check; it's implemented as a disk-asserted
   XCUITest instead (deterministic, no pointer geometry) — parity with how G5/G9 (also "special-handling"
   checks) were done. (Was logged in `.maintenance/ARCHIVE_NOTES_PROGRESS.md`, **retired 2026-08-01** — it was
   0-open/57-done and bound to no tooling; preserved under the gitignored
-  `old/archive-notes-progress-retired-20260801/`, since being gitignored means git never held it.)
+  `old/archive-notes-progress-retired-20260801/`, since being gitignored means git never held it.) (accepted: reconciled, W8-S8 pass 5).
 - **REMAINING (W8-S8 still open):** G6 (reveal → Reader) / G10 (jump-to-source) / G11 (Zotero chip open);
   G2/G6/G11 owner-eye docs in the harness README; and the `an.status.indexReady` probe queryability fix
-  (below, pass 1). Only then tick W8-S8 + flip SUITE_TODO W8.
+  (below, pass 1). Only then tick W8-S8 + flip SUITE_TODO W8. (accepted: all of it done since, W8-S8 passes 2-7 and W8-S8b; W8 is complete).
 
 ## GUI harness (W8-S8 pass 4): G7 replicate + G8 delete-last-instance green — INDEX-DB seam unblocks the folder graph (2026-07-15) — Tier-2
 
@@ -1591,7 +1591,7 @@ its pre-run mtime, all writes confined to the scratch `AN-GUI-Fixture`).
   folders → `OrganizationStore.load` falls back to the fixture's `organization.json` → the Reading/Ideas
   folders + the replicated item load deterministically. Distinct filename keeps the owner's real
   `notes-index-v1.sqlite3` untouched (verified); DEBUG-only + launch-arg-gated → compiled out of Release and
-  never runs on a normal launch. The index is a rebuildable cache, so resetting it loses nothing.
+  never runs on a normal launch. The index is a rebuildable cache, so resetting it loses nothing. (accepted: resolved, W8-S8 pass 4 (the index-DB seam)).
 - **FIXED (a11y bug, latent) — a container `.accessibilityIdentifier` was shadowing the controls inside it.**
   `LocationsInspector` set `.accessibilityIdentifier("an.detail.locations")` on its enclosing `VStack`; on
   macOS SwiftUI that id **propagates to every descendant AX element**, so the folder-row Remove button
@@ -1602,13 +1602,13 @@ its pre-run mtime, all writes confined to the scratch `AN-GUI-Fixture`).
   future check that needs one must relocate the marker the same way.
   **`an.detail.header` resolved 2026-11-05 (W40.fix-notes-list-rename):** its editable title needs its own id
   (`an.detail.title`), so the header is now `.accessibilityElement(children: .contain)` and keeps its id as a
-  container. `an.detail.metadata` is still the latent shape.
+  container. `an.detail.metadata` is still the latent shape. (accepted: done, W8-S8 pass 4).
 - **G8 confirms the recoverable-delete contract under the sandbox:** Cancel leaves the note on disk + its
   membership intact; Delete Note moves `items/<uuid>` out via `FileManager.trashItem` (system Trash,
-  recoverable) — verified working even with only the Route-B temporary-exception grant.
+  recoverable) — verified working even with only the Route-B temporary-exception grant. (accepted: done, W8-S8 pass 4).
 - **REMAINING (W8-S8 still open):** the checks G6 (reveal → Reader) / G10 (jump-to-source) / G11 (Zotero
   chip open); G2/G6/G11 owner-eye docs; and the `an.status.indexReady` probe queryability fix (below, pass 1).
-  Only then tick W8-S8 + flip SUITE_TODO W8. **(G4 done — pass 5, above.)**
+  Only then tick W8-S8 + flip SUITE_TODO W8. **(G4 done — pass 5, above.)** (accepted: all of it done since, W8-S8 passes 2-7 and W8-S8b; W8 is complete).
 
 ## GUI harness live (W8-S8 pass 1): first XCUITest checks green (G1, G3) + FIXED a main-thread editor loop the drive surfaced (2026-07-15)
 
@@ -1630,21 +1630,21 @@ override; readiness gates on a seeded row.
   markdown (`coordinator.lastAppliedMarkdown`), not the rendered string, so `updateNSView` is idempotent;
   `makeNSView`/`switchMode` record the applied source. This spun in **normal use** too (a user reading a note
   without clicking into the editor), not just under test. 189 XCTest + all Swift-Testing suites green (incl.
-  `EditorBindingTests`, `MarkdownBridgeTests`, `FormattingActionTests`), 0 new warnings.
+  `EditorBindingTests`, `MarkdownBridgeTests`, `FormattingActionTests`), 0 new warnings. (accepted: fixed, W8-S8 pass 1).
 - **OBSERVATION (minor, flagged) — a raw↔styled toggle canonicalizes the note body's whitespace on disk.**
   `switchMode` flushes a write-back and the Markdown serializer collapses the blank line after an ATX heading
   and drops the trailing newline (semantically identical — no content lost). A view-only toggle thus rewrites
   the note's own `.md` (mtime churn) with no edit. Not data loss and within Notes' own-store write rights
-  (never the corpus), but worth revisiting (skip the write when `serialize(storage) == parent.markdown`).
+  (never the corpus), but worth revisiting (skip the write when `serialize(storage) == parent.markdown`). (accepted: fixed since; `writeBack` skips a save when nothing was edited since the text was installed (`appliedSerialization`), so a view-only toggle writes nothing).
 - **OBSERVATION — the `an.status.indexReady` probe (W8-S7 §3.4) did not resolve as a readiness gate under
   XCUITest** (1×1 clear-color a11y element; value stayed empty across a 30 s poll). Non-blocking (the tests
   gate on a concrete seeded row) but the probe's queryability — flagged UNVERIFIED at W8-S7 — needs a fix
-  (bump the frame / adjust the a11y wrapping) before any FTS/relevance check relies on it.
+  (bump the frame / adjust the a11y wrapping) before any FTS/relevance check relies on it. (accepted: fixed, W8-S8b; the probe is queryable now).
 - **REMAINING (W8-S8 is oversized — recommend re-split; see plan Session Log / Daemon Report):** G5 (paste →
   source block), G7 (replicate), G8 (delete-last-instance, Tier-2) under XCUITest;
   G4/G6/G10/G11 in cliclick; G2/G6/G11 owner-eye docs. G5/G6 exercise the reader-page **source-block chip** —
   confirm its durable-link/thumbnail render (against the ungranted scratch corpus root) idles under the drive
-  before relying on those checks. (G9 landed in pass 2, below.)
+  before relying on those checks. (G9 landed in pass 2, below.) (accepted: all of it done since, W8-S8 passes 2-7 and W8-S8b; W8 is complete).
 
 ## GUI harness (W8-S8 pass 2): G9 create-extract green — first use of the DEBUG selection seam (2026-07-15)
 
@@ -1660,7 +1660,7 @@ parity holds.
 - **STRIP SIZING (fixed) — the DEBUG UITest control strip was `.frame(height: 14).font(.caption2)`,** which
   the W8-S7 notes flagged as an unverified XCUITest hit-testing hazard. Raised to `.frame(height: 28)` (dropped
   `.caption2`); XCUITest now reliably focuses the field + clicks the buttons. DEBUG- and
-  `-ANUITestStorePath`-gated, so a normal run never shows it and Release omits it entirely (no product change).
+  `-ANUITestStorePath`-gated, so a normal run never shows it and Release omits it entirely (no product change). (accepted: fixed, W8-S8 pass 2).
 - **FINDING — the XCUITest *runner* has READ-ONLY access to `/Users/`.** The RW temporary-exception
   entitlement is on the app-under-test, NOT the `ArchiveNotesUITests` runner, so a test can read the fixture
   to assert but **cannot delete the items it creates** (proven: a G1/G9-created dir has mtime = its creation
@@ -1668,7 +1668,7 @@ parity holds.
   their new item on disk within a run; the fixture is rebuilt externally by `make-notes-fixture.sh` before each
   run (mirroring the Reader harness), and every assertion tolerates a dirty fixture by subtracting a pre-test
   `itemDirs()` snapshot — so leftovers never change a result. (The earlier "best-effort cleanup / Route-B is
-  RW" comment was wrong for the runner and was removed.)
+  RW" comment was wrong for the runner and was removed.) (accepted: the sandbox's write exception is on the app, not the test runner; the fixture is rebuilt before each run and assertions subtract a snapshot).
 
 ## GUI harness (W8-S8 pass 3): G5 paste-as-source-block green (2026-07-15)
 
@@ -1690,7 +1690,7 @@ fixture's `idZotero` note; the real Store is absent and `notesStoreRootBookmark`
   thumbnail path separately. Target is `idZotero`, not the plain note, so G5 doesn't perturb the note G3/G9
   depend on; the Zotero chip has no thumbnail either. `handleSourceBlockPaste` requires `!currentIsRaw` (paste
   only in styled mode) and declines a Reader link pasted into an *extract* (§D7) — both honored by the
-  target/mode choice.
+  target/mode choice. (accepted: by design, W8-S8 pass 3; the live thumbnail path has its own scratch-only test).
 - **BLOCKER for G7/G8 (folder replicate / delete-last-instance) — the INDEX-DB caveat, now fully traced.** The
   folder tree loads **DB-first**: `OrganizationStore.load(storeRoot:)` reads folders from the sqlite index
   (`NotesIndex.allFolders()`) and consults the store's `organization.json` **only when that DB has zero
@@ -1705,7 +1705,7 @@ fixture's `idZotero` note; the real Store is absent and `notesStoreRootBookmark`
   container — then the fixture DB starts empty → `organization.json` loads fresh → G7/G8 become deterministic,
   and the container is never touched. G8's confirm/cancel IDs are `an.dialog.deleteLastInstance.confirm`/`.cancel`
   (`NotesBrowserView`); the `an.locations.remove` button (`LocationsInspector`) is the trigger; confirm →
-  `NoteStore.delete` → `FileManager.trashItem` (recoverable, never `removeItem`).
+  `NoteStore.delete` → `FileManager.trashItem` (recoverable, never `removeItem`). (accepted: resolved, W8-S8 pass 4 (the index-DB seam)).
 
 ## Zotero client tested over the REAL transport (in-process HTTP stub); attachment-kind reconciled (W8-S5, 2026-07-14)
 
@@ -1723,17 +1723,17 @@ intercept every request in-process. So the full runtime HTTP stack is exercised:
   guarantees zero egress; the plan explicitly lists it as an allowed harness. Required one tiny, additive
   production seam: `URLSessionZoteroTransport.init(session:)` (dependency injection; the client's own
   ephemeral session can't have a `URLProtocol` injected, and global `URLProtocol.registerClass` doesn't apply
-  to custom-configured sessions).
+  to custom-configured sessions). (accepted: reconciled, W8-S5; the harness the sandbox allows).
 - **RECONCILIATION — `testAttachmentSelectLinkParsed`.** A `zotero://select/…` URL does **not** encode
   item-vs-attachment (confirmed by `ZoteroSelectLinkTests.testDefaultKindIsItem`); attachment-ness is a
   front-matter/model attribute (`ZoteroRef.kind` = `.attachment` + `parentKey`, covered by
   `ZoteroFrontMatterRoundTripTests`). The test therefore pins the achievable contract: the URL yields the
   right key+library, and an attachment ref both carries `kind:.attachment`/`parentKey` and fetches over the
   client just like an item ref (attachments are addressed by their own key on the local API) — D8's "item AND
-  attachment" support. No production change to the parser (a testing sub-task must not invent behaviour).
+  attachment" support. No production change to the parser (a testing sub-task must not invent behaviour). (accepted: reconciled, W8-S5; the harness the sandbox allows).
 - **No bug found.** The read-only client degraded correctly on connection-refused (`.unavailable`, no throw to
   the caller) and on hang (bounded timeout); the stored `selectLink`/`citation` survive a down server so the
-  chip stays usable. No file-safety surface (no corpus/store writes) → Tier-1.
+  chip stays usable. No file-safety surface (no corpus/store writes) → Tier-1. (accepted: no bug found, W8-S5).
 
 ## Virtual-folder / durable-link / date-sort parity suites; sortDate cross-app divergence guarded (W8-S4, 2026-07-14)
 
@@ -1743,7 +1743,7 @@ W8-S4 added the plan §1.5/§1.6/§1.7 parity suites and, in doing so, pinned a 
   replicant + delete-last-instance invariants on a scratch `OrganizationStore`) and
   `ArchiveCoreTests/DateSortParityTests` (7, §1.7 — the shared SPEC §7 `DocumentTags.sortDate` key), plus a
   `/`-in-multi-segment-rel-path round-trip added to `ArchiveCoreTests/DurableLinkTests` (§1.6) and a
-  cross-implementation parity guard added to `ItemSortDateTests`.
+  cross-implementation parity guard added to `ItemSortDateTests`. (accepted: done, W8-S4).
 - **FINDING (flagged to Daemon Report) — Notes `Item.sortDate` RE-IMPLEMENTS the shared sort formula
   rather than reusing it.** §1.7's `testReuseNotReimplemented` wanted a "routes through the shared
   `DocumentTags.sortDate`" guard, but `Item.sortDate` (`Store/Item.swift`) duplicates the `*10_000/*100`
@@ -1754,14 +1754,14 @@ W8-S4 added the plan §1.5/§1.6/§1.7 parity suites and, in doing so, pinned a 
   for a shared table of dates, `Item.sortDate` MUST equal `DocumentTags.sortDate`, so any future drift
   fails a test. Sort order is a display/ordering concern (never written to a corpus → low file-safety
   stakes); the hardening follow-up — extract a shared numeric combiner in ArchiveCore and route both sides
-  through it — is a Daemon-Report item, out of scope for this testing sub-task.
+  through it — is a Daemon-Report item, out of scope for this testing sub-task. (accepted: fixed since; `Item.sortKey` now calls the shared `DocumentTags.sortDateKey`, and the parity test stays).
 - **RECONCILED — §1.6 resolve / re-grant / fallback live at the Notes layer, not ArchiveCore.** The plan
   placed the durable-link *resolver* cases in `ArchiveCoreTests/DurableLinkTests`, but the resolver
   (`ReaderLinkResolver` + `LinkResolution`, W4-S5) is a `@MainActor` type in the Notes app (it needs
   security-scoped bookmarks), so those cases already live in `ReaderLinkResolverTests` (resolve /
   unknown-guid→`needsRootGrant` / missing→`notFound` / renamed-candidate / path-traversal-rejected /
   grant-verify). ArchiveCore's DurableLink coverage is codec-only; W8-S4 closed its one gap (literal `/`
-  preserved on the wire, not percent-encoded to `%2F`).
+  preserved on the wire, not percent-encoded to `%2F`). (accepted: reconciled, W8-S4; the resolver is a Notes type).
 
 ## Index suite completed + prune-gate hardened; bm25 columns reconciled (W8-S3, 2026-07-14)
 
@@ -1781,19 +1781,19 @@ W8-S3 completed the `NotesIndex` verification layer (plan §1.4) and hardened th
   (mirrors Reader's `ContentIndexer`; future wiring adds the settled/boundary-scope Gate 1), so this was a
   latent risk, not an active bug — but the guarantee now holds inside the method, independent of any
   caller. Pinned by four pure `pruneGate…` tests (empty-snapshot never wipes even when repeated;
-  two-emission required; transient drop not deleted; only twice-confirmed absences deleted).
+  two-emission required; transient drop not deleted; only twice-confirmed absences deleted). (accepted: done, W8-S3).
 - **RECONCILED (plan §1.4 vs shipped) — the FTS index has four weighted columns, not five.** §1.4 lists a
   `linked-doc-display=3` weight, but the shipped `fts5(title, tags, authors, body, id UNINDEXED)` schema
   (W2-S4) has no such column and orders by `bm25(fts, 10, 6, 4, 1)`. The existing bm25 tests
   (`bm25TitleOutranksBody`, `tagsOutrankAuthorsOutrankBody`) therefore already cover every weighted column;
   no linked-doc-display test was invented. A linked-doc-display column would be a schema + indexer change,
-  not a test gap.
+  not a test gap. (accepted: reconciled, W8-S3; the shipped schema is the record).
 - **Coverage added to `NotesIndexTests`** (10 → 16): `reindexReplacesOldBody` (body-specific re-index; the
   existing `incrementalMtimeSkip` covered only the title) and `organizationGraphPersistsAndReloads` (the
   NotesIndex DB layer directly — folders + memberships + **template assignments** survive a close/reopen;
   `OrganizationStoreTests.foldersPersistToDB` covers the store layer but not template assignments via DB).
   All 16 green on scratch sqlite; adjacent `OrganizationStoreTests`/`OrganizationFileTests`/`NotesModelTests`
-  (31) green. Tier-2 (the org-graph writer + `organization.json` are durable app-owned data).
+  (31) green. Tier-2 (the org-graph writer + `organization.json` are durable app-owned data). (accepted: done, W8-S3).
 
 ## Tag projector safety suite + a latent concurrent-write race (W8-S2, 2026-07-14)
 
@@ -1817,7 +1817,7 @@ overwrite the current Finder Q facet or publish a stale Quality to the index/liv
   transition rule: it strips the exact old stamp during projection unless a current front-matter subject
   requests that exact spelling. Its scratch-only functional proof starts with the old stamp plus both a
   current managed subject and an unrelated Finder tag, then verifies that only the old stamp disappears and
-  the note bytes never change. No real Notes store or corpus was touched.
+  the note bytes never change. No real Notes store or corpus was touched. (accepted: fixed, R13d).
 
 - **FIXED — mechanism W15.tu3 (2026-07-28, `1ea80a7`); regression-pinned across all three callers W15.tu4.** A per-resolved-path serialization lock now lives
   inside `ArchiveCore.CoordinatedTagWriter` (Safety §10): the full read→modify→verify→write is mutually
@@ -1832,7 +1832,7 @@ overwrite the current Finder Q facet or publish a stale Quality to the index/liv
   complete write), a Reader `TagWriter` concurrent-same-path fixture (both added tags survive — the
   delta adapter inherits §10), and the flipped Notes `concurrentProjectionsNeverCorrupt` assertion —
   which now requires **both racing subjects survive** (not just the marker). Original analysis below (now
-  historical).
+  historical). (accepted: fixed, W15.tu3 and W15.tu4).
 - **(HISTORICAL — now FIXED by W15.tu3, above.) LATENT (found by this suite) — two concurrent same-file
   metadata writes can lose a racing tag.** `ArchiveCore.CoordinatedTagWriter.write` coordinates via
   `NSFileCoordinator(.contentIndependentMetadataOnly)`, which does **not** mutually-exclude two
@@ -1847,7 +1847,7 @@ overwrite the current Finder Q facet or publish a stale Quality to the index/liv
   design ran the projector on a background re-index *concurrently* with an interactive save of the **same**
   note. **Not fixed in S2** (S2 was the test suite); the fix — a per-path serialization lock inside the
   shared audited writer — shipped separately as **W15.tu3** (`1ea80a7`, see the FIXED entry above). It does
-  not, and cannot, cover cross-process writers.
+  not, and cannot, cover cross-process writers. (accepted: fixed, W15.tu3 and W15.tu4).
 - **Added — DEBUG scratch-write guard on `NotesTagProjector` (belt-and-suspenders, plan §5).** Under a
   unit-test harness (`XCTestConfigurationFilePath` set) **or** the GUI-drive store override
   (`ANUITestStorePath` set), `project(…)` now `precondition`s that the write target is under a known
@@ -1856,13 +1856,13 @@ overwrite the current Finder Q facet or publish a stale Quality to the index/liv
   corpus. **OFF in the real DEBUG app** (neither trigger present) and **compiled out of Release**, so
   ordinary tag writes to the real store are unaffected. The pure predicate `isScratchPath` is unit-tested
   directly; a companion test asserts the trigger env var is present so the guard is provably live (not
-  dormant) during the suite.
+  dormant) during the suite. (accepted: done, W8-S2; a test-safety design note).
 - **Verify-fail path is tested at the projector boundary, not via fault injection.** Case 5 pins that a
   reported success equals an independent on-disk re-read and that a subsequent projection reconciles
   against a fresh read (preserving a concurrent third-party tag — never a blind full-array restore). The
   post-write multiset verify itself (throw-on-mismatch, never silent success) lives inside the shared
   `CoordinatedTagWriter`; a fault-injection seam was deliberately **not** added to that audited cross-app
-  choke-point for a test.
+  choke-point for a test. (accepted: done, W8-S2; a test-safety design note).
 
 ## Front-matter codec — flow-list quote data-loss FIXED; two edge-normalizations pinned (W8-S1, 2026-07-14)
 
@@ -1878,19 +1878,19 @@ one real bug plus two benign edge-normalizations:
   and `parseFlowList` treats a double-quoted element's inner quotes as literal. Round-trip proven for `'`,
   `"`, and `\`+`"` combos by the fuzz suite + the well-formed-`Item` loop; no regression across
   `FrontMatterCodecTests`/`ZoteroFrontMatterRoundTripTests`/`NoteStoreTests`/`NotesIndexTests`. Scalar
-  values (e.g. `title`) were never affected (`unquoteScalar` only strips *both-end* quotes).
+  values (e.g. `title`) were never affected (`unquoteScalar` only strips *both-end* quotes). (accepted: fixed, W8-S1).
 - **PINNED (characterization, not fixed) — leading/trailing non-U+0020 whitespace in a scalar is trimmed
   on read.** `decode` trims a scalar value with `.whitespaces` (which includes tab + category-Zs like
   NBSP), but `encode`'s `needsQuoting` only quotes a *leading/trailing regular space*, so a leading/
   trailing **tab** or **NBSP** on e.g. a title is normalized away (`"\tTabbed"` → `"Tabbed"`). Edge
   regular-spaces DO survive (they're quoted); interior whitespace is unaffected. Pinned by
   `leadingTrailingEdgeWhitespaceInScalarIsNormalized` so a future `needsQuoting` tightening is intentional.
-  Marginal (who titles a note with an edge tab?) → flagged to Daemon Report, not fixed this session.
+  Marginal (who titles a note with an edge tab?) → flagged to Daemon Report, not fixed this session. (accepted: marginal, a title with an edge tab or NBSP; pinned by a test so a change is deliberate).
 - **NOTED (marginal) — `\r\r\n` in body text leaves a residual `\r\n` after one decode.** `decode`'s
   `replacingOccurrences("\r\n" → "\n")` is a single left-to-right pass, so `CR CR LF` collapses to a
   *residual* `\r\n` that then normalizes on a second decode → a body containing raw CR-soup isn't
   byte-idempotent. Real editors emit `\n` or clean `\r\n` (both handled correctly), so this is a
-  fuzz-only artifact; the fuzz body generator excludes lone CR and the observation is logged, not fixed.
+  fuzz-only artifact; the fuzz body generator excludes lone CR and the observation is logged, not fixed. (accepted: fuzz-only; real editors write `\n` or clean `\r\n`, both handled).
 
 ## Editor↔item body wiring — follow-ups (W7-S1a, 2026-07-13): the code items are fixed; the live GUI checks ran and held (W40.notes-w7-gui-checks, 2026-11-04)
 
@@ -1917,7 +1917,7 @@ autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two con
   another note and back, and after a relaunch, with the Markdown unrewritten
   (`NotesW7ChecksUITests.testS1a_PastedImageReloadsAfterReselectAndRelaunch`, VM, through the
   `an.editor.test.pasteImage` seam that calls the real `tryPasteImage`; ⌘V of an image and a drag are not sent).
-  Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`.
+  Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`. (accepted: resolved, W7-S5; the second-window name clash is refused safely, and a shared name authority cannot serve two windows' selections).
 - **Load/autosave, driven live (W40.notes-w7-gui-checks, 2026-11-04).** Select A, type, select B at once: A's
   edit is in A's file exactly once, B loads its own text and its file is untouched; the run recorded that the
   idle autosave had not yet written the file, so the switch saved it
@@ -1935,7 +1935,7 @@ autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two con
   (`EditorFlushRegistryTests`: registry collection, bounded reply, and a scratch-store "edit within the
   debounce → on disk after flush" functional test). A live GUI confirm (type → ⌘Q at once → reopen →
   edit present) is still deferred with the rest of Notes' GUI drive until the scratch-store launch
-  override lands (W8-S7) — driving the live app would write the owner's real store.
+  override lands (W8-S7) — driving the live app would write the owner's real store. (accepted: done, W40.notes-w7-gui-checks).
 
 ## Extracts create/copy-paste — follow-ups (W7-S2, 2026-07-13): image bytes fixed; the paste edges fixed (W40.fix-notes-extract-paste-edges, 2026-11-03); the live GUI checks ran and held (W40.notes-w7-gui-checks, 2026-11-04)
 
@@ -1964,14 +1964,14 @@ paste in an extract editor → note-passage blocks). Model + codec paths are uni
   (2) ✅ FIXED (same item) — two blocks citing the *same* image imported two copies, in the paste and in
   Create/Append's `persist` alike; one write now makes one copy per name+bytes (`ExtractAssetImports`), and
   two different images under one name still land as two files; (3) the end-to-end **GUI copy→paste drive**
-  still wants a live confirm.
+  still wants a live confirm. (accepted: fixed, W7-S5, W14.3, W9.b6 and W40.fix-notes-extract-paste-edges; the live copy→paste drive is VM check G13).
 - ✅ **FIXED (W14.4b, 2026-07-17):** Create-Extract (and Append-to-Extract) now auto-select + raise the
   extract in the Extracts window. `NotesModel.createExtract`/`appendToExtract` route the new/updated extract
   through `openItem(id:)` after re-index, so the Extracts window's pane consumes the `pendingOpen`, selects
   it, and (if open) raises itself (see the raise fix above). Note: a *closed* Extracts window is not
   auto-opened on create (deliberate — avoids an intrusive pop-up); the extract is still selected the next
   time that window opens. +2 model tests assert the open-request is published. **Live GUI drive → Morning
-  Review.**
+  Review.** (accepted: fixed, the item named at its start).
 - **Driven live (W40.notes-w7-gui-checks, 2026-11-04), all held.** The real ⌘⌥E on a two-block selection makes
   one extract with two note-passage blocks in the source's order, the source untouched
   (`NotesW7ChecksUITests.testS2_CreateExtractFromATwoBlockSelectionMakesTwoBlocks`); a plain external ⌘V into an
@@ -1979,7 +1979,7 @@ paste in an extract editor → note-passage blocks). Model + codec paths are uni
   Append to Extract…'s picker appends a block citing the new source, the source untouched
   (`testS2S4_AppendPickerAppendsAndTheSourcesColumnCountsBothSources`); copy in a note → paste into an extract
   gives provenanced blocks with the image bytes (`NotesGUITests.testG13_…`, through the copy/paste seams, not the
-  ⌘C/⌘V keystrokes); Create/Append raise the Extracts window (`testG14_…`, `testG15_…`). Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`.
+  ⌘C/⌘V keystrokes); Create/Append raise the Extracts window (`testG14_…`, `testG15_…`). Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`. (accepted: done, W40.notes-w7-gui-checks).
 
 ## Extracts jump-to-source + provenance chips — follow-ups (W7-S3, 2026-07-13): the template-pane and folder-scope edges are fixed (W40.fix-notes-jump-pending-template, 2026-11-03); the same-window edge stays a limitation; the live GUI checks ran (W40.notes-w7-gui-checks, 2026-11-04): the jump lands short of the block (W40.fix-notes-jump-scroll-short), the rest held
 
@@ -1997,12 +1997,12 @@ is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscio
   (`NotesGUITests.testG14_…`, `testG15_…`). **Failed: the scroll to the block.** A jump from the Extracts
   window to a block half-way down a 200-paragraph source selects the note and scrolls the view down, but stops
   short: the cited block is below the view, 3 runs of 3 (`testS3_JumpFromTheExtractsWindowScrollsToALowerBlock`,
-  an expected failure until **`W40.fix-notes-jump-scroll-short`**). Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`.
+  an expected failure until **`W40.fix-notes-jump-scroll-short`**). Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`. (accepted: done, W40.notes-w7-gui-checks).
 - ✅ **FIXED (W14.4b, 2026-07-17):** window is now programmatically RAISED. `NoteEditorPane.handleOpen`'s
   `.selectAndScroll` branch — which runs only in the window featuring the target's kind — calls
   `openWindow(id:)` (fronts the singleton Notes/Extracts `Window` scene, never duplicates) + `NSApp.activate`,
   so a jump-to-source brings the source note's window forward + focuses it. **Live raise/focus GUI drive →
-  Daemon Report.**
+  Daemon Report.** (accepted: fixed, the item named at its start).
 - ✅ **FIXED (W9.b5-fu1, 2026-10-06):** a request for the kind whose window is CLOSED now opens that window.
   `openAction` used to return `.ignore` in the non-featuring window, so with the featuring window closed no pane
   was mounted to act and Create Extract / an extract link / jump-to-source only activated the app. It now
@@ -2012,33 +2012,33 @@ is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscio
   so the open is deferred one main-loop turn (else the new pane reads `pendingOpen` as nil and never acts);
   and a pane ignores the publish until it has appeared, because before `onAppear` wires the body seams a
   select would mark the item loaded with an EMPTY body (the default `load` returns nil).
-  VM-checked by `testG15_OpenRequestOpensTheClosedFeaturingWindow`.
+  VM-checked by `testG15_OpenRequestOpensTheClosedFeaturingWindow`. (accepted: fixed, the item named at its start).
 - ✅ **FIXED (W40.fix-notes-jump-pending-template, 2026-11-03):** a request reaching a window in templates
   mode no longer waits. Templates mode mounts no `NoteEditorPane`, so `NotesBrowserView` observes
   `pendingOpen` itself while `showingTemplates`: a target this window selects leaves templates mode (one
   main-loop turn later; the mounted pane's `onAppear` then handles and consumes it,
   `NotePassageResolve.leavesTemplatesMode`), a deleted target is reported from there, and a target of the
   other kind opens that window, so the template being edited stays on screen for those two. VM test
-  `testG16_JumpToSourceLeavesTemplatesMode`.
+  `testG16_JumpToSourceLeavesTemplatesMode`. (accepted: fixed, the item named at its start).
 - ✅ **FIXED (W14.4c, 2026-07-17 `d615589`):** the chip live title now refreshes reactively. `NotesModel`
   gained an `itemsGeneration` counter (bumped on every `replaceItems`); `MarkdownEditorView.updateNSView`
   re-styles a chip-bearing extract when that generation changes even if THIS note's markdown didn't, so a
   rename in the *other* window recolors the chip while the extract sits idle. Gated to docs that carry a
   note-passage chip (plain notes never re-style on unrelated changes); scroll offset preserved across the
-  refresh so a reader isn't yanked. **Live cross-window recolor GUI drive → Daemon Report.**
+  refresh so a reader isn't yanked. **Live cross-window recolor GUI drive → Daemon Report.** (accepted: fixed, the item named at its start).
 - **Same-window active-editing edge.** If the jump target note is being actively edited *in the same
   window* (its text view is first responder), freeze-during-edit skips the content re-apply, so the
   scroll maps against possibly-stale content (falls back to top if out of range — non-crashing). The
   realistic jump is cross-window (Extract → Note window), where the target window isn't first responder,
-  so content re-applies and the scroll is exact.
+  so content re-applies and the scroll is exact. (accepted: the realistic jump is cross-window, where the scroll is exact; the same-window case falls back to the top without crashing).
 - ✅ **FIXED (W40.fix-notes-jump-pending-template, 2026-11-03): folder-scope-hidden target.** A jump
   cleared the window's *user* filters but left a shared *folder scope* that excludes the note, so the
   editor loaded it with no list row highlighted. `NotesNavigationModel.revealForOpen` now also widens such
   a scope (folder or smart folder, `NotePassageResolve.scopeHides`) to All Notes and says so in the status
-  line. The scope is shared, so the other window's list widens with it, as its sidebar shows.
+  line. The scope is shared, so the other window's list widens with it, as its sidebar shows. (accepted: fixed, the item named at its start).
 - ✅ **FIXED (W14.4a, 2026-07-17 `592049a`):** `Core/NotePassageSource.swift:118` "conditional cast from
   '[NSValue]' to '[NSValue]' always succeeds" — `textView.selectedRanges` is already `[NSValue]`, so the
-  `as?` cast is redundant; bound directly (behavior-identical). Warning gone on a clean compile.
+  `as?` cast is redundant; bound directly (behavior-identical). Warning gone on a clean compile. (accepted: fixed, the item named at its start).
 
 ## Extract-viewer featuring — follow-ups (W7-S4, 2026-07-14): the Sources column is fixed (W14.4d); the back-fill note stays; the live GUI checks ran and held (W40.notes-w7-gui-checks, 2026-11-04)
 
@@ -2060,17 +2060,17 @@ per-window kind round-trip; `NotesNavigationModelTests` window defaults). Consci
   pins each window comes back on its remembered choice
   (`NotesW7ChecksUITests.testS4_EachWindowFeaturesItsKindAndBothUnionsThem`); the Sources column reads 1, then 2
   after an append from a second source (`testS2S4_…`); it is hidden in the Note window and shown in the Extracts
-  window (`NotesGUITests.testG12_…`). Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`.
+  window (`NotesGUITests.testG12_…`). Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`. (accepted: done, W40.notes-w7-gui-checks).
 - ✅ **FIXED (W14.4d, 2026-07-17 `7ef833d`):** the "Sources" column is now per-window. `NotesAppSettings`
   gained `windowHiddenColumns(for:)`/`setWindowHiddenColumns(_:for:)` (keyed per window like
   `windowKindFilter`), defaulting the Note window to hide the always-blank Sources column while the Extracts
   window shows it; the header picker's toggle now persists per window. A first open seeds the default from the
   legacy global `hiddenColumns` (upgrade-safe); an explicit empty set means "show all". +4 settings tests.
-  **Live two-window visibility GUI drive → Daemon Report.**
+  **Live two-window visibility GUI drive → Daemon Report.** (accepted: fixed, the item named at its start).
 - **`source_count` back-fills on re-index, not instantly, for a pre-`source_count` DB.** The additive
   `ALTER TABLE` defaults existing rows to 0; a stale row shows a blank Sources cell until its mtime
   changes (or the disposable index is deleted + rebuilt). Only affects a dev DB created before this
-  change; a fresh index is correct from first build.
+  change; a fresh index is correct from first build. (accepted: affects only an index built before this change; the index is disposable and there is no production material).
 
 ## Test harness — headless unit run crashes — RESOLVED 2026-07-14 (W8-S6)
 
@@ -2085,14 +2085,14 @@ NSInvalidArgumentException: -[ArchiveNotes.BlockHeaderChipView performClick:]: u
   sent `performClick:` to the chip's **container view**. `BlockHeaderChipView` is an `NSView`, not an
   `NSControl`, so it doesn't respond to `performClick:`; the resulting `NSException` SIGABRT'd the whole
   Swift-Testing process, so the smoke gate was red headless even when every logic suite was green (this is
-  why W4-S7 reported "**92 non-display** tests green").
+  why W4-S7 reported "**92 non-display** tests green"). (accepted: resolved, W8-S6).
 - **Fix (W8-S6):** the test now invokes the Reveal **button's** target/action directly (and finally
   asserts the callback received the anchor); the vestigial `performClick:`-on-the-view line is gone.
   Verified headless: `xcodebuild test -scheme ArchiveNotesUnit -only-testing:ArchiveNotesTests` →
   **TEST SUCCEEDED · 492 Swift-Testing tests in 59 suites + 187 XCTest · 0 failures · no abort**. The
   unit smoke gate (`test-smoke.sh notes`) is green headless again. Since W9.c4, that command explicitly
   uses the UI-free `ArchiveNotesUnit` scheme and selects `ArchiveNotesTests`; GUI tests remain opt-in
-  through the off-screen VM harness.
+  through the off-screen VM harness. (accepted: resolved, W8-S6).
 
 ## Build/test gotchas (XcodeGen + Swift Testing, 2026-07-13)
 
@@ -2100,10 +2100,10 @@ NSInvalidArgumentException: -[ArchiveNotes.BlockHeaderChipView performClick:]: u
   explicit file list at *generation* time (not synchronized groups). If you add a `.swift` file to
   `Sources/`/`Tests/` **after** generating, the `.xcodeproj` won't reference it — it silently isn't
   compiled, and `-only-testing:…/NewSuite` matches 0 tests. In a fresh worktree: write your files first,
-  *then* `xcodegen generate`, then build/test. (Confirmed: 0 → N pbxproj refs only after re-generating.)
+  *then* `xcodegen generate`, then build/test. (Confirmed: 0 → N pbxproj refs only after re-generating.) (accepted: build-tool behaviour to know, not an app defect).
 - **`-only-testing:` / `-skip-testing:` don't select Swift-Testing suites here** (Xcode w/ MacOSX26.2 SDK).
   A `Target/SuiteType` (or `Target/SuiteType/func`) filter selects 0 for `@Suite`/`@Test` types; the XCTest
   "Executed N tests" summary also excludes Swift-Testing results (those print as `✔ Test "…"` lines). Read
   the `✔ Test`/`✔ Suite`/`Test run with N tests` lines to confirm a Swift-Testing suite ran, not the XCTest
   summary. A bare `-only-testing:<Target>` runs everything — this is the headless smoke path (the
-  `performClick:` abort that used to make it red is fixed; see the RESOLVED note above).
+  `performClick:` abort that used to make it red is fixed; see the RESOLVED note above). (accepted: build-tool behaviour to know, not an app defect).

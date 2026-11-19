@@ -666,7 +666,6 @@ because the owner asked. "It's important to not just let problems like this accu
 
 - [ ] **`W49.ki-audit-processor` — give every ArchiveProcessor/KNOWN_ISSUES.md bullet a disposition [M]** (lane: processor) (uses: light) (blocked-on: W49.ki-lint) — About 144 bullets. For each: a real defect or a gap someone would want closed is filed as an item (or pointed at the open item that covers it) and marked `queued:`; a deliberate design limit, or one the owner already ruled on, is marked `accepted:` with the reason or the call; a bullet that is already fixed is closed. Only what the owner alone can decide becomes one Daemon Report entry listing each with a recommendation (no decision words, so he is emailed), and its bullets are marked `asked:` with its gate. Sizing first: an item filed here is sized and placed like any other, and a fix that is cheap and certain is still filed, not done here.
 - [ ] **`W49.ki-audit-reader` — give every ArchiveReader/KNOWN_ISSUES.md bullet a disposition [M]** (lane: reader) (uses: light) (blocked-on: W49.ki-lint) — About 104 bullets; the same procedure as W49.ki-audit-processor.
-- [ ] **`W49.ki-audit-notes` — give every ArchiveNotes/KNOWN_ISSUES.md bullet a disposition [M]** (lane: notes) (uses: light) (blocked-on: W49.ki-lint) — About 109 bullets; the same procedure as W49.ki-audit-processor.
 
 ## Archive Processor — automatic segmentation (owner, 2026-10-05; before the W40 freeze)
 
