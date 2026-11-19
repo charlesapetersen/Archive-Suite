@@ -136,6 +136,11 @@ calls are section 1.
     W47.wh-read-flag-cm-owner-ok).** Leave both unflagged. Their cuts hold the 5% false-alarm ceiling on the 96 but
     caught none of their poor readings (0 of 2, 0 of 7), so a flag would only be false alarms on about 4% of good
     pages (`ArchiveProcessor/segbench-results/post-read-flag.md`). W47.wh-read-flag-cm is declined and not built.
+18. **The entity call's window (2026-11-19, walkthrough of 14:50; W47.wh-ent-8k-apply-owner-ok).** Move
+    EntityExtractor from the first 3,000 characters of a letter to the first 8,000. Paired and replicated on the 138
+    correspondence documents (Gemini 3.8 Flash), the sender rises 0.70 to 0.81 (+0.107, 95% +0.038 to +0.189), all on
+    the 48 letters past 3,000 characters; recipient and place tie; +$0.55 per 1,000 letters
+    (`ArchiveProcessor/segbench-results/ent-8k-paired.md`). W47.wh-ent-8k-apply builds it.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
