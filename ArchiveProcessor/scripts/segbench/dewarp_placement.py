@@ -56,11 +56,23 @@ LF_SRC = DCS.REH / 'licence-freed-sweep' / 'src'  # DocScanner and DocGeoNet (W4
 EXTRA = CACHE / 'src'             # DvD and DocTr++ code and weights (downloaded, never bundled; dewarp_extra_arms.py)
 DEWARPERS = ('uvdoc', 'dvd', 'doctrpp', 'docscanner', 'docgeonet')
 CHUNK_TALL = 1.4
+# W46.p16-dewarp-floor: a dewarper name may carry a variant, `<d>.<v>`, with its own grids, images and arms
+# (`dvd.r2-copy`). `.rN` is a fresh rerun of the same setup; `.noquad` runs d on the whole upright photograph, without
+# Apple's quad first. Variant names hold no '-', since the arm names split on it.
+
+
+def base(d):
+    return d.split('.')[0]
+
+
+def uses_quad(d):
+    return 'noquad' not in d.split('.')[1:]
 
 
 # ---------------------------------------------------------------- prep
 def dewarp_fn(d):
     import dewarp_arms as A
+    d = base(d)
     if d == 'uvdoc':
         return lambda img: A.uvdoc_arm(img, DCS.UVDOC_SRC)
     import dewarp_extra_arms as X
@@ -69,9 +81,13 @@ def dewarp_fn(d):
             'docgeonet': lambda img: X.docgeonet_arm(img, LF_SRC)}[d]
 
 
-def after_quad(img, quad, fn):
-    """dewarp_arms.uvdoc_after_quad for any dewarper: Apple's quad first, its lattice carried back through the quad."""
+def after_quad(img, quad, fn, use_quad=True):
+    """dewarp_arms.uvdoc_after_quad for any dewarper: Apple's quad first, its lattice carried back through the quad.
+    Without the quad, d sees the whole upright photograph and its lattice is already in its coordinates."""
     import dewarp_arms as A
+    if not use_quad:
+        out, g = fn(img)
+        return out, g, False
     q, _, found = A.quad_arm(img, quad)
     out, g = fn(q)
     if not found:
@@ -116,7 +132,7 @@ def cmd_prep(a):
             with Image.open(DCS.up(k)) as im:
                 img = np.asarray(im.convert('RGB'))
             quad = json.loads((CACHE / 'quad' / f'{k}.json').read_text())
-            out, grid, found = after_quad(img, quad, fn)
+            out, grid, found = after_quad(img, quad, fn, uses_quad(d))
             Image.fromarray(out).save(o, quality=92)
             np.savez(g, grid=grid, out_w=out.shape[1], out_h=out.shape[0], src_w=img.shape[1], src_h=img.shape[0],
                      found=found)
@@ -302,10 +318,11 @@ def common(x, arm, base='route'):
     return len(ids), sum(la[i] for i in ids), sum(lb[i] for i in ids)
 
 
-def paired(xs, arm, draws=DCS.DRAWS, seed=DCS.SEED):
-    """Pooled pass on the lines both arm and route score: arm, route, arm minus route with a page bootstrap."""
+def paired(xs, arm, draws=DCS.DRAWS, seed=DCS.SEED, base='route'):
+    """Pooled pass on the lines both arm and base score: arm, base (under 'route'), arm minus base with a page
+    bootstrap."""
     import random
-    cs = [common(x, arm) for x in xs]
+    cs = [common(x, arm, base) for x in xs]
 
     def d(sel):
         n = sum(c[0] for c in sel)
@@ -340,6 +357,23 @@ def summary(xs, arms):
     return s
 
 
+def floor(xs, runs):
+    """The rerun floor: for each pair of runs of one setup (`d`, `d.r2`, …) and each of its arms, the second run
+    against the first on the lines both score, and how many of those lines changed outcome."""
+    xs = [x for x in xs if x['arms']['route']['n']]
+    out = {}
+    for i, ra in enumerate(runs):
+        for rb in runs[i + 1:]:
+            for kind in ('copy', 'guarded', 'place-line', 'place-chunk'):
+                a, b = f'{rb}-{kind}', f'{ra}-{kind}'
+                if not all(a in x['arms'] and b in x['arms'] for x in xs):
+                    continue
+                flips = sum(x['arms'][a]['lines'][j] != x['arms'][b]['lines'][j]
+                            for x in xs for j in set(x['arms'][a]['lines']) & set(x['arms'][b]['lines']))
+                out[f'{a} vs {b}'] = paired(xs, a, base=b) | {'lines_changed': flips}
+    return out
+
+
 def cmd_report(a):
     by = {}
     for f in sorted(CACHE.glob('rows-*.json')):
@@ -360,6 +394,10 @@ def cmd_report(a):
            'sets': {'curved bound or curled': summary(curved, arms), 'their flat pairs': summary(flat, arms),
                     'curved, classed flat': summary([x for x in curved_all if x not in curved], arms),
                     'all 64': summary(xs, arms)},
+           'floor': {name: {d: floor(sel, sorted({arm.split('-')[0] for arm in arms if base(arm) == d
+                                                  and uses_quad(arm.split('-')[0]) and arm != 'route'}))
+                            for d in ('uvdoc', 'dvd')}
+                     for name, sel in (('curved bound or curled', curved), ('their flat pairs', flat))},
            'owner_pages': {x['key']: {arm: f"{v['pass']}/{v['n']}" for arm, v in x['arms'].items()}
                            | {'guard': x['guard']} for x in xs if x['key'] in PC.OWNER_PAGES},
            'rows': [{k: v for k, v in x.items() if k != 'arms'}
@@ -378,7 +416,7 @@ def main():
             p.add_argument('--dewarpers', default='uvdoc', type=lambda v: [d for d in v.split(',') if d])
     a = ap.parse_args()
     if a.cmd != 'report':
-        assert set(a.dewarpers) <= set(DEWARPERS), a.dewarpers
+        assert {base(d) for d in a.dewarpers} <= set(DEWARPERS) and not any('-' in d for d in a.dewarpers), a.dewarpers
     {'prep': cmd_prep, 'run': cmd_run, 'report': cmd_report}[a.cmd](a)
 
 

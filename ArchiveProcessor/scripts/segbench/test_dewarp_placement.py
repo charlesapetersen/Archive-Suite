@@ -68,5 +68,32 @@ class Paired(unittest.TestCase):
         self.assertEqual((s['lines'], s['arm'], s['route'], s['delta'][0]), (2, 100.0, 0.0, 100.0))
 
 
+class Variants(unittest.TestCase):
+    def test_names(self):
+        self.assertEqual((D.base('dvd.r2'), D.uses_quad('dvd.r2')), ('dvd', True))
+        self.assertEqual((D.base('dvd.noquad'), D.uses_quad('dvd.noquad')), ('dvd', False))
+        self.assertTrue(D.uses_quad('uvdoc'))
+
+    def test_no_quad_passes_the_whole_image(self):
+        img = np.zeros((4, 6, 3), np.uint8)
+        g = lattice(lambda u, v: (u, v))
+        out, grid, found = D.after_quad(img, {'found': True, 'corners': [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8],
+                                                                           [0.2, 0.8]]},
+                                        lambda im: (im, g), use_quad=False)
+        self.assertEqual((out.shape, found), (img.shape, False))
+        np.testing.assert_array_equal(grid, g)
+
+    def test_floor_pairs_runs_and_counts_changed_lines(self):
+        def row(r1, r2):
+            return {'arms': {'route': {'n': 2, 'lines': {'b1': True, 'b2': True}},
+                             'dvd-copy': {'lines': r1}, 'dvd.r2-copy': {'lines': r2}}}
+        xs = [row({'b1': True, 'b2': False}, {'b1': True, 'b2': True}),
+              row({'b1': False, 'b2': False}, {'b1': False, 'b2': False})]
+        f = D.floor(xs, ['dvd', 'dvd.r2'])
+        self.assertEqual(list(f), ['dvd.r2-copy vs dvd-copy'])
+        s = f['dvd.r2-copy vs dvd-copy']
+        self.assertEqual((s['lines'], s['lines_changed'], s['delta'][0], s['better'], s['worse']), (4, 1, 25.0, 1, 0))
+
+
 if __name__ == '__main__':
     unittest.main()
