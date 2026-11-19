@@ -282,6 +282,7 @@ public enum ContainerFileStore {
         let fd = openat(sfd, temp, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o644)
         guard fd >= 0 else { throw ContainerWriteError.io("create", errno) }
         var renamed = false
+        var written = stat()
         defer { if !renamed { unlinkat(sfd, temp, 0) } }
         do {
             defer { close(fd) }
@@ -294,6 +295,9 @@ public enum ContainerFileStore {
                 }
             }
             guard fsync(fd) == 0 else { throw ContainerWriteError.io("fsync", errno) }
+            // The written file's stamp, taken now so nothing can fail once it is in place: a rename keeps the
+            // inode, size and modification time.
+            guard fstat(fd, &written) == 0 else { throw ContainerWriteError.io("stat", errno) }
         }
         // A first document is put in place only if none appeared meanwhile, even from a writer that skips the lock.
         var flags: UInt32 = exists ? 0 : UInt32(RENAME_EXCL)
@@ -309,10 +313,7 @@ public enum ContainerFileStore {
             flags = 0
         }
         renamed = true
-        // Still under the lock: what was just put in place, not a later writer's.
-        var st = stat()
-        guard fstatat(sfd, name, &st, AT_SYMLINK_NOFOLLOW) == 0 else { throw ContainerWriteError.io("stat", errno) }
-        return makeStamp(st, dropped: false)
+        return makeStamp(written, dropped: false)
     }
 
     /// Renames the document in place to `<name>.set-aside-<UTC stamp>-<id>`, never over another file.

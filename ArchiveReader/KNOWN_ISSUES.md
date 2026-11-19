@@ -14,8 +14,17 @@ the section, each with Show. Writes only `<folder>/.archivesuite/containers.json
 `container-names.json`, each read fresh and written with its stamp (`NavigationModel+ContainerEdits`). A value the
 user set ends its disagreement warning (`SPEC/containers.md` §Warnings). Contract: `SPEC/containers.md`.
 What it does not do, deliberately or not yet:
-- **No undo.** Edit ▸ Undo does not reach a container edit. Remove Your Value or a new value puts it back; a
-  replaced label read is not kept under the user's value.
+- **Undo is Edit ▸ Undo and Redo, from the menu** (W47.ct-reader-edit-undo). ⌘Z stays Tags ▸ Undo Tag Change, so a
+  container edit is undone by choosing Edit ▸ Undo, which reads a bare "Undo": SwiftUI's Edit menu does not show the
+  undo manager's action name (accepted: the status line says what was undone, "Container Change undone.").
+  Undo puts back what each touched file held, read fresh, and leaves alone, with the reason, a file that changed
+  after the edit; a replaced label read comes back with it. Where there was no file, undo leaves an empty one, since
+  the store deletes nothing: an empty container file reads as none, and an empty standard-names file is only ever at
+  the folder the Reader wrote it in, so it hides no names further up for the Reader (accepted: no delete in the
+  store's write class). Undo and Redo run on the main thread, so the step that reverses them is registered in
+  place; a folder another app holds locked can delay one by up to 5 s (accepted: the files are small and the lock
+  short). The history is the window's; an edit made under another archive root is not undone after the root
+  changes (accepted: the step names files of the old root).
 - **A container file this build cannot overwrite is left alone.** That covers a newer version, one it cannot read,
   or one holding values it drops. The edit is refused with the reason, and the SPEC's "set aside on the user's
   say-so" (`write(…, settingAside: true)`) is not offered yet. The same holds for an unreadable standard-names file
@@ -25,7 +34,9 @@ What it does not do, deliberately or not yet:
   it". It is chosen only where the folder has no run of that field's level.
 - **Set for selection** takes fields with a level (not date or other marks), at most 5,000 files, and the files in
   each folder's order on disk, so a file the list does not show still keeps its value. Across several folders it is
-  not one write: if a later folder is refused, the earlier ones stay saved and the message says how many.
+  all or nothing: every folder's file is checked before any is written, and a write failing partway puts the
+  folders already written back and says so; one changed again in that moment is named as not put back (accepted:
+  two writers racing within one save, and the message names the folder).
 - **Warnings are per folder**, listed for the selected file's folder: disagreements and long unmarked runs
   (`ContainerInference.warnings`). The marker warnings (a photo inside your run, a marker with no read) come from
   Route A as label reads are applied, which the Reader does not do. There is no corpus-wide list yet.

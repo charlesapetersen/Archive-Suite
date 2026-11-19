@@ -558,6 +558,9 @@ Views/
                               network.client entitlement is for this alone).
   NavigationModel+ContainerEdits.swift  W47.ct-reader-edit: each edit read fresh, worked out and written off main
                               with the read's stamp (ContainerFileStore), one at a time; links inside the tree refused.
+                              W47.ct-reader-edit-undo: each edit returns a ContainerUndoStep (what every file held,
+                              the stamp of what was written) for the window's UndoManager; set for selection is
+                              prepared for every folder, then committed, rolled back on a failed write (commitAll).
   ContainerSection.swift      The Inspector's Container section (FieldStatusRow per value with its Edit menu,
                               disagreements, the folder's warnings), ContainerSelectionSection (set for selection)
                               and ContainerLevelsSheet.

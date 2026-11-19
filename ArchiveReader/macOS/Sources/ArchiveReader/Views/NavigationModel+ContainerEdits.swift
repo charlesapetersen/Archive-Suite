@@ -114,7 +114,7 @@ extension NavigationModel {
                 guard !written.isEmpty else { throw error }
                 let undone = ContainerUndoStep(restores: written).apply()
                 throw ContainerSelectionRolledBack(written: written.count, total: prepared.count,
-                                                   notRestored: undone.failures.map(\.folder), underlying: error)
+                                                   notRestored: undone.failures, underlying: error)
             }
         }
         return written.isEmpty ? nil : ContainerUndoStep(restores: written)
@@ -177,10 +177,15 @@ extension NavigationModel {
     private func registerContainerUndo(_ step: ContainerUndoStep, action: String, on undo: UndoManager?) {
         guard let undo, !step.restores.isEmpty else { return }
         let tree = containerTree?.path
+        // An edit's save lands after its event has ended, outside any undo group, where the action's name is lost
+        // (Edit ▸ Undo read a bare "Undo"); an undo or redo already has its group, and the reverse step goes in it.
+        let ownGroup = !undo.isUndoing && !undo.isRedoing
+        if ownGroup { undo.beginUndoGrouping() }
         undo.registerUndo(withTarget: self) { model in
             MainActor.assumeIsolated { model.applyContainerUndo(step, action: action, tree: tree, on: undo) }
         }
         undo.setActionName(action)
+        if ownGroup { undo.endUndoGrouping() }
     }
 
     /// Undo or Redo of a container edit. Run here, on the main thread, so the step that reverses it is registered
@@ -405,7 +410,7 @@ struct ContainerUndoStep: Sendable {
 struct ContainerSelectionRolledBack: Error {
     let written: Int
     let total: Int
-    let notRestored: [URL]
+    let notRestored: [(folder: URL, error: Error)]
     let underlying: Error
 }
 
@@ -431,9 +436,9 @@ func containerEditWriteMessage(_ error: Error) -> String {
             return "Nothing was saved: \(partial.written) of \(partial.total) folders were written and then put back. "
                 + reason
         }
-        let names = partial.notRestored.map { "“\($0.lastPathComponent)”" }.joined(separator: ", ")
-        return "Not every folder could be saved, and \(names) could not be put back as it was, because its file "
-            + "changed again meanwhile. " + reason
+        let names = partial.notRestored.map { "“\($0.folder.lastPathComponent)”" }.joined(separator: ", ")
+        return "Not every folder could be saved, and \(names) could not be put back as it was. "
+            + containerUndoMessage(partial.notRestored[0].error) + " " + reason
     }
     switch error as? ContainerWriteError {
     case .changedSinceRead?: return "Another app changed this folder's containers just now. Look again and redo the change."

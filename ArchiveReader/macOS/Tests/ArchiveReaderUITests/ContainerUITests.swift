@@ -174,4 +174,70 @@ final class ContainerUITests: XCTestCase {
         let json = try String(contentsOf: written, encoding: .utf8)
         XCTAssertTrue(json.contains("Box 5") && json.contains("Box 99"), json)
     }
+
+    /// W47.ct-reader-edit-undo: Edit ▸ Undo takes a container change back, and Edit ▸ Redo makes it again; each
+    /// rewrites only the box folder's container file.
+    func testEditUndoAndRedoTakeAContainerChangeBackAndForward() throws {
+        let suite = corpus.appendingPathComponent(".archivesuite", isDirectory: true)
+        try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: true)
+        try Data(#"{"levels":["repository","collection","box"],"overrides":{},"schemaVersion":1}"#.utf8)
+            .write(to: suite.appendingPathComponent("container-levels.json"))
+        let written = corpus.appendingPathComponent(
+            "Hoover Institution Archives/Glotzer papers, Mss 1036/Box 17/.archivesuite/containers.json")
+
+        let app = launch()
+        waitForRows(app, 5)
+        let table = app.tables["ar.table"]
+        XCTAssertTrue(table.staticTexts["Box 17"].firstMatch.waitForExistence(timeout: 30))
+        func count(_ box: String) -> Int {
+            table.tableRows.containing(NSPredicate(format: "label == %@ OR value == %@", box, box)).count
+        }
+        func waitFor(_ box: String, _ n: Int, _ why: String) {
+            let deadline = Date().addingTimeInterval(20)
+            while count(box) != n, Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.25)) }
+            XCTAssertEqual(count(box), n, why)
+        }
+        table.tableRows.containing(NSPredicate(format: "label == %@ OR value == %@", "Box 17", "Box 17"))
+            .element(boundBy: 0).click()
+        if !app.buttons["ar.tagEditor.done"].exists { app.typeKey("i", modifierFlags: [.command, .option]) }
+        let edit = app.descendants(matching: .any)["ar.container.container.edit"].firstMatch
+        XCTAssertTrue(edit.waitForExistence(timeout: 15))
+        edit.click()
+        app.menuItems["Change…"].firstMatch.click()
+        let field = app.textFields["ar.container.container.field"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.click()
+        field.typeKey("a", modifierFlags: .command)
+        field.typeText("Box 99\r")
+        waitFor("Box 99", 3, "the edit reaches the folder's files")
+        let edited = try String(contentsOf: written, encoding: .utf8)
+        XCTAssertTrue(edited.contains("Box 99"), edited)
+
+        // Edit ▸ Undo, chosen from the menu (⌘Z is Tags ▸ Undo Tag Change). The item reads a bare "Undo": SwiftUI's
+        // Edit menu does not take the undo manager's action name (ArchiveReader/KNOWN_ISSUES.md).
+        func choose(_ title: String) {
+            app.menuBars.menuBarItems["Edit"].click()
+            let item = app.menuBars.menuBarItems["Edit"].menuItems[title].firstMatch
+            let shown = app.menuBars.menuBarItems["Edit"].menuItems.allElementsBoundByIndex
+                .map { "\($0.title)\($0.isEnabled ? "" : " (off)")" }
+            XCTAssertTrue(item.waitForExistence(timeout: 5), "Edit ▸ \(title); the menu shows \(shown)")
+            XCTAssertTrue(item.isEnabled, "Edit ▸ \(title) is enabled")
+            _ = captureScreenshot("containers-edit-menu-\(title.lowercased())")
+            item.click()
+        }
+        choose("Undo")
+        waitFor("Box 17", 3, "undo puts the folder's name back")
+        XCTAssertEqual(count("Box 99"), 0)
+        let undone = try String(contentsOf: written, encoding: .utf8)
+        XCTAssertFalse(undone.contains("Box 99"), "the file holds what it held before the edit (none): \(undone)")
+        _ = captureScreenshot("containers-undone")
+
+        choose("Redo")
+        waitFor("Box 99", 3, "redo makes the change again")
+        XCTAssertTrue(try String(contentsOf: written, encoding: .utf8).contains("Box 99"))
+        XCTAssertEqual(count("Box 18"), 2, "the other folder is untouched throughout")
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: corpus.appendingPathComponent(
+                "Hoover Institution Archives/Glotzer papers, Mss 1036/Box 18/.archivesuite").path))
+    }
 }
