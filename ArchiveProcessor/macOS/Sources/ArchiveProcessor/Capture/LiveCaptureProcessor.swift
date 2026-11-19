@@ -1184,6 +1184,16 @@ final class LiveCaptureProcessor: ObservableObject {
         guard clearGeneration == startedGeneration else { return }
         groupRotationOverride[groupId] = nil   // consumed
 
+        // W47.ct-processor-capture — a box or folder label read into container fields, for its card. Awaited here,
+        // inside the segment's own processing, so a Finish waits for it like any other segment work.
+        var containerRead: ContainerFieldSet?
+        if let itemType = group.type.itemType, ContainerLabelCapture.enabled, let photo = group.photos.first {
+            containerRead = await ContainerLabelCapture.read(type: itemType, text: texts.first ?? "", photo: photo.url,
+                                                             rotation: results.first?.rotationDegrees ?? 0,
+                                                             gateway: config.textGateway)
+            guard clearGeneration == startedGeneration else { return }
+        }
+
         // Tags: Mac subjects skip the LLM; automatic mode calls the LLM; box/folder → color tag.
         let mac = session.macTags[groupId]
         let segment = DocumentSegment(pdfURLs: group.photos.map { $0.url },
@@ -1307,6 +1317,7 @@ final class LiveCaptureProcessor: ObservableObject {
             taggingMode: taggingMode,
             stampUnread: stampUnread, textLayer: textLayer)
         persistManifest()
+        if let containerRead { session.setContainerRead(groupId: groupId, read: containerRead) }
         for p in group.photos { pageTasks[PageKey(p)] = nil }   // free memory
         labelStagedRecord(groupId, type: gType, outcome: outcome, results: results)
         proceedToFinishIfReady()   // if the operator hit Finish mid-processing, this staged segment may be the last
@@ -2198,6 +2209,10 @@ final class LiveCaptureProcessor: ObservableObject {
     /// made mid-session — via the Live Capture "Output folder" picker or Process Files — is safe and
     /// expected: both the "Add to" existing-folder list and the destination track the current choice.
     /// Falls back to the locked config's directory, then Downloads.
+    /// W47.ct-processor-capture — the standard names under the output folder (`SPEC/containers.md` §Showing a value),
+    /// for the marker card. nil when there are none or the file is unreadable.
+    var containerNames: ContainerNames? { ContainerFileStore.loadNames(root: currentOutputDirectory).document }
+
     private var currentOutputDirectory: URL {
         // Test isolation (data safety): the headless LiveCaptureTestDriver sets LIVECAPTURE_TESTOUT, so
         // finalize writes into an ISOLATED scratch folder and NEVER the operator's real output corpus. The
@@ -2326,6 +2341,20 @@ final class LiveCaptureProcessor: ObservableObject {
                 return
             }
             self.recordSessionInCollections(plans, filed: filedGroups)
+            // W47.ct-processor-capture — each filed marker's container fields into its collection folder's
+            // `.archivesuite/containers.json`, its run starting at the marker's own PDF. Only markers whose label was
+            // read (an entry in `containerFields`); new files only, inside `.archivesuite`, after the files landed.
+            let filedMarkers: [ContainerLabelCapture.FiledMarker] = self.staged.compactMap { seg in
+                guard filedGroups.contains(seg.groupId),
+                      let type = CaptureGroupType(rawValue: seg.type)?.itemType,
+                      let fields = self.session.containerFields[seg.groupId],
+                      let pdf = outcome.firstPDFs[seg.groupId] else { return nil }
+                return ContainerLabelCapture.FiledMarker(folder: pdf.folder, fileName: pdf.fileName, type: type,
+                                                         fields: fields,
+                                                         text: self.retained[seg.groupId]?.texts.first ?? "")
+            }
+            let containerProblem = filedMarkers.isEmpty ? nil
+                : await Task.detached { ContainerLabelCapture.record(filedMarkers) }.value
             let placeholderByGroup = Dictionary(
                 self.staged.compactMap { seg -> (String, [URL])? in
                     guard let held = seg.placeholderSources, !held.isEmpty else { return nil }
@@ -2461,6 +2490,9 @@ final class LiveCaptureProcessor: ObservableObject {
                 let n = filedUntagged
                 self.finalizeSummary = (self.finalizeSummary ?? outcome.summary)
                     + " ⚠️ \(n) filed file\(n == 1 ? "" : "s") could NOT be tagged — \(n == 1 ? "it is" : "they are") in the collection, but \(n == 1 ? "it carries" : "they carry") NO Finder tags, so tag searches in the Reader will not find \(n == 1 ? "it" : "them"). Re-tag \(n == 1 ? "it" : "them") from the output folder (Process Files → re-tag), or check the folder's permissions before the next session."
+            }
+            if let containerProblem {
+                self.finalizeSummary = (self.finalizeSummary ?? outcome.summary) + " ⚠️ " + containerProblem
             }
             // Clear ONLY the confirmed-filed source photos (to the Trash); every unfiled or straggler page
             // stays in the backup folder + Captured pane, recoverable.
@@ -2633,6 +2665,14 @@ final class LiveCaptureProcessor: ObservableObject {
         let movedFiles: Int
         let filedGroupIds: Set<String>
         let allFiled: Bool
+        /// W47.ct-processor-capture — each filed segment's first PDF: its collection folder and file name, which
+        /// a marker's container run starts at.
+        var firstPDFs: [String: FiledPDF] = [:]
+    }
+
+    struct FiledPDF: Sendable {
+        let folder: URL
+        let fileName: String
     }
 
     private enum MoveResult { case moved, absent, failed }
@@ -2641,6 +2681,7 @@ final class LiveCaptureProcessor: ObservableObject {
         var movedFiles = 0
         var failedMoves = 0
         var filedGroupIds = Set<String>()
+        var firstPDFs: [String: FiledPDF] = [:]
         var totalSegments = 0
         // Move one file; returns true iff it actually LANDED at the destination — so a segment can tell
         // whether ALL of its authoritative PDF outputs were filed (the gate for deleting its source photo).
@@ -2669,6 +2710,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 // delete) ONLY if it staged at least one PDF and EVERY one reached the destination. Exported
                 // images / JSON are secondary and do NOT gate deletion.
                 var pdfExpected = 0, pdfLanded = 0
+                var landed: [String] = []
                 var firstNum: Int?
                 if seg.imageURLs.isEmpty {
                     // One-file output (PDF only): number by PDF (a merged doc is already a single PDF).
@@ -2677,7 +2719,8 @@ final class LiveCaptureProcessor: ObservableObject {
                         if firstNum == nil { firstNum = seq }
                         let numStr = String(format: "%05d", seq)
                         pdfExpected += 1
-                        if doMove(pdf, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf")) { pdfLanded += 1 }
+                        let dest = plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf")
+                        if doMove(pdf, to: dest) { pdfLanded += 1; landed.append(dest.lastPathComponent) }
                     }
                 } else if seg.pdfURLs.count == 1 && seg.imageURLs.count > 1 {
                     // Merged multi-page document: one PDF for many page images. Number each image, then the
@@ -2691,7 +2734,8 @@ final class LiveCaptureProcessor: ObservableObject {
                     }
                     if let fn = firstNum, let pdf = seg.pdfURLs.first {
                         pdfExpected += 1
-                        if doMove(pdf, to: plan.folder.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).pdf")) { pdfLanded += 1 }
+                        let dest = plan.folder.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).pdf")
+                        if doMove(pdf, to: dest) { pdfLanded += 1; landed.append(dest.lastPathComponent) }
                     }
                 } else {
                     // Two-file output, one PDF per page. The PDF list is authoritative (always page-complete);
@@ -2709,7 +2753,8 @@ final class LiveCaptureProcessor: ObservableObject {
                             _ = doMove(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"))
                         }
                         pdfExpected += 1
-                        if doMove(pdf, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf")) { pdfLanded += 1 }
+                        let dest = plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf")
+                        if doMove(pdf, to: dest) { pdfLanded += 1; landed.append(dest.lastPathComponent) }
                     }
                 }
                 if let json = seg.jsonURL, let fn = firstNum {
@@ -2718,13 +2763,16 @@ final class LiveCaptureProcessor: ObservableObject {
                     _ = doMove(json, to: jf.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).json"))
                 }
                 // Filed iff it produced ≥1 PDF and ALL of them landed. (No PDF → never filed → source kept.)
-                if pdfExpected > 0 && pdfLanded == pdfExpected { filedGroupIds.insert(seg.groupId) }
+                if pdfExpected > 0 && pdfLanded == pdfExpected {
+                    filedGroupIds.insert(seg.groupId)
+                    if let first = landed.first { firstPDFs[seg.groupId] = FiledPDF(folder: plan.folder, fileName: first) }
+                }
             }
         }
         let allFiled = failedMoves == 0 && filedGroupIds.count == totalSegments
         let summary = "Finalized \(plans.count) collection\(plans.count == 1 ? "" : "s") · \(movedFiles) files moved."
         return FinalizeOutcome(summary: summary, failedMoves: failedMoves, movedFiles: movedFiles,
-                               filedGroupIds: filedGroupIds, allFiled: allFiled)
+                               filedGroupIds: filedGroupIds, allFiled: allFiled, firstPDFs: firstPDFs)
     }
 
     /// THE source-retirement decision, as a pure function so it can be proven headlessly (W23.h5).

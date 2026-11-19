@@ -86,6 +86,7 @@ struct SettingsView: View {
     @AppStorage(DefaultsKeys.itemTypeColourFolder) private var itemTypeColourFolder: Int = 0
     @AppStorage(DefaultsKeys.enableCollectionSegmentation) private var enableCollectionSegmentation: Bool = false
     @AppStorage(DefaultsKeys.confirmCollectionIDs) private var confirmCollectionIDs: Bool = false
+    @AppStorage(DefaultsKeys.readContainerLabels) private var readContainerLabels: Bool = true
     @AppStorage(DefaultsKeys.reviewDocumentSegmentation) private var reviewDocumentSegmentation: Bool = false
     @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = true
     @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
@@ -1083,6 +1084,12 @@ struct SettingsView: View {
                 HStack {
                     Text("When capturing")
                     HelpButton(text: "Stage for later: captures collect in Live Capture; send them to Process Files for a normal batch run.\n\nProcess live: each captured segment is OCR'd, tagged, and turned into a PDF as you shoot (using the settings here); confirm collection names at the end.")
+                }
+            }
+            Toggle(isOn: $readContainerLabels) {
+                HStack {
+                    Text("Read box and folder labels")
+                    HelpButton(text: "When processing live, each Box or Folder photo is read into repository, collection, accession, series, box and folder, shown on a card for you to correct, and saved beside the collection's files (in its hidden .archivesuite folder) when you finish. Box and folder numbers come from the photo's text; with the AI gateway on, titles, collection number, date and accession come from GPT 5.6 Luna on the gateway, one short call per label photo.")
                 }
             }
 

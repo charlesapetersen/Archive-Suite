@@ -105,6 +105,8 @@ enum DefaultsKeys {
     static let localSegmenterModelID = "localSegmenterModelID"
     static let enableCollectionSegmentation = "enableCollectionSegmentation"
     static let confirmCollectionIDs = "confirmCollectionIDs"
+    /// W47.ct-processor-capture — read box and folder label photos into container fields at capture. Absent ⇒ on.
+    static let readContainerLabels = "readContainerLabels"
     static let reviewDocumentSegmentation = "reviewDocumentSegmentation"
     static let enableSegmentJSON = "enableSegmentJSON"
     static let tagVocabulary = "tagVocabulary"

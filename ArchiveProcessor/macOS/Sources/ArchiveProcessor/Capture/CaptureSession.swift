@@ -163,6 +163,11 @@ final class CaptureSession: ObservableObject {
     /// document groups already tagged or skipped on the Mac (drives the auto-advancing card).
     @Published private(set) var macTags: [String: MacSegmentTags] = [:]
     @Published private(set) var resolvedGroupIds: Set<String> = []
+    /// W47.ct-processor-capture — each box or folder marker's container fields (groupId → fields): the label read's
+    /// proposals (source `label`) until the operator confirms the marker card, then the card's values (source `user`).
+    /// An entry, even an empty one, means the read is in, which is what lets the marker's card appear. Written into
+    /// the marker's directory's `.archivesuite/containers.json` at finalize (`SPEC/containers.md`).
+    @Published private(set) var containerFields: [String: ContainerFieldSet] = [:]
     /// Document groups the phone has signalled complete (via `POST /segment/complete` at End segment).
     /// Photos now stream to the Mac page-by-page as they are shot, so a document group exists mid-segment;
     /// its tag card must appear only once the segment is complete — this gates `pendingTagGroup`.
@@ -563,6 +568,7 @@ final class CaptureSession: ObservableObject {
             completedDocGroups = restored.completed
             resolvedGroupIds = restored.resolved     // B9: don't re-surface an already-resolved tag card
             macTags = restored.macTags               // B9: keep the Mac-entered tags across the restart
+            containerFields = restored.containerFields
         } else {
             sessionId = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
             incomingFolder = root.appendingPathComponent(sessionId, isDirectory: true)
@@ -850,7 +856,7 @@ final class CaptureSession: ObservableObject {
     @discardableResult
     func commitPreparedClear(token: String) -> Bool {
         guard clearPhase == "prepared", clearToken == token else { return false }
-        let didWrite = writeManifest(completed: [], resolved: [], macTags: [:],
+        let didWrite = writeManifest(completed: [], resolved: [], macTags: [:], containerFields: [:],
                                      clearPhase: "committed", clearToken: token)
         if didWrite { clearPhase = "committed" }
         return didWrite
@@ -861,7 +867,7 @@ final class CaptureSession: ObservableObject {
         for p in photos { Self.trashOrRemove(p.url) }   // to Trash, not a hard delete — recoverable
         photos = []
         completedDocGroups.removeAll()
-        resolvedGroupIds.removeAll(); macTags.removeAll()   // B9: keep the persisted resolve state in sync
+        resolvedGroupIds.removeAll(); macTags.removeAll(); containerFields.removeAll()   // B9: keep the persisted resolve state in sync
         if writeManifest(preserveClearMarker: false) { clearPhase = nil; clearToken = nil }
         statusMessage = serverRunning ? "Listening on port \(listenPort)." : "Idle"
     }
@@ -906,7 +912,9 @@ final class CaptureSession: ObservableObject {
         guard recordFiledGroups(idsToRecord) else { return false }
         for p in removed { Self.trashOrRemove(p.url) }   // to Trash, not a hard delete — recoverable
         photos = photos.filter { !filed.contains($0.url) }
-        if photos.isEmpty { completedDocGroups.removeAll(); resolvedGroupIds.removeAll(); macTags.removeAll() }
+        if photos.isEmpty {
+            completedDocGroups.removeAll(); resolvedGroupIds.removeAll(); macTags.removeAll(); containerFields.removeAll()
+        }
         let refreshed = writeManifest()
         statusMessage = serverRunning ? "Listening on port \(listenPort)." : "Idle"
         if !refreshed {
@@ -952,12 +960,42 @@ final class CaptureSession: ObservableObject {
     /// The next document group ready for the Mac tag card: **complete** (the phone signalled End
     /// segment via `markSegmentComplete`) and not yet resolved. Pages stream in as shot, so a group
     /// exists mid-segment — gating on `completedDocGroups` keeps the card from popping before the
-    /// segment is finished. Box/folder markers need no card (finalized on arrival).
+    /// segment is finished. A box or folder marker is finalized on arrival and gets its card once its label read is
+    /// in (`containerFields`, W47.ct-processor-capture): the read's fields, for the operator to correct.
     var pendingTagGroup: CaptureGroup? {
         groups.first {
-            $0.type == .document && completedDocGroups.contains($0.id)
+            ($0.type == .document ? completedDocGroups.contains($0.id) : containerFields[$0.id] != nil)
                 && !resolvedGroupIds.contains($0.id) && !filedGroupIds.contains($0.id)
         }
+    }
+
+    /// The label read of a marker is in (W47.ct-processor-capture): its proposals replace earlier label values and keep
+    /// every value the operator set. Persisted best-effort: a lost write costs only the proposals, which the next
+    /// read gives again, and the card still appears from memory.
+    func setContainerRead(groupId: String, read: ContainerFieldSet) {
+        guard !filedGroupIds.contains(groupId), !resolvedGroupIds.contains(groupId) else { return }
+        var merged = containerFields[groupId] ?? ContainerFieldSet()
+        merged.values = merged.values.filter { $0.value.source == .user }
+        for (field, value) in read.values where merged[field] == nil { merged[field] = value }
+        containerFields[groupId] = merged
+        _ = writeManifest()
+    }
+
+    /// The marker card's Save: its values become the operator's (source `user`, keeping each proposal's reader where
+    /// the value is unchanged). Same durability contract as `applyMacTags`.
+    @discardableResult
+    func applyContainerFields(groupId: String, fields: ContainerFieldSet) -> Bool {
+        let previous = containerFields[groupId]
+        containerFields[groupId] = fields
+        let newlyResolved = resolvedGroupIds.insert(groupId).inserted
+        guard writeManifest() else {
+            containerFields[groupId] = previous
+            if newlyResolved { resolvedGroupIds.remove(groupId) }
+            statusMessage = Self.tagDecisionNotDurableMessage
+            return false
+        }
+        notifySegmentResolved(groupId)
+        return true
     }
 
     /// The phone ended a document segment (`POST /segment/complete`): attach the segment's tags to its
@@ -1133,6 +1171,8 @@ final class CaptureSession: ObservableObject {
         // already-staged output). Optional so pre-B9 manifests ({photos, completedDocGroups}) still decode.
         var resolvedGroupIds: [String]? = nil
         var macTags: [String: MacSegmentTags]? = nil
+        /// W47.ct-processor-capture — the markers' container fields; optional so older manifests decode.
+        var containerFields: [String: ContainerFieldSet]? = nil
         // W3.cap-r3-fu4: a filed group stays remembered after its source photos leave the Backup Folder.
         // Optional so pre-fu4 manifests continue to decode.
         var filedGroupIds: [String]? = nil
@@ -1150,6 +1190,7 @@ final class CaptureSession: ObservableObject {
                                completed completedOverride: Set<String>? = nil,
                                resolved resolvedOverride: Set<String>? = nil,
                                macTags macTagsOverride: [String: MacSegmentTags]? = nil,
+                               containerFields containerFieldsOverride: [String: ContainerFieldSet]? = nil,
                                clearPhase: String? = nil,
                                clearToken: String? = nil,
                                preserveClearMarker: Bool = true) -> Bool {
@@ -1162,6 +1203,7 @@ final class CaptureSession: ObservableObject {
         let manifest = SessionManifest(photos: entries, completedDocGroups: Array(completedOverride ?? completedDocGroups),
                                        resolvedGroupIds: Array(resolvedOverride ?? resolvedGroupIds),
                                        macTags: macTagsOverride ?? macTags,
+                                       containerFields: containerFieldsOverride ?? containerFields,
                                        filedGroupIds: filedGroupIds.sorted(), clearPhase: markerPhase,
                                        clearToken: markerToken)
         guard let data = try? JSONEncoder().encode(manifest) else { return false }
@@ -1175,18 +1217,19 @@ final class CaptureSession: ObservableObject {
     /// no persisted completion set → empty (its tag cards still surface at Finish, exactly as before).
     nonisolated static func decodeManifest(_ data: Data) -> (entries: [ManifestEntry], completed: Set<String>,
                                                              resolved: Set<String>, macTags: [String: MacSegmentTags],
-                                                             filed: Set<String>, clearPhase: String?, clearToken: String?)? {
+                                                             filed: Set<String>, clearPhase: String?, clearToken: String?,
+                                                             containerFields: [String: ContainerFieldSet])? {
         let d = JSONDecoder()
         if let m = try? d.decode(SessionManifest.self, from: data) {
             return (m.photos, Set(m.completedDocGroups), Set(m.resolvedGroupIds ?? []), m.macTags ?? [:],
-                    Set(m.filedGroupIds ?? []), m.clearPhase, m.clearToken)
+                    Set(m.filedGroupIds ?? []), m.clearPhase, m.clearToken, m.containerFields ?? [:])
         }
-        if let legacy = try? d.decode([ManifestEntry].self, from: data) { return (legacy, [], [], [:], [], nil, nil) }
+        if let legacy = try? d.decode([ManifestEntry].self, from: data) { return (legacy, [], [], [:], [], nil, nil, [:]) }
         return nil
     }
 
     /// Newest session folder that still has photos + a manifest (received but not yet cleared).
-    static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto], completed: Set<String>, resolved: Set<String>, macTags: [String: MacSegmentTags], filed: Set<String>, clearPhase: String?, clearToken: String?)? {
+    static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto], completed: Set<String>, resolved: Set<String>, macTags: [String: MacSegmentTags], filed: Set<String>, clearPhase: String?, clearToken: String?, containerFields: [String: ContainerFieldSet])? {
         let fm = FileManager.default
         guard let subdirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return nil }
         // ISO-8601 folder names sort lexically = chronologically; check newest first.
@@ -1212,7 +1255,7 @@ final class CaptureSession: ObservableObject {
                 || decoded.clearPhase == "prepared" || decoded.clearPhase == "committed" {
                 restored.sort { $0.seq < $1.seq }
                 return (folder, restored, decoded.completed, decoded.resolved, decoded.macTags,
-                        decoded.filed, decoded.clearPhase, decoded.clearToken)
+                        decoded.filed, decoded.clearPhase, decoded.clearToken, decoded.containerFields)
             }
         }
         return nil

@@ -1,5 +1,6 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
+import ArchiveCore
 import AppKit
 
 /// Headless, $0 self-test of the Live Capture session-manifest persistence (B5-ii), gated by
@@ -744,6 +745,71 @@ enum ManifestPersistenceTestDriver {
               && afterDurableDecisions.macTags["gCard"]?.year == 1971
               && afterDurableDecisions.macTags["gCard"]?.quality == 2
               && afterDurableDecisions.macTags["gSkip"] == nil)
+
+        // --- W47.ct-processor-capture: a box marker's card appears once its label read is in, its Save is durable
+        // before anything acts on it, and the container file is written beside the filed PDFs (scratch only). ---
+        let boxPhoto = session.ingest(jpeg: Data("synthetic box label".utf8), groupId: "gBox", seq: 103,
+                                      type: .box, quality: nil, year: nil, month: nil, deviceName: "ManifestTest")
+        check("W47: a box marker ingests with no card until its label is read",
+              boxPhoto != nil && session.pendingTagGroup == nil)
+        let boxRead = ContainerLabelReader.proposals(lines: ["HOOVER INSTITUTION ARCHIVES", "BOX NO. 17"], type: .box)
+        session.setContainerRead(groupId: "gBox", read: boxRead)
+        check("W47: the read brings up the marker's card with the parser's proposals",
+              session.pendingTagGroup?.id == "gBox"
+              && session.containerFields["gBox"]?[.container]?.value == "Box 17"
+              && session.containerFields["gBox"]?[.container]?.source == .label)
+        let cardFields = ContainerLabelCard.fields(for: .box)
+        let edited = ContainerLabelCard.confirmed(
+            texts: [.repository: "Hoover Institution Archives", .container: "Box 18", .collectionTitle: "Glotzer papers",
+                    .series: "  "],
+            shown: [.repository: "Hoover Institution Archives", .container: "Box 17"],
+            read: boxRead, fields: cardFields, at: Date())
+        check("W47: Save keeps an untouched field as written with its reader, and takes an edit as typed",
+              edited[.repository]?.value == "HOOVER INSTITUTION ARCHIVES" && edited[.repository]?.source == .user
+              && edited[.repository]?.reader == ContainerLabelReader.visionReader
+              && edited[.container]?.value == "Box 18" && edited[.container]?.reader == nil
+              && edited[.collectionTitle]?.value == "Glotzer papers" && edited[.series] == nil)
+        session.manifestWriteOverride = { _, _ in false }
+        let refusedBox = session.applyContainerFields(groupId: "gBox", fields: edited)
+        check("W47: a failed manifest write refuses the marker Save and keeps the card and the read",
+              !refusedBox && session.pendingTagGroup?.id == "gBox"
+              && session.containerFields["gBox"]?[.container]?.value == "Box 17")
+        session.manifestWriteOverride = nil
+        let savedBox = session.applyContainerFields(groupId: "gBox", fields: edited)
+        session.setContainerRead(groupId: "gBox", read: boxRead)   // a late re-read must not undo the Save
+        let afterBox = CaptureSession()
+        check("W47: the marker Save is durable, survives a restore, and a late read changes nothing",
+              savedBox && session.pendingTagGroup == nil
+              && session.containerFields["gBox"]?[.container]?.value == "Box 18"
+              && afterBox.containerFields["gBox"]?[.container]?.value == "Box 18"
+              && afterBox.containerFields["gBox"]?[.container]?.source == .user
+              && afterBox.pendingTagGroup == nil)
+
+        let collection = tmp.appendingPathComponent("00 Collection", isDirectory: true)
+        try? fm.createDirectory(at: collection, withIntermediateDirectories: true)
+        for name in ["00001 Glotzer.pdf", "00002 Glotzer.pdf"] {
+            try? Data("pdf \(name)".utf8).write(to: collection.appendingPathComponent(name))
+        }
+        let problem = ContainerLabelCapture.record([ContainerLabelCapture.FiledMarker(
+            folder: collection, fileName: "00001 Glotzer.pdf", type: .box, fields: edited, text: "")])
+        let written = ContainerFileStore.load(directory: collection).document
+        let resolved = written.map {
+            ContainerResolver.resolve(fileName: "00002 Glotzer.pdf", scopes: [ContainerScope(file: $0)])
+        }
+        let pdfsIntact = ["00001 Glotzer.pdf", "00002 Glotzer.pdf"].allSatisfy {
+            (try? Data(contentsOf: collection.appendingPathComponent($0))) == Data("pdf \($0)".utf8)
+        }
+        let collectionEntries = (try? fm.contentsOfDirectory(atPath: collection.path))?.sorted() ?? []
+        check("W47: finalize's write puts the marker's run in .archivesuite and touches no PDF",
+              problem == nil && resolved?.values[.container]?.value == "Box 18"
+              && resolved?.values[.collectionTitle]?.source == .user && pdfsIntact
+              && collectionEntries == [".archivesuite", "00001 Glotzer.pdf", "00002 Glotzer.pdf"])
+        let newerFile = ContainerFileStore.containerFileURL(in: collection)
+        try? Data(#"{"schemaVersion": 99}"#.utf8).write(to: newerFile)
+        let refusedNewer = ContainerLabelCapture.record([ContainerLabelCapture.FiledMarker(
+            folder: collection, fileName: "00002 Glotzer.pdf", type: .box, fields: edited, text: "")])
+        check("W47: a newer container file is left alone and the operator told",
+              refusedNewer != nil && (try? Data(contentsOf: newerFile)) == Data(#"{"schemaVersion": 99}"#.utf8))
 
         // --- B17: LAN request admission happens from a bounded head before body accumulation. ---
         let serverToken = "test-token"

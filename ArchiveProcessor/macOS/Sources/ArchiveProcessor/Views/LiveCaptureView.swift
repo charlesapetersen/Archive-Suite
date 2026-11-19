@@ -137,16 +137,22 @@ struct LiveCaptureView: View {
             }
         }
         .onDisappear { /* keep the session/server running across tab switches */ }
-        // Auto-advancing tag card: pops up for each completed document segment as it arrives,
-        // then advances to the next (box/folder markers need no card).
+        // Auto-advancing tag card: pops up for each completed document segment as it arrives, and for each box or
+        // folder marker once its label is read, then advances to the next.
         .sheet(item: Binding(
             get: { session.pendingTagGroup },
             // Dismissal is not a semantic action. Only the card's explicit Apply or Skip buttons may
             // resolve the group; treating Escape/click-outside as Skip silently discards typed metadata.
             set: { _ in }
         )) { group in
-            SegmentTagCard(group: group, session: session)
-                .interactiveDismissDisabled(true)
+            if let type = group.type.itemType {
+                // W47.ct-processor-capture — a box or folder label's read, for correction.
+                ContainerLabelCard(group: group, type: type, session: session)
+                    .interactiveDismissDisabled(true)
+            } else {
+                SegmentTagCard(group: group, session: session)
+                    .interactiveDismissDisabled(true)
+            }
         }
         .sheet(isPresented: $liveProc.showFinalizeSheet) {
             CollectionFinalizeSheet(liveProc: liveProc)

@@ -23,6 +23,11 @@ public struct ResolvedContainer: Equatable, Sendable {
     /// Per field, every candidate most specific first, the winner included.
     public var candidates: [ContainerField: [ContainerValue]]
 
+    public init(values: [ContainerField: ContainerValue], candidates: [ContainerField: [ContainerValue]] = [:]) {
+        self.values = values
+        self.candidates = candidates
+    }
+
     /// The value as shown, nil when there is none or the user set "none here".
     public func shown(_ field: ContainerField) -> String? { values[field]?.shown }
 
