@@ -12,7 +12,12 @@
    "ship": "The disagreement flag on LightOnOCR, labelled \"measured on plain photographs\"; Gemini left out or shown with its 21% false-alarm figure. Unblocking W46.post-read-flag-readers from nice-to-have.",
    "rec": "label",
    "why": "LightOnOCR clears the false-alarm floor and catches most of its poor typed readings, and about three in five with handwriting in; it is the free handwriting default, where a silent poor reading costs the most. The label should say how much less it catches on handwriting.",
-   "seconds": 45
+   "seconds": 45,
+   "plain": "A \"read poorly\" warning for readers other than Apple Vision",
+   "what": "The app can mark a page \"read poorly\" so that you know to check it. Today the warning exists only when Apple Vision did the reading. A page read by LightOnOCR (the free handwriting reader), Gemini or any other cloud reader gets no warning, however badly the reading went.",
+   "tested": "For LightOnOCR the warning compares its text with Apple Vision's and flags the pages where the two disagree. On your 96 pages it caught 8 of the 11 bad readings and gave 4 false alarms on 85 good ones, which is inside the limit of 1 false alarm in 20. In a wider check it caught about 8 in 10 bad readings on typed pages, and about 6 in 10 when handwritten pages were included. For Gemini the warning tested gave a false alarm on about 1 in 5 good readings of damaged pages, so it does not work there.",
+   "released": "LightOnOCR pages get the warning, with a note that it was tested on plain photographs and catches fewer bad readings on handwriting. Gemini stays without a warning. The work is already queued behind the nice-to-have list and would be moved up.",
+   "plain_why": "It meets the false-alarm limit for LightOnOCR. LightOnOCR is the free default for handwriting, where a bad reading that nobody notices costs the most."
   },
   {
    "id": "reading-dominated",
@@ -25,7 +30,12 @@
    "ship": "A \"show routes that lost\" setting listing them with their figures.",
    "rec": "keep",
    "why": "Each is beaten on the same pages by something the user can pick; showing them adds choices that only do worse.",
-   "seconds": 30
+   "seconds": 30,
+   "plain": "Readers that scored below the ones already on offer",
+   "what": "The app lists a reader only if nothing cheaper or faster reads as well. Left off the list are Apple's new on-device AI model, three commercial services (Azure, Amazon Textract, Transkribus) and fifteen other open models.",
+   "tested": "Each was run on the same pages as the readers on offer and scored below one that costs the same or less. Apple's on-device model scored 42 against Apple Vision's 83 on your 96 pages, and got stuck repeating itself on a third of them. On 25 pages Azure scored 90, Textract 87 and Transkribus 83, against 92.5 for Mistral, which is on the list.",
+   "released": "A \"show readers that lost\" setting would list them with their scores. A user could then choose a service they know or already pay for, and would see that it reads worse.",
+   "plain_why": "Each one is beaten on the same pages by a reader the user can already pick."
   },
   {
    "id": "post-correction",
@@ -38,7 +48,12 @@
    "ship": "The image corrector as an optional stage, labelled with both figures.",
    "rec": "keep",
    "why": "On your own material it ties; the public gain is real but small and costs a second 27B pass per band. Text-only correction stays out either way. A label would be a fair alternative if public-material users matter.",
-   "seconds": 30
+   "seconds": 30,
+   "plain": "A second pass that corrects the text after reading",
+   "what": "After a page is read, a model could look at the image and the text together and fix mistakes. The app does not offer this step.",
+   "tested": "It was compared with reading the page a second time with the same large model. On your 96 pages it made no difference (a tie). On 120 public test pages it gained about 1.5 points out of 100 and made 10 of the 120 readings worse. A cheaper version that corrects from the text alone, without the image, made 47 of the 120 public readings worse.",
+   "released": "An optional step, labelled with both results. It adds a second pass by the large model on every page.",
+   "plain_why": "On your own material it changes nothing, and the gain on public material is small for an extra pass. Releasing it with a label is a fair choice if users with other kinds of material weigh more for you here."
   },
   {
    "id": "cascade-triggers",
@@ -51,7 +66,12 @@
    "ship": "A larger disagreement test, then an opt-in trigger beside the word-count one.",
    "rec": "keep",
    "why": "Your call 5 already settles the cascade's design; these sit inside it and their figures do not argue for reopening it.",
-   "seconds": 25
+   "seconds": 25,
+   "plain": "More reasons to send a page to a second reader",
+   "what": "The app can have a second reader re-read a page. On 6 November you decided this happens only when the first reader fails outright, with one opt-in extra for Apple Vision pages that come back with very few words. Two other triggers were left out by a session before that call: the first reader reporting low confidence, and two readers disagreeing with each other.",
+   "tested": "Neither was shown to help reliably. The disagreement trigger gained on some sets of pages and not on others, and the note says it needs a larger test. The confidence signal was only tested as a \"check this page\" mark, never as a trigger.",
+   "released": "A larger test of the disagreement trigger would come first, then an opt-in setting beside the existing one.",
+   "plain_why": "Your 6 November call already sets how re-reading works, and these results give no reason to reopen it."
   },
   {
    "id": "half-size-retry",
@@ -64,7 +84,12 @@
    "ship": "A retry step before the second-reader fallback, labelled with its answer rate and level.",
    "rec": "keep",
    "why": "Its answers read at 4-11 NES, so it rescues almost nothing; the second VLM reader is the real fallback.",
-   "seconds": 25
+   "seconds": 25,
+   "plain": "Retrying at half size when a reader gets stuck",
+   "what": "AI readers sometimes get stuck repeating the same words and never finish a page. One remedy is to shrink the image to half size and try again. On the cluster the app does not do this. It sends the stuck page to a second reader.",
+   "tested": "Of 1,573 stuck pages the half-size retry produced an answer on 351, about 1 in 5. Those answers scored 4 to 11 out of 100, so almost all were unreadable. On the Mac it did well on the three stuck pages tested, which is too few to rely on.",
+   "released": "A retry step before the second reader is tried. It adds time on every stuck page.",
+   "plain_why": "It rescues almost nothing. The second reader is what recovers these pages."
   },
   {
    "id": "ocr-input-cleaning",
@@ -77,7 +102,12 @@
    "ship": "A per-route opt-in labelled with its measured change.",
    "rec": "keep",
    "why": "No method gains on any reader measured, and the stamp lead cannot be aimed at the pages it helps.",
-   "seconds": 30
+   "seconds": 30,
+   "plain": "Cleaning up the photograph before it is read",
+   "what": "Before a page is read, the image could be cleaned: evening out shadows, restoring faded text, removing coloured stamps, or cropping to the page. Five methods were tried and none is offered as a setting. (Your own earlier call covered only the copy you view, not the copy the reader sees.)",
+   "tested": "On your pages no method improved any reader, and several made reading worse. One cost Apple Vision 6 points out of 100, and shadow removal cost Gemini about 1. Removing colour may help Apple Vision on pages with a coloured stamp (about 3 points on 16 such pages, which could be chance), but it cost Gemini 7 points, and the app cannot tell which pages have such a stamp. For one small open reader the test was too small to rule out a modest effect.",
+   "released": "An optional \"clean before reading\" setting for each reader, labelled with its measured change. For most readers that change is a loss.",
+   "plain_why": "No method gained on any reader measured, and the possible gain on stamped pages cannot be aimed at the pages it would help."
   },
   {
    "id": "glare-cleaning",
@@ -90,7 +120,13 @@
    "ship": "The larger test, already filed inside W46.enh-small-reader-power (behind nice-to-have); then a glare-tag-triggered setting. DocRes needs a cluster GPU, so it would be a cluster setting.",
    "rec": "later",
    "why": "The largest gain in the OCR-input work, but for one reader on 6 pages; the filed test is the way to settle it.",
-   "seconds": 35
+   "seconds": 35,
+   "plain": "Cleaning pages with glare before Apple Vision reads them",
+   "what": "A page photographed with glare (a bright reflection across the text) reads badly. One cleaning model, DocRes, is the exception to the item on cleaning photographs: it appeared to help Apple Vision on glare pages. It is held back as a lead that still needs a proper test.",
+   "tested": "On 6 glare pages Apple Vision's score rose by about 10 points out of 100. Six pages is very few, and the real gain could be anywhere from under 1 point to 25. It did not help Gemini or the two other readers tried.",
+   "released": "It would run only on pages marked as glare, and only for users with a cluster, because the cleaning model needs a powerful graphics card.",
+   "wait": "A larger test, already queued behind the nice-to-have list.",
+   "plain_why": "This is the largest gain in all the image-cleaning work, but it is for one reader on six pages. The queued test would settle it."
   },
   {
    "id": "rotation-alternatives",
@@ -103,7 +139,12 @@
    "ship": "Rows labelled \"below Vision\".",
    "rec": "keep",
    "why": "Every user of the app has Vision; these turn pages wrong a third of the time or more.",
-   "seconds": 20
+   "seconds": 20,
+   "plain": "Turning pages upright without Apple Vision",
+   "what": "The app works out which way up each page is with Apple Vision, cross-checked by a second small model. Other ways of doing it were tested and are not offered.",
+   "tested": "Apple Vision with the cross-check got 3 of 119 test pages wrong. Of the alternatives, Tesseract got the turn right 63% of the time and a small open model 78%. The cross-check model used alone turned 73 of 80 Hebrew pages the wrong way.",
+   "released": "They would appear as choices marked \"below Apple Vision\". Every Mac that runs the app already has Apple Vision.",
+   "plain_why": "Every user has Apple Vision, and the alternatives turn a page wrong from about a fifth to over a third of the time."
   },
   {
    "id": "layout-regions",
@@ -116,7 +157,12 @@
    "ship": "A \"read by regions\" setting per kind, labelled with these losses.",
    "rec": "keep",
    "why": "The losses are measured and large on handwriting and registers; Vision's one gain is a tenth of a point for double the time.",
-   "seconds": 30
+   "seconds": 30,
+   "plain": "Reading a page region by region, for anything other than newspapers",
+   "what": "For newspapers the app first finds the columns and articles and then reads each region separately. Every other kind of page (letters, handwriting, tables, registers) is read whole. Reading those by region is not offered.",
+   "tested": "Reading by region scored lower wherever it was tested: about 4 points out of 100 lower on your 96 pages, 9 lower on tables, 15 lower on 16 handwritten pages and 11 lower on 80 register pages. There is one exception. Apple Vision on regions made slightly fewer errors (1.1% against 1.2%) and took twice as long.",
+   "released": "A \"read by regions\" setting for each kind of page, labelled with these losses.",
+   "plain_why": "The losses are measured, and they are large on handwriting and registers. Apple Vision's one gain is a tenth of a point for double the time."
   },
   {
    "id": "doclayout-yolo-scans",
@@ -129,7 +175,12 @@
    "ship": "The newspaper-ocr processing route (not the app's YOLO arm) as a \"scanned newspapers\" detector setting, labelled measured on 15 scans from one collection and unmeasured on photographs.",
    "rec": "label",
    "why": "A measured gain for users with flatbed scans, common outside your corpus, on a small one-collection set; a label says how thin it is.",
-   "seconds": 35
+   "seconds": 35,
+   "plain": "A different layout detector for flatbed-scanned newspapers",
+   "what": "To read a newspaper the app first runs a detector that finds the columns and articles. It uses the same detector for every newspaper. A second detector, DocLayout-YOLO, was passed over because one way of using it did badly on photographed newspapers.",
+   "tested": "On 15 flatbed-scanned newspaper pages the second detector led to text about 5 points out of 100 better (the real gain is somewhere between 1 and 8). Fourteen of the 15 pages are from one collection. In this form it has not been tested on photographed newspapers. The bad results on photographs came from a different way of using it.",
+   "released": "A \"scanned newspapers\" choice of detector, labelled as measured on 15 scans from one collection and not measured on photographs. Your own material is photographs, so this is mainly for other users.",
+   "plain_why": "It is a measured gain for users with flatbed scans, which are common outside your collection. The evidence is thin, and the label would say so."
   },
   {
    "id": "layout-whole-page-large",
@@ -142,7 +193,12 @@
    "ship": "A \"read whole\" choice for large readers on newspapers, or letting the solver's \"faster wins on a tie\" rule pick it.",
    "rec": "release",
    "why": "A tie on 15 pages; the session's tie rule in section 2 (\"faster wins among equal cost\", itself open to your veto) points to the whole page.",
-   "seconds": 25
+   "seconds": 25,
+   "plain": "Letting large readers skip the layout step on newspapers",
+   "what": "This is the reverse case: a step that is kept although it does not help. On newspapers the app always runs the layout detector first, including for the large readers, which read a whole newspaper page as well without it.",
+   "tested": "On 15 pages the large open model scored 96.7 reading the page whole and 96.5 reading it by regions, which is a tie. This was measured with a slightly older way of cutting the regions than the one the app now uses.",
+   "released": "Large readers would read newspaper pages whole and save the time of the detector step, either as a choice or automatically under the rule that the faster route wins a tie.",
+   "plain_why": "The two are tied on 15 pages, and the tie rule the settings already use picks the faster one. That tie rule was itself a session decision that you can veto."
   },
   {
    "id": "placement-alternatives",
@@ -155,7 +211,12 @@
    "ship": "An option in the cluster placement setting.",
    "rec": "keep",
    "why": "A tie and two clear losses.",
-   "seconds": 20
+   "seconds": 20,
+   "plain": "Other ways of placing the text over the page image",
+   "what": "After reading, the app lines up each line of text with its place on the page image, so that text can be searched and selected on the page. Three other ways of finding the lines were tested and are not offered.",
+   "tested": "One tied with what the app uses. One was 11 points out of 100 worse. Two readers that produce their own text blocks kept only about 1 line in 10 intact.",
+   "released": "Extra choices in the cluster placement setting that do the same or worse.",
+   "plain_why": "One tie and two clear losses. Users lose very little by not having them."
   },
   {
    "id": "marks-layer",
@@ -168,7 +229,12 @@
    "ship": "A layer labelled \"finds about 1 mark in 5\".",
    "rec": "keep",
    "why": "At one mark in five with half its finds wrong, the layer would mislead more than help; your nice-to-have item is the route to a better detector.",
-   "seconds": 25
+   "seconds": 25,
+   "plain": "A list of the stamps and signatures on each page",
+   "what": "The app could detect stamps and signatures and list them for each page. No such list is offered. On 6 November you put a better detection method on the nice-to-have list. Offering nothing in the meantime was a session's decision.",
+   "tested": "The best detector found 8 of 45 marks, about 1 in 5. Set to be more sensitive it found 17 of 45. At either setting about half of what it reported was not a mark.",
+   "released": "A stamps and signatures list labelled \"finds about 1 mark in 5\".",
+   "plain_why": "It would miss most marks, and half of what it listed would be wrong. The nice-to-have item is the way to a better detector."
   },
   {
    "id": "seg-magazine",
@@ -181,7 +247,13 @@
    "ship": "No open item settles the rest: W46.seg-magazine-rule-redo and W46.seg-magazine-rule-app have shipped; c1 waits on W46.gateway-models-ok, and the students need a box they were not trained on (07-segmentation.md l.69-78).",
    "rec": "later",
    "why": "A validity gap rather than a missed level, already lifted for the Gemini route; the rest waits on the gateway and a fresh box, so ask again then.",
-   "seconds": 20
+   "seconds": 20,
+   "plain": "Ranking the older methods of splitting magazines into articles",
+   "what": "Segmentation is the step that decides where one document ends and the next begins. In a magazine the unit is an article within an issue, and only the newest instruction, used with Gemini, tells the model so. For the older instructions and for the trained models the app shows their magazine results but does not rank them or pick among them.",
+   "tested": "With the new instruction Gemini places about 94% of boundaries correctly on magazines, against 71% with the old one. The others cannot be compared fairly yet. The older instructions lack the article rule, and the trained models were trained on the same box of magazines that is used for the test.",
+   "released": "The app would pick among the older methods on magazines from figures that are not a fair comparison.",
+   "wait": "One method waits for newer models to be enabled on the Stanford gateway. The trained models need a box of magazines they were not trained on.",
+   "plain_why": "No result fell short here. The comparison is not valid yet, and Gemini, the default, is already ranked."
   },
   {
    "id": "seg-alternatives",
@@ -194,7 +266,12 @@
    "ship": "Each as an opt-in labelled \"no measured gain\".",
    "rec": "keep",
    "why": "None changes the result, and most add cost.",
-   "seconds": 25
+   "seconds": 25,
+   "plain": "Extra options for finding document boundaries that did not help",
+   "what": "Seven additions to the step that finds where documents begin and end were tested and are not offered: two simpler kinds of model, giving the model worked examples, asking it several times and taking a vote, giving it facts about the collection, an extra cue for letters, and a review by a second model on every route.",
+   "tested": "None improved the result. The simpler models placed 27% of boundaries correctly without checking, against 79% for the app's small model. Worked examples gave no gain and used 1.4 to 2 times as much input. The second-model review doubled the cost, and the two models made the same mistakes.",
+   "released": "Opt-in settings labelled \"no measured gain\". Most of them cost more to run.",
+   "plain_why": "None changes the result, and most add cost."
   },
   {
    "id": "date-8b-image-mac",
@@ -207,7 +284,12 @@
    "ship": "An optional switch, off, labelled \"no measured gain\".",
    "rec": "keep",
    "why": "No gain on either measure, and it costs a model download and its time.",
-   "seconds": 35
+   "seconds": 35,
+   "plain": "Dating from the page image on a Mac with no cloud key",
+   "what": "When a document's text contains no year, a model can look at the page image for one, such as a stamp or a handwritten date. On a 16 GB Mac with no cloud key the only model that could do this is a small open one, which is a download. It is not offered, and the app dates from the text alone.",
+   "tested": "On 55 documents with no year in their text, the image pass got 32 right, against 33 without it. The number of undated documents given a wrong year was about the same either way (20 or 21 of 90).",
+   "released": "An optional switch, off by default, labelled \"no measured gain\". It needs a model download and adds time on each document.",
+   "plain_why": "It gained nothing on either test, and it costs a download and extra time."
   },
   {
    "id": "date-alternatives",
@@ -220,7 +302,12 @@
    "ship": "Each as a labelled option (\"range, about 50 years\"; \"found 1 of 3\").",
    "rec": "keep",
    "why": "Each does worse than what ships or than the simple baseline; the trained models also cite no evidence, which your traceable rule needs.",
-   "seconds": 30
+   "seconds": 30,
+   "plain": "Other ways of dating documents that scored below what the app does",
+   "what": "Five other dating methods were tested and are not offered: models trained on your tags used as the default, dating by typeface and paper, finding dated documents that look alike, dating an enclosure from its covering letter, and dating from the people named.",
+   "tested": "Trained models were right on 39% of documents whose year is not in the text, against 47% for the app's method, and marked none of 50 uncertain dates as uncertain. Typeface gives a range that holds the true year 11 times in 12, but the range is typically 50 years wide. Look-alikes got 27 of 122 right, against 52 for taking the year of the nearest dated document before it. The enclosure step found none of your 3 enclosures with most models and 1 of 3 with the best. People named narrowed the date on 2 of 54 documents.",
+   "released": "Each as a labelled option, such as \"range, about 50 years\" or \"found 1 of 3\". The main thing a user would gain is a rough range for undated documents.",
+   "plain_why": "Each does worse than the app's method or than a simple rule of thumb. The trained models also give no evidence for their date, which your rule on showing the evidence requires."
   },
   {
    "id": "ent-prompt-8k",
@@ -233,7 +320,13 @@
    "ship": "A paired run against the shipped call on the cached owner truth, then the prompt as the default if it holds.",
    "rec": "later",
    "why": "Against the shipped call it ties, inside the rerun drift; a paired rerun would settle whether the sender lead is real.",
-   "seconds": 35
+   "seconds": 35,
+   "plain": "A longer instruction for finding senders and places on cloud readers",
+   "what": "When a cloud model reads a letter it can also name the sender and the place. A longer and more detailed instruction for this was written and tested. It is held back because it was never run head to head against the instruction the app uses now.",
+   "tested": "It scored 0.76 against 0.69 on senders and 0.84 against 0.80 on places, where 1.0 is perfect. Set against the app's current instruction on the same documents, the lead is within chance, and repeating the same run moves the score by about as much as the lead. It costs about $3 per 1,000 documents, which is an estimate.",
+   "released": "It would become the default instruction on cloud routes and would probably give somewhat better senders and places.",
+   "wait": "One head-to-head run against the current instruction, on documents you have already checked.",
+   "plain_why": "Against what the app does now it is a tie so far. One paired run would show whether the lead on senders is real."
   },
   {
    "id": "ent-small-mac",
@@ -246,7 +339,12 @@
    "ship": "A row labelled \"low confidence\".",
    "rec": "keep",
    "why": "At these levels most names written would be wrong. A cloud route covers the small-Mac case; no route, Gemini 3.8 included (0.12-0.37), covers pre-modern material.",
-   "seconds": 25
+   "seconds": 25,
+   "plain": "Finding names on small Macs, and on medieval and early printed material",
+   "what": "Finding names (sender, recipient, place) needs a model too large for an 8 GB Mac. Two small tools that would fit were tested and are not offered, so a small Mac with no cloud key finds no names. Separately, no names are offered on medieval handwriting or early print.",
+   "tested": "On 138 of your documents the small tools scored 0.14 and 0.24 on senders, where 1.0 is perfect. Used ideally they could find at most 35 and 60 of the 138 senders. On medieval and early printed pages every method scored between 0.02 and 0.37, Gemini included.",
+   "released": "Names would appear on these Macs and materials marked \"low confidence\". Most of them would be wrong.",
+   "plain_why": "At these levels most names written would be wrong. A cloud route covers the small-Mac case, and no method yet works on pre-modern material."
   },
   {
    "id": "kinds-under-floor",
@@ -259,7 +357,13 @@
    "ship": "Route on the top class with an \"unsure\" mark, or the document prior (filed, not measured); a measurement of the cut itself.",
    "rec": "later",
    "why": "The floor itself is unmeasured; measure the document prior and the cut before choosing.",
-   "seconds": 35
+   "seconds": 35,
+   "plain": "Choosing a reader by page kind when the app is unsure of the kind",
+   "what": "Before reading, the app decides what kind of page it has (typed, handwritten, newspaper and so on) and sends it to the reader that suits that kind. When it is less than 80% sure of the kind it does not do this, and the page goes to the general reader. No measurement behind the 80% line was found.",
+   "tested": "78 of 848 pages, about 1 in 11, fall under the line. They include 17 of the 29 pages whose handwriting differs from the rest of their document, which are the pages this would help most. Overall, sending each page to the reader for its true kind is worth a little under 1 point out of 100 (97.3 against 96.5).",
+   "released": "Those pages would go to the reader for the app's best guess at their kind, with an \"unsure\" mark. How often that guess is wrong below the line has not been measured.",
+   "wait": "Two measurements: where the line should sit, and whether using the kind of the rest of the document works better.",
+   "plain_why": "The line itself was never measured. Measuring it comes before choosing."
   },
   {
    "id": "mixed-preflag",
@@ -272,7 +376,12 @@
    "ship": "ATRIUM as an optional download used only as the mixed pre-flag, labelled with its recall, precision and wide bounds; then re-asking call 3 with the timing in hand.",
    "rec": "label",
    "why": "Its licence is no longer a bar since 17 November, and as a pre-flag its point recall is four times the shipped classifier's; the bounds are wide, so the label must carry them.",
-   "seconds": 45
+   "seconds": 45,
+   "plain": "Spotting typed pages that also carry handwriting",
+   "what": "The app has a switch, \"Read handwriting on typed pages (signatures, dates, notes in the margin)\". You left it off because of its time cost. Without knowing which pages carry handwriting, it has to run the slow reader on every typed page, at about 140 times Apple Vision's time. A separate model, ATRIUM, could flag the pages that do carry handwriting, so the slow reader runs only on those. It is not offered, because as a general judge of page kinds it is worse than the app's own.",
+   "tested": "As a flagger of these pages it finds about half of them (51 to 60%), and about 7 in 10 of its flags are right. The app's own classifier finds about 1 in 8. The figures are uncertain: the real share found could be anywhere from 18% to 95%. A large open model was right on 99% of its flags but found only about 1 page in 4.",
+   "released": "ATRIUM as an optional download, used only to flag these pages, labelled with the figures and their uncertainty. You would then be asked again about the handwriting switch, with its timing now known. Its licence was the earlier obstacle and stopped being one with your 17 November call.",
+   "plain_why": "As a flagger it finds about four times as many of these pages as the app's own classifier, and it is what would make the handwriting switch cheap enough to turn on. The uncertainty is wide, so the label has to show it."
   },
   {
    "id": "capture-warnings",
@@ -285,7 +394,13 @@
    "ship": "A warning at the Vision cut labelled \"in-sample, about 28% false alarms\", or W46.capture-warning brought forward from nice-to-have.",
    "rec": "later",
    "why": "A warning at a 28% false-alarm rate would nag on good pages; the filed item calibrates on real captures. Bringing it forward from nice-to-have would also unblock the reader flag above.",
-   "seconds": 35
+   "seconds": 35,
+   "plain": "A \"retake this photo\" warning on the phone",
+   "what": "When you photograph a page, the phone app could warn that the shot is blurred and offer a retake. Today it shows fixed guidance only. A warning set on real photographs is queued on the nice-to-have list.",
+   "tested": "The warning levels tried so far catch between a half and two thirds of bad shots, and also warn on roughly 1 good shot in 4. They were tuned on the same pages they were tested on, so real results would probably be worse. Using Gemini to score the photo did no better than a baseline that does not look at the page.",
+   "released": "A one-tap retake prompt that would also interrupt on about 1 good photo in 4.",
+   "wait": "The queued item, which sets the warning level on real photographs. Moving it up from nice-to-have would also unblock the \"read poorly\" warning for other readers, the first item on this sheet.",
+   "plain_why": "A warning that fires on 1 good page in 4 would nag. The queued item sets the level on real photographs."
   },
   {
    "id": "kit-gate-minimums",
@@ -298,7 +413,12 @@
    "ship": "Admit a model under the minimum with a \"small held-out set\" label and its interval shown.",
    "rec": "label",
    "why": "The one measured case would be refused despite a large, clear gain; a label tells the user how thin the check is.",
-   "seconds": 40
+   "seconds": 40,
+   "plain": "Trained models for small collections",
+   "what": "The training kit trains a model on a user's own corrected material to find the document boundaries in that material. A trained model is used only if it passes a check, and the check needs a minimum amount of test material: at least 267 known boundaries and 10 documents set aside. A session set those minimums. Material below them, such as bound volumes and registers, gets no trained model.",
+   "tested": "The one real case measured would be refused. On a second box of Lincoln material the trained model cut errors from 17 to 5 in every 100 boundaries, a clear gain, but the box has 244 known boundaries, 23 short of the minimum.",
+   "released": "A model tested on less than the minimum could still be used, labelled \"small test set\" with its range of uncertainty shown.",
+   "plain_why": "The one measured case would be refused despite a large and clear gain. A label tells the user how thin the check was."
   },
   {
    "id": "item-fields-routes",
@@ -311,7 +431,13 @@
    "ship": "Re-run a local model on Vision text or the page images and score it; then fill under a \"lower confidence\" status, which the Reader already shows for dates and containers.",
    "rec": "later",
    "why": "This is mostly a missing measurement rather than a miss; a local re-run is $0 but needs the heavy lock.",
-   "seconds": 40
+   "seconds": 40,
+   "plain": "Title, byline and similar fields when working on the Mac only",
+   "what": "Item fields are the catalogue details of a document: title, byline, publication date, recipient's place. They are filled only when a cloud model does the work through the gateway. On a Mac-only set-up, or on the Local Agent route (a Claude or ChatGPT plan), they are not filled. Byline and publication date are also filled only on published material, and recipient's place only on correspondence, because those are the kinds they were measured on.",
+   "tested": "The bar for filling a field is about 90% right on pairs you checked. On title only Gemini clears it (91%), and GPT reached 82%. The Mac models fell short or were too close to call, but they were scored on the old ABBYY text, which you ruled out on 30 October. So no Mac route has a valid result.",
+   "released": "Fields would be filled on the Mac with no valid measurement of how often they are right.",
+   "wait": "A re-run of a Mac model on Apple Vision text or the page images. It costs nothing but needs the Mac's heavy-compute slot. If it comes close, the fields could be filled under the \"lower confidence\" mark the Reader already uses.",
+   "plain_why": "The Mac routes have no valid measurement yet. The re-run supplies one."
   }
  ],
  "excluded": [
@@ -324,5 +450,7 @@
   "No working signal, so nothing to ship: a glare warning (AUC 0.52-0.53 at best), a low-resolution flag, a trained reading-order model (Vision's order 0.972 ties the column sort's 0.971).",
   "Lifted since: the text-only segmentation tier (your pick, 13 November); the title field (6d1fb653); the OpenRouter listing (W41.app-openrouter-unmeasured).",
   "Routes hidden by provider terms (15-training-terms.md) are a privacy rule, not a quality floor."
- ]
+ ],
+ "plain_excluded": "Not on this sheet: the decisions you made yourself, anything dropped for cost, memory, safety or licence, things that were never measured at all, and things that had no working version to offer.",
+ "also": "One thing outside this sheet may be due. On 6 November you decided that an estimated date which fails the evidence check is not shown at all until the checker's false refusals are fixed. That fix shipped on 11 November, so the condition may now be met. It was your call, so it is not listed here. Say so in the last notes box if you want it looked at."
 }
