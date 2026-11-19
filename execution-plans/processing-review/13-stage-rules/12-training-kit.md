@@ -57,9 +57,14 @@ margin were call 7.2, decided 2026-11-06: gap accuracy against the shipped 2B, a
 count from the measured "needed" column (about 147 or 267 gaps, `seg-kit-gate.md`), two scored runs, and an anchor
 margin of 3.2 points on the public anchor; W46.kit-gate-rule enforces it (minimum 267, the larger figure). Its held-out
 intervals resample folders and, inside each, documents, so a one-box held-out set has a real interval; the 267 was
-derived again on that resampling (documents alone, 254-282 over five seeds) and stands, and a set of fewer than 10
-documents is refused (W46.kit-gate-groups, measurement review pass 12 P12-1; W46.kit-gate-docs, pass 13 P13-2). The solver shows the gate's verdict and
-interval, and never shows an after-training segmentation row as selectable without a manifest that passed.
+derived again on that resampling (documents alone, 254-282 over five seeds) and stands, and the documents' floor is 10
+(W46.kit-gate-groups, measurement review pass 12 P12-1; W46.kit-gate-docs, pass 13 P13-2). Below either floor the
+model is no longer refused for that alone (owner, 2026-11-19, call 15, W47.wh-kit-minimums): it passes when the gate's
+other tests pass, and the manifest labels it "small held-out set" (`gate.label`, with each run's paired interval and
+counts in `gate.labels`; Lincoln box 2 is the case: 244 gaps, errors 17.2 to 4.9 per 100, -12.3, -18.8 to -7.4).
+`kit_continuation.py heldout` likewise writes such a box and says so. The solver shows the gate's verdict and
+interval, with the label where there is one, and never shows an after-training segmentation row as selectable without
+a manifest that passed.
 
 Kind rules. Segmentation rows are per material, not per page kind: a trained student or continuation applies to the
 collection (or project of similar collections) it was gated on, and the manifest's held-out collections name it. The
@@ -251,6 +256,8 @@ interval itself carries); one document is refused (`seg-kit-gate.md` §The minim
 candidate truly 3.5 points worse passed about a quarter of the time on 280 gaps (simulated, a 3-point per-document
 spread); from ten the rate is at the few per cent many documents give (`seg-kit-gate.md` §The minimum number of
 documents). The manifest states the folder, document and gap counts. The anchor's point margin is unchanged.
+Since call 15 (owner, 2026-11-19, W47.wh-kit-minimums): below either minimum the gate no longer refuses; it labels the
+model "small held-out set" with its paired interval and counts, and the other tests still decide.
 
 **7.3 The licence statement for research-licensed models run through the kit.** The principle is settled (owner,
 2026-10-20, `00-plan.md`: a model a user runs on their own cluster through the kit may carry a research or
@@ -282,10 +289,10 @@ on. Open: where corrections live for the kit (H open question 9, gap audit §6);
 figure. Carried to note 07 for the trigger; the support question is decided with 7.2. Decided (session, section 2):
 corrections live in the review records; the next box of the same material is the held-out set; the gate's minimum
 support applies to it. So that box needs at least 267 known gaps (owner-ruled or tagged) beyond the 200 corrected, more
-than Lincoln box 2's 244; the gate resamples its documents (W46.kit-gate-groups), so one box gets a real interval.
+than Lincoln box 2's 244, to pass without the "small held-out set" label (call 15, 2026-11-19); the gate resamples its documents (W46.kit-gate-groups), so one box gets a real interval.
 That box also needs at least 10 documents (W46.kit-gate-docs): a material of a few long documents (bound volumes,
 registers) needs a next box, or several, holding ten; owner-like boxes hold about 1.8 gaps a document, so 267 gaps
-are about 150 documents. Built (W46.kit-continuation, 2026-11-13): `institutional-compute/kit_continuation.py` `pack` (refused below 200 ruled gaps), `heldout` (the next box, refused below 267 known gaps or 10 documents and on any page trained on) and `rows` (the shipped 2B's replies set to the person's calls, three corpus windows replayed a correction); README §"The continuation". A kit user without the owner's corpus replay set runs an unmeasured recipe: W46.kit-continuation-replay.
+are about 150 documents. Built (W46.kit-continuation, 2026-11-13): `institutional-compute/kit_continuation.py` `pack` (refused below 200 ruled gaps), `heldout` (the next box, refused on any page trained on; below 267 known gaps or 10 documents written and labelled "small held-out set" since call 15) and `rows` (the shipped 2B's replies set to the person's calls, three corpus windows replayed a correction); README §"The continuation". A kit user without the owner's corpus replay set runs an unmeasured recipe: W46.kit-continuation-replay.
 
 **7.6 The fine-tuning answer's mapping.** Section 3 reads "with a coding agent" as Mac-side steps and "on a cluster" as
 adding cluster rows [I]. Confirm, or make the coding agent a requirement for the cluster rows too. Decided (session,

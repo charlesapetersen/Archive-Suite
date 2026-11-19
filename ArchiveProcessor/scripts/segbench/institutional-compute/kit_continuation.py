@@ -13,8 +13,9 @@ THE TRIGGER (owner, 2026-11-06, call 7; notes 07 and 12 §7.5). The review recor
 collection-settings.md §"The review records") must hold at least 200 gaps of one material ruled on by a person
 (`checked` or `changed`); `pack` refuses below that. A gap left as proposed (`accepted`) is known: it may sit in a
 training window, with the call the person left, but it does not count. The held-out set is the next box of the same
-material, reviewed in the app the same way; `heldout` refuses it below the gate's own minimum, 267 known gaps in 10
-documents (train_seg.py MIN_KNOWN_GAPS, MIN_DOCUMENTS), and refuses any page the training pack holds. Nothing in the
+material, reviewed in the app the same way; below the gate's own minimum, 267 known gaps in 10 documents (train_seg.py
+MIN_KNOWN_GAPS, MIN_DOCUMENTS), `heldout` writes it and says the gate will label the continuation "small held-out set"
+(owner, 2026-11-19, call 15, W47.wh-kit-minimums); it refuses any page the training pack holds. Nothing in the
 records says two boxes are one material: that is the user's word, as with `kit_corrections.py --pool`.
 
 THE REQUEST is the one the app sends the shipped 2B (`window-local-seg-2b`, prompt c1, method_local.request): seven
@@ -312,7 +313,8 @@ def cmd_pack(a):
     print(json.dumps({k: meta[k] for k in ("material_name", "windows", "pages", "ruled_gaps", "known_gaps", "text",
                                            "pages_without_text", "pages_without_source")}, indent=1))
     print(f"-> {a.out}. Next: the shipped 2B answers it on the cluster (README, \"The continuation\"). The gate will "
-          f"need the next box of this material: at least 267 known gaps in 10 documents (kit_continuation.py heldout).")
+          f"need the next box of this material, with at least 267 known gaps in 10 documents to pass unlabelled; "
+          f"fewer and the model is labelled \"small held-out set\" (kit_continuation.py heldout).")
 
 
 def cmd_heldout(a):
@@ -336,17 +338,19 @@ def cmd_heldout(a):
     if overlap:
         reasons.append(f"{len(overlap)} of its pages are in the training pack {a.train}: the held-out box must be one "
                        f"the continuation never saw")
+    small = []   # owner, 2026-11-19, call 15 (W47.wh-kit-minimums): written, and the gate labels the model
     if len(truth) < T.MIN_KNOWN_GAPS:
-        reasons.append(f"{len(truth)} known gaps; the gate needs at least {T.MIN_KNOWN_GAPS} (train_seg.py check "
-                       f"refuses fewer): review more of the next box, or a further box of the same material")
+        small.append(f"{len(truth)} known gaps, under the gate's {T.MIN_KNOWN_GAPS}: review more of the next box, or a "
+                     f"further box of the same material, for a figure that needs no label")
     if docs < T.MIN_DOCUMENTS:
-        reasons.append(f"{docs} documents; the gate needs at least {T.MIN_DOCUMENTS}: a material of a few long "
-                       f"documents needs more than one next box")
+        small.append(f"{docs} documents, under the gate's {T.MIN_DOCUMENTS}: a material of a few long documents needs "
+                     f"more than one next box for a figure that needs no label")
     if reasons:
         shutil.rmtree(tmp)
         raise SystemExit(f"{meta['material_name']}: not a held-out box for the gate yet:\n- " + "\n- ".join(reasons))
     ruled = [t for t in truth if t["ruling"] in ("checked", "changed")]
-    meta.update(role="heldout", known_gaps=len(truth), ruled_gaps=len(ruled), documents=docs, train_pack=train["made"],
+    meta.update(role="heldout", known_gaps=len(truth), ruled_gaps=len(ruled), documents=docs, small_heldout=small,
+                train_pack=train["made"],
                 train_material=train["material"],
                 note="labels.jsonl is every recorded gap at the call the person left (as `tag`); ruled.csv the gaps "
                      "a person checked or changed. A gap accepted through the skim was the proposing approach's "
@@ -359,6 +363,8 @@ def cmd_heldout(a):
         print(f"note: the held-out box is recorded as {meta['material_name']}, the training pack as "
               f"{train['material_name']}; the gate is only meaningful if they are one material", file=sys.stderr)
     print(json.dumps({k: meta[k] for k in ("material_name", "windows", "known_gaps", "ruled_gaps", "documents")}, indent=1))
+    for x in small:
+        print(f"note: {x}; train_seg.py check will label the continuation \"{T.SMALL_LABEL}\"", file=sys.stderr)
     print(f"-> {a.out}: score it with train_seg.py check --labels {a.out}/labels.jsonl --ruled {a.out}/ruled.csv")
 
 

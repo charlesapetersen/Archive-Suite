@@ -2,7 +2,9 @@
 """W46.kit-continuation: the continuation's packs and rows, on synthetic review records and images (scratch only).
 Needs Pillow and numpy (`../torch-env.sh` on the Mac), as the Check tests do."""
 from __future__ import annotations
+import contextlib
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -185,18 +187,22 @@ class Heldout(Fixture):
                     "--out", self.root / out)
         return self.root / out
 
-    def test_the_gate_minimum_is_checked_before_a_cluster_hour(self):
+    def test_the_gate_minimum_is_said_before_a_cluster_hour(self):
+        # Refused until call 15 (W47.wh-kit-minimums); now written, with the reason recorded and said.
         small = self.collection("b", 1000, 200, lambda g: "accepted")
-        with self.assertRaises(SystemExit) as e:
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
             self.heldout(small)
-        self.assertIn(f"199 known gaps; the gate needs at least {T.MIN_KNOWN_GAPS}", str(e.exception))
-        self.assertFalse((self.root / "held").exists())
+        meta = json.loads((self.root / "held" / "pack.json").read_text())
+        self.assertEqual(meta["role"], "heldout")
+        self.assertIn(f"199 known gaps, under the gate's {T.MIN_KNOWN_GAPS}", " ".join(meta["small_heldout"]))
+        self.assertIn('will label the continuation "small held-out set"', err.getvalue())
 
-    def test_few_long_documents_are_refused(self):
+    def test_few_long_documents_are_said(self):
         long_docs = self.collection("c", 2000, 300, lambda g: "checked", new_every=40)
-        with self.assertRaises(SystemExit) as e:
-            self.heldout(long_docs)
-        self.assertIn(f"documents; the gate needs at least {T.MIN_DOCUMENTS}", str(e.exception))
+        self.heldout(long_docs)
+        meta = json.loads((self.root / "held" / "pack.json").read_text())
+        self.assertIn(f"documents, under the gate's {T.MIN_DOCUMENTS}", " ".join(meta["small_heldout"]))
 
     def test_pages_the_continuation_trained_on_are_refused(self):
         again = self.collection("d", 0, 300, lambda g: "checked")   # the same source images as box a
@@ -217,6 +223,7 @@ class Heldout(Fixture):
         meta = json.loads((out / "pack.json").read_text())
         self.assertEqual((meta["role"], meta["known_gaps"]), ("heldout", 289))
         self.assertGreaterEqual(meta["documents"], T.MIN_DOCUMENTS)
+        self.assertEqual(meta["small_heldout"], [])
         labels = [json.loads(l) for l in (out / "labels.jsonl").read_text().splitlines()]
         ruled = (out / "ruled.csv").read_text().splitlines()
         self.assertEqual(len(ruled), sum(1 for g in range(289) if g % 7 == 0 or not g % 2))

@@ -1508,28 +1508,42 @@ class Check(unittest.TestCase):
             self.assertTrue(m["gate"]["passed"])
             self.assertEqual(m["gate"]["reasons"], [])
 
-    def test_tiny_support_fails_the_gate(self):
-        # W46.kit-gate-rule's regression: a candidate that matches the shipped run on every gap, in both runs, with a
-        # perfect anchor, passed the proposed rule on 2 paired gaps. Below 267 known gaps the gate refuses.
+    def test_tiny_support_passes_labelled_small(self):
+        # W46.kit-gate-rule's case: a candidate that matches the shipped run on every gap, in both runs, with a perfect
+        # anchor, on 2 paired gaps. It was refused below 267 known gaps; since the owner's call 15 (2026-11-19,
+        # W47.wh-kit-minimums) it passes, labelled "small held-out set" with its interval and counts.
         right = {"H1": "new", "H2": "continue"}
         with tempfile.TemporaryDirectory() as t:
             r, m = self.coverage_check(Path(t), right, right)
-            self.assertEqual(r.returncode, 1, r.stdout)
+            self.assertEqual(r.returncode, 0, r.stdout)
             self.assertEqual(m["heldout"]["tags"]["difference_interval"], [0.0, 0.0])
-            self.assertFalse(m["gate"]["passed"])
-            self.assertEqual(m["gate"]["reasons"], [x for i in (1, 2) for x in (
-                f"run {i}: too few known held-out gaps: 2 (tags, paired with the shipped run), and the gate needs at "
-                "least 267 for its 3-point interval to mean anything",
-                f"run {i}: too few held-out documents: 2 (tags, paired with the shipped run), and the gate needs at "
-                "least 10: its interval resamples documents, and with fewer it is too narrow, so a candidate 3.5 "
-                "points worse passes too often")])
+            self.assertTrue(m["gate"]["passed"])
+            self.assertEqual(m["gate"]["reasons"], [])
+            self.assertEqual(m["gate"]["label"], "small held-out set")
+            self.assertEqual(m["gate"]["labels"], [
+                f"run {i}: small held-out set: difference 0.0 points, interval [0.0, 0.0], on 2 known gaps in 2 "
+                "documents and 2 folders (2 known held-out gaps (tags, paired with the shipped run), under the 267 the "
+                "3-point interval needs, so the interval is wider than the test assumes; 2 held-out documents (tags, "
+                "paired with the shipped run), under the 10 the interval needs: it resamples documents, and with fewer "
+                "it is too narrow, so a candidate 3.5 points worse passes too often)" for i in (1, 2)])
+            self.assertIn("label: run 1: small held-out set", r.stderr)
+            self.assertIn('labelled "small held-out set"', m["gate"]["rule"])
         with tempfile.TemporaryDirectory() as t:
             r, m = self.coverage_check(Path(t), right, right, fill=264)    # 266 paired gaps, one short
-            self.assertEqual(r.returncode, 1, r.stdout)
-            self.assertIn("too few known held-out gaps: 266", " ".join(m["gate"]["reasons"]))
-        with tempfile.TemporaryDirectory() as t:
-            r, m = self.coverage_check(Path(t), right, right, fill=265)    # exactly 267 passes
             self.assertEqual(r.returncode, 0, r.stdout)
+            self.assertEqual(m["gate"]["label"], "small held-out set")
+            self.assertIn("266 known held-out gaps", " ".join(m["gate"]["labels"]))
+            self.assertNotIn("held-out documents", " ".join(m["gate"]["labels"]))   # 28 documents: gaps alone
+        with tempfile.TemporaryDirectory() as t:
+            r, m = self.coverage_check(Path(t), right, right, fill=265)    # exactly 267: no label
+            self.assertEqual(r.returncode, 0, r.stdout)
+            self.assertEqual((m["gate"]["label"], m["gate"]["labels"]), (None, []))
+        with tempfile.TemporaryDirectory() as t:
+            # A small set is labelled, not excused: a candidate that trails still fails, and carries the label too.
+            r, m = self.coverage_check(Path(t), {"H1": "continue", "H2": "continue"}, right)
+            self.assertEqual(r.returncode, 1, r.stdout)
+            self.assertIn("trail the shipped model", " ".join(m["gate"]["reasons"]))
+            self.assertEqual(m["gate"]["label"], "small held-out set")
 
     def one_folder_check(self, tmp, n, wrong, doc=3):
         """W46.kit-gate-groups: a held-out set of one folder, B, of n gaps, a document starting at every ``doc``-th
@@ -1569,33 +1583,45 @@ class Check(unittest.TestCase):
             r, m = self.one_folder_check(Path(t), 276, ())                     # one folder is not refused as such
             self.assertEqual(r.returncode, 0, r.stdout)
 
-    def test_one_held_out_document_is_refused(self):
+    def test_one_held_out_document_is_labelled(self):
+        # Refused until call 15 (W47.wh-kit-minimums); now labelled, and the label says the interval cannot vary.
         with tempfile.TemporaryDirectory() as t:
             r, m = self.one_folder_check(Path(t), 276, (), doc=0)
-            self.assertEqual(r.returncode, 1, r.stdout)
+            self.assertEqual(r.returncode, 0, r.stdout)
             self.assertEqual(m["heldout"]["tags"]["paired_documents"], 1)
-            self.assertEqual(m["gate"]["reasons"], [f"run {i}: too few held-out documents: 1 (tags, paired with the "
-                                                    "shipped run), and the gate needs at least 10: its interval "
-                                                    "resamples documents, and with fewer it is too narrow, so a "
-                                                    "candidate 3.5 points worse passes too often" for i in (1, 2)])
+            self.assertEqual(m["gate"]["reasons"], [])
+            self.assertEqual(m["gate"]["labels"], [
+                f"run {i}: small held-out set: difference 0.0 points, interval [0.0, 0.0], on 276 known gaps in 1 "
+                "documents and 1 folders (1 held-out document (tags, paired with the shipped run), under the 10 the "
+                "interval needs: it resamples documents, and with fewer it is too narrow, so a candidate 3.5 points "
+                "worse passes too often; with one document the interval cannot vary and is the point figure)"
+                for i in (1, 2)])
 
-    def test_few_held_out_documents_are_refused(self):
+    def test_few_held_out_documents_are_labelled(self):
         # Measurement review pass 13, P13-2: two documents were accepted, and with two the draw has three outcomes, so
         # a candidate truly 3.5 points worse passed about a fifth of the time. 280 gaps, 10 of them wrong (-3.6).
+        # Under 10 documents the gate labels the model (call 15) instead of refusing it; this one trails, so it fails.
         wrong = range(14, 281, 28)
-        for doc, docs, refused in ((140, 2, True), (94, 3, True), (28, 10, False)):
+        for doc, docs, small in ((140, 2, True), (94, 3, True), (28, 10, False)):
             with tempfile.TemporaryDirectory() as t:
                 r, m = self.one_folder_check(Path(t), 280, wrong, doc=doc)
                 h = m["heldout"]
                 self.assertEqual((h["tags"]["paired_documents"], h["tags"]["difference"]), (docs, -3.57))
                 self.assertEqual((h["gate_folders"], h["gate_documents"], h["gate_gaps"]), (1, docs, 280))
                 self.assertEqual(r.returncode, 1, r.stdout)
-                said = " ".join(m["gate"]["reasons"])
-                self.assertEqual(f"too few held-out documents: {docs}" in said, refused, said)
-        with tempfile.TemporaryDirectory() as t:    # ten documents, none wrong: the count alone does not refuse
+                self.assertNotIn("too few", " ".join(m["gate"]["reasons"]))
+                self.assertEqual(f"{docs} held-out documents" in " ".join(m["gate"]["labels"]), small, m["gate"])
+                self.assertEqual(m["gate"]["label"], "small held-out set" if small else None)
+        with tempfile.TemporaryDirectory() as t:    # ten documents, none wrong: passes with no label
             r, m = self.one_folder_check(Path(t), 280, (), doc=28)
             self.assertEqual(r.returncode, 0, r.stdout)
-            self.assertIn("at least 10 documents", m["gate"]["rule"])
+            self.assertIsNone(m["gate"]["label"])
+            self.assertIn("267 known gaps or 10 documents", m["gate"]["rule"])
+        with tempfile.TemporaryDirectory() as t:    # three documents, none wrong: passes, labelled
+            r, m = self.one_folder_check(Path(t), 280, (), doc=94)
+            self.assertEqual(r.returncode, 0, r.stdout)
+            self.assertTrue(m["gate"]["passed"])
+            self.assertEqual(m["gate"]["label"], "small held-out set")
 
     # The corpus held-out set the shipped kit is checked on: 22 folders, (gaps, documents) each (corpus_pairs.py).
     CORPUS_HOLDOUT = ((8, 1), (8, 1), (11, 7), (20, 5), (28, 10), (52, 16), (53, 19), (61, 27), (70, 24), (71, 10),
@@ -1679,7 +1705,7 @@ class Check(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             m = json.loads((tmp / "m.json").read_text())
             self.assertEqual((m["heldout"]["gate_scored_on"], m["heldout"]["owner_ruled"]["expected_gaps"]), ("tags", 3))
-            # With no tags to fall back on, the three rulings are scored and are too few.
+            # With no tags to fall back on, the three rulings are scored: a small held-out set, labelled (call 15).
             labels = [json.loads(l) for l in (tmp / "labels.jsonl").read_text().splitlines()]
             (tmp / "labels.jsonl").write_text("".join(json.dumps({**g, "tag": None}) + "\n" for g in labels))
             r = subprocess.run([sys.executable, str(HERE / "train_seg.py"), "check", "--run", f"shipped={tmp / 'shipped'}",
@@ -1687,10 +1713,11 @@ class Check(unittest.TestCase):
                                 "--anchor-truth", str(tmp / "anchor.json"), "--labels", str(tmp / "labels.jsonl"),
                                 "--ruled", str(tmp / "ruled.csv"), "--out", str(tmp / "m.json")],
                                capture_output=True, text=True)
-            self.assertEqual(r.returncode, 1)
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
             m = json.loads((tmp / "m.json").read_text())
             self.assertEqual(m["heldout"]["gate_scored_on"], "owner_ruled")
-            self.assertIn("too few known held-out gaps: 3 (owner-ruled", " ".join(m["gate"]["reasons"]))
+            self.assertEqual(m["gate"]["label"], "small held-out set")
+            self.assertIn("3 known held-out gaps (owner-ruled", " ".join(m["gate"]["labels"]))
 
     def test_data_trains_only_whole_agreed_training_windows(self):
         # The kit's first step: a training window whose every gap the rule keeps, never a held-out one.

@@ -407,6 +407,10 @@ def cmd_report() -> None:
     print("wrote", OUT_MD, OUT_JSON)
 
 
+# The owner's call 15 on the gate's minimums, in the gate paragraph (W47.wh-kit-minimums).
+CALL_15 = ("Since the owner's call 15 (2026-11-19, W47.wh-kit-minimums) neither floor refuses on its own: below either, "
+           "the model passes when the gate's other tests pass, and the manifest labels it \"small held-out set\" with "
+           "its paired interval and counts.")
 LABEL_ERROR = (5.3, 0.0, 12.4)   # % wrong among agreed kept labels, with its interval (label-clean.md)
 
 
@@ -562,19 +566,21 @@ def render(split, boot, observed, dates, docs, sens, records, support) -> str:
           f"and {support['floor_seeds'][0]}-{support['floor_seeds'][1]} over seeds {support['seeds'][0]}-"
           f"{support['seeds'][1]}: the document bootstrap above, which drew documents to a size, gave the same figure. "
           "The floor is derived on documents because they are the unit every held-out set has, a one-box set "
-          "included; below it the interval is too narrow to trust.",
+          "included; below it the interval is too narrow to trust, and the model is labelled \"small held-out set\" "
+          "(call 15, W47.wh-kit-minimums).",
           f"- **Between boxes the interval widens, and the gate reads that from the interval, not the floor.** "
           f"Resampled as five folders the same gaps need {fl['five folders']['needed']:,} for ±3 points "
           f"({support['pairs'][PAIRS[0][1] + ' - ' + PAIRS[0][0]]['five folders']['needed']:,} for the 4B pair), "
           "because the boxes differ from one another. A held-out set of several unlike folders gets that wider "
-          "interval, and a trailing candidate fails on it; the floor only stops a set too small for any interval.",
+          "interval, and a trailing candidate fails on it; the floor only labels a set too small for its interval.",
           "- **One box alone varies.** The boxes' own figures run from "
           f"{min(r['needed'] for v in support['pairs'].values() for r in v['boxes'].values())} to "
           f"{max(r['needed'] for v in support['pairs'].values() for r in v['boxes'].values())}: a box with a few long "
           "documents where the models differ has a wide interval at its size. The gate scores the box it is given; "
           f"the floor is a minimum, not a promise that {support['gate_minimum']} gaps of any box reach ±3 points.",
-          "- **A held-out set of one document is refused.** The draw then repeats that document, and no number of "
-          "its gaps gives an interval."]
+          "- **A held-out set of one document gives no interval.** The draw then repeats that document, and no number "
+          "of its gaps gives an interval: the label says the interval is the point figure. It was refused until "
+          "call 15."]
     dm = support["documents"]
     L += ["", "### The minimum number of documents (W46.kit-gate-docs)", "",
           "Until 2026-11-11 the gate refused one held-out document and accepted two. With two, the document draw has "
@@ -598,8 +604,9 @@ def render(split, boot, observed, dates, docs, sens, records, support) -> str:
           f"3.5 points worse passes {r3['2']}% of the time on two documents and {lo3}-{hi3}% on three to five; "
           f"from ten it passes {r3['10']}%, and {lo20}-{hi20}% at 20-30, so more documents do not lower it "
           "much: what is left is set by the number of gaps, which the 267-gap floor governs. Below the minimum the "
-          "gate refuses with the count, as it refuses below the known-gap floor, and the manifest states the folders, "
-          "documents and gaps the held-out figure stands on.",
+          "gate labels the model \"small held-out set\" with the count, as it does below the known-gap floor (it "
+          "refused until call 15, W47.wh-kit-minimums), and the manifest states the folders, documents and gaps the "
+          "held-out figure stands on.",
           "- **The spread is not measured.** No per-document spread of a paired difference is committed; between the "
           "five owner boxes it is about 1.5 points after sampling variance, so 3 points is the harder plausible case. "
           f"At 1.5 points two documents still pass the 3.5-point candidate {r15['2']}% of the time, against "
@@ -641,7 +648,8 @@ def render(split, boot, observed, dates, docs, sens, records, support) -> str:
           "gate's own resampling, and the documents simulated above, W46.kit-gate-docs; the owner's rulings when they reach that, else the tags), a paired held-out gap-accuracy interval against the shipped model whose low end is above -3 "
           "points, over every gap the shipped run answered with the candidate's unanswered gaps counted wrong, and "
           "anchor pages exact less than 3.2 points (the top of the pages-exact rerun floor) below the shipped run's. "
-          "A candidate with no shipped run, no paired gap or no paired anchor fails (W46.kit-gate-coverage). The "
+          "A candidate with no shipped run, no paired gap or no paired anchor fails (W46.kit-gate-coverage). "
+          f"{CALL_15} The "
           "pages-exact rerun floor is not reused as a gap-accuracy tie unit (P7-4): the second run stands in for "
           "rerun wobble.", "",
           "The app reads the manifest as `archive-seg-manifest.json` beside the weights. `LocalSegmenter.refusal` runs "

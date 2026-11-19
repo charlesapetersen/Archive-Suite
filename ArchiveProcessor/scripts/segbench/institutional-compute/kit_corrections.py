@@ -13,8 +13,8 @@ Processor's `Settings/ReviewCorrections.swift`.
 The floor (14-owner-calls.md call 7; execution-plans/processing-review/13-stage-rules/12-training-kit.md §7.5): the
 segmentation continuation (`seg-2b-lora-k200`) once 200 gaps of one material were ruled on by a person: checked in the
 flagged pass or changed in the skim. A gap left as proposed through the skim (`accepted`) is known but not counted. The
-gate then needs a further box of the same material with at least 267 known gaps in 10 documents, which this count does
-not check (`train_seg.py check` does).
+gate then scores a further box of the same material; under 267 known gaps or 10 documents it labels the model "small
+held-out set" (call 15), which this count does not check (`train_seg.py check` does).
 
 The material is the collection (its id in the collection's settings document). Several collections of one material
 are counted together with `--pool NAME`, which the user decides: nothing in the records says two boxes are one

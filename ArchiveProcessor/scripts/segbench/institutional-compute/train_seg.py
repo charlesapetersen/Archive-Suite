@@ -39,7 +39,9 @@ count every expected gap: expected, answered and missing, the strict accuracy (a
 answered-only one, and the paired difference over every gap the shipped run answered, the candidate's missing answers
 counted wrong; a candidate with no shipped run or no paired gap fails (W46.kit-gate-coverage). The acceptance rule
 (call 7.2, W46.kit-gate-rule): two scored runs, each passing; in each, the paired interval's low end above -3 points
-on at least 267 known held-out gaps in at least 10 documents (W46.kit-gate-docs), and anchor pages exact less than 3.2 points below the shipped run's. It writes the
+and anchor pages exact less than 3.2 points below the shipped run's. Behind the held-out figure, at least 267 known gaps
+in at least 10 documents (W46.kit-gate-docs); fewer is not refused for that alone (owner, 2026-11-19, call 15,
+W47.wh-kit-minimums): the manifest labels the model "small held-out set" with its paired interval and counts. It writes the
 candidate's manifest (`archive-seg-manifest.json` beside the weights is what the app reads): prompt id, kit version,
 weights and training-data hashes, the scores, and the gate's verdict; it exits 1 when the gate fails. The app refuses a
 model whose manifest lacks the anchor score or names another prompt (`LocalSegmenter.refusal`). Sizes, from
@@ -216,7 +218,8 @@ PROMPT_ID = "c1"          # the app's id for the request these models are traine
 GATE_POINTS = 3.0         # a candidate may trail the shipped model by less than this on held-out gaps (kit_gate.py)
 # The support the 3-point interval needs: seg-kit-gate.md's "needed" column for gap accuracy is 147 (4B against the
 # 2B) and 267 (the 27B teacher against the 2B). A candidate's disagreement with the 2B is not known beforehand, so
-# the larger is the floor. Below it the interval is too wide to mean anything, and the gate refuses. Derived again on
+# the larger is the floor. Below it the interval is too wide to trust: the gate no longer refuses for that alone (owner,
+# 2026-11-19, call 15; W47.wh-kit-minimums) but labels the model SMALL_LABEL with its paired interval and counts. Derived again on
 # the gate's own resampling, folders and inside each documents (W46.kit-gate-groups, seg-kit-gate.md §The minimum
 # support): documents alone, the unit a one-box held-out set has, give 254-282 over five seeds, so 267 stands.
 MIN_KNOWN_GAPS = 267
@@ -224,8 +227,10 @@ MIN_KNOWN_GAPS = 267
 # documents the draw has few outcomes, so the interval is too narrow: on 280 gaps with a per-document spread of 3
 # points, a candidate truly 3.5 points worse passes about a quarter of the time with two documents and about one in
 # ten with three to five; from ten it is at the 4-5% that many documents give. The case is a box of a few long
-# documents (bound volumes, registers); owner-like boxes hold about 1.8 gaps a document.
+# documents (bound volumes, registers); owner-like boxes hold about 1.8 gaps a document. Below it, as below
+# MIN_KNOWN_GAPS, the model is labelled, not refused (call 15).
 MIN_DOCUMENTS = 10
+SMALL_LABEL = "small held-out set"
 RUNS_NEEDED = 2
 # On the public anchor, a candidate may score below the shipped run in pages exact by less than this, in each run:
 # the top of the rerun floor measured in pages exact (SEG-10, 1.4-3.2 points a box). The shipped build's anchor is
@@ -501,7 +506,8 @@ def gate_counts(row, paired):
 
 def run_reasons(row, paired, box, shipped_given):
     """Why one scored run fails the gate (an empty list when it passes). Missing evidence is a reason, never a pass
-    (W46.kit-gate-coverage); so is support below MIN_KNOWN_GAPS (W46.kit-gate-rule)."""
+    (W46.kit-gate-coverage). Support below MIN_KNOWN_GAPS or MIN_DOCUMENTS is not a reason (call 15,
+    W47.wh-kit-minimums): `run_small` labels it instead."""
     reasons = []
     if not row["anchor"]:
         reasons.append(f"no anchor score: the run has no answer for every gap of {box}")
@@ -528,19 +534,47 @@ def run_reasons(row, paired, box, shipped_given):
             elif d <= -ANCHOR_MARGIN:
                 reasons.append(f"on the anchor {box} it scores {d} points of pages exact against the shipped run, "
                                f"{ANCHOR_MARGIN:g} or more below it")
-    if held is not None and held["answered_gaps"]:
-        n = support(held, paired)
-        if n < MIN_KNOWN_GAPS:
-            reasons.append(f"too few known held-out gaps: {n} ({basis.replace('_', '-')}"
-                           f"{', paired with the shipped run' if paired else ''}), and the gate needs at least "
-                           f"{MIN_KNOWN_GAPS} for its {GATE_POINTS:g}-point interval to mean anything")
-        docs = held.get("paired_documents", 0) if paired else held["documents"]
-        if docs < MIN_DOCUMENTS:
-            reasons.append(f"too few held-out documents: {docs} ({basis.replace('_', '-')}"
-                           f"{', paired with the shipped run' if paired else ''}), and the gate needs at least "
-                           f"{MIN_DOCUMENTS}: its interval resamples documents, and with fewer it is too narrow, so a "
-                           f"candidate {GATE_POINTS + 0.5:g} points worse passes too often")
     return reasons
+
+
+def run_small(row, paired):
+    """Why one scored run's held-out figure is a small held-out set (an empty list when it is not): fewer than
+    MIN_KNOWN_GAPS known gaps or MIN_DOCUMENTS documents behind it. Owner, 2026-11-19, call 15 (W47.wh-kit-minimums):
+    such a model is no longer refused for that alone; it passes when the gate's other tests pass, labelled SMALL_LABEL
+    with its paired interval and counts, since below the minimums that interval is too wide (gaps) or too narrow
+    (documents) to trust as a 3-point test."""
+    basis, held = gate_basis(row, paired)
+    if held is None or not held["answered_gaps"]:
+        return []
+    n = support(held, paired)
+    docs = held.get("paired_documents", 0) if paired else held["documents"]
+    on = f"{basis.replace('_', '-')}{', paired with the shipped run' if paired else ''}"
+    out = []
+    if n < MIN_KNOWN_GAPS:
+        out.append(f"{n} known held-out gaps ({on}), under the {MIN_KNOWN_GAPS} the {GATE_POINTS:g}-point interval "
+                   f"needs, so the interval is wider than the test assumes")
+    if docs < MIN_DOCUMENTS:
+        out.append(f"{docs} held-out document{'s' if docs != 1 else ''} ({on}), under the {MIN_DOCUMENTS} the interval "
+                   f"needs: it resamples documents, and with fewer it is too narrow, so a candidate "
+                   f"{GATE_POINTS + 0.5:g} points worse passes too often"
+                   + ("; with one document the interval cannot vary and is the point figure" if docs == 1 else ""))
+    return out
+
+
+def small_label(row, paired):
+    """The manifest's label for a run on a small held-out set: SMALL_LABEL, the paired difference and interval (or the
+    model's own accuracy and interval for the shipped model), and the folders, documents and gaps; None otherwise."""
+    why = run_small(row, paired)
+    if not why:
+        return None
+    _, held = gate_basis(row, paired)
+    c = gate_counts(row, paired)
+    if paired and "difference_interval" in held:
+        fig = f"difference {held['difference']} points, interval {held['difference_interval']}"
+    else:
+        fig = f"accuracy {held['accuracy']}%, interval {held.get('interval')}"
+    return (f"{SMALL_LABEL}: {fig}, on {c['gate_gaps']} known gaps in {c['gate_documents']} documents and "
+            f"{c['gate_folders']} folders ({'; '.join(why)})")
 
 
 def cmd_check(a):
@@ -592,7 +626,10 @@ def cmd_check(a):
     for i, row in enumerate(cand_runs):
         row["gate_scored_on"] = gate_basis(row, paired)[0]
         row["gate_reasons"] = run_reasons(row, paired, box, bool(shipped))
+        row["gate_label"] = small_label(row, paired)
         reasons += [(f"run {i + 1}: " if len(cand_runs) > 1 else "") + r for r in row["gate_reasons"]]
+    labels = [(f"run {i + 1}: " if len(cand_runs) > 1 else "") + row["gate_label"]
+              for i, row in enumerate(cand_runs) if row["gate_label"]]
     cand = cand_runs[0]
     trained = json.loads((Path(a.adapter).parent / "train.json").read_text()) if a.adapter else {}
     licence = licence_of(a.licence, trained.get("model") or a.base_build)
@@ -613,19 +650,24 @@ def cmd_check(a):
         "review_load_at_98": None if not cand["anchor"] else cand["anchor"]["review_load_per_100_pages"],
         "scored_runs": len(cand_runs),
         "mac": json.loads(Path(mac).read_text()) if mac else None, "note": a.note,
-        "gate": {"rule": f"{RUNS_NEEDED} scored runs, each with an anchor score and a held-out score on at least "
-                         f"{MIN_KNOWN_GAPS} known gaps in at least {MIN_DOCUMENTS} documents (the owner's rulings when they reach "
-                         f"that, else the tags), its intervals resampling folders and, inside each, documents; "
+        "gate": {"rule": f"{RUNS_NEEDED} scored runs, each with an anchor score and a held-out score (the owner's "
+                         f"rulings when they reach {MIN_KNOWN_GAPS} known gaps, else the tags), its intervals resampling "
+                         f"folders and, inside each, documents; on fewer than {MIN_KNOWN_GAPS} known gaps or "
+                         f"{MIN_DOCUMENTS} documents the model is not refused for that alone but labelled "
+                         f"\"{SMALL_LABEL}\" with its interval and counts (call 15, W47.wh-kit-minimums); "
                          f"for a candidate other than the shipped model, in each run, a paired held-out gap-accuracy "
                          f"interval against the shipped run, over every gap that run answered with the candidate's "
                          f"missing answers counted wrong, whose low end is above -{GATE_POINTS:g} points, and anchor "
                          f"pages exact less than {ANCHOR_MARGIN:g} points below the shipped run's (decided, "
                          f"call 7.2, W46.kit-gate-rule; coverage, W46.kit-gate-coverage). The heldout and anchor "
                          f"blocks are run 1's; every run is under compared",
-                 "passed": not reasons, "reasons": reasons},
+                 "passed": not reasons, "reasons": reasons,
+                 "label": SMALL_LABEL if labels else None, "labels": labels},
         "compared": report["models"], "made": time.strftime("%Y-%m-%dT%H:%M:%S")}
     out.write_text(json.dumps(manifest, indent=1) + "\n")
     print(json.dumps({k: manifest[k] for k in ("model", "anchor", "heldout", "gate")}, indent=1))
+    for x in labels:
+        print(f"label: {x}", file=sys.stderr)
     print("wrote", out)
     return 0 if not reasons else 1
 

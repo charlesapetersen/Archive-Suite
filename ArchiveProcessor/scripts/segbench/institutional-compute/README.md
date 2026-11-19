@@ -241,11 +241,14 @@ the paired difference over every gap the shipped run answered, with the candidat
 candidate with no shipped run, or no gap the shipped run answered, fails rather than passing unpaired
 (W46.kit-gate-coverage). The candidate passes only with **two scored runs** (a `--run` per run, under the same
 name: two separate `submit.sh seg` jobs of the same model), and in each: the low end of the paired held-out
-gap-accuracy interval above -3 points; **at least 267 known held-out gaps** behind it (your rulings when you have that
-many, else your tags; fewer are refused, since the interval would be too wide to mean anything); **at least 10
-held-out documents** among them (fewer are refused: with two documents a candidate 3.5 points worse passes about a
-quarter of the time, so a box of a few long volumes or registers needs more than one box, W46.kit-gate-docs); and anchor pages
-exact less than 3.2 points below the shipped model's (W46.kit-gate-rule). `archive-seg-manifest.json` must sit beside the weights the
+gap-accuracy interval above -3 points, and anchor pages exact less than 3.2 points below the shipped model's
+(W46.kit-gate-rule). The held-out figure should stand on **at least 267 known held-out gaps** (your rulings when you
+have that many, else your tags) in **at least 10 held-out documents**. Fewer is not refused for that alone (owner,
+2026-11-19, call 15): the model passes when the rest of the gate passes, and the manifest's `gate.label` reads
+`small held-out set`, with `gate.labels` giving each run's paired interval and counts. Treat such a pass with care:
+with fewer gaps the interval is wider than the 3-point test assumes, and with two documents a candidate 3.5 points
+worse passes about a quarter of the time (W46.kit-gate-docs), so a box of a few long volumes or registers is better
+scored on more than one box. `archive-seg-manifest.json` must sit beside the weights the
 app loads (where `check --weights` puts it): Archive Processor refuses a model of yours without one, without an anchor score, or for another
 prompt. The manifest's `heldout` block states the folders, documents and gaps the gate's figure stands on
 (`gate_folders`, `gate_documents`, `gate_gaps`). The held-out intervals resample your folders and, inside each, their documents (as your tags start them), so
@@ -273,8 +276,8 @@ python3 kit_corrections.py export "/path/to/Box 1" --out gaps.jsonl          # e
 
 Each folder is read recursively, so a Live Capture folder with a collection in each subfolder can be given whole.
 Links are never followed. A page pair or line that was reviewed more than once counts once, from the newest review.
-The count does not check the gate's held-out box: that needs a further box of the same material with at least 267
-known gaps in 10 documents, which `train_seg.py check` enforces.
+The count does not check the gate's held-out box: a further box of the same material, which `train_seg.py check`
+labels "small held-out set" under 267 known gaps or 10 documents.
 
 ## The continuation: the 2B adapted to your material
 
@@ -296,9 +299,10 @@ python3 kit_continuation.py heldout "/path/to/Box 2" --sources "/path/to/Box 2 p
   you left as proposed can sit in a window, but they do not count. Give `--pool` or `--material` as for
   `kit_corrections.py`.
 - **`heldout`** builds the next box of the same material, for the gate. It writes `labels.jsonl`, which holds every
-  recorded gap at the call you left, and `ruled.csv`, which holds the gaps you checked or changed. It refuses fewer
-  than 267 known gaps or 10 documents (the gate's own minimum), and it refuses any page the training pack holds. Run
-  it before booking GPU time: a box that is too small cannot pass however good the model is. Nothing in the records
+  recorded gap at the call you left, and `ruled.csv`, which holds the gaps you checked or changed. It refuses any page
+  the training pack holds. Under 267 known gaps or 10 documents (the gate's own minimum) it still writes the box, says
+  so, and records it in `pack.json` (`small_heldout`): the gate will label the continuation "small held-out set". Run
+  it before booking GPU time, so you know whether the result will carry that label. Nothing in the records
   says two boxes are one material. That is your word. A gap you accepted through the skim carries the proposing model's call.
   When that model was the shipped 2B, the comparison leans toward it, which makes the gate harder to pass, never easier.
 
