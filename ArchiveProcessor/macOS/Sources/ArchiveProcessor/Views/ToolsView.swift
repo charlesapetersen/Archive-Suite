@@ -1,4 +1,5 @@
 import SwiftUI
+import ArchiveCore
 
 /// Standalone diagnostic tools (a top-level tab next to Process Files / Live Capture): compare OCR
 /// output across models, and test how image resolution affects OCR. Both run one-off OCR calls via
@@ -36,6 +37,7 @@ struct ToolsView: View {
     @State private var isRunningResolutionTest = false
 
     @State private var showHistory = false
+    @State private var showContainerBackfill = false
 
     @State private var showModelSelectionSheet = false
     @State private var showModelTestDropSheet = false
@@ -90,6 +92,17 @@ struct ToolsView: View {
                     disabled: false
                 ) { showHistory = true }
 
+                toolCard(
+                    title: "Read Box and Folder Labels",
+                    systemImage: "archivebox",
+                    detail: "For a folder photographed before Archive Processor: read its box and folder photos and propose "
+                        + "each document's box and folder, accepted folder by folder. Free with Apple Vision; a model "
+                        + "for titles is optional.",
+                    buttonTitle: "Read Labels in a Folder…",
+                    disabled: false
+                ) { showContainerBackfill = true }
+                .accessibilityIdentifier("ap.tools.backfill")
+
                 if apiKey.isEmpty {
                     Label("Set an API key in Settings (⌘,) to run these.", systemImage: "key")
                         .font(.caption).foregroundStyle(.orange)
@@ -107,6 +120,9 @@ struct ToolsView: View {
         // publishes it, and `selectedModel` re-reads on the resulting render.
         .onChange(of: selectedProvider) { _, _ in reloadKey() }
         .onChange(of: useGateway) { _, _ in reloadKey() }
+        .sheet(isPresented: $showContainerBackfill) {
+            ContainerBackfillSheet(model: Self.backfillModel()) { showContainerBackfill = false }
+        }
         .sheet(isPresented: $showHistory) {
             ProcessingHistoryView(onDismiss: { showHistory = false })
         }
@@ -184,6 +200,24 @@ struct ToolsView: View {
             }
             .padding(8)
         }
+    }
+
+    /// A new window's model; under a UI test, on the test's scratch folder with canned reads.
+    private static func backfillModel() -> ContainerBackfillModel {
+        let model = ContainerBackfillModel()
+#if DEBUG
+        if ProcessorUITestConfiguration.backfillFakeReads {
+            model.readOverride = { marker in
+                let n = Int(marker.fileName.prefix { $0.isNumber }) ?? 0
+                let fields: ContainerFieldSet = marker.type == .box
+                    ? ContainerFieldSet([.container: ContainerValue("Box \(n)", source: .label, reader: "uitest")])
+                    : ContainerFieldSet([.folder: ContainerValue("\(n)", source: .label, reader: "uitest")])
+                return ContainerBackfillCache.Entry(fields: fields, text: "")
+            }
+        }
+        if let folder = ProcessorUITestConfiguration.backfillFolder { model.choose(folder) }
+#endif
+        return model
     }
 
     // MARK: Run logic (moved from OCRView; standalone OCR calls)

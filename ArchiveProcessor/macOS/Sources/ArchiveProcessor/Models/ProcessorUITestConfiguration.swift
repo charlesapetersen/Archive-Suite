@@ -59,6 +59,11 @@ enum ProcessorUITestConfiguration {
         guard let provider = LLMProvider(rawValue: value) else { return nil }
         return ("Interrupted run (UI test): 0/2 files completed via \(provider.rawValue).", .direct(provider))
     }
+    /// W47.ct-backfill: the scratch folder Tools ▸ Read Box and Folder Labels opens on, and canned reads in place of
+    /// Vision and the models (a box photo reads "Box <n>", a folder photo folder "<n>", n its place in the folder).
+    static var backfillFolder: URL? { isActive ? urlValue(after: "-APUITestBackfillFolder") : nil }
+    static var backfillFakeReads: Bool { isActive && arguments.contains("-APUITestBackfillFakeReads") }
+
     static var droppedPDF: URL? {
         if let path = urlValue(after: "-APUITestDroppedPDFPath") { return path }
         if isActive, arguments.contains("-APUITestSyntheticSuitePair") { return syntheticSuitePair() }

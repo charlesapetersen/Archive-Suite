@@ -29,13 +29,27 @@ enum ContainerLabelCapture {
     /// such server, or a photo that is not an image, leaves the parser's values.
     static func read(type: ItemType, text: String, photo: URL, rotation: Int,
                      gateway: GatewayConfig?) async -> ContainerFieldSet {
+        await readLabel(type: type, text: text, photo: photo, rotation: rotation, gateway: gateway).fields
+    }
+
+    /// GPT 5.6 Luna's charge a label photo on the gateway, for an estimate: $0.1629 for 195 calls (`ct-read.md`,
+    /// the larger of the token estimate and the gateway's own figure).
+    static let gatewayDollarsPerLabel = 0.00084
+
+    /// `read`, with the Vision text it parsed (for recognising a "No Folder" sheet) and whether a gateway call was made
+    /// (real money). `useModel` false reads with Vision + parser alone: no gateway call and no local model.
+    static func readLabel(type: ItemType, text: String, photo: URL, rotation: Int, gateway: GatewayConfig?,
+                          useModel: Bool = true) async -> (fields: ContainerFieldSet, visionText: String, gatewayCalled: Bool) {
         let vision = try? await VisionClient(settings: .default).ocr(imageURL: photo)
         let visionText = vision?.text ?? ""
         let lines = (visionText.isEmpty ? text : visionText).components(separatedBy: .newlines)
         let parserReader = visionText.isEmpty ? ocrTextReader : ContainerLabelReader.visionReader
         var model: [ContainerField: String]?
         var modelReader = gatewayReader
-        if gateway == nil || gateway?.isLocalModel == true {
+        var gatewayCalled = false
+        if !useModel {
+            // Vision + parser alone.
+        } else if gateway == nil || gateway?.isLocalModel == true {
             model = await ContainerLabelGemma.read(photo: photo, rotation: rotation, gateway: gateway)
             modelReader = ContainerLabelReader.localModelReader
         } else if let gateway, let jpeg = ImageEncoding.uprightJPEG(url: photo, rotationDegrees: rotation, longEdge: imageLongSide) {
@@ -43,14 +57,16 @@ enum ContainerLabelCapture {
                 ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64," + jpeg.base64EncodedString()]],
                 ["type": "text", "text": ContainerLabelReader.modelPrompt],
             ]
+            gatewayCalled = true
             if let raw = await DateRoute.gatewayChat(content: content, gateway: gateway, model: gatewayModel,
                                                      maxTokens: maxTokens, timeout: timeout) {
                 model = ContainerLabelReader.modelFields(fromReply: raw)
             }
         }
-        return ContainerLabelReader.proposals(lines: lines, type: type, model: model,
-                                              modelReader: model == nil ? nil : modelReader,
-                                              parserReader: parserReader, at: Date())
+        let fields = ContainerLabelReader.proposals(lines: lines, type: type, model: model,
+                                                    modelReader: model == nil ? nil : modelReader,
+                                                    parserReader: parserReader, at: Date())
+        return (fields, visionText, gatewayCalled)
     }
 
     /// One filed marker, for the finalize write.

@@ -12,13 +12,19 @@ struct ContainerLevelsSheet: View {
     let onSave: (ContainerLevelsDraft) -> Void
     let onSkip: () -> Void
     let onCancel: () -> Void
+    /// The texts, so Tools ▸ Read Box and Folder Labels (W47.ct-backfill) can offer the map for a folder it reads.
+    var intro = "The PDFs will be filed in the same folders inside the output folder. Check what each level of folders "
+        + "is, then save: Archive Reader shows it as each document's repository, collection, box and folder. "
+        + "Saving writes one small file, “.archivesuite/container-levels.json”, in the output folder."
+    var cancelHelp = "Do not start the run."
+    var skipTitle = "Start Without Saving"
+    var skipHelp = "File the PDFs in the folders without saving what the levels name; Archive Reader asks later."
+    var saveTitle = "Save and Start"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("What do these folder levels name?").font(.headline)
-            Text("The PDFs will be filed in the same folders inside the output folder. Check what each level of folders "
-                 + "is, then save: Archive Reader shows it as each document's repository, collection, box and folder. "
-                 + "Saving writes one small file, “.archivesuite/container-levels.json”, in the output folder.")
+            Text(intro)
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
@@ -45,13 +51,13 @@ struct ContainerLevelsSheet: View {
             HStack {
                 Button("Cancel", action: onCancel)
                     .keyboardShortcut(.cancelAction)
-                    .help("Do not start the run.")
+                    .help(cancelHelp)
                     .accessibilityIdentifier("ap.containerLevels.cancel")
                 Spacer()
-                Button("Start Without Saving", action: onSkip)
-                    .help("File the PDFs in the folders without saving what the levels name; Archive Reader asks later.")
+                Button(skipTitle, action: onSkip)
+                    .help(skipHelp)
                     .accessibilityIdentifier("ap.containerLevels.skip")
-                Button("Save and Start") { onSave(draft) }
+                Button(saveTitle) { onSave(draft) }
                     .keyboardShortcut(.defaultAction)
                     .accessibilityIdentifier("ap.containerLevels.save")
             }
