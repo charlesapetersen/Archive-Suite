@@ -189,7 +189,9 @@ The measurement comes first and the build waits on the owner's look at it (`W47.
 8. `W47.ct-reader-view` — the column and facets. Done 2026-11-19: the Container column, the Containers facet menu,
    the Inspector's Container section and the folder-levels sheet (`ArchiveReader/KNOWN_ISSUES.md` "Containers in the
    list").
-9. `W47.ct-reader-edit` — the editor.
+9. `W47.ct-reader-edit` — the editor. Done 2026-11-19: the Inspector's Container section edits a run, set for
+   selection splits runs, standard names, the folder's warnings (`ArchiveReader/KNOWN_ISSUES.md` "Editing
+   containers").
 10. `W47.ct-processor-capture` — label reading at capture and the confirm card (waits on `W46.review-done`).
 11. `W47.ct-processor-intake` — Route B in Process Files: nested directories read with the level map.
 12. `W47.ct-backfill` — read the corpus's marker photos and propose runs for review.

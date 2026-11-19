@@ -40,7 +40,7 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 - **A local address is trusted.** Only a loopback address is asked, but a proxy there that forwards to a cloud model,
   or redirects, cannot be told apart from a local server; Ollama's `-cloud` tags are refused by name.
 - **Process Files has no card.** Its labels are written as proposals (source `label`), to confirm in the Reader's
-  editor (`W47.ct-reader-edit`). The pre-OCRed PDF route (re-tagging existing PDFs, a new run or a resumed one) reads
+  editor (the Inspector's Container section, W47.ct-reader-edit). The pre-OCRed PDF route (re-tagging existing PDFs, a new run or a resumed one) reads
   no labels: its outputs are its inputs, and nothing is written beside a source. An output outside the run's output
   folder, missing, or merged into another label's PDF is not recorded, and the summary counts it; so is one whose
   collection organisation stopped partway (its moves are not reported then).

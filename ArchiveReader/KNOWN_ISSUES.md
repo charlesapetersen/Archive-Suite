@@ -2,6 +2,36 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## Editing containers — the limits (W47.ct-reader-edit, 2026-11-19)
+
+Shipped: the Inspector's **Container** section edits. Each value has an **Edit** menu (Change…, Confirm, None Here,
+Remove Your Value, Use a Standard Name…, Stop Using the Standard Name), and **Add** gives a field the file lacks. An
+edit goes where the shown value lives (`ContainerEdits.target`), and the row says which files it reaches: the run
+that gives it, else the live run of its level, else a new run at the file when the folder's runs of that level
+start later, else the folder's own values. With several files selected, **set for selection** gives one field one
+value for them and no others, splitting runs at the selection's ends. The folder's **warnings** are listed under
+the section, each with Show. Writes only `<folder>/.archivesuite/containers.json` and the nearest
+`container-names.json`, each read fresh and written with its stamp (`NavigationModel+ContainerEdits`). A value the
+user set ends its disagreement warning (`SPEC/containers.md` §Warnings). Contract: `SPEC/containers.md`.
+What it does not do, deliberately or not yet:
+- **No undo.** Edit ▸ Undo does not reach a container edit. Remove Your Value or a new value puts it back; a
+  replaced label read is not kept under the user's value.
+- **A container file this build cannot overwrite is left alone.** That covers a newer version, one it cannot read,
+  or one holding values it drops. The edit is refused with the reason, and the SPEC's "set aside on the user's
+  say-so" (`write(…, settingAside: true)`) is not offered yet. The same holds for an unreadable standard-names file
+  nearer the folder than the root's.
+- **An edit to the folder's own values reaches the folders inside it** and outranks their label reads, as the SPEC's
+  precedence says (user, then label, then path). The row says "every file in this folder and the folders inside
+  it". It is chosen only where the folder has no run of that field's level.
+- **Set for selection** takes fields with a level (not date or other marks), at most 5,000 files, and the files in
+  each folder's order on disk, so a file the list does not show still keeps its value. Across several folders it is
+  not one write: if a later folder is refused, the earlier ones stay saved and the message says how many.
+- **Warnings are per folder**, listed for the selected file's folder: disagreements and long unmarked runs
+  (`ContainerInference.warnings`). The marker warnings (a photo inside your run, a marker with no read) come from
+  Route A as label reads are applied, which the Reader does not do. There is no corpus-wide list yet.
+- **Stop Using the Standard Name removes the whole entry**, with every wording it gathered and anything it filled in
+  other fields.
+
 ## Containers in the list — the limits (W47.ct-reader-view, 2026-11-19)
 
 Shipped: a **Container** column (box, folder and folder title, else the collection; ⚠︎ where sources disagree;
@@ -11,9 +41,9 @@ accession, series, container, each value with its file count; a chosen value is 
 levels** sheet, offered once per root after its scan settles and from File ▸ Container Levels…, which writes only
 `<main folder>/.archivesuite/container-levels.json` on Save. Contract: `SPEC/containers.md`.
 What it does not do, deliberately or not yet:
-- **Nothing is edited here.** Runs, "set for selection", standard names and the warnings list are
-  `W47.ct-reader-edit`; the Reader works out no runs from marker photos itself (Route A needs label reads:
-  `W47.ct-processor-capture`, `W47.ct-backfill`). It shows the runs container files already hold.
+- **Editing is the section above** (W47.ct-reader-edit). The Reader works out no runs from marker photos itself:
+  Route A needs label reads (`W47.ct-processor-capture`, `W47.ct-backfill`). It shows and edits the runs that
+  container files already hold.
 - **Container files changed by another app are read again on the next change to the listed files, a Rescan or a
   relaunch**, not the moment they change: the catalog is rebuilt when the listed paths change.
 - **A container rule is skipped until the catalog for the open root is built** (W47.ct-reader-facet-rules), like a
@@ -38,9 +68,9 @@ source and the measured figure; "Mark checked" / "Uncheck" writes or removes a `
 What it does not do, deliberately or not yet:
 - **Item fields can be checked, not edited.** The page-2 header is the Processor's output-time snapshot and the
   Reader writes no file contents, so a corrected value has nowhere to go yet: `W40.reader-item-field-edit`, after
-  W47.ct-reader-edit gives the Reader its `.archivesuite` write class.
+  W47.ct-reader-edit gave the Reader its `.archivesuite` write class.
 - **Container fields have their own Inspector section** (W47.ct-reader-view), with the same badge and no check
-  button: a container value is confirmed or corrected in the container editor, `W47.ct-reader-edit`.
+  button: a container value is confirmed or corrected from its Edit menu (W47.ct-reader-edit).
 - **Sender and recipient have no row**: no route writes them where the Reader can read them (the bench's item-field
   scope leaves them to W46), and the Reader does not read the JSON sidecar.
 - **A group selection counts the checked dates** and checks them all at once; item fields are listed one file at a

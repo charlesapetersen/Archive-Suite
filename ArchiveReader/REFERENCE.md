@@ -500,6 +500,8 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
                               Its rows (with each facet's folded key) answer Advanced Search's Container rule
                               through RuleContext.containers; a rebuild whose values changed recounts the smart
                               folders that test one (W47.ct-reader-facet-rules).
+  ContainerEdits.swift        W47.ct-reader-edit: the editor's edits worked out purely on a container file: where an
+                              edit goes (target), set, set for selection (splits runs), standard names.
   ContainerLevelsDraft.swift  The level map as the sheet edits it: pre-filled (ContainerLevelMap.prefilled), examples
                               per level, workflow folders and what their contents are, a preview; tied to its tree.
   CollationRanks.swift        localizedStandardCompare ranks cached across sorts, + UTF8Key (byte-
@@ -547,8 +549,11 @@ Views/
   NavigationModel+Containers.swift  W47.ct-reader-view: one catalog build at a time off main, the level map offered
                               once per root after the settled build, File ▸ Container Levels…, Save writing only
                               `.archivesuite/container-levels.json` (ContainerFileStore.writeLevelMap) into its tree.
-  ContainerSection.swift      The Inspector's Container section (FieldStatusRow per value, disagreements listed) and
-                              ContainerLevelsSheet.
+  NavigationModel+ContainerEdits.swift  W47.ct-reader-edit: each edit read fresh, worked out and written off main
+                              with the read's stamp (ContainerFileStore), one at a time; links inside the tree refused.
+  ContainerSection.swift      The Inspector's Container section (FieldStatusRow per value with its Edit menu,
+                              disagreements, the folder's warnings), ContainerSelectionSection (set for selection)
+                              and ContainerLevelsSheet.
   NavigationModel+ImproveOCR.swift  W44.reocr-reader: Flag as Poor OCR (off the main thread, one ledger group;
                               a stale batch result never overwrites a newer row), Connect Improve OCR Folder…,
                               Improve OCR… (ImproveOCROpener: Launch Services, or the DEBUG recorder), receipts →
