@@ -32,7 +32,8 @@ final class LibrarySortDecoratedTests: XCTestCase {
 
     func testMatchesTheComparatorItReplaced() {
         XCTAssertEqual(Set(SortField.allCases), [.date, .name, .quality, .readState, .fileType, .subjects,
-                                                 .relevance, .flag, .attention], "a new field needs a reference case")
+                                                 .relevance, .flag, .attention, .container],
+                       "a new field needs a reference case")
         let fields = SortField.allCases
         var rng = SeededGenerator(seed: 7)
         for round in 0..<60 {
@@ -40,7 +41,12 @@ final class LibrarySortDecoratedTests: XCTestCase {
             // The ⚑ and ⚠︎ keys (W40.fix-reader-columns): about a third of the rows each.
             let marks = SortMarks(
                 flagged: Set(files.map(\.path).filter { _ in Int.random(in: 0..<3, using: &rng) == 0 }),
-                needsAttention: Set(files.map(\.path).filter { _ in Int.random(in: 0..<3, using: &rng) == 0 }))
+                needsAttention: Set(files.map(\.path).filter { _ in Int.random(in: 0..<3, using: &rng) == 0 }),
+                // The Container cells (W47.ct-reader-view): a few boxes, some files with none.
+                containers: Dictionary(uniqueKeysWithValues: files.compactMap { f in
+                    let n = Int.random(in: 0..<6, using: &rng)
+                    return n == 0 ? nil : (f.path, ["Box 2", "Box 10", "Box 2, Folder 1", "box 2", "Carton 3"][n - 1])
+                }))
             let depth = Int.random(in: 1...3, using: &rng)
             let descriptors = (0..<depth).map { _ in
                 ARSortDescriptor(field: fields.randomElement(using: &rng)!, ascending: Bool.random(using: &rng))
@@ -149,6 +155,8 @@ final class LibrarySortDecoratedTests: XCTestCase {
                 case .flag: r = dir(cmp(marks.flagged.contains(a.path) ? 0 : 1, marks.flagged.contains(b.path) ? 0 : 1), d.ascending)
                 case .attention:
                     r = dir(cmp(marks.needsAttention.contains(a.path) ? 0 : 1, marks.needsAttention.contains(b.path) ? 0 : 1), d.ascending)
+                case .container:
+                    r = nilLast(marks.containers[a.path], marks.containers[b.path]) { dir($0.localizedStandardCompare($1), d.ascending) }
                 case .relevance: r = .orderedSame
                 }
                 if r != .orderedSame { return r == .orderedAscending }

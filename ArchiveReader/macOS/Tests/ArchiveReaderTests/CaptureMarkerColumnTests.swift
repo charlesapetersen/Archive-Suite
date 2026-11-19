@@ -40,7 +40,8 @@ final class CaptureMarkerColumnTests: XCTestCase {
     func testCaptureMarkerIsHiddenWhileNoFileHasOneAndTheChooserWritesTheChoice() {
         let defaults = fixtureDefaults()
         let model = NavigationModel(defaults: defaults)
-        XCTAssertEqual(model.effectiveHiddenColumns, [AppKitTableView.captureMarkerColumnID],
+        XCTAssertEqual(model.effectiveHiddenColumns, [AppKitTableView.captureMarkerColumnID,
+                                                      AppKitTableView.containerColumnID],
                        "no file carries a marker, so the column would only be blank")
         XCTAssertFalse(model.isColumnAvailable(AppKitTableView.captureMarkerColumnID))
         XCTAssertTrue(model.isColumnAvailable("type"))

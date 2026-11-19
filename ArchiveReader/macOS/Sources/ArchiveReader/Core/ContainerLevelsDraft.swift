@@ -69,7 +69,7 @@ struct ContainerLevelsDraft: Equatable, Sendable {
             for f in ordered where !names.contains(f.name) && names.count < 3 { names.append(f.name) }
             return names
         }
-        let workflow = map.overrides.filter { $0.value.role == .ignore && $0.value.children == nil }.keys
+        let workflow = map.overrides.filter { $0.value.role == .ignore }.keys
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         var perDirectory: [[String]: Int] = [:]
         for dir in directories where !dir.isEmpty { perDirectory[dir, default: 0] += 1 }
@@ -84,6 +84,18 @@ struct ContainerLevelsDraft: Equatable, Sendable {
     /// Stop skipping a workflow folder, or skip it again.
     mutating func setSkipped(_ path: String, _ skipped: Bool) {
         if skipped { map.overrides[path] = .init(role: .ignore) } else { map.overrides[path] = nil }
+    }
+
+    /// What the folders inside a skipped workflow folder are: by default the level the workflow folder stands at;
+    /// `role` names another ("05 Final Tagging/5 Priority 5" holding collections, SPEC §The level map, `children`).
+    mutating func setChildren(_ path: String, _ role: ContainerLevelRole?) {
+        guard map.overrides[path]?.role == .ignore else { return }
+        map.overrides[path] = .init(role: .ignore, children: role)
+    }
+
+    /// The roles `setChildren` may name: those `map.levels` holds (a `children` role must be one of them).
+    var childRoles: [ContainerLevelRole] {
+        Self.roles.filter { $0 != .ignore && map.levels.contains($0) }
     }
 
     /// What one folder path below the root would give, with the draft as it stands: "Repository: Hoover · Box: Box

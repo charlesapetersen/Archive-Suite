@@ -120,9 +120,24 @@ struct ContainerLevelsSheet: View {
                  + "their place.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ForEach(draft.workflowFolders, id: \.self) { path in
-                Toggle(path, isOn: Binding(get: { draft.map.overrides[path] != nil },
-                                           set: { draft.setSkipped(path, $0) }))
-                    .font(.caption)
+                HStack {
+                    Toggle(path, isOn: Binding(get: { draft.map.overrides[path] != nil },
+                                               set: { draft.setSkipped(path, $0) }))
+                        .font(.caption)
+                    Spacer(minLength: 8)
+                    if draft.map.overrides[path] != nil {
+                        Picker("Folders inside", selection: Binding(
+                            get: { draft.map.overrides[path]?.children },
+                            set: { draft.setChildren(path, $0) })) {
+                            Text("Take its level").tag(ContainerLevelRole?.none)
+                            ForEach(draft.childRoles, id: \.self) { role in
+                                Text("Are: \(ContainerLevelsDraft.roleName(role))").tag(ContainerLevelRole?.some(role))
+                            }
+                        }
+                        .frame(width: 200)
+                        .help("What the folders inside this workflow folder are")
+                    }
+                }
             }
         }
     }
