@@ -47,7 +47,13 @@ struct TagEditorView: View {
                     Divider()
                     dateSection(s, files)
                     Divider()
-                    FieldStatusSection(files: files, apply: apply)
+                    FieldStatusSection(files: files, apply: apply, revision: model.itemFieldRevision,
+                                       editable: model.containerTree != nil, saving: model.containerEditSaving,
+                                       error: model.itemFieldEditError,
+                                       onEdit: { field, edit in
+                                           guard let path = files.first?.path, files.count == 1 else { return }
+                                           model.editItemField(field, edit, forPath: path, undo: undoManager)
+                                       })
                     Divider()
                     // W47.ct-reader-view, W47.ct-reader-edit: shown for one file under the archive's main folder,
                     // where it is edited; for several, "set for selection".

@@ -192,9 +192,10 @@ extension NavigationModel {
     /// while the undo manager is undoing (it then goes to Redo, and the other way). The files are small and the store
     /// waits at most `lockWait` for another writer.
     private func applyContainerUndo(_ step: ContainerUndoStep, action: String, tree: String?, on undo: UndoManager) {
+        let document = step.document
         guard tree == containerTree?.path else {
-            containerEditError = "That change was made in another archive, so it was not undone."
-            announce(containerEditError ?? "")
+            setEditError("That change was made in another archive, so it was not undone.", document)
+            announce(editError(document) ?? "")
             return
         }
         let redoing = undo.isRedoing
@@ -202,7 +203,7 @@ extension NavigationModel {
         registerContainerUndo(result.inverse, action: action, on: undo)
         let verb = redoing ? "redone" : "undone"
         if result.failures.isEmpty {
-            containerEditError = nil
+            setEditError(nil, document)
             statusMessage = "\(action) \(verb)."
             announce(statusMessage)
         } else {
@@ -211,12 +212,25 @@ extension NavigationModel {
             let start = result.inverse.restores.isEmpty
                 ? "\(action) was not \(verb)."
                 : "\(action) was \(verb) except in \(failed) folder\(failed == 1 ? "" : "s") (\(names))."
-            let failure = start + " " + containerUndoMessage(result.failures[0].error)
-            containerEditError = failure
+            let failure = start + " " + containerUndoMessage(result.failures[0].error, document)
+            setEditError(failure, document)
             announce(failure)
         }
+        itemFieldRevision &+= 1
         containerEditSaving = true
         refreshContainers(force: true)
+    }
+
+    /// Where an edit's error is shown: the Container section or the Checks section.
+    func setEditError(_ message: String?, _ document: EditedDocument) {
+        switch document {
+        case .containers: containerEditError = message
+        case .itemFields: itemFieldEditError = message
+        }
+    }
+
+    private func editError(_ document: EditedDocument) -> String? {
+        document == .containers ? containerEditError : itemFieldEditError
     }
 
     /// Selects the file a warning starts at, if the list shows it.
@@ -245,18 +259,18 @@ extension NavigationModel {
 
     /// Runs one edit off the main thread, one at a time, then reads the container files again.
     /// What it wrote is registered with `undo` as `action`.
-    private func runContainerEdit(done: String, action: String, undo: UndoManager?,
-                                  _ work: @escaping @Sendable () throws -> ContainerUndoStep?) {
+    func runContainerEdit(done: String, action: String, undo: UndoManager?, document: EditedDocument = .containers,
+                          _ work: @escaping @Sendable () throws -> ContainerUndoStep?) {
         guard !containerEditSaving else {
-            containerEditError = "The last change is still being saved. Try again in a moment."
+            setEditError("The last change is still being saved. Try again in a moment.", document)
             return
         }
         containerEditSaving = true
-        containerEditError = nil
+        setEditError(nil, document)
         let treePath = containerTree?.path
         Task { [weak self] in
             let outcome: Result<ContainerUndoStep?, ContainerEditFailure> = await Task.detached(priority: .userInitiated) {
-                do { return .success(try work()) } catch { return .failure(ContainerEditFailure(error)) }
+                do { return .success(try work()) } catch { return .failure(ContainerEditFailure(error, document)) }
             }.value
             guard let self else { return }
             guard treePath == self.containerTree?.path else { self.containerEditSaving = false; return }
@@ -266,12 +280,13 @@ extension NavigationModel {
             case .failure(let error): failure = error.message
             }
             if let failure {
-                self.containerEditError = failure
+                self.setEditError(failure, document)
                 self.announce(failure)
             } else {
                 self.statusMessage = done
                 self.announce(done)
             }
+            self.itemFieldRevision &+= 1
             // The editor stays disabled until the catalog read after this edit is published, so a menu still
             // offering the old value cannot write it back over the one just saved (`refreshContainers` clears it).
             self.containerEditSaving = true
@@ -361,6 +376,8 @@ struct ContainerDocumentRestore: Sendable {
         case containers(ContainerFile)
         /// `<folder>/.archivesuite/container-names.json`.
         case names(ContainerNames)
+        /// `<folder>/.archivesuite/item-fields.json` (W40.reader-item-field-edit).
+        case itemFields(UserItemFields)
     }
     let folder: URL
     let restore: Document
@@ -371,6 +388,12 @@ struct ContainerDocumentRestore: Sendable {
 /// included.
 struct ContainerUndoStep: Sendable {
     var restores: [ContainerDocumentRestore]
+
+    /// Which document an edit wrote, so its errors are shown where it was made.
+    var document: EditedDocument {
+        restores.allSatisfy { if case .itemFields = $0.restore { true } else { false } } && !restores.isEmpty
+            ? .itemFields : .containers
+    }
 
     /// Puts each file back where it is still the document the edit wrote, read fresh and written with that read's
     /// stamp; any other is left alone. `inverse` is what takes the restored files forward again.
@@ -388,6 +411,10 @@ struct ContainerUndoStep: Sendable {
                     let current = try Self.current(ContainerFileStore.loadNames(root: r.folder), r.expecting)
                     let wrote = try ContainerFileStore.writeNames(doc, root: r.folder, expecting: r.expecting)
                     inverse.append(.init(folder: r.folder, restore: .names(current), expecting: wrote))
+                case .itemFields(let doc):
+                    let current = try Self.current(ContainerFileStore.loadItemFields(directory: r.folder), r.expecting)
+                    let wrote = try ContainerFileStore.writeItemFields(doc, directory: r.folder, expecting: r.expecting)
+                    inverse.append(.init(folder: r.folder, restore: .itemFields(current), expecting: wrote))
                 }
             } catch {
                 failures.append((r.folder, error))
@@ -417,15 +444,34 @@ struct ContainerSelectionRolledBack: Error {
 /// An edit's error, as the Inspector words it (carried off the detached task as text).
 struct ContainerEditFailure: Error {
     let message: String
-    init(_ error: Error) { message = containerEditWriteMessage(error) }
+    init(_ error: Error, _ document: EditedDocument = .containers) {
+        message = document == .containers ? containerEditWriteMessage(error) : itemFieldEditWriteMessage(error)
+    }
 }
 
+/// The document an edit in `.archivesuite` writes: the container files, or the user's item-field values.
+enum EditedDocument: Sendable { case containers, itemFields }
+
 /// Why an undo or redo left a folder alone.
-func containerUndoMessage(_ error: Error) -> String {
+func containerUndoMessage(_ error: Error, _ document: EditedDocument = .containers) -> String {
     if (error as? ContainerWriteError) == .changedSinceRead {
-        return "Its container file changed after the edit (another app, or another change), so it was left as it is."
+        let file = document == .containers ? "container file" : "item-field file"
+        return "Its \(file) changed after the edit (another app, or another change), so it was left as it is."
     }
-    return containerEditWriteMessage(error)
+    return document == .containers ? containerEditWriteMessage(error) : itemFieldEditWriteMessage(error)
+}
+
+/// Why an item-field edit was refused, for the Inspector's Checks (W40.reader-item-field-edit).
+func itemFieldEditWriteMessage(_ error: Error) -> String {
+    switch error as? ContainerWriteError {
+    case .changedSinceRead?: return "Another app changed this folder's item fields just now. Look again and redo the change."
+    case .busy?: return "Another app is writing this folder's item fields. Try again in a moment."
+    case .refusedExisting?: return "This folder's item-field file (“.archivesuite/\(UserItemFields.fileName)”) was written "
+        + "by a newer version, or is not one this version can read, so it is left as it is and nothing was changed."
+    case .notOrdinary?: return "This folder's “.archivesuite” is a link or not a folder, so nothing was written."
+    case .tooBig?: return "This folder's item-field file would pass its 1 MB limit, so nothing was written."
+    default: return "The change could not be saved: \(error.localizedDescription)"
+    }
 }
 
 /// Why a container edit was refused, for the Inspector.

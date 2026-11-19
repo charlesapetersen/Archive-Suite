@@ -212,6 +212,10 @@ final class NavigationModel: ObservableObject {
     @Published var containerEditError: String?
     /// A container edit is being written (`NavigationModel+ContainerEdits`); one at a time.
     @Published var containerEditSaving = false
+    /// W40.reader-item-field-edit: why the last item-field edit was refused, for the Inspector's Checks.
+    @Published var itemFieldEditError: String?
+    /// Bumped after each `.archivesuite` edit, undo or redo, so the Checks section reads the user's values again.
+    @Published var itemFieldRevision = 0
     var containerGeneration = 0
     /// `LibraryChangeSignature.containers` of the catalog last published (W47.ct-reader-facet-rules).
     private var containerValuesSig = 0

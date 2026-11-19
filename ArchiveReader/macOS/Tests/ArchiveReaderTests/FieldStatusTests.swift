@@ -72,7 +72,8 @@ final class FieldStatusTests: XCTestCase {
         XCTAssertEqual(read.itemFields.recipientPlace, "Boston, Massachusetts")
         XCTAssertEqual(read.dateEvidence?.hasPrefix("image;"), true)
         XCTAssertEqual(try Data(contentsOf: url), before, "reading never changes the file")
-        XCTAssertNil(FieldStatusSection.HeaderFields.read(url, isDataless: true), "a placeholder is never opened")
+        XCTAssertEqual(FieldStatusSection.HeaderFields.read(url, isDataless: true)?.itemFields, PDFItemFields(),
+                       "a placeholder is never opened (only the user's values beside it are read)")
         let jpeg = scratch.appendingPathComponent("marker.jpg")
         try Data("not a pdf".utf8).write(to: jpeg)
         XCTAssertNil(FieldStatusSection.HeaderFields.read(jpeg, isDataless: false))

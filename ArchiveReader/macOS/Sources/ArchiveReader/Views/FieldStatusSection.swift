@@ -8,9 +8,20 @@ import ArchiveCoreUI
 /// off the file, off the main thread), each with its state (`FieldStatusPolicy`) and a button that checks it without
 /// changing it. Editing a date above checks it too (`TagEditing.userDelta`). For a group it counts the checked dates
 /// and checks them all at once. A check is a `Checked <Field>` tag, written through `TagWriter` like any tag edit.
+///
+/// W40.reader-item-field-edit: an item field's value can be corrected, set to none or added. The user's value is kept
+/// in the folder's `.archivesuite/item-fields.json` (`UserItemFields`, `NavigationModel.editItemField`) and shown in
+/// place of page 2's, as checked; page 2 itself is never rewritten.
 struct FieldStatusSection: View {
     let files: [ArchiveFile]
     let apply: (TagEditOp) -> Void
+    /// `NavigationModel.itemFieldRevision`: a change reads the user's values again.
+    var revision = 0
+    /// Item fields can be edited: the file is under the archive's main folder.
+    var editable = false
+    var saving = false
+    var error: String?
+    var onEdit: (CheckableField, ItemFieldEdit) -> Void = { _, _ in }
     /// The last header read, with the file and version it was read from. Shown only while that is the selection, so
     /// a newly selected file never shows, or checks, the previous file's fields while its own are read.
     @State private var read: (key: ReadKey, header: HeaderFields?)?
@@ -21,10 +32,14 @@ struct FieldStatusSection: View {
         let modified: Date?
     }
 
-    /// What the inspector needs from a file's page-2 headers.
+    /// What the inspector needs from a file's page-2 headers, and the user's own values for its item fields.
     struct HeaderFields: Equatable, Sendable {
         var itemFields = PDFItemFields()
         var dateEvidence: String?
+        /// The user's values (`UserItemFields`); "" is "none".
+        var user: [CheckableField: String] = [:]
+        /// Why the folder's item-field file cannot be read or written, when it cannot; editing is then off.
+        var userProblem: String?
 
         /// The first text page carrying item fields gives them; the first with a date-evidence line gives that.
         init(headers: [PDFPageHeader?]) {
@@ -33,29 +48,63 @@ struct FieldStatusSection: View {
             dateEvidence = all.lazy.compactMap(\.dateEvidence).first
         }
 
-        /// Reads `url`'s headers. A placeholder that is not on disk, or a file that is not a PDF, gives none.
+        /// Reads `url`'s headers and the user's values in its folder. A file that is not a PDF gives none; a
+        /// placeholder that is not on disk gives the user's values alone.
         static func read(_ url: URL, isDataless: Bool) -> HeaderFields? {
-            guard !isDataless, url.pathExtension.lowercased() == "pdf",
-                  let doc = PDFDocument(url: url), !doc.isLocked else { return nil }
-            return HeaderFields(headers: PDFHeaderParser.textPageHeaders(doc))
+            guard url.pathExtension.lowercased() == "pdf" else { return nil }
+            var fields = HeaderFields(headers: [])
+            if !isDataless, let doc = PDFDocument(url: url), !doc.isLocked {
+                fields = HeaderFields(headers: PDFHeaderParser.textPageHeaders(doc))
+            }
+            let folder = url.deletingLastPathComponent().resolvingSymlinksInPath()
+            switch ContainerFileStore.loadItemFields(directory: folder) {
+            case .missing: break
+            case let .loaded(doc, stamp):
+                fields.user = doc.values(for: url.lastPathComponent)
+                if stamp.droppedOnReading { fields.userProblem = problem }
+            case .newer, .unreadable: fields.userProblem = problem
+            }
+            return fields
         }
+
+        static let problem = "This folder's “.archivesuite/\(UserItemFields.fileName)” was written by a newer version "
+            + "or cannot be read, so item fields cannot be corrected here. It is left as it is."
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Checks").font(.subheadline.bold())
             if let file = single {
-                FieldStatusList(tags: file.tags, header: read?.key == key(file) ? read?.header : nil, apply: apply)
+                let header = read?.key == key(file) ? read?.header : nil
+                FieldStatusList(tags: file.tags, header: header, apply: apply,
+                                editable: editable && header != nil && header?.userProblem == nil,
+                                saving: saving, onEdit: onEdit)
+                    .id(file.path)   // a field being typed into belongs to its file, never the next one selected
+                if let problem = header?.userProblem, editable {
+                    Text(problem).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let error {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red).font(.caption).fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("ar.fieldStatus.error")
+                }
             } else {
                 groupSummary
             }
         }
-        .task(id: single.map(key)) {
+        .task(id: single.map { TaskKey(file: key($0), revision: revision) }) {
             guard let file = single else { return }
             let k = key(file), url = file.url, dataless = file.isDataless
             let header = await Task.detached(priority: .utility) { HeaderFields.read(url, isDataless: dataless) }.value
             if !Task.isCancelled { read = (k, header) }
         }
+    }
+
+    /// What starts a read: a new file or version, or a saved edit. Only the file decides what is shown.
+    private struct TaskKey: Hashable {
+        let file: ReadKey
+        let revision: Int
     }
 
     private var single: ArchiveFile? { files.count == 1 ? files.first : nil }
@@ -89,16 +138,27 @@ struct FieldStatusSection: View {
     }
 }
 
-/// One file's checkable values, in a fixed order: the dates, then the item fields in header order.
+/// One file's checkable values, in a fixed order: the dates, then the item fields in header order. An item field the
+/// user has set shows their value, checked, and page 2's in its tooltip.
 struct FieldStatusList: View {
     let tags: DocumentTags
     let header: FieldStatusSection.HeaderFields?
     let apply: (TagEditOp) -> Void
+    var editable = false
+    var saving = false
+    var onEdit: (CheckableField, ItemFieldEdit) -> Void = { _, _ in }
+
+    @State private var editing: CheckableField?
+    @State private var draft = ""
 
     struct Row: Equatable {
         let field: CheckableField
         let value: String
         let status: FieldStatus
+        /// The value is the user's (`UserItemFields`), not page 2's.
+        var userSet = false
+        /// What page 2 reads, for an item field.
+        var pageValue: String?
     }
 
     static func rows(tags: DocumentTags, header: FieldStatusSection.HeaderFields?) -> [Row] {
@@ -113,12 +173,25 @@ struct FieldStatusList: View {
                             status: FieldStatusPolicy.sentWith(checked: tags.checkedFields.contains(.sentWith))))
         }
         for field in CheckableField.itemFields {
-            guard let fields = header?.itemFields, let value = field.value(in: fields) else { continue }
-            rows.append(Row(field: field, value: value,
-                            status: FieldStatusPolicy.itemField(field, checked: tags.checkedFields.contains(field))))
+            let page = header.flatMap { field.value(in: $0.itemFields) }
+            if let user = header?.user[field] {
+                rows.append(Row(field: field, value: user.isEmpty ? Self.noneText : user,
+                                status: FieldStatusPolicy.userItemField(pageValue: page), userSet: true,
+                                pageValue: page))
+            } else if let page {
+                rows.append(Row(field: field, value: page,
+                                status: FieldStatusPolicy.itemField(field, checked: tags.checkedFields.contains(field)),
+                                pageValue: page))
+            }
         }
         return rows
     }
+
+    /// How a user's "none" is shown.
+    static let noneText = "None"
+
+    /// The kinds a document can be given (SPEC tag-format §Item fields), in a fixed order for the menu.
+    static let kinds = ZoteroExport.kinds.sorted()
 
     var body: some View {
         let rows = Self.rows(tags: tags, header: header)
@@ -127,10 +200,92 @@ struct FieldStatusList: View {
                 Text("No date or item fields to check.").font(.callout).foregroundStyle(.secondary)
             }
             ForEach(rows, id: \.field) { row in
-                FieldStatusRow(name: row.field.label, value: row.value, status: row.status,
-                               identifier: "ar.fieldStatus.\(row.field)",
-                               onToggle: { apply(.setChecked(row.field, row.status.level != .checked)) })
+                VStack(alignment: .leading, spacing: 4) {
+                    FieldStatusRow(name: row.field.label, value: row.value, status: row.status,
+                                   identifier: "ar.fieldStatus.\(row.field)",
+                                   onToggle: row.userSet ? nil
+                                       : { apply(.setChecked(row.field, row.status.level != .checked)) })
+                    if editable, CheckableField.itemFields.contains(row.field) {
+                        if editing == row.field { editor(row.field) } else { rowMenu(row) }
+                    }
+                }
+            }
+            if editable {
+                let shown = Set(rows.map(\.field))
+                let missing = CheckableField.itemFields.filter { !shown.contains($0) }
+                if let field = editing, missing.contains(field) {
+                    Text(field.label).font(.callout).foregroundStyle(.secondary)
+                    editor(field)
+                }
+                if !missing.isEmpty { addMenu(missing) }
             }
         }
+    }
+
+    private func rowMenu(_ row: Row) -> some View {
+        let f = row.field
+        return Menu("Edit") {
+            Button("Change…") { begin(f, text: header?.user[f] == "" ? "" : row.value) }
+            if header?.user[f] != "" {
+                Button("None") { onEdit(f, .none) }
+                    .help("Say this file has no \(f.label.lowercased()), whatever page 2 reads.")
+            }
+            if row.userSet {
+                Button(row.pageValue.map { "Remove Your Value (page 2 reads “\($0)”)" } ?? "Remove Your Value") {
+                    onEdit(f, .remove)
+                }
+            }
+        }
+        .menuStyle(.borderlessButton).fixedSize().controlSize(.small)
+        .disabled(saving)
+        .help("Correct the \(f.label.lowercased()) for this file. Page 2 is not rewritten; your value is kept beside it.")
+        .accessibilityIdentifier("ar.fieldStatus.\(f).edit")
+    }
+
+    private func addMenu(_ missing: [CheckableField]) -> some View {
+        Menu("Add Item Field") {
+            ForEach(missing, id: \.self) { f in
+                Button(f.label) { begin(f, text: "") }
+            }
+        }
+        .menuStyle(.borderlessButton).fixedSize().controlSize(.small)
+        .disabled(saving)
+        .help("Give this file a kind, title, byline, publication, publication date or recipient place page 2 lacks.")
+        .accessibilityIdentifier("ar.fieldStatus.add")
+    }
+
+    @ViewBuilder private func editor(_ field: CheckableField) -> some View {
+        HStack {
+            if field == .documentKind {
+                Picker(field.label, selection: $draft) {
+                    if !Self.kinds.contains(draft) { Text(draft.isEmpty ? "Choose…" : draft).tag(draft) }
+                    ForEach(Self.kinds, id: \.self) { Text($0).tag($0) }
+                }
+                .labelsHidden().font(.callout)
+                .accessibilityIdentifier("ar.fieldStatus.\(field).field")
+            } else {
+                TextField(field.label, text: $draft)
+                    .textFieldStyle(.roundedBorder).font(.callout)
+                    .onSubmit { commit(field) }
+                    .accessibilityIdentifier("ar.fieldStatus.\(field).field")
+            }
+            Button("Save") { commit(field) }
+                .controlSize(.small).disabled(saving)
+                .accessibilityIdentifier("ar.fieldStatus.\(field).save")
+            Button("Cancel") { editing = nil }
+                .controlSize(.small)
+        }
+    }
+
+    private func begin(_ field: CheckableField, text: String) {
+        draft = text
+        editing = field
+    }
+
+    private func commit(_ field: CheckableField) {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        onEdit(field, .set(text))
+        editing = nil
     }
 }
