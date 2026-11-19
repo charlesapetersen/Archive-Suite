@@ -124,7 +124,7 @@ struct SettingsReadingPanel: View {
                     } label: {
                         Label("Fill in OpenAI preset", systemImage: "sparkles")
                     }
-                    HelpButton(text: "One-click fill for OpenAI's public API: sets the Gateway URL to https://api.openai.com/v1, a cost-effective OpenAI model, a display name, and its pricing. Paste your OpenAI key into the Gateway key field below. The gateway sends standard chat-completions requests, so this fills a non-reasoning model; for GPT-5 reasoning models pick OpenAI under the Direct API mode instead. For Azure OpenAI or another OpenAI-compatible proxy, apply this then edit the Gateway URL to your endpoint.")
+                    HelpButton(text: "One-click fill for OpenAI's public API: sets the Gateway URL to https://api.openai.com/v1, a cost-effective OpenAI model, a display name, and its pricing. Paste your OpenAI key into the Gateway key field in Settings › Accounts. The gateway sends standard chat-completions requests, so this fills a non-reasoning model; for GPT-5 reasoning models pick OpenAI under the Direct API mode instead. For Azure OpenAI or another OpenAI-compatible proxy, apply this then edit the Gateway URL to your endpoint.")
                 }
                 HStack {
                     SettingsField("Gateway URL") {

@@ -102,9 +102,9 @@ final class AppearanceSettingUITests: XCTestCase {
     }
 
     private func showSettings() throws -> XCUIElement {
-        app.typeKey(",", modifierFlags: .command)
-        let settings = app.windows.containing(.any, identifier: "ap.settings.guidedKeySetup").firstMatch
-        XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings should open")
+        let settings = app.showSettingsWindow()
+        XCTAssertTrue(settings.exists, "Settings should come up")
+        XCTAssertTrue(app.showSettingsPanel("General"), "Appearance is in the General panel")
         XCTAssertTrue(appearancePicker().waitForExistence(timeout: 5), "Settings should offer the Appearance picker")
         LayoutGuard.waitUntilSettled(settings)
         return settings

@@ -95,6 +95,7 @@ struct CollectionSettingsSection: View {
         }
         .onAppear(perform: reload)
         .onChange(of: outputPath) { _, _ in reload() }
+        .onChange(of: store.collectionRevision) { _, _ in reload() }   // a stage card or the sheet wrote it
         .sheet(isPresented: $showNewProject, onDismiss: {
             if let id = projectToAsk { projectToAsk = nil; interview = .project(id) }
         }) {

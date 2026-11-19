@@ -146,9 +146,15 @@ final class VisualReviewUITests: XCTestCase {
     private func settingsWindow() {
         let settings = openSettings()
         guard let settings else { missing.append("Settings window"); return }
-        shoot("settings-direct")
-        scrollSettings(settings, name: "settings-direct")
-        settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: 4000)
+        // W47.settings-panels: each of the eight panels, scrolled through.
+        for panel in XCUIApplication.settingsPanels {
+            guard app.showSettingsPanel(panel) else { missing.append("Settings panel \(panel)"); continue }
+            pause(0.5)
+            let slug = "settings-" + XCUIApplication.settingsPanelID(panel)
+            shoot(slug)
+            scrollSettings(settings, name: slug)
+        }
+        app.showSettingsPanel("Reading")
         pause(0.5)
 
         // A help popover (one is enough: they share one view).
@@ -160,12 +166,15 @@ final class VisualReviewUITests: XCTestCase {
             escape()
         } else { missing.append("help button") }
 
+        app.showSettingsPanel("Collection")
         if clickButton("New project…") {
             pause(0.8)
             shoot("settings-new-project-sheet")
             cancel()
         }
 
+        app.showSettingsPanel("Reading")
+        scrollSettings(settings, name: "settings-reading-to-models")
         if clickButton("Manage custom models…") {
             if waitForSheet() {
                 shoot("settings-manage-models")
@@ -181,6 +190,7 @@ final class VisualReviewUITests: XCTestCase {
 
         settingsSheet(settings)
 
+        app.showSettingsPanel("Accounts")
         let guided = element("ap.settings.guidedKeySetup")
         if guided.waitForExistence(timeout: 3) {
             guided.click()
@@ -198,6 +208,7 @@ final class VisualReviewUITests: XCTestCase {
             shoot("settings-\(slug)")
             scrollSettings(settings, name: "settings-\(slug)")
             if backend == "Local CLI Agent" {
+                app.showSettingsPanel("Accounts")
                 let wizard = element("ap.settings.localAgentGuidedSetup")
                 if wizard.waitForExistence(timeout: 3) {
                     wizard.click()
@@ -352,20 +363,19 @@ final class VisualReviewUITests: XCTestCase {
 
     private func openSettings() -> XCUIElement? {
         app.activate()
-        app.typeKey(",", modifierFlags: .command)
-        let settings = app.windows.containing(.any, identifier: "ap.settings.guidedKeySetup").firstMatch
-        guard settings.waitForExistence(timeout: 10) else { return nil }
+        let settings = app.showSettingsWindow()
+        guard settings.exists else { return nil }
         pause(1)
         return settings
     }
 
     private func chooseBackend(_ title: String) -> Bool {
+        app.showSettingsPanel("Reading")
         let picker = element("ap.settings.backendPicker")
         guard picker.waitForExistence(timeout: 3) else { missing.append("backend picker"); return false }
-        if !picker.isHittable {
-            app.windows.containing(.any, identifier: "ap.settings.guidedKeySetup").firstMatch
-                .scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: 4000)
-            pause(0.5)
+        for _ in 0..<8 where !picker.isHittable {
+            app.settingsWindow.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -300)
+            pause(0.4)
         }
         picker.click()
         let item = app.menuItems[title]
@@ -375,18 +385,24 @@ final class VisualReviewUITests: XCTestCase {
         return true
     }
 
-    /// W46.settings-sheet: the settings sheet from Settings, its three tabs, each scrolled through.
+    /// W46.settings-sheet: the settings sheet from Settings (the reading card's See the range, W47.settings-panels),
+    /// its three tabs, each scrolled through.
     private func settingsSheet(_ settings: XCUIElement) {
-        let button = element("ap.settings.openSettingsSheet")
-        guard button.waitForExistence(timeout: 3) else { missing.append("settings sheet button"); return }
+        app.showSettingsPanel("Reading")
+        let button = element("ap.sheet.seeRange.reading")
+        guard button.waitForExistence(timeout: 3) else { missing.append("See the range link"); return }
         let form = settings.scrollViews.firstMatch
+        form.scroll(byDeltaX: 0, deltaY: 4000)
         for _ in 0..<10 where !button.isHittable {
-            form.scroll(byDeltaX: 0, deltaY: -400)
+            form.scroll(byDeltaX: 0, deltaY: -200)
             pause(0.4)
         }
-        guard button.isHittable else { missing.append("settings sheet button (not reachable)"); return }
+        guard button.isHittable else { missing.append("See the range link (not reachable)"); return }
         button.click()
         if waitForSheet(), element("ap.sheet").waitForExistence(timeout: 5) {
+            // The link opens the Range tab; the tour starts from Choices.
+            let choices = app.sheets.firstMatch.radioButtons["Choices"]
+            if choices.waitForExistence(timeout: 2) { choices.click(); pause(0.8) }
             shoot("settings-sheet")
             scrollSheet("settings-sheet")
             let range = app.sheets.firstMatch.radioButtons["Range"]

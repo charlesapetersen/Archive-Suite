@@ -221,7 +221,7 @@ struct SettingsEstimateStrip: View {
         Text("SCOPE").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)
         Text(visionUseLLMJudgment
              ? "Vision stays free for transcription. The selected LLM is charged only for text-only classification, segmentation, dates, and generated tags."
-             : "This backend transcribes only. Enable Vision + LLM judgement below to classify, segment, date, or generate tags.")
+             : "This backend transcribes only. Turn on Vision + LLM judgement in Settings › Reading to classify, segment, date, or generate tags.")
             .font(.caption2).foregroundStyle(.primary)
     }
 
@@ -237,7 +237,8 @@ struct SettingsEstimateStrip: View {
     private func costRow(_ label: String, _ value: String, bold: Bool = false) -> some View {
         HStack {
             Text(label).font(.caption).foregroundStyle(.primary)
-                Text(value).font(.caption).fontWeight(bold ? .semibold : .regular)
+            Spacer()
+            Text(value).font(.caption).fontWeight(bold ? .semibold : .regular)
         }
     }
 }

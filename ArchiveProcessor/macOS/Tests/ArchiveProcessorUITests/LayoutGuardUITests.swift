@@ -54,10 +54,13 @@ final class LayoutGuardUITests: XCTestCase {
         }
         LayoutGuard.sweep(main, screen: "process files, \(appearance)", in: self)
 
-        app.typeKey(",", modifierFlags: .command)
-        let settings = app.windows.containing(.any, identifier: "ap.settings.guidedKeySetup").firstMatch
-        XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings should open")
-        // The Settings scene is fixed-size: in the VM it would neither shrink nor grow (2026-10-11).
-        LayoutGuard.sweep(settings, screen: "settings, \(appearance)", in: self, resize: false)
+        let settings = app.showSettingsWindow()
+        XCTAssertTrue(settings.exists, "Settings should come up")
+        // The Settings scene is fixed-size: in the VM it would neither shrink nor grow (2026-10-11). Every panel
+        // (W47.settings-panels).
+        for panel in XCUIApplication.settingsPanels {
+            XCTAssertTrue(app.showSettingsPanel(panel), "Settings should have a \(panel) panel")
+            LayoutGuard.sweep(settings, screen: "settings, \(panel), \(appearance)", in: self, resize: false)
+        }
     }
 }

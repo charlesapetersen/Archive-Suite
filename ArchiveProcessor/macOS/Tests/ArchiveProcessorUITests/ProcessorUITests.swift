@@ -56,7 +56,7 @@ final class ProcessorUITests: XCTestCase {
     }
 
     func testAnthropicGuidedKeySetupShowsConsoleCostPrivacyAndKeyShape() throws {
-        openSettings()
+        openSettings("Accounts")
         let guidedSetup = element("ap.settings.guidedKeySetup")
         XCTAssertTrue(guidedSetup.waitForExistence(timeout: 10), "Settings must expose the guided key setup")
         guidedSetup.click()
@@ -486,16 +486,18 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertFalse(element("ap.ocr.startBlockedReason").exists,
                        "no reason line while Start is enabled: \(renderedText(of: element("ap.ocr.startBlockedReason")))")
 
-        openSettings()
-        XCTAssertTrue(element("ap.settings.localAgentToolPicker").waitForExistence(timeout: 10),
-                      "the active Local Agent backend must reveal the CLI picker")
+        // W47.settings-panels: the estimate is a strip in Collection, the CLI's setup is in Accounts.
+        openSettings("Collection")
         let settingsCost = element("ap.settings.costPane")
-        XCTAssertTrue(settingsCost.exists,
-                      "the pinned Settings cost pane needs a stable UI-test identity")
+        XCTAssertTrue(settingsCost.waitForExistence(timeout: 10),
+                      "the Settings estimate needs a stable UI-test identity")
         XCTAssertTrue(renderedText(of: settingsCost).contains("Included in your subscription — usage limits apply."),
-                      "the pinned Settings pane must use the same no-dollar cost message")
+                      "the Settings estimate must use the same no-dollar cost message")
         XCTAssertTrue(renderedText(of: settingsCost).contains("paces automatically, then resumes"),
-                      "the pinned Settings pane must describe its subscription pacing")
+                      "the Settings estimate must describe its subscription pacing")
+        XCTAssertTrue(app.showSettingsPanel("Accounts"), "Settings must have an Accounts panel")
+        XCTAssertTrue(element("ap.settings.localAgentToolPicker").waitForExistence(timeout: 10),
+                      "Accounts must hold the CLI picker")
 
         let guidedSetup = element("ap.settings.localAgentGuidedSetup")
         XCTAssertTrue(guidedSetup.exists, "Local Agent setup must be reachable without a key or CLI login")
@@ -518,9 +520,9 @@ final class ProcessorUITests: XCTestCase {
     /// inside it, not a label alone on its row. The accessibility tree cannot see a border, so the screenshots
     /// are the visual half of this check.
     func testSettingsTextFieldsShowTheirFieldAndPlaceholder() throws {
-        openSettings()
-        let settings = app.windows.containing(.any, identifier: "ap.settings.guidedKeySetup").firstMatch
-        XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings must open")
+        openSettings("Accounts")
+        let settings = app.settingsWindow
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings must come up")
         defer { chooseBackend("Direct API", in: settings) }
 
         let anthropicKey = settings.secureTextFields["Anthropic API key"]
@@ -544,6 +546,7 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-settings-gateway-fields")
 
         chooseBackend("Local CLI Agent", in: settings)
+        XCTAssertTrue(app.showSettingsPanel("Accounts"))
         for label in ["CLI path", "Model"] {
             let field = settings.textFields[label]
             XCTAssertTrue(field.waitForExistence(timeout: 5), "the Local CLI \(label) row needs its field")
@@ -551,10 +554,11 @@ final class ProcessorUITests: XCTestCase {
                           "the Local CLI \(label) must say it is optional inside the field")
         }
         attachScreenshot("processor-settings-local-cli-fields")
-        settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -450)   // down to the image-size fields
+        XCTAssertTrue(app.showSettingsPanel("Pages and output"))
+        settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -2000)   // down to the image-size fields
         attachScreenshot("processor-settings-size-fields")
 
-        settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: 8000)   // Live Capture is near the top
+        XCTAssertTrue(app.showSettingsPanel("Capture"))
         let clientID = settings.textFields["Google client ID"]
         XCTAssertTrue(clientID.waitForExistence(timeout: 5), "the Google client ID needs its field")
         XCTAssertEqual(clientID.placeholderValue, "…apps.googleusercontent.com",
@@ -568,17 +572,11 @@ final class ProcessorUITests: XCTestCase {
         chooseTagging("Automatic (LLM)")
         defer { chooseTagging("Automatic (LLM)") }
         openSettings()
-        let settings = app.windows.containing(.any, identifier: "ap.settings.guidedKeySetup").firstMatch
-        XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings must open")
+        let settings = app.settingsWindow
+        XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings must come up")
         defer { chooseBackend("Direct API", in: settings) }
 
         chooseBackend("Apple Vision (on this Mac)", in: settings)
-        let batchReason = element("ap.settings.batchModeUnavailable")
-        XCTAssertTrue(batchReason.waitForExistence(timeout: 5), "Apple Vision must say batch mode is not used")
-        XCTAssertTrue(renderedText(of: batchReason).contains("Apple Vision"), renderedText(of: batchReason))
-        XCTAssertFalse(element("ap.settings.batchMode").isEnabled, "Apple Vision must not offer batch mode")
-        XCTAssertTrue(renderedText(of: element("ap.settings.ocrWorkersFixed")).contains("performance core"),
-                      "Apple Vision's worker row must show the count it uses, not a stepper it ignores")
         let conflict = element("ap.settings.visionTaggingConflict")
         XCTAssertTrue(conflict.waitForExistence(timeout: 5), "an LLM Tagging mode must be named beside transcription-only")
         XCTAssertTrue(renderedText(of: element("ap.ocr.reOCRExplanation")).contains("only transcribes"),
@@ -589,18 +587,29 @@ final class ProcessorUITests: XCTestCase {
         useNoTagging.click()
         XCTAssertTrue(waitUntil { !conflict.exists }, "No tagging must clear the conflict line")
 
+        XCTAssertTrue(app.showSettingsPanel("Pages and output"))
+        let batchReason = element("ap.settings.batchModeUnavailable")
+        XCTAssertTrue(batchReason.waitForExistence(timeout: 5), "Apple Vision must say batch mode is not used")
+        XCTAssertTrue(renderedText(of: batchReason).contains("Apple Vision"), renderedText(of: batchReason))
+        XCTAssertFalse(element("ap.settings.batchMode").isEnabled, "Apple Vision must not offer batch mode")
+        XCTAssertTrue(renderedText(of: element("ap.settings.ocrWorkersFixed")).contains("performance core"),
+                      "Apple Vision's worker row must show the count it uses, not a stepper it ignores")
+
         chooseBackend("Local CLI Agent", in: settings)
+        XCTAssertTrue(app.showSettingsPanel("Pages and output"))
         XCTAssertTrue(waitUntil { renderedText(of: batchReason).contains("subscription") },
                       "the Local CLI Agent must say batch mode is not used: \(renderedText(of: batchReason))")
         XCTAssertFalse(element("ap.settings.batchMode").isEnabled, "the Local CLI Agent must not offer batch mode")
         XCTAssertTrue(renderedText(of: element("ap.settings.ocrWorkersFixed")).contains("At most 2"),
                       "the Local CLI Agent's worker row must match its cap")
-        XCTAssertTrue(renderedText(of: element("ap.settings.costPane")).contains("at most two pages at a time"),
-                      "the pacing pane must state the same cap")
         scrollUntilHittable(element("ap.settings.ocrWorkersFixed"), in: settings)
         attachScreenshot("processor-settings-local-cli-backend-match")
+        XCTAssertTrue(app.showSettingsPanel("Collection"))
+        XCTAssertTrue(renderedText(of: element("ap.settings.costPane")).contains("at most two pages at a time"),
+                      "the pacing pane must state the same cap")
 
         chooseBackend("Direct API", in: settings)
+        XCTAssertTrue(app.showSettingsPanel("Pages and output"))
         XCTAssertTrue(waitUntil { !element("ap.settings.ocrWorkersFixed").exists },
                       "the direct route keeps its worker stepper")
     }
@@ -621,6 +630,7 @@ final class ProcessorUITests: XCTestCase {
     }
 
     private func chooseBackend(_ title: String, in settings: XCUIElement) {
+        app.showSettingsPanel("Reading")
         let picker = element("ap.settings.backendPicker")
         if !picker.isHittable { settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: 8000) }
         guard picker.waitForExistence(timeout: 5) else { return XCTFail("Settings needs its backend picker") }
@@ -752,7 +762,7 @@ final class ProcessorUITests: XCTestCase {
     /// W40.fix-processor-visual-polish: the name prompt takes typing at once (as an alert it opened with the focus on
     /// Cancel and no caret in the field). Since W46.settings-layers the prompt is New Project's; Escape writes nothing.
     func testNewProjectTakesTheNameWithoutAClick() throws {
-        openSettings()
+        openSettings("Collection")
         let save = app.buttons["New project…"]
         XCTAssertTrue(save.waitForExistence(timeout: 10), "Settings must offer New project")
         save.click()
@@ -787,7 +797,7 @@ final class ProcessorUITests: XCTestCase {
 
     /// W46.settings-interviews: Settings' collection section opens the collection interview, and Skip saves nothing.
     func testCollectionInterviewOpensFromSettings() throws {
-        openSettings()
+        openSettings("Collection")
         let answer = app.buttons["Answer…"]
         XCTAssertTrue(answer.waitForExistence(timeout: 10), "a collection with no answers must offer the interview")
         answer.click()
@@ -804,7 +814,7 @@ final class ProcessorUITests: XCTestCase {
 
     /// W46.settings-interviews: a new project is asked about its material as soon as it is named.
     func testNewProjectAsksAboutItsMaterial() throws {
-        openSettings()
+        openSettings("Collection")
         let newProject = app.buttons["New project…"]
         XCTAssertTrue(newProject.waitForExistence(timeout: 10), "Settings must offer New project")
         newProject.click()
@@ -932,9 +942,10 @@ final class ProcessorUITests: XCTestCase {
         }
     }
 
-    private func openSettings() {
-        app.activate()
-        app.typeKey(",", modifierFlags: .command)
+    /// Brings up Settings and, when `panel` is given, shows that panel (W47.settings-panels).
+    private func openSettings(_ panel: String? = nil) {
+        app.showSettingsWindow()
+        if let panel { XCTAssertTrue(app.showSettingsPanel(panel), "Settings must have a \(panel) panel") }
     }
 
     private func element(_ identifier: String) -> XCUIElement {

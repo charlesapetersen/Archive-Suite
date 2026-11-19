@@ -12,7 +12,12 @@ struct SettingsStageCards: View {
     var limits = false
 
     @State private var showingRange = false
-    private let folder = SettingsSheetButton.outputFolder()
+    /// Read so a change of Process Files' folder redraws the cards for the new collection.
+    @AppStorage(DefaultsKeys.outputDirectory) private var outputPath: String = ""
+    private var folder: URL? {
+        _ = outputPath
+        return SettingsSheetButton.outputFolder()
+    }
 
     var body: some View {
         SettingsSheetHost(outputFolder: folder, pages: 1000) { model, actions in
@@ -34,7 +39,8 @@ struct SettingsStageCards: View {
                             RuleStageBox(stage: stage, setSwitch: actions.setSwitch, setStrings: actions.setStrings)
                         }
                     }
-                    if let message = actions.problem {
+                    // Only this host's own problem: the store's is shown once, by the panel's other views or the sheet.
+                    if let message = actions.ownProblem {
                         Text(message).font(.caption).foregroundStyle(.red)
                     }
                 }

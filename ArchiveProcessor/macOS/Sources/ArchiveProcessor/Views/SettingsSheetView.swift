@@ -109,13 +109,16 @@ struct SettingsSheetView: View {
 }
 
 /// What a sheet page or a Settings panel's cards do when the user chooses: written through `SettingsSheetWriter` or to
-/// what Process Files runs. `problem` is the last write's failure, in words.
+/// what Process Files runs. `problem` is what went wrong, in words: this host's own reading or writing (`ownProblem`),
+/// else the store's last problem.
 struct SettingsSheetActions {
     var choose: (String, String?) -> Void
     var apply: (SettingsSheetModel.Apply) -> Void
     var setSwitch: (SettingsKey, Bool) -> Void
     var setStrings: (SettingsKey, [String]) -> Void
-    var problem: String?
+    var ownProblem: String?
+    var storeProblem: String?
+    var problem: String? { ownProblem ?? storeProblem }
 }
 
 /// Builds the settings sheet's model for the collection and this Mac, and writes its choices. Shared by the modal
@@ -155,8 +158,11 @@ struct SettingsSheetHost<Content: View>: View {
 
     var body: some View {
         content(model, SettingsSheetActions(choose: choose, apply: apply, setSwitch: setSwitch, setStrings: setStrings,
-                                            problem: problem ?? store.lastProblem))
+                                            ownProblem: problem, storeProblem: store.lastProblem))
             .onAppear { reload() }
+            // A Settings panel lives as long as the window: follow Process Files' folder, and another view's write.
+            .onChange(of: outputFolder) { _, _ in reload() }
+            .onChange(of: store.collectionRevision) { _, _ in reload() }
     }
 
     // MARK: Writing

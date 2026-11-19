@@ -41,6 +41,9 @@ final class TransientStateUITests: XCTestCase {
         TransientCheck.check("open Settings", in: app, test: self) {
             app.typeKey(",", modifierFlags: .command)
         }
+        TransientCheck.check("show the Accounts panel", in: app, test: self) {
+            XCTAssertTrue(app.showSettingsPanel("Accounts"), "Settings must have an Accounts panel")
+        }
         TransientCheck.check("open the guided key setup", in: app, test: self) {
             let guided = element("ap.settings.guidedKeySetup")
             XCTAssertTrue(guided.waitForExistence(timeout: 10), "Settings must expose the guided key setup")

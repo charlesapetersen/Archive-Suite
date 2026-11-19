@@ -63,13 +63,15 @@ final class AccessibilityAuditUITests: XCTestCase {
         LayoutGuard.waitUntilSettled(main)
         sweep.audit(main, screen: "process files")
 
-        app.typeKey(",", modifierFlags: .command)
-        let settings = app.windows.containing(.any, identifier: "ap.settings.guidedKeySetup").firstMatch
-        XCTAssertTrue(settings.waitForExistence(timeout: 10), "Settings should open")
-        LayoutGuard.waitUntilSettled(settings)
-        // Settings is a `.grouped` Form full of TextFields: on macOS 27 each sweep reports SwiftUI's unnamed
-        // parent/child orphan there (W40.vm-macos27-processor; the probe is on the exemption).
-        sweep.audit(settings, screen: "settings", exempt: [AccessibilityAudit.groupedFormTextFieldOrphan])
+        let settings = app.showSettingsWindow()
+        XCTAssertTrue(settings.exists, "Settings should come up")
+        // Every panel (W47.settings-panels). Each is a `.grouped` Form, many with TextFields: on macOS 27 each sweep
+        // reports SwiftUI's unnamed parent/child orphan there (W40.vm-macos27-processor; the probe is on the exemption).
+        for panel in XCUIApplication.settingsPanels {
+            XCTAssertTrue(app.showSettingsPanel(panel), "Settings should have a \(panel) panel")
+            LayoutGuard.waitUntilSettled(settings)
+            sweep.audit(settings, screen: "settings, \(panel)", exempt: [AccessibilityAudit.groupedFormTextFieldOrphan])
+        }
         sweep.finish()
     }
 

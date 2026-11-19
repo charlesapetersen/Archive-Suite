@@ -281,6 +281,9 @@ final class SettingsLayerStore: ObservableObject {
     /// The last thing that went wrong reading or writing, for the Settings window and the run log; cleared by the next
     /// write that succeeds.
     @Published private(set) var lastProblem: String?
+    /// Counts the collection writes this store has made, so every view holding a copy of a collection's document
+    /// reloads it after another view writes (W47.settings-panels: several panels and the sheet hold one each).
+    @Published private(set) var collectionRevision = 0
 
     let directory: URL
     var generalURL: URL { directory.appendingPathComponent("settings-general.json") }
@@ -443,6 +446,7 @@ final class SettingsLayerStore: ObservableObject {
         do {
             try CollectionSettingsFile.write(doc, in: outputDirectory)
             lastProblem = standingProblem
+            collectionRevision += 1
             return doc
         } catch {
             lastProblem = "\(error)"
