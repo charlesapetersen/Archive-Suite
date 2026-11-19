@@ -65,9 +65,12 @@ it rests on. A guess with no evidence is never written."
    within two letters of exactly one full name in a full date, spaces in a numeric date, a two-digit year after a month word, an l
    for a 1 in a day; they never choose the year. An image year whose quote holds no dated form takes the reply's
    document month. Measured in `date-full-date.md` with the owner's blind sheet folded (W46.date-full-date-fold): the
-   month right on 98.5% (131/133) and never wrong, the day 94.6% (105/111) with 2 wrong [M] (before the OCR forms
-   89.5% and 86.5%); on the public set's dates the OCR forms write the catalogue month on 99.0% (568/574), the strict
-   forms 97.6%. No ruling changed the rule (no day-first numeric date among them). The image pass is not sent for a
+   month right on 98.5% (131/133), wrong on 0 of 133 (95% upper bound 2.8%), the day 94.6% (105/111) with 2 wrong [M]
+   (before the OCR forms 89.5% and 86.5%). That is a fit, since the forms were written from these documents' misses,
+   and 89 of the 133 are agreed documents, whose truth (frozen at W46.p16-date-truth-strata) was the route's own
+   answer and is tested only by the sheet's 8 of 8 controls (95% 68-100); on the owner-ruled 47 alone the month is
+   95.7% (45/47; 70.2% before the forms). The held-out check is the public set's dates: the OCR forms write the
+   catalogue month on 99.0% (568/574), the strict forms 97.6%. No ruling changed the rule (no day-first numeric date among them). The image pass is not sent for a
    text year with no dated form: from the cached replies it would add about 2 months in 133, at about $0.51 per
    1,000 text-year documents.
 5. *Not used.* Typeface or paper dating (DAT-4: 11 of 12 ranges contain the year at a median width of 50 years,

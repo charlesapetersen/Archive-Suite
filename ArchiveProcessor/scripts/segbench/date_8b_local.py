@@ -96,7 +96,11 @@ def counts(rs, arm):
 
 
 def paired(rs, arm):
-    p = R.paired([{"truth_y": r["truth_y"], "x": r[arm]["year"], "a": r["a"]["year"]} for r in rs], "x", "a")
+    # R.paired names its first arm a_* and its second b_*; here the first is the 8B arm (c) and the second option (a),
+    # so the keys are renamed for what they hold (P16-9: `a_*` read as option (a), the opposite of what it held).
+    q = R.paired([{"truth_y": r["truth_y"], "x": r[arm]["year"], "a": r["a"]["year"]} for r in rs], "x", "a")
+    p = {"n": q["n"], "arm_exact": q["a_exact"], "option_a_exact": q["b_exact"], "gains": q["a_only"],
+         "losses": q["b_only"], "sign_p": q["sign_p"]}
     changed = [r for r in rs if r[arm]["year"] != r["a"]["year"]]
     p["changed"] = len(changed)
     p["wrong_to_wrong"] = sum(r[arm]["year"] != r["truth_y"] and r["a"]["year"] != r["truth_y"] for r in changed)
@@ -149,8 +153,8 @@ def score():
         for r in nc if r["quote_y"] is not None and r["quote_y"] != r["a"]["year"]]
     q = out["arms"]["c_quote"]["paired_no_candidate"]
     s = out["arms"]["c_strict"]["paired_no_candidate"]
-    out["condition_met"] = q["a_only"] > q["b_only"] and q["sign_p"] < 0.05 or (
-        s["a_only"] > s["b_only"] and s["sign_p"] < 0.05)
+    out["condition_met"] = q["gains"] > q["losses"] and q["sign_p"] < 0.05 or (
+        s["gains"] > s["losses"] and s["sign_p"] < 0.05)
     return out
 
 
@@ -171,8 +175,8 @@ def write_md(o):
     verdict = ("met" if o["condition_met"] else "not met")
     L += [f"The owner's condition (the 8B's quotes improve the year on the route) is **{verdict}**. On the "
           f"{o['owner_no_candidate']} owner documents whose own Vision text gives no year candidate, the only documents "
-          f"where (a) and (c) can differ, the quote-source reading gains {q['a_only']} and loses {q['b_only']} "
-          f"(exact sign test p {q['sign_p']}); the strict reading gains {s['a_only']} and loses {s['b_only']} "
+          f"where (a) and (c) can differ, the quote-source reading gains {q['gains']} and loses {q['losses']} "
+          f"(exact sign test p {q['sign_p']}); the strict reading gains {s['gains']} and loses {s['losses']} "
           f"(p {s['sign_p']}). " + (
               "No image route is added: the 16 GB route stays (a) and `qwen3-vl-8b-image-mac` stays unoffered."
               if not o["condition_met"] else "The gain clears the sign test; call 7.5 (c) may be added."), "",
@@ -196,7 +200,7 @@ def write_md(o):
           "flagged right made explicit |", "|---|---|---|---|---|---|---|---|---|"]
     for arm in ARMS[1:]:
         p, im = A[arm]["paired_no_candidate"], A[arm]["image_years"]
-        L.append(f"| {ARM_NAMES[arm]} | {im['n']} ({im['right']}) | {p['a_only']} | {p['b_only']} | {p['sign_p']} | "
+        L.append(f"| {ARM_NAMES[arm]} | {im['n']} ({im['right']}) | {p['gains']} | {p['losses']} | {p['sign_p']} | "
                  f"{p['changed']} | {p['wrong_to_wrong']} | {p['none_to_wrong']} | "
                  f"{p['flagged_right_to_explicit_right']} |")
     L += ["", "Strata, named for this comparison (whether the 8B quotes a year; whether propagation reaches within "

@@ -85,6 +85,19 @@ def main():
            "owner_read": None}]
     check("truth: the owner's ruling wins over agreement", F.truth_of(rs[0], docs) == ("owner, this sheet", [1958, None, None]))
     check("truth: can't tell is not a truth", F.truth_of(rs[1], docs) == ("owner can't tell", None))
+    # W46.p16-date-truth-strata: once frozen, the agreed truth no longer follows the route.
+    d = {"id": "o:d", "cls": "text", "route": [1960, 5, 9], "tag": [1960, None, False], "second": [1960, 5, 9],
+         "owner_read": None}
+    moved = dict(d, route=[1960, 6, 9])
+    check("truth: unfrozen agreement is the route's own answer", F.truth_of(d, {}) == ("agreed", [1960, 5, 9]))
+    check("truth: a frozen agreed month the route leaves is scored wrong",
+          F.truth_of(moved, {}, {"o:d": [1960, 5, 9]}) == ("agreed", [1960, 5, 9])
+          and F.summarise([dict(moved, strict=[5, 9], old_month=5, kind=None, date_from="quote")], {},
+                          {"o:d": [1960, 5, 9]})["month"] == {"wrong": 1})
+    check("truth: agreeing only since the freeze is disputed", F.truth_of(dict(d, id="o:e"), {}, {}) == ("disputed", None))
+    check("truth: no year tag is apart from a wrong year",
+          F.truth_of(dict(d, tag=[None, None, None]), {})[0] == "no owner year tag"
+          and F.truth_of(dict(d, tag=[1961, None, None]), {})[0] == "year not the owner's")
     bad = [n for n, ok in checks if not ok]
     print("ALL PASS" if not bad else f"FAILURES: {len(bad)}")
     raise SystemExit(1 if bad else 0)

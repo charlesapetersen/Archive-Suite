@@ -20,10 +20,14 @@ replies ($0, no model call):
   sheet   the blind sheet in CACHE/sheet (first two pages, upright, date-like strings boxed from Vision's word boxes,
           the readings hidden, a note per document, a turn button). Vision runs under the heavy lock.
   fold    the downloaded answers -> CACHE/rulings.json; `score` then reads them.
+  freeze  the agreed truth into CACHE/rulings.json (W46.p16-date-truth-strata): each agreed document's full date as
+          the second reader gives it (then equal to the route's), so a later route is scored against it, not against
+          itself. Once frozen, a document that newly agrees is disputed until the owner rules it.
 
     python3 date_full_date.py score
     python3 date_full_date.py sheet
     python3 date_full_date.py fold ~/Downloads/date-full-date-answers.json
+    python3 date_full_date.py freeze
 
 READ ONLY on the corpus and the JPEG originals; everything written stays in the private bench cache, except the report.
 """
@@ -153,12 +157,16 @@ def rows():
 
 # --- truth --------------------------------------------------------------------------------------------------------
 
-def truth_of(r, rulings):
+def truth_of(r, rulings, agreed=None):
     """(source, [year, month, day]) of the page's own full date for one row, or (why not, None). Only documents whose
-    explicit year is the owner's year are scored: a wrong year makes its month and day moot."""
+    explicit year is the owner's year are scored: a wrong year makes its month and day moot. `agreed` is the frozen
+    agreed truth ({document id: [year, month, day]}); None before the freeze, when agreement is read off this run's
+    route, which makes the agreed stratum the route's own answer."""
     if r["cls"] not in ("text", "image"):
         return "not explicit", None
     y = r["route"][0]
+    if r["tag"][0] is None:
+        return "no owner year tag", None
     if r["tag"][0] != y:
         return "year not the owner's", None
     if r["id"] in rulings:
@@ -169,8 +177,13 @@ def truth_of(r, rulings):
     o = r["owner_read"]
     if o and o[0] == y:
         return "owner, earlier sheet", [y, o[1], o[2]]
+    if agreed is not None and r["id"] in agreed:
+        t = agreed[r["id"]]
+        return ("agreed" if t[1] is not None else "agreed, no month"), list(t)
     tm = r["tag"][1]
     if r["cls"] == "text" and r["second"] == r["route"] and (tm is None or tm == r["route"][1]):
+        if agreed is not None:      # agrees only since the freeze: the owner has not seen it
+            return "disputed", None
         return ("agreed" if r["route"][1] is not None else "agreed, no month"), list(r["route"])
     if r["cls"] == "text" and r["second"][0] is None and r["route"][1] is None and tm is None:
         return "no month found", None
@@ -212,11 +225,34 @@ def wilson_txt(k, n):
     return f"{ci[0]:.0f}-{ci[1]:.0f}" if ci else "–"
 
 
-def summarise(rs, rulings):
+OWNER_SOURCES = ("owner, this sheet", "owner, earlier sheet")
+AGREED_SOURCES = ("agreed", "agreed, no month")
+
+
+def stratum(scored, sources):
+    """Month and day tallies, this route and the strict forms, on the scored documents of the named truth sources."""
+    g = [(r, t) for r, src, t in scored if src in sources]
+    sd = [(r, t) for r, t in g if t[2] != "unsure"]
+    return {"documents": len(g), "month": tally((r["route"][1], t[1]) for r, t in g),
+            "strict_month": tally((r["strict"][0], t[1]) for r, t in g),
+            "day": tally((r["route"][2], t[2]) for r, t in sd), "strict_day": tally((r["strict"][1], t[2]) for r, t in sd)}
+
+
+def ocr_forms_change(scored):
+    """Documents right only with the OCR forms (gained) or only with the strict forms (lost), month and day."""
+    out = {}
+    for f, i, j in (("month", 1, 0), ("day", 2, 1)):
+        g = [(r, t) for r, _, t in scored if t[i] not in (None, "unsure")]
+        out[f"{f}_gained"] = sorted(r["id"] for r, t in g if r["route"][i] == t[i] and r["strict"][j] != t[i])
+        out[f"{f}_lost"] = sorted(r["id"] for r, t in g if r["strict"][j] == t[i] and r["route"][i] != t[i])
+    return out
+
+
+def summarise(rs, rulings, agreed=None):
     scored = []
     by_source = collections.Counter()
     for r in rs:
-        src, t = truth_of(r, rulings)
+        src, t = truth_of(r, rulings, agreed)
         by_source[src] += 1
         if t is not None:
             scored.append((r, src, t))
@@ -242,6 +278,8 @@ def summarise(rs, rulings):
             "vs_tag": vs_tag, "vs_tag_old": vs_tag_old, "tagged": len(tagged), "by_from": dict(by_from),
             "by_truth_source": dict(collections.Counter(src for _, src, _ in scored)),
             "strict_month": strict_m, "strict_day": strict_d, "image_arm": image_arm(rs, scored),
+            "strata": {"owner": stratum(scored, OWNER_SOURCES), "agreed": stratum(scored, AGREED_SOURCES)},
+            "ocr_forms": ocr_forms_change(scored), "agreed_frozen": agreed is not None,
             "wrong": [{"id": r["id"], "route": r["route"], "truth": t, "source": src} for r, src, t in scored
                       if (r["route"][1] is not None and t[1] is not None and r["route"][1] != t[1])
                       or (r["route"][2] is not None and t[2] not in (None, "unsure") and r["route"][2] != t[2])],
@@ -303,7 +341,9 @@ def cmd_score(_a):
     rs = rows()
     folded = json.loads(RULINGS.read_text()) if RULINGS.exists() else {}
     rulings = folded.get("documents", {})
-    S = summarise(rs, rulings)
+    agreed = folded.get("agreed")
+    S = summarise(rs, rulings, agreed)
+    S["agreed_truth"] = agreed      # the frozen truth itself, kept with the result as well as in the bench cache
     S["public"] = public_check()
     key = json.loads(KEY.read_text())["documents"] if KEY.exists() else {}
     S["sheet"] = {"documents": len(key) if rulings else len(sheet_set(rs)), "folded": bool(rulings),
@@ -317,11 +357,15 @@ def ocr_findings(S):
     """W46.date-full-date-ocr-forms' findings: the OCR forms, the image reply's document month, the public check and the
     image pass for text years, priced."""
     m, d, sm, sd, a, pub = S["month"], S["day"], S["strict_month"], S["strict_day"], S["image_arm"], S["public"]
+    of = S["ocr_forms"]
     mt = sum(m.get(k, 0) for k in ("right", "wrong", "missing"))
     dtot = sum(d.get(k, 0) for k in ("right", "wrong", "missing"))
     L = [f"- **The OCR forms (W46.date-full-date-ocr-forms) take the month from {frac(sm.get('right', 0), mt)} to "
          f"{frac(m.get('right', 0), mt)} and the day from {frac(sd.get('right', 0), dtot)} to "
-         f"{frac(d.get('right', 0), dtot)}, with no new wrong month or day.** Where the strict forms give an explicit "
+         f"{frac(d.get('right', 0), dtot)}: right only with them, {len(of['month_gained'])} months and "
+         f"{len(of['day_gained'])} days; right only without them, {len(of['month_lost'])} and {len(of['day_lost'])}; "
+         "no new wrong month or day.** A fit: the forms were written from the misses on these very documents, so this "
+         "says they recover what they were written for; the public set below is their held-out check. Where the strict forms give an explicit "
          "year no month, the route now reads that year's dated forms as Vision damages them: a spaced day "
          "(`APR 2 0 1977`, `DEC 2 1 1982`), a bullet for a full stop (`Aug• 4, 1903•`), a misread month within two "
          "letters of one name in a full date with the four-digit year (`NIRCH 13, 1965`), Cyrillic look-alikes (`ОстОВЕя 1, 1966`), spaces in a numeric date "
@@ -353,6 +397,33 @@ def ocr_findings(S):
     return "\n".join(L)
 
 
+def upper_txt(k, n):
+    ci = P.wilson(k, n)
+    return f"{ci[1]:.1f}%" if ci else "–"
+
+
+def strata_finding(S):
+    """The owner-ruled and agreed strata apart (P16-2): the agreed one equals the route by construction at the freeze,
+    so only the sheet's controls test it."""
+    so, sa, c = S["strata"]["owner"], S["strata"]["agreed"], S["sheet"]["controls"] or {}
+    def n(t):
+        return sum(t.get(k, 0) for k in ("right", "wrong", "missing"))
+    om, osm, od, sam, sad = so["month"], so["strict_month"], so["day"], sa["month"], sa["day"]
+    ctl = (f"the agreed truth matched the owner on {c['same']} of {c['asked']} sheet controls (95% "
+           f"{wilson_txt(c['same'], c['asked'])}), so it may be wrong on up to about "
+           f"{100 - P.wilson(c['same'], c['asked'])[0]:.0f}% of these documents" if c.get("asked") else
+           "the sheet's controls are not folded yet")
+    return (f"- **The two strata apart.** Owner-ruled ({so['documents']} documents, his blind sheet and his earlier "
+            f"reading): the month right on {frac(om.get('right', 0), n(om))} (95% {wilson_txt(om.get('right', 0), n(om))}), "
+            f"{frac(osm.get('right', 0), n(osm))} before the OCR forms; the day {frac(od.get('right', 0), n(od))}, wrong on "
+            f"{od.get('wrong', 0)}. Agreed ({sa['documents']}): the month right on {frac(sam.get('right', 0), n(sam))}, "
+            f"the day {frac(sad.get('right', 0), n(sad))}, but that truth is the second reader's full date, which equalled "
+            "the route's on each of them when it was frozen"
+            + (" (W46.p16-date-truth-strata), so a later route is scored against it" if S["agreed_frozen"] else
+               ", and it is still re-derived from this run's route, so the stratum cannot score a wrong month")
+            + f": this route is right there by construction, and {ctl}. The headline counts both.")
+
+
 def report(S):
     m, d, o, vt, vto = S["month"], S["day"], S["old_month"], S["vs_tag"], S["vs_tag_old"]
     sm, sd = S["strict_month"], S["strict_day"]
@@ -369,11 +440,16 @@ def report(S):
          "neither. A numeric date is read month-first when its first part can be a month.", "",
          "## Findings", "",
          f"- **On the page's own date: the month right on {frac(m.get('right', 0), mt)} (95% {wilson_txt(m.get('right', 0), mt)}), "
-         f"wrong on {m.get('wrong', 0)}, not written on {m.get('missing', 0)}; the day right on "
+         f"wrong on {m.get('wrong', 0)} of {mt} (95% upper bound {upper_txt(m.get('wrong', 0), mt)}), not written on "
+         f"{m.get('missing', 0)}; the day right on "
          f"{frac(d.get('right', 0), dtot)} (95% {wilson_txt(d.get('right', 0), dtot)}), wrong on {d.get('wrong', 0)}, "
          f"not written on {d.get('missing', 0)}.** Of {S['scored']} documents with a page truth, {S['full_exact']} of "
          f"{S['with_month']} with a month on the page get the full date exactly. A month or day written where the page "
-         f"has none: {m.get('extra', 0)} and {d.get('extra', 0)}.",
+         f"has none: {m.get('extra', 0)} and {d.get('extra', 0)}. These figures are a fit, not a held-out score: the OCR "
+         "forms were written from this set's own misses (below); their held-out check is the public set's"
+         + (f", where they write a wrong month on {S['public']['ocr_month'].get('wrong', 0)} of "
+            f"{sum(S['public']['ocr_month'].values())}." if S["public"] else "."),
+         strata_finding(S),
          f"- **Against the Finder tags alone (W46.date-month-score's question): the owner's month on "
          f"{frac(vt.get('right', 0), tt)}, another month on {vt.get('wrong', 0)}, none on {vt.get('missing', 0)}** "
          f"({S['tagged']} explicit years that are the owner's year and carry his month tag). The route before this item "
@@ -396,6 +472,9 @@ def report(S):
          "| source | documents |", "|---|---|"]
     for k, v in sorted(S["by_source"].items(), key=lambda x: -x[1]):
         L.append(f"| {k} | {v} |")
+    L += ["", "Not scored: \"year not the owner's\" is an explicit year other than his Finder year tag; \"no owner year "
+          "tag\" is a document he left without one; \"disputed\" is a document that agrees only since the agreed truth "
+          "was frozen, or that no ruling covers."]
     L += ["", "## Month and day on the page truth", "",
           "| | right | wrong | not written | written, none on the page |", "|---|---|---|---|---|",
           f"| month, this route | {m.get('right', 0)} | {m.get('wrong', 0)} | {m.get('missing', 0)} | {m.get('extra', 0)} |",
@@ -416,7 +495,14 @@ def report(S):
           + ". Next, the route and a second reader agreeing: the Gemini 3.7 Flash image pass on the first two pages "
           "(the same gateway model as the route's trace call, but reading the page image, where the route reads Apple "
           "Vision's text and takes its date by rule from a quote that must be in that text), and not against the owner's "
-          "Finder month tag. Agreement-made truth cannot catch an error both readings share, and it leans the score "
+          "Finder month tag. "
+          + ("That agreed truth was frozen into the rulings file at W46.p16-date-truth-strata (the second reader's full "
+             "date, equal on every one of them to the route's and to the strict forms' the sheet was drawn on), so it "
+             "is the route's own answer at the freeze and a later route is scored against it; a document that agrees "
+             "only since then counts as disputed. " if S["agreed_frozen"] else
+             "That agreed truth is re-derived from this run's route, so a route change that writes a wrong month on an "
+             "agreed document makes it disputed, not wrong. ")
+          + "Agreement-made truth cannot catch an error both readings share, and it leans the score "
           "towards the easy documents: the disputed ones go to the owner, with controls drawn from the agreed ones to "
           "measure that truth's own error. Documents whose year came from the image pass are never agreed, since the "
           "second reader is then the route's own evidence. The owner's Finder tags carry no day. The sheet is blind (no "
@@ -424,15 +510,18 @@ def report(S):
           "the card says a date may lie outside the boxes, which marks a document as harder without saying which "
           "reading is right.",
           "- **Selection:** the owner's documents of W46.date-route-pipeline (stratified by date kind from his Finder tags, "
-          "seed 41), those with a confirmed JPEG original; scored where the route gives an explicit year equal to the "
-          "owner's year. Not chosen by any route or by the ABBYY text.",
+          "seed 41), those with a confirmed JPEG original, not chosen by any route or by the ABBYY text. But the score "
+          "is conditional on the route: a document is scored only where the route gives an explicit year and it equals "
+          "the owner's year tag, so its month and day are measured on the documents whose year the route already got "
+          "right.",
           "- **Comparison:** the same cached trace and image replies scored under the new rule and the rule before this "
           "item, and with the OCR forms switched off (`date_route_pipeline.OCR_FORMS`); Vision text on the JPEG "
           "originals for all. The public set has no route replies, so the route itself is scored on the owner's "
           "documents only; the OCR forms alone are checked on the public set's dates (its catalogue titles' month and "
           "day against the item's transcribed text, so a title date that is not the text's first date counts against "
           "both the strict and the OCR forms).",
-          f"- **Noise:** n is small ({mt} months, {dtot} days); intervals are Wilson 95%. The rule is deterministic on "
+          f"- **Noise:** n is small ({mt} months, {dtot} days); intervals are Wilson 95%, and the agreed stratum's own "
+          "truth error is bounded only by the sheet's controls (above). The rule is deterministic on "
           "cached replies, so there is no rerun noise in the rule itself; a fresh trace call could quote a different date.",
           "- **Scope:** not the tagging call's own month and day (the app keeps its day when it read the same year and "
           "month, and both when the route has no dated form; its cached replies here were made on the ABBYY text, so they "
@@ -668,6 +757,31 @@ def cmd_fold(a):
             print(f"  {i}: {r['note']}")
 
 
+def cmd_freeze(_a):
+    """Freeze the agreed truth into the rulings file (W46.p16-date-truth-strata). Before it, `truth_of` re-derived the
+    agreed truth from each run's own route, so a route that wrote a wrong month on an agreed document made it disputed
+    rather than wrong. The frozen value is the second reader's full date, which equals the route's on every agreed
+    document; the freeze refuses unless it also equals the strict forms' (the route the sheet was drawn on, before the
+    OCR forms) and every sheet control was agreed when the sheet was drawn (the controls are scored on the owner's ruling, so they are
+    not frozen)."""
+    folded = json.loads(RULINGS.read_text())
+    if folded.get("agreed") is not None:
+        raise SystemExit(f"already frozen on {folded['agreed_frozen']['date']}: {RULINGS}")
+    rs = rows()
+    agreed = {r["id"]: r for r in rs if truth_of(r, folded.get("documents", {}))[0] in AGREED_SOURCES}
+    drift = sorted(i for i, r in agreed.items() if r["strict"] != r["route"][1:] or r["second"] != r["route"])
+    controls = {k["id"] for k in json.loads(KEY.read_text())["documents"].values() if k["group"] == "control"}
+    unruled = {r["id"] for r in rs if truth_of(r, {})[0] in AGREED_SOURCES}     # the sheet's own split
+    if drift or not controls <= unruled or set(agreed) != unruled - set(folded.get("documents", {})):
+        raise SystemExit(f"not the sheet-time agreement: route differs on {drift}, controls not agreed "
+                         f"{sorted(controls - unruled)}")
+    folded["agreed"] = {i: list(r["second"]) for i, r in sorted(agreed.items())}
+    folded["agreed_frozen"] = {"date": dt.date.today().isoformat(), "by": "W46.p16-date-truth-strata",
+                               "documents": len(agreed), "controls": sorted(controls)}
+    RULINGS.write_text(json.dumps(folded, indent=1) + "\n")
+    print(f"{len(agreed)} agreed documents frozen ({len(controls)} of them sheet controls); {RULINGS}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -675,8 +789,9 @@ def main():
     sub.add_parser("sheet")
     f = sub.add_parser("fold")
     f.add_argument("answers")
+    sub.add_parser("freeze")
     a = ap.parse_args()
-    {"score": cmd_score, "sheet": cmd_sheet, "fold": cmd_fold}[a.cmd](a)
+    {"score": cmd_score, "sheet": cmd_sheet, "fold": cmd_fold, "freeze": cmd_freeze}[a.cmd](a)
 
 
 if __name__ == "__main__":
