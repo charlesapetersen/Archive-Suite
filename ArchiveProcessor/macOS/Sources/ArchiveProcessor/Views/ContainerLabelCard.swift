@@ -97,19 +97,22 @@ struct ContainerLabelCard: View {
         shown = t
     }
 
-    /// What Save stores: each non-empty field as the operator's. A field left as shown keeps its written value (and
-    /// the reader that proposed it); an edited one is the text typed.
+    /// What Save stores, as the operator's (source `user`):
+    /// - a field left as shown keeps the read's value as written, and the reader that proposed it, even where the
+    ///   display was a standard name or showed nothing; a field the read did not give (a standard name's fill from
+    ///   another field) stores nothing, since the display is not a value;
+    /// - an edited field stores the text typed, trimmed; an emptied one stores nothing.
     static func confirmed(texts: [ContainerField: String], shown: [ContainerField: String], read: ContainerFieldSet,
                           fields: [ContainerField], at date: Date) -> ContainerFieldSet {
         var out = ContainerFieldSet()
         for field in fields {
-            let text = (texts[field] ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty else { continue }
-            if let original = read[field], text == shown[field] {
-                out[field] = original.confirmed(at: date)
-            } else {
-                out[field] = ContainerValue(text, source: .user, at: date)
+            let typed = texts[field] ?? ""
+            if typed == (shown[field] ?? "") {
+                if let original = read[field] { out[field] = original.confirmed(at: date) }
+                continue
             }
+            let text = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty { out[field] = ContainerValue(text, source: .user, at: date) }
         }
         return out
     }

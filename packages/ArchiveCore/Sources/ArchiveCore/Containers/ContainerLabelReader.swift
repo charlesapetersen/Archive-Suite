@@ -80,8 +80,11 @@ public enum ContainerLabelReader {
     /// - collection subtitle, box title, folder title and other marks from nobody: no route reads them (`ct-read.md`),
     ///   so the user writes them.
     /// A folder label keeps only what a folder run stores (`ContainerInference.applyMarkers` drops the rest).
+    /// `parserReader` names where the lines came from: `visionReader` for Apple Vision's lines, the route scored;
+    /// another name for other text (an LLM transcript), which the bench has not scored.
     public static func proposals(lines: [String], type: ItemType, model: [ContainerField: String]? = nil,
-                                 modelReader: String? = nil, at date: Date? = nil) -> ContainerFieldSet {
+                                 modelReader: String? = nil, parserReader: String = visionReader,
+                                 at date: Date? = nil) -> ContainerFieldSet {
         let parsed = parse(lines: lines, type: type)
         var set = ContainerFieldSet()
         func put(_ field: ContainerField, _ value: String?, _ reader: String?) {
@@ -91,13 +94,13 @@ public enum ContainerLabelReader {
         }
         let modelValues = (model ?? [:]).filter { modelFields.contains($0.key) }
         for field in [ContainerField.container, .folder, .series, .seriesTitle] {
-            put(field, parsed[field], visionReader)
+            put(field, parsed[field], parserReader)
         }
         if let container = modelValues[.container].flatMap(clean) {
             put(.container, canonContainer(container), modelReader)
         }
         for field in [ContainerField.repository, .collectionTitle, .collectionNumber, .date, .accession] {
-            if let m = modelValues[field].flatMap(clean) { put(field, m, modelReader) } else { put(field, parsed[field], visionReader) }
+            if let m = modelValues[field].flatMap(clean) { put(field, m, modelReader) } else { put(field, parsed[field], parserReader) }
         }
         if type == .folder {
             set.values = set.values.filter { [.folder, .folderTitle, .date, .other].contains($0.key) }
@@ -166,10 +169,12 @@ public enum ContainerLabelReader {
     private static let container = regex(#"\b(box|carton|folio|volume|vol|reel|drawer|oversize|flat\s*file|bin|case|item)\b\.?"#
                                          + #"\s*(?:no\.?|number|#)?\s*([0-9]+[a-z]?)"#)
     private static let bareContainer = regex(#"^\s*(?:no\.?|#)?\s*(\d+[a-z]?)\s*$"#)
-    private static let date = regex(#"\b\#(year)\s*[-–—]\s*(?:\#(year)|\d\d)\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b|\b\#(year)s?\b"#)
+    // `P_DATE` and `P_PAIR` are case-sensitive in `ct_read.py` ("1950S" is no date there).
+    private static let date = regex(#"\b\#(year)\s*[-–—]\s*(?:\#(year)|\d\d)\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b|\b\#(year)s?\b"#,
+                                    caseless: false)
     private static let folder = regex(#"\b(?:folder|fol|fldr?|fd|ff?)\b\.?\s*(?:no\.?|#|number)?\s*(\d+[a-z]?)\b"#)
     private static let filesWord = regex(#"\bfiles?\b"#)
-    private static let pair = regex(#"^\s*(\d{1,3})\s*[-.:/]\s*(\d{1,3})\s*$"#)
+    private static let pair = regex(#"^\s*(\d{1,3})\s*[-.:/]\s*(\d{1,3})\s*$"#, caseless: false)
     private static let collectionNumber = regex(#"\b((?:mss?|sc|rg|ru|r-mc|cbi|mc|hug(?:\s*\(fp\))?|m|coll(?:ection)?\.?\s*(?:no\.?)?)"#
                                                 + #"\s?\.?\s?\d{2,}(?:[.\-]\d+)?)\b"#)
     private static let accession = regex(#"\b(?:accession|accn|acc)\b\.?\s*(?:no\.?|#|number)?\s*:?\s*([0-9][\w\-.]*)"#)
@@ -179,9 +184,9 @@ public enum ContainerLabelReader {
     private static let collectionWord = regex(#"\b(papers|records|collection|files|diaries|manuscripts)\b"#)
     private static let bare = regex(#"^\s*(?:no\.?|#)?\s*(\d{1,3}[a-z]?)\s*$"#)
 
-    private static func regex(_ p: String) -> NSRegularExpression {
+    private static func regex(_ p: String, caseless: Bool = true) -> NSRegularExpression {
         // The patterns are literals: a failure here is a programming error caught by the tests.
-        try! NSRegularExpression(pattern: p, options: [.caseInsensitive])
+        try! NSRegularExpression(pattern: p, options: caseless ? [.caseInsensitive] : [])
     }
 
     /// The first match in `s` as its groups (index 0 the whole; an unmatched group is ""), or nil.

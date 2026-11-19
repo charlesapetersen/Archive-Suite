@@ -90,16 +90,23 @@ public struct ContainerMarker: Equatable, Sendable {
     public var fileName: String
     /// nil for a document: it starts no run.
     public var type: ItemType?
-    /// The label read, source `label` with its reader. Empty when the photo has not been read or read nothing.
+    /// The label read, source `label` with its reader; values the user confirmed on a capture card are `user`. Empty
+    /// when the photo has not been read or read nothing.
     public var read: ContainerFieldSet
     /// The label's text, if any, for recognising a "No Folder" sheet.
     public var text: String?
+    /// The user said this photo starts a box or folder (the companion's Box or Folder button): it starts its run even
+    /// inside a run the user set, since starting a run is the user's own act there (W47.ct-processor-capture). False
+    /// for a type read from a colour, a tag or a classifier.
+    public var startedByUser: Bool
 
-    public init(fileName: String, type: ItemType?, read: ContainerFieldSet = ContainerFieldSet(), text: String? = nil) {
+    public init(fileName: String, type: ItemType?, read: ContainerFieldSet = ContainerFieldSet(), text: String? = nil,
+                startedByUser: Bool = false) {
         self.fileName = fileName
         self.type = type
         self.read = read
         self.text = text
+        self.startedByUser = startedByUser
     }
 }
 
@@ -147,7 +154,8 @@ public enum ContainerInference {
     /// - A run already at that start keeps every user value; a re-read replaces the label and path values it reads.
     ///   Nothing is removed: a field the read lacks keeps its value, a run with no marker stays.
     /// - A read never hides a user value: a photo inside a user's run of its level or deeper starts no run, and a read
-    ///   that disagrees with a user value leaves it, each with a warning.
+    ///   that disagrees with a user value leaves it, each with a warning. A photo the user marked as a start
+    ///   (`startedByUser`) starts its run all the same.
     public static func applyMarkers(_ markers: [ContainerMarker], to file: ContainerFile)
         -> (file: ContainerFile, warnings: [ContainerWarning]) {
         var runs = file.runs
@@ -166,7 +174,7 @@ public enum ContainerInference {
             }
             // A new run here would end every live run of its level or deeper; one the user set stands.
             let starts = !runs.contains { $0.start == at && $0.level == level }
-            if starts, ContainerResolver.liveRuns(at: at, in: runs).contains(where: { run in
+            if starts, !marker.startedByUser, ContainerResolver.liveRuns(at: at, in: runs).contains(where: { run in
                 run.start != at && run.level >= level && run.fields.values.values.contains { $0.source == .user }
             }) {
                 warnings.append(ContainerWarning(.markerInsideUserRun(type), start: at))

@@ -295,14 +295,18 @@ class CollectionSegmenter {
     /// - Parameter exportedImageMap: source-URL → its per-page exported original image URL, captured
     ///   BEFORE document merging (which repoints `outputURLMap` to a single merged PDF and so loses the
     ///   per-page image names). Also carries collision-renamed images whose base no longer matches the PDF.
+    /// - Returns: each moved output PDF's new place (old URL → new URL), so a later step can find it
+    ///   (W47.ct-processor-capture: the container file names a box or folder label by its filed name).
+    @discardableResult
     func organizeOutput(
         collections: [CollectionSegment],
         outputDirectory: URL,
         outputURLMap: [URL: URL],
         moveSiblingImages: Bool,
         exportedImageMap: [URL: URL] = [:]
-    ) throws {
+    ) throws -> [URL: URL] {
         let fm = FileManager.default
+        var movedPDFs: [URL: URL] = [:]
 
         for collection in collections {
             // Create collection folder
@@ -387,6 +391,7 @@ class CollectionSegmenter {
                                 destination: folderURL.appendingPathComponent("JSON Output/" + firstBase + ".json")))
                         }
                         try OutputFileSafety.relocateArtifactSet(artifactMoves)
+                        movedPDFs[pdfURL] = folderURL.appendingPathComponent(firstBase + ".pdf")
                         movedCount = firstNumber + pageImages.count - 1
                         continue
                     }
@@ -448,8 +453,10 @@ class CollectionSegmenter {
                     artifactMoves.append(.init(source: imageURL, destination: destImage))
                 }
                 try OutputFileSafety.relocateArtifactSet(artifactMoves)
+                movedPDFs[pdfURL] = destPDF
             }
         }
+        return movedPDFs
     }
 
     // MARK: - LLM Calls

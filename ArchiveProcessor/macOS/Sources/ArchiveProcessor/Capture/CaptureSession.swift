@@ -979,6 +979,7 @@ final class CaptureSession: ObservableObject {
         for (field, value) in read.values where merged[field] == nil { merged[field] = value }
         containerFields[groupId] = merged
         _ = writeManifest()
+        headlessResolvePendingTags()   // headless E2E only (env-gated): a marker's card resolves like a tag card
     }
 
     /// The marker card's Save: its values become the operator's (source `user`, keeping each proposal's reader where

@@ -1,5 +1,6 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
+import ArchiveCore
 
 /// Headless, $0 self-test of `CollectionSegmenter.organizeOutput`, gated by `COLLECTIONORGANIZE_TEST=1`
 /// (inert in normal use). No OCR, no network, no cost, no GUI — synthetic files in a temp dir.
@@ -121,7 +122,7 @@ enum CollectionOrganizeTestDriver {
             let i1 = out.appendingPathComponent("a.jpg"); let i2 = out.appendingPathComponent("b.jpg")
             writeFile(p1, "P1"); writeFile(p2, "P2"); writeFile(i1, "I1"); writeFile(i2, "I2")
             let coll = CollectionSegment(collectionName: "NM", fileURLs: [s1, s2])
-            try? seg.organizeOutput(
+            _ = try? seg.organizeOutput(
                 collections: [coll], outputDirectory: out,
                 outputURLMap: [s1: p1, s2: p2], moveSiblingImages: true,
                 exportedImageMap: [s1: i1, s2: i2])   // present but each source has its OWN pdf → sibling-by-name path
@@ -144,7 +145,7 @@ enum CollectionOrganizeTestDriver {
             let s1 = out.appendingPathComponent("x.src"); let s2 = out.appendingPathComponent("y.src")
             let merged = out.appendingPathComponent("x_merged.pdf"); writeFile(merged, "M")
             let coll = CollectionSegment(collectionName: "NE", fileURLs: [s1, s2])
-            try? seg.organizeOutput(
+            _ = try? seg.organizeOutput(
                 collections: [coll], outputDirectory: out,
                 outputURLMap: [s1: merged, s2: merged], moveSiblingImages: false)
             let folder = out.appendingPathComponent("NE")
@@ -168,7 +169,7 @@ enum CollectionOrganizeTestDriver {
             let merged = out.appendingPathComponent("m1_merged.pdf")
             writeFile(i1, "I1"); writeFile(i2, "I2"); writeFile(merged, "M")
             let coll = CollectionSegment(collectionName: "OW", fileURLs: [s1, s2])
-            try? seg.organizeOutput(
+            _ = try? seg.organizeOutput(
                 collections: [coll], outputDirectory: out,
                 outputURLMap: [s1: merged, s2: merged], moveSiblingImages: true,
                 exportedImageMap: [s1: i1, s2: i2])
@@ -232,6 +233,55 @@ enum CollectionOrganizeTestDriver {
             check("missing tracked export: unrelated preferred image remains untouched",
                   (try? String(contentsOf: unrelatedPreferred, encoding: .utf8)) == "USER")
             check("missing tracked export: PDF source remains retryable", fm.fileExists(atPath: pdf.path))
+            try? fm.removeItem(at: out)
+        }
+
+        // ============================================================================================
+        // W47.ct-processor-capture — Process Files' box and folder labels: organisation reports where each PDF
+        // went, and the labels' fields land in the collection folder's container file, naming the filed PDFs.
+        // ============================================================================================
+        do {
+            let out = fm.temporaryDirectory.appendingPathComponent("APOrgTest-labels-\(UUID().uuidString)", isDirectory: true)
+            try? fm.createDirectory(at: out, withIntermediateDirectories: true)
+            let names = ["box", "doc", "folder", "doc2"]
+            let sources = names.map { out.appendingPathComponent("\($0).jpg") }   // not images: no gateway read
+            let pdfs = names.map { out.appendingPathComponent("\($0).pdf") }
+            for (src, pdf) in zip(sources, pdfs) { writeFile(src, "src"); writeFile(pdf, "PDF \(pdf.lastPathComponent)") }
+            let map = Dictionary(uniqueKeysWithValues: zip(sources, pdfs))
+            var moves: [URL: URL] = [:]
+            do {
+                moves = try seg.organizeOutput(collections: [CollectionSegment(collectionName: "Glotzer", fileURLs: sources)],
+                                               outputDirectory: out, outputURLMap: map, moveSiblingImages: false)
+            } catch { check("labels: organizeOutput threw \(error)", false) }
+            let folder = out.appendingPathComponent("Glotzer")
+            check("labels: organizeOutput reports each PDF's new place",
+                  moves[pdfs[0]] == folder.appendingPathComponent("00001 Glotzer.pdf")
+                  && moves[pdfs[2]] == folder.appendingPathComponent("00003 Glotzer.pdf") && moves.count == 4)
+
+            let texts = ["HOOVER INSTITUTION ARCHIVES\nBOX NO. 17", "Dear Sir", "Folder 8\nCorrespondence", "More"]
+            let kinds: [DocumentClassification] = [.boxLabel, .documentStart, .folderLabel, .documentStart]
+            let processor = OCRProcessor()
+            processor.jobs = (0..<4).map { i in
+                var job = OCRJob(sourceURL: sources[i])
+                job.status = .succeeded
+                job.classification = kinds[i]
+                job.result = OCRResult(text: texts[i], classification: kinds[i], errorMessage: nil, errorCode: nil)
+                return job
+            }
+            processor.outputURLMap = map
+            let problem = await processor.recordContainerLabels(moves: moves)
+            let file = ContainerFileStore.load(directory: folder).document
+            let at4 = file.map { ContainerResolver.resolve(fileName: "00004 Glotzer.pdf", scopes: [ContainerScope(file: $0)]) }
+            let at2 = file.map { ContainerResolver.resolve(fileName: "00002 Glotzer.pdf", scopes: [ContainerScope(file: $0)]) }
+            check("labels: the box and folder labels' runs are written beside the filed PDFs, as proposals",
+                  problem == nil && at4?.values[.container]?.value == "Box 17" && at4?.values[.folder]?.value == "8"
+                  && at4?.values[.container]?.source == .label && at2?.values[.folder] == nil
+                  && at2?.values[.repository]?.value == "HOOVER INSTITUTION ARCHIVES")
+            let filed = (try? fm.contentsOfDirectory(atPath: folder.path))?.sorted() ?? []
+            check("labels: nothing but .archivesuite is added, and no PDF is changed",
+                  filed == [".archivesuite", "00001 Glotzer.pdf", "00002 Glotzer.pdf", "00003 Glotzer.pdf", "00004 Glotzer.pdf"]
+                  && (try? String(contentsOf: folder.appendingPathComponent("00003 Glotzer.pdf"), encoding: .utf8))
+                      == "PDF folder.pdf")
             try? fm.removeItem(at: out)
         }
 

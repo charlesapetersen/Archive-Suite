@@ -27,6 +27,7 @@ final class ContainerLabelReaderTests: XCTestCase {
             (["12"], .box, ["container": "Box 12"]),
             (["Fd 3 Files of the Committee", "Minutes"], .folder,
              ["collection_title": "Fd 3 Files of the Committee", "folder_title": "Minutes"]),
+            (["CORRESPONDENCE 1950S", "Folder 2"], .folder, ["folder": "2", "folder_title": "CORRESPONDENCE 1950S"]),
         ]
         for (lines, type, want) in cases {
             XCTAssertEqual(parsed(lines, type), want, "\(lines)")
@@ -120,6 +121,38 @@ final class ContainerRecordMarkersTests: XCTestCase {
         _ = try ContainerInference.recordMarkers([box("00001 Glotzer.pdf", reread)], in: dir)
         let again = try XCTUnwrap(ContainerFileStore.load(directory: dir).document)
         XCTAssertEqual(again.runs.first { $0.level == .collection }?.fields[.collectionTitle]?.value, "Albert Glotzer papers")
+    }
+
+    /// Two confirmed boxes and two confirmed folders in one batch, then a third box in a later session: each marker the
+    /// user started opens its own run, though the run before it holds the user's values (the review's finding 1).
+    func testConfirmedMarkersEachStartTheirRun() throws {
+        for n in 4...12 { try Data("pdf".utf8).write(to: dir.appendingPathComponent(String(format: "%05d Glotzer.pdf", n))) }
+        func user(_ f: [ContainerField: String]) -> ContainerFieldSet { ContainerFieldSet(f.mapValues { ContainerValue($0, source: .user) }) }
+        func marker(_ n: Int, _ type: ItemType, _ f: [ContainerField: String]) -> ContainerMarker {
+            ContainerMarker(fileName: String(format: "%05d Glotzer.pdf", n), type: type, read: user(f), startedByUser: true)
+        }
+        let batch = [marker(1, .box, [.container: "Box 17", .collectionTitle: "Glotzer papers"]),
+                     marker(2, .folder, [.folder: "1"]), marker(4, .folder, [.folder: "2"]),
+                     marker(6, .box, [.container: "Box 18"]), marker(7, .folder, [.folder: "1"])]
+        guard case .wrote(let warnings) = try ContainerInference.recordMarkers(batch, in: dir) else { return XCTFail() }
+        XCTAssertTrue(warnings.isEmpty, "\(warnings)")
+        _ = try ContainerInference.recordMarkers([marker(10, .box, [.container: "Box 19"])], in: dir)
+        let file = try XCTUnwrap(ContainerFileStore.load(directory: dir).document)
+        func at(_ n: Int) -> [ContainerField: String] {
+            ContainerResolver.resolve(fileName: String(format: "%05d Glotzer.pdf", n), scopes: [ContainerScope(file: file)])
+                .values.mapValues(\.value)
+        }
+        XCTAssertEqual(at(3), [.container: "Box 17", .folder: "1", .collectionTitle: "Glotzer papers"])
+        XCTAssertEqual(at(5), [.container: "Box 17", .folder: "2", .collectionTitle: "Glotzer papers"])
+        XCTAssertEqual(at(6), [.container: "Box 18", .collectionTitle: "Glotzer papers"])
+        XCTAssertEqual(at(8), [.container: "Box 18", .folder: "1", .collectionTitle: "Glotzer papers"])
+        XCTAssertEqual(at(12), [.container: "Box 19", .collectionTitle: "Glotzer papers"])
+
+        // A photo whose type a classifier gave still starts no run inside the user's (SPEC §Route A).
+        let classified = ContainerMarker(fileName: "00011 Glotzer.pdf", type: .box,
+                                         read: ContainerLabelReader.proposals(lines: ["Box 20"], type: .box))
+        XCTAssertEqual(try ContainerInference.recordMarkers([classified], in: dir),
+                       .unchanged([ContainerWarning(.markerInsideUserRun(.box), start: "00011 Glotzer.pdf")]))
     }
 
     func testLeavesANewerOrUnreadableDocumentAlone() throws {

@@ -764,6 +764,11 @@ enum ManifestPersistenceTestDriver {
                     .series: "  "],
             shown: [.repository: "Hoover Institution Archives", .container: "Box 17"],
             read: boxRead, fields: cardFields, at: Date())
+        let filledOnly = ContainerLabelCard.confirmed(
+            texts: [.repository: "Hoover", .place: "Stanford, CA"], shown: [.repository: "Hoover", .place: "Stanford, CA"],
+            read: boxRead, fields: cardFields + [.place], at: Date())
+        check("W47: Save stores the read's value under a standard name, and no display-only fill",
+              filledOnly[.repository]?.value == "HOOVER INSTITUTION ARCHIVES" && filledOnly[.place] == nil)
         check("W47: Save keeps an untouched field as written with its reader, and takes an edit as typed",
               edited[.repository]?.value == "HOOVER INSTITUTION ARCHIVES" && edited[.repository]?.source == .user
               && edited[.repository]?.reader == ContainerLabelReader.visionReader
@@ -791,7 +796,7 @@ enum ManifestPersistenceTestDriver {
             try? Data("pdf \(name)".utf8).write(to: collection.appendingPathComponent(name))
         }
         let problem = ContainerLabelCapture.record([ContainerLabelCapture.FiledMarker(
-            folder: collection, fileName: "00001 Glotzer.pdf", type: .box, fields: edited, text: "")])
+            folder: collection, fileName: "00001 Glotzer.pdf", type: .box, fields: edited, text: "", startedByUser: true)])
         let written = ContainerFileStore.load(directory: collection).document
         let resolved = written.map {
             ContainerResolver.resolve(fileName: "00002 Glotzer.pdf", scopes: [ContainerScope(file: $0)])
@@ -807,7 +812,7 @@ enum ManifestPersistenceTestDriver {
         let newerFile = ContainerFileStore.containerFileURL(in: collection)
         try? Data(#"{"schemaVersion": 99}"#.utf8).write(to: newerFile)
         let refusedNewer = ContainerLabelCapture.record([ContainerLabelCapture.FiledMarker(
-            folder: collection, fileName: "00002 Glotzer.pdf", type: .box, fields: edited, text: "")])
+            folder: collection, fileName: "00002 Glotzer.pdf", type: .box, fields: edited, text: "", startedByUser: true)])
         check("W47: a newer container file is left alone and the operator told",
               refusedNewer != nil && (try? Data(contentsOf: newerFile)) == Data(#"{"schemaVersion": 99}"#.utf8))
 

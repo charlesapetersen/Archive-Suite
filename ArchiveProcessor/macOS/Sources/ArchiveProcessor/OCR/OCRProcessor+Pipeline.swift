@@ -1808,11 +1808,12 @@ extension OCRProcessor {
         }
 
         // Organize into collection folders (after merge so merged PDFs get moved)
+        var organizedMoves: [URL: URL] = [:]
         if pending.enableCollectionSegmentation && !collectionSegments.isEmpty {
             let segmenter = CollectionSegmenter()
             statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
             do {
-                try segmenter.organizeOutput(
+                organizedMoves = try segmenter.organizeOutput(
                     collections: collectionSegments,
                     outputDirectory: pending.outputDirectory,
                     outputURLMap: outputURLMap,
@@ -1828,6 +1829,7 @@ extension OCRProcessor {
         cleanupTempFiles()
 
         guard !Task.isCancelled else { return }
+        let containerProblem = await recordContainerLabels(moves: organizedMoves)   // W47.ct-processor-capture
         restoreMixedPDFJobs(pending.mixedPDFOutcomes)
         restoredFullJobs = true
         progressRange = nil
@@ -1841,6 +1843,7 @@ extension OCRProcessor {
         // placeholder instead of the scan. Both are silent failures otherwise: the file is
         // there and looks processed, but tag search will not find it / the scan is missing.
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
+        if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
         if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
             if let checks = segmentationCheckSummary { statusMessage += " \(checks)."; segmentationCheckSummary = nil }
@@ -2211,11 +2214,12 @@ extension OCRProcessor {
         }
 
         // Organize into collection folders (after merge so merged PDFs get moved)
+        var organizedMoves: [URL: URL] = [:]
         if pending.enableCollectionSegmentation && !collectionSegments.isEmpty {
             let segmenter = CollectionSegmenter()
             statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
             do {
-                try segmenter.organizeOutput(
+                organizedMoves = try segmenter.organizeOutput(
                     collections: collectionSegments,
                     outputDirectory: pending.outputDirectory,
                     outputURLMap: outputURLMap,
@@ -2231,6 +2235,7 @@ extension OCRProcessor {
         cleanupTempFiles()
 
         guard !Task.isCancelled else { return }
+        let containerProblem = await recordContainerLabels(moves: organizedMoves)   // W47.ct-processor-capture
 
         activePendingRun = nil
         Self.deletePendingRun()
@@ -2249,6 +2254,7 @@ extension OCRProcessor {
         // placeholder instead of the scan. Both are silent failures otherwise: the file is
         // there and looks processed, but tag search will not find it / the scan is missing.
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
+        if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
         if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
             if let checks = segmentationCheckSummary { statusMessage += " \(checks)."; segmentationCheckSummary = nil }
@@ -3149,6 +3155,7 @@ extension OCRProcessor {
                 }
             }
         }
+        var organizedMoves: [URL: URL] = [:]   // W47.ct-processor-capture: where organisation moved each PDF
         if preOCRedInput {
             // --- Pre-OCRed PDF path: extract text, classify, skip PDF generation ---
             // A Vision-hybrid selection has no image work on this route either. Reuse its text
@@ -3429,7 +3436,7 @@ extension OCRProcessor {
                 let segmenter2 = CollectionSegmenter()
                 statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
                 do {
-                    try segmenter2.organizeOutput(
+                    organizedMoves = try segmenter2.organizeOutput(
                         collections: collectionSegments,
                         outputDirectory: outputDirectory,
                         outputURLMap: outputURLMap,
@@ -3446,6 +3453,7 @@ extension OCRProcessor {
         }
 
         guard !Task.isCancelled else { return }
+        let containerProblem = await recordContainerLabels(moves: organizedMoves)   // W47.ct-processor-capture
 
         if editingImageSubset, let fullJobsAfterPDF {
             var restored = fullJobsAfterPDF
@@ -3472,6 +3480,7 @@ extension OCRProcessor {
         // placeholder instead of the scan. Both are silent failures otherwise: the file is
         // there and looks processed, but tag search will not find it / the scan is missing.
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
+        if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
         if incrementalSkipped > 0 {
             statusMessage += " \(incrementalSkipped) already-processed skipped."
         }

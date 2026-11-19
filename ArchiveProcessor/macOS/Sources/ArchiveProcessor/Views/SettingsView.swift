@@ -1089,7 +1089,7 @@ struct SettingsView: View {
             Toggle(isOn: $readContainerLabels) {
                 HStack {
                     Text("Read box and folder labels")
-                    HelpButton(text: "When processing live, each Box or Folder photo is read into repository, collection, accession, series, box and folder, shown on a card for you to correct, and saved beside the collection's files (in its hidden .archivesuite folder) when you finish. Box and folder numbers come from the photo's text; with the AI gateway on, titles, collection number, date and accession come from GPT 5.6 Luna on the gateway, one short call per label photo.")
+                    HelpButton(text: "When processing live, each Box or Folder photo is read into repository, collection, accession, series, box and folder, shown on a card for you to correct, and saved beside the collection's files (in its hidden .archivesuite folder) when you finish. Process Files reads its box and folder labels the same way and saves them as proposals, to confirm in Archive Reader. Box and folder numbers come from the photo's text; with the AI gateway on, titles, collection number, date and accession come from GPT 5.6 Luna on the gateway, one short call per label photo.")
                 }
             }
 

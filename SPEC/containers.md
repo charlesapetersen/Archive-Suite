@@ -65,7 +65,8 @@ Each field holds `{ "value": V, "source": S }`, and may add `reader` and `confid
 until the user confirms it; confirming makes it `user` and keeps `reader`. The readers per field (owner,
 2026-11-13): box and folder numbers from Vision + parser; repository, collection title, collection number and date
 from GPT 5.6 Luna on the gateway, else Gemma 3 12B, proposed and confirmed once per run; accession from Luna, else
-Vision + parser; collection subtitle, box title, folder title and other marks from the user.
+Vision + parser; collection subtitle, box title, folder title and other marks from the user. The Processor has no
+Gemma route yet, so without the gateway it proposes the parser's values for those fields (`W47.ct-capture-gemma`).
 
 `path` values are worked out from the tree and the level map each time they are read and are **never stored**, so
 renaming a folder renames its value. A stored `path` value from another writer is read as `path`.
@@ -223,17 +224,22 @@ title, date and other marks, never a box number or collection field; a "No Folde
 folder") starts a folder run with no fields. A run already at that start keeps every user value; a re-read replaces
 the label values it reads and removes nothing, and applying the same reads twice changes nothing. A read never
 hides a user value: a photo inside a run the user set, of its own level or deeper, starts no run (it would end the
-user's run there), with a warning. A value one box's read filled into an earlier run stays there if a re-read
+user's run there), with a warning; except a photo the user marked as a start, the companion's Box or Folder button
+(`ContainerMarker.startedByUser`), since starting a run there is the user's own act. A value one box's read filled into an earlier run stays there if a re-read
 changes it; the user corrects the run. The caller shows the result for the user to accept before anything is
 written.
 
 **Reading a label** (`ContainerLabelReader`, W47.ct-processor-capture). `parse` is `ct_read.py` `vision_read`, the
-Vision + parser route as scored, from the photo's text lines and its item type. `proposals` takes container, folder,
+Vision + parser route as scored, from the photo's text lines and its item type. The Processor runs Apple Vision
+(accurate) on the photo for those lines; where Vision reads nothing it parses the run's OCR text, reader
+`ocr-text+parser`, a route not scored. `proposals` takes container, folder,
 series and series title from it; repository, collection title, collection number, date and accession from a model's
 reading of the photo when there is one, else from the parser; the container from the model only where the parser
 reads none; and collection subtitle, box title, folder title and other marks from nobody, for the user to write. A
 folder label keeps only folder, folder title, date and other marks. Every value is source `label` with its `reader`
-until the user confirms it.
+until the user confirms it. In Live Capture the marker's card shows them (through §Showing a value) for correction
+and Save confirms them; at Finish each filed marker's run starts at its own PDF in the collection folder. Process
+Files writes them as proposals, for the Reader.
 
 ## Warnings
 

@@ -1079,6 +1079,9 @@ final class LiveCaptureProcessor: ObservableObject {
     /// A document segment's Mac tag card was resolved (Save/Skip) → finalize it.
     func segmentResolved(groupId: String) {
         guard !stagingManifestBlocked, session.processingMode == .live else { return }
+        // A box or folder marker was finalized on arrival; its card resolving is what a held Finish waits for
+        // (W47.ct-processor-capture), so look again now rather than at the next watchdog tick.
+        if finalizedGroups.contains(groupId) { proceedToFinishIfReady(); return }
         Task { [weak self] in await self?.finalizeSegment(groupId: groupId) }
     }
 
@@ -2311,8 +2314,26 @@ final class LiveCaptureProcessor: ObservableObject {
             let folder = d.chosenExisting ?? outputDir.appendingPathComponent(name, isDirectory: true)
             return MovePlan(folder: folder, name: name, appending: d.chosenExisting != nil, segments: segs)
         }
+        // W47.ct-processor-capture — each read marker's fields, snapshotted here so the container write runs inside
+        // the same off-main task as the move, right after it: the tail below keeps its one suspension point.
+        let markerInputs: [String: (type: ItemType, fields: ContainerFieldSet, text: String)] =
+            staged.reduce(into: [:]) { acc, seg in
+                guard let type = CaptureGroupType(rawValue: seg.type)?.itemType,
+                      let fields = session.containerFields[seg.groupId] else { return }
+                acc[seg.groupId] = (type, fields, retained[seg.groupId]?.texts.first ?? "")
+            }
         Task { [weak self] in
-            let outcome = await Task.detached { Self.executePlans(plans) }.value
+            let (outcome, containerProblem) = await Task.detached { () -> (FinalizeOutcome, String?) in
+                let outcome = Self.executePlans(plans)
+                // Only markers whose PDF landed (`firstPDFs` is set only for a filed segment); new files only,
+                // inside each collection folder's `.archivesuite`.
+                let filed = markerInputs.compactMap { id, m -> ContainerLabelCapture.FiledMarker? in
+                    guard let pdf = outcome.firstPDFs[id] else { return nil }
+                    return ContainerLabelCapture.FiledMarker(folder: pdf.folder, fileName: pdf.fileName, type: m.type,
+                                                             fields: m.fields, text: m.text, startedByUser: true)
+                }
+                return (outcome, filed.isEmpty ? nil : ContainerLabelCapture.record(filed))
+            }.value
             guard let self else { return }
             self.showFinalizeSheet = false
             self.isFinalizing = false
@@ -2341,20 +2362,6 @@ final class LiveCaptureProcessor: ObservableObject {
                 return
             }
             self.recordSessionInCollections(plans, filed: filedGroups)
-            // W47.ct-processor-capture — each filed marker's container fields into its collection folder's
-            // `.archivesuite/containers.json`, its run starting at the marker's own PDF. Only markers whose label was
-            // read (an entry in `containerFields`); new files only, inside `.archivesuite`, after the files landed.
-            let filedMarkers: [ContainerLabelCapture.FiledMarker] = self.staged.compactMap { seg in
-                guard filedGroups.contains(seg.groupId),
-                      let type = CaptureGroupType(rawValue: seg.type)?.itemType,
-                      let fields = self.session.containerFields[seg.groupId],
-                      let pdf = outcome.firstPDFs[seg.groupId] else { return nil }
-                return ContainerLabelCapture.FiledMarker(folder: pdf.folder, fileName: pdf.fileName, type: type,
-                                                         fields: fields,
-                                                         text: self.retained[seg.groupId]?.texts.first ?? "")
-            }
-            let containerProblem = filedMarkers.isEmpty ? nil
-                : await Task.detached { ContainerLabelCapture.record(filedMarkers) }.value
             let placeholderByGroup = Dictionary(
                 self.staged.compactMap { seg -> (String, [URL])? in
                     guard let held = seg.placeholderSources, !held.isEmpty else { return nil }
