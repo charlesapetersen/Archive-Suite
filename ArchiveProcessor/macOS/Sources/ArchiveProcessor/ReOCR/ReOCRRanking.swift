@@ -114,7 +114,7 @@ struct ReOCRRanking: Sendable {
                 leftOut.append(LeftOut(id: r.id, name: r.name, reason: c))
                 continue
             }
-            guard let (provider, model) = executable(r, builtInModels: builtInModels) else {
+            guard let (provider, model) = executable(r, builtInModels: builtInModels, keys: resources.keys) else {
                 if r.family == .cluster {
                     institutional.append(LeftOut(id: r.id, name: r.name, reason: "an institutional computing run: export the "
                                                  + "pages, run them there and import the text"))
@@ -124,7 +124,15 @@ struct ReOCRRanking: Sendable {
                 continue
             }
             let blockers = readiness(r, provider: provider, solver: solver, resources: resources)
-            let per: Double? = r.family == .mac ? 0 : r.listUSDPer1000
+            var per: Double? = r.family == .mac ? 0 : r.listUSDPer1000
+            // A maker's row run through OpenRouter is billed at the route's price, not the maker's own list price:
+            // the measured cost scaled by the two prices of a page (W41.app-openrouter-any).
+            let maker = model.measuredModel
+            if maker != model {
+                let page = { (m: LLMModel) in CostEstimator.estimate(fileCount: 1, model: m, enableTagging: false,
+                                                                     sendPreviousImage: false, contextCharCount: 0).ocrCost }
+                per = per.map { page(maker) > 0 ? $0 * page(model) / page(maker) : $0 }
+            }
             rows.append(Row(id: r.id, name: r.name, appRoute: r.appRoute, provider: provider, modelID: model.id,
                             figure: figure(r, metric), sample: sample(r, metric), caveats: r.caveats,
                             usdPer1000: per, estimateUSD: per.map { $0 * Double(pages) / 1000 },
@@ -210,11 +218,13 @@ struct ReOCRRanking: Sendable {
 
     /// The provider and built-in model a route runs as in this app, or nil when the app cannot run it. Built-in
     /// models only: a custom model reusing an id is not the model that was measured.
-    static func executable(_ r: SettingsRouteTable.Route, builtInModels: [LLMModel]) -> (LLMProvider, LLMModel)? {
+    /// `keys`: with only an OpenRouter key, a maker's row runs as its OpenRouter route (W41.app-openrouter-any).
+    static func executable(_ r: SettingsRouteTable.Route, builtInModels: [LLMModel],
+                           keys: Set<String> = []) -> (LLMProvider, LLMModel)? {
         if r.id == "apple-vision" {
             return builtInModels.first { $0.provider == .appleVision }.map { (.appleVision, $0) }
         }
-        guard let ar = r.appRoute else { return nil }
+        guard let ar = r.appRoute(keys: keys) else { return nil }
         let parts = ar.split(separator: "|", maxSplits: 1).map(String.init)
         guard parts.count == 2,
               let provider = LLMProvider.allCases.first(where: { $0.rawValue.lowercased() == parts[0] }),

@@ -630,7 +630,7 @@ struct SettingsSheetModel {
                 if r.id == "apple-vision" {
                     runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” switches it on."
                     apply = .appleVision
-                } else if let ar = r.appRoute, ar.contains("|") {
+                } else if let ar = r.appRoute(keys: words.resources.keys), ar.contains("|") {
                     runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” switches it on."
                     apply = .reading(appRoute: ar)
                 } else {

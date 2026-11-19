@@ -139,17 +139,28 @@ enum ReOCRRankingTestDriver {
                   return $0.figure == nil
               })
         eq("3 with no keys the suggestion is Apple Vision", bare.suggestedID, "apple-vision")
-        // The table reaches Gemini routes through OpenRouter too, but the app runs them with a Gemini key.
+        // W41.app-openrouter-any: the table reaches Gemini routes through OpenRouter too, and so does the app now.
         var orOnly = SettingsResources(macMemoryGB: 16)
         orOnly.keys = ["openrouter"]
         let or = rank(.typewritten, resources: orOnly)
         check("3 an OpenRouter key alone readies only OpenRouter rows and Apple Vision",
               or.rows.allSatisfy { ($0.readiness == .ready) == ($0.provider == .openrouter || $0.provider == .appleVision) },
               "\(or.rows.map { "\($0.id) \($0.readiness)" })")
-        if let g = or.rows.first(where: { $0.provider == .gemini }) {
-            eq("3 a Gemini row with only an OpenRouter key needs a Gemini key", g.readiness, .needsSetup("needs a Gemini key"))
+        check("3 with only an OpenRouter key no row runs on a Gemini key", !or.rows.contains { $0.provider == .gemini })
+        if let g = or.rows.first(where: { $0.id == "gemini3.8-flash" }) {
+            eq("3 Gemini 3.8 Flash's row runs through OpenRouter, ready",
+               [g.provider.rawValue, g.modelID, "\(g.readiness)"], ["OpenRouter", "google/gemini-3.8-flash", "\(ReOCRRanking.Readiness.ready)"])
+            // Priced as the route the page takes, not the maker's own list price.
+            let route = OpenRouterRoute.makerRoutes[0].model, maker = LLMModel.geminiModels[0]
+            let direct = rank(.typewritten, resources: { var r = orOnly; r.keys = ["gemini"]; return r }())
+                .rows.first { $0.id == "gemini3.8-flash" }
+            let page = { (m: LLMModel) in CostEstimator.estimate(fileCount: 1, model: m, enableTagging: false,
+                                                                 sendPreviousImage: false, contextCharCount: 0).ocrCost }
+            check("3 its price is OpenRouter's route's", g.usdPer1000.flatMap { o in direct?.usdPer1000.map { abs(o - $0 * page(route) / page(maker)) < 1e-9 } } == true
+                  && (g.usdPer1000 ?? 0) > (direct?.usdPer1000 ?? .infinity),
+                  "\(String(describing: g.usdPer1000)) vs \(String(describing: direct?.usdPer1000))")
         } else {
-            check("3 a Gemini row exists", false)
+            check("3 Gemini 3.8 Flash's row exists", false)
         }
         let mac = rank(.typewritten, staysOnMac: true)
         check("3 a batch that stays on the Mac disables every hosted row",

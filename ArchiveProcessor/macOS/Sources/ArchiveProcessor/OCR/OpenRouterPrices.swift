@@ -11,7 +11,7 @@ import Foundation
 ///
 /// Read only when the Settings note for an OpenRouter model shows, so only when OpenRouter is chosen: at most once a
 /// day, a failed attempt waits an hour, one short request per route with no retries. Kept in UserDefaults so the
-/// next launch's estimate has them. No custom models: the catalog is still the list.
+/// next launch's estimate has them. The catalog's maker routes (W41.app-openrouter-any) are read the same way.
 enum OpenRouterPrices {
     struct Price: Codable, Equatable, Sendable {
         /// Dollars per million tokens, as `LLMModel` keeps them.
@@ -43,7 +43,8 @@ enum OpenRouterPrices {
             rows = endpoints.filter {
                 let tag = $0["tag"] as? String ?? ""
                 return (tag == route.providerTag || tag.hasPrefix(route.providerTag + "/"))
-                    && ($0["quantization"] as? String ?? "unknown") == route.precision
+                    // A maker's endpoint pins no precision (W41.app-openrouter-any).
+                    && (route.maker != nil || ($0["quantization"] as? String ?? "unknown") == route.precision)
             }
         }
         guard rows.count == 1, let row = rows.first, let tag = row["tag"] as? String,
@@ -85,7 +86,8 @@ enum OpenRouterPrices {
     /// Where the price came from, for the Settings note.
     static func source(_ route: OpenRouterRoute, _ prices: [String: Price]? = nil) -> String {
         guard let price = (prices ?? stored())[route.model.id] else {
-            return "the price the bench paid (OpenRouter's listing not read yet)"
+            return route.maker == nil ? "the price the bench paid (OpenRouter's listing not read yet)"
+                : "the maker's own price plus a tenth, until OpenRouter's listing is read"
         }
         let day = DateFormatter.localizedString(from: price.fetched, dateStyle: .medium, timeStyle: .none)
         return "OpenRouter's listed price for \(price.tag), read \(day)"

@@ -420,10 +420,14 @@ struct LLMModel: Identifiable, Hashable, Codable {
     // model runs on ONE provider at ONE precision with fallbacks off (`OpenRouterRoute`), as the bench's
     // `ocr_panel.py` / `ocr_cloud.py` routes did, so the price here is that provider's and the figure is the
     // bench's. Prices are the pinned endpoint's, from the panel's frozen OpenRouter catalogs (2026-10-11/13).
-    // The first entry is the provider's default: the rule table's pick for an OpenRouter key with no fallback for a
-    // failed page (strict NES, 94.01, every page answered), and not one of the truth's drafters.
+    // Until W41.app-openrouter-any the first open route (the rule table's pick for an OpenRouter key with no fallback
+    // for a failed page) was the provider's default; now the makers' routes lead, so it is Gemini 3.8 Flash's.
     /// At OpenRouter's listed price for each pinned upstream once read (W42.int-s2, `OpenRouterPrices`), else the bench's.
-    static var openrouterModels: [LLMModel] { OpenRouterRoute.catalog.map { OpenRouterPrices.priced($0) } }
+    /// W41.app-openrouter-any: the measured Gemini and GPT models come first, in their own providers' order, so the
+    /// provider's default is the app's (Gemini 3.8 Flash) and one OpenRouter key reaches the recommended route.
+    static var openrouterModels: [LLMModel] {
+        (OpenRouterRoute.makerRoutes + OpenRouterRoute.openRoutes).map { OpenRouterPrices.priced($0) }
+    }
 }
 
 // MARK: - OpenRouter routes
@@ -443,6 +447,10 @@ struct OpenRouterRoute: Sendable, Equatable {
     let reasoning: Reasoning
     /// What the bench measured for it, shown under the Settings model picker.
     let measured: String
+    /// W41.app-openrouter-any: the built-in model of another provider this route reaches (Gemini, OpenAI), on its
+    /// maker's own endpoint, as the bench's `ocr_cloud.py` read it; nil for an open-weight model. A maker serves its
+    /// own weights, so no precision is pinned (`quantizations` is not sent).
+    var maker: LLMModel? = nil
 
     enum Reasoning: Sendable, Equatable {
         /// Send no `reasoning` field (a non-reasoning instruct model).
@@ -461,7 +469,10 @@ struct OpenRouterRoute: Sendable, Equatable {
         }
     }
 
-    static let catalog: [OpenRouterRoute] = [
+    /// Every pinned route: the open-weight models, then the makers' (W41.app-openrouter-any).
+    static let catalog: [OpenRouterRoute] = openRoutes + makerRoutes
+
+    static let openRoutes: [OpenRouterRoute] = [
         // Rule table 94.01 NES, all 95 answered, $1.22 per 1,000 pages (ocr_cloud.py `qwen3-vl-235b`). Non-reasoning
         // instruct. With no fallback for a failed page it ties Qwen3.6 27B (−0.37 strict, under the 0.49 floor) and
         // is cheaper, so it is the pick (04-reading.md §9, profile 2).
@@ -510,6 +521,51 @@ struct OpenRouterRoute: Sendable, Equatable {
                 + "the cheapest measured reader; 4 pages ran to the token cap."),
     ]
 
+    /// W41.app-openrouter-any — the measured models of another provider, through OpenRouter on their maker's own
+    /// endpoint (`allow_fallbacks: false`), with the reasoning setting the bench sent (`ocr_cloud.py`,
+    /// `method_openrouter.py`); the bench read every one of them this way, so its figures are these routes' own
+    /// (owner, 2026-11-18: no parity check). The Claude entries are not here: the bench never read them, and an
+    /// unmeasured model is not given a measured route. The models' prices before OpenRouter's listing is read are
+    /// the maker's plus a tenth, as OpenRouter listed Gemini 3.8 Flash on 2026-11-18 ($0.825/$4.125 against Google's
+    /// $0.75/$3.75), so the ceiling is not under a listed price that was never read.
+    static let makerRoutes: [OpenRouterRoute] = [
+        maker("gemini-3.8-flash", as: "google/gemini-3.8-flash", on: "google-ai-studio", reasoning: .effort("low")),
+        maker("gemini-3.5-flash-lite", as: "google/gemini-3.5-flash-lite", on: "google-ai-studio",
+              reasoning: .effort("minimal")),
+        maker("gemini-3.1-flash-lite", as: "google/gemini-3.1-flash-lite", on: "google-ai-studio",
+              reasoning: .effort("minimal")),
+        maker("gemini-3.5-flash", as: "google/gemini-3.5-flash", on: "google-ai-studio", reasoning: .effort("minimal")),
+        maker("gemini-3.1-pro", as: "google/gemini-3.1-pro-preview", on: "google-ai-studio", reasoning: .effort("low")),
+        maker("gpt-5.4-mini", as: "openai/gpt-5.4-mini", on: "openai", reasoning: .effort("minimal")),
+    ]
+
+    private static func maker(_ id: String, as openRouterID: String, on tag: String, reasoning: Reasoning) -> OpenRouterRoute {
+        let m = (LLMModel.geminiModels + LLMModel.openaiModels).first { $0.id == id }!
+        let upstream = tag == "openai" ? "OpenAI" : "Google AI Studio"
+        return OpenRouterRoute(
+            model: LLMModel(id: openRouterID, displayName: "\(m.displayName) (\(upstream))", provider: .openrouter,
+                            supportsThinking: m.supportsThinking, returnsMd: m.returnsMd,
+                            inputCostPer1M: (m.inputCostPer1M * 1.1 * 1_000_000).rounded() / 1_000_000,
+                            outputCostPer1M: (m.outputCostPer1M * 1.1 * 1_000_000).rounded() / 1_000_000,
+                            batchDiscount: 1),
+            providerTag: tag, precision: "", reasoning: reasoning, measured: "", maker: m)
+    }
+
+    /// The route that reaches `model` through OpenRouter: itself for an OpenRouter model, the maker's route for a
+    /// measured Gemini or GPT model, else nil.
+    static func through(_ model: LLMModel) -> OpenRouterRoute? {
+        model.provider == .openrouter ? forModel(model.id)
+            : makerRoutes.first { $0.maker?.id == model.id && $0.maker?.provider == model.provider }
+    }
+
+    /// The maker's route for a route-table `app_route` (`gemini|gemini-3.8-flash` → `openrouter|google/gemini-3.8-flash`).
+    static func appRoute(throughOpenRouter appRoute: String) -> String? {
+        makerRoutes.first { $0.makerAppRoute == appRoute }.map { "openrouter|" + $0.model.id }
+    }
+
+    /// The maker's own route-table `app_route` (`gemini|gemini-3.8-flash`), whose figures this route carries.
+    var makerAppRoute: String? { maker.map { "\($0.provider.rawValue.lowercased())|\($0.id)" } }
+
     static func forModel(_ id: String) -> OpenRouterRoute? { catalog.first { $0.model.id == id } }
 
     /// This route with its price ceiling at `model`'s prices: the run's model, priced when its estimate was made
@@ -522,11 +578,32 @@ struct OpenRouterRoute: Sendable, Equatable {
             model: LLMModel(id: m.id, displayName: m.displayName, provider: m.provider, supportsThinking: m.supportsThinking,
                             returnsMd: m.returnsMd, inputCostPer1M: model.inputCostPer1M,
                             outputCostPer1M: model.outputCostPer1M, batchDiscount: m.batchDiscount),
-            providerTag: providerTag, precision: precision, reasoning: reasoning, measured: measured)
+            providerTag: providerTag, precision: precision, reasoning: reasoning, measured: measured, maker: maker)
+    }
+
+    /// This route sending `reasoning` instead (a maker's model at the user's thinking level, W41.app-openrouter-any).
+    func with(reasoning: Reasoning) -> OpenRouterRoute {
+        OpenRouterRoute(model: model, providerTag: providerTag, precision: precision, reasoning: reasoning,
+                        measured: measured, maker: maker)
     }
 
     /// Under the Settings model picker: where the model runs, so the user knows the price and the precision.
     var settingsNote: String {
+        if let maker {
+            let priced = OpenRouterPrices.priced(self)
+            let upstream = providerTag == "openai" ? "OpenAI" : "Google AI Studio"
+            let row = SettingsRouteTable.bundled?.stage("reading")?.routes.first { $0.appRoute == makerAppRoute }
+            let figure = row?.figure("overall").map {
+                "Measured on the owner's 96 test pages, read this way: \(String(format: "%.2f", $0)) NES on the pages it answered"
+                    // The geminiModels comment: it drafted part of the truth, so say so wherever its figure shows.
+                    + (maker.id == "gemini-3.8-flash" ? ", though it drafted part of their truth, so its lead may be partly flattery. " : ". ")
+            } ?? ""
+            return "\(maker.displayName) through OpenRouter. " + figure
+                + "Runs on \(upstream) only, with OpenRouter's fallbacks off, at $\(Self.price(priced.inputCostPer1M)) in, "
+                + "$\(Self.price(priced.outputCostPer1M)) out per million tokens (\(OpenRouterPrices.source(self))), "
+                + "with no batch discount: OpenRouter has no batch here. If \(upstream) is down the page fails rather "
+                + "than going elsewhere."
+        }
         let provider = providerTag.split(separator: "/").first.map(String.init) ?? providerTag
         let at = precision == "unknown" ? "at the precision it serves (it lists none)" : "at \(precision)"
         let priced = OpenRouterPrices.priced(self)
@@ -537,6 +614,15 @@ struct OpenRouterRoute: Sendable, Equatable {
     }
 
     private static func price(_ v: Double) -> String { String(format: "%.2f", v) }
+}
+
+extension LLMModel {
+    /// W41.app-openrouter-any: the built-in model this one stands for, for everything keyed on the model the bench
+    /// measured (image tokens, thinking tokens, Gemini's refusals and their second reader, the page guidance): the
+    /// maker's model for a maker's route through OpenRouter, else the model itself.
+    var measuredModel: LLMModel {
+        provider == .openrouter ? (OpenRouterRoute.forModel(id)?.maker ?? self) : self
+    }
 }
 
 // MARK: - OCR Job

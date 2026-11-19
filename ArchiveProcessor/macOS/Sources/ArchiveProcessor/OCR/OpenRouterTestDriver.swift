@@ -15,6 +15,8 @@ import Foundation
 ///   4. OpenRouter's 200-with-an-error reply becomes a failed page with its message, never an empty success.
 ///   5. The cost estimate is priced at the pinned provider's rates, and is not below what the panel paid.
 ///   7. The rotation vote (llmMajority) breaks a tie by the first ordering's answer, not by hash order.
+///   8. The measured Gemini and GPT models through OpenRouter (W41.app-openrouter-any): mapped, pinned to their
+///      makers, at the user's thinking level, their refusals read as Gemini's own, run on an OpenRouter key alone.
 @MainActor
 enum OpenRouterTestDriver {
     nonisolated static let envKey = "OPENROUTER_TEST"
@@ -137,6 +139,8 @@ enum OpenRouterTestDriver {
                                                                    apiKey: "k")!.ocr(imageURL: image)
         eq("4 an HTTP error keeps its status and message", [limited?.errorCode, limited?.errorMessage], ["401", "No auth credentials found"])
 
+        makerChecks()
+        await makerRequestChecks(wire: wire, image: image)
         costChecks()
         rotationVoteChecks()
         segmentationChecks()
@@ -231,8 +235,182 @@ enum OpenRouterTestDriver {
         check("6 an OpenRouter key makes glm runnable", routes.canRun(.openrouter) && !SegmentationRoutes().canRun(.openrouter))
     }
 
+    /// 8. W41.app-openrouter-any — the measured Gemini and GPT models through OpenRouter, on their makers' endpoints.
+    private static func makerChecks() {
+        let makers = OpenRouterRoute.makerRoutes
+        // The id mapping for every measured model (`ocr_cloud.py` / `method_openrouter.py` MODELS).
+        eq("8 the id mapping", Dictionary(uniqueKeysWithValues: makers.map { ($0.maker?.id ?? "", $0.model.id) }),
+           ["gemini-3.8-flash": "google/gemini-3.8-flash", "gemini-3.5-flash-lite": "google/gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite": "google/gemini-3.1-flash-lite", "gemini-3.5-flash": "google/gemini-3.5-flash",
+            "gemini-3.1-pro": "google/gemini-3.1-pro-preview", "gpt-5.4-mini": "openai/gpt-5.4-mini"])
+        eq("8 each pinned to its maker's own endpoint", makers.map(\.providerTag),
+           ["google-ai-studio", "google-ai-studio", "google-ai-studio", "google-ai-studio", "google-ai-studio", "openai"])
+        eq("8 the reasoning the bench sent", makers.map(\.reasoning),
+           [.effort("low"), .effort("minimal"), .effort("minimal"), .effort("minimal"), .effort("low"), .effort("minimal")])
+        for r in makers {
+            guard let m = r.maker else { check("8 \(r.model.id) names its maker", false); continue }
+            check("8 \(r.model.id) is an OpenRouter model with no batch", r.model.provider == .openrouter && r.model.batchDiscount == 1)
+            eq("8 \(r.model.id) thinks as its maker does", r.model.supportsThinking, m.supportsThinking)
+            check("8 \(r.model.id) stands for its maker's model", r.model.measuredModel == m
+                  && OpenRouterRoute.through(m)?.model.id == r.model.id && OpenRouterRoute.through(r.model)?.model.id == r.model.id)
+            // Before the listing is read: the maker's price plus a tenth (Gemini 3.8 Flash's listing, 2026-11-18).
+            check("8 \(r.model.id) priced at its maker's plus a tenth until the listing is read",
+                  abs(r.model.inputCostPer1M - m.inputCostPer1M * 1.1) < 1e-6 && abs(r.model.outputCostPer1M - m.outputCostPer1M * 1.1) < 1e-6,
+                  "\(r.model.inputCostPer1M)/\(r.model.outputCostPer1M)")
+            let note = r.settingsNote
+            check("8 \(r.model.id) note: maker, figure, fallbacks off, no batch",
+                  note.hasPrefix(m.displayName + " through OpenRouter") && note.contains("NES")
+                  && note.contains("fallbacks off") && note.contains("no batch discount"), note)
+        }
+        eq("8 Gemini 3.8 Flash's note says it drafted part of the truth",
+           makers[0].settingsNote.contains("drafted part of their truth"), true)
+        check("8 a cascade never escalates to the same model by its other route",
+              !OCRCascade(routeID: OCRCascade.routeID(for: LLMModel.geminiModels[0])).applies(to: .openrouter, model: makers[0].model)
+              && !OCRCascade(routeID: OCRCascade.routeID(for: makers[0].model)).applies(to: .gemini, model: LLMModel.geminiModels[0])
+              && OCRCascade(routeID: OCRCascade.routeID(for: LLMModel.geminiModels[4])).applies(to: .openrouter, model: makers[0].model))
+        eq("8 the OpenRouter default is the app's default", LLMProvider.openrouter.models.first?.id, "google/gemini-3.8-flash")
+        check("8 Claude is not mapped: the bench never read the app's Claude models",
+              LLMModel.anthropicModels.allSatisfy { OpenRouterRoute.through($0) == nil })
+        check("8 an open model stands for itself", OpenRouterRoute.catalog[0].model.measuredModel == OpenRouterRoute.catalog[0].model)
+
+        // Every reading row the bench measured through OpenRouter on a maker's model has its route.
+        guard let table = SettingsRouteTable.bundled, let reading = table.stage("reading")?.routes else {
+            check("8 the route table loads", false); return
+        }
+        let makerRows = reading.filter { r in
+            r.needs.key.contains("openrouter") && (r.appRoute?.hasPrefix("gemini|") == true || r.appRoute?.hasPrefix("openai|") == true)
+        }
+        check("8 the table has the makers' rows", makerRows.count == makers.count, makerRows.map(\.id).joined(separator: ", "))
+        for r in makerRows {
+            let through = r.appRoute(keys: ["openrouter"])
+            let id = through?.split(separator: "|").last.map(String.init) ?? ""
+            check("8 \(r.id) runs through OpenRouter with only an OpenRouter key",
+                  through?.hasPrefix("openrouter|") == true && LLMProvider.openrouter.models.contains { $0.id == id },
+                  through ?? "nil")
+            eq("8 \(r.id) keeps its maker's route with the maker's key", r.appRoute(keys: ["openrouter", r.appRoute!.components(separatedBy: "|")[0]]), r.appRoute)
+            eq("8 \(r.id) keeps its maker's route with no key", r.appRoute(keys: []), r.appRoute)
+            let run = ReOCRRanking.executable(r, builtInModels: OCRCascade.candidates + LLMModel.appleVisionModels, keys: ["openrouter"])
+            check("8 \(r.id) Re-OCR runs it through OpenRouter", run?.0 == .openrouter && run?.1.id == id)
+        }
+        if let open = reading.first(where: { $0.appRoute == "openrouter|qwen/qwen3.6-27b" }) {
+            eq("8 an open model's row is unchanged", open.appRoute(keys: ["openrouter"]), "openrouter|qwen/qwen3.6-27b")
+        }
+        // The sheet sees the run's mapped model as its maker's measured row.
+        let running = SettingsSheetView.running(segmentation: .defaultApproach, useAppleVision: false, useGateway: false,
+                                                useLocalAgent: false, provider: .openrouter, model: makers[0].model, table: table)
+        eq("8 the sheet finds the mapped model's row", running.readingRouteID, "gemini3.8-flash")
+
+        // The key interview with only an OpenRouter key: what it recommends runs on that key alone.
+        let mac = MacInventory.read(exists: { $0 == LLMProvider.openrouter.rawValue }, claudePath: nil, memoryGB: 16, chip: "Apple M4")
+        eq("8 interview: only the OpenRouter key is found", mac.keys, ["openrouter"])
+        var layer = SettingsLayer(kind: .general, name: "General")
+        GeneralInterviewAnswers.applyFound(mac, to: &layer, now: Date(timeIntervalSince1970: 1_800_000_000))
+        let resources = SettingsResolver(general: layer).resources(macMemoryGB: 16)
+        eq("8 interview: the sheet's keys", resources.keys, ["openrouter"])
+        var answers = SettingsAnswers()
+        answers.ceilingUSD = 100
+        let solution = SettingsSolver(table: table, pairs: OCRPairMatrix.bundled, resources: resources, answers: answers).solve()
+        let picks = solution.picks.filter { $0.stage == "reading" }.compactMap(\.route).filter { $0.appRoute != nil }
+        lines.append("INFO 8 reading picks with only an OpenRouter key: "
+                     + picks.map { "\($0.id) → \($0.appRoute(keys: resources.keys) ?? "-")" }.joined(separator: ", "))
+        check("8 interview: a pick reads through a maker's model", picks.contains { makerRows.map(\.id).contains($0.id) })
+        check("8 interview: every pick runs on the OpenRouter key", !picks.isEmpty && picks.allSatisfy { r in
+            let ar = r.appRoute(keys: resources.keys) ?? ""
+            return ar.hasPrefix("openrouter|") && LLMProvider.openrouter.models.contains { "openrouter|" + $0.id == ar }
+        })
+
+        // Google's and OpenAI's paid API terms rule training out: no warning under the no-training switch.
+        for r in makers {
+            eq("8 \(r.model.id) raises no training warning", SettingsTraining.runWarning(
+                [(.openRouter(modelID: r.model.id), "reads the pages")], resources: resources), nil)
+        }
+        // Priced as its maker: the same image and thinking tokens, at the route's prices, no batch.
+        let direct = LLMModel.geminiModels[0], mapped = makers[0].model
+        let d = CostEstimator.estimate(fileCount: 1000, model: direct, enableTagging: false, sendPreviousImage: false, contextCharCount: 0)
+        let o = CostEstimator.estimate(fileCount: 1000, model: mapped, enableTagging: false, sendPreviousImage: false, contextCharCount: 0)
+        check("8 Gemini 3.8 Flash through OpenRouter costs its maker's tokens at a tenth more", abs(o.ocrCost - d.ocrCost * 1.1) < 1e-6,
+              "\(o.ocrCost) vs \(d.ocrCost)")
+        eq("8 no batch discount through OpenRouter", o.batchOcrCost, o.ocrCost)
+        eq("8 its thinking tokens are its maker's", CostEstimator.estimatedThinkingTokens(for: mapped), 117)
+        // The listing's row for a maker: the one Google AI Studio row, whatever precision it lists.
+        let listing = Data(#"{"data":{"id":"google/gemini-3.8-flash","endpoints":[{"tag":"google-vertex","quantization":"unknown","pricing":{"prompt":"0.0000009","completion":"0.0000045"}},{"tag":"google-ai-studio","pricing":{"prompt":"0.000000825","completion":"0.000004125"}}]}}"#.utf8)
+        let price = OpenRouterPrices.parse(listing, route: makers[0])
+        eq("8 the listing's AI Studio row prices the maker's route", [price?.inputPer1M, price?.outputPer1M, nil], [0.825, 4.125, nil])
+        eq("8 and names where it came from", price?.tag, "google-ai-studio")
+    }
+
+    /// 8. The maker's requests: the user's thinking level, and Gemini's refusals as OpenRouter passes them on.
+    private static func makerRequestChecks(wire: Wire, image: URL) async {
+        let flash = OpenRouterRoute.makerRoutes[0].model, lite = OpenRouterRoute.makerRoutes[1].model
+        func body(_ model: LLMModel, _ level: ThinkingLevel?) async -> [String: Any]? {
+            wire.requests = []
+            wire.reply = #"{"choices":[{"message":{"content":"[document_start]\nHello archive"}}]}"#
+            _ = try? await OpenAICompatibleClient.openRouter(model: model, apiKey: "k", thinkingLevel: level)?.ocr(imageURL: image)
+            return wire.requests.first?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        }
+        let high = await body(flash, .high)
+        eq("8 High reads at effort high", (high?["reasoning"] as? [String: Any])?["effort"] as? String, "high")
+        eq("8 High gets the direct clients' high budget on top", high?["max_tokens"] as? Int,
+           8192 + ThinkingLevel.high.budgetTokens(for: .documentOCR))
+        let low = await body(flash, .low)
+        eq("8 Low reads at the bench's effort", (low?["reasoning"] as? [String: Any])?["effort"] as? String, "low")
+        eq("8 Low keeps the bench's 8,192", low?["max_tokens"] as? Int, 8192)
+        let mini = await body(OpenRouterRoute.makerRoutes[5].model, .low)
+        eq("8 GPT-5.4 mini at Low keeps the bench's minimal", (mini?["reasoning"] as? [String: Any])?["effort"] as? String, "minimal")
+        eq("8 GPT-5.4 mini at High reads at high", ((await body(OpenRouterRoute.makerRoutes[5].model, .high))?["reasoning"]
+            as? [String: Any])?["effort"] as? String, "high")
+        let none = await body(lite, .high)
+        eq("8 a model with no thinking level keeps the bench's effort", (none?["reasoning"] as? [String: Any])?["effort"] as? String, "minimal")
+        let open = await body(OpenRouterRoute.catalog[2].model, .high)
+        eq("8 an open model keeps the bench's effort", (open?["reasoning"] as? [String: Any])?["effort"] as? String, "minimal")
+
+        func read(_ model: LLMModel, _ reply: String, status: Int = 200) async -> OCRResult? {
+            wire.reply = reply
+            wire.status = status
+            defer { wire.status = 200 }
+            return try? await OpenAICompatibleClient.openRouter(model: model, apiKey: "k")?.ocr(imageURL: image)
+        }
+        let recitation = await read(flash, #"{"choices":[{"finish_reason":"stop","native_finish_reason":"RECITATION","message":{"content":""}}]}"#)
+        eq("8 Gemini's RECITATION finish is its refusal", recitation?.errorCode, "Recitation")
+        check("8 and a refusal the second reader takes", recitation.map(OCRRefusalFallback.isRefusal) == true)
+        let raw = #"{"error":{"code":502,"message":"Provider returned error","metadata":{"raw":"{\"error\":\"RECITATION\"}"}}}"#
+        eq("8 a provider error naming RECITATION is the refusal, not a retried 503", (await read(flash, raw))?.errorCode, "Recitation")
+        eq("8 so is an HTTP error naming it", (await read(flash, raw, status: 400))?.errorCode, "Recitation")
+        eq("8 a content filter is its native reason", (await read(flash,
+            #"{"choices":[{"finish_reason":"content_filter","native_finish_reason":"SAFETY","message":{"content":null}}]}"#))?.errorCode, "SAFETY")
+        eq("8 Gemini's other reason with no text is that reason", (await read(flash,
+            #"{"choices":[{"finish_reason":"stop","native_finish_reason":"OTHER","message":{"content":""}}]}"#))?.errorCode, "OTHER")
+        eq("8 OpenAI's content filter fails the page", (await read(OpenRouterRoute.makerRoutes[5].model,
+            #"{"choices":[{"finish_reason":"content_filter","message":{"content":"[document_start]\nHalf"}}]}"#))?.errorCode, "content_filter")
+        eq("8 Gemini's STOP with text is its reading", (await read(flash,
+            #"{"choices":[{"finish_reason":"stop","native_finish_reason":"STOP","message":{"content":"[document_start]\nHello archive"}}]}"#))?.text, "Hello archive")
+        check("8 an open model's reply is not read as Gemini's refusal", (await read(OpenRouterRoute.catalog[0].model,
+            #"{"choices":[{"finish_reason":"stop","native_finish_reason":"RECITATION","message":{"content":"[document_start]\nHello archive"}}]}"#))?.text == "Hello archive")
+        eq("8 an unrelated provider error is still a retried 503", (await read(flash,
+            #"{"error":{"code":502,"message":"Provider returned error"}}"#))?.errorCode, "503")
+
+        // The refused page goes to the second reader, as Gemini's own refusal does.
+        guard let refused = recitation, let qwen = OpenRouterRoute.forModel(OCRRefusalFallback.openRouterReaderID)?.model else {
+            check("8 a refusal to resolve", false); return
+        }
+        OCRRefusalFallback.routesOverride = { [OCRRefusalFallback.Route(provider: .openrouter, model: qwen, apiKey: "k", localAgent: nil)] }
+        defer { OCRRefusalFallback.routesOverride = nil }
+        wire.reply = #"{"choices":[{"message":{"content":"[document_start]\nHello archive"}}]}"#
+        func resolve(_ model: LLMModel) async -> OCRResult {
+            await OCRCascade.resolve(refused, cascade: .off, provider: .openrouter, model: model, refusalFallback: true,
+                                     imageURL: image, previousText: nil, previousImageURL: nil, customPrompt: nil,
+                                     imageScale: 1, visionSettings: .default)
+        }
+        let second = await resolve(flash)
+        check("8 Gemini's refusal through OpenRouter is read by the second reader",
+              second.text == "Hello archive" && second.secondReader?.model == qwen.displayName,
+              String(describing: second.secondReader))
+        let kept = await resolve(OpenRouterRoute.catalog[3].model)
+        check("8 an open model's failure is not sent to Gemini's second reader", kept.secondReader == nil && kept.text == nil)
+    }
+
     private static func catalogChecks() {
-        let c = OpenRouterRoute.catalog
+        let c = OpenRouterRoute.openRoutes
         eq("1 models", c.map(\.model.id), ["qwen/qwen3-vl-235b-a22b-instruct", "qwen/qwen3.6-27b", "z-ai/glm-5.3-flash",
                                             "qwen/qwen3.8-flash", "qwen/qwen3.5-9b"])
         eq("1 pinned providers", c.map(\.providerTag), ["deepinfra/fp8", "chutes/fp8", "z-ai", "alibaba", "deepinfra/bf16"])
@@ -247,8 +425,11 @@ enum OpenRouterTestDriver {
               c.filter { !$0.settingsNote.contains("not been measured") }.allSatisfy { r in
                   reading.contains { $0.appRoute == "openrouter|\(r.model.id)" } })
         check("1 every model is an OpenRouter model", c.allSatisfy { $0.model.provider == .openrouter })
-        eq("1 the provider's models are the catalog, no custom ones", LLMProvider.openrouter.models.map(\.id),
-           c.map(\.model.id))
+        // W41.app-openrouter-any: the makers' measured models first (the provider's default is the app's), then these.
+        eq("1 the provider's models are the makers' routes then the open ones, no custom ones",
+           LLMProvider.openrouter.models.map(\.id), (OpenRouterRoute.makerRoutes + c).map(\.model.id))
+        eq("1 the catalog is every pinned route", OpenRouterRoute.catalog.map(\.model.id),
+           (c + OpenRouterRoute.makerRoutes).map(\.model.id))
         check("1 no batch path", !LLMProvider.openrouter.supportsBatch)
         check("1 names carry provider and precision for the PDF header",
               c.allSatisfy { $0.model.displayName.contains($0.providerTag.split(separator: "/")[0]) && $0.model.displayName.contains($0.precision) },
@@ -273,15 +454,27 @@ enum OpenRouterTestDriver {
         eq("2 \(tag) model", body["model"] as? String, route.model.id)
         let provider = body["provider"] as? [String: Any]
         eq("2 \(tag) provider order", provider?["order"] as? [String], [route.providerTag])
-        eq("2 \(tag) quantizations", provider?["quantizations"] as? [String], [route.precision])
+        if route.maker == nil {
+            eq("2 \(tag) quantizations", provider?["quantizations"] as? [String], [route.precision])
+            check("2 \(tag) no require_parameters", provider?["require_parameters"] == nil)
+        } else {
+            // A maker serves its own weights; an endpoint that would drop the reasoning setting is refused.
+            check("2 \(tag) no quantizations for a maker", provider?["quantizations"] == nil)
+            check("2 \(tag) require_parameters", raw.contains(#""require_parameters":true"#))
+        }
         // A JSON boolean false, not 0: OpenRouter would read a number as no setting at all.
         check("2 \(tag) allow_fallbacks is JSON false", raw.contains(#""allow_fallbacks":false"#), raw.prefix(400).description)
         let price = provider?["max_price"] as? [String: Double]
         eq("2 \(tag) max_price prompt", price?["prompt"], route.model.inputCostPer1M)
         eq("2 \(tag) max_price completion", price?["completion"], route.model.outputCostPer1M)
-        eq("2 \(tag) temperature 0", (body["temperature"] as? NSNumber)?.doubleValue, 0)
+        if route.maker?.provider == .openai {
+            check("2 \(tag) no temperature on OpenAI's endpoint", body["temperature"] == nil)
+        } else {
+            eq("2 \(tag) temperature 0", (body["temperature"] as? NSNumber)?.doubleValue, 0)
+        }
         let allowance: Int
-        if case .effort = route.reasoning { allowance = 1024 } else { allowance = 0 }
+        // A maker's page read keeps the bench's 8,192 with its reasoning inside (`ocr_panel.py`).
+        if case .effort = route.reasoning, route.maker == nil || !ocr { allowance = 1024 } else { allowance = 0 }
         eq("2 \(tag) max_tokens (plus room for reasoning)", body["max_tokens"] as? Int, (ocr ? 8192 : 512) + allowance)
         check("2 \(tag) no OpenAI reasoning_effort", body["reasoning_effort"] == nil)
         let reasoning = body["reasoning"] as? [String: Any]
@@ -295,6 +488,8 @@ enum OpenRouterTestDriver {
         if ocr {
             let content = ((body["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]) ?? []
             eq("2 \(tag) image then prompt", content.map { $0["type"] as? String ?? "" }, ["image_url", "text"])
+            let detail = (content.first?["image_url"] as? [String: Any])?["detail"] as? String
+            eq("2 \(tag) image detail", detail, route.maker?.provider == .openai ? "high" : nil)
         }
     }
 

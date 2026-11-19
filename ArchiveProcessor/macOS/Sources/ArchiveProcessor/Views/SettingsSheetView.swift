@@ -48,7 +48,9 @@ struct SettingsSheetView: View {
         if useGateway {
             return .init(readingRouteID: nil, readingName: "the model on your API gateway", segmentation: segmentation)
         }
-        let route = "\(provider.rawValue.lowercased())|\(model.id)"
+        // A maker's model through OpenRouter is the measured row of its maker (W41.app-openrouter-any).
+        let route = (provider == .openrouter ? OpenRouterRoute.forModel(model.id)?.makerAppRoute : nil)
+            ?? "\(provider.rawValue.lowercased())|\(model.id)"
         let id = table?.stage("reading")?.routes.first { $0.appRoute == route }?.id
         return .init(readingRouteID: id, readingName: model.displayName, segmentation: segmentation)
     }

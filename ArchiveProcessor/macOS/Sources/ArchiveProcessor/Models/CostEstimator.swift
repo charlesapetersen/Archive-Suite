@@ -43,6 +43,7 @@ struct CostEstimator {
         case .appleVision: return 0   // runs in-process; it has no billable image-token accounting
         // W41.app-openrouter: the OCR panel's logged prompt tokens on its pinned providers, less the ~400-token
         // prompt: Qwen3-VL 235B 4,091 a page, Qwen3.6 27B 3,351 (99 and 135 calls, 2,400 px pages). The larger.
+        // A maker's model through OpenRouter is priced by its maker's tokens (`LLMModel.measuredModel`).
         case .openrouter: return 3_700
         }
     }
@@ -50,8 +51,9 @@ struct CostEstimator {
     /// Thinking tokens a model spends per OCR page, billed at its output rate. Gemini 3.8 Flash thinks even
     /// with no thinking level set: ~117 a page in the W41 pilot (W41.app-ocr-default-fu1).
     /// GLM-5.3 Flash reasons at minimal on OpenRouter: 153 tokens a call over the Deaver windows (cheap-models.md).
+    /// A maker's model through OpenRouter counts as itself (W41.app-openrouter-any), as its image tokens do.
     static func estimatedThinkingTokens(for model: LLMModel) -> Double {
-        switch model.id {
+        switch model.measuredModel.id {
         case "gemini-3.8-flash": return 117
         case "z-ai/glm-5.3-flash": return 153
         default: return 0
@@ -147,7 +149,7 @@ struct CostEstimator {
             let scaleArea = max(0.01, min(1.0, imageScale))   // defensive clamp against stale/out-of-range values
             // For a gateway, model.provider is a stand-in (.anthropic); use the caller-supplied upstream
             // family so a Gemini-behind-gateway isn't under-estimated ~6.7×.
-            let imgTokens = estimatedImageTokens(for: imageTokenProvider ?? model.provider) * scaleArea
+            let imgTokens = estimatedImageTokens(for: imageTokenProvider ?? model.measuredModel.provider) * scaleArea
             let contextTokens = Double(contextCharCount) / 4.0 // ~4 chars per token
             let inputPerFile = estimatedPromptTokens + imgTokens + contextTokens
                 + (sendPreviousImage ? imgTokens : 0)

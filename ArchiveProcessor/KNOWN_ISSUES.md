@@ -2,6 +2,22 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W41.app-openrouter-any, 2026-11-18): what the makers' models through OpenRouter do not yet do
+
+- **Before OpenRouter's listing is read, a maker's price is a guess.** A Gemini or GPT model through OpenRouter is
+  priced at its maker's own price plus a tenth (Gemini 3.8 Flash's listing on 2026-11-18) until
+  `OpenRouterPrices.refreshIfStale` has read its endpoint, which happens when the Settings note for an OpenRouter model
+  shows. That price is also the request's `max_price`, so if OpenRouter lists one of them higher, every page fails
+  (nothing is charged) until the note has shown once. A user who reaches the route from “Read with this”, Re-OCR's
+  ranking or page-kind routing may not have seen the note. Fix: read the listing when any of those picks an OpenRouter
+  model, before its estimate shows.
+- **The estimate counts the maker's thinking tokens at Low only.** At High, a maker's thinking model gets the direct
+  clients' 8,000-token budget on top of the bench's 8,192, but the estimate still counts 117 thinking tokens a page for
+  Gemini 3.8 Flash and none for the others, as the direct routes' estimates do.
+- **No batch, no LLM rotation** through OpenRouter: the standard price only, and rotation stays on this Mac.
+- **The app's Claude models and the unmeasured Gemini and GPT built-ins are not offered through OpenRouter**: the
+  bench read none of them, and their OpenRouter ids come with the listing (`W41.app-openrouter-unmeasured`).
+
 ## FIXED (W46.layout-partition-fix, 2026-11-17): the newspaper fill read like a whole page
 
 W46.layout-partition-score found the shipped partition scoring 20.2 strict NES on the 15 L9 scans against 84.6 for

@@ -43,16 +43,10 @@ struct OpenAICompatibleClient: Sendable {
         var contentParts: [[String: Any]] = []
 
         if let prevURL = previousImageURL, let prevData = ImageEncoding.loadImageAsJPEG(url: prevURL, scale: imageScale) {
-            contentParts.append([
-                "type": "image_url",
-                "image_url": ["url": "data:image/jpeg;base64,\(prevData.base64EncodedString())"]
-            ])
+            contentParts.append(["type": "image_url", "image_url": imageField(prevData.base64EncodedString())])
         }
 
-        contentParts.append([
-            "type": "image_url",
-            "image_url": ["url": "data:image/jpeg;base64,\(base64)"]
-        ])
+        contentParts.append(["type": "image_url", "image_url": imageField(base64)])
         contentParts.append(["type": "text", "text": prompt])
 
         var body: [String: Any] = [
@@ -74,15 +68,36 @@ struct OpenAICompatibleClient: Sendable {
         guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
 
         if http.statusCode != 200 {
+            // Gemini's refusal of reprinted text can come back as an upstream error naming it: still a refusal.
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let refused = makerRefusal(finish: nil, native: nil, content: nil, errorText: Self.providerErrorText(json)) {
+                return refused
+            }
             let errorMessage = Self.parseErrorResponse(data: data, statusCode: http.statusCode, provider: billingProvider)
             return OCRResult(text: nil, classification: nil, errorMessage: errorMessage, errorCode: "\(http.statusCode)")
         }
         return parseCompletion(data)
     }
 
+    /// The `image_url` object: OpenAI's own endpoint through OpenRouter reads it at `detail: high`, as the bench sent it
+    /// (`ocr_cloud.py`); every other caller's stays byte-identical.
+    private func imageField(_ base64: String) -> [String: Any] {
+        var field: [String: Any] = ["url": "data:image/jpeg;base64,\(base64)"]
+        if openRouterRoute?.maker?.provider == .openai { field["detail"] = "high" }
+        return field
+    }
+
     /// A whole (unstreamed) chat-completions reply as an OCR result. Also a local server's, when it ignored `stream`.
     private func parseCompletion(_ data: Data) -> OCRResult {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+        let whole = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let choice = (whole?["choices"] as? [[String: Any]])?.first
+        if let refused = makerRefusal(finish: choice?["finish_reason"] as? String,
+                                      native: choice?["native_finish_reason"] as? String,
+                                      content: (choice?["message"] as? [String: Any])?["content"] as? String,
+                                      errorText: whole.flatMap(Self.providerErrorText)) {
+            return refused
+        }
+        guard let json = whole,
               let choices = json["choices"] as? [[String: Any]],
               let message = choices.first?["message"] as? [String: Any],
               let rawContent = message["content"] as? String else {
@@ -303,10 +318,56 @@ extension OpenAICompatibleClient {
 
     /// A client for one of `OpenRouterRoute.catalog`'s models, or nil for a model the catalog lacks: an unpinned
     /// OpenRouter call would read with weights and at a price the bench never measured, so there is none.
-    static func openRouter(model: LLMModel, apiKey: String) -> OpenAICompatibleClient? {
-        guard let route = OpenRouterRoute.forModel(model.id) else { return nil }
+    /// `thinkingLevel`: a maker's thinking model reads at the user's High, as its direct client does
+    /// (W41.app-openrouter-any); at Low (Process Files' default) or none, at the effort the bench sent, which is low or
+    /// below, so the measured figure is the setting sent. An open model keeps the bench's.
+    static func openRouter(model: LLMModel, apiKey: String, thinkingLevel: ThinkingLevel? = nil) -> OpenAICompatibleClient? {
+        guard var route = OpenRouterRoute.forModel(model.id)?.ceiling(model) else { return nil }
+        if route.maker != nil, route.model.supportsThinking, thinkingLevel == .high {
+            route = route.with(reasoning: .effort(ThinkingLevel.high.openAIReasoningEffort))
+        }
         return OpenAICompatibleClient(baseURL: openRouterBaseURL, apiKey: apiKey, modelID: route.model.id,
-                                      openRouterRoute: route.ceiling(model))
+                                      openRouterRoute: route)
+    }
+
+    /// W41.app-openrouter-any — a maker's refusal as OpenRouter passes it on, read as the direct client reads it, so
+    /// the page goes to its second reader (`OCRRefusalFallback`, Gemini's) or fails, and is never retried as a
+    /// transport failure or kept as a transcription: Gemini's own finish reason (`native_finish_reason`) RECITATION,
+    /// or a provider error whose text names it (`ocr_pages_export.py` REFUSED), is `Recitation`; a `content_filter`
+    /// finish is its native reason (SAFETY, PROHIBITED_CONTENT…) or `content_filter`; Gemini's other non-STOP reason
+    /// with no text is that reason (`GeminiClient`). nil for an open model's route and for every other reply.
+    func makerRefusal(finish: String?, native: String?, content: String?, errorText: String?) -> OCRResult? {
+        guard let maker = openRouterRoute?.maker else { return nil }
+        let gemini = maker.provider == .gemini
+        if gemini, native == "RECITATION" || errorText?.contains("RECITATION") == true {
+            return OCRResult(text: nil, classification: nil,
+                             errorMessage: "Gemini refused to OCR this content (Recitation — likely copyrighted material).",
+                             errorCode: "Recitation")
+        }
+        let name = gemini ? "Gemini" : maker.provider.rawValue
+        if finish == "content_filter" {
+            let code = native.flatMap { $0.isEmpty || $0 == "STOP" ? nil : $0 } ?? "content_filter"
+            return OCRResult(text: nil, classification: nil, errorMessage: "\(name) refused this page (\(code)).",
+                             errorCode: code)
+        }
+        let empty = (content ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if gemini, finish != nil || content != nil, empty, let native, !native.isEmpty,
+           !["STOP", "MAX_TOKENS"].contains(native) {
+            return OCRResult(text: nil, classification: nil, errorMessage: "Gemini returned no text (\(native)).",
+                             errorCode: native)
+        }
+        return nil
+    }
+
+    /// A provider's error text in an OpenRouter body: the error's message and the upstream's raw reply, top level or
+    /// on the choice.
+    static func providerErrorText(_ json: [String: Any]) -> String? {
+        let choice = (json["choices"] as? [[String: Any]])?.first
+        let errors = [json["error"], choice?["error"]].compactMap { $0 as? [String: Any] }
+        let text = errors.flatMap { e in
+            [e["message"] as? String, (e["metadata"] as? [String: Any])?["raw"] as? String].compactMap { $0 }
+        }
+        return text.isEmpty ? nil : text.joined(separator: " ")
     }
 
     /// OpenRouter's in-body error codes: a provider failure or timeout (502, 503, 408) reads as 503, the code the
@@ -316,8 +377,9 @@ extension OpenAICompatibleClient {
     }
 
     /// `openRouter(model:apiKey:)`, throwing for a model with no pinned route (a stale saved selection).
-    static func pinnedOpenRouter(model: LLMModel, apiKey: String) throws -> OpenAICompatibleClient {
-        guard let client = openRouter(model: model, apiKey: apiKey) else {
+    static func pinnedOpenRouter(model: LLMModel, apiKey: String,
+                                 thinkingLevel: ThinkingLevel? = nil) throws -> OpenAICompatibleClient {
+        guard let client = openRouter(model: model, apiKey: apiKey, thinkingLevel: thinkingLevel) else {
             throw OCRError.networkError("\(model.id) has no pinned OpenRouter provider. Choose one of the listed OpenRouter models.")
         }
         return client
@@ -329,12 +391,18 @@ extension OpenAICompatibleClient {
     func applyOpenRouterRoute(_ body: inout [String: Any]) {
         guard let route = openRouterRoute else { return }
         body["provider"] = Self.openRouterProviderField(route)
-        body["temperature"] = 0
+        // OpenAI's endpoint takes no temperature (`ocr_cloud.py` drops it there).
+        if route.maker?.provider != .openai { body["temperature"] = 0 }
         if let reasoning = route.reasoning.body { body["reasoning"] = reasoning }
         // Excluded reasoning still counts against max_tokens: give a reasoning model room above the answer's
-        // budget, or a short call (classification asks for 64) can come back empty.
-        if case .effort = route.reasoning, let limit = body["max_tokens"] as? Int {
+        // budget, or a short call (classification asks for 64) can come back empty. A maker's page read keeps the
+        // bench's 8,192 with reasoning in it (`ocr_panel.py`); its short calls get the room too, and the user's High
+        // gets the direct clients' high budget on top (`ThinkingLevel.budgetTokens`).
+        guard case .effort(let effort) = route.reasoning, let limit = body["max_tokens"] as? Int else { return }
+        if route.maker == nil || limit < 8192 {
             body["max_tokens"] = limit + Self.openRouterReasoningAllowance
+        } else if effort == ThinkingLevel.high.openAIReasoningEffort {
+            body["max_tokens"] = limit + ThinkingLevel.high.budgetTokens(for: .documentOCR)
         }
     }
 
@@ -346,8 +414,14 @@ extension OpenAICompatibleClient {
         var field: [String: Any] = [
             "order": [route.providerTag],
             "allow_fallbacks": false,
-            "quantizations": [route.precision],
             "max_price": ["prompt": route.model.inputCostPer1M, "completion": route.model.outputCostPer1M]]
+        if route.maker == nil {
+            field["quantizations"] = [route.precision]
+        } else {
+            // A maker serves its own weights (no precision to pin), and an endpoint that would drop the reasoning
+            // setting is refused rather than read with another (`ocr_cloud.py`).
+            field["require_parameters"] = true
+        }
         if denyDataCollection { field["data_collection"] = "deny" }
         return field
     }

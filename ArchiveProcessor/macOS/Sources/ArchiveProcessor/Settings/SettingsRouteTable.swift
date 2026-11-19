@@ -194,6 +194,16 @@ struct SettingsRouteTable: Decodable, Sendable {
         let family: Family
         /// The Processor's `provider|model` id when the app offers this route; nil when it does not yet.
         let appRoute: String?
+
+        /// W41.app-openrouter-any: the app route for a user whose keys are `keys`: the row's own, unless the user has
+        /// no key for its provider but has an OpenRouter key, which reaches the same model on its maker's endpoint
+        /// (`OpenRouterRoute.makerRoutes`; `gemini|gemini-3.8-flash` → `openrouter|google/gemini-3.8-flash`).
+        func appRoute(keys: Set<String>) -> String? {
+            guard let ar = appRoute, let provider = ar.split(separator: "|").first.map(String.init),
+                  !keys.contains(provider), keys.contains("openrouter"),
+                  let through = OpenRouterRoute.appRoute(throughOpenRouter: ar) else { return appRoute }
+            return through
+        }
         let status: String
         let needs: Needs
         let figures: [String: JSONValue]

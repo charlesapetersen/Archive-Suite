@@ -31,11 +31,17 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 ## OCR rules (Primary Function 1)
 
 - **Built-in models** are the REFERENCE.md §LLM Provider & Model Selection lists (`Models/ProviderModels.swift`);
-  don't silently add others to them. OpenRouter's are exactly `OpenRouterRoute.catalog`, each pinned as benched (`provider.order`,
-  `allow_fallbacks: false`, `quantizations`, `max_price`, temp 0), no custom models; a model outside it gets no client, so no call goes unpinned.
+  don't silently add others to them. OpenRouter's are `OpenRouterRoute.catalog`, each pinned as benched (`provider.order`,
+  `allow_fallbacks: false`, `max_price`): the open models at their `quantizations`, temp 0; and the measured Gemini and GPT
+  models on their makers' own endpoints (`makerRoutes`, W41.app-openrouter-any), so one OpenRouter key reaches the
+  recommended route. Such a model stands for its maker's (`LLMModel.measuredModel`: figures, tokens, Gemini's refusals
+  and their second reader), and a route-table row runs through it when the user has only an OpenRouter key
+  (`Route.appRoute(keys:)`). No custom models yet (unmeasured ones: `W41.app-openrouter-unmeasured`); a model outside the
+  catalog gets no client, so no call goes unpinned.
   Their prices are OpenRouter's listing for the pinned upstream only (`OCR/OpenRouterPrices.swift`, read when the
-  Settings note for an OpenRouter model shows, at most daily), else the bench's; `max_price` is the run's model's price,
-  the one its estimate showed (`OpenRouterRoute.ceiling`). Segmentation's OpenRouter voter keeps the bench's.
+  Settings note for an OpenRouter model shows, at most daily), else the bench's (a maker's: its own price plus a tenth);
+  `max_price` is the run's model's price, the one its estimate showed (`OpenRouterRoute.ceiling`). Segmentation's
+  OpenRouter voter keeps the bench's.
 - **One way to read a page** (W42.int-s2): every client is a VisionOCRKit `PageReader`, and `PageReaders.reader`
   (`OCR/PageReaders.swift`) is the only place that picks one (Local Agent, then gateway, then provider). Never call a
   client's `ocr` elsewhere: `scripts/check-page-reader-seam.sh` fails on it, and on a provider with no reader.

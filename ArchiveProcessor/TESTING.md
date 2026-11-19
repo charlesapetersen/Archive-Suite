@@ -349,7 +349,11 @@ existing scratch, key-free, no-network execution remains unchanged.
   seam is inactive). The catalog (ids, pinned provider, precision, prices), the request on the wire for OCR and
   text calls (provider order, fallbacks off as a JSON false, quantizations, max_price, temperature, reasoning,
   max_tokens), no client for an uncatalogued model, failed-page handling (in-body errors, finish_reason
-  error/length, empty text answers, HTTP errors keeping OpenRouter's message), the estimate against what the panel
+  error/length, empty text answers, HTTP errors keeping OpenRouter's message), and (section 8, W41.app-openrouter-any)
+  the makers' routes: the id mapping for every measured Gemini and GPT model, their request (maker pinned, no
+  quantizations, `require_parameters`, OpenAI's no temperature and `detail: high`, the user's High), Gemini's refusals
+  through OpenRouter read as `Recitation` and sent to the second reader, the listing's AI Studio row, the price and
+  tokens of the maker, the sheet and Re-OCR rows and the key interview with only an OpenRouter key; the estimate against what the panel
   paid, and the GLM segmentation approach (options.json figures, the window request, its error mapping). No key,
   network, corpus, or spend; not in the health gate.
 - **`live-openrouter.sh`** — PAID (about $0.03): each catalog model reads two synthetic pages through the real

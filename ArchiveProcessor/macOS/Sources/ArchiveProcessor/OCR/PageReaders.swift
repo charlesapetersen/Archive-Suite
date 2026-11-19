@@ -50,7 +50,8 @@ enum PageReaders {
             return Measured(OpenAICompatibleClient.openAI(model: model, apiKey: apiKey, thinkingLevel: thinkingLevel),
                             route: OCRCascade.routeID(for: model), dollars: price, pricedModel: model)
         case .openrouter:
-            return Measured(try OpenAICompatibleClient.pinnedOpenRouter(model: model, apiKey: apiKey),
+            return Measured(try OpenAICompatibleClient.pinnedOpenRouter(model: model, apiKey: apiKey,
+                                                                        thinkingLevel: thinkingLevel),
                             route: OCRCascade.routeID(for: model), dollars: price, pricedModel: model)
         case .appleVision:
             return Measured(VisionClient(settings: visionSettings), dollars: nil)

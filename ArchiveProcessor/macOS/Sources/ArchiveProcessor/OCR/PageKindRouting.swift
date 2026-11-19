@@ -62,7 +62,10 @@ enum PageKindRouting {
         func firstPick(_ id: String) -> Candidate? {
             guard let entry = guidance.kinds.first(where: { $0.id == id }) else { return nil }
             for pick in entry.picks {
-                if let m = pick.appModel, let c = available.first(where: { $0.modelID == m }) { return c }
+                // The maker's own key first, else the same model through OpenRouter (W41.app-openrouter-any).
+                if let m = pick.appModel, let c = available.first(where: { $0.modelID == m })
+                    ?? available.first(where: { $0.provider == .openrouter
+                        && OpenRouterRoute.forModel($0.modelID)?.maker?.id == m }) { return c }
             }
             return nil
         }

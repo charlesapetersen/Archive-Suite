@@ -117,7 +117,9 @@ struct OCRCascade: Codable, Equatable, Sendable {
     /// escalation model.
     func applies(to provider: LLMProvider, model: LLMModel) -> Bool {
         guard let target = escalationModel, provider != .appleVision else { return false }
-        return Self.routeID(for: target) != Self.routeID(for: model)
+        // The same model by its other route (Gemini's own key, or through OpenRouter) is not a stronger reader: it
+        // would refuse or fail the page again (W41.app-openrouter-any).
+        return Self.routeID(for: target.measuredModel) != Self.routeID(for: model.measuredModel)
     }
 
     /// What one escalated page costs at the escalation route's standard rate, for the pre-run estimate.
@@ -167,7 +169,9 @@ struct OCRCascade: Codable, Equatable, Sendable {
         costScale: Double? = nil, visionSettings: VisionOCRSettings, firstReaderLabel: String? = nil
     ) async -> OCRResult {
         let costScale = costScale ?? imageScale
-        let refused = refusalFallback && provider == .gemini && OCRRefusalFallback.isRefusal(first)
+        // Gemini through OpenRouter refuses the same pages as Gemini itself (W41.app-openrouter-any).
+        let family = provider == .openrouter ? model.measuredModel.provider : provider
+        let refused = refusalFallback && family == .gemini && OCRRefusalFallback.isRefusal(first)
         guard cascade.applies(to: provider, model: model), let target = cascade.escalationModel else {
             return refused
                 ? await OCRRefusalFallback.readRefusedPage(
@@ -178,7 +182,7 @@ struct OCRCascade: Codable, Equatable, Sendable {
         cascade.breaker.notePage(imageURL)
         let trigger: SecondReader.Trigger
         let firstCode: String
-        if isEscalatable(first, provider: provider) {
+        if isEscalatable(first, provider: family) {
             // A cut-off, unparsable or 500 reply is a failure even from Gemini; only its finish/block reasons refuse.
             let failure = [OCRFailureCode.cutOff, OCRFailureCode.unparsable, "500"].contains(first.errorCode ?? "")
             trigger = refused && !failure ? .refusal : .failure

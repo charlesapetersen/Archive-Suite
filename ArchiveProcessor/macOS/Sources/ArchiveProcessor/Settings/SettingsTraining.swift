@@ -81,6 +81,9 @@ enum SettingsTraining {
         "chutes": Record(provider: "Chutes, through OpenRouter", terms: .mayTrain,
                          summary: "OpenRouter serves Chutes only to accounts that allow providers to train on prompts",
                          source: "https://x.com/OpenRouterAI/status/1889732807481561112"),
+        // W41.app-openrouter-any: a maker's own endpoint (`OpenRouterRoute.makerRoutes`) holds the maker's API terms.
+        "google-ai-studio": makersThroughOpenRouter["gemini"]!,
+        "openai": makersThroughOpenRouter["openai"]!,
     ]
 
     /// A closed model reached through OpenRouter runs on its maker's paid API, so the maker's API terms hold.

@@ -801,7 +801,7 @@ struct OCRView: View {
                                 }
                             }
                             if !useGateway && !useLocalAgent && !useAppleVision && !preOCRedInput
-                                && effectiveModel.provider == .gemini {
+                                && effectiveModel.measuredModel.provider == .gemini {
                                 // W41.app-ocr-default-fu1 — a refused page is read again, outside the totals above.
                                 let range = OCRRefusalFallback.pageCostRange(imageScale: imageScale / 100.0)
                                 Text("Pages Gemini refuses are read by a second reader: \(CostEstimate.money(range.lowerBound))–\(CostEstimate.money(range.upperBound)) a page with a key, free with a Claude subscription. Not in the totals.")
