@@ -1,6 +1,7 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import AppKit
 import Foundation
+import ArchiveCore
 
 /// Key-free, no-network contract for W41.app-local-models, gated by `LOCALMODELS_TEST=1` (does nothing in normal
 /// use). Every request goes to the no-wire seam (`NetworkSession.testTransport`), which this flag enables; the driver
@@ -20,6 +21,9 @@ import Foundation
 ///      is read once more with a repetition penalty, the reason says so, and a timeout or a good page is read once.
 ///   7. (W41.app-local-models-fu2) Every local call, OCR and text, turns reasoning off under the servers' three
 ///      spellings; a text reply with no answer (cut, empty or all reasoning) throws; a remote gateway is unchanged.
+///   8. (W47.ct-capture-gemma) A label's titles go to Gemma 3 12B only on a server on this Mac that lists it, the gateway's
+///      own address first when it is a local model there; the request is `ct_read.py`'s (prompt, temperature 0, 640
+///      tokens, the stand-in key); only its four fields are taken, and a remote gateway never asks for it.
 @MainActor
 enum LocalModelsTestDriver {
     nonisolated static let envKey = "LOCALMODELS_TEST"
@@ -234,9 +238,110 @@ enum LocalModelsTestDriver {
 
         await streamChecks(wire: wire, image: image, local: local, remote: remote, reply: reply)
         await reasoningOffChecks(wire: wire, image: image, local: local, remote: remote, reply: reply)
+        await gemmaLabelChecks(wire: wire, image: image, remote: remote, reply: reply)
     }
 
     /// Whether a request body turns reasoning off under all three spellings.
+    /// 8. Gemma 3 12B for a label's titles (W47.ct-capture-gemma). The model lists come from the driver, never a server.
+    private static func gemmaLabelChecks(wire: Wire, image: URL, remote: GatewayConfig,
+                                         reply: (String, String) -> String) async {
+        final class Asked: @unchecked Sendable {
+            let lock = NSLock()
+            var urls: [String] = []
+            var lists: [String: [String]] = [:]
+            func list(_ url: String) throws -> [String] {
+                try lock.withLock {
+                    urls.append(url)
+                    guard let l = lists[url] else { throw URLError(.cannotConnectToHost) }
+                    return l
+                }
+            }
+            func reset(_ lists: [String: [String]]) { lock.withLock { self.lists = lists; urls = [] } }
+            var asked: [String] { lock.withLock { urls } }
+        }
+        let asked = Asked()
+        let saved = ContainerLabelGemma.listModels
+        ContainerLabelGemma.listModels = { try asked.list($0) }
+        defer { ContainerLabelGemma.listModels = saved }
+        let mlx = LocalModelRoute.Server.mlxVLM.baseURL, ollama = LocalModelRoute.Server.ollama.baseURL
+        let onMac = GatewayConfig(baseURL: "http://127.0.0.1:9999/v1/", modelID: "qwen", displayName: "Q",
+                                  localModel: true)
+        let offMac = GatewayConfig(baseURL: "http://local-mac.invalid:1234/v1", modelID: "qwen", displayName: "Q",
+                                   localModel: true)
+        eq("8 the local gateway's own address first, then the presets", ContainerLabelGemma.candidates(gateway: onMac),
+           ["http://127.0.0.1:9999/v1"] + LocalModelRoute.Server.allCases.map(\.baseURL))
+        eq("8 a local model off this Mac is not asked", ContainerLabelGemma.candidates(gateway: offMac),
+           LocalModelRoute.Server.allCases.map(\.baseURL))
+        eq("8 the measured build is picked first",
+           ContainerLabelGemma.pick(from: ["gemma3:12b", "mlx-community/gemma-3-12b-it-4bit"]), "mlx-community/gemma-3-12b-it-4bit")
+        eq("8 another Gemma 3 12B tag is taken", ContainerLabelGemma.pick(from: ["qwen3.5:9b", "gemma3:12b-it-qat"]),
+           "gemma3:12b-it-qat")
+        eq("8 no other model stands in", ContainerLabelGemma.pick(from: ["qwen3.5:9b", "gemma3:27b", "gemma-3-4b"]), nil)
+
+        func read(_ gateway: GatewayConfig?) async -> ContainerFieldSet {
+            await ContainerLabelGemma.forget()
+            return await ContainerLabelCapture.read(type: .box, text: "BOX NO. 17", photo: image, rotation: 0,
+                                                    gateway: gateway)
+        }
+        let answer = #"{"kind": "box label", "repository": "Hoover Institution Archives", "collection_title": "Glotzer Papers", "#
+            + #""collection_number": "91006", "accession": "1991-006", "container": "Box 99", "box_title": "Speeches", "#
+            + #""date": "1930-1990"}"#
+        // No gateway: the second preset lists it, so the read goes there.
+        asked.reset([mlx: ["qwen3.5:9b"], ollama: ["gemma3:12b"]])
+        wire.reset(["127.0.0.1": reply(answer, "stop")])
+        var set = await read(nil)
+        eq("8 no gateway: the presets asked in turn until one lists it", asked.asked, [LocalModelRoute.Server.lmStudio.baseURL, ollama])
+        eq("8 no gateway: titles from Gemma", set[.repository]?.value, "Hoover Institution Archives")
+        eq("8 no gateway: its reader recorded", set[.collectionTitle]?.reader, "gemma-3-12b")
+        eq("8 Gemma's date taken", set[.date]?.value, "1930-1990")
+        check("8 Gemma's container, accession and box title not taken",
+              set[.container]?.value != "Box 99" && set[.accession]?.value != "1991-006" && set[.boxTitle] == nil,
+              "\(String(describing: set[.container]?.value)) \(String(describing: set[.accession]?.value))")
+        if wire.requests.count == 1, let request = wire.requests.first, let body = jsonBody(request) {
+            eq("8 the request goes to that server", request.url?.absoluteString, ollama + "/chat/completions")
+            eq("8 request: the model it listed", body["model"] as? String, "gemma3:12b")
+            eq("8 request: temperature 0", body["temperature"] as? Int, 0)
+            eq("8 request: ct_read's 640-token cap", body["max_tokens"] as? Int, 640)
+            eq("8 request: the stand-in key", request.value(forHTTPHeaderField: "Authorization"), "Bearer local")
+            let content = ((body["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]) ?? []
+            check("8 request: the photo and ct_read's prompt",
+                  (content.first?["image_url"] as? [String: Any])?["url"].map { "\($0)".hasPrefix("data:image/jpeg;base64,") } == true
+                  && content.last?["text"] as? String == ContainerLabelReader.localModelPrompt)
+        } else { check("8 one Gemma request sent", false, "\(wire.requests.count) requests") }
+
+        // A local model on this Mac: its own server is asked first and used when it lists Gemma.
+        asked.reset(["http://127.0.0.1:9999/v1": ["qwen", "mlx-community/gemma-3-12b-it-4bit"]])
+        wire.reset(["127.0.0.1": reply(answer, "stop")])
+        set = await read(onMac)
+        eq("8 local gateway: its own server asked first", asked.asked, ["http://127.0.0.1:9999/v1"])
+        eq("8 local gateway: titles from Gemma there", set[.repository]?.reader, "gemma-3-12b")
+
+        // Nothing lists it: no call, the parser's values.
+        asked.reset([:])
+        wire.reset([:])
+        set = await read(nil)
+        check("8 no server: no call, the parser's values",
+              wire.requests.isEmpty && set[.repository]?.reader != "gemma-3-12b", "\(wire.requests.count) requests")
+        // Remembered: a second label within the window asks no server again.
+        _ = await ContainerLabelCapture.read(type: .box, text: "", photo: image, rotation: 0, gateway: nil)
+        eq("8 the servers asked once for a run of labels", asked.asked.count, LocalModelRoute.Server.allCases.count)
+
+        // A reply cut at the cap gives nothing.
+        asked.reset([mlx: ["mlx-community/gemma-3-12b-it-4bit"]])
+        wire.reset(["127.0.0.1": reply(#"{"repository": "Hoover Inst"#, "length")])
+        set = await read(nil)
+        check("8 a cut reply: the parser's values", set[.repository]?.reader != "gemma-3-12b")
+
+        // A remote gateway: Luna, and Gemma never asked.
+        asked.reset([mlx: ["mlx-community/gemma-3-12b-it-4bit"]])
+        wire.reset(["remote-gateway": reply(answer, "stop")])
+        set = await read(remote)
+        check("8 remote gateway: no local server asked, Luna read it",
+              asked.asked.isEmpty && set[.repository]?.reader == ContainerLabelCapture.gatewayReader
+              && wire.hosts == ["remote-gateway.invalid"], "\(asked.asked) \(wire.hosts)")
+        await ContainerLabelGemma.forget()
+    }
+
     private static func asksNoReasoning(_ body: [String: Any]?) -> Bool {
         body?["enable_thinking"] as? Bool == false && body?["think"] as? Bool == false
             && (body?["chat_template_kwargs"] as? [String: Any])?["enable_thinking"] as? Bool == false

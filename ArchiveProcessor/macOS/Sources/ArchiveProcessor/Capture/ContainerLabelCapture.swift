@@ -23,9 +23,10 @@ enum ContainerLabelCapture {
     static let ocrTextReader = "ocr-text+parser"
 
     /// One label photo's proposals: Vision + parser on the photo's own Apple Vision lines (accurate, as `ct-read.md`
-    /// scored it; the run's OCR text if Vision reads nothing), and the gateway's reading of the image when
-    /// the session reads text through the gateway (not a local model on it, which cannot serve Luna). A failed gateway
-    /// call, or a photo that is not an image, leaves the parser's values.
+    /// scored it; the run's OCR text if Vision reads nothing), and a model's reading of the image: GPT 5.6 Luna when
+    /// the session reads text through the gateway, else (no gateway, or a local model on it, which cannot serve Luna)
+    /// Gemma 3 12B when a server on this Mac lists it (`ContainerLabelGemma`, W47.ct-capture-gemma). A failed call, no
+    /// such server, or a photo that is not an image, leaves the parser's values.
     static func read(type: ItemType, text: String, photo: URL, rotation: Int,
                      gateway: GatewayConfig?) async -> ContainerFieldSet {
         let vision = try? await VisionClient(settings: .default).ocr(imageURL: photo)
@@ -33,7 +34,11 @@ enum ContainerLabelCapture {
         let lines = (visionText.isEmpty ? text : visionText).components(separatedBy: .newlines)
         let parserReader = visionText.isEmpty ? ocrTextReader : ContainerLabelReader.visionReader
         var model: [ContainerField: String]?
-        if let gateway, !gateway.isLocalModel, let jpeg = ImageEncoding.uprightJPEG(url: photo, rotationDegrees: rotation, longEdge: imageLongSide) {
+        var modelReader = gatewayReader
+        if gateway == nil || gateway?.isLocalModel == true {
+            model = await ContainerLabelGemma.read(photo: photo, rotation: rotation, gateway: gateway)
+            modelReader = ContainerLabelReader.localModelReader
+        } else if let gateway, let jpeg = ImageEncoding.uprightJPEG(url: photo, rotationDegrees: rotation, longEdge: imageLongSide) {
             let content: [[String: Any]] = [
                 ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64," + jpeg.base64EncodedString()]],
                 ["type": "text", "text": ContainerLabelReader.modelPrompt],
@@ -44,7 +49,7 @@ enum ContainerLabelCapture {
             }
         }
         return ContainerLabelReader.proposals(lines: lines, type: type, model: model,
-                                              modelReader: model == nil ? nil : gatewayReader,
+                                              modelReader: model == nil ? nil : modelReader,
                                               parserReader: parserReader, at: Date())
     }
 

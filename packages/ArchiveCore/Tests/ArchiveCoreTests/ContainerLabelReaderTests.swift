@@ -67,6 +67,34 @@ final class ContainerLabelReaderTests: XCTestCase {
         XCTAssertEqual(set.values.mapValues(\.value), [.folder: "8", .date: "1950"])
     }
 
+    /// W47.ct-capture-gemma: Gemma 3 12B gives repository, collection title, collection number and date only; its
+    /// container and accession, and the titles no route reads, are left to the parser and the user.
+    func testGemmaGivesOnlyItsFourFields() {
+        let reply = #"{"kind": "box label", "repository": "Hoover Institution Archives", "collection_title": "Albert "#
+            + #"Glotzer Papers", "collection_number": "91006", "accession": "1991-006", "container": "Box 99", "#
+            + #""box_title": "Speeches", "date": "1930-1990", "other": null, "label_box": [1, 2, 3, 4]}"#
+        let gemma = ContainerLabelReader.localModelFields(fromReply: reply)
+        XCTAssertEqual(Set(gemma.keys), [.repository, .collectionTitle, .collectionNumber, .date])
+        let lines = ["HOOVER INSTITUTION ARCHIVES", "BOX NO. 17", "ACCESSION NO. 91006-10.V"]
+        let set = ContainerLabelReader.proposals(lines: lines, type: .box, model: gemma,
+                                                 modelReader: ContainerLabelReader.localModelReader)
+        XCTAssertEqual(set[.repository]?.value, "Hoover Institution Archives")
+        XCTAssertEqual(set[.repository]?.reader, "gemma-3-12b")
+        XCTAssertEqual(set[.collectionTitle]?.value, "Albert Glotzer Papers")
+        XCTAssertEqual(set[.date]?.reader, "gemma-3-12b")
+        XCTAssertEqual(set[.container]?.value, "Box 17")
+        XCTAssertEqual(set[.container]?.reader, ContainerLabelReader.visionReader)
+        XCTAssertEqual(set[.accession]?.value, "91006-10.V")
+        XCTAssertEqual(set[.accession]?.reader, ContainerLabelReader.visionReader)
+        XCTAssertNil(set[.boxTitle])
+        // A reply cut short or not JSON gives nothing, and the parser's values stand.
+        XCTAssertTrue(ContainerLabelReader.localModelFields(fromReply: #"{"repository": "Hoover"#).isEmpty)
+        // The prompt is `ct_read.py`'s, unchanged: its length there on 2026-11-19, and its two ends.
+        XCTAssertEqual(ContainerLabelReader.localModelPrompt.count, 2366)
+        XCTAssertTrue(ContainerLabelReader.localModelPrompt.hasPrefix("This photo was taken in an archive reading room."))
+        XCTAssertTrue(ContainerLabelReader.localModelPrompt.hasSuffix("on a 0-1000 scale, or null}"))
+    }
+
     func testModelReplyParsesLeniently() {
         let reply = "Here you are:\n```json\n{\"repository\": \"Hoover Institution Archives\", \"collection_number\": null, "
             + "\"container\": 17, \"accession\": \"unknown\", \"box_title\": \"Subject\"}\n```"

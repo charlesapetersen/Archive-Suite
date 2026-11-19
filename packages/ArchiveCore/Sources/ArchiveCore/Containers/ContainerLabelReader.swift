@@ -141,6 +141,59 @@ public enum ContainerLabelReader {
          "date": the date or time period written on the label, e.g. "1946-2001"}
         """
 
+    // MARK: Gemma 3 12B on this Mac (W47.ct-capture-gemma)
+
+    /// The `reader` of a value from Gemma 3 12B on a local server.
+    public static let localModelReader = "gemma-3-12b"
+
+    /// The fields Gemma 3 12B is chosen for where the gateway is off (owner, 2026-11-13; `ct-read.md`): repository,
+    /// collection title, collection number and date. Its accession and container are not taken: Vision + parser read
+    /// them better there (accession −6 points against Vision, container a tie).
+    public static let localModelFields: [ContainerField] = [.repository, .collectionTitle, .collectionNumber, .date]
+
+    /// Gemma's reply as fields, the ones it is chosen for only.
+    public static func localModelFields(fromReply raw: String) -> [ContainerField: String] {
+        modelFields(fromReply: raw).filter { localModelFields.contains($0.key) }
+    }
+
+    /// The prompt Gemma 3 12B was scored with, `ct_read.py` `PROMPT` character for character (every example invented;
+    /// the final reading rules). A change here is a change to what was measured: score it there first.
+    public static let localModelPrompt = """
+        This photo was taken in an archive reading room. It may show a box label, a folder label or tab, a \
+        divider sheet, or a page of a document. Read what is written on the label, if there is one, into these \
+        fields. Copy only what is written: never infer or fill in anything, such as a repository the label does \
+        not name. Use null for anything not written there. Rules:
+        - series: only when the label says "Series" (e.g. "Series IV"); the series' name goes in series_title. \
+        Without the word "Series", put that text under other.
+        - accession: only when the label says "Accession" or "ACCN"; an unlabelled number goes under other.
+        - container: the container type and its own number only: "Box 7" for "Box 7 of 90", "Box #7" or "Box \
+        7/90".
+        - A folder marked with two numbers such as "3-11" or "6.2" is box 3 folder 11, or box 6 folder 2: \
+        container "Box 3", folder "11".
+        - folder_title: only on a folder; never read a folder title off a box label. A box label's own title is \
+        box_title.
+        - A title cut off by the edge of the photo or hidden ends with "...".
+        - Leave out the archive's internal marks: text or numbers beside a serial number, "Archival Media", \
+        location or shelf-location notes, the archive's logo, barcodes and their numbers, and notes about the \
+        box itself such as "Acid Free".
+        Reply with JSON only:
+        {"kind": one of "box label", "folder label", "divider or other", "document page",
+         "repository": the archive or library, e.g. "Riverside County Historical Library",
+         "collection_title": e.g. "Jane Doe Papers, 1931-1977",
+         "collection_subtitle": a further line naming a part of the collection, e.g. a record group's office,
+         "collection_number": a call or collection number, e.g. "MS 0482", "XC0071", "RG 27",
+         "accession": an accession number, e.g. "2004-118",
+         "series": e.g. "Series IV",
+         "series_title": the series' name, e.g. "Speeches and Writings",
+         "container": e.g. "Box 23", "Carton 4",
+         "box_title": the title a box label gives the box's contents, e.g. "Committee Minutes, A-F",
+         "folder": the folder number, e.g. "12",
+         "folder_title": the folder's title, e.g. "Budget Hearings 1962",
+         "date": the date or time period written for this box or folder, e.g. "1940-1955", "6/2/61",
+         "other": any other identifying mark, e.g. an unlabelled number "72-031"; several joined with "; ",
+         "label_box": [x1, y1, x2, y2] the label's region on a 0-1000 scale, or null}
+        """
+
     // MARK: Parts
 
     /// `ct_truth.py` `clean`: spacing collapsed and trimmed; nothing for an empty or placeholder value.
