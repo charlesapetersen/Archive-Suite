@@ -277,6 +277,15 @@ enum LocalModelsTestDriver {
         eq("8 another Gemma 3 12B tag is taken", ContainerLabelGemma.pick(from: ["qwen3.5:9b", "gemma3:12b-it-qat"]),
            "gemma3:12b-it-qat")
         eq("8 no other model stands in", ContainerLabelGemma.pick(from: ["qwen3.5:9b", "gemma3:27b", "gemma-3-4b"]), nil)
+        eq("8 never a cloud tag or a base model", ContainerLabelGemma.pick(from: ["gemma3:12b-cloud", "google/gemma-3-12b-pt"]), nil)
+        eq("8 mlx-vlm's snapshot path is taken",
+           ContainerLabelGemma.pick(from: ["/c/hub/models--mlx-community--gemma-3-12b-it-4bit/snapshots/abc"]),
+           "/c/hub/models--mlx-community--gemma-3-12b-it-4bit/snapshots/abc")
+        check("8 loopback means an address on this Mac, not a name starting 127.",
+              LocalModelRoute.isLoopback("http://127.0.0.1:8080/v1") && LocalModelRoute.isLoopback("http://127.1.2.3/v1")
+              && LocalModelRoute.isLoopback("http://localhost:1234/v1") && LocalModelRoute.isLoopback("http://[::1]:11434/v1")
+              && !LocalModelRoute.isLoopback("http://127.example.com/v1") && !LocalModelRoute.isLoopback("http://127.0.0.1.nip.io/v1")
+              && !LocalModelRoute.isLoopback("http://128.0.0.1/v1"))
 
         func read(_ gateway: GatewayConfig?) async -> ContainerFieldSet {
             await ContainerLabelGemma.forget()
@@ -331,6 +340,15 @@ enum LocalModelsTestDriver {
         wire.reset(["127.0.0.1": reply(#"{"repository": "Hoover Inst"#, "length")])
         set = await read(nil)
         check("8 a cut reply: the parser's values", set[.repository]?.reader != "gemma-3-12b")
+
+        // A server whose call fails counts as none for the window: the next label makes no call.
+        asked.reset([mlx: ["mlx-community/gemma-3-12b-it-4bit"]])
+        wire.reset(["127.0.0.1": "STATUS 400 {\"error\": \"no vision\"}"])
+        _ = await read(nil)
+        let failedCalls = wire.requests.count
+        _ = await ContainerLabelCapture.read(type: .box, text: "", photo: image, rotation: 0, gateway: nil)
+        check("8 a failed server is not asked again within the window", failedCalls == 1 && wire.requests.count == 1,
+              "\(failedCalls) then \(wire.requests.count)")
 
         // A remote gateway: Luna, and Gemma never asked.
         asked.reset([mlx: ["mlx-community/gemma-3-12b-it-4bit"]])

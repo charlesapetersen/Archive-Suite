@@ -8,8 +8,9 @@ import ArchiveCore
 ///
 /// Measured there (`segbench-results/ct-read.md`, 4-bit MLX on the 18 GB M3 Pro): a median 14.93 s a label photo,
 /// 8.04 GB at its peak. It is used only when a server on this Mac lists it (`find`): the gateway's own address when it
-/// is a local model, else the three presets' (`LocalModelRoute.Server`). Nothing is sent anywhere else, and with no
-/// server answering the card proposes the parser's values, as before.
+/// is a local model, else the three presets' (`LocalModelRoute.Server`): only addresses on this Mac, though a server
+/// there that forwards to the cloud (a proxy) cannot be told apart. With no server answering the card proposes the
+/// parser's values, as before.
 enum ContainerLabelGemma {
     /// The name each server lists it under: the measured MLX build, and the other servers' usual names for the same model.
     static let ids: [LocalModelRoute.Server: String] = [
@@ -46,13 +47,16 @@ enum ContainerLabelGemma {
     }
 
     /// The model ID to ask for among those a server lists: the measured build first, then any other server's name for
-    /// it, then a listed name that is plainly Gemma 3 12B (an Ollama tag such as `gemma3:12b-it-qat`). nil if none.
+    /// it, then a listed name that is plainly Gemma 3 12B instruction-tuned (an Ollama tag such as `gemma3:12b-it-qat`,
+    /// or mlx-vlm's snapshot path for a cached build with no `main` ref). Never a cloud tag (Ollama lists its
+    /// `…-cloud` models beside the local ones, and those calls leave the Mac) or a base `-pt` model. nil if none.
     static func pick(from listed: [String]) -> String? {
         let known = ([.mlxVLM, .ollama, .lmStudio] as [LocalModelRoute.Server]).compactMap { ids[$0] }
         if let id = known.first(where: listed.contains) { return id }
         return listed.first { id in
             let s = id.lowercased()
-            return s.contains("gemma-3-12b") || s.contains("gemma3:12b")
+            guard s.contains("gemma-3-12b") || s.contains("gemma3:12b") else { return false }
+            return !s.contains("cloud") && !s.contains("-pt")
         }
     }
 
@@ -64,6 +68,8 @@ enum ContainerLabelGemma {
         }
         func set(_ key: [String], _ server: Server?, now: Date) { found = (key, server, now) }
         func clear() { found = nil }
+        /// A call to the found server failed: treat it as no server for the rest of the window.
+        func failed(_ key: [String], now: Date) { if found?.key == key, found?.server != nil { found = (key, nil, now) } }
     }
     private static let memory = Memory()
 
@@ -106,13 +112,18 @@ enum ContainerLabelGemma {
 
     /// Gemma's fields for the photo (its four only, `ContainerLabelReader.localModelFields`), or nil when no server
     /// lists it or the call fails, is cut at its cap, or gives none of them.
+    /// A server whose call fails (an error status, a text-only build refusing the image) counts as none for the rest of
+    /// `rememberFor`, so a run of labels does not fail one call each.
     static func read(photo: URL, rotation: Int, gateway: GatewayConfig?) async -> [ContainerField: String]? {
         guard let server = await find(gateway: gateway),
               let jpeg = ImageEncoding.uprightJPEG(url: photo, rotationDegrees: rotation, longEdge: imageLongSide),
-              let request = request(jpeg: jpeg, server: server),
-              let (data, response) = try? await NetworkSession.data(for: request, policy: .nonIdempotent, maxRetries: 0),
-              (response as? HTTPURLResponse)?.statusCode == 200,
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let request = request(jpeg: jpeg, server: server) else { return nil }
+        guard let (data, response) = try? await NetworkSession.data(for: request, policy: .nonIdempotent, maxRetries: 0),
+              (response as? HTTPURLResponse)?.statusCode == 200 else {
+            if !Task.isCancelled { await memory.failed(candidates(gateway: gateway), now: Date()) }
+            return nil
+        }
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let choice = (json["choices"] as? [[String: Any]])?.first,
               let answer = LocalModelRoute.textAnswer((choice["message"] as? [String: Any])?["content"] as? String,
                                                       finish: choice["finish_reason"] as? String) else { return nil }

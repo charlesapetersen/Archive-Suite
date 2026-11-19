@@ -319,7 +319,11 @@ enum LocalModelRoute {
     /// the local route's single worker, cap and escalation are wrong for a remote paid gateway.
     static func isLoopback(_ baseURL: String) -> Bool {
         guard let host = URL(string: baseURL)?.host?.lowercased() else { return false }
-        return host == "localhost" || host == "::1" || host.hasPrefix("127.")
+        if host == "localhost" || host == "::1" || host == "[::1]" { return true }
+        // A dotted IPv4 address in 127.0.0.0/8, not a name that merely starts "127." (W47.ct-capture-gemma review).
+        let octets = host.split(separator: ".", omittingEmptySubsequences: false)
+        return octets.count == 4 && octets.first == "127"
+            && octets.allSatisfy { !$0.isEmpty && $0.count <= 3 && $0.allSatisfy(\.isASCII) && UInt8($0) != nil }
     }
 
     // MARK: Server check

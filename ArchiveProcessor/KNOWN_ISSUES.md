@@ -24,10 +24,21 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   not make routes (`LLMModel.anthropicModels` says which).
 
 ## ⚠️ LIMITATION (W47.ct-processor-capture, 2026-11-19): what reading box and folder labels does not do
-- **No Gemma route.** The owner's readers give repository, collection title and number and date to GPT 5.6 Luna on the
-  gateway, else Gemma 3 12B; the app has no Gemma route, so with the gateway off (or a local model on it) the card
-  proposes the Vision + parser values for those fields, a weaker route (`segbench-results/ct-read.md`).
-  `W47.ct-capture-gemma` adds it.
+- **Gemma needs a server already running on this Mac** (W47.ct-capture-gemma). With the gateway off or a local model on
+  it, repository, collection title and number and date come from Gemma 3 12B only when LM Studio, Ollama or mlx-vlm
+  on this Mac lists it (`ContainerLabelGemma`); otherwise the card proposes the Vision + parser values, a weaker
+  route (`segbench-results/ct-read.md`). The app starts no server and downloads no model. A server is looked for
+  once every two minutes, so one started mid-run is used from the next window; one whose call fails is skipped for
+  the window. With mlx-vlm, start it with the model (`mlx_vlm.server --model mlx-community/gemma-3-12b-it-4bit`): its
+  0.7.4 cache listing skips that build, whose index names five shards where the repo has two, so a server that has
+  not loaded it does not list it. Settings has no switch for it apart from the label-reading toggle. The reader is recorded as
+  `gemma-3-12b` whichever build the server lists.
+- **Gemma beside a local OCR model swaps models.** With a local model as the gateway, Gemma (about 8 GB) is asked on
+  that same server first; LM Studio and Ollama may unload the OCR model to load it, and load it again for the next
+  page, tens of seconds each way on an 18 GB Mac, inside Live Capture's segment work (Finish waits). Not measured
+  interleaved; `segbench-results/ct-gemma-route.md` times labels alone.
+- **A local address is trusted.** Only a loopback address is asked, but a proxy there that forwards to a cloud model,
+  or redirects, cannot be told apart from a local server; Ollama's `-cloud` tags are refused by name.
 - **Process Files has no card.** Its labels are written as proposals (source `label`), to confirm in the Reader's
   editor (`W47.ct-reader-edit`). The pre-OCRed PDF route (re-tagging existing PDFs, a new run or a resumed one) reads
   no labels: its outputs are its inputs, and nothing is written beside a source. An output outside the run's output
