@@ -33,9 +33,7 @@ final class MenuShortcutTests: XCTestCase {
     }
 
     private func menuBar() throws -> [(String, Shortcut)] {
-        for _ in 0..<20 where (NSApp.mainMenu?.items.count ?? 0) < 4 {
-            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-        }
+        Self.refreshMenuBar()
         let menu = try XCTUnwrap(NSApp.mainMenu, "the app should have built its menu bar")
         let all = shortcuts(in: menu)
         XCTAssertTrue(all.contains { $0.0.hasPrefix("Tags ▸ ") }, "the app's own menus should be in the menu bar: \(all.map(\.0))")
@@ -61,6 +59,7 @@ final class MenuShortcutTests: XCTestCase {
     }
 
     func testTheSuiteSharedKeysAreInPlace() throws {
+        pinCopySwapOff()
         let all = try menuBar()
         func key(of path: String) -> Shortcut? { all.first { $0.0 == path }?.1 }
         XCTAssertEqual(key(of: "File ▸ Choose Archive Folder…"), shortcut("o", [.command, .shift]))

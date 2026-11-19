@@ -31,6 +31,7 @@ final class ReaderCommandTableTests: XCTestCase {
     }
 
     func testCopyCleanedIsShiftCommandCInEveryHelpText() {
+        pinCopySwapOff()
         XCTAssertEqual(ReaderCommand.copyCleaned.help,
                        "Copy the selected text cleaned for prose — joins lines, de-hyphenates (⇧⌘C)")
         XCTAssertEqual(ReaderCommand.copyLinks.glyph, "⌥⌘C")
@@ -42,9 +43,7 @@ final class ReaderCommandTableTests: XCTestCase {
     /// to a command in the table. Items listed only with a window in front (Hide Sidebar) are not in the unit
     /// host's menu bar; the VM's `ViewerUITests` sees those.
     func testTheMenuBarMatchesTheTable() throws {
-        for _ in 0..<20 where (NSApp.mainMenu?.items.count ?? 0) < 4 {
-            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-        }
+        Self.refreshMenuBar()
         let bar = try XCTUnwrap(NSApp.mainMenu)
         let ownMenus: Set<String> = ["Go", "Selection", "Tags", "Sort & Filter", "Document"]
         let menuCommands = ReaderCommand.allCases.filter { $0.context == .menuBar && !$0.reserved }
@@ -69,6 +68,7 @@ final class ReaderCommandTableTests: XCTestCase {
 
     /// No key held for a later item is already on the menu bar, the system's own items included.
     func testReservedKeysAreFree() throws {
+        Self.refreshMenuBar()
         let bar = try XCTUnwrap(NSApp.mainMenu)
         func all(_ menu: NSMenu) -> [NSMenuItem] { menu.items.flatMap { [$0] + ($0.submenu.map(all) ?? []) } }
         let bound = Set(all(bar).compactMap(Self.key(of:)))
@@ -188,5 +188,37 @@ final class ReaderCommandTableTests: XCTestCase {
             }
         }
         return out
+    }
+}
+
+extension XCTestCase {
+    /// The unit host shares the installed Reader's defaults, so Settings' ⌘C/⇧⌘C swap is whatever the owner last
+    /// chose (W40.reader-copy-shortcut-swap). A test of the default keys turns it off and puts the saved value back
+    /// after.
+    @MainActor
+    func pinCopySwapOff() {
+        let key = SettingsKey.copyCleanedOnCommandC
+        let saved = UserDefaults.standard.object(forKey: key)
+        addTeardownBlock { @MainActor in
+            if let saved { UserDefaults.standard.set(saved, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) }
+            Self.refreshMenuBar()
+        }
+        UserDefaults.standard.removeObject(forKey: key)
+        Self.refreshMenuBar()
+    }
+
+    /// SwiftUI rebuilds a menu's items when the menu is about to open, so a menu bar read after a setting changed
+    /// (the copy swap, by a test or by the owner) shows the old items until each menu is asked to update, as
+    /// opening it would.
+    @MainActor
+    static func refreshMenuBar() {
+        for _ in 0..<20 where (NSApp.mainMenu?.items.count ?? 0) < 4 {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        for menu in NSApp.mainMenu?.items.compactMap(\.submenu) ?? [] {
+            menu.delegate?.menuNeedsUpdate?(menu)
+            menu.update()
+        }
     }
 }
