@@ -12,10 +12,10 @@ Your rule of 18 November (14-owner-calls.md call 13): nothing is withheld for mi
 
 - **Where the withholding is:** OCR/ReadQualityFlag.swift flags Vision readings only; the decision is in the body of 6f87dc24 (W46.post-read-quality-flag), which filed W46.post-read-flag-readers (open, behind W46.capture-warning and so behind nice-to-have).
 - **The floor, and where it is written:** At most 5% false alarms on good readings, a reading counted poor under 70 NES (post-read-flag.md).
-- **The measured figure:** Vision's own cut (0.9815) holds it: 10 of 21 poor readings caught with 3 of 75 false alarms on the 96, 179 of 231 with 7 of 249 on the capture ladder. For other readers, disagreement with Vision catches 82% of LightOnOCR's poor readings at 5% false alarms on plain photographs (cross-validated) and 33-36% of Qwen3.5 9B's, but the same cut flags 21% of Gemini's good readings of damaged images.
+- **The measured figure:** Vision's own cut (0.9815) holds it: 10 of 21 poor readings caught with 3 of 75 false alarms on the 96, 179 of 231 with 7 of 249 on the capture ladder. For LightOnOCR, disagreement with Vision catches 8 of 11 poor readings on the 96 (73%, 43-90) with 4 of 85 false alarms; cross-validated 62% (56-68) with handwritten pages in and 82% (77-87) on typed pages only (post-read-flag.md). Qwen3.5 9B 33-36%. The same cut flags 21% of Gemini's good readings of damaged images.
 - **What the user loses:** No warning at all when LightOnOCR (the free handwriting default), Gemini, Qwen or any cloud route reads a page badly.
 - **What shipping it would take:** The disagreement flag on LightOnOCR, labelled "measured on plain photographs"; Gemini left out or shown with its 21% false-alarm figure. Unblocking W46.post-read-flag-readers from nice-to-have.
-- **Recommendation: release with a label.** The one reader that clears the floor is the free default for handwriting, where a silent poor reading costs the most.
+- **Recommendation: release with a label.** LightOnOCR clears the false-alarm floor and catches most of its poor typed readings, and about three in five with handwriting in; it is the free handwriting default, where a silent poor reading costs the most. The label should say how much less it catches on handwriting.
 
 ### 2. Readers with no row on the reading chart: Apple's on-device model, the commercial services, and fifteen dominated routes (`reading-dominated`)
 
@@ -30,10 +30,10 @@ Your rule of 18 November (14-owner-calls.md call 13): nothing is withheld for mi
 
 - **Where the withholding is:** settings-routes.json reading rule no-post-correction; 04-reading.md l.77-80.
 - **The floor, and where it is written:** A gain over re-reading with the same model.
-- **The measured figure:** The image-grounded corrector -0.42 (-1.47 to +0.64) against re-reading with the 27B, over 57 band readings on the 96 and 120 public. Text-only correction gains 1.6 on the 96 and nothing on the public set, where it makes 47 of 120 readings worse (ocr-postcorrect.md).
-- **What the user loses:** A second pass that sometimes fixes a reading, and as often damages one.
-- **What shipping it would take:** An optional stage labelled "no measured gain".
-- **Recommendation: keep withheld.** A tie at best, and text-only correction worsens two pages in five on unseen material.
+- **The measured figure:** The image-grounded corrector against re-reading with the 27B: -0.42 (-1.47 to +0.64) on the 96, but +1.47 (+0.55 to +2.63) on 120 public band readings; it worsens 4 of 57 and 10 of 120. Text-only correction gains 1.6 on the 96 and nothing on the public set, where it worsens 47 of 120 (ocr-postcorrect.md).
+- **What the user loses:** An image-grounded second pass that gains about 1.5 points on public material and ties on yours.
+- **What shipping it would take:** The image corrector as an optional stage, labelled with both figures.
+- **Recommendation: keep withheld.** On your own material it ties; the public gain is real but small and costs a second 27B pass per band. Text-only correction stays out either way. A label would be a fair alternative if public-material users matter.
 
 ### 4. Cascade triggers other than failure: log-probability and two-reader disagreement (`cascade-triggers`)
 
@@ -46,12 +46,12 @@ Your rule of 18 November (14-owner-calls.md call 13): nothing is withheld for mi
 
 ### 5. A half-size retry when a cluster reader loops (`half-size-retry`)
 
-- **Where the withholding is:** 04-reading.md section 3 l.91; section 2 Reading ("never a half-size retry on the cluster").
+- **Where the withholding is:** 04-reading.md section 3 l.91; section 2 Reading ("never a half-size retry on the cluster"); bench-corpus/loop-rerun-20261021.md.
 - **The floor, and where it is written:** Rescuing most looped pages.
-- **The measured figure:** Answered 351 of 1,573 looped pages on the cluster (loop-rerun-20261021.md); on the Mac it led on three MLX loops (87.5), n 3.
-- **What the user loses:** A cheap rescue for the fifth of looped pages it answers.
-- **What shipping it would take:** A retry step before the second-reader fallback, labelled with its 22% rescue rate.
-- **Recommendation: keep withheld.** The second VLM reader that is used instead rescues more; a 22% step in front of it adds time to every loop.
+- **The measured figure:** Answered 351 of 1,573 looped pages on the cluster, 1,216 capped again, and the answers read at 4.2-11.0 NES pooled (bench-corpus/loop-rerun-20261021.md); on the Mac it led on three MLX loops (87.5), n 3.
+- **What the user loses:** An answer on a fifth of looped pages, almost all of it unreadable.
+- **What shipping it would take:** A retry step before the second-reader fallback, labelled with its answer rate and level.
+- **Recommendation: keep withheld.** Its answers read at 4-11 NES, so it rescues almost nothing; the second VLM reader is the real fallback.
 
 ## Reading copy and OCR input
 
@@ -68,10 +68,10 @@ Your rule of 18 November (14-owner-calls.md call 13): nothing is withheld for mi
 
 - **Where the withholding is:** 02-ocr-input.md section 6 l.79, held as a lead inside the no-enhancement rule.
 - **The floor, and where it is written:** A result, not a lead: more than 6 pages, a significant pair.
-- **The measured figure:** On 6 glare pages, Vision with DocRes appearance +10.2 (+0.6 to +25.6), deshadow +9.2 (+0.2 to +24.8); p 0.129 across the set.
-- **What the user loses:** A possible rescue of glare pages, which cost handwriting the most (27B -12.9, Gemini -16.1 on 8 pages).
-- **What shipping it would take:** A test on more glare pages; then a setting triggered by a glare tag. DocRes needs a cluster GPU, so it would be a cluster setting.
-- **Recommendation: ask again later.** The largest gain in the OCR-input work, on too few pages to offer; a bigger test is cheap and offline.
+- **The measured figure:** On 6 glare pages, Vision with DocRes appearance +10.2 (+0.6 to +25.6), deshadow +9.2 (+0.2 to +24.8). The lead is Vision's only: on the same pages DocRes gives Gemini +0.5 (-0.5 to +1.9) and Qwen3-VL and GLM about 0 (enh-ocr-input.md); the 27B was not run.
+- **What the user loses:** A possible rescue of glare pages for Apple Vision readings.
+- **What shipping it would take:** The larger test, already filed inside W46.enh-small-reader-power (behind nice-to-have); then a glare-tag-triggered setting. DocRes needs a cluster GPU, so it would be a cluster setting.
+- **Recommendation: ask again later.** The largest gain in the OCR-input work, but for one reader on 6 pages; the filed test is the way to settle it.
 
 ### 8. Rotation without Apple Vision: Tesseract, small local VLMs, PP-LCNet alone on right-to-left pages (`rotation-alternatives`)
 
@@ -95,21 +95,21 @@ Your rule of 18 November (14-owner-calls.md call 13): nothing is withheld for mi
 
 ### 10. DocLayout-YOLO as the detector for scanned newspapers (`doclayout-yolo-scans`)
 
-- **Where the withholding is:** 03-layout.md l.25 and call 1 (section 2 Layout picked PP-DocLayoutV3 for every newspaper).
+- **Where the withholding is:** 03-layout.md l.25, l.101 and call 1 (section 2 Layout picked PP-DocLayoutV3 for every newspaper).
 - **The floor, and where it is written:** Working on photographed newspapers.
-- **The measured figure:** On photographs it loses 40.1 on Skew and keeps no region on 58 of 155 pages; on the 15 L9 scans it leads PP-DocLayoutV3 by 4.6 (1.1 to 8.0), descriptive (layout-pair-newspapers.md).
+- **The measured figure:** On the 15 L9 scans (14 from one collection, mss34132) DocLayout-YOLO as the newspaper-ocr route leads PP-DocLayoutV3 by 4.6 (1.1 to 8.0), descriptive (layout-pair-newspapers.md). The photograph losses (40.1 on Skew, no region kept on 58 of 155 pages) are a different arm, YOLO with the app's region sort; the newspaper-ocr route was not run on photographs.
 - **What the user loses:** About 5 points on flatbed-scanned newspapers.
-- **What shipping it would take:** A detector setting "scanned newspapers", labelled measured on 15 scans.
-- **Recommendation: release with a label.** It fails on photographs, which is why it is not the default, but users with scans (common outside your corpus) lose a measured gain.
+- **What shipping it would take:** The newspaper-ocr processing route (not the app's YOLO arm) as a "scanned newspapers" detector setting, labelled measured on 15 scans from one collection and unmeasured on photographs.
+- **Recommendation: release with a label.** A measured gain for users with flatbed scans, common outside your corpus, on a small one-collection set; a label says how thin it is.
 
 ### 11. Whole-page reading of newspapers for large readers (the detector is always run) (`layout-whole-page-large`)
 
 - **Where the withholding is:** 03-layout.md call 5 (l.105, l.124); section 2 Layout ("the gain is nil, not negative").
 - **The floor, and where it is written:** The reverse case: the detector is kept although it does not help.
-- **The measured figure:** 27B whole page 0.967 against regions 0.965 on 15 pages.
+- **The measured figure:** 27B whole page 0.967 against raw regions 0.965 on 15 pages, no interval, an inference (03-layout.md l.124); the app ships the partition, on which the 27B was not measured.
 - **What the user loses:** The time of a detector pass that adds nothing for large readers.
 - **What shipping it would take:** A "read whole" choice for large readers on newspapers, or letting the solver's "faster wins on a tie" rule pick it.
-- **Recommendation: release.** A tie on 15 pages; your tie rule says the faster arrangement wins.
+- **Recommendation: release.** A tie on 15 pages; the session's tie rule in section 2 ("faster wins among equal cost", itself open to your veto) points to the whole page.
 
 ## Placement
 
@@ -141,14 +141,14 @@ Your rule of 18 November (14-owner-calls.md call 13): nothing is withheld for mi
 - **The floor, and where it is written:** A valid comparison: the students trained on the box and the older prompts lack the article rule.
 - **The measured figure:** Gemini 3.8 with g2 now ranks (93.8% of gaps against g1's 71.2%, seg-magazine-rule.md); g1, w1, c1 and the students still show figures without being picked.
 - **What the user loses:** A pick among the older prompts and the students on magazines.
-- **What shipping it would take:** W46.seg-magazine-rule-redo, already filed.
-- **Recommendation: ask again later.** A validity gap rather than a missed level, already partly lifted; the redo item settles the rest.
+- **What shipping it would take:** No open item settles the rest: W46.seg-magazine-rule-redo and W46.seg-magazine-rule-app have shipped; c1 waits on W46.gateway-models-ok, and the students need a box they were not trained on (07-segmentation.md l.69-78).
+- **Recommendation: ask again later.** A validity gap rather than a missed level, already lifted for the Gemini route; the rest waits on the gateway and a fresh box, so ask again then.
 
 ### 15. Segmentation options that did not help: the document-split and feature models, few-shot examples, self-voting, a collection-facts block, letter cue c2, disagreement review on every route (`seg-alternatives`)
 
 - **Where the withholding is:** 07-segmentation.md section 2 l.15, l.87-88, l.275, SEG-4 l.290, call 3 option (b); section 2 Segmentation.
 - **The floor, and where it is written:** A measured gain over the shipped prompt.
-- **The measured figure:** Split and feature models 29.1% unchecked with 86.8 checks per 100 pages against manual's 86.8 (seg-adapt-curve.md). Few-shot: no measurable gain at 1.43-2.01 times the input tokens (seg-adapt-fewshot.md). Self-voting and the facts block from seg-window-modality.md and seg-context.md, c2 no measured effect. Review on every route doubles the cost while the models err alike.
+- **The measured figure:** Split and feature models 27.1% unchecked at 86.8 checks per 100 pages, against the 2B's 79.4% at 78.8 (seg-adapt-curve.md). Few-shot: no measurable gain at 1.43-2.01 times the input tokens (seg-adapt-fewshot.md). Self-voting and the facts block from seg-window-modality.md and seg-context.md, c2 no measured effect. Review on every route doubles the cost while the models err alike.
 - **What the user loses:** Settings that cost more and do not change the result.
 - **What shipping it would take:** Each as an opt-in labelled "no measured gain".
 - **Recommendation: keep withheld.** None changes the result, and most add cost.
@@ -159,7 +159,7 @@ Your rule of 18 November (14-owner-calls.md call 13): nothing is withheld for mi
 
 - **Where the withholding is:** settings-routes.json dating qwen3-vl-8b-image-mac (a7068d5f, local baseline 57ddaeee); 08-dating.md call 7.5, "decided as recommended (section 2)", not one of your section-1 calls as pass 16 said.
 - **The floor, and where it is written:** "Once its quotes improve the year" over the text-only route.
-- **The measured figure:** On 55 documents with no year in their Vision text: strict reading gains 0 and loses 1; as a quote source gains 1 and loses 2 (sign test p 1.0); 32 of 55 right either way (58.2%, 45-70); false years on undated documents 20 to 21 of 90 (date-8b-local.md). On the traces it gains 0 (date-route-pipeline.md).
+- **The measured figure:** On 55 documents with no year in their Vision text: strict reading gains 0 and loses 1; as a quote source gains 1 and loses 2 (sign test p 1.0); baseline 33 of 55 (60.0%), both 8B arms 32 of 55; false years on undated documents 20 to 21 of 90 (date-8b-local.md). On the traces it gains 0 (date-route-pipeline.md).
 - **What the user loses:** The only page-image dating a 16 GB Mac with no key could have.
 - **What shipping it would take:** An optional switch, off, labelled "no measured gain".
 - **Recommendation: keep withheld.** No gain on either measure, and it costs a model download and its time.
@@ -179,10 +179,10 @@ Your rule of 18 November (14-owner-calls.md call 13): nothing is withheld for mi
 
 - **Where the withholding is:** 09-entities.md l.133-149 and section 9 l.382-383; settings-routes.json gemini-entity8k.
 - **The floor, and where it is written:** A gain over the shipped call; withheld because its 3,000-character twin ties the shipped call, and it was never paired with the shipped call itself.
-- **The measured figure:** Sender 0.76 against 0.69, place 0.84 against 0.80; the one paired figure for prompt length is +0.087 (+0.022 to +0.170) on sender, on the built truth (ent-score-paid.md). Cost about $3.0 per 1,000 documents, an estimate (88 of 138 calls cached).
+- **The measured figure:** Sender 0.76 against 0.69, place 0.84 against 0.80. Paired: 8k against 3k +0.087 (+0.022 to +0.170) on sender, though on 88 of 138 documents the two are equal by construction (cached); 8k against the shipped tagging call +0.054 (-0.026 to +0.145), a tie. Rerun drift is +0.044 (0.000 to +0.115) on sender and -0.155 on place, which covers the place gap (ent-score-paid.md). Cost about $3.0 per 1,000 documents, an estimate.
 - **What the user loses:** Probably better senders and places on cloud routes.
 - **What shipping it would take:** A paired run against the shipped call on the cached owner truth, then the prompt as the default if it holds.
-- **Recommendation: ask again later.** The paired evidence points toward the longer prompt, not away; one paired run settles it.
+- **Recommendation: ask again later.** Against the shipped call it ties, inside the rerun drift; a paired rerun would settle whether the sender lead is real.
 
 ### 19. Names on Macs too small for the 8B (NLTagger, GLiNER2.5), and on pre-modern hands and early print (`ent-small-mac`)
 
@@ -191,7 +191,7 @@ Your rule of 18 November (14-owner-calls.md call 13): nothing is withheld for mi
 - **The measured figure:** Sender F1 0.14 (NLTagger) and 0.24 (GLiNER) on 138 owner documents; even a perfect position rule reaches at most 35 and 60 of 138 named senders (ent-truth-owner.md, ent-score.md). Pre-modern Latin hands and early print 0.02-0.37 on L5 and L7 (ent-robust.md).
 - **What the user loses:** Any names on an 8 GB Mac with no key, and on medieval and early-modern material.
 - **What shipping it would take:** A row labelled "low confidence".
-- **Recommendation: keep withheld.** At these levels most names written would be wrong; a cloud route covers both cases.
+- **Recommendation: keep withheld.** At these levels most names written would be wrong. A cloud route covers the small-Mac case; no route, Gemini 3.8 included (0.12-0.37), covers pre-modern material.
 
 ## Kinds and routing
 
@@ -199,7 +199,7 @@ Your rule of 18 November (14-owner-calls.md call 13): nothing is withheld for mi
 
 - **Where the withholding is:** settings-routes.json kinds rule low-confidence-keeps-model; 10-kinds-and-routing.md section 3 l.38-43; section 2 Kinds. The 0.8 comes from K-kinds section 5 (W41.app-page-kind); no measurement behind it was found.
 - **The floor, and where it is written:** 0.8 on the top class.
-- **The measured figure:** 78 of 848 pages fall under it, 16 of them among the 28 pages whose hand differs from the rest of their document (kind-churn.md). Routing by true kind reads 97.26 against 96.47 for the best single reader on the 96 (kind-classifier.md section 4).
+- **The measured figure:** 78 of 848 pages fall under it, 17 of them among the 29 pages whose hand differs from the rest of their document (kind-churn.md). Routing by true kind reads 97.26 against 96.47 for the best single reader on the 96 (kind-classifier.md section 4).
 - **What the user loses:** Kind routing on about one page in eleven, including most of the odd-hand pages it would help.
 - **What shipping it would take:** Route on the top class with an "unsure" mark, or the document prior (filed, not measured); a measurement of the cut itself.
 - **Recommendation: ask again later.** The floor itself is unmeasured; measure the document prior and the cut before choosing.
@@ -208,21 +208,21 @@ Your rule of 18 November (14-owner-calls.md call 13): nothing is withheld for mi
 
 - **Where the withholding is:** settings-routes.json kinds atrium-zero-shot ("not offered while the shipped classifier is kept"); 10-kinds-and-routing.md P4-1 l.86-88, l.61, section 6 l.113. Your call 3 set the switch off for its time cost; that is not this.
 - **The floor, and where it is written:** Beating the shipped classifier on kinds, and an established filter for mixed pages.
-- **The measured figure:** As a kind classifier ATRIUM is worse: 121 of 141 against 137 (p 0.000855), 638 of 895 against 723 (kind-atrium.md). On mixed pages it is far ahead: recall 51-60% at 69.8% precision against the shipped classifier's 12-14%. The pre-flag guessed the band on 7 of 14 pages (mixed-route-bands.md). Without a pre-flag the switch costs about 140 times Vision's time on every typed page (ocr-time-like-for-like.md, the like-for-like timing call 3 waited for).
+- **The measured figure:** As a kind classifier ATRIUM is worse: 121 of 141 against 137 (p 0.000855), 638 of 895 against 723 (kind-atrium.md). On mixed pages its recall is 51-60% at 69.8% precision, covered-frame point estimates whose finite bounds run 18-95%, against the shipped classifier's 12-14% and Qwen3.6-27B's 23% at 99% precision. Qwen3.6-27B's pre-flag guessed the band on 7 of 14 pages (mixed-route-bands.md); the note says no mixed filter is established. Without a pre-flag the switch costs about 140 times Vision's time on every typed page (ocr-time-like-for-like.md, the like-for-like timing call 3 waited for).
 - **What the user loses:** A mixed switch cheap enough to turn on.
-- **What shipping it would take:** ATRIUM as an optional download used only as the mixed pre-flag, labelled with its recall and precision; then re-asking call 3 with the timing in hand.
-- **Recommendation: release with a label.** Its licence is no longer a bar since 17 November, and as a pre-flag it is four times the shipped classifier's recall.
+- **What shipping it would take:** ATRIUM as an optional download used only as the mixed pre-flag, labelled with its recall, precision and wide bounds; then re-asking call 3 with the timing in hand.
+- **Recommendation: release with a label.** Its licence is no longer a bar since 17 November, and as a pre-flag its point recall is four times the shipped classifier's; the bounds are wide, so the label must carry them.
 
 ## Capture
 
 ### 22. A sharpness or retake warning on the phone, and Gemini's quality score as a retake check (`capture-warnings`)
 
-- **Where the withholding is:** settings-routes.json capture rule cap-guidance ("no tilt or compression warning"); 11-capture.md sections 3, 5, 7, 8 call 1; section 2 Capture. W46.capture-warning is open behind nice-to-have; your note of 17 November said a non-live warning is still worthwhile.
+- **Where the withholding is:** settings-routes.json capture rule cap-guidance ("no tilt or compression warning"); 11-capture.md sections 3, 5, 7, 8 call 1; section 2 Capture. W46.capture-warning (a warning calibrated on real captures) is open behind nice-to-have.
 - **The floor, and where it is written:** A cut chosen on held-out real captures (11-capture.md section 7).
 - **The measured figure:** In-sample cuts catch 48-69% of losses with 17-34% false alarms on good pages; the Vision cut about 28% false alarms; Laplacian AUC 0.70-0.75 (capture-ladder.md). Gemini's score AUC 0.81-0.90 pooled, below a page-blind 0.83-0.91, and 0.50-0.80 within one defect, on 480 images of 48 pages.
 - **What the user loses:** A one-tap retake prompt on a blurred capture; the app shows static guidance.
 - **What shipping it would take:** A warning at the Vision cut labelled "in-sample, about 28% false alarms", or W46.capture-warning brought forward from nice-to-have.
-- **Recommendation: ask again later.** Your 17 November note already wants the non-live warning; bringing W46.capture-warning forward also unblocks the reader flag above.
+- **Recommendation: ask again later.** A warning at a 28% false-alarm rate would nag on good pages; the filed item calibrates on real captures. Bringing it forward from nice-to-have would also unblock the reader flag above.
 
 ## Training kit
 
@@ -241,10 +241,10 @@ Your rule of 18 November (14-owner-calls.md call 13): nothing is withheld for mi
 
 - **Where the withholding is:** ItemFieldPolicy.skipReason (Tagging/ItemFieldExtractor.swift:269-273): not run on a Local Agent plan or a local-model gateway. ItemFieldPolicy.withheld (l.250-265): byline and publication date only on published kinds, recipient place only on correspondence, "not measured on this kind". Title fills everywhere since your gate (6d1fb653).
 - **The floor, and where it is written:** The fill rule: Wilson lower bound 0.85 and point 0.90 on owner-checked pairs (FieldStatus.swift, item-fields-score.md).
-- **The measured figure:** Only the Gemini 3.7 image prompt fills (0.91, 0.86-0.94 stratified, of 147). GPT 5.6 Luna 0.82 (0.76-0.87), below the bar. The local Qwen 27B, 8B and 4B rows are "too close" or below the bar, but were scored on ABBYY text, which your 30 October rule bars, so no local route has a valid figure.
+- **The measured figure:** On title, only the Gemini 3.7 image prompt fills (0.91, 0.86-0.94 stratified, of 147); GPT 5.6 Luna 0.82 (0.76-0.87), below the bar. The local Qwen 27B, 8B and 4B rows are "too close" or below the bar on the other fields and never fill title, but were scored on ABBYY text, which your 30 October rule bars, so no local route has a valid figure.
 - **What the user loses:** Every item field on the Mac and on a Local Agent plan, and three fields on kinds nobody measured.
-- **What shipping it would take:** A local route scored on Vision text or the page images; then fill under a "lower confidence" status, which the Reader already shows for dates and containers.
-- **Recommendation: ask again later.** This is mostly a missing measurement rather than a miss; rescoring the local rows on Vision text is offline and $0.
+- **What shipping it would take:** Re-run a local model on Vision text or the page images and score it; then fill under a "lower confidence" status, which the Reader already shows for dates and containers.
+- **Recommendation: ask again later.** This is mostly a missing measurement rather than a miss; a local re-run is $0 but needs the heavy lock.
 
 ## Left out, and why
 

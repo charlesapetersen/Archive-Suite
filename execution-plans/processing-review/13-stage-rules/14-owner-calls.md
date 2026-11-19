@@ -73,7 +73,8 @@ calls are section 1.
 13. **Withholding for a quality floor (2026-11-18).** No feature, field or route is withheld, dropped or left unoffered
     because a measurement falls short of a fill rule, threshold or baseline without the owner's confirmation; the session
     asks with the figures and what the user would lose. Authority: the repo `CLAUDE.md`, "Withholding a feature for a
-    quality floor". The withholdings already made are reviewed in `W47.withheld-review`.
+    quality floor". The withholdings already made are listed in `../16-withheld-review.md` (W47.withheld-review, 24
+    entries); his answers are recorded here by `W47.withheld-calls`.
 
 14. **The segmentation rerun floor (2026-11-18).** Two segmentation routes tie when the paired interval holds 0, as
     before; the students' 3.2-point rerun floor (SEG-10) is reported beside it as `tie_floor` and does not decide a
