@@ -73,7 +73,7 @@ final class NavigationModel: ObservableObject {
     /// `RootFolderStore` already took an injected domain; they were unreachable from a test because the
     /// model that constructs them did not. Production passes `.standard`; only tests pass a throwaway
     /// suite.
-    private let defaults: UserDefaults
+    let defaults: UserDefaults
 
     @Published var filter = LibraryFilter()
     /// The text field binds to this; a debounce pipeline copies it into `filter.searchText` after
@@ -196,18 +196,39 @@ final class NavigationModel: ObservableObject {
     /// Page-2 `Classification:` values published by the disposable content index for nav-row display.
     /// Missing/unindexed rows stay absent and render as an em dash; classification never drives a write.
     @Published private(set) var classifications: [String: String] = [:]
+    /// W47.ct-reader-view: where each listed file sits in its archive, from the container files, the level map
+    /// and the file names (`ContainerCatalog`). Built off the main thread on each change to the listed paths;
+    /// display, sort and filter only.
+    @Published var containerCatalog: ContainerCatalog = .empty { didSet { containerCatalogRevision &+= 1 } }
+    /// Bumped with each catalog published, so the table redraws its Container cells.
+    private(set) var containerCatalogRevision = 0
+    /// The level map offered for the root, while the sheet is open (`NavigationModel+Containers`).
+    @Published var containerLevelsDraft: ContainerLevelsDraft?
+    /// Why the last level-map save failed, shown in the sheet.
+    @Published var containerLevelsError: String?
+    var containerGeneration = 0
+    /// The paths the catalog was last built from (count and an order-free hash), so an unchanged set is not rebuilt.
+    var containerSignature: (root: String, count: Int, hash: Int)?
     /// The list columns the user has hidden, from the header's menu (W40.fix-reader-columns-in-header).
     @Published var hiddenColumns: Set<String> = [] {
         didSet { if hiddenColumns != oldValue { AppSettings.setHiddenColumns(hiddenColumns, in: defaults) } }
     }
     /// The columns the list hides: the user's choice, plus Capture marker while no file in the library has one.
     /// Files made before the apps carry no page-2 marker, so for most material the column could only be blank.
+    /// The same holds for Container while no file has a container value (W47.ct-reader-view).
     var effectiveHiddenColumns: Set<String> {
-        classifications.isEmpty ? hiddenColumns.union([AppKitTableView.captureMarkerColumnID]) : hiddenColumns
+        var hidden = hiddenColumns
+        if classifications.isEmpty { hidden.insert(AppKitTableView.captureMarkerColumnID) }
+        if containerCatalog.isEmpty { hidden.insert(AppKitTableView.containerColumnID) }
+        return hidden
     }
-    /// Whether the user can show `id` now; Capture marker waits for a file that has one.
+    /// Whether the user can show `id` now; Capture marker and Container wait for a file that has one.
     func isColumnAvailable(_ id: String) -> Bool {
-        id != AppKitTableView.captureMarkerColumnID || !classifications.isEmpty
+        switch id {
+        case AppKitTableView.captureMarkerColumnID: return !classifications.isEmpty
+        case AppKitTableView.containerColumnID: return !containerCatalog.isEmpty
+        default: return true
+        }
     }
     func setColumn(_ id: String, visible: Bool) {
         guard id != "name" else { return }   // the file name is always shown
@@ -415,6 +436,13 @@ final class NavigationModel: ObservableObject {
         NotificationCenter.default.publisher(for: ItemTypePreferences.didChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.applyItemTypePreferences() } }
+            .store(in: &cancellables)
+        // W47.ct-reader-view: the level map is offered once the root's scan has settled.
+        library.$phase
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] phase in MainActor.assumeIsolated {
+                if phase.isSettled { self?.offerContainerLevelsIfNeeded() }
+            } }
             .store(in: &cancellables)
         if let root = rootStore.root {
             library.start(scope: root, markerGUID: rootStore.rootMarker?.guid)
@@ -1145,11 +1173,13 @@ final class NavigationModel: ObservableObject {
         let rules = scope == nil ? nil : scopeRules
         let context = rules.map { ruleContext(for: $0) }
         let statuses = formatStatuses
+        let containers = filter.activeContainerFacets.isEmpty ? nil : containerCatalog.rows
         return { file in
             if let rules, let context, !rules.matches(file, context) { return false }
             guard filter.matches(file) else { return false }
             if let ftsPaths, !ftsPaths.contains(file.path) { return false }
             if filter.needsAttentionOnly, statuses[file.path]?.needsAttention != true { return false }
+            if let containers, !filter.matchesContainer(containers[file.path]) { return false }
             return true
         }
     }
@@ -1234,6 +1264,9 @@ final class NavigationModel: ObservableObject {
         if sort.contains(where: { $0.field == .flag }) { marks.flagged = flags.flagged }
         if sort.contains(where: { $0.field == .attention }) {
             marks.needsAttention = Set(formatStatuses.lazy.filter { $0.value.needsAttention }.map(\.key))
+        }
+        if sort.contains(where: { $0.field == .container }) {
+            marks.containers = containerCatalog.rows.compactMapValues { $0.cell.isEmpty ? nil : $0.cell }
         }
         return marks
     }
@@ -1880,7 +1913,10 @@ final class NavigationModel: ObservableObject {
         let filesToIndex = indexableFiles(files)
         indexer.startIndexing(filesToIndex)             // incremental; no-op if running
         checkImproveOCRReceipts(libraryChanged: true)   // W44.reocr-reader: replaced files keep their dates
-        if pathsChanged { refreshFormatStatuses() }     // format status is path-keyed; tag-only edits can't change it
+        if pathsChanged {
+            refreshFormatStatuses()     // format status is path-keyed; tag-only edits can't change it
+            refreshContainers()         // so are containers: a container file is read for the paths listed
+        }
         restoreSelectionIfNeeded()                      // reading-session resume
         applyPendingRevealIfPossible()                  // deep-link reveal deferral
         // Prune stale index rows — separate from startIndexing (a destructive delete must never ride
@@ -2252,6 +2288,9 @@ final class NavigationModel: ObservableObject {
             pendingVisitSelection = nil
             indexer.resetPruneState()   // old root's pending-prune set is invalid for the new root
             filter.pathPrefix = nil
+            filter.containerFacets = nil   // another root's boxes and collections
+            containerCatalog = .empty
+            containerSignature = nil
             filterSearchText = filter.searchText   // sync debounced field
             // R-3: an OCR search active over the OLD corpus leaves ftsPaths holding old-root paths; once
             // the new library loads, recompute would AND the new files against those → empty/wrong

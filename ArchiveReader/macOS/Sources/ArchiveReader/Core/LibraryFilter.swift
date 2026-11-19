@@ -64,6 +64,28 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         set { poorOCR = newValue ? true : nil }
     }
 
+    /// W47.ct-reader-view: the container facets, by `ContainerFacet` raw value, each the shown value a file must
+    /// have (compared by `ContainerFacet.key`). The values are the model's `ContainerCatalog`, not the file's, so this
+    /// dimension is applied by the model, like `needsAttentionOnly`. Optional for the same reason as
+    /// `ambiguousDates`. Use `containerFacet(_:)` and `setContainerFacet(_:_:)`.
+    var containerFacets: [String: String]? = nil
+    func containerFacet(_ facet: ContainerFacet) -> String? { containerFacets?[facet.rawValue] }
+    mutating func setContainerFacet(_ facet: ContainerFacet, _ value: String?) {
+        var all = containerFacets ?? [:]
+        all[facet.rawValue] = value
+        containerFacets = all.isEmpty ? nil : all
+    }
+    /// The container facets in effect, in the facets' order.
+    var activeContainerFacets: [(facet: ContainerFacet, value: String)] {
+        ContainerFacet.allCases.compactMap { f in containerFacet(f).map { (f, $0) } }
+    }
+    /// Whether a file whose container is `row` passes the container facets.
+    func matchesContainer(_ row: ContainerRow?) -> Bool {
+        activeContainerFacets.allSatisfy { facet, value in
+            row?.facets[facet].map { ContainerFacet.key($0) == ContainerFacet.key(value) } ?? false
+        }
+    }
+
     var dateRange: DateRangeFilter? {
         dateFromYear == nil && dateToYear == nil ? nil : DateRangeFilter(fromYear: dateFromYear, toYear: dateToYear)
     }
@@ -79,6 +101,7 @@ struct LibraryFilter: Sendable, Equatable, Codable {
             || !searchText.trimmingCharacters(in: .whitespaces).isEmpty
             || (pathPrefix?.isEmpty == false)
             || needsAttentionOnly || ambiguousDatesOnly || poorOCROnly
+            || !activeContainerFacets.isEmpty
     }
 
     func matches(_ file: ArchiveFile) -> Bool {
@@ -131,6 +154,8 @@ enum SortField: String, Sendable, CaseIterable, Codable {
     case date, name, quality, readState, fileType, subjects, relevance
     /// The ⚑ and ⚠︎ columns (W40.fix-reader-columns). Neither is on the file: they come from `SortMarks`.
     case flag, attention
+    /// The Container column (W47.ct-reader-view), from the model's `ContainerCatalog` through `SortMarks`.
+    case container
 }
 
 /// The two sort keys the rows do not carry: which paths are flagged (`FlagStore`) and which need attention
@@ -138,6 +163,8 @@ enum SortField: String, Sendable, CaseIterable, Codable {
 struct SortMarks: Sendable {
     var flagged: Set<String> = []
     var needsAttention: Set<String> = []
+    /// Each path's Container cell, for the Container sort; a path with none sorts last.
+    var containers: [String: String] = [:]
 }
 
 struct ARSortDescriptor: Sendable, Equatable, Codable {
@@ -181,6 +208,7 @@ enum LibrarySort {
             // 0 or 1, never `Int.max`: an unmarked row is a value, so descending puts it first.
             case .flag:      columns[c] = files.map { marks.flagged.contains($0.path) ? 0 : 1 }
             case .attention: columns[c] = files.map { marks.needsAttention.contains($0.path) ? 0 : 1 }
+            case .container: stringColumns.append((c, files.map { marks.containers[$0.path] }))
             case .relevance: break
             }
         }
@@ -241,6 +269,7 @@ enum LibrarySort {
             case .subjects:  return string(subjectsKey(f))
             case .flag:      return .int(marks.flagged.contains(f.path) ? 0 : 1)
             case .attention: return .int(marks.needsAttention.contains(f.path) ? 0 : 1)
+            case .container: return string(marks.containers[f.path])
             case .relevance: return .missing
             }
         }

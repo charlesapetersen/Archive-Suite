@@ -10,6 +10,8 @@ import Foundation
 /// One thing in effect that narrows the list.
 enum FilterFacet: Hashable, Sendable {
     case smartFolder, folder, read, quality(Int), tag(String), dates, name, text, needsAttention, ambiguousDates, poorOCR
+    /// A container facet (W47.ct-reader-view).
+    case container(ContainerFacet)
 
     /// The folder and the smart folder say *where* the list looks rather than what it looks for, so an empty
     /// list is blamed on them only when no other filter alone explains it.
@@ -38,6 +40,7 @@ struct ActiveFilterChip: Identifiable, Equatable, Sendable {
         case .needsAttention: return "ar.filter.needsAttention"
         case .ambiguousDates: return "ar.filter.ambiguousDates"
         case .poorOCR: return "ar.filter.poorOCR"
+        case let .container(c): return "ar.filter.chip.container.\(c.rawValue)"
         }
     }
 
@@ -62,6 +65,9 @@ struct ActiveFilterChip: Identifiable, Equatable, Sendable {
         for q in f.qualities.sorted() { add(.quality(q), "Q\(q)", "the Q\(q) filter") }
         for t in f.subjects.sorted(by: { $0.localizedStandardCompare($1) == .orderedAscending }) {
             add(.tag(t), "Tag: \(t)", "the tag \u{201c}\(t)\u{201d}")
+        }
+        for (facet, value) in f.activeContainerFacets {
+            add(.container(facet), "\(facet.label): \(value)", "the \(facet.label.lowercased()) \u{201c}\(value)\u{201d}")
         }
         if let years = f.dateYearsSummary {
             let sent = f.dateRangeRoles == .own ? "" : f.dateRangeRoles == .sentWith ? ", sent-with date" : ", own or sent-with"
@@ -115,6 +121,7 @@ extension LibraryFilter {
         case .needsAttention: f.needsAttentionOnly = false
         case .ambiguousDates: f.ambiguousDatesOnly = false
         case .poorOCR: f.poorOCROnly = false
+        case let .container(c): f.setContainerFacet(c, nil)
         }
         return f
     }
