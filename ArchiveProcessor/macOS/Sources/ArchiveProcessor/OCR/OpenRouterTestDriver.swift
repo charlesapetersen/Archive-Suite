@@ -207,15 +207,16 @@ enum OpenRouterTestDriver {
               solver.blockers(seg, stage: "segmentation").joined(separator: "; "))
         eq("10 the reading row runs through OpenRouter", reading.appRoute(keys: ["openrouter"]), "openrouter|anthropic/claude-sonnet-5.5")
         eq("10 by the Anthropic key with it", reading.appRoute(keys: ["anthropic", "openrouter"]), "anthropic|claude-sonnet-5-5")
-        // The app reads it only by key, so the Claude plan alone does not reach it, nor makes it free.
+        // By key it is money. W41.app-claude-plan-reading: the Claude plan reaches it too, at no money, and the sheet then
+        // switches on the plan, never the key (SettingsSheetTestDriver 3a).
         var planAndKey = res
         planAndKey.plans = ["claude"]
-        check("10 by key it is money, even with the Claude plan", solver.usdPer1000(reading, stage: "reading") > 19
-              && SettingsSolver(table: table, pairs: nil, resources: planAndKey, answers: SettingsAnswers())
-                .usdPer1000(reading, stage: "reading") > 19)
+        check("10 by key alone it is money", solver.usdPer1000(reading, stage: "reading") > 19)
+        check("10 with the Claude plan it is no money", SettingsSolver(table: table, pairs: nil, resources: planAndKey,
+              answers: SettingsAnswers()).usdPer1000(reading, stage: "reading") == 0)
         var planOnly = SettingsResources(macMemoryGB: 16)
         planOnly.plans = ["claude"]
-        check("10 the plan alone does not reach the reading row", !SettingsSolver(table: table, pairs: nil, resources: planOnly,
+        check("10 the plan alone reaches the reading row", SettingsSolver(table: table, pairs: nil, resources: planOnly,
               answers: SettingsAnswers()).blockers(reading, stage: "reading").isEmpty)
         let solved = SettingsSolver(table: table, pairs: OCRPairMatrix.bundled, resources: res, answers: SettingsAnswers()).solve()
         lines.append("INFO 10 picks with only an OpenRouter key: "

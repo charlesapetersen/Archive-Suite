@@ -1087,6 +1087,7 @@ struct OCRView: View {
                             Text(processor.statusMessage)
                                 .font(.caption)
                                 .foregroundStyle(.primary)
+                            if processor.isProcessing { PlanPauseCaption() }
                         }
                     }
                 }

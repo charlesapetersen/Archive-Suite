@@ -1534,6 +1534,9 @@ extension OCRProcessor {
                 to: result, previousText: contextText,
                 customPrompt: segmentationContext.customPrompt, configuration: visionTextLLM)
 
+            // A page that Stop cut short (a call cancelled, or one waiting for the Claude plan's window) is not recorded, so
+            // Resume reads it in its main pass instead of taking it as already tried (W41.app-claude-plan-reading).
+            if Task.isCancelled && result.text == nil { return }
             guard await handleOCRResult(
                 result, index: index, jobID: jobID, url: url, model: model,
                 outputDirectory: outputDirectory, runConfig: runConfig) else { return }

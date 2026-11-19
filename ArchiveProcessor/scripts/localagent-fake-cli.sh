@@ -14,6 +14,11 @@
 #   notlogged  a "not logged in" error on stderr (client → cli_not_logged_in)                   exit 1
 #   entitlement a signed-in-but-not-authorized error (client → cli_entitlement_missing)         exit 1
 #   ratelimited a usage-limit error on stderr (client → cli_rate_limited)                        exit 1
+#   limitjson  the plan's usage limit as `claude -p --output-format json` reports it: an is_error envelope on stdout,
+#              "You've hit your limit · resets in 2s", nothing on stderr (W41.app-claude-plan-reading)  exit 1
+#   limitthenok  the epoch form "Claude AI usage limit reached|<now+1>" for the first $LOCALAGENT_FAKE_LIMITS calls
+#              (default 2, counted in $LOCALAGENT_FAKE_COUNT_DIR/calls), then `ok`                exit 1, then 0
+#   iserror0   an is_error envelope with exit 0 and a reason that is no limit ("…while generating…")   exit 0
 #   timeout    sleeps well past any test timeout (tests the client's SIGTERM/SIGKILL path)      exit 0
 #              (with $LOCALAGENT_FAKE_PID_DIR set, it writes its pid there and execs the sleep, so a test
 #              can check the child itself is gone after a cancel)
@@ -58,6 +63,22 @@ case "$mode" in
   ratelimited)
     echo "Error: usage limit reached. Please try again later." >&2
     exit 1 ;;
+  limitjson)
+    printf '%s\n' '{"type":"result","subtype":"success","is_error":true,"result":"You'"'"'ve hit your limit · resets in 2s","total_cost_usd":0}'
+    exit 1 ;;
+  limitthenok)
+    count_file="${LOCALAGENT_FAKE_COUNT_DIR:?}/calls"
+    n=$(( $(cat "$count_file" 2>/dev/null || echo 0) + 1 ))
+    echo "$n" > "$count_file"
+    if [ "$n" -le "${LOCALAGENT_FAKE_LIMITS:-2}" ]; then
+        printf '{"type":"result","subtype":"success","is_error":true,"result":"Claude AI usage limit reached|%s"}\n' "$(( $(date +%s) + 1 ))"
+        exit 1
+    fi
+    printf '%s\n' '{"result":"[document_start]\n[rotate_0]\nFAKE-CLI-OCR-TOKEN read after the window reset","total_cost_usd":0,"is_error":false}'
+    exit 0 ;;
+  iserror0)
+    printf '%s\n' '{"type":"result","subtype":"error_during_execution","is_error":true,"result":"An internal error occurred while generating the answer"}'
+    exit 0 ;;
   timeout)
     if [ -n "${LOCALAGENT_FAKE_PID_DIR:-}" ]; then
         echo $$ > "$LOCALAGENT_FAKE_PID_DIR/$$"

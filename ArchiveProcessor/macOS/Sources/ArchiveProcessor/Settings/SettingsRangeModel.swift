@@ -151,7 +151,7 @@ extension SettingsSheetModel {
             case .mac, .manual, .kit: return "free"
             default: break
             }
-            if acc.viaPlan { return "no money: it uses your \(plan) plan" }
+            if acc.viaPlan { return "no money: it uses your \(plan) plan's five-hour and weekly usage windows" }
             if acc.viaCluster { return "no money: it runs on your cluster" }
             if x > 0 {
                 let batch = overnight && r.batchUSDPer1000 != nil && x == r.batchUSDPer1000

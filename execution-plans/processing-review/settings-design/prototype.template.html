@@ -265,7 +265,10 @@ function blockers(r) {
   return out;
 }
 function money(stage, r) {
-  if (r.family !== "cloud") return 0;
+  // A plan row the user's plans reach costs no money; reached by its key instead, it is the key's price (SettingsSolver.usdPer1000).
+  const n = r.needs || {};
+  if (r.family === "plan" && n.plan && n.plan.every(p => state.plans[p])) return 0;
+  if (r.family !== "cloud" && r.family !== "plan") return 0;
   const per = (state.batchPrices && r.usd_1000_batch != null) ? r.usd_1000_batch : r.usd_1000;
   const units = STAGE_UNIT[stage] === "pages" ? state.pages : state.docs;
   return per * units / 1000;
@@ -386,7 +389,7 @@ function cardHTML(s, sol, opts = {}) {
       ${kindLine(s, x)}
       <div class="facts">
         <div><b>${accLabel(s)}</b><span class="num">${fmt.pct(x.acc)}</span></div>
-        <div><b>cost, ${unit}</b><span class="num">${fmt.usd(x.usd)}${r.family === "plan" ? ` <small>(about $${(r.usd_1000 * unitsOf(s) / 1000).toFixed(2)} of list-price use on the plan)</small>` : r.family === "cluster" && r.usd_1000 ? ` <small>(${fmt.usd(r.usd_1000 * state.pages / 1000)} at cloud GPU rates)</small>` : ""}</span></div>
+        <div><b>cost, ${unit}</b><span class="num">${fmt.usd(x.usd)}${r.family === "plan" && !x.usd ? ` <small>(about $${(r.usd_1000 * unitsOf(s) / 1000).toFixed(2)} of list-price use on the plan)</small>` : r.family === "cluster" && r.usd_1000 ? ` <small>(${fmt.usd(r.usd_1000 * state.pages / 1000)} at cloud GPU rates)</small>` : ""}</span></div>
         <div><b>time</b><span class="num">${fmt.hrs(x.hrs)}${r.s_est ? " <small>est.</small>" : ""}</span></div>
         ${r.peak_gb ? `<div><b>memory</b><span class="num">${r.peak_gb} GB peak</span></div>` : ""}
       </div>

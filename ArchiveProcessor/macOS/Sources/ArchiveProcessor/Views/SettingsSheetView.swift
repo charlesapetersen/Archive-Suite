@@ -27,6 +27,8 @@ struct SettingsSheetView: View {
     @AppStorage(DefaultsKeys.useAppleVision) private var useAppleVision = false
     @AppStorage(DefaultsKeys.useGateway) private var useGateway = false
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent = false
+    @AppStorage(DefaultsKeys.localAgentTool) private var localAgentToolRaw = LocalAgentTool.claude.rawValue
+    @AppStorage(DefaultsKeys.localAgentModel) private var localAgentModel = ""
     @AppStorage(DefaultsKeys.batchMode) private var batchMode = false
     @ObservedObject private var modelStore = ModelSelectionStore.shared
 
@@ -38,11 +40,18 @@ struct SettingsSheetView: View {
 
     static func running(segmentation: SegmentationApproach, useAppleVision: Bool, useGateway: Bool,
                         useLocalAgent: Bool, provider: LLMProvider, model: LLMModel,
-                        table: SettingsRouteTable?) -> SettingsSheetModel.Running {
+                        table: SettingsRouteTable?, localAgentTool: LocalAgentTool = .claude,
+                        localAgentModel: String = "") -> SettingsSheetModel.Running {
         if useAppleVision {
             return .init(readingRouteID: "apple-vision", readingName: "Apple Vision on this Mac", segmentation: segmentation)
         }
         if useLocalAgent {
+            // `claude` at a measured Anthropic model is that row read by the plan (W41.app-claude-plan-reading).
+            let model = localAgentModel.trimmingCharacters(in: .whitespacesAndNewlines)
+            if localAgentTool == .claude, !model.isEmpty,
+               let r = table?.stage("reading")?.routes.first(where: { $0.appRoute == "anthropic|\(model)" && $0.needs.plan == ["claude"] }) {
+                return .init(readingRouteID: r.id, readingName: "your Claude plan (\(model))", segmentation: segmentation)
+            }
             return .init(readingRouteID: nil, readingName: "your signed-in command-line agent", segmentation: segmentation)
         }
         if useGateway {
@@ -60,7 +69,8 @@ struct SettingsSheetView: View {
         let running = Self.running(
             segmentation: SegmentationApproach(rawValue: segmentationRaw) ?? .defaultApproach,
             useAppleVision: useAppleVision, useGateway: useGateway, useLocalAgent: useLocalAgent,
-            provider: selectedProvider, model: modelStore.model(for: selectedProvider), table: table)
+            provider: selectedProvider, model: modelStore.model(for: selectedProvider), table: table,
+            localAgentTool: LocalAgentTool(rawValue: localAgentToolRaw) ?? .claude, localAgentModel: localAgentModel)
         return SettingsSheetModel(table: table, pairs: OCRPairMatrix.bundled, resolver: resolver,
                                   macMemoryGB: SettingsLayerStore.thisMacMemoryGB, pages: pages,
                                   month: store.monthSpend(), running: running)
@@ -160,6 +170,15 @@ struct SettingsSheetView: View {
             useAppleVision = false
             selectedProvider = provider
             modelStore.setModel(m, for: provider)
+        case .readingByPlan(let model):
+            // The Local Agent backend with `claude`: the plan's login, never a key (`LocalAgentClient` strips the
+            // variables that would bill one). No batch: the plan has none.
+            useGateway = false
+            useAppleVision = false
+            batchMode = false
+            localAgentToolRaw = LocalAgentTool.claude.rawValue
+            localAgentModel = model
+            useLocalAgent = true
         }
     }
 
@@ -525,7 +544,7 @@ extension SettingsSheetModel.Apply {
     var buttonTitle: String {
         switch self {
         case .segmentation: return "Use this in Process Files"
-        case .reading, .appleVision: return "Read with this"
+        case .reading, .readingByPlan, .appleVision: return "Read with this"
         }
     }
 }

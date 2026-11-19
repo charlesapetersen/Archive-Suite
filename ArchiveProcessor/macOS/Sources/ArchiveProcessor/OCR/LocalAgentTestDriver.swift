@@ -1,6 +1,7 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 import AppKit
+import SwiftUI
 
 /// Headless, key-free ($0) functional test of the Local Agent CLI backend, gated by
 /// `LOCALAGENT_TEST=1` (does nothing in normal use). No real model, no network, no cost: it drives the
@@ -86,6 +87,100 @@ enum LocalAgentTestDriver {
                 let r = try await client(mode: "garbage").ocr(imageURL: imageURL)
                 check("ocr(garbage): errorCode = cli_bad_response", r.errorCode == "cli_bad_response")
             } catch { check("ocr(garbage) returns a result", false) }
+
+            // 5c. W41.app-claude-plan-reading: the plan's usage limit as `claude -p --output-format json` reports it (an
+            // is_error envelope on stdout, nothing on stderr), its reset read, and an error envelope never taken as text.
+            let now = Date()
+            func run(_ out: String, _ err: String = "", exit: Int32 = 1) -> LocalAgentClient.CLIRun {
+                .init(exitCode: exit, stdout: out, stderr: err, timedOut: false, spawnFailed: false)
+            }
+            if case .usageLimited(let reset, let message) = LocalAgentClient.classifyClaude(
+                run(#"{"type":"result","is_error":true,"result":"You've hit your limit · resets in 2s"}"#), now: now) {
+                check("classify: the envelope's limit is a usage limit, reset in 2 s",
+                      reset.map { abs($0.timeIntervalSince(now) - 2) < 0.5 } == true)
+                check("classify: the limit message says nothing goes to a key", message.contains("nothing is sent to a key"))
+            } else { check("classify: the envelope's limit is a usage limit", false) }
+            if case .usageLimited(let reset, _) = LocalAgentClient.classifyClaude(
+                run(#"{"is_error":true,"result":"Claude AI usage limit reached|1800000000"}"#), now: now) {
+                check("classify: the epoch reset is read", reset == Date(timeIntervalSince1970: 1_800_000_000))
+            } else { check("classify: the epoch form is a usage limit", false) }
+            if case .usageLimited(let reset, _) = LocalAgentClient.classifyClaude(
+                run("", "Error: usage limit reached. Please try again later."), now: now) {
+                check("classify: a stderr limit with no reset has none", reset == nil)
+            } else { check("classify: a stderr limit is a usage limit", false) }
+            check("classify: an error envelope with exit 0 is no text",
+                  LocalAgentClient.classifyClaude(run(#"{"is_error":true,"result":"An internal error occurred while generating"}"#,
+                                                      exit: 0), now: now)
+                  == .failure(code: "cli_error", message: "The Claude Code CLI reported an error: An internal error occurred while generating"))
+            if case .failure(let code, _) = LocalAgentClient.classifyClaude(run("", "could not separate the pages", exit: 2), now: now) {
+                check("classify: 'separate' is no usage limit for claude", code == "cli_exit_2")
+            } else { check("classify: 'separate' is a failure", false) }
+            check("classify: a good envelope is its result",
+                  LocalAgentClient.classifyClaude(run(#"{"is_error":false,"result":"text"}"#, exit: 0), now: now) == .success("text"))
+
+            // 5d. A page that meets the limit waits for the reset and is read on the plan again; the pause is shown while
+            // it waits and gone after.
+            let fast = UsageWindowPacing(grace: 0, unknownWait: 0.5, minimumWait: 0.2, tick: 0.05)
+            let countDir = root.appendingPathComponent("count", isDirectory: true)
+            try? fm.createDirectory(at: countDir, withIntermediateDirectories: true)
+            setenv("LOCALAGENT_FAKE_COUNT_DIR", countDir.path, 1)
+            setenv("LOCALAGENT_FAKE_MODE", "limitthenok", 1)
+            let paced = LocalAgentClient(config: LocalAgentConfig(tool: .claude, binaryPath: fakeCLI), pacing: fast)
+            let sawPause = Task { () -> Bool in
+                for _ in 0..<200 {
+                    if LocalAgentClient.usageWindowPause.until != nil { return true }
+                    try? await Task.sleep(nanoseconds: 20_000_000)
+                }
+                return false
+            }
+            let started = Date()
+            let resumed = try? await paced.ocr(imageURL: imageURL)
+            let calls = (try? String(contentsOf: countDir.appendingPathComponent("calls"), encoding: .utf8))?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            check("pacing: the page is read after two limits", resumed?.text?.contains("read after the window reset") == true)
+            check("pacing: three calls, all on the plan", calls == "3")
+            check("pacing: it waited for the resets (\(String(format: "%.1f", Date().timeIntervalSince(started))) s)",
+                  Date().timeIntervalSince(started) >= 0.4)
+            check("pacing: the pause was shown while it waited", await sawPause.value)
+            check("pacing: no pause after", LocalAgentClient.usageWindowPause.until == nil)
+            unsetenv("LOCALAGENT_FAKE_COUNT_DIR")
+
+            // 5e. Stop while waiting ends the wait at once, with a cancelled page (which the batch does not record).
+            setenv("LOCALAGENT_FAKE_MODE", "limitjson", 1)
+            let slow = LocalAgentClient(config: LocalAgentConfig(tool: .claude, binaryPath: fakeCLI),
+                                        pacing: UsageWindowPacing(grace: 60, unknownWait: 60, minimumWait: 60, tick: 0.05))
+            let waiting = Task { try? await slow.ocr(imageURL: imageURL) }
+            var paused = false
+            for _ in 0..<200 where !paused {
+                try? await Task.sleep(nanoseconds: 20_000_000)
+                paused = LocalAgentClient.usageWindowPause.until != nil
+            }
+            check("stop: the page was waiting", paused)
+            let stopAt = Date()
+            waiting.cancel()
+            let stopped = await waiting.value
+            check("stop: the wait ends at once", Date().timeIntervalSince(stopAt) < 2)
+            check("stop: the page is cancelled, no text", stopped?.errorCode == "cli_cancelled" && stopped?.text == nil)
+            check("stop: no pause after", LocalAgentClient.usageWindowPause.until == nil)
+
+            // 5f. The unverified adapters do not wait: a limit fails the page as before.
+            setenv("LOCALAGENT_FAKE_MODE", "ratelimited", 1)
+            let gem = try? await LocalAgentClient(config: LocalAgentConfig(tool: .gemini, binaryPath: fakeCLI), pacing: slow.pacing)
+                .ocr(imageURL: imageURL)
+            check("gemini: a limit fails the page, no wait", gem?.errorCode == "cli_rate_limited")
+
+            // 5g. The status line's words, and the caption draws.
+            let box = UsageWindowPause()
+            check("pause: nothing to say when no page waits", box.message() == nil)
+            let id = UUID()
+            box.begin(id, until: Date().addingTimeInterval(3 * 86_400))
+            let words = box.message() ?? ""
+            check("pause: says paused, the day, and no key", words.hasPrefix("Paused:") && words.contains(" on ")
+                  && words.contains("nothing is sent to a key"))
+            let caption = ImageRenderer(content: PlanPauseCaption(pause: box).frame(width: 400))
+            caption.scale = 1
+            check("pause: the caption draws", (caption.nsImage?.size.height ?? 0) > 5)
+            box.end(id)
 
             // 5b. An API key in the app's own environment never reaches `claude` (W40.fix-processor-localagent-api-key):
             // OCR, text completion and the probe all spawn through the same path.

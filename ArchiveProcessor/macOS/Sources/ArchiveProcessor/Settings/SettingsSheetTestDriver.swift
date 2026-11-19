@@ -252,6 +252,51 @@ enum SettingsSheetTestDriver {
             check("3 a paid pick names its cost", r.cost.contains("$") || r.cost.hasPrefix("free"), r.cost)
             check("3 a reading pick the app runs can be applied", r.routeID == "gemini3.8-flash" ? r.apply == .reading(appRoute: "gemini|gemini-3.8-flash") : true)
         }
+        // 3a. W41.app-claude-plan-reading: the Claude plan reads with Claude Sonnet 5.5 at no money, and "Read with this"
+        // switches on the plan (the Local Agent's `claude`), never a key: with an Anthropic key as well, the row is still
+        // priced at nothing, so it must still run on the plan.
+        for (name, keys) in [("plan-only", [String]()), ("plan-and-key", ["anthropic"])] {
+            let planSheet = sheet("claude-\(name)", general: layer(.general, [(.plans, .strings(["claude"])), (.keys, .strings(keys)),
+                                                                          (.staysOnMac, .bool(false))]))
+            if let r = card(planSheet, "reading"), r.routeID == "claude-sonnet5.5" {
+                check("3a \(name): Read with this switches on the plan", r.apply == .readingByPlan(model: "claude-sonnet-5-5"),
+                      String(describing: r.apply))
+                check("3a \(name): the card says the plan's windows, not money",
+                      r.cost.contains("usage windows") && !r.cost.contains("$"), r.cost)
+                check("3a \(name): what runs now says the plan's windows", r.runsNow?.contains("five-hour and weekly") == true,
+                      r.runsNow ?? "nil")
+            } else {
+                check("3a \(name): the plan's reading pick is Claude Sonnet 5.5", false, card(planSheet, "reading")?.routeID ?? "no card")
+            }
+            check("3a \(name): the plan in use", planSheet.totals.contains { $0.id == "plan" && $0.value == "In use" },
+                  planSheet.totals.map { "\($0.id)=\($0.value)" }.joined(separator: ", "))
+        }
+        // Reading through the plan already: the sheet finds the row and offers no switch.
+        let onPlan = SettingsSheetView.running(segmentation: .manual, useAppleVision: false, useGateway: false, useLocalAgent: true,
+                                               provider: .gemini, model: LLMProvider.gemini.models[0], table: table,
+                                               localAgentTool: .claude, localAgentModel: "claude-sonnet-5-5")
+        check("3a the plan's run is the Claude reading row", onPlan.readingRouteID == "claude-sonnet5.5", onPlan.readingRouteID ?? "nil")
+        let onCLIDefault = SettingsSheetView.running(segmentation: .manual, useAppleVision: false, useGateway: false,
+                                                     useLocalAgent: true, provider: .gemini, model: LLMProvider.gemini.models[0],
+                                                     table: table, localAgentTool: .claude, localAgentModel: "")
+        check("3a the CLI's own default model is no measured row", onCLIDefault.readingRouteID == nil)
+        let planNow = sheet("claude-plan-running", general: layer(.general, [(.plans, .strings(["claude"])), (.staysOnMac, .bool(false))]),
+                            running: onPlan)
+        if let r = card(planNow, "reading") {
+            check("3a reading on the plan already: nothing to switch", r.routeID != "claude-sonnet5.5" || r.apply == nil,
+                  String(describing: r.apply))
+        }
+        // A key alone: the key's route, at the key's price.
+        let keySheet = sheet("claude-key-only", general: layer(.general, [(.keys, .strings(["anthropic"])), (.staysOnMac, .bool(false)),
+                                                                          (.moneyHabit, .string(MoneyHabit.perBatch.rawValue)),
+                                                                          (.batchCeilingUSD, .double(100))]))
+        if let r = card(keySheet, "reading"), r.routeID == "claude-sonnet5.5" {
+            check("3a key only: Read with this uses the Anthropic key", r.apply == .reading(appRoute: "anthropic|claude-sonnet-5-5"),
+                  String(describing: r.apply))
+            check("3a key only: the card names a price", r.cost.contains("$"), r.cost)
+        } else {
+            lines.append("SKIP 3a key only: the reading pick is \(card(keySheet, "reading")?.routeID ?? "nil")")
+        }
         check("3 limits: the ceiling", paid.limits.first { $0.id == "ceiling" }?.value == "$10.00")
         check("3 a batch limit shows no month line", paid.limits.first { $0.id == "month" } == nil)
 

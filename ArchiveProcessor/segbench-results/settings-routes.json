@@ -1,6 +1,6 @@
 {
  "version": 1,
- "built": "2026-11-18",
+ "built": "2026-11-19",
  "item": "W46.settings-routes-table",
  "method": "ArchiveProcessor/scripts/segbench/settings_routes.py",
  "schema": "execution-plans/processing-review/13-stage-rules/00-index.md §The table schema",
@@ -4755,8 +4755,8 @@
     },
     {
      "id": "claude-sonnet5.5",
-     "name": "Claude Sonnet 5.5 (measured on the Claude plan; an Anthropic or OpenRouter key)",
-     "family": "cloud",
+     "name": "Claude Sonnet 5.5 (your Claude plan, or an Anthropic or OpenRouter key)",
+     "family": "plan",
      "app_route": "anthropic|claude-sonnet-5-5",
      "status": "shipped",
      "needs": {
@@ -4764,7 +4764,9 @@
        "anthropic",
        "openrouter"
       ],
-      "plan": [],
+      "plan": [
+       "claude"
+      ],
       "cluster": false,
       "gpus": null,
       "mac": false,
@@ -4856,6 +4858,7 @@
       "usd_1000_list": 19.56,
       "price_read": "2026-10-15 (cloud pilot)",
       "derived": "the pilot's three pages extrapolated to 99, $1.936, per 1,000 pages",
+      "plan_share": "no money on the Claude plan: it uses the plan's five-hour and weekly windows, measured on the user's account (usage.md)",
       "source": {
        "file": "ArchiveProcessor/segbench-results/ocr-panel-cloud-pilot.md",
        "route": "claude-sonnet5.5",

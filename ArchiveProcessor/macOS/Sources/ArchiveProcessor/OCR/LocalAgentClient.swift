@@ -53,7 +53,16 @@ struct LocalAgentClient: Sendable {
     /// `nil` ⇒ no reset time is currently known.
     nonisolated(unsafe) static var lastUsageWindowResetAt: Date?
 
-    init(config: LocalAgentConfig) { self.config = config }
+    /// How a page waits out the plan's usage limit (W41.app-claude-plan-reading).
+    let pacing: UsageWindowPacing
+
+    /// The pages waiting for the plan's usage window, app-wide, for the status line (`UsageWindowPause`).
+    static let usageWindowPause = UsageWindowPause()
+
+    init(config: LocalAgentConfig, pacing: UsageWindowPacing = .standard) {
+        self.config = config
+        self.pacing = pacing
+    }
 
     // MARK: - Public seam (mirrors OpenAICompatibleClient)
 
@@ -93,12 +102,14 @@ struct LocalAgentClient: Sendable {
                                          customPrompt: customPrompt)
         let prompt = Self.augmentWithImagePaths(basePrompt, pagePath: pageURL.path, previousPath: prevPath)
 
-        let run = await Self.invoke(binary: binary, tool: config.tool, modelOverride: config.modelOverride,
-                                    prompt: prompt, timeout: Self.ocrTimeout)
+        let run = await Self.invokePaced(binary: binary, tool: config.tool, modelOverride: config.modelOverride,
+                                         prompt: prompt, timeout: Self.ocrTimeout, pacing: pacing)
 
         switch run {
         case .failure(let code, let message):
             return Self.failure(code: code, message: message)
+        case .usageLimited(_, let message):
+            return Self.failure(code: "cli_rate_limited", message: message)
         case .success(let text):
             let (classification, rotationDegrees, ocrText) = OCRPrompt.parseResponse(text)
             return OCRResult(text: ocrText, classification: classification,
@@ -114,14 +125,14 @@ struct LocalAgentClient: Sendable {
         guard let binary = Self.resolveBinaryPath(tool: config.tool, override: config.binaryPath) else {
             throw OCRError.networkError("The \(config.tool.displayName) CLI was not found. Install it and sign in.")
         }
-        let run = await Self.invoke(binary: binary, tool: config.tool, modelOverride: config.modelOverride,
-                                    prompt: prompt, timeout: Self.textTimeout)
+        let run = await Self.invokePaced(binary: binary, tool: config.tool, modelOverride: config.modelOverride,
+                                         prompt: prompt, timeout: Self.textTimeout, pacing: pacing)
         switch run {
         case .success(let text):
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { throw OCRError.networkError("The \(config.tool.displayName) CLI returned no text.") }
             return trimmed
-        case .failure(_, let message):
+        case .failure(_, let message), .usageLimited(_, let message):
             throw OCRError.networkError(message)
         }
     }
@@ -156,6 +167,8 @@ struct LocalAgentClient: Sendable {
             return ProbeOutcome(ok: true, code: nil, message: nil)
         case .failure(let code, let message):
             return ProbeOutcome(ok: false, code: code, message: message)
+        case .usageLimited(_, let message):
+            return ProbeOutcome(ok: false, code: "cli_rate_limited", message: message)
         }
     }
 
@@ -187,9 +200,32 @@ struct LocalAgentClient: Sendable {
 
     /// Outcome of one CLI OCR/text call: either the model's raw text, or a friendly (never-raw-stderr)
     /// error message + a stable code the validator / pipeline can branch on.
-    private enum InvokeOutcome: Sendable {
+    enum InvokeOutcome: Sendable, Equatable {
         case success(String)
         case failure(code: String, message: String)
+        /// `claude` said the plan's usage limit is reached, with the reset it printed when it printed one.
+        case usageLimited(reset: Date?, message: String)
+    }
+
+    /// `invoke`, but a `claude` call that meets the plan's usage limit waits for the window to reset and tries the plan
+    /// again, as long as it takes (W41.app-claude-plan-reading): a long batch pauses and resumes by itself, and the
+    /// page is never sent anywhere else, so nothing is billed to a key behind the user's back. Cancelling the run
+    /// (Stop) ends the wait at once. `gemini`/`codex` are unverified adapters and keep failing the page, as before.
+    static func invokePaced(binary: String, tool: LocalAgentTool, modelOverride: String?, prompt: String,
+                            timeout: TimeInterval, pacing: UsageWindowPacing) async -> InvokeOutcome {
+        while true {
+            let run = await invoke(binary: binary, tool: tool, modelOverride: modelOverride, prompt: prompt,
+                                   timeout: timeout)
+            guard tool == .claude, case .usageLimited(let reset, _) = run else { return run }
+            let until = pacing.resumeAt(reset: reset, now: Date())
+            let id = UUID()
+            usageWindowPause.begin(id, until: until)
+            let waited = await pacing.wait(until: until)
+            usageWindowPause.end(id)
+            guard waited else {
+                return .failure(code: "cli_cancelled", message: "The \(tool.displayName) CLI request was cancelled.")
+            }
+        }
     }
 
     private static func invoke(binary: String, tool: LocalAgentTool, modelOverride: String?,
@@ -232,6 +268,7 @@ struct LocalAgentClient: Sendable {
         if cli.spawnFailed {
             return .failure(code: "cli_spawn_failed", message: "Could not launch the \(tool.displayName) CLI.")
         }
+        if tool == .claude { return classifyClaude(cli, now: Date()) }
         if cli.exitCode != 0 {
             let code = exitErrorCode(stderr: cli.stderr, exitCode: cli.exitCode)
             // Record a parseable usage-window reset so a bulk run can pace to it (W13.cli-4) and the
@@ -247,6 +284,44 @@ struct LocalAgentClient: Sendable {
                             message: "The \(tool.displayName) CLI returned an unreadable response.")
         }
         return .success(text)
+    }
+
+    /// A finished `claude -p --output-format json` call. The CLI reports a usage limit in its JSON envelope on stdout
+    /// (`is_error`, and the reason in `result`), not only on stderr, and can do so with exit 0, so the envelope decides:
+    /// success only when it is not an error and has a result; otherwise its `result`, or all the output when there is
+    /// no envelope, says why (as the segmentation windows read it, `LocalAgentWindowTransport.classify`). A usage
+    /// limit is matched narrowly (`LocalAgentWindowTransport.isUsageLimit`), since the page then waits for it.
+    static func classifyClaude(_ cli: CLIRun, now: Date) -> InvokeOutcome {
+        let envelope = (try? JSONSerialization.jsonObject(with: Data(cli.stdout.utf8))) as? [String: Any]
+        let isError = envelope?["is_error"] as? Bool == true
+        if cli.exitCode == 0, !isError, let text = envelope?["result"] as? String, !text.isEmpty {
+            return .success(text)
+        }
+        let reason = (envelope?["result"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? (cli.stderr + "\n" + cli.stdout)
+        let tool = LocalAgentTool.claude
+        if exitErrorCode(stderr: reason, exitCode: cli.exitCode) == "cli_not_logged_in" {
+            return .failure(code: "cli_not_logged_in", message: friendlyExitMessage(tool: tool, stderr: reason, exitCode: 1))
+        }
+        if LocalAgentWindowTransport.isUsageLimit(reason) {
+            let reset = parseUsageWindowReset(fromStderr: reason, now: now)
+            lastUsageWindowResetAt = reset
+            let when = reset.map { " It resets \(usageWindowHint(for: $0, now: now))." } ?? ""
+            return .usageLimited(reset: reset, message: "Your Claude plan's usage limit is reached.\(when) Reading "
+                                 + "waits for it and goes on with the plan; nothing is sent to a key.")
+        }
+        if cli.exitCode != 0 {
+            var code = exitErrorCode(stderr: reason, exitCode: cli.exitCode)
+            // The broad "limit/quota/rate" match is for the unverified adapters; for `claude` only the narrow one above
+            // is a usage limit, so a message that merely says "generate" or "separate" is an ordinary failure.
+            if code == "cli_rate_limited" { code = "cli_exit_\(cli.exitCode)" }
+            let message = code == "cli_exit_\(cli.exitCode)" ? "The Claude Code CLI failed (exit \(cli.exitCode))."
+                : friendlyExitMessage(tool: tool, stderr: reason, exitCode: cli.exitCode)
+            return .failure(code: code, message: message)
+        }
+        if isError {
+            return .failure(code: "cli_error", message: "The Claude Code CLI reported an error: \(String(reason.prefix(200)))")
+        }
+        return .failure(code: "cli_bad_response", message: "The Claude Code CLI returned an unreadable response.")
     }
 
     /// Inherited from a shell that launched the app, these make `claude -p` bill an API key instead of the
@@ -369,6 +444,11 @@ struct LocalAgentClient: Sendable {
     static func parseUsageWindowReset(fromStderr stderr: String, now: Date,
                                       calendar: Calendar = .current) -> Date? {
         let s = stderr.lowercased()
+        // Claude Code's older form: "Claude AI usage limit reached|1763600000", the reset in Unix seconds.
+        if let r = s.range(of: #"limit reached\|(\d{9,11})"#, options: .regularExpression),
+           let secs = Double(s[r].split(separator: "|").last ?? "") {
+            return Date(timeIntervalSince1970: secs)
+        }
         if let secs = relativeResetSeconds(in: s), secs > 0 {
             return now.addingTimeInterval(secs)
         }

@@ -410,11 +410,20 @@ enum SettingsSolverTestDriver {
         var claude = mac(16)
         claude.plans = ["claude"]
         let d3 = solve("D3", claude)
-        // W41.app-openrouter-claude: Claude Sonnet 5.5's reading row is read by key only (the app has no reading by the
-        // plan that row measures), so the plan alone reads with what runs on this Mac.
-        eq("D3 reading: the plan alone reaches no Claude reading, Vision", pick(d3, "reading"), "apple-vision")
-        check("D3 the Claude reading row needs a key", d3.blockers("reading", "claude-sonnet5.5").contains { $0.contains("key") },
+        // W41.app-claude-plan-reading: Claude Sonnet 5.5's reading row is read by the plan (the Local Agent backend), as
+        // the bench read it, at no money.
+        eq("D3 reading: Claude Sonnet 5.5 on the plan", pick(d3, "reading"), "claude-sonnet5.5")
+        check("D3 the plan reaches the Claude reading row", d3.blockers("reading", "claude-sonnet5.5").isEmpty,
               d3.blockers("reading", "claude-sonnet5.5").joined(separator: "; "))
+        let claudeRow = table.stage("reading")!.route("claude-sonnet5.5")!
+        let d3Solver = SettingsSolver(table: table, pairs: nil, resources: claude, answers: SettingsAnswers())
+        check("D3 the plan's reading is no money", d3Solver.usdPer1000(claudeRow, stage: "reading") == 0)
+        // By key the same row is money: the cloud pilot's price, never the plan's nothing.
+        var keyOnly = mac(16)
+        keyOnly.keys = ["anthropic"]
+        let keySolver = SettingsSolver(table: table, pairs: nil, resources: keyOnly, answers: SettingsAnswers())
+        check("D3 by an Anthropic key the row is money", keySolver.usdPer1000(claudeRow, stage: "reading") > 0,
+              "\(keySolver.usdPer1000(claudeRow, stage: "reading"))")
         eq("D3 segmentation: Claude Sonnet 5.5", pick(d3, "segmentation"), "claude-sonnet5.5")
         eq("D3 dating: no plan row, the Mac route", pick(d3, "dating", "step 1"), "vision-2b-chooser-t3")
         eq("D3 names: no plan row, the Mac route", pick(d3, "entities", "correspondence-typed"), "qwen3-vl-8b-mac")
@@ -442,6 +451,8 @@ enum SettingsSolverTestDriver {
         let d5 = solve("D5", d5r, cheap)
         eq("D5 segmentation: Claude ties Gemini text and costs no money", pick(d5, "segmentation"),
            "claude-sonnet5.5")
+        // W41.app-claude-plan-reading: the plan's reading costs no money, so it is the cheapest within a point.
+        eq("D5 reading: Claude Sonnet 5.5 on the plan", pick(d5, "reading"), "claude-sonnet5.5")
         let seg = table.stage("segmentation")!
         let g2 = seg.route("gemini3.8-flash")!, g1 = seg.route("gemini3.7-flash-gateway")!
         let text = seg.route("gemini3.8-flash-text")!, local = seg.route("seg-qwen3.5-2b-8bit")!

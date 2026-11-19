@@ -106,7 +106,18 @@ struct SettingsSheetModel {
     enum Apply: Equatable {
         case segmentation(SegmentationApproach)
         case reading(appRoute: String)
+        /// W41.app-claude-plan-reading: the row read through the user's Claude plan — the Local Agent backend running
+        /// `claude` at `model` — when the plan is what reaches it, so the sheet's "no money" is what the run pays.
+        case readingByPlan(model: String)
         case appleVision
+    }
+
+    /// The model the Claude plan reads a reading row with: the row's Anthropic model, when the user's Claude plan
+    /// reaches the row. Nil otherwise (no plan, or not a Claude row), so a key or nothing applies.
+    static func claudePlanModel(_ r: SettingsRouteTable.Route, solver: SettingsSolver) -> String? {
+        guard r.needs.plan == ["claude"], solver.access(r).viaPlan,
+              let ar = r.appRoute, ar.hasPrefix("anthropic|") else { return nil }
+        return String(ar.dropFirst("anthropic|".count))
     }
 
     struct RuleRow: Identifiable {
@@ -328,7 +339,7 @@ struct SettingsSheetModel {
                                 + (byHand ? "; finding documents by hand counts as 0 before your checking" : "")))
         }
         out.append(Total(id: "plan", label: "Your subscription plan", value: planInUse ? "In use" : "Not used",
-                         detail: planInUse ? "its allowance is used, not money" : nil))
+                         detail: planInUse ? "its five-hour and weekly usage windows are used, not money" : nil))
         return out
     }
 
@@ -630,6 +641,11 @@ struct SettingsSheetModel {
                 if r.id == "apple-vision" {
                     runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” switches it on."
                     apply = .appleVision
+                } else if let model = Self.claudePlanModel(r, solver: solver) {
+                    // Priced at no money because the plan reaches it, so it must run on the plan, never on a key.
+                    runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” "
+                        + "switches on your Claude plan, which uses its five-hour and weekly windows, not money."
+                    apply = .readingByPlan(model: model)
                 } else if let ar = r.appRoute(keys: words.resources.keys), ar.contains("|") {
                     runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” switches it on."
                     apply = .reading(appRoute: ar)
@@ -1409,7 +1425,7 @@ struct SettingsSheetWords {
             let same = stage.unit == "pages" && a.pages == 1000 && per.count == 1
             return "\(money(usd)) for \(units)" + (per.isEmpty || same ? "" : " (\(per.joined(separator: "; ")))")
         }
-        if routes.contains(where: { $0.family == .plan }) { return "no money: it uses your plan's allowance" }
+        if routes.contains(where: { $0.family == .plan }) { return "no money: it uses your plan's five-hour and weekly usage windows" }
         if routes.contains(where: { $0.family == .cluster }) { return "no money: it runs on your cluster" }
         if routes.contains(where: { $0.family == .cloud }) && stage.id == "entities" {
             return "no extra money: the names come in the same request that finds each document's date"
