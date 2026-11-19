@@ -13,7 +13,7 @@ extension ZoteroExport {
     /// How a CSL type imports in Zotero 10: the Zotero type, and which of the type-dependent variables it keeps.
     struct ConnectorType {
         var itemType: String
-        /// `genre` → the base field `type` (Letter Type, Manuscript Type).
+        /// `genre` → the base field `type` (Letter Type, Report Type, Presentation Type).
         var genre = false
         /// `publisher-place` → `place`.
         var place = false
@@ -21,7 +21,9 @@ extension ZoteroExport {
         var publication = false
         /// `medium` (Artwork's Medium).
         var medium = false
-        /// The creator type an author takes (Artwork's Artist).
+        /// `archive`, `archive_location`, `call-number` (every type here but Presentation).
+        var archive = true
+        /// The creator type an author takes (Artwork's Artist, Presentation's Presenter).
         var authorType = "author"
         /// Letter has a recipient creator; elsewhere a recipient becomes the type's primary creator.
         var recipient = false
@@ -30,7 +32,9 @@ extension ZoteroExport {
     static func connectorType(csl: String) -> ConnectorType {
         switch csl {
         case "personal_communication": return ConnectorType(itemType: "letter", genre: true, recipient: true)
-        case "manuscript": return ConnectorType(itemType: "manuscript", genre: true, place: true)
+        case "report": return ConnectorType(itemType: "report", genre: true, place: true)
+        case "speech": return ConnectorType(itemType: "presentation", genre: true, place: true, archive: false,
+                                            authorType: "presenter")
         case "article-newspaper": return ConnectorType(itemType: "newspaperArticle", place: true, publication: true)
         case "article-magazine": return ConnectorType(itemType: "magazineArticle", publication: true)
         case "article-journal": return ConnectorType(itemType: "journalArticle", publication: true)
@@ -43,9 +47,10 @@ extension ZoteroExport {
     static func connectorItem(csl: [String: Any], subjects: [String]) -> [String: Any] {
         let type = connectorType(csl: csl["type"] as? String ?? "document")
         var out: [String: Any] = ["id": csl["id"] ?? "", "itemType": type.itemType]
-        var fields: [(String, String)] = [("title", "title"), ("archive", "archive"),
-                                          ("archive_location", "archiveLocation"), ("call-number", "callNumber"),
-                                          ("note", "extra"), ("URL", "url")]
+        var fields: [(String, String)] = [("title", "title"), ("note", "extra"), ("URL", "url")]
+        if type.archive {
+            fields += [("archive", "archive"), ("archive_location", "archiveLocation"), ("call-number", "callNumber")]
+        }
         if type.genre { fields.append(("genre", "type")) }
         if type.place { fields.append(("publisher-place", "place")) }
         if type.publication { fields.append(("container-title", "publicationTitle")) }

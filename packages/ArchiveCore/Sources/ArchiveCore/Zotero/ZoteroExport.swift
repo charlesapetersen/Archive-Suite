@@ -58,7 +58,7 @@ public enum ZoteroExport {
         var genre: String?
         /// Zotero's `recipient` creator type (Letter only).
         var recipient = false
-        /// `publisher-place`: the place the document was written, on the unpublished types.
+        /// `publisher-place`: the place the document was written, on the types whose Place is not a publisher's.
         var authorPlace = false
         /// `container-title`.
         var publication = false
@@ -68,18 +68,21 @@ public enum ZoteroExport {
         var kindInExtra = false
         /// The Zotero type has no field for the genre (Document): it goes into Extra as the CSL variable as well.
         var genreInExtra = false
+        /// The Zotero type has no archive fields (Presentation): they go into Extra as the CSL variables as well.
+        var archiveInExtra = false
     }
 
-    /// The item-field kinds (SPEC tag-format §Item fields) by their Zotero type: letters and telegrams as Letter,
-    /// memos, reports and speeches as Manuscript (unpublished, and kept with their archive fields), the articles as
-    /// their article types, a clipping or newsletter as a newspaper or magazine article, a photograph as Artwork.
+    /// The item-field kinds (SPEC tag-format §Item fields) by the closest type in Zotero 10.0.9's schema: letters,
+    /// telegrams and memos as Letter (Letter Type Telegram or Memo), a report as Report, a speech as Presentation
+    /// (Presentation Type Speech), the articles as their article types, a clipping or newsletter as a newspaper or
+    /// magazine article, a photograph as Artwork. A press release, and anything with no kind, is the generic Document.
     static func typeMap(kind: String?, format: String?) -> TypeMap {
         switch kind?.lowercased() {
         case "letter": return TypeMap(csl: "personal_communication", recipient: true)
         case "telegram": return TypeMap(csl: "personal_communication", genre: "Telegram", recipient: true)
-        case "memo": return TypeMap(csl: "manuscript", genre: "Memo", authorPlace: true)
-        case "report": return TypeMap(csl: "manuscript", genre: "Report", authorPlace: true)
-        case "speech": return TypeMap(csl: "manuscript", genre: "Speech", authorPlace: true)
+        case "memo": return TypeMap(csl: "personal_communication", genre: "Memo", recipient: true)
+        case "report": return TypeMap(csl: "report", authorPlace: true)
+        case "speech": return TypeMap(csl: "speech", genre: "Speech", authorPlace: true, archiveInExtra: true)
         case "press release": return TypeMap(csl: "document", genre: "Press release", genreInExtra: true)
         case "newspaper article": return TypeMap(csl: "article-newspaper", publication: true)
         case "clipping": return TypeMap(csl: "article-newspaper", publication: true, kindInExtra: true)
@@ -112,10 +115,15 @@ public enum ZoteroExport {
         var item: [String: Any] = ["id": id ?? source.fileName, "type": map.csl]
         var extra: [String] = []
 
-        // The container (`ContainerCSL`); Zotero has no field for the collection or the repository's place, so those
-        // go into Extra as well, as the CSL variables Zotero reads from there.
+        // The container (`ContainerCSL`); Zotero has no field for the collection or the repository's place, nor
+        // Presentation for any archive field, so those go into Extra as well, as the CSL variables Zotero reads there.
         let container = ContainerCSL(shown: source.container)
         for (key, value) in container.variables { item[key] = value }
+        if map.archiveInExtra {
+            for key in ["archive", "archive_location", "call-number"] {
+                if let v = container.variables[key] { extra.append("\(key): \(v)") }
+            }
+        }
         if let v = container.variables["archive_collection"] { extra.append("archive_collection: \(v)") }
         if let v = container.variables["archive-place"] { extra.append("archive-place: \(v)") }
         extra += container.noteLines
@@ -144,8 +152,8 @@ public enum ZoteroExport {
             }
         }
 
-        // Places: the place a document was written fills the Zotero type's Place where it has one; a published
-        // piece's Place is its publisher's, so its author's place goes into Extra.
+        // Places: the place a document was written fills the Zotero type's Place where it has one (Report,
+        // Presentation); a published piece's Place is its publisher's, so its author's place goes into Extra.
         if !side.authorPlaces.isEmpty {
             let places = side.authorPlaces.joined(separator: "; ")
             if map.authorPlace { item["publisher-place"] = places } else { extra.append("Author place: \(places)") }

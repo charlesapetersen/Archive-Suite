@@ -356,10 +356,14 @@ into `note` as a line, never dropped.
   `Unknown` placeholder is no name; a sending place only with `quoted` evidence), else `author_name`, `recipient_name`,
   `author_location`; `recipient_location`, `publication_name` and `format` as written. Material that predates the apps
   carries only its tags and folders.
-- **Type** by the item-field kind: `letter` → `personal_communication` (Letter); `telegram` → the same, genre
-  Telegram; `memo`, `report`, `speech` → `manuscript`, genre Memo / Report / Speech; `press release` → `document`, genre
-  Press release; `newspaper article` and `clipping` → `article-newspaper`; `magazine article` and `newsletter` →
-  `article-magazine`; `journal article` → `article-journal`; `photograph` → `graphic` (Artwork), `medium` Photograph.
+- **Type** by the item-field kind, the closest type in Zotero 10.0.9's schema (`W47.ct-zotero-types`): `letter` →
+  `personal_communication` (Letter); `telegram` and `memo` → the same, genre (Letter Type) Telegram / Memo; `report`
+  → `report` (Report); `speech` → `speech` (Presentation), genre (Presentation Type) Speech; `press release` →
+  `document`, genre Press release; `newspaper article` and `clipping` → `article-newspaper`; `magazine article` and
+  `newsletter` → `article-magazine`; `journal article` → `article-journal`; `photograph` → `graphic` (Artwork),
+  `medium` Photograph. Document is the generic type for a kind with no match. Zotero's Presentation has no archive
+  fields, so a speech's `archive`, `archive_location` and `call-number` are also the first `note` lines, as the CSL
+  variables Zotero reads from Extra. Nothing gathered fills Report's Institution or Presentation's Meeting.
   With no kind, a `format` that names one exactly stands in; with none, or `other`, `document`, its genre the `format`
   when there is one. Zotero's Document has no genre field, so a Document's genre is also the `note` line
   `genre: <genre>`, the CSL variable Zotero reads from Extra. A clipping's or newsletter's kind goes into `note` as `Document kind: <kind>`, and a `format` the
@@ -368,8 +372,8 @@ into `note` as a line, never dropped.
   sender; each a CSL `literal` name, never split into given and family. A sender the byline does not name is
   `Sender: <names>` in `note`. **Recipient** = `recipient` on a Letter, else
   the `note` line `Recipient: <names>`.
-- **Places.** The sending place is `publisher-place` (Zotero's Place) on Manuscript; on every other type, Document
-  included (it has no Place), the `note` line `Author place: <places>`. The recipient's place is always `Recipient place: <places>` in `note`.
+- **Places.** The sending place is `publisher-place` (Zotero's Place) on Report and Presentation; on every other type
+  (Letter and Document have no Place, an article's is its publisher's) the `note` line `Author place: <places>`. The recipient's place is always `Recipient place: <places>` in `note`.
 - **Publication** = `container-title` on the article types, else `Publication: <name>` in `note`. The printed issue
   date is `Publication date: <date>` in `note`, never `issued` (FLD-6).
 - **`issued`** from the tags: `date-parts` to the precision they give, a decade as `literal` (`1970s`), and `circa`
@@ -378,7 +382,7 @@ into `note` as a line, never dropped.
   `Sent with: <wire value>` in `note`, with ` (uncertain)` when its uncertain tag is set.
 - **Subjects** (the tags' subjects, less `OCR Poor` and `OCR Failed`) as `keyword` for other CSL tools and as
   `Subjects: <a>; <b>` in `note`, which Zotero keeps. Add to Zotero (below) also sends them as tags.
-- **`note`** lines, in order: `archive_collection: …` and `archive-place: …` (CSL variables Zotero reads from Extra),
+- **`note`** lines, in order: a speech's archive lines (above), `archive_collection: …` and `archive-place: …` (CSL variables Zotero reads from Extra),
   `accession: …`, `series: …`, then the lines above, and last `File: <file name>`. Notes adds the source link as `URL`.
 
 ### Add to Zotero (W47.ct-zotero-tags)
@@ -391,7 +395,7 @@ answers 201. Nothing else is contacted.
 
 - **The items** (`ZoteroExport.connectorItems`) are in the translator form: what Zotero's importer
   (`itemFromCSLJSON`) makes of the export's CSL-JSON item, field for field (base field names, `creators` as
-  `{creatorType, lastName, fieldMode: 1}`, `date` as Zotero writes it: "1959", "March 1959", "March 12, 1959" or the
+  `{creatorType, lastName, fieldMode: 1}`, an author a Presentation's `presenter`, `date` as Zotero writes it: "1959", "March 1959", "March 12, 1959" or the
   literal), checked against Zotero 10.0.9's importer for every document kind; plus `tags`, one `{tag}` per subject.
   Extra keeps its `Subjects:` line, so the two routes carry the same text.
 - **Not running** (nothing answers on the port) and **refused** (any status but 201) are reported; a refused batch

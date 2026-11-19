@@ -100,18 +100,45 @@ final class ZoteroExportTests: XCTestCase {
         ])
     }
 
-    func testMemoKeepsItsPlaceAndPutsTheRecipientInExtra() {
+    func testMemoIsALetterWithItsRecipient() {
         var side = ZoteroSidecar()
         side.authors = ["J. Cannon"]
         side.recipients = ["Political Committee"]
         side.authorPlaces = ["New York"]
         let item = ZoteroExport.item(ZoteroSource(fileName: "m.pdf",
                                                   itemFields: PDFItemFields(documentKind: "memo"), sidecar: side))
-        XCTAssertEqual(item["type"] as? String, "manuscript")
+        XCTAssertEqual(item["type"] as? String, "personal_communication")
         XCTAssertEqual(item["genre"] as? String, "Memo")
-        XCTAssertEqual(item["publisher-place"] as? String, "New York")
-        XCTAssertNil(item["recipient"])
-        XCTAssertEqual(note(item), ["Recipient: Political Committee", "File: m.pdf"])
+        XCTAssertEqual((item["recipient"] as? [[String: String]])?.compactMap { $0["literal"] }, ["Political Committee"])
+        XCTAssertNil(item["publisher-place"], "Letter has no Place")
+        XCTAssertEqual(note(item), ["Author place: New York", "File: m.pdf"])
+    }
+
+    func testReportAndSpeechTakeTheirOwnTypesAndPlaces() {
+        var side = ZoteroSidecar()
+        side.authors = ["J. Hansen"]
+        side.recipients = ["Convention"]
+        side.authorPlaces = ["Detroit"]
+        let report = ZoteroExport.item(ZoteroSource(fileName: "r.pdf", itemFields: PDFItemFields(documentKind: "report"),
+                                                    sidecar: side, container: glotzer))
+        XCTAssertEqual(report["type"] as? String, "report")
+        XCTAssertNil(report["genre"], "the type says Report")
+        XCTAssertEqual(report["publisher-place"] as? String, "Detroit")
+        XCTAssertEqual(report["archive"] as? String, "Hoover Institution Archives")
+        XCTAssertEqual(note(report), ["archive_collection: Albert Glotzer Papers", "archive-place: Stanford, CA",
+                                      "accession: 91006", "Recipient: Convention", "File: r.pdf"])
+
+        let speech = ZoteroExport.item(ZoteroSource(fileName: "s.pdf", itemFields: PDFItemFields(documentKind: "speech"),
+                                                    sidecar: side, container: glotzer))
+        XCTAssertEqual(speech["type"] as? String, "speech")
+        XCTAssertEqual(speech["genre"] as? String, "Speech")
+        XCTAssertEqual(speech["publisher-place"] as? String, "Detroit")
+        XCTAssertEqual(speech["archive"] as? String, "Hoover Institution Archives", "kept for other CSL tools")
+        XCTAssertEqual(note(speech), ["archive: Hoover Institution Archives",
+                                      "archive_location: Box 17, Folder 8, Reports 1959-1960", "call-number: Mss 1036",
+                                      "archive_collection: Albert Glotzer Papers", "archive-place: Stanford, CA",
+                                      "accession: 91006", "Recipient: Convention", "File: s.pdf"],
+                       "Presentation has no archive fields")
     }
 
     func testClippingTakesByLinePublicationAndKeepsThePrintedDateApart() {
@@ -263,6 +290,9 @@ final class ZoteroExportTests: XCTestCase {
         var memo = ZoteroSidecar()
         memo.recipients = ["Political Committee"]
         memo.authorPlaces = ["New York"]
+        var speech = ZoteroSidecar()
+        speech.authors = ["J. Hansen"]
+        speech.authorPlaces = ["Detroit"]
         let sources = [
             ZoteroSource(fileName: "0004.pdf", tags: tags(["1959", "3 March", "Day 12", "Trotskyism"]),
                          itemFields: PDFItemFields(documentKind: "letter", recipientPlace: "Chicago"),
@@ -273,9 +303,13 @@ final class ZoteroExportTests: XCTestCase {
                 documentKind: "newspaper article", title: "Strike Spreads", byline: "A. Reporter",
                 publication: "The Militant", publicationDate: "June 3, 1946"), container: glotzer),
             ZoteroSource(fileName: "p.pdf", itemFields: PDFItemFields(documentKind: "photograph"), container: glotzer),
+            ZoteroSource(fileName: "r.pdf", tags: tags(["1959"]), itemFields: PDFItemFields(documentKind: "report"),
+                         sidecar: speech, container: glotzer),
+            ZoteroSource(fileName: "s.pdf", tags: tags(["1959"]), itemFields: PDFItemFields(documentKind: "speech"),
+                         sidecar: speech, container: glotzer),
         ]
         let items = try zoteroImport(ZoteroExport.export(sources))
-        XCTAssertEqual(items.count, 4)
+        XCTAssertEqual(items.count, 6)
         func creators(_ i: [String: Any]) -> [String] {
             (i["creators"] as? [[String: Any]] ?? []).map { "\($0["creatorType"] ?? ""): \($0["lastName"] ?? "")" }
         }
@@ -294,14 +328,14 @@ final class ZoteroExportTests: XCTestCase {
                                   "Subjects: Trotskyism", "File: 0004.pdf"])
 
         let m = items[1]
-        XCTAssertEqual(m["itemType"] as? String, "manuscript")
-        // A translator's item holds a base field by its base name; saving it fills the type's own field (Manuscript
+        XCTAssertEqual(m["itemType"] as? String, "letter")
+        // A translator's item holds a base field by its base name; saving it fills the type's own field (Letter
         // Type, Medium).
         XCTAssertEqual(m["type"] as? String, "Memo")
-        XCTAssertEqual(m["place"] as? String, "New York")
+        XCTAssertNil(m["place"])
         XCTAssertEqual(m["date"] as? String, "1960s")
-        XCTAssertEqual(creators(m), [])
-        XCTAssertEqual(extra(m), ["Recipient: Political Committee", "File: m.pdf"])
+        XCTAssertEqual(creators(m), ["recipient: Political Committee"])
+        XCTAssertEqual(extra(m), ["Author place: New York", "File: m.pdf"])
 
         let c = items[2]
         XCTAssertEqual(c["itemType"] as? String, "newspaperArticle")
@@ -316,6 +350,24 @@ final class ZoteroExportTests: XCTestCase {
         XCTAssertEqual(p["itemType"] as? String, "artwork")
         XCTAssertEqual(p["medium"] as? String, "Photograph")
         XCTAssertEqual(p["archive"] as? String, "Hoover Institution Archives")
+
+        let r = items[4]
+        XCTAssertEqual(r["itemType"] as? String, "report")
+        XCTAssertNil(r["type"])
+        XCTAssertEqual(r["place"] as? String, "Detroit")
+        XCTAssertEqual(creators(r), ["author: J. Hansen"])
+        XCTAssertEqual(r["archiveLocation"] as? String, "Box 17, Folder 8, Reports 1959-1960")
+        XCTAssertEqual(r["callNumber"] as? String, "Mss 1036")
+
+        let s = items[5]
+        XCTAssertEqual(s["itemType"] as? String, "presentation")
+        XCTAssertEqual(s["type"] as? String, "Speech")
+        XCTAssertEqual(s["place"] as? String, "Detroit")
+        XCTAssertEqual(creators(s), ["presenter: J. Hansen"])
+        for key in ["archive", "archiveLocation", "callNumber"] { XCTAssertNil(s[key], key) }
+        XCTAssertEqual(Array(extra(s).prefix(3)), ["archive: Hoover Institution Archives",
+                                                   "archive_location: Box 17, Folder 8, Reports 1959-1960",
+                                                   "call-number: Mss 1036"])
     }
 
     // MARK: Add to Zotero (W47.ct-zotero-tags)
@@ -450,8 +502,8 @@ final class ZoteroExportTests: XCTestCase {
             try await Task.sleep(nanoseconds: 500_000_000)
         }
         XCTAssertEqual(saved.count, sources.count)
-        // The API names a base field by the type's own name (Letter Type, Manuscript Type, Artwork's Medium).
-        let ownNames = ["type": ["letterType", "manuscriptType"], "medium": ["artworkMedium"]]
+        // The API names a base field by the type's own name (Letter, Report and Presentation Type, Artwork's Medium).
+        let ownNames = ["type": ["letterType", "reportType", "presentationType"], "medium": ["artworkMedium"]]
         for sent in ZoteroExport.connectorItems(sources) {
             let title = sent["title"] as? String
             guard let got = saved.first(where: { $0["title"] as? String == title }) else {

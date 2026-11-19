@@ -17009,3 +17009,18 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   The app does not read the gate's verdict or label (`LocalSegmenter.refusal` checks kit version, prompt and an anchor score only), as before this item; the label reaches the user through `check`'s output and the manifest.
   Tests: test_institutional_compute (tiny support passes labelled, 266 labelled, 267 unlabelled, a trailing small set still fails; one document labelled; 2 and 3 documents labelled, 10 not; rulings-only small set labelled) and test_kit_continuation (a small box and a few-long-documents box written with `small_heldout`); 88 + 17 tests pass with the shared torch-env Python. Two container tests fail only when the engine's `PYTHONPATH` (ops/autonomous/pyguard) leaks into them; they pass with it unset, before and after this change. No bench-cache scratch was made (the `kit-gate` cache the report reads is kept, it is the report's input).
   <!-- /W47.wh-kit-minimums -->
+- [x] **W47.ct-zotero-types — export each kind as its matching Zotero item type [S]** · §Archival containers — W47 (owner, 2026-10-21) · SHIPPED 2026-11-19
+  Owner, 2026-11-19: export to matching types; Document the generic type. Each item-field kind now goes to the closest
+  type in Zotero 10.0.9's schema (read from the installed app's schema.json): letter, telegram and memo → Letter
+  (Letter Type Telegram / Memo; a memo keeps its recipient as a creator, where Manuscript put it in Extra, and its
+  place moves to Extra since Letter has none); report → CSL `report` / Zotero Report (place in Place); speech → CSL
+  `speech` / Presentation (Presentation Type Speech, place in Place, the author as presenter). Presentation has no
+  archive fields, so a speech's archive, archive_location and call-number are also Extra lines in CSL-variable form.
+  Press release stays the generic Document (no Zotero type for it); articles, clipping, newsletter, photograph
+  unchanged. Nothing gathered fills Report's Institution or Presentation's Meeting, so they stay empty. Both routes
+  (ZoteroExport.typeMap for the CSL-JSON, ZoteroConnector.connectorType for Add to Zotero). Checked: ZoteroExportTests
+  21 run, 0 failures, the importer cross-check (every kind, field for field against Zotero 10.0.9's itemFromCSLJSON)
+  included; live on the VM's scratch Zotero 10.0.9 (vm-zotero-live.sh), every kind saved and read back. SPEC
+  containers.md §Zotero "Type", "Places", "note" updated. ArchiveCore's public API is unchanged (internal types only),
+  so the app bundles were not rebuilt. $0 spent. No bench cache used. No migration: nothing to migrate.
+  <!-- /W47.ct-zotero-types -->
