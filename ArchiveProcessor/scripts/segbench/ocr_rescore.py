@@ -11,6 +11,7 @@ without the three agreement letters) and the 895 frozen public pages (corpus/rou
            FarmShare truth96 routes and the 2026-10-18 owner99 runs (CHURRO, Qwen3.5-27B), from FARMSHARE.
   the 895  the two reference routes and Apple Vision (bench-corpus/routes), the kraken specialists, the open
            sweep's eleven routes and the 2026-10-18 CHURRO, Qari and Fanar runs, from FARMSHARE.
+           Gemini 4 Hydrogen through AI Studio (gemini4-hydrogen-96/low), W46.gemini4-hydrogen-96.
   both     Gemini 3.7 Flash through the Stanford gateway (gateway-gemini/panel, gemini37-public/responses), and
            W46.ocr-new-open's three Sherlock routes (Xiaomi-OCR-0, PaddleOCR-VL 1.6, Qwen3.8 27B) and
            W46.ocr-new-open-sherlock's Infinity-Parser2-Pro, from
@@ -59,6 +60,7 @@ PRESERVE = ('L2', 'L5', 'L6', 'L7', 'L8')   # strata whose strict score keeps lo
 SECOND_READER = 'apple-vision'
 SECOND_FOR_VISION = 'gemini3.8-flash'
 GATEWAY_ROUTE = 'gemini3.7-flash-gw'   # Gemini 3.7 Flash through the Stanford gateway, on both sets
+HYDROGEN_ROUTE = 'gemini4-hydrogen'    # Gemini 4 Hydrogen through AI Studio, the 96 only (W46.gemini4-hydrogen-96)
 
 T96 = FARMSHARE / 'FarmShare-truth96-20261020/outputs'
 TRUTH96_ROUTES = [  # label, folder under T96, mode (farmshare_truth96.py's)
@@ -166,6 +168,9 @@ def owner_sources():
     gw = CACHE / 'gateway-gemini/panel'   # W46.fix-ocr-scorers-paid's reading of the 96 (gateway_gemini.py panel)
     if gw.is_dir():
         out[(GATEWAY_ROUTE, 'gateway')] = {p: _gateway(gw / f'{p}-original.json') for p in pages}
+    h = CACHE / 'gemini4-hydrogen-96/low'   # W46.gemini4-hydrogen-96 (ocr_hydrogen96.py panel; same reply format)
+    if h.is_dir():
+        out[(HYDROGEN_ROUTE, 'AI Studio')] = {p: _gateway(h / f'{p}-original.json') for p in pages}
     return out
 
 
@@ -507,11 +512,43 @@ PAGE_FIELDS = ['set', 'route', 'family', 'page', 'stratum', 'ok', 'nes', 'truth_
                'suspect_not_truth', 'not_truth']
 
 
+def merge(out: Path, route: str):
+    """W46.gemini4-hydrogen-96: one route's owner96 rows, scored as a full run scores them (Apple Vision the suspect
+    check's second reader), replace that route's rows in ocr-scorers.json and -pages.csv; the report is rewritten from
+    the merged summary and the saved restoration rows."""
+    src = owner_sources()
+    if not any(k[0] == route for k in src):
+        raise SystemExit(f'{route}: no saved readings on the 96')
+    keep = [r['page'] for r in P.rows() if r['page'] not in P.AGREEMENT]
+    rows = [r for r in score_set('owner96', src, lambda p: (P.TRUTH / 'truth' / f'{p}.txt').read_text(),
+                                 lambda p: 'S0', lambda t: keep) if r['route'] == route]
+    old = json.loads((out / 'ocr-scorers.json').read_text())
+    summary = [r for r in old['summary'] if not (r['set'] == 'owner96' and r['route'] == route)] + summarise(rows)
+    (out / 'ocr-scorers.json').write_text(json.dumps({**old, 'summary': summary}, indent=1))
+    with (out / 'ocr-scorers-pages.csv').open(newline='') as f:
+        prior = [r for r in csv.DictReader(f) if not (r['set'] == 'owner96' and r['route'] == route)]
+    with (out / 'ocr-scorers-pages.csv').open('w', newline='') as f:
+        w = csv.DictWriter(f, PAGE_FIELDS, extrasaction='ignore')
+        w.writeheader()
+        w.writerows(prior)
+        for r in rows:
+            w.writerow({k: (f'{v:.6f}' if isinstance(v, float) else v) for k, v in r.items()})
+    n = lambda s: len({(r['route'], r['family']) for r in summary if r['set'] == s})
+    write_md(out / 'ocr-scorers.md', summary, old['restoration_only'],
+             f'The 96: {n("owner96")} routes. The 895: {n("public895")} routes.')
+    print(f'{route}: {len(rows)} page scores merged -> {out}')
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--out', type=Path, default=RESULTS)
     ap.add_argument('--only', choices=['owner', 'public'])
+    ap.add_argument('--merge', metavar='ROUTE',
+                    help="score only ROUTE on the 96 and merge its rows into the existing files, leaving every other "
+                         "row as it is (for when a source folder has moved off this Mac and a full run would drop it)")
     a = ap.parse_args()
+    if a.merge:
+        return merge(a.out, a.merge)
     rows, counts = [], []
     truth_owner = lambda p: (P.TRUTH / 'truth' / f'{p}.txt').read_text()
     if a.only != 'public':

@@ -1,0 +1,1834 @@
+{
+ "model": "gemini-4-hydrogen",
+ "model_version_returned": [
+  "gemini-4-hydrogen"
+ ],
+ "arm": "low (thinkingLevel low, temperature 0, 8,192 output tokens, default media resolution)",
+ "second_arm": "not run: the low arm spent $1.1286 of the $2.00 cap, and the default (dynamic) thinking is expected to spend at least as many thinking tokens as low (not measured), so a second arm of the same pages would pass the cap",
+ "headline95": {
+  "gemini4-hydrogen": 0.9690375726204796,
+  "gemini3.8-flash": 0.964707333432243,
+  "qwen3.6-27b": 0.9538375377885339
+ },
+ "service_tiers": [
+  "standard"
+ ],
+ "all96": {
+  "gemini4-hydrogen": {
+   "pages": 96,
+   "answered": 96,
+   "nes_answered": 0.9688955658566879,
+   "nes_all": 0.9688955658566879,
+   "kind_right": 93
+  },
+  "gemini3.8-flash": {
+   "pages": 96,
+   "answered": 94,
+   "nes_answered": 0.964424280099674,
+   "nes_all": 0.9443321075975973,
+   "kind_right": 87
+  },
+  "qwen3.6-27b": {
+   "pages": 96,
+   "answered": 95,
+   "nes_answered": 0.9534259238470003,
+   "nes_all": 0.9434944038069274,
+   "kind_right": 86
+  }
+ },
+ "by_kind": {
+  "handwritten": {
+   "gemini4-hydrogen": {
+    "pages": 16,
+    "answered": 16,
+    "nes_answered": 0.9464556543605458,
+    "nes_all": 0.9464556543605458,
+    "kind_right": 16
+   },
+   "gemini3.8-flash": {
+    "pages": 16,
+    "answered": 16,
+    "nes_answered": 0.9581102963099426,
+    "nes_all": 0.9581102963099426,
+    "kind_right": 15
+   },
+   "qwen3.6-27b": {
+    "pages": 16,
+    "answered": 16,
+    "nes_answered": 0.9261108074708119,
+    "nes_all": 0.9261108074708119,
+    "kind_right": 12
+   }
+  },
+  "mixed": {
+   "gemini4-hydrogen": {
+    "pages": 2,
+    "answered": 2,
+    "nes_answered": 0.7575506254751538,
+    "nes_all": 0.7575506254751538,
+    "kind_right": 0
+   },
+   "gemini3.8-flash": {
+    "pages": 2,
+    "answered": 2,
+    "nes_answered": 0.7706242302692834,
+    "nes_all": 0.7706242302692834,
+    "kind_right": 1
+   },
+   "qwen3.6-27b": {
+    "pages": 2,
+    "answered": 2,
+    "nes_answered": 0.7200298780321428,
+    "nes_all": 0.7200298780321428,
+    "kind_right": 1
+   }
+  },
+  "printed": {
+   "gemini4-hydrogen": {
+    "pages": 28,
+    "answered": 28,
+    "nes_answered": 0.962708289479518,
+    "nes_all": 0.962708289479518,
+    "kind_right": 27
+   },
+   "gemini3.8-flash": {
+    "pages": 28,
+    "answered": 26,
+    "nes_answered": 0.9391655431147529,
+    "nes_all": 0.8720822900351276,
+    "kind_right": 25
+   },
+   "qwen3.6-27b": {
+    "pages": 28,
+    "answered": 28,
+    "nes_answered": 0.9481867524935138,
+    "nes_all": 0.9481867524935138,
+    "kind_right": 27
+   }
+  },
+  "typewritten": {
+   "gemini4-hydrogen": {
+    "pages": 50,
+    "answered": 50,
+    "nes_answered": 0.9879950099219298,
+    "nes_all": 0.9879950099219298,
+    "kind_right": 50
+   },
+   "gemini3.8-flash": {
+    "pages": 50,
+    "answered": 50,
+    "nes_answered": 0.9873313001377626,
+    "nes_all": 0.9873313001377626,
+    "kind_right": 46
+   },
+   "qwen3.6-27b": {
+    "pages": 50,
+    "answered": 49,
+    "nes_answered": 0.974865326939783,
+    "nes_all": 0.9553680204009873,
+    "kind_right": 46
+   }
+  }
+ },
+ "hands16": {
+  "gemini4-hydrogen": {
+   "pages": 16,
+   "answered": 16,
+   "nes_answered": 0.9464556543605458,
+   "nes_all": 0.9464556543605458,
+   "kind_right": 16
+  },
+  "gemini3.8-flash": {
+   "pages": 16,
+   "answered": 16,
+   "nes_answered": 0.9581102963099426,
+   "nes_all": 0.9581102963099426,
+   "kind_right": 15
+  },
+  "qwen3.6-27b": {
+   "pages": 16,
+   "answered": 16,
+   "nes_answered": 0.9261108074708119,
+   "nes_all": 0.9261108074708119,
+   "kind_right": 12
+  }
+ },
+ "paired": {
+  "hydrogen_minus_38": {
+   "n": 94,
+   "delta": 0.005394753980756306,
+   "p": 0.4062593740625937,
+   "lo": -0.00400585066293075,
+   "hi": 0.017716187930665588,
+   "verdict": "tie"
+  },
+  "hydrogen_minus_qwen": {
+   "n": 95,
+   "delta": 0.015433653153460816,
+   "p": 0.145985401459854,
+   "lo": -0.0047967106299342185,
+   "hi": 0.03508734557732872,
+   "verdict": "tie"
+  },
+  "hands_hydrogen_minus_38": {
+   "n": 16,
+   "delta": -0.011654641949396832,
+   "p": 0.48025197480251974,
+   "lo": -0.03855640825124682,
+   "hi": 0.006309655736660626,
+   "verdict": "tie"
+  }
+ },
+ "tokens": {
+  "prompt": 140231,
+  "output": 45699,
+  "thinking": 72089
+ },
+ "calls": 96,
+ "cost_96": 1.093762,
+ "per_1000": 11.393354166666667,
+ "old_per_1000_intro": 3.2201328124999997,
+ "old_per_1000_jan2027": 6.440265624999999,
+ "wall_s_median": 6.2715,
+ "old_wall_s_median": 4.781499999999999,
+ "item_spent": 1.128571,
+ "price": [
+  1.5,
+  7.5
+ ],
+ "read_on": "2026-11-18",
+ "pages_detail": {
+  "p001": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9605188945290468,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9605188945290468,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9605188945290468,
+    "kind_right": true
+   }
+  },
+  "p002": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": false
+   }
+  },
+  "p003": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9984105960264901,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9984105960264901,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.8256832050941895,
+    "kind_right": true
+   }
+  },
+  "p004": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9994242947610823,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p005": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9928693667997718,
+    "kind_right": true
+   }
+  },
+  "p006": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p007": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9894179894179894,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9654255319148937,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9315789473684211,
+    "kind_right": true
+   }
+  },
+  "p008": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9994129732902847,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9994129732902847,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9609397944199707,
+    "kind_right": true
+   }
+  },
+  "p009": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.5480682839173405,
+    "kind_right": false
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.548683404776485,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.46617915904936014,
+    "kind_right": true
+   }
+  },
+  "p010": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9994487320837927,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9991730981256891,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9991730981256891,
+    "kind_right": true
+   }
+  },
+  "p011": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.7904564315352697,
+    "kind_right": false
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.7846790890269151,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.7904564315352697,
+    "kind_right": false
+   }
+  },
+  "p012": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p013": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.7925773195876289,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.7665979381443299,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.7863917525773196,
+    "kind_right": false
+   }
+  },
+  "p014": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9991511035653651,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9906621392190152,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9906621392190152,
+    "kind_right": true
+   }
+  },
+  "p015": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9695121951219512,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9438430311231394,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9047292666209733,
+    "kind_right": true
+   }
+  },
+  "p016": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9955654101995566,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9782135076252724,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9944567627494457,
+    "kind_right": true
+   }
+  },
+  "p017": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9938817131203264,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9918422841604351,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9898028552005439,
+    "kind_right": true
+   }
+  },
+  "p018": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.8706382978723404,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": false,
+    "nes": 0.0,
+    "kind_right": null
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.8548936170212766,
+    "kind_right": true
+   }
+  },
+  "p019": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9915611814345991,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9915611814345991,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9746835443037974,
+    "kind_right": true
+   }
+  },
+  "p020": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9811954331766286,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9738955823293173,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9691067830758898,
+    "kind_right": true
+   }
+  },
+  "p021": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p022": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.998162890385793,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9975490196078431,
+    "kind_right": false
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9957107843137255,
+    "kind_right": false
+   }
+  },
+  "p023": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9992852037169406,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9985714285714286,
+    "kind_right": false
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": false
+   }
+  },
+  "p024": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9723145071982281,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9723145071982281,
+    "kind_right": false
+   },
+   "qwen3.6-27b": {
+    "ok": false,
+    "nes": 0.0,
+    "kind_right": null
+   }
+  },
+  "p025": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9975124378109452,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.47117794486215536,
+    "kind_right": true
+   }
+  },
+  "p026": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9959046909903202,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9959046909903202,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9955323901712584,
+    "kind_right": true
+   }
+  },
+  "p027": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9414595028067362,
+    "kind_right": true
+   }
+  },
+  "p028": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9992144540455616,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9992144540455616,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.997643362136685,
+    "kind_right": true
+   }
+  },
+  "p029": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9978009895547004,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9978009895547004,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9900826446280991,
+    "kind_right": true
+   }
+  },
+  "p030": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9950402975821451,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9919404835709857,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9845009299442034,
+    "kind_right": true
+   }
+  },
+  "p031": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.967032967032967,
+    "kind_right": false
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9925650557620818,
+    "kind_right": false
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9738805970149254,
+    "kind_right": false
+   }
+  },
+  "p032": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9985422740524781,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p033": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9991220368744512,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9982448442299254,
+    "kind_right": true
+   }
+  },
+  "p034": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.3988439306358381,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.21965317919075145,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9884393063583815,
+    "kind_right": true
+   }
+  },
+  "p035": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9994229659549914,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p036": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p037": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9996865203761756,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9971786833855799,
+    "kind_right": true
+   }
+  },
+  "p039": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p040": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9956663055254604,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9967462039045553,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9548793284365162,
+    "kind_right": true
+   }
+  },
+  "p041": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9953645174884113,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9953645174884113,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9932574799831437,
+    "kind_right": true
+   }
+  },
+  "p042": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.997164667393675,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.989938757655293,
+    "kind_right": true
+   }
+  },
+  "p043": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9993630573248408,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9997876857749469,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9944786578891485,
+    "kind_right": true
+   }
+  },
+  "p044": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9997488068324542,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9997488068324542,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9881939211253454,
+    "kind_right": true
+   }
+  },
+  "p045": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9948805460750854,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9931740614334471,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9965870307167235,
+    "kind_right": true
+   }
+  },
+  "p046": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9822485207100592,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9921722113502935,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.903353057199211,
+    "kind_right": true
+   }
+  },
+  "p047": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9322834645669291,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9212598425196851,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.8976377952755905,
+    "kind_right": true
+   }
+  },
+  "p048": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.8132678132678133,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.8648648648648649,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.8648648648648649,
+    "kind_right": false
+   }
+  },
+  "p049": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9341085271317829,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9396887159533074,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9027237354085603,
+    "kind_right": true
+   }
+  },
+  "p050": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.7427652733118971,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.924904214559387,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.840032154340836,
+    "kind_right": true
+   }
+  },
+  "p051": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9961089494163424,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9845857418111753,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9587242026266416,
+    "kind_right": false
+   }
+  },
+  "p052": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9903498190591074,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9879372738238842,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9843184559710495,
+    "kind_right": true
+   }
+  },
+  "p053": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9852034525277436,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9741060419235512,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9531442663378545,
+    "kind_right": true
+   }
+  },
+  "p054": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9019607843137255,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9287925696594427,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.810838445807771,
+    "kind_right": true
+   }
+  },
+  "p055": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9371428571428572,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9371428571428572,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9885714285714285,
+    "kind_right": false
+   }
+  },
+  "p056": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9802110817941952,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9775725593667546,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9300791556728232,
+    "kind_right": true
+   }
+  },
+  "p057": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9455445544554455,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p058": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9981325863678805,
+    "kind_right": true
+   }
+  },
+  "p059": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9949409780775716,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p060": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p061": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9995782370307887,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9995782370307887,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9995782370307887,
+    "kind_right": true
+   }
+  },
+  "p062": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9865792759051186,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9868913857677902,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.968789013732834,
+    "kind_right": true
+   }
+  },
+  "p063": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": false
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9997297297297297,
+    "kind_right": true
+   }
+  },
+  "p064": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p065": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9939577039274925,
+    "kind_right": true
+   }
+  },
+  "p066": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9713603818615751,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p067": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p068": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9967727063162748,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9967727063162748,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9995389580451821,
+    "kind_right": true
+   }
+  },
+  "p069": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9937965260545906,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9937965260545906,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p070": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9930966469428008,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9935515873015873,
+    "kind_right": false
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9935515873015873,
+    "kind_right": true
+   }
+  },
+  "p071": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9996914532551682,
+    "kind_right": true
+   }
+  },
+  "p072": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9903071875932001,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9955062911923307,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9743551289742052,
+    "kind_right": true
+   }
+  },
+  "p073": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p074": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9803468208092485,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": false,
+    "nes": 0.0,
+    "kind_right": null
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9803468208092485,
+    "kind_right": true
+   }
+  },
+  "p075": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9981458590852905,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9975308641975309,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9993819530284301,
+    "kind_right": true
+   }
+  },
+  "p076": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9413995174077904,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9410954185325525,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9420489824077268,
+    "kind_right": true
+   }
+  },
+  "p077": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9908571428571429,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9897377423033067,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.967391304347826,
+    "kind_right": true
+   }
+  },
+  "p078": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9948177578165486,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9948177578165486,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.7959923993781309,
+    "kind_right": true
+   }
+  },
+  "p079": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9994714587737844,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p080": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9416666666666667,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9331926863572433,
+    "kind_right": true
+   }
+  },
+  "p081": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9554049232964681,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9381003201707577,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.914734213342847,
+    "kind_right": true
+   }
+  },
+  "p082": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.5684210526315789,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.5964912280701755,
+    "kind_right": true
+   }
+  },
+  "p083": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9877922077922078,
+    "kind_right": true
+   }
+  },
+  "p084": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9962546816479401,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9993734335839599,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9887218045112782,
+    "kind_right": true
+   }
+  },
+  "p085": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9995150339476236,
+    "kind_right": true
+   }
+  },
+  "p087": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p088": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9804804804804805,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9943904263275991,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9887387387387387,
+    "kind_right": true
+   }
+  },
+  "p089": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.99308142629058,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.99308142629058,
+    "kind_right": false
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9925492283129325,
+    "kind_right": true
+   }
+  },
+  "p090": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9989109719575279,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9959261271048343,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9978195693649495,
+    "kind_right": true
+   }
+  },
+  "p091": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9989148128052089,
+    "kind_right": true
+   }
+  },
+  "p092": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p093": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9934613812832039,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.991826726604005,
+    "kind_right": true
+   }
+  },
+  "p095": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.9995164410058027,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9995164410058027,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9990333494441759,
+    "kind_right": true
+   }
+  },
+  "p097": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9939226519337017,
+    "kind_right": true
+   }
+  },
+  "p098": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9980449657869013,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9990205680705191,
+    "kind_right": true
+   }
+  },
+  "p099": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9986338797814208,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 1.0,
+    "kind_right": true
+   }
+  },
+  "p100": {
+   "gemini4-hydrogen": {
+    "ok": true,
+    "nes": 0.8519078201737816,
+    "kind_right": true
+   },
+   "gemini3.8-flash": {
+    "ok": true,
+    "nes": 0.9561435302645886,
+    "kind_right": true
+   },
+   "qwen3.6-27b": {
+    "ok": true,
+    "nes": 0.9031047424087342,
+    "kind_right": true
+   }
+  }
+ }
+}

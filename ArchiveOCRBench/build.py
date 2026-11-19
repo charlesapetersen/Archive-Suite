@@ -35,6 +35,9 @@ LOCAL_CSV = RESULTS / "ocr-panel-local-groups.csv"
 GATEWAY_MD = RESULTS / "gemini37-vs-38.md"  # W46.fix-ocr-scorers-paid: gateway_gemini.py report, Gemini 3.7 Flash
 GATEWAY_CSV = RESULTS / "gemini37-vs-38-groups.csv"
 GATEWAY_ROUTES = {"gemini3.7-flash-gw"}
+HYDROGEN_MD = RESULTS / "gemini4-hydrogen-96.md"  # W46.gemini4-hydrogen-96: ocr_hydrogen96.py report, the 96 only
+HYDROGEN_CSV = RESULTS / "gemini4-hydrogen-96-groups.csv"
+HYDROGEN_ROUTES = {"gemini4-hydrogen"}  # read after the cascades were built, so left out of them like the gateway's
 # W46.ocr-new-open's Mac readers and W46.ocr-new-open-boxes's granite-docling, added after the difficulty fit was built:
 # on the headline and speed tables, not in the fit.
 LATE_MAC_ROUTES = {"xiaomi-ocr-0-bf16", "paddleocr-vl1.6-bf16", "granite-docling-258m-mlx", "apple-fm-27",
@@ -1449,6 +1452,12 @@ def main():
         overall[rid] = [float(cells[2]), int(done), int(total)]
         std[rid] = dollars_per_1000(cells[-1])  # an estimate: the gateway returns no cost (the route's name says so)
         panel[rid] = "cloud"
+    for cells in table_after(HYDROGEN_MD.read_text(), "## Original pages"):
+        rid = route_id(cells[0])
+        done, _, total = cells[1].split("/")
+        overall[rid] = [float(cells[2]), int(done), int(total)]
+        std[rid] = dollars_per_1000(cells[-1])  # the billed tokens at Google's list price: AI Studio returns no cost
+        panel[rid] = "cloud"
     for cells in table_after(local_md, "## Original pages"):
         rid = route_id(cells[0])
         done, _, total = cells[1].split("/")
@@ -1467,7 +1476,7 @@ def main():
         sys.exit(f"no price for: {[k for k, v in std.items() if v is None]}")
 
     kinds = {}
-    for path, key in ((CLOUD_CSV, "route"), (LOCAL_CSV, "model"), (GATEWAY_CSV, "route")):
+    for path, key in ((CLOUD_CSV, "route"), (LOCAL_CSV, "model"), (GATEWAY_CSV, "route"), (HYDROGEN_CSV, "route")):
         with path.open(newline="") as f:
             for row in csv.DictReader(f):
                 if row["attribute"] == "kind" and row[key] in names:
@@ -1575,7 +1584,7 @@ def main():
 
     # The difficulty and cascade analysis reads ocr-pages.csv's per-page rows. Its cascades are built from the routes
     # an app user could run; the later gateway reading of Gemini 3.7 Flash and the late Mac readers are left out of them.
-    app_routes = [r["id"] for r in routes if r["panel"] != "farmshare" and r["id"] not in GATEWAY_ROUTES | LATE_MAC_ROUTES
+    app_routes = [r["id"] for r in routes if r["panel"] != "farmshare" and r["id"] not in GATEWAY_ROUTES | HYDROGEN_ROUTES | LATE_MAC_ROUTES
                   and not r["id"].startswith(("gw-regions-", "dewarp-", "enh-", "colour-"))]
     # ocr-pages.csv now holds every whole-page route (W46.ocr-rescore-offline); the difficulty fit keeps the 28 routes
     # and the FarmShare Qwen run it was built on, so its figures do not move with the headline table's additions.

@@ -33,8 +33,12 @@ BENCH_INPUTS = P.RESULTS.parents[1] / 'ArchiveOCRBench' / 'data' / 'inputs.json'
 # with a run), from its committed pages.csv, and Gemini 3.7 Flash's gateway reading of the 96 (gateway_gemini.py).
 FARMSHARE_TRUTH = P.RESULTS / 'farmshare' / 'truth'
 GATEWAY_ROUTE, GATEWAY = 'gemini3.7-flash-gw', CACHES / 'gateway-gemini' / 'panel'
+# W46.gemini4-hydrogen-96: Gemini 4 Hydrogen through AI Studio on the personal key (ocr_hydrogen96.py).
+HYDROGEN_ROUTE, HYDROGEN = 'gemini4-hydrogen', CACHES / 'gemini4-hydrogen-96' / 'low'
 MAC = ('qwen3-vl-8b-mlx4', 'lightonocr-3-4b-mlx8', 'qwen3.5-9b-mlx4', 'xiaomi-ocr-0-bf16', 'paddleocr-vl1.6-bf16',
        'granite-docling-258m-mlx')
+# W46.licence-freed-sweep's Mac readers: read like MAC, but not among the CHEAP pairs, which predate them.
+MAC_LATE = ('hunyuanocr-1.5-bf16', 'fastvlm-0.5b-bf16')
 # The cheap readers whose texts are compared pairwise: free, or $1 or less per 1,000 pages on the bench.
 CHEAP = ('apple-vision', *MAC, 'qwen3.5-9b', 'mistral-small-24b', 'gemma4-31b', 'gemma4-26b-a4b', 'qwen3.6-35b-a3b',
          'qwen3.8-flash', 'qwen3.5-35b-a3b', 'qwen3-vl-30b-a3b')
@@ -112,10 +116,14 @@ def reading(route, job):
         import gateway_gemini as G
         got = load(GATEWAY / (job + '.json'))
         return G.parsed(got), got.get('meta') or {}
+    if route == HYDROGEN_ROUTE:
+        import ocr_hydrogen96 as H
+        got = load(HYDROGEN / (job + '.json'))
+        return H.parsed(got), got.get('meta') or {}
     if route == 'apple-vision':
         f = LOCAL / 'vision' / (job + '.txt')
         return ({'text': f.read_text(), 'kind': None} if f.exists() else None), {}
-    if route in MAC:
+    if route in MAC + MAC_LATE:
         got = load(LOCAL / 'local' / route / (job + '.json'))
     elif route == 'mistral-ocr-4-1':
         text = load(CLOUD / 'mistral' / (job + '.json')).get('text') or ''
@@ -167,7 +175,13 @@ def main():
                 row = {**s, 'ok': bool(parsed), 'cost': meta.get('cost', 0),
                        'completion_tokens': (meta.get('usage') or {}).get('completion_tokens'),
                        'finish': meta.get('finish', '')}
-            elif route in MAC:
+            elif route == HYDROGEN_ROUTE:   # thinking is billed as output, so it counts in the output tokens
+                s = S.score(truth[p], parsed['text'] if parsed else '')
+                u = meta.get('usage') or {}
+                row = {**s, 'ok': bool(parsed), 'cost': meta.get('cost', 0),
+                       'completion_tokens': (u.get('candidatesTokenCount') or 0) + (u.get('thoughtsTokenCount') or 0),
+                       'finish': meta.get('finish', '')}
+            elif route in MAC + MAC_LATE:
                 s = S.score(truth[p], parsed['text'] if parsed else '')
                 row = {**s, 'ok': bool(parsed), 'cost': 0, 'completion_tokens': meta.get('completion_tokens'),
                        'finish': meta.get('finish', '')}
