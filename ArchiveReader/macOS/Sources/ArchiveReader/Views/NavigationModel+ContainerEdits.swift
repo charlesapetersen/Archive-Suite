@@ -291,6 +291,19 @@ extension NavigationModel {
         selection = Set(match.map(\.id))
     }
 
+    /// A warning's Show in the Library health list (W49.reader-ct-warnings-all): the file it starts at is selected
+    /// where the list is; one in another folder or hidden by a filter is shown in All Files, as Show in All Files does.
+    func showContainerWarning(_ row: ContainerWarningRow) {
+        if displayed.contains(where: { $0.path == row.startPath }) { return selectContainerWarning(row) }
+        let files = library.files.filter { $0.path == row.startPath }
+        guard !files.isEmpty else {
+            statusMessage = "“\(row.start)” is no longer in the library."
+            announce(statusMessage)
+            return
+        }
+        showInAllFiles(ids: Set(files.map(\.id)), files: files)
+    }
+
     // MARK: Writing
 
     /// The tree, the directory below it and the name of a file the editor may edit; nil (with the reason shown) when

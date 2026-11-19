@@ -57,9 +57,12 @@ What it does not do, deliberately or not yet:
   all or nothing: every folder's file is checked before any is written, and a write failing partway puts the
   folders already written back and says so; one changed again in that moment is named as not put back (accepted:
   two writers racing within one save, and the message names the folder).
-- **Warnings are per folder**, listed for the selected file's folder: disagreements and long unmarked runs
-  (`ContainerInference.warnings`). The marker warnings (a photo inside your run, a marker with no read) come from
-  Route A as label reads are applied, which the Reader does not do. There is no corpus-wide list yet. (queued: W49.reader-ct-warnings-all, for the library-wide list; the marker warnings stay Route A's, in the Processor).
+- **Warnings: disagreements and long unmarked runs only** (`ContainerInference.warnings`). The Inspector lists the
+  selected file's folder; the Library health popover lists every folder's, each with its folder and a Show that
+  reaches a file the list hides by lifting the folder and filters as Show in All Files does, at most 200 listed and
+  the rest counted (W49.reader-ct-warnings-all). The marker warnings (a photo inside your run, a marker with no read)
+  come from Route A as label reads are applied, which the Reader does not do. (accepted: the marker warnings are
+  Route A's, in the Processor; the Reader applies no label reads).
 - **Stop Using the Standard Name removes the whole entry**, with every wording it gathered and anything it filled in
   other fields. (accepted: an entry is one name with its wordings; a single value is changed with Change… instead).
 

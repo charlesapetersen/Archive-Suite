@@ -2001,9 +2001,15 @@ final class NavigationModel: ObservableObject {
     /// The list is built off main at corpus size, as choosing All Files is; the selection is put back as a Back's
     /// is, once the list is presented. It is emptied first so that putting it back scrolls to it.
     func showInAllFiles() {
-        let ids = selection
+        guard !selection.isEmpty else { return }
+        showInAllFiles(ids: selection, files: selectedFiles)
+    }
+
+    /// Shows `files` (their `ids`) among their neighbours, as `showInAllFiles()` does with the selection: also how a
+    /// container warning's Show reaches a file the list does not show now (W49.reader-ct-warnings-all).
+    func showInAllFiles(ids: Set<ArchiveFile.ID>, files: [ArchiveFile]) {
         guard !ids.isEmpty else { return }
-        let leaving = visit, files = selectedFiles
+        let leaving = visit
         clearUserFilters(recompute: false)
         if scope != nil { exitScope() }
         filter.pathPrefix = nil

@@ -165,6 +165,17 @@ struct ContainerWarningRow: Equatable, Sendable {
     }
 }
 
+/// One warning in the library-wide list (W49.reader-ct-warnings-all): the folder it is in, below the archive's main
+/// folder, and the warning as the Inspector lists it.
+struct ContainerFolderWarning: Equatable, Sendable {
+    /// "Series 2/Box 17"; empty for the main folder itself.
+    let folder: String
+    let row: ContainerWarningRow
+
+    /// The folder as the list names it.
+    var folderName: String { folder.isEmpty ? "The archive's main folder" : folder }
+}
+
 struct ContainerCatalog: Sendable {
     /// The path of the tree's root (the archive's main folder), spelled as the library spells paths.
     let rootPath: String
@@ -178,6 +189,9 @@ struct ContainerCatalog: Sendable {
     /// Each facet's values across the listed files, with how many files carry each, most first
     /// (`facetValues(_:)`), worked out once here rather than on every redraw of the filter bar.
     let facetLists: [ContainerFacet: [FacetValue]]
+    /// Every folder's warnings (`ContainerInference.warnings`), folders in path order and each folder's warnings in
+    /// its own order: the Library health list (W49.reader-ct-warnings-all), gathered here off the main thread.
+    let warnings: [ContainerFolderWarning]
     private let contexts: [String: DirectoryContext]
 
     struct DirectoryContext: Sendable {
@@ -195,7 +209,7 @@ struct ContainerCatalog: Sendable {
     }
 
     static let empty = ContainerCatalog(rootPath: "", rows: [:], rootLevelMap: .missing, fileDirectories: [],
-                                        facetLists: [:], contexts: [:])
+                                        facetLists: [:], warnings: [], contexts: [:])
 
     var isEmpty: Bool { rows.isEmpty }
 
@@ -296,8 +310,7 @@ struct ContainerCatalog: Sendable {
             }
             if target == .directory, file.directory[field]?.source == .user { userHeld.insert(field) }
         }
-        let directoryPath = ([rootPath.hasSuffix("/") ? String(rootPath.dropLast()) : rootPath] + dir)
-            .joined(separator: "/")
+        let directoryPath = Self.directoryPath(dir, under: rootPath)
         return ContainerEditorInfo(
             directory: dir, directoryPath: directoryPath, name: name, scopes: scopes,
             written: record.values.compactMapValues { $0.shown },
@@ -305,6 +318,11 @@ struct ContainerCatalog: Sendable {
             userHeld: userHeld,
             byStandardName: Set(shown.compactMap { $0.value.byStandardName && $0.value.asWritten != nil ? $0.key : nil }),
             warnings: context.warnings.map { ContainerWarningRow($0, directoryPath: directoryPath) })
+    }
+
+    /// `directory`'s path as the library spells paths.
+    static func directoryPath(_ directory: [String], under rootPath: String) -> String {
+        ([rootPath.hasSuffix("/") ? String(rootPath.dropLast()) : rootPath] + directory).joined(separator: "/")
     }
 
     static func sourceName(_ source: ContainerSource) -> String {
@@ -355,8 +373,16 @@ struct ContainerCatalog: Sendable {
                                           disagreements: ContainerDisplay.disagreements(record, names: context.names))
             }
         }
-        return ContainerCatalog(rootPath: rootPath, rows: rows, rootLevelMap: rootMap,
-                                fileDirectories: fileDirectories, facetLists: facetLists(rows), contexts: contexts)
+        let warnings = contexts.filter { !$0.value.warnings.isEmpty }
+            .sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
+            .flatMap { key, context -> [ContainerFolderWarning] in
+                let directoryPath = Self.directoryPath(byDirectory[key]?.components ?? [], under: rootPath)
+                return context.warnings.map {
+                    ContainerFolderWarning(folder: key, row: ContainerWarningRow($0, directoryPath: directoryPath))
+                }
+            }
+        return ContainerCatalog(rootPath: rootPath, rows: rows, rootLevelMap: rootMap, fileDirectories: fileDirectories,
+                                facetLists: facetLists(rows), warnings: warnings, contexts: contexts)
     }
 
     /// `path`'s directory below `rootPath` (top first) and its name; nil when it is not under the root. Byte-exact,

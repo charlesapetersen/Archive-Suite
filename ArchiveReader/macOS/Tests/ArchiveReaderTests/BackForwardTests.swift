@@ -1,5 +1,6 @@
 import XCTest
 import SwiftUI
+import ArchiveCore
 @testable import ArchiveReader
 
 /// W40.reader-back-forward (owner, 2026-11-13): Go ▸ Back and Forward, ⌘[ and ⌘], through a viewer's page jumps
@@ -255,6 +256,37 @@ final class BackForwardTests: XCTestCase {
         XCTAssertNil(model.filter.pathPrefix)
         XCTAssertEqual(model.displayed.count, 3)
         XCTAssertEqual(model.selection, [letter.id])
+    }
+
+    /// W49.reader-ct-warnings-all: a warning's Show in the Library health list selects its file where the list is,
+    /// and reaches one in another folder through All Files.
+    func testAContainerWarningsShowReachesAFileInAnotherFolder() throws {
+        let model = fixtureNavigationModel(pinnedTo: try makeRoot())
+        model.filter.read = .all
+        model.recompute()
+        model.setFolderScope(folder(model, "Smith"))
+        model.recompute()
+        let jones = try XCTUnwrap(model.library.files.first { $0.name == "Jones memo.pdf" })
+        let smith = try XCTUnwrap(model.displayed.first { $0.name == "Smith memo.pdf" })
+        func row(_ file: ArchiveFile) -> ContainerWarningRow {
+            ContainerWarningRow(ContainerWarning(.disagreement([.container]), start: file.name),
+                                directoryPath: (file.path as NSString).deletingLastPathComponent)
+        }
+
+        model.showContainerWarning(row(smith))
+        XCTAssertEqual(model.selection, [smith.id])
+        XCTAssertNotNil(model.filter.pathPrefix, "a file the list shows is selected in place")
+
+        model.showContainerWarning(row(jones))
+        XCTAssertNil(model.filter.pathPrefix, "the folder is lifted")
+        XCTAssertEqual(model.selection, [jones.id])
+        model.goBack()
+        XCTAssertEqual(model.selection, [smith.id], "Back returns to the folder")
+
+        let gone = ContainerWarningRow(ContainerWarning(.longUnmarkedRun(count: 30), start: "gone.pdf"),
+                                       directoryPath: "/nowhere")
+        model.showContainerWarning(gone)
+        XCTAssertEqual(model.statusMessage, "“gone.pdf” is no longer in the library.")
     }
 
     // MARK: Keys

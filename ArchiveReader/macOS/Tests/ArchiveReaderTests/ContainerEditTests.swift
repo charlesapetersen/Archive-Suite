@@ -663,4 +663,34 @@ final class ContainerEditTests: XCTestCase {
         XCTAssertEqual(d.warnings.first?.startPath, rootPath + "/Box 17/c.pdf")
         XCTAssertNil(catalog.editor(forPath: "/elsewhere/x.pdf"))
     }
+
+    /// W49.reader-ct-warnings-all: every folder's warnings in one list, folders in path order, each with its folder.
+    func testTheCatalogListsEveryFoldersWarningsWithTheirFolders() throws {
+        let box = try makeBox()
+        let other = root.appendingPathComponent("Box 9", isDirectory: true)
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        for n in names { try Data("scratch fixture".utf8).write(to: other.appendingPathComponent(n)) }
+        try ContainerFileStore.writeLevelMap(ContainerLevelMap(levels: [.box]), root: root.resolvingSymlinksInPath(),
+                                             expecting: nil)
+        try ContainerFileStore.write(ContainerFile(runs: [
+            ContainerRun(start: "c.pdf", level: .box, fields: ContainerFieldSet([.container: label("Box 18")])),
+        ]), directory: box, expecting: nil)
+        try ContainerFileStore.write(ContainerFile(runs: [
+            ContainerRun(start: "e.pdf", level: .box, fields: ContainerFieldSet([.container: label("Box 10")])),
+        ]), directory: other, expecting: nil)
+        let rootPath = root.path
+        let paths = ["Box 17", "Box 9"].flatMap { dir in names.map { rootPath + "/\(dir)/" + $0 } }
+        let catalog = ContainerCatalog.build(treeRoot: root, rootPath: rootPath, filePaths: paths)
+        XCTAssertEqual(catalog.warnings.map(\.folder), ["Box 9", "Box 17"], "folders in the Finder's order")
+        XCTAssertEqual(catalog.warnings.map(\.row.text), [
+            "The sources disagree on container: 2 files from “e.pdf”.",
+            "The sources disagree on container: 4 files from “c.pdf”.",
+        ])
+        XCTAssertEqual(catalog.warnings.map(\.row.startPath), [rootPath + "/Box 9/e.pdf", rootPath + "/Box 17/c.pdf"])
+        let d = try XCTUnwrap(catalog.editor(forPath: paths[3]))
+        XCTAssertEqual(d.warnings, [catalog.warnings[1].row], "the Inspector's list is the folder's part of it")
+        XCTAssertEqual(ContainerCatalog.empty.warnings, [])
+        XCTAssertEqual(ContainerFolderWarning(folder: "", row: catalog.warnings[0].row).folderName,
+                       "The archive's main folder")
+    }
 }

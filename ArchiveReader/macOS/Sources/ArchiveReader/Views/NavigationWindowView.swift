@@ -911,8 +911,9 @@ struct NavigationWindowView: View {
                     .accessibilityIdentifier("ar.status.indexFailure")
             }
             // The quiet indicator for the counts the filter bar no longer shows (W40.fix-reader-health-counts):
-            // tinted, with a dot, while a file needs attention or has an ambiguous date.
+            // tinted, with a dot, while a file needs attention, has an ambiguous date or starts a container warning.
             let healthIssues = model.needsAttentionCount > 0 || model.ambiguousDateCount > 0
+                || !model.containerCatalog.warnings.isEmpty
             Button { showingHealth = true } label: {
                 Image(systemName: healthIssues ? "stethoscope.circle.fill" : "stethoscope")
                     .foregroundStyle(healthIssues ? ReaderColors.warning : .secondary)
@@ -925,7 +926,8 @@ struct NavigationWindowView: View {
                 .popover(isPresented: $showingHealth) {
                     DataQualityView(model: model,
                                     showNeedsAttention: { model.filter.needsAttentionOnly = true; showingHealth = false },
-                                    showAmbiguousDates: { model.filter.ambiguousDatesOnly = true; showingHealth = false })
+                                    showAmbiguousDates: { model.filter.ambiguousDatesOnly = true; showingHealth = false },
+                                    showContainerWarning: { model.showContainerWarning($0); showingHealth = false })
                 }
             Spacer()
             // Identified because this is where a REFUSED write reports itself ("Could not verify …"),
@@ -992,11 +994,14 @@ private extension View {
 
 /// A small library-health readout (data-quality counts). The two counts that have a list filter carry a Show
 /// button for it; the filter bar shows those filters only while they are on (W40.fix-reader-health-counts).
+/// Below them, the container warnings of every folder, each with its folder and a Show for the file it starts at
+/// (W49.reader-ct-warnings-all); the Inspector lists only the selected file's folder.
 struct DataQualityView: View {
     // The presented popover owns its observation; passing counts here freezes a snapshot at opening.
     @ObservedObject var model: NavigationModel
     let showNeedsAttention: () -> Void
     let showAmbiguousDates: () -> Void
+    var showContainerWarning: (ContainerWarningRow) -> Void = { _ in }
     var body: some View {
         let q = model.dataQuality
         VStack(alignment: .leading, spacing: 6) {
@@ -1013,9 +1018,49 @@ struct DataQualityView: View {
             filterRow("Ambiguous dates", model.ambiguousDateCount,
                       help: "Show only files with two tags for one date (two Years, Months, Days, Decades or Sent With dates)",
                       id: "ar.health.ambiguousDates", action: showAmbiguousDates)
+            let warnings = model.containerCatalog.warnings
+            if !warnings.isEmpty { containerWarnings(warnings) }
         }
         .padding(14)
-        .frame(width: 300)
+        .frame(width: model.containerCatalog.warnings.isEmpty ? 300 : 380)
+    }
+
+    /// The most container warnings listed; the rest are counted.
+    static let maxContainerWarnings = 200
+
+    private func containerWarnings(_ warnings: [ContainerFolderWarning]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Divider().padding(.vertical, 2)
+            row("Container warnings", warnings.count, warn: true)
+                .accessibilityIdentifier("ar.health.containerWarnings")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(Array(warnings.prefix(Self.maxContainerWarnings).enumerated()), id: \.offset) { i, w in
+                        HStack(alignment: .firstTextBaseline) {
+                            Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(w.folderName).font(.caption.bold()).lineLimit(1).truncationMode(.head)
+                                    .help(w.folderName)
+                                Text(w.row.text).font(.caption).fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 6)
+                            Button("Show") { showContainerWarning(w.row) }
+                                .controlSize(.small)
+                                .help("Select “\(w.row.start)” in the list.")
+                                .accessibilityIdentifier("ar.health.containerWarning.\(i).show")
+                        }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("ar.health.containerWarning.\(i)")
+                    }
+                    if warnings.count > Self.maxContainerWarnings {
+                        Text("and \(warnings.count - Self.maxContainerWarnings) more.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 260)
+        }
     }
     private func filterRow(_ label: String, _ value: Int, help: String, id: String,
                            action: @escaping () -> Void) -> some View {
