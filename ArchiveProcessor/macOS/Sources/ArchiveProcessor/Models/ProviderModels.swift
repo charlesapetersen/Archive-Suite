@@ -794,11 +794,12 @@ struct OCRResult: Codable {
     var rotationUnsure: Bool? = nil
     /// The fixed newspaper layout stage, including a visible whole-page fallback reason.
     var newspaperLayout: NewspaperLayoutRecord? = nil
-    /// W46.post-read-quality-flag — Apple Vision read this page with low confidence, so it probably read poorly
-    /// (`ReadQualityFlag`). Set only on Vision's own reading, and carried by the rebuilds that keep its text and feed
-    /// the run summary (not Live Capture's group rotation, the newspaper region join or re-OCR pairs, which show none).
-    /// `nil` = not flagged, or not read by Vision.
-    let readPoorly: ReadQualityFlag?
+    /// W46.post-read-quality-flag — this page probably read poorly (`ReadQualityFlag`): Apple Vision read it with low
+    /// confidence, or (W47.wh-read-flag-readers) another reader's text disagreed with Vision's past that reader's cut,
+    /// set by `performOCRCall` (`ReadQualityDisagreement`). Carried by the rebuilds that keep the text and feed the run
+    /// summary (not Live Capture's group rotation, the newspaper region join or re-OCR pairs, which show none).
+    /// `nil` = not flagged, or read by a route with no measured cut.
+    var readPoorly: ReadQualityFlag?
 
     init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?,
          enclosure: Bool? = nil, ocrClassification: DocumentClassification?? = nil, ocrEnclosure: Bool?? = nil,

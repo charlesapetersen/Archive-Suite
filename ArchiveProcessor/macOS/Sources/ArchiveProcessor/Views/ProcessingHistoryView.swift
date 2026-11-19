@@ -132,7 +132,7 @@ private struct ProcessingHistoryRow: View {
                 Text("· \(n) left unturned, rotation unsure")
             }
             if let n = run.readPoorlyPages, n > 0 {
-                Text("· \(n) may have read poorly (Apple Vision was unsure)")
+                Text("· \(n) may have read poorly (Apple Vision was unsure, or read the page differently)")
             }
         }
         .font(.caption).foregroundStyle(.primary)

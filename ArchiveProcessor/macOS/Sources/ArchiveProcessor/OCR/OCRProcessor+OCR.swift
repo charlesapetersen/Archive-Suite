@@ -514,8 +514,8 @@ extension OCRProcessor {
                     classification: pageResults.first?.classification,
                     errorMessage: combinedText.isEmpty ? "No text returned by model." : nil,
                     errorCode: nil,
-                    // W46.post-read-quality-flag: the PDF read poorly if any of its pages did; the least sure page's.
-                    readPoorly: pageResults.compactMap(\.readPoorly).min { $0.visionConfidence < $1.visionConfidence }
+                    // W46.post-read-quality-flag: the PDF read poorly if any of its pages did; the most concerning page's.
+                    readPoorly: ReadQualityFlag.worst(pageResults.compactMap(\.readPoorly))
                 )
                 jobs[index].classification = pageResults.first?.classification
                 jobs[index].status = .succeeded
@@ -1971,6 +1971,14 @@ extension OCRProcessor {
         // correction was found; otherwise keep the LLM prompt's parsed rotation.
         var merged = mergeRotation(into: resolved, verdict: await rotationCorrection)
         if let routed { merged.pageReader = routed.record }
+        // W47.wh-read-flag-readers: another reader's page is flagged when it disagrees with Vision past its own cut.
+        let route = localAgent == nil
+            ? ReadQualityDisagreement.Route(provider: provider, modelID: gatewayConfig?.modelID ?? model.id,
+                                            gateway: gatewayConfig != nil, local: gatewayConfig?.isLocalModel == true)
+            : nil
+        if let flag = await ReadQualityDisagreement.check(merged, route: route, imageURL: imageURL) {
+            merged.readPoorly = flag
+        }
         return merged
     }
     /// What rotation detection decided for a page: the clockwise correction (nil = keep the OCR model's own guess),

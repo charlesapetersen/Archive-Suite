@@ -115,9 +115,16 @@ def add(a, b):
     return {k: a.get(k, 0) + b[k] for k in b}
 
 
-def crossval(risk, poor, nes, groups=None, folds=FOLDS, seeds=SEEDS):
+def fit_cut_each(risk, poor, sets, ceiling=CEILING):
+    """The lowest cut whose false alarms stay within the ceiling on every set at once (sets: one label per row).
+    False alarms only fall as the cut rises, so it is the highest of the sets' own cuts."""
+    return max(fit_cut([r for r, s in zip(risk, sets) if s == x], [y for y, s in zip(poor, sets) if s == x], ceiling)
+               for x in set(sets))
+
+
+def crossval(risk, poor, nes, groups=None, folds=FOLDS, seeds=SEEDS, sets=None):
     """Repeated k-fold: the cut fitted on the other folds, applied to the held-out one; counts pooled over seeds.
-    groups: one key per row; rows sharing a key (a page's images) stay in one fold."""
+    groups: one key per row; rows sharing a key (a page's images) stay in one fold. sets: fit with fit_cut_each."""
     keys = sorted(set(groups)) if groups else list(range(len(risk)))
     gidx = groups or list(range(len(risk)))
     tot = {}
@@ -128,7 +135,8 @@ def crossval(risk, poor, nes, groups=None, folds=FOLDS, seeds=SEEDS):
         for f in range(folds):
             tr = [i for i in range(len(risk)) if fold_of[gidx[i]] != f]
             te = [i for i in range(len(risk)) if fold_of[gidx[i]] == f]
-            cut = fit_cut([risk[i] for i in tr], [poor[i] for i in tr])
+            cut = fit_cut_each([risk[i] for i in tr], [poor[i] for i in tr], [sets[i] for i in tr]) if sets \
+                else fit_cut([risk[i] for i in tr], [poor[i] for i in tr])
             tot = add(tot, counts([risk[i] for i in te], [poor[i] for i in te], [nes[i] for i in te], cut))
     return tot
 
@@ -197,12 +205,51 @@ def readings_ladder():
     return out
 
 
+# W47.wh-read-flag-readers: every other reader the app offers whose 96 readings are cached, with the app route it
+# stands for (provider, the app's model id) and where its reading of a page is. 'A' the cloud panel's responses,
+# 'B' the local panel's (OpenRouter), 'claude' the plan route's, 'mistral' Mistral OCR's own, 'mlx' the Mac mlx
+# panel's plain (not log-probability) readings.
+APP_ROUTES = {
+    'gemini3.8-flash': ('Gemini 3.8 Flash', 'gemini', 'gemini-3.8-flash', 'A'),
+    'gemini3.5-flash': ('Gemini 3.5 Flash', 'gemini', 'gemini-3.5-flash', 'A'),
+    'gemini3.1-pro': ('Gemini 3.1 Pro', 'gemini', 'gemini-3.1-pro', 'A'),
+    'gemini3.5-flash-lite': ('Gemini 3.5 Flash Lite', 'gemini', 'gemini-3.5-flash-lite', 'A'),
+    'gemini3.1-flash-lite': ('Gemini 3.1 Flash Lite', 'gemini', 'gemini-3.1-flash-lite', 'B'),
+    'gpt5.4-mini': ('GPT-5.4 mini', 'openai', 'gpt-5.4-mini', 'A'),
+    'claude-sonnet5.5': ('Claude Sonnet 5.5', 'anthropic', 'claude-sonnet-5-5', 'claude'),
+    'mistral-ocr-4-1': ('Mistral OCR', 'mistral', 'mistral-ocr-latest', 'mistral'),
+    'qwen3-vl-235b': ('Qwen3-VL 235B', 'openrouter', 'qwen/qwen3-vl-235b-a22b-instruct', 'A'),
+    'qwen3.8-flash': ('Qwen3.8 Flash', 'openrouter', 'qwen/qwen3.8-flash', 'A'),
+    'qwen3.6-27b': ('Qwen3.6 27B', 'openrouter', 'qwen/qwen3.6-27b', 'B'),
+    'qwen3.5-9b': ('Qwen3.5 9B', 'openrouter', 'qwen/qwen3.5-9b', 'B'),
+    'qwen3-vl-8b-mlx4': ('Qwen3-VL 8B', 'local', 'qwen3-vl-8b', 'mlx'),
+}
+# The two Mac routes post_read_flag already reads (log-probability runs), and Gemini 3.7 Flash through the gateway.
+APP_ROUTES_KNOWN = {'lightonocr-3-4b-mlx8': ('LightOnOCR-3', 'local', 'lightonocr'),
+                    'qwen3.5-9b-mlx4': ('Qwen3.5 9B', 'local', 'qwen3.5-9b'),
+                    'gemini3.7-flash': ('Gemini 3.7 Flash', 'gateway', 'gemini-3.7-flash')}
+
+
+def route_text(key, page):
+    """(text, ok) for one app route's reading of one of the 96, from the caches APP_ROUTES names."""
+    src = APP_ROUTES[key][3]
+    jid = page + '-original.json'
+    path = {'A': CACHE / 'ocr-panel-cloud/responses' / key / jid, 'B': CACHE / 'ocr-panel-local/responses' / key / jid,
+            'claude': CACHE / 'ocr-panel-cloud/sub' / key / jid, 'mistral': CACHE / 'ocr-panel-cloud/mistral' / jid,
+            'mlx': CACHE / 'ocr-panel-local/local' / key / jid}[src]
+    if not path.exists():
+        raise SystemExit(f'missing reading {path}')
+    d = json.loads(path.read_text())
+    text = d.get('text') or '' if src == 'mistral' else ((d.get('parsed') or {}).get('text') or '')
+    return text, bool(text)
+
+
 LABEL = {'lightonocr-3-4b-mlx8': 'LightOnOCR-3 4B (Mac mlx 8-bit)', 'qwen3.5-9b-mlx4': 'Qwen3.5-9B (Mac mlx 4-bit)',
          'gemini3.7-flash': 'Gemini 3.7 Flash (gateway)', 'vision': 'Apple Vision',
-         'lightonocr3-4b': 'LightOnOCR-3 4B (Sherlock vLLM)', 'qwen3.5-9b': 'Qwen3.5-9B (Sherlock vLLM)'}
-PAIRS_96 = {'lightonocr-3-4b-mlx8': ['qwen3.5-9b-mlx4', 'vision'], 'qwen3.5-9b-mlx4': ['lightonocr-3-4b-mlx8', 'vision'],
-            'gemini3.7-flash': ['vision', 'qwen3.5-9b-mlx4'], 'vision': ['gemini3.7-flash', 'qwen3.5-9b-mlx4']}
-PAIRS_LADDER = {'gemini3.7-flash': ['vision'], 'vision': ['gemini3.7-flash']}
+         'lightonocr3-4b': 'LightOnOCR-3 4B (Sherlock vLLM)', 'qwen3.5-9b': 'Qwen3.5-9B (Sherlock vLLM)',
+         **{k: v[0] + (' (Mac mlx 4-bit)' if v[1] == 'local' else '') for k, v in APP_ROUTES.items()
+            if k != 'qwen3.5-9b'}}
+
 
 
 def rows_for(read, truth_of, kind_of, pairs):
@@ -313,10 +360,64 @@ def analyse():
                        '96': out['sets']['96']['vision']['conf']['in_sample'],
                        '96_crossval': out['sets']['96']['vision']['conf']['crossval'],
                        'ladder_defects': tr['vision|conf|96->ladder defects']}
+    out['app_readers'], rows_routes = app_readers(pages, r96, rows96, rowsl, truth, kind)
     out['pages'] = [{'set': n, 'reader': r['reader'], 'page': r['page'], 'variant': r['variant'], 'kind': r['kind'],
                      'nes': round(r['nes'], 4), **{k: (None if v == FAILED else round(v, 5)) for k, v in r['risk'].items()}}
-                    for n, rows in (('96', rows96), ('ladder', rowsl)) for r in rows]
+                    for n, rows in (('96', rows96 + rows_routes), ('ladder', rowsl)) for r in rows]
     return out
+
+
+def flag_at(rows, sig, cut):
+    """The app's threshold for a fitted cut: midway between it and the next lower finite risk, so every row flags
+    exactly as in the fit (flag at risk >= the threshold)."""
+    below = [r['risk'][sig] for r in rows if r['risk'][sig] != FAILED and r['risk'][sig] < cut]
+    return round((cut + max(below)) / 2, 4) if below else cut
+
+
+def app_readers(pages, r96, rows96, rowsl, truth, kind):
+    """W47.wh-read-flag-readers: each reader's own 'vs vision' cut for the app, under the same ceiling. The 96 for
+    every reader; Gemini 3.7 Flash, the one reader with ladder readings, gets the lowest cut that holds the ceiling on
+    the 96 and on the ladder's 480 defect images each (fit_cut_each; cross-validation keeps a page's images in one
+    fold). A reader ships when its cut holds and catches some poor reading cross-validated; a cut that catches none
+    would only add false alarms, so that reader is left to the owner (call 13)."""
+    read = {'vision': r96['vision']}
+    for key in APP_ROUTES:
+        read[key] = {p: (*route_text(key, p), None) for p in pages}
+    rows_routes = rows_for(read, lambda k: truth[k], lambda k: kind[k], {k: ['vision'] for k in APP_ROUTES})
+    sig = 'vs vision'
+    out = {}
+    fits = {k: ([r for r in rows96 if r['reader'] == k], '96 plain photographs, read on this Mac')
+            for k in ('lightonocr-3-4b-mlx8', 'qwen3.5-9b-mlx4')}
+    gem96 = [r for r in rows96 if r['reader'] == 'gemini3.7-flash']
+    gemlad = [r for r in rowsl if r['reader'] == 'gemini3.7-flash' and r['variant'] != 'raw']
+    fits['gemini3.7-flash'] = (gem96 + gemlad, '96 plain photographs and 480 damaged copies of 48 of them')
+    for k in APP_ROUTES:
+        fits[k] = ([r for r in rows_routes if r['reader'] == k],
+                   '96 plain photographs' + (', read on this Mac' if APP_ROUTES[k][1] == 'local' else ''))
+    for k, (rows, measured_on) in fits.items():
+        if k == 'gemini3.7-flash':
+            risk, poor, nes = [r['risk'][sig] for r in rows], [r['poor'] for r in rows], [r['nes'] for r in rows]
+            sets = ['96' if r in gem96 else 'ladder' for r in rows]
+            c = fit_cut_each(risk, poor, sets)
+            ev = {'auc': auc([min(x, 1e9) for x in risk], poor), 'cut': None if c == FAILED else c,
+                  'in_sample': rates(counts(risk, poor, nes, c)),
+                  'crossval': rates(crossval(risk, poor, nes, [r['page'] for r in rows], sets=sets))}
+        else:
+            ev = evaluate(rows, sig)
+        cut = ev['cut']
+        e = {'label': (APP_ROUTES.get(k) or APP_ROUTES_KNOWN[k])[0],
+             'route': list((APP_ROUTES.get(k) or APP_ROUTES_KNOWN[k])[1:3]), 'measured_on': measured_on,
+             'signal': sig, 'auc': ev['auc'], 'cut': cut, 'flag_at': None if cut is None else flag_at(rows, sig, cut),
+             'in_sample': ev['in_sample'], 'crossval': ev['crossval'],
+             'ships': cut is not None and ev['in_sample']['fa_rate'] <= CEILING and ev['crossval']['hits'] > 0}
+        if k == 'gemini3.7-flash' and cut is not None:
+            e['on_96'] = rates(counts([r['risk'][sig] for r in gem96], [r['poor'] for r in gem96],
+                                      [r['nes'] for r in gem96], cut))
+            e['on_ladder_defects'] = rates(counts([r['risk'][sig] for r in gemlad], [r['poor'] for r in gemlad],
+                                                  [r['nes'] for r in gemlad], cut))
+            e['ships'] = e['ships'] and e['on_96']['fa_rate'] <= CEILING and e['on_ladder_defects']['fa_rate'] <= CEILING
+        out[k] = e
+    return out, rows_routes
 
 
 # --- the report --------------------------------------------------------------------------------------------------
@@ -378,8 +479,39 @@ def render(out):
           f"| the 96, in-sample | {_cell(a['96'])} |",
           f"| the 96, cross-validated | {_cv(a['96_crossval'])} | – |",
           f"| ladder defect images, applied once | {_cell(a['ladder_defects'])} |"]
-    L += ['', FINDINGS.strip(), '', CARD.strip(), '']
+    L += ['', '## Each reader\'s own cut, for the app (W47.wh-read-flag-readers, 2026-11-19)', '',
+          "Owner, 2026-11-19 (call 15): every reader the bench has read gets the disagreement-with-Vision flag at its "
+          "own cut under the same 5% ceiling. Signal: vs vision, every page (the app does not know a page is "
+          "handwritten before it is read). Gemini 3.7 Flash's cut is the lowest that holds the ceiling on the 96 and "
+          "on the ladder's 480 defect images each. \"flag at\" is the app's threshold, midway between the cut and the "
+          "next lower disagreement seen. A reader ships when its cut holds and catches a poor reading cross-validated.",
+          '', '| reader | app route | measured on | AUC | cut | flag at | in-sample hits | false alarms | flags under 90 '
+          '| cross-validated hits | cross-validated false alarms | ships |',
+          '|---|---|---|---:|---:|---:|---|---|---:|---|---|---|']
+    for k, e in out['app_readers'].items():
+        L.append(f"| {e['label']} | {' '.join(e['route'])} | {e['measured_on']} | {e['auc']:.3f} | {_cutf(e['cut'])} | "
+                 f"{'–' if e['flag_at'] is None else format(e['flag_at'], '.4f')} | {_cell(e['in_sample'])} | "
+                 f"{_cv(e['crossval'])} | {'yes' if e['ships'] else 'no, asked'} |")
+    g = out['app_readers'].get('gemini3.7-flash', {})
+    if 'on_96' in g:
+        L += ['', f"Gemini 3.7 Flash at its cut: on the 96 {_cell(g['on_96'])}; on the ladder's defect images "
+                  f"{_cell(g['on_ladder_defects'])} (hits | false alarms | flags under 90)."]
+    L += ['', FINDINGS.strip(), '', FINDINGS_READERS.strip(), '', CARD.strip(), '']
     return '\n'.join(L)
+
+
+def check_swift(out):
+    """The Swift rules carry the shipped readers' thresholds and no others (ReadQualityDisagreement.swift)."""
+    import re
+    src = (HERE.parents[1] / 'macOS/Sources/ArchiveProcessor/OCR/ReadQualityDisagreement.swift').read_text()
+    have = {m.group(2): float(m.group(1)) for m in re.finditer(
+        r'flagAtOrAbove: ([0-9.]+),\s*measuredOn: "[^"]*",\s*benchKey: "([^"]+)"', src)}
+    have.update({m.group(2): float(m.group(1)) for m in re.finditer(r'plain\("[^"]+", ([0-9.]+), "([^"]+)"\)', src)})
+    want = {k: e['flag_at'] for k, e in out['app_readers'].items() if e['ships']}
+    bad = sorted(set(have) ^ set(want)) + sorted(k for k in set(have) & set(want) if abs(have[k] - want[k]) > 1e-9)
+    if bad:
+        raise SystemExit(f'ReadQualityDisagreement.swift does not match app_readers: {bad} (have {have}, want {want})')
+    return want
 
 
 HEAD = """
@@ -455,6 +587,34 @@ CARD = """
 """
 
 
+FINDINGS_READERS = """
+## Findings for the other readers (2026-11-19, W47.wh-read-flag-readers; supersedes the last bullet above)
+
+- **The owner released the flag for every reader (call 15), so each reader with cached readings now has its own
+  disagreement-with-Vision cut.** Fourteen of sixteen ship. On the 96, cross-validated, they catch 25-67% of their
+  own poor readings at 4-5% false alarms (LightOnOCR-3 on the Mac 62%, Qwen3-VL 8B on the Mac 63%, Gemini 3.5 Flash
+  67%, Qwen3.5 9B through OpenRouter 51%, Gemini 3.8 Flash 40%, GPT-5.4 mini 40%). Most readers have 4 to 9 poor
+  readings in 96, so each rate moves by 10-25 points with one page; the intervals in the table say how far.
+- **Gemini 3.7 Flash gets a cut that holds on damaged photographs too.** The lowest cut that keeps false alarms within
+  5% on the 96 and on the ladder's 480 defect images each is a disagreement of 0.980 (near-total). It flags none of
+  Gemini's good plain readings and none of its 3 poor ones; on the defect images it catches 20 of 53 poor readings
+  with 21 false alarms in 427 (5%). A cut fitted on the two sets pooled (0.952) flags 6% of good defect readings, over
+  the ceiling. Every other reader was measured on plain photographs only: its cut is untested on damaged captures,
+  where Vision reads worse and the cut may flag more (Gemini's 96 cut flagged 21% there), and the run summary names
+  what each reader's check was measured on.
+- **Claude Sonnet 5.5 and Mistral OCR are left to the owner.** Their cuts hold the ceiling (4 false alarms in 94 and
+  in 89) but caught none of their poor readings, in-sample or cross-validated (0 of 2 and 0 of 7): a flag would be
+  only false alarms. Asked as W47.wh-read-flag-cm-owner-ok; until he answers, neither reader is flagged.
+- **What the app ships.** After a reader's page, Apple Vision reads the same image with the settings the cuts were
+  fitted with, and the page is flagged when 1 minus the bench's NES of the reader's text against Vision's reaches
+  the reader's threshold ("flag at"); Vision finding no text counts as total disagreement, as in the fit. A measured
+  model through OpenRouter on its maker's endpoint (the route the bench read it on) and the same model called
+  directly share its cut. Not checked: a page another route read instead (a refusal or escalation), an imported
+  page, a newspaper page read in regions, a page the app turned, a blank reading, a page Vision failed on, batch
+  runs, the Local Agent, and a model the bench has not read (LightOnOCR and the Mac Qwens only on a server on this Mac).
+"""
+
+
 def report():
     out = analyse()
     pages = out.pop('pages')
@@ -465,6 +625,7 @@ def report():
     OUT_JSON.write_text(json.dumps(out, indent=1, default=lambda x: None) + '\n')
     OUT_MD.write_text(render(out))
     print(OUT_MD.read_text())
+    print('Swift rules match:', check_swift(out))   # exits non-zero, after writing, when they do not
 
 
 def self_test():
@@ -482,14 +643,37 @@ def self_test():
     assert fit_cut([FAILED, 1.], [True, False]) == FAILED       # no finite cut fits: only failures flagged
     cv = crossval(risk, poor, [0.9] * 24)
     assert cv['n'] == 24 * SEEDS and cv['poor'] == 4 * SEEDS
+    # two sets: the second's good readings sit higher, so the cut that holds on both is the second's
+    sets = ['a'] * 24 + ['b'] * 21
+    both = fit_cut_each(risk + [float(i) + 10 for i in range(20)] + [40.], poor + [False] * 20 + [True], sets)
+    assert both == 29., both
+    assert fit_cut_each(risk, poor, ['a'] * 24) == cut
+    rows = [{'risk': {'s': x}} for x in (1., 2., 4., FAILED)]
+    assert flag_at(rows, 's', 4.) == 3. and flag_at(rows, 's', 1.) == 1.
     print('self-test ok')
+
+
+def parity(path):
+    """Every app route's 96 readings with Vision's and the bench's NES of one against the other, as JSON at path (a
+    temporary file: it holds page text), for the Swift contract's parity check (READQUALITY_PARITY)."""
+    pages, r96 = readings_96()
+    rows = []
+    for key in [*APP_ROUTES, 'lightonocr-3-4b-mlx8', 'qwen3.5-9b-mlx4', 'gemini3.7-flash']:
+        for p in pages:
+            text, ok = route_text(key, p) if key in APP_ROUTES else r96[key][p][:2]
+            vision = r96['vision'][p][0]
+            if ok:
+                rows.append({'vision': vision, 'reader': text, 'nes': _score(vision, text)})
+    Path(path).write_text(json.dumps(rows, ensure_ascii=False))
+    print(f'{len(rows)} pairs to {path}')
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('cmd', choices=['report', 'self-test'])
+    ap.add_argument('cmd', choices=['report', 'self-test', 'parity'])
+    ap.add_argument('path', nargs='?')
     a = ap.parse_args()
-    report() if a.cmd == 'report' else self_test()
+    report() if a.cmd == 'report' else parity(a.path) if a.cmd == 'parity' else self_test()
 
 
 if __name__ == '__main__':

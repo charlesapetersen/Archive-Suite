@@ -42,7 +42,8 @@ struct ProcessingRun: Codable, Identifiable, Equatable {
     var kindRoutedPages: Int? = nil
     /// Pages the agreement rule left as they were, rotation unsure (W46.rotation-default). Optional, as above.
     var rotationUnsurePages: Int? = nil
-    /// Pages Apple Vision read with low confidence, so probably read poorly (W46.post-read-quality-flag). Optional, as above.
+    /// Pages that probably read poorly (W46.post-read-quality-flag): Apple Vision read them with low confidence, or
+    /// another reader's text disagreed with Vision's past its cut (W47.wh-read-flag-readers). Optional, as above.
     var readPoorlyPages: Int? = nil
     /// Pages that entered the newspaper layout stage, including its whole-page fallbacks.
     var newspaperPages: Int? = nil

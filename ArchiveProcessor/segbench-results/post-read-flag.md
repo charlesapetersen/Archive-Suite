@@ -89,6 +89,31 @@ Apple Vision's reading is flagged when its character-weighted mean line confiden
 | the 96, cross-validated | 46% (41-51) | 6% (5-7) | – |
 | ladder defect images, applied once | 179/231 77% (72-82) | 7/249 3% (1-6) | 99% |
 
+## Each reader's own cut, for the app (W47.wh-read-flag-readers, 2026-11-19)
+
+Owner, 2026-11-19 (call 15): every reader the bench has read gets the disagreement-with-Vision flag at its own cut under the same 5% ceiling. Signal: vs vision, every page (the app does not know a page is handwritten before it is read). Gemini 3.7 Flash's cut is the lowest that holds the ceiling on the 96 and on the ladder's 480 defect images each. "flag at" is the app's threshold, midway between the cut and the next lower disagreement seen. A reader ships when its cut holds and catches a poor reading cross-validated.
+
+| reader | app route | measured on | AUC | cut | flag at | in-sample hits | false alarms | flags under 90 | cross-validated hits | cross-validated false alarms | ships |
+|---|---|---|---:|---:|---:|---|---|---:|---|---|---|
+| LightOnOCR-3 | local lightonocr | 96 plain photographs, read on this Mac | 0.963 | 0.651 | 0.6481 | 8/11 73% (43-90) | 4/85 5% (2-11) | 83% | 62% (56-68) | 5% (4-6) | yes |
+| Qwen3.5 9B | local qwen3.5-9b | 96 plain photographs, read on this Mac | 0.900 | 0.677 | 0.6754 | 4/9 44% (19-73) | 4/87 5% (2-11) | 62% | 36% (29-43) | 5% (4-6) | yes |
+| Gemini 3.7 Flash | gateway gemini-3.7-flash | 96 plain photographs and 480 damaged copies of 48 of them | 0.896 | 0.980 | 0.9764 | 20/56 36% (24-49) | 21/520 4% (3-6) | 61% | 35% (32-37) | 4% (4-4) | yes |
+| Gemini 3.8 Flash | gemini gemini-3.8-flash | 96 plain photographs | 0.897 | 0.695 | 0.6882 | 2/5 40% (12-77) | 4/91 4% (2-11) | 33% | 40% (31-50) | 4% (3-5) | yes |
+| Gemini 3.5 Flash | gemini gemini-3.5-flash | 96 plain photographs | 0.952 | 0.695 | 0.6847 | 4/6 67% (30-90) | 4/90 4% (2-11) | 50% | 67% (58-74) | 4% (3-5) | yes |
+| Gemini 3.1 Pro | gemini gemini-3.1-pro | 96 plain photographs | 0.913 | 0.702 | 0.7006 | 2/4 50% (15-85) | 4/92 4% (2-11) | 50% | 50% (39-61) | 4% (4-5) | yes |
+| Gemini 3.5 Flash Lite | gemini gemini-3.5-flash-lite | 96 plain photographs | 0.842 | 0.697 | 0.6967 | 2/5 40% (12-77) | 4/91 4% (2-11) | 33% | 40% (31-50) | 4% (3-5) | yes |
+| Gemini 3.1 Flash Lite | gemini gemini-3.1-flash-lite | 96 plain photographs | 0.876 | 0.699 | 0.6978 | 4/8 50% (22-78) | 4/88 5% (2-11) | 50% | 42% (35-50) | 4% (3-5) | yes |
+| GPT-5.4 mini | openai gpt-5.4-mini | 96 plain photographs | 0.908 | 0.696 | 0.6721 | 2/5 40% (12-77) | 4/91 4% (2-11) | 50% | 40% (31-50) | 4% (4-5) | yes |
+| Claude Sonnet 5.5 | anthropic claude-sonnet-5-5 | 96 plain photographs | 0.835 | 0.708 | 0.7052 | 0/2 0% (0-66) | 4/94 4% (2-10) | 0% | 0% (0-9) | 4% (3-5) | no, asked |
+| Mistral OCR | mistral mistral-ocr-latest | 96 plain photographs | 0.815 | 0.703 | 0.7034 | 0/7 0% (0-35) | 4/89 4% (2-11) | 0% | 0% (0-3) | 4% (3-5) | no, asked |
+| Qwen3-VL 235B | openrouter qwen/qwen3-vl-235b-a22b-instruct | 96 plain photographs | 0.886 | 0.711 | 0.7106 | 2/5 40% (12-77) | 4/91 4% (2-11) | 67% | 28% (20-37) | 4% (3-5) | yes |
+| Qwen3.8 Flash | openrouter qwen/qwen3.8-flash | 96 plain photographs | 0.909 | 0.737 | 0.7243 | 3/6 50% (19-81) | 4/90 4% (2-11) | 71% | 50% (41-59) | 4% (3-5) | yes |
+| Qwen3.6 27B | openrouter qwen/qwen3.6-27b | 96 plain photographs | 0.883 | 0.711 | 0.7034 | 1/4 25% (5-70) | 4/92 4% (2-11) | 40% | 25% (17-35) | 4% (3-5) | yes |
+| Qwen3.5 9B | openrouter qwen/qwen3.5-9b | 96 plain photographs | 0.936 | 0.700 | 0.6979 | 5/9 56% (27-81) | 4/87 5% (2-11) | 78% | 51% (43-58) | 5% (4-6) | yes |
+| Qwen3-VL 8B | local qwen3-vl-8b | 96 plain photographs, read on this Mac | 0.950 | 0.708 | 0.7013 | 5/7 71% (36-92) | 4/89 4% (2-11) | 78% | 63% (55-70) | 4% (3-5) | yes |
+
+Gemini 3.7 Flash at its cut: on the 96 0/3 0% (0-56) | 0/93 0% (0-4) | –; on the ladder's defect images 20/53 38% (26-51) | 21/427 5% (3-7) | 61% (hits | false alarms | flags under 90).
+
 ## Findings (2026-11-18)
 
 - **Apple Vision's own confidence is the one flag near a 5% false-alarm rate on plain and damaged photographs
@@ -119,6 +144,31 @@ Apple Vision's reading is flagged when its character-weighted mean line confiden
   readers yet: no rule measured here holds the ceiling for them across capture conditions. A reader-specific Vision
   disagreement cut for the Mac's open readers needs their ladder readings (not on this Mac), and real captures
   (W46.capture-warning) before it can be trusted; filed as W46.post-read-flag-readers.
+
+## Findings for the other readers (2026-11-19, W47.wh-read-flag-readers; supersedes the last bullet above)
+
+- **The owner released the flag for every reader (call 15), so each reader with cached readings now has its own
+  disagreement-with-Vision cut.** Fourteen of sixteen ship. On the 96, cross-validated, they catch 25-67% of their
+  own poor readings at 4-5% false alarms (LightOnOCR-3 on the Mac 62%, Qwen3-VL 8B on the Mac 63%, Gemini 3.5 Flash
+  67%, Qwen3.5 9B through OpenRouter 51%, Gemini 3.8 Flash 40%, GPT-5.4 mini 40%). Most readers have 4 to 9 poor
+  readings in 96, so each rate moves by 10-25 points with one page; the intervals in the table say how far.
+- **Gemini 3.7 Flash gets a cut that holds on damaged photographs too.** The lowest cut that keeps false alarms within
+  5% on the 96 and on the ladder's 480 defect images each is a disagreement of 0.980 (near-total). It flags none of
+  Gemini's good plain readings and none of its 3 poor ones; on the defect images it catches 20 of 53 poor readings
+  with 21 false alarms in 427 (5%). A cut fitted on the two sets pooled (0.952) flags 6% of good defect readings, over
+  the ceiling. Every other reader was measured on plain photographs only: its cut is untested on damaged captures,
+  where Vision reads worse and the cut may flag more (Gemini's 96 cut flagged 21% there), and the run summary names
+  what each reader's check was measured on.
+- **Claude Sonnet 5.5 and Mistral OCR are left to the owner.** Their cuts hold the ceiling (4 false alarms in 94 and
+  in 89) but caught none of their poor readings, in-sample or cross-validated (0 of 2 and 0 of 7): a flag would be
+  only false alarms. Asked as W47.wh-read-flag-cm-owner-ok; until he answers, neither reader is flagged.
+- **What the app ships.** After a reader's page, Apple Vision reads the same image with the settings the cuts were
+  fitted with, and the page is flagged when 1 minus the bench's NES of the reader's text against Vision's reaches
+  the reader's threshold ("flag at"); Vision finding no text counts as total disagreement, as in the fit. A measured
+  model through OpenRouter on its maker's endpoint (the route the bench read it on) and the same model called
+  directly share its cut. Not checked: a page another route read instead (a refusal or escalation), an imported
+  page, a newspaper page read in regions, a page the app turned, a blank reading, a page Vision failed on, batch
+  runs, the Local Agent, and a model the bench has not read (LightOnOCR and the Mac Qwens only on a server on this Mac).
 
 ## Measurement card
 

@@ -2,6 +2,21 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W47.wh-read-flag-readers, 2026-11-19): what the read-poorly flag for other readers does not do
+
+`OCR/ReadQualityDisagreement.swift`; figures in `segbench-results/post-read-flag.md` §"Each reader's own cut".
+- Every reader's cut but Gemini 3.7 Flash's was fitted on the 96 plain photographs only. On a damaged capture Vision
+  reads worse, so the same cut may flag more good pages (Gemini's plain-photo cut flagged 21% of its good damaged
+  readings); the run summary says what each check was measured on (queued: W46.post-read-flag-readers).
+- Claude Sonnet 5.5 and Mistral OCR pages are never flagged: their cuts hold the 5% ceiling but caught none of their
+  poor readings on the 96 (0 of 2, 0 of 7) (asked: W47.wh-read-flag-cm-owner-ok).
+- A route the bench has not read (a typed gateway or OpenRouter model, Claude on the plan, the Local Agent, the older
+  Gemini, GPT and Claude models) is not flagged, nor is a page another route read in its place, an imported page, a
+  newspaper page read in regions, a page the app turned, a page Vision failed on, or a batch run's pages (accepted: a cut is only as good as the readings it was fitted on; the refit on real
+  captures adds readers as the bench reads them).
+- Each checked page costs one extra Apple Vision reading on this Mac (time not measured; no money) (accepted: the
+  check needs Vision's text, and Vision is free and local).
+
 ## ⚠️ LIMITATION (W41.app-openrouter-any, 2026-11-18): what the makers' models through OpenRouter do not yet do
 
 - **Before OpenRouter's listing is read, a maker's price is a guess.** A Gemini or GPT model through OpenRouter is

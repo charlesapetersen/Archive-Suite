@@ -988,6 +988,17 @@ def postread():
             "fa_96": a["96"]["false_alarms"], "good_96": a["96"]["good"], "hits_lad": a["ladder_defects"]["hits"],
             "poor_lad": a["ladder_defects"]["poor"], "fa_lad": a["ladder_defects"]["false_alarms"],
             "good_lad": a["ladder_defects"]["good"]}
+    # W47.wh-read-flag-readers: each reader's own cut against Vision, every page, as the app ships it
+    for k, e in (d.get("app_readers") or {}).items():
+        cv = e["crossval"]
+        rows.append({"reader": e["label"] + (", Mac" if e["route"][0] == "local" else ", OpenRouter"
+                                             if e["route"][0] == "openrouter" else ""),
+                     "set": "the 96 + ladder defects" if "damaged" in e["measured_on"] else "the 96, plain",
+                     "signal": "against Vision, the app's cut" + ("" if e["ships"] else " (not shipped)"),
+                     "auc": e["auc"], "poor": e["in_sample"]["poor"], "hit_rate": cv["hit_rate"], "fa_rate": cv["fa_rate"]})
+    shipped = [e for e in (d.get("app_readers") or {}).values() if e["ships"]]
+    rule["readers_shipped"] = len(shipped)
+    rule["readers_fitted"] = len(d.get("app_readers") or {})
     return {"rows": rows, "app_rule": rule}
 
 

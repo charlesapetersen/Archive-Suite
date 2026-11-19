@@ -71286,6 +71286,150 @@ true,
 "poor":243,
 "hit_rate":0.7835390946502058,
 "fa_rate":0.04894736842105263
+},
+{
+"reader":"LightOnOCR-3, Mac",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut",
+"auc":0.9625668449197861,
+"poor":11,
+"hit_rate":0.6227272727272727,
+"fa_rate":0.05
+},
+{
+"reader":"Qwen3.5 9B, Mac",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut",
+"auc":0.9003831417624522,
+"poor":9,
+"hit_rate":0.35555555555555557,
+"fa_rate":0.04655172413793104
+},
+{
+"reader":"Gemini 3.7 Flash",
+"set":"the 96 + ladder defects",
+"signal":"against Vision, the app's cut",
+"auc":0.8955013736263736,
+"poor":56,
+"hit_rate":0.3464285714285714,
+"fa_rate":0.03990384615384615
+},
+{
+"reader":"Gemini 3.8 Flash",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut",
+"auc":0.8967032967032967,
+"poor":5,
+"hit_rate":0.4,
+"fa_rate":0.03956043956043956
+},
+{
+"reader":"Gemini 3.5 Flash",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut",
+"auc":0.9518518518518518,
+"poor":6,
+"hit_rate":0.6666666666666666,
+"fa_rate":0.04
+},
+{
+"reader":"Gemini 3.1 Pro",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut",
+"auc":0.9130434782608695,
+"poor":4,
+"hit_rate":0.5,
+"fa_rate":0.043478260869565216
+},
+{
+"reader":"Gemini 3.5 Flash Lite",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut",
+"auc":0.8417582417582418,
+"poor":5,
+"hit_rate":0.4,
+"fa_rate":0.04120879120879121
+},
+{
+"reader":"Gemini 3.1 Flash Lite",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut",
+"auc":0.8764204545454546,
+"poor":8,
+"hit_rate":0.425,
+"fa_rate":0.04261363636363636
+},
+{
+"reader":"GPT-5.4 mini",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut",
+"auc":0.9076923076923077,
+"poor":5,
+"hit_rate":0.4,
+"fa_rate":0.04450549450549451
+},
+{
+"reader":"Claude Sonnet 5.5",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut (not shipped)",
+"auc":0.8351063829787234,
+"poor":2,
+"hit_rate":0.0,
+"fa_rate":0.0398936170212766
+},
+{
+"reader":"Mistral OCR",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut (not shipped)",
+"auc":0.8154093097913323,
+"poor":7,
+"hit_rate":0.0,
+"fa_rate":0.04044943820224719
+},
+{
+"reader":"Qwen3-VL 235B, OpenRouter",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut",
+"auc":0.8857142857142857,
+"poor":5,
+"hit_rate":0.28,
+"fa_rate":0.04120879120879121
+},
+{
+"reader":"Qwen3.8 Flash, OpenRouter",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut",
+"auc":0.9092592592592592,
+"poor":6,
+"hit_rate":0.5,
+"fa_rate":0.03833333333333333
+},
+{
+"reader":"Qwen3.6 27B, OpenRouter",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut",
+"auc":0.8831521739130435,
+"poor":4,
+"hit_rate":0.25,
+"fa_rate":0.04076086956521739
+},
+{
+"reader":"Qwen3.5 9B, OpenRouter",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut",
+"auc":0.9361430395913155,
+"poor":9,
+"hit_rate":0.5055555555555555,
+"fa_rate":0.04597701149425287
+},
+{
+"reader":"Qwen3-VL 8B, Mac",
+"set":"the 96, plain",
+"signal":"against Vision, the app's cut",
+"auc":0.9502407704654896,
+"poor":7,
+"hit_rate":0.6285714285714286,
+"fa_rate":0.04269662921348315
 }
 ],
 "app_rule":{
@@ -71297,7 +71441,9 @@ true,
 "hits_lad":179,
 "poor_lad":231,
 "fa_lad":7,
-"good_lad":249
+"good_lad":249,
+"readers_shipped":14,
+"readers_fitted":16
 }
 },
 "postcorrect":{
@@ -72089,7 +72235,7 @@ if (PRF) {
   const pc = v => v === null ? '—' : (100 * v).toFixed(0) + '%';
   document.getElementById('dif-postread-rows').innerHTML = PRF.rows.map(r => '<tr><td>' + r.reader + '</td><td>' + r.set + '</td><td>' + r.signal + '</td><td>' + f2(r.auc) + '</td><td>' + pc(r.hit_rate) + ' of ' + r.poor + '</td><td>' + pc(r.fa_rate) + '</td></tr>').join('');
   const a = PRF.app_rule;
-  document.getElementById('dif-postread-note').textContent = 'What it shows: Apple Vision\'s own confidence is the only flag that keeps false alarms near 5% on plain and damaged photographs alike. The app ships it for pages Vision reads: under ' + a.flag_below + ' it flags ' + a.hits_96 + ' of Vision\'s ' + a.poor_96 + ' poor readings of the 96 with ' + a.fa_96 + ' false alarms in ' + a.good_96 + ', and ' + a.hits_lad + ' of ' + a.poor_lad + ' on the ladder\'s defect images with ' + a.fa_lad + ' in ' + a.good_lad + '. Disagreement with Vision ranks the other readers\' errors well on plain photographs, but Vision loses far more to blur than they do, so a cut fitted there flags about a fifth of Gemini\'s good readings of damaged images, and a cut strict enough for both catches almost nothing on plain ones; the other readers get no flag until real captures exist. Full report: segbench-results/post-read-flag.md.';
+  document.getElementById('dif-postread-note').textContent = 'What it shows: Apple Vision\'s own confidence is the only flag that keeps false alarms near 5% on plain and damaged photographs alike. The app ships it for pages Vision reads: under ' + a.flag_below + ' it flags ' + a.hits_96 + ' of Vision\'s ' + a.poor_96 + ' poor readings of the 96 with ' + a.fa_96 + ' false alarms in ' + a.good_96 + ', and ' + a.hits_lad + ' of ' + a.poor_lad + ' on the ladder\'s defect images with ' + a.fa_lad + ' in ' + a.good_lad + '. Disagreement with Vision ranks the other readers\' errors well on plain photographs, but Vision loses far more to blur than they do, so a cut fitted there flags about a fifth of Gemini\'s good readings of damaged images. So each reader gets its own cut ("the app\'s cut" rows, every page): ' + (a.readers_shipped || 0) + ' of ' + (a.readers_fitted || 0) + ' readers ship one; Gemini 3.7 Flash\'s holds the ceiling on plain and damaged images each and catches about a third of its poor damaged readings, the others were measured on plain photographs only, and Claude Sonnet 5.5 and Mistral OCR caught none of their poor readings, so they wait for the owner. Full report: segbench-results/post-read-flag.md.';
 } else document.getElementById('dif-postread').hidden = true;
 const PCR = DATA.postcorrect;
 if (PCR) {

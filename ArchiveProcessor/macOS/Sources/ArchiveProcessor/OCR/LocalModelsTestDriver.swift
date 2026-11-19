@@ -226,6 +226,24 @@ enum LocalModelsTestDriver {
         check("4 a remote gateway's cut page still never escalates",
               p.errorCode == OCRFailureCode.cutOff && !wire.hosts.contains { $0.contains("anthropic") })
 
+        // 4b. (W47.wh-read-flag-readers) The page a local model read is checked against Vision's reading of it.
+        let said = "The committee met on the fourth of March to consider the report."
+        ReadQualityDisagreement.visionOverride = { _ in .text(said) }
+        defer { ReadQualityDisagreement.visionOverride = nil }
+        wire.reset(["local-mac": reply("[document_start]\n\(said)")])
+        p = await ocr(stayLocal, .off)
+        check("4 a local page that reads as Vision did is not flagged", p.text == said && p.readPoorly == nil,
+              String(describing: p.readPoorly))
+        wire.reset(["local-mac": reply("[document_start]\nZq xv wk jj pp")])
+        p = await ocr(stayLocal, .off)
+        check("4 one that does not is flagged, for its reader",
+              p.readPoorly?.reader == ReadQualityDisagreement.qwenVL8Mac.reader && p.readPoorly?.disagreement ?? 0 > 0.9,
+              String(describing: p.readPoorly))
+        wire.reset(["remote-gateway": reply("[document_start]\nZq xv wk jj pp")])
+        p = await ocr(remote, .off)
+        check("4 a gateway model the bench has not read is not checked", p.text != nil && p.readPoorly == nil)
+        ReadQualityDisagreement.visionOverride = nil
+
         // 5. Scheduling and the estimate.
         eq("5 a local gateway reads one page at a time", OCRProcessor.schedulingWorkerCount(for: nil, gateway: local), 1)
         check("5 a remote gateway keeps the worker count",

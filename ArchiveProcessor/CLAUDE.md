@@ -68,7 +68,11 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 - **Read-poorly flag** (`OCR/ReadQualityFlag.swift`): Apple Vision's reading whose character-weighted line confidence
   is under 0.9815 sets `OCRResult.readPoorly`; the run summary names the files and the history counts them. UI only,
   never written to a file; only under the default Vision settings it was fitted with; the summary's rebuilds pass it on. The cut is fitted in
-  `segbench-results/post-read-flag.md`. Contract: `scripts/test-read-quality-flag.sh`.
+  `segbench-results/post-read-flag.md`. Another reader's page (`OCR/ReadQualityDisagreement.swift`, set at the end of
+  `performOCRCall`): Vision reads the same image and the page is flagged when the reader's text disagrees with it (1
+  minus the bench's NES) past that reader's own cut, fitted by `post_read_flag.py` (`app_readers`, which also checks
+  the Swift table); a route the bench has not read has no rule. The summary says per reader what its cut was measured
+  on. Contract: `scripts/test-read-quality-flag.sh` (and section 4b of `scripts/test-local-models.sh`).
 - **A model on this Mac** always sends the stand-in bearer `local`, never a saved key; escalating its failed pages
   is off by default (it may have been chosen to keep pages on the Mac). Its measured limits are required
   (W41.mac-local-measure: 4,096-token cap, streamed repetition check + one re-read with a repetition penalty, 600 s

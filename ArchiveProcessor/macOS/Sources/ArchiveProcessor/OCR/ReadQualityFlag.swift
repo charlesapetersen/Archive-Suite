@@ -1,19 +1,37 @@
 import Foundation
 
-/// W46.post-read-quality-flag — "this page probably read poorly", said after processing, for a page Apple Vision read.
-/// The signal is Vision's own confidence: the mean of its line confidences, each line weighted by its characters. The
-/// cut was fitted on the owner's 96 for at most 5% false alarms among readings at 70 NES or above
-/// (`ArchiveProcessor/segbench-results/post-read-flag.md`: in-sample 10 of 21 poor readings caught with 3 false alarms in
-/// 75; cross-validated, the estimate for new pages, 46% caught at 5.8% false alarms, 87 in 1,500 pooled over repeats;
-/// on the capture ladder's damaged photographs 179 of 231 with 7 in 249). No other
-/// reader is flagged: disagreement with Vision did not hold the ceiling on damaged photographs, and no route returns
-/// token probabilities. UI only (the run summary and the history); nothing is written to a file.
+/// W46.post-read-quality-flag — "this page probably read poorly", said after processing. Two signals, each fitted
+/// for at most 5% false alarms among readings at 70 NES or above (`ArchiveProcessor/segbench-results/post-read-flag.md`):
+///
+/// * a page Apple Vision read: Vision's own confidence, the mean of its line confidences, each line weighted by its
+///   characters, fitted on the owner's 96 (in-sample 10 of 21 poor readings caught with 3 false alarms in 75;
+///   cross-validated, the estimate for new pages, 46% caught at 5.8% false alarms, 87 in 1,500 pooled over repeats;
+///   on the capture ladder's damaged photographs 179 of 231 with 7 in 249);
+/// * W47.wh-read-flag-readers (owner, 2026-11-19, call 15): a page another reader read, its disagreement with Apple
+///   Vision's reading of the same image, at that reader's own cut (`ReadQualityDisagreement`). A reader with no
+///   measured cut is not flagged.
+///
+/// UI only (the run summary and the history); nothing is written to a file.
 struct ReadQualityFlag: Codable, Equatable, Sendable {
-    /// The reading's character-weighted mean line confidence, 0-1.
-    let visionConfidence: Double
+    /// Vision's own reading: its character-weighted mean line confidence, 0-1. nil on another reader's flag.
+    var visionConfidence: Double?
+    /// Another reader's: 1 minus the similarity of its text to Apple Vision's reading of the same image (0 the same,
+    /// 1 nothing alike or Vision read nothing). nil on Vision's own flag.
+    var disagreement: Double? = nil
+    /// The reader whose disagreement cut fired, and what that cut was measured on, for the run summary.
+    var reader: String? = nil
+    var measuredOn: String? = nil
+
+    /// How far past its signal's cut this flag is: what picks the one a multi-page PDF keeps.
+    var concern: Double {
+        if let visionConfidence { return Self.flagBelow - visionConfidence }
+        return disagreement ?? 0
+    }
 
     /// Flag a reading whose weighted confidence is under this. Fitted by `post_read_flag.py report` (`app_rule`).
     static let flagBelow = 0.9815
+    /// What that cut was measured on, in the run summary's words: fitted on the 96, applied once to the ladder.
+    static let visionMeasuredOn = "96 plain photographs and 480 damaged copies of 48 of them"
 
     /// The character-weighted mean confidence of Vision's kept lines; nil when they hold no characters.
     static func weightedConfidence(_ lines: [(text: String, confidence: Float)]) -> Double? {
@@ -35,5 +53,10 @@ struct ReadQualityFlag: Codable, Equatable, Sendable {
     static func applies(to settings: VisionOCRSettings) -> Bool {
         !settings.usesFastRecognition && settings.minimumConfidence == 0
             && settings.languages == VisionOCRSettings.default.languages
+    }
+
+    /// The flag a multi-page PDF keeps: its most concerning page's.
+    static func worst(_ flags: [ReadQualityFlag]) -> ReadQualityFlag? {
+        flags.max { $0.concern < $1.concern }
     }
 }

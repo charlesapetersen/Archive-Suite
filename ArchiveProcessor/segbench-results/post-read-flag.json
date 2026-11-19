@@ -1980,5 +1980,929 @@
    "precision": 0.9623655913978495,
    "under_90_of_flags": 0.9946236559139785
   }
+ },
+ "app_readers": {
+  "lightonocr-3-4b-mlx8": {
+   "label": "LightOnOCR-3",
+   "route": [
+    "local",
+    "lightonocr"
+   ],
+   "measured_on": "96 plain photographs, read on this Mac",
+   "signal": "vs vision",
+   "auc": 0.9625668449197861,
+   "cut": 0.6508960573476702,
+   "flag_at": 0.6481,
+   "in_sample": {
+    "n": 96,
+    "poor": 11,
+    "good": 85,
+    "flagged": 12,
+    "hits": 8,
+    "false_alarms": 4,
+    "flags_under_90": 10,
+    "hit_rate": 0.7272727272727273,
+    "hit_ci": [
+     0.4343497069897537,
+     0.9025411942607853
+    ],
+    "fa_rate": 0.047058823529411764,
+    "fa_ci": [
+     0.018449962264952775,
+     0.11483894743500761
+    ],
+    "precision": 0.6666666666666666,
+    "under_90_of_flags": 0.8333333333333334
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 220,
+    "good": 1700,
+    "flagged": 222,
+    "hits": 137,
+    "false_alarms": 85,
+    "flags_under_90": 176,
+    "hit_rate": 0.6227272727272727,
+    "hit_ci": [
+     0.5570877551006376,
+     0.6841542660428853
+    ],
+    "fa_rate": 0.05,
+    "fa_ci": [
+     0.04061622524118159,
+     0.06141297747343696
+    ],
+    "precision": 0.6171171171171171,
+    "under_90_of_flags": 0.7927927927927928
+   },
+   "ships": true
+  },
+  "qwen3.5-9b-mlx4": {
+   "label": "Qwen3.5 9B",
+   "route": [
+    "local",
+    "qwen3.5-9b"
+   ],
+   "measured_on": "96 plain photographs, read on this Mac",
+   "signal": "vs vision",
+   "auc": 0.9003831417624522,
+   "cut": 0.6766370250606305,
+   "flag_at": 0.6754,
+   "in_sample": {
+    "n": 96,
+    "poor": 9,
+    "good": 87,
+    "flagged": 8,
+    "hits": 4,
+    "false_alarms": 4,
+    "flags_under_90": 5,
+    "hit_rate": 0.4444444444444444,
+    "hit_ci": [
+     0.188775429471914,
+     0.7333526542559703
+    ],
+    "fa_rate": 0.04597701149425287,
+    "fa_ci": [
+     0.018022396823237183,
+     0.11233197826482823
+    ],
+    "precision": 0.5,
+    "under_90_of_flags": 0.625
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 180,
+    "good": 1740,
+    "flagged": 145,
+    "hits": 64,
+    "false_alarms": 81,
+    "flags_under_90": 84,
+    "hit_rate": 0.35555555555555557,
+    "hit_ci": [
+     0.28931215725066883,
+     0.42783564825145926
+    ],
+    "fa_rate": 0.04655172413793104,
+    "fa_ci": [
+     0.037612080494592345,
+     0.05748921769671128
+    ],
+    "precision": 0.4413793103448276,
+    "under_90_of_flags": 0.5793103448275863
+   },
+   "ships": true
+  },
+  "gemini3.7-flash": {
+   "label": "Gemini 3.7 Flash",
+   "route": [
+    "gateway",
+    "gemini-3.7-flash"
+   ],
+   "measured_on": "96 plain photographs and 480 damaged copies of 48 of them",
+   "signal": "vs vision",
+   "auc": 0.8955013736263736,
+   "cut": 0.9797687861271677,
+   "flag_at": 0.9764,
+   "in_sample": {
+    "n": 576,
+    "poor": 56,
+    "good": 520,
+    "flagged": 41,
+    "hits": 20,
+    "false_alarms": 21,
+    "flags_under_90": 25,
+    "hit_rate": 0.35714285714285715,
+    "hit_ci": [
+     0.2445639270270599,
+     0.4880635428266874
+    ],
+    "fa_rate": 0.04038461538461539,
+    "fa_ci": [
+     0.026563302695830928,
+     0.060947120302266206
+    ],
+    "precision": 0.4878048780487805,
+    "under_90_of_flags": 0.6097560975609756
+   },
+   "crossval": {
+    "n": 11520,
+    "poor": 1120,
+    "good": 10400,
+    "flagged": 803,
+    "hits": 388,
+    "false_alarms": 415,
+    "flags_under_90": 474,
+    "hit_rate": 0.3464285714285714,
+    "hit_ci": [
+     0.31912858297390007,
+     0.3747784587301977
+    ],
+    "fa_rate": 0.03990384615384615,
+    "fa_ci": [
+     0.036308722360174996,
+     0.04383874931990132
+    ],
+    "precision": 0.48318804483188044,
+    "under_90_of_flags": 0.5902864259028643
+   },
+   "ships": true,
+   "on_96": {
+    "n": 96,
+    "poor": 3,
+    "good": 93,
+    "flagged": 0,
+    "hits": 0,
+    "false_alarms": 0,
+    "flags_under_90": 0,
+    "hit_rate": 0.0,
+    "hit_ci": [
+     0.0,
+     0.5615060804490177
+    ],
+    "fa_rate": 0.0,
+    "fa_ci": [
+     0.0,
+     0.0396689026203615
+    ],
+    "precision": null,
+    "under_90_of_flags": null
+   },
+   "on_ladder_defects": {
+    "n": 480,
+    "poor": 53,
+    "good": 427,
+    "flagged": 41,
+    "hits": 20,
+    "false_alarms": 21,
+    "flags_under_90": 25,
+    "hit_rate": 0.37735849056603776,
+    "hit_ci": [
+     0.25936076571733824,
+     0.5119334976390768
+    ],
+    "fa_rate": 0.04918032786885246,
+    "fa_ci": [
+     0.03238880644782861,
+     0.07401131833120853
+    ],
+    "precision": 0.4878048780487805,
+    "under_90_of_flags": 0.6097560975609756
+   }
+  },
+  "gemini3.8-flash": {
+   "label": "Gemini 3.8 Flash",
+   "route": [
+    "gemini",
+    "gemini-3.8-flash"
+   ],
+   "measured_on": "96 plain photographs",
+   "signal": "vs vision",
+   "auc": 0.8967032967032967,
+   "cut": 0.6948640483383686,
+   "flag_at": 0.6882,
+   "in_sample": {
+    "n": 96,
+    "poor": 5,
+    "good": 91,
+    "flagged": 6,
+    "hits": 2,
+    "false_alarms": 4,
+    "flags_under_90": 2,
+    "hit_rate": 0.4,
+    "hit_ci": [
+     0.1176182311592533,
+     0.769280067791163
+    ],
+    "fa_rate": 0.04395604395604396,
+    "fa_ci": [
+     0.017224087727905874,
+     0.10763251528174392
+    ],
+    "precision": 0.3333333333333333,
+    "under_90_of_flags": 0.3333333333333333
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 100,
+    "good": 1820,
+    "flagged": 112,
+    "hits": 40,
+    "false_alarms": 72,
+    "flags_under_90": 40,
+    "hit_rate": 0.4,
+    "hit_ci": [
+     0.3093997461136028,
+     0.4979992153815976
+    ],
+    "fa_rate": 0.03956043956043956,
+    "fa_ci": [
+     0.03153187438812423,
+     0.049528673852468605
+    ],
+    "precision": 0.35714285714285715,
+    "under_90_of_flags": 0.35714285714285715
+   },
+   "ships": true
+  },
+  "gemini3.5-flash": {
+   "label": "Gemini 3.5 Flash",
+   "route": [
+    "gemini",
+    "gemini-3.5-flash"
+   ],
+   "measured_on": "96 plain photographs",
+   "signal": "vs vision",
+   "auc": 0.9518518518518518,
+   "cut": 0.6948640483383686,
+   "flag_at": 0.6847,
+   "in_sample": {
+    "n": 96,
+    "poor": 6,
+    "good": 90,
+    "flagged": 8,
+    "hits": 4,
+    "false_alarms": 4,
+    "flags_under_90": 4,
+    "hit_rate": 0.6666666666666666,
+    "hit_ci": [
+     0.29998832134152864,
+     0.9032306674407831
+    ],
+    "fa_rate": 0.044444444444444446,
+    "fa_ci": [
+     0.01741696001324882,
+     0.1087701467709492
+    ],
+    "precision": 0.5,
+    "under_90_of_flags": 0.5
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 120,
+    "good": 1800,
+    "flagged": 152,
+    "hits": 80,
+    "false_alarms": 72,
+    "flags_under_90": 81,
+    "hit_rate": 0.6666666666666666,
+    "hit_ci": [
+     0.5783093452093498,
+     0.744683897772007
+    ],
+    "fa_rate": 0.04,
+    "fa_ci": [
+     0.03188353608059252,
+     0.05007576677615498
+    ],
+    "precision": 0.5263157894736842,
+    "under_90_of_flags": 0.5328947368421053
+   },
+   "ships": true
+  },
+  "gemini3.1-pro": {
+   "label": "Gemini 3.1 Pro",
+   "route": [
+    "gemini",
+    "gemini-3.1-pro"
+   ],
+   "measured_on": "96 plain photographs",
+   "signal": "vs vision",
+   "auc": 0.9130434782608695,
+   "cut": 0.7017543859649122,
+   "flag_at": 0.7006,
+   "in_sample": {
+    "n": 96,
+    "poor": 4,
+    "good": 92,
+    "flagged": 6,
+    "hits": 2,
+    "false_alarms": 4,
+    "flags_under_90": 3,
+    "hit_rate": 0.5,
+    "hit_ci": [
+     0.15003570882017148,
+     0.8499642911798285
+    ],
+    "fa_rate": 0.043478260869565216,
+    "fa_ci": [
+     0.01703544061158062,
+     0.10651842326381375
+    ],
+    "precision": 0.3333333333333333,
+    "under_90_of_flags": 0.5
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 80,
+    "good": 1840,
+    "flagged": 120,
+    "hits": 40,
+    "false_alarms": 80,
+    "flags_under_90": 60,
+    "hit_rate": 0.5,
+    "hit_ci": [
+     0.392972274311075,
+     0.607027725688925
+    ],
+    "fa_rate": 0.043478260869565216,
+    "fa_ci": [
+     0.03507248554942168,
+     0.05378634050157966
+    ],
+    "precision": 0.3333333333333333,
+    "under_90_of_flags": 0.5
+   },
+   "ships": true
+  },
+  "gemini3.5-flash-lite": {
+   "label": "Gemini 3.5 Flash Lite",
+   "route": [
+    "gemini",
+    "gemini-3.5-flash-lite"
+   ],
+   "measured_on": "96 plain photographs",
+   "signal": "vs vision",
+   "auc": 0.8417582417582418,
+   "cut": 0.6972624798711755,
+   "flag_at": 0.6967,
+   "in_sample": {
+    "n": 96,
+    "poor": 5,
+    "good": 91,
+    "flagged": 6,
+    "hits": 2,
+    "false_alarms": 4,
+    "flags_under_90": 2,
+    "hit_rate": 0.4,
+    "hit_ci": [
+     0.1176182311592533,
+     0.769280067791163
+    ],
+    "fa_rate": 0.04395604395604396,
+    "fa_ci": [
+     0.017224087727905874,
+     0.10763251528174392
+    ],
+    "precision": 0.3333333333333333,
+    "under_90_of_flags": 0.3333333333333333
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 100,
+    "good": 1820,
+    "flagged": 115,
+    "hits": 40,
+    "false_alarms": 75,
+    "flags_under_90": 40,
+    "hit_rate": 0.4,
+    "hit_ci": [
+     0.3093997461136028,
+     0.4979992153815976
+    ],
+    "fa_rate": 0.04120879120879121,
+    "fa_ci": [
+     0.03300149537039394,
+     0.051348812244039255
+    ],
+    "precision": 0.34782608695652173,
+    "under_90_of_flags": 0.34782608695652173
+   },
+   "ships": true
+  },
+  "gemini3.1-flash-lite": {
+   "label": "Gemini 3.1 Flash Lite",
+   "route": [
+    "gemini",
+    "gemini-3.1-flash-lite"
+   ],
+   "measured_on": "96 plain photographs",
+   "signal": "vs vision",
+   "auc": 0.8764204545454546,
+   "cut": 0.6994735637445639,
+   "flag_at": 0.6978,
+   "in_sample": {
+    "n": 96,
+    "poor": 8,
+    "good": 88,
+    "flagged": 8,
+    "hits": 4,
+    "false_alarms": 4,
+    "flags_under_90": 4,
+    "hit_rate": 0.5,
+    "hit_ci": [
+     0.21521252682444186,
+     0.7847874731755582
+    ],
+    "fa_rate": 0.045454545454545456,
+    "fa_ci": [
+     0.017815960935119883,
+     0.11111907503986312
+    ],
+    "precision": 0.5,
+    "under_90_of_flags": 0.5
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 160,
+    "good": 1760,
+    "flagged": 143,
+    "hits": 68,
+    "false_alarms": 75,
+    "flags_under_90": 68,
+    "hit_rate": 0.425,
+    "hit_ci": [
+     0.35104220189233704,
+     0.5024748536051677
+    ],
+    "fa_rate": 0.04261363636363636,
+    "fa_ci": [
+     0.034130956263691045,
+     0.05308866708570721
+    ],
+    "precision": 0.4755244755244755,
+    "under_90_of_flags": 0.4755244755244755
+   },
+   "ships": true
+  },
+  "gpt5.4-mini": {
+   "label": "GPT-5.4 mini",
+   "route": [
+    "openai",
+    "gpt-5.4-mini"
+   ],
+   "measured_on": "96 plain photographs",
+   "signal": "vs vision",
+   "auc": 0.9076923076923077,
+   "cut": 0.6960486322188449,
+   "flag_at": 0.6721,
+   "in_sample": {
+    "n": 96,
+    "poor": 5,
+    "good": 91,
+    "flagged": 6,
+    "hits": 2,
+    "false_alarms": 4,
+    "flags_under_90": 3,
+    "hit_rate": 0.4,
+    "hit_ci": [
+     0.1176182311592533,
+     0.769280067791163
+    ],
+    "fa_rate": 0.04395604395604396,
+    "fa_ci": [
+     0.017224087727905874,
+     0.10763251528174392
+    ],
+    "precision": 0.3333333333333333,
+    "under_90_of_flags": 0.5
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 100,
+    "good": 1820,
+    "flagged": 121,
+    "hits": 40,
+    "false_alarms": 81,
+    "flags_under_90": 66,
+    "hit_rate": 0.4,
+    "hit_ci": [
+     0.3093997461136028,
+     0.4979992153815976
+    ],
+    "fa_rate": 0.04450549450549451,
+    "fa_ci": [
+     0.03595221818365715,
+     0.05497760817845676
+    ],
+    "precision": 0.3305785123966942,
+    "under_90_of_flags": 0.5454545454545454
+   },
+   "ships": true
+  },
+  "claude-sonnet5.5": {
+   "label": "Claude Sonnet 5.5",
+   "route": [
+    "anthropic",
+    "claude-sonnet-5-5"
+   ],
+   "measured_on": "96 plain photographs",
+   "signal": "vs vision",
+   "auc": 0.8351063829787234,
+   "cut": 0.7075034738304771,
+   "flag_at": 0.7052,
+   "in_sample": {
+    "n": 96,
+    "poor": 2,
+    "good": 94,
+    "flagged": 4,
+    "hits": 0,
+    "false_alarms": 4,
+    "flags_under_90": 0,
+    "hit_rate": 0.0,
+    "hit_ci": [
+     0.0,
+     0.6576280471103807
+    ],
+    "fa_rate": 0.0425531914893617,
+    "fa_ci": [
+     0.016670278401570267,
+     0.10435799587031408
+    ],
+    "precision": 0.0,
+    "under_90_of_flags": 0.0
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 40,
+    "good": 1880,
+    "flagged": 75,
+    "hits": 0,
+    "false_alarms": 75,
+    "flags_under_90": 0,
+    "hit_rate": 0.0,
+    "hit_ci": [
+     0.0,
+     0.08762453925039232
+    ],
+    "fa_rate": 0.0398936170212766,
+    "fa_ci": [
+     0.03194439491235017,
+     0.04971937129814226
+    ],
+    "precision": 0.0,
+    "under_90_of_flags": 0.0
+   },
+   "ships": false
+  },
+  "mistral-ocr-4-1": {
+   "label": "Mistral OCR",
+   "route": [
+    "mistral",
+    "mistral-ocr-latest"
+   ],
+   "measured_on": "96 plain photographs",
+   "signal": "vs vision",
+   "auc": 0.8154093097913323,
+   "cut": 0.7034883720930233,
+   "flag_at": 0.7034,
+   "in_sample": {
+    "n": 96,
+    "poor": 7,
+    "good": 89,
+    "flagged": 4,
+    "hits": 0,
+    "false_alarms": 4,
+    "flags_under_90": 0,
+    "hit_rate": 0.0,
+    "hit_ci": [
+     0.0,
+     0.35433884297520657
+    ],
+    "fa_rate": 0.0449438202247191,
+    "fa_ci": [
+     0.01761420103381913,
+     0.10993207132684676
+    ],
+    "precision": 0.0,
+    "under_90_of_flags": 0.0
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 140,
+    "good": 1780,
+    "flagged": 72,
+    "hits": 0,
+    "false_alarms": 72,
+    "flags_under_90": 0,
+    "hit_rate": 0.0,
+    "hit_ci": [
+     0.0,
+     0.02670715564899167
+    ],
+    "fa_rate": 0.04044943820224719,
+    "fa_ci": [
+     0.03224313041681515,
+     0.0506350802942704
+    ],
+    "precision": 0.0,
+    "under_90_of_flags": 0.0
+   },
+   "ships": false
+  },
+  "qwen3-vl-235b": {
+   "label": "Qwen3-VL 235B",
+   "route": [
+    "openrouter",
+    "qwen/qwen3-vl-235b-a22b-instruct"
+   ],
+   "measured_on": "96 plain photographs",
+   "signal": "vs vision",
+   "auc": 0.8857142857142857,
+   "cut": 0.7107670654468684,
+   "flag_at": 0.7106,
+   "in_sample": {
+    "n": 96,
+    "poor": 5,
+    "good": 91,
+    "flagged": 6,
+    "hits": 2,
+    "false_alarms": 4,
+    "flags_under_90": 4,
+    "hit_rate": 0.4,
+    "hit_ci": [
+     0.1176182311592533,
+     0.769280067791163
+    ],
+    "fa_rate": 0.04395604395604396,
+    "fa_ci": [
+     0.017224087727905874,
+     0.10763251528174392
+    ],
+    "precision": 0.3333333333333333,
+    "under_90_of_flags": 0.6666666666666666
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 100,
+    "good": 1820,
+    "flagged": 103,
+    "hits": 28,
+    "false_alarms": 75,
+    "flags_under_90": 68,
+    "hit_rate": 0.28,
+    "hit_ci": [
+     0.2013955916759837,
+     0.37488212361345724
+    ],
+    "fa_rate": 0.04120879120879121,
+    "fa_ci": [
+     0.03300149537039394,
+     0.051348812244039255
+    ],
+    "precision": 0.27184466019417475,
+    "under_90_of_flags": 0.6601941747572816
+   },
+   "ships": true
+  },
+  "qwen3.8-flash": {
+   "label": "Qwen3.8 Flash",
+   "route": [
+    "openrouter",
+    "qwen/qwen3.8-flash"
+   ],
+   "measured_on": "96 plain photographs",
+   "signal": "vs vision",
+   "auc": 0.9092592592592592,
+   "cut": 0.7371592539454807,
+   "flag_at": 0.7243,
+   "in_sample": {
+    "n": 96,
+    "poor": 6,
+    "good": 90,
+    "flagged": 7,
+    "hits": 3,
+    "false_alarms": 4,
+    "flags_under_90": 5,
+    "hit_rate": 0.5,
+    "hit_ci": [
+     0.18761280689940868,
+     0.8123871931005913
+    ],
+    "fa_rate": 0.044444444444444446,
+    "fa_ci": [
+     0.01741696001324882,
+     0.1087701467709492
+    ],
+    "precision": 0.42857142857142855,
+    "under_90_of_flags": 0.7142857142857143
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 120,
+    "good": 1800,
+    "flagged": 129,
+    "hits": 60,
+    "false_alarms": 69,
+    "flags_under_90": 86,
+    "hit_rate": 0.5,
+    "hit_ci": [
+     0.411937137430229,
+     0.588062862569771
+    ],
+    "fa_rate": 0.03833333333333333,
+    "fa_ci": [
+     0.03040166681224639,
+     0.048231401634561785
+    ],
+    "precision": 0.46511627906976744,
+    "under_90_of_flags": 0.6666666666666666
+   },
+   "ships": true
+  },
+  "qwen3.6-27b": {
+   "label": "Qwen3.6 27B",
+   "route": [
+    "openrouter",
+    "qwen/qwen3.6-27b"
+   ],
+   "measured_on": "96 plain photographs",
+   "signal": "vs vision",
+   "auc": 0.8831521739130435,
+   "cut": 0.7107360525082044,
+   "flag_at": 0.7034,
+   "in_sample": {
+    "n": 96,
+    "poor": 4,
+    "good": 92,
+    "flagged": 5,
+    "hits": 1,
+    "false_alarms": 4,
+    "flags_under_90": 2,
+    "hit_rate": 0.25,
+    "hit_ci": [
+     0.045586062644636216,
+     0.6993639475573634
+    ],
+    "fa_rate": 0.043478260869565216,
+    "fa_ci": [
+     0.01703544061158062,
+     0.10651842326381375
+    ],
+    "precision": 0.2,
+    "under_90_of_flags": 0.4
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 80,
+    "good": 1840,
+    "flagged": 95,
+    "hits": 20,
+    "false_alarms": 75,
+    "flags_under_90": 40,
+    "hit_rate": 0.25,
+    "hit_ci": [
+     0.1680610581209431,
+     0.3548488100113445
+    ],
+    "fa_rate": 0.04076086956521739,
+    "fa_ci": [
+     0.03264143940773623,
+     0.050793927274521075
+    ],
+    "precision": 0.21052631578947367,
+    "under_90_of_flags": 0.42105263157894735
+   },
+   "ships": true
+  },
+  "qwen3.5-9b": {
+   "label": "Qwen3.5 9B",
+   "route": [
+    "openrouter",
+    "qwen/qwen3.5-9b"
+   ],
+   "measured_on": "96 plain photographs",
+   "signal": "vs vision",
+   "auc": 0.9361430395913155,
+   "cut": 0.6997389033942559,
+   "flag_at": 0.6979,
+   "in_sample": {
+    "n": 96,
+    "poor": 9,
+    "good": 87,
+    "flagged": 9,
+    "hits": 5,
+    "false_alarms": 4,
+    "flags_under_90": 7,
+    "hit_rate": 0.5555555555555556,
+    "hit_ci": [
+     0.2666473457440297,
+     0.811224570528086
+    ],
+    "fa_rate": 0.04597701149425287,
+    "fa_ci": [
+     0.018022396823237183,
+     0.11233197826482823
+    ],
+    "precision": 0.5555555555555556,
+    "under_90_of_flags": 0.7777777777777778
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 180,
+    "good": 1740,
+    "flagged": 171,
+    "hits": 91,
+    "false_alarms": 80,
+    "flags_under_90": 122,
+    "hit_rate": 0.5055555555555555,
+    "hit_ci": [
+     0.43316615772522116,
+     0.5777127728323893
+    ],
+    "fa_rate": 0.04597701149425287,
+    "fa_ci": [
+     0.037096475841966084,
+     0.056857929191151596
+    ],
+    "precision": 0.5321637426900585,
+    "under_90_of_flags": 0.7134502923976608
+   },
+   "ships": true
+  },
+  "qwen3-vl-8b-mlx4": {
+   "label": "Qwen3-VL 8B",
+   "route": [
+    "local",
+    "qwen3-vl-8b"
+   ],
+   "measured_on": "96 plain photographs, read on this Mac",
+   "signal": "vs vision",
+   "auc": 0.9502407704654896,
+   "cut": 0.7078103207810321,
+   "flag_at": 0.7013,
+   "in_sample": {
+    "n": 96,
+    "poor": 7,
+    "good": 89,
+    "flagged": 9,
+    "hits": 5,
+    "false_alarms": 4,
+    "flags_under_90": 7,
+    "hit_rate": 0.7142857142857143,
+    "hit_ci": [
+     0.35892909014821267,
+     0.9177828342909844
+    ],
+    "fa_rate": 0.0449438202247191,
+    "fa_ci": [
+     0.01761420103381913,
+     0.10993207132684676
+    ],
+    "precision": 0.5555555555555556,
+    "under_90_of_flags": 0.7777777777777778
+   },
+   "crossval": {
+    "n": 1920,
+    "poor": 140,
+    "good": 1780,
+    "flagged": 164,
+    "hits": 88,
+    "false_alarms": 76,
+    "flags_under_90": 129,
+    "hit_rate": 0.6285714285714286,
+    "hit_ci": [
+     0.5460990905516259,
+     0.7041762122814905
+    ],
+    "fa_rate": 0.04269662921348315,
+    "fa_ci": [
+     0.03424782205679994,
+     0.05311509178039278
+    ],
+    "precision": 0.5365853658536586,
+    "under_90_of_flags": 0.7865853658536586
+   },
+   "ships": true
+  }
  }
 }
