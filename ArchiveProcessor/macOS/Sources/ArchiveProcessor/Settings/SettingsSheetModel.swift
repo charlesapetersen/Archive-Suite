@@ -199,6 +199,8 @@ struct SettingsSheetModel {
     /// The range tab: one chart per card stage (W46.settings-range-view).
     let ranges: [SettingsRangeChart]
     let ruleStages: [RuleStage]
+    /// A card stage's own switches (dating's image pass on every document), by stage (W47.settings-panels).
+    let stageSwitches: [String: [SwitchRow]]
 
     /// The stage cards' override keys, one per card.
     static func overrideKey(_ stage: String) -> SettingsKey { .override(stage: stage, part: "all") }
@@ -247,6 +249,14 @@ struct SettingsSheetModel {
             : "These totals assume every pick is switched on. Process Files does not use the app's picks yet for "
                 + off.joined(separator: " and ") + "; each card below says what it uses now, and its button switches it on."
         ruleStages = Self.ruleStageIDs.compactMap { id in table.stage(id).map { Self.ruleStage($0, resolver: resolver) } }
+        var stageSwitches: [String: [SwitchRow]] = [:]
+        for stage in Self.cardStages {
+            if let st = table.stage(stage) {
+                let rows = Self.switches(st, resolver: resolver)
+                if !rows.isEmpty { stageSwitches[stage] = rows }
+            }
+        }
+        self.stageSwitches = stageSwitches
     }
 
     // MARK: Limits and totals
@@ -974,8 +984,9 @@ struct SettingsSheetModel {
 
     // MARK: Rules
 
-    private static func ruleStage(_ stage: SettingsRouteTable.Stage, resolver: SettingsResolver) -> RuleStage {
-        let switches: [SwitchRow] = stage.rules.compactMap { rule in
+    /// The stage's rules that carry a switch the app stores (`switchKey`), as rows.
+    private static func switches(_ stage: SettingsRouteTable.Stage, resolver: SettingsResolver) -> [SwitchRow] {
+        stage.rules.compactMap { rule in
             guard let sw = rule.switchSetting, let key = Self.switchKey(sw.id) else { return nil }
             let resolved = resolver.resolve(key)
             return SwitchRow(id: sw.id, key: key, label: Self.switchLabel(key) ?? sw.label, isOn: resolved.value.bool ?? sw.defaultValue,
@@ -984,6 +995,10 @@ struct SettingsSheetModel {
                                  : key == .placeHandOnImage && !HandPlacer.isInstalled() ? Self.handDownloadNote : nil,
                              offersHandDownload: key == .placeHandOnImage && !HandPlacer.isInstalled())
         }
+    }
+
+    private static func ruleStage(_ stage: SettingsRouteTable.Stage, resolver: SettingsResolver) -> RuleStage {
+        let switches = Self.switches(stage, resolver: resolver)
         var forms: FormsRow?
         if stage.id == "placement" {
             let resolved = resolver.resolve(.searchableFor)

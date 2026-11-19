@@ -183,6 +183,10 @@ struct PageKindBatchControl: View {
             .menuStyle(.borderlessButton)
             .fixedSize()
             .accessibilityIdentifier("ap.ocr.pageKindBatch")
+            // W47.settings-panels: these menus choose for this batch only and store nothing; say where the stored switch is.
+            Text("For this batch only. Choosing each page's reader by its kind is set in Settings › Reading.")
+                .font(.caption2).foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
             let routed = plan.routedCounts(runModel: runModel)
             if !routed.isEmpty {
                 Text("Read by another model, in the totals: "

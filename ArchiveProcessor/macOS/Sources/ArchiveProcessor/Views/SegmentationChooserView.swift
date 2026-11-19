@@ -18,6 +18,8 @@ struct SegmentationChooserView: View {
     /// the key wizard closes.
     @Binding var routes: SegmentationRoutes
     var options: SegmentationOptions? = SegmentationOptionsStore.shared
+    /// Where the setting lives, said under the picker when this is a shortcut to it (Process Files; W47.settings-panels).
+    var shortcutNote: String? = nil
 
     @State private var wizardSpecs: [ProviderKeySpec] = []
 
@@ -57,6 +59,11 @@ struct SegmentationChooserView: View {
                 }
             }
             .accessibilityIdentifier("ap.segmentation.picker")
+            if let shortcutNote {
+                Text(shortcutNote).font(.caption2).foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("ap.segmentation.home")
+            }
 
             // With both an Anthropic key and `claude`, the user chooses how Claude's windows are paid for.
             if routes.offersClaudeRouteChoice, SegmentationRow.planNotionalUSD(approach, options: options, pageCount: 1) != nil {

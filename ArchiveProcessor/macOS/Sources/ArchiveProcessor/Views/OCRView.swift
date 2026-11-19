@@ -661,6 +661,11 @@ struct OCRView: View {
                             .font(.caption2).foregroundStyle(.primary)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("ap.ocr.reOCRExplanation")
+                        if let home = SettingsPanelOwnership.shortcutNote(DefaultsKeys.taggingModeRaw) {
+                            Text(home).font(.caption2).foregroundStyle(.primary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("ap.ocr.taggingHome")
+                        }
                     }
                     .padding(4)
                     // Full width, so the card ends where the cards above and below it do (it stopped about
@@ -671,7 +676,7 @@ struct OCRView: View {
                 .disabled(isPDFOnlyReOCR)
 
                 // Who proposes the boundaries (W36.seg-opt-chooser). Not for Live Capture: the phone already
-                // gave them. Linked to Settings → Segmentation.
+                // gave them. A shortcut to Settings › Documents, and says so.
                 if captureBoundaries.isEmpty {
                     GroupBox("Segmentation") {
                         VStack(alignment: .leading, spacing: 4) {
@@ -680,7 +685,8 @@ struct OCRView: View {
                                 scaleCaption: segmentationPageCount > 0
                                     ? "for the \(segmentationPageCount) page\(segmentationPageCount == 1 ? "" : "s") dropped"
                                     : "per 100 pages",
-                                routes: $segmentationRoutes)
+                                routes: $segmentationRoutes,
+                                shortcutNote: SettingsPanelOwnership.shortcutNote(DefaultsKeys.segmentationApproach))
                                 .disabled(isPDFOnlyReOCR)
                             // A greyed chooser says why, as Tagging does (W40.fix-processor-start-why).
                             if isPDFOnlyReOCR {

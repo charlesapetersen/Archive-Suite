@@ -1,0 +1,174 @@
+import SwiftUI
+import ArchiveCore
+
+/// Settings › Accounts (W47.settings-panels): the API keys and their status, the gateway key, the Claude and ChatGPT
+/// plans, and the command-line agent's setup.
+struct SettingsAccountsPanel: View {
+    @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
+    @AppStorage(DefaultsKeys.localAgentBinaryPath) private var localAgentBinaryPath: String = ""
+    @AppStorage(DefaultsKeys.localAgentModel) private var localAgentModel: String = ""
+    @State private var anthropicKey = ""
+    @State private var geminiKey = ""
+    @State private var mistralKey = ""
+    @State private var openaiKey = ""
+    @State private var openrouterKey = ""
+    @State private var gatewayKey = ""
+    @State private var localAgentStatus = ""       // Detect & Verify result message (empty = not yet run)
+    @State private var localAgentChecking = false
+    @State private var showKeyWizard = false
+    @State private var showLocalAgentWizard = false
+
+    @State private var showPlanQuestions = false
+
+    var body: some View {
+        Form {
+            apiKeySection
+            Section {
+                LabeledContent("Claude and ChatGPT plans") {
+                    Button("Check and sign in…") { showPlanQuestions = true }
+                        .accessibilityIdentifier("ap.settings.planSignIn")
+                }
+                .help("The plans are asked about, checked and signed in to with the setup questions.")
+            } header: { Text("Plans") }
+            Section {
+                localAgentControls
+            } header: { Text("Command-line agent") }
+        }
+        .formStyle(.grouped)
+        .onAppear { reloadKeys() }
+        .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in reloadKeys() }
+        .sheet(isPresented: $showLocalAgentWizard) {
+            LocalAgentWizard { showLocalAgentWizard = false }
+        }
+        .sheet(isPresented: $showPlanQuestions) { GeneralInterviewView { showPlanQuestions = false } }
+    }
+
+    /// Reload the key fields from the Keychain — on appear and whenever a key changes (e.g. the guided
+    /// wizard saves one), so the SecureFields stay in sync with the "Validated"/"Saved" chips.
+    private func reloadKeys() {
+        anthropicKey = KeychainHelper.load(account: LLMProvider.anthropic.rawValue) ?? ""
+        geminiKey = KeychainHelper.load(account: LLMProvider.gemini.rawValue) ?? ""
+        mistralKey = KeychainHelper.load(account: LLMProvider.mistral.rawValue) ?? ""
+        openaiKey = KeychainHelper.load(account: LLMProvider.openai.rawValue) ?? ""
+        openrouterKey = KeychainHelper.load(account: LLMProvider.openrouter.rawValue) ?? ""
+        gatewayKey = KeychainHelper.load(account: "Gateway") ?? ""
+    }
+
+    /// The Local Agent backend's tool, path and model, and its check (the backend itself is chosen in Settings › Reading).
+    /// Detect & Verify is inert until tapped.
+    @ViewBuilder private var localAgentControls: some View {
+        Picker(selection: $localAgentTool) {
+            ForEach(LocalAgentTool.allCases, id: \.self) { Text($0.displayName).tag($0) }
+        } label: {
+            HStack {
+                Text("CLI tool")
+                HelpButton(text: "Which locally installed CLI performs OCR and tagging. Each authenticates with its own subscription login (Claude Code, Gemini CLI, or OpenAI Codex CLI) — no API key is used. Only Claude Code is verified on this machine so far; Gemini/Codex support is best-effort pending their setup check.")
+            }
+        }
+        .accessibilityIdentifier("ap.settings.localAgentToolPicker")
+        SettingsField("CLI path") {
+            TextField("CLI path", text: $localAgentBinaryPath, prompt: Text("Optional — auto-detected if blank"))
+        }
+        SettingsField("Model") {
+            TextField("Model", text: $localAgentModel, prompt: Text("Optional — the CLI's default if blank"))
+        }
+        HStack {
+            Button {
+                runLocalAgentDetectVerify()
+            } label: {
+                Label(localAgentChecking ? "Checking…" : "Detect & Verify", systemImage: "checkmark.seal")
+            }
+            .disabled(localAgentChecking)
+            HelpButton(text: "Checks that the selected CLI is installed and signed in by running one tiny prompt through it. No API key is used and no document is sent — the CLI authenticates with your subscription.")
+            Button { showLocalAgentWizard = true } label: {
+                Label("Set up (guided)…", systemImage: "wand.and.stars")
+            }
+            .accessibilityIdentifier("ap.settings.localAgentGuidedSetup")
+            HelpButton(text: "Step-by-step setup for Claude Code or the Gemini CLI: how to install, sign in with your subscription, and verify — no API key needed.")
+        }
+        if !localAgentStatus.isEmpty {
+            Text(localAgentStatus).font(.caption).foregroundStyle(.primary)
+        }
+        Text("No API key needed — the CLI uses your existing subscription login. Personal use of your own subscription on your own archive is intended use.")
+            .font(.caption).foregroundStyle(.primary)
+    }
+
+    /// Run detect-and-verify off the main actor and surface the plain-English result. Spawns the CLI
+    /// only on explicit user action; sends no document (a trivial prompt round-trip).
+    private func runLocalAgentDetectVerify() {
+        let config = LocalAgentConfig(tool: localAgentTool,
+                                      binaryPath: localAgentBinaryPath,
+                                      modelOverride: localAgentModel.isEmpty ? nil : localAgentModel)
+        localAgentChecking = true
+        localAgentStatus = ""
+        Task { @MainActor in
+            let status = await LocalAgentValidator.detectAndVerify(config: config)
+            localAgentStatus = status.message(tool: config.tool)
+            localAgentChecking = false
+        }
+    }
+
+    @ViewBuilder private var apiKeySection: some View {
+        Section {
+            Button { showKeyWizard = true } label: {
+                Label("Set up keys (guided) — Gemini, Mistral & OpenAI", systemImage: "wand.and.stars")
+            }
+            .accessibilityIdentifier("ap.settings.guidedKeySetup")
+            keyField("Anthropic", account: LLMProvider.anthropic.rawValue, text: $anthropicKey)
+            keyField("Gemini", account: LLMProvider.gemini.rawValue, text: $geminiKey)
+            keyField("Mistral", account: LLMProvider.mistral.rawValue, text: $mistralKey)
+            keyField("OpenAI", account: LLMProvider.openai.rawValue, text: $openaiKey)
+            keyField("OpenRouter", account: LLMProvider.openrouter.rawValue, text: $openrouterKey)
+            keyField("Gateway", account: "Gateway", text: $gatewayKey)
+        } header: {
+            HStack {
+                Text("API Keys")
+                HelpButton(text: "New here? Tap “Set up keys (guided)” to create your own Gemini, Mistral, or OpenAI key step by step, with a live check that it works. Gemini and Mistral have free tiers; OpenAI is pay-as-you-go. Or paste a key directly below. Each key is stored securely in the macOS Keychain; you only need one provider.")
+            }
+        }
+        .sheet(isPresented: $showKeyWizard) {
+            ProviderKeyWizard { showKeyWizard = false }
+        }
+    }
+
+    @ViewBuilder private func keyField(_ label: String, account: String, text: Binding<String>) -> some View {
+        HStack {
+            Text(label).frame(width: 84, alignment: .leading)
+            // The title is only the accessibility label; the field draws bordered with an empty-state prompt,
+            // so an unset key no longer reads like a stored one (W40.fix-processor-settings-fields).
+            SecureField("\(label) API key", text: text, prompt: Text("Not set — paste a key"))
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.leading)
+                .onChange(of: text.wrappedValue) { _, k in
+                    let t = k.trimmingCharacters(in: .whitespaces)
+                    // Ignore programmatic reloads (e.g. after the wizard saves, or on appear): if the value
+                    // already matches the Keychain, don't re-save, clear the Validated flag, or loop notices.
+                    if t == (KeychainHelper.load(account: account) ?? "") { return }
+                    if t.isEmpty {
+                        KeychainHelper.delete(account: account)
+                        UserDefaults.standard.set(false, forKey: "keySaveFailed_\(account)")
+                    } else {
+                        let ok = KeychainHelper.save(account: account, password: t)
+                        UserDefaults.standard.set(!ok, forKey: "keySaveFailed_\(account)")   // surface a failed write
+                    }
+                    UserDefaults.standard.set(false, forKey: "keyValidated_\(account)")   // manual edit → needs re-validation
+                    NotificationCenter.default.post(name: .apiKeyChanged, object: nil)
+                }
+            keyStatusChip(account: account, hasKey: !text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+    }
+
+    /// Small status chip: green "Validated" once the guided wizard's live check passed, else "Saved".
+    @ViewBuilder private func keyStatusChip(account: String, hasKey: Bool) -> some View {
+        if hasKey && UserDefaults.standard.bool(forKey: "keySaveFailed_\(account)") {
+            Label("Save failed", systemImage: "exclamationmark.triangle.fill")
+                .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.red)
+        } else if UserDefaults.standard.bool(forKey: "keyValidated_\(account)") {
+            Label("Validated", systemImage: "checkmark.seal.fill")
+                .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.green)
+        } else if hasKey {
+            Text("Saved").font(.caption).foregroundStyle(.primary)
+        }
+    }
+}

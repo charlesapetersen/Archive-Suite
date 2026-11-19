@@ -21,22 +21,7 @@ struct SettingsSheetView: View {
     var initialTab: Tab = .choices
     var onDone: () -> Void
 
-    @ObservedObject private var store = SettingsLayerStore.shared
-    @AppStorage(DefaultsKeys.segmentationApproach) private var segmentationRaw = SegmentationApproach.defaultApproach.rawValue
-    @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
-    @AppStorage(DefaultsKeys.useAppleVision) private var useAppleVision = false
-    @AppStorage(DefaultsKeys.useGateway) private var useGateway = false
-    @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent = false
-    @AppStorage(DefaultsKeys.localAgentTool) private var localAgentToolRaw = LocalAgentTool.claude.rawValue
-    @AppStorage(DefaultsKeys.localAgentModel) private var localAgentModel = ""
-    @AppStorage(DefaultsKeys.batchMode) private var batchMode = false
-    @ObservedObject private var modelStore = ModelSelectionStore.shared
-
     @State private var tab: Tab = .choices
-    @State private var doc: CollectionSettingsDocument?
-    @State private var problem: String?
-
-    private var resolver: SettingsResolver { store.resolver(for: doc) }
 
     static func running(segmentation: SegmentationApproach, useAppleVision: Bool, useGateway: Bool,
                         useLocalAgent: Bool, provider: LLMProvider, model: LLMModel,
@@ -65,51 +50,40 @@ struct SettingsSheetView: View {
         return .init(readingRouteID: id, readingName: model.displayName, segmentation: segmentation)
     }
 
-    private var model: SettingsSheetModel? {
-        guard let table = SettingsRouteTable.bundled, table.problems().isEmpty else { return nil }
-        let running = Self.running(
-            segmentation: SegmentationApproach(rawValue: segmentationRaw) ?? .defaultApproach,
-            useAppleVision: useAppleVision, useGateway: useGateway, useLocalAgent: useLocalAgent,
-            provider: selectedProvider, model: modelStore.model(for: selectedProvider), table: table,
-            localAgentTool: LocalAgentTool(rawValue: localAgentToolRaw) ?? .claude, localAgentModel: localAgentModel)
-        return SettingsSheetModel(table: table, pairs: OCRPairMatrix.bundled, resolver: resolver,
-                                  macMemoryGB: SettingsLayerStore.thisMacMemoryGB, pages: pages,
-                                  month: store.monthSpend(), running: running)
-    }
-
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            if let model {
-                ScrollView {
-                    SettingsSheetPage(model: model, tab: tab, choose: choose, apply: apply, setSwitch: setSwitch,
-                                      setStrings: setStrings)
+        SettingsSheetHost(outputFolder: outputFolder, pages: pages) { model, actions in
+            VStack(spacing: 0) {
+                header
+                Divider()
+                if let model {
+                    ScrollView {
+                        // Each card and rule says which Settings panel it is set in (W47.settings-panels).
+                        SettingsSheetPage(model: model, tab: tab, choose: actions.choose, apply: actions.apply,
+                                          setSwitch: actions.setSwitch, setStrings: actions.setStrings,
+                                          seeRange: { tab = .range }, showsHomes: true)
+                    }
+                } else {
+                    Text("The measured figures are missing from this build, so the settings sheet cannot be shown.")
+                        .padding(24)
+                    Spacer()
                 }
-            } else {
-                Text("The measured figures are missing from this build, so the settings sheet cannot be shown.")
-                    .padding(24)
-                Spacer()
-            }
-            Divider()
-            HStack {
-                if let message = problem ?? store.lastProblem {
-                    Text(message).font(.caption).foregroundStyle(.red)
+                Divider()
+                HStack {
+                    if let message = actions.problem {
+                        Text(message).font(.caption).foregroundStyle(.red)
+                    }
+                    Spacer()
+                    Button("Done", action: onDone)
+                        .keyboardShortcut(.defaultAction)
+                        .accessibilityIdentifier("ap.sheet.done")
                 }
-                Spacer()
-                Button("Done", action: onDone)
-                    .keyboardShortcut(.defaultAction)
-                    .accessibilityIdentifier("ap.sheet.done")
+                .padding(12)
             }
-            .padding(12)
         }
         .frame(minWidth: 720, idealWidth: 780, minHeight: 560, idealHeight: 720)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ap.sheet")
-        .onAppear {
-            tab = initialTab
-            reload()
-        }
+        .onAppear { tab = initialTab }
     }
 
     private var header: some View {
@@ -131,6 +105,58 @@ struct SettingsSheetView: View {
             .accessibilityIdentifier("ap.sheet.tab")
         }
         .padding(16)
+    }
+}
+
+/// What a sheet page or a Settings panel's cards do when the user chooses: written through `SettingsSheetWriter` or to
+/// what Process Files runs. `problem` is the last write's failure, in words.
+struct SettingsSheetActions {
+    var choose: (String, String?) -> Void
+    var apply: (SettingsSheetModel.Apply) -> Void
+    var setSwitch: (SettingsKey, Bool) -> Void
+    var setStrings: (SettingsKey, [String]) -> Void
+    var problem: String?
+}
+
+/// Builds the settings sheet's model for the collection and this Mac, and writes its choices. Shared by the modal
+/// sheet and the Settings panels' stage cards (W47.settings-panels), so the two read and write the same layers.
+struct SettingsSheetHost<Content: View>: View {
+    let outputFolder: URL?
+    let pages: Int
+    @ViewBuilder var content: (SettingsSheetModel?, SettingsSheetActions) -> Content
+
+    @ObservedObject private var store = SettingsLayerStore.shared
+    @AppStorage(DefaultsKeys.segmentationApproach) private var segmentationRaw = SegmentationApproach.defaultApproach.rawValue
+    @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
+    @AppStorage(DefaultsKeys.useAppleVision) private var useAppleVision = false
+    @AppStorage(DefaultsKeys.useGateway) private var useGateway = false
+    @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent = false
+    @AppStorage(DefaultsKeys.localAgentTool) private var localAgentToolRaw = LocalAgentTool.claude.rawValue
+    @AppStorage(DefaultsKeys.localAgentModel) private var localAgentModel = ""
+    @AppStorage(DefaultsKeys.batchMode) private var batchMode = false
+    @ObservedObject private var modelStore = ModelSelectionStore.shared
+
+    @State private var doc: CollectionSettingsDocument?
+    @State private var problem: String?
+
+    private var resolver: SettingsResolver { store.resolver(for: doc) }
+
+    private var model: SettingsSheetModel? {
+        guard let table = SettingsRouteTable.bundled, table.problems().isEmpty else { return nil }
+        let running = SettingsSheetView.running(
+            segmentation: SegmentationApproach(rawValue: segmentationRaw) ?? .defaultApproach,
+            useAppleVision: useAppleVision, useGateway: useGateway, useLocalAgent: useLocalAgent,
+            provider: selectedProvider, model: modelStore.model(for: selectedProvider), table: table,
+            localAgentTool: LocalAgentTool(rawValue: localAgentToolRaw) ?? .claude, localAgentModel: localAgentModel)
+        return SettingsSheetModel(table: table, pairs: OCRPairMatrix.bundled, resolver: resolver,
+                                  macMemoryGB: SettingsLayerStore.thisMacMemoryGB, pages: pages,
+                                  month: store.monthSpend(), running: running)
+    }
+
+    var body: some View {
+        content(model, SettingsSheetActions(choose: choose, apply: apply, setSwitch: setSwitch, setStrings: setStrings,
+                                            problem: problem ?? store.lastProblem))
+            .onAppear { reload() }
     }
 
     // MARK: Writing
@@ -228,6 +254,10 @@ struct SettingsSheetPage: View {
     var apply: (SettingsSheetModel.Apply) -> Void = { _ in }
     var setSwitch: (SettingsKey, Bool) -> Void = { _, _ in }
     var setStrings: (SettingsKey, [String]) -> Void = { _, _ in }
+    /// Each card's "See the range" link; nil draws none.
+    var seeRange: (() -> Void)? = nil
+    /// Each card and rule names the Settings panel it is set in (the modal sheet; W47.settings-panels).
+    var showsHomes = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -244,6 +274,38 @@ struct SettingsSheetPage: View {
     // MARK: Choices
 
     @ViewBuilder private func choices(_ m: SettingsSheetModel) -> some View {
+        SheetLimitsAndTotals(model: m)
+
+        ForEach(m.cards) { card in
+            StageCardView(card: card, choose: { choose(card.id, $0) }, backToApp: { choose(card.id, nil) },
+                          apply: apply, seeRange: seeRange,
+                          homeNote: showsHomes ? SettingsPanelOwnership.stageNote(card.id) : nil)
+            ForEach(m.stageSwitches[card.id] ?? []) { sw in
+                SheetSwitchRow(row: sw, setSwitch: setSwitch)
+            }
+        }
+    }
+
+    // MARK: Rules
+
+    @ViewBuilder private func rules(_ m: SettingsSheetModel) -> some View {
+        Text("These steps were measured and have no trade-off to choose: every option tried was the same or worse. "
+             + "They run the same way for every collection; a switch is shown only where one is offered.")
+            .font(.callout)
+            .fixedSize(horizontal: false, vertical: true)
+        ForEach(m.ruleStages) { stage in
+            RuleStageBox(stage: stage, setSwitch: setSwitch, setStrings: setStrings,
+                         homeNote: showsHomes ? SettingsPanelOwnership.stageNote(stage.id) : nil)
+        }
+    }
+}
+
+/// The limits the user set and this batch's totals: the top of the sheet, and the Collection panel's strip.
+struct SheetLimitsAndTotals: View {
+    let model: SettingsSheetModel
+
+    var body: some View {
+        let m = model
         SheetBox {
             Text("Your limits").font(.headline)
         } content: {
@@ -294,60 +356,69 @@ struct SettingsSheetPage: View {
                 ForEach(m.toRelax, id: \.self) { Text("• \($0)").font(.caption).fixedSize(horizontal: false, vertical: true) }
             }
         }
-
-        ForEach(m.cards) { card in
-            StageCardView(card: card, choose: { choose(card.id, $0) }, backToApp: { choose(card.id, nil) },
-                          apply: apply)
-        }
     }
+}
 
-    // MARK: Rules
+/// One table switch, with where its value comes from.
+struct SheetSwitchRow: View {
+    let row: SettingsSheetModel.SwitchRow
+    var setSwitch: (SettingsKey, Bool) -> Void
 
-    @ViewBuilder private func rules(_ m: SettingsSheetModel) -> some View {
-        Text("These steps were measured and have no trade-off to choose: every option tried was the same or worse. "
-             + "They run the same way for every collection; a switch is shown only where one is offered.")
-            .font(.callout)
-            .fixedSize(horizontal: false, vertical: true)
-        ForEach(m.ruleStages) { stage in
-            SheetBox {
-                Text(stage.title).font(.headline)
-            } content: {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(stage.text).fixedSize(horizontal: false, vertical: true)
-                    ForEach(stage.switches) { sw in
-                        Toggle(isOn: Binding(get: { sw.isOn }, set: { setSwitch(sw.key, $0) })) {
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(sw.label)
-                                Text(sw.source).font(.caption2).foregroundStyle(.secondary)
-                                if let note = sw.note {
-                                    Text(note).font(.caption2).italic().foregroundStyle(.secondary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                            }
-                        }
-                        .accessibilityIdentifier("ap.sheet.switch.\(sw.id)")
-                        if sw.offersHandDownload { HandPlacerDownloadRow() }
-                    }
-                    if stage.id == "layout" { NewspaperLayoutDownloadRow() }
-                    if let forms = stage.forms { formsRow(forms) }
-                    DisclosureGroup("The rules in detail") {
-                        VStack(alignment: .leading, spacing: 3) {
-                            ForEach(stage.rules) { r in
-                                Text("• \(r.text)" + (r.source.map { " (\($0))" } ?? ""))
-                                    .font(.caption).fixedSize(horizontal: false, vertical: true)
-                            }
-                            if let s = stage.source {
-                                Text("Source: \(s)").font(.caption2).foregroundStyle(.secondary)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .font(.caption)
+    var body: some View {
+        let sw = row
+        Toggle(isOn: Binding(get: { sw.isOn }, set: { setSwitch(sw.key, $0) })) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(sw.label)
+                Text(sw.source).font(.caption2).foregroundStyle(.secondary)
+                if let note = sw.note {
+                    Text(note).font(.caption2).italic().foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .accessibilityIdentifier("ap.sheet.rule.\(stage.id)")
         }
+        .accessibilityIdentifier("ap.sheet.switch.\(sw.id)")
+        if sw.offersHandDownload { HandPlacerDownloadRow() }
+    }
+}
+
+/// One stage that is a rule rather than a choice: its text, its switches and its rules in detail.
+struct RuleStageBox: View {
+    let stage: SettingsSheetModel.RuleStage
+    var setSwitch: (SettingsKey, Bool) -> Void
+    var setStrings: (SettingsKey, [String]) -> Void
+    /// Where the stage is set, in the modal sheet (W47.settings-panels).
+    var homeNote: String? = nil
+
+    var body: some View {
+        SheetBox {
+            Text(stage.title).font(.headline)
+        } content: {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(stage.text).fixedSize(horizontal: false, vertical: true)
+                if let homeNote {
+                    Text(homeNote).font(.caption2).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("ap.sheet.home.\(stage.id)")
+                }
+                ForEach(stage.switches) { sw in SheetSwitchRow(row: sw, setSwitch: setSwitch) }
+                if stage.id == "layout" { NewspaperLayoutDownloadRow() }
+                if let forms = stage.forms { formsRow(forms) }
+                DisclosureGroup("The rules in detail") {
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(stage.rules) { r in
+                            Text("• \(r.text)" + (r.source.map { " (\($0))" } ?? ""))
+                                .font(.caption).fixedSize(horizontal: false, vertical: true)
+                        }
+                        if let s = stage.source {
+                            Text("Source: \(s)").font(.caption2).foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .font(.caption)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityIdentifier("ap.sheet.rule.\(stage.id)")
     }
 
     /// W42.int-s5-compress — the searchable form's switches: every page, or by kind.
@@ -377,7 +448,6 @@ struct SettingsSheetPage: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ap.sheet.forms")
     }
-
 }
 
 /// A titled box drawn in SwiftUI alone (a `GroupBox` draws nothing offscreen, so the self-test could not see it).
@@ -404,6 +474,10 @@ struct StageCardView: View {
     var choose: (String) -> Void
     var backToApp: () -> Void
     var apply: (SettingsSheetModel.Apply) -> Void
+    /// Opens the Range view at this card's chart; nil draws no link.
+    var seeRange: (() -> Void)? = nil
+    /// Where the card's stage is set, in the modal sheet (W47.settings-panels).
+    var homeNote: String? = nil
 
     var body: some View {
         SheetBox {
@@ -415,6 +489,10 @@ struct StageCardView: View {
         } content: {
             VStack(alignment: .leading, spacing: 8) {
                 Text(card.about).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                if let homeNote {
+                    Text(homeNote).font(.caption2).foregroundStyle(.secondary)
+                        .accessibilityIdentifier("ap.sheet.home.\(card.id)")
+                }
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(card.routeName).font(.title3.weight(.semibold))
                         .fixedSize(horizontal: false, vertical: true)
@@ -504,6 +582,12 @@ struct StageCardView: View {
                     }
                     .fixedSize()
                     .accessibilityIdentifier("ap.sheet.override.\(card.id)")
+                    if let seeRange {
+                        Button("See the range") { seeRange() }
+                            .buttonStyle(.link)
+                            .help("Every measured route for this stage on one chart, with this card's pick marked.")
+                            .accessibilityIdentifier("ap.sheet.seeRange.\(card.id)")
+                    }
                     if card.isCustom || card.hasOverride {
                         Button(card.isCustom ? "Back to the app's pick" + (card.appPick.map { " (\($0))" } ?? "")
                                : "Clear an old choice") { backToApp() }
