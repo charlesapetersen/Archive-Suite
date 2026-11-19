@@ -221,6 +221,14 @@ user's run there), with a warning. A value one box's read filled into an earlier
 changes it; the user corrects the run. The caller shows the result for the user to accept before anything is
 written.
 
+**Reading a label** (`ContainerLabelReader`, W47.ct-processor-capture). `parse` is `ct_read.py` `vision_read`, the
+Vision + parser route as scored, from the photo's text lines and its item type. `proposals` takes container, folder,
+series and series title from it; repository, collection title, collection number, date and accession from a model's
+reading of the photo when there is one, else from the parser; the container from the model only where the parser
+reads none; and collection subtitle, box title, folder title and other marks from nobody, for the user to write. A
+folder label keeps only folder, folder title, date and other marks. Every value is source `label` with its `reader`
+until the user confirms it.
+
 ## Warnings
 
 `ContainerInference.applyMarkers` and `.warnings` give the warnings; they are shown, never acted on.
