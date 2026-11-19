@@ -186,7 +186,9 @@ The measurement comes first and the build waits on the owner's look at it (`W47.
    for the record, the inheritance rule, the container file and the level map (`packages/ArchiveCore/Sources/ArchiveCore/Containers/`).
 7. `W47.ct-infer` — the inference in ArchiveCore: both routes, the level map, the name patterns, merging. Done
    2026-11-19: `ContainerInference` and `ContainerPatterns`, `SPEC/containers.md` §Name patterns, §Route A, §Warnings.
-8. `W47.ct-reader-view` — the column and facets.
+8. `W47.ct-reader-view` — the column and facets. Done 2026-11-19: the Container column, the Containers facet menu,
+   the Inspector's Container section and the folder-levels sheet (`ArchiveReader/KNOWN_ISSUES.md` "Containers in the
+   list").
 9. `W47.ct-reader-edit` — the editor.
 10. `W47.ct-processor-capture` — label reading at capture and the confirm card (waits on `W46.review-done`).
 11. `W47.ct-processor-intake` — Route B in Process Files: nested directories read with the level map.

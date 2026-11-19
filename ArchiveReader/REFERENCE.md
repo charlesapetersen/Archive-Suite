@@ -493,6 +493,12 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
                               Levenshtein, union-find) behind Find Similar Tags; suggests merges, never writes.
   LibraryFilter.swift         LibraryFilter (Codable, incl. pathPrefix folder-scope) + LibrarySort
                               (decorated: Int key columns, paths ranked only for full ties).
+  ContainerCatalog.swift      W47.ct-reader-view: each listed file's container (box, folder, collection…) from the
+                              container files, the nearest level map and standard names under the archive's main
+                              folder, resolved by ArchiveCore's ContainerResolver; the column cell, facet values and
+                              the Inspector's detail with each value's FieldStatus. Read only, built off main.
+  ContainerLevelsDraft.swift  The level map as the sheet edits it: pre-filled (ContainerLevelMap.prefilled), examples
+                              per level, workflow folders and what their contents are, a preview; tied to its tree.
   CollationRanks.swift        localizedStandardCompare ranks cached across sorts, + UTF8Key (byte-
                               keyed hashing; String normalizes non-ASCII on every hash).
   ReaderStages.swift          os_signpost intervals (`com.archivereader.app`/`Stages`) around the stages one
@@ -535,6 +541,11 @@ Search/                       Discovery + disposable caches (never the corpus):
   FlagStore.swift             Per-file flag in UserDefaults (outside the corpus); notes are Archive Notes' job.
   SavedSearch.swift           Named filter+FTS query (smart folders), UserDefaults-persisted.
 Views/
+  NavigationModel+Containers.swift  W47.ct-reader-view: one catalog build at a time off main, the level map offered
+                              once per root after the settled build, File ▸ Container Levels…, Save writing only
+                              `.archivesuite/container-levels.json` (ContainerFileStore.writeLevelMap) into its tree.
+  ContainerSection.swift      The Inspector's Container section (FieldStatusRow per value, disagreements listed) and
+                              ContainerLevelsSheet.
   NavigationModel+ImproveOCR.swift  W44.reocr-reader: Flag as Poor OCR (off the main thread, one ledger group;
                               a stale batch result never overwrites a newer row), Connect Improve OCR Folder…,
                               Improve OCR… (ImproveOCROpener: Launch Services, or the DEBUG recorder), receipts →

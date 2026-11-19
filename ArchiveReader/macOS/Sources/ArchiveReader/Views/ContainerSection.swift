@@ -32,8 +32,6 @@ struct ContainerSection: View {
                     .font(.callout).foregroundStyle(.secondary)
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("ar.container")
     }
 }
 
@@ -90,7 +88,7 @@ struct ContainerLevelsSheet: View {
         }
         .padding(20)
         .frame(width: 560)
-        .accessibilityIdentifier("ar.containerLevels")
+        // No identifier on the whole sheet: on a stack it would replace its children's (KNOWN_ISSUES).
     }
 
     private func levelRow(_ depth: Int) -> some View {

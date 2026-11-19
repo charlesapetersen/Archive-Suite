@@ -55,7 +55,7 @@ final class ContainerUITests: XCTestCase {
         let app = launch(["-ARUITestOfferContainerLevels"])
         waitForRows(app, 5)
 
-        let sheet = app.descendants(matching: .any)["ar.containerLevels"]
+        let sheet = app.buttons["ar.containerLevels.save"]
         XCTAssertTrue(sheet.waitForExistence(timeout: 60), "offered once the scan has settled")
         let preview = app.staticTexts["ar.containerLevels.preview"]
         XCTAssertTrue(preview.waitForExistence(timeout: 5))
@@ -64,7 +64,7 @@ final class ContainerUITests: XCTestCase {
         _ = captureScreenshot("containers-level-sheet")
         let mapURL = corpus.appendingPathComponent(".archivesuite/container-levels.json")
         XCTAssertFalse(FileManager.default.fileExists(atPath: mapURL.path), "nothing is written before Save")
-        app.buttons["ar.containerLevels.save"].click()
+        sheet.click()
         XCTAssertTrue(sheet.waitForNonExistence(timeout: 10))
         XCTAssertTrue(FileManager.default.fileExists(atPath: mapURL.path), "Save writes the level map")
 
@@ -105,6 +105,6 @@ final class ContainerUITests: XCTestCase {
         let again = launch(["-ARUITestOfferContainerLevels"])
         waitForRows(again, 5)
         RunLoop.current.run(until: Date().addingTimeInterval(3))
-        XCTAssertFalse(again.descendants(matching: .any)["ar.containerLevels"].exists, "a root with a map is not asked")
+        XCTAssertFalse(again.buttons["ar.containerLevels.save"].exists, "a root with a map is not asked")
     }
 }

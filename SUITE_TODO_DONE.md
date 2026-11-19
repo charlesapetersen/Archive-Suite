@@ -16845,3 +16845,35 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   (W46.date-evidence-check, d30d68ec) shipped 2026-11-11. The answers are W47.withheld-calls, behind the owner gate.
   $0, no model calls. Bench cache: kept REHEARSAL/withheld-review/index.html (51 KB, the sheet the owner will answer).
   <!-- /W47.withheld-review -->
+- [x] **W47.ct-reader-view — the Container column and facets in the Reader [M]** · §Archival containers — W47 (owner, 2026-10-21) (lane: reader) (uses: build,vm) (blocked-on: W47.ct-infer) — A Container column and facets for repository, collection, accession, series and container, read from the container files and the inference; the Route B level-map sheet when a root is first added. detail: execution-plans/containers/00-plan.md Show each value's state with `FieldStatusPolicy.container` and ArchiveCoreUI's `FieldStatusBadge`, as the Inspector's Checks do (W40.reader-field-status). Show values through `ContainerDisplay.values` and warn with `ContainerDisplay.disagreements` (title case, standard names; W47.ct-normalise).
+  SHIPPED 2026-11-19. `Core/ContainerCatalog.swift` reads, off the main thread, every listed directory's container
+  file, the nearest level map and standard names under the archive's main folder (the granted folder, or its "Archival
+  Photos"), and resolves each file through `ContainerResolver` (runs, directory values, the level map's path values,
+  the numbers in its own name), shown through `ContainerDisplay.values`. The **Container** column (box, box title,
+  folder and folder title, else the collection or repository; ⚠︎ and a tooltip where `ContainerDisplay.disagreements`
+  finds sources disagreeing; `SortField.container` through `SortMarks`) is hidden while no file has a value, as Capture
+  marker is. A **Containers** menu in the filter bar lists repository, collection, accession, series and container,
+  each value with its file count (100 most common per facet); a chosen value filters the list (by `ContainerNames.key`,
+  applied by the model, not until the catalog for the root is built) and is a removable chip. The Inspector's
+  **Container** section lists one file's values with `FieldStatusRow` and `FieldStatusPolicy.container` (the run's
+  level passed, so a Vision + parser box number on a box run is Unchecked and clears the rule; a value filled by a
+  standard name is as sure as the value it matched) and each disagreement with its candidates and sources. The
+  **folder levels** sheet (`ContainerLevelsDraft`, `ContainerLevelsSheet`) is offered once per root after its scan has
+  settled and the published catalog is from the settled paths, and from File ▸ Container Levels…: each level with
+  examples and a role picker, the workflow folders skipped and what the folders inside them are (`children`), a
+  preview of one folder's values; Save writes only `<main folder>/.archivesuite/container-levels.json` through
+  `ContainerFileStore.writeLevelMap`, only into the tree the sheet was made for; Not Now writes nothing. Tier-2
+  review (Opus): no unsafe write path found; it raised the draft built on the main thread from one entry per file
+  (a hang at corpus size), Save writing into a root chosen after the sheet opened, a build per first-scan batch, the
+  offer using a partial catalog, a stale old-root build landing after a root change, Rescan not re-reading container
+  files, a standard-name fill shown as checked, an unreadable nested map falling back to an outer one, and a facet
+  restored at launch hiding every row; all fixed with tests. Tests: ContainerViewTests 14 (scratch trees: nothing
+  written while building; only the map file new on save; a refused save into another tree), the sort, column-fit and
+  header-menu tests updated; Reader unit bundle 933 tests, 0 failures, no new warnings (the "Publishing changes"
+  runtime note in NavigationWindowMinimumWidthTests is the same on the pre-change commit); ContainerUITests passed in
+  the Tart VM (screenshots `containers-level-sheet`, `-column`, `-facet`, `-inspector`: the sheet's levels and
+  preview, the column, the chip narrowing to Box 18, the Inspector's badges). Left open: editing (W47.ct-reader-edit),
+  container rules for smart folders (W47.ct-reader-facet-rules, filed); limits in ArchiveReader/KNOWN_ISSUES.md
+  "Containers in the list"; SPEC/containers.md §The level map says how the Reader picks the tree root and the nearest
+  map. No migration: nothing to migrate. $0. No bench cache used.
+  <!-- /W47.ct-reader-view -->

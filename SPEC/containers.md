@@ -164,6 +164,12 @@ container file. Reading is strict: a role this build does not know makes the map
 | `overrides` | Relative path (names joined by `/`, as written) to `{ "role": R, "children": C? }`, for one directory. |
 | `updatedAt` | When the map was confirmed. |
 
+The Reader (`W47.ct-reader-view`) takes as the root of the tree the archive's main folder: the folder the user
+granted, or its "Archival Photos" folder when it holds one. It offers the pre-filled map once per root, after the
+root's scan has settled, and from File ▸ Container Levels…, and writes it only on Save, only into the tree the sheet
+was made for. The nearest map above a directory wins even when this build cannot read it: that subtree then has no
+path values, rather than an outer map's.
+
 - In `levels`, `ignore` occupies its depth and names no field ("ignore this level").
 - An override with role `ignore` is a workflow folder ("05 Final Tagging"): it names no field and does not count, so
   its subfolders take the role it would have had. Any other override role names that directory's role, and its
