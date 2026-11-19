@@ -85,13 +85,19 @@ public enum ContainerFileStore {
     /// `settingAside`: only on the user's explicit say-so, when the document on disk is unreadable or holds values
     /// this build drops. That document is renamed, not deleted, to `<name>.set-aside-<UTC stamp>-<id>` in
     /// `.archivesuite`, and the new one written in its place. A newer document is never set aside.
+    ///
+    /// Returns the stamp of the document as written, taken under the lock, so a later writer (an undo) can tell
+    /// whether anyone has changed it since.
+    @discardableResult
     public static func write(_ file: ContainerFile, directory: URL, expecting: ContainerFileStamp?,
-                             settingAside: Bool = false) throws {
+                             settingAside: Bool = false) throws -> ContainerFileStamp {
         try write(file, in: directory, name: ContainerFile.fileName, version: ContainerFile.schemaVersion,
                   expecting: expecting, settingAside: settingAside)
     }
 
-    public static func writeLevelMap(_ map: ContainerLevelMap, root: URL, expecting: ContainerFileStamp?) throws {
+    @discardableResult
+    public static func writeLevelMap(_ map: ContainerLevelMap, root: URL, expecting: ContainerFileStamp?) throws
+        -> ContainerFileStamp {
         try write(map, in: root, name: ContainerLevelMap.fileName, version: ContainerLevelMap.schemaVersion,
                   expecting: expecting)
     }
@@ -105,7 +111,9 @@ public enum ContainerFileStore {
         load(root, ContainerNames.fileName, version: ContainerNames.schemaVersion)
     }
 
-    public static func writeNames(_ names: ContainerNames, root: URL, expecting: ContainerFileStamp?) throws {
+    @discardableResult
+    public static func writeNames(_ names: ContainerNames, root: URL, expecting: ContainerFileStamp?) throws
+        -> ContainerFileStamp {
         try write(names, in: root, name: ContainerNames.fileName, version: ContainerNames.schemaVersion,
                   expecting: expecting)
     }
@@ -215,10 +223,11 @@ public enum ContainerFileStore {
 
     // MARK: Writing
 
+    @discardableResult
     static func write<D: Codable & Equatable & Sendable>(
         _ document: D, in directory: URL, name: String, version: Int, expecting: ContainerFileStamp?,
         settingAside: Bool = false
-    ) throws {
+    ) throws -> ContainerFileStamp {
         let data = try encoder.encode(document)
         guard data.count <= ContainerFile.maxFileBytes else { throw ContainerWriteError.tooBig }
 
@@ -300,6 +309,10 @@ public enum ContainerFileStore {
             flags = 0
         }
         renamed = true
+        // Still under the lock: what was just put in place, not a later writer's.
+        var st = stat()
+        guard fstatat(sfd, name, &st, AT_SYMLINK_NOFOLLOW) == 0 else { throw ContainerWriteError.io("stat", errno) }
+        return makeStamp(st, dropped: false)
     }
 
     /// Renames the document in place to `<name>.set-aside-<UTC stamp>-<id>`, never over another file.

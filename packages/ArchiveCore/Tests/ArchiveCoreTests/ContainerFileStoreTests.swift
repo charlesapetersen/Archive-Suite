@@ -91,6 +91,18 @@ final class ContainerFileStoreTests: XCTestCase {
         XCTAssertEqual(ContainerFileStore.load(directory: dir).document?.runs.first?.fields[.container]?.value, "Box 18")
     }
 
+    /// W47.ct-reader-edit-undo: a write returns the stamp of what it put in place, so an undo can check the file is
+    /// still that one; a later write makes it stale.
+    func testAWriteReturnsTheStampTheNextReadSees() throws {
+        let first = try ContainerFileStore.write(sample(), directory: dir, expecting: nil)
+        XCTAssertEqual(ContainerFileStore.load(directory: dir).stamp, first)
+        let second = try ContainerFileStore.write(sample("Box 18"), directory: dir, expecting: first)
+        XCTAssertNotEqual(second, first)
+        XCTAssertEqual(ContainerFileStore.load(directory: dir).stamp, second)
+        let names = try ContainerFileStore.writeNames(ContainerNames(), root: dir, expecting: nil)
+        XCTAssertEqual(ContainerFileStore.loadNames(root: dir).stamp, names)
+    }
+
     func testANewerDocumentIsNeitherReadNorOverwritten() throws {
         try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: false)
         let newer = Data(#"{"schemaVersion": 2, "whatever": true}"#.utf8)

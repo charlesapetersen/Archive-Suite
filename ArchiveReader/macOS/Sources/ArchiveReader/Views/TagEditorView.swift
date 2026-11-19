@@ -9,6 +9,8 @@ struct TagEditorView: View {
     /// Observed through `feed`, and only while shown (`TagInspectorView`).
     let model: NavigationModel
     @StateObject private var feed = InspectorFeed()
+    /// The window's: container edits are undone from Edit ▸ Undo (W47.ct-reader-edit-undo).
+    @Environment(\.undoManager) private var undoManager
     /// Immutable for this editor instance, so a departing field always writes its original targets.
     /// (W40.fix-reader-menus-follow-window). Every write still goes through `NavigationModel` → `TagWriter`.
     let targetPaths: [String]
@@ -53,9 +55,11 @@ struct TagEditorView: View {
                        let editor = model.containerCatalog.editor(forPath: file.path) {
                         ContainerSection(detail: model.containerCatalog.detail(forPath: file.path), editor: editor,
                                          error: model.containerEditError, saving: model.containerEditSaving,
-                                         onEdit: { model.editContainerField($0, $1, forPath: file.path) },
+                                         onEdit: { model.editContainerField($0, $1, forPath: file.path,
+                                                                            undo: undoManager) },
                                          onName: { model.setContainerStandardName($2, for: $1, field: $0,
-                                                                                  forPath: file.path) },
+                                                                                  forPath: file.path,
+                                                                                  undo: undoManager) },
                                          onShowWarning: { model.selectContainerWarning($0) })
                             .id(file.path)
                         Divider()
@@ -63,7 +67,8 @@ struct TagEditorView: View {
                         ContainerSelectionSection(count: files.count, error: model.containerEditError,
                                                   saving: model.containerEditSaving,
                                                   onSet: { model.setContainerFieldForSelection($0, $1,
-                                                                                               paths: files.map(\.path)) })
+                                                                                               paths: files.map(\.path),
+                                                                                               undo: undoManager) })
                         Divider()
                     }
                     qualitySection(s)

@@ -310,6 +310,129 @@ final class ContainerEditTests: XCTestCase {
         XCTAssertEqual(try snapshot(), before, "not even an empty .archivesuite")
     }
 
+    // MARK: Undo and Redo (W47.ct-reader-edit-undo)
+
+    private func makeFolder(_ name: String) throws -> URL {
+        let dir = root.appendingPathComponent(name, isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        for n in names { try Data("scratch fixture".utf8).write(to: dir.appendingPathComponent(n)) }
+        return dir.resolvingSymlinksInPath()
+    }
+
+    func testUndoPutsBackWhatTheEditReplacedAndRedoTakesItForwardAgain() throws {
+        let box = try makeBox()
+        try ContainerFileStore.write(boxAndFolder, directory: box, expecting: nil)
+        let original = try XCTUnwrap(ContainerFileStore.load(directory: box).document)
+        let restore = try XCTUnwrap(try NavigationModel.editContainerFile(at: box) { file in
+            ContainerEdits.set(.container, to: self.user("Box 9"), at: .run(start: "a.pdf", level: .box), in: file)
+        })
+        let edited = try XCTUnwrap(ContainerFileStore.load(directory: box).document)
+        XCTAssertEqual(shown(.container, edited).first, "Box 9")
+
+        let undone = ContainerUndoStep(restores: [restore]).apply()
+        XCTAssertTrue(undone.failures.isEmpty)
+        XCTAssertEqual(ContainerFileStore.load(directory: box).document, original, "the label read is back as it was")
+        let redone = undone.inverse.apply()
+        XCTAssertTrue(redone.failures.isEmpty)
+        XCTAssertEqual(ContainerFileStore.load(directory: box).document, edited)
+        XCTAssertTrue(redone.inverse.apply().failures.isEmpty, "and undone again")
+        XCTAssertEqual(ContainerFileStore.load(directory: box).document, original)
+    }
+
+    func testUndoLeavesAFileChangedSinceTheEditAlone() throws {
+        let box = try makeBox()
+        let restore = try XCTUnwrap(try NavigationModel.editContainerFile(at: box) { file in
+            ContainerEdits.set(.container, to: self.user("Box 9"), at: .directory, in: file)
+        })
+        // Another app writes in between.
+        guard case let .loaded(doc, stamp) = ContainerFileStore.load(directory: box) else { return XCTFail() }
+        let other = try XCTUnwrap(ContainerEdits.set(.container, to: user("Box 3"), at: .directory, in: doc))
+        try ContainerFileStore.write(other, directory: box, expecting: stamp)
+        let before = try snapshot()
+        let result = ContainerUndoStep(restores: [restore]).apply()
+        XCTAssertEqual(result.failures.count, 1)
+        XCTAssertEqual(result.failures.first?.error as? ContainerWriteError, .changedSinceRead)
+        XCTAssertTrue(result.inverse.restores.isEmpty, "nothing to redo")
+        XCTAssertEqual(try snapshot(), before, "the other app's file is left as it is")
+        XCTAssertTrue(containerUndoMessage(result.failures[0].error).contains("changed after the edit"))
+    }
+
+    func testUndoOfAFolderThatHadNoFileLeavesAnEmptyOne() throws {
+        let box = try makeBox()
+        let restore = try XCTUnwrap(try NavigationModel.setForSelection(.container, user("Box 5"),
+                                                                        selected: ["b.pdf"], in: box))
+        XCTAssertTrue(ContainerUndoStep(restores: [restore]).apply().failures.isEmpty)
+        let read = try XCTUnwrap(ContainerFileStore.load(directory: box).document)
+        XCTAssertEqual(read, ContainerFile(), "an empty document: the store deletes nothing")
+        XCTAssertEqual(shown(.container, read), ["-", "-", "-", "-", "-", "-"])
+    }
+
+    func testUndoOfAStandardNamePutsTheNamesFileBack() throws {
+        let tree = root.resolvingSymlinksInPath()
+        let names = ContainerEdits.setStandardName("Box 1", for: "B. 1", field: .container, in: ContainerNames(), at: now)
+        let first = try ContainerFileStore.writeNames(names, root: tree, expecting: nil)
+        guard case let .loaded(original, _) = ContainerFileStore.loadNames(root: tree) else { return XCTFail() }
+        let renamed = ContainerEdits.setStandardName("Box One", for: "B. 1", field: .container, in: original, at: now)
+        let wrote = try ContainerFileStore.writeNames(renamed, root: tree, expecting: first)
+        let step = ContainerUndoStep(restores: [ContainerDocumentRestore(folder: tree, restore: .names(original),
+                                                                         expecting: wrote)])
+        let undone = step.apply()
+        XCTAssertTrue(undone.failures.isEmpty)
+        XCTAssertEqual(ContainerFileStore.loadNames(root: tree).document, original)
+        XCTAssertTrue(undone.inverse.apply().failures.isEmpty)
+        XCTAssertEqual(ContainerFileStore.loadNames(root: tree).document?.names, renamed.names)
+    }
+
+    func testSetForSelectionAcrossFoldersWritesNothingWhenOneIsRefused() throws {
+        let first = try makeFolder("Box 1")
+        let second = try makeFolder("Box 2")
+        let suite = second.appendingPathComponent(ContainerFile.folderName, isDirectory: true)
+        try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: true)
+        try Data(#"{"schemaVersion": 2, "runs": []}"#.utf8).write(to: suite.appendingPathComponent(ContainerFile.fileName))
+        let before = try snapshot()
+        XCTAssertThrowsError(try NavigationModel.setForSelection(.container, user("Box 5"),
+                                                                 in: [(first, ["a.pdf"]), (second, ["a.pdf"])])) {
+            XCTAssertEqual($0 as? ContainerWriteError, .refusedExisting(ContainerFile.fileName))
+        }
+        XCTAssertEqual(try snapshot(), before, "the first folder was not written either")
+    }
+
+    func testSetForSelectionAcrossFoldersUndoesAsOneStep() throws {
+        let first = try makeFolder("Box 1")
+        let second = try makeFolder("Box 2")
+        try ContainerFileStore.write(boxAndFolder, directory: second, expecting: nil)
+        let original = ContainerFileStore.load(directory: second).document
+        let step = try XCTUnwrap(try NavigationModel.setForSelection(
+            .container, user("Box 5"), in: [(first, ["b.pdf"]), (second, ["c.pdf", "d.pdf"])]))
+        XCTAssertEqual(step.restores.count, 2)
+        XCTAssertEqual(shown(.container, try XCTUnwrap(ContainerFileStore.load(directory: second).document)),
+                       ["Box 1", "Box 1", "Box 5", "Box 5", "Box 1", "Box 1"])
+        XCTAssertTrue(step.apply().failures.isEmpty)
+        XCTAssertEqual(ContainerFileStore.load(directory: first).document, ContainerFile())
+        XCTAssertEqual(ContainerFileStore.load(directory: second).document, original)
+    }
+
+    func testAWriteFailingPartwayPutsBackTheFoldersAlreadyWritten() throws {
+        let first = try makeFolder("Box 1")
+        let second = try makeFolder("Box 2")
+        try ContainerFileStore.write(boxAndFolder, directory: first, expecting: nil)
+        let original = ContainerFileStore.load(directory: first).document
+        let prepared = try [first, second].compactMap {
+            try NavigationModel.prepareSetForSelection(.container, user("Box 5"), selected: ["b.pdf"], in: $0)
+        }
+        XCTAssertEqual(prepared.count, 2)
+        // Another app writes the second folder after it was read.
+        try ContainerFileStore.write(boxAndFolder, directory: second, expecting: nil)
+        XCTAssertThrowsError(try NavigationModel.commitAll(prepared)) { error in
+            let rolled = error as? ContainerSelectionRolledBack
+            XCTAssertEqual(rolled?.written, 1)
+            XCTAssertEqual(rolled?.notRestored.count, 0)
+            XCTAssertEqual(rolled?.underlying as? ContainerWriteError, .changedSinceRead)
+            XCTAssertTrue(containerEditWriteMessage(error).hasPrefix("Nothing was saved"))
+        }
+        XCTAssertEqual(ContainerFileStore.load(directory: first).document, original, "the first folder is put back")
+    }
+
     // MARK: The catalog's editor state
 
     func testTheEditorSaysWhereAnEditGoesAndListsTheFoldersWarnings() throws {
