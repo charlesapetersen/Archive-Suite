@@ -18,3 +18,6 @@ python3 ArchiveProcessor/scripts/segbench/settings_routes.py
 python3 execution-plans/processing-review/settings-design/build_figures.py . execution-plans/processing-review/settings-design/figures.json
 python3 execution-plans/processing-review/settings-design/inject.py execution-plans/processing-review/settings-design/prototype.template.html execution-plans/processing-review/settings-design/figures.json execution-plans/processing-review/settings-design/prototype.html
 ```
+
+`levels.md` (W47.settings-levels, 2026-11-19) is the later design that splits the Settings window into panels and
+three levels, with where each existing setting and each feature released by call 15 sits. It waits on the owner.
