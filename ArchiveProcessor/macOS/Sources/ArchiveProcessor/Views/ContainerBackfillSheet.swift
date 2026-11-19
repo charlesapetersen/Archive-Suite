@@ -230,7 +230,7 @@ struct ContainerBackfillSheet: View {
     private var footer: some View {
         HStack {
             if model.gatewayCalls > 0 {
-                Text("\(model.gatewayCalls) gateway calls, about \(dollars(Double(model.gatewayCalls) * ContainerLabelCapture.gatewayDollarsPerLabel)).")
+                Text("\(model.gatewayCalls) gateway calls, \(dollars(model.spentDollars)), counted in the month's spending.")
                     .font(.caption).foregroundStyle(.secondary)
                     .accessibilityIdentifier("ap.backfill.spent")
             }

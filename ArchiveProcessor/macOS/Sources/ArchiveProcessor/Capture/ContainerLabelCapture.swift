@@ -36,13 +36,33 @@ enum ContainerLabelCapture {
     /// the larger of the token estimate and the gateway's own figure).
     static let gatewayDollarsPerLabel = 0.00084
 
+    /// Luna's price on the gateway, dollars a million tokens in and out (`ct-read.md`).
+    static let gatewayInputPer1M = 0.20
+    static let gatewayOutputPer1M = 1.20
+
+    /// What one label call is counted at (W47.ct-label-cost): the gateway's own figure where it reports one, else the
+    /// reply's tokens at Luna's price, else (no response, a cancelled or failed request included, or a reply without
+    /// usage) the per-label estimate, the safe side for a monthly limit. A figure of 0 is LiteLLM's for a model it has
+    /// no price for, so it is not taken. A request never built (status 0), or one the gateway refused with an error
+    /// status and no figure, costs nothing, as a provider's own 4xx/5xx does for a page read.
+    static func charge(_ reply: DateRoute.GatewayReply) -> Double {
+        if reply.status == 0 { return 0 }
+        if let reported = reply.reportedCost, reported > 0 { return reported }
+        if let status = reply.status, status != 200 { return 0 }
+        if let p = reply.promptTokens, let c = reply.completionTokens {
+            return (Double(p) * gatewayInputPer1M + Double(c) * gatewayOutputPer1M) / 1_000_000
+        }
+        return gatewayDollarsPerLabel
+    }
+
     /// `read`, with the Vision text it parsed (for recognising a "No Folder" sheet), whether Vision answered at all (an
-    /// error is not an empty label), whether a gateway call was made (real money) and whether a model's reading that
-    /// parsed went into the fields. `useModel` false reads with Vision + parser
-    /// alone: no gateway call and no local model.
+    /// error is not an empty label), whether a gateway call was made (real money) and what it is counted at
+    /// (`charge`, 0 with no call), and whether a model's reading that parsed went into the fields. `useModel` false
+    /// reads with Vision + parser alone: no gateway call and no local model.
     static func readLabel(type: ItemType, text: String, photo: URL, rotation: Int, gateway: GatewayConfig?,
                           useModel: Bool = true)
-        async -> (fields: ContainerFieldSet, visionText: String, visionAnswered: Bool, gatewayCalled: Bool, modelAnswered: Bool) {
+        async -> (fields: ContainerFieldSet, visionText: String, visionAnswered: Bool, gatewayCalled: Bool,
+                  dollars: Double, modelAnswered: Bool) {
         let vision = try? await VisionClient(settings: .default).ocr(imageURL: photo)
         let visionText = vision?.text ?? ""
         let lines = (visionText.isEmpty ? text : visionText).components(separatedBy: .newlines)
@@ -50,6 +70,7 @@ enum ContainerLabelCapture {
         var model: [ContainerField: String]?
         var modelReader = gatewayReader
         var gatewayCalled = false
+        var dollars = 0.0
         if !useModel {
             // Vision + parser alone.
         } else if gateway == nil || gateway?.isLocalModel == true {
@@ -60,16 +81,35 @@ enum ContainerLabelCapture {
                 ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64," + jpeg.base64EncodedString()]],
                 ["type": "text", "text": ContainerLabelReader.modelPrompt],
             ]
-            gatewayCalled = true
-            if let raw = await DateRoute.gatewayChat(content: content, gateway: gateway, model: gatewayModel,
-                                                     maxTokens: maxTokens, timeout: timeout) {
+            let reply = await DateRoute.gatewayChatMetered(content: content, gateway: gateway, model: gatewayModel,
+                                                           maxTokens: maxTokens, timeout: timeout)
+            gatewayCalled = reply.status != 0
+            dollars = charge(reply)
+            if let raw = reply.text {
                 model = ContainerLabelReader.modelFields(fromReply: raw)
             }
         }
         let fields = ContainerLabelReader.proposals(lines: lines, type: type, model: model,
                                                     modelReader: model == nil ? nil : modelReader,
                                                     parserReader: parserReader, at: Date())
-        return (fields, visionText, vision != nil, gatewayCalled, !(model ?? [:]).isEmpty)
+        return (fields, visionText, vision != nil, gatewayCalled, dollars, !(model ?? [:]).isEmpty)
+    }
+
+    /// The up-front estimate's line for label reads (W47.ct-label-cost), nil when the run will make no gateway call
+    /// for them. Which photos are box or folder labels is known only once the run has read them, so the line gives the
+    /// price a photo rather than a total.
+    static func estimateNote(gateway: GatewayConfig?, preOCRedInput: Bool, enabled: Bool = enabled) -> String? {
+        guard enabled, !preOCRedInput, let gateway, !gateway.isLocalModel else { return nil }
+        return "Each box or folder label photo the run finds is also read by GPT 5.6 Luna through the gateway: about "
+            + String(format: "$%.5f", gatewayDollarsPerLabel)
+            + " a photo. Not in the totals above; the run's cost and history count each call."
+    }
+
+    /// The run summary's line for its label reads through the gateway (W47.ct-label-cost); nil with none.
+    static func spendNote(calls: Int, dollars: Double) -> String? {
+        guard calls > 0 else { return nil }
+        return "\(calls) box or folder label\(calls == 1 ? "" : "s") read through the gateway (GPT 5.6 Luna), "
+            + String(format: "$%.4f", dollars) + "."
     }
 
     /// One filed marker, for the finalize write.

@@ -884,7 +884,9 @@ extension OCRProcessor {
             readPoorly: readPoorlyNames.count,
             layouts: jobs.compactMap { $0.result?.newspaperLayout })
         ProcessingHistoryStore.shared.record(run)
-        Self.recordNewspaperAdjustedSpend(snapshot, jobs: jobs, usd: run.cost, files: run.fileCount, baseSources: nil)
+        // The label calls are already in the ledger on a line of their own (W47.ct-label-cost).
+        Self.recordNewspaperAdjustedSpend(snapshot, jobs: jobs, usd: max(0, run.cost - snapshot.labelDollars),
+                                          files: run.fileCount, baseSources: nil)
         activeRunHistory = nil
     }
 
@@ -900,6 +902,9 @@ extension OCRProcessor {
     }
 
     static func recordLedgerSpend(_ snapshot: RunHistorySnapshot, jobs: [OCRJob], wholeRun: Bool) {
+        // The label calls are already in the ledger on a line of their own (W47.ct-label-cost).
+        var snapshot = snapshot
+        snapshot.labelDollars = 0
         let usd: Double
         var files = snapshot.fileCount
         var baseSources: Set<URL>? = nil
@@ -1850,6 +1855,7 @@ extension OCRProcessor {
         // there and looks processed, but tag search will not find it / the scan is missing.
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
         statusMessage += treeFallbackSuffix   // W47.ct-processor-intake
+        if let note = containerLabelSpendNote { statusMessage += " " + note }   // W47.ct-label-cost
         if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
         if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
@@ -2266,6 +2272,7 @@ extension OCRProcessor {
         // there and looks processed, but tag search will not find it / the scan is missing.
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
         statusMessage += treeFallbackSuffix   // W47.ct-processor-intake
+        if let note = containerLabelSpendNote { statusMessage += " " + note }   // W47.ct-label-cost
         if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
         if pending.enableTagging && !passSourceTags {
             statusMessage += " \(segments.count) segments tagged."
@@ -3506,6 +3513,7 @@ extension OCRProcessor {
         // there and looks processed, but tag search will not find it / the scan is missing.
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
         statusMessage += treeFallbackSuffix   // W47.ct-processor-intake
+        if let note = containerLabelSpendNote { statusMessage += " " + note }   // W47.ct-label-cost
         if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
         if incrementalSkipped > 0 {
             statusMessage += " \(incrementalSkipped) already-processed skipped."

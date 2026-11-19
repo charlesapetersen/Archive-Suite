@@ -721,6 +721,9 @@ class OCRProcessor: ObservableObject {
     /// `activePendingRun` before the tail. Nil when not running; NEVER persisted (the history log itself
     /// lives in `ProcessingHistoryStore`). See `Models/ProcessingHistory.swift`.
     var activeRunHistory: RunHistorySnapshot?
+    /// The run summary's line for the box and folder labels the last `recordContainerLabels` read through the gateway
+    /// (W47.ct-label-cost); nil when it made no call.
+    var containerLabelSpendNote: String?
 
     /// The settings layers frozen at this run's start (W46.settings-layers), copied into its pending run or batch.
     var activeResolvedSettings: ResolvedSettingsSnapshot? { didSet { updateOpenRouterPolicy() } }

@@ -64,8 +64,11 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 - **Process Files reads its labels one at a time before the run's summary.** One Vision pass, and with the gateway one
   call of up to 60 s, per label photo, after organisation ("Reading N box and folder labels…"); Stop ends it with
   nothing written.
-- **The Luna call is not in the run's cost.** About $0.001 a label photo through the gateway (`ct-read.md`), in Live
-  Capture and Process Files alike; neither the run history nor the estimate counts it.
+- **The up-front estimate gives the label read's price a photo, not a total** (W47.ct-label-cost). Each Luna call is
+  counted in the run's cost, summary, history and month's ledger (the gateway's own figure, else its tokens, else
+  $0.00084), but which photos are labels is known only once the run has read them (accepted: no classification
+  before the run). After a relaunch, a Live Capture marker filed later is counted at the $0.00084 estimate when its
+  fields carry Luna's reading, since the measured charge is kept in memory (accepted: within a cent of the figure).
 - **Vision reads the photo as stored**, turned by its EXIF orientation only, not by the run's rotation correction; a
   label shot sideways may read nothing there, and the run's OCR text stands in (`ocr-text+parser`).
 - **A marker whose card is still up when the collection sheet is confirmed** is filed with its read's proposals; its

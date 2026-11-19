@@ -11,7 +11,9 @@ extension OCRProcessor {
     /// inside `outputDirectory` (never a source: the pre-OCRed route's outputs are its inputs, so it reads no labels).
     /// Returns one line for the run's summary when something was not recorded or wants a look, else nil. Stops,
     /// writing nothing, when the run is cancelled.
+    /// What the label reads spent goes into the run's history snapshot and `containerLabelSpendNote` (W47.ct-label-cost).
     func recordContainerLabels(moves: [URL: URL], outputDirectory: URL, preOCRedInput: Bool) async -> String? {
+        containerLabelSpendNote = nil
         guard ContainerLabelCapture.enabled, !preOCRedInput, !Task.isCancelled else { return nil }
         let root = outputDirectory.resolvingSymlinksInPath().standardizedFileURL.pathComponents
         struct Label { let type: ItemType; let source: URL; let output: URL; let text: String; let rotation: Int }
@@ -48,13 +50,29 @@ extension OCRProcessor {
         }
         statusMessage = "Reading \(labels.count) box and folder label\(labels.count == 1 ? "" : "s")\(pace)…"
         var markers: [ContainerLabelCapture.FiledMarker] = []
+        var calls = 0
+        var dollars = 0.0
+        // The month's ledger gets the calls as a line of their own, Stop or not: a run's own line takes a top-up only
+        // above a cent's fraction, which one label's charge may be under.
+        defer {
+            containerLabelSpendNote = ContainerLabelCapture.spendNote(calls: calls, dollars: dollars)
+            SettingsLayerStore.shared.recordSpend(usd: dollars, runID: UUID(), outputDirectory: outputDirectory,
+                                                  files: calls)
+        }
         for label in labels {
             guard !Task.isCancelled else { return nil }
-            let fields = await ContainerLabelCapture.read(type: label.type, text: label.text, photo: label.source,
+            let r = await ContainerLabelCapture.readLabel(type: label.type, text: label.text, photo: label.source,
                                                           rotation: label.rotation, gateway: gateway)
+            // W47.ct-label-cost: the call is real money: the history's cost counts it, and the ledger (above).
+            if r.gatewayCalled {
+                calls += 1
+                dollars += r.dollars
+                activeRunHistory?.labelCalls += 1
+                activeRunHistory?.labelDollars += r.dollars
+            }
             markers.append(ContainerLabelCapture.FiledMarker(folder: label.output.deletingLastPathComponent(),
                                                              fileName: label.output.lastPathComponent, type: label.type,
-                                                             fields: fields, text: label.text, startedByUser: false))
+                                                             fields: r.fields, text: label.text, startedByUser: false))
         }
         guard !Task.isCancelled else { return nil }
         let problem = await Task.detached(operation: { ContainerLabelCapture.record(markers) }).value

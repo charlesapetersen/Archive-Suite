@@ -17038,3 +17038,22 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   `~/Library/Caches/ArchiveSuiteRehearsal/segbench/kind-churn/` (reproduced kind-churn.md exactly) and kept there
   (6 MB) for the answer's follow-up. $0.
   <!-- /W47.wh-kinds-floor -->
+- [x] **W47.ct-label-cost — count the label-reading gateway calls in a run's cost [S]** · §Archival containers — W47 (lane: processor) — SHIPPED 2026-11-19.
+  Owner, 2026-11-19: queue it (the KNOWN_ISSUES entry "The Luna call is not in the run's cost"). Each GPT 5.6 Luna call
+  for a box or folder label is now counted: `DateRoute.gatewayChatMetered` keeps the reply's status, the gateway's own
+  figure (LiteLLM's `x-litellm-response-cost` header, as the bench reads it) and its tokens; `ContainerLabelCapture.charge`
+  counts the figure (not a 0, LiteLLM's for an unpriced model), else the tokens at Luna's $0.20 / $1.20 a million, else
+  (no response, or no usage) the $0.00084 estimate; a refused call with no figure costs nothing. Process Files adds the
+  calls to the history row's cost and count and to the run summary ("N box or folder labels read through the gateway
+  (GPT 5.6 Luna), $X."), and gives them a month's-ledger line of their own, Stop or not (a run's own line takes a
+  top-up only above $0.0005, which one label may be under; the run's share leaves them out). Live Capture counts each
+  marker's call with its pages when finalize files it (the folder's ledger line) and says so in the finalize summary;
+  calls of markers cleared or never filed go to the ledger at Clear. Tools ▸ Read Box and Folder Labels shows the measured figure and records each
+  pass in the month's ledger. The up-front estimate pane gives the price a photo: which photos are labels is known only
+  once read (KNOWN_ISSUES, accepted). Tests: `scripts/test-local-models.sh` group 9 (fake gateway: header, tokens,
+  thinking in total_tokens, junk header, no usage, 500, 500 with a figure, no response, Vision only; history, ledger,
+  Codable, summary and estimate lines), 17 checks; date-route, collection-organize, processing-history and the Live
+  Capture recovery driver (300 PASS) still pass. Tier-2: one Opus adversarial review; its confirmed findings (the
+  ledger floor, a Clear during a read, a 0 figure) fixed here. No Capture/ durability or protocol path changed, so
+  the phone E2E was not run. $0 spent (no real gateway call). No bench cache used. No migration: nothing to migrate.
+  <!-- /W47.ct-label-cost -->

@@ -24,6 +24,8 @@ import ArchiveCore
 ///   8. (W47.ct-capture-gemma) A label's titles go to Gemma 3 12B only on a server on this Mac that lists it, the gateway's
 ///      own address first when it is a local model there; the request is `ct_read.py`'s (prompt, temperature 0, 640
 ///      tokens, the stand-in key); only its four fields are taken, and a remote gateway never asks for it.
+///   9. (W47.ct-label-cost) A label's Luna call is counted at the gateway's own figure, else its tokens at Luna's price,
+///      else the per-label estimate; a refused call costs nothing; the run's history adds it, its ledger share does not.
 @MainActor
 enum LocalModelsTestDriver {
     nonisolated static let envKey = "LOCALMODELS_TEST"
@@ -58,6 +60,8 @@ enum LocalModelsTestDriver {
         /// queued "THROW" fails that request on the wire; "STATUS 422 <body>" answers it with that status.
         var queued: [String] = []
         var timesOut = false
+        /// Response headers for every answer (the gateway's cost header).
+        var headers: [String: String]? = nil
         func answer(_ request: URLRequest) throws -> String {
             try lock.withLock {
                 requests.append(request)
@@ -72,7 +76,7 @@ enum LocalModelsTestDriver {
             }
         }
         func reset(_ answers: [String: String], queued: [String] = []) {
-            lock.withLock { self.answers = answers; self.queued = queued; requests = [] }
+            lock.withLock { self.answers = answers; self.queued = queued; requests = []; headers = nil }
             NetworkSession.testStreamLinesRead = 0
         }
         var hosts: [String] { lock.withLock { requests.map { $0.url?.host ?? "" } } }
@@ -93,7 +97,8 @@ enum LocalModelsTestDriver {
                 status = code
                 body = String(body.dropFirst(11))
             }
-            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!
+            let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil,
+                                           headerFields: wire.lock.withLock { wire.headers })!
             return (Data(body.utf8), response)
         }
         OCRCascade.keyOverride = { "test-\($0.rawValue)" }
@@ -358,6 +363,89 @@ enum LocalModelsTestDriver {
               asked.asked.isEmpty && set[.repository]?.reader == ContainerLabelCapture.gatewayReader
               && wire.hosts == ["remote-gateway.invalid"], "\(asked.asked) \(wire.hosts)")
         await ContainerLabelGemma.forget()
+        await labelCostChecks(wire: wire, image: image, remote: remote, answer: answer)
+    }
+
+    /// 9. W47.ct-label-cost: what a label's gateway call is counted at, and where it goes.
+    private static func labelCostChecks(wire: Wire, image: URL, remote: GatewayConfig, answer: String) async {
+        func read(_ body: String, headers: [String: String]? = nil, throwing: Bool = false, useModel: Bool = true)
+            async -> (called: Bool, dollars: Double, reader: String?) {
+            wire.reset(["remote-gateway": body], queued: throwing ? ["THROW", "THROW", "THROW", "THROW"] : [])
+            wire.lock.withLock { wire.headers = headers }
+            let r = await ContainerLabelCapture.readLabel(type: .box, text: "BOX NO. 17", photo: image, rotation: 0,
+                                                          gateway: remote, useModel: useModel)
+            return (r.gatewayCalled, r.dollars, r.fields[.repository]?.reader)
+        }
+        func usage(_ p: Int, _ c: Int, total: Int? = nil) -> String {
+            var u: [String: Any] = ["prompt_tokens": p, "completion_tokens": c]
+            if let total { u["total_tokens"] = total }
+            let data = try! JSONSerialization.data(withJSONObject: [
+                "choices": [["finish_reason": "stop", "message": ["content": answer]]], "usage": u])
+            return String(data: data, encoding: .utf8)!
+        }
+        func near(_ a: Double, _ b: Double) -> Bool { abs(a - b) < 1e-12 }
+
+        var r = await read(usage(2109, 320), headers: ["x-litellm-response-cost": "0.00042"])
+        check("9 the gateway's own figure counts", r.called && near(r.dollars, 0.00042)
+              && r.reader == ContainerLabelCapture.gatewayReader, "\(r)")
+        r = await read(usage(2109, 320))
+        check("9 no figure: the tokens at Luna's price", near(r.dollars, (2109 * 0.20 + 320 * 1.20) / 1_000_000), "\(r)")
+        r = await read(usage(1000, 100, total: 1500))
+        check("9 thinking outside completion_tokens is counted", near(r.dollars, (1000 * 0.20 + 500 * 1.20) / 1_000_000),
+              "\(r)")
+        r = await read(usage(1000, 100), headers: ["x-litellm-response-cost": "0.0"])
+        check("9 a figure of 0 (a model LiteLLM has no price for) falls back to the tokens",
+              near(r.dollars, (1000 * 0.20 + 100 * 1.20) / 1_000_000), "\(r)")
+        r = await read(usage(1000, 100), headers: ["x-litellm-response-cost": "junk"])
+        check("9 an unreadable figure falls back to the tokens", near(r.dollars, (1000 * 0.20 + 100 * 1.20) / 1_000_000),
+              "\(r)")
+        let bare = try! JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": answer]]]])
+        r = await read(String(data: bare, encoding: .utf8)!)
+        check("9 no figure and no usage: the per-label estimate",
+              r.called && near(r.dollars, ContainerLabelCapture.gatewayDollarsPerLabel), "\(r)")
+        r = await read("STATUS 500 {\"error\": \"down\"}")
+        check("9 a refused call costs nothing but is a call",
+              r.called && r.dollars == 0 && r.reader != ContainerLabelCapture.gatewayReader, "\(r)")
+        r = await read("STATUS 500 {}", headers: ["x-litellm-response-cost": "0.0001"])
+        check("9 a refused call the gateway still charges counts its figure", near(r.dollars, 0.0001), "\(r)")
+        r = await read("{}", throwing: true)
+        check("9 no response: the per-label estimate, the safe side",
+              r.called && near(r.dollars, ContainerLabelCapture.gatewayDollarsPerLabel), "\(r)")
+        r = await read(usage(1, 1), useModel: false)
+        check("9 Vision and parser alone: no call, nothing counted", !r.called && r.dollars == 0 && wire.requests.isEmpty)
+
+        // The run's cost: history and ledger add the label calls.
+        var snapshot = RunHistorySnapshot(
+            startedAt: Date(), provider: .gemini, gatewayConfig: nil, localAgent: nil, imageTokenProvider: nil,
+            model: LLMProvider.gemini.models[0], visionTextProvider: nil, visionTextModel: nil, batchMode: false,
+            enableTagging: false, enableCollectionSegmentation: false, preOCRedInput: false, reOCRMultiPagePDF: false,
+            mixedReOCR: false, sendPreviousImage: false, contextCharCount: 0, imageScale: 1, rotationMode: .off,
+            fileCount: 3)
+        let plain = snapshot.makeRun(succeeded: 3)
+        snapshot.labelCalls = 2
+        snapshot.labelDollars = 0.0016
+        let withLabels = snapshot.makeRun(succeeded: 3)
+        check("9 the history's cost adds the label calls", near(withLabels.cost, plain.cost + 0.0016)
+              && withLabels.labelReads == 2 && plain.labelReads == nil, "\(plain.cost) \(withLabels.cost)")
+        check("9 the run's own ledger share leaves them out: they have a line of their own",
+              snapshot.spentSoFar(readSources: []) == 0)
+        let decoded = try? JSONDecoder().decode(ProcessingRun.self, from: JSONEncoder().encode(withLabels))
+        eq("9 the history keeps the count", decoded?.labelReads, 2)
+
+        // What the operator reads.
+        eq("9 the summary line", ContainerLabelCapture.spendNote(calls: 2, dollars: 0.0016),
+           "2 box or folder labels read through the gateway (GPT 5.6 Luna), $0.0016.")
+        eq("9 no call, no summary line", ContainerLabelCapture.spendNote(calls: 0, dollars: 0), nil)
+        check("9 the estimate names the price a photo",
+              ContainerLabelCapture.estimateNote(gateway: remote, preOCRedInput: false, enabled: true)?
+                .contains("$0.00084 a photo") == true)
+        var onMac = remote
+        onMac.localModel = true
+        check("9 no estimate line without a remote gateway, for pre-OCRed input, or with labels off",
+              ContainerLabelCapture.estimateNote(gateway: nil, preOCRedInput: false, enabled: true) == nil
+              && ContainerLabelCapture.estimateNote(gateway: onMac, preOCRedInput: false, enabled: true) == nil
+              && ContainerLabelCapture.estimateNote(gateway: remote, preOCRedInput: true, enabled: true) == nil
+              && ContainerLabelCapture.estimateNote(gateway: remote, preOCRedInput: false, enabled: false) == nil)
     }
 
     private static func asksNoReasoning(_ body: [String: Any]?) -> Bool {

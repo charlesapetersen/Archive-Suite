@@ -392,6 +392,10 @@ final class LiveCaptureProcessor: ObservableObject {
     /// cleared out from under it, so finalize bails cleanly — no re-added state, no stale manifest, no orphan
     /// output PDF repopulating the just-cleared Processing pane (B8). A no-op when Clear was never pressed.
     private var clearGeneration = 0
+    /// W47.ct-label-cost — what each marker's label read through the gateway was counted at, by group, until finalize
+    /// files it. In memory only: a marker filed after a relaunch is counted at the per-label estimate when its fields
+    /// carry the gateway's reading (`labelCharge`).
+    private var labelCharges: [String: Double] = [:]
     /// Everything `writeSegmentFiles` needs, retained per finalized segment so the end-of-session
     /// rotation review can regenerate a segment's staged PDF/JPG with corrected rotation. In-memory
     /// for the current run only (rotation review is a same-session step, before finalization).
@@ -1191,10 +1195,17 @@ final class LiveCaptureProcessor: ObservableObject {
         // inside the segment's own processing, so a Finish waits for it like any other segment work.
         var containerRead: ContainerFieldSet?
         if let itemType = group.type.itemType, ContainerLabelCapture.enabled, let photo = group.photos.first {
-            containerRead = await ContainerLabelCapture.read(type: itemType, text: texts.first ?? "", photo: photo.url,
-                                                             rotation: results.first?.rotationDegrees ?? 0,
-                                                             gateway: config.textGateway)
+            let r = await ContainerLabelCapture.readLabel(type: itemType, text: texts.first ?? "", photo: photo.url,
+                                                          rotation: results.first?.rotationDegrees ?? 0,
+                                                          gateway: config.textGateway)
+            // W47.ct-label-cost: the call's charge, counted with the marker's pages when finalize files it (a group
+            // read again adds its second call); a session cleared during the read has it in the ledger at once.
+            if r.gatewayCalled {
+                if clearGeneration == startedGeneration { labelCharges[groupId, default: 0] += r.dollars }
+                else { recordUnfiledLabelSpend(r.dollars, calls: 1) }
+            }
             guard clearGeneration == startedGeneration else { return }
+            containerRead = r.fields
         }
 
         // Tags: Mac subjects skip the LLM; automatic mode calls the LLM; box/folder → color tag.
@@ -2240,12 +2251,16 @@ final class LiveCaptureProcessor: ObservableObject {
 
     /// W46.settings-layers: record this session in every collection folder finalize actually filed into, with the
     /// layers as that folder resolves them and the session's processing settings. A record never blocks finalize.
-    private func recordSessionInCollections(_ plans: [MovePlan], filed: Set<String>) {
+    /// W47.ct-label-cost: returns the summary's line for the filed markers' label reads through the gateway, else nil.
+    private func recordSessionInCollections(_ plans: [MovePlan], filed: Set<String>) -> String? {
         let processing = sessionProcessingSettings ?? ProcessingSettingsCapture.capture()
         // Two drafts may file into one existing folder: one record per folder, counting every filed document in it.
         var order: [URL] = []
         var counts: [String: Int] = [:]
         var pages: [String: Int] = [:]
+        var labels: [String: Double] = [:]
+        var labelCalls = 0
+        var labelDollars = 0.0
         for plan in plans {
             let key = plan.folder.standardizedFileURL.path
             if counts[key] == nil { order.append(plan.folder) }
@@ -2253,6 +2268,13 @@ final class LiveCaptureProcessor: ObservableObject {
             counts[key, default: 0] += filedSegments.count
             pages[key, default: 0] += filedSegments.reduce(0) {
                 $0 + max(retained[$1.groupId]?.pages.count ?? 0, max($1.imageURLs.count, $1.pdfURLs.count))
+            }
+            for seg in filedSegments {
+                guard let usd = labelCharge(seg.groupId) else { continue }
+                labels[key, default: 0] += usd
+                labelCalls += 1
+                labelDollars += usd
+                labelCharges[seg.groupId] = nil
             }
         }
         let store = SettingsLayerStore.shared
@@ -2262,11 +2284,30 @@ final class LiveCaptureProcessor: ObservableObject {
             store.record(snapshot, kind: "liveCapture", fileCount: count, in: folder)
             // The month's ledger (W46.settings-ledger-more): the pages filed here, priced as Process Files prices a
             // run of them. Filed pages only, so a finalize retried after a failure counts each page once.
+            // The markers' label calls are added to the folder's pages (W47.ct-label-cost).
             if let config, let filedPages = pages[folder.standardizedFileURL.path] {
-                store.recordSpend(usd: Self.estimatedSpend(config, pages: filedPages), runID: snapshot.runID,
-                                  outputDirectory: folder, files: count)
+                store.recordSpend(usd: Self.estimatedSpend(config, pages: filedPages)
+                                      + (labels[folder.standardizedFileURL.path] ?? 0),
+                                  runID: snapshot.runID, outputDirectory: folder, files: count)
             }
         }
+        return ContainerLabelCapture.spendNote(calls: labelCalls, dollars: labelDollars)
+    }
+
+    /// Label calls of markers the session never filed (cleared, or discarded before a Clear) were paid for all the
+    /// same: the month's ledger gets them on a line of their own (W47.ct-label-cost).
+    private func recordUnfiledLabelSpend(_ usd: Double, calls: Int) {
+        SettingsLayerStore.shared.recordSpend(usd: usd, runID: UUID(), outputDirectory: currentOutputDirectory,
+                                              files: calls)
+    }
+
+    /// A filed marker's label call through the gateway, nil when it made none: its counted charge, or after a relaunch
+    /// (charges are in memory only) the per-label estimate when its fields carry the gateway's reading.
+    private func labelCharge(_ groupId: String) -> Double? {
+        if let usd = labelCharges[groupId] { return usd }
+        guard let fields = session.containerFields[groupId],
+              fields.values.values.contains(where: { $0.reader == ContainerLabelCapture.gatewayReader }) else { return nil }
+        return ContainerLabelCapture.gatewayDollarsPerLabel
     }
 
     /// The list-price estimate for `pages` pages read with the session's settings, by the same math as the
@@ -2362,7 +2403,7 @@ final class LiveCaptureProcessor: ObservableObject {
                     + " ⚠️ The filed-group ledger could not be saved. Original photos and staged recovery data remain in the Backup Folder; check disk space or permissions before finishing again."
                 return
             }
-            self.recordSessionInCollections(plans, filed: filedGroups)
+            let labelSpendNote = self.recordSessionInCollections(plans, filed: filedGroups)
             let placeholderByGroup = Dictionary(
                 self.staged.compactMap { seg -> (String, [URL])? in
                     guard let held = seg.placeholderSources, !held.isEmpty else { return nil }
@@ -2501,6 +2542,9 @@ final class LiveCaptureProcessor: ObservableObject {
             }
             if let containerProblem {
                 self.finalizeSummary = (self.finalizeSummary ?? outcome.summary) + " ⚠️ " + containerProblem
+            }
+            if let labelSpendNote {   // W47.ct-label-cost
+                self.finalizeSummary = (self.finalizeSummary ?? outcome.summary) + " " + labelSpendNote
             }
             // Clear ONLY the confirmed-filed source photos (to the Trash); every unfiled or straggler page
             // stays in the backup folder + Captured pane, recoverable.
@@ -2643,6 +2687,8 @@ final class LiveCaptureProcessor: ObservableObject {
         retained.removeAll()
         groupCollectionKey.removeAll()
         groupRotationOverride.removeAll()
+        recordUnfiledLabelSpend(labelCharges.values.reduce(0, +), calls: labelCharges.count)   // W47.ct-label-cost
+        labelCharges.removeAll()
         pageTasks.removeAll()
         rotationReviewPages.removeAll()
         currentCollectionKey = "__unfiled__"

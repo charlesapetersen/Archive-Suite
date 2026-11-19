@@ -877,6 +877,14 @@ struct OCRView: View {
                                     .foregroundStyle(.primary)
                                     .accessibilityIdentifier("ap.ocr.secondReaderCost")
                             }
+                            if let line = ContainerLabelCapture.estimateNote(gateway: useGateway ? currentGatewayConfig : nil,
+                                                                             preOCRedInput: preOCRedInput) {
+                                // W47.ct-label-cost — which photos are labels is known only once they are read.
+                                Text(line)
+                                    .font(.caption2)
+                                    .foregroundStyle(.primary)
+                                    .accessibilityIdentifier("ap.ocr.labelReadCost")
+                            }
                             if pageKindsActive && !droppedFiles.isEmpty {
                                 PageKindBatchControl(store: pageKinds, plan: pageReaderPlan,
                                                      runDefault: pageKindRunDefault, runModel: effectiveModel)

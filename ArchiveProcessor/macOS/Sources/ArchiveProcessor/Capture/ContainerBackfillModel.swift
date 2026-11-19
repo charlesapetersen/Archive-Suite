@@ -51,8 +51,9 @@ final class ContainerBackfillModel: ObservableObject {
     @Published var levelsDraft: ContainerLevelsDraft?
     @Published var levelsError: String?
     @Published private(set) var message: String?
-    /// Gateway calls this window made (each about `ContainerLabelCapture.gatewayDollarsPerLabel`).
+    /// Gateway calls this window made, and what they are counted at (`ContainerLabelCapture.charge`, W47.ct-label-cost).
     @Published private(set) var gatewayCalls = 0
+    @Published private(set) var spentDollars: Double = 0
 
     private var task: Task<Void, Never>?
     private var scanFlag: CancelFlag?
@@ -97,8 +98,6 @@ final class ContainerBackfillModel: ObservableObject {
     var estimatedDollars: Double {
         requestedRoute == .luna ? Double(markersToRead) * ContainerLabelCapture.gatewayDollarsPerLabel : 0
     }
-
-    var spentDollars: Double { Double(gatewayCalls) * ContainerLabelCapture.gatewayDollarsPerLabel }
 
     var needsCostConfirmation: Bool {
         estimatedDollars > 0 && spentDollars + estimatedDollars > Self.confirmAboveDollars
@@ -197,6 +196,9 @@ final class ContainerBackfillModel: ObservableObject {
         var left: [String: Int] = [:]
         for d in toRead { left[d.relativePath] = d.markers.count }
         let override = readOverride
+        // W47.ct-label-cost: what the pass's calls cost goes into the month's ledger at its end, the window closed or
+        // not, as a line of its own (W46.settings-ledger).
+        let ledgerRoot = root
         phase = .reading(done: 0, total: total)
         message = nil
         task = Task { [weak self] in
@@ -205,25 +207,27 @@ final class ContainerBackfillModel: ObservableObject {
             var finished: [String] = []
             // Reads that land after the window closed, saved straight into the cache below: they were paid for.
             var orphans: [String: ContainerBackfillCache.Entry] = [:]
+            var paid = (calls: 0, dollars: 0.0)
             typealias Keys = (vision: String, model: String)
             typealias Result = (dir: String, keys: Keys, entry: ContainerBackfillCache.Entry?, visionAnswered: Bool,
-                                called: Bool, modelAnswered: Bool)
+                                called: Bool, dollars: Double, modelAnswered: Bool)
             await withTaskGroup(of: Result.self) { group in
                 func add() {
                     guard next < work.count else { return }
                     let (dir, marker, keys, hit) = work[next]
                     next += 1
                     group.addTask {
-                        if let hit { return (dir, keys, hit, false, false, false) }
-                        if Task.isCancelled { return (dir, keys, nil, false, false, false) }
-                        if let override { return (dir, keys, await override(marker), true, false, route != .vision) }
+                        if let hit { return (dir, keys, hit, false, false, 0, false) }
+                        if Task.isCancelled { return (dir, keys, nil, false, false, 0, false) }
+                        if let override { return (dir, keys, await override(marker), true, false, 0, route != .vision) }
                         let r = await Self.read(marker, gateway: gateway, route: route)
                         return (dir, keys, r?.entry, r?.visionAnswered ?? false, r?.gatewayCalled ?? false,
-                                r?.modelAnswered ?? false)
+                                r?.dollars ?? 0, r?.modelAnswered ?? false)
                     }
                 }
                 for _ in 0..<Self.concurrentReads { add() }
                 while let r = await group.next() {
+                    if r.called { paid.calls += 1; paid.dollars += r.dollars }
                     // A read that arrives after Stop is still kept and counted: it was paid for. A read is kept under
                     // a route's key only when that route answered, so a failed one is tried again next time.
                     var keep: [String: ContainerBackfillCache.Entry] = [:]
@@ -235,7 +239,7 @@ final class ContainerBackfillModel: ObservableObject {
                         orphans.merge(keep) { _, new in new }
                         group.cancelAll(); continue
                     }
-                    if r.called { self.gatewayCalls += 1 }
+                    if r.called { self.gatewayCalls += 1; self.spentDollars += r.dollars }
                     for (k, entry) in keep where k == r.keys.model || self.reads[k] == nil { self.reads[k] = entry }
                     let dir = r.dir
                     guard gen == self.generation, !Task.isCancelled else { group.cancelAll(); continue }
@@ -250,6 +254,8 @@ final class ContainerBackfillModel: ObservableObject {
                     finished = []
                 }
             }
+            SettingsLayerStore.shared.recordSpend(usd: paid.dollars, runID: UUID(), outputDirectory: ledgerRoot,
+                                                  files: paid.calls)
             guard let self else {
                 if !orphans.isEmpty { cache.merge(orphans) }
                 return
@@ -264,13 +270,14 @@ final class ContainerBackfillModel: ObservableObject {
     /// its text layer.
     nonisolated private static func read(_ marker: ContainerBackfill.Marker, gateway: GatewayConfig?,
                                          route: ContainerBackfillCache.Route)
-        async -> (entry: ContainerBackfillCache.Entry, visionAnswered: Bool, gatewayCalled: Bool, modelAnswered: Bool)? {
+        async -> (entry: ContainerBackfillCache.Entry, visionAnswered: Bool, gatewayCalled: Bool, dollars: Double,
+                  modelAnswered: Bool)? {
         let photo = await Task.detached { PDFToImageConverter.imageURL(for: marker.url) }.value
         defer { if photo != marker.url { try? FileManager.default.removeItem(at: photo) } }
         let r = await ContainerLabelCapture.readLabel(type: marker.type, text: "", photo: photo, rotation: 0,
                                                       gateway: gateway, useModel: route != .vision)
         return (ContainerBackfillCache.Entry(fields: r.fields, text: r.visionText), r.visionAnswered, r.gatewayCalled,
-                r.modelAnswered)
+                r.dollars, r.modelAnswered)
     }
 
     private func containerMarkers(_ d: ContainerBackfill.Directory, route: ContainerBackfillCache.Route) -> [ContainerMarker] {

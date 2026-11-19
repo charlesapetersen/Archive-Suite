@@ -118,25 +118,63 @@ extension DateRoute {
     /// The same request for another stage's measured call (W47.item-fields-build), with that stage's caps.
     static func gatewayChat(content: Any, gateway: GatewayConfig, model: String, maxTokens: Int,
                             timeout: TimeInterval) async -> String? {
+        await gatewayChatMetered(content: content, gateway: gateway, model: model, maxTokens: maxTokens,
+                                 timeout: timeout).text
+    }
+
+    /// One gateway call's reply with what it says about its own charge (W47.ct-label-cost): the HTTP status (nil when
+    /// no response came back), the gateway's own figure from LiteLLM's `x-litellm-response-cost` header, and the
+    /// reply's token usage, reasoning included.
+    struct GatewayReply: Sendable, Equatable {
+        var text: String?
+        var status: Int?
+        var reportedCost: Double?
+        var promptTokens: Int?
+        var completionTokens: Int?
+
+        init(text: String? = nil, status: Int? = nil, reportedCost: Double? = nil, promptTokens: Int? = nil,
+             completionTokens: Int? = nil) {
+            self.text = text; self.status = status; self.reportedCost = reportedCost
+            self.promptTokens = promptTokens; self.completionTokens = completionTokens
+        }
+
+        /// Parses a response as `gatewayChat` reads it; the text only on a 200.
+        init(data: Data?, response: URLResponse?) {
+            let http = response as? HTTPURLResponse
+            status = http?.statusCode
+            if let v = http?.value(forHTTPHeaderField: "x-litellm-response-cost"), let d = Double(v), d.isFinite, d >= 0 {
+                reportedCost = d
+            }
+            let json = data.flatMap { (try? JSONSerialization.jsonObject(with: $0)) as? [String: Any] }
+            if let usage = json?["usage"] as? [String: Any], let p = usage["prompt_tokens"] as? Int,
+               let c = usage["completion_tokens"] as? Int {
+                // A proxy may report thinking outside completion_tokens; total_tokens then says so.
+                promptTokens = p
+                completionTokens = max(c, (usage["total_tokens"] as? Int ?? 0) - p)
+            }
+            guard status == 200, let choices = json?["choices"] as? [[String: Any]],
+                  let message = choices.first?["message"] as? [String: Any] else { return }
+            text = message["content"] as? String
+        }
+    }
+
+    /// `gatewayChat`, keeping the reply's charge.
+    static func gatewayChatMetered(content: Any, gateway: GatewayConfig, model: String, maxTokens: Int,
+                                   timeout: TimeInterval) async -> GatewayReply {
         let body: [String: Any] = [
             "model": model, "temperature": 0, "max_tokens": maxTokens, "reasoning_effort": "low",
             "messages": [["role": "user", "content": content]],
         ]
         guard let url = URL(string: "\(GatewayConfig.normalizedBaseURL(gateway.baseURL))/chat/completions"),
-              let data = try? JSONSerialization.data(withJSONObject: body) else { return nil }
+              let data = try? JSONSerialization.data(withJSONObject: body) else { return GatewayReply(status: 0) }
         var request = URLRequest(url: url, timeoutInterval: timeout)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(gateway.apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = data
         guard let (respData, response) = try? await NetworkSession.data(for: request, policy: .nonIdempotent,
-                                                                        maxRetries: 3),
-              (response as? HTTPURLResponse)?.statusCode == 200,
-              let json = try? JSONSerialization.jsonObject(with: respData) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
-              let message = choices.first?["message"] as? [String: Any],
-              let text = message["content"] as? String else { return nil }
-        return text
+                                                                        maxRetries: 3) else { return GatewayReply() }
+        return GatewayReply(data: respData, response: response)
     }
 }
 

@@ -48,6 +48,8 @@ struct ProcessingRun: Codable, Identifiable, Equatable {
     var newspaperPages: Int? = nil
     /// Image-reading requests made by those pages (regions, fills and fallbacks), across their recorded attempts.
     var newspaperRequests: Int? = nil
+    /// Box and folder label photos read through the gateway (W47.ct-label-cost); their charge is in `cost`.
+    var labelReads: Int? = nil
 }
 
 /// Parameters captured at the START of a Process-Files run so the pipeline's completion tails can
@@ -94,6 +96,11 @@ struct RunHistorySnapshot {
     var newspaperBatchExtraCost: Double = 0
     /// Runtime-only completed region charges, including reads whose result Stop discards.
     var newspaperSpend = NewspaperReadingSpend()
+    /// Box and folder label reads through the gateway (W47.ct-label-cost), each at `ContainerLabelCapture.charge`. In
+    /// the history's cost; the ledger has them on a line of their own (`recordContainerLabels`), so `spentSoFar` and
+    /// the ledger's share of `makeRun` leave them out.
+    var labelCalls = 0
+    var labelDollars: Double = 0
 
     /// Reserve all expanded batch requests beyond the original request the base estimate already counts.
     /// Each crop keeps its original page's previous-image context; batch discounts apply to these requests only.
@@ -221,13 +228,14 @@ struct RunHistorySnapshot {
             batchMode: batchMode,
             modeLabel: modeLabel,
             cost: max(0, estimatedCost + secondReaderCost + routedCost + layoutCost
-                      + newspaperSpend.unreported(layouts: layouts, baseSources: nil)),
+                      + newspaperSpend.unreported(layouts: layouts, baseSources: nil)) + labelDollars,
             secondReaderPages: secondReaders.isEmpty ? nil : secondReaders.count,
             kindRoutedPages: routed.isEmpty ? nil : routed.count,
             rotationUnsurePages: rotationUnsure > 0 ? rotationUnsure : nil,
             readPoorlyPages: readPoorly > 0 ? readPoorly : nil,
             newspaperPages: layouts.isEmpty ? nil : layouts.count,
-            newspaperRequests: layouts.isEmpty ? nil : layouts.reduce(0) { $0 + $1.requests }
+            newspaperRequests: layouts.isEmpty ? nil : layouts.reduce(0) { $0 + $1.requests },
+            labelReads: labelCalls > 0 ? labelCalls : nil
         )
     }
 }
