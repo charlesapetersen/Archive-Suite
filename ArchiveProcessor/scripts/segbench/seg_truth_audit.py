@@ -47,7 +47,6 @@ OUT = REH / "seg-truth-audit"
 PACK = OUT / "pack.json"            # keys, strata and page paths; the asked gap's truth is in KEY only
 KEY = OUT / "key.json"
 SHEET = OUT / "index.html"
-PAGES = OUT / "img"
 RULINGS = OUT / "rulings.json"
 RESULTS = HERE.parents[1] / "segbench-results"
 RECORD = RESULTS / "seg-truth-audit.json"
@@ -254,11 +253,22 @@ def cmd_report(_a):
 # --- sheet --------------------------------------------------------------------------------------------------------
 
 def cmd_sheet(_a):
-    import check_time as CT
     key = json.loads(KEY.read_text())["items"]
+    items, turned, close = build_sheet(key, OUT, unchecked_ok=False)
+    SHEET.write_text(render_sheet(items, turned, close))
+    print(f"{len(items)} gaps, {sum(len(it['strip']) for it in items)} page slots, {len(turned)} turned upright, "
+          f"{len(close)} close calls left as taken {close}; {SHEET}")
+
+
+def build_sheet(key: list[dict], out: Path, unchecked_ok: bool, tag: str = TAG):
+    """The sheet's items for asked gaps [{key, box, i}], pages copied to out/img and turned upright where Apple Vision is
+    clear; writes out/pack.json. A close call not in EYE_UPRIGHT stops the build unless `unchecked_ok` (a session that
+    may not look at the pages leaves it as taken and says so on the sheet). Returns (items, turned, close)."""
+    import check_time as CT
     cols = {n: data.load(n, with_exif=False) for n in data.TEST}
     from score import PHOTO, segment_ids
-    PAGES.mkdir(parents=True, exist_ok=True)
+    pages_dir = out / "img"
+    pages_dir.mkdir(parents=True, exist_ok=True)
     items = []
     for k, g in enumerate(key):
         col = cols[g["box"]]
@@ -267,7 +277,7 @@ def cmd_sheet(_a):
         strip = []
         for j in range(lo, hi + 1):
             p = col.pages[j]
-            dest = PAGES / f"{g['box']}-{p.n:03d}{p.path.suffix.lower()}"
+            dest = pages_dir / f"{g['box']}-{p.n:03d}{p.path.suffix.lower()}"
             if not dest.exists():
                 shutil.copyfile(p.path, dest)   # read the box's image, write only the bench cache
             sep = None
@@ -282,26 +292,25 @@ def cmd_sheet(_a):
         items.append({"id": f"a{k + 1:02d}", "key": g["key"], "box": g["box"], "left": col.pages[i].n,
                       "right": col.pages[i + 1].n, "strip": strip})
     paths = sorted({p["path"] for it in items for p in it["strip"]})
-    saved, CT.OUT = CT.OUT, OUT      # orient() writes its list and scores beside the pack
+    saved, CT.OUT = CT.OUT, out      # orient() writes its list and scores beside the pack
     try:
         turns = CT.orient(paths)
     finally:
         CT.OUT = saved
-    scores = json.loads((OUT / "orient-scores.json").read_text())
+    scores = json.loads((out / "orient-scores.json").read_text())
     close = sorted(Path(p).stem for p, sc in scores.items() if max(range(4), key=lambda k: sc[k]) and not turns[p])
     unchecked = [c for c in close if c not in EYE_UPRIGHT]
-    if unchecked:
+    if unchecked and not unchecked_ok:
         raise SystemExit(f"close orientation calls not checked by eye: {unchecked}; look, then add to EYE_UPRIGHT")
     for it in items:
         for p in it["strip"]:
             p["rotation"] = turns[p["path"]]
             p["src"] = "img/" + Path(p["path"]).name
     turned = sorted(Path(p).stem for p, d in turns.items() if d)
-    PACK.write_text(json.dumps({"tag": TAG, "date": dt.date.today().isoformat(), "turned": turned,
-                                "close_calls": close, "items": items}, indent=1) + "\n")
-    SHEET.write_text(render_sheet(items, turned, close))
-    print(f"{len(items)} gaps, {len(paths)} pages, {len(turned)} turned upright, {len(close)} close calls left as taken "
-          f"{close}; {SHEET}")
+    (out / "pack.json").write_text(json.dumps({"tag": tag, "date": dt.date.today().isoformat(), "turned": turned,
+                                               "close_calls": close, "unchecked_close_calls": unchecked,
+                                               "items": items}, indent=1) + "\n")
+    return items, turned, close
 
 
 SEP_TEXT = {"new": "│ new", "same": "· same", "card": "· card", "ask": "?"}
@@ -312,7 +321,15 @@ SEP_TEXT = {"new": "│ new", "same": "· same", "card": "· card", "ask": "?"}
 # and a page the next gap already separates is said to be a one-page document if it does not continue.
 
 
-def render_sheet(items, turned, close) -> str:
+AUDIT_TITLE = "Segmentation truth audit: gaps every model agreed on"
+AUDIT_INTRO = """{n} gaps from the Stanton and RG165 test boxes where all eleven segmentation routes made the
+same call. Until now the truth was re-checked only where a model disagreed."""
+
+
+def render_sheet(items, turned, close, title=AUDIT_TITLE, intro=AUDIT_INTRO, store="seg-truth-audit-answers",
+                 unchecked=()) -> str:
+    """The owner sheet. `intro` is the opening sentences ({n} is the gap count); `store` names the browser's saved
+    answers and the downloaded file; `unchecked` lists close orientation calls nobody looked at."""
     cards = []
     for it in items:
         cells, strip = [], it["strip"]
@@ -352,7 +369,9 @@ def render_sheet(items, turned, close) -> str:
   </fieldset>
 </section>''')
     data_js = json.dumps({it["id"]: it["key"] for it in items})
-    return f'''<!doctype html><html><head><meta charset="utf-8"><title>Segmentation truth audit: agreed gaps</title>
+    close_note = (f"Apple Vision could not tell for {', '.join(unchecked)}, and no one has looked: they are shown as "
+                  "taken. " if unchecked else "")
+    return f'''<!doctype html><html><head><meta charset="utf-8"><title>{html.escape(title)}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root {{ --bg:#fff; --fg:#1d1d1f; --muted:#666; --line:#d0d0d5; --gap:#d1453b; --new:#2f6fdb; --card:#f6f6f8; }}
@@ -379,20 +398,19 @@ fieldset {{ border:0; padding:0; margin:8px 0 0; display:flex; flex-wrap:wrap; g
 #done {{ position:fixed; bottom:0; left:0; right:0; background:var(--bg); border-top:1px solid var(--line); padding:10px 16px;
   display:flex; gap:12px; align-items:center; }}
 </style></head><body>
-<h1>Segmentation truth audit: gaps every model agreed on</h1>
-<p class="intro">{len(items)} gaps from the Stanton and RG165 test boxes where all eleven segmentation routes made the
-same call. Until now the truth was re-checked only where a model disagreed. For each gap, the two pages in the red box
+<h1>{html.escape(title)}</h1>
+<p class="intro">{intro.format(n=len(items))} For each gap, the two pages in the red box
 are asked: does the right one belong to the same document as the left one? A page can be a document of one page. The
 pages either side are context; each mark between them names its own pair (<b>81|82 │ new</b>, <b>· same</b>,
 <b>· card</b> for a label photo), is the truth as it stands, not asked, and goes in as listed: if one is wrong, say so in
 the note. The sheet does not show what the truth or the models say at the asked gap.
 Pages were turned upright where Apple Vision was clear ({len(turned)} turned{": " + ", ".join(turned) if turned else ""});
-use "turn" on any still sideways. Answers save in this browser as you go; "Save answers" downloads them.</p>
+{close_note}use "turn" on any still sideways. Answers save in this browser as you go; "Save answers" downloads them.</p>
 {"".join(cards)}
 <div id="done"><span id="count"></span><input id="snote" type="text" placeholder="note on the whole sheet (optional)">
 <button type="button" id="save">Save answers</button></div>
 <script>
-const KEY='seg-truth-audit-answers', IDS={data_js};
+const KEY='{store}', IDS={data_js};
 let A=JSON.parse(localStorage.getItem(KEY)||'{{}}'); A._notes=A._notes||{{}}; A._turns=A._turns||{{}};
 const save=()=>localStorage.setItem(KEY,JSON.stringify(A));
 const cnt=()=>{{document.getElementById('count').textContent=Object.keys(IDS).filter(k=>A[k]).length+' of '+Object.keys(IDS).length+' answered';}};
@@ -407,7 +425,7 @@ document.querySelectorAll('.turn').forEach(b=>b.addEventListener('click',()=>{{
 document.querySelectorAll('img').forEach(img=>{{ const r=A._turns[img.getAttribute('src')]; if(r!=null) img.style.transform='rotate('+r+'deg)'; }});
 document.getElementById('save').addEventListener('click',()=>{{ const out=Object.assign({{_keys:IDS}},A);
   const b=new Blob([JSON.stringify(out,null,1)],{{type:'application/json'}}); const u=document.createElement('a');
-  u.href=URL.createObjectURL(b); u.download='seg-truth-audit-answers.json'; u.click(); }});
+  u.href=URL.createObjectURL(b); u.download='{store}.json'; u.click(); }});
 cnt();
 </script></body></html>
 '''

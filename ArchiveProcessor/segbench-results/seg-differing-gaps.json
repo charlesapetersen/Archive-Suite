@@ -1,0 +1,170 @@
+{
+ "tag": "W46.seg-differing-gaps-sheet",
+ "date": "2026-11-19",
+ "asked": [
+  "Stanton 12|13",
+  "Stanton 20|21",
+  "Stanton 170|171",
+  "Stanton 227|228",
+  "Stanton 232|233"
+ ],
+ "pairs_per_gap": {
+  "Stanton 12|13": 12,
+  "Stanton 20|21": 16,
+  "Stanton 170|171": 12,
+  "Stanton 227|228": 12,
+  "Stanton 232|233": 12
+ },
+ "pages": [
+  10,
+  11,
+  12,
+  13,
+  14,
+  15,
+  18,
+  19,
+  20,
+  21,
+  22,
+  23,
+  168,
+  169,
+  170,
+  171,
+  172,
+  173,
+  225,
+  226,
+  227,
+  228,
+  229,
+  230,
+  231,
+  232,
+  233,
+  234,
+  235
+ ],
+ "turned": [],
+ "close_calls": [
+  "Stanton-014",
+  "Stanton-020",
+  "Stanton-021"
+ ],
+ "unchecked_close_calls": [],
+ "before": {
+  "chatgpt-gpt6.1-sol | qwen3.5-27b-teacher": {
+   "delta": 8.92,
+   "lo": 2.01,
+   "hi": 16.87,
+   "tie": false,
+   "neutral_tie": false
+  },
+  "chatgpt-gpt6.1-sol | seg-qwen3.5-2b-8bit": {
+   "delta": 10.77,
+   "lo": 3.91,
+   "hi": 18.38,
+   "tie": false,
+   "neutral_tie": false
+  },
+  "chatgpt-gpt6.1-sol | seg-qwen3.5-2b-bf16-cluster": {
+   "delta": 10.77,
+   "lo": 3.91,
+   "hi": 18.38,
+   "tie": false,
+   "neutral_tie": false
+  },
+  "mix-claude-chatgpt | qwen3.5-27b-teacher": {
+   "delta": 8.92,
+   "lo": 2.01,
+   "hi": 16.87,
+   "tie": false,
+   "neutral_tie": false
+  },
+  "mix-claude-chatgpt | seg-qwen3.5-2b-8bit": {
+   "delta": 10.77,
+   "lo": 3.91,
+   "hi": 18.38,
+   "tie": false,
+   "neutral_tie": false
+  },
+  "mix-claude-chatgpt | seg-qwen3.5-2b-bf16-cluster": {
+   "delta": 10.77,
+   "lo": 3.91,
+   "hi": 18.38,
+   "tie": false,
+   "neutral_tie": false
+  },
+  "claude-sonnet5.5 | qwen3.5-27b-teacher": {
+   "delta": 7.69,
+   "lo": 0.92,
+   "hi": 15.59,
+   "tie": false,
+   "neutral_tie": false
+  },
+  "claude-sonnet5.5 | seg-qwen3.5-2b-8bit": {
+   "delta": 9.54,
+   "lo": 2.83,
+   "hi": 17.08,
+   "tie": false,
+   "neutral_tie": false
+  },
+  "claude-sonnet5.5 | seg-qwen3.5-2b-bf16-cluster": {
+   "delta": 9.54,
+   "lo": 2.83,
+   "hi": 17.08,
+   "tie": false,
+   "neutral_tie": false
+  },
+  "gemini3.7-flash-gateway | qwen3.5-27b-teacher": {
+   "delta": 7.69,
+   "lo": 0.33,
+   "hi": 15.91,
+   "tie": false,
+   "neutral_tie": true
+  },
+  "gemini3.7-flash-gateway | seg-qwen3.5-2b-8bit": {
+   "delta": 9.54,
+   "lo": 2.3,
+   "hi": 17.43,
+   "tie": false,
+   "neutral_tie": true
+  },
+  "gemini3.7-flash-gateway | seg-qwen3.5-2b-bf16-cluster": {
+   "delta": 9.54,
+   "lo": 2.3,
+   "hi": 17.43,
+   "tie": false,
+   "neutral_tie": true
+  },
+  "gemini3.8-flash-text | seg-qwen3.5-2b-8bit": {
+   "delta": 8.31,
+   "lo": 2.55,
+   "hi": 14.97,
+   "tie": false,
+   "neutral_tie": true
+  },
+  "gemini3.8-flash-text | seg-qwen3.5-2b-bf16-cluster": {
+   "delta": 8.31,
+   "lo": 2.55,
+   "hi": 14.97,
+   "tie": false,
+   "neutral_tie": true
+  },
+  "gemini3.8-flash | seg-qwen3.5-2b-8bit": {
+   "delta": 8.0,
+   "lo": 2.4,
+   "hi": 14.61,
+   "tie": false,
+   "neutral_tie": true
+  },
+  "gemini3.8-flash | seg-qwen3.5-2b-bf16-cluster": {
+   "delta": 8.0,
+   "lo": 2.4,
+   "hi": 14.61,
+   "tie": false,
+   "neutral_tie": true
+  }
+ }
+}
