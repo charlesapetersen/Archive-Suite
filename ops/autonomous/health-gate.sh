@@ -130,6 +130,10 @@ step processor-write-surface-lint-proof bash "$ROOT/ArchiveProcessor/scripts/tes
 # W40.a5: every Processor test driver / headless contract is `#if DEBUG`, so none ships in Release.
 step processor-release-drivers-lint       bash "$ROOT/ArchiveProcessor/scripts/lint-release-drivers.sh"
 step processor-release-drivers-lint-proof bash "$ROOT/ArchiveProcessor/scripts/lint-release-drivers.sh" --self-test
+# W49.ki-lint: a KNOWN_ISSUES bullet added or reworded since the lint's base ends with (queued: TAG), (accepted: …)
+# or (asked: GATE), and no queued tag has shipped while its bullet stays (CLAUDE.md "Definition of done").
+step known-issues-lint       bash "$ROOT/ops/autonomous/lint-known-issues.sh"
+step known-issues-lint-proof bash "$ROOT/ops/autonomous/lint-known-issues.sh" --self-test
 # PYTHONDONTWRITEBYTECODE: this one imports `finder_tags.py` from the source tree, so CPython would
 # leave a `__pycache__` dir in ArchiveProcessor/scripts on every gate run. The repo ignores that path
 # now as well, but the gate should not be dirtying the checkout it is judging in the first place.
