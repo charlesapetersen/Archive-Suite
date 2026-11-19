@@ -60,13 +60,13 @@ extension NavigationModel {
         containerBuildInFlight = true
         let paths = files.map(\.path)
         Task { [weak self] in
-            let (catalog, draft) = await Task.detached(priority: .utility) {
+            let (catalog, draft, valuesSig) = await Task.detached(priority: .utility) {
                 let catalog = ContainerCatalog.build(treeRoot: tree.url, rootPath: tree.path, filePaths: paths)
                 // The pre-filled map weighs every file's folder, so it is made here and not on the main thread.
                 let draft = Self.shouldOfferContainerLevels(catalog: catalog, settled: true, asked: false)
                     ? ContainerLevelsDraft.make(directories: catalog.fileDirectories, tree: tree.url, treePath: tree.path)
                     : nil
-                return (catalog, draft)
+                return (catalog, draft, LibraryChangeSignature.containers(catalog.rows))
             }.value
             guard let self else { return }
             self.containerBuildInFlight = false
@@ -74,7 +74,8 @@ extension NavigationModel {
                 self.containerCatalog = catalog
                 self.containerBuiltSignature = signature
                 self.containerPrefilledDraft = draft
-                if !self.filter.activeContainerFacets.isEmpty
+                let scopeTestsContainers = self.containerValuesChanged(signature: valuesSig)
+                if scopeTestsContainers || !self.filter.activeContainerFacets.isEmpty
                     || self.sort.contains(where: { $0.field == .container }) {
                     self.recompute()
                 }

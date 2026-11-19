@@ -16,8 +16,10 @@ What it does not do, deliberately or not yet:
   `W47.ct-processor-capture`, `W47.ct-backfill`). It shows the runs container files already hold.
 - **Container files changed by another app are read again on the next change to the listed files, a Rescan or a
   relaunch**, not the moment they change: the catalog is rebuilt when the listed paths change.
-- **Container filters are not saved in a smart folder** (the save sheet says so); Advanced Search has no container
-  rule: `W47.ct-reader-facet-rules`.
+- **A container rule is skipped until the catalog for the open root is built** (W47.ct-reader-facet-rules), like a
+  text rule whose index answer has not come back: a smart folder with one lists and counts its other rules' files
+  for that moment after launch or a root change. It compares the facet's shown value by `ContainerNames.key`, the
+  same value the Containers menu offers, so a collection matches by its title when it has one, else its number.
 - **The facet menu lists each facet's 100 most common values**, counted over the whole library, not narrowed by the
   other facets chosen.
 - **The narrowest window scrolls sideways** once Container is shown, as with Capture marker: the default columns

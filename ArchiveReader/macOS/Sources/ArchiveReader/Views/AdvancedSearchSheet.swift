@@ -317,6 +317,30 @@ private struct RuleValueView: View {
             }
             .help(rule.text.isEmpty ? "Choose a folder in the archive" : rule.text)
             .accessibilityIdentifier("ar.advanced.rule.folder")
+        case .container:
+            // W47.ct-reader-facet-rules: a facet and its value, offered from the facet's values in the library.
+            HStack(spacing: 6) {
+                Picker("Container facet", selection: $rule.containerFacet) {
+                    ForEach(ContainerFacet.allCases, id: \.self) { Text($0.label.lowercased()).tag($0) }
+                }
+                .labelsHidden().fixedSize()
+                .accessibilityIdentifier("ar.advanced.rule.containerFacet")
+                TextField("value", text: $rule.text)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(minWidth: 140, maxWidth: .infinity)
+                    .help("Case, accents and punctuation are ignored: \u{201c}box 17\u{201d} matches \u{201c}Box 17.\u{201d}")
+                    .accessibilityIdentifier("ar.advanced.rule.containerValue")
+                let values = model.containerCatalog.facetValues(rule.containerFacet)
+                Menu {
+                    ForEach(values.prefix(100), id: \.value) { v in
+                        Button("\(v.value) (\(v.count.formatted()))") { rule.text = v.value }
+                    }
+                } label: { Image(systemName: "chevron.down") }
+                .menuStyle(.borderlessButton).fixedSize()
+                .disabled(values.isEmpty)
+                .help("Choose one of the library's values")
+                .accessibilityIdentifier("ar.advanced.rule.containerValues")
+            }
         case .needsAttention, .ambiguousDate, .flagged, .group:
             EmptyView()
         }
@@ -349,6 +373,7 @@ extension RuleField {
         case .needsAttention: return "Needs attention"
         case .ambiguousDate: return "Ambiguous date"
         case .flagged: return "Flagged"
+        case .container: return "Container"
         case .group: return "Group"
         }
     }

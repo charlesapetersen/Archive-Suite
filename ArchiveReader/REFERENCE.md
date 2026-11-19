@@ -497,6 +497,9 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
                               container files, the nearest level map and standard names under the archive's main
                               folder, resolved by ArchiveCore's ContainerResolver; the column cell, facet values and
                               the Inspector's detail with each value's FieldStatus. Read only, built off main.
+                              Its rows (with each facet's folded key) answer Advanced Search's Container rule
+                              through RuleContext.containers; a rebuild whose values changed recounts the smart
+                              folders that test one (W47.ct-reader-facet-rules).
   ContainerLevelsDraft.swift  The level map as the sheet edits it: pre-filled (ContainerLevelMap.prefilled), examples
                               per level, workflow folders and what their contents are, a preview; tied to its tree.
   CollationRanks.swift        localizedStandardCompare ranks cached across sorts, + UTF8Key (byte-

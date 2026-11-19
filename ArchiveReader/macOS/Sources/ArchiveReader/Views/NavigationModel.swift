@@ -209,6 +209,8 @@ final class NavigationModel: ObservableObject {
     /// Whether a level-map save is being written; the sheet's Save waits for it.
     @Published var containerLevelsSaving = false
     var containerGeneration = 0
+    /// `LibraryChangeSignature.containers` of the catalog last published (W47.ct-reader-facet-rules).
+    private var containerValuesSig = 0
     /// The paths the last catalog build started from, so an unchanged set is not rebuilt.
     var containerSignature: ContainerPathSignature?
     /// The paths the published catalog was built from; the level map is offered only once it is the current set.
@@ -564,6 +566,7 @@ final class NavigationModel: ObservableObject {
             parts.append(f.subjects.sorted().joined(separator: " + "))
         }
         if let p = f.pathPrefix, !p.isEmpty { parts.append(URL(fileURLWithPath: p).lastPathComponent) }
+        parts += f.activeContainerFacets.map(\.value)
         let fn = f.searchText.trimmingCharacters(in: .whitespaces)
         if !fn.isEmpty { parts.append("name:\(fn)") }
         let q = fullTextQuery.trimmingCharacters(in: .whitespaces)
@@ -1205,6 +1208,10 @@ final class NavigationModel: ObservableObject {
             context.needsAttention = Set(formatStatuses.lazy.filter { $0.value.needsAttention }.map(\.key))
         }
         if search.uses(.flagged) { context.flagged = flags.flagged }
+        // Only the catalog built for this root: an older one's rows would match the wrong files.
+        if search.uses(.container), containerCatalog.rootPath == containerTree?.path {
+            context.containers = containerCatalog.rows
+        }
         return context
     }
 
@@ -2162,6 +2169,16 @@ final class NavigationModel: ObservableObject {
             pendingRevealJPEGRelativePath = nil
             pendingRevealSettledMisses = 0
         }
+    }
+
+    /// A catalog was published with values signed `signature`. When they changed, the smart folders with a
+    /// container rule are recounted, and the list rebuilt when the scope tests a container (W47.ct-reader-facet-rules).
+    /// Returns whether the scope's rules test one, so the caller can fold the list rebuild into its own.
+    func containerValuesChanged(signature: Int) -> Bool {
+        guard signature != containerValuesSig else { return false }
+        containerValuesSig = signature
+        if savedSearches.searches.contains(where: { $0.search.uses(.container) }) { refreshSmartFolderCounts() }
+        return scopeRules?.uses(.container) == true
     }
 
     private var smartFolderCountGeneration = 0

@@ -49,6 +49,9 @@ struct ContainerRow: Equatable, Sendable {
     let summary: [(field: ContainerField, text: String)]
     /// Each facet's shown value.
     let facets: [ContainerFacet: String]
+    /// Each facet's value as `ContainerFacet.key` folds it, worked out once here for the container rules
+    /// (W47.ct-reader-facet-rules), which test every listed row.
+    let facetKeys: [ContainerFacet: String]
     /// The fields whose candidates disagree (`ContainerDisplay.disagreements`).
     let disagreements: [ContainerField]
 
@@ -80,6 +83,7 @@ struct ContainerRow: Equatable, Sendable {
         var facets: [ContainerFacet: String] = [:]
         for facet in ContainerFacet.allCases { facets[facet] = facet.value(in: shown) }
         self.facets = facets
+        facetKeys = facets.mapValues(ContainerFacet.key)
         self.disagreements = disagreements
     }
 

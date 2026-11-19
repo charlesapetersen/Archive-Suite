@@ -34,6 +34,9 @@ enum RuleField: String, Codable, Sendable, CaseIterable {
     case needsAttention
     case ambiguousDate
     case flagged
+    /// A container facet's value (W47.ct-reader-facet-rules): `SearchRule.containerFacet` and `text`, compared by
+    /// `ContainerFacet.key` against the model's `ContainerCatalog` through `RuleContext.containers`.
+    case container
     /// A nested list of rules with its own all/any (`SearchRule.combine`, `children`).
     case group
 
@@ -46,6 +49,7 @@ enum RuleField: String, Codable, Sendable, CaseIterable {
         case .text, .ocrText, .fileName: return 0
         case .folder: return 1
         case .date: return 2
+        case .container: return 4
         default: return 3
         }
     }
@@ -56,7 +60,7 @@ enum RuleField: String, Codable, Sendable, CaseIterable {
         case .text, .ocrText: return [.allWords, .phrase, .anyWords, .noWords]
         case .fileName: return [.contains, .doesNotContain, .beginsWith, .endsWith]
         case .tags: return [.hasAll, .hasAny, .hasNone]
-        case .quality, .readState, .fileType, .folder: return [.is, .isNot]
+        case .quality, .readState, .fileType, .folder, .container: return [.is, .isNot]
         case .date: return [.between, .after, .before, .undated]
         case .needsAttention, .ambiguousDate, .flagged: return [.is, .isNot]
         case .group: return [.is]
@@ -84,6 +88,8 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
     /// own date; the sent-with date is searched on its own). A row saved without the key keeps `either`, what it
     /// meant when saved; every row written since W37 carries the key.
     var dateRole: DateRoleChoice = .own
+    /// A container row's facet; its value is `text`.
+    var containerFacet: ContainerFacet = .container
     /// A group row's own all/any and rules.
     var combine: RuleCombine = .all
     var children: [SearchRule] = []
@@ -110,6 +116,7 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
         read = try c.decodeIfPresent(ReadFilter.self, forKey: .read) ?? .unread
         fileType = try c.decodeIfPresent(String.self, forKey: .fileType) ?? "PDF"
         dateRole = try c.decodeIfPresent(DateRoleChoice.self, forKey: .dateRole) ?? .either
+        containerFacet = try c.decodeIfPresent(ContainerFacet.self, forKey: .containerFacet) ?? .container
         combine = try c.decodeIfPresent(RuleCombine.self, forKey: .combine) ?? .all
         children = try c.decodeIfPresent([SearchRule].self, forKey: .children) ?? []
     }
@@ -123,7 +130,7 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
     var isActive: Bool {
         switch field {
         case .text, .ocrText: return !AdvancedSearch.words(text).isEmpty
-        case .fileName: return !text.trimmingCharacters(in: .whitespaces).isEmpty
+        case .fileName, .container: return !text.trimmingCharacters(in: .whitespaces).isEmpty
         case .folder: return !text.isEmpty
         case .tags: return !tags.isEmpty
         case .quality: return !qualities.isEmpty
@@ -155,6 +162,9 @@ struct RuleContext: Sendable {
     var textHits: [UUID: Set<String>] = [:]
     var needsAttention: Set<String> = []
     var flagged: Set<String> = []
+    /// The listed files' containers, by path, from the catalog built for the open root. nil while there is none
+    /// (not built yet, or built for another root): a container rule is then skipped like a pending text rule.
+    var containers: [String: ContainerRow]? = nil
 }
 
 struct AdvancedSearch: Codable, Equatable, Sendable {
@@ -209,6 +219,7 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
                 var r = r
                 if r.field == .group { r.children = prune(r.children) }
                 if r.field == .fileName { r.text = r.text.trimmingCharacters(in: .whitespaces) }
+                if r.field == .container { r.text = ContainerFacet.key(r.text) }
                 return r
             }
         }
@@ -278,6 +289,10 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
         case .needsAttention: return context.needsAttention.contains(file.path) == positive
         case .ambiguousDate: return file.dateIsAmbiguous == positive
         case .flagged: return context.flagged.contains(file.path) == positive
+        case .container:
+            guard let containers = context.containers else { return nil }
+            let key = prepared ? rule.text : ContainerFacet.key(rule.text)
+            return (containers[file.path]?.facetKeys[rule.containerFacet] == key) == positive
         case .group: return evaluate(rule.children, rule.combine, file, context, prepared: prepared)
         }
     }
@@ -365,6 +380,9 @@ extension AdvancedSearch {
         // folder saved from it needs no rule of its own.
         if f.poorOCROnly {
             var r = SearchRule(field: .tags, op: .hasAll); r.tags = [DocumentTags.poorOCRTag]; rules.append(r)
+        }
+        for (facet, value) in f.activeContainerFacets {
+            var r = SearchRule(field: .container); r.containerFacet = facet; r.text = value; rules.append(r)
         }
         self.init(combine: .all, rules: rules)
     }

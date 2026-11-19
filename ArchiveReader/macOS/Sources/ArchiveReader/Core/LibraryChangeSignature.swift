@@ -46,4 +46,15 @@ enum LibraryChangeSignature {
         for s in f.subjects { h.combine(s) }
         return h.finalize()
     }
+
+    /// Signature of the container facet values smart-folder rules match (W47.ct-reader-facet-rules): each listed
+    /// file's path with its folded facet values. Like `matchFacets`, the path in each part keeps files apart.
+    static func containers(_ rows: [String: ContainerRow]) -> Int {
+        rows.reduce(0) { sig, entry in
+            var h = Hasher()
+            h.combine(entry.key)
+            for facet in ContainerFacet.allCases { h.combine(entry.value.facetKeys[facet]) }
+            return sig ^ h.finalize()
+        }
+    }
 }

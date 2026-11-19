@@ -29,12 +29,6 @@ struct SaveSearchSheet: View {
                 .focused($nameFocused)
                 .onSubmit { commit() }
                 .accessibilityIdentifier("ar.saveSearch.name")
-            if !model.filter.activeContainerFacets.isEmpty {
-                // W47.ct-reader-view: smart-folder rules have no container rule yet.
-                Text("The container filters are not saved in the smart folder; it keeps the other filters.")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("ar.saveSearch.containerNote")
-            }
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
