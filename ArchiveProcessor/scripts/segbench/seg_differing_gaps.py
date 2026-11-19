@@ -14,8 +14,8 @@ This asks the owner about those gaps, blind to the routes' calls and to the trut
 Run each under the heavy lock (`ops/autonomous/heavy-run.py run -- ...`; `sheet` runs Apple Vision's orientation check
 and loads the boxes). No model call, upload or key. Owner images stay on this Mac: the key, pack and sheet are in
 ~/Library/Caches/ArchiveSuiteRehearsal/seg-differing-gaps/, never in git. The committed record
-(segbench-results/seg-differing-gaps.json) holds page numbers and counts only. After `apply`, rerun seg_pair_ties.py
-and settings_routes.py --check and compare each pair's verdict with the record's `before`.
+(segbench-results/seg-differing-gaps.json) holds page numbers and counts only. After `apply` (whose record's fold.keys
+seg_pair_ties.rejudged() counts as re-judged), rerun seg_pair_ties.py and settings_routes.py --check and compare each pair's verdict with the record's `before`.
 """
 from __future__ import annotations
 
@@ -45,8 +45,9 @@ TITLE = "Segmentation truth: the gaps that decide the differing routes"
 INTRO = """{n} gaps from the Stanton test box. They decide whether some segmentation routes really beat others, and
 no one has looked at them again since the first labels."""
 # The owner's answers once checked, box -> {right page: "New" | "Cont"} for every answer that differs from the truth,
-# so a misread file cannot fold silently. None until the answers arrive: apply refuses.
-EXPECTED: dict[str, dict[int, str]] | None = None
+# so a misread file cannot fold silently. Checked 2026-11-19 (answers saved 08:39): all five "same document", as the
+# truth already had it, so nothing changes in the truth.
+EXPECTED: dict[str, dict[int, str]] | None = {}
 
 
 def asked() -> tuple[list[dict], dict]:
@@ -142,6 +143,7 @@ def cmd_apply(_a):
         assert all(got[n] == lab for n, lab in flips.items()), (box, flips)
     record = json.loads(RECORD.read_text())
     record["fold"] = {"date": dt.date.today().isoformat(), "ruled": folded["ruled"], "differs": folded["differs"],
+                      "keys": [r["key"] for r in folded["rows"] if r["answer"] in ("new", "continue")],
                       "changed": [{"key": r["key"], "truth_before": r["truth"], "answer": r["answer"]}
                                   for r in folded["rows"] if r["differs"]]}
     RECORD.write_text(json.dumps(record, indent=1) + "\n")

@@ -92,28 +92,28 @@ Identical page by page (no document right in one and not the other): chatgpt-gpt
 
 ## The differing pairs and the gaps no one re-judged (SEG-11)
 
-Truth was re-judged only where models disagreed with it: the 92 gaps the app's Gemini route flagged (13 Nov), Stanton's magazine rulings and the 50 agreed gaps of the audit. For each pair the interval separates, the documents exactly right in one route only, and how many of them are decided at a gap the owner never looked at again (a gap in or bounding the document where the two routes' calls differ). *Neutralised* sets the winner's flags on those documents to the loser's, as if the truth were wrong at every such gap against the winner: the pair's edge if none of them counted.
+Truth was re-judged only where models disagreed with it: the 92 gaps the app's Gemini route flagged (13 Nov), Stanton's magazine rulings, the 50 agreed gaps of the audit and the five gaps that decided the differing pairs (W46.seg-differing-gaps-sheet, 19 Nov). For each pair the interval separates, the documents exactly right in one route only, and how many of them are decided at a gap the owner never looked at again (a gap in or bounding the document where the two routes' calls differ). *Neutralised* sets the winner's flags on those documents to the loser's, as if the truth were wrong at every such gap against the winner: the pair's edge if none of them counted.
 
 | a | b | discordant documents | decided at an un-re-judged gap (for the winner) | neutralised a − b | interval / with the floor |
 |---|---|---:|---:|---|---|
-| chatgpt-gpt6.1-sol | qwen3.5-27b-teacher | 12 | 1 (1) | +8.31 [+1.56, +16.11] | differs / tie |
-| chatgpt-gpt6.1-sol | seg-qwen3.5-2b-8bit | 20 | 5 (5) | +7.69 [+1.40, +14.89] | differs / tie |
-| chatgpt-gpt6.1-sol | seg-qwen3.5-2b-bf16-cluster | 20 | 5 (5) | +7.69 [+1.40, +14.89] | differs / tie |
-| mix-claude-chatgpt | qwen3.5-27b-teacher | 12 | 1 (1) | +8.31 [+1.56, +16.11] | differs / tie |
-| mix-claude-chatgpt | seg-qwen3.5-2b-8bit | 20 | 5 (5) | +7.69 [+1.40, +14.89] | differs / tie |
-| mix-claude-chatgpt | seg-qwen3.5-2b-bf16-cluster | 20 | 5 (5) | +7.69 [+1.40, +14.89] | differs / tie |
-| claude-sonnet5.5 | qwen3.5-27b-teacher | 10 | 1 (1) | +7.08 [+0.33, +14.93] | differs / tie |
-| claude-sonnet5.5 | seg-qwen3.5-2b-8bit | 18 | 5 (5) | +6.46 [+0.29, +13.64] | differs / tie |
-| claude-sonnet5.5 | seg-qwen3.5-2b-bf16-cluster | 18 | 5 (5) | +6.46 [+0.29, +13.64] | differs / tie |
-| gemini3.7-flash-gateway | qwen3.5-27b-teacher | 10 | 1 (1) | +7.08 [+0.00, +15.26] | tie / tie |
-| gemini3.7-flash-gateway | seg-qwen3.5-2b-8bit | 18 | 5 (5) | +6.46 [-0.32, +14.03] | tie / tie |
-| gemini3.7-flash-gateway | seg-qwen3.5-2b-bf16-cluster | 18 | 5 (5) | +6.46 [-0.32, +14.03] | tie / tie |
-| gemini3.8-flash-text | seg-qwen3.5-2b-8bit | 15 | 5 (5) | +5.23 [+0.00, +11.31] | tie / tie |
-| gemini3.8-flash-text | seg-qwen3.5-2b-bf16-cluster | 15 | 5 (5) | +5.23 [+0.00, +11.31] | tie / tie |
-| gemini3.8-flash | seg-qwen3.5-2b-8bit | 13 | 5 (5) | +4.92 [+0.00, +11.01] | tie / tie |
-| gemini3.8-flash | seg-qwen3.5-2b-bf16-cluster | 13 | 5 (5) | +4.92 [+0.00, +11.01] | tie / tie |
+| chatgpt-gpt6.1-sol | qwen3.5-27b-teacher | 12 | 0 (0) | +8.92 [+2.01, +16.87] | differs / tie |
+| chatgpt-gpt6.1-sol | seg-qwen3.5-2b-8bit | 20 | 0 (0) | +10.77 [+3.91, +18.38] | differs / differs |
+| chatgpt-gpt6.1-sol | seg-qwen3.5-2b-bf16-cluster | 20 | 0 (0) | +10.77 [+3.91, +18.38] | differs / differs |
+| mix-claude-chatgpt | qwen3.5-27b-teacher | 12 | 0 (0) | +8.92 [+2.01, +16.87] | differs / tie |
+| mix-claude-chatgpt | seg-qwen3.5-2b-8bit | 20 | 0 (0) | +10.77 [+3.91, +18.38] | differs / differs |
+| mix-claude-chatgpt | seg-qwen3.5-2b-bf16-cluster | 20 | 0 (0) | +10.77 [+3.91, +18.38] | differs / differs |
+| claude-sonnet5.5 | qwen3.5-27b-teacher | 10 | 0 (0) | +7.69 [+0.92, +15.59] | differs / tie |
+| claude-sonnet5.5 | seg-qwen3.5-2b-8bit | 18 | 0 (0) | +9.54 [+2.83, +17.08] | differs / tie |
+| claude-sonnet5.5 | seg-qwen3.5-2b-bf16-cluster | 18 | 0 (0) | +9.54 [+2.83, +17.08] | differs / tie |
+| gemini3.7-flash-gateway | qwen3.5-27b-teacher | 10 | 0 (0) | +7.69 [+0.33, +15.91] | differs / tie |
+| gemini3.7-flash-gateway | seg-qwen3.5-2b-8bit | 18 | 0 (0) | +9.54 [+2.30, +17.43] | differs / tie |
+| gemini3.7-flash-gateway | seg-qwen3.5-2b-bf16-cluster | 18 | 0 (0) | +9.54 [+2.30, +17.43] | differs / tie |
+| gemini3.8-flash-text | seg-qwen3.5-2b-8bit | 15 | 0 (0) | +8.31 [+2.55, +14.97] | differs / tie |
+| gemini3.8-flash-text | seg-qwen3.5-2b-bf16-cluster | 15 | 0 (0) | +8.31 [+2.55, +14.97] | differs / tie |
+| gemini3.8-flash | seg-qwen3.5-2b-8bit | 13 | 0 (0) | +8.00 [+2.40, +14.61] | differs / tie |
+| gemini3.8-flash | seg-qwen3.5-2b-bf16-cluster | 13 | 0 (0) | +8.00 [+2.40, +14.61] | differs / tie |
 
-Neutralised, 7 of the 16 pairs would tie under the interval alone: gemini3.7-flash-gateway over qwen3.5-27b-teacher; gemini3.7-flash-gateway over seg-qwen3.5-2b-8bit; gemini3.7-flash-gateway over seg-qwen3.5-2b-bf16-cluster; gemini3.8-flash-text over seg-qwen3.5-2b-8bit; gemini3.8-flash-text over seg-qwen3.5-2b-bf16-cluster; gemini3.8-flash over seg-qwen3.5-2b-8bit; gemini3.8-flash over seg-qwen3.5-2b-bf16-cluster. These are the verdicts an owner look at those gaps could move; no truth is changed here.
+Neutralised, every one of the 16 pairs still clears 0. These are the verdicts an owner look at those gaps could move; no truth is changed here.
 
 ## The picks the floor would move (not changed; the owner kept the interval-only rule, 2026-11-18)
 

@@ -158,9 +158,12 @@ def bootstrap(fa, fb, docs, floor=0.0):
 
 def rejudged() -> set[str]:
     """"<box> <left>|<right>" of every test-box gap the owner has looked at again since his capture labels: the 92 the
-    app's Gemini route flagged (13 Nov), Stanton's magazine rulings, and the 50 agreed gaps of the audit."""
+    app's Gemini route flagged (13 Nov), Stanton's magazine rulings, the 50 agreed gaps of the audit, and the five gaps
+    that decided the differing pairs (W46.seg-differing-gaps-sheet, 19 Nov)."""
     import seg_truth_audit as A
-    return A.answered() | set(json.loads(A.RECORD.read_text())["keys"])
+    diff = A.RESULTS / "seg-differing-gaps.json"
+    later = set(json.loads(diff.read_text()).get("fold", {}).get("keys", [])) if diff.exists() else set()
+    return A.answered() | set(json.loads(A.RECORD.read_text())["keys"]) | later
 
 
 def seg11(a, b, flags, labels, cols, winner):
@@ -300,7 +303,8 @@ def render(out) -> str:
               "bf16 FarmShare run, the same answers as the cluster row), not two runs.", ""]
     L += ["## The differing pairs and the gaps no one re-judged (SEG-11)", "",
           "Truth was re-judged only where models disagreed with it: the 92 gaps the app's Gemini route flagged (13 Nov), "
-          "Stanton's magazine rulings and the 50 agreed gaps of the audit. For each pair the interval separates, the "
+          "Stanton's magazine rulings, the 50 agreed gaps of the audit and the five gaps that decided the differing pairs "
+          "(W46.seg-differing-gaps-sheet, 19 Nov). For each pair the interval separates, the "
           "documents exactly right in one route only, and how many of them are decided at a gap the owner never looked "
           "at again (a gap in or bounding the document where the two routes' calls differ). *Neutralised* sets the "
           "winner's flags on those documents to the loser's, as if the truth were wrong at every such gap against "

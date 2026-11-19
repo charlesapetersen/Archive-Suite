@@ -166,5 +166,18 @@
    "tie": false,
    "neutral_tie": true
   }
+ },
+ "fold": {
+  "date": "2026-11-19",
+  "ruled": 5,
+  "differs": 0,
+  "keys": [
+   "Stanton 12|13",
+   "Stanton 20|21",
+   "Stanton 170|171",
+   "Stanton 227|228",
+   "Stanton 232|233"
+  ],
+  "changed": []
  }
 }

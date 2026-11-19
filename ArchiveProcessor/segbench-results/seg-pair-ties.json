@@ -182,15 +182,13 @@
    "tie_floor": true,
    "seg11": {
     "discordant": 12,
-    "unrejudged": 1,
-    "unrejudged_for_winner": 1,
-    "gaps": [
-     "Stanton 20|21"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 8.31,
-     "lo": 1.56,
-     "hi": 16.11,
+     "delta": 8.92,
+     "lo": 2.01,
+     "hi": 16.87,
      "tie": false,
      "tie_floor": true
     }
@@ -212,21 +210,15 @@
    "tie_floor": false,
    "seg11": {
     "discordant": 20,
-    "unrejudged": 5,
-    "unrejudged_for_winner": 5,
-    "gaps": [
-     "Stanton 12|13",
-     "Stanton 20|21",
-     "Stanton 170|171",
-     "Stanton 227|228",
-     "Stanton 232|233"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 7.69,
-     "lo": 1.4,
-     "hi": 14.89,
+     "delta": 10.77,
+     "lo": 3.91,
+     "hi": 18.38,
      "tie": false,
-     "tie_floor": true
+     "tie_floor": false
     }
    }
   },
@@ -246,21 +238,15 @@
    "tie_floor": false,
    "seg11": {
     "discordant": 20,
-    "unrejudged": 5,
-    "unrejudged_for_winner": 5,
-    "gaps": [
-     "Stanton 12|13",
-     "Stanton 20|21",
-     "Stanton 170|171",
-     "Stanton 227|228",
-     "Stanton 232|233"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 7.69,
-     "lo": 1.4,
-     "hi": 14.89,
+     "delta": 10.77,
+     "lo": 3.91,
+     "hi": 18.38,
      "tie": false,
-     "tie_floor": true
+     "tie_floor": false
     }
    }
   },
@@ -370,15 +356,13 @@
    "tie_floor": true,
    "seg11": {
     "discordant": 12,
-    "unrejudged": 1,
-    "unrejudged_for_winner": 1,
-    "gaps": [
-     "Stanton 20|21"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 8.31,
-     "lo": 1.56,
-     "hi": 16.11,
+     "delta": 8.92,
+     "lo": 2.01,
+     "hi": 16.87,
      "tie": false,
      "tie_floor": true
     }
@@ -400,21 +384,15 @@
    "tie_floor": false,
    "seg11": {
     "discordant": 20,
-    "unrejudged": 5,
-    "unrejudged_for_winner": 5,
-    "gaps": [
-     "Stanton 12|13",
-     "Stanton 20|21",
-     "Stanton 170|171",
-     "Stanton 227|228",
-     "Stanton 232|233"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 7.69,
-     "lo": 1.4,
-     "hi": 14.89,
+     "delta": 10.77,
+     "lo": 3.91,
+     "hi": 18.38,
      "tie": false,
-     "tie_floor": true
+     "tie_floor": false
     }
    }
   },
@@ -434,21 +412,15 @@
    "tie_floor": false,
    "seg11": {
     "discordant": 20,
-    "unrejudged": 5,
-    "unrejudged_for_winner": 5,
-    "gaps": [
-     "Stanton 12|13",
-     "Stanton 20|21",
-     "Stanton 170|171",
-     "Stanton 227|228",
-     "Stanton 232|233"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 7.69,
-     "lo": 1.4,
-     "hi": 14.89,
+     "delta": 10.77,
+     "lo": 3.91,
+     "hi": 18.38,
      "tie": false,
-     "tie_floor": true
+     "tie_floor": false
     }
    }
   },
@@ -543,15 +515,13 @@
    "tie_floor": true,
    "seg11": {
     "discordant": 10,
-    "unrejudged": 1,
-    "unrejudged_for_winner": 1,
-    "gaps": [
-     "Stanton 20|21"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 7.08,
-     "lo": 0.33,
-     "hi": 14.93,
+     "delta": 7.69,
+     "lo": 0.92,
+     "hi": 15.59,
      "tie": false,
      "tie_floor": true
     }
@@ -573,19 +543,13 @@
    "tie_floor": true,
    "seg11": {
     "discordant": 18,
-    "unrejudged": 5,
-    "unrejudged_for_winner": 5,
-    "gaps": [
-     "Stanton 12|13",
-     "Stanton 20|21",
-     "Stanton 170|171",
-     "Stanton 227|228",
-     "Stanton 232|233"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 6.46,
-     "lo": 0.29,
-     "hi": 13.64,
+     "delta": 9.54,
+     "lo": 2.83,
+     "hi": 17.08,
      "tie": false,
      "tie_floor": true
     }
@@ -607,19 +571,13 @@
    "tie_floor": true,
    "seg11": {
     "discordant": 18,
-    "unrejudged": 5,
-    "unrejudged_for_winner": 5,
-    "gaps": [
-     "Stanton 12|13",
-     "Stanton 20|21",
-     "Stanton 170|171",
-     "Stanton 227|228",
-     "Stanton 232|233"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 6.46,
-     "lo": 0.29,
-     "hi": 13.64,
+     "delta": 9.54,
+     "lo": 2.83,
+     "hi": 17.08,
      "tie": false,
      "tie_floor": true
     }
@@ -701,16 +659,14 @@
    "tie_floor": true,
    "seg11": {
     "discordant": 10,
-    "unrejudged": 1,
-    "unrejudged_for_winner": 1,
-    "gaps": [
-     "Stanton 20|21"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 7.08,
-     "lo": 0.0,
-     "hi": 15.26,
-     "tie": true,
+     "delta": 7.69,
+     "lo": 0.33,
+     "hi": 15.91,
+     "tie": false,
      "tie_floor": true
     }
    }
@@ -731,20 +687,14 @@
    "tie_floor": true,
    "seg11": {
     "discordant": 18,
-    "unrejudged": 5,
-    "unrejudged_for_winner": 5,
-    "gaps": [
-     "Stanton 12|13",
-     "Stanton 20|21",
-     "Stanton 170|171",
-     "Stanton 227|228",
-     "Stanton 232|233"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 6.46,
-     "lo": -0.32,
-     "hi": 14.03,
-     "tie": true,
+     "delta": 9.54,
+     "lo": 2.3,
+     "hi": 17.43,
+     "tie": false,
      "tie_floor": true
     }
    }
@@ -765,20 +715,14 @@
    "tie_floor": true,
    "seg11": {
     "discordant": 18,
-    "unrejudged": 5,
-    "unrejudged_for_winner": 5,
-    "gaps": [
-     "Stanton 12|13",
-     "Stanton 20|21",
-     "Stanton 170|171",
-     "Stanton 227|228",
-     "Stanton 232|233"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 6.46,
-     "lo": -0.32,
-     "hi": 14.03,
-     "tie": true,
+     "delta": 9.54,
+     "lo": 2.3,
+     "hi": 17.43,
+     "tie": false,
      "tie_floor": true
     }
    }
@@ -859,20 +803,14 @@
    "tie_floor": true,
    "seg11": {
     "discordant": 15,
-    "unrejudged": 5,
-    "unrejudged_for_winner": 5,
-    "gaps": [
-     "Stanton 12|13",
-     "Stanton 20|21",
-     "Stanton 170|171",
-     "Stanton 227|228",
-     "Stanton 232|233"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 5.23,
-     "lo": 0.0,
-     "hi": 11.31,
-     "tie": true,
+     "delta": 8.31,
+     "lo": 2.55,
+     "hi": 14.97,
+     "tie": false,
      "tie_floor": true
     }
    }
@@ -893,20 +831,14 @@
    "tie_floor": true,
    "seg11": {
     "discordant": 15,
-    "unrejudged": 5,
-    "unrejudged_for_winner": 5,
-    "gaps": [
-     "Stanton 12|13",
-     "Stanton 20|21",
-     "Stanton 170|171",
-     "Stanton 227|228",
-     "Stanton 232|233"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 5.23,
-     "lo": 0.0,
-     "hi": 11.31,
-     "tie": true,
+     "delta": 8.31,
+     "lo": 2.55,
+     "hi": 14.97,
+     "tie": false,
      "tie_floor": true
     }
    }
@@ -972,20 +904,14 @@
    "tie_floor": true,
    "seg11": {
     "discordant": 13,
-    "unrejudged": 5,
-    "unrejudged_for_winner": 5,
-    "gaps": [
-     "Stanton 12|13",
-     "Stanton 20|21",
-     "Stanton 170|171",
-     "Stanton 227|228",
-     "Stanton 232|233"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 4.92,
-     "lo": 0.0,
-     "hi": 11.01,
-     "tie": true,
+     "delta": 8.0,
+     "lo": 2.4,
+     "hi": 14.61,
+     "tie": false,
      "tie_floor": true
     }
    }
@@ -1006,20 +932,14 @@
    "tie_floor": true,
    "seg11": {
     "discordant": 13,
-    "unrejudged": 5,
-    "unrejudged_for_winner": 5,
-    "gaps": [
-     "Stanton 12|13",
-     "Stanton 20|21",
-     "Stanton 170|171",
-     "Stanton 227|228",
-     "Stanton 232|233"
-    ],
+    "unrejudged": 0,
+    "unrejudged_for_winner": 0,
+    "gaps": [],
     "neutral": {
-     "delta": 4.92,
-     "lo": 0.0,
-     "hi": 11.01,
-     "tie": true,
+     "delta": 8.0,
+     "lo": 2.4,
+     "hi": 14.61,
+     "tie": false,
      "tie_floor": true
     }
    }
