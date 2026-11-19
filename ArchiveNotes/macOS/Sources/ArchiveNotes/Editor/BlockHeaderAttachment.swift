@@ -172,6 +172,8 @@ final class BlockHeaderChipView: NSView {
     private let liveLabel: String?
     /// W7-S3 — the note-passage source no longer resolves; render greyed with a "source removed" hint.
     private let sourceMissing: Bool
+    /// W47.ct-zotero — the source's archival location, shown once read.
+    private let containerLabel = NSTextField(labelWithString: "")
 #if DEBUG
     var uiTestSourceNoteID: String? { box.anchor.notePassageTarget?.id.uuidString.lowercased() }
 #endif
@@ -245,6 +247,20 @@ final class BlockHeaderChipView: NSView {
         // A block with none of these (plain freeform) shows just its label rather than dead buttons.
         var views: [NSView] = [label]
 
+        // W47.ct-zotero: a Reader source shows where its document sits in the archive, filled in once the file's
+        // container is read, and offers its gathered metadata to Zotero.
+        let isReaderSource = box.anchor.link != nil && (box.kind == .readerPage || box.kind == .readerDoc)
+        if isReaderSource {
+            containerLabel.font = .systemFont(ofSize: 10)
+            containerLabel.textColor = .secondaryLabelColor
+            containerLabel.lineBreakMode = .byTruncatingTail
+            containerLabel.setContentCompressionResistancePriority(.defaultLow - 1, for: .horizontal)
+            containerLabel.isHidden = true
+            containerLabel.setAccessibilityIdentifier("an.chip.container")
+            views.append(containerLabel)
+            loadContainerLine()
+        }
+
         if isPassage {
             let jumpButton = NSButton(title: "Jump to Source", target: self,
                                       action: #selector(jumpClicked))
@@ -273,6 +289,17 @@ final class BlockHeaderChipView: NSView {
 
             views.append(revealButton)
             views.append(previewButton)
+        }
+
+        if isReaderSource {
+            let copyButton = NSButton(title: "Copy for Zotero", target: self, action: #selector(copyForZoteroClicked))
+            copyButton.bezelStyle = .inline
+            copyButton.controlSize = .small
+            copyButton.font = .systemFont(ofSize: 10)
+            copyButton.toolTip = "Copy this source's archival location, dates, people and item fields as CSL-JSON; "
+                + "in Zotero, choose File ▸ Import from Clipboard"
+            copyButton.setAccessibilityIdentifier("an.chip.copyForZotero")
+            views.append(copyButton)
         }
 
         if box.anchor.zoteroSelect != nil {
@@ -310,6 +337,37 @@ final class BlockHeaderChipView: NSView {
 
     @objc private func jumpClicked() {
         onJump?(box.anchor)
+    }
+
+    private func loadContainerLine() {
+        let anchor = box.anchor
+        Task { @MainActor [weak self] in
+            guard let line = await SourceArchiveInfo.shared?.containerLine(for: anchor), let self else { return }
+            self.containerLabel.stringValue = line
+            self.containerLabel.toolTip = line
+            self.containerLabel.isHidden = false
+        }
+    }
+
+    @objc private func copyForZoteroClicked() {
+        let anchor = box.anchor
+        Task { @MainActor [weak self] in
+            guard let json = await SourceArchiveInfo.shared?.zoteroJSON(for: anchor),
+                  let text = String(data: json, encoding: .utf8) else {
+                self?.reportCopyFailure()
+                return
+            }
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
+    }
+
+    private func reportCopyFailure() {
+        let alert = NSAlert()
+        alert.messageText = "This source's file could not be read."
+        alert.informativeText = "Copy for Zotero reads the document at its recorded path in an archive folder Notes "
+            + "can open. Use Preview to find it, or choose its archive folder from the File menu (Choose Archive Folder…)."
+        if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
     }
 
     @objc private func openZoteroClicked() {

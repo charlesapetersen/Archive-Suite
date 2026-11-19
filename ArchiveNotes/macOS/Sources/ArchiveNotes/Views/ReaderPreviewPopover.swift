@@ -395,6 +395,7 @@ final class SourceBlockPreviewState: ObservableObject {
     init() {
         let store = ReaderRootStore(defaults: Self.rootGrantDefaults)
         self.rootStore = store
+        SourceArchiveInfo.shared = SourceArchiveInfo(rootStore: store)
         let resolver = ReaderLinkResolver(rootStore: store)
         let chooser = ReaderRootChooser(rootStore: store, resolver: resolver)
 #if DEBUG
