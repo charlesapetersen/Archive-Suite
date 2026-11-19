@@ -286,6 +286,29 @@ enum SettingsSheetTestDriver {
             check("3a reading on the plan already: nothing to switch", r.routeID != "claude-sonnet5.5" || r.apply == nil,
                   String(describing: r.apply))
         }
+        check("3a the plan's run is on the plan", onPlan.onPlan)
+        // Review H1: the same model read on a key, with the plan there too, is not the pick the sheet prices at nothing:
+        // it offers the plan and says the run now pays.
+        let sonnet = LLMProvider.anthropic.models.first { $0.id == "claude-sonnet-5-5" }!
+        for (name, provider, model) in [("Anthropic", LLMProvider.anthropic, sonnet),
+                                        ("OpenRouter", .openrouter, LLMProvider.openrouter.models.first {
+                                            OpenRouterRoute.forModel($0.id)?.makerAppRoute == "anthropic|claude-sonnet-5-5" } ?? sonnet)] {
+            let onKey = SettingsSheetView.running(segmentation: .manual, useAppleVision: false, useGateway: false,
+                                                  useLocalAgent: false, provider: provider, model: model, table: table)
+            check("3a \(name) key run: the Claude row, not on the plan",
+                  onKey.readingRouteID == "claude-sonnet5.5" && !onKey.onPlan, onKey.readingRouteID ?? "nil")
+            let keyNow = sheet("claude-plan-\(name)-key-running",
+                               general: layer(.general, [(.plans, .strings(["claude"])), (.keys, .strings([name.lowercased()])),
+                                                         (.staysOnMac, .bool(false))]), running: onKey)
+            if let r = card(keyNow, "reading"), r.routeID == "claude-sonnet5.5" {
+                check("3a \(name) key run with the plan: Read with this switches on the plan",
+                      r.apply == .readingByPlan(model: "claude-sonnet-5-5"), String(describing: r.apply))
+                check("3a \(name) key run with the plan: says the run now pays", r.runsNow?.contains("on a key, which is money") == true,
+                      r.runsNow ?? "nil")
+            } else {
+                check("3a \(name) key run with the plan: the pick is Claude", false, card(keyNow, "reading")?.routeID ?? "no card")
+            }
+        }
         // A key alone: the key's route, at the key's price.
         let keySheet = sheet("claude-key-only", general: layer(.general, [(.keys, .strings(["anthropic"])), (.staysOnMac, .bool(false)),
                                                                           (.moneyHabit, .string(MoneyHabit.perBatch.rawValue)),

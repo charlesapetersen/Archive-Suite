@@ -16758,3 +16758,28 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   is unchanged. Bench cache: the item wrote only temporary directories (removed) and one guard quarantine folder of
   its own temp readings, moved to the Trash.
   <!-- /W46.vision-short-reads -->
+- [x] **W41.app-claude-plan-reading — Claude reads pages through the user's Claude subscription, not only through a key [M]** · §W40 — verification phase: prove the Suite works (lane: processor) (uses: build) · SHIPPED 2026-11-19
+  Owner, 2026-11-19 walkthrough: a0801741 had made the Claude reading row key-only, so a Claude plan alone was
+  recommended Apple Vision. Now the route table's `claude-sonnet5.5` reading row (family plan) is reached by the Claude
+  plan at no money, using its five-hour and weekly windows, or by an Anthropic/OpenRouter key at the pilot's $19.56 per
+  1,000. The sheet's "Read with this" switches on the Local Agent with `claude` at `claude-sonnet-5-5`
+  (`SettingsSheetModel.Apply.readingByPlan`) whenever the plan reaches the row, even with a key there too, since it is
+  then priced at nothing; a direct Anthropic or OpenRouter run of the same model is not taken as that pick
+  (`Running.onPlan`) and is offered the switch, the card saying the run now pays. The sheet's plan wording names the
+  usage windows. Solver D3 and D5 read on the plan; prototype prices a plan row reached by key as money.
+  Pause and resume: `claude -p` reports its limit in the JSON envelope on stdout; `LocalAgentClient.classifyClaude`
+  reads it (an is_error envelope is never page text; only the envelope's result says why), `pacingReset` reads the
+  reset (relative, clock, "Nov 24, 9am", epoch in s or ms; a bare clock more than 22 h ahead is unknown), and
+  `invokePaced` waits for it plus a minute (15 minutes when unknown) in 30 s ticks, then reads on the plan again. Never
+  a key; key variables still stripped. Stop ends the wait; the sequential loops do not record a page Stop cut short, so
+  Resume reads it. Process Files and Live Capture show the pause (`PlanPauseCaption`).
+  Tier-2 review (Opus): HIGH (a key run of the same model shown as "no money" with no switch) fixed; MEDs fixed (a
+  clock just past stalling a day; the raw envelope matched as a limit; the dated weekly form unparsed); LOWs fixed
+  (Live Capture caption; the batch switch left alone; millisecond epochs) or in KNOWN_ISSUES (no cap on the wait; no
+  90% meter stop for reading). Tests: localagent 5c-5g with new fake modes (limitjson, limitthenok, iserror0), sheet
+  3a, solver D3/D5, openrouter 10; green also settings-routes, -interviews, -layers, segmentation-chooser,
+  ocr-refusal, reocr-ranking, page-reader, ocr-cascade, provider-errors, localagent-pacing-test. Clean build, no new
+  warnings. Live check (`scripts/test-localagent.sh --live`, the three synthetic e2e-fixtures pages, on the plan): 3/3
+  read, 5.7-8.5 s a page one at a time (about 520 pages an hour), 11.6 s for the three two at once (about 930 an
+  hour); not a benchmark figure. No money. Bench cache: nothing written there.
+  <!-- /W41.app-claude-plan-reading -->

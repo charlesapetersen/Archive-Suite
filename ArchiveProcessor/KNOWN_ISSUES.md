@@ -23,6 +23,22 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   (W41.app-openrouter-claude), and the listing skips its id. Opus 5.5 and Haiku 4.5 have narrow measurements that do
   not make routes (`LLMModel.anthropicModels` says which).
 
+## ⚠️ LIMITATION (W41.app-claude-plan-reading, 2026-11-19): what reading on the Claude plan does not do
+- **A page waits at the limit for as long as it takes.** No cap: it reads on the plan again after the reset the CLI
+  printed (plus a minute), or every 15 minutes when it printed none or a bare clock time more than 22 hours ahead
+  (`LocalAgentClient.pacingReset`), until the plan answers or the user presses Stop. It never goes to a key. The
+  message forms read are Claude Code's ("resets 3pm", "resets in 2h", "resets Nov 24, 9am", "usage limit reached|epoch");
+  a new wording the CLI adopts is matched as a limit only if it says "usage limit", "hit your limit", "limit reached",
+  "session limit", "rate limit" or 429 (`LocalAgentWindowTransport.isUsageLimit`), else the page fails as before.
+- **Reading does not stop at 90% of the five-hour window.** The segmentation windows read the account's meter
+  (`stream-json`, `PlanRunGate`) and pause before the window runs out; the page reader uses `--output-format json`,
+  which prints no meter, so a batch reads until the limit itself and then waits.
+- **Live Capture waits too.** A captured page at the limit waits inside its OCR task; the capture window shows the
+  pause (`PlanPauseCaption`), and the segment is filed when its pages are read.
+- **Throughput is from three synthetic pages** (`scripts/e2e-fixtures`, 2026-11-19): 5.7–8.5 s a page one at a time,
+  11.6 s for the three two at once; not a benchmark figure, so not in ArchiveOCRBench. `scripts/test-localagent.sh
+  --live` repeats it on the plan.
+
 ## ⚠️ LIMITATION (W41.app-openrouter-claude, 2026-11-18): Claude Sonnet 5.5's routes carry its plan route's figures
 - **Its figures were measured through `claude -p`**, the owner's plan (reading: 96.48 NES on the 96, a relative of the
   truth's drafter Claude Opus 5.5; windows: 88.9% on the test boxes). The Anthropic key and OpenRouter routes carry them

@@ -16,6 +16,8 @@ import Foundation
 
 // ===================================================================================================
 // COPY of LocalAgentClient's usage-window parser (OCR/LocalAgentClient.swift). Keep in sync.
+// Not copied (W41.app-claude-plan-reading): the epoch and dated reset forms and `pacingReset`, which the in-app
+// LocalAgentTestDriver (5c) tests against the real parser.
 func parseUsageWindowReset(fromStderr stderr: String, now: Date, calendar: Calendar = .current) -> Date? {
     let s = stderr.lowercased()
     if let secs = relativeResetSeconds(in: s), secs > 0 { return now.addingTimeInterval(secs) }

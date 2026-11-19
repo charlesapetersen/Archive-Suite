@@ -50,7 +50,8 @@ struct SettingsSheetView: View {
             let model = localAgentModel.trimmingCharacters(in: .whitespacesAndNewlines)
             if localAgentTool == .claude, !model.isEmpty,
                let r = table?.stage("reading")?.routes.first(where: { $0.appRoute == "anthropic|\(model)" && $0.needs.plan == ["claude"] }) {
-                return .init(readingRouteID: r.id, readingName: "your Claude plan (\(model))", segmentation: segmentation)
+                return .init(readingRouteID: r.id, readingName: "your Claude plan (\(model))", segmentation: segmentation,
+                             onPlan: true)
             }
             return .init(readingRouteID: nil, readingName: "your signed-in command-line agent", segmentation: segmentation)
         }
@@ -172,10 +173,9 @@ struct SettingsSheetView: View {
             modelStore.setModel(m, for: provider)
         case .readingByPlan(let model):
             // The Local Agent backend with `claude`: the plan's login, never a key (`LocalAgentClient` strips the
-            // variables that would bill one). No batch: the plan has none.
+            // variables that would bill one). The batch switch is left as it is: the Local Agent run ignores it.
             useGateway = false
             useAppleVision = false
-            batchMode = false
             localAgentToolRaw = LocalAgentTool.claude.rawValue
             localAgentModel = model
             useLocalAgent = true

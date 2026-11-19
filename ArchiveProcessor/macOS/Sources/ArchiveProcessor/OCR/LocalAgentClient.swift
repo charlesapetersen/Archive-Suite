@@ -297,13 +297,17 @@ struct LocalAgentClient: Sendable {
         if cli.exitCode == 0, !isError, let text = envelope?["result"] as? String, !text.isEmpty {
             return .success(text)
         }
-        let reason = (envelope?["result"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? (cli.stderr + "\n" + cli.stdout)
+        // When the envelope parsed, only its `result` (or stderr) says why: its other fields (a duration of 429 ms) must
+        // not read as a limit.
+        let reason = envelope != nil
+            ? ((envelope?["result"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? cli.stderr)
+            : (cli.stderr + "\n" + cli.stdout)
         let tool = LocalAgentTool.claude
         if exitErrorCode(stderr: reason, exitCode: cli.exitCode) == "cli_not_logged_in" {
             return .failure(code: "cli_not_logged_in", message: friendlyExitMessage(tool: tool, stderr: reason, exitCode: 1))
         }
         if LocalAgentWindowTransport.isUsageLimit(reason) {
-            let reset = parseUsageWindowReset(fromStderr: reason, now: now)
+            let reset = pacingReset(reason, now: now)
             lastUsageWindowResetAt = reset
             let when = reset.map { " It resets \(usageWindowHint(for: $0, now: now))." } ?? ""
             return .usageLimited(reset: reset, message: "Your Claude plan's usage limit is reached.\(when) Reading "
@@ -444,11 +448,14 @@ struct LocalAgentClient: Sendable {
     static func parseUsageWindowReset(fromStderr stderr: String, now: Date,
                                       calendar: Calendar = .current) -> Date? {
         let s = stderr.lowercased()
-        // Claude Code's older form: "Claude AI usage limit reached|1763600000", the reset in Unix seconds.
-        if let r = s.range(of: #"limit reached\|(\d{9,11})"#, options: .regularExpression),
-           let secs = Double(s[r].split(separator: "|").last ?? "") {
-            return Date(timeIntervalSince1970: secs)
+        // Claude Code's older form: "Claude AI usage limit reached|1763600000", the reset in Unix seconds (milliseconds
+        // when it has 13 digits).
+        if let r = s.range(of: #"limit reached\|\d{9,13}(?!\d)"#, options: .regularExpression),
+           let n = Double(s[r].split(separator: "|").last ?? "") {
+            return Date(timeIntervalSince1970: n > 1e11 ? n / 1000 : n)
         }
+        // A date and a clock time, as a weekly window prints it: "resets Nov 24, 9am", "resets nov 24 at 9:30am".
+        if let d = datedReset(in: s, now: now, calendar: calendar) { return d }
         if let secs = relativeResetSeconds(in: s), secs > 0 {
             return now.addingTimeInterval(secs)
         }
@@ -456,6 +463,47 @@ struct LocalAgentClient: Sendable {
             return nextOccurrence(hour: hour, minute: minute, at: now, calendar: calendar)
         }
         return nil
+    }
+
+    /// The reset a page waiting on the plan sleeps to (W41.app-claude-plan-reading). A bare clock time is read as its
+    /// next occurrence, so one printed just after the window reset ("resets 3pm" at 3:01) would read as tomorrow and
+    /// stall a batch for a day: a bare clock time more than 22 hours ahead is taken as unknown instead, so the page
+    /// tries the plan again after `UsageWindowPacing.unknownWait`. A five-hour window's clock is never that far ahead; a
+    /// weekly one prints its date (`datedReset`).
+    static func pacingReset(_ message: String, now: Date, calendar: Calendar = .current) -> Date? {
+        guard let reset = parseUsageWindowReset(fromStderr: message, now: now, calendar: calendar) else { return nil }
+        let s = message.lowercased()
+        let bareClock = relativeResetSeconds(in: s) == nil && s.range(of: #"limit reached\|\d"#, options: .regularExpression) == nil
+            && datedReset(in: s, now: now, calendar: calendar) == nil
+        return bareClock && reset.timeIntervalSince(now) > 22 * 3600 ? nil : reset
+    }
+
+    private static let monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+
+    /// "resets nov 24, 9am" / "resets on nov 24 at 9:30 pm" → that instant in `calendar`, in this year, or next year when
+    /// it is more than a day past.
+    private static func datedReset(in s: String, now: Date, calendar: Calendar) -> Date? {
+        guard let re = try? NSRegularExpression(pattern:
+            #"(?:reset(?:s|ting)?|again|available|back)\s*(?:on\s*)?(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s*(?:at\s*)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?"#)
+        else { return nil }
+        let ns = s as NSString
+        guard let m = re.firstMatch(in: s, range: NSRange(location: 0, length: ns.length)),
+              let month = monthNames.firstIndex(of: ns.substring(with: m.range(at: 1))).map({ $0 + 1 }),
+              let day = Int(ns.substring(with: m.range(at: 2))),
+              var hour = Int(ns.substring(with: m.range(at: 3))) else { return nil }
+        let minute = m.range(at: 4).location != NSNotFound ? (Int(ns.substring(with: m.range(at: 4))) ?? 0) : 0
+        let ampm = m.range(at: 5).location != NSNotFound ? ns.substring(with: m.range(at: 5)) : ""
+        if ampm == "pm" && hour < 12 { hour += 12 }
+        if ampm == "am" && hour == 12 { hour = 0 }
+        guard (1...31).contains(day), (0...23).contains(hour), (0...59).contains(minute) else { return nil }
+        var comps = DateComponents(year: calendar.component(.year, from: now), month: month, day: day, hour: hour,
+                                   minute: minute, second: 0)
+        guard var d = calendar.date(from: comps) else { return nil }
+        if d < now.addingTimeInterval(-86_400) {
+            comps.year = (comps.year ?? 0) + 1
+            d = calendar.date(from: comps) ?? d
+        }
+        return d
     }
 
     /// A short human phrase for when a usage window frees up ("around 3:15 PM"), for the friendly

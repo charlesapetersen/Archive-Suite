@@ -271,6 +271,7 @@ struct LiveCaptureView: View {
                         Text(session.statusMessage)
                             .font(.caption).foregroundStyle(.primary)
                             .fixedSize(horizontal: false, vertical: true)
+                        PlanPauseCaption()
                     }
                     .padding(6)
                 }

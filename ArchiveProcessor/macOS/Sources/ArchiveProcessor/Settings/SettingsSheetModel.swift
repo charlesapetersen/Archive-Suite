@@ -15,6 +15,9 @@ struct SettingsSheetModel {
         var readingRouteID: String?
         var readingName: String
         var segmentation: SegmentationApproach
+        /// The reading runs on the user's Claude plan (the Local Agent's `claude`), not on a key. A row the plan reaches
+        /// is priced at nothing, so the same row read on a key is not what the sheet's pick means (W41.app-claude-plan-reading).
+        var onPlan = false
     }
 
     struct Limit: Identifiable {
@@ -637,13 +640,16 @@ struct SettingsSheetModel {
                 }
             }
         case "reading":
-            if let r = route, lead?.flag == nil, r.id != running.readingRouteID {
+            // The pick read on a key while the plan reaches it is still to switch: the sheet prices it at nothing.
+            let planModel = route.flatMap { Self.claudePlanModel($0, solver: solver) }
+            if let r = route, lead?.flag == nil, r.id != running.readingRouteID || (planModel != nil && !running.onPlan) {
                 if r.id == "apple-vision" {
                     runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” switches it on."
                     apply = .appleVision
-                } else if let model = Self.claudePlanModel(r, solver: solver) {
+                } else if let model = planModel {
                     // Priced at no money because the plan reaches it, so it must run on the plan, never on a key.
-                    runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” "
+                    let onKey = r.id == running.readingRouteID ? " on a key, which is money" : ""
+                    runsNow = "Not switched on yet: Process Files now reads with \(running.readingName)\(onKey). “Read with this” "
                         + "switches on your Claude plan, which uses its five-hour and weekly windows, not money."
                     apply = .readingByPlan(model: model)
                 } else if let ar = r.appRoute(keys: words.resources.keys), ar.contains("|") {

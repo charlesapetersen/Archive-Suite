@@ -115,6 +115,27 @@ enum LocalAgentTestDriver {
             if case .failure(let code, _) = LocalAgentClient.classifyClaude(run("", "could not separate the pages", exit: 2), now: now) {
                 check("classify: 'separate' is no usage limit for claude", code == "cli_exit_2")
             } else { check("classify: 'separate' is a failure", false) }
+            // Review fixes: only the envelope's result says why; the reset forms a batch sleeps to.
+            if case .usageLimited = LocalAgentClient.classifyClaude(
+                run(#"{"type":"result","subtype":"error_max_turns","is_error":true,"duration_ms":429,"result":""}"#), now: now) {
+                check("classify: a 429 among the envelope's other fields is no limit", false)
+            } else { check("classify: a 429 among the envelope's other fields is no limit", true) }
+            var cal = Calendar(identifier: .gregorian)
+            cal.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+            let at301 = cal.date(from: DateComponents(year: 2026, month: 11, day: 19, hour: 15, minute: 1))!
+            check("pacing reset: a clock just past is unknown, not tomorrow",
+                  LocalAgentClient.pacingReset("You've hit your limit · resets 3pm", now: at301, calendar: cal) == nil)
+            check("pacing reset: a clock ahead is that time",
+                  LocalAgentClient.pacingReset("You've hit your limit · resets 5pm", now: at301, calendar: cal)
+                  == cal.date(from: DateComponents(year: 2026, month: 11, day: 19, hour: 17)))
+            check("pacing reset: the weekly date form",
+                  LocalAgentClient.pacingReset("You've hit your weekly limit · resets Nov 24, 9am", now: at301, calendar: cal)
+                  == cal.date(from: DateComponents(year: 2026, month: 11, day: 24, hour: 9)))
+            check("pacing reset: a millisecond epoch",
+                  LocalAgentClient.pacingReset("Claude AI usage limit reached|1800000000000", now: at301, calendar: cal)
+                  == Date(timeIntervalSince1970: 1_800_000_000))
+            check("pacing reset: relative", LocalAgentClient.pacingReset("resets in 2h", now: at301, calendar: cal)
+                  == at301.addingTimeInterval(7200))
             check("classify: a good envelope is its result",
                   LocalAgentClient.classifyClaude(run(#"{"is_error":false,"result":"text"}"#, exit: 0), now: now) == .success("text"))
 
