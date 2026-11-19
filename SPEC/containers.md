@@ -343,14 +343,15 @@ into `note` as a line, never dropped.
   Press release; `newspaper article` and `clipping` → `article-newspaper`; `magazine article` and `newsletter` →
   `article-magazine`; `journal article` → `article-journal`; `photograph` → `graphic` (Artwork), `medium` Photograph.
   With no kind, a `format` that names one exactly stands in; with none, or `other`, `document`, its genre the `format`
-  when there is one. A clipping's or newsletter's kind goes into `note` as `Document kind: <kind>`, and a `format` the
+  when there is one. Zotero's Document has no genre field, so a Document's genre is also the `note` line
+  `genre: <genre>`, the CSL variable Zotero reads from Extra. A clipping's or newsletter's kind goes into `note` as `Document kind: <kind>`, and a `format` the
   type did not take as its genre and that does not repeat the kind as `Format: <format>`.
 - **Title** = the item field's title; none is made up. **Author** = the byline's names (a list split at `; `), else the
   sender; each a CSL `literal` name, never split into given and family. A sender the byline does not name is
   `Sender: <names>` in `note`. **Recipient** = `recipient` on a Letter, else
   the `note` line `Recipient: <names>`.
-- **Places.** The sending place is `publisher-place` (Zotero's Place) on Manuscript and Document; on every other type
-  the `note` line `Author place: <places>`. The recipient's place is always `Recipient place: <places>` in `note`.
+- **Places.** The sending place is `publisher-place` (Zotero's Place) on Manuscript; on every other type, Document
+  included (it has no Place), the `note` line `Author place: <places>`. The recipient's place is always `Recipient place: <places>` in `note`.
 - **Publication** = `container-title` on the article types, else `Publication: <name>` in `note`. The printed issue
   date is `Publication date: <date>` in `note`, never `issued` (FLD-6).
 - **`issued`** from the tags: `date-parts` to the precision they give, a decade as `literal` (`1970s`), and `circa`

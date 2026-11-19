@@ -176,7 +176,7 @@ final class ZoteroExportTests: XCTestCase {
         side.itemFields = PDFItemFields(documentKind: "other")
         let other = ZoteroExport.item(ZoteroSource(fileName: "a", sidecar: side))
         XCTAssertEqual(other["genre"] as? String, "Postcard")
-        XCTAssertEqual(note(other), ["File: a"])
+        XCTAssertEqual(note(other), ["genre: Postcard", "File: a"], "Zotero's Document has no genre field")
         side.itemFields = PDFItemFields(documentKind: "letter")
         XCTAssertEqual(note(ZoteroExport.item(ZoteroSource(fileName: "b", sidecar: side))), ["Format: Postcard", "File: b"])
         side.format = "Letter"
@@ -231,11 +231,31 @@ final class ZoteroExportTests: XCTestCase {
 
     // MARK: Zotero's own importer
 
+    /// The Zotero items the installed Zotero's importer makes of the CSL-JSON `export`. Skips where Zotero 10 or node
+    /// is not installed.
+    private func zoteroImport(_ export: Data) throws -> [[String: Any]] {
+        let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Tools/zotero-import/zotero-import.sh")
+        let input = FileManager.default.temporaryDirectory.appendingPathComponent("zotero-\(UUID().uuidString).json")
+        try export.write(to: input)
+        defer { try? FileManager.default.removeItem(at: input) }
+        let run = Process()
+        run.executableURL = URL(fileURLWithPath: "/bin/bash")
+        run.arguments = [script.path, input.path]
+        let out = Pipe()
+        run.standardOutput = out
+        run.standardError = Pipe()
+        try run.run()
+        let data = out.fileHandleForReading.readDataToEndOfFile()
+        run.waitUntilExit()
+        if run.terminationStatus == 3 { throw XCTSkip("Zotero 10 or node is not installed") }
+        XCTAssertEqual(run.terminationStatus, 0)
+        return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+    }
+
     /// Imports an export with the installed Zotero's importer and reads each field back from the Zotero item. Skips
     /// where Zotero 10 or node is not installed.
     func testZoteroImportsEveryGatheredField() throws {
-        let script = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("Tools/zotero-import/zotero-import.sh")
         var letter = ZoteroSidecar()
         letter.authors = ["Max Shachtman"]
         letter.recipients = ["Albert Glotzer"]
@@ -254,22 +274,7 @@ final class ZoteroExportTests: XCTestCase {
                 publication: "The Militant", publicationDate: "June 3, 1946"), container: glotzer),
             ZoteroSource(fileName: "p.pdf", itemFields: PDFItemFields(documentKind: "photograph"), container: glotzer),
         ]
-        let input = FileManager.default.temporaryDirectory.appendingPathComponent("zotero-\(UUID().uuidString).json")
-        try ZoteroExport.export(sources).write(to: input)
-        defer { try? FileManager.default.removeItem(at: input) }
-
-        let run = Process()
-        run.executableURL = URL(fileURLWithPath: "/bin/bash")
-        run.arguments = [script.path, input.path]
-        let out = Pipe()
-        run.standardOutput = out
-        run.standardError = Pipe()
-        try run.run()
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        run.waitUntilExit()
-        if run.terminationStatus == 3 { throw XCTSkip("Zotero 10 or node is not installed") }
-        XCTAssertEqual(run.terminationStatus, 0)
-        let items = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [[String: Any]])
+        let items = try zoteroImport(ZoteroExport.export(sources))
         XCTAssertEqual(items.count, 4)
         func creators(_ i: [String: Any]) -> [String] {
             (i["creators"] as? [[String: Any]] ?? []).map { "\($0["creatorType"] ?? ""): \($0["lastName"] ?? "")" }
@@ -312,4 +317,148 @@ final class ZoteroExportTests: XCTestCase {
         XCTAssertEqual(p["medium"] as? String, "Photograph")
         XCTAssertEqual(p["archive"] as? String, "Hoover Institution Archives")
     }
+
+    // MARK: Add to Zotero (W47.ct-zotero-tags)
+
+    /// One document of every kind, with every variable the export writes.
+    private var everyKind: [ZoteroSource] {
+        var side = ZoteroSidecar()
+        side.authors = ["Max Shachtman"]
+        side.recipients = ["Albert Glotzer"]
+        side.authorPlaces = ["New York"]
+        side.format = "Carbon copy"
+        let kinds = ["letter", "telegram", "memo", "report", "speech", "press release", "newspaper article", "clipping",
+                     "magazine article", "newsletter", "journal article", "photograph", "other", nil]
+        let dates = [["1959", "3 March", "Day 12"], ["1959", "3 March"], ["1959"], ["1970s"], ["1959", "Date Uncertain"]]
+        return kinds.enumerated().map { n, kind in
+            ZoteroSource(fileName: "\(n).pdf", tags: tags(dates[n % dates.count] + ["Trotskyism", "Labor", "OCR Poor"]),
+                         itemFields: PDFItemFields(documentKind: kind, title: "Title \(n)", byline: n % 2 == 0 ? nil : "A. Reporter",
+                                                   publication: "The Militant", publicationDate: "June 3, 1946",
+                                                   recipientPlace: "Chicago"),
+                         sidecar: side, container: glotzer, link: "archivereader://reveal?n=\(n)")
+        }
+    }
+
+    /// The connector item is what Zotero's own importer makes of the CSL-JSON item, field for field, plus the tags.
+    func testConnectorItemsAreWhatZoteroImportsPlusTags() throws {
+        let sources = everyKind
+        let imported = try zoteroImport(ZoteroExport.export(sources))
+        let sent = ZoteroExport.connectorItems(sources)
+        XCTAssertEqual(imported.count, sent.count)
+        func normal(_ item: [String: Any]) -> NSDictionary {
+            var item = item
+            for key in ["id", "itemID", "tags", "attachments", "seeAlso"] { item[key] = nil }
+            item["creators"] = (item["creators"] as? [[String: Any]] ?? []).map { c -> [String: Any] in
+                var c = c
+                c["creatorTypeID"] = nil
+                return c
+            }
+            return item as NSDictionary
+        }
+        for (z, s) in zip(imported, sent) {
+            XCTAssertEqual(normal(s), normal(z), "\(s["id"] ?? "")")
+            XCTAssertEqual(s["id"] as? String, z["itemID"] as? String)
+            XCTAssertEqual((s["tags"] as? [[String: String]])?.compactMap { $0["tag"] }, ["Trotskyism", "Labor"])
+        }
+    }
+
+    func testConnectorItemTagsDatesAndRepeatedNames() {
+        let items = ZoteroExport.connectorItems([
+            ZoteroSource(fileName: "a.pdf", tags: tags(["1959", "3 March", "OCR Failed", "Unread"])),
+            ZoteroSource(fileName: "a.pdf"),
+        ])
+        XCTAssertEqual(items.compactMap { $0["id"] as? String }, ["a.pdf", "a.pdf (2)"])
+        XCTAssertEqual(items[0]["date"] as? String, "March 1959")
+        XCTAssertEqual((items[0]["tags"] as? [[String: String]])?.count, 0, "workflow tags are not subjects")
+        XCTAssertNil(items[1]["date"])
+        XCTAssertEqual(items[1]["itemType"] as? String, "document")
+        XCTAssertEqual(ZoteroExport.zoteroDate(["date-parts": [[1946, 6, 3]], "circa": true]), "June 3, 1946")
+    }
+
+    func testConnectorPostsBatchesToSaveItemsOnLoopback() async throws {
+        let session = ZoteroStub.session()
+        ZoteroStub.reset(status: 201)
+        let sources = (0..<51).map { ZoteroSource(fileName: "\($0).pdf", tags: tags(["Labor"])) }
+        try await ZoteroConnector(port: 23999, session: session).save(sources)
+        let requests = ZoteroStub.requests
+        XCTAssertEqual(requests.count, 2, "50 items a request")
+        for r in requests {
+            XCTAssertEqual(r.url?.absoluteString, "http://127.0.0.1:23999/connector/saveItems")
+            XCTAssertEqual(r.httpMethod, "POST")
+            XCTAssertEqual(r.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertEqual(r.value(forHTTPHeaderField: "X-Zotero-Connector-API-Version"), "3")
+        }
+        let bodies = try requests.map { try XCTUnwrap(JSONSerialization.jsonObject(with: ZoteroStub.body($0)) as? [String: Any]) }
+        XCTAssertEqual(bodies.map { ($0["items"] as? [Any])?.count }, [50, 1])
+        XCTAssertNotEqual(bodies[0]["sessionID"] as? String, bodies[1]["sessionID"] as? String)
+        let first = try XCTUnwrap((bodies[0]["items"] as? [[String: Any]])?.first)
+        XCTAssertEqual((first["tags"] as? [[String: String]])?.first?["tag"], "Labor")
+
+        ZoteroStub.reset(status: 500)
+        do {
+            try await ZoteroConnector(port: 23999, session: session).save(sources)
+            XCTFail("a refusal throws")
+        } catch let failure as ZoteroConnector.Failure {
+            XCTAssertEqual(failure, .refused(status: 500))
+        }
+        XCTAssertEqual(ZoteroStub.requests.count, 1, "nothing is sent after a refused batch")
+
+        ZoteroStub.reset(status: 200)
+        let running = await ZoteroConnector(port: 23999, session: session).isRunning()
+        XCTAssertTrue(running)
+        XCTAssertEqual(ZoteroStub.requests.first?.url?.path, "/connector/ping")
+    }
+
+    func testConnectorWithNothingListeningIsNotRunning() async throws {
+        // A port nothing listens on: the real loopback, no stub.
+        let connector = ZoteroConnector(port: 9)
+        let running = await connector.isRunning()
+        XCTAssertFalse(running)
+        do {
+            try await connector.save([ZoteroSource(fileName: "a.pdf")])
+            XCTFail("no Zotero throws")
+        } catch let failure as ZoteroConnector.Failure {
+            XCTAssertEqual(failure, .notRunning)
+        }
+    }
+}
+
+/// Answers every request with one status and records it.
+final class ZoteroStub: URLProtocol, @unchecked Sendable {
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var status = 201
+    nonisolated(unsafe) private static var recorded: [URLRequest] = []
+
+    static func session() -> URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [ZoteroStub.self]
+        return URLSession(configuration: config)
+    }
+    static func reset(status: Int) { lock.withLock { self.status = status; recorded = [] } }
+    static var requests: [URLRequest] { lock.withLock { recorded } }
+    static func body(_ request: URLRequest) -> Data {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return Data() }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 65536)
+        while stream.hasBytesAvailable {
+            let n = stream.read(&buffer, maxLength: buffer.count)
+            if n <= 0 { break }
+            data.append(buffer, count: n)
+        }
+        return data
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        let status = Self.lock.withLock { Self.recorded.append(request); return Self.status }
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil)!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data())
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
 }

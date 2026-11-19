@@ -66,6 +66,8 @@ public enum ZoteroExport {
         var genreAsMedium = false
         /// A kind the Zotero type cannot state is written into Extra.
         var kindInExtra = false
+        /// The Zotero type has no field for the genre (Document): it goes into Extra as the CSL variable as well.
+        var genreInExtra = false
     }
 
     /// The item-field kinds (SPEC tag-format §Item fields) by their Zotero type: letters and telegrams as Letter,
@@ -78,7 +80,7 @@ public enum ZoteroExport {
         case "memo": return TypeMap(csl: "manuscript", genre: "Memo", authorPlace: true)
         case "report": return TypeMap(csl: "manuscript", genre: "Report", authorPlace: true)
         case "speech": return TypeMap(csl: "manuscript", genre: "Speech", authorPlace: true)
-        case "press release": return TypeMap(csl: "document", genre: "Press release", authorPlace: true)
+        case "press release": return TypeMap(csl: "document", genre: "Press release", genreInExtra: true)
         case "newspaper article": return TypeMap(csl: "article-newspaper", publication: true)
         case "clipping": return TypeMap(csl: "article-newspaper", publication: true, kindInExtra: true)
         case "magazine article": return TypeMap(csl: "article-magazine", publication: true)
@@ -87,8 +89,8 @@ public enum ZoteroExport {
         case "photograph": return TypeMap(csl: "graphic", genre: "Photograph", genreAsMedium: true)
         default:
             // No kind read (material that predates the apps), or `other`: a Document, stating the tagging call's
-            // format when there is one.
-            return TypeMap(csl: "document", genre: format, authorPlace: true)
+            // format when there is one. Zotero's Document has neither a genre nor a place field.
+            return TypeMap(csl: "document", genre: format, genreInExtra: format != nil)
         }
     }
 
@@ -120,6 +122,7 @@ public enum ZoteroExport {
 
         if let title = fields.title { item["title"] = title }
         if let genre = map.genre { item[map.genreAsMedium ? "medium" : "genre"] = genre }
+        if map.genreInExtra, let genre = map.genre { extra.append("genre: \(genre)") }
         if map.kindInExtra, let kind { extra.append("Document kind: \(kind)") }
         // A format the type did not take as its genre, and that does not just repeat the kind, is kept.
         if let format = side.format, map.genre != format, format.lowercased() != kind?.lowercased() {
@@ -166,8 +169,8 @@ public enum ZoteroExport {
                 extra.append("Sent with: \(sent.wireValue)\(tags.sentWithUncertain ? " (uncertain)" : "")")
             }
             // Zotero's CSL-JSON importer takes no tags: the subjects travel as `keyword` for other CSL tools and as
-            // an Extra line Zotero keeps.
-            let subjects = tags.subjects.filter { !notSubjects.contains($0.lowercased()) }
+            // an Extra line Zotero keeps (Add to Zotero sends them as tags too, `ZoteroConnector`).
+            let subjects = Self.subjects(tags)
             if !subjects.isEmpty {
                 item["keyword"] = subjects.joined(separator: ", ")
                 extra.append("Subjects: \(subjects.joined(separator: "; "))")
@@ -178,6 +181,11 @@ public enum ZoteroExport {
         extra.append("File: \(source.fileName)")
         item["note"] = extra.joined(separator: "\n")
         return item
+    }
+
+    /// The tags' subjects, less the workflow tags.
+    static func subjects(_ tags: DocumentTags) -> [String] {
+        tags.subjects.filter { !notSubjects.contains($0.lowercased()) }
     }
 
     /// The header's fields, each one the header lacks taken from the sidecar.
