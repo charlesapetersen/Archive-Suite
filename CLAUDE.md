@@ -300,6 +300,11 @@ environment and what may move to the backup:
 not done until the trackers match reality:
 - flip the shipped item's `SUITE_TODO.md` checkbox to `[x]` (cite the commit) and add/close any
   `KNOWN_ISSUES.md` entry — **in the same commit as the code**, not "later";
+- end every `KNOWN_ISSUES.md` bullet you add or reword with its disposition (owner, 2026-11-19): `(queued: TAG)`
+  naming the open item that fixes it, filed in the same commit if none exists; `(accepted: …)` with the design reason
+  or the owner's call; or `(asked: GATE)` with the owner gate and a Daemon Report entry that asks it. A limit that is
+  only written down is how the Luna label cost went unqueued. `W49.ki-lint` enforces it; `W49.ki-audit-*` cover the
+  older bullets;
 - delete a shipped `execution-plans/` plan.
 
 `SUITE_TODO.md` is the **tracker of record.** An unattended/autonomous run must **reconcile it before it
