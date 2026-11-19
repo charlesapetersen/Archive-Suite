@@ -155,6 +155,26 @@ final class ContainerRecordMarkersTests: XCTestCase {
                        .unchanged([ContainerWarning(.markerInsideUserRun(.box), start: "00011 Glotzer.pdf")]))
     }
 
+    /// A marker the user started never takes over a file that was already in the folder (the second review's finding 3):
+    /// adding Box 18 to a folder whose finding aid sorts after the new PDF and sits in the user's Box 17 run.
+    func testAStartedMarkerLeavesFilesAlreadyThere() throws {
+        try Data("pdf".utf8).write(to: dir.appendingPathComponent("Glotzer finding aid.pdf"))
+        let box17 = ContainerFieldSet([.container: ContainerValue("Box 17", source: .user)])
+        try ContainerFileStore.write(ContainerFile(runs: [ContainerRun(start: "00001 Glotzer.pdf", level: .box, fields: box17)]),
+                                     directory: dir, expecting: nil)
+        try Data("pdf".utf8).write(to: dir.appendingPathComponent("00004 Glotzer.pdf"))
+        let box18 = ContainerMarker(fileName: "00004 Glotzer.pdf", type: .box,
+                                    read: ContainerFieldSet([.container: ContainerValue("Box 18", source: .user)]),
+                                    startedByUser: true)
+        let outcome = try ContainerInference.recordMarkers([box18], in: dir, filedNow: ["00004 Glotzer.pdf"])
+        XCTAssertEqual(outcome, .unchanged([ContainerWarning(.markerInsideUserRun(.box), start: "00004 Glotzer.pdf")]))
+        // With nothing of the folder's after it, the same marker starts its run.
+        try FileManager.default.removeItem(at: dir.appendingPathComponent("Glotzer finding aid.pdf"))
+        guard case .wrote = try ContainerInference.recordMarkers([box18], in: dir, filedNow: ["00004 Glotzer.pdf"]) else {
+            return XCTFail()
+        }
+    }
+
     func testLeavesANewerOrUnreadableDocumentAlone() throws {
         let folder = dir.appendingPathComponent(ContainerFile.folderName)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

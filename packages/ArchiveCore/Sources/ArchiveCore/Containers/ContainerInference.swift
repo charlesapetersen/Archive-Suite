@@ -96,8 +96,9 @@ public struct ContainerMarker: Equatable, Sendable {
     /// The label's text, if any, for recognising a "No Folder" sheet.
     public var text: String?
     /// The user said this photo starts a box or folder (the companion's Box or Folder button): it starts its run even
-    /// inside a run the user set, since starting a run is the user's own act there (W47.ct-processor-capture). False
-    /// for a type read from a colour, a tag or a classifier.
+    /// inside a run the user set, since starting a run is the user's own act there (W47.ct-processor-capture), unless
+    /// the new run would take over a file that was already in the directory (`applyMarkers`' `existing`). False for a
+    /// type read from a colour, a tag or a classifier.
     public var startedByUser: Bool
 
     public init(fileName: String, type: ItemType?, read: ContainerFieldSet = ContainerFieldSet(), text: String? = nil,
@@ -155,8 +156,9 @@ public enum ContainerInference {
     ///   Nothing is removed: a field the read lacks keeps its value, a run with no marker stays.
     /// - A read never hides a user value: a photo inside a user's run of its level or deeper starts no run, and a read
     ///   that disagrees with a user value leaves it, each with a warning. A photo the user marked as a start
-    ///   (`startedByUser`) starts its run all the same.
-    public static func applyMarkers(_ markers: [ContainerMarker], to file: ContainerFile)
+    ///   (`startedByUser`) starts its run all the same, unless the run would cover one of `existing` (files that were in
+    ///   the directory before the ones being filed now): that file's values are the user's, so it is refused as above.
+    public static func applyMarkers(_ markers: [ContainerMarker], to file: ContainerFile, existing: [String] = [])
         -> (file: ContainerFile, warnings: [ContainerWarning]) {
         var runs = file.runs
         var warnings: [ContainerWarning] = []
@@ -174,7 +176,8 @@ public enum ContainerInference {
             }
             // A new run here would end every live run of its level or deeper; one the user set stands.
             let starts = !runs.contains { $0.start == at && $0.level == level }
-            if starts, !marker.startedByUser, ContainerResolver.liveRuns(at: at, in: runs).contains(where: { run in
+            if starts, !(marker.startedByUser && !coversExisting(at: at, level: level, runs: runs, existing: existing)),
+               ContainerResolver.liveRuns(at: at, in: runs).contains(where: { run in
                 run.start != at && run.level >= level && run.fields.values.values.contains { $0.source == .user }
             }) {
                 warnings.append(ContainerWarning(.markerInsideUserRun(type), start: at))
@@ -191,6 +194,15 @@ public enum ContainerInference {
         var out = file
         out.runs = runs
         return (out, warnings)
+    }
+
+    /// Whether a run of `level` started at `at` would cover one of `existing`: a file after `at` and before the next run
+    /// of that level or shallower.
+    private static func coversExisting(at: String, level: ContainerLevel, runs: [ContainerRun], existing: [String]) -> Bool {
+        let end = runs.first { ContainerOrder.precedes(at, $0.start) && $0.level <= level }?.start
+        return existing.contains { name in
+            ContainerOrder.precedes(at, name) && (end.map { ContainerOrder.precedes(name, $0) } ?? true)
+        }
     }
 
     /// Merges `values` into the run of `level` at `start`, making it if there is none. User values stay; returns the

@@ -211,9 +211,15 @@ extension ContainerInference {
     /// finalize (W47.ct-processor-capture): the user has confirmed each marker's fields on the capture card, so this
     /// is the "accept" the SPEC asks of the caller. New files only, inside `.archivesuite` (`ContainerFileStore.write`);
     /// a document this build cannot read or that is newer is never overwritten or set aside. A document that changes
-    /// between the read and the write is read again once.
-    public static func recordMarkers(_ markers: [ContainerMarker], in directory: URL, now: Date = Date()) throws
-        -> RecordOutcome {
+    /// between the read and the write is read again once. `filedNow`: the names the caller has just filed into the
+    /// directory; every other visible file there counts as `existing` for `applyMarkers`, so a marker the user started
+    /// never takes over a file that was already there. nil when the caller cannot say (no file counts as existing).
+    public static func recordMarkers(_ markers: [ContainerMarker], in directory: URL, filedNow: Set<String>? = nil,
+                                     now: Date = Date()) throws -> RecordOutcome {
+        let existing = filedNow.map { filed in
+            ((try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? [])
+                .filter { !$0.hasPrefix(".") && !filed.contains($0) }
+        } ?? []
         for attempt in 0..<2 {
             let file: ContainerFile
             let stamp: ContainerFileStamp?
@@ -225,7 +231,7 @@ extension ContainerInference {
             case .newer: return .leftAlone("written by a newer version")
             case .unreadable(let why): return .leftAlone(why)
             }
-            let (applied, warnings) = applyMarkers(markers, to: file)
+            let (applied, warnings) = applyMarkers(markers, to: file, existing: existing)
             if applied.runs == file.runs && applied.directory == file.directory { return .unchanged(warnings) }
             var out = applied
             out.updatedAt = now

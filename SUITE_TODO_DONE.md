@@ -16877,3 +16877,40 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   "Containers in the list"; SPEC/containers.md §The level map says how the Reader picks the tree root and the nearest
   map. No migration: nothing to migrate. $0. No bench cache used.
   <!-- /W47.ct-reader-view -->
+- [x] **W47.ct-processor-capture — Route A at capture: read the label, confirm on the card [M · Tier-2]** · §Archival containers — W47 (owner, 2026-10-21) (lane: processor) (uses: build) (blocked-on: W47.ct-infer, W46.review-done) — Read box and folder labels on W47.ct-read's recommended route in Live Capture and Process Files, show the parsed fields on the capture card for correction, write the container file at finalize; the collection-name prompt keeps the numbers it now drops. The card shows values through `ContainerDisplay.values` with the tree's standard names (W47.ct-normalise). detail: execution-plans/containers/00-plan.md
+  SHIPPED 2026-11-19. ArchiveCore `Containers/ContainerLabelReader.swift`: `parse` is `ct_read.py` `vision_read` in
+  Swift (its outputs on nine label line sets are the test's expectations, P_DATE/P_PAIR case-sensitive as there);
+  `proposals` takes container, folder, series and series title from the parser, repository, collection title and
+  number, date and accession from Luna's reading when there is one (else the parser), the container from Luna only
+  where the parser reads none, nothing for subtitle, box title, folder title and other marks; a folder label keeps
+  folder, folder title, date and other. `ContainerInference.recordMarkers` applies a directory's markers and writes
+  `.archivesuite/containers.json`, leaving a newer, unreadable or value-dropping document alone, reading again once on
+  a change between read and write. `ContainerMarker.startedByUser`: a companion's Box/Folder photo starts its run
+  even inside a run holding the user's values (SPEC §Route A). Processor: `Capture/ContainerLabelCapture.swift` reads
+  the marker photo's own Apple Vision lines (accurate; the run's OCR text where Vision reads nothing, reader
+  `ocr-text+parser`) and, with a non-local gateway, one gpt-5.6-luna call on the image, inside the marker's own
+  finalize (a Finish waits for it); the read brings up `Views/ContainerLabelCard.swift` in the auto-advancing card
+  flow (`CaptureSession.containerFields`, in the capture manifest; Save durable before it acts; an untouched field keeps
+  the read's written value and reader, a display-only standard-name fill stores nothing; Skip leaves proposals; a
+  resolved card moves a held Finish on). At Finish each filed marker's fields go into its collection folder inside the
+  move's own off-main task, its run at the marker's own PDF (`FinalizeOutcome.firstPDFs`); warnings and a left-alone
+  file reach the summary. Process Files (`OCR/OCRProcessor+Containers.swift`) reads its box and folder labels the same
+  way after organisation (`organizeOutput` now returns where it moved each PDF) on every completion path and writes them
+  as proposals. The collection-name prompt is unchanged: the numbers it leaves out of the folder name are kept in the
+  record. Setting: Live Capture → Read box and folder labels (on). Limits: `ArchiveProcessor/KNOWN_ISSUES.md`; the Gemma
+  fallback the owner's readers name is `W47.ct-capture-gemma`.
+  Tier-2: an Opus adversarial review found one HIGH (a confirmed box or folder made every later marker in the folder
+  be refused as "inside the user's run") and seven lower (a new await in the finalize tail let Clear/Finish interleave;
+  warnings dropped; the parser fed an LLM transcript under the Vision reader's name; the SPEC's Gemma line; card Save
+  with standard names; a held Finish waiting on the watchdog; case-insensitive date/pair patterns); all fixed. A second Opus pass confirmed them and found two
+  HIGH in the new Process Files path (Stop not honoured while labels were read; the pre-OCRed route, whose outputs
+  are its inputs, would have written `.archivesuite` beside source PDFs) and one MED (a started marker could take
+  over a file already in the folder, e.g. a finding aid sorting after the new PDF), plus three LOW; fixed: the label
+  reading stops on Stop and writes nothing, the pre-OCRed route reads no labels and an output must lie inside the
+  run's output folder and differ from its source, `recordMarkers(filedNow:)` counts every other visible file as
+  existing and a started marker never covers one, and a label not recorded is counted in the summary. Checks: ArchiveCore 434 tests green, Container 67 (scratch directories: PDFs' bytes untouched, only
+  `.archivesuite` added; two confirmed boxes and three folders plus a later session's box); test-manifest-persistence
+  (eight W47 checks) and test-collection-organize (five: the pre-OCRed route and an output that is its own source write nothing) ALL
+  PASS; test-recovery ALL PASS (one of five runs failed a 10 s settle in the untouched document path at load 8). No money spent (no gateway call in any test: the test photos
+  are not images). No migration: nothing to migrate (owner, 2026-08-01). No bench cache used.
+  <!-- /W47.ct-processor-capture -->

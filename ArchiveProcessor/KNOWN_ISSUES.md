@@ -23,6 +23,28 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   (W41.app-openrouter-claude), and the listing skips its id. Opus 5.5 and Haiku 4.5 have narrow measurements that do
   not make routes (`LLMModel.anthropicModels` says which).
 
+## ⚠️ LIMITATION (W47.ct-processor-capture, 2026-11-19): what reading box and folder labels does not do
+- **No Gemma route.** The owner's readers give repository, collection title and number and date to GPT 5.6 Luna on the
+  gateway, else Gemma 3 12B; the app has no Gemma route, so with the gateway off (or a local model on it) the card
+  proposes the Vision + parser values for those fields, a weaker route (`segbench-results/ct-read.md`).
+  `W47.ct-capture-gemma` adds it.
+- **Process Files has no card.** Its labels are written as proposals (source `label`), to confirm in the Reader's
+  editor (`W47.ct-reader-edit`). The pre-OCRed PDF route (re-tagging existing PDFs, a new run or a resumed one) reads
+  no labels: its outputs are its inputs, and nothing is written beside a source. An output outside the run's output
+  folder, missing, or merged into another label's PDF is not recorded, and the summary counts it; so is one whose
+  collection organisation stopped partway (its moves are not reported then).
+- **Process Files reads its labels one at a time before the run's summary.** One Vision pass, and with the gateway one
+  call of up to 60 s, per label photo, after organisation ("Reading N box and folder labels…"); Stop ends it with
+  nothing written.
+- **The Luna call is not in the run's cost.** About $0.001 a label photo through the gateway (`ct-read.md`), in Live
+  Capture and Process Files alike; neither the run history nor the estimate counts it.
+- **Vision reads the photo as stored**, turned by its EXIF orientation only, not by the run's rotation correction; a
+  label shot sideways may read nothing there, and the run's OCR text stands in (`ocr-text+parser`).
+- **A marker whose card is still up when the collection sheet is confirmed** is filed with its read's proposals; its
+  card goes with it. Skip leaves proposals too; both are confirmed later in the Reader.
+- **A marker whose own PDF failed to move** and is filed by a later Finish gets the next number after the documents
+  already filed, so its run starts after them (the numbering, not the label read).
+
 ## ⚠️ LIMITATION (W41.app-claude-plan-reading, 2026-11-19): what reading on the Claude plan does not do
 - **A page waits at the limit for as long as it takes.** No cap: it reads on the plan again after the reset the CLI
   printed (plus a minute), or every 15 minutes when it printed none or a bare clock time more than 22 hours ahead

@@ -269,7 +269,16 @@ enum CollectionOrganizeTestDriver {
                 return job
             }
             processor.outputURLMap = map
-            let problem = await processor.recordContainerLabels(moves: moves)
+            // The pre-OCRed route reads no labels, and nothing is written beside a source.
+            let preOCRed = await processor.recordContainerLabels(moves: moves, outputDirectory: out, preOCRedInput: true)
+            check("labels: the pre-OCRed route writes no container file",
+                  preOCRed == nil && ContainerFileStore.load(directory: folder) == .missing)
+            processor.outputURLMap = Dictionary(uniqueKeysWithValues: zip(sources, sources))
+            let asSource = await processor.recordContainerLabels(moves: [:], outputDirectory: out, preOCRedInput: false)
+            check("labels: an output that is its own source is never written beside",
+                  asSource != nil && ContainerFileStore.load(directory: out) == .missing)
+            processor.outputURLMap = map
+            let problem = await processor.recordContainerLabels(moves: moves, outputDirectory: out, preOCRedInput: false)
             let file = ContainerFileStore.load(directory: folder).document
             let at4 = file.map { ContainerResolver.resolve(fileName: "00004 Glotzer.pdf", scopes: [ContainerScope(file: $0)]) }
             let at2 = file.map { ContainerResolver.resolve(fileName: "00002 Glotzer.pdf", scopes: [ContainerScope(file: $0)]) }

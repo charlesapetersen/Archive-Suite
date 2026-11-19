@@ -2329,8 +2329,9 @@ final class LiveCaptureProcessor: ObservableObject {
                 // inside each collection folder's `.archivesuite`.
                 let filed = markerInputs.compactMap { id, m -> ContainerLabelCapture.FiledMarker? in
                     guard let pdf = outcome.firstPDFs[id] else { return nil }
-                    return ContainerLabelCapture.FiledMarker(folder: pdf.folder, fileName: pdf.fileName, type: m.type,
-                                                             fields: m.fields, text: m.text, startedByUser: true)
+                    return ContainerLabelCapture.FiledMarker(
+                        folder: pdf.folder, fileName: pdf.fileName, type: m.type, fields: m.fields, text: m.text,
+                        startedByUser: true, filedNow: outcome.filedNames[pdf.folder.standardizedFileURL.path] ?? [])
                 }
                 return (outcome, filed.isEmpty ? nil : ContainerLabelCapture.record(filed))
             }.value
@@ -2675,6 +2676,8 @@ final class LiveCaptureProcessor: ObservableObject {
         /// W47.ct-processor-capture — each filed segment's first PDF: its collection folder and file name, which
         /// a marker's container run starts at.
         var firstPDFs: [String: FiledPDF] = [:]
+        /// Every file name that landed, by its folder's path: what a container run started now may cover.
+        var filedNames: [String: Set<String>] = [:]
     }
 
     struct FiledPDF: Sendable {
@@ -2689,12 +2692,16 @@ final class LiveCaptureProcessor: ObservableObject {
         var failedMoves = 0
         var filedGroupIds = Set<String>()
         var firstPDFs: [String: FiledPDF] = [:]
+        var filedNames: [String: Set<String>] = [:]
         var totalSegments = 0
         // Move one file; returns true iff it actually LANDED at the destination — so a segment can tell
         // whether ALL of its authoritative PDF outputs were filed (the gate for deleting its source photo).
         func doMove(_ src: URL, to dest: URL) -> Bool {
             switch move(src, to: dest, fm: fm) {
-            case .moved: movedFiles += 1; return true
+            case .moved:
+                movedFiles += 1
+                filedNames[dest.deletingLastPathComponent().standardizedFileURL.path, default: []].insert(dest.lastPathComponent)
+                return true
             case .absent: return false           // nothing staged for this slot (e.g. a page whose gen failed)
             case .failed: failedMoves += 1; return false   // a real move error — the output is still in staging
             }
@@ -2779,7 +2786,8 @@ final class LiveCaptureProcessor: ObservableObject {
         let allFiled = failedMoves == 0 && filedGroupIds.count == totalSegments
         let summary = "Finalized \(plans.count) collection\(plans.count == 1 ? "" : "s") · \(movedFiles) files moved."
         return FinalizeOutcome(summary: summary, failedMoves: failedMoves, movedFiles: movedFiles,
-                               filedGroupIds: filedGroupIds, allFiled: allFiled, firstPDFs: firstPDFs)
+                               filedGroupIds: filedGroupIds, allFiled: allFiled, firstPDFs: firstPDFs,
+                               filedNames: filedNames)
     }
 
     /// THE source-retirement decision, as a pure function so it can be proven headlessly (W23.h5).

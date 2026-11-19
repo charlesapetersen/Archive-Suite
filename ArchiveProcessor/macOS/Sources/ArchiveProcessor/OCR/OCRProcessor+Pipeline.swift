@@ -1829,7 +1829,9 @@ extension OCRProcessor {
         cleanupTempFiles()
 
         guard !Task.isCancelled else { return }
-        let containerProblem = await recordContainerLabels(moves: organizedMoves)   // W47.ct-processor-capture
+        let containerProblem = await recordContainerLabels(   // W47.ct-processor-capture
+            moves: organizedMoves, outputDirectory: pending.outputDirectory, preOCRedInput: false)   // a batch run never has pre-OCRed input
+        guard !Task.isCancelled else { return }
         restoreMixedPDFJobs(pending.mixedPDFOutcomes)
         restoredFullJobs = true
         progressRange = nil
@@ -2235,7 +2237,9 @@ extension OCRProcessor {
         cleanupTempFiles()
 
         guard !Task.isCancelled else { return }
-        let containerProblem = await recordContainerLabels(moves: organizedMoves)   // W47.ct-processor-capture
+        let containerProblem = await recordContainerLabels(   // W47.ct-processor-capture
+            moves: organizedMoves, outputDirectory: pending.outputDirectory, preOCRedInput: pending.preOCRedInput)
+        guard !Task.isCancelled else { return }
 
         activePendingRun = nil
         Self.deletePendingRun()
@@ -3453,7 +3457,9 @@ extension OCRProcessor {
         }
 
         guard !Task.isCancelled else { return }
-        let containerProblem = await recordContainerLabels(moves: organizedMoves)   // W47.ct-processor-capture
+        let containerProblem = await recordContainerLabels(   // W47.ct-processor-capture
+            moves: organizedMoves, outputDirectory: outputDirectory, preOCRedInput: preOCRedInput)
+        guard !Task.isCancelled else { return }
 
         if editingImageSubset, let fullJobsAfterPDF {
             var restored = fullJobsAfterPDF

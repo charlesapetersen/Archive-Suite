@@ -57,6 +57,8 @@ enum ContainerLabelCapture {
         let text: String
         /// The type came from the companion's Box or Folder button (`ContainerMarker.startedByUser`).
         let startedByUser: Bool
+        /// The names this filing put into `folder` (`ContainerInference.recordMarkers`' `filedNow`); nil when unknown.
+        var filedNow: Set<String>? = nil
     }
 
     /// Applies each collection folder's markers to its container file (new files only, inside `.archivesuite`).
@@ -70,7 +72,7 @@ enum ContainerLabelCapture {
                                 startedByUser: $0.startedByUser)
             }
             do {
-                switch try ContainerInference.recordMarkers(list, in: folder) {
+                switch try ContainerInference.recordMarkers(list, in: folder, filedNow: group.first?.filedNow) {
                 case .leftAlone(let why): problems.append("\(folder.lastPathComponent): \(why)")
                 case .wrote(let w), .unchanged(let w): warnings += w
                 }

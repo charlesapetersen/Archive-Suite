@@ -225,7 +225,8 @@ folder") starts a folder run with no fields. A run already at that start keeps e
 the label values it reads and removes nothing, and applying the same reads twice changes nothing. A read never
 hides a user value: a photo inside a run the user set, of its own level or deeper, starts no run (it would end the
 user's run there), with a warning; except a photo the user marked as a start, the companion's Box or Folder button
-(`ContainerMarker.startedByUser`), since starting a run there is the user's own act. A value one box's read filled into an earlier run stays there if a re-read
+(`ContainerMarker.startedByUser`), since starting a run there is the user's own act, so long as its run would cover
+only files filed with it, none that was already in the directory (`recordMarkers`' `filedNow`). A value one box's read filled into an earlier run stays there if a re-read
 changes it; the user corrects the run. The caller shows the result for the user to accept before anything is
 written.
 
