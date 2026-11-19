@@ -73,4 +73,13 @@ final class ZoteroExportReaderTests: XCTestCase {
         XCTAssertEqual(NavigationModel.zoteroExportName([URL(fileURLWithPath: "/a/1.pdf"), URL(fileURLWithPath: "/a/2.pdf")]),
                        "Zotero export.json")
     }
+
+    /// W47.ct-zotero-tags: what Add to Zotero reports.
+    func testAddToZoteroMessages() {
+        XCTAssertEqual(NavigationModel.zoteroAddedMessage(count: 2, failure: nil),
+                       "Added 2 documents to Zotero, with their subjects as tags, in the library or collection selected there.")
+        XCTAssertTrue(NavigationModel.zoteroAddedMessage(count: 1, failure: .notRunning).hasPrefix("Zotero is not running"))
+        XCTAssertTrue(NavigationModel.zoteroAddedMessage(count: 1, failure: .refused(status: 500))
+            .contains("did not add the 1 document (it answered 500)"))
+    }
 }

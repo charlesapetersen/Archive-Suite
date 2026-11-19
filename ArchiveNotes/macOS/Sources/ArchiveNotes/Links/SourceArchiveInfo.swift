@@ -2,7 +2,8 @@ import AppKit
 import ArchiveCore
 
 /// W47.ct-zotero — what a source block's archive knows about its document: the archival location the chip shows, and
-/// the CSL-JSON "Copy for Zotero" puts on the clipboard (`ZoteroExport`, the same export as the Reader's). It resolves
+/// the CSL-JSON "Copy for Zotero" puts on the clipboard (`ZoteroExport`, the same export as the Reader's), and what
+/// "Add to Zotero" sends to the Zotero on this Mac with the subjects as tags (W47.ct-zotero-tags). It resolves
 /// only the exact, already-granted path of a Reader link, as the thumbnail renderer does: a chip never starts a
 /// basename walk or asks for a folder. Read only; it holds its own short security scope for each read, so it cannot
 /// close the visible preview's.
@@ -32,10 +33,13 @@ final class SourceArchiveInfo {
 
     /// Everything gathered for the source, as a one-item CSL-JSON array; nil when the source cannot be reached.
     func zoteroJSON(for anchor: SourceAnchor) async -> Data? {
+        await zoteroSource(for: anchor).map { ZoteroExport.export([$0]) }
+    }
+
+    /// Everything gathered for the source (W47.ct-zotero-tags: Add to Zotero sends it); nil when it cannot be reached.
+    func zoteroSource(for anchor: SourceAnchor) async -> ZoteroSource? {
         let link = anchor.link
-        return await read(anchor) { pdf, lookup in
-            ZoteroExport.export([ZoteroSource.gather(pdf: pdf, lookup: lookup, link: link)])
-        }
+        return await read(anchor) { pdf, lookup in ZoteroSource.gather(pdf: pdf, lookup: lookup, link: link) }
     }
 
     /// Repository, collection and the composed location (`ContainerCSL`'s `archive_location`), joined by ` · `.

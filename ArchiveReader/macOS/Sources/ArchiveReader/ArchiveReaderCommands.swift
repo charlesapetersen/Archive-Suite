@@ -214,6 +214,8 @@ struct ArchiveReaderCommands: Commands {
                 .disabled(noSelection)
             Button(ReaderCommand.exportToZotero.title) { nav?.exportToZotero() }
                 .disabled(noSelection)
+            Button(ReaderCommand.addToZotero.title) { nav?.addToZotero() }
+                .disabled(noSelection)
             Divider()
             Button(ReaderCommand.selectRun.title) { nav?.extendSelectionToDocumentRun() }
                 .disabled(noSelection)

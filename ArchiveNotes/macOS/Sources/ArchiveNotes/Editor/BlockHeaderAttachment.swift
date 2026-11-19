@@ -1,4 +1,5 @@
 import AppKit
+import ArchiveCore
 
 /// Reference wrapper so a `SourceAnchor` (value type) can ride on an `NSAttributedString.Key`.
 /// Immutable + `@unchecked Sendable` — all fields are `let`.
@@ -300,6 +301,15 @@ final class BlockHeaderChipView: NSView {
                 + "in Zotero, choose File ▸ Import from Clipboard"
             copyButton.setAccessibilityIdentifier("an.chip.copyForZotero")
             views.append(copyButton)
+
+            let addButton = NSButton(title: "Add to Zotero", target: self, action: #selector(addToZoteroClicked))
+            addButton.bezelStyle = .inline
+            addButton.controlSize = .small
+            addButton.font = .systemFont(ofSize: 10)
+            addButton.toolTip = "Add this source to Zotero on this Mac, with its subjects as tags, into the library "
+                + "or collection selected there"
+            addButton.setAccessibilityIdentifier("an.chip.addToZotero")
+            views.append(addButton)
         }
 
         if box.anchor.zoteroSelect != nil {
@@ -362,10 +372,42 @@ final class BlockHeaderChipView: NSView {
         }
     }
 
-    private func reportCopyFailure() {
+    /// W47.ct-zotero-tags: the source straight into the Zotero on this Mac, through its connector, with the
+    /// subjects as tags (the clipboard's CSL-JSON cannot carry them).
+    @objc private func addToZoteroClicked(_ sender: NSButton) {
+        let anchor = box.anchor
+        Task { @MainActor [weak self] in
+            guard let source = await SourceArchiveInfo.shared?.zoteroSource(for: anchor) else {
+                self?.reportCopyFailure(action: "Add to Zotero")
+                return
+            }
+            do {
+                try await ZoteroConnector().save([source])
+                sender.title = "Added to Zotero"
+            } catch {
+                self?.reportZoteroFailure(error as? ZoteroConnector.Failure ?? .notRunning)
+            }
+        }
+    }
+
+    private func reportZoteroFailure(_ failure: ZoteroConnector.Failure) {
+        let alert = NSAlert()
+        switch failure {
+        case .notRunning:
+            alert.messageText = "Zotero is not running on this Mac."
+            alert.informativeText = "Start Zotero and try again, or use Copy for Zotero and File ▸ Import from Clipboard."
+        case .refused(let status):
+            alert.messageText = "Zotero did not add this source."
+            alert.informativeText = "It answered \(status). Select a library or collection you can edit in Zotero and "
+                + "try again."
+        }
+        if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
+    }
+
+    private func reportCopyFailure(action: String = "Copy for Zotero") {
         let alert = NSAlert()
         alert.messageText = "This source's file could not be read."
-        alert.informativeText = "Copy for Zotero reads the document at its recorded path in an archive folder Notes "
+        alert.informativeText = "\(action) reads the document at its recorded path in an archive folder Notes "
             + "can open. Use Preview to find it, or choose its archive folder from the File menu (Choose Archive Folder…)."
         if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
     }

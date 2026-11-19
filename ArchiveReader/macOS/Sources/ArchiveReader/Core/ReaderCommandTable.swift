@@ -69,7 +69,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
     // File
     case chooseFolder, rescan, saveSearch, connectImproveOCR, containerLevels
     // Selection
-    case open, preview, revealInFinder, copyLinks, copyArchiveLinks, exportToZotero, selectRun, nextUnread,
+    case open, preview, revealInFinder, copyLinks, copyArchiveLinks, exportToZotero, addToZotero, selectRun, nextUnread,
          previousUnread
     // Tags
     case markRead, markUnread, markReadAndNext, renameTag, findSimilarTags, toggleFlag, undoTagChange, redoTagChange,
@@ -135,6 +135,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .copyLinks: return "Copy Link(s)"
         case .copyArchiveLinks: return "Copy Archive Link(s)"
         case .exportToZotero: return "Export to Zotero…"
+        case .addToZotero: return "Add to Zotero"
         case .selectRun: return "Select Document Run"
         case .nextUnread: return "Next Unread"
         case .previousUnread: return "Previous Unread"
@@ -222,7 +223,7 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .revealInFinder: return CommandKey("r", [.command, .shift])
         case .copyLinks: return CommandKey("c", [.command, .option])
         case .copyArchiveLinks: return CommandKey("l", [.command, .shift])
-        case .exportToZotero, .selectRun: return nil
+        case .exportToZotero, .addToZotero, .selectRun: return nil
         // ⌘] / ⌘[ are Back and Forward, as in Finder and Preview (W40.reader-back-forward); the bare ] / [ in
         // the list stay Next / Previous Unread.
         case .nextUnread: return CommandKey("]", [.command, .option])
@@ -288,6 +289,8 @@ enum ReaderCommand: String, CaseIterable, Sendable {
         case .copyArchiveLinks: return "Copy durable archive links"
         case .exportToZotero:
             return "Save the selection's archival location, dates, people and item fields as a CSL-JSON file for Zotero's File ▸ Import"
+        case .addToZotero:
+            return "Add the selection to the Zotero open on this Mac, with its subjects as tags, into the library or collection selected there"
         case .markRead: return "Mark the selected documents as read"
         case .markUnread: return "Mark the selected documents as unread"
         case .toggleFlag: return "Flag or unflag the selection — app-only, never written to the file"

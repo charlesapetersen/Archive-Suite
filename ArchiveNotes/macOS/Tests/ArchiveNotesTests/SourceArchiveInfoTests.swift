@@ -68,6 +68,13 @@ struct SourceArchiveInfoTests {
         #expect((item["issued"] as? [String: Any])?["date-parts"] as? [[Int]] == [[1959]])
         #expect(item["URL"] as? String == source.link)
         #expect((item["note"] as? String)?.contains("Subjects: Trotskyism") == true)
+
+        // W47.ct-zotero-tags: Add to Zotero sends the same source, with the subjects as tags.
+        let gathered = try #require(await info.zoteroSource(for: source))
+        let sent = try #require(ZoteroExport.connectorItems([gathered]).first)
+        #expect(sent["itemType"] as? String == "letter")
+        #expect((sent["tags"] as? [[String: String]])?.compactMap { $0["tag"] } == ["Trotskyism"])
+        #expect(sent["url"] as? String == source.link)
     }
 
     @Test("A source not at its recorded path, or in a root not granted, gives nothing")
@@ -91,10 +98,12 @@ struct SourceArchiveInfoTests {
         let reader = SourceAnchor(link: "archivereader://reveal?x", display: "a.pdf — p. 1", page: 1)
         let chip = BlockHeaderChipView(box: SourceAnchorBox(anchor: reader, kind: .readerPage), onReveal: nil)
         #expect(ids(chip).contains("an.chip.copyForZotero"))
+        #expect(ids(chip).contains("an.chip.addToZotero"))
         #expect(ids(chip).contains("an.chip.container"))
         let zotero = SourceAnchor(display: "Item", zoteroSelect: "zotero://select/items/ABC")
         let other = BlockHeaderChipView(box: SourceAnchorBox(anchor: zotero, kind: .zoteroItem), onReveal: nil)
         #expect(!ids(other).contains("an.chip.copyForZotero"))
+        #expect(!ids(other).contains("an.chip.addToZotero"))
         #expect(!ids(other).contains("an.chip.container"))
     }
 

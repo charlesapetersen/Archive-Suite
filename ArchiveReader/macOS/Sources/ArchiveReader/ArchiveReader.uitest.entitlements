@@ -38,5 +38,9 @@
 	<array>
 		<string>/Users/</string>
 	</array>
+	<!-- W47.ct-zotero-tags: Selection ▸ Add to Zotero talks to Zotero on this Mac, on 127.0.0.1 only
+	     (ZoteroConnector). The Reader contacts nothing else. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
 </dict>
 </plist>
