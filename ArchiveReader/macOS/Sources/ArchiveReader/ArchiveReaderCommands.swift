@@ -212,6 +212,8 @@ struct ArchiveReaderCommands: Commands {
             Button(ReaderCommand.copyArchiveLinks.title) { nav?.copyArchiveLinks() }
                 .keyboardShortcut(.copyArchiveLinks)
                 .disabled(noSelection)
+            Button(ReaderCommand.exportToZotero.title) { nav?.exportToZotero() }
+                .disabled(noSelection)
             Divider()
             Button(ReaderCommand.selectRun.title) { nav?.extendSelectionToDocumentRun() }
                 .disabled(noSelection)

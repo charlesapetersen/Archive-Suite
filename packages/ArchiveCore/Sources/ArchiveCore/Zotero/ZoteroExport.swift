@@ -36,13 +36,17 @@ public struct ZoteroSource: Equatable, Sendable {
     public static func gather(pdf: URL, lookup: ContainerLookup?, link: String? = nil) -> ZoteroSource {
         var source = ZoteroSource(fileName: pdf.lastPathComponent, link: link)
         source.tags = TagReading.readTags(pdf)
-        if let doc = PDFDocument(url: pdf) {
-            source.itemFields = PDFHeaderParser.textPageHeaders(doc).lazy.compactMap { $0?.itemFields }
-                .first { !$0.isEmpty } ?? PDFItemFields()
-        }
+        source.itemFields = headerItemFields(pdf: pdf)
         source.sidecar = ZoteroSidecar.read(pdf: pdf)
         if let lookup { source.container = lookup.shown(for: pdf).mapValues(\.text) }
         return source
+    }
+
+    /// The item fields of the first text page whose header has any.
+    public static func headerItemFields(pdf: URL) -> PDFItemFields {
+        guard let doc = PDFDocument(url: pdf) else { return PDFItemFields() }
+        return PDFHeaderParser.textPageHeaders(doc).lazy.compactMap { $0?.itemFields }.first { !$0.isEmpty }
+            ?? PDFItemFields()
     }
 }
 

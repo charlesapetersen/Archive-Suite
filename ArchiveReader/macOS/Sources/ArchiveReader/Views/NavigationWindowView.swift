@@ -282,6 +282,7 @@ struct NavigationWindowView: View {
         menu.addItem(withTitle: "Open in Default App", action: #selector(ContextMenuActions.openInDefaultApp), keyEquivalent: "")
         menu.addItem(withTitle: "Copy Link(s)", action: #selector(ContextMenuActions.copyLinks), keyEquivalent: "")
         menu.addItem(withTitle: "Copy Archive Link(s)", action: #selector(ContextMenuActions.copyArchiveLinks), keyEquivalent: "")
+        menu.addItem(withTitle: ReaderCommand.exportToZotero.title, action: #selector(ContextMenuActions.exportToZotero), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "Mark Read", action: #selector(ContextMenuActions.markRead), keyEquivalent: "")
         menu.addItem(withTitle: "Mark Unread", action: #selector(ContextMenuActions.markUnread), keyEquivalent: "")
@@ -1070,6 +1071,7 @@ final class ContextMenuActions: NSObject {
     @objc func openInDefaultApp() { model.openInDefaultApp() }
     @objc func copyLinks()        { model.copyLinks() }
     @objc func copyArchiveLinks() { model.copyArchiveLinks() }
+    @objc func exportToZotero() { model.exportToZotero() }
     @objc func markRead()         { model.mark(.read) }
     @objc func markUnread()       { model.mark(.unread) }
     @objc func toggleFlag()       { model.toggleFlagSelection() }
