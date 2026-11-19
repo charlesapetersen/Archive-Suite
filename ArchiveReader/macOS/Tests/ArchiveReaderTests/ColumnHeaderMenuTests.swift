@@ -40,7 +40,8 @@ final class ColumnHeaderMenuTests: XCTestCase {
         }
 
         var choices = try menu()
-        XCTAssertEqual(choices.items.compactMap { $0.representedObject as? String }.prefix(9),
+        XCTAssertEqual(choices.items.compactMap { $0.representedObject as? String }
+                           .prefix(AppKitTableView.columnDefinitions.count),
                        AppKitTableView.columnDefinitions.map(\.id)[...])
         XCTAssertEqual(try item("flag", in: choices).title, "⚑ Flag")
         XCTAssertEqual(try item("warning", in: choices).title, "⚠︎ Needs attention")
@@ -50,8 +51,13 @@ final class ColumnHeaderMenuTests: XCTestCase {
         let capture = try item(AppKitTableView.captureMarkerColumnID, in: choices)
         XCTAssertFalse(capture.isEnabled)
         XCTAssertEqual(capture.state, .off)
+        // Container, like Capture marker, waits for a file that has one (W47.ct-reader-view).
+        let container = try item(AppKitTableView.containerColumnID, in: choices)
+        XCTAssertFalse(container.isEnabled)
+        XCTAssertEqual(container.state, .off)
         try invoke(name)
         try invoke(capture)
+        try invoke(container)
         XCTAssertTrue(model.hiddenColumns.isEmpty, "even direct dispatch cannot change disabled choices")
 
         let typeColumn = try XCTUnwrap(table.tableColumns.first { $0.identifier.rawValue == "type" })

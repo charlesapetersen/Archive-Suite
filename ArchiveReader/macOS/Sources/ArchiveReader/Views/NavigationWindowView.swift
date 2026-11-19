@@ -106,8 +106,10 @@ struct NavigationWindowView: View {
                                     set: { if !$0, model.containerLevelsDraft != nil { model.dismissContainerLevels() } })) {
             if let draft = model.containerLevelsDraft {
                 ContainerLevelsSheet(draft: draft, error: model.containerLevelsError,
+                                     saving: model.containerLevelsSaving,
                                      onSave: { model.saveContainerLevels($0) },
                                      onCancel: { model.dismissContainerLevels() })
+                    .id(draft.id)
             }
         }
         .sheet(item: $model.advancedSearchRequest) { request in AdvancedSearchSheet(model: model, request: request) }
@@ -601,7 +603,7 @@ struct NavigationWindowView: View {
     }
 
     /// The most values a container facet's menu lists; the rest are reached by narrowing with another facet first.
-    static let containerFacetMenuLimit = 200
+    static let containerFacetMenuLimit = 100
 
     /// W47.ct-reader-view: the container facets, one submenu each, every value with how many files carry it. A
     /// chosen value shows as a chip under the bar.

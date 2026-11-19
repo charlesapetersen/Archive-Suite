@@ -206,9 +206,19 @@ final class NavigationModel: ObservableObject {
     @Published var containerLevelsDraft: ContainerLevelsDraft?
     /// Why the last level-map save failed, shown in the sheet.
     @Published var containerLevelsError: String?
+    /// Whether a level-map save is being written; the sheet's Save waits for it.
+    @Published var containerLevelsSaving = false
     var containerGeneration = 0
-    /// The paths the catalog was last built from (count and an order-free hash), so an unchanged set is not rebuilt.
-    var containerSignature: (root: String, count: Int, hash: Int)?
+    /// The paths the last catalog build started from, so an unchanged set is not rebuilt.
+    var containerSignature: ContainerPathSignature?
+    /// The paths the published catalog was built from; the level map is offered only once it is the current set.
+    var containerBuiltSignature: ContainerPathSignature?
+    /// One build at a time: a change during a build asks for one more when it lands, rather than a build per batch
+    /// of a first scan.
+    var containerBuildInFlight = false
+    var containerRebuildPending = false
+    /// The pre-filled level map for a root without one, made with the catalog off the main thread.
+    var containerPrefilledDraft: ContainerLevelsDraft?
     /// The list columns the user has hidden, from the header's menu (W40.fix-reader-columns-in-header).
     @Published var hiddenColumns: Set<String> = [] {
         didSet { if hiddenColumns != oldValue { AppSettings.setHiddenColumns(hiddenColumns, in: defaults) } }
@@ -441,7 +451,7 @@ final class NavigationModel: ObservableObject {
         library.$phase
             .receive(on: DispatchQueue.main)
             .sink { [weak self] phase in MainActor.assumeIsolated {
-                if phase.isSettled { self?.offerContainerLevelsIfNeeded() }
+                if phase.isSettled { self?.refreshContainers() }   // offers the map once the build is current
             } }
             .store(in: &cancellables)
         if let root = rootStore.root {
@@ -1173,7 +1183,10 @@ final class NavigationModel: ObservableObject {
         let rules = scope == nil ? nil : scopeRules
         let context = rules.map { ruleContext(for: $0) }
         let statuses = formatStatuses
-        let containers = filter.activeContainerFacets.isEmpty ? nil : containerCatalog.rows
+        // Not applied until the catalog for this root has been built (a facet restored at launch would hide
+        // every row until then).
+        let containers = filter.activeContainerFacets.isEmpty || containerCatalog.rootPath != containerTree?.path
+            ? nil : containerCatalog.rows
         return { file in
             if let rules, let context, !rules.matches(file, context) { return false }
             guard filter.matches(file) else { return false }
@@ -2289,8 +2302,13 @@ final class NavigationModel: ObservableObject {
             indexer.resetPruneState()   // old root's pending-prune set is invalid for the new root
             filter.pathPrefix = nil
             filter.containerFacets = nil   // another root's boxes and collections
+            containerGeneration += 1       // a build for the old root still running is dropped when it lands
             containerCatalog = .empty
             containerSignature = nil
+            containerBuiltSignature = nil
+            containerPrefilledDraft = nil
+            containerLevelsDraft = nil     // a sheet for the old root must not save into this one
+            containerLevelsError = nil
             filterSearchText = filter.searchText   // sync debounced field
             // R-3: an OCR search active over the OLD corpus leaves ftsPaths holding old-root paths; once
             // the new library loads, recompute would AND the new files against those → empty/wrong
@@ -2323,6 +2341,7 @@ final class NavigationModel: ObservableObject {
             return
         }
         library.rescan()
+        refreshContainers(force: true)   // the container files are read again, though no path changed
         statusMessage = "Rescanning \(library.scopeDescription)…"
         announce(statusMessage)
     }

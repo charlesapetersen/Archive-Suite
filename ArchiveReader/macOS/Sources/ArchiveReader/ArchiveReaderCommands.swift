@@ -177,7 +177,7 @@ struct ArchiveReaderCommands: Commands {
             Button(ReaderCommand.saveSearch.title) { nav?.showingSaveDialog = true }
                 .disabled(nav == nil)
             Button(ReaderCommand.containerLevels.title) { nav?.openContainerLevels() }
-                .disabled(nav?.containerTree == nil)
+                .disabled(nav?.rootStore.root == nil)
             Divider()
             Button(ReaderCommand.connectImproveOCR.title) { tagSheetNav?.chooseImproveOCRFolder() }
                 .disabled(tagSheetNav == nil)

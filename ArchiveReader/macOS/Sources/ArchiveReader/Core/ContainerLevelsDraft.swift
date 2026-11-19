@@ -8,7 +8,13 @@ import ArchiveCore
 // edited once per root. Nothing is written until the user saves it; saving writes only
 // `<root>/.archivesuite/container-levels.json`, through ArchiveCore's audited writer.
 
-struct ContainerLevelsDraft: Equatable, Sendable {
+struct ContainerLevelsDraft: Equatable, Sendable, Identifiable {
+    /// A new draft is a new sheet, so a sheet never keeps editing a draft the model has replaced.
+    let id = UUID()
+    /// The tree the draft was made for (the archive's main folder) and its path as the library spells paths; the
+    /// map is saved only into this tree, and only while it is still the one open.
+    let tree: URL
+    let treePath: String
     /// The map as the user is editing it.
     var map: ContainerLevelMap
     /// A few folder names at each depth of `map.levels`, the most common first, workflow folders left out.
@@ -41,19 +47,22 @@ struct ContainerLevelsDraft: Equatable, Sendable {
     /// A draft from `directories` (each listed file's directory below the root, top first, once per file): the
     /// stored map when there is one (`existing`), else the pre-filled one.
     static func make(directories: [[String]], existing: ContainerLevelMap? = nil,
-                     expecting: ContainerFileStamp? = nil) -> ContainerLevelsDraft {
+                     expecting: ContainerFileStamp? = nil, tree: URL, treePath: String) -> ContainerLevelsDraft {
         var map = existing ?? ContainerLevelMap.prefilled(directories: directories)
         // Per depth, each folder (by its path) with the files under it. Depth as the map counts it: a skipped
         // folder takes none.
+        // Each folder once, with how many files sit in it: at corpus size there are far fewer folders than files.
+        var perDirectory: [[String]: Int] = [:]
+        for dir in directories { perDirectory[dir, default: 0] += 1 }
         var folders: [[String: (name: String, files: Int)]] = []
-        for dir in directories {
+        for (dir, files) in perDirectory {
             let kept = dir.indices.filter { i in
                 map.overrides[dir[0...i].joined(separator: "/")]?.role != .ignore
                     && !ContainerPatterns.isWorkflowName(dir[i])
             }
             for (depth, i) in kept.enumerated() {
                 while folders.count <= depth { folders.append([:]) }
-                folders[depth][dir[0...i].joined(separator: "/"), default: (dir[i], 0)].files += 1
+                folders[depth][dir[0...i].joined(separator: "/"), default: (dir[i], 0)].files += files
             }
         }
         // A depth the folders do not reach still shows, so a stored map's every entry can be edited.
@@ -71,14 +80,13 @@ struct ContainerLevelsDraft: Equatable, Sendable {
         }
         let workflow = map.overrides.filter { $0.value.role == .ignore }.keys
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-        var perDirectory: [[String]: Int] = [:]
-        for dir in directories where !dir.isEmpty { perDirectory[dir, default: 0] += 1 }
-        let sample = perDirectory.max {
+        let sample = perDirectory.filter { !$0.key.isEmpty }.max {
             $0.value != $1.value ? $0.value < $1.value
                                  : $0.key.joined(separator: "/").localizedStandardCompare($1.key.joined(separator: "/")) == .orderedDescending
         }?.key
-        return ContainerLevelsDraft(map: map, examples: examples, folderCounts: folders.map(\.count),
-                                    workflowFolders: workflow, sampleDirectory: sample, expecting: expecting)
+        return ContainerLevelsDraft(tree: tree, treePath: treePath, map: map, examples: examples,
+                                    folderCounts: folders.map(\.count), workflowFolders: workflow,
+                                    sampleDirectory: sample, expecting: expecting)
     }
 
     /// Stop skipping a workflow folder, or skip it again.

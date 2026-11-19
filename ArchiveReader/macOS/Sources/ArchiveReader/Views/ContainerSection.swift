@@ -43,6 +43,7 @@ struct ContainerSection: View {
 struct ContainerLevelsSheet: View {
     @State var draft: ContainerLevelsDraft
     let error: String?
+    let saving: Bool
     let onSave: (ContainerLevelsDraft) -> Void
     let onCancel: () -> Void
 
@@ -83,6 +84,7 @@ struct ContainerLevelsSheet: View {
                     .accessibilityIdentifier("ar.containerLevels.cancel")
                 Button("Save Levels") { onSave(draft) }
                     .keyboardShortcut(.defaultAction)
+                    .disabled(saving)
                     .accessibilityIdentifier("ar.containerLevels.save")
             }
         }

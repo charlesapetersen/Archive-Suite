@@ -12,7 +12,8 @@ final class TableColumnFitTests: XCTestCase {
 
     private var fitter: TableColumnFitter?
 
-    /// Capture marker hidden, as it is while no file has a marker (`CaptureMarkerColumnTests`).
+    /// Capture marker and Container hidden, as they are while no file has one (`CaptureMarkerColumnTests`,
+    /// `ContainerViewTests`). With either shown, the narrowest window scrolls sideways (KNOWN_ISSUES).
     private func makeTable(width: CGFloat) -> (NSScrollView, NSTableView) {
         let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: width, height: 600))
         scrollView.hasVerticalScroller = true
@@ -22,6 +23,7 @@ final class TableColumnFitTests: XCTestCase {
         tableView.intercellSpacing = NSSize(width: 8, height: 2)
         AppKitTableView.addColumns(to: tableView)
         tableView.tableColumns.first { $0.identifier.rawValue == "classification" }!.isHidden = true
+        tableView.tableColumns.first { $0.identifier.rawValue == AppKitTableView.containerColumnID }!.isHidden = true
         scrollView.documentView = tableView
         fitter = AppKitTableView.fitColumns(of: tableView)
         scrollView.layoutSubtreeIfNeeded()

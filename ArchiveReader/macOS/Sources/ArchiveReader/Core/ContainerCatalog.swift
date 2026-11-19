@@ -185,16 +185,24 @@ struct ContainerCatalog: Sendable {
         let shown = ContainerDisplay.values(record, names: context.names)
         guard !shown.isEmpty else { return nil }
         let live = ContainerResolver.liveRuns(at: name, in: context.scopes.first?.file?.runs ?? [])
+        func status(_ field: ContainerField, _ value: ContainerValue) -> FieldStatus {
+            FieldStatusPolicy.container(value, field: field, level: live.last { $0.fields[field] == value }?.level)
+        }
         let rows = ContainerField.allCases.compactMap { field -> ContainerDetailRow? in
             guard let text = shown[field]?.text else { return nil }
-            guard let value = record.values[field] else {
-                // Filled by another field's standard name: the user's own naming.
-                return ContainerDetailRow(field: field, text: text, status: FieldStatus(
-                    level: .checked, source: "From your standard name for another field", measured: ""))
+            if let value = record.values[field] { return ContainerDetailRow(field: field, text: text, status: status(field, value)) }
+            // Filled by the standard name another field's value matched: as sure as that value, no surer.
+            let source = ContainerField.allCases.first { other in
+                guard let written = record.shown(other), let entry = context.names?.entry(for: other, matching: written)
+                else { return false }
+                return entry.shown(field) != nil
             }
-            let level = live.last { $0.fields[field] == value }?.level
-            return ContainerDetailRow(field: field, text: text,
-                                      status: FieldStatusPolicy.container(value, field: field, level: level))
+            guard let source, let value = record.values[source] else { return nil }
+            let from = status(source, value)
+            return ContainerDetailRow(field: field, text: text, status: FieldStatus(
+                level: from.level, source: "From your standard name for the \(source.label.lowercased()), "
+                    + from.source.prefix(1).lowercased() + from.source.dropFirst(),
+                measured: from.measured))
         }
         let disagreements = ContainerDisplay.disagreements(record, names: context.names).map { field in
             var seen: Set<String> = []
@@ -231,8 +239,8 @@ struct ContainerCatalog: Sendable {
 
         // Every directory on the way up is read once, whichever file asks first.
         var files: [String: ContainerFile?] = [:]
-        var maps: [String: ContainerLevelMap?] = [:]
-        var namesAt: [String: ContainerNames?] = [:]
+        var maps: [String: ContainerLoad<ContainerLevelMap>] = [:]
+        var namesAt: [String: ContainerLoad<ContainerNames>] = [:]
         func url(_ components: [String]) -> URL {
             components.reduce(treeRoot) { $0.appendingPathComponent($1, isDirectory: true) }
         }
@@ -243,32 +251,36 @@ struct ContainerCatalog: Sendable {
             files[key] = file
             return file
         }
-        func levelMap(_ components: [String]) -> ContainerLevelMap? {
+        func levelMap(_ components: [String]) -> ContainerLoad<ContainerLevelMap> {
             let key = components.joined(separator: "/")
             if let cached = maps[key] { return cached }
-            let map = ContainerFileStore.loadLevelMap(root: url(components)).document
+            let map = ContainerFileStore.loadLevelMap(root: url(components))
             maps[key] = map
             return map
         }
-        func names(_ components: [String]) -> ContainerNames? {
+        func names(_ components: [String]) -> ContainerLoad<ContainerNames> {
             let key = components.joined(separator: "/")
             if let cached = namesAt[key] { return cached }
-            let found = ContainerFileStore.loadNames(root: url(components)).document
+            let found = ContainerFileStore.loadNames(root: url(components))
             namesAt[key] = found
             return found
         }
+        func isMissing<D>(_ load: ContainerLoad<D>) -> Bool {
+            if case .missing = load { return true }
+            return false
+        }
 
-        let rootMap = ContainerFileStore.loadLevelMap(root: treeRoot)
-        maps[""] = rootMap.document
+        let rootMap = levelMap([])
         var contexts: [String: DirectoryContext] = [:]
         var rows: [String: ContainerRow] = [:]
         for (key, entry) in byDirectory {
             let dir = entry.components
-            // The nearest level map and standard names at or above the directory (SPEC §The level map).
-            let mapDepth = (0...dir.count).reversed().first { levelMap(Array(dir[0..<$0])) != nil }
-            let nameDepth = (0...dir.count).reversed().first { names(Array(dir[0..<$0])) != nil }
+            // The nearest level map and standard names at or above the directory (SPEC §The level map). The nearest
+            // one wins even when this build cannot read it: its subtree then gets none, not an outer one's.
+            let mapDepth = (0...dir.count).reversed().first { !isMissing(levelMap(Array(dir[0..<$0]))) }
+            let nameDepth = (0...dir.count).reversed().first { !isMissing(names(Array(dir[0..<$0]))) }
             var scopes: [ContainerScope]
-            if let m = mapDepth, let map = levelMap(Array(dir[0..<m])) {
+            if let m = mapDepth, let map = levelMap(Array(dir[0..<m])).document {
                 let below = Array(dir[m...])
                 let chain = (0...below.count).map { containerFile(Array(dir[0..<(m + $0)])) }
                 scopes = map.scopes(for: below, files: chain)
@@ -277,7 +289,8 @@ struct ContainerCatalog: Sendable {
             } else {
                 scopes = (0...dir.count).reversed().map { ContainerScope(file: containerFile(Array(dir[0..<$0]))) }
             }
-            let context = DirectoryContext(scopes: scopes, names: nameDepth.flatMap { names(Array(dir[0..<$0])) })
+            let context = DirectoryContext(scopes: scopes,
+                                           names: nameDepth.flatMap { names(Array(dir[0..<$0])).document })
             contexts[key] = context
             for (name, path) in entry.files {
                 let record = ContainerResolver.resolve(fileName: name, scopes: scopes,

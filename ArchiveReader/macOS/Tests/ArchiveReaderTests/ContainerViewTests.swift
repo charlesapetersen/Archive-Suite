@@ -165,7 +165,7 @@ final class ContainerViewTests: XCTestCase {
         XCTAssertFalse(NavigationModel.shouldOfferContainerLevels(catalog: first, settled: true, asked: true),
                        "once per root")
 
-        var draft = ContainerLevelsDraft.make(directories: first.fileDirectories)
+        var draft = ContainerLevelsDraft.make(directories: first.fileDirectories, tree: root, treePath: root.path)
         XCTAssertEqual(draft.map.levels, [.repository, .collection, .box])
         XCTAssertEqual(draft.workflowFolders, ["05 Final Tagging"])
         XCTAssertEqual(draft.examples[2], ["Box 17", "Box 18"])
@@ -204,7 +204,8 @@ final class ContainerViewTests: XCTestCase {
         guard case let .loaded(stored, stamp) = ContainerFileStore.loadLevelMap(root: root) else {
             return XCTFail("the map reads back")
         }
-        let reopened = ContainerLevelsDraft.make(directories: second.fileDirectories, existing: stored, expecting: stamp)
+        let reopened = ContainerLevelsDraft.make(directories: second.fileDirectories, existing: stored, expecting: stamp,
+                                                  tree: root, treePath: root.path)
         XCTAssertEqual(reopened.map.levels, draft.map.levels)
         XCTAssertThrowsError(try ContainerFileStore.writeLevelMap(draft.map, root: root, expecting: nil),
                              "a write that did not read the stored map is refused")
@@ -224,6 +225,50 @@ final class ContainerViewTests: XCTestCase {
                                                 filePaths: [box17().appendingPathComponent("a.pdf").path])
         XCTAssertFalse(NavigationModel.shouldOfferContainerLevels(catalog: unreadable, settled: true, asked: false),
                        "an unreadable map is left alone, not replaced")
+    }
+
+    func testAnUnreadableNestedMapGivesItsSubtreeNoLevelsRatherThanTheOuterOnes() throws {
+        let urls = try makeTree()
+        try writeLevels([.repository, .collection, .box])
+        let inner = root.appendingPathComponent(repository).appendingPathComponent(collection)
+            .appendingPathComponent(ContainerFile.folderName, isDirectory: true)
+        try FileManager.default.createDirectory(at: inner, withIntermediateDirectories: true)
+        try Data("{ not json".utf8).write(to: inner.appendingPathComponent(ContainerLevelMap.fileName))
+        let catalog = build(urls)
+        XCTAssertNil(catalog.rows[path(urls["c"]!)], "the nearest map wins even unread: no path values below it")
+        XCTAssertEqual(catalog.rows[path(urls["fromm"]!)]?.cell, "Box 2, Folder 4", "file names still count")
+    }
+
+    func testAValueFilledByAStandardNameIsAsSureAsTheValueItMatched() throws {
+        let urls = try makeTree()
+        try writeLevels([.repository, .collection, .box])
+        var names = ContainerNames()
+        names.set(ContainerStandardName(field: .repository, variants: [repository],
+                                        fields: [.repository: "Hoover Institution Library & Archives",
+                                                 .place: "Stanford, CA"]))
+        try ContainerFileStore.writeNames(names, root: root, expecting: nil)
+        let catalog = build(urls)
+        let c = try XCTUnwrap(catalog.detail(forPath: path(urls["c"]!)))
+        let place = try XCTUnwrap(c.rows.first { $0.field == .place })
+        XCTAssertEqual(place.text, "Stanford, CA")
+        XCTAssertEqual(place.status.level, .lowerConfidence, "matched by a folder name, so no surer than it")
+        XCTAssertTrue(place.status.source.hasPrefix("From your standard name for the repository"))
+        XCTAssertEqual(catalog.rows[path(urls["c"]!)]?.facets[.repository], "Hoover Institution Library & Archives")
+    }
+
+    func testSavingRefusesATreeThatIsNoLongerOpen() throws {
+        try makeTree()
+        let model = fixtureNavigationModel(pinnedTo: root)
+        XCTAssertTrue(waitUntil { model.displayed.count == 4 })
+        let other = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("ContainerViewOther-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: other) }
+        let draft = ContainerLevelsDraft.make(directories: [["A"]], tree: other, treePath: other.path)
+        model.saveContainerLevels(draft)
+        XCTAssertEqual(model.containerLevelsError, "The archive folder changed since this sheet opened, so nothing was saved.")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: other.appendingPathComponent(ContainerFile.folderName).path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ContainerFileStore.levelMapURL(in: root).path))
     }
 
     func testSplitIsByteExactUnderTheRoot() {
