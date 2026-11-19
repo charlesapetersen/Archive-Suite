@@ -48,10 +48,10 @@ What it does not do, deliberately or not yet:
 - **A container file this build cannot overwrite is left alone.** That covers a newer version, one it cannot read,
   or one holding values it drops. The edit is refused with the reason, and the SPEC's "set aside on the user's
   say-so" (`write(…, settingAside: true)`) is not offered yet. The same holds for an unreadable standard-names file
-  nearer the folder than the root's.
+  nearer the folder than the root's. (queued: W49.reader-ct-set-aside).
 - **An edit to the folder's own values reaches the folders inside it** and outranks their label reads, as the SPEC's
   precedence says (user, then label, then path). The row says "every file in this folder and the folders inside
-  it". It is chosen only where the folder has no run of that field's level.
+  it". It is chosen only where the folder has no run of that field's level. (accepted: the SPEC's precedence, user then label then path, SPEC/containers.md).
 - **Set for selection** takes fields with a level (not date or other marks), at most 5,000 files, and the files in
   each folder's order on disk, so a file the list does not show still keeps its value. Across several folders it is
   all or nothing: every folder's file is checked before any is written, and a write failing partway puts the
@@ -59,9 +59,9 @@ What it does not do, deliberately or not yet:
   two writers racing within one save, and the message names the folder).
 - **Warnings are per folder**, listed for the selected file's folder: disagreements and long unmarked runs
   (`ContainerInference.warnings`). The marker warnings (a photo inside your run, a marker with no read) come from
-  Route A as label reads are applied, which the Reader does not do. There is no corpus-wide list yet.
+  Route A as label reads are applied, which the Reader does not do. There is no corpus-wide list yet. (queued: W49.reader-ct-warnings-all, for the library-wide list; the marker warnings stay Route A's, in the Processor).
 - **Stop Using the Standard Name removes the whole entry**, with every wording it gathered and anything it filled in
-  other fields.
+  other fields. (accepted: an entry is one name with its wordings; a single value is changed with Change… instead).
 
 ## Containers in the list — the limits (W47.ct-reader-view, 2026-11-19)
 
@@ -74,21 +74,21 @@ levels** sheet, offered once per root after its scan settles and from File ▸ C
 What it does not do, deliberately or not yet:
 - **Editing is the section above** (W47.ct-reader-edit). The Reader works out no runs from marker photos itself:
   Route A needs label reads (`W47.ct-processor-capture`, `W47.ct-backfill`). It shows and edits the runs that
-  container files already hold.
+  container files already hold. (accepted: Route A reads labels in the Processor, W47.ct-processor-capture and W47.ct-backfill; the Reader edits the runs they write).
 - **Container files changed by another app are read again on the next change to the listed files, a Rescan or a
-  relaunch**, not the moment they change: the catalog is rebuilt when the listed paths change.
+  relaunch**, not the moment they change: the catalog is rebuilt when the listed paths change. (accepted: the catalog follows the listed files; a Rescan reads a changed container file at once).
 - **A container rule is skipped until the catalog for the open root is built** (W47.ct-reader-facet-rules), like a
   text rule whose index answer has not come back: a smart folder with one lists and counts its other rules' files
   for that moment after launch or a root change. It compares the facet's shown value by `ContainerNames.key`, the
-  same value the Containers menu offers, so a collection matches by its title when it has one, else its number.
+  same value the Containers menu offers, so a collection matches by its title when it has one, else its number. (accepted: as a text rule waits for its index answer; the rule applies once the catalog is built).
 - **The facet menu lists each facet's 100 most common values**, counted over the whole library, not narrowed by the
-  other facets chosen.
+  other facets chosen. (accepted: a bound on the menu's length; the counts are the library's own).
 - **The narrowest window scrolls sideways** once Container is shown, as with Capture marker: the default columns
-  already take 656 of its 668 pt (`TableColumnFitter`).
+  already take 656 of its 668 pt (`TableColumnFitter`). (accepted: the default columns already fill the narrowest window; a column can be hidden from the header menu).
 - **The sheet edits the tree root's map only**: a nested map (a level map in a subfolder) is read, not edited, and
-  one this build cannot read gives its subtree no folder levels rather than an outer map's.
+  one this build cannot read gives its subtree no folder levels rather than an outer map's. (accepted: the sheet sets the tree's own levels; a nested map overrides one subtree and is read as the SPEC says).
 - **The tree root is the archive's main folder**: the granted folder, or its "Archival Photos" folder when it holds
-  one (`ReaderArchiveLayout`). Files outside it (the JPEG partner tree) have no container.
+  one (`ReaderArchiveLayout`). Files outside it (the JPEG partner tree) have no container. (accepted: the main folder is the container tree by design, ReaderArchiveLayout; a JPEG original's partner PDF carries its container).
 
 ## Field checks in the Inspector — the limits (W40.reader-field-status, 2026-11-18)
 
@@ -109,13 +109,13 @@ What it does not do, deliberately or not yet:
   the file under the archive's main folder (accepted: a name key as a container run's start; the check is the tag's
   alone; nothing else shows item fields yet; titles are per document; `.archivesuite` writes are allowed only there).
 - **Container fields have their own Inspector section** (W47.ct-reader-view), with the same badge and no check
-  button: a container value is confirmed or corrected from its Edit menu (W47.ct-reader-edit).
+  button: a container value is confirmed or corrected from its Edit menu (W47.ct-reader-edit). (accepted: by design, W47.ct-reader-edit; a container value is confirmed by being the user's own).
 - **Sender and recipient have no row**: no route writes them where the Reader can read them (the bench's item-field
-  scope leaves them to W46), and the Reader does not read the JSON sidecar.
+  scope leaves them to W46), and the Reader does not read the JSON sidecar. (accepted: no route writes sender or recipient where the Reader can read them; the row comes with such a route).
 - **A group selection counts the checked dates** and checks them all at once; item fields are listed one file at a
-  time.
+  time. (accepted: item fields are per document, so a group has no one value to show).
 - **A check is not tied to the value it checked.** It names the field. Another writer that changes the value
-  without the user (a copied source tag set, a later Processor rewrite of page 2) leaves the check standing.
+  without the user (a copied source tag set, a later Processor rewrite of page 2) leaves the check standing. (accepted: SPEC/tag-format.md §Field checks: a check names the field and never holds the value).
 
 ## Improve OCR in the Reader: flag, filter, hand-off, receipts — the limits (W44.reocr-reader, 2026-11-13)
 
@@ -126,23 +126,23 @@ What it does not do, deliberately or not yet:
 - **The index's freshness key is the date, inode and size** (W44.reocr-reader-freshness), so a replacement that
   keeps the date is read again without its receipt, and a tag edit (an extended attribute written in place) is not.
   What still passes as unchanged: a rewrite in place, same inode, that keeps both the size and the date. No suite
-  writer does that (a Processor publication changes the inode, `SPEC/improve-ocr.md`); a receipt or a rebuild fixes it.
+  writer does that (a Processor publication changes the inode, `SPEC/improve-ocr.md`); a receipt or a rebuild fixes it. (accepted: no suite writer rewrites a file in place keeping its size and date; a receipt or a rebuild covers one that does).
 - **Generic edits that name `OCR Poor` run on the main thread**, as every Reader tag write does, and wait at most 1 s
-  for the file's flag lock (`SPEC/improve-ocr.md` §3 states the exception). The Flag command runs off it.
+  for the file's flag lock (`SPEC/improve-ocr.md` §3 states the exception). The Flag command runs off it. (accepted: SPEC/improve-ocr.md §3 states the exception; the wait is bounded at 1 s).
 - **Never connected, a generic edit of the tag is not recorded**, like an edit in Finder; the Flag command asks for
   the folder first. Connected but unusable (moved, replaced by another store, no root marker): every write that names
-  the tag is refused with the reason, and unrelated edits go ahead.
+  the tag is refused with the reason, and unrelated edits go ahead. (accepted: unconnected, there is no store to record in, as for an edit in Finder; unusable, the write is refused with the reason).
 - **The command's direction comes from the list's rows** (flag unless every target is flagged), which lag a change
-  made in another app until the watcher sees it; the write itself re-reads the file.
+  made in another app until the watcher sees it; the write itself re-reads the file. (accepted: the write re-reads the file, so a lagging row changes only which way the command goes).
 - **Receipts are read on library changes, on activation and every 20 s**; the Processor sends no wake-up. Seen IDs are
   kept in the Reader's own defaults, all of them; receipts stay in the shared folder. An index pass already running
   when a receipt is handled can write the file's old text back after the row was dropped; it carries the old file's
-  inode, so the next pass after the watcher sees the replacement reads the file again.
+  inode, so the next pass after the watcher sees the replacement reads the file again. (accepted: the Processor sends no wake-up; a stale row is read again on the next pass after the watcher sees the replacement).
 - **A reload after a receipt rebuilds the document's panes** on the same page pair; zoom and find highlights in that
-  window start again.
+  window start again. (accepted: the file changed under the panes, so they are rebuilt).
 - **Not exercised by automation:** the real Launch Services launch of Archive Processor (no Processor is installed in
   the test VM, so `ImproveOCRUITests` uses the DEBUG hand-off recorder) and the Connect panel itself (the test connects
-  the fixture's folder by path). The hand-off link and manifest are unit-tested against the Processor's decoder rules.
+  the fixture's folder by path). The hand-off link and manifest are unit-tested against the Processor's decoder rules. (accepted: the test VM has no Processor installed; the link and manifest are unit-tested against the Processor's decoder rules).
 
 ## ✅ CLOSED (W40.reader-jpeg-read, 2026-11-17) — Mark Read and Unread work on JPEGs; the status line says why a file was left alone
 
@@ -374,12 +374,12 @@ A find hit is the k-th match of each pane of its page pair, selected in both and
 JPEG original gets boxes at the PDF image page's match positions (a page overlay — `PDFPage.copy()` shares
 annotations with the original and removing one from the copy leaves it there, measured). Limits that stay:
 - **Pairing is by ordinal.** If the image page's text layer misses or splits an occurrence the OCR text page
-  has, later hits on that pair select different words in the two panes. Nothing in the PDF links them better.
+  has, later hits on that pair select different words in the two panes. Nothing in the PDF links them better. (accepted: nothing in the PDF links the two panes' words better).
 - **An image page with no text layer gets no highlight** (the test corpus's image pages have none): there are
-  no positions to draw from. The hit still shows on the text page.
+  no positions to draw from. The hit still shows on the text page. (accepted: an image page with no text layer has no positions to draw from).
 - **The extracted-text pane highlights but does not scroll to the current hit** (a SwiftUI `Text` cannot
   scroll to a range); the image pane beside it does. Its matches come from a string search on the same text
-  as PDFKit's, so a query PDFKit matches across a line break or ligature may be marked one match off there.
+  as PDFKit's, so a query PDFKit matches across a line break or ligature may be marked one match off there. (accepted: a SwiftUI Text cannot scroll to a range; the image pane beside it does).
 
 ## ✅ CLOSED (W40.fix-reader-a11y-labels, 2026-10-25) — unnamed Reader controls and PDF pages
 
@@ -500,28 +500,28 @@ the plan is being deleted. Synthetic **scratch** corpus, 150,000 files / 124,647
 
 - **Cold full walk: 6.1 s** (40.8 µs/file) — one pass, in the background, off the main actor. That is **half**
   the plan's ~12 s projection, not 3× it; the earlier "37 s / ~3× worse" reading was the clamp. Against it:
-  Spotlight's answer for the owner's real corpus on 2026-08-04 was **zero rows**.
+  Spotlight's answer for the owner's real corpus on 2026-08-04 was **zero rows**. (accepted: measured, W26.verify and W26.verify-fu1; a figure, not a defect).
 - **Warm start: 0.460 s** for 115,999 cached rows (4.0 µs/row), matching the plan's 4.3 µs/row projection.
-  This is the number a user experiences on every launch after the first.
+  This is the number a user experiences on every launch after the first. (accepted: measured, W26.verify and W26.verify-fu1; a figure, not a defect).
 - **Fingerprint-only pass** (warm start's first phase): **0.69 s** (4.6 µs/file). **Steady revalidation: 3.4 s**
-  — the fingerprint pass plus the trustworthy tag reads the cache cannot vouch for.
+  — the fingerprint pass plus the trustworthy tag reads the cache cannot vouch for. (accepted: measured, W26.verify and W26.verify-fu1; a figure, not a defect).
 - **Cold index persist: 1.58 s** for 115,999 rows (13.7 µs/row). **Cache size: 43.2 MiB, 390 B/row**
-  including WAL/shm. **Footprint: +277 MiB** across the Reader lane's full cold-walk-and-persist sequence.
+  including WAL/shm. **Footprint: +277 MiB** across the Reader lane's full cold-walk-and-persist sequence. (accepted: measured, W26.verify and W26.verify-fu1; a figure, not a defect).
 - **Vs the API pattern it replaced: 1.2–1.5×** (three runs on the same tree: 1.19×, 1.32×, 1.48×) — the
   right side of the +15% the plan predicted from `CorpusWalker`'s extra `stat(2)` per entry, but noisier
   than one run suggests. ⚠️ Two cautions. Compare only passes that are equally *warm*: timing the walker
   first and the old path second reports a spurious 1.36×, because the first pass warms the cache for the
   second. And this ratio is the one figure here that has only ever been taken **in the clamped lane** — the
   clamp taxes `stat(2)` heavily, which is exactly where the walker's extra cost is, so if anything it
-  overstates the penalty. The shape is trustworthy; the exact factor is not.
+  overstates the penalty. The shape is trustworthy; the exact factor is not. (accepted: measured, W26.verify and W26.verify-fu1; a figure, not a defect).
 - **Discovery writes nothing** — every path's inode, size, mtime, ctime and xattr digest identical before
-  and after, measured by a separate process (150,650 paths, and the hostile sibling too).
+  and after, measured by a separate process (150,650 paths, and the hostile sibling too). (accepted: measured, W26.verify and W26.verify-fu1; a figure, not a defect).
 - A cancelled pass is `cancelled`, not `completed`, not `isClean`, and prunes nothing; a cancelled warm
-  revalidation leaves `asOf == nil` with every row preserved.
+  revalidation leaves `asOf == nil` with every row preserved. (accepted: measured, W26.verify and W26.verify-fu1; a figure, not a defect).
 - **The QoS cliff is `.background`, not "any non-default band."** Measured on the same tree in the same
   process: `.utility` 40.8 µs/file vs `.userInitiated` 42.6 µs/file — no difference worth the name. It is
   the background clamp alone that costs ~6×, so a shipping change that moved discovery to `.utility` from a
-  higher band would cost nothing, and one that let it fall to `.background` would cost everything.
+  higher band would cost nothing, and one that let it fall to `.background` would cost everything. (accepted: measured, W26.verify and W26.verify-fu1; a figure, not a defect).
 
 ## 📏 MEASURED (`W40.reader-scale-measure`, 2026-11-11) — one change still costs the whole library: tag changes, selection and the document window's file switch FIXED, S2
 
@@ -535,31 +535,31 @@ shows the same chain in the running app. Evidence: `verification/evidence/reader
   folders were counted twice, row by row on main (1.2 s). **Fixed 2026-11-11 (`W40.fix-reader-change-incremental`):
   19 ms busy, a 13 ms stall, visible in a median 309 ms** (the wait is FSEvents' delivery, not the Reader). The library patches the changed rows through a row index and
   publishes a `LibraryChangeSet`; the model patches the list, the selection and the counts from it, and no indexing
-  pass, format-status read or second recompute starts for a tag change. Smart-folder counts run off main.
+  pass, format-status read or second recompute starts for a tag change. Smart-folder counts run off main. (accepted: fixed, W40.fix-reader-change-incremental; the measured cost before and after).
 - ✅ **A Reader write on 1 or 20 files in a smart folder** was visible after 0.7–0.8 s with 1.5–1.8 s busy [2.7–3.0 s,
   5.7–6.3 s]. **Fixed 2026-11-11: 4.5 and 7 ms busy after TagWriter, visible in 47 and 86 ms.** TagWriter's own share
   (verify, two full fsyncs, audit: 30 ms for 1 file, 67 ms for 20) is unchanged and is now nearly all of it.
   Still on the whole-library path, correct and not budgeted: a change that adds or removes a row, a content change,
-  a subtree read. Evidence: `verification/evidence/reader/W40.fix-reader-change-incremental.md`.
+  a subtree read. Evidence: `verification/evidence/reader/W40.fix-reader-change-incremental.md`. (accepted: fixed, W40.fix-reader-change-incremental; the changes left on the whole-library path are correct and rare).
 - ~~**An arrow key or ⇧-arrow: 105–158 ms busy whatever is selected**~~ — fixed by `W40.fix-reader-selection-at-size`
-  (2026-11-11): 0-7 ms at -O, with the inspector shown. Evidence: `verification/evidence/reader/W40.fix-reader-selection-at-size.md`.
+  (2026-11-11): 0-7 ms at -O, with the inspector shown. Evidence: `verification/evidence/reader/W40.fix-reader-selection-at-size.md`. (accepted: fixed, W40.fix-reader-selection-at-size; kept as the measured record).
 - ~~**Next file in a document window with 5 open: 245 ms**~~ — fixed by `W40.fix-reader-viewer-switch` (2026-11-11):
   30 ms main-busy and visible in a median 32 ms at -O. The 245 ms was the lane drawing the page on the main actor;
   sampled in the VM with real PDFViews, PDFKit draws tiles on its own queue, so the real cost was 150–500 ms of blank
   page. The image page of the open file and both neighbours is now drawn ahead and shown until PDFKit's tiles land,
   and the neighbours (and their JPEG originals) are opened off the main actor. A jump to a file that is not a
   neighbour still waits about 200 ms for its pixels, with the main thread free. Evidence:
-  `verification/evidence/reader/W40.fix-reader-viewer-switch.md`.
+  `verification/evidence/reader/W40.fix-reader-viewer-switch.md`. (accepted: fixed, W40.fix-reader-viewer-switch; a jump past the neighbours waits for PDFKit, with the main thread free).
 - **Memory: no leak in the model.** Over 200 edits and 200 file switches the footprint stops growing within 20 steps
   (+228 MB at -O, +72 and +142 MB in two Debug runs), and a quiet minute returns nothing. The growth is freed whole-library copies kept by
   the allocator (about 370 MB of Malloc Small reclaimable). ✅ Since `W40.fix-reader-change-incremental` (rows patched
   in place; `ArchiveFile` shares its fields, so a whole-list copy is a pointer per row) the same run ends where it
   started (484 against 485 MiB). The views' memory, measured in the VM with real PDFViews on the real sample
   (`W40.fix-reader-viewer-switch`): 200 switches with 5 open end within 29 MiB of their start, so a fresh PDFView per
-  page does not accumulate IOSurface; the owner's 332 MB at 6 h 19 min is not reproduced by switching alone.
+  page does not accumulate IOSurface; the owner's 332 MB at 6 h 19 min is not reproduced by switching alone. (accepted: measured, W40.reader-scale-measure and W40.fix-reader-viewer-switch; no leak in the model or the views).
 - **The owner's builds are now Release:** `ArchiveReader/launch.sh` builds and runs Release (-O; `--debug` for
   Debug), since -O shows a change 1.5–4× sooner. The Reader's Release build had been carrying `get-task-allow`. It no
-  longer does. Notes and the DMG check: `W40.release-no-debug-entitlements`.
+  longer does. Notes and the DMG check: `W40.release-no-debug-entitlements`. (accepted: a fact about the owner's builds, W40.release-no-debug-entitlements).
 
 ## 📏 MEASURED (`W40.d7`, 2026-10-15) — the Reader at corpus size: two S2 stalls, both fixed 2026-10-31
 
@@ -568,25 +568,25 @@ Full numbers, method and caveats: `verification/evidence/reader/W40.d7-at-size.m
 Debug otherwise, and Swift-side sorting is 1.5–3× slower there.
 
 - **Discovery** re-measured against the section above: within ~10% (cold walk 6.98 s, warm start 0.48 s, steady
-  revalidation 3.70 s at 150k). The Reader lane's footprint rose to +409 MiB from +277 MiB; not explained.
+  revalidation 3.70 s at 150k). The Reader lane's footprint rose to +409 MiB from +277 MiB; not explained. (accepted: measured, W40.d7; the footprint is the one-off cold walk's, and the model's memory was measured since with no leak (W40.reader-scale-measure)).
 - **Fixed 2026-10-31, S2 — `W40.fix-reader-list-recompute-at-size`.** At 115,999 rows every tag edit re-sorted
   everything on the main thread: 1.56 s per edit, 0.96–5.5 s per sort change. Now **139 ms per edit** and 62–171 ms
   per sort change at `-O` (decorated sort on cached collation ranks, stored native-UTF-8 paths, byte-keyed hashing,
   no per-edit table dictionary); `ReaderAtSizeTests` asserts it. Still paid once per session: a sort's first sight
-  of its keys, 0.74 s for 116k names. Evidence: `verification/evidence/reader/W40.fix-reader-list-recompute-at-size.md`.
+  of its keys, 0.74 s for 116k names. Evidence: `verification/evidence/reader/W40.fix-reader-list-recompute-at-size.md`. (accepted: fixed, W40.fix-reader-list-recompute-at-size; a sort's first sight of its keys is paid once per session).
 - **Fixed 2026-10-31, S2 — `W40.fix-reader-fts-snippet-stall`** (`87201576`): snippets leave out stop words, seek each
-  hit by rowid and stop after 250 ms; the long-body reproduction went from 2/60 to 60/60 previews in budget. Not yet
-  re-run on the sample lane (`W40.fts-snippet-sample-rerun`, waiting on the sample's copy back). What was measured:
+  hit by rowid and stop after 250 ms; the long-body reproduction went from 2/60 to 60/60 previews in budget. Re-run on
+  the sample lane by `W40.fts-snippet-sample-rerun` (2026-10-31): 270.6 ms at 102,478 rows, every hit previewed. What was measured:
   `searchRanked("Bureau of the Budget")` took **41.7 s** over
   102k rows (the sample's real text, replicated); distinctive single terms take 11–146 ms. It runs on the
-  `ContentIndex` actor, so later queries queue behind it.
+  `ContentIndex` actor, so later queries queue behind it. (accepted: fixed, W40.fix-reader-fts-snippet-stall; re-run on the sample by W40.fts-snippet-sample-rerun).
 - **Fixed 2026-11-05, S3 — `W40.fix-reader-fts-snippets`:** the 250 ms budget above left hits without a snippet
   (owner, Reader session 1), and every hit past the 300th never had one. They are now filled in, off the main thread,
   as their rows are drawn; a query of stop words alone is quoted by scanning the body (`snippet()` on `the` took
   0.9 s for one long body). At 102k every hit with body text among the first 1,000 has one; a photo (no body) still
-  shows only its name. Evidence: `verification/evidence/reader/W40.fix-reader-fts-snippets.md`.
+  shows only its name. Evidence: `verification/evidence/reader/W40.fix-reader-fts-snippets.md`. (accepted: fixed, W40.fix-reader-fts-snippets; a photo has no body text to quote).
 - **Fine at size:** filters 7–33 ms, the health popover's `dataQuality` 30 ms, scrolling's cell work 2.7 ms a
-  row, index build 1.7 ms per real PDF (5,268 in 9.2 s; ~3 min projected for the corpus [I]).
+  row, index build 1.7 ms per real PDF (5,268 in 9.2 s; ~3 min projected for the corpus [I]). (accepted: measured, W40.d7; within budget).
 
 ## ✅ FIXED (`W26.previewzoom`) — the preview sheet's zoom/fit shortcuts did nothing; `⌘0` never reached it
 
@@ -600,9 +600,9 @@ was always fine** — only the sheet was affected.
 in `~/.tart-mirror/vm-artifacts/shots-reader/`):
 - Document ▸ `Fit Page` was disabled from the list (correct — nothing to fit) and **stayed disabled while the
   preview sheet was open**, so `ArchiveReaderCommands`' `@FocusedObject var doc` was nil and `.disabled(doc == nil)`
-  killed `Fit Page`, `Zoom In`, `Zoom Out` and the pane-focus commands alike.
+  killed `Fit Page`, `Zoom In`, `Zoom Out` and the pane-focus commands alike. (accepted: fixed, W26.previewzoom; what the VM measured before the fix).
 - In pixels the sheet's image pane was **byte-identical** before and after `⌘↑`×3 and again after `⌘0` (three
-  screenshots, two blobs — the result bundle deduplicated the identical pair). Nothing zoomed; nothing refit.
+  screenshots, two blobs — the result bundle deduplicated the identical pair). Nothing zoomed; nothing refit. (accepted: fixed, W26.previewzoom; what the VM measured before the fix).
 
 **Cause:** `PreviewSheet` published with `.focusedObject(model)`, which applies only while the modified
 subtree holds SwiftUI keyboard focus — and the pane is an AppKit `PDFView` behind `NSViewRepresentable`, which
@@ -883,25 +883,25 @@ said was **present**. Search results vanish until a reindex — the files themse
 
 **The fix is a prune epoch, and two halves of it are load-bearing:**
 - `commitPruneDecision` does read-decide-write in **one main-actor hop**. A split read-then-write is the
-  window a newer emission interleaved through, so a generation check alone would not have closed it.
+  window a newer emission interleaved through, so a generation check alone would not have closed it. (accepted: fixed, W23.l2; why the fix is built this way).
 - The row delete **re-checks the epoch** before running. Skipping a superseded delete costs only that the
-  rows survive another two-emission cycle; deleting them wrongly costs search hits until a reindex.
+  rows survive another two-emission cycle; deleting them wrongly costs search hits until a reindex. (accepted: fixed, W23.l2; why the fix is built this way).
 
 Gotchas for whoever touches this next:
 - **`resetPruneState` bumps the epoch, not just the task.** A root change invalidates the old root's
-  absences; without the bump an in-flight task from that root re-stashes them over the cleared state.
+  absences; without the bump an in-flight task from that root re-stashes them over the cleared state. (accepted: fixed, W23.l2; a note for whoever touches this next).
 - **The delete now happens AFTER the pending-state write** (it used to be before). That ordering is safe
   because `pendingPrune` is in-memory only: if the `try?`'d delete fails, the next emission re-stashes the
   absence and prunes a cycle later. Two end-to-end tests over a real scratch index pin the observable
-  contract so the reordering can't drift.
+  contract so the reordering can't drift. (accepted: fixed, W23.l2; a note for whoever touches this next).
 - **`pruneDecision` is now a pure function here too**, mirroring `NotesIndexer`'s (this file is its
   fork) — which moves the "an empty snapshot can never wipe the index" guarantee inside the decision.
   `NavigationModel` already refuses to call with an empty set, so no reachable behaviour changed; the
-  point is that the guarantee can no longer be lost to a future caller.
+  point is that the guarantee can no longer be lost to a future caller. (accepted: fixed, W23.l2; a note for whoever touches this next).
 - **The race tests don't try to win a real race.** They drive the interleavings through the epoch seam
   (`beginPruneGeneration` / `commitPruneDecision`), and each one re-implements the pre-fix ungated logic
   against the same fixture and asserts it produced the harmful outcome — so a passing test can't be
-  vacuous. `inFlightPruneTask` exists so an end-to-end test can await an emission instead of sleeping.
+  vacuous. `inFlightPruneTask` exists so an end-to-end test can await an emission instead of sleeping. (accepted: fixed, W23.l2; a note for whoever touches this next).
 
 ## ✅ FIXED (W23.m9) — a failed `ContentIndex.open()` poisoned search until restart, silently
 **2026-07-30.** Two defects on the same path, both about silence.
@@ -930,16 +930,16 @@ SQLite reason (`ar.status.indexFailure`).
 Gotchas for whoever touches this next:
 - **`pruneIfSettled`'s `try?` is deliberate.** A failed open there makes `allPaths()` empty, so the diff finds
   nothing absent and the prune deletes nothing — it degrades to a no-op. The asymmetry with the query paths is
-  intentional and commented in place.
+  intentional and commented in place. (accepted: by design, W23.m9; a failed open there degrades the prune to a no-op).
 - **A failed open now STOPS the pass.** Continuing meant extracting 150k PDFs to discard them one batch at a
-  time; the honest path is also the cheap one.
+  time; the honest path is also the cheap one. (accepted: by design, W23.m9; stopping is the honest and the cheap path).
 - **`.incomplete(rows:)` has no end-to-end test** and can't easily get one: post-fix a batch write can only
   fail at *runtime* (disk full, corruption after open), and there is no portable way to make SQLite fail a
   write on demand short of corrupting an open file (undefined behaviour). The outcome→state mapping is a pure
   function that IS tested; the count itself is `batch.count` at two flush sites, exact because `upsertBatch`
-  rolls the whole batch back on any error.
+  rolls the whole batch back on any error. (accepted: SQLite cannot be made to fail a write on demand; the outcome mapping is a tested pure function).
 - `ContentIndexer` gained an `init(url:)` seam (the app path is now `convenience init()`), which is how the
-  failure paths are reachable without an Application Support file.
+  failure paths are reachable without an Application Support file. (accepted: fixed, W23.m9; the seam the failure tests use).
 
 Tests: `ContentIndexRecoveryTests` (3), `ContentIndexerFailureTests` (7) — scratch garbage sqlite3 files under
 the bundle temp dir; the `ArchiveFile` paths need not exist (an unreadable file is a legitimate row). Both
@@ -971,13 +971,13 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   clipped: the AppKit name-column `NSTextField` (a `labelWithString:` field) stayed single-line
   (`usesSingleLineMode`/`wraps = false`), so the appended second line + `\n` never grew the row under
   `usesAutomaticRowHeights`. Fix: in the snippet branch, put the field into the same multi-line-capable state the
-  tags cell (`TagTokenCellView`) uses, and reset it in the non-hit branch (cells are reused). `AppKitTableView.swift`.
+  tags cell (`TagTokenCellView`) uses, and reset it in the non-hit branch (cells are reused). `AppKitTableView.swift`. (accepted: fixed, the 2026-07-16 GUI pass; AppKitTableView.swift).
 - **Column-header click sort was dead (FIXED).** `sortDescriptorsDidChange` is an `NSTableViewDataSource`
   callback, but it was implemented on the `Coordinator` (only the table's *delegate*); the
   `NSTableViewDiffableDataSource` is the real `dataSource` and never forwarded it. Fix: a
   `SortableDiffableDataSource` subclass implements + forwards it — **and the method MUST be `@objc`**: an optional
   @objc-protocol method added on a *subclass* is not auto-exposed to the Obj-C runtime, so `respondsToSelector:`
-  returned false and AppKit never called it (build was clean; only runtime/GUI surfaced it). `AppKitTableView.swift`.
+  returned false and AppKit never called it (build was clean; only runtime/GUI surfaced it). `AppKitTableView.swift`. (accepted: fixed, the 2026-07-16 GUI pass; the @objc lesson).
 - **Selected-tag filter chips shifted the file table left (FIXED `b5a5a01`, owner-verified 2026-07-16).** The chips
   rendered as separate buttons beside the "Add tag filter…" field in a single-row filter bar that already sits near
   the window width; each added chip's width tipped the content column past the window, so the root `HStack`
@@ -992,15 +992,15 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   resistance. Tags live *inside* the field, so adding a filter adds **zero** width to the bar and the column can't
   be pushed past the window. Replaced the `TagFilterField` combo box (deleted; that was its only call site).
   **Lesson:** when a layout bug is "container X inflates its parent", moving the content *inside* an
-  already-bounded control beats resizing the container.
+  already-bounded control beats resizing the container. (accepted: fixed, b5a5a01, owner-verified 2026-07-16; the layout lesson).
 
 ## Verified facts to rely on (2026-07-04)
 - Writing `.tagNamesKey` while keeping the color-name token (`Red`/`Purple`) and **not** touching
   `.labelNumberKey` **preserved** `labelNumber` (tested on a Red-labeled scratch copy, local APFS).
-  Still verify `labelNumber` after every write and restore on drift.
+  Still verify `labelNumber` after every write and restore on drift. (accepted: a verified platform fact; the writer verifies the label after every write).
 - `FileManager.setAttributes([.creationDate:])` accepts historical dates (1938, 1850) but **clamps
   below ~1677-09-21** (int64-ns-since-1970). → Do NOT use creation date as the chronological sort
-  key; sort by a date derived from the tags (no range limit, medieval-safe).
+  key; sort by a date derived from the tags (no range limit, medieval-safe). (accepted: a verified platform fact; the sort key comes from the tags).
 - ~~Spotlight tag queries are fast (compound 3-facet over 6,941 files ≈ 0.38s) and scale.~~
   ⛔ **RETRACTED 2026-08-07 (`W26.docs`) — this "verified fact" is what the 2026-08-04 incident falsified,
   and it is exactly the kind of fact this section exists to be trusted on.** The 0.38 s was measured on a
@@ -1009,16 +1009,16 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   Read/Unread-tagged PDFs were found in this folder."* Speed was never the risk; **unfalsifiable emptiness**
   was. Replacement fact, measured read-only 2026-08-04 on the real corpus: a single-threaded
   `FileManager.enumerator` walk of 123,028 files / 102,478 PDFs at depth 7 takes **10.15 s**, and it cannot
-  be silently empty. Discovery is that walk now (`ArchiveCore.CorpusWalker`, `W26.walk1`/`walk2`).
+  be silently empty. Discovery is that walk now (`ArchiveCore.CorpusWalker`, `W26.walk1`/`walk2`). (accepted: retracted, W26.docs; discovery is the file walk now).
 
 ## macOS tag/label coupling (verified 2026-07-05)
 - A **`Red`/`Purple` tag token is inseparable from its Finder color label**: setting the token makes
   macOS auto-assign label 6/3, and there is no "Red subject with no label" state. So `TagWriter`'s
   color-clear removes the token matching the *actual* label (correct), and a document whose subject
-  is literally "Red"/"Purple" will always appear color-labeled. Non-color subjects are unaffected.
+  is literally "Red"/"Purple" will always appear color-labeled. Non-color subjects are unaffected. (accepted: macOS couples the token and the label; a subject literally Red or Purple is always labelled).
 - **Do not run overlapping `xcodebuild test` invocations** on the same scheme/DerivedData — the
   concurrent test processes contend on `NSFileCoordinator` and tag writes, ballooning runtimes
-  (seen: a 0.07s suite took 448s under contention). Run one build/test at a time.
+  (seen: a 0.07s suite took 448s under contention). Run one build/test at a time. (accepted: an environment rule; the heavy lock runs one build or test at a time).
 
 ## Deferred hardening (from the 2026-07-05 code review)
 - **Write-target identity re-verification (Safety §6, low severity) — FIXED 2026-07-17 (mechanism
@@ -1059,7 +1059,7 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   anyway, reads through `readTrustingURL` and pays neither. Pinned by `TagWriterPrimitiveTests`
   (`…ThroughAReusedURL…`, `testWriteReadsTheDiskNotTheCallersURLCache`,
   `testWriteThroughACachedURLKeepsAnExternalHiddenFlag`, `testUncachedURLKeepsTheNameBytesAndRefusesAnEmptyPath`)
-  and the two `UndoDurabilityTests` that failed before it.
+  and the two `UndoDurabilityTests` that failed before it. (accepted: fixed, W14.2 and W40.fix-identity-url-cache; how the identity check works).
 
 ## @Published willSet timing (fixed 2026-07-05 — GUI-caught)
 - A Combine subscription on a nested `@Published` (`library.$files`) fires in **willSet**, *before* the
@@ -1068,7 +1068,7 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   load. Fix: `.receive(on: DispatchQueue.main)` before the sink so it runs after the value commits
   (or use the value the publisher delivers, not the stored property). **Do not** read a just-changed
   `@Published` back from `self` inside its own synchronous sink. Unit tests missed this; only running
-  the GUI surfaced it (verified via `screencapture`).
+  the GUI surfaced it (verified via `screencapture`). (accepted: fixed, 2026-07-05; a lesson for Combine sinks).
 
 ## SwiftUI `Table` row-render skip via identity-only Equatable (fixed 2026-07-05 — GUI-caught)
 - `ArchiveFile` conformed to `Equatable`/`Hashable` by **`url` only** (treating `==` as *identity*).
@@ -1080,7 +1080,7 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   `ArchiveFile.swift`; row *identity* for selection stays `id` = url.path; url-only `hash` remains valid
   (value-equal ⇒ same url ⇒ same hash). **Lesson:** for a type used as SwiftUI collection data, make
   `Equatable` reflect **displayed value**, not identity — identity belongs in `id`. Unit tests missed
-  it; only the live GUI surfaced it (same lesson as the willSet gotcha above).
+  it; only the live GUI surfaced it (same lesson as the willSet gotcha above). (accepted: fixed, 2026-07-05; Equatable reflects the displayed value, identity is id).
 
 ## Spotlight tag-index lag clobber (fixed 2026-07-05; obsolete subsystem removed by W26.walk2 2026-08-05)
 - The 2026-07-05 fix overlaid `TagWriter`'s verified `.after` value while Spotlight re-emitted stale tags.
@@ -1089,7 +1089,7 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   `PendingWrite` subsystem and its 8-case test file. A smaller monotonic ordering guard now protects the
   distinct race that remains: if a walk started before a verified write, its later emission cannot replace
   the fresh `.after`/`.afterLabel`. All five write call sites still publish only the writer's verified re-read;
-  no optimistic reconstruction, disk write, or extra disk read was introduced.
+  no optimistic reconstruction, disk write, or extra disk read was introduced. (accepted: fixed, W26.walk2; the Spotlight subsystem is gone; the ordering guard remains).
 
 ## Interleaved merged PDFs: pages 3+ were unviewable AND unfindable (W23.m2 — fixed 2026-07-30)
 - Processor merges a multi-page document as `image1, text1, image2, text2, …` (`PDFGenerator.mergeDocumentPDFs`,
@@ -1100,23 +1100,23 @@ An interactive GUI pass surfaced three display/interaction bugs in shipped Reade
   `default: break` discarding every match on page index ≥ 2. Net effect for any merged document with 2+ source
   pages: every scan after the first, and all of its OCR text, was unreachable at every affordance — no
   scrolling, no cycling, no find, no menu command — **even though the full-text index had already extracted it**,
-  so search would lead you to a document whose matching page you then could not open.
+  so search would lead you to a document whose matching page you then could not open. (accepted: fixed, W23.m2; the defect as found).
 - Fix: a **page-pair** model. New pure `Core/DocumentPagePairs` — pair `p` is PDF page `2p` (image) + `2p+1`
   (OCR text) — is the single home for that arithmetic, shared by the viewer and the find scanner so they
   cannot drift. `pairCount` rounds **up**, so a merge of a 2-page document and a bare scan doesn't lose the
   trailing scan. `DocumentViewerModel` publishes `pair`: cycling walks pairs then files (backwards lands on the
   previous document's **last** pair), `canGoNext`/`canGoPrevious` gate the buttons, `positionLabel` gains
   "· page 2 of 4" only when there IS more than one pair, and `DocumentFindScanner.pairMatchCounts` buckets
-  every page so `FindNavigator` can address a match by `(doc, pair, pane)`.
+  every page so `FindNavigator` can address a match by `(doc, pair, pane)`. (accepted: fixed, W23.m2; the page-pair model).
 - **Gotcha worth remembering:** both viewers must key their panes on `model.pageIdentity` (index + pair), not
   on the file index. `PDFPaneView.updateNSView`'s reuse fallback compares `page.string`, which is `nil` for
   both the old and the new **image** page — so without the pair in the `.id`, stepping to the next pair leaves
   the previous scan on screen. `PreviewSheet` had no `.id` at all, which was the same latent bug for document
-  cycling there; it is keyed now too.
+  cycling there; it is keyed now too. (accepted: fixed, W23.m2; a note for whoever touches the panes).
 - Not a SPEC change: the SPEC already documented the interleaved variant and the no-2-page-assumption rule.
-  This is Reader coming into conformance with it.
+  This is Reader coming into conformance with it. (accepted: not a SPEC change; the Reader conforms to the SPEC).
 - ~~Still open (separate item)~~ **CLOSED by `W23.m4`** (below): the focused-pane page number, the command's
-  unreachability from the document window, and reveal dropping the page are all fixed.
+  unreachability from the document window, and reveal dropping the page are all fixed. (accepted: fixed, W23.m4; closed below).
 
 ## Page-level durable links were broken at all three ends (W23.m4 — fixed 2026-07-30)
 `archivereader://reveal?…&page=N` is the citation Notes stores for a quoted page (the reveal contract in
@@ -1133,18 +1133,18 @@ leaves it broken:
   (`@StateObject` injected into both scenes) that carries it out of the navigation window. The nav model
   stays the single writer (`attach(linkContext:)` + a `rootStore.objectWillChange` sink), so a root switch or
   clear can never leave a document window citing the old archive. The command now needs only the focused
-  viewer + that target.
+  viewer + that target. (accepted: fixed, W23.m4; ArchiveLinkTarget).
 - **It wrote the wrong page.** The page was `imagePageIndex(pair:) + 1` — the pair's **image** page — no
   matter which pane you were reading, so citing a passage of OCR text produced a link to the scan.
   Fix: `DocumentViewerModel.focusedPageNumber`, the 1-based PDF page of the **focused** pane, degrading to
-  the pair's image page when that pane holds no page (a trailing text-less scan, or a failed load).
+  the pair's image page when that pane holds no page (a trailing text-less scan, or a failed load). (accepted: fixed, W23.m4; focusedPageNumber).
 - **Reveal threw the page away.** `revealAndSelect` stored it in `pendingRevealPage`; the only other
   mentions **cleared** it. The link selected the row and stopped — no viewer, no page.
   Fix: `goToPDFPage(_:)` (the exact inverse of `focusedPageNumber`: page → pair + pane, clamped, a vanished
   text page degrading to its image page), an additive optional `DocumentSelection.initialPage`, and
   `openViewerRequest`/`openViewerSelection` — a counter+payload request in the shape of the existing
   `requestScroll`, since `openWindow` is an Environment action only a View holds. A link **without** a page
-  still just selects and scrolls; that is unchanged.
+  still just selects and scrolls; that is unchanged. (accepted: fixed, W23.m4; goToPDFPage).
 - **Gotchas worth remembering:** (a) adding those two modifiers inline to `NavigationWindowView.body`
   overflowed the compiler's type-check budget ("unable to type-check this expression in reasonable time") —
   they live in one extracted `archivePageLinkBridge` modifier. (b) `make-gui-fixture.sh` now writes a
@@ -1152,7 +1152,7 @@ leaves it broken:
   identity, so every archive-link command stays disabled and the GUI lane could not test them at all.
   (c) `initialPage` is part of the `WindowGroup` value, so two links to different pages of one document open
   two windows (same page → the existing window is brought forward). That is the value-identity semantics of
-  `openWindow(id:value:)`, and reasonable here: each cited page gets its own view.
+  `openWindow(id:value:)`, and reasonable here: each cited page gets its own view. (accepted: by design, W23.m4; two links to different pages open two windows, as openWindow's value identity gives).
 
 ## A root's identity could be a GUID the disk never had (W23.m6 + W23.l3 — fixed 2026-07-30)
 Every durable archive link names the root's `.archive-suite-root.json` GUID, so a GUID that isn't on disk is a
@@ -1162,17 +1162,17 @@ from it without knowing:
   to `nil`. "Absent" is precisely the answer that licenses minting a replacement, so a transient read error on
   an **existing** marker invited `ensure` to write a new GUID over it — orphaning every link already copied
   from that root. Now: `nil` means absent and nothing else; unreadable throws the new `.unreadable`, malformed
-  still throws `.malformed`, and `ensure` refuses to fall through to creation on either.
+  still throws `.malformed`, and `ensure` refuses to fall through to creation on either. (accepted: fixed, W23.m6; nil means absent and nothing else).
 - **A failed write returned the in-memory marker anyway.** Indistinguishable from a durable one, but it is a
   different GUID after the next launch. On a read-only volume / no write permission / disk full, links copied
   during that session were born broken. Now `ensure` throws the (declared-but-never-used) `.readOnly`, carrying
   the marker as `provisional` so a caller can say *which* identity was lost without being able to mint from it.
-  Same for a write that reports success but leaves nothing readable.
+  Same for a write that reports success but leaves nothing readable. (accepted: fixed, W23.m6; ensure throws .readOnly).
 - **First-time creation was a check-then-write race (W23.l3).** The absence check sat *outside* the write
   coordination, so two processes could both see absence and both write; the loser returned a GUID the disk had
   already replaced. The re-check, write and confirmation now happen inside **one** write claim, and a racer that
   finds a winner adopts it. (Codex confirmed this by inspection only — the new concurrency fixture reproduces
-  it: under the old ordering 8 racers get 8 different GUIDs with one on disk, 3 runs out of 3.)
+  it: under the old ordering 8 racers get 8 different GUIDs with one on disk, 3 runs out of 3.) (accepted: fixed, W23.l3; one write claim).
 
 Reader side: `RootFolderStore.rootMarker` is now derived from `Core/RootMarkerState.swift` and is **nil unless
 the identity is durable** — one choke point, so `copyArchiveLinks`, the W23.m4 focused link target and
@@ -1194,47 +1194,47 @@ Notes first touches all return the single durable GUID.
 A multi-agent hunt for this bug class (the willSet + clobber category) confirmed four more:
 - **`extendSelectionToDocumentRun` selection race:** the `Task` mixed a *pre-await* `selected` snapshot
   with the *post-await* current `self.selection`, so a selection change during the `await` polluted it.
-  Fix: snapshot the selection before the await and bail if it changed (the selection is the epoch).
+  Fix: snapshot the selection before the await and bail if it changed (the selection is the epoch). (accepted: fixed, 2026-07-05; the selection is the epoch).
 - **`ContentIndexer` dropped live updates:** `guard !running` silently dropped any index request that
   arrived during a running pass (new/re-OCR'd files never indexed). Fix: coalescing `pending` + relaunch
-  on finish (a tag-only update does not restart a huge initial index, since `needsIndex` skips it).
+  on finish (a tag-only update does not restart a huge initial index, since `needsIndex` skips it). (accepted: fixed, 2026-07-05; coalescing pending and relaunch).
 - **`ContentIndexer` uncancelled scope change:** the detached task was never cancelled (its
   `Task.isCancelled` check was dead code), so a stale-scope pass held the slot and the new root was
   never indexed. Fix: store + cancel the task on an empty-set (scope-clear) call, with a `generation`
-  token so a superseded pass can't clobber newer progress/finish state.
+  token so a superseded pass can't clobber newer progress/finish state. (accepted: fixed, 2026-07-05; a cancelled, generation-checked pass).
 - **⌘O orphaned the Preview sheet:** the Selection-menu ⌘O stayed enabled over the preview and opened
-  the doc window without dismissing the sheet. Fix: `openSelection()` clears `showingPreview` first.
+  the doc window without dismissing the sheet. Fix: `openSelection()` clears `showingPreview` first. (accepted: fixed, 2026-07-05; openSelection clears the preview first).
 
 ## Open risks / to verify
 **Reviewed with the owner 2026-07-18** — every former entry here was grounded against current code; almost all
 are now settled in code + tests. Kept as a short record:
 - **SETTLED — Spotlight content indexing is not relied on.** Full-text search uses the Reader's own FTS5 index
   (`Search/ContentIndex.swift` + `ContentIndexer` + `PDFTextExtractor` over page-2 text), never
-  `kMDItemTextContent` (0 code references). The old "re-check on-disk indexing" residual is moot.
+  `kMDItemTextContent` (0 code references). The old "re-check on-disk indexing" residual is moot. (accepted: settled with the owner, 2026-07-18).
 - **SETTLED — `.documentIdentifierKey` is never requested** (it can assign/persist an identifier = a mutation).
   It appears only in "never request" comments; W14.2 identity re-verification uses `fileResourceIdentifier`
-  (Safety §6). Enforced, not "to confirm."
+  (Safety §6). Enforced, not "to confirm." (accepted: settled with the owner, 2026-07-18).
 - **SETTLED — tag-write coordination.** The shared `CoordinatedTagWriter` uses
   `NSFileCoordinator(.contentIndependentMetadataOnly)` (never `.forReplacing`), reads the array **inside** the
   coordinated block (TOCTOU), and verifies by re-read multiset. Covered by focused example tests
   (`TagWriterPrimitiveTests`/`TagWriterTests`). *(A generative property test was considered 2026-07-18 and
-  declined as assurance-only — the path is deterministic + audited + green.)*
+  declined as assurance-only — the path is deterministic + audited + green.)* (accepted: settled with the owner, 2026-07-18; a property test was declined as assurance only).
 - **SETTLED — facet classification is display/sort/filter only, never drives a write.** `DocumentTags.parse`
   demotes shadowed collisions (a subject literally `1984`/`P7`/`Read`) back to subjects; `TagEditing` removes only
-  the exact winning token. Regression-tested (incl. the `Read`-substring case).
+  the exact winning token. Regression-tested (incl. the `Read`-substring case). (accepted: settled with the owner, 2026-07-18).
 - **SETTLED — segment features degrade when Classification is absent** (`DocumentRuns` returns a single item);
   the nav table is AppKit `NSTableView`; non-2-page / corrupt / non-PDF files degrade via `PDFFormatStatus` +
-  render guards (page count is never a defect signal).
+  render guards (page count is never a defect signal). (accepted: settled with the owner, 2026-07-18).
 - **Low-pri, NOT queued (owner-reviewed 2026-07-18) — Unicode-on-write verification.** A scratch probe/guard for
   (a) macOS not trimming whitespace off a tag on write and (b) locking in that the verify treats NFC==NFD as
   equal. **The note's NFC/NFD "false-fail" fear is already neutralized** — Swift `String` comparison is
   canonical-equivalence-aware — so only the trim case is unpinned. Assurance-only, not a correctness gap; left
-  as a soft backlog item.
+  as a soft backlog item. (accepted: the owner's call, 2026-07-18: assurance only, not queued).
 
 ## Environment notes
-- Xcode 26.3 / Swift 6.2 toolchain; XcodeGen 2.45.2 at `/opt/homebrew/bin/xcodegen`.
-- GitHub CLI: use `/opt/homebrew/bin/gh` (bare `gh` is shadowed on this machine).
-- The corpus lives in `Test files/Brown Gemini/` (150-PDF representative sample as of 2026-07-18, slimmed from ~6,941) and is gitignored — never modify it.
+- Xcode 27.2 / Swift 6.4 toolchain (checked 2026-11-19); XcodeGen 2.45.2 at `/opt/homebrew/bin/xcodegen`. (accepted: an environment note).
+- GitHub CLI: use `/opt/homebrew/bin/gh` (bare `gh` is shadowed on this machine). (accepted: an environment note).
+- The corpus lives in `Test files/Brown Gemini/` at the repository root (150-PDF representative sample as of 2026-07-18, slimmed from ~6,941) and is gitignored — never modify it. (accepted: an environment note; the sample is read-only).
 
 ### W40.audit-ledger-undo — history now survives relaunch (2026-10-18)
 
@@ -1266,15 +1266,15 @@ by another running copy during the read, offers nothing rather than older histor
 `O_APPEND`, so two running copies never write over each other's lines. What is still not covered:
 - **A double fault.** If the intent itself cannot be written (storage failing) and the process dies
   before storage recovers, the change is on disk with no line at all, and the older history is offered
-  after relaunch. The in-process warning and barrier still cover the case while the app runs.
+  after relaunch. The in-process warning and barrier still cover the case while the app runs. (accepted: the in-process warning and barrier cover it while the app runs; it needs a second fault before storage recovers).
 - **The disk keeps everything:** about 1 KB per changed file (mostly the bookmark). Deleting old segments
-  would lose audit history, which §12 keeps; ask before adding a retention.
+  would lose audit history, which §12 keeps; ask before adding a retention. (accepted: Safety §12 keeps the audit history; a retention is the owner's to ask for).
 - **An action that crashes hides the history before it for good**, even when every write in it was
-  recorded and only the `actionDone` was lost. That is the safe direction; later actions are offered.
+  recorded and only the `actionDone` was lost. That is the safe direction; later actions are offered. (accepted: the safe direction; later actions are still offered).
 - **Reading is bounded only once the window fills.** An archive with fewer than 100 actions since the
-  last barrier still decodes every segment on each undo refresh (on the main actor), as it did before.
+  last barrier still decodes every segment on each undo refresh (on the main actor), as it did before. (accepted: under 100 actions since the last barrier the read is small).
 - Two running copies cutting a segment at the same moment: the second rename fails, is logged, and the
-  append goes on into the live file.
+  append goes on into the live file. (accepted: logged, and the append goes on into the live file, so no line is lost).
 
 Scratch regressions: UndoDurabilityTests, LedgerUndoHistoryTests, LedgerJournalTests; evidence in
 verification/evidence/reader/W40.audit-ledger-undo.md. R-46 stays fixed-pending-recheck.
@@ -1292,13 +1292,13 @@ still reads as the change left it, and otherwise also leaves the inverse's colou
 token is judged on its own, and the rest of the file's undo still goes ahead. Tests:
 `TagWriterTests`, MARK "Undo against a file changed since".
 - **Changed meaning:** a copy someone added since, of a token the change removed, now counts toward the
-  restore. Before `[A,A]`, the change removes both, someone adds one `A`, undo gives `[A,A]` (main gave `[A,A,A]`).
+  restore. Before `[A,A]`, the change removes both, someone adds one `A`, undo gives `[A,A]` (main gave `[A,A,A]`). (accepted: the intended meaning of the guard, W45.undo-still-applied).
 - **Two running copies are covered by reasoning, not by a test.** The in-process path lock serializes two
   undos inside one app. Across two copies, the guard relies on `NSFileCoordinator` writing claims excluding
   each other, so the later undo reads the earlier one's result. Writers that do not coordinate (Finder, raw
-  xattr writes) were never serialized and still are not.
+  xattr writes) were never serialized and still are not. (accepted: NSFileCoordinator's write claims exclude each other; Finder and raw xattr writers never coordinated).
 - **Counts are exact strings:** a re-cased copy (`unread` put back where the change removed `Unread`) is not
-  counted, so undo still adds `Unread`. This is unchanged from before, and matches the path's exact matching of Read/Unread.
+  counted, so undo still adds `Unread`. This is unchanged from before, and matches the path's exact matching of Read/Unread. (accepted: matches the path's exact matching of Read and Unread).
 
 
 ### W40.root-marker — root identity deferred to the first archive-link copy (fixed 2026-10-18)
