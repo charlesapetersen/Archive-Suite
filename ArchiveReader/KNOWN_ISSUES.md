@@ -77,9 +77,17 @@ Unchecked (yellow) or Unchecked, lower confidence (red), with its own label and 
 source and the measured figure; "Mark checked" / "Uncheck" writes or removes a `Checked <Field>` tag through
 `TagWriter`, and typing a date checks it. Contract: `SPEC/tag-format.md` §Field checks.
 What it does not do, deliberately or not yet:
-- **Item fields can be checked, not edited.** The page-2 header is the Processor's output-time snapshot and the
-  Reader writes no file contents, so a corrected value has nowhere to go yet: `W40.reader-item-field-edit`, after
-  W47.ct-reader-edit gave the Reader its `.archivesuite` write class.
+- **Item fields are corrected beside the file, not in it** (W40.reader-item-field-edit, 2026-11-19). Each item field
+  has an Edit menu (Change…, None, Remove Your Value) and Add Item Field gives one page 2 lacks; the value goes to the
+  folder's `.archivesuite/item-fields.json` and is shown checked, page 2's value in the tooltip. Page 2 is never
+  rewritten. Limits: the entry is keyed by file name, so renaming a file in Finder leaves its corrections behind and a later file given that name takes them (names
+  are compared composed, so two files whose names differ only in Unicode composition, possible on some network
+  volumes, share them); a
+  `Checked <Field>` tag set before the correction stays and speaks for page 2's value again once the correction is
+  removed; only the Inspector and the Zotero export (and Notes' Copy for Zotero, through the same gather) read the
+  corrections, not the Processor, search or the list's columns; one file at a time, no set for selection; editing needs
+  the file under the archive's main folder (accepted: a name key as a container run's start; the check is the tag's
+  alone; nothing else shows item fields yet; titles are per document; `.archivesuite` writes are allowed only there).
 - **Container fields have their own Inspector section** (W47.ct-reader-view), with the same badge and no check
   button: a container value is confirmed or corrected from its Edit menu (W47.ct-reader-edit).
 - **Sender and recipient have no row**: no route writes them where the Reader can read them (the bench's item-field

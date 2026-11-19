@@ -41,9 +41,7 @@ public struct ZoteroSource: Equatable, Sendable {
         source.tags = TagReading.readTags(pdf)
         source.itemFields = headerItemFields(pdf: pdf)
         source.sidecar = ZoteroSidecar.read(pdf: pdf)
-        let folder = pdf.deletingLastPathComponent().resolvingSymlinksInPath()
-        source.userItemFields = ContainerFileStore.loadItemFields(directory: folder).document?
-            .values(for: pdf.lastPathComponent) ?? [:]
+        source.userItemFields = UserItemFields.values(besides: pdf)
         if let lookup { source.container = lookup.shown(for: pdf).mapValues(\.text) }
         return source
     }

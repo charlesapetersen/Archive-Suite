@@ -48,8 +48,12 @@ struct TagEditorView: View {
                     dateSection(s, files)
                     Divider()
                     FieldStatusSection(files: files, apply: apply, revision: model.itemFieldRevision,
-                                       editable: model.containerTree != nil, saving: model.containerEditSaving,
-                                       error: model.itemFieldEditError,
+                                       editable: files.count == 1 && model.containerTree.map {
+                                           ContainerCatalog.split(files[0].path, under: $0.path) != nil } == true,
+                                       saving: model.containerEditSaving,
+                                       error: files.count == 1 && (model.itemFieldEditPath == nil
+                                           || model.itemFieldEditPath == files.first?.path)
+                                           ? model.itemFieldEditError : nil,
                                        onEdit: { field, edit in
                                            guard let path = files.first?.path, files.count == 1 else { return }
                                            model.editItemField(field, edit, forPath: path, undo: undoManager)

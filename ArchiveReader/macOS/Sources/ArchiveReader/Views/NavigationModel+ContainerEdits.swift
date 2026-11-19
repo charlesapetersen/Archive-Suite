@@ -167,7 +167,7 @@ extension NavigationModel {
             guard edited.names != names.names else { return nil }
             let wrote = try ContainerFileStore.writeNames(edited, root: root, expecting: stamp)
             return ContainerUndoStep(restores: [ContainerDocumentRestore(folder: root, restore: .names(names),
-                                                                         expecting: wrote)])
+                                                                         expecting: wrote, written: .names(edited))])
         }
     }
 
@@ -194,11 +194,13 @@ extension NavigationModel {
     private func applyContainerUndo(_ step: ContainerUndoStep, action: String, tree: String?, on undo: UndoManager) {
         let document = step.document
         guard tree == containerTree?.path else {
+            if document == .itemFields { itemFieldEditPath = nil }
             setEditError("That change was made in another archive, so it was not undone.", document)
             announce(editError(document) ?? "")
             return
         }
         let redoing = undo.isRedoing
+        if document == .itemFields { itemFieldEditPath = nil }   // an undo's error is shown whatever is selected
         let result = step.apply()
         registerContainerUndo(result.inverse, action: action, on: undo)
         let verb = redoing ? "redone" : "undone"
@@ -216,9 +218,21 @@ extension NavigationModel {
             setEditError(failure, document)
             announce(failure)
         }
+        finishEdit(document)
+    }
+
+    /// After an edit, undo or redo: the Checks read the user's values again; a container edit keeps the editor off
+    /// until the catalog read after it is published, so a menu still offering the old value cannot write it back. An
+    /// item-field edit changes nothing the catalog reads, and each one reads its file fresh, so it waits for nothing.
+    private func finishEdit(_ document: EditedDocument) {
         itemFieldRevision &+= 1
-        containerEditSaving = true
-        refreshContainers(force: true)
+        switch document {
+        case .containers:
+            containerEditSaving = true
+            refreshContainers(force: true)
+        case .itemFields:
+            containerEditSaving = false
+        }
     }
 
     /// Where an edit's error is shown: the Container section or the Checks section.
@@ -286,11 +300,9 @@ extension NavigationModel {
                 self.statusMessage = done
                 self.announce(done)
             }
-            self.itemFieldRevision &+= 1
             // The editor stays disabled until the catalog read after this edit is published, so a menu still
             // offering the old value cannot write it back over the one just saved (`refreshContainers` clears it).
-            self.containerEditSaving = true
-            self.refreshContainers(force: true)
+            self.finishEdit(document)
         }
     }
 
@@ -365,13 +377,14 @@ struct PreparedContainerEdit: Sendable {
     /// Writes it with the read's stamp; what undoes it.
     func commit() throws -> ContainerDocumentRestore {
         let wrote = try ContainerFileStore.write(edited, directory: directory, expecting: stamp)
-        return ContainerDocumentRestore(folder: directory, restore: .containers(before), expecting: wrote)
+        return ContainerDocumentRestore(folder: directory, restore: .containers(before), expecting: wrote,
+                                        written: .containers(edited))
     }
 }
 
-/// One file a container edit wrote: the document to put back, and the stamp of the one the edit wrote.
+/// One file a container edit wrote: the document to put back, and the stamp and content of the one the edit wrote.
 struct ContainerDocumentRestore: Sendable {
-    enum Document: Sendable {
+    enum Document: Sendable, Equatable {
         /// `<folder>/.archivesuite/containers.json`.
         case containers(ContainerFile)
         /// `<folder>/.archivesuite/container-names.json`.
@@ -382,6 +395,28 @@ struct ContainerDocumentRestore: Sendable {
     let folder: URL
     let restore: Document
     let expecting: ContainerFileStamp
+    /// What the edit wrote, as it reads back. An undo of a later edit in the same folder rewrites the file with the
+    /// content this edit wrote but a new stamp; that file is still this edit's, so its own undo goes ahead
+    /// (`ContainerUndoStep.apply`).
+    let written: Document
+
+    init(folder: URL, restore: Document, expecting: ContainerFileStamp, written: Document) {
+        self.folder = folder
+        self.restore = restore
+        self.expecting = expecting
+        self.written = written.asStored
+    }
+}
+
+extension ContainerDocumentRestore.Document {
+    /// The document with its dates in whole seconds, as a read of the file gives it.
+    var asStored: Self {
+        switch self {
+        case .containers(let d): return .containers(ContainerFileStore.asStored(d) ?? d)
+        case .names(let d): return .names(ContainerFileStore.asStored(d) ?? d)
+        case .itemFields(let d): return .itemFields(ContainerFileStore.asStored(d) ?? d)
+        }
+    }
 }
 
 /// What one Undo or Redo of a container edit puts back: every file of one edit, a set for selection's folders
@@ -404,17 +439,26 @@ struct ContainerUndoStep: Sendable {
             do {
                 switch r.restore {
                 case .containers(let doc):
-                    let current = try Self.current(ContainerFileStore.load(directory: r.folder), r.expecting)
-                    let wrote = try ContainerFileStore.write(doc, directory: r.folder, expecting: r.expecting)
-                    inverse.append(.init(folder: r.folder, restore: .containers(current), expecting: wrote))
+                    let (current, stamp) = try Self.current(ContainerFileStore.load(directory: r.folder), r) {
+                        .containers($0)
+                    }
+                    let wrote = try ContainerFileStore.write(doc, directory: r.folder, expecting: stamp)
+                    inverse.append(.init(folder: r.folder, restore: .containers(current), expecting: wrote,
+                                         written: r.restore))
                 case .names(let doc):
-                    let current = try Self.current(ContainerFileStore.loadNames(root: r.folder), r.expecting)
-                    let wrote = try ContainerFileStore.writeNames(doc, root: r.folder, expecting: r.expecting)
-                    inverse.append(.init(folder: r.folder, restore: .names(current), expecting: wrote))
+                    let (current, stamp) = try Self.current(ContainerFileStore.loadNames(root: r.folder), r) {
+                        .names($0)
+                    }
+                    let wrote = try ContainerFileStore.writeNames(doc, root: r.folder, expecting: stamp)
+                    inverse.append(.init(folder: r.folder, restore: .names(current), expecting: wrote,
+                                         written: r.restore))
                 case .itemFields(let doc):
-                    let current = try Self.current(ContainerFileStore.loadItemFields(directory: r.folder), r.expecting)
-                    let wrote = try ContainerFileStore.writeItemFields(doc, directory: r.folder, expecting: r.expecting)
-                    inverse.append(.init(folder: r.folder, restore: .itemFields(current), expecting: wrote))
+                    let (current, stamp) = try Self.current(ContainerFileStore.loadItemFields(directory: r.folder), r) {
+                        .itemFields($0)
+                    }
+                    let wrote = try ContainerFileStore.writeItemFields(doc, directory: r.folder, expecting: stamp)
+                    inverse.append(.init(folder: r.folder, restore: .itemFields(current), expecting: wrote,
+                                         written: r.restore))
                 }
             } catch {
                 failures.append((r.folder, error))
@@ -423,12 +467,17 @@ struct ContainerUndoStep: Sendable {
         return (ContainerUndoStep(restores: inverse), failures)
     }
 
-    /// The document on disk, when it is still the one with `expected`'s stamp.
-    private static func current<D>(_ load: ContainerLoad<D>, _ expected: ContainerFileStamp) throws -> D {
-        guard case let .loaded(doc, stamp) = load, stamp == expected else {
+    /// The document on disk and its stamp, when it is still the one `restore`'s edit wrote: the same stamp, or (after
+    /// an undo or redo of a later edit in the folder put it back) the same content, `updatedAt` included, so another
+    /// writer's change is never taken for it. The write that follows uses this read's stamp.
+    private static func current<D>(_ load: ContainerLoad<D>, _ restore: ContainerDocumentRestore,
+                                   _ wrap: (D) -> ContainerDocumentRestore.Document) throws
+        -> (D, ContainerFileStamp) {
+        guard case let .loaded(doc, stamp) = load,
+              stamp == restore.expecting || (!stamp.droppedOnReading && wrap(doc) == restore.written) else {
             throw ContainerWriteError.changedSinceRead
         }
-        return doc
+        return (doc, stamp)
     }
 }
 

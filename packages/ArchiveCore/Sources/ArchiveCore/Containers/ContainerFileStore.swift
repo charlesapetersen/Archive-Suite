@@ -331,6 +331,13 @@ public enum ContainerFileStore {
 
     // MARK: Helpers
 
+    /// `document` as it reads back once written: dates in whole seconds, as the file stores them. nil if it does not
+    /// encode. Lets a writer compare what it wrote with what a later read finds.
+    public static func asStored<D: Codable>(_ document: D) -> D? {
+        guard let data = try? encoder.encode(document) else { return nil }
+        return try? decoder.decode(D.self, from: data)
+    }
+
     static func fileType(_ url: URL) -> mode_t? {
         var st = stat()
         guard lstat(url.path, &st) == 0 else { return nil }

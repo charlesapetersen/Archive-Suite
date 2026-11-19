@@ -84,15 +84,23 @@ extension NavigationModel {
         let urls = files.map(\.url)
         // A file the catalog has not reached yet (a scan still settling) is read through the same lookup.
         let tree = containerTree?.url
-        return {
-            let lookup = tree.map(ContainerLookup.init(treeRoot:))
-            return zip(sources, urls).map { source, url -> ZoteroSource in
-                var s = source
-                if s.container.isEmpty, let lookup { s.container = lookup.shown(for: url).mapValues(\.text) }
-                s.itemFields = ZoteroSource.headerItemFields(pdf: url)
-                s.sidecar = ZoteroSidecar.read(pdf: url)
-                return s
-            }
+        return { Self.gatherZotero(sources, urls: urls, tree: tree) }
+    }
+
+    /// Fills each source from its file: the container (when the catalog had none), page 2's item fields, the sidecar,
+    /// and the user's item-field values (W40.reader-item-field-edit), read once per folder. Read only.
+    nonisolated static func gatherZotero(_ sources: [ZoteroSource], urls: [URL], tree: URL?) -> [ZoteroSource] {
+        let lookup = tree.map(ContainerLookup.init(treeRoot:))
+        var corrections: [String: UserItemFields?] = [:]
+        return zip(sources, urls).map { source, url -> ZoteroSource in
+            var s = source
+            if s.container.isEmpty, let lookup { s.container = lookup.shown(for: url).mapValues(\.text) }
+            s.itemFields = ZoteroSource.headerItemFields(pdf: url)
+            s.sidecar = ZoteroSidecar.read(pdf: url)
+            let folder = url.deletingLastPathComponent().path
+            if corrections[folder] == nil { corrections[folder] = .some(UserItemFields.load(folderOf: url)) }
+            s.userItemFields = corrections[folder]??.values(for: url.lastPathComponent) ?? [:]
+            return s
         }
     }
 

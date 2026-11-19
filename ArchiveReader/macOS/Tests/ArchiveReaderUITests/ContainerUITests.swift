@@ -3,7 +3,8 @@ import XCTest
 /// W47.ct-reader-view: the folder levels offered when a root is first added, the Container column, the Containers
 /// facet menu and the Inspector's Container section, on a scratch corpus built here. The only file the app writes is
 /// the level map, in the scratch corpus's `.archivesuite` folder, when the test presses Save, and (W47.ct-reader-edit)
-/// the box folders' container files, when the test edits a container.
+/// the box folders' container files, when the test edits a container, and (W40.reader-item-field-edit) a box folder's
+/// `.archivesuite/item-fields.json`, when the test corrects an item field.
 @MainActor
 final class ContainerUITests: XCTestCase {
     private var scratch: URL!
@@ -239,5 +240,72 @@ final class ContainerUITests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(
             atPath: corpus.appendingPathComponent(
                 "Hoover Institution Archives/Glotzer papers, Mss 1036/Box 18/.archivesuite").path))
+    }
+
+    /// W40.reader-item-field-edit: an item field added in the Inspector's Checks shows as the user's, checked; None
+    /// hides it; Edit ▸ Undo brings the value back. Only the box folder's `.archivesuite/item-fields.json` is written,
+    /// and no PDF changes.
+    func testTheChecksCorrectAnItemFieldAndUndoTakesItBack() throws {
+        let box17 = corpus.appendingPathComponent("Hoover Institution Archives/Glotzer papers, Mss 1036/Box 17",
+                                                  isDirectory: true)
+        let written = box17.appendingPathComponent(".archivesuite/item-fields.json")
+        let pdf = box17.appendingPathComponent("doc-01.pdf")
+        let bytes = try Data(contentsOf: pdf)
+
+        let app = launch()
+        waitForRows(app, 5)
+        let table = app.tables["ar.table"]
+        table.tableRows.element(boundBy: 0).click()
+        if !app.buttons["ar.tagEditor.done"].exists { app.typeKey("i", modifierFlags: [.command, .option]) }
+        let add = app.descendants(matching: .any)["ar.fieldStatus.add"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 15), "a field page 2 lacks can be added")
+        add.click()
+        let titleItem = app.menuItems["Title"].firstMatch
+        XCTAssertTrue(titleItem.waitForExistence(timeout: 5))
+        titleItem.click()
+        let field = app.textFields["ar.fieldStatus.title.field"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.click()
+        field.typeText("The Harbour Report")
+        _ = captureScreenshot("item-field-typing")
+        app.buttons["ar.fieldStatus.title.save"].firstMatch.click()
+
+        let value = app.staticTexts["ar.fieldStatus.title.value"].firstMatch
+        XCTAssertTrue(value.waitForExistence(timeout: 20), "the user's value is listed")
+        XCTAssertEqual(value.accessibilityText, "The Harbour Report")
+        let status = app.descendants(matching: .any)["ar.fieldStatus.title.status"].firstMatch
+        XCTAssertEqual(status.label, "Checked")
+        // The tooltip's source line ("Set by the user; page 2 has none") is checked in ItemFieldEditTests.
+        _ = captureScreenshot("item-field-set")
+        let json = try String(contentsOf: written, encoding: .utf8)
+        XCTAssertTrue(json.contains("The Harbour Report") && json.contains("doc-01.pdf"), json)
+        XCTAssertEqual(try Data(contentsOf: pdf), bytes, "the PDF is never rewritten")
+
+        // None: the file has no title, still the user's and checked.
+        let edit = app.descendants(matching: .any)["ar.fieldStatus.title.edit"].firstMatch
+        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        edit.click()
+        let none = app.menuItems["None"].firstMatch
+        XCTAssertTrue(none.waitForExistence(timeout: 5))
+        none.click()
+        let gone = NSPredicate(format: "label == %@ OR value == %@", "None", "None")
+        wait(for: [expectation(for: gone, evaluatedWith: value)], timeout: 20)
+        _ = captureScreenshot("item-field-none")
+
+        // Edit ▸ Undo, from the menu (⌘Z is Tags ▸ Undo Tag Change).
+        app.menuBars.menuBarItems["Edit"].click()
+        let undo = app.menuBars.menuBarItems["Edit"].menuItems["Undo"].firstMatch
+        XCTAssertTrue(undo.waitForExistence(timeout: 5))
+        XCTAssertTrue(undo.isEnabled)
+        undo.click()
+        let back = NSPredicate(format: "label == %@ OR value == %@", "The Harbour Report", "The Harbour Report")
+        wait(for: [expectation(for: back, evaluatedWith: value)], timeout: 20)
+        _ = captureScreenshot("item-field-undone")
+        XCTAssertTrue(try String(contentsOf: written, encoding: .utf8).contains("The Harbour Report"))
+        XCTAssertEqual(try Data(contentsOf: pdf), bytes)
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: corpus.appendingPathComponent(
+                "Hoover Institution Archives/Glotzer papers, Mss 1036/Box 18/.archivesuite").path),
+                       "the other folder is untouched")
     }
 }

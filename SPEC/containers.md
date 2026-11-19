@@ -15,7 +15,8 @@ There is no production material yet (owner, 2026-08-01), so the shape may change
 that an older build leaves a newer document alone. It is not there to carry a migration.
 
 **File safety.** Writing the container file and the level map is a new write class in the corpus: **new files only**,
-inside the hidden `.archivesuite` folder; no file outside it is rewritten, renamed, retagged or moved, and nothing is
+inside the hidden `.archivesuite` folder (which also holds the user's item-field values, `item-fields.json`, written
+the same way: `SPEC/tag-format.md` §Field checks); no file outside it is rewritten, renamed, retagged or moved, and nothing is
 deleted. Tier-2, tested on scratch copies (Reader Core Directive). Both files are found by their path, never by a
 Spotlight query (Wave 26). `CorpusWalker` skips hidden folders, so neither is ever indexed or shown as a document.
 

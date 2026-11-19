@@ -561,6 +561,13 @@ Views/
                               W47.ct-reader-edit-undo: each edit returns a ContainerUndoStep (what every file held,
                               the stamp of what was written) for the window's UndoManager; set for selection is
                               prepared for every folder, then committed, rolled back on a failed write (commitAll).
+  NavigationModel+ItemFieldEdits.swift  W40.reader-item-field-edit: an item field's correction (Change, None, Remove
+                              Your Value) read fresh and written off main to the file's folder's
+                              .archivesuite/item-fields.json (ArchiveCore UserItemFields, ContainerFileStore), with
+                              the container editor's ContainerUndoStep; errors go to the Checks, not the Container.
+  FieldStatusSection.swift    The Inspector's Checks (W40.reader-field-status): dates and page-2 item fields with
+                              their FieldStatus and Mark checked; each item field's Edit menu and Add Item Field
+                              (W40.reader-item-field-edit), the user's value shown checked, page 2's in the tooltip.
   ContainerSection.swift      The Inspector's Container section (FieldStatusRow per value with its Edit menu,
                               disagreements, the folder's warnings), ContainerSelectionSection (set for selection)
                               and ContainerLevelsSheet.

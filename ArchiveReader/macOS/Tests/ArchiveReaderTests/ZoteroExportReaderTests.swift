@@ -43,6 +43,23 @@ final class ZoteroExportReaderTests: XCTestCase {
                        "a Document has no recipient field, so the recipient goes into Extra")
     }
 
+    /// W40.reader-item-field-edit: the user's corrected title and "none" byline reach the export.
+    func testTheExportCarriesTheUsersItemFieldValues() throws {
+        let box = root.appendingPathComponent("Box 17", isDirectory: true)
+        try FileManager.default.createDirectory(at: box, withIntermediateDirectories: true)
+        let pdfs = ["0001.pdf", "0002.pdf"].map { box.appendingPathComponent($0) }
+        for pdf in pdfs { try Data("scratch fixture".utf8).write(to: pdf) }
+        var fields = UserItemFields()
+        fields.set(.title, to: "The Right Title", for: "0001.pdf")
+        fields.set(.documentKind, to: "report", for: "0001.pdf")
+        try ContainerFileStore.writeItemFields(fields, directory: box.resolvingSymlinksInPath(), expecting: nil)
+        let sources = NavigationModel.gatherZotero(pdfs.map { ZoteroSource(fileName: $0.lastPathComponent) },
+                                                   urls: pdfs, tree: nil)
+        XCTAssertEqual(sources[0].userItemFields, [.title: "The Right Title", .documentKind: "report"])
+        XCTAssertEqual(sources[1].userItemFields, [:])
+        XCTAssertEqual(ZoteroExport.item(sources[0])["title"] as? String, "The Right Title")
+    }
+
     func testTheExportIsNeverSavedInsideTheArchive() throws {
         let inner = root.appendingPathComponent("Box 17", isDirectory: true)
         try FileManager.default.createDirectory(at: inner, withIntermediateDirectories: true)

@@ -113,6 +113,27 @@ final class ItemFieldEditTests: XCTestCase {
         XCTAssertTrue(containerUndoMessage(result.failures[0].error, .itemFields).contains("item-field file"))
     }
 
+    func testTwoEditsInOneFolderAreUndoneInTurnButAnotherWritersChangeIsNot() throws {
+        let dir = try makeFolder()
+        let first = try XCTUnwrap(try set(.title, "Title", "a.pdf", in: dir))
+        let second = try XCTUnwrap(try set(.byline, "J. Smith", "b.pdf", in: dir))
+        let undoSecond = ContainerUndoStep(restores: [second]).apply()
+        XCTAssertTrue(undoSecond.failures.isEmpty)
+        let undoFirst = ContainerUndoStep(restores: [first]).apply()
+        XCTAssertTrue(undoFirst.failures.isEmpty, "\(undoFirst.failures)")
+        XCTAssertEqual(ContainerFileStore.loadItemFields(directory: dir).document?.files, [:])
+
+        // Same again, but another writer changes the file between the edit and its undo: the undo is refused.
+        let third = try XCTUnwrap(try set(.title, "Mine", "a.pdf", in: dir))
+        guard case let .loaded(doc, stamp) = ContainerFileStore.loadItemFields(directory: dir) else { return XCTFail() }
+        var other = doc
+        other.set(.publication, to: "Theirs", for: "b.pdf")
+        try ContainerFileStore.writeItemFields(other, directory: dir, expecting: stamp)
+        XCTAssertEqual(ContainerUndoStep(restores: [third]).apply().failures.first?.error as? ContainerWriteError,
+                       .changedSinceRead)
+        XCTAssertEqual(ContainerFileStore.loadItemFields(directory: dir).document, other)
+    }
+
     func testTheInspectorShowsTheUsersValueCheckedAndTheirNone() throws {
         let dir = try makeFolder()
         try set(.title, "The Right Title", "a.pdf", in: dir)

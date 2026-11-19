@@ -24,6 +24,7 @@ extension NavigationModel {
     func editItemField(_ field: CheckableField, _ edit: ItemFieldEdit, forPath path: String,
                        undo: UndoManager? = nil) {
         guard CheckableField.itemFields.contains(field) else { return }
+        itemFieldEditPath = path
         guard let tree = containerTree, let (dir, name) = ContainerCatalog.split(path, under: tree.path) else {
             itemFieldEditError = "This file is outside the archive's main folder, so a correction cannot be saved for it."
             return
@@ -63,6 +64,7 @@ extension NavigationModel {
         guard edited.files != fields.files else { return nil }
         edited.updatedAt = Date()
         let wrote = try ContainerFileStore.writeItemFields(edited, directory: directory, expecting: stamp)
-        return ContainerDocumentRestore(folder: directory, restore: .itemFields(fields), expecting: wrote)
+        return ContainerDocumentRestore(folder: directory, restore: .itemFields(fields), expecting: wrote,
+                                        written: .itemFields(edited))
     }
 }

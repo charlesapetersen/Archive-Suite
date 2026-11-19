@@ -142,6 +142,21 @@ the container file (`SPEC/containers.md`).
   its box number on a folder photo is 28 of 35, and every other field and reader falls short. Path values are not
   measured on the owner's folders. A `user` container value is checked. A value's own `confidence` is shown as a hint and never ranks it. When a new measurement moves a
   field across the rule, the table moves with it, in the same commit.
+- **The user's own value (W40.reader-item-field-edit).** A page-2 item field the user corrects in the Reader's
+  Inspector is not written into the PDF (page 2 stays the Processor's output-time snapshot). It goes to
+  `<the file's folder>/.archivesuite/item-fields.json`, written through `ContainerFileStore` exactly as the container
+  file is (`SPEC/containers.md` §The container file: no link followed, `flock`, the read's stamp checked, a temporary
+  file renamed in place, nothing deleted). UTF-8 JSON, sorted keys, at most 1 MB:
+  `{ "schemaVersion": 1, "files": { "<file name>": { "<field>": "<value>", … } }, "updatedAt": "<ISO 8601>" }`, the
+  file name as it is in the folder (compared composed, NFC), the field keys `documentKind`, `title`, `byline`,
+  `publication`, `publicationDate`, `recipientPlace`. A value replaces page 2's wherever an app shows or exports the
+  field (the Reader's Checks, the Zotero export); `""` says the file has no such field, hiding page 2's (and, for the
+  kind, the tagging call's format standing in for one). Taking the user's value away removes its key, and a file left
+  with none its entry. Strict: an unknown key or field, a non-string value or the same name twice makes the document
+  unreadable, and one of a larger `schemaVersion` is not interpreted; either is shown as such and never overwritten.
+  A user value **is checked** (`FieldStatusPolicy.userItemField`), as a `user` container value is; a `Checked <Field>`
+  tag speaks for page 2's value and is left as it is. The dates are tags and never stored here. Only a person's edit
+  writes the file. A renamed file loses its entry (keyed by name, like a container run's start).
 - Display only for every other purpose: a check never drives a write of anything but itself. No migration is written
   because there is nothing to migrate.
 

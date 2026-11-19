@@ -214,6 +214,8 @@ final class NavigationModel: ObservableObject {
     @Published var containerEditSaving = false
     /// W40.reader-item-field-edit: why the last item-field edit was refused, for the Inspector's Checks.
     @Published var itemFieldEditError: String?
+    /// The file the last item-field edit was for; its error is shown only with that file (nil: with any).
+    var itemFieldEditPath: String?
     /// Bumped after each `.archivesuite` edit, undo or redo, so the Checks section reads the user's values again.
     @Published var itemFieldRevision = 0
     var containerGeneration = 0
@@ -2335,6 +2337,7 @@ final class NavigationModel: ObservableObject {
             containerLevelsDraft = nil     // a sheet for the old root must not save into this one
             containerLevelsError = nil
             containerEditError = nil       // the old root's refusal
+            itemFieldEditError = nil
             filterSearchText = filter.searchText   // sync debounced field
             // R-3: an OCR search active over the OLD corpus leaves ftsPaths holding old-root paths; once
             // the new library loads, recompute would AND the new files against those → empty/wrong

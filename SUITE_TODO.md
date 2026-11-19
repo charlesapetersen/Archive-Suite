@@ -1029,7 +1029,6 @@ waits until the pipeline is sorted out (points 6, 9).
 
 Owner, 2026-11-13: eight points on the Reader, filed as given. The first is a bug and goes first.
 
-- [ ] **`W40.reader-item-field-edit` — edit a page-2 item field's value in the Inspector [S-M · Tier-2]** (lane: reader) (uses: build,vm) (blocked-on: W47.ct-reader-edit) — W40.reader-field-status shows each item field with its check and lets the user mark it checked, but a wrong value cannot be corrected: the page-2 header is the Processor's output-time snapshot and the Reader writes no file contents. Store the user's value where W47.ct-reader-edit puts the Reader's `.archivesuite` write class (a per-file record beside `containers.json`, through `ContainerFileStore`'s descriptor-bound writer), show it in place of the header value as Checked, and say so in SPEC/tag-format.md §Field checks. Tier-2: a new written file under the Core Directive, tested on scratch copies. KNOWN_ISSUES (Reader) "Field checks in the Inspector".
 
 
 ## Archive Notes — owner requests (2026-10-28)

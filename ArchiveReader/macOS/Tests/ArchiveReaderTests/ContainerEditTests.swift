@@ -357,6 +357,28 @@ final class ContainerEditTests: XCTestCase {
         XCTAssertTrue(containerUndoMessage(result.failures[0].error).contains("changed after the edit"))
     }
 
+    /// Two edits in one folder, undone in turn: the first undo rewrites the file with the first edit's content and a
+    /// new stamp, and the second still goes ahead; Redo then takes both forward again.
+    func testTwoEditsInOneFolderAreUndoneInTurn() throws {
+        let box = try makeBox()
+        let first = try XCTUnwrap(try NavigationModel.editContainerFile(at: box) { file in
+            ContainerEdits.set(.container, to: self.user("Box 9"), at: .directory, in: file)
+        })
+        let second = try XCTUnwrap(try NavigationModel.editContainerFile(at: box) { file in
+            ContainerEdits.set(.folder, to: self.user("3"), at: .directory, in: file)
+        })
+        let undoSecond = ContainerUndoStep(restores: [second]).apply()
+        XCTAssertTrue(undoSecond.failures.isEmpty)
+        let undoFirst = ContainerUndoStep(restores: [first]).apply()
+        XCTAssertTrue(undoFirst.failures.isEmpty, "the first edit's file is still its own: \(undoFirst.failures)")
+        XCTAssertEqual(ContainerFileStore.load(directory: box).document?.directory, ContainerFieldSet())
+        XCTAssertTrue(undoFirst.inverse.apply().failures.isEmpty)
+        XCTAssertTrue(undoSecond.inverse.apply().failures.isEmpty)
+        let read = try XCTUnwrap(ContainerFileStore.load(directory: box).document)
+        XCTAssertEqual(read.directory[.container]?.value, "Box 9")
+        XCTAssertEqual(read.directory[.folder]?.value, "3")
+    }
+
     func testUndoOfAFolderThatHadNoFileLeavesAnEmptyOne() throws {
         let box = try makeBox()
         let restore = try XCTUnwrap(try NavigationModel.setForSelection(.container, user("Box 5"),
@@ -375,7 +397,8 @@ final class ContainerEditTests: XCTestCase {
         let renamed = ContainerEdits.setStandardName("Box One", for: "B. 1", field: .container, in: original, at: now)
         let wrote = try ContainerFileStore.writeNames(renamed, root: tree, expecting: first)
         let step = ContainerUndoStep(restores: [ContainerDocumentRestore(folder: tree, restore: .names(original),
-                                                                         expecting: wrote)])
+                                                                         expecting: wrote,
+                                                                         written: .names(renamed))])
         let undone = step.apply()
         XCTAssertTrue(undone.failures.isEmpty)
         XCTAssertEqual(ContainerFileStore.loadNames(root: tree).document, original)

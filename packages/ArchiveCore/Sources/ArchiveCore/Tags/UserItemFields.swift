@@ -43,6 +43,17 @@ public struct UserItemFields: Equatable, Sendable {
         files[k] = values.isEmpty ? nil : values
     }
 
+    /// The user's values for the file at `url`, read from its folder's `item-fields.json`; none when there is no
+    /// document or it cannot be read. Read only.
+    public static func values(besides url: URL) -> [CheckableField: String] {
+        load(folderOf: url)?.values(for: url.lastPathComponent) ?? [:]
+    }
+
+    /// The document in `url`'s folder, if one can be read.
+    public static func load(folderOf url: URL) -> UserItemFields? {
+        ContainerFileStore.loadItemFields(directory: url.deletingLastPathComponent().resolvingSymlinksInPath()).document
+    }
+
     /// `fields` with the user's `values` in place: a value replaces the header's, "" removes it.
     public static func applied(_ values: [CheckableField: String], to fields: PDFItemFields) -> PDFItemFields {
         var f = fields

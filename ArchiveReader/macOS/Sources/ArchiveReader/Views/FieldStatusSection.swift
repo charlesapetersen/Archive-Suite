@@ -24,7 +24,7 @@ struct FieldStatusSection: View {
     var onEdit: (CheckableField, ItemFieldEdit) -> Void = { _, _ in }
     /// The last header read, with the file and version it was read from. Shown only while that is the selection, so
     /// a newly selected file never shows, or checks, the previous file's fields while its own are read.
-    @State private var read: (key: ReadKey, header: HeaderFields?)?
+    @State private var read: (key: ReadKey, revision: Int, header: HeaderFields?)?
 
     /// A file as read: its path and its content date, so a page 2 rewritten in place is read again.
     struct ReadKey: Hashable {
@@ -76,8 +76,10 @@ struct FieldStatusSection: View {
             Text("Checks").font(.subheadline.bold())
             if let file = single {
                 let header = read?.key == key(file) ? read?.header : nil
+                // Edits wait for the read after the last save, so a menu never offers a state the file has left.
+                let current = read?.revision == revision
                 FieldStatusList(tags: file.tags, header: header, apply: apply,
-                                editable: editable && header != nil && header?.userProblem == nil,
+                                editable: editable && current && header != nil && header?.userProblem == nil,
                                 saving: saving, onEdit: onEdit)
                     .id(file.path)   // a field being typed into belongs to its file, never the next one selected
                 if let problem = header?.userProblem, editable {
@@ -95,9 +97,9 @@ struct FieldStatusSection: View {
         }
         .task(id: single.map { TaskKey(file: key($0), revision: revision) }) {
             guard let file = single else { return }
-            let k = key(file), url = file.url, dataless = file.isDataless
+            let k = key(file), url = file.url, dataless = file.isDataless, rev = revision
             let header = await Task.detached(priority: .utility) { HeaderFields.read(url, isDataless: dataless) }.value
-            if !Task.isCancelled { read = (k, header) }
+            if !Task.isCancelled { read = (k, rev, header) }
         }
     }
 
