@@ -180,6 +180,20 @@ ALLOW=(
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}defer { if !renamed { unlinkat(sfd, temp, 0) } }"
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}while renameatx_np(sfd, temp, sfd, name, flags) != 0 {"
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}guard renameatx_np(sfd, name, sfd, aside, UInt32(RENAME_EXCL)) == 0 else {"
+  # W49.reader-ct-set-aside (671d08c2, which did not run this lint), audited by W49.lint-setaside-pin: renames only,
+  # nothing deleted, all relative to the same O_NOFOLLOW `.archivesuite` descriptor and under its flock. The rollback
+  # in `write` puts the set-aside document back, exclusively, when the new one could not take its place.
+  # `putBackSetAside` accepts `name` only as one of the two container file names and `aside` only as
+  # `<name>.set-aside-…` with no `/`, refuses unless `name` still matches the caller's stamp and both are ordinary
+  # files, then swaps them (RENAME_SWAP); without an atomic swap, three RENAME_EXCL renames through a fresh
+  # `.<name>.<UUID>.swap` name, each failure undoing the earlier steps. Lines 191 and 198 are the same undo line.
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}renameatx_np(sfd, asideName, sfd, name, UInt32(RENAME_EXCL))"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}if renameatx_np(sfd, aside, sfd, name, UInt32(RENAME_SWAP)) != 0 {"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}guard renameatx_np(sfd, name, sfd, parked, UInt32(RENAME_EXCL)) == 0 else {"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}guard renameatx_np(sfd, aside, sfd, name, UInt32(RENAME_EXCL)) == 0 else {"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}renameatx_np(sfd, parked, sfd, name, UInt32(RENAME_EXCL))"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}guard renameatx_np(sfd, parked, sfd, aside, UInt32(RENAME_EXCL)) == 0 else {"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}if renameatx_np(sfd, name, sfd, aside, UInt32(RENAME_EXCL)) == 0 {"
 
   # ── rule 3 (errorHandler:-less enumerator) ──────────────────────────────────────────────────
   # `ArchiveLibrary.swift`'s Spotlight-era fixture loader used to be allowed here. `W26.walk2`
