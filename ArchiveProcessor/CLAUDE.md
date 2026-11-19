@@ -31,23 +31,15 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 ## OCR rules (Primary Function 1)
 
 - **Built-in models** are the REFERENCE.md §LLM Provider & Model Selection lists (`Models/ProviderModels.swift`);
-  don't silently add others to them. OpenRouter's are `OpenRouterRoute.catalog`, each pinned as benched (`provider.order`,
-  `allow_fallbacks: false`, `max_price`): the open models at their `quantizations`, temp 0; and the measured Gemini, GPT
-  and Claude Sonnet 5.5 models on their makers' own endpoints (`makerRoutes`, W41.app-openrouter-any and
-  -claude; Claude's windows too, not the mix's), so one OpenRouter key reaches the recommended route. Claude 4.7+
-  refuse a `budget_tokens` (`ThinkingLevel.anthropicThinkingFields`).
-  Such a model stands for its maker's (`LLMModel.measuredModel`: figures, tokens, Gemini's refusals
-  and their second reader), and a route-table row runs through it when the user has only an OpenRouter key
-  (`Route.appRoute(keys:)`). Any other model (W41.app-openrouter-unmeasured): every image-reading model in OpenRouter's
-  listing (`OCR/OpenRouterListing.swift`, `GET /models`, read with the prices) and any id typed in Manage custom
-  models, after the pinned ones, marked not measured. These are unpinned (`OpenRouterRoute.unpinned`): no provider
-  order, OpenRouter's fallbacks on, always `data_collection: "deny"`, `max_price` at the listing's price the estimate
-  showed; a typed id the listing does not price is `LLMModel.unpriced` (no estimate, no ceiling, the note says so).
-  The benched routes stay pinned exactly as before. An id neither listed nor typed gets no client.
-  Their prices are OpenRouter's listing for the pinned upstream only (`OCR/OpenRouterPrices.swift`, read when the
-  Settings note for an OpenRouter model shows or the main window opens with an OpenRouter key, at most daily), else the bench's (a maker's: its own price plus a tenth);
-  `max_price` is the run's model's price, the one its estimate showed (`OpenRouterRoute.ceiling`). Segmentation's
-  OpenRouter voter keeps the bench's.
+  don't silently add others. OpenRouter's benched routes (`OpenRouterRoute.catalog`, makers' endpoints in
+  `makerRoutes`) stay pinned as benched (`provider.order`, `allow_fallbacks: false`, open models at their
+  `quantizations`, temp 0) and stand for their maker's model (`LLMModel.measuredModel`). Any other image model in the
+  listing, or any id typed in Manage custom models, is unpinned (`OpenRouterRoute.unpinned`: no provider order,
+  OpenRouter's fallbacks on), marked not measured, always `data_collection: "deny"`; a typed id
+  with no listed price is `LLMModel.unpriced` (no estimate, no ceiling, the note says so); an id neither listed nor
+  typed gets no client. `max_price` is the price the run's estimate showed (`OpenRouterRoute.ceiling`); segmentation's
+  OpenRouter voter keeps the bench's prices. Claude 4.7+ refuse a `budget_tokens`. Price sources, key-only routing:
+  REFERENCE.md §"OCR, Live Capture and Releasing rules — full wording".
 - **One way to read a page** (W42.int-s2): every client is a VisionOCRKit `PageReader`, and `PageReaders.reader`
   (`OCR/PageReaders.swift`) is the only place that picks one (Local Agent, then gateway, then provider). Never call a
   client's `ocr` elsewhere: `scripts/check-page-reader-seam.sh` fails on it, and on a provider with no reader.
@@ -60,37 +52,32 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
   key/quota/request errors, a remote gateway, the Local Agent or Apple Vision as first reader; a per-run breaker
   bounds spend. Contract: `scripts/test-ocr-cascade.sh`.
 - **Institutional computing import** matches only on the image's SHA-256 with model and nonblank `cluster`
-  recorded, never on filenames or institution (missing provenance matches nothing), rechecked at use time;
-  Retry/Rotate always reads fresh; read-only on the bulk folder and inputs; direct non-batch path only (never gateway, Local Agent, Vision or
-  pre-OCRed input); header labels sanitised (separator, one line); estimates still count every page. Contract:
-  `scripts/test-institutional-compute-import.sh`.
+  recorded (never filenames or institution; missing provenance matches nothing), rechecked at use; Retry/Rotate always
+  reads fresh; read-only on the bulk folder and inputs; direct non-batch path only (never gateway, Local Agent,
+  Vision or pre-OCRed input); header labels sanitised (separator, one line); estimates count every page.
+  Contract: `scripts/test-institutional-compute-import.sh`.
 - **Page-kind routing** is off by default. Contract: `scripts/test-ocr-page-kind.sh`.
-- **Read-poorly flag** (`OCR/ReadQualityFlag.swift`): Apple Vision's reading whose character-weighted line confidence
-  is under 0.9815 sets `OCRResult.readPoorly`; the run summary names the files and the history counts them. UI only,
-  never written to a file; only under the default Vision settings it was fitted with; the summary's rebuilds pass it on. The cut is fitted in
-  `segbench-results/post-read-flag.md`. Another reader's page (`OCR/ReadQualityDisagreement.swift`, set at the end of
-  `performOCRCall`): Vision reads the same image and the page is flagged when the reader's text disagrees with it (1
-  minus the bench's NES) past that reader's own cut, fitted by `post_read_flag.py` (`app_readers`, which also checks
-  the Swift table); a route the bench has not read has no rule. The summary says per reader what its cut was measured
-  on. Contract: `scripts/test-read-quality-flag.sh` (and section 4b of `scripts/test-local-models.sh`).
+- **Read-poorly flag** (`OCR/ReadQualityFlag.swift`, `ReadQualityDisagreement.swift`) is UI only, never written to a
+  file. Vision's own reading: character-weighted line confidence under 0.9815, only under the default Vision settings it was fitted with.
+  Another reader: its text disagrees with Vision's reading of the image past that reader's own cut (`post_read_flag.py`
+  `app_readers`, which checks the Swift table); a route the bench has not read has no rule. The run summary names the
+  files and what each cut was measured on, the history counts them, rebuilds pass it on. Contract:
+  `scripts/test-read-quality-flag.sh` (and section 4b of `scripts/test-local-models.sh`).
 - **A model on this Mac** always sends the stand-in bearer `local`, never a saved key; escalating its failed pages
-  is off by default (it may have been chosen to keep pages on the Mac). Its measured limits are required
-  (W41.mac-local-measure: 4,096-token cap, streamed repetition check + one re-read with a repetition penalty, 600 s
-  → `length`, temp 0, one page at a time). Contract: `scripts/test-local-models.sh`.
+  is off by default (pages may be meant to stay on the Mac). Its measured limits (4,096-token cap, streamed
+  repetition check + one re-read with a repetition penalty, 600 s → `length`, temp 0, one page at a time) are required. Contract: `scripts/test-local-models.sh`.
 - **Gateway and Local Agent skip batch and LLM rotation.** Local Agent (`OCR/LocalAgentClient.swift`): no shell,
   prompt on stdin not argv, absolute-path binary, per-call timeout, friendly errors (never raw stderr), **no key**,
-  $0 under the actual CLI's name; only `claude` is validated (`gemini`/`codex` are `VERIFY` placeholders);
-  `runAsync` signals exit via `terminationHandler` (`waitUntilExit()` on GCD missed exits) and kills its child on
-  cancel. Precedence localAgent > gateway > direct; concurrency 1–2 + usage-window pacing; the header/history keep
-  the model override or `CLI default` and never price the direct-provider fallback. At the plan's usage limit a
-  page waits and reads on the plan again, never a key (`invokePaced`; REFERENCE.md, W41.app-claude-plan-reading).
-  $0 harness: `scripts/localagent-fake-cli.sh`, `scripts/test-localagent.sh`, `[3.5]` in `scripts/test-smoke.sh`.
-- **Requirements:** Low/High thinking where supported; a cost estimate before processing, standard vs batch side
-  by side, updated as files are added, **reflecting the batch discount** (batch total only with batch on, a direct provider and no pre-OCRed
-  input; Vision / Local Agent / an unpriced gateway show a note, never a dollar figure); batch toggle; parallel workers. Input:
-  drag-and-drop or open panel; JPEG, PNG, TIFF, HEIC, PDF (pre-OCRed input: PDFs only). Model defaults
-  (REFERENCE.md) are item decisions (W41.app-ocr-default, W41.app-seg-default): don't change them silently. A
-  live-key OCR smoke is the final OpenAI model-ID confirmation.
+  $0 under the actual CLI's name; only `claude` is validated (`gemini`/`codex` are `VERIFY`
+  placeholders); `runAsync` signals exit via `terminationHandler` (`waitUntilExit()` on GCD missed exits) and kills
+  its child on cancel. Precedence localAgent > gateway > direct; concurrency 1–2
+  + usage-window pacing; the header/history keep the model override or `CLI default` and never price the
+  direct-provider fallback. At the plan's usage limit a
+  page waits and reads on the plan again, never a key (`invokePaced`). $0 harness: `scripts/test-localagent.sh`, `[3.5]` in `scripts/test-smoke.sh`.
+- **Requirements:** Low/High thinking where supported; a live cost estimate before processing, standard vs batch
+  side by side, **reflecting the batch discount** (a batch total only with batch on, a direct provider, no pre-OCRed input; Vision / Local Agent / an unpriced gateway show a note, never a
+  dollar figure); batch toggle; parallel workers. Input: drag-and-drop or open panel; JPEG, PNG, TIFF, HEIC, PDF (pre-OCRed: PDFs only). Model
+  defaults (REFERENCE.md) are item decisions: don't change them silently. A live-key OCR smoke is the final OpenAI model-ID check.
 - **Output: each input image → one PDF, same base filename.** Page 1 the image; page 2 the text under `Extracted
   text.` and `[Provider] · [Model] · [Day Month Year]`. **Critical: page 2 is arbitrarily tall — all text on one
   page, never a third**, well-formatted and laid out. No text → `No text returned by model.` + the error code/reason. Show Gemini's
@@ -105,9 +92,8 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 - **Date tags (most important):** year `1968` or decade `1970s` (a decade only typed by hand; the LLM never emits it; written verbatim);
   month `MM Month`. Date undetermined: estimate the year from surrounding documents, **never estimate the month**,
   always add `Date Uncertain`.
-- **Typing a date (W40.processor-date-field):** each card has one Date field (`Views/TypedDateField.swift`, read by
-  ArchiveCore `DateFieldEntry.archiveDate`, the suite's one date field), stored as the same Year/Month/Day strings
-  (`Tagging/TypedDateTags.swift`); Sent with is folded below it. Unreadable text disables Save. Live Capture keeps a year and month.
+- **Typing a date:** each card has one Date field, read by ArchiveCore `DateFieldEntry.archiveDate` (the suite's one
+  date field), stored as the same Year/Month/Day strings (`Tagging/TypedDateTags.swift`); Sent with is folded below it. Unreadable text disables Save. Live Capture keeps a year and month.
 - **Subjects:** 2–6 per document, general but not too general. Box photos → `Red`; folder photos → `Purple`.
 - **`Unread`**: every output (PDF **and** any exported original) gets it, applied **last**, only in real-tagging
   modes (`.automatic`/`.autoDate`/`.human`), never "No tagging" or "Copy source tags"; via the **required**
@@ -131,33 +117,30 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
   cards appear only for *completed* segments; **Finish is drain-gated** on the phone's heartbeat.
 - **The protocol and [`../SPEC/relay-object-format.md`](../SPEC/relay-object-format.md) change on all sides together.**
 - **Drive relay** ([`ArchiveCapture/README-oauth.md`](ArchiveCapture/README-oauth.md)): ⚠️ the Android OAuth client
-  ID is **NOT in git** (gitignored `ArchiveCapture/local.properties`, `driveOAuthClientId=…`; iOS: gitignored
-  `ArchiveCaptureiOS/Config/DriveLocal.xcconfig`); the Android client ID is bound to package + signing SHA-1; an unconfigured build still compiles, LAN/USB
-  unaffected; it needs **"Custom URI scheme" enabled**. Scope is `drive.file` (per file); Drive/ChatGPT tokens
-  and the Mac's Drive client secret (`DriveClientSecret`) live in the Keychain (iOS: this device only); the phone has
-  no secret. The ChatGPT plan route sends `store: false`, and only a completed response answers.
-  **Mac and phone sign in to the same Google account**; the Mac signs in to Drive before Start — a mid-session
-  sign-in waits for the next session (owner-accepted limitation, 2026-07-08, A5). The iPhone uses the relay only by an explicit Cloud choice; Wi-Fi never switches to Drive itself.
+  ID is **NOT in git** (gitignored `ArchiveCapture/local.properties`; iOS: gitignored
+  `ArchiveCaptureiOS/Config/DriveLocal.xcconfig`); the Android ID is bound to package + signing SHA-1 and needs
+  **"Custom URI scheme" enabled**; an unconfigured build still compiles, LAN/USB unaffected. Scope
+  `drive.file`; Drive/ChatGPT tokens and the Mac's `DriveClientSecret` live in the Keychain (iOS: this device only);
+  the phone has no secret. The ChatGPT plan route sends `store: false`; only a completed response answers.
+  **Mac and phone sign in to the same Google account**, the Mac before Start (a mid-session sign-in waits for the
+  next session; owner-accepted, A5). The iPhone uses the relay only by an explicit Cloud choice, never on its own.
 - **Rejected transports (don't re-open):** personal hotspot, MultipeerConnectivity/AWDL, Bluetooth, AirDrop /
   Quick Share. No Mac-side transport picker (A5, removed as a footgun).
 - **LAN security — accepted risk (owner, 2026-07-18):** plaintext HTTP + persistent bearer token; no TLS/AEAD, no
-  companion changes, no packet-capture harness — **do not re-promote LANSEC-5/6/7 or the crypto redesign.** The acceptance rests on the shipped mitigations:
-  high-entropy `lanToken` + failed-auth backoff (W16.lan2), header-first admission, connection/memory caps,
-  `constantTimeEquals`, both receivers' `isSafeGroupId` path-traversal guard (`Net/CaptureValidation.swift`). On
-  untrusted venue Wi-Fi use the USB cable (either phone) or Drive relay; LAN only on a trusted network. The Drive-relay
-  code never authenticates the LAN server. Pairing is QR-only (a Bonjour-discovery check is moot). Record:
-  `KNOWN_ISSUES.md` §"Live Capture LAN channel".
+  companion changes, no packet-capture harness — **do not re-promote LANSEC-5/6/7 or the crypto redesign.** It rests
+  on the shipped mitigations, which stay: high-entropy `lanToken` + failed-auth backoff, header-first admission,
+  connection/memory caps, `constantTimeEquals`, both receivers' `isSafeGroupId` path-traversal guard. Untrusted Wi-Fi: USB
+  (either phone) or Drive relay; LAN only on a trusted network. The Drive-relay code never authenticates the LAN server. Pairing is QR-only. Record: `KNOWN_ISSUES.md` §"Live Capture LAN channel".
 - **Backup folder:** legacy staging is read in place, not migrated; launch pruning never removes a folder still holding a photo
   *or* a `_processed` output.
 - **Finish-window rules**, each load-bearing (`KNOWN_ISSUES.md` §"REFERENCE: the shared Processing pane during a
-  finish"): every Live retry is refused while `isFinalizing` **in `retryFailed` itself**, not only in the view
-  (`W3.cap-r3-fu7`). `proceedToFinishIfReady` **holds** a finish while a per-item sheet is up (in `finishSession`
-  it would discard it; `W3.cap-r3-fu9`), so sheet targets live on `LiveCaptureProcessor` — ⚠️ a view `@State`
-  target compiles cleanly and silently disables the guard, untested. The finishing scrim freezes the pointer only;
-  keyboard/VoiceOver rely on `.disabled` (`W3.cap-r3-fu10`). An emptied Captured pane still offers Finish and
-  Clear while `hasUnfiledWork`; Finish is also `.disabled` on the narrower `canFinish`, and the two gates stay
-  separate (`W3.cap-r3-fu12`). Failure taxonomy is label-only (Tier-2): `labelStagedRecord(...)` is the ONE
-  labeller and never changes a finalize/deletion decision (that keys off `filedGroupIds` + `pagesComplete`).
+  finish"): `retryFailed` itself refuses every Live retry while `isFinalizing`, not only the view. A finish is
+  **held** (`proceedToFinishIfReady`) while a per-item sheet is up, so sheet targets live on `LiveCaptureProcessor` —
+  ⚠️ a view `@State` target compiles and silently disables the guard, untested. The scrim freezes the pointer only;
+  keyboard/VoiceOver rely on `.disabled`. An emptied Captured pane still offers Finish and Clear while
+  `hasUnfiledWork`; Finish is also `.disabled` on the narrower `canFinish`; the two gates stay separate. Failure
+  taxonomy is label-only (Tier-2): `labelStagedRecord(...)` is the ONE labeller and never changes a
+  finalize/deletion decision (that keys off `filedGroupIds` + `pagesComplete`).
 - **Retries reproduce the immutable run/session backend** (W25.retry-backend): no provider/model picker; the one
   per-item retry sheet controls rotation; `rotationRetryTarget` stays in the finalization guard and cannot alter
   routing or credentials.
@@ -213,10 +196,8 @@ files, including in `ArchiveCaptureiOS/`); keep commits small and rebase often; 
 - `OCRProcessor` methods go in the matching per-area `OCRProcessor+<Area>.swift` extension (Pipeline, OCR, Tagging,
   ReviewFlows, WindowSegmentation, MixedPDFRecovery; types in `+Types.swift`). Keep them coarse: a new file only for a
   new pipeline area. **All stored properties stay in `OCRProcessor.swift`**.
-- Verifying a move-only refactor: run the move-proof (`git show --color-moved | grep …`) **tty-independently**
-  (piped, it passes for any commit); census-diff private members for access-level changes (grep can't see
-  `internal`); gate on a warnings delta (beware a cached "0 warnings"). `LiveCaptureTestDriver` does **not**
-  exercise the batch GUI path (`startProcessing → review → performTaggingPhase → finalize`).
+- A move-only refactor: run the move-proof **tty-independently** (piped, it passes for any commit), census-diff
+  private members, gate on a warnings delta (beware a cached "0 warnings"). `LiveCaptureTestDriver` does **not** exercise the batch GUI path.
 - `Tagging/` is Tier-2; `Segmentation/` is not (writes nothing). `WindowPrompts.swift` is verbatim from the bench
   (a test compares byte for byte). `enclosureOf` uses the OCR `[enclosure]` marker, never adjacency. `PlanUsage`
   never reads the CLI's login; `PlanRunGate` pauses at a 90% five-hour meter; Claude/ChatGPT routes ask "key or
@@ -258,10 +239,10 @@ login or real corpus) or
 `… processor sighted` (pixels). See `AGENTS.md` → *GUI verification*.
 
 **Phone↔Mac E2E** (`scripts/E2E-PHONE-MAC.md`): `OCR_KEY=<key> caffeinate -di ArchiveProcessor/scripts/e2e-phone-mac.sh`
-(a few cents). Needs the Mac free + awake (don't drive its GUI meanwhile), the `ap_test36` emulator + android-36
-image, `xcodegen` on PATH, a Gemini key. Auto-finalize is gated on `LIVECAPTURE_TESTOUT` so it can never file into
-the real corpus; its inject seam (`files/test_inject.jpg`) is debug-only, stripped from release. The Tier-2 gate for `Capture/`/`Net/`, **not** per-commit. It pairs over `10.0.2.2` and never touches USB; for `adb reverse`:
-`scripts/usb-reverse-probe.sh` (free).
+(a few cents): the Tier-2 gate for `Capture/`/`Net/`, **not** per-commit. Needs the Mac free + awake (don't drive
+its GUI meanwhile), the `ap_test36` emulator + android-36 image, `xcodegen` on PATH, a Gemini key. Auto-finalize is gated on `LIVECAPTURE_TESTOUT` so it can
+never file into the real corpus; its inject seam is debug-only, stripped from release. It pairs over `10.0.2.2`, never USB (`adb reverse`:
+`scripts/usb-reverse-probe.sh`, free).
 
 **Cadence:** push often (clean build + Tier-1, plus Tier-2 where it applies); a DMG + GitHub release is the sparse
 milestone, gated by the Tier-3 review. Push often, release rarely.
@@ -272,11 +253,10 @@ milestone, gated by the Tier-3 review. Push often, release rarely.
   §*Releasing*); the bare `vX.Y.Z` tags (to `v3.8.2`) are this app's pre-merge history. `CFBundleShortVersionString` stays "1.0".
   Patch for internal-only changes, minor for user-facing features. Distribution is owner-only.
 - Signed with the self-signed **`CODE_SIGN_IDENTITY: "Archive Suite Dev"`** (not ad-hoc), not notarized. The
-  target **declares no** `get-task-allow` / `disable-library-validation` (entitlements aren't config-scoped, so
-  they'd ship everywhere); Debug sets `ENABLE_DEBUG_DYLIB: NO` (W28.cert-fu2; valid while there is no app-hosted XCTest
-  target or SwiftUI previews); Release keeps hardened runtime + strict library validation and
-  `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO` (Xcode otherwise injects `get-task-allow` into Release). **⛔ The Release signature must contain
-  neither debug entitlement.** Why: REFERENCE.md §Releasing.
+  target **declares no** `get-task-allow` / `disable-library-validation`; Debug sets `ENABLE_DEBUG_DYLIB: NO`
+  (W28.cert-fu2; valid while there is no app-hosted XCTest target or SwiftUI previews); Release keeps hardened runtime + strict library validation and
+  `CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO`. **⛔ The Release signature must contain neither debug entitlement.**
+  Why: REFERENCE.md §Releasing.
 - **Call `gh` by full path, `/opt/homebrew/bin/gh`** — a shadowing Python `gh` is first on `PATH`.
 
 The release build + DMG + `gh release` commands are in REFERENCE.md §Releasing (a Tier-3, owner-gated step).
@@ -285,6 +265,5 @@ The `.dmg` is a build artifact — never commit it (build under gitignored `buil
 ## Reference (read on demand)
 
 Every original section is in [`REFERENCE.md`](REFERENCE.md) under its original heading (Primary Function 1–3 and
-their subsections, File Input, OCR Output Format, Settings & Tools, Architecture Notes, Project Structure, the
-Implementation map); its Background part holds the full wording of Concurrent / multi-agent development,
-Verification & review policy and Releasing. A rule stated there still binds.
+subsections, File Input, OCR Output Format, Settings & Tools, Architecture Notes, Project Structure, the Implementation map); its
+Background part holds the full wording of the sections and bullets compacted here. A rule stated there still binds.
