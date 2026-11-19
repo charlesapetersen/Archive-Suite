@@ -40,7 +40,13 @@ extension OCRProcessor {
             : "\(skipped) box or folder label\(skipped == 1 ? " was" : "s were") not recorded: \(skipped == 1 ? "its PDF was" : "their PDFs were") not where the run left \(skipped == 1 ? "it" : "them"), or shared one with another label."
         guard !labels.isEmpty else { return skippedNote }
         let gateway = currentGateway
-        statusMessage = "Reading \(labels.count) box and folder label\(labels.count == 1 ? "" : "s")…"
+        // W47.ct-capture-gemma: with Gemma on this Mac the read takes about 13 s a label, so the line says how long.
+        var pace = ""
+        if gateway == nil || gateway?.isLocalModel == true, await ContainerLabelGemma.find(gateway: gateway) != nil {
+            let minutes = Int((Double(labels.count) * ContainerLabelGemma.secondsPerLabel / 60).rounded(.up))
+            pace = " with Gemma 3 12B on this Mac, about \(minutes) min"
+        }
+        statusMessage = "Reading \(labels.count) box and folder label\(labels.count == 1 ? "" : "s")\(pace)…"
         var markers: [ContainerLabelCapture.FiledMarker] = []
         for label in labels {
             guard !Task.isCancelled else { return nil }

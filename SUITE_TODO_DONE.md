@@ -16917,3 +16917,27 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
 - [x] **W47.ct-reader-facet-rules — container facets as smart-folder and Advanced Search rules [S]** · §Archival containers — W47 (lane: reader) (uses: build) — Filed by W47.ct-reader-view (2026-11-19): the Containers menu filters the list, but a smart folder saved from it keeps only the other filters (the save sheet says so) and Advanced Search has no container rule. Add a container rule (facet and value, compared by `ContainerNames.key`) matched against the model's `ContainerCatalog` through `RuleContext`, keep it in `AdvancedSearch(filter:)`, and fold container values into `LibraryChangeSignature` so smart-folder counts follow a catalog rebuild. KNOWN_ISSUES (Reader) "Containers in the list".
   SHIPPED 2026-11-19. Advanced Search has a Container field (facet: repository, collection, accession, series or container; is / is not; a value typed or picked from the library's values), matched by `ContainerFacet.key` against the catalog's rows, which now carry each facet's folded key, through `RuleContext.containers` (nil, so the rule is skipped, until the catalog for the open root is built). `AdvancedSearch(filter:)` turns the Containers menu's choices into those rules, so a smart folder saved from them keeps them; the save sheet's note is gone and the suggested name includes the values. `LibraryChangeSignature.containers` signs the catalog's values; a rebuild that changes them recounts the smart folders with a container rule and rebuilds the list when the open scope tests one. New frozen fixture `saved-searches-2026-11-container.json` (the `containerFacet` key; every older fixture still loads, the key defaulting to container). Tests: `ContainerRuleTests` (rule matching, prepared parity, groups, decode, filter-bar parity, signature, and a model test: a smart folder saved from a facet whose count goes 0 → 2 and whose list follows when a level map is written and the catalog rebuilt); Reader unit bundle 940 tests green bar the DeepLinkTests skip. Not VM-checked: the form's new row is a picker, a text field and a value menu built from existing controls. No migration: nothing to migrate. $0. No bench cache used.
   <!-- /W47.ct-reader-facet-rules -->
+- [x] **W47.ct-capture-gemma — Gemma 3 12B for a label's titles where the gateway is off [S]** · §Archival containers — W47 (lane: processor) — SHIPPED 2026-11-19
+  With the gateway off or a local model on it, a box or folder label photo's repository, collection title, collection
+  number and date now come from Gemma 3 12B on a server on this Mac (`Capture/ContainerLabelGemma.swift`), in Live
+  Capture and Process Files alike; container, folder, accession and series stay with Vision + parser, the titles no
+  route reads with the user. It asks only loopback addresses (the local gateway's own first, then the LM Studio,
+  Ollama and mlx-vlm presets) and only a server that lists Gemma 3 12B (the measured MLX build first; never an Ollama
+  `-cloud` tag or a `-pt` base model), remembers the answer for two minutes, and skips a server whose call failed for
+  that window; with none, the parser's values as before. The request is `ct_read.py`'s: its prompt character for
+  character (`ContainerLabelReader.localModelPrompt`, guarded by length and ends in ArchiveCore's tests), temperature
+  0, 640 tokens, reasoning off, the upright photo at 1600 px. Reader recorded `gemma-3-12b`. Process Files' status line
+  gives the time ("about N min"). Settings' help says so.
+  **Time a label on this Mac** (`segbench-results/ct-gemma-route.md`, `scripts/segbench/ct_gemma_route.py`): through
+  mlx_vlm.server with the app's request, 60 truth photos, median 13.04 s (mean 13.6, slowest 41.8), 59 of 60 parsed.
+  Against the truth on the same 236 cells: 75.8% through the server, 78.8% in-process (a tie, -3.0, -7.7 to +1.7),
+  Vision + parser 71.6% (+4.2, -0.4 to +9.0). mlx-vlm 0.7.4 lists this build only once loaded (its index names five
+  shards, the repo has two), so it must be started with `--model`; recorded in KNOWN_ISSUES with the model-swap cost
+  beside a local OCR model (unmeasured) and the local-proxy limit.
+  Review: Opus Tier-2, no HIGH; fixed the cloud/base tag match, a loose loopback test (`LocalModelRoute.isLoopback` took
+  127.example.com), repeated failing calls; the probe lists nothing while a headless driver's no-wire seam is active.
+  Checks: test-local-models (section 8, 26 checks), test-collection-organize, test-manifest-persistence, test-recovery
+  ALL PASS; ArchiveCore 435 tests, 0 failures (additive API only, so Reader and Notes are untouched). No money spent.
+  Bench cache: kept `ct-read/results/gemma-route.json` (the report's input, counts only); nothing else written. Not in
+  ArchiveOCRBench: container reading has no page there (ct-read.md is not on it either).
+  <!-- /W47.ct-capture-gemma -->

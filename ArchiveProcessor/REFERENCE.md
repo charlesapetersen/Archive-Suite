@@ -501,7 +501,8 @@ Capture/                       Live Capture core (Tier-2):
                                deletes a source only after its output is confirmed at the destination
                                (`filedGroupIds`), via the Trash. (Recovery Core Directive.)
   ContainerLabelCapture.swift  W47.ct-processor-capture: a Box/Folder label photo read into container fields
-                               (`ContainerLabelReader` on its Vision lines; Luna on the gateway for titles) and the
+                               (`ContainerLabelReader` on its Vision lines; Luna on the gateway for titles, else
+                               Gemma 3 12B on this Mac, `ContainerLabelGemma.swift`; test-local-models §8) and the
                                finalize write into `.archivesuite/containers.json`. Card: `Views/ContainerLabelCard.swift`;
                                Process Files: `OCR/OCRProcessor+Containers.swift`. Checks: test-manifest-persistence.sh,
                                test-collection-organize.sh (W47 lines).

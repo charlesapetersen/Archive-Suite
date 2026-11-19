@@ -7,7 +7,8 @@ import ArchiveCore
 /// prompt (`ContainerLabelReader.localModelPrompt`), the upright photo, temperature 0, a 640-token cap.
 ///
 /// Measured there (`segbench-results/ct-read.md`, 4-bit MLX on the 18 GB M3 Pro): a median 14.93 s a label photo,
-/// 8.04 GB at its peak. It is used only when a server on this Mac lists it (`find`): the gateway's own address when it
+/// 8.04 GB at its peak; through mlx-vlm's server with this request, a median 13.04 s and a tie with that reading
+/// (`segbench-results/ct-gemma-route.md`). It is used only when a server on this Mac lists it (`find`): the gateway's own address when it
 /// is a local model, else the three presets' (`LocalModelRoute.Server`): only addresses on this Mac, though a server
 /// there that forwards to the cloud (a proxy) cannot be told apart. With no server answering the card proposes the
 /// parser's values, as before.
@@ -20,15 +21,17 @@ enum ContainerLabelGemma {
     static let maxTokens = 640
     /// Twice the slowest of its 192 photos there would be about 40 s; a first call also loads the model (about 8 GB).
     static let timeout: TimeInterval = 180
-    /// The measured median, for the operator (Settings) and the run's status line.
-    static let secondsPerLabel = 14.93
+    /// For Process Files' status line: the median a label through mlx-vlm's server with this request (`segbench-results/ct-gemma-route.md`, 60 photos).
+    static let secondsPerLabel = 13.04
     static let imageLongSide = 1600
     /// How long a found (or missing) server is remembered, so a run of labels asks the servers once.
     static let rememberFor: TimeInterval = 120
 
     /// The server's model list (`GET /models`). A seam for the headless contract, which answers it without a server.
+    /// `LocalModelRoute.listModels` does not go through `NetworkSession`, so while a headless driver's no-wire seam is
+    /// active it lists nothing rather than reach a real server on this Mac.
     nonisolated(unsafe) static var listModels: @Sendable (String) async throws -> [String] = {
-        try await LocalModelRoute.listModels(baseURL: $0)
+        NetworkSession.testTransportIsActive ? [] : try await LocalModelRoute.listModels(baseURL: $0)
     }
 
     struct Server: Equatable, Sendable {
