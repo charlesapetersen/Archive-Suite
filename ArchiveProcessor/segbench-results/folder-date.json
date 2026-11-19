@@ -1,0 +1,152 @@
+{
+ "item": "W47.ct-folder-date",
+ "counts": {
+  "undated agreed": 425,
+  "undated, in a folder run": 280,
+  "undated, no folder run": 145,
+  "folder photos in the labelled folders": 1840,
+  "  a year or range read by Vision + parser": 791,
+  "folder photos over an undated document": 160,
+  "  a date read by Vision + parser": 58,
+  "  of which a year or range": 57,
+  "undated, in a dated folder run (Vision + parser)": 135
+ },
+ "vision_check": {
+  "documents": [
+   1763,
+   1079
+  ],
+  "within_1": [
+   1763,
+   1241
+  ],
+  "single_year": [
+   1034,
+   458
+  ],
+  "single_year_within_1": [
+   1034,
+   587
+  ],
+  "range": [
+   729,
+   621
+  ],
+  "folders": 481,
+  "folders_all": 301,
+  "folders_none": 106,
+  "undated_dated": 135
+ },
+ "truth_photos": {
+  "in_runs": 60,
+  "dated": 29
+ },
+ "truth_check": {
+  "documents": [
+   56,
+   49
+  ],
+  "within_1": [
+   56,
+   52
+  ],
+  "single_year": [
+   14,
+   13
+  ],
+  "single_year_within_1": [
+   14,
+   14
+  ],
+  "range": [
+   42,
+   36
+  ],
+  "folders": 17,
+  "folders_all": 14,
+  "folders_none": 0,
+  "undated_dated": 9
+ },
+ "vision_on_truth_photos": {
+  "documents": [
+   48,
+   36
+  ],
+  "within_1": [
+   48,
+   46
+  ],
+  "single_year": [
+   23,
+   12
+  ],
+  "single_year_within_1": [
+   23,
+   21
+  ],
+  "range": [
+   25,
+   24
+  ],
+  "folders": 17,
+  "folders_all": 11,
+  "folders_none": 3,
+  "undated_dated": 2
+ },
+ "decade_check": [
+  76,
+  46
+ ],
+ "undated_page_years": {
+  "in_dated_runs": 135,
+  "sampled": 27,
+  "pass_year": 11,
+  "pass_within": 8,
+  "pass_within_1": 8,
+  "owner_ruled": {
+   "D03": [
+    1962,
+    1962,
+    [
+     1950,
+     1969
+    ]
+   ],
+   "D18": [
+    1970,
+    1970,
+    [
+     1971,
+     1972
+    ]
+   ],
+   "D04": [
+    1978,
+    1978,
+    [
+     1978,
+     1978
+    ]
+   ],
+   "D02": [
+    1971,
+    1971,
+    [
+     1971,
+     1973
+    ]
+   ]
+  }
+ },
+ "range_widths": {
+  "one year": 34,
+  "ten years or less": 18,
+  "over ten years": 5
+ },
+ "sheet_folder_photos": [
+  "D06",
+  "D13",
+  "D14",
+  "D18"
+ ]
+}
