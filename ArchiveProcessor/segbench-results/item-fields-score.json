@@ -678,6 +678,169 @@
   ]
  },
  "fourth_sheet_open": false,
+ "mac_owner_verdicts": {},
+ "mac_runs": {},
+ "off_kind": {
+  "byline": {
+   "kinds": {
+    "other": 2,
+    "press release": 1
+   },
+   "owner": 0,
+   "pairs": 164,
+   "routes": {
+    "app-gemini-3.8-flash": {
+     "filled": 56,
+     "read": 82,
+     "truth empty": 56
+    },
+    "app-qwen3-vl-8b": {
+     "filled": 52,
+     "read": 82,
+     "truth empty": 52
+    },
+    "app-qwen3.5-4b": {
+     "filled": 66,
+     "read": 82,
+     "right": 1,
+     "truth empty": 65
+    },
+    "app-qwen3.6-27b": {
+     "filled": 50,
+     "read": 82,
+     "truth empty": 50
+    },
+    "draft-gemini": {
+     "filled": 5,
+     "read": 164,
+     "right": 3,
+     "truth empty": 2
+    },
+    "draft-luna": {
+     "filled": 3,
+     "read": 164,
+     "right": 2,
+     "truth empty": 1
+    },
+    "extractor": {
+     "filled": 66,
+     "read": 141,
+     "truth empty": 66
+    },
+    "tagging": {
+     "filled": 113,
+     "read": 164,
+     "right": 1,
+     "truth empty": 112
+    }
+   },
+   "true": 3
+  },
+  "publication_date": {
+   "kinds": {
+    "other": 1,
+    "press release": 1
+   },
+   "owner": 0,
+   "pairs": 164,
+   "routes": {
+    "app-gemini-3.8-flash": {
+     "filled": 82,
+     "read": 82,
+     "truth empty": 82
+    },
+    "app-qwen3-vl-8b": {
+     "filled": 82,
+     "read": 82,
+     "truth empty": 82
+    },
+    "app-qwen3.5-4b": {
+     "filled": 82,
+     "read": 82,
+     "truth empty": 82
+    },
+    "app-qwen3.6-27b": {
+     "filled": 82,
+     "read": 82,
+     "truth empty": 82
+    },
+    "draft-gemini": {
+     "filled": 2,
+     "read": 164,
+     "right": 2
+    },
+    "draft-luna": {
+     "filled": 1,
+     "read": 164,
+     "right": 1
+    },
+    "extractor": {
+     "filled": 4,
+     "read": 141,
+     "truth empty": 4
+    },
+    "tagging": {
+     "filled": 164,
+     "read": 164,
+     "right": 0,
+     "truth empty": 162
+    }
+   },
+   "true": 2
+  },
+  "recipient_place": {
+   "kinds": {
+    "newspaper article": 1
+   },
+   "owner": 1,
+   "pairs": 146,
+   "routes": {
+    "app-gemini-3.8-flash": {
+     "filled": 1,
+     "read": 67,
+     "truth empty": 1
+    },
+    "app-qwen3-vl-8b": {
+     "filled": 2,
+     "read": 67,
+     "truth empty": 2
+    },
+    "app-qwen3.5-4b": {
+     "filled": 3,
+     "read": 67,
+     "truth empty": 3
+    },
+    "app-qwen3.6-27b": {
+     "filled": 4,
+     "read": 67,
+     "truth empty": 4
+    },
+    "draft-gemini": {
+     "filled": 1,
+     "read": 146,
+     "right": 1
+    },
+    "draft-luna": {
+     "filled": 2,
+     "read": 146,
+     "right": 1,
+     "truth empty": 1
+    },
+    "extractor": {
+     "filled": 5,
+     "read": 83,
+     "truth empty": 5
+    },
+    "tagging": {
+     "filled": 4,
+     "read": 146,
+     "right": 1,
+     "truth empty": 3
+    }
+   },
+   "true": 1
+  }
+ },
  "paired": {
   "drafted": {
    "byline": {

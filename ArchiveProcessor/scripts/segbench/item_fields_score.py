@@ -68,6 +68,7 @@ import corpus_survey as CS  # noqa: E402
 import date_tagging as DT  # noqa: E402
 import ent_truth as ET  # noqa: E402
 import item_fields as IF  # noqa: E402
+import item_fields_mac as IFM  # noqa: E402
 import item_fields_retruth as IR  # noqa: E402
 
 CACHE = IR.CACHE
@@ -101,6 +102,13 @@ ROUTES = [("draft-gemini", "Gemini 3.7 Flash, item prompt on the page images (dr
 SHORT = {"draft-gemini": "Gemini 3.7 image prompt", "tagging": "Gemini 3.7 app call", "app-gemini-3.8-flash":
          "Gemini 3.8 app call", "draft-luna": "Luna image prompt", "app-qwen3.6-27b": "Qwen3.6 27B",
          "app-qwen3-vl-8b": "Qwen3-VL 8B", "app-qwen3.5-4b": "Qwen3.5 4B", "extractor": "Qwen3.5 4B extractor"}
+# W47.wh-item-fields-mac: the Mac models on Vision text, the Mac readers' text and the page images, judged like the
+# other local rows (no drafter shares their family), once their readings are in the bench cache.
+for _rk, _label, _short in IFM.route_rows():
+    ROUTES.append((_rk, _label, False))
+    SHORT[_rk] = _short
+MAC = [rk for rk, *_ in ROUTES if rk.startswith("mac-")]
+OFF_KIND = ("byline", "publication_date", "recipient_place")   # the fields the app fills on its measured kinds only
 
 
 # --- values ------------------------------------------------------------------------------------------------------
@@ -362,6 +370,7 @@ def predictions(rows, docs):
     for i in ids:
         r = IF.reading(IF.EXTRACTOR, i, "extract") if rd[i]["part"] == "base" else None
         P["extractor"][i] = IF.parse(r["raw"]) if r else None
+    P.update(IFM.predictions(ids))
     for k in P:
         for i, v in P[k].items():
             if v:
@@ -511,6 +520,38 @@ def draw_routes(P, frows, skip):
                     c[1] += 1
                     c[0] += IF.filled(f, tv) and IF.field_match(f, pv, tv, "ed2")
             out[f"{rk}|{f}"] = c
+    return out
+
+
+def off_kind(P, frows, skip):
+    """The three fields the app fills on their measured kinds only, on the documents of every other kind: per field,
+    the pairs (drafted truth, and of them owner-checked) and the ones with a true value; per route, filled, right
+    (the ed2 match) and filled where the truth is empty. The truth's own definitions leave a byline and publication
+    date off correspondence and a recipient place off everything else, so most such pairs are empty by definition."""
+    out = {}
+    for f in OFF_KIND:
+        ks = IF.SCOPE[f]
+        fr = [t for t in frows if t["id"] not in skip and f not in t["unknown"] and t["label"]["kind"] not in ks]
+        o = {"pairs": len(fr), "owner": sum(1 for t in fr if t["owner"].get(f)),
+             "true": sum(1 for t in fr if IF.filled(f, t["label"][f])),
+             "kinds": dict(collections.Counter(t["label"]["kind"] for t in fr if IF.filled(f, t["label"][f]))),
+             "routes": {}}
+        for rk, *_ in ROUTES:
+            c = collections.Counter()
+            for t in fr:
+                p = P[rk].get(t["id"])
+                if p is None:
+                    continue
+                c["read"] += 1
+                pv, tv = p.get(f), t["label"][f]
+                if IF.filled(f, pv):
+                    c["filled"] += 1
+                    if IF.filled(f, tv):
+                        c["right"] += IF.field_match(f, pv, tv, "ed2")
+                    else:
+                        c["truth empty"] += 1
+            o["routes"][rk] = dict(c)
+        out[f] = o
     return out
 
 
@@ -766,6 +807,12 @@ def build():
         "tag_conflicts": tag_conflicts(P["draft-gemini"], frows, tags, skip),
         "season_year_only": season_year_only(frows, fixes, P["draft-gemini"]),
         "paired": {w: paired(P, frows, skip, w) for w in ("drafted", "owner")},
+        "off_kind": off_kind(P, frows, skip),
+        # The Mac rows judged on the owner's values alone (their stratified figure), beside their verdict on the
+        # drafted truth: the item asks for the owner-checked pairs (W47.wh-item-fields-mac).
+        "mac_owner_verdicts": {f"{rk}|{f}": verdict(scores[f"{rk}|owner|{f}"], 0.0, None, strat[f"{rk}|{f}"])
+                               for rk in MAC for f in FIELDS if strat.get(f"{rk}|{f}")},
+        "mac_runs": IFM.run_summary(),
         "rule": {"floor": FLOOR, "lower": LOWER, "point": POINT}}
     json.dump(o, open(RESULTS.replace(".md", ".json"), "w"), indent=1, sort_keys=True)
     open(RESULTS, "w").write(report(o))
@@ -789,6 +836,70 @@ def strat_cell(st):
     if not st:
         return "-"
     return f"{f2(st['precision'])} [{f2(st['lo'])}, {f2(st['hi'])}] of {st['filled']}"
+
+
+def mac_section(o):
+    """W47.wh-item-fields-mac's rows: the runs, each field's two verdicts, and the three fields off their kinds."""
+    if not MAC:
+        return []
+    c, runs, lab = o["counts"], o["mac_runs"], dict((rk, label) for rk, label, _f in ROUTES)
+    L = ["", "## The models that run on the Mac (W47.wh-item-fields-mac)", "",
+         "The owner's call 15 (2026-11-19): \"This should be tested not only with Vision but with other models that "
+         "can run on the Mac.\" Qwen3-VL 8B and Qwen3.5 4B, 4-bit MLX on this Mac, read the 299 documents with the "
+         "image prompt itself (item_fields_retruth.PROMPT), at temperature 0, thinking off, on three inputs: the "
+         "Apple Vision text alone; the Mac readers' text alone (LightOnOCR-3 4B on the handwritten part's pages, "
+         "Vision on the rest, so it differs from the first only on those 20 documents); and the drafters' own "
+         f"input, the page images (cut to {IFM.IMAGE_SIDE} px) with the Vision text. Qwen3.6 27B is not run: its "
+         "4-bit weights are about 16 GB and this Mac has 18 GB of memory. No ABBYY text; $0. Every row is in the "
+         "field tables above, judged on the drafted truth like the other local rows; the second verdict below is "
+         "on the owner's values alone (the stratified figure), which the item asks for.", "",
+         "| route | documents | unparsed | median s a document | hours | peak GB |", "|---|---|---|---|---|---|"]
+    for rk in MAC:
+        r = runs.get(rk)
+        if r:
+            L.append(f"| {lab[rk]} | {r['docs']} of {r['of']} | {r['unparsed']} | {r['median_s']} | {r['total_h']} | "
+                     f"{r['peak_gb']} |")
+    if runs.get("lighton"):
+        lt = runs["lighton"]
+        L += ["", f"LightOnOCR-3 4B read the handwritten part's {lt['pages']} pages (its card's settings, the "
+              f"1,600 px upload copies) at a median {lt['median_s']} s a page; {lt['at_max_tokens']} ran to its "
+              "token cap."]
+    L += ["", "| field | route | drafted-truth precision | verdict | owner-checked, stratified | on the owner's values |",
+          "|---|---|---|---|---|---|"]
+    for f in FIELDS:
+        for rk in MAC:
+            sd = o["scores"][f"{rk}|drafted|{f}"]
+            if not sd["docs"]:
+                continue
+            L.append(f"| {f} | {SHORT[rk]} | {frac(sd['ed2'], sd['pred_filled'])} | {o['verdicts'][f'{rk}|{f}']} | "
+                     f"{strat_cell(o['stratified'].get(f'{rk}|{f}'))} | "
+                     f"{o['mac_owner_verdicts'].get(f'{rk}|{f}', 'never filled')} |")
+    fills = [(f, SHORT[rk]) for f in FIELDS for rk in MAC if o["verdicts"][f"{rk}|{f}"] == "fill"
+             or o["mac_owner_verdicts"].get(f"{rk}|{f}") == "fill"]
+    L += ["", ("Fills by either verdict: " + "; ".join(f"{f} ({n})" for f, n in fills) + ".") if fills else
+          "No Mac route fills any field by either verdict."]
+    ok = o["off_kind"]
+    L += ["", "### Three fields off their measured kinds", "",
+          "The app fills byline and publication date on printed kinds only and recipient place on correspondence "
+          "only (ItemFieldPolicy.withheld, \"not measured on this kind\"). On the documents of every other kind: "
+          "the pairs, how many carry a true value, and each route's filled, right and filled-where-the-truth-is-"
+          "empty. The truth's definitions leave a byline and publication date off correspondence and a recipient "
+          "place off anything but correspondence, so most of these pairs are empty by definition and a value there "
+          "is the route breaking the definition.", "",
+          "| field | pairs | owner-checked | with a true value (kinds) |", "|---|---|---|---|"]
+    for f in OFF_KIND:
+        x = ok[f]
+        L.append(f"| {f} | {x['pairs']} | {x['owner']} | {x['true']}"
+                 + (" (" + ", ".join(f"{k} {n}" for k, n in sorted(x["kinds"].items())) + ")" if x["kinds"] else "")
+                 + " |")
+    L += ["", "| route | " + " | ".join(f"{f}: filled, right, truth empty" for f in OFF_KIND) + " |",
+          "|---|" + "---|" * len(OFF_KIND)]
+    for rk in ["draft-gemini", "draft-luna", "tagging"] + MAC:
+        cells = [ok[f]["routes"].get(rk) or {} for f in OFF_KIND]
+        if any(x.get("read") for x in cells):
+            L.append(f"| {SHORT[rk]} | " + " | ".join(f"{x.get('filled', 0)}, {x.get('right', 0)}, "
+                                                    f"{x.get('truth empty', 0)}" for x in cells) + " |")
+    return L
 
 
 def report(o):
@@ -974,6 +1085,7 @@ def report(o):
             if v:
                 L.append(f"| {f} | {wch} | {v.get('both', 0)} | {v.get('only 3.7', 0)} | {v.get('only 3.8', 0)} | "
                          f"{v.get('neither', 0)} |")
+    L += mac_section(o)
     L += ["", "## Pages read sideways or upside down", "",
           f"{c['sideways_docs']} documents (listed in `item-fields-retruth.md`) are out of every figure above. On "
           "them, right / filled over all fields against the drafted truth: "
@@ -1019,7 +1131,8 @@ def report(o):
           "The app's call on Vision text gives no title and returns the document's date rather than the printed "
           "issue date, so the image prompt is the route for the item fields. The local routes and the extractor "
           "ran on ABBYY text, which the app will not use (owner, 2026-10-30): their rows are a record rather than a "
-          "candidate.", "",
+          "candidate." + (" The Mac rows (W47.wh-item-fields-mac, above) read Vision text, the Mac readers' text and "
+                          "the page images instead, so they are candidates." if MAC else ""), "",
           "## Measurement card", "",
           "- **Truth:** W47.item-fields-retruth's (Gemini 3.7 and GPT 5.6 Luna drafting, Gemini 3.7 ruling) with "
           "the four owner sheets' answers and notes folded in. Sheets 2-4 (W47.item-fields-more-checks, "
@@ -1031,8 +1144,10 @@ def report(o):
           f"non-drafter routes score. The owner upheld the judge on {tot['judge right']} of the {tot['answered']} "
           f"disputes he answered, an error of {frac(tot['answered'] - tot['judge right'], tot['answered'])} on that "
           "stratum beside the controls', so a few points of truth error per field beyond the controls' on the "
-          "drafted truth (P11-6); it moves no verdict, since the rows judged on the drafted truth are ABBYY "
-          "records. The drafter-family rows are judged on the owner's values only. The fold reads a typed season or "
+          "drafted truth (P11-6); "
+          + ("it moves no verdict, since the rows judged on the drafted truth are ABBYY records. " if not MAC else
+             "for the Mac rows, judged on the drafted truth, it is why their owner-checked figure stands beside. ")
+          + "The drafter-family rows are judged on the owner's values only. The fold reads a typed season or "
           f"two-month issue as its year ({len(o['season_year_only']['typed'])} drawn publication dates were typed "
           "so), which makes a year-only reading of such a piece right: the image prompt is right that way on "
           f"{len(o['season_year_only']['year-only right'])} drawn "
@@ -1050,7 +1165,9 @@ def report(o):
           "seed 4750) from the rest, split by the image prompt's filling, chosen by no other route and no ABBYY "
           "text. The stratified figure counts each part at its own size.",
           "- **Comparison:** the image prompt and the app's call on Vision text ran on the same pages; the cached "
-          "app replies and the extractor ran on ABBYY text (FLD-4), base only.",
+          "app replies and the extractor ran on ABBYY text (FLD-4), base only"
+          + ("; the Mac rows on the same pages and Vision text as the image prompt, every part, the same prompt "
+             "word for word (its opening changed for the text-only inputs)" if MAC else "") + ".",
           "- **Noise:** Wilson intervals; the stratified interval sets each drawn part at its Wilson bounds, exact "
           "for the image prompt (one part) and conservative for the other routes; no rerun of any route here, so a "
           "route's run-to-run spread is not in the intervals.",
