@@ -149,6 +149,14 @@ ALLOW=(
   # derived from the ledger's own URL; the segment is kept, never rewritten or deleted.
   "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Core/AuditLedger.swift${SEP}try FileManager.default.moveItem(at: url, to: segment)"
 
+  # Selection ▸ Export to Zotero… (W47.ct-zotero f87bfab3, reshaped by W47.ct-zotero-tags 4e30a1ac; neither ran this
+  # lint), audited for gate-fix 2026-11-19: writes ONE new CSL-JSON file at the URL an NSSavePanel returned, the
+  # sandbox's user-selected file and nothing derived from a scanned corpus URL. Before the write,
+  # `zoteroDestinationRefusal` refuses any folder in or under the granted root, its JPEG tree, a sibling main/JPEG
+  # folder and every selected file's folder, resolved through links and compared case-folded
+  # (`ZoteroExportReaderTests`). The archive itself is only read to gather the items.
+  "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift${SEP}Result { try ZoteroExport.export(gather()).write(to: destination, options: .atomic) }"
+
   # ── rule 4 (raw POSIX write) ────────────────────────────────────────────────────────────────────
   # The audit ledger's append handle (already audited above as the ledger's own file).
   "posixwrite${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Core/AuditLedger.swift${SEP}let fd = open(url.path, O_WRONLY | O_APPEND | O_CLOEXEC)"
