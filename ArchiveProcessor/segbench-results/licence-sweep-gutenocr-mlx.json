@@ -1,0 +1,1622 @@
+{
+ "item": "W46.licence-freed-sweep",
+ "detector": "bevaya/GutenOCR-3B@fd16c80c01b04cac06c6275b32c4241e0583c2e2 (CC BY-NC 4.0), LINES prompt",
+ "default": "blla.ctc-mccatmus-conf",
+ "pairs": "pooled line pass, each route minus the default, page bootstrap",
+ "replay": {
+  "rows": 244,
+  "equal": 244
+ },
+ "tables": {
+  "word|owner-hand|truth": [
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 166,
+    "unread": 0,
+    "broken": 90,
+    "delta": null
+   },
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 166,
+    "unread": 0,
+    "broken": 59,
+    "delta": [
+     0.0,
+     -6.9879518072289155,
+     6.852248394004283
+    ]
+   },
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 153,
+    "unread": 0,
+    "broken": 78,
+    "delta": [
+     -2.736842105263158,
+     -7.775377969762419,
+     3.3783783783783785
+    ]
+   },
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 134,
+    "unread": 0,
+    "broken": 78,
+    "delta": [
+     -6.7368421052631575,
+     -13.693693693693694,
+     1.1286681715575622
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 20,
+    "lines": 475,
+    "passed": 19,
+    "unread": 0,
+    "broken": 212,
+    "delta": [
+     -30.94736842105263,
+     -37.423312883435585,
+     -25.240847784200387
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 18,
+    "unread": 0,
+    "broken": 213,
+    "delta": [
+     -31.157894736842106,
+     -37.66233766233766,
+     -25.39325842696629
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 20,
+    "lines": 475,
+    "passed": 18,
+    "unread": 0,
+    "broken": 213,
+    "delta": [
+     -31.157894736842106,
+     -37.66233766233766,
+     -25.39325842696629
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 20,
+    "lines": 475,
+    "passed": 18,
+    "unread": 0,
+    "broken": 213,
+    "delta": [
+     -31.157894736842106,
+     -37.66233766233766,
+     -25.39325842696629
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 20,
+    "lines": 475,
+    "passed": 17,
+    "unread": 0,
+    "broken": 136,
+    "delta": [
+     -31.36842105263158,
+     -37.65281173594132,
+     -25.49019607843137
+    ]
+   }
+  ],
+  "word|owner-hand|lightonocr3-4b": [
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 101,
+    "unread": 36,
+    "broken": 114,
+    "delta": null
+   },
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 88,
+    "unread": 36,
+    "broken": 89,
+    "delta": [
+     -2.736842105263158,
+     -9.090909090909092,
+     3.5714285714285716
+    ]
+   },
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 75,
+    "unread": 36,
+    "broken": 114,
+    "delta": [
+     -5.473684210526316,
+     -12.365591397849462,
+     1.2048192771084338
+    ]
+   },
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 73,
+    "unread": 36,
+    "broken": 82,
+    "delta": [
+     -5.894736842105263,
+     -10.966542750929367,
+     -0.7920792079207921
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 20,
+    "lines": 475,
+    "passed": 8,
+    "unread": 36,
+    "broken": 169,
+    "delta": [
+     -19.57894736842105,
+     -27.516778523489933,
+     -11.608961303462321
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 20,
+    "lines": 475,
+    "passed": 8,
+    "unread": 36,
+    "broken": 146,
+    "delta": [
+     -19.57894736842105,
+     -28.04123711340206,
+     -11.08829568788501
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 7,
+    "unread": 36,
+    "broken": 182,
+    "delta": [
+     -19.789473684210527,
+     -27.710843373493976,
+     -11.914893617021276
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 20,
+    "lines": 475,
+    "passed": 7,
+    "unread": 36,
+    "broken": 170,
+    "delta": [
+     -19.789473684210527,
+     -27.710843373493976,
+     -11.914893617021276
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 20,
+    "lines": 475,
+    "passed": 5,
+    "unread": 36,
+    "broken": 142,
+    "delta": [
+     -20.210526315789473,
+     -28.199566160520607,
+     -12.147505422993492
+    ]
+   }
+  ],
+  "word|owner-hand|gemini3.8-flash": [
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 167,
+    "unread": 3,
+    "broken": 40,
+    "delta": [
+     1.0526315789473684,
+     -6.483790523690773,
+     7.551487414187643
+    ]
+   },
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 162,
+    "unread": 3,
+    "broken": 76,
+    "delta": null
+   },
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 151,
+    "unread": 3,
+    "broken": 68,
+    "delta": [
+     -2.3157894736842106,
+     -7.578947368421052,
+     3.1683168316831685
+    ]
+   },
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 131,
+    "unread": 3,
+    "broken": 77,
+    "delta": [
+     -6.526315789473684,
+     -13.776722090261282,
+     1.6317016317016317
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 20,
+    "lines": 475,
+    "passed": 18,
+    "unread": 3,
+    "broken": 223,
+    "delta": [
+     -30.31578947368421,
+     -37.5,
+     -24.279835390946502
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 17,
+    "unread": 3,
+    "broken": 224,
+    "delta": [
+     -30.526315789473685,
+     -37.93103448275862,
+     -24.470134874759154
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 20,
+    "lines": 475,
+    "passed": 17,
+    "unread": 3,
+    "broken": 224,
+    "delta": [
+     -30.526315789473685,
+     -37.93103448275862,
+     -24.470134874759154
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 20,
+    "lines": 475,
+    "passed": 17,
+    "unread": 3,
+    "broken": 224,
+    "delta": [
+     -30.526315789473685,
+     -37.93103448275862,
+     -24.470134874759154
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 20,
+    "lines": 475,
+    "passed": 16,
+    "unread": 3,
+    "broken": 142,
+    "delta": [
+     -30.736842105263158,
+     -38.084632516703785,
+     -24.470588235294116
+    ]
+   }
+  ],
+  "word|owner-hand|qwen3.6-27b": [
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 164,
+    "unread": 11,
+    "broken": 65,
+    "delta": null
+   },
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 164,
+    "unread": 11,
+    "broken": 55,
+    "delta": [
+     0.0,
+     -8.369098712446352,
+     7.8277886497064575
+    ]
+   },
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 149,
+    "unread": 11,
+    "broken": 75,
+    "delta": [
+     -3.1578947368421053,
+     -9.67032967032967,
+     3.8626609442060085
+    ]
+   },
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 128,
+    "unread": 11,
+    "broken": 75,
+    "delta": [
+     -7.578947368421052,
+     -15.086206896551724,
+     0.6578947368421053
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 20,
+    "lines": 475,
+    "passed": 14,
+    "unread": 11,
+    "broken": 129,
+    "delta": [
+     -31.57894736842105,
+     -38.93129770992366,
+     -24.229979466119097
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 20,
+    "lines": 475,
+    "passed": 12,
+    "unread": 11,
+    "broken": 184,
+    "delta": [
+     -32.0,
+     -38.87530562347188,
+     -25.41322314049587
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 11,
+    "unread": 11,
+    "broken": 185,
+    "delta": [
+     -32.21052631578947,
+     -39.33054393305439,
+     -25.523012552301257
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 20,
+    "lines": 475,
+    "passed": 11,
+    "unread": 11,
+    "broken": 190,
+    "delta": [
+     -32.21052631578947,
+     -39.33054393305439,
+     -25.523012552301257
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 20,
+    "lines": 475,
+    "passed": 10,
+    "unread": 11,
+    "broken": 187,
+    "delta": [
+     -32.421052631578945,
+     -39.562624254473164,
+     -25.548902195608783
+    ]
+   }
+  ],
+  "word|L2-bentham|truth": [
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 196,
+    "unread": 0,
+    "broken": 20,
+    "delta": [
+     10.509554140127388,
+     1.8518518518518519,
+     17.079889807162534
+    ]
+   },
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 194,
+    "unread": 0,
+    "broken": 18,
+    "delta": [
+     9.872611464968152,
+     2.1806853582554515,
+     16.666666666666668
+    ]
+   },
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 163,
+    "unread": 0,
+    "broken": 16,
+    "delta": null
+   },
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 110,
+    "unread": 0,
+    "broken": 25,
+    "delta": [
+     -16.878980891719745,
+     -27.43362831858407,
+     -6.148867313915858
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 14,
+    "lines": 314,
+    "passed": 49,
+    "unread": 0,
+    "broken": 113,
+    "delta": [
+     -36.30573248407644,
+     -43.75,
+     -29.253731343283583
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 14,
+    "lines": 314,
+    "passed": 48,
+    "unread": 0,
+    "broken": 117,
+    "delta": [
+     -36.62420382165605,
+     -44.48669201520912,
+     -29.45736434108527
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 14,
+    "lines": 314,
+    "passed": 48,
+    "unread": 0,
+    "broken": 116,
+    "delta": [
+     -36.62420382165605,
+     -44.48669201520912,
+     -29.45736434108527
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 47,
+    "unread": 0,
+    "broken": 98,
+    "delta": [
+     -36.94267515923567,
+     -44.866920152091254,
+     -29.55223880597015
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 14,
+    "lines": 314,
+    "passed": 41,
+    "unread": 0,
+    "broken": 49,
+    "delta": [
+     -38.853503184713375,
+     -46.464646464646464,
+     -31.987577639751553
+    ]
+   }
+  ],
+  "word|L2-bentham|lightonocr3-4b": [
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 90,
+    "unread": 3,
+    "broken": 48,
+    "delta": [
+     4.777070063694268,
+     -2.5,
+     12.448132780082988
+    ]
+   },
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 89,
+    "unread": 3,
+    "broken": 46,
+    "delta": [
+     4.45859872611465,
+     -1.6666666666666667,
+     11.85897435897436
+    ]
+   },
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 75,
+    "unread": 3,
+    "broken": 27,
+    "delta": null
+   },
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 65,
+    "unread": 3,
+    "broken": 34,
+    "delta": [
+     -3.1847133757961785,
+     -9.876543209876543,
+     3.3240997229916895
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 14,
+    "lines": 314,
+    "passed": 5,
+    "unread": 3,
+    "broken": 74,
+    "delta": [
+     -22.29299363057325,
+     -33.21799307958477,
+     -12.759643916913946
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 14,
+    "lines": 314,
+    "passed": 5,
+    "unread": 3,
+    "broken": 74,
+    "delta": [
+     -22.29299363057325,
+     -33.21799307958477,
+     -12.759643916913946
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 14,
+    "lines": 314,
+    "passed": 4,
+    "unread": 3,
+    "broken": 75,
+    "delta": [
+     -22.611464968152866,
+     -33.45195729537367,
+     -13.056379821958457
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 4,
+    "unread": 3,
+    "broken": 73,
+    "delta": [
+     -22.611464968152866,
+     -33.45195729537367,
+     -13.056379821958457
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 14,
+    "lines": 314,
+    "passed": 3,
+    "unread": 3,
+    "broken": 10,
+    "delta": [
+     -22.929936305732483,
+     -33.61344537815126,
+     -13.355048859934854
+    ]
+   }
+  ],
+  "word|L2-bentham|qwen3.6-27b": [
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 178,
+    "unread": 1,
+    "broken": 20,
+    "delta": [
+     10.828025477707007,
+     1.2345679012345678,
+     18.41269841269841
+    ]
+   },
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 173,
+    "unread": 1,
+    "broken": 16,
+    "delta": [
+     9.235668789808917,
+     1.345291479820628,
+     16.87116564417178
+    ]
+   },
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 144,
+    "unread": 1,
+    "broken": 11,
+    "delta": null
+   },
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 95,
+    "unread": 1,
+    "broken": 20,
+    "delta": [
+     -15.605095541401274,
+     -27.794561933534744,
+     -3.103448275862069
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 14,
+    "lines": 314,
+    "passed": 42,
+    "unread": 1,
+    "broken": 109,
+    "delta": [
+     -32.48407643312102,
+     -41.791044776119406,
+     -24.624624624624623
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 41,
+    "unread": 1,
+    "broken": 110,
+    "delta": [
+     -32.802547770700635,
+     -42.2680412371134,
+     -24.691358024691358
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 14,
+    "lines": 314,
+    "passed": 41,
+    "unread": 1,
+    "broken": 111,
+    "delta": [
+     -32.802547770700635,
+     -42.2680412371134,
+     -24.691358024691358
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 14,
+    "lines": 314,
+    "passed": 41,
+    "unread": 1,
+    "broken": 110,
+    "delta": [
+     -32.802547770700635,
+     -42.2680412371134,
+     -24.691358024691358
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 14,
+    "lines": 314,
+    "passed": 35,
+    "unread": 1,
+    "broken": 57,
+    "delta": [
+     -34.71337579617835,
+     -43.93939393939394,
+     -26.3768115942029
+    ]
+   }
+  ],
+  "lab|owner-hand|truth": [
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 209,
+    "unread": 0,
+    "broken": 53,
+    "delta": null
+   },
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 192,
+    "unread": 0,
+    "broken": 47,
+    "delta": [
+     -3.5789473684210527,
+     -14.613778705636744,
+     6.51685393258427
+    ]
+   },
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 125,
+    "unread": 0,
+    "broken": 39,
+    "delta": [
+     -17.68421052631579,
+     -27.423167848699762,
+     -9.929078014184396
+    ]
+   },
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 113,
+    "unread": 0,
+    "broken": 43,
+    "delta": [
+     -20.210526315789473,
+     -28.60576923076923,
+     -11.720226843100189
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 20,
+    "lines": 475,
+    "passed": 16,
+    "unread": 0,
+    "broken": 143,
+    "delta": [
+     -40.63157894736842,
+     -49.42263279445727,
+     -32.35831809872029
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 16,
+    "unread": 0,
+    "broken": 143,
+    "delta": [
+     -40.63157894736842,
+     -49.42263279445727,
+     -32.35831809872029
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 20,
+    "lines": 475,
+    "passed": 16,
+    "unread": 0,
+    "broken": 143,
+    "delta": [
+     -40.63157894736842,
+     -49.42263279445727,
+     -32.35831809872029
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 20,
+    "lines": 475,
+    "passed": 16,
+    "unread": 0,
+    "broken": 146,
+    "delta": [
+     -40.63157894736842,
+     -49.42263279445727,
+     -32.35831809872029
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 20,
+    "lines": 475,
+    "passed": 8,
+    "unread": 0,
+    "broken": 60,
+    "delta": [
+     -42.31578947368421,
+     -51.06382978723404,
+     -33.9622641509434
+    ]
+   }
+  ],
+  "lab|owner-hand|lightonocr3-4b": [
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 102,
+    "unread": 36,
+    "broken": 53,
+    "delta": null
+   },
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 93,
+    "unread": 36,
+    "broken": 36,
+    "delta": [
+     -1.894736842105263,
+     -10.380622837370241,
+     4.8076923076923075
+    ]
+   },
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 68,
+    "unread": 36,
+    "broken": 33,
+    "delta": [
+     -7.157894736842105,
+     -13.926940639269406,
+     -1.5706806282722514
+    ]
+   },
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 48,
+    "unread": 36,
+    "broken": 36,
+    "delta": [
+     -11.368421052631579,
+     -18.451025056947607,
+     -5.380333951762523
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 20,
+    "lines": 475,
+    "passed": 7,
+    "unread": 36,
+    "broken": 111,
+    "delta": [
+     -20.0,
+     -28.940568475452196,
+     -11.52482269503546
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 20,
+    "lines": 475,
+    "passed": 4,
+    "unread": 36,
+    "broken": 79,
+    "delta": [
+     -20.63157894736842,
+     -29.447852760736197,
+     -12.284069097888676
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 4,
+    "unread": 36,
+    "broken": 95,
+    "delta": [
+     -20.63157894736842,
+     -29.33884297520661,
+     -12.380952380952381
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 20,
+    "lines": 475,
+    "passed": 3,
+    "unread": 36,
+    "broken": 83,
+    "delta": [
+     -20.842105263157894,
+     -29.652351738241308,
+     -12.523719165085389
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 20,
+    "lines": 475,
+    "passed": 2,
+    "unread": 36,
+    "broken": 68,
+    "delta": [
+     -21.05263157894737,
+     -29.83539094650206,
+     -12.775330396475772
+    ]
+   }
+  ],
+  "lab|owner-hand|gemini3.8-flash": [
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 196,
+    "unread": 3,
+    "broken": 48,
+    "delta": null
+   },
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 188,
+    "unread": 3,
+    "broken": 44,
+    "delta": [
+     -1.6842105263157894,
+     -12.4282982791587,
+     8.636363636363637
+    ]
+   },
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 125,
+    "unread": 3,
+    "broken": 31,
+    "delta": [
+     -14.947368421052632,
+     -24.337349397590362,
+     -7.218683651804671
+    ]
+   },
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 116,
+    "unread": 3,
+    "broken": 38,
+    "delta": [
+     -16.842105263157894,
+     -25.59652928416486,
+     -8.00711743772242
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 20,
+    "lines": 475,
+    "passed": 13,
+    "unread": 3,
+    "broken": 140,
+    "delta": [
+     -38.526315789473685,
+     -47.735849056603776,
+     -29.646017699115045
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 13,
+    "unread": 3,
+    "broken": 140,
+    "delta": [
+     -38.526315789473685,
+     -47.735849056603776,
+     -29.646017699115045
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 20,
+    "lines": 475,
+    "passed": 13,
+    "unread": 3,
+    "broken": 140,
+    "delta": [
+     -38.526315789473685,
+     -47.735849056603776,
+     -29.646017699115045
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 20,
+    "lines": 475,
+    "passed": 13,
+    "unread": 3,
+    "broken": 143,
+    "delta": [
+     -38.526315789473685,
+     -47.735849056603776,
+     -29.646017699115045
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 20,
+    "lines": 475,
+    "passed": 6,
+    "unread": 3,
+    "broken": 63,
+    "delta": [
+     -40.0,
+     -49.134199134199136,
+     -31.078610603290677
+    ]
+   }
+  ],
+  "lab|owner-hand|qwen3.6-27b": [
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 204,
+    "unread": 11,
+    "broken": 42,
+    "delta": null
+   },
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 182,
+    "unread": 11,
+    "broken": 38,
+    "delta": [
+     -4.631578947368421,
+     -14.89795918367347,
+     4.166666666666667
+    ]
+   },
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 119,
+    "unread": 11,
+    "broken": 24,
+    "delta": [
+     -17.894736842105264,
+     -26.940639269406393,
+     -10.262008733624453
+    ]
+   },
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 111,
+    "unread": 11,
+    "broken": 35,
+    "delta": [
+     -19.57894736842105,
+     -27.69607843137255,
+     -10.991379310344827
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 20,
+    "lines": 475,
+    "passed": 14,
+    "unread": 11,
+    "broken": 121,
+    "delta": [
+     -40.0,
+     -49.01477832512315,
+     -30.892448512585812
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 20,
+    "lines": 475,
+    "passed": 14,
+    "unread": 11,
+    "broken": 121,
+    "delta": [
+     -40.0,
+     -49.01477832512315,
+     -30.892448512585812
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 20,
+    "lines": 475,
+    "passed": 14,
+    "unread": 11,
+    "broken": 122,
+    "delta": [
+     -40.0,
+     -49.01477832512315,
+     -30.892448512585812
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 20,
+    "lines": 475,
+    "passed": 14,
+    "unread": 11,
+    "broken": 128,
+    "delta": [
+     -40.0,
+     -49.01477832512315,
+     -30.892448512585812
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 20,
+    "lines": 475,
+    "passed": 6,
+    "unread": 11,
+    "broken": 48,
+    "delta": [
+     -41.68421052631579,
+     -50.354609929078016,
+     -33.093525179856115
+    ]
+   }
+  ],
+  "lab|L2-bentham|truth": [
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 176,
+    "unread": 0,
+    "broken": 3,
+    "delta": [
+     16.24203821656051,
+     5.51948051948052,
+     26.50602409638554
+    ]
+   },
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 158,
+    "unread": 0,
+    "broken": 6,
+    "delta": [
+     10.509554140127388,
+     -5.128205128205129,
+     25.364431486880466
+    ]
+   },
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 125,
+    "unread": 0,
+    "broken": 2,
+    "delta": null
+   },
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 87,
+    "unread": 0,
+    "broken": 6,
+    "delta": [
+     -12.101910828025478,
+     -20.905923344947734,
+     -3.8805970149253732
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 14,
+    "lines": 314,
+    "passed": 26,
+    "unread": 0,
+    "broken": 76,
+    "delta": [
+     -31.528662420382165,
+     -39.0,
+     -24.074074074074073
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 26,
+    "unread": 0,
+    "broken": 59,
+    "delta": [
+     -31.528662420382165,
+     -39.0,
+     -24.074074074074073
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 14,
+    "lines": 314,
+    "passed": 26,
+    "unread": 0,
+    "broken": 77,
+    "delta": [
+     -31.528662420382165,
+     -39.0,
+     -24.074074074074073
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 14,
+    "lines": 314,
+    "passed": 26,
+    "unread": 0,
+    "broken": 76,
+    "delta": [
+     -31.528662420382165,
+     -39.0,
+     -24.074074074074073
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 14,
+    "lines": 314,
+    "passed": 13,
+    "unread": 0,
+    "broken": 21,
+    "delta": [
+     -35.6687898089172,
+     -42.279411764705884,
+     -29.226361031518625
+    ]
+   }
+  ],
+  "lab|L2-bentham|lightonocr3-4b": [
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 80,
+    "unread": 3,
+    "broken": 11,
+    "delta": [
+     7.006369426751593,
+     -3.4482758620689653,
+     15.972222222222221
+    ]
+   },
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 65,
+    "unread": 3,
+    "broken": 6,
+    "delta": [
+     2.229299363057325,
+     -2.848101265822785,
+     6.934306569343065
+    ]
+   },
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 58,
+    "unread": 3,
+    "broken": 10,
+    "delta": null
+   },
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 35,
+    "unread": 3,
+    "broken": 4,
+    "delta": [
+     -7.32484076433121,
+     -12.828947368421053,
+     -2.710843373493976
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 14,
+    "lines": 314,
+    "passed": 2,
+    "unread": 3,
+    "broken": 41,
+    "delta": [
+     -17.8343949044586,
+     -27.112676056338028,
+     -9.495548961424332
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 14,
+    "lines": 314,
+    "passed": 2,
+    "unread": 3,
+    "broken": 41,
+    "delta": [
+     -17.8343949044586,
+     -27.112676056338028,
+     -9.495548961424332
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 14,
+    "lines": 314,
+    "passed": 1,
+    "unread": 3,
+    "broken": 42,
+    "delta": [
+     -18.15286624203822,
+     -27.430555555555557,
+     -9.810126582278482
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 1,
+    "unread": 3,
+    "broken": 42,
+    "delta": [
+     -18.15286624203822,
+     -27.430555555555557,
+     -9.810126582278482
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 14,
+    "lines": 314,
+    "passed": 0,
+    "unread": 3,
+    "broken": 7,
+    "delta": [
+     -18.471337579617835,
+     -27.675276752767527,
+     -10.21671826625387
+    ]
+   }
+  ],
+  "lab|L2-bentham|qwen3.6-27b": [
+   {
+    "route": "ppocrv6.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 167,
+    "unread": 1,
+    "broken": 4,
+    "delta": [
+     17.515923566878982,
+     6.644518272425249,
+     27.808988764044944
+    ]
+   },
+   {
+    "route": "orli.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 142,
+    "unread": 1,
+    "broken": 5,
+    "delta": [
+     9.554140127388536,
+     -4.248366013071895,
+     23.270440251572328
+    ]
+   },
+   {
+    "route": "blla.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 112,
+    "unread": 1,
+    "broken": 2,
+    "delta": null
+   },
+   {
+    "route": "surya.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 87,
+    "unread": 1,
+    "broken": 4,
+    "delta": [
+     -7.961783439490445,
+     -15.699658703071673,
+     -0.8547008547008547
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-cer",
+    "pages": 14,
+    "lines": 314,
+    "passed": 16,
+    "unread": 1,
+    "broken": 78,
+    "delta": [
+     -30.573248407643312,
+     -36.08562691131498,
+     -25.16778523489933
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-conf",
+    "pages": 14,
+    "lines": 314,
+    "passed": 16,
+    "unread": 1,
+    "broken": 79,
+    "delta": [
+     -30.573248407643312,
+     -36.08562691131498,
+     -25.16778523489933
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-lines",
+    "pages": 14,
+    "lines": 314,
+    "passed": 16,
+    "unread": 1,
+    "broken": 80,
+    "delta": [
+     -30.573248407643312,
+     -36.08562691131498,
+     -25.16778523489933
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s1",
+    "pages": 14,
+    "lines": 314,
+    "passed": 16,
+    "unread": 1,
+    "broken": 79,
+    "delta": [
+     -30.573248407643312,
+     -36.08562691131498,
+     -25.16778523489933
+    ]
+   },
+   {
+    "route": "gutenocr.ctc-mccatmus-s8",
+    "pages": 14,
+    "lines": 314,
+    "passed": 11,
+    "unread": 1,
+    "broken": 33,
+    "delta": [
+     -32.1656050955414,
+     -37.62376237623762,
+     -26.54320987654321
+    ]
+   }
+  ]
+ }
+}

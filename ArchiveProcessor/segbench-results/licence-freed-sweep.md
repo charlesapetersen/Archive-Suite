@@ -7,7 +7,7 @@ went through a small pilot on inputs an earlier item already scored, with every 
 so only the new arm is new. A full run was made only where the pilot could change a pick.
 
 Script: `scripts/segbench/licence_sweep.py` (subcommands `layoutreader`, `hunyuan-prep`, `readers`, `bln600`,
-`signature`, `gutenocr-prep`, `gutenocr-lines`), with new arms in `ocr_mac_local.py` (HunyuanOCR-1.5, FastVLM),
+`signature`, `gutenocr-prep`, `gutenocr-lines`, `gutenocr-check`), with new arms in `ocr_mac_local.py` (HunyuanOCR-1.5, FastVLM),
 `dewarp_extra_arms.py` and `dewarp_placement.py` (DocScanner, DocGeoNet) and `place_hands.py` (GutenOCR). Figures:
 `licence-sweep-*.json` and `dewarp-placement.json`. All of it ran on this Mac. No API call was made and nothing was
 spent.
@@ -19,7 +19,7 @@ spent.
 | LayoutReader | reading order | CC BY-NC-SA 4.0 | the three layout-order panels in full | ties the free rows-first XY-cut on lines, loses on regions: no pick changes |
 | HunyuanOCR-1.5 | Mac reader | Tencent Hunyuan community licence, not for users in the EU, UK or South Korea | 25 of the 96, then the 96 in full | ties Apple Vision, behind LightOnOCR-3 4B 8-bit and Xiaomi-OCR-0: no pick changes |
 | FastVLM 0.5B | Mac reader | Apple AMLR (research only) | the 96 | 45 of 96 run to the token cap; strict NES 0.281: no |
-| GutenOCR-3B | placement lines | CC BY-NC 4.0 | the 41 place-hands pages | inconclusive: its boxes come back squeezed in height on this runtime; a rerun on its reference runtime is filed (W46.gutenocr-lines-ref) |
+| GutenOCR-3B | placement lines | CC BY-NC 4.0 | the 41 place-hands pages | on its card's runtime (W46.gutenocr-lines-ref) it ties the shipped placer with the app's line writer and stays behind PP-OCRv6 on Bentham; at 12 times blla's time a page: no pick changes |
 | Surya-2 | placement lines | OpenRAIL-M | none possible | surya-ocr 0.24 has no line detector: no |
 | DocScanner-L, DocGeoNet | dewarp | the authors' non-commercial licence | the 64 dewarp-placement pages in full | both crop the page; the guard holds them back: no |
 | tech4humans signature detector | marks | YOLOv8s AGPL-3.0, gated | an ungated sibling from the same authors, Apache-2.0 | ties the YOLO11m marks detector on recall, worse at IoU 0.5: no |
@@ -114,19 +114,44 @@ Two shims were needed:
 
 The shipped placer's 244 page rows, re-dragged with this build of the writer and drag tool, equal their stored rows.
 
-| Line pass, lines both score | Shipped placer (blla + McCATMuS conf) | GutenOCR + McCATMuS conf |
-|---|---|---|
-| Owner hands, truth reading, word writer | 34.9 (166/475) | 3.8 (18/475), −31.2 (−37.7 to −25.4) |
-| Owner hands, truth reading, lab writer | 44.0 (209/475) | 3.4 (16/475), −40.6 (−49.4 to −32.4) |
-| Bentham, truth reading, word writer | 51.9 (163/314) | 15.0 (47/314), −36.9 (−44.9 to −29.6) |
+**On mlx-vlm the boxes were squeezed in height.** Their lines numbered about what kraken finds and their x extents
+matched kraken's lines, but on every one of the 41 pages the lowest box ended at about half the height of kraken's
+lowest line (median 0.547 of it; p007: the last box ends at y 896 of 1,792, kraken's last line at 1,510). Four pages
+ran to the 6,144-token cap. The line pass then fell 31 to 41 points below the shipped placer, which measured the
+runtime, not the model (`licence-sweep-gutenocr-mlx.json`). The processor files were not the cause: both
+`preprocessor_config.json` and `processor_config.json` name Qwen2VLImageProcessorFast. The Qwen3VLImageProcessor
+first reported here came from the mlx conversion's copy.
 
-**This does not measure the model.** Its lines number about what kraken finds (15 against 20 on p007, 20 against 23
-and 25 against 28 on two Bentham pages), and their x extents match kraken's lines. Their y extents stop at about 0.6
-of the page's height, on 11 pages checked (p007: the last box ends at y 896 of 1,792, and kraken's last line at
-1,510). So the boxes come back squeezed in height on this runtime, and every drag misses. Four pages also ran to the
-6,144-token cap. Its processor files disagree (`preprocessor_config.json` names Qwen2VLImageProcessorFast,
-`processor_config.json` Qwen3VLImageProcessor), and that is the likeliest cause. The authors' reference runtime
-(transformers, `qwen_vl_utils`) was not tried. `W46.gutenocr-lines-ref` reruns it there before any verdict.
+**On the card's runtime they lie on kraken's lines (W46.gutenocr-lines-ref).** `place_hands.py detect gutenocr` now
+runs the model card's code: transformers 5.22 `Qwen2_5_VLForConditionalGeneration` in bf16 on MPS, `qwen_vl_utils`'
+`process_vision_info` and the repository's chat template, greedy, with the config loaded tied and the tie asserted
+after loading. The input is the same 1,792 px page, and the processor's grid is asserted equal to it. The card feeds
+the page at full size, but a full page (12.5 Mpx, about 16,000 visual tokens) does not fit beside other sessions. The
+mlx route is kept as `detect gutenocr-mlx`. `licence_sweep.py gutenocr-check` compares both runtimes with kraken blla
+(`licence-sweep-gutenocr-check.json`). On the card's runtime the lowest box ends at a median 0.997 of blla's lowest
+line, and a median 96.6% of the boxes' centres fall inside a blla line that overlaps them in x. On mlx the figures
+were 0.547 and 71.4%. No page ran to the cap. The run took 32 to 216 s a page, a median of 71 s, against 6 s for
+blla. One page, p094, still disagrees: 19 boxes against blla's 8, with 10% on a blla line.
+
+| Line pass, lines both score | Shipped placer (blla + McCATMuS conf) | GutenOCR + McCATMuS conf, card's runtime | mlx-vlm 8-bit, for the record |
+|---|---|---|---|
+| Owner hands, truth reading, lab writer (the app's) | 44.0 (209/475) | 40.2 (191/475), −3.8 (−11.8 to +4.1) | 3.4, −40.6 |
+| Owner hands, Qwen3.6-27B reading, lab writer | 42.9 (204/475) | 39.6 (188/475), −3.4 (−10.8 to +4.7) | 2.9, −40.0 |
+| Owner hands, LightOnOCR-3 reading, lab writer | 21.5 (102/475) | 17.1 (81/475), −4.4 (−9.3 to −0.2) | 0.8, −20.6 |
+| Bentham, truth reading, lab writer | 39.8 (125/314) | 35.4 (111/314), −4.5 (−17.9 to +10.0) | 8.3, −31.5 |
+| Bentham, Qwen3.6-27B reading, lab writer | 35.7 (112/314) | 34.1 (107/314), −1.6 (−14.5 to +12.5) | 5.1, −30.6 |
+| Owner hands, truth reading, word writer | 34.9 (166/475) | 43.6 (207/475), +8.6 (+3.5 to +13.5) | 3.8, −31.2 |
+| Owner hands, Qwen3.6-27B reading, word writer | 34.5 (164/475) | 42.1 (200/475), +7.6 (+0.2 to +14.4) | 2.3, −32.2 |
+| Bentham, truth reading, word writer | 51.9 (163/314) | 70.1 (220/314), +18.2 (+11.7 to +23.7) | 15.0, −36.9 |
+| Bentham, Qwen3.6-27B reading, word writer | 45.9 (144/314) | 64.0 (201/314), +18.2 (+12.0 to +24.4) | 13.1, −32.8 |
+
+**Verdict: no pick changes.** With the app's line writer GutenOCR ties the shipped placer on the owner's hands with
+every reading but LightOnOCR-3, where it loses 4.4. On Bentham it ties blla and stays well behind PP-OCRv6's lines
+(56.1 with the truth reading, against its 35.4). It also costs about 12 times blla's time a page and is CC BY-NC.
+With the word writer it leads on both collections, by 8 points on the owner's hands and 18 on Bentham, ahead of
+PP-OCRv6 there (62.4) as well. The word writer is not the app's, and the shipped placer passes more lines with the
+lab writer (44.0) than GutenOCR does with the word writer (43.6) on the owner's hands. So the win does not carry over
+to the app. It would matter only if the app's writer changed, and then GutenOCR is worth rescoring with it.
 
 **Surya-2.** surya-ocr 0.24 (the Surya-2 release, checkpoint surya-ocr-2.5) has no text-line detector any more. One
 VLM, served through llama.cpp, vLLM or mlx-vlm, returns layout blocks with their HTML, and nothing at line level, so
@@ -208,12 +233,12 @@ not worth the owner's time unless he wants it measured as named.
   No tested route and no ABBYY text chose anything.
 - **Comparison.** Each new arm sees the same inputs and settings as the incumbents beside it. Incumbents were rerun in
   the same process (layout order, dewarp) or read from their committed per-page rows (readers, placement, marks).
-- **Noise.** Every arm here is deterministic on one machine (greedy decoding, CPU or MLX), so the rerun floor is 0 and
+- **Noise.** Every arm here is deterministic on one machine (greedy decoding, CPU, MLX or MPS), so the rerun floor is 0 and
   the paired interval alone tests a gap.
 - **Scope.**
   - The readers ran on the 96 only. HunyuanOCR-1.5's 895 half was not run, since the 96 show it changes no pick.
   - FastVLM's prompt is ours, since it has none of its own.
   - The signature result is a stand-in for the gated model, not the model itself.
   - BLN600 was read by Apple Vision alone.
-  - GutenOCR's placement figures are this runtime's, not the model's (above).
+  - GutenOCR ran at 1,792 px, not at the full page size its card uses (above), and on one runtime, transformers bf16 on MPS.
   - `ocr-scorers.json` and `ocr-scorers.md` are not regenerated: a full `ocr_rescore.py` run here would drop six Sherlock routes whose raw results are no longer on this Mac. The two new routes' 192 page rows were appended to `ocr-scorers-pages.csv` from the same rescore, whose rows for an untouched route (LightOnOCR-3 4B 8-bit) equal the committed ones on all 96 pages.

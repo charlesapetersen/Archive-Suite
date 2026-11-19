@@ -313,7 +313,11 @@ def gutenocr_lines() -> int:
     (WORK / "gutenocr-lines-rows.jsonl").write_text("".join(json.dumps(r) + "\n" for r in new))
     rows = [r for r in L.load_rows() if r["detector"] != "gutenocr"] + new
     keep = {L.DEFAULT, "ppocrv6.ctc-mccatmus-conf", "surya.ctc-mccatmus-conf", "orli.ctc-mccatmus-conf"}
-    out = {"item": "W46.licence-freed-sweep", "detector": f"{PH.GUTEN[0]}@{PH.GUTEN[1]} (CC BY-NC 4.0), LINES prompt",
+    # W46.licence-freed-sweep scored the mlx-vlm 8-bit run (licence-sweep-gutenocr-mlx.json, boxes squeezed in height);
+    # W46.gutenocr-lines-ref reran detect gutenocr on the card's transformers runtime, which this file now holds.
+    first = json.loads(next((PH.CACHE / "lines/gutenocr").glob("*.json")).read_text())
+    out = {"item": "W46.gutenocr-lines-ref", "detector": f"{PH.GUTEN[0]}@{PH.GUTEN[1]} (CC BY-NC 4.0), LINES prompt",
+           "runtime": first.get("device"), "input": "1,792 px on the longer side",
            "default": L.DEFAULT, "pairs": "pooled line pass, each route minus the default, page bootstrap",
            "replay": {"rows": len(replay), "equal": same}, "tables": {}}
     for w in L.WRITERS:
