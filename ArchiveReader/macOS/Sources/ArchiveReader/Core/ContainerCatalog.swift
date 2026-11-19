@@ -329,60 +329,15 @@ struct ContainerCatalog: Sendable {
             fileDirectories.append(dir)
         }
 
-        // Every directory on the way up is read once, whichever file asks first.
-        var files: [String: ContainerFile?] = [:]
-        var maps: [String: ContainerLoad<ContainerLevelMap>] = [:]
-        var namesAt: [String: ContainerLoad<ContainerNames>] = [:]
-        func url(_ components: [String]) -> URL {
-            components.reduce(treeRoot) { $0.appendingPathComponent($1, isDirectory: true) }
-        }
-        func containerFile(_ components: [String]) -> ContainerFile? {
-            let key = components.joined(separator: "/")
-            if let cached = files[key] { return cached }
-            let file = ContainerFileStore.load(directory: url(components)).document
-            files[key] = file
-            return file
-        }
-        func levelMap(_ components: [String]) -> ContainerLoad<ContainerLevelMap> {
-            let key = components.joined(separator: "/")
-            if let cached = maps[key] { return cached }
-            let map = ContainerFileStore.loadLevelMap(root: url(components))
-            maps[key] = map
-            return map
-        }
-        func names(_ components: [String]) -> ContainerLoad<ContainerNames> {
-            let key = components.joined(separator: "/")
-            if let cached = namesAt[key] { return cached }
-            let found = ContainerFileStore.loadNames(root: url(components))
-            namesAt[key] = found
-            return found
-        }
-        func isMissing<D>(_ load: ContainerLoad<D>) -> Bool {
-            if case .missing = load { return true }
-            return false
-        }
-
-        let rootMap = levelMap([])
+        // Every directory on the way up is read once, whichever file asks first (`ContainerLookup`, shared with
+        // Notes and the Zotero export).
+        let lookup = ContainerLookup(treeRoot: treeRoot)
+        let rootMap = lookup.levelMap([])
         var contexts: [String: DirectoryContext] = [:]
         var rows: [String: ContainerRow] = [:]
         for (key, entry) in byDirectory {
-            let dir = entry.components
-            // The nearest level map and standard names at or above the directory (SPEC §The level map). The nearest
-            // one wins even when this build cannot read it: its subtree then gets none, not an outer one's.
-            let mapDepth = (0...dir.count).reversed().first { !isMissing(levelMap(Array(dir[0..<$0]))) }
-            let nameDepth = (0...dir.count).reversed().first { !isMissing(names(Array(dir[0..<$0]))) }
-            var scopes: [ContainerScope]
-            if let m = mapDepth, let map = levelMap(Array(dir[0..<m])).document {
-                let below = Array(dir[m...])
-                let chain = (0...below.count).map { containerFile(Array(dir[0..<(m + $0)])) }
-                scopes = map.scopes(for: below, files: chain)
-                // Above the map's folder, only the container files' directory values apply.
-                scopes += (0..<m).reversed().map { ContainerScope(file: containerFile(Array(dir[0..<$0]))) }
-            } else {
-                scopes = (0...dir.count).reversed().map { ContainerScope(file: containerFile(Array(dir[0..<$0]))) }
-            }
-            var context = DirectoryContext(scopes: scopes,
-                                           names: nameDepth.flatMap { names(Array(dir[0..<$0])).document })
+            let (scopes, names) = lookup.context(directory: entry.components)
+            var context = DirectoryContext(scopes: scopes, names: names)
             context.files = entry.files.map(\.name)
             // A directory with no container file and no folder values above it has nothing to disagree about.
             if scopes.contains(where: { $0.file != nil || !$0.pathFields.isEmpty }) {

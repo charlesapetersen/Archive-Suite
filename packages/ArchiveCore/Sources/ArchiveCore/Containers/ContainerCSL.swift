@@ -12,7 +12,16 @@ public struct ContainerCSL: Equatable, Sendable {
     public var noteLines: [String]
 
     public init(_ record: ResolvedContainer) {
-        let v = { (f: ContainerField) in record.shown(f) }
+        self.init(value: { record.shown($0) })
+    }
+
+    /// From the values as an app shows them (`ContainerDisplay.values`: title case, standard names), which is what
+    /// the Zotero export sends (W47.ct-zotero).
+    public init(shown: [ContainerField: String]) {
+        self.init(value: { shown[$0] })
+    }
+
+    private init(value v: (ContainerField) -> String?) {
         var vars: [String: String] = [:]
         vars["archive"] = v(.repository)
         vars["archive-place"] = v(.place)
