@@ -206,6 +206,11 @@ stated as a rule; its full wording, history and the cases behind it are in [`REF
   and will not be topped up; no bench or review work plans on it. Gemini goes through the gateway only; newer Google
   models are requested for the gateway at nice-to-have (`W46.gateway-google-models`). The app's Gemini-key route for
   users is unchanged.
+  **Exception to 1 Dec 2026 (owner, 2026-11-18):** the owner put $5 on that key while the gateway's November $50 is
+  spent. Until the gateway resets on 1 Dec, bench or review work that needs a Gemini model the key serves may use it,
+  up to the $5 in all across items; each item records what it spent in its DONE entry and the Daemon Report, and the
+  $7-per-item rule still applies. Work that needs a non-Google model (Sonnet 5 for W46.owner-set-grow, GPT, Claude)
+  still waits for the gateway. From 1 Dec the rule above applies again and nothing plans on the remainder.
 - ✅ **Benchmark uploads are authorized (owner, 2026-10-25).** The frozen 96 owner benchmark pages and 12 public pages,
   with their region and tile crops, may go to `https://aiapi-prod.stanford.edu/v1/chat/completions` (Processor Gateway
   key, Gemini 3.7 Flash); adjudicated truth text is not sent. Comparable benchmark image uploads and experiment work
