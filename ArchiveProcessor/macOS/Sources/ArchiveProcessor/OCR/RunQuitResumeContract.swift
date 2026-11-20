@@ -9,6 +9,7 @@ import PDFKit
 /// resume reads only the pages left, and no page is read twice. Also the Interrupted Run box's note for pages missing
 /// since the run began, the guard that sends nothing for them, the sleep hold, and a Stop that takes the quit back.
 /// W49.proc-stop-saves-inflight: Stop waits the same way (and Stop Now does not), and the mixed-PDF route waits too.
+/// W49.proc-quit-waits-batch-submit: a quit or Stop during a paid batch's create request waits for its reply.
 /// The journal is redirected into a temporary directory the way `InstitutionalComputeImportTestDriver` does it;
 /// nothing outside it is read or written.
 ///
@@ -269,7 +270,117 @@ enum RunQuitResumeContract {
 
         try? fm.removeItem(at: manifest)
         await mixedRouteWaits(root: root, gate: gate) { check($0, $1, $2) }
+        await batchSubmissionWaits(root: root, quits: quits) { check($0, $1, $2) }
         finish(results)
+    }
+
+    /// The batch's requests in order, held until released; the create's reply is a job name or, failing, a 500.
+    private actor BatchServer {
+        var open = false
+        var failCreate = false
+        var urls: [String] = []
+        func arrive(_ url: String) { urls.append(url) }
+        func isOpen() -> Bool { open }
+        func reset(failCreate: Bool) { open = false; self.failCreate = failCreate; urls = [] }
+        func release() { open = true }
+        func failing() -> Bool { failCreate }
+        func sent() -> [String] { urls }
+    }
+
+    /// W49.proc-quit-waits-batch-submit: a quit or Stop asked while a paid batch's create request is out waits for the
+    /// reply. A quit then leaves the job running, journaled as submitted, for Resume; Stop cancels it with the provider;
+    /// a create that fails drops the wait, so the app stays open on the failure message.
+    private static func batchSubmissionWaits(root: URL, quits: QuitCount,
+                                             check: (String, Bool, String) -> Void) async {
+        let server = BatchServer()
+        NetworkSession.testTransport = { request in
+            let url = request.url?.absoluteString ?? ""
+            await server.arrive(url)
+            while !(await server.isOpen()) { try await Task.sleep(nanoseconds: 20_000_000) }
+            let failing = await server.failing()
+            let failed = url.contains(":batchGenerateContent") && failing
+            let job = url.contains(":batchGenerateContent") ? #"{"name":"batches/quit-test"}"# : "{}"
+            let response = HTTPURLResponse(url: request.url ?? URL(string: "https://x.invalid")!,
+                                           statusCode: failed ? 500 : 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+            return (Data((failed ? #"{"error":{"message":"test failure"}}"# : job).utf8), response)
+        }
+        let image = root.appendingPathComponent("batch-page.jpg")
+        let out = root.appendingPathComponent("batch-out", isDirectory: true)
+        try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+        guard makeJPEG(image, shade: 0.4) else { check("the batch fixture is written", false, ""); return }
+        let journal = OCRProcessor.pendingBatchURL
+        let model = LLMModel.geminiModels[0]
+
+        func submit(_ ask: (OCRProcessor) -> Void, failCreate: Bool = false) async -> (OCRProcessor, Bool, [String]) {
+            OCRProcessor.deletePendingBatch()
+            await server.reset(failCreate: failCreate)
+            let processor = OCRProcessor()
+            processor.taggingMode = .none
+            processor.jobs = [OCRJob(sourceURL: image)]
+            processor.isProcessing = true
+            let run = Task {
+                await processor.performBatchOCR(
+                    fileURLs: [image], originalFiles: [image], provider: .gemini, model: model, thinkingLevel: nil,
+                    apiKey: "test-key", outputDirectory: out, sendPreviousImage: false, enableTagging: false)
+            }
+            processor.processingTask = run
+            let sent = await waitFor { await !server.sent().isEmpty }
+            let waitable = sent && processor.ocrPhaseActive && processor.drainablePassKind == .batchSubmission
+            ask(processor)
+            await server.release()
+            await run.value
+            await processor.batchCancellationTask?.value
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            return (processor, waitable, await server.sent())
+        }
+
+        // A quit: waits for the reply, records the job, quits, and asks the provider for nothing more.
+        let quitsBefore = quits.value
+        var askedMessage = ""
+        let (quitter, quitWaitable, quitSent) = await submit {
+            $0.beginQuitWhenPagesSaved()
+            askedMessage = $0.statusMessage
+        }
+        _ = await waitFor { quits.value > quitsBefore }
+        let kept = OCRProcessor._testReadPendingBatch(from: journal)
+        check("a batch submission counts as a pass a quit can wait on", quitWaitable, quitSent.joined(separator: " "))
+        check("the quit says it waits for the batch's reply", askedMessage == OCRProcessor.batchQuitWaitMessage,
+              askedMessage)
+        check("the quit lands once the job is journaled as submitted", quits.value == quitsBefore + 1
+              && OCRProcessor.quitApproved && kept?.submissionComplete == true
+              && kept?.submittedChunkIds == ["batches/quit-test"],
+              "quits \(quits.value - quitsBefore), journal \(kept.map { "\($0.submittedChunkIds)" } ?? "none")")
+        check("a quit neither cancels the job nor polls it", quitSent.count == 1 && !quitter.isProcessing
+              && quitter.statusMessage == OCRProcessor.batchQuitRecordedMessage,
+              "\(quitSent), \(quitter.statusMessage)")
+        OCRProcessor.quitApproved = false
+
+        // Stop: waits for the reply too, then cancels the job it now knows; the app stays open.
+        let (stopper, _, stopSent) = await submit { $0.requestStop() }
+        check("Stop during a batch submission waits, then cancels the recorded job",
+              stopSent.count == 2 && stopSent[1].contains("batches/quit-test:cancel")
+              && !stopper.isProcessing && !stopper.drainingPages && quits.value == quitsBefore + 1
+              && !FileManager.default.fileExists(atPath: journal.path),
+              "\(stopSent), journal \(FileManager.default.fileExists(atPath: journal.path) ? "kept" : "gone")")
+
+        // Stop, then a quit: the Stop still cancels the job, and the app quits once that is done.
+        let (both, _, bothSent) = await submit {
+            $0.requestStop()
+            $0.beginQuitWhenPagesSaved()
+        }
+        _ = await waitFor { quits.value > quitsBefore + 1 }
+        check("a quit after Stop still cancels the job, then quits",
+              bothSent.count == 2 && bothSent[1].contains("batches/quit-test:cancel") && quits.value == quitsBefore + 2
+              && !both.isProcessing && !FileManager.default.fileExists(atPath: journal.path),
+              "\(bothSent), quits \(quits.value - quitsBefore)")
+        OCRProcessor.quitApproved = false
+
+        // A create that fails: the run reports it and the quit is dropped, so the message stays on screen.
+        let (failed, _, _) = await submit({ $0.beginQuitWhenPagesSaved() }, failCreate: true)
+        check("a failed submission drops the waiting quit and keeps its journal", quits.value == quitsBefore + 2
+              && !OCRProcessor.quitApproved && !failed.drainingPages && !failed.ocrPhaseActive && !failed.isProcessing
+              && FileManager.default.fileExists(atPath: journal.path), failed.statusMessage)
+        OCRProcessor.deletePendingBatch()
     }
 
     /// The mixed-PDF route, whose recovery record keeps each page's reading as it lands: a Stop asked while a page is

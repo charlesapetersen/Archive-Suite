@@ -101,6 +101,10 @@ settings, then goes on to tagging and organizing. What it costs:
   no new one starts, and the run stops with its manifest kept. The button then reads **Stop Now**, which stops at
   once (for a page that hangs) and loses those pages. A mixed run's PDF half waits the same way for the page it is
   reading, which its recovery record then keeps.
+- **While a batch is being submitted**, quit and Stop wait for the provider's reply too, since a create request cut
+  off leaves its outcome uncertain (below). **Quit When the Batch Is Recorded** quits once every job is in the
+  recovery journal, and Resume collects the results after relaunch; Stop waits the same way and then cancels the
+  jobs with the provider. **Quit Now** and **Stop Now** cut the request off as before.
 - **A crash** loses only the pages in flight at that moment (at most one per OCR worker).
 - **Sleep**: while a run reads pages the app holds off idle sleep (not while it waits on a review sheet). Closing the lid still sleeps the Mac; the run
   carries on after waking, and a page whose request failed meanwhile is offered for retry at the end of the pass.

@@ -25,6 +25,9 @@ class OCRProcessor: ObservableObject {
     var ocrPhaseActive = false { didSet { updateRunActivity() } }
     /// The pass `ocrPhaseActive` belongs to (`beginDrainablePass`).
     var drainablePass: UUID?
+    /// What that pass waits for: pages being read, or (W49.proc-quit-waits-batch-submit) a paid batch's create reply.
+    enum DrainablePassKind { case pages, batchSubmission }
+    var drainablePassKind = DrainablePassKind.pages
     /// Every processor that has run, so the app's quit can ask about those still working.
     static var processorsThatRan: [WeakProcessor] = []
     struct WeakProcessor { weak var processor: OCRProcessor? }

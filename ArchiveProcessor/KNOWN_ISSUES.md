@@ -6,13 +6,11 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 `ProcessorAppDelegate.applicationShouldTerminate`, `OCRProcessor.requestStop` / `finishPageDrainIfAsked`,
 `pendingRunMissingNote`; contract `scripts/test-run-quit-resume.sh`. A quit or Stop now waits for the pages being read,
-on the standard route and the mixed-PDF route (W49.proc-stop-saves-inflight); these cases still cost pages.
-- **A quit during a batch submission does not wait for the submission's reply.** The pages are read on the
-  provider's side, so a quit once the batch is accepted loses nothing; a quit while the create request is out leaves
-  the "outcome is uncertain" journal, which asks the user to check the provider's console before Resume. (queued:
-  W49.proc-quit-waits-batch-submit)
-- **Stop Now, and Quit Now, still drop the pages in flight**, which a resume reads again. (accepted: they are the
-  answers that stop at once for a page that hangs; the default Stop and quit wait)
+on the standard route and the mixed-PDF route (W49.proc-stop-saves-inflight), and for a batch submission's reply
+(W49.proc-quit-waits-batch-submit); these cases still cost pages.
+- **Stop Now, and Quit Now, still drop the pages in flight**, which a resume reads again; during a batch submission
+  they cut the create request off, leaving the "outcome is uncertain" journal. (accepted: they are the answers that
+  stop at once for a page or a request that hangs; the default Stop and quit wait)
 - **A crash loses the pages in flight**, at most one per OCR worker (Settings › Parallel OCR workers, default 4);
   a resume reads them again. (accepted: a request whose process dies has no answer to save, and the count is the
   user's own worker setting)

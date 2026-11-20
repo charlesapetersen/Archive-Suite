@@ -2789,14 +2789,25 @@ extension OCRProcessor {
     func beginQuitWhenPagesSaved() {
         guard isProcessing, ocrPhaseActive else { return }
         quitWhenPagesSaved = true
-        statusMessage = Self.quitWaitMessage
+        statusMessage = pageDrainMessage
     }
 
     static let stoppedAfterDrainNote = "The pages being read were saved; Resume Run continues from the first page not read."
     static let stopWaitMessage = "Stopping once the pages being read now are saved… Stop Now stops at once."
+    static let batchQuitWaitMessage = "Quitting once the provider's reply to the batch submission is in and recorded…"
+    static let batchStopWaitMessage = "Stopping once the provider's reply to the batch submission is in, so the job can "
+        + "be cancelled… Stop Now stops at once."
+    static let batchQuitRecordedMessage = "The batch job is recorded; Resume collects its results. Quitting…"
 
-    /// What the run says while it waits for the pages in flight.
-    var pageDrainMessage: String { quitWhenPagesSaved ? Self.quitWaitMessage : Self.stopWaitMessage }
+    /// What the run says while it waits for the pages in flight, or for a batch submission's reply.
+    var pageDrainMessage: String {
+        switch (drainablePassKind, quitWhenPagesSaved) {
+        case (.pages, true): Self.quitWaitMessage
+        case (.pages, false): Self.stopWaitMessage
+        case (.batchSubmission, true): Self.batchQuitWaitMessage
+        case (.batchSubmission, false): Self.batchStopWaitMessage
+        }
+    }
 
     /// W49.proc-stop-saves-inflight: the Stop button and ⌘. In the main OCR pass the first press waits for the pages
     /// being read (a reading that lands after a plain Stop is not saved, so Resume Run would read and pay for that page
@@ -2805,14 +2816,15 @@ extension OCRProcessor {
     func requestStop() {
         guard isProcessing, ocrPhaseActive, !drainingPages else { cancel(); return }
         stopWhenPagesSaved = true
-        statusMessage = Self.stopWaitMessage
+        statusMessage = pageDrainMessage
     }
 
     /// Marks the start of a pass a quit or Stop can wait on. The token ties its end to this run: a run stopped at once
     /// goes on unwinding, and its end must neither unmark nor stop a newer run started on the same processor.
-    func beginDrainablePass() -> UUID {
+    func beginDrainablePass(_ kind: DrainablePassKind = .pages) -> UUID {
         let pass = UUID()
         drainablePass = pass
+        drainablePassKind = kind
         ocrPhaseActive = true
         return pass
     }
@@ -2821,24 +2833,48 @@ extension OCRProcessor {
         guard drainablePass == pass else { return }
         drainablePass = nil
         ocrPhaseActive = false
-        finishPageDrainIfAsked()
+        finishPageDrainIfAsked(after: drainablePassKind)
+    }
+
+    /// W49.proc-quit-waits-batch-submit: a batch submission that failed has ended its run and said why, so a quit or
+    /// Stop waiting on it is dropped rather than carried out: the app stays open on the failure message.
+    func abandonDrainablePass(_ pass: UUID) {
+        guard drainablePass == pass else { return }
+        drainablePass = nil
+        ocrPhaseActive = false
+        quitWhenPagesSaved = false
+        stopWhenPagesSaved = false
     }
 
     /// Called as the main OCR pass ends, however it ends. When a quit or Stop is waiting, every page started has been
     /// saved to the run's record by now, so Stop keeps a run that Resume Run continues from the first page not read.
-    func finishPageDrainIfAsked() {
+    /// After a batch submission every job created is in the journal: Stop then cancels them all with the provider,
+    /// and a quit leaves them running, journaled, for Resume to collect.
+    func finishPageDrainIfAsked(after kind: DrainablePassKind = .pages) {
         guard drainingPages else { return }
         let quitting = quitWhenPagesSaved
         let run = processingTask
+        // A quit is not a Stop: the jobs stay with the provider and the journal on disk. Without the batch context
+        // `cancel()` neither cancels them nor closes the journal (W49.proc-quit-waits-batch-submit). They will be
+        // billed, so the run's whole estimate goes into the ledger now, as for a cancellation the provider did not
+        // confirm. A Stop asked before the quit still cancels them, and the quit waits for that.
+        let keepJobs = quitting && kind == .batchSubmission && !stopWhenPagesSaved
+        if keepJobs {
+            recordUnfinishedRunSpend(wholeRun: true)
+            activeBatch = nil
+        }
         cancel()
+        let cancellation = batchCancellationTask
         guard quitting else {
-            statusMessage += " " + Self.stoppedAfterDrainNote
+            if kind == .pages { statusMessage += " " + Self.stoppedAfterDrainNote }
             return
         }
-        statusMessage = "The pages being read are saved. Quitting…"
+        statusMessage = kind == .pages ? "The pages being read are saved. Quitting…"
+            : keepJobs ? Self.batchQuitRecordedMessage : "Cancelling the batch job, then quitting…"
         Task {
             // Let the stopped run unwind (and its ledger line land) before the process ends.
             await run?.value
+            if !keepJobs, kind == .batchSubmission { await cancellation?.value }
             await Task.yield()
             // Another window's run still draining quits for both when it is done; a run started meanwhile was not
             // asked about, so the quit then waits for a new ⌘Q.

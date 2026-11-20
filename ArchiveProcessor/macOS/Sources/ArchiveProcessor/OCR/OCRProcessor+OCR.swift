@@ -830,6 +830,13 @@ extension OCRProcessor {
             batchId: "", apiKey: apiKey, model: model,
             thinkingLevel: thinkingLevel, provider: provider)
 
+        // W49.proc-quit-waits-batch-submit: a create request cut off by a quit or Stop leaves the outcome uncertain (the
+        // job may exist, billed, with no ID here), so both can wait for the reply: the pass ends once every job created
+        // is journaled and the submission marked complete. Any failure exit drops the wait instead.
+        let submitPass = beginDrainablePass(.batchSubmission)
+        var submitPassOpen = true
+        defer { if submitPassOpen { abandonDrainablePass(submitPass) } }
+
         let batchId: String
         do {
             switch provider {
@@ -904,6 +911,10 @@ extension OCRProcessor {
             isProcessing = false
             return
         }
+        // A quit or Stop that waited is carried out here: Stop cancels every journaled job, a quit leaves them for Resume.
+        submitPassOpen = false
+        endDrainablePass(submitPass)
+        guard !Task.isCancelled else { batchPollInterrupted = true; return }
         newspaper.removeScratch()
         statusMessage = "Batch submitted. Waiting for results…"
 
