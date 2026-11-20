@@ -403,6 +403,59 @@ final class ItemAssetStore: EditorAssetStore {
                                          inItemDirectory: NoteStore.itemDir(root: root, id: id))
     }
 
+    /// W49.notes-auto-copy-images — copy every image `body` names inside item `id`'s own folder but
+    /// outside its `assets/` into `assets/`, and return the body with those references rewritten, plus the
+    /// references outside the folder for the user to pick (`StrayImageAdoption`). A copy that fails leaves
+    /// its reference as it was (still Blocked), never half-rewritten.
+    func adoptStrayImages(in body: String, for id: UUID) async -> StrayImageOutcome {
+        let itemDir = NoteStore.itemDir(root: root, id: id)
+        var newPaths: [String: String] = [:]
+        var copied: [String] = []
+        var toPick: [String] = []
+        for ref in StrayImageAdoption.references(in: body) where newPaths[ref.path] == nil {
+            switch StrayImageAdoption.classify(ref.path, inItemDirectory: itemDir) {
+            case .inNoteFolder(let url):
+                do {
+                    let path = try await importFile(at: url, into: id)
+                    newPaths[ref.path] = path
+                    copied.append(String(path.dropFirst(AssetPathResolver.assetsFolder.count + 1)))
+                } catch {
+                    NSLog("ItemAssetStore: couldn't copy %@ into assets: %@", ref.path, "\(error)")
+                }
+            case .outsideNoteFolder:
+                if !toPick.contains(ref.path) { toPick.append(ref.path) }
+            case .notFound, nil:
+                break
+            }
+        }
+        return StrayImageOutcome(body: StrayImageAdoption.rewriting(body, newPaths),
+                                 copied: copied, toPick: toPick)
+    }
+
+    /// Copy the image at `url` into item `id`'s `assets/` and return its `assets/<name>` reference. Used
+    /// for an image inside the note's folder and for one the user picked (the open panel granted the read).
+    /// The bytes are read off the main thread; the name comes from this store's reservation, as a paste's
+    /// does. An identical file already at that name is reused rather than copied again, so adopting the
+    /// same image twice (an undo, a reopen before the rewrite saved) never piles up `photo-1`, `photo-2`.
+    func importFile(at url: URL, into id: UUID) async throws -> String {
+        let dir = NoteStore.assetsDir(root: root, id: id)
+        let preferred = StrayImageAdoption.assetName(for: url)
+        let existingURL = dir.appendingPathComponent(preferred)
+        // Both reads off the main thread; the existing file is read only when its size matches. A
+        // reserved name whose paste is still in flight has no file yet, so it can never match here.
+        let (data, alreadyThere) = try await Task.detached(priority: .userInitiated) {
+            let data = try Data(contentsOf: url)
+            let size = (try? FileManager.default.attributesOfItem(atPath: existingURL.path))?[.size] as? Int
+            let same = size == data.count && (try? Data(contentsOf: existingURL)) == data
+            return (data, same)
+        }.value
+        if alreadyThere { return "assets/\(preferred)" }
+        let name = uniqueName(preferred, in: dir, itemID: id)
+        reserved[id, default: []].insert(name)
+        try await store.writeReservedAsset(data, name: name, into: id)
+        return "assets/\(name)"
+    }
+
     /// Await all in-flight asset byte-writes (used by tests; a natural flush seam for a future
     /// window-close / quit save, W7-S6).
     ///

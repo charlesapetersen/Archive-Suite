@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import Combine
+import UniformTypeIdentifiers
 
 /// Center pane of the 3-pane shell: hosts the Markdown editor with formatting toolbar, bound to the
 /// currently-selected item's body (W7-S1a). Loading + autosaving the selected note's Markdown via the
@@ -106,6 +107,7 @@ struct NoteEditorPane: View {
                     .accessibilityIdentifier("an.editor.externalChange")
             }
             if bodyEditor.showsHeldDraft { heldDraftBar }
+            if let reference = bodyEditor.imagesToPick.first { pickImageBar(reference) }
             bodyEditorView
                 .id(bodyEditor.reloadGeneration)
                 .id(bodyEditor.loadedID)
@@ -190,6 +192,11 @@ struct NoteEditorPane: View {
                 do { try await Task.sleep(for: .seconds(1)) } catch { return }
                 await bodyEditor.refreshFromDisk()
             }
+        }
+        // Back to styled from raw: a reference typed in the raw view is drawn from here on, so copy its
+        // image in now (W49.notes-auto-copy-images).
+        .onChange(of: isRaw) { _, raw in
+            if !raw { Task { await bodyEditor.adoptStrayImages() } }
         }
         .onChange(of: nav.selectedItemID) { _, newID in
             parseFailureMessage = nil
@@ -475,6 +482,18 @@ struct NoteEditorPane: View {
         bodyEditor.onExternalChange = {
             model.statusMessage = "This note changed outside this editor and was reloaded."
         }
+        // W49.notes-auto-copy-images: the copy goes through the pane's asset store, the name arbiter its
+        // pastes use. The first note shown can get here before `refreshAssetStore` has made it.
+        bodyEditor.adoptImages = { id, body in
+            if assetStore == nil { assetStore = model.makeAssetStore() }
+            guard let assetStore else { return nil }
+            return await assetStore.adoptStrayImages(in: body, for: id)
+        }
+        bodyEditor.onImagesAdopted = { names in
+            model.statusMessage = names.count == 1
+                ? "Copied the image \(names[0]) into this note's assets folder."
+                : "Copied \(names.count) images into this note's assets folder: \(names.joined(separator: ", "))."
+        }
         bodyEditor.flushEditor = { [flushBox] in flushBox.flush?() }
         bodyEditor.onShownChange = { [weak nav, weak bodyEditor] in
             guard let nav, let bodyEditor else { return }
@@ -609,6 +628,67 @@ struct NoteEditorPane: View {
         .padding(8)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("an.editor.heldDraft")
+    }
+
+    /// W49.notes-auto-copy-images: the note names an image outside its own folder. Notes does not read
+    /// that path unasked (the sandbox may not grant it, and it may be another note's file); picking it
+    /// once grants the read, and the image is copied into the note's assets folder.
+    private func pickImageBar(_ reference: String) -> some View {
+        let more = bodyEditor.imagesToPick.count - 1
+        return HStack(spacing: 8) {
+            Label("This note names an image outside its folder: \(reference)"
+                  + (more > 0 ? " (and \(more) more)" : "") + ". Choose it once to copy it in.",
+                  systemImage: "photo.badge.exclamationmark")
+                .font(.caption)
+                .lineLimit(2)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button("Choose Image…") { pickStrayImage(reference) }
+                .accessibilityIdentifier("an.editor.pickImage.choose")
+        }
+        .controlSize(.small)
+        .padding(8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("an.editor.pickImage")
+    }
+
+    private func pickStrayImage(_ reference: String) {
+        guard let id = bodyEditor.loadedID else { return }
+        if assetStore == nil { assetStore = nav.model.makeAssetStore() }
+        guard let assetStore, let url = chooseImageFile(for: reference) else { return }
+        let model = nav.model
+        Task {
+            do {
+                let path = try await assetStore.importFile(at: url, into: id)
+                guard bodyEditor.loadedID == id else { return }
+                bodyEditor.applyPickedImage(reference: reference, assetPath: path)
+                model.statusMessage = "Copied the image \(url.lastPathComponent) into this note's assets folder."
+            } catch {
+                model.statusMessage = "Couldn't copy \(url.lastPathComponent) into this note. It still shows as Blocked."
+            }
+        }
+    }
+
+    /// The panel is the one step an XCUITest cannot drive: under the harness, `-ANUITestImagePickPath`
+    /// stands in for the file a person would pick, as `-ANUITestStorePickPath` does for the store folder.
+    private func chooseImageFile(for reference: String) -> URL? {
+#if DEBUG
+        if Self.isUITestHarness,
+           let pick = UserDefaults.standard.string(forKey: "ANUITestImagePickPath"), !pick.isEmpty {
+            return URL(fileURLWithPath: pick)
+        }
+#endif
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose the image this note names as \u{201C}\(reference)\u{201D}. "
+            + "Notes copies it into the note's assets folder."
+        panel.prompt = "Copy In"
+        if reference.hasPrefix("/") {
+            panel.directoryURL = URL(fileURLWithPath: reference).deletingLastPathComponent()
+        }
+        return panel.runModal() == .OK ? panel.url : nil
     }
 }
 

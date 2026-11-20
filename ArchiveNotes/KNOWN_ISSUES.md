@@ -1392,9 +1392,15 @@ green, no new warnings.
 
 **Consequences worth knowing, not bugs:**
 - A **hand-authored reference outside `assets/`** — an image at the item root (`![](photo.png)`), or a
-  mis-cased `Assets/x.png` — now renders "Blocked" instead of loading. Deliberate: `<item>/assets/` is the
-  boundary this item specifies, every in-app writer (`addAsset` / `importAsset` / block thumbs) emits
-  `assets/<name>`, and it is fully recoverable — move the file into `assets/`; nothing is rewritten or lost. (queued: W49.notes-auto-copy-images).
+  mis-cased `Assets/x.png` — rendered "Blocked" instead of loading. **Now copied in (W49.notes-auto-copy-images,
+  owner call 22, 2026-11-19):** when a note opens, is reloaded after another editor changed it, or leaves the
+  raw view, an image it names inside its own item folder is copied into `assets/` (the original is left in
+  place; an identical copy already there is reused) and the reference rewritten through the ordinary checked
+  save, with a status line naming the copies (`StrayImageAdoption`, `ItemAssetStore.adoptStrayImages`). A path
+  outside the note's folder (absolute, `~`, `../OTHER`, a symlink pointing out) is never read unasked: a bar
+  above the editor asks the user to choose it once, and the open panel's grant is what lets it be copied.
+  The read seam is unchanged, so Blocked now remains only for a file that cannot be found (or is not an
+  image) and for a remote `https:` image, which Notes never fetches. (accepted: fixed, W49.notes-auto-copy-images).
 - **Hard links are undetectable** by any path-containment rule. An `assets/x.png` hard-linked to another
   item's file still reads those bytes. Nothing in the app creates one. (accepted: no path rule can see a hard link, and nothing in the app makes one).
 - **`W23.m11` (the cache key) was the deliberate leftover** — this item did not change it, because

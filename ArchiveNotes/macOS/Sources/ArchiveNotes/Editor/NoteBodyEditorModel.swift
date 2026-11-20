@@ -86,6 +86,13 @@ final class NoteBodyEditorModel: ObservableObject {
     var onHeldDraftDiscarded: () -> Void = {}
     /// True while the editor shows a held draft the user has not yet kept or set aside.
     @Published private(set) var showsHeldDraft = false
+    /// W49.notes-auto-copy-images: copy the images a body names outside its `assets/` into it
+    /// (→ `ItemAssetStore.adoptStrayImages`). Nil = no store, nothing done.
+    var adoptImages: (UUID, String) async -> StrayImageOutcome? = { _, _ in nil }
+    /// Images were copied in: the asset names, for the status line.
+    var onImagesAdopted: ([String]) -> Void = { _ in }
+    /// References outside the note's folder, offered for the user to pick once (empty = none).
+    @Published private(set) var imagesToPick: [String] = []
 
     /// An unsaved body and the saved body it was edited from.
     struct HeldDraft: Equatable, Sendable {
@@ -109,6 +116,8 @@ final class NoteBodyEditorModel: ObservableObject {
     private var persisting = 0
     /// The saved body the held draft was shown over; keeping the draft makes it the save's baseline.
     private var heldDraftShownOver: String?
+    /// An adoption pass is copying (W49.notes-auto-copy-images).
+    private var adopting = false
 
     init() {}
 
@@ -152,8 +161,55 @@ final class NoteBodyEditorModel: ObservableObject {
                 showHeldDraft(for: id, over: body)
             }
             settledSelection = SettledSelection(id: id)
+            if body.map(StrayImageAdoption.hasCandidates) == true { await adoptStrayImages() }
             return
         }
+    }
+
+    // MARK: Images named outside assets/ (W49.notes-auto-copy-images)
+
+    /// Copy the images the loaded body names outside its `assets/` into it and point the references at
+    /// the copies, as an edit (dirty, saved through the checked path like typing). Run when a note opens,
+    /// when it is reloaded after another editor changed it, and when the raw view switches back to styled:
+    /// those are the moments a hand-written reference comes in, and the only ones an image is drawn after.
+    /// A body that changed during the copy is left alone; the next of those moments tries again, and the
+    /// copy is reused then rather than made twice. One pass at a time: a second one started while the first
+    /// is copying (a raw-view switch during the open) would find the copy not yet written and make another.
+    func adoptStrayImages() async {
+        guard let id = loadedID, !showsHeldDraft, !adopting else { return }
+        flushEditor()
+        let body = markdown
+        guard StrayImageAdoption.hasCandidates(body) else {
+            imagesToPick = []
+            return
+        }
+        // A `select` begun during the copy is about to replace this note; a rewrite applied now would be
+        // dropped by its `setLoaded` while the status line claimed it.
+        let generation = loadGeneration
+        adopting = true
+        defer { adopting = false }
+        guard let outcome = await adoptImages(id, body) else { return }
+        flushEditor()
+        guard loadedID == id, generation == loadGeneration, markdown == body, !showsHeldDraft else { return }
+        imagesToPick = outcome.toPick
+        guard outcome.body != body else { return }
+        markdown = outcome.body
+        // Recreate TextKit: a focused editor keeps its own text (freeze-during-edit), and its next
+        // write-back would put the old references back.
+        reloadGeneration &+= 1
+        onImagesAdopted(outcome.copied)
+    }
+
+    /// The user picked the file for `reference` and it was copied to `assetPath`: point the body at it.
+    func applyPickedImage(reference: String, assetPath: String) {
+        guard loadedID != nil else { return }
+        flushEditor()
+        imagesToPick.removeAll { $0 == reference }
+        let rewritten = StrayImageAdoption.rewriting(markdown, [reference: assetPath])
+        guard rewritten != markdown else { return }
+        if showsHeldDraft { acceptHeldDraft() }
+        markdown = rewritten
+        reloadGeneration &+= 1
     }
 
     // MARK: Held draft (W40.fix-notes-held-draft-reopen)
@@ -291,6 +347,7 @@ final class NoteBodyEditorModel: ObservableObject {
         reloadGeneration &+= 1
         externalChangeMessage = "This note changed outside this editor and was reloaded."
         onExternalChange()
+        await adoptStrayImages()
     }
 
     @discardableResult
@@ -353,6 +410,7 @@ final class NoteBodyEditorModel: ObservableObject {
         externalChangeMessage = nil
         showsHeldDraft = false
         heldDraftShownOver = nil
+        imagesToPick = []
     }
 
     /// (Re)schedule the debounced idle save, capturing the target id at schedule time so a later

@@ -294,6 +294,10 @@ macOS/Sources/ArchiveNotes/
                                    (resolvingSymlinksInPath + component-wise ancestry, so a symlink
                                    inside assets/ can't escape). Typed AssetResolution; `resolved`
                                    carries the canonical URL (W23.m3)
+    StrayImageAdoption.swift       images a body names outside assets/: classify (inside the note's
+                                   folder → copy; outside → user picks once; missing → Blocked),
+                                   rewrite the references; ItemAssetStore.adoptStrayImages copies
+                                   (W49.notes-auto-copy-images)
     BlockHeaderAttachment.swift    NSTextAttachment + view provider for source-block header chips
                                    (W47.ct-zotero: a Reader source's chip adds its container line and Copy
                                    for Zotero, through SourceArchiveInfo)
