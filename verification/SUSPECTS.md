@@ -39,10 +39,19 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   record that.
 - **Would clear it:** the flag is still set after the viewer loads, or the owner rules that opening a file may
   download it.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.reader-s002-reproduce-check`);
+  evidence [`evidence/reader/W49.reader-s002-dataless-viewer.md`](evidence/reader/W49.reader-s002-dataless-viewer.md)
 - **History:**
   - 2026-10-12 W40.b1 — raised.
   - 2026-11-20 W49.notes-s007-reproduce (no test of the Reader) — the route for this check exists now. The owner's OneDrive holds dataless PDFs, and a bare `PDFDocument(url:)` on one downloads it, while the thread guard keeps it dataless ([`evidence/notes/W49.notes-s007-dataless-preview.md`](evidence/notes/W49.notes-s007-dataless-preview.md)). An engine session must set the process materialization policy back to on first: it inherits off.
+  - 2026-11-20 W49.reader-s002-reproduce (Opus 5.5) — reproduced on the same OneDrive placeholder as S-007, and
+    wider than raised. `loadDocument` (viewer and preview) opens it bare; the open downloaded the whole 6.2 MB file
+    (2.5 s). Worse, the shipped `PreviewImagePrefetcher`, compiled into a probe and called as a list selection change
+    calls it, downloaded it (1.6 s) to draw a bitmap: **selecting the row is enough**, preview shown or not, and the
+    rows either side and the document window's neighbours are drawn too. Its `FileStamp` reads `SF_DATALESS`; nothing
+    checks it. The neighbour open holds (`NeighbourCache.start` skips a dataless file, its comment saying that would
+    download unasked), so the prefetcher's download is not deliberate; whether an explicit open may download is asked
+    in the Daemon Report. `performFind` over a multi-file selection opens bare as well. Evicted after each run.
 
 ### S-003 · A dead Reader content index still shows "No matches" in the list
 
