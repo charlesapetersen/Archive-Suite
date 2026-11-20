@@ -16,9 +16,12 @@ import java.net.URLDecoder
 class DriveRelayTransportTest {
 
     /** In-memory mock Google Drive covering exactly the DriveClient calls the transport makes. */
-    private class MockDrive : HttpExecuting {
+    internal class MockDrive : HttpExecuting {
         class F(val id: String, val name: String, val appProps: MutableMap<String, String>, val parents: List<String>, var media: ByteArray, val mime: String)
         val store = LinkedHashMap<String, F>()
+        /** W49.relay-suspects: object names whose create Drive answers with a 500, and each refused create. */
+        val failCreate = HashSet<String>()
+        val refusedCreates = ArrayList<String>()
         private var seq = 0
         private fun newId(): String { seq++; return "f$seq" }
         fun injectFolder(relayToken: String) { val id = newId(); store[id] = F(id, "folder", mutableMapOf("relayToken" to relayToken, "relayFolder" to "1"), emptyList(), ByteArray(0), "application/vnd.google-apps.folder") }
@@ -39,6 +42,10 @@ class DriveRelayTransportTest {
                 val meta = JSONObject(content(parts[1]))
                 val ap = HashMap<String, String>(); meta.optJSONObject("appProperties")?.let { for (k in it.keys()) ap[k] = it.getString(k) }
                 val parents = ArrayList<String>(); meta.optJSONArray("parents")?.let { for (i in 0 until it.length()) parents.add(it.getString(i)) }
+                if (meta.optString("name") in failCreate) {
+                    refusedCreates.add(meta.optString("name"))
+                    return Triple(500, """{"error":{"code":500,"message":"Internal Error"}}""".toByteArray(), emptyMap())
+                }
                 val id = newId(); store[id] = F(id, meta.optString("name"), ap, parents, content(parts[2]).toByteArray(Charsets.UTF_8), "")
                 return Triple(200, """{"id":"$id"}""".toByteArray(), emptyMap())
             }

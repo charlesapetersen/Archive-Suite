@@ -288,8 +288,14 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     /** Build the transport for an endpoint: HTTP for LAN/USB, the Google Drive relay for cloud. The
      *  cloud transport pulls a fresh Google access token per call via [DriveAuth]. */
     private fun transportFor(ep: MacEndpoint): SegmentTransport =
-        if (ep.isCloud) DriveRelayTransport(DriveClient(token = { driveAuth.accessTokenBlocking() }), ep.token)
+        if (ep.isCloud) DriveRelayTransport(driveClientForTest ?: DriveClient(token = { driveAuth.accessTokenBlocking() }), ep.token)
         else MacClient(ep)
+
+    companion object {
+        /** Test-only (W49.relay-suspects): the cloud relay's [DriveClient], so a JVM test can run the real view
+         *  model and [DriveRelayTransport] against a mock Drive with no Google sign-in. Never set in the app. */
+        internal var driveClientForTest: DriveClient? = null
+    }
 
     fun connect(host: String, port: Int, token: String, name: String = "Mac", onResult: (Boolean) -> Unit) {
         val ep = MacEndpoint(host, port, token, name)

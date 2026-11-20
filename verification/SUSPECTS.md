@@ -568,10 +568,14 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a test in `DriveRelayTransportTest` whose `MockDrive` answers the segment create with a 500:
   `segmentComplete` returns `true` and no segment object exists.
 - **Would clear it:** `segmentComplete` returns `false` in that test.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.relay-suspects-check`); [`evidence/processor/W49.relay-suspects.md`](evidence/processor/W49.relay-suspects.md), `ArchiveCapture/app/src/test/java/com/archiveprocessor/capture/capture/DriveRelaySegmentSignalSuspectTest.kt`
 - **History:**
   - 2026-10-21 W40.i2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.relay-suspects` under phase rule 5a.
+  - 2026-11-20 W49.relay-suspects — reproduced. The code still says it. The real `CaptureViewModel` (Robolectric):
+    restored segment with its page on the Mac, cloud pairing, End segment, Skip; the real transport against the mock
+    Drive answering the segment create with a 500. One create, refused, no retry; no segment object; the group left
+    `endedSegments` on disk; a re-pair sent nothing. The comment it rests on is about photos; iOS returns `false`.
 
 ### S-022 · iOS may write a HEIC photo, or a wrongly rotated one, into a `.jpg` the Mac reads as JPEG
 
@@ -936,10 +940,16 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** `scripts/test-filerelay.sh`-style session with an ended segment whose last page has not yet
   arrived: press Finish and count pages filed.
 - **Would clear it:** Finish holds until the page lands.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.relay-suspects-check`); [`evidence/processor/W49.relay-suspects.md`](evidence/processor/W49.relay-suspects.md), `ArchiveProcessor/scripts/repro-relay-suspects.sh`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.relay-suspects` under phase rule 5a.
+  - 2026-11-20 W49.relay-suspects — reproduced. The code still says it (the heartbeat route is now
+    `Net/CaptureServer.swift:633-637`; `FileRelayReceiver`, the Mac's receiver for both relays, never feeds the gate).
+    The built app headless on the file relay, Apple Vision: page 1 of `g1` receipted, page 2 still on the phone, then
+    Finish (the session-complete marker driving `requestFinish`): finalized about a second later, `g1` filed with one
+    page. Page 2 then arrived, was receipted, and stayed in the backup folder as a page of an already-filed document.
+    Nothing exempts the relay from `P-48`'s promise.
 
 ### S-039 · Stage for later can hand the same photos to Process Files twice
 
