@@ -31,7 +31,7 @@ final class FieldStatusTests: XCTestCase {
         Extracted text.
         Gemini · gemini-3.7-flash · 7 November 2026
         Classification: Document Start
-        Date evidence: image; page 1; "1958"
+        Date evidence: image; page 1; "1958"; year 1958
         Document kind: letter
         Recipient place: Boston, Massachusetts
 
@@ -41,7 +41,7 @@ final class FieldStatusTests: XCTestCase {
     private func header() -> FieldStatusSection.HeaderFields {
         var h = FieldStatusSection.HeaderFields(headers: [])
         h.itemFields = PDFItemFields(documentKind: "letter", recipientPlace: "Boston, Massachusetts")
-        h.dateEvidence = "image; page 1; top right; \"12 March 1958\""
+        h.dateEvidence = "image; page 1; top right; \"12 March 1958\"; year 1958"
         return h
     }
 

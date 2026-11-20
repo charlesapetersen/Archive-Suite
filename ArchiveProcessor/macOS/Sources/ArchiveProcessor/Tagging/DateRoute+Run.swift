@@ -267,8 +267,9 @@ extension DateRoute.Decision {
 
     /// W46.date-route-header — the PDF header's `Date evidence:` value (owner call 9): for a non-explicit date only (read
     /// off the page image, taken from a stamp on it, estimated, or inherited from the cover), its class, source, place and quote, and the 90%
-    /// interval where the route measured it. Nil for an explicit text year and for no year. One line, never holding the
-    /// provenance separator, the quote cut to `headerQuoteChars`.
+    /// interval where the route measured it, and last the Year or Decade it gave (`year 1958`, `decade 1960s`). Nil for an
+    /// explicit text year and for no year. One line, never holding the provenance separator, the quote cut to
+    /// `headerQuoteChars`.
     var headerEvidence: String? {
         guard year != nil || decade != nil else { return nil }
         var parts: [String]
@@ -294,6 +295,11 @@ extension DateRoute.Decision {
         if evidenceClass == .estimate, measured, let lo = trace.lo, let hi = trace.hi {
             parts.append("90% interval \(lo)-\(hi)")
         }
+        // W49.reader-finder-year-stands: last, the Year or Decade tag `apply` writes, so a reader can tell when the tag
+        // was changed since (in Finder) and the line no longer speaks for it.
+        let folderDecade = evidenceClass == .folder ? decade : nil
+        let gave = ContainerFolderDate.evidenceGave(year: folderDecade == nil ? year : nil, decade: folderDecade)
+        if !gave.isEmpty { parts.append(gave) }
         return parts.joined(separator: "; ")
     }
 

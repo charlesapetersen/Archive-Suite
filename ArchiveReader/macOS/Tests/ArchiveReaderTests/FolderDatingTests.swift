@@ -27,6 +27,7 @@ final class FolderDatingTests: XCTestCase {
         try await super.tearDown()
     }
 
+    /// The test page is narrow (`TestPDFBuilder`), so each header line is kept short enough not to wrap into the body.
     private static func page2(_ lines: [String]) -> String {
         (["Extracted text.", "Gemini · gemini-3.7-flash · 7 November 2026"] + lines + ["", "Body text."])
             .joined(separator: "\n")
@@ -39,9 +40,9 @@ final class FolderDatingTests: XCTestCase {
             ("0001.pdf", ["Unread", "Folder"], ["Classification: Folder"]),
             ("0002.pdf", ["Unread", "Harbours"], ["Classification: Document Start"]),
             ("0003.pdf", ["Unread", "1958", "Date Uncertain"],
-             ["Classification: Document Start", "Date evidence: estimate; from 0002.pdf; line 3; \"1958\""]),
+             ["Classification: Document Start", "Date evidence: estimate; line 3; year 1958"]),
             ("0004.pdf", ["Unread", "1961"], ["Classification: Document Start"]),
-            ("0005.pdf", ["Unread", "1962"], ["Classification: Document Start", "Date evidence: image; page 1; \"1962\""]),
+            ("0005.pdf", ["Unread", "1962"], ["Classification: Document Start", "Date evidence: image; page 1; year 1962"]),
             ("0006.pdf", ["Unread"], nil),
             ("0007.pdf", ["Unread", "1950", "Checked Date"], ["Classification: Document Start"]),
         ]
@@ -105,6 +106,31 @@ final class FolderDatingTests: XCTestCase {
         XCTAssertNil(placeholder[files[2].path]?.page, "a placeholder is never opened")
     }
 
+    /// W49.reader-finder-year-stands: an estimated year retyped in Finder (which adds no check) no longer matches the
+    /// year page 2's evidence gave, so it is the user's and the folder's date does not replace it.
+    func testAYearRetypedInFinderStands() throws {
+        try makeFolder(date: "1965-1967")
+        let retyped = folder.appendingPathComponent("0003.pdf")
+        try (retyped as NSURL).setResourceValue(["Unread", "1959", "Date Uncertain"], forKey: .tagNamesKey)
+        let run = try XCTUnwrap(NavigationModel.folderDatingRun(tree: root, components: ["Box 3"], editedName: "0002.pdf"))
+        let files = run.names.map { name -> ArchiveFile in
+            let url = folder.appendingPathComponent(name)
+            let raw = (try? URL(fileURLWithPath: url.path).resourceValues(forKeys: [.tagNamesKey]))?.tagNames ?? []
+            return ArchiveFile(url: url, name: name, fileType: "PDF", tags: DocumentTags.parse(raw: raw, labelNumber: nil),
+                               contentModified: nil)
+        }
+        let evidence = NavigationModel.folderDatingEvidence(files.map { ($0.path, $0.url, false) }, directory: folder)
+        let plan = NavigationModel.folderDatingPlan(run.date, files: files, evidence: evidence)
+        XCTAssertEqual(plan.writes.map { ($0 as NSString).lastPathComponent }, ["0002.pdf", "0006.pdf"],
+                       "the retyped year stands")
+        var header = FieldStatusSection.HeaderFields(headers: [])
+        header.dateEvidence = evidence[files[2].path]?.page
+        XCTAssertEqual(header.dateEvidence?.hasPrefix("estimate;"), true)
+        let date = FieldStatusList.rows(tags: files[2].tags, header: header).first { $0.field == .date }
+        XCTAssertEqual(date?.status, FieldStatusPolicy.date(checked: false, evidence: nil),
+                       "the Checks no longer call it the estimate's")
+    }
+
     func testAnUnconfirmedOrUnusableDateOffersNothing() throws {
         try makeFolder(date: "1965-1967", source: .label)
         XCTAssertNil(NavigationModel.folderDatingRun(tree: root, components: ["Box 3"], editedName: "0002.pdf"),
@@ -146,11 +172,11 @@ final class FolderDatingTests: XCTestCase {
         let fields = try XCTUnwrap(ContainerFileStore.loadItemFields(directory: folder).document)
         let record = try XCTUnwrap(fields.dateRecord(for: "0003.pdf"))
         XCTAssertEqual(record, FolderDateRecord(date: "1966-02", uncertain: false,
-                                                evidence: "folder; from 0001.pdf; \"Feb. 1966\""))
+                                                evidence: "folder; from 0001.pdf; \"Feb. 1966\"; year 1966"))
         XCTAssertNil(fields.dateRecord(for: "0004.pdf"))
         let dated = DocumentTags.parse(raw: Array(try tagsOnDisk("0003.pdf")), labelNumber: nil)
         XCTAssertEqual(FieldStatusPolicy.date(checked: false, evidence: FolderDateRecord.evidence(
-            record, page: "estimate; from 0002.pdf", tags: dated)).source,
+            record, page: "estimate; from 0002.pdf; year 1958", tags: dated)).source,
                        FieldStatusPolicy.date(checked: false, evidence: record.evidence).source,
                        "the Checks name the folder, not the estimate page 2 still records")
 

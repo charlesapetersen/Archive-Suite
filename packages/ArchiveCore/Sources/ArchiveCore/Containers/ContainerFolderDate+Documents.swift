@@ -21,12 +21,34 @@ extension ContainerFolderDate {
     }
 
     /// The `Date evidence:` value Process Files writes for this date (`SPEC/tag-format.md` §Date evidence):
-    /// `folder; from <the run's first file>; "<the folder's date>"`, one line, the quote cut to 60 characters.
+    /// `folder; from <the run's first file>; "<the folder's date>"; year <y>` (or `decade <d>s`), one line, the quote
+    /// cut to 60 characters.
     public var evidence: String {
         var parts = ["folder", "from " + Self.evidenceSafe(start.isEmpty ? "the folder" : start, limit: 80)]
         let quote = Self.evidenceSafe(text, limit: 60)
         if !quote.isEmpty { parts.append("\"" + quote + "\"") }
+        switch inherited {
+        case let .year(y, _, _): parts.append(Self.evidenceGave(year: y, decade: nil))
+        case let .decade(d): parts.append(Self.evidenceGave(year: nil, decade: d))
+        case nil: break
+        }
         return parts.joined(separator: "; ")
+    }
+
+    /// The last part of a `Date evidence:` value (W49.reader-finder-year-stands): the Year or Decade tag the evidence
+    /// gave, `year 1958` or `decade 1960s`. A year wins over a decade, as in the tags.
+    public static func evidenceGave(year: Int?, decade: Int?) -> String {
+        if let year { return "year \(year)" }
+        return decade.map { "decade \($0)s" } ?? ""
+    }
+
+    /// Whether a `Date evidence:` value describes the date `tags` carry: its last part names the Year (or, with no
+    /// Year, the Decade) the file holds. A value without that part, or naming another year, does not: the date was
+    /// changed since (in Finder, which records nothing), so it is the user's.
+    public static func evidenceDescribes(_ evidence: String?, tags: DocumentTags) -> Bool {
+        guard let last = evidence?.components(separatedBy: "; ").last?.trimmingCharacters(in: .whitespaces),
+              tags.year != nil || tags.decade != nil else { return false }
+        return last == evidenceGave(year: tags.year, decade: tags.decade)
     }
 
     /// As the dating route's `headerSafe`: control characters and runs of white space become one space, the middle dot
@@ -103,10 +125,12 @@ public struct FolderDateRecord: Equatable, Sendable, Codable {
         return own.wireValue == date && tags.dateUncertain == uncertain
     }
 
-    /// The evidence a file's date rests on: this record's where it still holds, else page 2's line.
+    /// The evidence a file's date rests on: this record's where it still holds, else page 2's line where it still
+    /// names the file's Year or Decade (W49.reader-finder-year-stands); nil otherwise, so a year retyped in Finder is the
+    /// user's and stands.
     public static func evidence(_ record: FolderDateRecord?, page: String?, tags: DocumentTags) -> String? {
         if let record, record.holds(for: tags) { return record.evidence }
-        return page
+        return ContainerFolderDate.evidenceDescribes(page, tags: tags) ? page : nil
     }
 
     /// The item's own date as its tags give it; a Year wins over a Decade.

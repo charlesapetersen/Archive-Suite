@@ -126,6 +126,8 @@ final class FieldCheckTests: XCTestCase {
         XCTAssertTrue(measured("folder; from 00012.pdf; \"Feb. 1970\"").contains("13 of 14"))
         XCTAssertTrue(measured("folder; from the folder; \"1965-1967\"").contains("20 of 42"))
         XCTAssertTrue(measured("folder; from 0001.pdf; \"1958-1969\"").contains("not measured"))
+        XCTAssertTrue(measured("folder; from 0001.pdf; \"1958-1969\"; decade 1960s").contains("not measured"))
+        XCTAssertTrue(measured("folder; from 00012.pdf; \"Feb. 1970\"; year 1970").contains("13 of 14"))
         XCTAssertTrue(measured("folder; from a.pdf").contains("33 of 56"))
         XCTAssertTrue(measured("folder; from a.pdf; \"1900-1950\"").contains("33 of 56"))
         XCTAssertEqual(FieldStatusPolicy.date(checked: true, evidence: "folder; from a.pdf; \"1965-1967\"").measured, "")

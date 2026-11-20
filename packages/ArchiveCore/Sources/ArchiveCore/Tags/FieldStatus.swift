@@ -126,11 +126,14 @@ public enum FieldStatusPolicy {
     }
 
     /// The folder rule's figure for the form it wrote, read from the evidence's quoted folder value
-    /// (`folder; from <start>; "<value>"`): `segbench-results/folder-date.md`, "What the rule writes, scored by its form",
-    /// the owner's Year tags on the dated documents of 17 checked folders.
+    /// (`folder; from <start>; "<value>"; year <y>`, the text between the first and last quote mark):
+    /// `segbench-results/folder-date.md`, "What the rule writes, scored by its form", the owner's Year tags on the dated
+    /// documents of 17 checked folders.
     static func folderFigure(_ evidence: String?) -> String {
-        let value = evidence?.split(separator: ";").last
-            .map { $0.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\"")) }
+        let value = evidence.flatMap { e -> String? in
+            guard let open = e.firstIndex(of: "\""), let close = e.lastIndex(of: "\""), open < close else { return nil }
+            return String(e[e.index(after: open)..<close])
+        }
         switch value.flatMap({ ContainerFolderDate.parse($0) })?.inherited {
         case .year(_, _, uncertain: false):
             return "a checked single-year folder date was the owner’s year for 13 of 14 dated documents inside it"

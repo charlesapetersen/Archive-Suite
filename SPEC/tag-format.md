@@ -405,8 +405,11 @@ Recipient place: <place>; <place>
   covering letter, or taken from the folder's confirmed date (W47.ct-folder-date, a year or a decade); never for an
   explicit year in the document's own text, nor when there is no year. The value is `; `-separated parts, class first:
   `image; page <n>; <place>; "<quote>"`, `stamp; page <n>; <place>; "<quote>"`, `estimate; from <file>; line <n>; "<quote>"; 90% interval <lo>-<hi>`,
-  `inherited; from <file>`, `folder; from <the folder run's first file>; "<the folder's date>"` (Live Capture: `from the folder`, the folder photo's filed name not yet known; W47.ct-folder-date-live) (parts absent when unknown). The interval appears only where the route measured it
-  (the gateway's Gemini 3.7 Flash). Control characters and runs of white space become one space, the middle dot a
+  `inherited; from <file>`, `folder; from <the folder run's first file>; "<the folder's date>"` (Live Capture: `from the folder`, the folder photo's filed name not yet known; W47.ct-folder-date-live) (parts absent when unknown), each followed by a last part naming the Year or Decade tag it gave, `year <y>` or
+  `decade <d>s` (W49.reader-finder-year-stands). The interval appears only where the route measured it
+  (the gateway's Gemini 3.7 Flash). The line speaks for the date only while the file's Year (or, with none, its Decade)
+  is the one its last part names: a line without that part, or naming another, does not, so a year retyped in Finder
+  (which records nothing) reads as the user's, as a date with no line does. Control characters and runs of white space become one space, the middle dot a
   comma, the quote is cut to 60 characters with `…`, and the line is fitted to one physical line, so it never
   holds the provenance separator nor wraps into the body. It goes with the Finder-tag year (an output-time
   snapshot; the tags stay authoritative) and with the sidecar's `dating` object, which carries the same evidence
