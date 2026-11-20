@@ -10,6 +10,15 @@ extension FocusedValues {
     }
 }
 
+// The undo manager of the window in front, which container edits are registered on (W49.reader-undo-menu-names).
+struct WindowUndoManagerKey: FocusedValueKey { typealias Value = UndoManager }
+extension FocusedValues {
+    var windowUndoManager: UndoManager? {
+        get { self[WindowUndoManagerKey.self] }
+        set { self[WindowUndoManagerKey.self] = newValue }
+    }
+}
+
 /// The app's menu bar. Commands act on whichever window is frontmost via `@FocusedObject`
 /// (nav vs. document), and are where the keyboard shortcuts are bound (the toolbars are clickable but
 /// declare no shortcuts, so nothing double-registers). Names and keys come from `ReaderCommand`.
@@ -22,6 +31,7 @@ struct ArchiveReaderCommands: Commands {
     // "Copy Archive Link to This Page" work in the document window, where there is no NavigationModel.
     @FocusedValue(\.archiveLinkContext) private var linkContext: ArchiveLinkContext?
     @FocusedValue(\.documentTagActions) private var documentTags: DocumentTagActions?
+    @FocusedValue(\.windowUndoManager) private var windowUndo: UndoManager?
     @Environment(\.openWindow) private var openWindow
     /// Holds the navigation window's model whichever window is in front, so File ▸ Choose Archive Folder…
     /// can reach it from a document window or with no window open (W40.fix-reader-choose-folder-shortcut).
@@ -52,28 +62,56 @@ struct ArchiveReaderCommands: Commands {
     private var tagCanUndo: Bool { nav != nil ? (nav?.undoDepth ?? 0) > 0 : (docTags?.canUndo ?? false) }
     private var tagCanRedo: Bool { nav != nil ? (nav?.redoDepth ?? 0) > 0 : (docTags?.canRedo ?? false) }
     private var tagModel: NavigationModel? { nav ?? docTags?.navigation }
-    /// W40.reader-rotate-undo: the menu's title, from the history last read. The action reads the ledger fresh.
-    private var undoTakesRotation: Bool {
-        DocumentViewerModel.undoTakesRotation(rotation: doc?.nextRotationUndoDate,
-                                              tag: tagCanUndo ? tagModel?.knownUndoDate : nil)
+    /// The container and item-field edits made in the window in front (`ContainerHistory`).
+    private var containerUndoStep: ContainerHistory.Step? { tagModel?.containerUndo(on: windowUndo) }
+    private var containerRedoStep: ContainerHistory.Step? { tagModel?.containerUndo(on: windowUndo, redo: true) }
+
+    /// W49.reader-undo-menu-names: Edit ▸ Undo and Redo take the newest change of the tag ledger, the viewer's turns
+    /// and the window's container edits, and are named for it. The title reads the history last read; the action
+    /// reads the ledger fresh. A tag change whose time is not read yet still counts, as the oldest.
+    private func nextUndo(tag: Date?) -> ReaderUndoSource? {
+        ReaderUndoSource.newest(tag: tagCanUndo ? tag ?? .distantPast : nil, rotation: doc?.nextRotationUndoDate,
+                                container: containerUndoStep?.date)
     }
-    private var redoTakesRotation: Bool {
-        DocumentViewerModel.undoTakesRotation(rotation: doc?.nextRotationRedoDate,
-                                              tag: tagCanRedo ? tagModel?.knownRedoDate : nil)
+    private func nextRedo(tag: Date?) -> ReaderUndoSource? {
+        ReaderUndoSource.newest(tag: tagCanRedo ? tag ?? .distantPast : nil, rotation: doc?.nextRotationRedoDate,
+                                container: containerRedoStep?.date)
+    }
+
+    private var undoTitle: String {
+        switch nextUndo(tag: tagModel?.knownUndoDate) {
+        case .tag: return ReaderCommand.undoTagChange.title
+        case .rotation: return "Undo Rotation"
+        case .container: return "Undo \(containerUndoStep?.action ?? "")"
+        case nil: return "Undo"
+        }
+    }
+
+    private var redoTitle: String {
+        switch nextRedo(tag: tagModel?.knownRedoDate) {
+        case .tag: return ReaderCommand.redoTagChange.title
+        case .rotation: return "Redo Rotation"
+        case .container: return "Redo \(containerRedoStep?.action ?? "")"
+        case nil: return "Redo"
+        }
     }
 
     private func undo() {
-        let tag = tagCanUndo ? tagModel?.nextUndoDate() : nil
-        if DocumentViewerModel.undoTakesRotation(rotation: doc?.nextRotationUndoDate, tag: tag) {
-            doc?.undoRotation()
-        } else if let nav { nav.undoLast() } else { docTags?.undo() }
+        switch nextUndo(tag: tagCanUndo ? tagModel?.nextUndoDate() : nil) {
+        case .rotation: doc?.undoRotation()
+        case .container: windowUndo?.undo()
+        case .tag: if let nav { nav.undoLast() } else { docTags?.undo() }
+        case nil: break
+        }
     }
 
     private func redo() {
-        let tag = tagCanRedo ? tagModel?.nextRedoDate() : nil
-        if DocumentViewerModel.undoTakesRotation(rotation: doc?.nextRotationRedoDate, tag: tag) {
-            doc?.redoRotation()
-        } else if let nav { nav.redoLast() } else { docTags?.redo() }
+        switch nextRedo(tag: tagCanRedo ? tagModel?.nextRedoDate() : nil) {
+        case .rotation: doc?.redoRotation()
+        case .container: windowUndo?.redo()
+        case .tag: if let nav { nav.redoLast() } else { docTags?.redo() }
+        case nil: break
+        }
     }
 
     var body: some Commands {
@@ -139,6 +177,19 @@ struct ArchiveReaderCommands: Commands {
         // No "Copy" here: ⌘C is the standard Edit ▸ Copy, which reaches the viewer through the responder
         // chain (`ReaderPDFView.copy(_:)`). A second ⌘C matched first and copied the PDF selection with the
         // caret in the find field (W48.reader-copy-shortcut).
+        // Edit ▸ Undo and Redo, named for what they take back: tag changes (on the shared ledger), the viewer's turns
+        // (W40.reader-rotate-undo) and the window's container edits, newest first (W49.reader-undo-menu-names). They
+        // were Tags ▸ Undo/Redo Tag Change beside the system's unnamed Edit ▸ Undo, which alone reached container
+        // edits. With the caret in a text field, ⌘Z and ⇧⌘Z undo the typing instead (`TextUndoGuard`).
+        CommandGroup(replacing: .undoRedo) {
+            Button(undoTitle) { undo() }
+                .keyboardShortcut(.undoTagChange)
+                .disabled(!tagCanUndo && !(doc?.canUndoRotation ?? false) && containerUndoStep == nil)
+            Button(redoTitle) { redo() }
+                .keyboardShortcut(.redoTagChange)
+                .disabled(!tagCanRedo && !(doc?.canRedoRotation ?? false) && containerRedoStep == nil)
+        }
+
         CommandGroup(after: .pasteboard) {
             Divider()
             // Owner, 2026-11-08: ⇧⌘C cleans prose; Selection ▸ Copy Link(s) takes ⌥⌘C so
@@ -261,14 +312,6 @@ struct ArchiveReaderCommands: Commands {
             .keyboardShortcut(.togglePoorOCR).disabled(noTagTarget)
             Button(ReaderCommand.improveOCR.title) { if let nav { nav.improveOCR() } else { docTags?.improveOCR() } }
                 .disabled(noTagTarget)
-            Divider()
-            // W40.reader-rotate-undo: one Undo for tag changes and the viewer's rotations, most recent first.
-            Button(undoTakesRotation ? "Undo Rotation" : ReaderCommand.undoTagChange.title) { undo() }
-                .keyboardShortcut(.undoTagChange)
-                .disabled(!tagCanUndo && !(doc?.canUndoRotation ?? false))
-            Button(redoTakesRotation ? "Redo Rotation" : ReaderCommand.redoTagChange.title) { redo() }
-                .keyboardShortcut(.redoTagChange)
-                .disabled(!tagCanRedo && !(doc?.canRedoRotation ?? false))
         }
 
         // View (nav window): sorting + clearing

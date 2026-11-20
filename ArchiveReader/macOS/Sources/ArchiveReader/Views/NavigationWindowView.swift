@@ -9,6 +9,8 @@ struct NavigationWindowView: View {
     @EnvironmentObject private var deepLinkRouter: DeepLinkRouter
     @EnvironmentObject private var linkContext: ArchiveLinkContext
     @Environment(\.openWindow) private var openWindow
+    /// The window's undo manager, which its container edits are registered on; published for Edit ▸ Undo.
+    @Environment(\.undoManager) private var undoManager
     @State private var showingHealth = false
     @State private var showingDateFilter = false      // W37: the year-range popover
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
@@ -145,6 +147,7 @@ struct NavigationWindowView: View {
         .focusedSceneObject(model)
         .focusedSceneObject(publishedPreviewViewer)   // W26.previewzoom — the preview sheet's viewer
         .focusedSceneValue(\.openSelection) { openSelection() }
+        .focusedSceneValue(\.windowUndoManager, undoManager)   // W49.reader-undo-menu-names
         // W23.m4 — page-link publication + the deep-link "open the viewer ON the cited page" bridge.
         // Extracted into one modifier: adding them inline blew this body's type-check budget.
         .archivePageLinkBridge(model: model, context: linkContext, openWindow: openWindow)

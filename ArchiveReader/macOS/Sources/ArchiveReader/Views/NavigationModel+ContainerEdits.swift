@@ -26,6 +26,19 @@ enum ContainerFieldEdit: Equatable, Sendable {
     case remove
 }
 
+/// One window's container and item-field undo steps, newest last, kept beside its undo manager's own stacks so the
+/// menu can name the next one and say when it was made (W49.reader-undo-menu-names).
+struct ContainerHistory {
+    struct Step: Equatable {
+        let action: String
+        /// When the step was made, or last moved between Undo and Redo, as a rotation's is.
+        let date: Date
+    }
+    weak var manager: UndoManager?
+    var undos: [Step] = []
+    var redos: [Step] = []
+}
+
 extension NavigationModel {
     /// Edits `field` where `path`'s value lives (`ContainerEdits.target`): every file the run covers follows.
     func editContainerField(_ field: ContainerField, _ edit: ContainerFieldEdit, forPath path: String,
@@ -218,6 +231,31 @@ extension NavigationModel {
         }
         undo.setActionName(action)
         if ownGroup { undo.endUndoGrouping() }
+        recordContainerHistory(action, on: undo)
+    }
+
+    /// Adds the step just registered on `undo` to its window's history: an undo's reverse goes to Redo, a redo's or a
+    /// new edit's to Undo, and a new edit ends what Redo held, as the undo manager does.
+    private func recordContainerHistory(_ action: String, on undo: UndoManager) {
+        let step = ContainerHistory.Step(action: action, date: Date())
+        var entry = containerHistory.first { $0.manager === undo } ?? ContainerHistory(manager: undo)
+        if undo.isUndoing {
+            entry.redos.append(step)
+        } else {
+            entry.undos.append(step)
+            if !undo.isRedoing { entry.redos.removeAll() }
+        }
+        containerHistory = containerHistory.filter { $0.manager != nil && $0.manager !== undo } + [entry]
+    }
+
+    /// The window's next container undo (or redo): its action's name and when it was made; nil unless the undo
+    /// manager's next step is that one (typing in a field, say, sits above it until that is undone).
+    func containerUndo(on undo: UndoManager?, redo: Bool = false) -> ContainerHistory.Step? {
+        guard let undo, let entry = containerHistory.first(where: { $0.manager === undo }),
+              let step = redo ? entry.redos.last : entry.undos.last,
+              redo ? undo.canRedo : undo.canUndo,
+              (redo ? undo.redoActionName : undo.undoActionName) == step.action else { return nil }
+        return step
     }
 
     /// Undo or Redo of a container edit. Run here, on the main thread, so the step that reverses it is registered
@@ -225,13 +263,17 @@ extension NavigationModel {
     /// waits at most `lockWait` for another writer.
     private func applyContainerUndo(_ step: ContainerUndoStep, action: String, tree: String?, on undo: UndoManager) {
         let document = step.document
+        let redoing = undo.isRedoing
+        // The undo manager has taken this step off its stack; the history follows (`recordContainerHistory`).
+        if let index = containerHistory.firstIndex(where: { $0.manager === undo }) {
+            _ = redoing ? containerHistory[index].redos.popLast() : containerHistory[index].undos.popLast()
+        }
         guard tree == containerTree?.path else {
             if document == .itemFields { itemFieldEditPath = nil }
             setEditError("That change was made in another archive, so it was not undone.", document)
             announce(editError(document) ?? "")
             return
         }
-        let redoing = undo.isRedoing
         if document == .containers { folderDatingOffer = nil }   // the folder date it offered may be the one undone
         if document == .itemFields { itemFieldEditPath = nil }   // an undo's error is shown whatever is selected
         let result = step.apply()

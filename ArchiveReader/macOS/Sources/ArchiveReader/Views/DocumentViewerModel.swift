@@ -546,7 +546,7 @@ final class DocumentViewerModel: ObservableObject {
 
     /// One turn the reader gave a page in this window: where, from and to, and when it was done (or, on the redo
     /// stack, when it was undone). The date orders it against the tag ledger's changes, whose lines carry theirs,
-    /// so Edit's one Undo takes whichever of the two is newer (`undoTakesRotation`).
+    /// so Edit's one Undo takes whichever is newest (`ReaderUndoSource`).
     struct TurnChange: Equatable {
         let path: String
         let page: Int
@@ -562,14 +562,6 @@ final class DocumentViewerModel: ObservableObject {
     var canRedoRotation: Bool { !turnRedos.isEmpty && !findFieldFocused }
     var nextRotationUndoDate: Date? { canUndoRotation ? turnUndos.last?.date : nil }
     var nextRotationRedoDate: Date? { canRedoRotation ? turnRedos.last?.date : nil }
-
-    /// Most recent action first: the rotation when it is newer than the tag change Undo would otherwise revert,
-    /// or when there is none. The same rule serves redo, with each side's newest undo.
-    nonisolated static func undoTakesRotation(rotation: Date?, tag: Date?) -> Bool {
-        guard let rotation else { return false }
-        guard let tag else { return true }
-        return rotation >= tag
-    }
 
     func undoRotation() { step(from: \.turnUndos, to: \.turnRedos, applying: \.before, verb: "undone") }
     func redoRotation() { step(from: \.turnRedos, to: \.turnUndos, applying: \.after, verb: "redone") }

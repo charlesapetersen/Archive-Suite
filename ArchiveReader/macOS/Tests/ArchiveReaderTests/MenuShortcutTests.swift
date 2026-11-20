@@ -45,17 +45,19 @@ final class MenuShortcutTests: XCTestCase {
     }
 
     func testNoTwoCommandsShareAShortcut() throws {
-        // ⌘Z / ⇧⌘Z are the one deliberate pair: Tags ▸ Undo/Redo Tag Change answer them unless a text field has
-        // the caret, where Edit ▸ Undo/Redo undo the typing (`TextUndoGuard`, REFERENCE §Keyboard map).
-        let allowed: Set<Set<String>> = [
-            ["Edit ▸ Undo", "Tags ▸ Undo Tag Change"],
-            ["Edit ▸ Redo", "Tags ▸ Redo Tag Change"],
-        ]
         let byShortcut = Dictionary(grouping: try menuBar(), by: \.1)
         for (key, items) in byShortcut where items.count > 1 {
-            let paths = Set(items.map(\.0))
-            XCTAssertTrue(allowed.contains(paths), "\(key) is bound by more than one command: \(paths.sorted())")
+            XCTFail("\(key) is bound by more than one command: \(items.map(\.0).sorted())")
         }
+    }
+
+    /// W49.reader-undo-menu-names: one Undo and one Redo, in the Edit menu, on ⌘Z and ⇧⌘Z; the Tags menu has none.
+    /// With nothing to undo they read a bare "Undo" and "Redo", and are named for the change once there is one.
+    func testUndoAndRedoAreTheEditMenusOnly() throws {
+        let all = try menuBar()
+        XCTAssertEqual(all.filter { $0.1 == shortcut("z", [.command]) }.map(\.0), ["Edit ▸ Undo"])
+        XCTAssertEqual(all.filter { $0.1 == shortcut("z", [.command, .shift]) }.map(\.0), ["Edit ▸ Redo"])
+        XCTAssertFalse(all.contains { $0.0.hasPrefix("Tags ▸ Undo") || $0.0.hasPrefix("Tags ▸ Redo") })
     }
 
     func testTheSuiteSharedKeysAreInPlace() throws {

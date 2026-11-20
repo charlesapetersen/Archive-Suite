@@ -39,7 +39,7 @@ struct FolderDatingOffer: Identifiable, Equatable {
         let them = paths.count == 1 ? "1 document in it has" : "\(paths.count) documents in it have"
         return "The folder is dated “\(date.text)”. \(them) no date of its own, or one only estimated or taken from a "
             + "stamp; each would be dated \(shown). Dates read from a document's text or page image, checked dates "
-            + "and the folder photo are left as they are. Tags ▸ Undo Tag Change (⌘Z) takes it back."
+            + "and the folder photo are left as they are. Edit ▸ Undo Tag Change (⌘Z) takes it back."
     }
 
     var confirmTitle: String { "Date \(paths.count) Document\(paths.count == 1 ? "" : "s")" }

@@ -141,7 +141,7 @@ final class RotationUITests: FixtureUITestCase {
         settle(1)
         let turned = inkBounds(in: docWindow)
         XCTAssertGreaterThan(turned.height, turned.width * 3, "⌃⌘R turned the page")
-        let undo = tagsMenuItem("Undo Rotation")
+        let undo = editMenuItem("Undo Rotation")
         XCTAssertTrue(undo.exists && undo.isEnabled, "the menu's Undo names the rotation, the most recent action")
         closeMenu()
 
@@ -150,7 +150,7 @@ final class RotationUITests: FixtureUITestCase {
         captureScreenshot("w40-rotate-undo-1-undone")
         let undone = inkBounds(in: docWindow)
         XCTAssertGreaterThan(undone.width, undone.height * 3, "⌘Z puts the page back upright")
-        let redo = tagsMenuItem("Redo Rotation")
+        let redo = editMenuItem("Redo Rotation")
         XCTAssertTrue(redo.exists && redo.isEnabled, "the menu's Redo names the rotation")
         closeMenu()
 
@@ -162,7 +162,7 @@ final class RotationUITests: FixtureUITestCase {
 
         pressKey("z", modifiers: .command)
         settle(1)
-        XCTAssertFalse(tagsMenuItem("Undo Rotation").exists, "nothing of the rotation is left to undo")
+        XCTAssertFalse(editMenuItem("Undo Rotation").exists, "nothing of the rotation is left to undo")
         closeMenu()
         pressKey("w", modifiers: .command)
         settle(0.5)
@@ -173,11 +173,12 @@ final class RotationUITests: FixtureUITestCase {
 
     // MARK: - Helpers
 
-    private func tagsMenuItem(_ title: String) -> XCUIElement {
+    /// Edit ▸ Undo and Redo, named for the change (W49.reader-undo-menu-names; they were under Tags).
+    private func editMenuItem(_ title: String) -> XCUIElement {
         let bar = app.menuBars.element(boundBy: 0)
-        let tags = bar.menuBarItems["Tags"]
-        XCTAssertTrue(tags.waitForExistence(timeout: 5), "the Tags menu should exist")
-        tags.click()
+        let edit = bar.menuBarItems["Edit"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 5), "the Edit menu should exist")
+        edit.click()
         let item = bar.menuItems[title]
         _ = item.waitForExistence(timeout: 2)
         return item

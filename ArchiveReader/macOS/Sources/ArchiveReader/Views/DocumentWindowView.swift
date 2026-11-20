@@ -29,6 +29,8 @@ struct DocumentWindowView: View {
     @State private var docWindow: NSWindow?
     /// Whether this is the key window: the frontmost document window's file is the list's file on view.
     @Environment(\.controlActiveState) private var activeState
+    /// The window's undo manager, which its Inspector's container edits are registered on; published for Edit ▸ Undo.
+    @Environment(\.undoManager) private var undoManager
 
     private var defaultFraction: CGFloat { CGFloat(AppSettings.viewerSplitFraction) }
     private let handleWidth: CGFloat = 10
@@ -72,6 +74,7 @@ struct DocumentWindowView: View {
         .focusedSceneValue(\.archiveLinkContext, linkContext)
         // W40.fix-reader-menus-follow-window: the Tags menu acts on this window's open file.
         .focusedSceneValue(\.documentTagActions, DocumentTagActions(router: router, viewer: model))
+        .focusedSceneValue(\.windowUndoManager, undoManager)   // W49.reader-undo-menu-names
         .onChange(of: model.showingTagEditor) { _, visible in infoVisible = visible }
         .onChange(of: model.showingThumbnails) { _, visible in thumbnailsVisible = visible }
         .onChange(of: model.invertingImages) { _, on in invertImages = on }

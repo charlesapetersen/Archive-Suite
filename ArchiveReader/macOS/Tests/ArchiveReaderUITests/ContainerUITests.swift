@@ -214,8 +214,8 @@ final class ContainerUITests: XCTestCase {
         let edited = try String(contentsOf: written, encoding: .utf8)
         XCTAssertTrue(edited.contains("Box 99"), edited)
 
-        // Edit ▸ Undo, chosen from the menu (⌘Z is Tags ▸ Undo Tag Change). The item reads a bare "Undo": SwiftUI's
-        // Edit menu does not take the undo manager's action name (ArchiveReader/KNOWN_ISSUES.md).
+        // Edit ▸ Undo, named for the change (W49.reader-undo-menu-names): it read a bare "Undo", and only the menu
+        // reached a container edit; ⌘Z now does too.
         func choose(_ title: String) {
             app.menuBars.menuBarItems["Edit"].click()
             let item = app.menuBars.menuBarItems["Edit"].menuItems[title].firstMatch
@@ -226,15 +226,24 @@ final class ContainerUITests: XCTestCase {
             _ = captureScreenshot("containers-edit-menu-\(title.lowercased())")
             item.click()
         }
-        choose("Undo")
+        choose("Undo Container Change")
         waitFor("Box 17", 3, "undo puts the folder's name back")
         XCTAssertEqual(count("Box 99"), 0)
         let undone = try String(contentsOf: written, encoding: .utf8)
         XCTAssertFalse(undone.contains("Box 99"), "the file holds what it held before the edit (none): \(undone)")
         _ = captureScreenshot("containers-undone")
 
-        choose("Redo")
+        choose("Redo Container Change")
         waitFor("Box 99", 3, "redo makes the change again")
+        XCTAssertTrue(try String(contentsOf: written, encoding: .utf8).contains("Box 99"))
+
+        // ⌘Z and ⇧⌘Z take the same change, the newest of any kind, with the list in front.
+        table.tableRows.containing(NSPredicate(format: "label == %@ OR value == %@", "Box 99", "Box 99"))
+            .element(boundBy: 0).click()
+        app.typeKey("z", modifierFlags: .command)
+        waitFor("Box 17", 3, "⌘Z undoes the container change")
+        app.typeKey("z", modifierFlags: [.command, .shift])
+        waitFor("Box 99", 3, "⇧⌘Z redoes it")
         XCTAssertTrue(try String(contentsOf: written, encoding: .utf8).contains("Box 99"))
         XCTAssertEqual(count("Box 18"), 2, "the other folder is untouched throughout")
         XCTAssertFalse(FileManager.default.fileExists(
@@ -292,9 +301,9 @@ final class ContainerUITests: XCTestCase {
         wait(for: [expectation(for: gone, evaluatedWith: value)], timeout: 20)
         _ = captureScreenshot("item-field-none")
 
-        // Edit ▸ Undo, from the menu (⌘Z is Tags ▸ Undo Tag Change).
+        // Edit ▸ Undo, named for the change (W49.reader-undo-menu-names).
         app.menuBars.menuBarItems["Edit"].click()
-        let undo = app.menuBars.menuBarItems["Edit"].menuItems["Undo"].firstMatch
+        let undo = app.menuBars.menuBarItems["Edit"].menuItems["Undo Title None"].firstMatch
         XCTAssertTrue(undo.waitForExistence(timeout: 5))
         XCTAssertTrue(undo.isEnabled)
         undo.click()

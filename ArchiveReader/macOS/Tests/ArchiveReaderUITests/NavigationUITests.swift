@@ -771,7 +771,7 @@ final class NavigationUITests: FixtureUITestCase {
         XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path)), beforeBytes)
         XCTAssertFalse(undo.isEnabled, "inverse records cannot become redo candidates")
         captureScreenshot("w40-audit-ledger-undo-verified")
-        app.menuBars.menuBarItems["Tags"].click()
+        app.menuBars.menuBarItems["Edit"].click()   // Edit ▸ Redo Tag Change (W49.reader-undo-menu-names)
         app.menuItems["Redo Tag Change"].click()
         XCTAssertTrue(waitForTags(on: name, containing: ["Read"], excluding: ["Unread"]))
         XCTAssertTrue(app.staticTexts["Redid 1 change in \(name): Read state: “Unread” → “Read”."]

@@ -274,6 +274,9 @@ final class NavigationModel: ObservableObject {
     @Published private(set) var undoDepth = 0
     /// How many undos Redo Tag Change can reverse (W40.fix-reader-redo).
     @Published private(set) var redoDepth = 0
+    /// Each window's container and item-field undo steps with when each was made, so Edit ▸ Undo can name the next one
+    /// and weigh it against the tag ledger (W49.reader-undo-menu-names; `NavigationModel+ContainerEdits`).
+    @Published var containerHistory: [ContainerHistory] = []
     @Published var statusMessage = ""
     // G4 keyboard triage: bumped whenever a triage action wants the newly-selected row scrolled into
     // view. The window observes the counter (so scrolling to the *same* id twice still fires) and asks

@@ -162,13 +162,24 @@ final class PageRotationTests: XCTestCase {
         XCTAssertEqual(model.imageTurns, 0, "the first pair's turn was undone")
     }
 
-    func testUndoTakesTheNewerOfRotationAndTagChange() {
+    /// W49.reader-undo-menu-names: Edit ▸ Undo takes the newest of a tag change, a turn and a container edit.
+    func testUndoTakesTheNewestOfTagRotationAndContainerChange() {
         let earlier = Date(timeIntervalSince1970: 100), later = Date(timeIntervalSince1970: 200)
-        XCTAssertFalse(DocumentViewerModel.undoTakesRotation(rotation: nil, tag: nil))
-        XCTAssertFalse(DocumentViewerModel.undoTakesRotation(rotation: nil, tag: later))
-        XCTAssertTrue(DocumentViewerModel.undoTakesRotation(rotation: earlier, tag: nil))
-        XCTAssertTrue(DocumentViewerModel.undoTakesRotation(rotation: later, tag: earlier))
-        XCTAssertFalse(DocumentViewerModel.undoTakesRotation(rotation: earlier, tag: later))
+        let latest = Date(timeIntervalSince1970: 300)
+        func newest(_ tag: Date?, _ rotation: Date?, _ container: Date? = nil) -> ReaderUndoSource? {
+            ReaderUndoSource.newest(tag: tag, rotation: rotation, container: container)
+        }
+        XCTAssertNil(newest(nil, nil))
+        XCTAssertEqual(newest(later, nil), .tag)
+        XCTAssertEqual(newest(nil, earlier), .rotation)
+        XCTAssertEqual(newest(earlier, later), .rotation)
+        XCTAssertEqual(newest(later, earlier), .tag)
+        XCTAssertEqual(newest(later, later), .rotation, "a tie goes to the turn, as before")
+        XCTAssertEqual(newest(nil, nil, earlier), .container)
+        XCTAssertEqual(newest(later, earlier, latest), .container)
+        XCTAssertEqual(newest(latest, earlier, later), .tag)
+        XCTAssertEqual(newest(earlier, latest, later), .rotation)
+        XCTAssertEqual(newest(.distantPast, nil, earlier), .container, "a tag change not yet read is the oldest")
     }
 
     func testRotationUndoIsOffWhileFindHasTheKeyboard() throws {
