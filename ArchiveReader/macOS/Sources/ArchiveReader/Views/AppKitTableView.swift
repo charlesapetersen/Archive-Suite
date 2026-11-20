@@ -33,6 +33,9 @@ struct AppKitTableView: NSViewRepresentable {
     /// Where each file sits in its archive (W47.ct-reader-view).
     static let containerColumnID = "container"
 
+    /// Page 2's item fields with the user's corrections (W49.reader-item-fields-search).
+    static let itemFieldsColumnID = "itemFields"
+
     /// One source for construction, the header's menu and tests.
     static let columnDefinitions: [ColumnDefinition] = [
         .init(id: "flag", title: "⚑", width: 26, minWidth: 26, maxWidth: 30, sortField: .flag,
@@ -60,6 +63,10 @@ struct AppKitTableView: NSViewRepresentable {
                   + "names, as the folder levels read them (File ▸ Container Levels…), and from the container "
                   + "records the apps keep beside the files. ⚠︎ marks sources that disagree. Offered once a file "
                   + "in the library has one. Click to sort."),
+        .init(id: itemFieldsColumnID, title: "Item fields", width: 200, minWidth: 100, maxWidth: 500, sortField: nil,
+              toolTip: "The document's title, byline, publication and other item fields, as the Inspector shows "
+                  + "them: from page 2, with your corrections in their place. Offered once a file in the library "
+                  + "has one. Point at a cell for each field."),
         .init(id: "tags", title: "File tags", width: 300, minWidth: 100, maxWidth: 600, sortField: .subjects, flexible: true,
               toolTip: "The file's topic tags. Click a cell to edit them; click the header to sort."),
         // Quality holds a 75-pt pop-up inset 1 pt each side, so 78 is the narrowest it fits in. At 72 it overhung
@@ -278,6 +285,16 @@ struct AppKitTableView: NSViewRepresentable {
             }
         }
 
+        // Item fields read again (a pass, or a correction): redraw the loaded rows' Item fields cells.
+        if coordinator.lastItemFieldsGeneration != model.itemFieldsRevision {
+            coordinator.lastItemFieldsGeneration = model.itemFieldsRevision
+            let column = tableView.column(withIdentifier: NSUserInterfaceItemIdentifier(Self.itemFieldsColumnID))
+            let rowSet = Self.loadedRows(of: tableView)
+            if column >= 0, !rowSet.isEmpty {
+                tableView.reloadData(forRowIndexes: rowSet, columnIndexes: IndexSet(integer: column))
+            }
+        }
+
         // Shown or hidden from the header's menu, or Capture marker's first value arriving.
         if coordinator.applyHiddenColumns(model.effectiveHiddenColumns, to: tableView) {
             coordinator.columnFitter?.fit()
@@ -345,6 +362,7 @@ struct AppKitTableView: NSViewRepresentable {
         var lastSnippetFillGeneration: Int = 0
         /// The container catalog last drawn (W47.ct-reader-view), so a new one redraws the Container cells.
         var lastContainerGeneration = 0
+        var lastItemFieldsGeneration = 0
         private(set) var currentSnapshotIDs: [ArchiveFile.ID] = []
         /// Each id's row in `currentSnapshotIDs`, rebuilt only when the snapshot changes.
         private(set) var rowByID: [ArchiveFile.ID: Int] = [:]
@@ -717,6 +735,9 @@ struct AppKitTableView: NSViewRepresentable {
                     fontSize: currentFontSize
                 )
 
+            case AppKitTableView.itemFieldsColumnID:
+                Self.configureItemFieldsTextField(tf, fields: parent.model.itemFields(for: file.path))
+
             case AppKitTableView.containerColumnID:
                 let row = parent.model.containerRow(for: file.path)
                 if let row, !row.disagreements.isEmpty {
@@ -928,6 +949,13 @@ struct AppKitTableView: NSViewRepresentable {
             textField.textColor = .secondaryLabelColor
             textField.lineBreakMode = .byTruncatingTail
             textField.toolTip = classification
+        }
+
+        /// The Item fields cell's formatter, for the table and its headless pixel guard (W49.reader-item-fields-search).
+        static func configureItemFieldsTextField(_ textField: NSTextField, fields: IndexedItemFields?) {
+            textField.stringValue = fields?.columnText ?? ""
+            textField.lineBreakMode = .byTruncatingTail
+            textField.toolTip = fields?.columnToolTip
         }
 
         // MARK: NSTableViewDelegate

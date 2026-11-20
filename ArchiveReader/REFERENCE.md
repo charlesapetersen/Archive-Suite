@@ -254,7 +254,9 @@ writes against the real corpus — always a copy.
   `NavigationModel.hiddenColumns`, which persists; File name is always shown. Capture marker is hidden while
   no file in the library has a marker, since files made before the apps
   have none. It names the kind of capture, not the container a file is in (that is `W47.ct-reader-view`'s
-  Container column).
+  Container column). **Item fields** (W49.reader-item-fields-search, display only, no sort) gives the title,
+  byline, publication, publication date, kind and recipient place on one line, the user's corrections over page
+  2's, from the content index (`IndexedItemFields`); hidden likewise while no file has one.
 - **Document viewer:** two `PDFView`s (image left / OCR text right), **independent zoom** per pane,
   draggable gray splitter with center grab handle, **default 2/3 : 1/3** — the split, per-pane zoom,
   and window size then persist as the next viewer's default (DV-1/DV-2; **no** per-document reset).
@@ -542,8 +544,12 @@ Search/                       Discovery + disposable caches (never the corpus):
   RootFolderStore.swift       Security-scoped root bookmark; read-only adoption, identity creation only
                               on archive-link copy; container-only display preference identity.
   ContentIndex.swift          SQLite FTS5 actor (import SQLite3) — full-text + classification; open() is
-                              ALL-OR-NOTHING (setup failure ⇒ discardHandle + db = nil) (W23.m9).
+                              ALL-OR-NOTHING (setup failure ⇒ discardHandle + db = nil) (W23.m9). Keeps page
+                              2's item fields and the user's corrections (`files.header_fields`/`user_fields`,
+                              FTS `fields`, searched with the body: W49.reader-item-fields-search).
+  IndexedItemFields.swift     A file's item fields as the index keeps them; the Item fields column's text.
   ContentIndexer.swift        Background (detached) incremental indexing; async search/classification;
+                              each pass and each item-field edit (`syncUserFields`) reads the corrections;
                               publishes `Failure` (unavailable/incomplete) → amber status-bar line (W23.m9).
   PDFTextExtractor.swift      PDFKit text + Classification-line extraction (guards corrupt/non-PDF).
   FlagStore.swift             Per-file flag in UserDefaults (outside the corpus); notes are Archive Notes' job.

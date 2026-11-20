@@ -101,9 +101,17 @@ What it does not do, deliberately or not yet:
   are compared composed, so two files whose names differ only in Unicode composition, possible on some network
   volumes, share them); a
   `Checked <Field>` tag set before the correction stays and speaks for page 2's value again once the correction is
-  removed; only the Inspector and the Zotero export (and Notes' Copy for Zotero, through the same gather) read the
-  corrections, not the Processor, search or the list's columns; one file at a time, no set for selection; editing needs
-  the file under the archive's main folder (queued: W49.reader-item-fields-search).
+  removed (accepted: SPEC/tag-format.md §Field checks: a check names the field and never holds the value).
+- **Corrections reach search and the Item fields column, with limits** (W49.reader-item-fields-search). The content
+  index keeps page 2's item fields and the corrections beside each file; the OCR text box and an Advanced Search OCR
+  text rule match a corrected value, and the Item fields column (offered once a file has one) shows what the Inspector
+  shows. Page 2's own value stays searchable too, since it is in the page's text, and a hit on a correction alone shows
+  a snippet of the page without a highlight. A correction made in the Reader is indexed at once; one written by
+  another copy of the Reader on a shared folder waits for the next index pass, since the watcher ignores
+  `.archivesuite`. The column does not sort. The Processor does not read corrections; corrections are one file at a
+  time, with no set for selection; renaming a file in Finder leaves them behind; editing needs the file under the
+  archive's main folder (queued: W49.reader-item-fields-follow; the owner, 2026-11-19 call 21: renames and several
+  files at once "can come later").
 - **Container fields have their own Inspector section** (W47.ct-reader-view), with the same badge and no check
   button: a container value is confirmed or corrected from its Edit menu (W47.ct-reader-edit). (accepted: by design, W47.ct-reader-edit; a container value is confirmed by being the user's own).
 - **Sender and recipient have no row**: the Processor writes them only to the JSON sidecar (the names feature's

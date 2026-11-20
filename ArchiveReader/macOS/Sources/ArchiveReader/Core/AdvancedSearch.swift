@@ -150,7 +150,7 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
     /// to leave out (any of the words).
     var ftsExpression: String? {
         guard field.isText, isActive else { return nil }
-        let column = field == .ocrText ? "body" : nil
+        let column = field == .ocrText ? ContentIndex.ocrTextColumns : nil   // with the corrected item fields
         return AdvancedSearch.ftsExpression(op: op, text: text, column: column)
     }
 }

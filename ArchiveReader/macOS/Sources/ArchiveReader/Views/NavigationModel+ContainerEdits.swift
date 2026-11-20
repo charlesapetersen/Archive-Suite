@@ -301,6 +301,7 @@ extension NavigationModel {
     /// item-field edit changes nothing the catalog reads, and each one reads its file fresh, so it waits for nothing.
     private func finishEdit(_ document: EditedDocument) {
         itemFieldRevision &+= 1
+        syncItemFieldsToIndex()
         switch document {
         case .containers:
             containerEditSaving = true

@@ -239,7 +239,7 @@ final class ContentIndexTests: XCTestCase {
         let ranked = await idx.searchRanked("riesm")
         XCTAssertEqual(ranked.paths, ["/body.pdf"], "the prefix term is limited to the OCR text too")
         XCTAssertNotNil(ranked.snippets["/body.pdf"])
-        XCTAssertEqual(idx.ocrTextMatchExpression("cold war"), "body : (\"cold\" \"war\"*)")
+        XCTAssertEqual(idx.ocrTextMatchExpression("cold war"), "{body fields} : (\"cold\" \"war\"*)")
         XCTAssertEqual(idx.ocrTextMatchExpression("  "), "")
         let anyText = await idx.search(expression: "\"riesman\"")
         XCTAssertEqual(Set(anyText), ["/body.pdf", "/Riesman to Petersen.pdf", "/class.pdf"])

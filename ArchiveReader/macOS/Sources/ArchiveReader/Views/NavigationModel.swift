@@ -196,6 +196,11 @@ final class NavigationModel: ObservableObject {
     /// Page-2 `Classification:` values published by the disposable content index for nav-row display.
     /// Missing/unindexed rows stay absent and render as an em dash; classification never drives a write.
     @Published private(set) var classifications: [String: String] = [:]
+    /// W49.reader-item-fields-search: page 2's item fields with the user's corrections over them, per path, from the
+    /// content index, for the Item fields column. Display only.
+    @Published private(set) var itemFields: [String: IndexedItemFields] = [:] { didSet { itemFieldsRevision &+= 1 } }
+    /// Bumped with each change to `itemFields`, so the table redraws its Item fields cells.
+    private(set) var itemFieldsRevision = 0
     /// W47.ct-reader-view: where each listed file sits in its archive, from the container files, the level map
     /// and the file names (`ContainerCatalog`). Built off the main thread on each change to the listed paths;
     /// display, sort and filter only.
@@ -245,6 +250,7 @@ final class NavigationModel: ObservableObject {
     var effectiveHiddenColumns: Set<String> {
         var hidden = hiddenColumns
         if classifications.isEmpty { hidden.insert(AppKitTableView.captureMarkerColumnID) }
+        if itemFields.isEmpty { hidden.insert(AppKitTableView.itemFieldsColumnID) }
         if containerCatalog.isEmpty { hidden.insert(AppKitTableView.containerColumnID) }
         return hidden
     }
@@ -252,6 +258,7 @@ final class NavigationModel: ObservableObject {
     func isColumnAvailable(_ id: String) -> Bool {
         switch id {
         case AppKitTableView.captureMarkerColumnID: return !classifications.isEmpty
+        case AppKitTableView.itemFieldsColumnID: return !itemFields.isEmpty
         case AppKitTableView.containerColumnID: return !containerCatalog.isEmpty
         default: return true
         }
@@ -1319,6 +1326,9 @@ final class NavigationModel: ObservableObject {
     /// Box/Folder/Document Start/Continuation from the content index, for the optional provenance column.
     func classification(for path: String) -> String? { classifications[path] }
 
+    /// A file's item fields as the Inspector shows them, for the Item fields column (W49.reader-item-fields-search).
+    func itemFields(for path: String) -> IndexedItemFields? { itemFields[path] }
+
     /// Whether another currently-displayed row shares this file's base name (case-insensitive) — the
     /// nav list then surfaces the containing folder to disambiguate. Read-only display aid.
     func isDuplicatedName(_ name: String) -> Bool { DuplicateNames.isDuplicated(name, in: duplicatedNames) }
@@ -1335,11 +1345,13 @@ final class NavigationModel: ObservableObject {
             guard let self else { return }
             let statuses = await self.indexer.formatStatuses(for: paths)
             let classifications = await self.indexer.classifications(for: paths)
+            let itemFields = await self.indexer.itemFields(for: paths)
             let count = await self.indexer.needsAttentionCount(among: paths)   // R-5: scope to the current library
             guard generation == self.formatGeneration else { return }   // superseded by a newer refresh
             ReaderStages.measure("model.formatStatuses.publish") {
                 self.formatStatuses = statuses
                 self.classifications = classifications
+                if self.itemFields != itemFields { self.itemFields = itemFields }
                 self.needsAttentionCount = count
             }
             self.recompute()
@@ -1533,7 +1545,7 @@ final class NavigationModel: ObservableObject {
     /// Re-run any active full-text search after an index pass completes (Part B: search-during-index
     /// refresh). The pass may have indexed files that now match the query but were upserted after the
     /// original search ran — re-querying folds them in. Also refreshes the base scope's OCR query.
-    private func refreshFullTextSearchIfActive() {
+    func refreshFullTextSearchIfActive() {
         if !fullTextQuery.trimmingCharacters(in: .whitespaces).isEmpty {
             runFullTextSearch()
         }

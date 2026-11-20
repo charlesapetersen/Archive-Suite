@@ -152,7 +152,8 @@ the container file (`SPEC/containers.md`).
   `{ "schemaVersion": 1, "files": { "<file name>": { "<field>": "<value>", … } }, "updatedAt": "<ISO 8601>" }`, the
   file name as it is in the folder (compared composed, NFC), the field keys `documentKind`, `title`, `byline`,
   `publication`, `publicationDate`, `recipientPlace`. A value replaces page 2's wherever an app shows or exports the
-  field (the Reader's Checks, the Zotero export); `""` says the file has no such field, hiding page 2's (and, for the
+  field (the Reader's Checks, its search and Item fields column through the disposable content index, the Zotero
+  export); `""` says the file has no such field, hiding page 2's (and, for the
   kind, the tagging call's format standing in for one). Taking the user's value away removes its key, and a file left
   with none its entry. **`dates`** (W47.ct-folder-date-reader; optional, absent when empty): `{ "<file name>":
   { "date": "<ArchiveDate wire value: 1966, 1966-02 or 1960s>", "uncertain": <bool>, "evidence": "<the Date evidence:

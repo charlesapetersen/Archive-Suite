@@ -49,6 +49,17 @@ extension NavigationModel {
         }
     }
 
+    /// W49.reader-item-fields-search: after an edit, undo or redo, the content index reads the corrections beside the
+    /// listed files again, so search and the Item fields column follow at once rather than at the next pass.
+    func syncItemFieldsToIndex() {
+        let files = library.files
+        Task { [weak self] in
+            guard let self, await self.indexer.syncUserFields(files) else { return }
+            self.refreshFormatStatuses()
+            self.refreshFullTextSearchIfActive()
+        }
+    }
+
     /// Reads `directory`'s item-field file, applies `change` and writes it with the read's stamp; nil when nothing
     /// changed. A document this build cannot read, or of a newer version, is refused before `change` runs.
     nonisolated static func editItemFields(at directory: URL, _ change: (UserItemFields) -> UserItemFields) throws

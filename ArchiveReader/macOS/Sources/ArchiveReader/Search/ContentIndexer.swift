@@ -199,6 +199,13 @@ final class ContentIndexer: ObservableObject {
                 }
                 catch { cacheRowsDropped = datalessPaths.count }
             }
+            // W49.reader-item-fields-search: the user's corrections beside the files, read fresh each pass. A
+            // file whose text is current gets them here; one extracted below takes them with its row.
+            let userFields = Self.userFields(of: files)
+            if let changed = try? await idx.setUserFields(Self.userFieldChanges(
+                stored: await idx.storedUserFields(), current: userFields, among: files)), changed > 0 {
+                await self?.didCommit(gen)
+            }
             let work = files.filter { f in
                 guard !f.isDataless else { return false }
                 guard let stored = existing[f.path] else { return true }
@@ -231,7 +238,7 @@ final class ContentIndexer: ObservableObject {
                 while queued < workers, let f = workIter.next() {
                     group.addTask(priority: .utility) {
                         guard !Task.isCancelled else { return nil }
-                        return Self.extractRow(f, extractPDF: extractPDF)
+                        return Self.extractRow(f, user: userFields[f.path] ?? [:], extractPDF: extractPDF)
                     }
                     queued += 1
                 }
@@ -263,7 +270,7 @@ final class ContentIndexer: ObservableObject {
                     if let f = workIter.next() {
                         group.addTask(priority: .utility) {
                             guard !Task.isCancelled else { return nil }
-                            return Self.extractRow(f, extractPDF: extractPDF)
+                            return Self.extractRow(f, user: userFields[f.path] ?? [:], extractPDF: extractPDF)
                         }
                     }
                 }
@@ -288,7 +295,7 @@ final class ContentIndexer: ObservableObject {
     /// PDF open. The outer `isDataless` filter is the ordinary path; this guard closes the race where
     /// a local file becomes a placeholder after discovery but before `PDFDocument(url:)`.
     private nonisolated static func extractRow(
-        _ file: ArchiveFile,
+        _ file: ArchiveFile, user: [CheckableField: String],
         extractPDF: @Sendable (URL) -> ExtractedContent?
     ) -> IndexRow {
         CorpusWalker.withDatalessMaterializationDisabled {
@@ -298,12 +305,64 @@ final class ContentIndexer: ObservableObject {
                 return IndexRow(path: path, mtime: stamp.mtime, identity: stamp.identity, name: file.name,
                                 classification: content.classification, body: content.fullBody,
                                 pageCount: content.pageCount,
-                                hasText: !content.fullBody.isEmpty, readable: true)
+                                hasText: !content.fullBody.isEmpty, readable: true,
+                                headerFields: IndexedItemFields.values(of: IndexedItemFields.header(of: content)),
+                                userFields: user)
             }
             return IndexRow(path: path, mtime: stamp.mtime, identity: stamp.identity, name: file.name,
                             classification: nil, body: "",
-                            pageCount: 0, hasText: false, readable: false)
+                            pageCount: 0, hasText: false, readable: false, userFields: user)
         }
+    }
+
+    /// The user's item-field values for each of `files` that has any, read from each folder's `item-fields.json`
+    /// once (`UserItemFields`). A folder whose file cannot be read gives none, as the Inspector shows none. Dataless
+    /// files have no row, so they are left out.
+    nonisolated static func userFields(of files: [ArchiveFile]) -> [String: [CheckableField: String]] {
+        var out: [String: [CheckableField: String]] = [:]
+        let byFolder = Dictionary(grouping: files.lazy.filter { !$0.isDataless }) {
+            $0.url.deletingLastPathComponent().path
+        }
+        for group in byFolder.values {
+            guard let first = group.first, let doc = UserItemFields.load(folderOf: first.url) else { continue }
+            for file in group {
+                let values = doc.values(for: file.url.lastPathComponent)
+                if !values.isEmpty { out[file.path] = values }
+            }
+        }
+        return out
+    }
+
+    /// The rows of `files` whose stored corrections differ from `current`, with the values to store.
+    nonisolated static func userFieldChanges(stored: [String: [CheckableField: String]],
+                                             current: [String: [CheckableField: String]],
+                                             among files: [ArchiveFile]) -> [String: [CheckableField: String]] {
+        var out: [String: [CheckableField: String]] = [:]
+        for file in files where !file.isDataless {
+            let now = current[file.path] ?? [:]
+            if (stored[file.path] ?? [:]) != now { out[file.path] = now }
+        }
+        return out
+    }
+
+    /// Reads the corrections beside `files` again and stores those that changed (after an item-field edit, undo
+    /// or redo, W49.reader-item-fields-search). True when a row changed. A file not yet indexed takes its
+    /// corrections when it is.
+    func syncUserFields(_ files: [ArchiveFile]) async -> Bool {
+        guard !files.isEmpty, await openForQuery() else { return false }
+        let idx = index
+        let changed = await Task.detached(priority: .userInitiated) { () -> Int in
+            let current = Self.userFields(of: files)
+            let changes = Self.userFieldChanges(stored: await idx.storedUserFields(), current: current, among: files)
+            return (try? await idx.setUserFields(changes)) ?? 0
+        }.value
+        return changed > 0
+    }
+
+    /// Page 2's item fields and the user's corrections, per indexed path that has either.
+    func itemFields(for paths: [String]) async -> [String: IndexedItemFields] {
+        guard await openForQuery() else { return [:] }
+        return await index.itemFields(for: paths)
     }
 
     /// The freshness stamp discovery recorded for `file`, as the index stores it.

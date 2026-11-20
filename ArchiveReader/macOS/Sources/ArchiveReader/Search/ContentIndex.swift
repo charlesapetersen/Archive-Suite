@@ -14,6 +14,9 @@ struct IndexRow: Sendable {
     let pageCount: Int
     let hasText: Bool
     let readable: Bool
+    /// Page 2's item fields and the user's corrections beside the file (W49.reader-item-fields-search).
+    var headerFields: [CheckableField: String] = [:]
+    var userFields: [CheckableField: String] = [:]
 }
 
 /// What the index compares to decide a file's text is current (W44.reocr-reader-freshness): the content
@@ -68,13 +71,14 @@ actor ContentIndex {
             // W44.reocr-reader-freshness: the freshness key gained `inode`/`size`. A table written before
             // that is dropped with its text and rebuilt by the next pass — no migration, the index is a
             // cache, and dropping inside the same file leaves no orphan behind.
+            // W49.reader-item-fields-search: the same for `header_fields`/`user_fields` and the FTS `fields` column.
             let columns = try columnNames("files")
-            if !columns.isEmpty, !columns.contains("inode") {
+            if !columns.isEmpty, !columns.contains("inode") || !columns.contains("user_fields") {
                 try exec("DROP TABLE IF EXISTS fts;")
                 try exec("DROP TABLE files;")
             }
-            try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL, inode INTEGER, size INTEGER, page_count INTEGER, has_text INTEGER, readable INTEGER);")
-            try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(body, classification, name, path UNINDEXED);")
+            try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL, inode INTEGER, size INTEGER, page_count INTEGER, has_text INTEGER, readable INTEGER, header_fields TEXT, user_fields TEXT);")
+            try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(body, classification, name, fields, path UNINDEXED);")
         } catch {
             // `sqlite3_open_v2` is lazy: a corrupt or foreign file opens cleanly and fails on the
             // FIRST statement ("file is not a database"). Drop the handle so the next open() re-reads
@@ -155,11 +159,13 @@ actor ContentIndex {
     /// records an unreadable/non-PDF file (empty body) so it can still be surfaced as needing attention.
     func upsert(path: String, mtime: Double, identity: ContentIdentity? = nil, name: String,
                 classification: String?, body: String,
-                pageCount: Int = 0, hasText: Bool = true, readable: Bool = true) throws {
+                pageCount: Int = 0, hasText: Bool = true, readable: Bool = true,
+                headerFields: [CheckableField: String] = [:], userFields: [CheckableField: String] = [:]) throws {
         try exec("BEGIN IMMEDIATE;")
         do {
             try upsertRow(path: path, mtime: mtime, identity: identity, name: name, classification: classification,
-                          body: body, pageCount: pageCount, hasText: hasText, readable: readable)
+                          body: body, pageCount: pageCount, hasText: hasText, readable: readable,
+                          headerFields: headerFields, userFields: userFields)
             try exec("COMMIT;")
         } catch {
             try? exec("ROLLBACK;")
@@ -177,7 +183,8 @@ actor ContentIndex {
             for row in rows {
                 try upsertRow(path: row.path, mtime: row.mtime, identity: row.identity, name: row.name,
                               classification: row.classification, body: row.body,
-                              pageCount: row.pageCount, hasText: row.hasText, readable: row.readable)
+                              pageCount: row.pageCount, hasText: row.hasText, readable: row.readable,
+                              headerFields: row.headerFields, userFields: row.userFields)
             }
             try exec("COMMIT;")
         } catch {
@@ -190,7 +197,10 @@ actor ContentIndex {
     /// BEGIN/COMMIT here. Fully synchronous (no await) to preserve the actor-reentrancy invariant.
     private func upsertRow(path: String, mtime: Double, identity: ContentIdentity?, name: String,
                            classification: String?,
-                           body: String, pageCount: Int, hasText: Bool, readable: Bool) throws {
+                           body: String, pageCount: Int, hasText: Bool, readable: Bool,
+                           headerFields: [CheckableField: String], userFields: [CheckableField: String]) throws {
+        let header = IndexedItemFields.encode(headerFields), user = IndexedItemFields.encode(userFields)
+        let fields = IndexedItemFields.searchText(userFields)
         var rowid: Int64? = nil
         if let sel = prepare("SELECT rowid FROM files WHERE path = ?;") {
             bindText(sel, 1, path)
@@ -199,31 +209,37 @@ actor ContentIndex {
         }
         if let rowid {
             try run("DELETE FROM fts WHERE rowid = ?;") { sqlite3_bind_int64($0, 1, rowid) }
-            try run("UPDATE files SET mtime = ?, inode = ?, size = ?, page_count = ?, has_text = ?, readable = ? WHERE rowid = ?;") {
+            try run("UPDATE files SET mtime = ?, inode = ?, size = ?, page_count = ?, has_text = ?, readable = ?, header_fields = ?, user_fields = ? WHERE rowid = ?;") {
                 sqlite3_bind_double($0, 1, mtime)
                 self.bindIdentity($0, 2, identity)
                 sqlite3_bind_int($0, 4, Int32(pageCount))
                 sqlite3_bind_int($0, 5, hasText ? 1 : 0)
                 sqlite3_bind_int($0, 6, readable ? 1 : 0)
-                sqlite3_bind_int64($0, 7, rowid)
+                self.bindText($0, 7, header)
+                self.bindText($0, 8, user)
+                sqlite3_bind_int64($0, 9, rowid)
             }
-            try insertFTS(rowid: rowid, body: body, classification: classification, name: name, path: path)
+            try insertFTS(rowid: rowid, body: body, classification: classification, name: name, fields: fields, path: path)
         } else {
-            try run("INSERT INTO files(path, mtime, inode, size, page_count, has_text, readable) VALUES(?, ?, ?, ?, ?, ?, ?);") {
+            try run("INSERT INTO files(path, mtime, inode, size, page_count, has_text, readable, header_fields, user_fields) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?);") {
                 self.bindText($0, 1, path); sqlite3_bind_double($0, 2, mtime)
                 self.bindIdentity($0, 3, identity)
                 sqlite3_bind_int($0, 5, Int32(pageCount))
                 sqlite3_bind_int($0, 6, hasText ? 1 : 0)
                 sqlite3_bind_int($0, 7, readable ? 1 : 0)
+                self.bindText($0, 8, header)
+                self.bindText($0, 9, user)
             }
             let newRow = sqlite3_last_insert_rowid(db)
-            try insertFTS(rowid: newRow, body: body, classification: classification, name: name, path: path)
+            try insertFTS(rowid: newRow, body: body, classification: classification, name: name, fields: fields, path: path)
         }
     }
 
     /// Full-text search of the **OCR text** (the body column) → matching file paths. This is the
     /// "Search OCR text" box: a word only in the file name or the classification is not a hit
-    /// (W40.fix-reader-ocr-search-names; the filter bar's name box searches names). Input is tokenized
+    /// (W40.fix-reader-ocr-search-names; the filter bar's name box searches names). The user's corrected
+    /// item fields (the `fields` column) are searched with the body, which holds page 2's own
+    /// (W49.reader-item-fields-search). Input is tokenized
     /// and quoted so arbitrary user text can never be an FTS5 syntax error; terms are AND-combined.
     ///
     /// Returns **all** matching paths by default (`limit == nil`), ordered by **bm25 relevance**
@@ -257,13 +273,13 @@ actor ContentIndex {
 
     private func rankedHits(match: String, limit: Int? = nil) -> [(rowid: Int64, path: String)] {
         guard !match.isEmpty else { return [] }
-        // bm25 weights in FTS5 column order (body, classification, name), for an expression that
-        // reaches every column (Advanced Search's "Any text"): name hits rank highest (10), then
-        // classification (5), then body (1). bm25 returns negative scores
+        // bm25 weights in FTS5 column order (body, classification, name, fields), for an expression
+        // that reaches every column (Advanced Search's "Any text"): name hits rank highest (10), then
+        // classification and the user's item fields (5), then body (1). bm25 returns negative scores
         // (more negative = more relevant); ORDER BY ascending puts the best matches first.
         let sql = limit == nil
-            ? "SELECT rowid, path FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 1.0, 5.0, 10.0);"
-            : "SELECT rowid, path FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 1.0, 5.0, 10.0) LIMIT ?;"
+            ? "SELECT rowid, path FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 1.0, 5.0, 10.0, 5.0);"
+            : "SELECT rowid, path FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 1.0, 5.0, 10.0, 5.0) LIMIT ?;"
         guard let stmt = prepare(sql) else { return [] }
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, match)
@@ -396,6 +412,78 @@ actor ContentIndex {
             if let snip = SearchSnippet.fragment(in: String(cString: c), terms: terms) { out[hit.path] = snip }
         }
         return (out, attempted)
+    }
+
+    /// The FTS columns the OCR text box and an Advanced Search OCR-text rule match: the text and the user's
+    /// corrected item fields (W49.reader-item-fields-search).
+    nonisolated static let ocrTextColumns = "{body fields}"
+
+    /// Page 2's item fields and the user's corrections, per indexed path among `paths` that has either. One scan of
+    /// the rows that have any, since most files (made before the apps) have none.
+    func itemFields(for paths: [String]) -> [String: IndexedItemFields] {
+        guard !paths.isEmpty, let stmt = prepare("SELECT path, header_fields, user_fields FROM files "
+                                                 + "WHERE header_fields <> '' OR user_fields <> '';") else { return [:] }
+        defer { sqlite3_finalize(stmt) }
+        let wanted = Set(paths)
+        var out: [String: IndexedItemFields] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let p = sqlite3_column_text(stmt, 0) else { continue }
+            let path = String(cString: p)
+            guard wanted.contains(path) else { continue }
+            let header = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
+            let user = sqlite3_column_text(stmt, 2).map { String(cString: $0) } ?? ""
+            let fields = IndexedItemFields(header: IndexedItemFields.fields(IndexedItemFields.decode(header)),
+                                           user: IndexedItemFields.decode(user))
+            if !fields.isEmpty { out[path] = fields }
+        }
+        return out
+    }
+
+    /// Every indexed path with corrections stored, and them.
+    func storedUserFields() -> [String: [CheckableField: String]] {
+        guard let stmt = prepare("SELECT path, user_fields FROM files WHERE user_fields <> '';") else { return [:] }
+        defer { sqlite3_finalize(stmt) }
+        var out: [String: [CheckableField: String]] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let p = sqlite3_column_text(stmt, 0), let u = sqlite3_column_text(stmt, 1) else { continue }
+            let values = IndexedItemFields.decode(String(cString: u))
+            if !values.isEmpty { out[String(cString: p)] = values }
+        }
+        return out
+    }
+
+    /// Stores the user's corrections for indexed paths, in one transaction; a path not indexed is skipped (its
+    /// extraction reads them). The number of rows changed.
+    @discardableResult
+    func setUserFields(_ changes: [String: [CheckableField: String]]) throws -> Int {
+        guard !changes.isEmpty else { return 0 }
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            var changed = 0
+            for (path, values) in changes {
+                var rowid: Int64?
+                if let sel = prepare("SELECT rowid FROM files WHERE path = ?;") {
+                    bindText(sel, 1, path)
+                    if sqlite3_step(sel) == SQLITE_ROW { rowid = sqlite3_column_int64(sel, 0) }
+                    sqlite3_finalize(sel)
+                }
+                guard let rowid else { continue }
+                try run("UPDATE files SET user_fields = ? WHERE rowid = ?;") {
+                    self.bindText($0, 1, IndexedItemFields.encode(values))
+                    sqlite3_bind_int64($0, 2, rowid)
+                }
+                try run("UPDATE fts SET fields = ? WHERE rowid = ?;") {
+                    self.bindText($0, 1, IndexedItemFields.searchText(values))
+                    sqlite3_bind_int64($0, 2, rowid)
+                }
+                changed += 1
+            }
+            try exec("COMMIT;")
+            return changed
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
     }
 
     func classifications(for paths: [String]) -> [String: String] {
@@ -539,11 +627,12 @@ actor ContentIndex {
         matchTerms(query).map { $0.term }.joined(separator: " ")
     }
 
-    /// `ftsMatchExpression` limited to the body column, the OCR text: `body : ("term1" "term2"*)`.
+    /// `ftsMatchExpression` limited to the OCR text and the user's item fields:
+    /// `{body fields} : ("term1" "term2"*)`.
     /// What `search` and `searchRanked` match with; empty for an empty query.
     nonisolated func ocrTextMatchExpression(_ query: String) -> String {
         let expression = ftsMatchExpression(query)
-        return expression.isEmpty ? "" : "body : (\(expression))"
+        return expression.isEmpty ? "" : "\(Self.ocrTextColumns) : (\(expression))"
     }
 
     /// The expression `snippet()` is given: `ftsMatchExpression` without its `SearchSnippet.stopWords`
@@ -581,13 +670,15 @@ actor ContentIndex {
 
     // MARK: - SQLite helpers
 
-    private func insertFTS(rowid: Int64, body: String, classification: String?, name: String, path: String) throws {
-        try run("INSERT INTO fts(rowid, body, classification, name, path) VALUES(?, ?, ?, ?, ?);") { stmt in
+    private func insertFTS(rowid: Int64, body: String, classification: String?, name: String, fields: String,
+                           path: String) throws {
+        try run("INSERT INTO fts(rowid, body, classification, name, fields, path) VALUES(?, ?, ?, ?, ?, ?);") { stmt in
             sqlite3_bind_int64(stmt, 1, rowid)
             self.bindText(stmt, 2, body)
             self.bindText(stmt, 3, classification ?? "")
             self.bindText(stmt, 4, name)
-            self.bindText(stmt, 5, path)
+            self.bindText(stmt, 5, fields)
+            self.bindText(stmt, 6, path)
         }
     }
 
