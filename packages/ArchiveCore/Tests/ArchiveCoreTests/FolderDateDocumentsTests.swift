@@ -153,4 +153,54 @@ final class FolderDateDocumentsTests: XCTestCase {
             return XCTFail("an unknown key in a record is read")
         }
     }
+
+    /// W49.reader-folder-date-undo: which dates a folder gave, and how one is taken away when the folder no longer
+    /// gives a date.
+    func testTheDatesAFolderGaveAndTakingThemAway() {
+        let reader = "folder; from 0001.pdf; \"Feb. 1966\"; gave 1966-02"
+        XCTAssertTrue(ContainerFolderDate.folderGave(tags(["1966", "2 February"]), evidence: reader))
+        XCTAssertTrue(ContainerFolderDate.folderGave(tags(["1960s", "Date Uncertain"]),
+                                                     evidence: "folder; from 0001.pdf; \"1960s\""),
+                      "Process Files' folder date, from page 2")
+        XCTAssertFalse(ContainerFolderDate.folderGave(tags(["1966", "Checked Date"]), evidence: reader), "checked")
+        XCTAssertFalse(ContainerFolderDate.folderGave(tags(["1966"]), evidence: nil), "the file's own")
+        XCTAssertFalse(ContainerFolderDate.folderGave(tags(["1958"]), evidence: "stamp; page 1; gave 1958"))
+        XCTAssertFalse(ContainerFolderDate.folderGave(tags(["1966", "1967"]), evidence: reader), "carried twice")
+        XCTAssertFalse(ContainerFolderDate.folderGave(tags(["Unread"]), evidence: reader), "no date")
+
+        let dated = ["Unread", "1966", "2 February", "Date Uncertain"]
+        XCTAssertEqual(apply(ContainerFolderDate.undatingDelta(given: tags(dated), page: nil), to: dated), ["Unread"])
+        XCTAssertEqual(apply(ContainerFolderDate.undatingDelta(given: tags(dated), page: reader), to: dated), ["Unread"],
+                       "page 2 a folder's too: no date to go back to")
+        XCTAssertEqual(apply(ContainerFolderDate.undatingDelta(
+            given: tags(dated), page: "estimate; from 0002.pdf; gave 1958, Date Uncertain"), to: dated),
+                       ["Unread", "1958", "Date Uncertain"], "back to the estimate the folder's replaced")
+        let certain = ["Unread", "1966", "2 February"]
+        XCTAssertEqual(apply(ContainerFolderDate.undatingDelta(
+            given: tags(certain), page: "stamp; page 1; \"MAR 1958\"; gave 1958-03"), to: certain),
+                       ["Unread", "1958", "3 March"])
+        XCTAssertEqual(apply(ContainerFolderDate.undatingDelta(
+            given: tags(certain), page: "stamp; page 1; \"MAR 1958\""), to: certain), ["Unread"],
+                       "an evidence line that names no date: no date")
+    }
+
+    /// The review's cases: an image's date is never put back (a folder's never replaced one), a covering letter's year
+    /// stands, and a date tag added in Finder that the form cannot name makes the record stop speaking for the file.
+    func testUndatingLeavesTheFilesOwnDates() {
+        let dated = ["Unread", "1966"]
+        XCTAssertEqual(apply(ContainerFolderDate.undatingDelta(given: tags(dated), page: "image; page 1; gave 1962"),
+                             to: dated), ["Unread"], "an image's date is not the folder's to put back")
+        XCTAssertEqual(apply(ContainerFolderDate.undatingDelta(given: tags(dated), page: "inherited; from 0002.pdf; gave 1966"),
+                             to: dated), ["Unread", "1966"], "the cover's year")
+        let cover = ["Unread", "1966", "Sent With 1966-04-02"]
+        XCTAssertTrue(ContainerFolderDate.undatingDelta(given: tags(cover), page: nil).isEmpty,
+                      "a year the covering letter gives too stands")
+        let record = FolderDateRecord(date: "1966", uncertain: false, evidence: "folder; from 0001.pdf; gave 1966")
+        XCTAssertTrue(record.holds(for: tags(["1966"])))
+        XCTAssertFalse(record.holds(for: tags(["1966", "Day 5"])), "a Day with no Month was added in Finder")
+        let decade = FolderDateRecord(date: "1960s", uncertain: true, evidence: "folder; from 0001.pdf; gave 1960s")
+        XCTAssertTrue(decade.holds(for: tags(["1960s", "Date Uncertain"])))
+        XCTAssertFalse(decade.holds(for: tags(["1960s", "3 March", "Date Uncertain"])), "a Month beside the Decade")
+        XCTAssertFalse(decade.holds(for: tags(["1960s", "1966", "Date Uncertain"])), "a Year beside the Decade")
+    }
 }

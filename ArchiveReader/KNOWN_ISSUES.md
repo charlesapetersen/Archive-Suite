@@ -8,8 +8,16 @@ Shipped: setting or confirming a folder run's date in the Container section offe
 have no date of their own, by the owner's folder-date rule (`SPEC/containers.md` §The folder-date rule). The tags go
 through `TagWriter` in one undo group (Edit ▸ Undo Tag Change); the `Date evidence:` value is kept in the folder's
 `.archivesuite/item-fields.json` and the Checks name the folder for those dates.
-- **Clearing or widening the folder's date un-dates nothing**, and choosing Not Now does not ask again until the
-  date is edited again (queued: W49.reader-folder-date-undo).
+- **Choosing Not Now does not ask again until the folder's date is edited again**; its Edit ▸ Confirm asks again
+  (accepted: the user's own answer to the offer; owner call 21, 2026-11-19, asked only that the dates follow the
+  folder's, W49.reader-folder-date-undo).
+- **Undoing the folder-date edit itself (the Container section's Undo) does not offer**; the tag change has its own
+  Undo Tag Change, and editing the date again offers (queued: W49.reader-folder-date-undo-fu).
+- **Taking a folder's dates away keeps their records**, so Undo restores the evidence; a date the user later types
+  in Finder exactly as the folder gave it, with no check, reads as the folder's again (queued: W49.reader-folder-date-undo-fu).
+- **Taking a folder's dates away puts back page 2's stamp, estimate or cover date**, even where the user had deleted
+  it in Finder before the folder dated the file: the record does not keep what the folder replaced
+  (queued: W49.reader-folder-date-undo-fu).
 - **The offer is made only from the Container section.** A folder date written into the container file elsewhere
   (Live Capture's Finish, another app) dates nothing already written until it is set or confirmed here (accepted: the
   offer answers the user's own edit; Live Capture dates its own session's documents, W47.ct-folder-date-live).

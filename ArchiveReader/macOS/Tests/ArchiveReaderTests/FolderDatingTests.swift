@@ -87,7 +87,7 @@ final class FolderDatingTests: XCTestCase {
         try makeFolder(date: "1965-1967")
         let run = try XCTUnwrap(NavigationModel.folderDatingRun(tree: root, components: ["Box 3"], editedName: "0003.pdf"))
         XCTAssertEqual(run.names, ["0001.pdf", "0002.pdf", "0003.pdf", "0004.pdf", "0005.pdf", "0006.pdf", "0007.pdf"])
-        XCTAssertEqual(run.date.inherited, .year(1966, month: nil, uncertain: true))
+        XCTAssertEqual(run.date?.inherited, .year(1966, month: nil, uncertain: true))
 
         let files = run.names.map { name -> ArchiveFile in
             let url = folder.appendingPathComponent(name)
@@ -98,7 +98,7 @@ final class FolderDatingTests: XCTestCase {
         let evidence = NavigationModel.folderDatingEvidence(files.map { ($0.path, $0.url, false) }, directory: folder)
         XCTAssertEqual(evidence[files[0].path]?.containerPhoto, true)
         XCTAssertEqual(evidence[files[2].path]?.page?.hasPrefix("estimate;"), true)
-        let plan = NavigationModel.folderDatingPlan(run.date, files: files, evidence: evidence)
+        let plan = NavigationModel.folderDatingPlan(try XCTUnwrap(run.date), files: files, evidence: evidence)
         XCTAssertEqual(plan.writes.map { ($0 as NSString).lastPathComponent }, ["0002.pdf", "0003.pdf", "0006.pdf"],
                        "undated, estimated and no text; not the folder photo, the text's or image's year, a checked date")
         XCTAssertEqual(plan.records, plan.writes)
@@ -120,7 +120,7 @@ final class FolderDatingTests: XCTestCase {
                                contentModified: nil)
         }
         let evidence = NavigationModel.folderDatingEvidence(files.map { ($0.path, $0.url, false) }, directory: folder)
-        let plan = NavigationModel.folderDatingPlan(run.date, files: files, evidence: evidence)
+        let plan = NavigationModel.folderDatingPlan(try XCTUnwrap(run.date), files: files, evidence: evidence)
         XCTAssertEqual(plan.writes.map { ($0 as NSString).lastPathComponent }, ["0002.pdf", "0006.pdf"],
                        "the retyped year stands")
         var header = FieldStatusSection.HeaderFields(headers: [])
@@ -146,7 +146,7 @@ final class FolderDatingTests: XCTestCase {
                                    contentModified: nil)
             }
             let evidence = NavigationModel.folderDatingEvidence(files.map { ($0.path, $0.url, false) }, directory: folder)
-            let plan = NavigationModel.folderDatingPlan(run.date, files: files, evidence: evidence)
+            let plan = NavigationModel.folderDatingPlan(try XCTUnwrap(run.date), files: files, evidence: evidence)
             XCTAssertEqual(plan.writes.map { ($0 as NSString).lastPathComponent }, ["0002.pdf", "0006.pdf"],
                            "the user's \(changed) stands")
         }
@@ -250,5 +250,105 @@ final class FolderDatingTests: XCTestCase {
         let fields = ContainerFileStore.loadItemFields(directory: folder).document
         XCTAssertNil(fields?.dateRecord(for: "0003.pdf"), "the checked file keeps no record")
         XCTAssertNotNil(fields?.dateRecord(for: "0002.pdf"))
+    }
+
+    private func setFolderDate(_ value: ContainerValue?) throws {
+        try ContainerFileStore.write(ContainerFile(runs: [ContainerRun(start: "0001.pdf", level: .folder,
+            fields: ContainerFieldSet(value.map { [.date: $0] } ?? [:]))]), directory: folder, expecting: stamp())
+    }
+
+    private func datedFromTheFolder(_ model: NavigationModel) throws {
+        model.applyFolderDating(try offered(model))
+        wait { model.statusMessage.hasPrefix("Dated ") }
+        XCTAssertEqual(try tagsOnDisk("0003.pdf"), ["Unread", "1966", "2 February"])
+        model.folderDatingOffer = nil
+        model.statusMessage = ""
+    }
+
+    /// W49.reader-folder-date-undo: clearing the folder's date takes away exactly the dates it gave, the estimate's
+    /// coming back, and leaves a date the user changed since; one Undo puts them back.
+    func testClearingTheFolderDateTakesAwayTheDatesItGave() throws {
+        try makeFolder(date: "Feb. 1966")
+        let before = try bytes()
+        let model = fixtureNavigationModel(pinnedTo: root)
+        wait { model.library.files.count >= 7 }
+        try datedFromTheFolder(model)
+        let checked = try XCTUnwrap(model.library.files.first { $0.path.hasSuffix("0006.pdf") }?.path)
+        model.applyEdit(.setChecked(.date, true), paths: [checked])
+        XCTAssertEqual(try tagsOnDisk("0006.pdf"), ["Unread", "1966", "2 February", "Checked Date"])
+
+        for cleared in [nil, ContainerValue("Feb. 1966", source: .label, reader: FieldStatusPolicy.visionParser),
+                        ContainerValue("1930-1970", source: .user, at: now)] {
+            try setFolderDate(cleared)
+            let offer = try offered(model)
+            XCTAssertNil(offer.date)
+            XCTAssertEqual(offer.paths.map { ($0 as NSString).lastPathComponent }, ["0002.pdf", "0003.pdf"],
+                           "the dates the folder gave and nobody checked; \(String(describing: cleared))")
+            XCTAssertTrue(offer.title.hasPrefix("Take the folder's date from 2 documents"), offer.title)
+            model.folderDatingOffer = nil
+        }
+
+        let depth = model.undoDepth
+        model.applyFolderDating(try offered(model))
+        wait { model.statusMessage.hasPrefix("Took ") }
+        XCTAssertTrue(model.statusMessage.hasPrefix("Took the folder's date from 2 documents"), model.statusMessage)
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours"])
+        XCTAssertEqual(try tagsOnDisk("0003.pdf"), ["Unread", "1958", "Date Uncertain"], "the estimate's date is back")
+        XCTAssertEqual(try tagsOnDisk("0006.pdf"), ["Unread", "1966", "2 February", "Checked Date"], "checked stands")
+        XCTAssertEqual(try tagsOnDisk("0004.pdf"), ["Unread", "1961"])
+        XCTAssertEqual(try tagsOnDisk("0005.pdf"), ["Unread", "1962"])
+        XCTAssertEqual(try tagsOnDisk("0007.pdf"), ["Unread", "1950", "Checked Date"])
+        XCTAssertEqual(try bytes(), before, "only Finder tags and .archivesuite change")
+
+        XCTAssertEqual(model.undoDepth, depth + 1, "one Undo")
+        model.undoLast()
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours", "1966", "2 February"])
+        XCTAssertEqual(try tagsOnDisk("0003.pdf"), ["Unread", "1966", "2 February"])
+        let fields = try XCTUnwrap(ContainerFileStore.loadItemFields(directory: folder).document)
+        let restored = DocumentTags.parse(raw: Array(try tagsOnDisk("0003.pdf")), labelNumber: nil)
+        XCTAssertEqual(fields.dateRecord(for: "0003.pdf")?.holds(for: restored), true,
+                       "the record speaks for the restored date again")
+    }
+
+    /// Widening the folder's date replaces the dates it gave with the wider one, and nothing the user checked.
+    func testWideningTheFolderDateUpdatesTheDatesItGave() throws {
+        try makeFolder(date: "Feb. 1966")
+        let model = fixtureNavigationModel(pinnedTo: root)
+        wait { model.library.files.count >= 7 }
+        try datedFromTheFolder(model)
+        try setFolderDate(ContainerValue("1960s", source: .user, at: now))
+        let offer = try offered(model)
+        XCTAssertEqual(offer.paths.map { ($0 as NSString).lastPathComponent }, ["0002.pdf", "0003.pdf", "0006.pdf"])
+        model.applyFolderDating(offer)
+        wait { model.statusMessage.hasPrefix("Dated ") }
+        XCTAssertEqual(try tagsOnDisk("0003.pdf"), ["Unread", "1960s", "Date Uncertain"])
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours", "1960s", "Date Uncertain"])
+        XCTAssertEqual(try tagsOnDisk("0004.pdf"), ["Unread", "1961"])
+        XCTAssertEqual(try tagsOnDisk("0007.pdf"), ["Unread", "1950", "Checked Date"])
+    }
+
+    /// None Here in the Container section offers the undating; an edit of a folder that gave no date before offers none.
+    func testNoneHereOffersAndAnUndatedFolderDoesNot() throws {
+        try makeFolder(date: "Feb. 1966")
+        let model = fixtureNavigationModel(pinnedTo: root)
+        wait { model.library.files.count >= 7 }
+        try datedFromTheFolder(model)
+        let tree = try XCTUnwrap(model.containerTree)
+        let edited = ([tree.path] + ["Box 3", "0002.pdf"]).joined(separator: "/")
+        wait { !model.containerEditSaving }
+        model.editContainerField(.date, .noneHere, forPath: edited)
+        wait { model.folderDatingOffer != nil }
+        let offer = try XCTUnwrap(model.folderDatingOffer)
+        XCTAssertNil(offer.date)
+        XCTAssertEqual(offer.paths.map { ($0 as NSString).lastPathComponent }, ["0002.pdf", "0003.pdf", "0006.pdf"])
+        model.folderDatingOffer = nil
+
+        // Already no date: a second None Here (a folder that dated nothing before it) offers nothing.
+        wait { !model.containerEditSaving }
+        model.editContainerField(.date, .noneHere, forPath: edited)
+        wait { !model.containerEditSaving }
+        let deadline = Date().addingTimeInterval(1.5)
+        while Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
+        XCTAssertNil(model.folderDatingOffer)
     }
 }

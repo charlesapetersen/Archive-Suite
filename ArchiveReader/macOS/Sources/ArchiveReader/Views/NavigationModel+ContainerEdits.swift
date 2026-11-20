@@ -51,15 +51,18 @@ extension NavigationModel {
         case .noneHere: "None Here"
         case .remove: "Remove Your Value"
         }
-        // W47.ct-folder-date-reader: a folder date typed or confirmed may date the run's undated documents.
+        // W47.ct-folder-date-reader: a folder date typed or confirmed may date the run's undated documents; any edit of
+        // it, a clearing included, updates the dates it gave (W49.reader-folder-date-undo).
         var onSaved: (@MainActor () -> Void)?
-        if field == .date, case .set = edit {
+        let before = FolderDateBefore()
+        if field == .date {
             let window = undo.map { ObjectIdentifier($0) }
-            onSaved = { [weak self] in self?.offerFolderDating(at: path, window: window) }
+            onSaved = { [weak self] in self?.offerFolderDating(at: path, window: window, datedBefore: before.dated) }
         }
         runContainerEdit(done: "Container saved.", action: action, undo: undo, {
             let directory = try Self.containerDirectoryURL(tree, dir)
             return try Self.editContainerFile(at: directory) { file in
+                if field == .date { before.dated = ContainerFolderDate.confirmed(at: name, in: file.runs)?.inherited != nil }
                 let target = ContainerEdits.target(for: field, at: name, in: file)
                 let old: ContainerValue?
                 switch target {

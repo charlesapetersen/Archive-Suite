@@ -106,6 +106,37 @@ extension ContainerFolderDate {
         return TagDelta(add: d.add + u.add, remove: d.remove + u.remove)
     }
 
+    /// Whether a document with `tags`, whose date rests on `evidence` (as for `dates`), carries a date a folder gave it
+    /// (W49.reader-folder-date-undo): the evidence is a folder's, and the date is neither checked nor carried twice. Such a
+    /// date follows the folder's: a later folder date replaces it (`dates`), and one that gives no date takes it away
+    /// (`undatingDelta`). A date the user changed or checked since, or one from the file itself, is not the folder's.
+    public static func folderGave(_ tags: DocumentTags, evidence: String?) -> Bool {
+        guard tags.year != nil || tags.decade != nil, !tags.checkedFields.contains(.date),
+              !tags.dateAmbiguities.contains(where: { $0.facet != .sentWith }) else { return false }
+        return evidenceClass(evidence) == "folder"
+    }
+
+    /// The tag change that takes away a date a folder gave (`folderGave`) when the folder no longer gives one
+    /// (W49.reader-folder-date-undo). Where page 2's `Date evidence:` is a stamp's, the estimate's or a covering
+    /// letter's (the kinds a folder's date replaces) and names the date it gave, the file goes back to that date and its
+    /// `Date Uncertain`; otherwise its Year or Decade, Month, Day and `Date Uncertain` are removed. Never a check. A year
+    /// the file's covering letter (`Sent With`) also gives is the file's own and stands: empty.
+    public static func undatingDelta(given tags: DocumentTags, page: String?) -> TagDelta {
+        var restored: (date: ArchiveDate, uncertain: Bool)?
+        if let page, ["stamp", "estimate", "inherited"].contains(evidenceClass(page) ?? ""),
+           let last = page.components(separatedBy: "; ").last?.trimmingCharacters(in: .whitespaces),
+           last.hasPrefix("gave ") {
+            let gave = String(last.dropFirst("gave ".count))
+            let uncertain = gave.hasSuffix(", Date Uncertain")
+            let wire = uncertain ? String(gave.dropLast(", Date Uncertain".count)) : gave
+            restored = ArchiveDate.parse(wireValue: wire).map { ($0, uncertain) }
+        }
+        if restored == nil, let year = tags.year, tags.sentWith?.year == year { return TagDelta() }
+        let d = TagEditing.delta(for: .setDate(restored?.date), given: tags)
+        let u = TagEditing.delta(for: .setDateUncertain(restored?.uncertain ?? false), given: tags)
+        return TagDelta(add: d.add + u.add, remove: d.remove + u.remove)
+    }
+
     /// The record the Reader keeps beside a file it dated by this rule.
     public var record: FolderDateRecord? {
         inheritedDate.map { FolderDateRecord(date: $0.date.wireValue, uncertain: $0.uncertain, evidence: evidence) }
@@ -127,7 +158,11 @@ public struct FolderDateRecord: Equatable, Sendable, Codable {
     /// The record still describes the file: its own date and `Date Uncertain` are those it gave. After an undo, or any
     /// later change of the date, it does not, and is ignored.
     public func holds(for tags: DocumentTags) -> Bool {
-        guard let own = Self.ownDate(tags), !tags.dateAmbiguities.contains(where: { $0.facet != .sentWith }) else {
+        // A date tag the form cannot name (a Day with no Month, a Month beside a Decade, a Decade beside a Year) was
+        // added since, in Finder, so the date is the user's (W49.reader-folder-date-undo).
+        guard let own = Self.ownDate(tags), !tags.dateAmbiguities.contains(where: { $0.facet != .sentWith }),
+              tags.day == nil || tags.month != nil, tags.year == nil || tags.decade == nil,
+              tags.year != nil || tags.month == nil else {
             return false
         }
         return own.wireValue == date && tags.dateUncertain == uncertain

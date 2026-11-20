@@ -165,8 +165,21 @@ Owner, 2026-10-31: a dated folder dates the otherwise undated documents inside i
   beside the files: page 2 is never rewritten, so `<folder>/.archivesuite/item-fields.json` keeps, per file, the date
   given and the `Date evidence:` value (`SPEC/tag-format.md` §The user's own value, `dates`). That record stands for
   page 2's evidence only while the file's own date and `Date Uncertain` are those it gave; an undo or a later edit
-  of the date leaves it inert. If it cannot be saved, nothing is dated. Clearing or widening the folder's date
-  un-dates nothing.
+  of the date leaves it inert. If it cannot be saved, nothing is dated.
+- **The dates a folder gave follow its date (`W49.reader-folder-date-undo`, owner 2026-11-19).** A date the folder
+  gave is one whose evidence (the Reader's record while it holds, else page 2's line while it names the file's date)
+  is a folder's, neither checked nor carried twice; a date the user changed or checked since, or one from the file
+  itself, is not. Every edit of a folder run's `date` in the Container section (Change…, Confirm, None Here, Remove
+  Your Value) offers again for the run the edited file is in. A date that still dates replaces the dates the folder
+  gave with the rest (above). One that dates nothing (cleared, no longer the user's, 20 years or more) offers to take
+  them away, but only where the run's confirmed date dated documents just before the edit (a box's date, an edit that
+  changed nothing, or folder evidence from elsewhere offers nothing): where page 2's evidence is a stamp's, the
+  estimate's or a covering letter's and ends `gave <date>[, Date Uncertain]` (the date the folder's replaced), the file
+  goes back to that date; a year the file's `Sent With` also gives stands; otherwise its Year or Decade, Month, Day and
+  `Date Uncertain` are removed. No check is written; one undo group. Accepting reads the folder's date again: one set
+  since, or a file that left the run, changes nothing. The records are kept, so an undo puts the date back with its
+  evidence. A record holds only while the file's date tags are a form it gives (no Day without a Month, no Month or
+  Year beside a Decade), so one added in Finder is the user's.
 
 ## The container file
 
