@@ -186,6 +186,11 @@ calls are section 1.
     refusal second reader and the failed-page retry. Backlog: Vision OCR's Zotero library sweep moved here behind
     nice-to-have (W49.zotero-library-sweep); the bench's remaining kind prices and reproduce attempts for suspects
     S-004 and S-005 queued; the rest kept as wishes or as earlier calls left them.
+25. **After the walkthrough of 2026-11-20.** Azure Document Intelligence, AWS Textract and Transkribus are left out of
+    the lower-scoring readers: no clients, no Transkribus upload ("It would be a bit much to build whole clients just
+    for these inadequate readers"). Their bench scores stay; Textract's $1.35 was already spent. The Reader's rule
+    against changing PDFs is open to change ("Maybe we should be less adamant about Reader never changing PDFs given
+    how much the app has developed"): W49.item-fields-home weighs it.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 

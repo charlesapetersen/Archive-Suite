@@ -21,10 +21,10 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 lower-scoring row runs since W47.wh-readers-lost-clients (the on-device model through `OCR/OnDeviceModelClient.swift`).
 - **Azure Document Intelligence and AWS Textract are rows but not offered.** Both read all 96 since
   W47.wh-readers-lost-vendors-read (90.90 and 88.45 on the 95, under Mistral OCR 4.1's 93.01, so lower-scoring), and
-  the rows say "not offered until the Processor has a reader for it": there is no client for either yet
-  (queued: W47.wh-readers-lost-vendors-clients).
+  the rows say "not offered": the Processor has no client for either and will not get one (accepted: owner, 2026-11-20,
+  call 25, "It would be a bit much to build whole clients just for these inadequate readers").
 - **Transkribus has no row.** Its figures are on 25 of the 96 only; the other 71 are packed for the owner's hand
-  upload at app.transkribus.org (queued: W47.wh-readers-lost-vendors-tk).
+  upload at app.transkribus.org, which is not needed now (accepted: owner, 2026-11-20, call 25, as for Azure and Textract).
 
 ## ⚠️ LIMITATION (W47.wh-yolo-scans, 2026-11-20): what the scanned-newspaper detector does not yet do
 
