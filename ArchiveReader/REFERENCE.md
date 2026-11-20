@@ -656,7 +656,9 @@ Views/
   DarkPageImages.swift        View ▸ Invert Image Colors (W40.reader-image-invert): the sRGB colour cube, put on
                               the image pane as a layer filter and drawn into the tiles' bitmaps.
   (Core/)DocumentFind.swift   Pure FindNavigator (match list + wrap cursor) + DocumentFindScanner (per-pane
-                              findString counts). Backs the ⌘F in-viewer find; unit-tested (DocumentFindTests).
+                              findString matches, paired into hits). Backs the ⌘F in-viewer find; unit-tested (DocumentFindTests).
+  (Core/)FindWordAlignment.swift  Pairs the two panes' find matches through a word diff of the pages
+                              (W49.reader-find-word-align); unit-tested (FindWordAlignmentTests).
   PreviewSheet.swift          Quick 2-up preview (Space): image | OCR text; ↑/↓ browse list, ←/→ cycle.
 Info.plist · ArchiveReader.entitlements (sandbox + user-selected + app-scope bookmarks)
 ```

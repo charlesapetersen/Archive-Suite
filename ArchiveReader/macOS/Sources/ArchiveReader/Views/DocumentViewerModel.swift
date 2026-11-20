@@ -713,16 +713,16 @@ final class DocumentViewerModel: ObservableObject {
             applyCurrentMatch()
             return
         }
-        var perPair: [(doc: Int, pair: Int, left: Int, right: Int)] = []
+        var perPair: [(doc: Int, pair: Int, hits: [PairHit])] = []
         for i in urls.indices {
             // Reuse the already-loaded document for the current index; open the rest read-only.
             let doc = (i == index) ? current : PDFDocument(url: urls[i])
             guard let doc else { continue }
-            for (p, counts) in DocumentFindScanner.pairMatchCounts(in: doc, query: query).enumerated() {
-                perPair.append((doc: i, pair: p, left: counts.left, right: counts.right))
+            for (p, hits) in DocumentFindScanner.pairHits(in: doc, query: query).enumerated() {
+                perPair.append((doc: i, pair: p, hits: hits))
             }
         }
-        findNavigator = FindNavigator(perPair: perPair)
+        findNavigator = FindNavigator(hits: perPair)
         refreshFindPublished()
         applyCurrentMatch()
     }

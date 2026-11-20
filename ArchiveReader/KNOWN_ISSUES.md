@@ -379,11 +379,20 @@ proof that a file has a valid image/text pair. The normative grammar is in
 
 ## Find in the document window: what "both panes" can and cannot do (W40.fix-reader-find-both-panes, 2026-11-05)
 
-A find hit is the k-th match of each pane of its page pair, selected in both and stepped together; the
+A find hit is one occurrence, selected in both panes of its page pair and stepped together; the
 JPEG original gets boxes at the PDF image page's match positions (a page overlay — `PDFPage.copy()` shares
-annotations with the original and removing one from the copy leaves it there, measured). Limits that stay:
-- **Pairing is by ordinal.** If the image page's text layer misses or splits an occurrence the OCR text page
-  has, later hits on that pair select different words in the two panes. Nothing in the PDF links them better. (queued: W49.reader-find-word-align).
+annotations with the original and removing one from the copy leaves it there, measured). Since
+W49.reader-find-word-align (2026-11-20) the two panes' matches are paired by lining the pages' words up
+(`FindWordAlignment`: a diff over case/diacritic-folded words; a match on a word the diff could not line up
+pairs with the other page's unpaired match in the same stretch between shared words), not by ordinal, so a
+word the image page's text layer split or missed no longer shifts the later hits: it is a hit of the text
+pane alone. Cost, measured in the unit bundle: a 300-page document with 9,908 matches, 0.558 s for the find
+alone and 0.568 s with the alignment; two unrelated 1,500-word pages 0.046 s. Limits that stay:
+- **An occurrence the image layer lacks among identical neighbours is ambiguous.** When a word is repeated
+  and one copy is missing from the layer with nothing between to tell them apart ("zulu image zulu" against
+  "zulu image zulu zulu"), the alignment may treat a different copy as the missing one, and within a stretch
+  the diff could not line up, matches pair in order. (accepted: the two texts carry nothing that tells the
+  copies apart; the diff picks one of the equally good alignments).
 - **An image page with no text layer gets no highlight** (the test corpus's image pages have none): there are
   no positions to draw from. The hit still shows on the text page. (accepted: an image page with no text layer has no positions to draw from).
 - **The extracted-text pane's matches come from a string search** on the same text as PDFKit's, so a query

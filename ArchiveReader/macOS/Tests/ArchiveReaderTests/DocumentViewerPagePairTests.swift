@@ -209,7 +209,9 @@ final class DocumentViewerPagePairTests: XCTestCase {
     /// hit is selected in BOTH panes at once, and Find Next moves both to their next match together.
     func testFindSelectsTheHitInBothPanesAndStepsThemTogether() throws {
         let url = try scratchDir().appendingPathComponent("both.pdf")
-        XCTAssertTrue(TestPDFBuilder.write(pages: ["zulu image zulu", "Extracted text.\nzulu text zulu zulu"], to: url))
+        // The text page has one more "zulu" at the end than the image page's layer (hits are paired by
+        // lining the pages' words up since W49.reader-find-word-align; "end" pins the extra one as the last).
+        XCTAssertTrue(TestPDFBuilder.write(pages: ["zulu image zulu end", "Extracted text.\nzulu image zulu end zulu"], to: url))
         let model = load([url])
         model.findQuery = "zulu"
         model.performFind()
