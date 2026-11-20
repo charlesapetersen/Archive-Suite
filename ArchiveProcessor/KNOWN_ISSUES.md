@@ -66,8 +66,10 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   unflagged typed or printed page keeps its kind's reader: on the 2,000 bulk pages it found 51-60% of the pages with
   handwriting at 69.8% precision (finite bounds 18-95% precision, 7-97% recall; `kind-atrium.md` §5). The switch's note
   says so (accepted: owner, 2026-11-19, call 15, "release with a label").
-- **The default is still off until the follow-up ships.** The owner answered call 3 again on 2026-11-20 (call 24): on by
-  default, with or without the pre-flag (queued: W47.wh-mixed-preflag-default).
+- **Without the pre-flag, every typed page goes to the handwriting reader.** The switch is on by default since
+  W47.wh-mixed-preflag-default (it still acts only with "Choose each page's reader by its kind" on), so until the
+  pre-flag is downloaded each told typed or printed page is read for handwriting, about 25 s a page on an M3 Pro
+  (accepted: owner, 2026-11-20, call 24, "on by default, whether or not the pre-flag is downloaded").
 
 ## ⚠️ LIMITATION (W40.fix-processor-review-classification-stale, 2026-11-20): where page 2's Classification is not rewritten
 

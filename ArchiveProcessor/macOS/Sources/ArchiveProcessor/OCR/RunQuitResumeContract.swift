@@ -401,7 +401,8 @@ enum RunQuitResumeContract {
             page.unlockFocus()
             if let pdfPage = PDFPage(image: page) { document.insert(pdfPage, at: i) }
         }
-        guard makeJPEG(image, shade: 0.5), document.write(to: pdf) else {
+        guard makeJPEG(image, shade: 0.5), let data = document.dataRepresentation(),
+              (try? data.write(to: pdf)) != nil else {
             check("the mixed fixture is written", false, "")
             return
         }
