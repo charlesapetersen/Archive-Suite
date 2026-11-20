@@ -499,10 +499,15 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   with a reset time. Confirmed if the run does not wait for that time before retrying. Kept until then (a
   promised feature, so not deleted); the Processor ledger (`W40.b3`) should carry it as a row.
 - **Would clear it:** the run waits for the reset.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-messages-check`); [`evidence/processor/W49.proc-suspects-messages.md`](evidence/processor/W49.proc-suspects-messages.md), `ArchiveProcessor/scripts/repro-suspects-messages.sh`
 - **History:**
   - 2026-10-16 W40.e5 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-messages — reproduced, narrower than raised. The Claude CLI now waits for the reset
+    (W41.app-claude-plan-reading): a stub reporting a limit 45 s ahead was called again at 105 s and the page read. The
+    Codex CLI, same stub: one call, the page failed at once with "… The app paces to your subscription window and
+    retries." No wait and no retry. The Gemini CLI takes the same branch (code). `lastUsageWindowResetAt` is still never
+    read.
 
 ### S-019 · Typing `-->` after an unclosed Notes block header may drop the lines before it
 
@@ -630,10 +635,13 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** drive the wizard where `save` returns false (headless mode already makes it do so,
   `Models/KeychainHelper.swift:30`) and read the chip state.
 - **Would clear it:** the chip reads "Save failed" or not-set in that run.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-messages-check`); [`evidence/processor/W49.proc-suspects-messages.md`](evidence/processor/W49.proc-suspects-messages.md), `ArchiveProcessor/scripts/repro-suspects-messages.sh`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-messages — reproduced. The code still says it. The wizard's step for a passed check,
+    run with `save` refusing (headless), then the key row as it reloads: `save` returned false, the field reloaded empty,
+    and the chip was "Validated" (Gemini and OpenAI). The button press itself was not driven. Nothing calls it deliberate.
 
 ### S-025 · The gateway's "Fill in OpenAI preset" picks a reasoning model the gateway request cannot drive
 
@@ -647,10 +655,15 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** apply the preset and read `gatewayModelID`, then send one page through the no-wire seam and
   check the body; a single live page against OpenAI (under a cent) would show the 400.
 - **Would clear it:** OpenAI accepts the request, or the preset picks a model that takes `max_tokens`.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-messages-check`); [`evidence/processor/W49.proc-suspects-messages.md`](evidence/processor/W49.proc-suspects-messages.md), `ArchiveProcessor/scripts/repro-suspects-messages.sh`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-messages — reproduced up to the wire. The preset now falls back to GPT-5.4 mini, not
+    GPT-5 nano (still `supportsThinking: true`). One photo through the preset's gateway: the request to
+    api.openai.com named `gpt-5.4-mini` with `max_tokens: 8192` and no `max_completion_tokens`. OpenAI's 400 was not
+    observed (no OpenAI key here); it rests on the app's own statement. The preset's comment means a model the request
+    works with, so not intended.
 
 ### S-026 · Batch OCR is not size-based: large images go up at full size
 
@@ -725,10 +738,15 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a run of rotated synthetic scans with LLM rotation set and the key removed: check page 1
   orientation and whether anything reports the fallback.
 - **Would clear it:** the fallback is reported, or the pages come out upright.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-messages-check`); [`evidence/processor/W49.proc-suspects-messages.md`](evidence/processor/W49.proc-suspects-messages.md), `ArchiveProcessor/scripts/repro-suspects-messages.sh`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-messages — half reproduced. LLM comparative (one vote) on the gateway, three turned
+    pages, every vote answered 500: nothing reported it (no page unsure, nothing in the status line). Vision turned all
+    three synthetic pages correctly, so no sideways page came out. Since raised, the default (agreement) marks and counts
+    a failed cloud call, the help measures Vision wrong on 3 of 119 (not about 60%), and README documents the fallback;
+    the silence is undocumented. A fix keeps the fallback and reports it.
 
 ### S-030 · The run log can give one failed file another's reason
 
@@ -739,10 +757,14 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `P-26`.
 - **Would confirm it:** a run with two same-named failing files from two folders, logging on.
 - **Would clear it:** each line carries its own file's reason.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-messages-check`); [`evidence/processor/W49.proc-suspects-messages.md`](evidence/processor/W49.proc-suspects-messages.md), `ArchiveProcessor/scripts/repro-suspects-messages.sh`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-messages — reproduced, worse than raised. `a/same.jpg` and `b/same.jpg`, every OCR call
+    refused: both failed (manifest), but the status line said "0 succeeded, 1 failed" and the log "Failed: 1" with one
+    line and one reason. `failedFiles` is kept by name and skips a name it holds (`OCR/OCRProcessor+OCR.swift:1722`,
+    `:1847`), so the second file is dropped, not given the first one's reason. The `try?` write was not tested.
 
 ### S-031 · Under a window segmentation approach, enclosures may get no `Sent With` date
 
@@ -1160,3 +1182,29 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-suspects-money — raised.
+
+### S-052 · Label reads that fail are counted as read
+
+- **Raised:** 2026-11-20 · W49.proc-suspects-messages · seen in a run (the S-029 case).
+- **Suspected behaviour:** both box/folder label reads through the gateway were answered 500, yet the run summary said
+  "2 box or folder labels read through the gateway (GPT 5.6 Luna), $0.0000." and gave no "read nothing" warning. A user
+  reads that as two labels read.
+- **Where:** `Capture/ContainerLabelCapture.swift` `spendNote` (counts calls) and `warningNote`.
+- **Would confirm it:** a run whose label calls all fail; read the summary and the container file's markers.
+- **Would clear it:** the summary says the reads failed, or counts only answered calls.
+- **Status:** `open`
+- **History:**
+  - 2026-11-20 W49.proc-suspects-messages — raised.
+
+### S-053 · The label reader asks any gateway for GPT 5.6 Luna
+
+- **Raised:** 2026-11-20 · W49.proc-suspects-messages · seen in a run (the S-025 case).
+- **Suspected behaviour:** with the gateway set to OpenAI by "Fill in OpenAI preset", a box label read went to
+  api.openai.com naming `gpt-5.6-luna` (`max_tokens: 1200`, `reasoning_effort: low`). A gateway that does not serve that
+  model fails every label read; with S-052 the run would still report them read.
+- **Where:** `Capture/ContainerLabelCapture.swift` (the label reader's gateway call).
+- **Would confirm it:** the label read against a gateway that does not list the model; read its reply and the summary.
+- **Would clear it:** the reader checks the gateway serves the model, or skips the call where it does not.
+- **Status:** `open`
+- **History:**
+  - 2026-11-20 W49.proc-suspects-messages — raised.

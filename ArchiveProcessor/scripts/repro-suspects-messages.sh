@@ -29,7 +29,7 @@ for i in 1 2; do
     magick -size 600x400 xc:white -fill black -draw "rectangle 40,40 $((100 + i * 60)),$((80 + i * 30))" "$WORK/in/p$i.jpg"
 done
 # S-029: a page of printed lines, turned 90, 180 and 270 degrees clockwise (so it needs 270, 180 and 90 to stand up).
-magick -size 1200x1600 xc:white -fill black -font Helvetica -pointsize 44 \
+magick -size 1200x1600 xc:white -fill black -font '/System/Library/Fonts/Supplemental/Times New Roman.ttf' -pointsize 44 \
     -annotate +80+160 'WAR DEPARTMENT, WASHINGTON' -annotate +80+260 'March 12, 1918. Memorandum for the Chief' \
     -annotate +80+340 'of Staff. Subject: the reorganization of the' -annotate +80+420 'Military Intelligence Section, its duties' \
     -annotate +80+500 'and the officers assigned to it this month.' -annotate +80+580 'The section will report to the Chief daily.' \
@@ -113,10 +113,12 @@ else
 fi
 EOF
         chmod +x "$stub"
+        APPARGS=(-writeLogFile YES)
         run_case "s018-$tool" "PROCESSFILES_LOCALAGENT=$tool:$stub" PROCESSFILES_MAXIMAGES=1
+        APPARGS=()
         first=$(cat "$WORK/s018-$tool.first" 2>/dev/null || echo 0)
         echo "  CLI calls (seconds after the first): $(awk -v f="$first" '{printf "%s@%ds ", $2, $1 - f}' "$WORK/s018-$tool.calls" 2>/dev/null)"
-        grep -h -o 'usage limit reached[^"]*' "$WORK/s018-$tool/app.log" 2>/dev/null | sort -u | head -2 | sed 's/^/  app said: /'
+        grep -h '•' "$LAST"/ArchiveProcessor_Log_*.txt 2>/dev/null | sed 's/^ */  run log: /'
         echo "  pages: $(grep -v '^#' "$LAST/manifest.tsv" 2>/dev/null | cut -f3 | sort | uniq -c | awk '{printf "%s %s, ", $2, $1}')"
     done
     echo "CASE s018: codex CLI calls $(awk '{printf "%s ", $2}' "$WORK/s018-codex.calls" 2>/dev/null)→ $(cat "$WORK/s018-codex/DONE.txt" 2>/dev/null);" \
@@ -127,6 +129,7 @@ s029)   # LLM rotation (one vote) on the gateway, every vote failing; then the d
         FAKE_GATEWAY_FAIL_OTHER=1 run_case "s029-$mode" "${GW[@]}" "PROCESSFILES_TESTIN=$WORK/rot" \
             PROCESSFILES_MAXIMAGES=3 "PROCESSFILES_ROTATION=$mode"
         sed 's/^/  page: /' "$LAST/rotation.tsv" 2>/dev/null
+        cut -f1,4 "$WORK/s029-$mode/gateway.log" | cut -c1-90 | sort | uniq -c | sed 's/^/  stand-in: /'
         grep -o 'otat[^"]*' "$WORK/s029-$mode/app.log" 2>/dev/null | sort -u | head -5 | sed 's/^/  app.log: /'
     done
     echo "CASE s029: needed turned-90→270 turned-180→180 turned-270→90;" \
@@ -138,10 +141,12 @@ s030)   # Two same-named files in two folders, every OCR call refused with a mes
     APPARGS=(-writeLogFile YES)
     FAKE_GATEWAY_FAIL_OCR=$(seq -s, 1 40) run_case s030-same-names "${GW[@]}" "PROCESSFILES_TESTIN=$WORK/tree" PROCESSFILES_TREE=1
     APPARGS=()
-    grep -v '^ocr-400' "$WORK/s030-same-names/gateway.log" | head -3 | sed 's/^/  other call: /'
+    cut -f1,3,4 "$WORK/s030-same-names/gateway.log" | cut -c1-110 | sed 's/^/  stand-in: /'
+    grep -v '^#' "$LAST/manifest.tsv" | sed 's/^/  manifest: /'
+    find "$LAST" -name '*.pdf' | sed "s|$LAST/|  output: |"
     log=$(grep -l 'OCR Log' "$LAST"/*.txt "$LAST"/*/*.txt 2>/dev/null | head -1)
     echo "  log: ${log:-none}"
-    [ -n "$log" ] && grep -A3 'did not produce' "$log" | sed 's/^/  /'
+    [ -n "$log" ] && sed -n '4,12p' "$log" | sed 's/^/  log: /'
     echo "CASE s030: the log's failure lines: $([ -n "$log" ] && grep '•' "$log" | grep -o 'call [0-9]*' | tr '\n' ' ')"
     ;;
 *) echo "unknown case $c" >&2 ;;

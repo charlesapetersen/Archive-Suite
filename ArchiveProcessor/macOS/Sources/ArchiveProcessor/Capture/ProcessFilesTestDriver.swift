@@ -266,7 +266,8 @@ enum ProcessFilesTestDriver {
         processor.taggingMode = mode
         processor.passSourceTags = (mode == .copySource)
         processor.rotationMode = .off          // macOS Vision rotation hangs without a window server
-        // W49.proc-suspects-messages (S-029): PROCESSFILES_ROTATION names the rotation mode Settings holds.
+        // W49.proc-suspects-messages (S-029): PROCESSFILES_ROTATION names the rotation mode Settings holds. Vision and
+        // PP-LCNet ran headless on 2026-11-20 (llmSingle and agreement, three pages each), so the hang above may be old.
         if let raw = env["PROCESSFILES_ROTATION"] {
             guard let rotation = RotationMode(rawValue: raw) else { return fail("unknown rotation mode \(raw)", marker: donePath) }
             processor.rotationMode = rotation
