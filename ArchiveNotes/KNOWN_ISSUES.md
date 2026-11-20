@@ -3,6 +3,14 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ⚠️ OPEN (W49.notes-s007-reproduce, 2026-11-20) — the source-block preview downloads a cloud placeholder
+
+Clicking a source block whose PDF is a dataless cloud placeholder (OneDrive, iCloud, Google Drive) downloads the
+whole file. `ReaderPreviewPopover.showPDF` opens it with a bare `PDFDocument(url:)`; only the chip thumbnail runs
+inside `CorpusWalker.withDatalessMaterializationDisabled`. Measured on a real OneDrive placeholder: 6.2 MB downloaded
+in 1.9 s, and the file stayed materialised. Bandwidth and disk only, no data loss. Evidence:
+`verification/evidence/notes/W49.notes-s007-dataless-preview.md`; suspect S-007 (queued: W49.notes-s007-fix).
+
 ## ✅ FIXED (W49.notes-s006-fix, 2026-11-20) — a subject spelled `ArchiveSuite` now reaches Finder
 
 A note whose subject was exactly `ArchiveSuite` never carried the Finder tag: every save's facet reconciliation

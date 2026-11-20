@@ -42,6 +42,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-12 W40.b1 — raised.
+  - 2026-11-20 W49.notes-s007-reproduce (no test of the Reader) — the route for this check exists now. The owner's OneDrive holds dataless PDFs, and a bare `PDFDocument(url:)` on one downloads it, while the thread guard keeps it dataless ([`evidence/notes/W49.notes-s007-dataless-preview.md`](evidence/notes/W49.notes-s007-dataless-preview.md)). An engine session must set the process materialization policy back to on first: it inherits off.
 
 ### S-003 · A dead Reader content index still shows "No matches" in the list
 
@@ -149,10 +150,11 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   - decide that opening a preview is an explicit request to download, and record that.
 - **Would clear it:** the flag is still set after the preview opens, or the owner rules that a preview may
   download.
-- **Status:** `open`
+- **Status:** `reproduced` — fix filed as `W49.notes-s007-fix`, [`evidence/notes/W49.notes-s007-dataless-preview.md`](evidence/notes/W49.notes-s007-dataless-preview.md)
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner walkthrough (call 27) — reproduce attempt queued as `W49.notes-s007-reproduce`.
+  - 2026-11-20 W49.notes-s007-reproduce — reproduced on a real OneDrive placeholder (a 6.2 MB personal PDF, no corpus file). The popover's bare `PDFDocument(url:)` downloaded the whole file in 1.9 s and cleared `SF_DATALESS`. Inside the thread guard the file stayed dataless and the open returned nil. The file was evicted again afterwards. Engine sessions run with materialization off process-wide, so a probe has to set the process policy back to on to see this. Filed `W49.notes-s007-fix`.
 
 ### S-008 · Notes may not remember a window size changed just before ⌘Q
 
