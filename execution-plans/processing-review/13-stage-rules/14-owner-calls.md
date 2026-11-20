@@ -191,6 +191,8 @@ calls are section 1.
     for these inadequate readers"). Their bench scores stay; Textract's $1.35 was already spent. The Reader's rule
     against changing PDFs is open to change ("Maybe we should be less adamant about Reader never changing PDFs given
     how much the app has developed"): W49.item-fields-home weighs it.
+    The handwriting placer (hands.tgz) uploaded to models-1 at his yes; fuzzy OCR search in the Reader queued behind
+    nice-to-have (W49.reader-fuzzy-search).
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 

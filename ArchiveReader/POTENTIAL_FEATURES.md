@@ -39,7 +39,7 @@ The P2 triage pass shipped (see `CLAUDE.md` §Implementation map):
 - **Fuzzy OCR text search** — tolerate typos / near-matches in full-text search (FTS5 prefix/`NEAR`,
   a trigram tokenizer, or an edit-distance layer over candidates), so a misspelled query still finds
   the document. Deferred by owner (2026-07-09); would coordinate with the bm25 ranking in the
-  `index-parallelization` plan. | Search/ContentIndex.swift, Views/NavigationModel.swift.
+  `index-parallelization` plan. | Search/ContentIndex.swift, Views/NavigationModel.swift. (queued: W49.reader-fuzzy-search, behind nice-to-have, owner 2026-11-20)
 
 ## Lower priority / long-term
 - **An on-device model pass for Copy Cleaned for Prose.** Measured and declined for now (W40.reader-prose-model,

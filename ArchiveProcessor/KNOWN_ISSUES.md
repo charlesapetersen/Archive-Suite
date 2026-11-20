@@ -366,10 +366,6 @@ W46.place-hands-textpage; it was 0.67, under which a page kept the text page alo
 Measured with `scripts/measure-hands.sh` on 21 owner hand pages (qwen3.6-27b readings) and 3 public ledger pages
 (Apple Vision readings) at the earlier 0.67 gate: 21 placed, 3 to the text page by the gate; at 0.9 the bench keeps the
 layer on 9 of 20 owner hand pages (`place-hands-lines.md`, Qwen3.6-27B). Open:
-- **The download is not published yet.** The app pins `hands.tgz` (286,946,670 B, sha256 `f835149b…`) at the
-  `models-1` release of `charlesapetersen/vision-ocr`, where nothing has been attached, so "Download the handwriting
-  placer" fails until the owner uploads the archive kept in the autonomous state's `model-files/hands-build/`
-  (`W42.int-s5-hands-publish`). Until then every hand page gets the text page, as before, and says why (queued: W42.int-s5-hands-publish).
 - **Time and memory:** 13.6-31.8 s a page in the app, median 18.2 (blla on the CPU about 6-9 s, imports and model loads
   3-5 s, every page in a fresh process; the first page of a launch 64 s, torch imported cold), physical footprint 4.6-6.8 GB a page; the placer's cap is 10 GB (`HandPlacer.memoryGB`) and
   it holds every model-reader slot, so hand pages run one at a time and never beside a model reader. A 16 GB Mac, not
