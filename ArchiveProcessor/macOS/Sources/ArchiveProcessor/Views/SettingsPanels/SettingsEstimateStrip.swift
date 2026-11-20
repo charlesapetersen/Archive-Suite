@@ -25,6 +25,7 @@ struct SettingsEstimateStrip: View {
     @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
     @AppStorage(DefaultsKeys.enableCollectionSegmentation) private var enableCollectionSegmentation: Bool = false
     @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
+    @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = true
     @AppStorage(DefaultsKeys.contextCharCount) private var contextCharCount: Double = 0   // context slider removed; kept 0 (parallel OCR)
     @ObservedObject private var modelStore = ModelSelectionStore.shared
     @State private var openRouterPricesRead = 0
@@ -124,7 +125,11 @@ struct SettingsEstimateStrip: View {
                     preOCRedInput: preOCRedInput, sendPreviousImage: sendPreviousImage && segmentationPlan.usesPerPageClassifier,
                     contextCharCount: Int(contextCharCount), imageScale: imageScale / 100.0,
                     rotationMode: rotationMode, useGateway: useGateway,
-                    imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil, gatewayRotation: gatewayRotation)
+                    imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil, gatewayRotation: gatewayRotation,
+                    measuredRoute: DateRoute.measuredRoute(gateway: useGateway ? GatewayConfig.fromDefaults() : nil,
+                                                           usesLocalAgent: useLocalAgent),
+                    dateImageEveryDocument: DateRoute.imageEveryDocument(SettingsLayerStore.shared.resolver(for: nil)),
+                    sidecars: enableSegmentJSON)
                 let time = TimeEstimator.estimate(
                     fileCount: 1000, model: model, rotationMode: rotationMode,
                     sequentialOCR: contextCharCount > 0, enableTagging: tagging,
@@ -144,6 +149,8 @@ struct SettingsEstimateStrip: View {
                 if !preOCRedInput { costRow("· OCR", est.ocrFormatted) }
                 if est.rotationCost > 0 { costRow("· Rotation", est.rotationFormatted) }
                 if tagging { costRow("· Tagging", est.taggingFormatted) }
+                if est.datingCost > 0 { costRow("· Dating", est.datingFormatted) }
+                if est.itemFieldCost > 0 { costRow("· Item fields", est.itemFieldFormatted) }
                 if enableCollectionSegmentation { costRow("· Collection", est.collectionFormatted) }
                 if let row = segmentationRow { costRow("· Segmentation", row.costSummary) }
 

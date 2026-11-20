@@ -2400,7 +2400,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// processing history (a Local Agent session costs nothing; Apple Vision alone costs nothing).
     static func estimatedSpend(_ config: SessionProcessingConfig, pages: Int) -> Double {
         guard pages > 0 else { return 0 }
-        return RunHistorySnapshot(
+        var snapshot = RunHistorySnapshot(
             startedAt: Date(), provider: config.provider, gatewayConfig: config.gateway, localAgent: config.localAgent,
             imageTokenProvider: config.gateway != nil ? OCRProcessor.gatewayUpstreamProviderFromDefaults() : nil,
             model: config.model, visionTextProvider: config.visionTextLLM?.provider,
@@ -2408,7 +2408,13 @@ final class LiveCaptureProcessor: ObservableObject {
             enableTagging: config.taggingMode.llmTags, enableCollectionSegmentation: false, preOCRedInput: false,
             reOCRMultiPagePDF: false, mixedReOCR: false, sendPreviousImage: false, contextCharCount: 0,
             imageScale: config.imageScale, rotationMode: config.rotationMode, fileCount: pages
-        ).estimatedCost
+        )
+        // The dating and item-field terms (W49.proc-fix-s041), with the switches `liveDating` and `liveItemFields` read.
+        snapshot.sidecars = config.enableSegmentJSON
+        var doc: CollectionSettingsDocument?
+        if case .document(let d) = CollectionSettingsFile.read(in: config.outputDirectory) { doc = d }
+        snapshot.dateImageEveryDocument = DateRoute.imageEveryDocument(SettingsLayerStore.shared.resolver(for: doc))
+        return snapshot.estimatedCost
     }
 
     func beginFinalize() {

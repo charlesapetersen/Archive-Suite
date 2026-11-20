@@ -3302,6 +3302,9 @@ extension OCRProcessor {
             outputDirectory: outputDirectory, runID: runID, processing: ProcessingSettingsCapture.capture())
         activeResolvedSettings = frozen
         activeRunHistory?.ledgerRunID = frozen.runID
+        activeRunHistory?.dateImageEveryDocument = frozen.values[SettingsKey.dateImageEveryDocument.rawValue]?
+            .value.bool ?? false
+        activeRunHistory?.sidecars = enableSegmentJSON
         activeRunHistory?.outputDirectory = outputDirectory
         activeRunToRecord = resumingMixedPDF == nil
             ? PendingCollectionRecord(snapshot: frozen, outputDirectory: outputDirectory, fileCount: files.count) : nil

@@ -12,7 +12,7 @@ extension DateRoute {
         let localAgent: LocalAgentConfig?
 
         /// A remote gateway: the measured route (Gemini 3.7 Flash) for both calls, and the only image pass.
-        var measured: Bool { localAgent == nil && gateway != nil && gateway?.isLocalModel != true }
+        var measured: Bool { DateRoute.measuredRoute(gateway: gateway, usesLocalAgent: localAgent != nil) }
 
         /// What the sidecar names as the route.
         var label: String { measured ? "Gateway · " + DateRoute.gatewayModel : ownLabel }
@@ -24,6 +24,17 @@ extension DateRoute {
             if let g = gateway { return "this Mac · " + g.displayName }
             return provider.rawValue + " · " + model.displayName
         }
+    }
+
+    /// Whether a run on this backend takes the measured route: a remote gateway, not a Local Agent plan. The image
+    /// pass and the item-field call run only there; the Cost Estimate prices them by it (W49.proc-fix-s041).
+    static func measuredRoute(gateway: GatewayConfig?, usesLocalAgent: Bool) -> Bool {
+        !usesLocalAgent && gateway != nil && gateway?.isLocalModel != true
+    }
+
+    /// The Dates card's "image on every document" switch as `resolver` resolves it.
+    static func imageEveryDocument(_ resolver: SettingsResolver) -> Bool {
+        resolver.resolve(.dateImageEveryDocument).value.bool ?? false
     }
 
     /// What one document needs for its route, gathered on the main actor.

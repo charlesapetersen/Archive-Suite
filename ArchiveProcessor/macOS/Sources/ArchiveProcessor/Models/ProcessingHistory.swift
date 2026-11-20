@@ -80,6 +80,9 @@ struct RunHistorySnapshot {
     let imageScale: Double
     let rotationMode: RotationMode
     var fileCount: Int
+    /// The dating route's image switch and the JSON sidecars, for the dating and item-field terms (W49.proc-fix-s041).
+    var dateImageEveryDocument = false
+    var sidecars = false
     /// Multi-page PDFs among `fileCount` and their total pages. Those pages go to `model` directly, one
     /// call each, so they are priced apart from the image subset (never at batch rates).
     var pdfFileCount: Int = 0
@@ -144,7 +147,11 @@ struct RunHistorySnapshot {
             useGateway: gatewayConfig != nil,
             imageTokenProvider: imageTokenProvider,
             visionTextOnly: visionTextModel != nil,
-            gatewayRotation: gatewayRotation
+            gatewayRotation: gatewayRotation,
+            measuredRoute: visionTextModel == nil
+                && DateRoute.measuredRoute(gateway: gatewayConfig, usesLocalAgent: localAgent != nil),
+            dateImageEveryDocument: dateImageEveryDocument,
+            sidecars: sidecars
         )
         return CostEstimator.runTotal(images: est, directPDFPages: pdfPages, batch: batchMode) + newspaperBatchExtraCost
     }
@@ -276,6 +283,9 @@ extension RunHistorySnapshot {
             pdfSources: run.mixedPDFOutcomes?.map(\.sourceURL) ?? [],
             pdfHalfRead: run.mixedPDFOutcomes != nil
         )
+        dateImageEveryDocument = run.resolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
+            .value.bool ?? false
+        sidecars = run.enableSegmentJSON
     }
 
     /// Build a history snapshot for a RESUMED batch run from its persisted manifest plus the live

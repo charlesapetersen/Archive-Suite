@@ -164,12 +164,16 @@ enum ProcessFilesTestDriver {
             fileCount: inputs.count, model: model, enableTagging: mode.llmTags,
             sendPreviousImage: false, contextCharCount: 0, imageScale: 1.0, rotationMode: .off,
             useGateway: gateway != nil || provider == .appleVision,
-            imageTokenProvider: gateway != nil ? (LLMProvider(rawValue: env["PROCESSFILES_GATEWAY_UPSTREAM"] ?? "") ?? .gemini) : nil)
+            imageTokenProvider: gateway != nil ? (LLMProvider(rawValue: env["PROCESSFILES_GATEWAY_UPSTREAM"] ?? "") ?? .gemini) : nil,
+            measuredRoute: DateRoute.measuredRoute(gateway: gateway, usesLocalAgent: false),
+            dateImageEveryDocument: DateRoute.imageEveryDocument(SettingsLayerStore.shared.resolver(for: nil)),
+            sidecars: true)
         let metered = env[Self.meterEnvKey] == "1"
         let capUSD = env["PROCESSFILES_CAP_USD"].flatMap(Double.init)
         writeMarker(runDir.appendingPathComponent("estimate.txt").path,
                     "files=\(inputs.count)\tmodel=\(model.id)\tocr=\(estimate.ocrFormatted)\tclassification=\(estimate.classificationFormatted)"
-                    + "\ttagging=\(estimate.taggingFormatted)\ttotal=\(estimate.totalStandardFormatted)"
+                    + "\ttagging=\(estimate.taggingFormatted)\tdating=\(estimate.datingFormatted)"
+                    + "\titemFields=\(estimate.itemFieldFormatted)\ttotal=\(estimate.totalStandardFormatted)"
                     + (batch ? "\tbatch=\(CostEstimate.money(estimate.totalBatch))" : "")
                     + "\tcap=\(capUSD.map(CostEstimate.money) ?? "none")\n")
         if gateway != nil && !metered {

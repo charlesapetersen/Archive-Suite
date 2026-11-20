@@ -828,13 +828,17 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   `estimate.txt` total for the same pages and settings.
 - **Would clear it:** the metered spend at or under the estimate, with the estimator's figures written down as
   the reason (then the omission is a wording matter for the box, not a low figure).
-- **Status:** `open`
+- **Status:** `cleared` — fixed by `W49.proc-fix-s041`, [`evidence/processor/W49.proc-fix-s041.md`](evidence/processor/W49.proc-fix-s041.md)
 - **History:**
   - 2026-11-18 W40.d1 — raised.
   - 2026-11-18 W40.d1 — still `open`: the paid run went through OpenRouter (Qwen3.8 Flash), not the gateway; there the
     metered ceiling, $0.1056 for 113 photos in 195 calls, ran under the estimate of $0.1267. The gateway's dating and
     item-field calls are still unmeasured.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-fix-s041` (seen in a run: fix with that run as its test).
+  - 2026-11-20 W49.proc-fix-s041 — `cleared`: the estimate has a dating term (trace on every backend, the image pass on
+    the measured route) and an item-field term (measured route, sidecars on, by the page), at the bench's gateway
+    figures. The item-fields driver checks a term for each kind of call its runs make; the stand-in run's estimate
+    goes from $3.85 to $4.15, the paid run's from $0.1267 to $0.1433 (metered $0.1056). The names call is S-044.
 
 ### S-042 · A failed tagging call leaves a document untagged, and the run still reports it tagged
 
@@ -871,3 +875,19 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.notes-suspects-text — raised.
+
+### S-044 · Process Files' cost estimate leaves out the names call
+
+- **Raised:** 2026-11-20 · W49.proc-fix-s041 · by code reading, while adding the dating and item-field terms.
+- **Suspected behaviour:** with sidecars on and names ranked, each correspondence document the tagging call reads as
+  a letter, memo or telegram gets one more text call on the run's own route (`EntityExtractor.extract`, after
+  `EntityRunPolicy.decide`, in `performTaggingPhase`). `CostEstimator.estimate` has no term for it, so a run with
+  names ranked costs more than the Cost Estimate box says, by about one text call on each such document.
+- **Where:** ledger `P-03`, `P-02`; `Tagging/EntityExtractor.swift`, `OCR/OCRProcessor+Tagging.swift`,
+  `Models/CostEstimator.swift`.
+- **Would confirm it:** a run with names ranked on a box with letters, its calls by kind against the estimate's
+  terms (the item-fields driver's part 6 counts them the same way).
+- **Would clear it:** names are never ranked in a run the estimate prices, or the call is free on every route.
+- **Status:** `open`
+- **History:**
+  - 2026-11-20 W49.proc-fix-s041 — raised.

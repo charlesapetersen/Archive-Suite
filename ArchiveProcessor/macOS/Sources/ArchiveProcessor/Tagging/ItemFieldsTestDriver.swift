@@ -18,6 +18,8 @@ import PDFKit
 ///      sidecars off.
 ///   5. The page-2 header lines (SPEC §2-page PDF): written at render time and by the after-the-call rewrite, read
 ///      back by Core's parser with every other line and the body unchanged.
+///   6. The Cost Estimate (W49.proc-fix-s041, suspect S-041): a term for every kind of call part 4's runs made (the
+///      dating route's two and the item fields') and none for a kind they did not, and its figures for W40.d1's runs.
 @MainActor
 enum ItemFieldsTestDriver {
     nonisolated static let envKey = "ITEM_FIELDS_TEST"
@@ -42,6 +44,7 @@ enum ItemFieldsTestDriver {
         sidecar()
         headerLines()
         await endToEnd()
+        estimateFigures()
         lines.append(failures == 0 ? "ALL PASS" : "FAILURES \(failures)")
         let text = lines.joined(separator: "\n") + "\n"
         if let out = ProcessInfo.processInfo.environment["ITEM_FIELDS_TEST_OUT"] {
@@ -302,6 +305,9 @@ enum ItemFieldsTestDriver {
         var tagging = 0
         /// Per item-field request: the marker, the model, the image count.
         var fields: [(String, String, Int)] = []
+        /// The dating route's trace and image calls (`DateRoute.run`).
+        var trace = 0
+        var image = 0
         var other = 0
     }
 
@@ -325,7 +331,9 @@ enum ItemFieldsTestDriver {
                         ? #"{"kind": "newspaper article", "title": "SENATE ACTS ON THE BUDGET", "byline": ["Mary Jones"], "publication": "The Sun", "publication_date": "1967-03-02", "recipient_place": []}"#
                         : #"{"kind": "letter", "title": null, "byline": [], "publication": null, "publication_date": null, "recipient_place": ["Boston, MA"]}"#
                 }
-                wire.other += 1
+                if text.contains("You are dating a document") { wire.trace += 1 }
+                else if text.contains("These are the first pages of one archival document") { wire.image += 1 }
+                else { wire.other += 1 }
                 return "{}"
             }
             let reply = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": content]]]])
@@ -407,12 +415,39 @@ enum ItemFieldsTestDriver {
         }
         let gw = GatewayConfig(baseURL: "https://gateway.test/v1", modelID: "some-tagging-model", displayName: "Gateway")
         guard let route = OpenRouterRoute.catalog.first else { check("4 an OpenRouter route", false); return }
+        let fileCount = docs.reduce(0) { $0 + $1.1 }
+        /// Part 6: the run's calls by kind against the estimate for its settings, then the counts cleared.
+        func estimateCovers(_ label: String, gateway: GatewayConfig?, sidecars: Bool) {
+            let (trace, image, fields) = wire.lock.withLock { (wire.trace, wire.image, wire.fields.count) }
+            wire.lock.withLock { wire.trace = 0; wire.image = 0 }
+            let measured = DateRoute.measuredRoute(gateway: gateway, usesLocalAgent: false)
+            let e = CostEstimator.estimate(fileCount: fileCount, model: route.model, enableTagging: true,
+                                           sendPreviousImage: false, contextCharCount: 0, useGateway: gateway != nil,
+                                           measuredRoute: measured, sidecars: sidecars)
+            let docs = CostEstimator.estimatedDocuments(fileCount)
+            let traceTerm = measured ? docs * CostEstimator.gatewayDateTraceCallCost
+                : docs * (CostEstimator.estimatedDateTraceInputTokens * route.model.inputCostPer1M
+                          + CostEstimator.estimatedDateTraceOutputTokens * route.model.outputCostPer1M) / 1_000_000
+            let imageTerm = measured ? docs * CostEstimator.dateImageShare * CostEstimator.gatewayDateImageCallCost : 0
+            check("6 \(label): the trace call made (\(trace)) is priced", trace > 0 && traceTerm > 0,
+                  "\(trace) \(traceTerm)")
+            check("6 \(label): an image pass made (\(image)) has its term, none where none is made",
+                  (image > 0) == (imageTerm > 0) && abs(e.datingCost - traceTerm - imageTerm) < 1e-12,
+                  "\(image) \(e.datingCost) \(traceTerm) \(imageTerm)")
+            check("6 \(label): an item-field call made (\(fields)) has its term, none where none is made",
+                  (fields > 0) == (e.itemFieldCost > 0)
+                  && (fields == 0 || abs(e.itemFieldCost - Double(fileCount) * CostEstimator.gatewayItemFieldPageCost) < 1e-12),
+                  "\(fields) \(e.itemFieldCost)")
+            check("6 \(label): both are in the total", abs(e.totalStandard - e.ocrCost - e.classificationCost - e.taggingCost
+                  - e.collectionCost - e.rotationCost - e.datingCost - e.itemFieldCost) < 1e-12)
+        }
 
         let (g, gOut) = processor(gateway: gw, out: "gateway")
         check("4 two segments", g.segments.count == 2, "\(g.segments.count)")
         await g.performTaggingPhase(provider: .gemini, model: route.model, apiKey: "",
                                     outputDirectory: tmp, enableSegmentJSON: true)
         let calls = wire.lock.withLock { wire.fields }
+        estimateCovers("gateway", gateway: gw, sidecars: true)
         check("4 gateway: one item-field call per document, on the measured model, with every page's image",
               calls.count == 2 && calls.allSatisfy { $0.1 == ItemFieldExtractor.gatewayModel }
               && calls.first { $0.0 == "DOCA" }?.2 == 2 && calls.first { $0.0 == "DOCL" }?.2 == 1, "\(calls)")
@@ -448,9 +483,11 @@ enum ItemFieldsTestDriver {
         await off.performTaggingPhase(provider: .gemini, model: route.model, apiKey: "",
                                       outputDirectory: tmp, enableSegmentJSON: false)
         check("4 sidecars off: no item-field call", wire.lock.withLock { wire.fields.isEmpty })
+        estimateCovers("sidecars off", gateway: gw, sidecars: false)
         let (key, keyOut) = processor(gateway: nil, out: "key")
         await key.performTaggingPhase(provider: .openrouter, model: route.model, apiKey: "test-key",
                                       outputDirectory: tmp, enableSegmentJSON: true)
+        estimateCovers("a key route", gateway: nil, sidecars: true)
         let ka = json(keyOut["A"])
         let keyHeader = PDFDocument(url: tmp.appendingPathComponent("key/A0.pdf"))?.page(at: 1)
             .flatMap { PDFHeaderParser.parse($0).header }
@@ -458,6 +495,48 @@ enum ItemFieldsTestDriver {
         check("4 a key route: no item-field call, the tagging call's publication kept",
               wire.lock.withLock { wire.fields.isEmpty } && ka["item_fields"] == nil
               && ka["publication_name"] as? String == "Tagging Paper", "\(ka.keys.sorted())")
+    }
+
+    // MARK: 6. The Cost Estimate's figures
+
+    /// W40.d1's two runs of the 113-photo RG 165 box (`verification/evidence/processor/W40.d1-bulk-ocr.md`), with the
+    /// inputs its `estimate.txt` used. The stand-in run made 57 trace, 57 image and 57 item-field calls that the
+    /// estimate had no term for; the paid OpenRouter run made 41 trace calls, metered at most $0.1056 in all.
+    private static func estimateFigures() {
+        func near(_ a: Double, _ b: Double) -> Bool { abs(a - b) < 1e-9 }
+        let docs = 113.0 / 3
+        // On the measured route the two terms are the bench's per-call figures, whatever the run's own model.
+        if let flash = LLMModel.geminiModels.first {
+            let g = CostEstimator.estimate(fileCount: 113, model: flash, enableTagging: true, sendPreviousImage: false,
+                                           contextCharCount: 0, useGateway: true, imageTokenProvider: .gemini,
+                                           measuredRoute: true, sidecars: true)
+            check("6 the stand-in run: the dating route's calls, the image pass on 32%",
+                  near(g.datingCost, docs * (0.00220 + 0.32 * 0.00284)), g.datingFormatted)
+            check("6 the stand-in run: the item fields by the page", near(g.itemFieldCost, 113 * 1.00 / 627),
+                  g.itemFieldFormatted)
+            check("6 dating and item fields are never batched", near(g.totalBatch - g.batchOcrCost,
+                                                                     g.totalStandard - g.ocrCost))
+            let every = CostEstimator.estimate(fileCount: 113, model: flash, enableTagging: true, sendPreviousImage: false,
+                                               contextCharCount: 0, useGateway: true, measuredRoute: true,
+                                               dateImageEveryDocument: true, sidecars: true)
+            check("6 image on every document: the image pass on each", near(every.datingCost, docs * (0.00220 + 0.00284)))
+            let none = CostEstimator.estimate(fileCount: 113, model: flash, enableTagging: false, sendPreviousImage: false,
+                                              contextCharCount: 0, useGateway: true, measuredRoute: true, sidecars: true)
+            check("6 no tagging: no dating or item-field call", none.datingCost == 0 && none.itemFieldCost == 0)
+        } else {
+            check("6 a Gemini model", false)
+        }
+        guard let qwen = OpenRouterRoute.forModel("qwen/qwen3.8-flash")?.model else {
+            check("6 the paid run's model", false); return
+        }
+        let p = CostEstimator.estimate(fileCount: 113, model: qwen, enableTagging: true, sendPreviousImage: false,
+                                       contextCharCount: 0)
+        check("6 the paid run: OCR and tagging as its estimate.txt", p.ocrFormatted == "$0.1146"
+              && p.taggingFormatted == "$0.0120", "\(p.ocrFormatted) \(p.taggingFormatted)")
+        check("6 the paid run: the trace call on its own model, no image pass or item fields",
+              near(p.datingCost, docs * (2000 * 0.15 + 300 * 0.47) / 1_000_000) && p.itemFieldCost == 0, p.datingFormatted)
+        check("6 the paid run: the estimate stays above the metered $0.1056", p.totalStandard >= 0.1056,
+              p.totalStandardFormatted)
     }
 }
 #endif

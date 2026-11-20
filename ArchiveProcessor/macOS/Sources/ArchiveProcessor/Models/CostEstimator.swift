@@ -9,9 +9,16 @@ struct CostEstimate {
     let batchOcrCost: Double
     let fileCount: Int
     let model: LLMModel
+    /// W49.proc-fix-s041: the dating route's calls a document (`DateRoute.run`) and the item-field call
+    /// (`ItemFieldExtractor.extract`), which go out after tagging and are never batched.
+    var datingCost: Double = 0
+    var itemFieldCost: Double = 0
 
-    var totalStandard: Double { ocrCost + classificationCost + taggingCost + collectionCost + rotationCost }
-    var totalBatch: Double { batchOcrCost + classificationCost + taggingCost + collectionCost + rotationCost }
+    private var afterOCR: Double {
+        classificationCost + taggingCost + collectionCost + rotationCost + datingCost + itemFieldCost
+    }
+    var totalStandard: Double { ocrCost + afterOCR }
+    var totalBatch: Double { batchOcrCost + afterOCR }
 
     /// Dollars and cents from $1 up ("$34.65"); four decimals below it, where a page's cost lives ("$0.0012").
     static func money(_ v: Double) -> String { "$" + String(format: abs(v) >= 1 ? "%.2f" : "%.4f", v) }
@@ -20,6 +27,8 @@ struct CostEstimate {
     var taggingFormatted: String { Self.money(taggingCost) }
     var collectionFormatted: String { Self.money(collectionCost) }
     var rotationFormatted: String { Self.money(rotationCost) }
+    var datingFormatted: String { Self.money(datingCost) }
+    var itemFieldFormatted: String { Self.money(itemFieldCost) }
     var totalStandardFormatted: String { Self.money(totalStandard) }
 }
 
@@ -73,6 +82,30 @@ struct CostEstimator {
     // Tagging: text-only, ~1 call per segment (~3 files/segment average)
     static let estimatedTaggingInputTokens: Double = 1500
     static let estimatedTaggingOutputTokens: Double = 200
+
+    /// Documents a run's tagging, dating and item-field calls go to: ~3 files a document. The W40.d1 paid run on
+    /// the RG 165 box made 41 of each for 113 photos (2.8 a document).
+    static func estimatedDocuments(_ fileCount: Int) -> Double { max(1.0, Double(fileCount) / 3.0) }
+
+    // Dating (W49.proc-fix-s041): the trace call goes to every document a run tags, on the run's own text route, or on
+    // the measured route where that runs (`DateRoute.Backend.measured`, a remote gateway). Its prompt is ~1,100
+    // characters of template, 3,000 of the document's text and up to 600 of each of six neighbours (~2,000 tokens);
+    // the reply is the date with its evidence.
+    static let estimatedDateTraceInputTokens: Double = 2000
+    static let estimatedDateTraceOutputTokens: Double = 300
+    /// The measured route's calls on Gemini 3.7 Flash through the gateway, the mean per call over the W46.date-route-
+    /// pipeline ledger at 3.8's list price as a ceiling (the gateway's own figure was 1.00 times it):
+    /// trace 362 calls, $0.00220; the image pass on the first two pages, 366 calls, $0.00284
+    /// (`segbench-results/date-route-pipeline.md`, "Cost and time").
+    static let gatewayDateTraceCallCost = 0.00220
+    static let gatewayDateImageCallCost = 0.00284
+    /// The image pass runs where the document's own text has no year: 32% of the owner's mix in the same report.
+    /// With "date image on every document" on, every document.
+    static let dateImageShare = 0.32
+    /// The item-field call (measured route only, sidecars on) sends every page's image at 1,600 px (the first 8 and
+    /// last 2 of a longer document) and their text. Its bench run was the same call: drafts/gemini, $1.00 over 299
+    /// documents of 627 pages (`segbench-results/item-fields-retruth.md`, "Spend"), so it is priced by the page.
+    static let gatewayItemFieldPageCost = 1.00 / 627
 
     // Collection segmentation: text-only calls (~500 input + 50 output per box, plus one clustering call)
     static let estimatedCollectionInputTokens: Double = 500
@@ -135,7 +168,14 @@ struct CostEstimator {
         visionTextOnly: Bool = false,
         /// The run's rotation calls go to a remote gateway's `LLMRotationDetector.gatewayModel` (not a model on this
         /// Mac, not Apple Vision): priced at the measured per-call figure (W46.rotation-default).
-        gatewayRotation: Bool = false
+        gatewayRotation: Bool = false,
+        /// The run's backend is a remote gateway (`DateRoute.measuredRoute`): the dating route's calls go to its
+        /// measured model, the image pass with them, and the item-field call runs.
+        measuredRoute: Bool = false,
+        /// The Dates card's "image on every document" switch (`SettingsKey.dateImageEveryDocument`).
+        dateImageEveryDocument: Bool = false,
+        /// The run writes JSON sidecars, the item fields' only output (`ItemFieldPolicy.skipReason`).
+        sidecars: Bool = false
     ) -> CostEstimate {
         // Apple Vision is an in-process macOS framework. It never calls a provider and the V1 backend
         // exposes only transcription / source-tag copying, so every estimated dollar component is $0.
@@ -174,12 +214,23 @@ struct CostEstimator {
 
         // Tagging cost
         var taggingCost: Double = 0
+        var datingCost: Double = 0
+        var itemFieldCost: Double = 0
         if enableTagging {
-            let estimatedSegments = max(1.0, Double(fileCount) / 3.0)
+            let estimatedSegments = estimatedDocuments(fileCount)
             let tagInput = estimatedSegments * estimatedTaggingInputTokens
             let tagOutput = estimatedSegments * estimatedTaggingOutputTokens
             taggingCost = (tagInput / 1_000_000) * model.inputCostPer1M
                         + (tagOutput / 1_000_000) * model.outputCostPer1M
+            // Each tagged document's date, then its item fields (`performTaggingPhase`).
+            if measuredRoute {
+                let imageShare = dateImageEveryDocument ? 1.0 : dateImageShare
+                datingCost = estimatedSegments * (gatewayDateTraceCallCost + imageShare * gatewayDateImageCallCost)
+                if sidecars { itemFieldCost = Double(fileCount) * gatewayItemFieldPageCost }
+            } else {
+                datingCost = estimatedSegments * (estimatedDateTraceInputTokens / 1_000_000 * model.inputCostPer1M
+                                                  + estimatedDateTraceOutputTokens / 1_000_000 * model.outputCostPer1M)
+            }
         }
 
         // Collection segmentation cost
@@ -215,7 +266,9 @@ struct CostEstimator {
             rotationCost: rotationCost,
             batchOcrCost: batchOcrCost,
             fileCount: fileCount,
-            model: model
+            model: model,
+            datingCost: datingCost,
+            itemFieldCost: itemFieldCost
         )
     }
 

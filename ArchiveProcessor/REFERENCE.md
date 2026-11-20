@@ -84,6 +84,11 @@ For models that support low/high thinking, include a dropdown: Low / High.
 - Display estimated cost before processing based on file count and selected model
 - Show standard vs. batch pricing side by side — the batch total appears only when batch mode is on, on a direct provider, with no pre-OCRed input (`Views/OCRView.swift` `ap.ocr.batchTotal`); Apple Vision, the Local Agent and an unpriced gateway show a note instead of a dollar figure
 - Update dynamically as files are added
+- With tagging on, it counts each document's dating calls and, on a remote gateway with sidecars on, the item-field call
+  (W49.proc-fix-s041): the trace call on every backend, the image pass on 32% of documents (all, with the Dates card's
+  image switch on), and the item fields by the page, at the bench's measured gateway figures. Neither is batched.
+  Process Files' Cost Estimate box shows them as "Dating" and "Item fields", Settings as "· Dating" and "· Item fields";
+  the run history and Live Capture's ledger entry count them the same way
 
 ### Batch Processing
 - Toggle button to enable batch mode

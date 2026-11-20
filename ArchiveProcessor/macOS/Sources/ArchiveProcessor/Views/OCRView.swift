@@ -275,8 +275,37 @@ struct OCRView: View {
             useGateway: useGateway || useAppleVision,
             imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil,
             visionTextOnly: useAppleVision && visionUseLLMJudgment,
-            gatewayRotation: gatewayRotation
+            gatewayRotation: gatewayRotation,
+            measuredRoute: DateRoute.measuredRoute(gateway: useGateway ? currentGatewayConfig : nil,
+                                                   usesLocalAgent: useLocalAgent),
+            dateImageEveryDocument: dateImageEveryDocument,
+            sidecars: enableSegmentJSON
         ).addingOCR(readersDelta)
+    }
+
+    /// The dating route's and the item fields' lines of the Cost Estimate box (W49.proc-fix-s041), each where it costs.
+    @ViewBuilder private func datingRows(_ est: CostEstimate) -> some View {
+        if est.datingCost > 0 {
+            HStack {
+                Text("Dating:").foregroundStyle(.primary)
+                Spacer()
+                Text(est.datingFormatted)
+            }
+        }
+        if est.itemFieldCost > 0 {
+            HStack {
+                Text("Item fields:").foregroundStyle(.primary)
+                Spacer()
+                Text(est.itemFieldFormatted)
+            }
+        }
+    }
+
+    /// The Dates card's switch for this run's output folder: its collection, its project and the general layer.
+    private var dateImageEveryDocument: Bool {
+        var doc: CollectionSettingsDocument?
+        if let outDir = outputDirectory, case .document(let d) = CollectionSettingsFile.read(in: outDir) { doc = d }
+        return DateRoute.imageEveryDocument(SettingsLayerStore.shared.resolver(for: doc))
     }
 
     /// Direct per-page calls for the dropped multi-page PDFs, priced with the model that OCRs them.
@@ -734,6 +763,7 @@ struct OCRView: View {
                                         Text(est.taggingFormatted)
                                     }
                                 }
+                                datingRows(est)
                                 if enableCollectionSegmentation {
                                     HStack {
                                         Text("Collection ID:").foregroundStyle(.primary)
@@ -838,6 +868,7 @@ struct OCRView: View {
                                         Text(est.taggingFormatted)
                                     }
                                 }
+                                datingRows(est)
                                 if enableCollectionSegmentation {
                                     HStack {
                                         Text("Collection ID:").foregroundStyle(.primary)
