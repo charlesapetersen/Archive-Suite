@@ -322,8 +322,10 @@ Three tiers, so nothing sprawls or goes stale:
   rationale. `next-queue-item.sh` and `check-tracker-sync.sh` read it; never rename it without updating them.
   History: [`REFERENCE.md`](REFERENCE.md) §"Completed tracker record".
 - **Long-term ideas → each app's `POTENTIAL_FEATURES.md`** — the durable wishlist tier. **Not an unreviewed backlog (owner,
-  2026-11-19):** a session that adds an entry also writes a Daemon Report line (no decision) naming it, so it reaches
-  the walkthrough; an entry that would change what users get today is an item or an owner question, not a wish.
+  2026-11-19):** the walkthrough digest's "Backlog entries" shows each new entry once (Agent Manager `backlogs.json`,
+  which also registers `verification/SUSPECTS.md`, `FUTURE_FEATURES.md` and `execution-plans/paid-runs-deferred.md`);
+  a new file of this kind is registered there in the same change. An entry that would change what users get today
+  is an item or an owner question, not a wish.
 - **In-flight progress notes → `execution-plans/items/<TAG>.md`** — checkpoint notes, session notes and saved-draft branches for one open item, written by its claimant; the `SUITE_TODO.md` entry carries only a pointer line, never the notes (they made that shared file a rebase-conflict hotspot). Deleted when the item ships, useful lines folded into its `SUITE_TODO_DONE.md` entry. Detail: `ops/autonomous/README.md` §L2.
 - **Short-term execution plans → `execution-plans/`** (root) — one detailed plan per in-flight feature, tracked from `SUITE_TODO.md`; **delete a plan once its feature ships** (git keeps the history). Don't let shipped plans linger.
 
