@@ -9,7 +9,7 @@ its measured pages per hour per GPU) and the Mac-local 4-bit run.
   Gemini 3.7 Flash, Gemini 4 Hydrogen and the FarmShare/Sherlock runs still use their price over all 96 on the kind
   charts; their per-page tokens would give each its own (queued: W49.bench-kind-price-rest, owner 2026-11-20).
 - **More kinds and tags.** Clippings, tables and table forms are in the groups CSVs already. Mixed pages (2) are
-  too few to chart.
+  too few to chart. (queued: W49.bench-more-kinds behind nice-to-have, owner 2026-11-20)
 - **Newspapers.** NewsBench is the lab's newspaper truth set (`W41.farmshare-news-layout`); its scores would make
   a fifth chart (queued: W49.bench-news-chart behind nice-to-have, owner 2026-11-20).
 - **A checking chart for segmentation.** Checks per 100 pages against pages right after checking, if the table

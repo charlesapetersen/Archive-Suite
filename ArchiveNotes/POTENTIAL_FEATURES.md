@@ -21,14 +21,16 @@ evidence these are one suite.
 - **Unified suite-wide storage path + migration** — a suite-level default root plus a migration that re-keys
   Reader's path-keyed index and the Notes store, serving the owner's "move to a new computer easily" goal.
   Tier-2, separately gated. _(00-overview §15.1 / §2 deferred list; also noted in `SUITE_TODO.md` as a `(later)`
-  behavior/data follow-on.)_ Folded into the design note `W49.notes-store-format` (owner, 2026-11-19 walkthrough).
+  behavior/data follow-on.)_ Moved into the survey `W49.storage-simplify-audit` (owner, 2026-11-20, call 27; the 2026-11-19 fold into
+  `W49.notes-store-format` was the session's, not his).
 - **Zotero write-back** — Notes currently only *reads* Zotero metadata (D8, read-only client). A future iteration
   could create/update Zotero items from Notes. _(00-overview §15.5, §17 out-of-scope.)_
-- **Extract re-snapshot / refresh from source** — extracts are snapshot+link (D7), so source edits deliberately
+- **Extract re-snapshot / refresh from source** — declined (owner, 2026-11-20, call 27): extracts stay snapshots. Was: extracts are snapshot+link (D7), so source edits deliberately
   don't touch them; an opt-in affordance could re-pull the latest source-note text into an existing extract on
   demand. _(`00-overview` §17 out-of-scope.)_
 - **Multi-root Reader corpus support** — durable-link resolution currently resolves against a single granted
-  Reader root; supporting multiple corpus roots is deferred. _(00-overview §2 deferred list, §17.)_
+  Reader root; supporting multiple corpus roots is deferred. _(00-overview §2 deferred list, §17.)_ (queued: part of
+  W49.storage-simplify-audit, owner 2026-11-20)
 - **Notes + Reader unified window / shared view** — declined (owner, 2026-11-20, call 27): they stay separate apps,
   linked by source blocks. Was: an open architectural question of whether Notes and Reader
   should ever share one window (or a unified view) rather than remaining separate apps. _(00-overview §15.3.)_

@@ -214,6 +214,15 @@ calls are section 1.
     W49.bench-seg-check-chart). From Vision OCR, which merges into the Processor: symbol-mode JBIG2 is never used,
     as his rule (the Xerox digit-swap mechanism; this carries over to the Processor's PDF writing), and `--roi`
     region selection is dropped.
+    Then an audit of the two earlier walkthroughs' Backlog entries (2026-11-19 21:58, 2026-11-20 06:07) found 15
+    settled without him, some recorded as his. Put to him one at a time: OCR confidence scoring and the side-by-side
+    view stay deleted (the read-poorly flag and the Reader's panes cover them); the suite-wide storage path moves from
+    W49.notes-store-format into W49.storage-simplify-audit, with several Reader roots; the reproduce attempts for
+    S-002 to S-005 and W49.bench-kind-price-rest stay queued; charts for clippings and tables, the processing queue
+    (after W49.proc-resume-standard-runs) and undo across the review dialogs go behind nice-to-have
+    (W49.bench-more-kinds, W49.proc-run-queue, W49.proc-review-undo); refreshing an extract from its source is
+    declined. Sonnet's measured price and the per-kind prices had already shipped ($0). The rest of those two
+    walkthroughs' entries were settled by earlier calls of his or were his own answers.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
