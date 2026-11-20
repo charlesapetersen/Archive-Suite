@@ -44,7 +44,8 @@ it rests on. A guess with no evidence is never written."
    earlier middle), the decade for 8-19. Scored by that form on the 56 owner-dated documents of 17 checked folders
    (`folder-date.md`, W46.p17-folder-date-forms) [M]: a single year 13 of 14 exact; the mid-point year 20 of 42 exact,
    33 within a year; every written year 33 of 56 (folder bootstrap 34-89%); the decade band holds no document. The
-   even-span middle and whether a mid-point year shows its figure are asked at `W46.p17-folder-date-forms-owner-ok`.
+   owner (2026-11-20, call 24) kept the earlier even-span middle and dropped the mid-point year's figure: it shows
+   `Date Uncertain` alone (W46.folder-date-midpoint-call).
    3c. *A stamp* (`W46.date-stamp-fallback`, owner 2026-11-17: a stamp is better than no date). Where the image pass
    finds no own date but a written stamped date (a received stamp, a postmark), and no cover gives a year, the
    earliest such year is the document's, with `Date Uncertain`, evidence class `stamp` and its quote and place. An own

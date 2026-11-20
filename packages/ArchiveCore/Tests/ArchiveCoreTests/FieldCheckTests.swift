@@ -124,7 +124,11 @@ final class FieldCheckTests: XCTestCase {
     func testFolderDateFigureFollowsTheWrittenForm() {
         func measured(_ e: String?) -> String { FieldStatusPolicy.date(checked: false, evidence: e).measured }
         XCTAssertTrue(measured("folder; from 00012.pdf; \"Feb. 1970\"").contains("13 of 14"))
-        XCTAssertTrue(measured("folder; from the folder; \"1965-1967\"").contains("20 of 42"))
+        XCTAssertEqual(measured("folder; from the folder; \"1965-1967\""), "", "a mid-point year: Date Uncertain alone")
+        let midpoint = FieldStatusPolicy.date(checked: false, evidence: "folder; from a.pdf; \"1965-1966\"; gave 1965, Date Uncertain")
+        XCTAssertEqual(midpoint.level, .lowerConfidence)
+        XCTAssertFalse(midpoint.detail.contains("fill rule"))
+        XCTAssertTrue(midpoint.detail.hasSuffix("dating route."))
         XCTAssertTrue(measured("folder; from 0001.pdf; \"1958-1969\"").contains("not measured"))
         XCTAssertTrue(measured("folder; from 0001.pdf; \"1958-1969\"; gave 1960s, Date Uncertain").contains("not measured"))
         XCTAssertTrue(measured("folder; from 00012.pdf; \"Feb. 1970\"; gave 1970-02").contains("13 of 14"))

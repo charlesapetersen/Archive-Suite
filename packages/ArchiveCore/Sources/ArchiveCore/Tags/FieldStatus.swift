@@ -51,7 +51,7 @@ public struct FieldStatus: Sendable, Equatable {
 
     /// The one-line explanation for a tooltip or an accessibility value.
     public var detail: String {
-        level == .checked ? "\(level.label). \(source)." : "\(level.label). \(source). \(measured)"
+        level == .checked || measured.isEmpty ? "\(level.label). \(source)." : "\(level.label). \(source). \(measured)"
     }
 }
 
@@ -97,7 +97,7 @@ public enum FieldStatusPolicy {
     public static func date(checked: Bool, evidence: String?) -> FieldStatus {
         let cls = evidence.flatMap { $0.split(separator: ";", maxSplits: 1).first }
             .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
-        let source: String, figure: String
+        let source: String, figure: String?
         switch cls {
         case "image":
             source = "Read off the page image by the Processor’s dating route"
@@ -122,14 +122,15 @@ public enum FieldStatusPolicy {
             figure = "an explicit year from the text is 139 of 158 exact"
         }
         if checked { return FieldStatus(level: .checked, source: source, measured: "") }
-        return FieldStatus(level: .lowerConfidence, source: source, measured: "Below the fill rule: \(figure).")
+        return FieldStatus(level: .lowerConfidence, source: source, measured: figure.map { "Below the fill rule: \($0)." } ?? "")
     }
 
     /// The folder rule's figure for the form it wrote, read from the evidence's quoted folder value
     /// (`folder; from <start>; "<value>"; gave <date>`, the text between the first and last quote mark):
     /// `segbench-results/folder-date.md`, "What the rule writes, scored by its form", the owner's Year tags on the dated
-    /// documents of 17 checked folders.
-    static func folderFigure(_ evidence: String?) -> String {
+    /// documents of 17 checked folders. A range's mid-point year shows none: its `Date Uncertain` says it alone (owner,
+    /// 2026-11-20, call 24; it was measured 20 of 42 exact, within a year for 33).
+    static func folderFigure(_ evidence: String?) -> String? {
         let value = evidence.flatMap { e -> String? in
             guard let open = e.firstIndex(of: "\""), let close = e.lastIndex(of: "\""), open < close else { return nil }
             return String(e[e.index(after: open)..<close])
@@ -138,7 +139,7 @@ public enum FieldStatusPolicy {
         case .year(_, _, uncertain: false):
             return "a checked single-year folder date was the owner’s year for 13 of 14 dated documents inside it"
         case .year(_, _, uncertain: true):
-            return "the mid-point year of a checked folder range was exact for 20 of 42 dated documents inside it, within a year for 33"
+            return nil
         case .decade:
             return "a decade from a checked folder range is not measured (no dated document in the checked folders)"
         case nil:

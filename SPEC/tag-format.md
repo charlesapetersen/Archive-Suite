@@ -138,7 +138,7 @@ the container file (`SPEC/containers.md`).
   `segbench-results/date-route-pipeline.md`; stamp 1/1 where it fired, a stamp's year 25/25 on documents carrying
   one, most also dated in their text, `segbench-results/date-stamp-fallback.md`; a year written from a folder's
   checked date, by the form it wrote: a single year 13/14, a range's mid-point year 20/42 exact and 33/42 within a
-  year, a decade not measured, `segbench-results/folder-date.md`), and the class comes from the page's `Date evidence:` line (none: text
+  year (not shown: a mid-point year shows `Date Uncertain` alone, owner 2026-11-20), a decade not measured, `segbench-results/folder-date.md`), and the class comes from the page's `Date evidence:` line (none: text
   or not recorded); the covering letter's date is not measured on its own. Of the container label reads
   (`segbench-results/ct-read.md`) only Vision + parser's box number on a box photo clears it (70 of 71, upright photos);
   its box number on a folder photo is 28 of 35, and every other field and reader falls short. Path values are not

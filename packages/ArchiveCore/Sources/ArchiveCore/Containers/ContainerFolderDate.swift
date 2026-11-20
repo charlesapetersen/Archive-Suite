@@ -9,7 +9,8 @@ import Foundation
 // Measured in `ArchiveProcessor/segbench-results/folder-date.md`: a checked folder date holds for 88% of the dated
 // documents inside (49 of 56, 17 folders); Vision + parser's own single-year read for 44%, hence confirmed only.
 // Scored by the form written (W46.p17-folder-date-forms): a single year 13 of 14 exact, the mid-point year 20 of 42
-// exact and 33 within a year, the decade unmeasured; `FieldStatusPolicy.folderFigure` gives the user that form's figure.
+// exact and 33 within a year, the decade unmeasured; `FieldStatusPolicy.folderFigure` gives the user that form's figure,
+// except the mid-point year, which shows Date Uncertain alone (owner, 2026-11-20, W46.folder-date-midpoint-call).
 
 /// A folder run's `date` value read as years: `lo...hi`, and a month where it names one year and one month.
 public struct ContainerFolderDate: Equatable, Sendable {
