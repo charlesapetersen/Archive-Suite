@@ -126,7 +126,7 @@ extension NavigationModel {
     }
 
     /// Writes every prepared edit; if one fails, puts back those already written and throws.
-    nonisolated static func commitAll(_ prepared: [PreparedContainerEdit]) throws -> ContainerUndoStep? {
+    nonisolated static func commitAll(_ prepared: [any PreparedDocumentEdit]) throws -> ContainerUndoStep? {
         var written: [ContainerDocumentRestore] = []
         for edit in prepared {
             do {
@@ -490,7 +490,12 @@ extension NavigationModel {
 }
 
 /// A container file read and edited, not yet written.
-struct PreparedContainerEdit: Sendable {
+/// A folder's edit in `.archivesuite`, read and changed, that `commitAll` writes with the others or not at all.
+protocol PreparedDocumentEdit: Sendable {
+    func commit() throws -> ContainerDocumentRestore
+}
+
+struct PreparedContainerEdit: PreparedDocumentEdit {
     let directory: URL
     /// What the file held (an empty document where there was none).
     let before: ContainerFile
@@ -667,6 +672,8 @@ func containerUndoMessage(_ error: Error, _ document: EditedDocument = .containe
 
 /// Why an item-field edit was refused, for the Inspector's Checks (W40.reader-item-field-edit).
 func itemFieldEditWriteMessage(_ error: Error) -> String {
+    // W49.reader-item-fields-follow: a selection's edit across folders is put back as a container one is.
+    if let partial = error as? ContainerSelectionRolledBack { return rolledBackMessage(partial, .itemFields) }
     switch error as? ContainerWriteError {
     case .changedSinceRead?: return "Another app changed this folder's item fields just now. Look again and redo the change."
     case .busy?: return "Another app is writing this folder's item fields. Try again in a moment."
@@ -678,18 +685,22 @@ func itemFieldEditWriteMessage(_ error: Error) -> String {
     }
 }
 
+/// Why a "set for selection" across folders saved nothing, or which folders it could not put back.
+func rolledBackMessage(_ partial: ContainerSelectionRolledBack, _ document: EditedDocument) -> String {
+    let reason = document == .containers ? containerEditWriteMessage(partial.underlying)
+                                         : itemFieldEditWriteMessage(partial.underlying)
+    guard !partial.notRestored.isEmpty else {
+        return "Nothing was saved: \(partial.written) of \(partial.total) folders were written and then put back. "
+            + reason
+    }
+    let names = partial.notRestored.map { "“\($0.folder.lastPathComponent)”" }.joined(separator: ", ")
+    return "Not every folder could be saved, and \(names) could not be put back as it was. "
+        + containerUndoMessage(partial.notRestored[0].error, document) + " " + reason
+}
+
 /// Why a container edit was refused, for the Inspector.
 func containerEditWriteMessage(_ error: Error) -> String {
-    if let partial = error as? ContainerSelectionRolledBack {
-        let reason = containerEditWriteMessage(partial.underlying)
-        guard !partial.notRestored.isEmpty else {
-            return "Nothing was saved: \(partial.written) of \(partial.total) folders were written and then put back. "
-                + reason
-        }
-        let names = partial.notRestored.map { "“\($0.folder.lastPathComponent)”" }.joined(separator: ", ")
-        return "Not every folder could be saved, and \(names) could not be put back as it was. "
-            + containerUndoMessage(partial.notRestored[0].error) + " " + reason
-    }
+    if let partial = error as? ContainerSelectionRolledBack { return rolledBackMessage(partial, .containers) }
     if let needed = error as? ContainerSetAsideNeeded { return needed.refusal }
     switch error as? ContainerWriteError {
     case .changedSinceRead?: return "Another app changed this folder's containers just now. Look again and redo the change."

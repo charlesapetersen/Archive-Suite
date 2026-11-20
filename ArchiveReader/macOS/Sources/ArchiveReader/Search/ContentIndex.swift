@@ -356,7 +356,7 @@ actor ContentIndex {
         return (filled.snippets, paths.firstIndex(of: nextPath) ?? paths.count)
     }
 
-    /// KWIC `snippet()` of the **body** column (index 0) for each of `hits`, keyed by path. One prepared
+    /// KWIC `snippet()` of the **body** column (index 0), else of the corrected item fields, for each of `hits`, keyed by path. One prepared
     /// statement, MATCH plus `rowid = ?`, which FTS5 answers by seeking the doclists to that row, so
     /// `snippet()` (which reads the stored body) runs only for these rows. Best match first, checking the
     /// clock before each row: rows left when `budget` runs out get no snippet. The expression is
@@ -369,25 +369,35 @@ actor ContentIndex {
         if let terms = stopTerms {
             return scannedSnippetMap(terms: terms, hits: hits, budget: budget)
         }
-        let sql = "SELECT snippet(fts, 0, ?, ?, ?, ?) FROM fts WHERE fts MATCH ? AND rowid = ?;"
+        // W49.reader-item-fields-follow: a hit on the user's corrected item fields alone (column 3, `fields`) gets
+        // a body snippet with no mark in it, so that row is asked again for a snippet of the fields, which has one.
+        let sql = "SELECT snippet(fts, ?, ?, ?, ?, ?) FROM fts WHERE fts MATCH ? AND rowid = ?;"
         guard let stmt = prepare(sql) else { return ([:], hits.count) }
         defer { sqlite3_finalize(stmt) }
+        func snippet(column: Int32, rowid: Int64) -> String {
+            sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
+            // Placeholder order: 1 = column, 2–5 = snippet marks/ellipsis/tokens, 6 = MATCH expr, 7 = the rowid.
+            sqlite3_bind_int(stmt, 1, column)
+            bindText(stmt, 2, SearchSnippet.openMark)
+            bindText(stmt, 3, SearchSnippet.closeMark)
+            bindText(stmt, 4, SearchSnippet.ellipsis)
+            sqlite3_bind_int(stmt, 5, Int32(SearchSnippet.tokenCount))
+            bindText(stmt, 6, match)
+            sqlite3_bind_int64(stmt, 7, rowid)
+            guard sqlite3_step(stmt) == SQLITE_ROW else { return "" }
+            return sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? ""
+        }
         let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(max(0, budget) * 1e9)
         var out: [String: String] = [:]
         var attempted = 0
         for hit in hits {
             guard DispatchTime.now().uptimeNanoseconds < deadline else { break }
             attempted += 1
-            sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
-            // Placeholder order: 1–4 = snippet marks/ellipsis/tokens, 5 = MATCH expr, 6 = the rowid.
-            bindText(stmt, 1, SearchSnippet.openMark)
-            bindText(stmt, 2, SearchSnippet.closeMark)
-            bindText(stmt, 3, SearchSnippet.ellipsis)
-            sqlite3_bind_int(stmt, 4, Int32(SearchSnippet.tokenCount))
-            bindText(stmt, 5, match)
-            sqlite3_bind_int64(stmt, 6, hit.rowid)
-            guard sqlite3_step(stmt) == SQLITE_ROW else { continue }
-            let snip = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? ""
+            var snip = snippet(column: 0, rowid: hit.rowid)
+            if !snip.contains(SearchSnippet.openMark) {
+                let fields = snippet(column: Self.fieldsColumn, rowid: hit.rowid)
+                if fields.contains(SearchSnippet.openMark) { snip = fields }
+            }
             if !snip.isEmpty { out[hit.path] = snip }
         }
         return (out, attempted)
@@ -417,6 +427,9 @@ actor ContentIndex {
     /// The FTS columns the OCR text box and an Advanced Search OCR-text rule match: the text and the user's
     /// corrected item fields (W49.reader-item-fields-search).
     nonisolated static let ocrTextColumns = "{body fields}"
+
+    /// The FTS column index of `fields`, for `snippet()`.
+    nonisolated static let fieldsColumn: Int32 = 3
 
     /// Page 2's item fields and the user's corrections, per indexed path among `paths` that has either. One scan of
     /// the rows that have any, since most files (made before the apps) have none.

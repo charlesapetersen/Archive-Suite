@@ -254,7 +254,7 @@ writes against the real corpus — always a copy.
   `NavigationModel.hiddenColumns`, which persists; File name is always shown. Capture marker is hidden while
   no file in the library has a marker, since files made before the apps
   have none. It names the kind of capture, not the container a file is in (that is `W47.ct-reader-view`'s
-  Container column). **Item fields** (W49.reader-item-fields-search, display only, no sort) gives the title,
+  Container column). **Item fields** (W49.reader-item-fields-search, display only; sorts by its text, W49.reader-item-fields-follow) gives the title,
   byline, publication, publication date, kind and recipient place on one line, the user's corrections over page
   2's, from the content index (`IndexedItemFields`); hidden likewise while no file has one.
 - **Document viewer:** two `PDFView`s (image left / OCR text right), **independent zoom** per pane,

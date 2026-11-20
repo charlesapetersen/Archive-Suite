@@ -32,7 +32,7 @@ final class LibrarySortDecoratedTests: XCTestCase {
 
     func testMatchesTheComparatorItReplaced() {
         XCTAssertEqual(Set(SortField.allCases), [.date, .name, .quality, .readState, .fileType, .subjects,
-                                                 .relevance, .flag, .attention, .container],
+                                                 .relevance, .flag, .attention, .container, .itemFields],
                        "a new field needs a reference case")
         let fields = SortField.allCases
         var rng = SeededGenerator(seed: 7)
@@ -46,6 +46,12 @@ final class LibrarySortDecoratedTests: XCTestCase {
                 containers: Dictionary(uniqueKeysWithValues: files.compactMap { f in
                     let n = Int.random(in: 0..<6, using: &rng)
                     return n == 0 ? nil : (f.path, ["Box 2", "Box 10", "Box 2, Folder 1", "box 2", "Carton 3"][n - 1])
+                }),
+                // The Item fields cells (W49.reader-item-fields-follow): a few titles, some files with none.
+                itemFields: Dictionary(uniqueKeysWithValues: files.compactMap { f in
+                    let n = Int.random(in: 0..<5, using: &rng)
+                    return n == 0 ? nil : (f.path, ["Annual Report", "annual report · Mary Jones", "Ledger 2",
+                                                    "Ledger 10"][n - 1])
                 }))
             let depth = Int.random(in: 1...3, using: &rng)
             let descriptors = (0..<depth).map { _ in
@@ -157,6 +163,8 @@ final class LibrarySortDecoratedTests: XCTestCase {
                     r = dir(cmp(marks.needsAttention.contains(a.path) ? 0 : 1, marks.needsAttention.contains(b.path) ? 0 : 1), d.ascending)
                 case .container:
                     r = nilLast(marks.containers[a.path], marks.containers[b.path]) { dir($0.localizedStandardCompare($1), d.ascending) }
+                case .itemFields:
+                    r = nilLast(marks.itemFields[a.path], marks.itemFields[b.path]) { dir($0.localizedStandardCompare($1), d.ascending) }
                 case .relevance: r = .orderedSame
                 }
                 if r != .orderedSame { return r == .orderedAscending }

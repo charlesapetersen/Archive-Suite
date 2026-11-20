@@ -224,9 +224,15 @@ final class NavigationModel: ObservableObject {
     /// W49.reader-ct-set-aside: the offer to set aside a container file the last edit could not overwrite.
     @Published var containerSetAsideOffer: ContainerSetAsideOffer?
     /// The file the last item-field edit was for; its error is shown only with that file (nil: with any).
-    var itemFieldEditPath: String?
+    var itemFieldEditPath: String? { didSet { itemFieldEditForSelection = false } }
+    /// The last item-field error came from a selection's edit, so a single file selected after it does not show it.
+    /// Set after `itemFieldEditPath`, which clears it.
+    var itemFieldEditForSelection = false
     /// Bumped after each `.archivesuite` edit, undo or redo, so the Checks section reads the user's values again.
     @Published var itemFieldRevision = 0
+    /// `syncItemFieldsToIndex`: a sync is running, and another was asked for while it ran.
+    var itemFieldSyncRunning = false
+    var itemFieldSyncQueued = false
     var containerGeneration = 0
     /// `LibraryChangeSignature.containers` of the catalog last published (W47.ct-reader-facet-rules).
     private var containerValuesSig = 0
@@ -452,6 +458,14 @@ final class NavigationModel: ObservableObject {
             .sink { [weak self] _ in MainActor.assumeIsolated {
                 self?.publishLinkTarget()
                 self?.refreshUndoHistory()
+            } }
+            .store(in: &cancellables)
+        library.$userItemFieldsRevision
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated {
+                self?.itemFieldRevision &+= 1   // the Checks read the user's values again
+                self?.syncItemFieldsToIndex()
             } }
             .store(in: &cancellables)
         library.$jpegPartnerIndex
@@ -1311,6 +1325,9 @@ final class NavigationModel: ObservableObject {
         }
         if sort.contains(where: { $0.field == .container }) {
             marks.containers = containerCatalog.rows.compactMapValues { $0.cell.isEmpty ? nil : $0.cell }
+        }
+        if sort.contains(where: { $0.field == .itemFields }) {
+            marks.itemFields = itemFields.compactMapValues(\.columnText)
         }
         return marks
     }

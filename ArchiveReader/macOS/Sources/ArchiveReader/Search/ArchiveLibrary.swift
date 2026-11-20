@@ -74,6 +74,10 @@ final class ArchiveLibrary: ObservableObject {
     /// absence; callers must not collapse those states.
     @Published private(set) var jpegPartnerIndex: JPEGPartnerIndex?
     @Published private(set) var jpegPartnerScanStatus: JPEGPartnerScanStatus = .notConfigured
+    /// W49.reader-item-fields-follow: bumped when the watcher sees a folder's `.archivesuite/item-fields.json`
+    /// change, written by another app or another copy of the Reader (this one's own writes are marked and skipped),
+    /// so the model reads the corrections into the index again rather than at the next pass.
+    @Published private(set) var userItemFieldsRevision: UInt64 = 0
 
     /// The root being walked, so `rescan()` needs no argument.
     private var root: URL?
@@ -1031,6 +1035,7 @@ final class ArchiveLibrary: ObservableObject {
         if let root, requestTouchesJPEGPartnerTree(request, root: root) {
             refreshJPEGPartnerIndex(scope: root)
         }
+        if Self.touchesUserItemFields(request) { userItemFieldsRevision &+= 1 }
         if request.fullRescan {
             pendingWatchRequest = CorpusWatchRequest()
             requestRootRescan(urgent: false)
@@ -1038,6 +1043,13 @@ final class ArchiveLibrary: ObservableObject {
         }
         pendingWatchRequest.merge(request)
         drainWatchWork()
+    }
+
+    /// Whether `request` names a folder's item-field file, or a subtree that may hold one. A full rescan needs no
+    /// signal: the pass reads every listed folder's corrections.
+    nonisolated static func touchesUserItemFields(_ request: CorpusWatchRequest) -> Bool {
+        let suffix = "/" + ContainerFile.folderName + "/" + UserItemFields.fileName
+        return !request.subtrees.isEmpty || request.paths.contains { $0.hasSuffix(suffix) }
     }
 
     private func requestTouchesJPEGPartnerTree(_ request: CorpusWatchRequest, root: URL) -> Bool {

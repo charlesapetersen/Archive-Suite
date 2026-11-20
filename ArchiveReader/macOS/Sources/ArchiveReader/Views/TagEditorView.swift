@@ -47,16 +47,25 @@ struct TagEditorView: View {
                     Divider()
                     dateSection(s, files)
                     Divider()
+                    // W49.reader-item-fields-follow: for several files, one value set for them all.
                     FieldStatusSection(files: files, apply: apply, revision: model.itemFieldRevision,
-                                       editable: files.count == 1 && model.containerTree.map {
-                                           ContainerCatalog.split(files[0].path, under: $0.path) != nil } == true,
+                                       editable: files.count <= Self.maxContainerSelection
+                                           && files.allSatisfy { model.canEditItemFields($0.path) },
                                        saving: model.containerEditSaving,
-                                       error: files.count == 1 && (model.itemFieldEditPath == nil
-                                           || model.itemFieldEditPath == files.first?.path)
+                                       // A selection's error is shown for a selection only; an undo's (no
+                                       // path either) for one file too.
+                                       error: files.count > 1 ? (model.itemFieldEditPath == nil
+                                                                 ? model.itemFieldEditError : nil)
+                                           : (model.itemFieldEditPath == nil && !model.itemFieldEditForSelection)
+                                              || model.itemFieldEditPath == files.first?.path
                                            ? model.itemFieldEditError : nil,
                                        onEdit: { field, edit in
-                                           guard let path = files.first?.path, files.count == 1 else { return }
-                                           model.editItemField(field, edit, forPath: path, undo: undoManager)
+                                           if files.count == 1, let path = files.first?.path {
+                                               model.editItemField(field, edit, forPath: path, undo: undoManager)
+                                           } else if files.count > 1 {
+                                               model.editItemFieldForSelection(field, edit, paths: files.map(\.path),
+                                                                               undo: undoManager)
+                                           }
                                        })
                     Divider()
                     // W47.ct-reader-view, W47.ct-reader-edit: shown for one file under the archive's main folder,

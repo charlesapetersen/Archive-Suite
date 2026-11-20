@@ -95,23 +95,27 @@ source and the measured figure; "Mark checked" / "Uncheck" writes or removes a `
 `TagWriter`, and typing a date checks it. Contract: `SPEC/tag-format.md` §Field checks.
 What it does not do, deliberately or not yet:
 - **Item fields are corrected beside the file, not in it** (W40.reader-item-field-edit, 2026-11-19). Each item field
-  has an Edit menu (Change…, None, Remove Your Value) and Add Item Field gives one page 2 lacks; the value goes to the
-  folder's `.archivesuite/item-fields.json` and is shown checked, page 2's value in the tooltip. Page 2 is never
-  rewritten. Limits: the entry is keyed by file name, so renaming a file in Finder leaves its corrections behind and a later file given that name takes them (names
-  are compared composed, so two files whose names differ only in Unicode composition, possible on some network
-  volumes, share them); a
+  has an Edit menu (Change…, None, Remove Your Value) and Add Item Field gives one page 2 lacks; for several selected
+  files one value, None or Remove is given to them all, all or nothing, one Undo (W49.reader-item-fields-follow). The
+  value goes to the folder's `.archivesuite/item-fields.json` and is shown checked, page 2's value in the tooltip. Page 2
+  is never rewritten. Any file under the folder the Reader was given can be corrected, the boundary its tag writes keep.
+  The entry is keyed by file name, so renaming a file in Finder leaves its corrections behind and a later file given
+  that name takes them (asked: W49.reader-item-fields-rename-owner-ok). Names are compared composed, so two files whose
+  names differ only in Unicode composition, possible on some network volumes, share them (accepted: a platform fact: APFS and
+  HFS+ take such names as one name, and Finder shows the two alike). A
   `Checked <Field>` tag set before the correction stays and speaks for page 2's value again once the correction is
   removed (accepted: SPEC/tag-format.md §Field checks: a check names the field and never holds the value).
-- **Corrections reach search and the Item fields column, with limits** (W49.reader-item-fields-search). The content
-  index keeps page 2's item fields and the corrections beside each file; the OCR text box and an Advanced Search OCR
-  text rule match a corrected value, and the Item fields column (offered once a file has one) shows what the Inspector
-  shows. Page 2's own value stays searchable too, since it is in the page's text, and a hit on a correction alone shows
-  a snippet of the page without a highlight. A correction made in the Reader is indexed at once; one written by
-  another copy of the Reader on a shared folder waits for the next index pass, since the watcher ignores
-  `.archivesuite`. The column does not sort. The Processor does not read corrections; corrections are one file at a
-  time, with no set for selection; renaming a file in Finder leaves them behind; editing needs the file under the
-  archive's main folder (queued: W49.reader-item-fields-follow; the owner, 2026-11-19 call 21: renames and several
-  files at once "can come later").
+- **Corrections reach search and the Item fields column** (W49.reader-item-fields-search, W49.reader-item-fields-follow).
+  The content index keeps page 2's item fields and the corrections beside each file; the OCR text box and an Advanced
+  Search OCR text rule match a corrected value, a hit on a correction alone shows a marked snippet of the correction,
+  and the Item fields column (offered once a file has one) shows what the Inspector shows and sorts by that text, files
+  with none last. A correction made in this Reader is indexed at once; one written by another app or another copy of the
+  Reader is picked up when the watcher sees its folder's file change. Page 2's own value stays searchable too, since it
+  is in the page's text (accepted: the text page is the file's searchable OCR text, which the Reader never rewrites). A
+  query of stop words alone keeps a snippet of the text without a mark when only a correction matched (accepted: such a
+  query is read by a scan of the text, W40.fix-reader-fts-snippets, measured at up to a second a row with `snippet()`).
+  The Processor does not read corrections: a later run that rewrites page 2 leaves them beside the file, still shown
+  over the new page 2 (asked: W49.proc-item-fields-rerun-owner-ok).
 - **Container fields have their own Inspector section** (W47.ct-reader-view), with the same badge and no check
   button: a container value is confirmed or corrected from its Edit menu (W47.ct-reader-edit). (accepted: by design, W47.ct-reader-edit; a container value is confirmed by being the user's own).
 - **Sender and recipient have no row**: the Processor writes them only to the JSON sidecar (the names feature's

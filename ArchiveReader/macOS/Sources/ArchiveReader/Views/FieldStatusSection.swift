@@ -97,6 +97,15 @@ struct FieldStatusSection: View {
                 }
             } else {
                 groupSummary
+                if editable, files.count > 1 {
+                    ItemFieldSelectionEditor(count: files.count, saving: saving, onEdit: onEdit)
+                        .id(SelectionKey(first: files.first?.path, count: files.count))   // a draft is its selection's
+                }
+                if let error {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red).font(.caption).fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("ar.fieldStatus.error")
+                }
             }
         }
         .task(id: single.map { TaskKey(file: key($0), revision: revision) }) {
@@ -111,6 +120,11 @@ struct FieldStatusSection: View {
     private struct TaskKey: Hashable {
         let file: ReadKey
         let revision: Int
+    }
+
+    private struct SelectionKey: Hashable {
+        let first: String?
+        let count: Int
     }
 
     private var single: ArchiveFile? { files.count == 1 ? files.first : nil }
@@ -140,7 +154,59 @@ struct FieldStatusSection: View {
                 }
             }
         }
-        Text("Item fields are listed for one file at a time.").font(.caption).foregroundStyle(.secondary)
+        Text(editable && files.count > 1 ? "Item fields are listed for one file at a time; below, one value can be given to every "
+                 + "selected file." : "Item fields are listed for one file at a time.")
+            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// W49.reader-item-fields-follow: one item field set for every selected file, as the container editor's "set for
+/// selection": the value, None, or the user's values taken away. Each file's value goes beside it, as for one file.
+struct ItemFieldSelectionEditor: View {
+    let count: Int
+    var saving = false
+    let onEdit: (CheckableField, ItemFieldEdit) -> Void
+
+    @State private var field: CheckableField = .title
+    @State private var draft = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Picker("Item field", selection: $field) {
+                    ForEach(IndexedItemFields.columnOrder, id: \.self) { Text($0.label).tag($0) }
+                }
+                .labelsHidden().frame(width: 160)
+                .accessibilityIdentifier("ar.itemFieldSelection.field")
+                TextField(field.label, text: $draft)
+                    .textFieldStyle(.roundedBorder).font(.callout)
+                    .onSubmit(set)
+                    .accessibilityIdentifier("ar.itemFieldSelection.value")
+            }
+            HStack {
+                Button("Set for \(count) Files", action: set)
+                    .controlSize(.small)
+                    .disabled(saving || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityIdentifier("ar.itemFieldSelection.set")
+                Menu("More") {
+                    Button("None for \(count) Files") { onEdit(field, .none) }
+                        .help("Say these files have no \(field.label.lowercased()), whatever page 2 reads.")
+                    Button("Remove Your \(field.label) from \(count) Files") { onEdit(field, .remove) }
+                        .help("Take your value away, so page 2's shows again.")
+                }
+                .controlSize(.small).fixedSize()
+                .disabled(saving)
+                .accessibilityIdentifier("ar.itemFieldSelection.more")
+                Spacer()
+            }
+        }
+    }
+
+    private func set() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        onEdit(field, .set(text))
+        draft = ""
     }
 }
 

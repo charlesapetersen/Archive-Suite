@@ -63,10 +63,12 @@ struct AppKitTableView: NSViewRepresentable {
                   + "names, as the folder levels read them (File ▸ Container Levels…), and from the container "
                   + "records the apps keep beside the files. ⚠︎ marks sources that disagree. Offered once a file "
                   + "in the library has one. Click to sort."),
-        .init(id: itemFieldsColumnID, title: "Item fields", width: 200, minWidth: 100, maxWidth: 500, sortField: nil,
+        .init(id: itemFieldsColumnID, title: "Item fields", width: 200, minWidth: 100, maxWidth: 500,
+              sortField: .itemFields,
               toolTip: "The document's title, byline, publication and other item fields, as the Inspector shows "
                   + "them: from page 2, with your corrections in their place. Offered once a file in the library "
-                  + "has one. Point at a cell for each field."),
+                  + "has one. Point at a cell for each field. Click to sort, by the title first; files with none "
+                  + "go last."),
         .init(id: "tags", title: "File tags", width: 300, minWidth: 100, maxWidth: 600, sortField: .subjects, flexible: true,
               toolTip: "The file's topic tags. Click a cell to edit them; click the header to sort."),
         // Quality holds a 75-pt pop-up inset 1 pt each side, so 78 is the narrowest it fits in. At 72 it overhung

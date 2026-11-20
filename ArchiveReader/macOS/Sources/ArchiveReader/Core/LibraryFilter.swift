@@ -156,6 +156,8 @@ enum SortField: String, Sendable, CaseIterable, Codable {
     case flag, attention
     /// The Container column (W47.ct-reader-view), from the model's `ContainerCatalog` through `SortMarks`.
     case container
+    /// The Item fields column (W49.reader-item-fields-follow): its text, from the content index through `SortMarks`.
+    case itemFields
 }
 
 /// The two sort keys the rows do not carry: which paths are flagged (`FlagStore`) and which need attention
@@ -165,6 +167,8 @@ struct SortMarks: Sendable {
     var needsAttention: Set<String> = []
     /// Each path's Container cell, for the Container sort; a path with none sorts last.
     var containers: [String: String] = [:]
+    /// Each path's Item fields cell, for that column's sort; a path with none sorts last.
+    var itemFields: [String: String] = [:]
 }
 
 struct ARSortDescriptor: Sendable, Equatable, Codable {
@@ -209,6 +213,7 @@ enum LibrarySort {
             case .flag:      columns[c] = files.map { marks.flagged.contains($0.path) ? 0 : 1 }
             case .attention: columns[c] = files.map { marks.needsAttention.contains($0.path) ? 0 : 1 }
             case .container: stringColumns.append((c, files.map { marks.containers[$0.path] }))
+            case .itemFields: stringColumns.append((c, files.map { marks.itemFields[$0.path] }))
             case .relevance: break
             }
         }
@@ -270,6 +275,7 @@ enum LibrarySort {
             case .flag:      return .int(marks.flagged.contains(f.path) ? 0 : 1)
             case .attention: return .int(marks.needsAttention.contains(f.path) ? 0 : 1)
             case .container: return string(marks.containers[f.path])
+            case .itemFields: return string(marks.itemFields[f.path])
             case .relevance: return .missing
             }
         }
