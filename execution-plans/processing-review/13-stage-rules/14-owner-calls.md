@@ -203,7 +203,9 @@ calls are section 1.
     deferred; the NewsBench chart behind nice-to-have and the segmentation checking chart conditional on the table;
     the CMIF export, cloud drives, creation-date mirror, a shared Notes and Reader window and a richer Markdown editor
     kept as wishes. The Sherlock family-coverage batch (submitted 2026-11-17) was still pending on priority, with
-    nothing failed; it is collected after it runs.
+    nothing failed; it is collected after it runs. Revisited the same morning: the Notes editor's undo across the ⌘/
+    switch queued (W49.notes-undo-across-toggle) and its missing constructs behind nice-to-have, with the question of
+    what can be borrowed (W49.notes-editor-constructs); the CMIF export stays parked on his 2026-11-06 call.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
