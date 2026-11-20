@@ -117,7 +117,8 @@ class EditorLinesUITests: NotesFixtureUITestCase {
             XCTAssertTrue(pollUntil(timeout: 10) { (self.noteBody(uuid: id) ?? "").contains("- Via toolbar") },
                           "the list should save — disk: \(noteBody(uuid: id) ?? "")")
             let body = noteBody(uuid: id) ?? ""
-            XCTAssertTrue(body.contains(original + "\n\n- Via shortcut\n- Second item\n- Via menu\n- Via toolbar"),
+            // The empty line typed above the list is kept as an `&nbsp;` line (W49.notes-keep-blank-lines).
+            XCTAssertTrue(body.contains(original + "\\\n&nbsp;\n\n- Via shortcut\n- Second item\n- Via menu\n- Via toolbar"),
                           "each way in should write a list item — disk: \(body.debugDescription)")
             try saveShot("W40.fix-notes-editor-lines-bullets-\(journeyLayout.rawValue)")
 
@@ -130,6 +131,59 @@ class EditorLinesUITests: NotesFixtureUITestCase {
             XCTAssertTrue(pollUntil(timeout: 5) { self.markerCount() == 5 }, "Return after a reselect should make an item — \(markers())")
             XCTAssertTrue(pollUntil(timeout: 10) { (self.noteBody(uuid: id) ?? "").contains("- Via toolbar\n- After reselect") },
                           "disk: \(noteBody(uuid: id) ?? "")")
+        }
+    }
+
+    /// W49.notes-keep-blank-lines (owner call 20, keep what I type): a blank line typed above a list, a list toggled
+    /// on the empty last line with the caret moved away before anything is typed, and an empty item between two
+    /// items, each saved, shown after a reselect, and still there after a relaunch.
+    func testBlankLinesAndEmptyItemsAreKept() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let id = Self.idPlain
+            try loadNote(id)
+
+            // A blank line, then a list toggled on the empty last line; the caret leaves before anything is typed.
+            try typeIntoEditor("\n\n")
+            app.typeKey("u", modifierFlags: [.command, .option])
+            XCTAssertTrue(pollUntil(timeout: 5) { self.markerCount() == 1 }, "⌥⌘U should draw a bullet — \(markers())")
+            app.typeKey(.upArrow, modifierFlags: .command)
+            XCTAssertTrue(pollUntil(timeout: 5) { self.markerCount() == 1 },
+                          "the bullet should stay when the caret moves away — markers: \(markers())")
+            XCTAssertTrue(pollUntil(timeout: 10) { (self.noteBody(uuid: id) ?? "").contains(self.original + "\\\n&nbsp;\n\n- &nbsp;") },
+                          "the blank line and the empty item should save — disk: \((noteBody(uuid: id) ?? "").debugDescription)")
+
+            // Reselect: the blank line and the bullet are back; typing at the end is the item's text.
+            reselect(id)
+            XCTAssertTrue(pollUntil(timeout: 5) { self.markerCount() == 1 }, "the empty item should be drawn after a reselect — \(markers())")
+            XCTAssertTrue(editorText.hasSuffix(shown + "\n\n"), "editor after reselect: \(editorText.debugDescription)")
+            try typeIntoEditor("One\nTwo")
+            XCTAssertTrue(pollUntil(timeout: 5) { self.markerCount() == 2 }, "two items — \(markers())")
+
+            // An empty item between the two: Return at the end of "One".
+            app.typeKey(.upArrow, modifierFlags: [])
+            app.typeKey(.rightArrow, modifierFlags: .command)
+            editor.typeText("\n")
+            XCTAssertTrue(pollUntil(timeout: 5) { self.markerCount() == 3 }, "the empty item should have a bullet — \(markers())")
+            XCTAssertTrue(pollUntil(timeout: 10) { (self.noteBody(uuid: id) ?? "").contains("- One\n- &nbsp;\n- Two") },
+                          "the empty item should save — disk: \((noteBody(uuid: id) ?? "").debugDescription)")
+            reselect(id)
+            XCTAssertTrue(editorText.hasSuffix(shown + "\n\nOne\n\nTwo"), "editor after reselect: \(editorText.debugDescription)")
+            XCTAssertTrue(pollUntil(timeout: 5) { self.markerCount() == 3 }, "three bullets after a reselect — \(markers())")
+            try saveShot("W49.notes-keep-blank-lines-\(journeyLayout.rawValue)")
+
+            // Quit and relaunch: the same lines, and opening the note rewrites nothing.
+            let saved = noteBody(uuid: id) ?? ""
+            app.typeKey("q", modifierFlags: .command)
+            XCTAssertTrue(app.wait(for: .notRunning, timeout: 15), "⌘Q should quit the app")
+            XCTAssertEqual(noteBody(uuid: id), saved, "quitting should not change the saved note")
+            relaunch()
+            try loadNote(id)
+            XCTAssertTrue(pollUntil(timeout: 10) { self.editorText.hasSuffix(self.shown + "\n\nOne\n\nTwo") },
+                          "relaunched editor: \(editorText.debugDescription)")
+            RunLoop.current.run(until: Date().addingTimeInterval(3))
+            XCTAssertEqual(noteBody(uuid: id), saved, "opening the note after relaunch must not rewrite it")
+            print("[blank-lines] final body: \(saved.debugDescription)")
         }
     }
 

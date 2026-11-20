@@ -37,6 +37,11 @@ extension NSAttributedString.Key {
     /// only how it shows: code and the block kinds set and clear `.backgroundColor` themselves, so the serializer
     /// reads this key. Underline needs no key of its own: it is `.underlineStyle`, written `<u>…</u>`.
     static let noteHighlight = NSAttributedString.Key("an.highlight")
+    /// The block kind of the empty last line, on the newline before it (`BlockKind`, W49.notes-keep-blank-lines).
+    /// That line has no character of its own, so a list toggled on it lived only in the typing attributes and was
+    /// gone once the caret moved. Read from the file's `- &nbsp;` at the end, written back as that, and only
+    /// meaningful on the last character of the text.
+    static let noteNextLineKind = NSAttributedString.Key("an.nextLineKind")
 }
 
 // MARK: - Underline and highlight (W40.notes-underline-highlight)
@@ -199,10 +204,13 @@ enum MarkdownStyler {
     /// the separator here fixes both faces at once, and is why the serializer can keep emitting a
     /// paragraph's text verbatim.
     @MainActor
-    static func style(_ source: AttributedString, fontSize: CGFloat = 14) -> NSMutableAttributedString {
+    /// `sourceLines`: the Markdown's lines, when it was parsed with source positions (W49.notes-keep-blank-lines).
+    static func style(_ source: AttributedString, fontSize: CGFloat = 14,
+                      sourceLines: [Substring]? = nil) -> NSMutableAttributedString {
         let result = NSMutableAttributedString()
         let bodyFont = NSFont.systemFont(ofSize: fontSize)
         var previous: (intent: PresentationIntent?, attrs: [NSAttributedString.Key: Any])?
+        var previousEndLine: Int?
 
         for run in source.runs {
             let runText = String(source[run.range].characters)
@@ -211,18 +219,29 @@ enum MarkdownStyler {
             if let previous, previous.intent != run.presentationIntent {
                 dropRawHTMLLineEnd(result)
                 let separator = blockSeparator(from: previous.intent, to: run.presentationIntent)
+                let extra = extraBlankLines(after: previous, endLine: previousEndLine, before: run, attrs: attrs,
+                                            sourceLines: sourceLines)
+                let extraText = NSAttributedString(string: String(repeating: "\n", count: extra), attributes: [
+                    .font: bodyFont, .foregroundColor: NSColor.textColor, .noteBlockKind: BlockKind.plain
+                ])
                 // A code block's text ends with its own newline, which already is the one newline to what follows
                 // (W40.fix-notes-editor-lines: a second showed a blank line that came back after Backspace).
                 let endsLine = result.length > 0 && (result.string as NSString).character(at: result.length - 1) == 0x0A
+                // Extra blank lines go with the text side of the boundary, where the serializer counts them as typed
+                // lines: before the separator after text, after it otherwise.
+                let afterPlain = previous.attrs[.noteBlockKind] as? BlockKind == .plain
+                if afterPlain { result.append(extraText) }
                 if !(separator == "\n" && endsLine) {
                     result.append(NSAttributedString(string: separator,
                                                      attributes: separatorAttributes(after: previous.attrs,
                                                                                      bodyFont: bodyFont)))
                 }
+                if !afterPlain { result.append(extraText) }
             }
 
             result.append(NSAttributedString(string: runText, attributes: attrs))
             previous = (run.presentationIntent, attrs)
+            if let end = run.markdownSourcePosition?.endLine { previousEndLine = end }
         }
         dropRawHTMLLineEnd(result)
         InlineTagStyle.applyTags(in: result)
@@ -238,6 +257,29 @@ enum MarkdownStyler {
         guard last >= 0, (result.string as NSString).character(at: last) == 0x0A,
               result.attribute(.noteRawHTML, at: last, effectiveRange: nil) as? Bool == true else { return }
         result.deleteCharacters(in: NSRange(location: last, length: 1))
+    }
+
+    /// W49.notes-keep-blank-lines — the empty lines a file holds between two blocks beyond the one Markdown reads
+    /// there. Markdown reads any number of blank lines as one boundary, so a file with several between a heading
+    /// and its text showed one newline. Each blank line past the first is one more empty line, as the serializer
+    /// writes a typed one. Counted from the source lines, which `MarkdownBridge` asks the parser for only when the
+    /// text has two blank lines in a row. Not inside a list or between two quotes, where blank lines are the
+    /// block's own (a loose list, a second quote), and not beside raw HTML, which keeps its own newlines.
+    /// Every line between the two blocks must be blank: a line with no run of its own (a link reference definition,
+    /// a rule, a setext underline) is not an empty line (W49 review).
+    private static func extraBlankLines(after previous: (intent: PresentationIntent?, attrs: [NSAttributedString.Key: Any]),
+                                        endLine: Int?, before run: AttributedString.Runs.Run,
+                                        attrs: [NSAttributedString.Key: Any], sourceLines: [Substring]?) -> Int {
+        guard let sourceLines, let endLine, let startLine = run.markdownSourcePosition?.startLine else { return 0 }
+        let blank = startLine - endLine - 1
+        guard blank >= 2, startLine - 1 <= sourceLines.count,
+              sourceLines[endLine..<(startLine - 1)].allSatisfy({ $0.allSatisfy { $0 == " " || $0 == "\t" || $0 == "\r" } }),
+              previous.attrs[.noteRawHTML] as? Bool != true, attrs[.noteRawHTML] as? Bool != true
+        else { return 0 }
+        switch (previous.attrs[.noteBlockKind] as? BlockKind ?? .plain, attrs[.noteBlockKind] as? BlockKind ?? .plain) {
+        case (.listItem, .listItem), (.blockquote, .blockquote): return 0
+        default: return blank - 1
+        }
     }
 
     /// The text that separates two adjacent blocks (W40.fix-notes-editor-lines): only two paragraphs of text (or of one quote) are a blank line apart. A

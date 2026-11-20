@@ -75,7 +75,12 @@ enum MarkdownBridge {
         // If no block headers, parse the whole thing as a single body
         // `parse` hands back text with its header-line escapes removed (W40.fix-notes-block-marker-in-text).
         if blocks.isEmpty {
-            return parseSingleBodyWithStatus(leadingText ?? markdown, fontSize: fontSize, assetStore: assetStore)
+            let parsed = parseSingleBodyWithStatus(leadingText ?? markdown, fontSize: fontSize, assetStore: assetStore)
+            guard !parsed.failed else { return parsed }
+            let text = parsed.attributed as? NSMutableAttributedString
+                ?? NSMutableAttributedString(attributedString: parsed.attributed)
+            restoreEmptyLines(in: text)
+            return ParseOutcome(attributed: text, failed: false)
         }
 
         let result = NSMutableAttributedString()
@@ -107,6 +112,7 @@ enum MarkdownBridge {
             }
         }
 
+        restoreEmptyLines(in: result)
         return ParseOutcome(attributed: result, failed: failed)
     }
 
@@ -193,10 +199,13 @@ enum MarkdownBridge {
         let (cleaned, imageRefs) = extractImageReferences(markdown)
 
         // Use Apple's CommonMark parser (AttributedString API) for semantic attributes
+        // Source lines only where the Styler needs them, to count blank lines past the first (W49.notes-keep-blank-lines).
+        let countsBlankLines = hasTwoBlankLines(cleaned)
         let options = AttributedString.MarkdownParsingOptions(
             allowsExtendedAttributes: true,
             interpretedSyntax: .full,
-            failurePolicy: .returnPartiallyParsedIfPossible
+            failurePolicy: .returnPartiallyParsedIfPossible,
+            appliesSourcePositionAttributes: countsBlankLines
         )
 
         let semantic: AttributedString
@@ -210,13 +219,69 @@ enum MarkdownBridge {
             ]), failed: true)
         }
 
-        let styled = MarkdownStyler.style(semantic, fontSize: fontSize)
+        let styled = MarkdownStyler.style(semantic, fontSize: fontSize,
+                                          sourceLines: countsBlankLines ? cleaned.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) : nil)
 
         if !imageRefs.isEmpty {
             restoreImageAttachments(in: styled, refs: imageRefs, assetStore: assetStore)
         }
 
         return ParseOutcome(attributed: styled, failed: false)
+    }
+
+    /// Whether `markdown` has two blank lines in a row anywhere (lines of spaces and tabs count as blank).
+    private static func hasTwoBlankLines(_ markdown: String) -> Bool {
+        var newlines = 0
+        for unit in markdown.utf8 {
+            switch unit {
+            case 0x0A:
+                newlines += 1
+                if newlines == 3 { return true }
+            case 0x20, 0x09, 0x0D: continue
+            default: newlines = 0
+            }
+        }
+        return false
+    }
+
+    /// The `&nbsp;` marker for an empty line, the U+00A0 Apple's parser reads it as.
+    static let emptyLineMarker = "&nbsp;"
+
+    /// W49.notes-keep-blank-lines — turn each line that is `&nbsp;` alone back into the empty line it was written
+    /// for. Markdown has no empty paragraph or empty list item (`- ` alone is no item), so the serializer writes an
+    /// empty line beside a block, or an empty item, as `&nbsp;`, which reads back as a U+00A0 line. That character
+    /// is deleted, and the newline after it is the line. An empty item at the very end has no newline after it: its
+    /// kind goes on the newline before it, as `.noteNextLineKind`. A U+00A0 the operator typed alone on a line goes
+    /// the same way; it showed nothing. One in code, inline code or raw HTML is text and stays. One the serializer
+    /// does not write (at the end, or before a chip) is still deleted, so no stray U+00A0 reaches the text.
+    @MainActor
+    private static func restoreEmptyLines(in text: NSMutableAttributedString) {
+        let string = text.string as NSString
+        var location = string.length
+        func isNewline(_ i: Int) -> Bool { let c = string.character(at: i); return c == 0x0A || c == 0x0D }
+        while location > 0 {
+            let found = string.range(of: "\u{00A0}", options: .backwards, range: NSRange(location: 0, length: location))
+            guard found.location != NSNotFound else { return }
+            let i = found.location
+            location = i
+            guard i == 0 || isNewline(i - 1) else { continue }
+            let attrs = text.attributes(at: i, effectiveRange: nil)
+            guard attrs[.noteInlineCode] as? Bool != true, attrs[.noteRawHTML] as? Bool != true else { continue }
+            let kind = attrs[.noteBlockKind] as? BlockKind ?? .plain
+            switch kind {
+            case .plain, .listItem: break
+            default: continue
+            }
+            if i + 1 < text.length {
+                guard isNewline(i + 1) else { continue }
+                text.deleteCharacters(in: NSRange(location: i, length: 1))
+            } else if i > 0 {
+                text.deleteCharacters(in: NSRange(location: i, length: 1))
+                if case .listItem = kind {
+                    text.addAttribute(.noteNextLineKind, value: kind, range: NSRange(location: i - 1, length: 1))
+                }
+            }
+        }
     }
 
     // MARK: - Insert block (seam for W4)
@@ -447,12 +512,19 @@ enum MarkdownBridge {
         let sub = attributed.attributedSubstring(from: range)
         if sub.length == 0 { return "" }
 
-        let paragraphs = collectParagraphs(sub)
+        var paragraphs = collectParagraphs(sub)
+        // W49.notes-keep-blank-lines — an empty list item on the last line, kept on the newline before it, is one
+        // more paragraph with no text.
+        if NSMaxRange(range) == attributed.length,
+           let kind = attributed.attribute(.noteNextLineKind, at: attributed.length - 1, effectiveRange: nil) as? BlockKind,
+           case .listItem = kind, [0x0A, 0x0D].contains((attributed.string as NSString).character(at: attributed.length - 1)) {
+            paragraphs.append(Para(range: NSRange(location: sub.length, length: 0), kind: kind))
+        }
         var lines: [String] = []
         var listState: [Int: (ordered: Bool, ordinal: Int)] = [:]
         var previousKind: BlockKind?
 
-        for para in paragraphs {
+        for (index, para) in paragraphs.enumerated() {
             var kind = para.kind
             if case .listItem(let ordered, let depth, let ordinal) = kind {
                 // Nested lists have independent numbering. Returning to a parent drops deeper state;
@@ -465,7 +537,7 @@ enum MarkdownBridge {
             } else {
                 listState.removeAll()
             }
-            let line = serializeParagraph(sub, range: para.range, kind: kind)
+            let line = serializeParagraph(sub, range: para.range, kind: kind, followed: index < paragraphs.count - 1)
             // W40.fix-notes-editor-lines — two blocks of different kinds are written a blank line apart, as the
             // Styler reads them, whatever newlines sit between them in the editor (it shows them one newline
             // apart). A list item or a quote followed directly by text would otherwise take that text in as a
@@ -553,9 +625,12 @@ enum MarkdownBridge {
                 guard ch == 0x0A || ch == 0x0D else { i += 1; continue }
                 let width = ch == 0x0D && i + 1 < NSMaxRange(range) && text.character(at: i + 1) == 0x0A ? 2 : 1
                 i += width
-                if attributed.attribute(.noteBlockSeparator, at: i - width, effectiveRange: nil) as? Bool != true,
-                   isTypedLineBreak(attributed, at: i - width, in: range) {
-                    if i - width > start { result.append(Para(range: NSRange(location: start, length: i - start), kind: kind)) }
+                // W49.notes-keep-blank-lines — a newline alone is an empty item, kept: a second paragraph of an item
+                // has text, so even a separator ends one there.
+                let empty = i - width == start
+                let isSeparator = attributed.attribute(.noteBlockSeparator, at: i - width, effectiveRange: nil) as? Bool == true
+                if (!isSeparator && isTypedLineBreak(attributed, at: i - width, in: range)) || (isSeparator && empty) {
+                    result.append(Para(range: NSRange(location: start, length: i - start), kind: kind))
                     start = i
                 }
             }
@@ -569,9 +644,12 @@ enum MarkdownBridge {
 
     // MARK: - Paragraph serialization
 
+    /// `followed`: another block of this text comes after this one, so a newline ending it is the boundary to that
+    /// block rather than an empty line.
     private static func serializeParagraph(_ storage: NSAttributedString,
                                            range: NSRange,
-                                           kind: BlockKind) -> String {
+                                           kind: BlockKind,
+                                           followed: Bool) -> String {
         // W3.notes-editor-blankline-collapse — a block separator at the END of this paragraph is
         // not part of its text: it separates this block from the next, and `serializeBodySegment`'s
         // join already writes one of its newlines. Emitting the rest AFTER the decorated construct
@@ -588,14 +666,31 @@ enum MarkdownBridge {
         }
 
         if case .plain = kind {
-            let (leading, lines) = plainLines(storage, range: contentRange)
-            return leading + lines + separatorSuffix
+            let plain = plainLines(storage, range: contentRange)
+            // W49.notes-keep-blank-lines — the empty lines after the text, before the next block, which the Styler
+            // reads as one newline whatever the file holds. All the newlines left after a one-newline separator are
+            // such lines; with no separator, the last newline is the boundary. They are written as breaks ending in
+            // an `&nbsp;` line, which `restoreEmptyLines` reads back as empty. A paragraph with no text at all is that
+            // line. At the end of the text, or before a chip, they are dropped as before: nothing follows them, and
+            // a marker there would read back as a stray U+00A0 (W49 review).
+            let oneNewlineSeparator = separatorSuffix.isEmpty && contentRange.length < range.length
+            if followed, plain.leading.isEmpty, !plain.endsInHTML, separatorSuffix.isEmpty {
+                let empty = oneNewlineSeparator ? plain.trailingBreaks : plain.trailingBreaks - 1
+                if plain.lines.isEmpty, empty >= 0 {
+                    return String(repeating: "\\\n", count: empty) + emptyLineMarker
+                }
+                if empty > 0 {
+                    return plain.lines + String(repeating: "\\\n", count: empty) + emptyLineMarker
+                }
+            }
+            return plain.leading + plain.lines + separatorSuffix
         }
         // W40.fix-notes-return-list-quote — a quote's paragraphs, typed or read from the file, are cut the
         // same way and every line is marked: an unmarked line after `> q` is a lazy continuation that reads
         // back as `q r`, and one after a blank line leaves the quote.
         if case .blockquote = kind {
-            let (leading, lines) = plainLines(storage, range: contentRange)
+            let plain = plainLines(storage, range: contentRange)
+            let (leading, lines) = (plain.leading, plain.lines)
             guard !lines.isEmpty else { return "\(leading)> \(separatorSuffix)" }
             let quoted = lines.components(separatedBy: "\n").map { $0.isEmpty ? ">" : "> \($0)" }
             return leading + quoted.joined(separator: "\n") + separatorSuffix
@@ -624,7 +719,9 @@ enum MarkdownBridge {
         case .listItem(let ordered, let depth, let ordinal):
             let indent = String(repeating: "    ", count: depth)
             let bullet = ordered ? "\(ordinal). " : "- "
-            let content = startsWithRawHTML(storage, range: contentRange) ? trimmed : escapingBlockStart(trimmed)
+            // An empty item is `&nbsp;`: `- ` alone is no item (W49.notes-keep-blank-lines).
+            let content = trimmed.allSatisfy({ $0 == " " || $0 == "\t" || $0 == "\u{00A0}" }) ? emptyLineMarker
+                : startsWithRawHTML(storage, range: contentRange) ? trimmed : escapingBlockStart(trimmed)
             return "\(indent)\(bullet)\(content)\(separatorSuffix)"
 
         case .plain:
@@ -660,8 +757,10 @@ enum MarkdownBridge {
     /// that holds a typed newline (extra blank lines after a heading or a list) is written as breaks opening
     /// the paragraph; a run at the end is the boundary to what follows, which `serializeBodySegment` writes.
     /// The newline `endLine` puts before a chip counts as two: it ended a block.
+    /// `trailingBreaks` is the count of newlines after the last line of text (or, with no text, of typed ones), and
+    /// `endsInHTML` whether that text ends in raw HTML.
     private static func plainLines(_ storage: NSAttributedString,
-                                   range: NSRange) -> (leading: String, lines: String) {
+                                   range: NSRange) -> (leading: String, lines: String, trailingBreaks: Int, endsInHTML: Bool) {
         let text = storage.string as NSString
         let end = range.location + range.length
         // The width of the newline at `k` (CRLF is one), or 0 for any other character. Raw HTML's newlines are
@@ -717,7 +816,9 @@ enum MarkdownBridge {
                     }
                     j += w
                 }
-                if (separators as NSString).length > 1 { leading = separators }
+                // The join to the line above already writes one of its newlines (W49.notes-keep-blank-lines: written
+                // whole, it was one blank line more than the editor showed, which a reopen now shows).
+                if (separators as NSString).length > 1 { leading = String(separators.dropFirst()) }
                 breaks = typed
                 i = j
                 start = j
@@ -732,7 +833,7 @@ enum MarkdownBridge {
             start = i
         }
         emit(end)
-        return (leading, lines)
+        return (leading, lines, breaks, previousEndsInHTML)
     }
 
     /// Whether the first non-blank character of `range` is raw HTML, whose text is the file's own and must not
@@ -989,6 +1090,11 @@ enum MarkdownBridge {
                 let next = i + 1 < chars.count ? chars[i + 1] : nil
                 if next.map({ ($0.isASCII && $0.isLetter) || "/!?".contains($0) }) ?? true { result.append("\\") }
                 result.append(ch)
+            case "&":
+                // A typed `&nbsp;` or `&amp;` is text, not the character it names (W49.notes-keep-blank-lines: an
+                // `&nbsp;` line is the serializer's empty line).
+                if isEntity(chars, at: i) { result.append("\\") }
+                result.append(ch)
             case "#":
                 if i == 0 {
                     result.append("\\")
@@ -999,6 +1105,24 @@ enum MarkdownBridge {
             }
         }
         return result
+    }
+
+    /// Whether `chars` hold an HTML entity reference at `i` (`&name;`, `&#123;`, `&#x1F;`), which CommonMark reads as
+    /// the character it names. A run ending mid-reference is not one; the next run's text is escaped on its own.
+    private static func isEntity(_ chars: [Character], at i: Int) -> Bool {
+        var j = i + 1
+        var numeric = false
+        if j < chars.count, chars[j] == "#" {
+            numeric = true
+            j += 1
+            if j < chars.count, chars[j] == "x" || chars[j] == "X" { j += 1 }
+        }
+        let start = j
+        while j < chars.count, j - start < 32, chars[j].isASCII,
+              numeric ? chars[j].isHexDigit : (chars[j].isLetter || chars[j].isNumber) {
+            j += 1
+        }
+        return j > start && j < chars.count && chars[j] == ";"
     }
 
     /// Wrap text in emphasis delimiters with any spaces at its edges moved outside them. CommonMark neither opens

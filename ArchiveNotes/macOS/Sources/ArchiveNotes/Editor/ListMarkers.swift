@@ -71,13 +71,16 @@ enum ListMarkers {
         return markers
     }
 
-    /// The marker an empty last line would show, when the caret sits on it with list typing attributes (the
-    /// line has no character to carry the kind, so a toggled-on empty line would otherwise show nothing).
+    /// The marker an empty last line shows: with the caret on it, from the typing attributes (the line has no
+    /// character to carry the kind, so a toggled-on empty line would otherwise show nothing); elsewhere, from the
+    /// kind kept on the newline before it (`.noteNextLineKind`, W49.notes-keep-blank-lines).
     static func trailingMarker(in storage: NSAttributedString, typingAttributes: [NSAttributedString.Key: Any],
                                caret: NSRange) -> Marker? {
         let length = storage.length
-        guard caret.length == 0, caret.location == length,
-              case .listItem(let ordered, let depth, let ordinal)? = typingAttributes[.noteBlockKind] as? BlockKind
+        let onLine = caret.length == 0 && caret.location == length
+        let kept = length > 0 ? storage.attribute(.noteNextLineKind, at: length - 1, effectiveRange: nil) as? BlockKind : nil
+        guard case .listItem(let ordered, let depth, let ordinal)? =
+                onLine ? typingAttributes[.noteBlockKind] as? BlockKind : kept
         else { return nil }
         if length > 0 {
             let last = (storage.string as NSString).character(at: length - 1)

@@ -170,7 +170,8 @@ struct EditorLinesTests {
         type(tv, "one")
         tv.insertNewline(nil)
         type(tv, "two")
-        #expect(MarkdownBridge.serialize(storage) == "A\n\n- one\n- two")
+        // The empty line typed above the list is kept (W49.notes-keep-blank-lines; the editor shows one).
+        #expect(MarkdownBridge.serialize(storage) == "A\\\n&nbsp;\n\n- one\n- two")
         reselect(tv, storage)
         #expect(ListMarkers.markers(in: storage, range: NSRange(location: 0, length: storage.length)).map(\.text) == ["•", "•"])
     }
@@ -340,6 +341,188 @@ struct EditorLinesTests {
         let saved = MarkdownBridge.serialize(storage)
         #expect(!saved.contains("# \n") && !saved.hasSuffix("# "), "got \(saved.debugDescription)")
         #expect(saved.hasSuffix("\n# Title"), "got \(saved.debugDescription)")
+    }
+
+    // MARK: - W49.notes-keep-blank-lines (owner call 20: keep what I type)
+
+    /// Type, save, reselect: the same lines, and a reopened note saves the same.
+    private func expectKept(_ tv: EditorTextView, _ storage: NSTextStorage, _ label: String,
+                            sourceLocation: SourceLocation = #_sourceLocation) -> String {
+        let typed = storage.string
+        let saved = reselect(tv, storage)
+        #expect(storage.string == typed, "\(label): reopened \(storage.string.debugDescription), saved \(saved.debugDescription)",
+                sourceLocation: sourceLocation)
+        #expect(MarkdownBridge.serialize(storage) == saved, "\(label): a reopened note must save the same",
+                sourceLocation: sourceLocation)
+        return saved
+    }
+
+    /// Case 1: blank lines typed at the end of text, right before a heading, list, quote or code block.
+    @Test func blankLinesBeforeABlockAreKept() throws {
+        for (block, written) in [("# T", "# T"), ("- x", "- x"), ("> q", "> q"), ("```\nc\n```", "```\nc\n```")] {
+            for count in 1...3 {
+                let (tv, storage) = try editor("A\n\n" + block)
+                caret(tv, at: 1)
+                for _ in 0..<count { tv.insertNewline(nil) }
+                #expect(storage.string.hasPrefix("A" + String(repeating: "\n", count: count + 1)), "\(block): typed \(storage.string.debugDescription)")
+                let saved = expectKept(tv, storage, "\(block) after \(count) Returns")
+                #expect(saved == "A" + String(repeating: "\\\n", count: count) + "&nbsp;\n\n" + written, "\(block): saved \(saved.debugDescription)")
+            }
+        }
+    }
+
+    /// Case 1, typed into a new note: text, Returns, then a list toggled on and typed into.
+    @Test func blankLinesTypedBeforeAToggledList() throws {
+        let (tv, storage) = try editor("A")
+        tv.insertNewline(nil); tv.insertNewline(nil); tv.insertNewline(nil)
+        EditorFormatting.toggleUnorderedList(tv, fontSize: 14)
+        type(tv, "x")
+        #expect(storage.string == "A\n\n\nx")
+        #expect(expectKept(tv, storage, "toggled list") == "A\\\n\\\n&nbsp;\n\n- x")
+    }
+
+    /// Case 1, an empty line alone between two blocks, after a heading.
+    @Test func anEmptyLineBetweenTwoBlocksIsKept() throws {
+        let (tv, storage) = try editor("# H\n\n- x")
+        caret(tv, at: 1)
+        tv.insertNewline(nil); tv.insertNewline(nil)
+        #expect(storage.string == "H\n\n\nx")
+        #expect(expectKept(tv, storage, "heading, empty lines, list") == "# H\n\n\\\n&nbsp;\n\n- x")
+    }
+
+    /// Case 2: an empty line between two list items is an empty item, kept.
+    @Test func anEmptyListItemIsKept() throws {
+        for (list, written) in [("- a\n- b", "- a\n- &nbsp;\n- b"), ("1. a\n2. b", "1. a\n2. &nbsp;\n3. b")] {
+            let (tv, storage) = try editor(list)
+            caret(tv, at: 1)
+            tv.insertNewline(nil)
+            #expect(storage.string == "a\n\nb")
+            #expect(expectKept(tv, storage, list) == written)
+            #expect(ListMarkers.markers(in: storage, range: NSRange(location: 0, length: storage.length)).count == 3)
+        }
+    }
+
+    /// Case 3: a list toggled on an empty last line stays when the caret moves away before anything is typed,
+    /// and after a reselect; typing there later is an item.
+    @Test func aListToggledOnTheEmptyLastLineIsKept() throws {
+        let (tv, storage) = try editor("A")
+        tv.insertNewline(nil); tv.insertNewline(nil)
+        EditorFormatting.toggleUnorderedList(tv, fontSize: 14)
+        caret(tv, at: 0)
+        #expect(ListMarkers.trailingMarker(in: storage, typingAttributes: tv.typingAttributes, caret: tv.selectedRange())?.text == "•")
+        #expect(MarkdownBridge.serialize(storage) == "A\\\n&nbsp;\n\n- &nbsp;")
+        caret(tv, at: storage.length)
+        #expect(EditorFormatting.currentState(for: tv).blockKind == .listItem(ordered: false, depth: 0, ordinal: 1))
+        caret(tv, at: 0)
+        #expect(expectKept(tv, storage, "toggled, caret moved") == "A\\\n&nbsp;\n\n- &nbsp;")
+        #expect(ListMarkers.trailingMarker(in: storage, typingAttributes: tv.typingAttributes, caret: tv.selectedRange())?.text == "•")
+        type(tv, "x")   // the caret is at the end after a reselect
+        #expect(MarkdownBridge.serialize(storage) == "A\\\n&nbsp;\n\n- x")
+        // Toggled off again, it is a plain empty line, which at the end of the note is not written.
+        let (tv2, storage2) = try editor("A")
+        tv2.insertNewline(nil); tv2.insertNewline(nil)
+        EditorFormatting.toggleUnorderedList(tv2, fontSize: 14)
+        EditorFormatting.toggleUnorderedList(tv2, fontSize: 14)
+        #expect(MarkdownBridge.serialize(storage2) == "A")
+    }
+
+    /// Case 3, after Return in a list: the empty item at the end is kept, and Return on it still leaves the list.
+    @Test func anEmptyLastItemAfterReturnIsKept() throws {
+        let (tv, storage) = try editor("- a")
+        tv.insertNewline(nil)
+        #expect(expectKept(tv, storage, "Return after an item") == "- a\n- &nbsp;")
+        tv.insertNewline(nil)
+        #expect(ListMarkers.trailingMarker(in: storage, typingAttributes: tv.typingAttributes, caret: tv.selectedRange()) == nil)
+        #expect(MarkdownBridge.serialize(storage) == "- a")
+    }
+
+    /// Case 4: a file with several blank lines between a heading and its text, or between any two blocks, shows
+    /// each one past the first as an empty line, and saves as the editor writes typed ones.
+    @Test func severalBlankLinesInAFileAreShown() throws {
+        let cases: [(String, String, String)] = [
+            ("# H\n\n\n\nText", "H\n\n\nText", "# H\n\n\\\n\\\nText"),
+            ("A\n\n\n\nB", "A\n\n\n\nB", "A\n\n\\\n\\\nB"),
+            ("A\n\n\n# T", "A\n\nT", "A\\\n&nbsp;\n\n# T"),
+            ("# H\n\n\n- x", "H\n\nx", "# H\n\n&nbsp;\n\n- x"),
+            ("```\nc\n```\n\n\nText", "c\n\nText", "```\nc\n```\n\n\\\nText"),
+        ]
+        for (file, shown, saved) in cases {
+            let (tv, storage) = try editor(file)
+            #expect(storage.string == shown, "\(file.debugDescription): shown \(storage.string.debugDescription)")
+            #expect(expectKept(tv, storage, file.debugDescription) == saved)
+        }
+        // Blank lines a list or two quotes hold, and those in a code block, are theirs, as before.
+        for (file, shown) in [("- a\n\n\n- b", "a\nb"), ("```\nc\n\n\nd\n```", "c\n\n\nd\n")] {
+            let (_, storage) = try editor(file)
+            #expect(storage.string == shown, "\(file.debugDescription): shown \(storage.string.debugDescription)")
+        }
+    }
+
+    /// The marker is text where it is not alone on a line, and typed `&nbsp;` is text.
+    @Test func theMarkerOnlyMeansAnEmptyLine() throws {
+        for (file, shown) in [("```\n&nbsp;\n```", "&nbsp;\n"), ("a &nbsp; b", "a \u{00A0} b"), ("`&nbsp;`", "&nbsp;")] {
+            let (_, storage) = try editor(file)
+            #expect(storage.string == shown, "\(file.debugDescription): shown \(storage.string.debugDescription)")
+        }
+        let (tv, storage) = try editor("A")
+        tv.insertNewline(nil); tv.insertNewline(nil)
+        type(tv, "&nbsp; and &amp;")
+        #expect(expectKept(tv, storage, "typed entities") == "A\n\n\\&nbsp; and \\&amp;")
+    }
+
+    /// From the Tier-2 review: where nothing follows (the end of the note, a chip below), no `&nbsp;` is written, and
+    /// none read from such a place stays as a character.
+    @Test func noStrayMarkerWhereNothingFollows() throws {
+        let chip = "<!-- block: freeform -->\nBody."
+        func expectNoStrayCharacter(_ storage: NSTextStorage, _ label: String) {
+            #expect(!storage.string.contains("\u{00A0}"), "\(label): \(storage.string.debugDescription)")
+        }
+        // Return after text above a chip, and after a list item above a chip.
+        for file in ["A\n" + chip, "- a\n" + chip] {
+            let (tv, storage) = try editor(file)
+            caret(tv, at: 1)
+            tv.insertNewline(nil)
+            let saved = reselect(tv, storage)
+            expectNoStrayCharacter(storage, file)
+            #expect(MarkdownBridge.serialize(storage) == saved, "\(file.debugDescription): saved \(saved.debugDescription)")
+        }
+        // Return after text, then the block below deleted: the empty line is at the end.
+        let (tv, storage) = try editor("A\n\n# T")
+        caret(tv, at: 1)
+        tv.insertNewline(nil)
+        storage.deleteCharacters(in: NSRange(location: storage.length - 1, length: 1))
+        #expect(!reselect(tv, storage).contains("&nbsp;"))
+        expectNoStrayCharacter(storage, "block deleted")
+        // Read from such places, the marker is not kept as a character.
+        for file in ["A\\\n&nbsp;", "A\\\n&nbsp;\n" + chip, "- a\n- &nbsp;\n" + chip] {
+            let (_, storage) = try editor(file)
+            expectNoStrayCharacter(storage, file)
+        }
+    }
+
+    /// From the Tier-2 review: the kept kind of the empty last line goes once text is typed there, so deleting that
+    /// text later does not bring back a list the operator turned off.
+    @Test func theKeptKindGoesOnceTheLineHasText() throws {
+        let (tv, storage) = try editor("A")
+        tv.insertNewline(nil); tv.insertNewline(nil)
+        EditorFormatting.toggleUnorderedList(tv, fontSize: 14)
+        type(tv, "x")
+        tv.setSelectedRange(NSRange(location: storage.length - 1, length: 1))
+        EditorFormatting.toggleUnorderedList(tv, fontSize: 14)
+        tv.deleteBackward(nil)
+        #expect(storage.string == "A\n\n")
+        #expect(MarkdownBridge.serialize(storage) == "A")
+        #expect(ListMarkers.trailingMarker(in: storage, typingAttributes: tv.typingAttributes, caret: NSRange(location: 0, length: 0)) == nil)
+    }
+
+    /// From the Tier-2 review: a line with no text run of its own (a link reference definition) is not a blank line.
+    /// CRLF lines are counted as lines.
+    @Test func linesWithoutARunAreNotBlankLines() throws {
+        for (file, shown) in [("See [x]\n\n[x]: http://a\n\n\nNext", "See x\n\nNext"),
+                              ("A\r\n\r\n\r\n\r\nB", "A\n\n\n\nB")] {
+            let (_, storage) = try editor(file)
+            #expect(storage.string == shown, "\(file.debugDescription): shown \(storage.string.debugDescription)")
+        }
     }
 
     /// Tab and Shift-Tab on an empty last list line indent and outdent what is typed there.

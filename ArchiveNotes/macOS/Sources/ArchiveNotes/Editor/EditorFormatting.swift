@@ -662,6 +662,7 @@ enum EditorFormatting {
         }
         if textView.selectedRange().length == 0 {
             textView.typingAttributes = typingAttributes(textView.typingAttributes, kind: newKind, fontSize: fontSize)
+            keepEmptyLastLineKind(textView, kind: newKind)
         }
     }
 
@@ -677,6 +678,7 @@ enum EditorFormatting {
             }
             if textView.selectedRange().length == 0 {
                 textView.typingAttributes = typingAttributes(textView.typingAttributes, kind: newKind, fontSize: fontSize)
+                keepEmptyLastLineKind(textView, kind: newKind)
             }
         } else {
             applyBlockKind(.plain, textView: textView, fontSize: fontSize)
@@ -806,7 +808,32 @@ enum EditorFormatting {
         // (W40.fix-notes-editor-lines).
         if textView.selectedRange().length == 0 {
             textView.typingAttributes = typingAttributes(textView.typingAttributes, kind: kind, fontSize: fontSize)
+            keepEmptyLastLineKind(textView, kind: kind)
         }
+    }
+
+    /// W49.notes-keep-blank-lines — a list on the empty last line, kept on the newline before it
+    /// (`.noteNextLineKind`), so that it is still there when the caret has moved away and is saved as `- &nbsp;`.
+    /// The typing attributes alone held it, and AppKit replaces those on every caret move. Any other kind clears it.
+    /// Called with the caret on that line; elsewhere it does nothing.
+    static func keepEmptyLastLineKind(_ textView: NSTextView, kind: BlockKind) {
+        guard let storage = textView.textStorage, storage.length > 0,
+              textView.selectedRange() == NSRange(location: storage.length, length: 0) else { return }
+        let last = NSRange(location: storage.length - 1, length: 1)
+        let c = (storage.string as NSString).character(at: last.location)
+        guard c == 0x0A || c == 0x0D else { return }
+        let wanted: BlockKind?
+        if case .listItem = kind { wanted = kind } else { wanted = nil }
+        guard storage.attribute(.noteNextLineKind, at: last.location, effectiveRange: nil) as? BlockKind != wanted else { return }
+        let typing = textView.typingAttributes
+        changeAttributes(textView, in: last) { storage in
+            if let wanted {
+                storage.addAttribute(.noteNextLineKind, value: wanted, range: last)
+            } else {
+                storage.removeAttribute(.noteNextLineKind, range: last)
+            }
+        }
+        textView.typingAttributes = typing
     }
 
     /// `attrs` as typing attributes for a paragraph of `kind`: the same visuals `applyBlockKind` gives text.

@@ -690,6 +690,12 @@ final class EditorTextView: NSTextView {
             clean.removeValue(forKey: .noteHardLineBreak)
             clean.removeValue(forKey: .noteRawHTML)
             clean.removeValue(forKey: .noteChipLineEnd)
+            // On the empty last line, seeded from the newline before it, the line's own kind is on that newline
+            // (W49.notes-keep-blank-lines). It is never typed onward.
+            if let kind = clean.removeValue(forKey: .noteNextLineKind) as? BlockKind, let storage = textStorage,
+               selectedRange() == NSRange(location: storage.length, length: 0) {
+                clean = EditorFormatting.typingAttributes(clean, kind: kind, fontSize: configuredFontSize)
+            }
             super.typingAttributes = clean
             invalidateListMarkers()   // an empty last line's marker follows the typing kind
         }
@@ -796,7 +802,26 @@ final class EditorTextView: NSTextView {
     }
 
     override func shouldChangeText(in affectedCharRange: NSRange, replacementString: String?) -> Bool {
-        isEditable && super.shouldChangeText(in: affectedCharRange, replacementString: replacementString)
+        guard isEditable, super.shouldChangeText(in: affectedCharRange, replacementString: replacementString) else { return false }
+        // W49.notes-keep-blank-lines — text inserted on the empty last line ends it being empty: the kind kept for it
+        // on the newline before goes, or it would come back as an empty item once that text is deleted.
+        if let storage = textStorage, replacementString?.isEmpty == false, affectedCharRange.location > 0,
+           affectedCharRange.location == storage.length,
+           storage.attribute(.noteNextLineKind, at: storage.length - 1, effectiveRange: nil) != nil {
+            staleNextLineKind = storage.length - 1
+        }
+        return true
+    }
+
+    /// Where `shouldChangeText` found a kept empty-line kind that the change in flight ends; cleared in `didChangeText`.
+    private var staleNextLineKind: Int?
+
+    override func didChangeText() {
+        if let location = staleNextLineKind, let storage = textStorage, location < storage.length {
+            staleNextLineKind = nil
+            storage.removeAttribute(.noteNextLineKind, range: NSRange(location: location, length: 1))
+        }
+        super.didChangeText()
     }
 
     // MARK: - List keyboard behavior (Tab / Return / Backspace)
@@ -877,6 +902,8 @@ final class EditorTextView: NSTextView {
             storage.addAttribute(.paragraphStyle, value: MarkdownStyler.listParagraphStyle(depth: depth),
                                  range: newParaRange)
         }
+        // A new empty item at the end is kept as one, as an empty item in the middle is (W49.notes-keep-blank-lines).
+        EditorFormatting.keepEmptyLastLineKind(self, kind: newKind)
     }
 
     override func deleteBackward(_ sender: Any?) {
