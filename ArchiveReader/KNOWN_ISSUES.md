@@ -115,7 +115,7 @@ What it does not do, deliberately or not yet:
   value goes to the folder's `.archivesuite/item-fields.json` and is shown checked, page 2's value in the tooltip. Page 2
   is never rewritten. Any file under the folder the Reader was given can be corrected, the boundary its tag writes keep.
   The entry is keyed by file name, so renaming a file in Finder leaves its corrections behind and a later file given
-  that name takes them (asked: W49.reader-item-fields-rename-owner-ok). Names are compared composed, so two files whose
+  that name takes them (queued: W49.reader-item-fields-rename, owner call 24). Names are compared composed, so two files whose
   names differ only in Unicode composition, possible on some network volumes, share them (accepted: a platform fact: APFS and
   HFS+ take such names as one name, and Finder shows the two alike). A
   `Checked <Field>` tag set before the correction stays and speaks for page 2's value again once the correction is
@@ -130,12 +130,12 @@ What it does not do, deliberately or not yet:
   query of stop words alone keeps a snippet of the text without a mark when only a correction matched (accepted: such a
   query is read by a scan of the text, W40.fix-reader-fts-snippets, measured at up to a second a row with `snippet()`).
   The Processor does not read corrections: a later run that rewrites page 2 leaves them beside the file, still shown
-  over the new page 2 (asked: W49.proc-item-fields-rerun-owner-ok).
+  over the new page 2 (queued: W49.proc-item-fields-rerun, owner call 24).
 - **Container fields have their own Inspector section** (W47.ct-reader-view), with the same badge and no check
   button: a container value is confirmed or corrected from its Edit menu (W47.ct-reader-edit). (accepted: by design, W47.ct-reader-edit; a container value is confirmed by being the user's own).
 - **Sender and recipient have no row**: the Processor writes them only to the JSON sidecar (the names feature's
   `entities` object, else the tagging call's names), never to page 2, and the Inspector does not read the sidecar,
-  though the Zotero export does (`ZoteroSidecar`). (asked: W49.reader-sender-row-check-owner-ok).
+  though the Zotero export does (`ZoteroSidecar`). (queued: W49.reader-sender-row-check, owner call 24).
 - **A group selection counts the checked dates** and checks them all at once; item fields are listed one file at a
   time. (accepted: item fields are per document, so a group has no one value to show).
 - **A check is not tied to the value it checked.** It names the field. Another writer that changes the value

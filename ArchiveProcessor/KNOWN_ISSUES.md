@@ -30,11 +30,6 @@ lower-scoring row runs since W47.wh-readers-lost-clients (the on-device model th
 
 `OCR/NewspaperPageReader.swift` (`NewspaperDetector`), VisionOCRKit `ScanNewspaperLayout`; the switch is in Settings →
 Rules → Columns and reading order, off by default.
-- **The download is not published yet.** The app pins `doclayout-yolo-1280.tgz` (64,147,778 B, sha256 `99c62ee6…`) at
-  the `models-1` release of `charlesapetersen/vision-ocr`, where nothing has been attached, so "Download the
-  scanned-newspaper layout helper" fails until the owner uploads the archive kept in the autonomous state's
-  `model-files/scan-layout-build/`. Until then a scan with the switch on keeps PP-DocLayoutV3, as the switch says
-  (queued: W47.wh-yolo-scans-publish).
 - **Measured on scans from one collection, and on raw regions.** The 4.6-point lead is 15 L9 scans, 14 from one Library
   of Congress collection, read on the regions as newspaper-ocr cut them, not through the app's partition
   (W46.layout-partition-fix); photographed newspapers are unmeasured and always use PP-DocLayoutV3 (accepted: owner,
@@ -51,16 +46,12 @@ Rules → Columns and reading order, off by default.
 
 VisionOCRKit `MixedPagePreflag` (ATRIUM v4.3 as Core ML), `Views/OCRView+PageKind.swift` (`PageKindStore`); the
 download row is under "Read handwriting on typed pages" in Settings › Reading.
-- **The download is not published yet.** The app pins `atrium-page-kind.tgz` (299,939,558 B, sha256 `e69ec9ca…`) at
-  the `models-1` release of `charlesapetersen/vision-ocr`, where nothing has been attached, so "Download the mixed-page
-  pre-flag" fails until the owner uploads the archive kept in the autonomous state's `model-files/atrium-build/`.
-  Until then the switch acts on every typed or printed page, as before (queued: W47.wh-mixed-preflag-publish).
 - **About half the pages with handwriting are not flagged, and so not read for it.** With the pre-flag downloaded an
   unflagged typed or printed page keeps its kind's reader: on the 2,000 bulk pages it found 51-60% of the pages with
   handwriting at 69.8% precision (finite bounds 18-95% precision, 7-97% recall; `kind-atrium.md` §5). The switch's note
   says so (accepted: owner, 2026-11-19, call 15, "release with a label").
-- **The default is still off.** Whether the switch should be on by default now that the pre-flag exists is call 3,
-  re-asked with the like-for-like timing (asked: W47.wh-mixed-preflag-default-owner-ok).
+- **The default is still off until the follow-up ships.** The owner answered call 3 again on 2026-11-20 (call 24): on by
+  default, with or without the pre-flag (queued: W47.wh-mixed-preflag-default).
 
 ## ⚠️ LIMITATION (W40.fix-processor-review-classification-stale, 2026-11-20): where page 2's Classification is not rewritten
 
