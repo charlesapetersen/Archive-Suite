@@ -61,8 +61,9 @@ What it does not do, deliberately or not yet:
   nothing: every folder's file is checked before any is written, and a write failing partway puts the folders
   already written back and says so; one changed again in that moment is named as not put back (accepted: putting
   it back would overwrite the other app's change, which the Reader's Core Directive on file safety forbids). A date set this way offers to date the
-  folder's documents only when the selection is one run of neighbours in one folder; a selection that makes several
-  runs offers nothing (queued: W49.reader-set-selection-date-offer). A selection scattered through one folder makes
+  documents of every folder run it is in, in every folder, as one offer that names the folders (at most 10, then a
+  count), dates them in one ledger group (one Undo) and rechecks each run's date at the answer; an Undo or Redo of the
+  edit offers for every run whose date it changed (W49.reader-set-selection-date-offer). A selection scattered through one folder makes
   two runs per stretch of neighbours, and a container file is at most 1 MB (SPEC §The container file), so several thousand
   stretches in one folder are refused at the write with "would pass its 1 MB limit", the folders already written put
   back (queued: W49.ct-file-size-cap).

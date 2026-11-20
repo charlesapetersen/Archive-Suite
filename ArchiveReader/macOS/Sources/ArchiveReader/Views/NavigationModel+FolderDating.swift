@@ -27,19 +27,28 @@ import ArchiveCore
 // (`folderDateRecordsFollow`), so a date typed again in Finder is the user's. An Undo or Redo of the Container section's
 // own date edit offers as the edit did (`offerFolderDatingAfterUndo`).
 
-/// The offer made after a folder date is confirmed: which documents it would date.
+/// The offer made after a folder date is confirmed: which documents it would date. One offer may cover several folder
+/// runs, in one folder or several (W49.reader-set-selection-date-offer: a date set for a selection makes a run for each
+/// stretch of neighbours); it is answered once, as one ledger group.
 struct FolderDatingOffer: Identifiable, Equatable {
+    /// One folder run the offer dates.
+    struct Part: Equatable {
+        /// The run's folder date; nil takes away the dates the folder gave (W49.reader-folder-date-undo).
+        let date: ContainerFolderDate?
+        /// The folder below the tree's root, and a file of the run (the one the date was saved at).
+        let directory: [String]
+        let editedName: String
+        /// The files whose tags change, in the folder's order.
+        let paths: [String]
+        /// Every file that takes the date (those already reading so too): each gets the evidence record.
+        let recorded: [String]
+    }
+
     let id = UUID()
-    /// The folder date the files take; nil takes away the dates the folder gave (W49.reader-folder-date-undo).
-    let date: ContainerFolderDate?
+    /// In the folders' order. A part dates its run's documents, or takes away the dates its folder gave; one offer may
+    /// do both (an Undo across runs that dated and did not date before).
+    let parts: [Part]
     let treePath: String
-    /// The folder below the tree's root, and the file the date was saved at.
-    let directory: [String]
-    let editedName: String
-    /// The files whose tags change, in the folder's order.
-    let paths: [String]
-    /// Every file that takes the date (those already reading so too): each gets the evidence record.
-    let recorded: [String]
     /// What each file's date rested on when the offer was made.
     let evidence: [String: FolderDatingEvidence]
     /// The date each recorded file had before the folder's (`ContainerFolderDate.replacedDate`); absent for none.
@@ -47,32 +56,89 @@ struct FolderDatingOffer: Identifiable, Equatable {
     /// The window the edit was made in, whose Inspector asks; nil asks in any.
     let window: ObjectIdentifier?
 
-    private var count: String { "\(paths.count) document\(paths.count == 1 ? "" : "s")" }
+    /// The first part's folder date; nil takes the dates away. Each part writes its own.
+    var date: ContainerFolderDate? { parts.first?.date }
+    var paths: [String] { parts.flatMap(\.paths) }
+    var recorded: [String] { parts.flatMap(\.recorded) }
+
+    /// The folders the parts are in, each once, in order.
+    var directories: [[String]] {
+        var seen: Set<[String]> = []
+        return parts.map(\.directory).filter { seen.insert($0).inserted }
+    }
+
+    private var dating: [Part] { parts.filter { $0.date != nil } }
+    private var undating: [Part] { parts.filter { $0.date == nil } }
+
+    private static func documents(_ n: Int) -> String { "\(n) document\(n == 1 ? "" : "s")" }
+    private var count: String { Self.documents(paths.count) }
 
     var title: String {
-        let folder = "“\(directory.last ?? "the folder")”"
-        return date == nil ? "Take the folder's date from \(count) in \(folder)?"
-            : "Date \(count) in \(folder) from the folder?"
+        let folders = directories
+        let place = folders.count == 1 ? "“\(folders.first?.last ?? "the folder")”" : "\(folders.count) folders"
+        let from = folders.count == 1 ? "the folder" : "their folders"
+        if dating.isEmpty {
+            return "Take the folder\(folders.count == 1 ? "'s" : "s'") date from \(count) in \(place)?"
+        }
+        return undating.isEmpty ? "Date \(count) in \(place) from \(from)?" : "Update \(count) in \(place) from \(from)?"
+    }
+
+    /// The folders, for an offer in several: each by its path below the tree's root, at most 10 named.
+    private var folderList: String {
+        let folders = directories
+        guard folders.count > 1 else { return "" }
+        let named = folders.prefix(10).map { "“\($0.isEmpty ? "the top folder" : $0.joined(separator: "/"))”" }
+        let more = folders.count > named.count ? ", and \(folders.count - named.count) more" : ""
+        return "The folders: " + named.joined(separator: ", ") + more + ". "
     }
 
     var message: String {
         let undo = "Edit ▸ Undo Tag Change (⌘Z) takes it back."
-        guard let date else {
-            let them = paths.count == 1 ? "1 document in it was" : "\(paths.count) documents in it were"
-            return "The folder no longer gives a date. \(them) dated from the folder's date; each goes back to the "
+        let several = directories.count > 1
+        let place = several ? "them" : "it"
+        func them(_ n: Int, _ one: String, _ many: String) -> String {
+            n == 1 ? "1 document in \(place) \(one)" : "\(n) documents in \(place) \(many)"
+        }
+        let undated = undating.flatMap(\.paths).count
+        guard !dating.isEmpty else {
+            return (several ? "The folders no longer give a date. " : "The folder no longer gives a date. ") + folderList
+                + "\(them(undated, "was", "were")) dated from the folder's date; each goes back to the "
                 + "stamp's or estimate's date it had, or to no date. Dates you changed or checked since, and dates "
                 + "from a document's own text or page image, are left as they are. " + undo
         }
-        let shown = date.inheritedDate.map { $0.date.display + ($0.uncertain ? ", marked uncertain" : "") } ?? ""
-        let them = paths.count == 1 ? "1 document in it has" : "\(paths.count) documents in it have"
-        return "The folder is dated “\(date.text)”. \(them) no date of its own, or one only estimated, taken from a "
-            + "stamp or given by the folder's earlier date; each would be dated \(shown). Dates read from a "
-            + "document's text or page image, checked dates and the folder photo are left as they are. " + undo
+        // Each run's date, once each: a selection sets one; an Undo across runs may put back several.
+        var seen: Set<String> = []
+        let dates = dating.compactMap(\.date).filter { seen.insert($0.text).inserted }
+        let named = dates.prefix(10).map { "“\($0.text)”" }.joined(separator: ", ")
+            + (dates.count > 10 ? ", and \(dates.count - 10) more" : "")
+        let each = dates.count == 1
+            ? "each would be dated " + (dates[0].inheritedDate.map { $0.date.display + ($0.uncertain ? ", marked uncertain" : "") } ?? "")
+            : "each would take its own folder's date"
+        let lead = several || dates.count > 1 ? "The folders are dated \(named). " : "The folder is dated \(named). "
+        let dated = "\(them(dating.flatMap(\.paths).count, "has", "have")) no date of its own, or one only estimated, "
+            + "taken from a stamp or given by the folder's earlier date; \(each). "
+        guard undated > 0 else {
+            return lead + folderList + dated + "Dates read from a document's text or page image, checked dates and the "
+                + "folder photo are left as they are. " + undo
+        }
+        return lead + folderList + dated + "\(Self.documents(undated)) dated from a folder that no longer gives a date "
+            + "\(undated == 1 ? "goes" : "go") back to the stamp's or estimate's date \(undated == 1 ? "it" : "each") had, "
+            + "or to no date. Dates you changed or checked since, dates read from a document's text or page image, and "
+            + "the folder photo are left as they are. " + undo
     }
 
     var confirmTitle: String {
         let n = "\(paths.count) Document\(paths.count == 1 ? "" : "s")"
-        return date == nil ? "Update \(n)" : "Date \(n)"
+        return undating.isEmpty ? "Date \(n)" : "Update \(n)"
+    }
+
+    /// The status line after the answer: `changed` documents written.
+    func done(_ changed: Int) -> String {
+        let n = Self.documents(changed)
+        let several = directories.count > 1
+        guard !dating.isEmpty else { return "Took the folder\(several ? "s'" : "'s") date from \(n)" }
+        guard undating.isEmpty, let date else { return "Updated \(n) from their folders" }
+        return "Dated \(n) \(date.inheritedDate?.date.display ?? date.text) from the folder\(several ? "s" : "")"
     }
 }
 
@@ -97,12 +163,19 @@ final class FolderDateBefore: @unchecked Sendable {
     var dated = false
 }
 
-/// The one folder run a date set for a selection made (W49.reader-set-selection-limits): its first file, and whether a
-/// confirmed folder date dated documents there before (`FolderDateBefore`). Set off the main thread by the edit's work
-/// and read after it finished; `start` stays nil when the selection made several runs.
+/// The folder runs a date set for a selection is in (W49.reader-set-selection-date-offer): for each folder, the first
+/// selected file of each run, and whether a confirmed folder date dated documents there before (`FolderDateBefore`).
+/// Set off the main thread by the edit's work and read after it finished.
 final class FolderDateSelection: @unchecked Sendable {
-    var start: String?
-    var datedBefore = false
+    struct Run: Equatable, Sendable {
+        let name: String
+        let datedBefore: Bool
+    }
+
+    /// By the folder's directory path; a retried edit replaces what its first try noted.
+    var runs: [String: [Run]] = [:]
+    /// The folder below the tree's root, by the same path, for the edit that knows it.
+    var components: [String: [String]] = [:]
 }
 
 /// A folder run whose confirmed date can date documents: the date, the folder on disk and the run's files.
@@ -117,79 +190,129 @@ extension NavigationModel {
     /// After the folder date at `path` was saved: works out which documents it dates and, if any, offers it. A date
     /// that dates nothing offers to take away the dates the folder gave, where it dated before the edit (`datedBefore`).
     func offerFolderDating(at path: String, window: ObjectIdentifier?, datedBefore: Bool = true) {
-        guard let tree = containerTree, let (dir, name) = ContainerCatalog.split(path, under: tree.path) else { return }
+        offerFolderDating(runs: [(path, datedBefore)], window: window)
+    }
+
+    /// `offerFolderDating(at:)` for several runs at once (W49.reader-set-selection-date-offer): each named by a file of
+    /// it, with whether it dated before. One offer covers every run that would change a document; a run named twice
+    /// counts once.
+    func offerFolderDating(runs edited: [(path: String, datedBefore: Bool)], window: ObjectIdentifier?) {
+        guard let tree = containerTree else { return }
+        var byFolder: [[String]: [(name: String, datedBefore: Bool)]] = [:]
+        var order: [[String]] = []
+        for e in edited {
+            guard let (dir, name) = ContainerCatalog.split(e.path, under: tree.path) else { continue }
+            if byFolder[dir] == nil { order.append(dir) }
+            byFolder[dir, default: []].append((name, e.datedBefore))
+        }
+        guard !order.isEmpty else { return }
+        let (asked, folders) = (byFolder, order)
         Task { [weak self] in
-            let run = await Task.detached(priority: .userInitiated) {
-                Self.folderDateRun(tree: tree.url, components: dir, editedName: name)
+            // Each folder's container file is read once, however many of its runs are named.
+            let found = await Task.detached(priority: .userInitiated) {
+                folders.map { dir -> [(dir: [String], name: String, run: FolderDatingRun)] in
+                    let named = asked[dir] ?? []
+                    guard let runs = Self.folderDateRuns(tree: tree.url, components: dir,
+                                                         editedNames: named.map(\.name)) else { return [] }
+                    var seen: Set<String> = []
+                    return zip(named, runs).compactMap { n, run in
+                        guard run.date != nil || n.datedBefore, seen.insert(run.names.first ?? n.name).inserted
+                        else { return nil }
+                        return (dir, n.name, run)
+                    }
+                }.flatMap { $0 }
             }.value
-            guard let self, let run, run.date != nil || datedBefore, tree.path == self.containerTree?.path else { return }
-            let base = ([tree.path.hasSuffix("/") ? String(tree.path.dropLast()) : tree.path] + dir)
-                .joined(separator: "/")
-            let files = self.libraryFiles(atPaths: run.names.map { base + "/" + $0 })
-                .filter { $0.url.pathExtension.lowercased() == "pdf" && $0.itemType == nil }
-            let reads = files.map { (path: $0.path, url: $0.url, dataless: $0.isDataless) }
+            guard let self, !found.isEmpty, tree.path == self.containerTree?.path else { return }
+            let root = tree.path.hasSuffix("/") ? String(tree.path.dropLast()) : tree.path
+            let reads = found.map { f -> (files: [String], directory: URL, reads: [(path: String, url: URL, dataless: Bool)]) in
+                let base = ([root] + f.dir).joined(separator: "/")
+                let files = self.libraryFiles(atPaths: f.run.names.map { base + "/" + $0 })
+                    .filter { $0.url.pathExtension.lowercased() == "pdf" && $0.itemType == nil }
+                return (files.map(\.path), f.run.directory, files.map { ($0.path, $0.url, $0.isDataless) })
+            }
             let evidence = await Task.detached(priority: .userInitiated) {
-                Self.folderDatingEvidence(reads, directory: run.directory)
+                reads.reduce(into: [String: FolderDatingEvidence]()) { all, r in
+                    all.merge(Self.folderDatingEvidence(r.reads, directory: r.directory)) { a, _ in a }
+                }
             }.value
             guard tree.path == self.containerTree?.path else { return }
-            // The rows as they read now: an edit while the pages were read is taken into account.
-            let rows = self.libraryFiles(atPaths: files.map(\.path))
-            let plan = run.date.map { Self.folderDatingPlan($0, files: rows, evidence: evidence) }
-                ?? (writes: Self.folderUndatingPlan(files: rows, evidence: evidence), records: [], replaced: [:])
-            guard !plan.writes.isEmpty else { return }
+            var parts: [FolderDatingOffer.Part] = []
+            var replaced: [String: FolderDateRecord.Replaced] = [:]
+            for (f, r) in zip(found, reads) {
+                // The rows as they read now: an edit while the pages were read is taken into account.
+                let rows = self.libraryFiles(atPaths: r.files)
+                let plan = f.run.date.map { Self.folderDatingPlan($0, files: rows, evidence: evidence) }
+                    ?? (writes: Self.folderUndatingPlan(files: rows, evidence: evidence), records: [], replaced: [:])
+                guard !plan.writes.isEmpty else { continue }
+                parts.append(.init(date: f.run.date, directory: f.dir, editedName: f.name, paths: plan.writes,
+                                   recorded: plan.records))
+                replaced.merge(plan.replaced) { a, _ in a }
+            }
+            guard !parts.isEmpty else { return }
             // The container edit's catalog read may still be running; the answer is written only after it.
             for _ in 0..<50 where self.containerEditSaving { try? await Task.sleep(for: .milliseconds(100)) }
             guard tree.path == self.containerTree?.path, !self.containerEditSaving else { return }
-            self.folderDatingOffer = FolderDatingOffer(date: run.date, treePath: tree.path, directory: dir,
-                                                       editedName: name, paths: plan.writes, recorded: plan.records,
-                                                       evidence: evidence, replaced: plan.replaced, window: window)
+            self.folderDatingOffer = FolderDatingOffer(parts: parts, treePath: tree.path, evidence: evidence,
+                                                       replaced: replaced, window: window)
         }
     }
 
-    /// "Date N Documents": the evidence records first, then the tags, one ledger group (one Undo). The folder's date is
-    /// read again first: one undone, removed or changed since the offer dates nothing. A file whose date changed since
-    /// the offer, so that it no longer takes the folder's, is left alone, and its record taken back.
+    /// Whether every part's run still holds the date it was offered with and every file it names: one that left it no
+    /// longer takes this date. Each folder's container file is read once. Read only.
+    nonisolated private static func partsStand(_ parts: [FolderDatingOffer.Part], tree: URL,
+                                               names: (FolderDatingOffer.Part) -> [String]) -> Bool {
+        var byFolder: [[String]: [FolderDatingOffer.Part]] = [:]
+        for part in parts { byFolder[part.directory, default: []].append(part) }
+        return byFolder.allSatisfy { dir, parts in
+            guard let runs = folderDateRuns(tree: tree, components: dir, editedNames: parts.map(\.editedName))
+            else { return false }
+            return zip(parts, runs).allSatisfy { part, run in
+                run.date == part.date && Set(names(part)).isSubset(of: run.names)
+            }
+        }
+    }
+
+    /// "Date N Documents": the evidence records first, then the tags, one ledger group (one Undo). Each run's folder
+    /// date is read again first: one undone, removed or changed since the offer changes nothing, in any of its folders.
+    /// The records of several folders are written all or nothing (`commitAll`). A file whose date changed since the
+    /// offer, so that it no longer takes the folder's, is left alone, and its record taken back. A part for a folder
+    /// that no longer gives a date writes no record: its records are retired after the tags (`writeFolderDates`), and
+    /// Undo Tag Change revives them as it puts the folder's date back (`folderDateRecordsFollow`).
     func applyFolderDating(_ offer: FolderDatingOffer) {
         folderDatingOffer = nil
         itemFieldEditPath = nil   // a refusal is shown in the Checks whatever is selected
         guard let tree = containerTree, tree.path == offer.treePath else { return }
-        guard let record = offer.date?.record else {
-            if offer.date == nil { applyFolderUndating(offer, tree: tree.url) }
-            return
+        // Each folder's records, every part of it together.
+        var records: [[String]: [(name: String, record: FolderDateRecord)]] = [:]
+        for part in offer.parts {
+            guard let date = part.date else { continue }
+            guard let plain = date.record else { return }
+            for path in part.recorded {
+                records[part.directory, default: []].append(((path as NSString).lastPathComponent,
+                                                             date.record(replacing: offer.replaced[path]) ?? plain))
+            }
         }
-        let names = offer.recorded.map { ($0 as NSString).lastPathComponent }
-        let records = offer.recorded.map { offer.date?.record(replacing: offer.replaced[$0]) ?? record }
-        let editedName = offer.editedName
+        let folders = records.sorted { $0.key.joined(separator: "/") < $1.key.joined(separator: "/") }
         runContainerEdit(done: "", action: "Folder Date", undo: nil, document: .itemFields, {
-            // The same date, and the run still holds every file: one that left it no longer takes this date.
-            guard let run = Self.folderDateRun(tree: tree.url, components: offer.directory, editedName: editedName),
-                  run.date == offer.date, Set(names).isSubset(of: run.names) else {
-                throw FolderDateChanged()
+            guard Self.partsStand(offer.parts, tree: tree.url, names: { part in
+                (part.date == nil ? part.paths : part.recorded).map { ($0 as NSString).lastPathComponent }
+            }) else { throw FolderDateChanged() }
+            let prepared = try folders.compactMap { dir, named in
+                try Self.prepareItemFieldEdit(at: try Self.containerDirectoryURL(tree.url, dir)) { fields in
+                    var fields = fields
+                    for (name, record) in named { fields.setDateRecord(record, for: name) }
+                    return fields
+                }
             }
-            let directory = try Self.containerDirectoryURL(tree.url, offer.directory)
-            _ = try Self.editItemFields(at: directory) { fields in
-                var fields = fields
-                for (name, record) in zip(names, records) { fields.setDateRecord(record, for: name) }
-                return fields
-            }
-            return nil
-        }, onSaved: { [weak self] in self?.writeFolderDates(offer) })
-    }
-
-    /// "Update N Documents" for a folder that no longer gives a date: its date is read again first (one set since dates
-    /// nothing here), then the tags, one ledger group. The records of the files undated are then retired, and Undo Tag
-    /// Change revives them as it puts the folder's date back (`folderDateRecordsFollow`).
-    private func applyFolderUndating(_ offer: FolderDatingOffer, tree: URL) {
-        let names = offer.paths.map { ($0 as NSString).lastPathComponent }
-        runContainerEdit(done: "", action: "Folder Date", undo: nil, document: .itemFields, {
-            guard let run = Self.folderDateRun(tree: tree, components: offer.directory, editedName: offer.editedName),
-                  run.date == nil, Set(names).isSubset(of: run.names) else { throw FolderDateChanged() }
+            _ = try Self.commitAll(prepared)
             return nil
         }, onSaved: { [weak self] in self?.writeFolderDates(offer) })
     }
 
     /// The tag half of `applyFolderDating`, on the main thread as every other tag edit.
     private func writeFolderDates(_ offer: FolderDatingOffer) {
+        var partOf: [String: FolderDatingOffer.Part] = [:]
+        for part in offer.parts { for path in part.paths { partOf[path] = part } }
         let reverified = reverifyCacheRows(libraryFiles(atPaths: offer.paths))
         var verified: [TagWriteResult] = []
         var changed = 0
@@ -200,9 +323,9 @@ extension NavigationModel {
             for f in reverified.files {
                 let e = offer.evidence[f.path]
                 let evidence = FolderDateRecord.evidence(e?.record, page: e?.page, tags: f.tags)
-                guard f.itemType == nil else { continue }
+                guard f.itemType == nil, let part = partOf[f.path] else { continue }
                 let delta: TagDelta?
-                if let date = offer.date {
+                if let date = part.date {
                     // A file whose date changed since the offer, so that its record would keep another date as the
                     // one replaced, is left alone too (W49.reader-folder-date-undo-fu).
                     let same = ContainerFolderDate.replacedDate(f.tags, evidence: evidence, record: e?.record)
@@ -226,56 +349,99 @@ extension NavigationModel {
         // A record only for a file that now carries the folder's date: one skipped or refused here may later carry the
         // same date by other means (its own text, a Finder edit), and the record would then speak for it.
         // Taking the dates away retires, by this group, the records it undated (W49.reader-folder-date-undo-fu).
-        let skipped = offer.paths.filter { !dated.contains($0) }
-        let taken: [(name: String, record: FolderDateRecord)] = offer.date == nil ? [] : skipped.compactMap { path in
-            offer.date?.record(replacing: offer.replaced[path]).map { ((path as NSString).lastPathComponent, $0) }
-        }
-        let retired: [(name: String, record: FolderDateRecord)] = offer.date != nil ? [] : offer.paths.compactMap { path in
-            guard dated.contains(path), let record = offer.evidence[path]?.record else { return nil }
-            return ((path as NSString).lastPathComponent, record)
+        // Each folder's records in one edit.
+        var taken: [[String]: [(name: String, record: FolderDateRecord)]] = [:]
+        var retired: [[String]: [(name: String, record: FolderDateRecord)]] = [:]
+        for part in offer.parts {
+            for path in part.paths {
+                let name = (path as NSString).lastPathComponent
+                if let date = part.date {
+                    guard !dated.contains(path), let record = date.record(replacing: offer.replaced[path]) else { continue }
+                    taken[part.directory, default: []].append((name, record))
+                } else if dated.contains(path), let record = offer.evidence[path]?.record {
+                    retired[part.directory, default: []].append((name, record))
+                }
+            }
         }
         if !taken.isEmpty || !retired.isEmpty, let tree = containerTree, tree.path == offer.treePath {
-            let directory = offer.directory
+            let folders = Set(taken.keys).union(retired.keys)
+                .sorted { $0.joined(separator: "/") < $1.joined(separator: "/") }
+            let (takenByFolder, retiredByFolder) = (taken, retired)
             Self.folderDateRecordQueue.async {
-                guard let url = try? Self.containerDirectoryURL(tree.url, directory) else { return }
-                Self.editFolderDateRecords(at: url) { fields in
-                    for (name, record) in taken where fields.dateRecord(for: name) == record {
-                        fields.setDateRecord(nil, for: name)
-                    }
-                    for (name, record) in retired where fields.dateRecord(for: name) == record {
-                        var retiring = record
-                        retiring.retiredBy = group.uuidString
-                        fields.setDateRecord(retiring, for: name)
+                for directory in folders {
+                    guard let url = try? Self.containerDirectoryURL(tree.url, directory) else { continue }
+                    Self.editFolderDateRecords(at: url) { fields in
+                        for (name, record) in takenByFolder[directory] ?? [] where fields.dateRecord(for: name) == record {
+                            fields.setDateRecord(nil, for: name)
+                        }
+                        for (name, record) in retiredByFolder[directory] ?? []
+                        where fields.dateRecord(for: name) == record {
+                            var retiring = record
+                            retiring.retiredBy = group.uuidString
+                            fields.setDateRecord(retiring, for: name)
+                        }
                     }
                 }
             }
         }
-        let n = "\(changed) document\(changed == 1 ? "" : "s")"
-        let done = offer.date.map { "Dated \(n) \($0.inheritedDate?.date.display ?? $0.text) from the folder" }
-            ?? "Took the folder's date from \(n)"
+        let done = offer.done(changed)
         statusMessage = done + (failures > 0 ? "; \(failures) could not update." : ".")
         announce(statusMessage)
     }
 
     /// After Undo or Redo of a Container-section edit (W49.reader-folder-date-undo-fu): where it changed a folder run's
-    /// confirmed date, offers as the edit itself does, for the first file whose date changed. `step` is the reverse
-    /// just registered: each restore's `restore` is what the folder held before, `written` what it holds now.
+    /// confirmed date, offers as the edit itself does, for the first file of each run whose date changed, in every
+    /// folder the edit wrote (W49.reader-set-selection-date-offer: a selection's edit makes several). `step` is the
+    /// reverse just registered: each restore's `restore` is what the folder held before, `written` what it holds now.
     func offerFolderDatingAfterUndo(_ step: ContainerUndoStep, window: ObjectIdentifier) {
         guard let tree = containerTree else { return }
         let root = tree.url.resolvingSymlinksInPath().pathComponents
         let base = tree.path.hasSuffix("/") ? String(tree.path.dropLast()) : tree.path
+        var runs: [(path: String, datedBefore: Bool)] = []
         for r in step.restores {
             guard case let .containers(before) = r.restore, case let .containers(after) = r.written else { continue }
             let folder = r.folder.pathComponents
-            guard folder.starts(with: root), let names = try? Self.fileNames(in: r.folder),
-                  let name = names.sorted(by: ContainerOrder.precedes).first(where: {
-                      ContainerFolderDate.confirmed(at: $0, in: before.runs)
-                          != ContainerFolderDate.confirmed(at: $0, in: after.runs)
-                  }) else { continue }
-            let path = ([base] + folder.dropFirst(root.count) + [name]).joined(separator: "/")
-            let datedBefore = ContainerFolderDate.confirmed(at: name, in: before.runs)?.inherited != nil
-            offerFolderDating(at: path, window: window, datedBefore: datedBefore)
-            return
+            guard folder.starts(with: root), let names = try? Self.fileNames(in: r.folder) else { continue }
+            let prefix = [base] + folder.dropFirst(root.count)
+            for (name, datedBefore) in Self.datedRunsChanged(names, before: before.runs, after: after.runs) {
+                runs.append(((prefix + [name]).joined(separator: "/"), datedBefore))
+            }
+        }
+        if !runs.isEmpty { offerFolderDating(runs: runs, window: window) }
+    }
+
+    /// The first of `names` in each run of `after` where a file's confirmed folder date differs from `before`'s, and
+    /// whether a date that dates documents was confirmed there before. One pass over each (`lastLiveRuns`).
+    nonisolated static func datedRunsChanged(_ names: [String], before: [ContainerRun],
+                                             after: [ContainerRun]) -> [(name: String, datedBefore: Bool)] {
+        let sorted = names.sorted(by: ContainerOrder.precedes)
+        let was = lastLiveRuns(sorted, in: before), now = lastLiveRuns(sorted, in: after)
+        var out: [(name: String, datedBefore: Bool)] = []
+        var last: String?   // the run of the last file taken: its level and start, or "" for none live
+        for (i, name) in sorted.enumerated() {
+            let old = was[i].flatMap { ContainerFolderDate.confirmed(at: name, in: [$0]) }
+            guard old != now[i].flatMap({ ContainerFolderDate.confirmed(at: name, in: [$0]) }) else { continue }
+            let key = now[i].map { "\($0.level.rawValue)/\($0.start)" } ?? ""
+            guard key != last else { continue }
+            last = key
+            out.append((name, old?.inherited != nil))
+        }
+        return out
+    }
+
+    /// The deepest run live at each of `sortedNames` (in `ContainerOrder`), as `ContainerResolver.liveRuns(at:in:).last`
+    /// reads it, in one pass: `runs` is in `ContainerFile.normalised` order.
+    nonisolated static func lastLiveRuns(_ sortedNames: [String], in runs: [ContainerRun]) -> [ContainerRun?] {
+        var live: [ContainerRun] = []
+        var j = 0
+        return sortedNames.map { name in
+            while j < runs.count, ContainerOrder.atOrBefore(runs[j].start, name) {
+                let run = runs[j]
+                live.removeAll { $0.level >= run.level }
+                live.append(run)
+                j += 1
+            }
+            return live.last
         }
     }
 
@@ -394,6 +560,13 @@ extension NavigationModel {
     /// where that dates documents, else nil, and every file on disk the same run is live at (with no run live there,
     /// every file no run is live at), in the folder's order. Nil when the container file cannot be read. Read only.
     nonisolated static func folderDateRun(tree: URL, components: [String], editedName: String) -> FolderDatingRun? {
+        folderDateRuns(tree: tree, components: components, editedNames: [editedName])?.first
+    }
+
+    /// `folderDateRun` for several files of one folder at once, in their order (W49.reader-set-selection-date-offer):
+    /// the container file and the folder are read once, and each file's run found in one pass, so a selection that made
+    /// thousands of runs costs about as much as one. Read only.
+    nonisolated static func folderDateRuns(tree: URL, components: [String], editedNames: [String]) -> [FolderDatingRun]? {
         guard let directory = try? containerDirectoryURL(tree, components) else { return nil }
         let runs: [ContainerRun]
         switch ContainerFileStore.load(directory: directory) {
@@ -402,13 +575,22 @@ extension NavigationModel {
         default: return nil
         }
         guard let all = try? fileNames(in: directory) else { return nil }
-        let date = ContainerFolderDate.confirmed(at: editedName, in: runs).flatMap { $0.inherited == nil ? nil : $0 }
-        let run = ContainerResolver.liveRuns(at: editedName, in: runs).last
-        let names = all.filter { name in
-            let live = ContainerResolver.liveRuns(at: name, in: runs).last
-            return live?.level == run?.level && live?.start == run?.start
-        }.sorted(by: ContainerOrder.precedes)
-        return FolderDatingRun(date: date, directory: directory, names: names)
+        let names = Array(Set(all).union(editedNames)).sorted(by: ContainerOrder.precedes)
+        let live = lastLiveRuns(names, in: runs)
+        func key(_ run: ContainerRun?) -> String { run.map { "\($0.level.rawValue)/\($0.start)" } ?? "" }
+        var keyOf: [String: String] = [:], liveAt: [String: ContainerRun] = [:], byRun: [String: [String]] = [:]
+        let onDisk = Set(all)
+        for (name, run) in zip(names, live) {
+            keyOf[name] = key(run)
+            liveAt[name] = run
+            if onDisk.contains(name) { byRun[key(run), default: []].append(name) }   // in the folder's order
+        }
+        return editedNames.map { edited in
+            let run = liveAt[edited]
+            let date = run.flatMap { ContainerFolderDate.confirmed(at: edited, in: [$0]) }
+                .flatMap { $0.inherited == nil ? nil : $0 }
+            return FolderDatingRun(date: date, directory: directory, names: byRun[keyOf[edited] ?? ""] ?? [])
+        }
     }
 
     /// Each file's page-2 date evidence and classification, and the Reader's records beside them. A placeholder that

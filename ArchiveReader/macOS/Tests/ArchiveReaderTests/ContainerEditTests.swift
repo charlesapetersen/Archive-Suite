@@ -460,9 +460,9 @@ final class ContainerEditTests: XCTestCase {
         }
     }
 
-    /// The folder-dating offer is armed only for an edit that made one run: a run starting inside the selection
-    /// splits it, and an offer for the first part would leave the rest undated.
-    func testADateSetForOneRunNotesItsStartAndOneSplitByARunNotesNone() throws {
+    /// W49.reader-set-selection-date-offer: a date set for a selection notes every run it is in, each by its first
+    /// selected file: one per stretch of neighbours, and one more where a run of the folder starts inside a stretch.
+    func testADateSetForASelectionNotesEveryRunItIsIn() throws {
         let box = try makeBox()
         try ContainerFileStore.write(ContainerFile(runs: [
             ContainerRun(start: "a.pdf", level: .folder, fields: ContainerFieldSet([.date: user("1950")])),
@@ -471,13 +471,31 @@ final class ContainerEditTests: XCTestCase {
         let split = FolderDateSelection()
         _ = try NavigationModel.setForSelection(.date, user("1953"), in: [(box, ["b.pdf", "c.pdf", "d.pdf", "e.pdf"])],
                                                 noting: split)
-        XCTAssertNil(split.start, "the run at d.pdf split the selection in two")
-        let one = FolderDateSelection()
-        _ = try NavigationModel.setForSelection(.date, user("1954"), in: [(box, ["b.pdf", "c.pdf"])], noting: one)
-        XCTAssertEqual(one.start, "b.pdf")
-        XCTAssertTrue(one.datedBefore, "the 1953 just set dated b.pdf before")
+        XCTAssertEqual(split.runs[box.path], [.init(name: "b.pdf", datedBefore: true), .init(name: "d.pdf", datedBefore: true)],
+                       "the run at d.pdf splits the selection in two")
+        let gaps = FolderDateSelection()
+        let before = try XCTUnwrap(ContainerFileStore.load(directory: box).document)
+        _ = try NavigationModel.setForSelection(.date, user("1954"), in: [(box, ["a.pdf", "c.pdf", "f.pdf"])],
+                                                noting: gaps)
+        XCTAssertEqual(gaps.runs[box.path]?.map(\.name), ["a.pdf", "c.pdf", "f.pdf"], "three stretches, three runs")
         let read = try XCTUnwrap(ContainerFileStore.load(directory: box).document)
-        XCTAssertEqual(shown(.date, read), ["1950", "1954", "1954", "1953", "1953", "1960"])
+        XCTAssertEqual(shown(.date, read), ["1954", "1953", "1954", "1953", "1953", "1954"])
+        // Undo of that edit offers for the same runs: the first file of each whose date changed.
+        let names = ["a.pdf", "b.pdf", "c.pdf", "d.pdf", "e.pdf", "f.pdf"]
+        XCTAssertEqual(NavigationModel.datedRunsChanged(names, before: read.runs, after: before.runs).map(\.name),
+                       ["a.pdf", "c.pdf", "f.pdf"])
+        XCTAssertEqual(NavigationModel.datedRunsChanged(names, before: read.runs, after: read.runs).count, 0)
+        // The batch run lookup reads as the one-file one.
+        let tree = box.deletingLastPathComponent()
+        let batch = try XCTUnwrap(NavigationModel.folderDateRuns(tree: tree, components: [box.lastPathComponent],
+                                                                 editedNames: names))
+        for (name, run) in zip(names, batch) {
+            let one = try XCTUnwrap(NavigationModel.folderDateRun(tree: tree, components: [box.lastPathComponent],
+                                                                  editedName: name))
+            XCTAssertEqual(run.names, one.names, name)
+            XCTAssertEqual(run.date, one.date, name)
+        }
+        XCTAssertEqual(batch.map(\.names), [["a.pdf"], ["b.pdf"], ["c.pdf"], ["d.pdf", "e.pdf"], ["d.pdf", "e.pdf"], ["f.pdf"]])
     }
 
     func testNoChangeWritesNothing() throws {

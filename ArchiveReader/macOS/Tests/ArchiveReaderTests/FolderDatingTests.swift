@@ -35,7 +35,9 @@ final class FolderDatingTests: XCTestCase {
 
     /// The files, their tags and page 2: 0001 the folder photo; 0002 undated; 0003 an estimate; 0004 its own text's
     /// year; 0005 read off the image; 0006 no text at all; 0007 a checked date.
-    private func makeFolder(date: String, source: ContainerSource = .user) throws {
+    private func makeFolder(date: String, source: ContainerSource = .user, in directory: URL? = nil) throws {
+        let folder: URL = directory ?? self.folder
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let files: [(String, [String], [String]?)] = [
             ("0001.pdf", ["Unread", "Folder"], ["Classification: Folder"]),
             ("0002.pdf", ["Unread", "Harbours"], ["Classification: Document Start"]),
@@ -65,8 +67,8 @@ final class FolderDatingTests: XCTestCase {
         return nil
     }
 
-    private func tagsOnDisk(_ name: String) throws -> Set<String> {
-        Set(try URL(fileURLWithPath: folder.appendingPathComponent(name).path)
+    private func tagsOnDisk(_ name: String, in directory: URL? = nil) throws -> Set<String> {
+        Set(try URL(fileURLWithPath: (directory ?? folder).appendingPathComponent(name).path)
             .resourceValues(forKeys: [.tagNamesKey]).tagNames ?? [])
     }
 
@@ -552,5 +554,105 @@ final class FolderDatingTests: XCTestCase {
         let deadline = Date().addingTimeInterval(1.5)
         while Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
         XCTAssertNil(model.folderDatingOffer)
+    }
+    /// W49.reader-set-selection-date-offer: a date set for a selection that makes several runs, in two folders, makes
+    /// one offer for them all; it dates each run's documents in one ledger group (one Undo), and a folder whose date
+    /// changed since the offer stops it everywhere.
+    func testADateSetForASelectionOfSeveralRunsOffersThemAll() throws {
+        try makeFolder(date: "1940s", source: .label)
+        let other = root.appendingPathComponent("Box 4", isDirectory: true)
+        try makeFolder(date: "1940s", source: .label, in: other)
+        let model = fixtureNavigationModel(pinnedTo: root)
+        wait { model.library.files.count >= 14 }
+        let tree = try XCTUnwrap(model.containerTree)
+        wait { model.containerCatalog.rootPath == tree.path }
+        func path(_ dir: String, _ name: String) -> String { ([tree.path] + [dir, name]).joined(separator: "/") }
+        // Box 3: two stretches (0002-0003, 0006), so two runs; Box 4: one.
+        let selected = [path("Box 3", "0002.pdf"), path("Box 3", "0003.pdf"), path("Box 3", "0006.pdf"),
+                        path("Box 4", "0002.pdf")]
+
+        func offer(_ date: String) throws -> FolderDatingOffer {
+            wait { !model.containerEditSaving }
+            model.setContainerFieldForSelection(.date, date, paths: selected)
+            wait { model.folderDatingOffer != nil }
+            return try XCTUnwrap(model.folderDatingOffer, "a selection of several runs is offered; "
+                                 + "\(model.containerEditError ?? "") \(model.statusMessage)")
+        }
+        let first = try offer("Feb. 1966")
+        XCTAssertEqual(first.parts.map(\.directory), [["Box 3"], ["Box 3"], ["Box 4"]])
+        XCTAssertEqual(first.parts.map(\.editedName), ["0002.pdf", "0006.pdf", "0002.pdf"])
+        XCTAssertEqual(first.paths.map { (($0 as NSString).deletingLastPathComponent as NSString).lastPathComponent
+                                          + "/" + ($0 as NSString).lastPathComponent },
+                       ["Box 3/0002.pdf", "Box 3/0003.pdf", "Box 3/0006.pdf", "Box 4/0002.pdf"],
+                       "each run's undated and estimated documents, none outside the selection")
+        XCTAssertEqual(first.title, "Date 4 documents in 2 folders from their folders?")
+        XCTAssertTrue(first.message.contains("“Box 3”, “Box 4”"), first.message)
+
+        // Box 4's date changed between the offer and the answer: nothing is dated, in either folder.
+        model.folderDatingOffer = nil
+        let box4 = try XCTUnwrap(ContainerFileStore.load(directory: other).document)
+        var runs = box4.runs
+        let i = try XCTUnwrap(runs.firstIndex { $0.start == "0002.pdf" })
+        runs[i] = ContainerRun(start: "0002.pdf", level: .folder,
+                               fields: ContainerFieldSet([.date: ContainerValue("1970", source: .user, at: now)]))
+        guard case let .loaded(_, stamp4) = ContainerFileStore.load(directory: other) else { return XCTFail("Box 4") }
+        try ContainerFileStore.write(ContainerFile(runs: runs), directory: other, expecting: stamp4)
+        model.applyFolderDating(first)
+        wait { model.itemFieldEditError != nil }
+        XCTAssertEqual(model.itemFieldEditError?.contains("changed since it was offered"), true,
+                       model.itemFieldEditError ?? "")
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours"])
+        XCTAssertNil(ContainerFileStore.loadItemFields(directory: folder).document?.dateRecord(for: "0002.pdf"))
+
+        let offered = try offer("Feb. 1966")
+        XCTAssertEqual(offered.paths.count, 4)
+        let depth = model.undoDepth
+        model.applyFolderDating(offered)
+        wait { model.statusMessage.hasPrefix("Dated ") }
+        XCTAssertTrue(model.statusMessage.hasPrefix("Dated 4 documents"), model.statusMessage)
+        XCTAssertTrue(model.statusMessage.contains("from the folders"), model.statusMessage)
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours", "1966", "2 February"])
+        XCTAssertEqual(try tagsOnDisk("0003.pdf"), ["Unread", "1966", "2 February"])
+        XCTAssertEqual(try tagsOnDisk("0006.pdf"), ["Unread", "1966", "2 February"])
+        XCTAssertEqual(try tagsOnDisk("0002.pdf", in: other), ["Unread", "Harbours", "1966", "2 February"])
+        XCTAssertEqual(try tagsOnDisk("0003.pdf", in: other), ["Unread", "1958", "Date Uncertain"], "not selected")
+        XCTAssertEqual(try tagsOnDisk("0006.pdf", in: other), ["Unread"], "not selected")
+        let fields = try XCTUnwrap(ContainerFileStore.loadItemFields(directory: folder).document)
+        XCTAssertEqual(fields.dateRecord(for: "0006.pdf")?.evidence, "folder; from 0006.pdf; \"Feb. 1966\"; gave 1966-02",
+                       "each run's record names its own start")
+        XCTAssertNotNil(ContainerFileStore.loadItemFields(directory: other).document?.dateRecord(for: "0002.pdf"))
+
+        XCTAssertEqual(model.undoDepth, depth + 1, "one Undo")
+        model.undoLast()
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours"])
+        XCTAssertEqual(try tagsOnDisk("0003.pdf"), ["Unread", "1958", "Date Uncertain"])
+        XCTAssertEqual(try tagsOnDisk("0006.pdf"), ["Unread"])
+        XCTAssertEqual(try tagsOnDisk("0002.pdf", in: other), ["Unread", "Harbours"])
+    }
+    /// An offer whose runs take different dates, or where some take the folder's dates away (an Undo across runs),
+    /// names every date and says each file takes its own folder's, and asks to update rather than date.
+    func testAnOfferOfSeveralDatesAndAnUndatingSaysSo() throws {
+        let a = try XCTUnwrap(ContainerFolderDate.parse("1950", start: "0001.pdf"))
+        let b = try XCTUnwrap(ContainerFolderDate.parse("1962", start: "0005.pdf"))
+        func part(_ date: ContainerFolderDate?, _ dir: String, _ names: [String]) -> FolderDatingOffer.Part {
+            .init(date: date, directory: [dir], editedName: names[0], paths: names.map { "/t/\(dir)/\($0)" },
+                  recorded: date == nil ? [] : names.map { "/t/\(dir)/\($0)" })
+        }
+        let two = FolderDatingOffer(parts: [part(a, "Box 3", ["0002.pdf"]), part(b, "Box 3", ["0006.pdf", "0007.pdf"])],
+                                    treePath: "/t", evidence: [:], window: nil)
+        XCTAssertEqual(two.title, "Date 3 documents in “Box 3” from the folder?")
+        XCTAssertTrue(two.message.hasPrefix("The folders are dated “1950”, “1962”."), two.message)
+        XCTAssertTrue(two.message.contains("each would take its own folder's date"), two.message)
+        XCTAssertFalse(two.message.contains("would be dated 1950"), two.message)
+        XCTAssertEqual(two.confirmTitle, "Date 3 Documents")
+
+        let mixed = FolderDatingOffer(parts: [part(a, "Box 3", ["0002.pdf"]), part(nil, "Box 4", ["0003.pdf"])],
+                                      treePath: "/t", evidence: [:], window: nil)
+        XCTAssertEqual(mixed.title, "Update 2 documents in 2 folders from their folders?")
+        XCTAssertTrue(mixed.message.contains("would be dated 1950"), mixed.message)
+        XCTAssertTrue(mixed.message.contains("1 document dated from a folder that no longer gives a date goes back"),
+                      mixed.message)
+        XCTAssertEqual(mixed.confirmTitle, "Update 2 Documents")
+        XCTAssertEqual(mixed.done(2), "Updated 2 documents from their folders")
     }
 }
