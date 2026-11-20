@@ -10,8 +10,9 @@ import XCTest
 // and it proposes the same thing for every photo (New Document, upright), so every difference in the output is the
 // test's hand. Apple Vision cannot read in the VM guest (W40.d1), and it could not open these dialogs anyway.
 //
-// Run A, Automatic tagging with the Manual approach: the Review rotation pass (photo 3 turned 90°), the per-page
-// segmentation review (photos 1-2 Box, photo 4 Continuation, photo 5 removed, by keys), the box/folder confirmation
+// Run A, Automatic tagging with the Manual approach: the Review rotation pass (photo 3 turned 90°) and the per-page
+// segmentation review (photos 1-2 Box, photo 4 Continuation, photo 5 removed), both by their keys as the window opens,
+// after a row click and after a radio click (W40.fix-processor-review-keys), the box/folder confirmation
 // (photo 2 turned to Folder), and Complete. Run B, Manual tagging (Segment & Tag): photo 1 Box, photo 2 Folder,
 // photos 3-4 one document tagged by typing a date, a subject and a quality, photo 5 removed, photo 6 a second
 // document with its own date and subject. Rotation is off in B, so its photo 3 is A's photo 3 unturned.
@@ -80,52 +81,61 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         ])
         clickStart()
 
-        // Review rotation: every photo proposed upright; photo 3 turned 90° by its radio.
+        // Review rotation, by the keys the header promises (W40.fix-processor-review-keys), first with no click at all:
+        // every photo is proposed upright and photo 3 ends turned 90°. The footer counts the rotated pages.
         let rotation = reviewWindow("Review Rotation", timeout: 300)
+        let turned = rotation.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '6 page' OR value BEGINSWITH '6 page'")).firstMatch
+        press([.downArrow, .downArrow, "]"], turned, reads: "1 rotated", "rotation, keys as the window opens: ↓ ↓ ] turns photo 3")
+        press([.downArrow, .rightArrow], turned, reads: "2 rotated", "rotation: ↓ → turns photo 4")
+        press([.upArrow, "["], turned, reads: "1 rotated", "rotation: ↑ [ turns photo 3 back")
+        press(["]"], turned, reads: "2 rotated", "rotation: ] turns photo 3 again")
+        press([.downArrow, .leftArrow], turned, reads: "1 rotated", "rotation: ↓ ← turns photo 4 back")
+        XCTAssertFalse(text(of: turned).contains("2 rotated"))
         shrinkThumbnails(in: rotation)
+        // A click on photo 3's 90° radio (already chosen) makes it the row the keys act on.
         let turn = rotation.buttons.matching(NSPredicate(format: "label == '90°'"))
         guard turn.count >= 3 else { dump(rotation, "no 90° radio for photo 3"); return [:] }
         turn.element(boundBy: 2).click()
+        press([.downArrow, "]"], turned, reads: "2 rotated", "rotation, keys after a radio click: ↓ ] turns photo 4")
+        press(["["], turned, reads: "1 rotated", "rotation: [ turns photo 4 back")
         shot("w40d2-a-rotation-chosen")
-        rotation.buttons["Confirm"].click()
+        app.typeKey(.return, modifierFlags: [])   // Return confirms, the header says
+        waitGone(rotation, "Return confirms the rotation review")
 
-        // Per-page segmentation review, by keys from the first row: 3 Box, ↓ 3 Box, ↓ (New Document), ↓ 2
-        // Continuation, ↓ X remove, ↓ (New Document), Return confirms.
+        // Per-page segmentation review, by keys: 3 as the window opens (photo 1 Box), a click on photo 2's row and 3
+        // (Box), a click on photo 4's New Document radio and 2 (Continuation), ↓ X (photo 5 removed), ↓ 4 then 1
+        // (photo 6 a Folder and back), Escape asks before discarding, Return confirms.
         let review = reviewWindow("Document Segmentation Review", timeout: 120)
+        let footer = review.staticTexts.matching(NSPredicate(format: "label CONTAINS 'new document' OR value CONTAINS 'new document'")).firstMatch
+        print("[w40d2] segmentation review footer as opened: '\(text(of: footer))'")
+        press(["3"], footer, reads: "1 box", "segmentation, keys as the window opens: 3 makes photo 1 a Box")
         shrinkThumbnails(in: review)
         let boxes = review.buttons.matching(NSPredicate(format: "label == '3 Box'"))
         XCTAssertEqual(boxes.count, 6, "every row is drawn at the smallest thumbnail size")
-        let footer = review.staticTexts.matching(NSPredicate(format: "label CONTAINS 'new document' OR value CONTAINS 'new document'")).firstMatch
-        let before = text(of: footer)
-        review.staticTexts["Document Segmentation Review"].click()   // a click in the window, as a user starts
-        for key in ["3", .downArrow, "3", .downArrow, .downArrow, "2", .downArrow, "x"] as [KeyOrChar] {
-            key.type(on: app)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-        }
-        app.typeKey(.return, modifierFlags: [])   // Return confirms, the header says
-        RunLoop.current.run(until: Date().addingTimeInterval(3))
-        shot("w40d2-a-segmentation-keys")
-        let afterKeys = text(of: footer) + (review.exists ? "" : " (closed by Return)")
-        print("[w40d2] segmentation review footer: before keys '\(before)', after keys '\(afterKeys)'")
-        if afterKeys == before, review.exists {
-            // The promised keys (README §Segmentation Review) changed nothing; the same choices by click. An expected
-            // failure still stops a test that does not continue after failures, so this one check does.
-            continueAfterFailure = true
-            XCTExpectFailure("W40.fix-processor-review-keys: the per-page review's 1-4, X, ↓ and Return do nothing", strict: false) {
-                XCTAssertNotEqual(afterKeys, before, "the keys 3, ↓, 2, X and Return change the review")
-            }
-            continueAfterFailure = false
-            boxes.element(boundBy: 0).click()
-            boxes.element(boundBy: 1).click()
-            review.buttons.matching(NSPredicate(format: "label == '2 Continuation'")).element(boundBy: 3).click()
-            let remove = review.buttons.matching(NSPredicate(
-                format: "label ==[c] 'delete' OR label ==[c] 'trash' OR label CONTAINS[c] 'remove'"))
-            guard remove.count == 6 else { dump(review, "expected a remove button per row, found \(remove.count)"); return [:] }
-            remove.element(boundBy: 4).click()
-        }
+        let names = (ProcessInfo.processInfo.environment["W40D2_PHOTOS"] ?? "").components(separatedBy: "|")
+        guard names.count >= 6 else { dump(review, "W40D2_PHOTOS names \(names.count) photos, not six"); return [:] }
+        let row2 = review.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", names[1], names[1])).firstMatch
+        guard row2.exists else { dump(review, "no file name '\(names.first ?? "")…' to click in photo 2's row"); return [:] }
+        row2.click()
+        press(["3"], footer, reads: "2 boxes", "segmentation, keys after a row click: 3 makes photo 2 a Box")
+        review.buttons.matching(NSPredicate(format: "label == '1 New Document'")).element(boundBy: 3).click()
+        press(["2"], footer, reads: "1 continuation", "segmentation, keys after a radio click: 2 makes photo 4 a Continuation")
+        press([.downArrow, "x"], footer, reads: "1 removed", "segmentation: ↓ X removes photo 5")
+        press([.downArrow, "4"], footer, reads: "1 folder", "segmentation: ↓ 4 makes photo 6 a Folder")
+        press(["1"], footer, reads: "2 new documents", "segmentation: 1 makes photo 6 a New Document again")
+        XCTAssertFalse(text(of: footer).contains("folder"), "photo 6 is no longer a Folder")
+        let chosen = text(of: footer)
         shot("w40d2-a-segmentation-chosen")
-        print("[w40d2] segmentation review footer as confirmed: '\(text(of: footer))'")
-        if review.exists { review.buttons["Confirm"].click() }
+        print("[w40d2] segmentation review footer as chosen: '\(chosen)'")
+        app.typeKey(.escape, modifierFlags: [])   // Escape asks before discarding the run
+        let keep = app.buttons["Keep Working"]
+        XCTAssertTrue(keep.waitForExistence(timeout: 5), "Escape asks before discarding the review")
+        shot("w40d2-a-segmentation-escape")
+        keep.click()
+        XCTAssertTrue(review.exists, "Keep Working leaves the review open")
+        XCTAssertEqual(text(of: footer), chosen, "and its choices as they were")
+        app.typeKey(.return, modifierFlags: [])   // Return confirms, the header says
+        waitGone(review, "Return confirms the segmentation review")
 
         // Box/folder confirmation: both labels arrive as Box; the second is turned to Folder.
         let sheet = app.sheets.firstMatch
@@ -308,6 +318,25 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         return window
     }
 
+    /// Presses `keys` one at a time, then waits for `footer` to read `want`: each review key changes the footer's count.
+    private func press(_ keys: [KeyOrChar], _ footer: XCUIElement, reads want: String, _ step: String) {
+        for key in keys {
+            key.type(on: app)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+        }
+        let deadline = Date().addingTimeInterval(3)
+        while !text(of: footer).contains(want), Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.2)) }
+        print("[w40d2] \(step): footer '\(text(of: footer))'")
+        if !text(of: footer).contains(want) { shot("w40d2-fail-\(slug(step))") }
+        XCTAssertTrue(text(of: footer).contains(want), "\(step): the footer reads '\(want)'")
+    }
+
+    private func waitGone(_ window: XCUIElement, _ why: String) {
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: window)
+        if XCTWaiter.wait(for: [gone], timeout: 10) != .completed { shot("w40d2-fail-\(slug(why))") }
+        XCTAssertFalse(window.exists, why)
+    }
+
     private func text(of element: XCUIElement) -> String {
         guard element.exists else { return "(absent)" }
         return (element.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? element.label
@@ -443,6 +472,8 @@ private enum KeyOrChar: ExpressibleByStringLiteral {
     case char(String)
     case key(XCUIKeyboardKey)
     static let downArrow = KeyOrChar.key(.downArrow)
+    static let upArrow = KeyOrChar.key(.upArrow)
+    static let leftArrow = KeyOrChar.key(.leftArrow)
     static let rightArrow = KeyOrChar.key(.rightArrow)
     init(stringLiteral value: String) { self = .char(value) }
     @MainActor func type(on app: XCUIApplication) {

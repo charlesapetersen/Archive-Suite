@@ -9,6 +9,9 @@ struct DocumentSegmentReviewSheet: View {
     @ObservedObject var processor: OCRProcessor
     @State private var thumbnailSize: CGFloat = 400
     @State private var focusedIndex: Int = 0
+    /// The window itself takes the keys (W40.fix-processor-review-keys): `onKeyPress` reaches only a focused view
+    /// or its ancestors, and nothing else in this window is focusable, so without it every key fell through.
+    @FocusState private var keysFocused: Bool
 
     /// Whether New-Document / Continuation options are offered (only when merging or tagging by segment).
     private var showDocClasses: Bool { processor.reviewShowsDocumentClasses }
@@ -112,7 +115,9 @@ struct DocumentSegmentReviewSheet: View {
                                     processor.documentReviewItems[idx].fileIndex)
                             )
                             .id(idx)
-                            .onTapGesture { focusedIndex = idx }
+                            // A click anywhere in a row, its radios included, makes it the row the keys act on
+                            // and gives the keys back to the window.
+                            .simultaneousGesture(TapGesture().onEnded { focusedIndex = idx; keysFocused = true })
                         }
                     }
                     .padding()
@@ -147,6 +152,10 @@ struct DocumentSegmentReviewSheet: View {
             .padding()
         }
         .frame(minWidth: 1000, idealWidth: 1900, maxWidth: .infinity, minHeight: 800, idealHeight: 1300, maxHeight: .infinity)
+        .focusable(true)
+        .focusEffectDisabled()
+        .focused($keysFocused)
+        .onAppear { keysFocused = true }
         .onKeyPress(.upArrow) {
             if focusedIndex > 0 { focusedIndex -= 1 }
             return .handled

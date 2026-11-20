@@ -710,15 +710,19 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   `DocumentSegmentReviewSheet`: slider 60-800 (`Views/OCRView+DocumentSegmentReviewSheet.swift:74`), keys 1-4
   (`:171-200`), arrows (`:150-157`), Return (`:216`).
 - **Real-path test:** `ReviewDialogsJourneyUITests` (W40.d2, VM: `scripts/journey-review-dialogs.sh`), the real Start on
-  six rehearsal photos, keys then clicks. `scripts/test-segmentation-review.sh` waits on `awaitingDocumentReview` but
+  six rehearsal photos: every key by itself as the window opens, after a row click and after a radio click, in both this
+  dialog and the Review rotation pass; Escape asks; Return confirms. `scripts/test-segmentation-review.sh` waits on `awaitingDocumentReview` but
   never draws the sheet or sends keys.
 - **Runtime evidence:** W40.d2, 2026-11-19: the dialog opens on every photo; the slider works; by click, Box, Continuation
   and the trash reach the output (the removed photo has no PDF, the Continuation carries its document's tags). The keys
   3, ↓, 2, X and Return changed nothing and did not confirm ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)).
-- **Status:** `broken` — `W40.fix-processor-review-keys` (S3)
+  W40.fix-processor-review-keys, 2026-11-20: the window is now focusable and focused on open, and a click in a row
+  gives the keys back; in the VM 1-4, X, ↑/↓, ←/→, [ ], Escape and Return all acted, the footer counting each change.
+- **Status:** `works`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-19 W40.d2 — `unproven` → `broken`: the promised keys do nothing; the clicks work.
+  - 2026-11-20 W40.fix-processor-review-keys — `broken` → `works`: the keys reach the review (focus fix), journey-tested.
 - **Notes:** **Drift.** The rotation radios and `[`/`]` are not in this dialog: they appear only in the separate,
   opt-in Review rotation pass (`rotationOnly`, `:15-16`, `:201-213`; enabled by `reviewRotation` with rotation on,
   `OCR/OCRProcessor+Pipeline.swift:3084`). Keys 1 and 2 work only when document classes are shown (`:171-181`). The
