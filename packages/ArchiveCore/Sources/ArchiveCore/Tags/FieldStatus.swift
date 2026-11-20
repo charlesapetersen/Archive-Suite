@@ -113,7 +113,7 @@ public enum FieldStatusPolicy {
             figure = "not measured on its own"
         case "folder":
             source = "Taken from the folder’s confirmed date by the Processor’s dating route"
-            figure = "a checked folder date held for 49 of 56 dated documents inside it (folder-date.md), not scored as an exact year"
+            figure = folderFigure(evidence)
         case .some:
             source = "From the Processor’s dating route"
             figure = "not measured for this evidence"
@@ -123,6 +123,24 @@ public enum FieldStatusPolicy {
         }
         if checked { return FieldStatus(level: .checked, source: source, measured: "") }
         return FieldStatus(level: .lowerConfidence, source: source, measured: "Below the fill rule: \(figure).")
+    }
+
+    /// The folder rule's figure for the form it wrote, read from the evidence's quoted folder value
+    /// (`folder; from <start>; "<value>"`): `segbench-results/folder-date.md`, "What the rule writes, scored by its form",
+    /// the owner's Year tags on the dated documents of 17 checked folders.
+    static func folderFigure(_ evidence: String?) -> String {
+        let value = evidence?.split(separator: ";").last
+            .map { $0.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "\"")) }
+        switch value.flatMap({ ContainerFolderDate.parse($0) })?.inherited {
+        case .year(_, _, uncertain: false):
+            return "a checked single-year folder date was the owner’s year for 13 of 14 dated documents inside it"
+        case .year(_, _, uncertain: true):
+            return "the mid-point year of a checked folder range was exact for 20 of 42 dated documents inside it, within a year for 33"
+        case .decade:
+            return "a decade from a checked folder range is not measured (no dated document in the checked folders)"
+        case nil:
+            return "a year written from a checked folder date was exact for 33 of 56 dated documents inside it"
+        }
     }
 
     /// The covering letter's date (`Sent With …`). The route's dates are not measured apart from the own date's.

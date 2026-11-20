@@ -120,6 +120,17 @@ final class FieldCheckTests: XCTestCase {
         XCTAssertEqual(FieldStatusPolicy.sentWith(checked: false).level, .lowerConfidence)
     }
 
+    /// W46.p17-folder-date-forms: a folder-dated document carries the figure of the form the rule wrote.
+    func testFolderDateFigureFollowsTheWrittenForm() {
+        func measured(_ e: String?) -> String { FieldStatusPolicy.date(checked: false, evidence: e).measured }
+        XCTAssertTrue(measured("folder; from 00012.pdf; \"Feb. 1970\"").contains("13 of 14"))
+        XCTAssertTrue(measured("folder; from the folder; \"1965-1967\"").contains("20 of 42"))
+        XCTAssertTrue(measured("folder; from 0001.pdf; \"1958-1969\"").contains("not measured"))
+        XCTAssertTrue(measured("folder; from a.pdf").contains("33 of 56"))
+        XCTAssertTrue(measured("folder; from a.pdf; \"1900-1950\"").contains("33 of 56"))
+        XCTAssertEqual(FieldStatusPolicy.date(checked: true, evidence: "folder; from a.pdf; \"1965-1967\"").measured, "")
+    }
+
     func testContainerValuesMapByTheirSource() {
         func level(_ v: ContainerValue, _ f: ContainerField = .container, _ l: ContainerLevel? = .box) -> FieldCheckLevel {
             FieldStatusPolicy.container(v, field: f, level: l).level
