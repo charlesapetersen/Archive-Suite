@@ -259,7 +259,9 @@ final class NotesModel: ObservableObject {
     /// answer it.
     private func askForFirstLibrary() {
         guard !ArchiveTestHost.isUnitTestHost, let chooser = storeFolderChooser else { return }
-        Task { @MainActor in
+        // From the run loop, not a `Task`: Make Library ends in Restart and Switch, whose quit hung inside a
+        // main-queue job (`StoreFolderChooser.onMainRunLoop`).
+        StoreFolderChooser.onMainRunLoop {
             // A launch by double-clicking a library asks to switch to that one instead.
             guard !StoreFolderChooser.libraryArrivedFromFinder else { return }
             chooser.newLibrary(readerRoots: ReaderRootStore.savedRootFolders(), firstLaunch: true)

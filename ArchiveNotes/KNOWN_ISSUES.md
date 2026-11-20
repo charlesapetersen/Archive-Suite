@@ -135,11 +135,6 @@ it. When a parent cannot be looked at at all (`stat` fails other than "not found
 archive?" and offers Choose Archive Folder… first (accepted: owner, 2026-11-20, call 24, chose this question as
 the remedy; a folder with no marker anywhere above it carries no sign to detect).
 
-A library double-clicked in Finder showed the switch question in the VM, but only the screen recording saw it:
-XCUITest cannot query an instance LaunchServices started, and the UITest build has a read-only exception for the
-fixture path, so the shipping sandbox's grant for a library opened from Finder is not yet checked
-(queued: W49.notes-finder-open-check).
-
 ## ⚠️ LIMIT (W40.root-marker-auto, 2026-11-06) — Choose Archive Folder… gives a plain folder an archive identity
 
 File ▸ Choose Archive Folder… now writes `.archive-suite-root.json` (kind `reader`) into a folder that has none,

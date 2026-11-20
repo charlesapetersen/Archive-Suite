@@ -294,6 +294,18 @@ final class StoreFolderChooser {
         return finish(.quitCancelled(picked))
     }
 
+    /// Runs `body` from the main run loop in its default mode, not as a main-queue job. A pick that is not a
+    /// menu or button action (a library from Finder, the first launch's Save panel) must start this way, since it
+    /// may end in Restart and Switch: the quit waits in `applicationShouldTerminate` for the editors' flush, which
+    /// needs the main queue, and a nested run loop started inside a main-queue job (a `Task` on the main actor,
+    /// `DispatchQueue.main.async`) never drains it, so the app hung instead of quitting (measured with the
+    /// Release build in the VM, W49.notes-finder-open-check). Default mode only, so it waits out an open alert.
+    static func onMainRunLoop(_ body: @escaping @MainActor () -> Void) {
+        let loop = CFRunLoopGetMain()
+        CFRunLoopPerformBlock(loop, CFRunLoopMode.defaultMode.rawValue) { MainActor.assumeIsolated(body) }
+        CFRunLoopWakeUp(loop)
+    }
+
     private func finish(_ outcome: Outcome) -> Outcome {
         report(outcome)
         return outcome

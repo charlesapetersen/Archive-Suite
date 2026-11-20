@@ -164,17 +164,12 @@ final class NotesAppDelegate: NSObject, NSApplicationDelegate {
 
     private func flushPendingLibraries() {
         guard openLibrary != nil, !pendingLibraries.isEmpty else { return }
-        // After the event returns, so the confirmation's modal loop does not run inside the event handler. A
-        // run-loop perform, not a `Task`: Restart and Switch quits from inside this call, and a quit that waits
-        // for the editors' flush (`applicationShouldTerminate`) needs the main queue, which a nested run loop
-        // started inside a main-queue job never drains, so the app hung there instead of quitting (measured
-        // with the Release build in the VM, W49.notes-finder-open-check).
-        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(deliverPendingLibrary),
-                                               object: nil)
-        perform(#selector(deliverPendingLibrary), with: nil, afterDelay: 0)
+        // After the event returns, so the confirmation's modal loop does not run inside the event handler, and
+        // from the run loop rather than a `Task`, so Restart and Switch can quit (`onMainRunLoop`).
+        StoreFolderChooser.onMainRunLoop { [weak self] in self?.deliverPendingLibrary() }
     }
 
-    @objc private func deliverPendingLibrary() {
+    private func deliverPendingLibrary() {
         guard let openLibrary, let library = pendingLibraries.first else { return }
         pendingLibraries.removeAll()
         openLibrary(library)

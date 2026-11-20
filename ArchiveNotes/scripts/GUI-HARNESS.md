@@ -114,7 +114,8 @@ File ▸ Choose Store Folder… (it persists over the owner's real root).
   checked in the VM with a **Release** build (production entitlements, verified on the built app): `open -a` on a
   scratch `.archivenotes` at a first launch, "Restart and Switch" pressed through the Accessibility API by pid
   (XCUITest cannot query an instance LaunchServices started), then the relaunched app must write the library's
-  marker through its bookmark and show no dialog. Boots and stops the VM itself; about 4 minutes. Exit 0 = passed
+  marker through its bookmark and show no dialog; then the same for a first launch's Save panel (Make Library at
+  ~/Documents). Boots and stops the VM itself; about 4 minutes. Exit 0 = passed
   (W49.notes-finder-open-check).
 - `macOS/Tests/ArchiveNotesUITests/` — `SmokeUITest.swift` (launch) + `NotesGUITests.swift`
   (`NotesFixtureUITestCase` base + G0–G20).
