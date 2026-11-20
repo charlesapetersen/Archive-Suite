@@ -166,6 +166,11 @@ calls are section 1.
     the Containers facets as a searchable narrowed list, and unclashable pasted-image names. His note on images
     outside a note's assets folder: copy them in automatically wherever Notes can read them. Re-tagging labels waits
     on W49.corpus-specific-audit (his 2026-11-19 ask to move corpus-only code into a one-time migration).
+23. **Item fields on the Mac's own models (2026-11-19, walkthrough of 21:58; W47.wh-item-fields-mac).** Use them,
+    though none clears the fill rule (point 0.90, lower bound 0.85): byline 0.89 [0.74, 0.96] and kind 0.86 [0.74, 0.92]
+    from Qwen3-VL 8B on images, publication date 0.89 [0.69, 0.95] from Qwen3.5 4B on Vision text, on his checked
+    values. On by default for Mac and Local Agent users, each value marked lower confidence; the other three fields
+    stay empty. W47.wh-item-fields-mac-fill builds it. The bar itself is unchanged for other routes.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 

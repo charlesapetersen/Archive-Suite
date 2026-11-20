@@ -5,8 +5,6 @@
 ## High Priority
 
 ### Quality & Accuracy
-- **OCR confidence scoring** — request confidence levels from the LLM and flag low-confidence pages for human review
-- **Side-by-side original/OCR verification view** — show the original image alongside its OCR text in the main review flow (the Tools "Compare Models" tool already shows multiple model outputs side by side)
 
 ### Workflow
 - **Queue system** — add files to a processing queue and process in the background

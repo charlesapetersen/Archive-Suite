@@ -21,7 +21,7 @@ evidence these are one suite.
 - **Unified suite-wide storage path + migration** — a suite-level default root plus a migration that re-keys
   Reader's path-keyed index and the Notes store, serving the owner's "move to a new computer easily" goal.
   Tier-2, separately gated. _(00-overview §15.1 / §2 deferred list; also noted in `SUITE_TODO.md` as a `(later)`
-  behavior/data follow-on.)_
+  behavior/data follow-on.)_ Folded into the design note `W49.notes-store-format` (owner, 2026-11-19 walkthrough).
 - **Zotero write-back** — Notes currently only *reads* Zotero metadata (D8, read-only client). A future iteration
   could create/update Zotero items from Notes. _(00-overview §15.5, §17 out-of-scope.)_
 - **Extract re-snapshot / refresh from source** — extracts are snapshot+link (D7), so source edits deliberately
