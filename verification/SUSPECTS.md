@@ -443,10 +443,17 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   document-segmentation review on. Confirmed if no review is requested.
 - **Would clear it:** the review is requested, or a design note shows pre-OCRed runs are meant to skip it (then it
   is a doc and signature fix, not a bug).
-- **Status:** `open`
+- **Status:** `cleared` — `W49.proc-suspects-filing`, `ArchiveProcessor/scripts/repro-suspects-filing.sh` `s017-preocred`
 - **History:**
   - 2026-10-16 W40.e5 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-filing — cleared. The parameter is still dead (`OCR/OCRProcessor+OCR.swift:98`) and
+    `false` is still passed on (`:254`), but the pre-OCRed path raises the per-page review and the box/folder
+    confirmation itself (`:184-189`), under the same condition as the image path. A real Process Files run on six
+    scratch text-layer PDFs (Pre-OCRed, Automatic, Collection ID and Review document segmentation on, the stand-in
+    gateway) raised the whole-run document review, the box/folder confirmation and the final review. The literal
+    `false` matches the image path (`OCR/OCRProcessor+Pipeline.swift:3621`); that the setting does nothing on any fresh
+    run is S-046.
 
 ### S-018 · The Processor tells the user it paces to the subscription window, but OCR does not
 
@@ -656,10 +663,16 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `P-22`.
 - **Would confirm it:** a scratch folder holding `a/b/x.jpg` and `y.jpg`, dropped: count the rows.
 - **Would clear it:** both files are listed.
-- **Status:** `open`
+- **Status:** `cleared` — `W49.proc-suspects-filing`, by the code change of `W47.ct-processor-intake` (no run: the question is SwiftUI with no headless seam)
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-filing — cleared as written; the code no longer says it. Since
+    `W47.ct-processor-intake` (2026-11-19) drag-drop and Add Files… both go through `admit` (`Views/OCRView.swift:1505`),
+    which asks "Read the folders inside?" whenever a chosen folder has subfolders; Yes reads the tree, No adds the top
+    level by the user's choice. So nested photos are no longer left out silently. The tree read itself is covered by
+    `PROCESSFILES_TREE=1`. The duplicate half is unchanged and was not attempted (no headless seam): S-048. The README
+    still describes the old top-level-only read: S-049.
 
 ### S-029 · An LLM rotation failure silently falls back to the weaker local detector
 
@@ -702,10 +715,16 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a window-approach run (recorded answers) on a letter plus an enclosure page carrying the
   marker: check the enclosure's tags for `Sent With`.
 - **Would clear it:** `Sent With` is written.
-- **Status:** `open`
+- **Status:** `cleared` — `W49.proc-suspects-filing`, `ArchiveProcessor/scripts/repro-suspects-filing.sh` `s031-window` (`SegmentationReviewTestDriver` §9a)
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-filing — cleared; the premise is wrong. The window stage ends in
+    `rebuildSegments` (`OCR/OCRProcessor+WindowSegmentation.swift:116`), which runs `DocumentSegmenter` with the OCR's
+    enclosure flags, so the window path does not bypass it. The real `runWindowSegmentationStage` on recorded window
+    answers that agree with the OCR (folder, a two-page letter, its enclosure marked `[enclosure]`, a document) kept the
+    relation: the enclosure's segment is `enclosureOf` the letter, which is what `applyGeneratedTags` writes `Sent With`
+    from (proved end to end by `DUAL_DATE_TEST` §5). Windows that split the letter drop it (§9b): S-047.
 
 ### S-032 · A segmentation approach with no key can be started, and fails only after the OCR is paid for
 
@@ -732,10 +751,15 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `P-33`.
 - **Would confirm it:** feed that JSON to the parser in a driver and read the tags.
 - **Would clear it:** `Date Uncertain` is forced when there is no year.
-- **Status:** `open`
+- **Status:** `cleared` — `W49.proc-suspects-filing`, `ArchiveProcessor/scripts/repro-suspects-filing.sh` `s033-noyear`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-filing — cleared. The parser still behaves as described
+    (`Tagging/TagGenerator.swift:180`), but the dating route runs after it on every real path and overwrites the flag
+    (`Tagging/DateRoute+Run.swift:203-205`); its decision starts at `dateUncertain: true` and clears it only with a year.
+    A real Process Files run (Automatic, stand-in gateway answering every tag call with `year: null`,
+    `date_uncertain: false`) wrote `Date Uncertain` on 4 of 4 document PDFs.
 
 ### S-034 · No tagging and Copy source tags still write Box/Folder tags when collection segmentation is on
 
@@ -749,10 +773,18 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   output's tags.
 - **Would clear it:** the source tags survive (or the owner rules that Red/Purple belongs in those modes, and the SPEC
   says so).
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-filing-check`) and the owner (Daemon Report, 2026-11-20: the code calls it deliberate); `ArchiveProcessor/scripts/repro-suspects-filing.sh` `s034-none`, `s034-copysource`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-filing — reproduced. The code is unchanged (`applyBoxFolderLabelTags`,
+    `OCR/OCRProcessor+Tagging.swift:301-307`, passes for `.none` and `.copySource`). Real Process Files runs on six
+    scratch photos with Collection ID on, the stand-in gateway classifying one box and one folder label: under No
+    tagging the box PDF got `Box` and the folder PDF `Folder`; under Copy source tags, every photo carrying the source
+    tag `Source Tag A`, the four document PDFs kept it and the box and folder PDFs lost it, replaced by `Box` and
+    `Folder`. No colour was written (no colour is chosen by default, `Tagging/ItemTypeColourSetting.swift:4`). The
+    function's comment calls this intended and `ProcessFilesTagWarningTestDriver` (`:178-192`) checks for it, while
+    `SPEC/tag-format.md:538-546` promises the opposite, so it is asked rather than queued.
 
 ### S-035 · Resuming a batch skips the per-page review and the box/folder confirmation
 
@@ -765,10 +797,19 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** `scripts/test-batch-resume.sh`-style resume of a finished batch under Automatic + Manual:
   record which review gates are raised.
 - **Would clear it:** the dialog and confirmation are raised, or the skip is a recorded decision.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-filing-check`) and the owner (Daemon Report, 2026-11-20); `ArchiveProcessor/scripts/repro-suspects-filing.sh` `s035-resume` (`ResumeReviewGatesProbe`)
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-filing — reproduced, wider than written. `resumeBatch` is now at
+    `OCR/OCRProcessor+Pipeline.swift:1622`; a batch resume pins the approach to Manual (`:399-401`), so its segments come
+    straight from the stored classes (`:1766-1782`). The real `resumeBatch`, on a finished Gemini batch journal in a
+    scratch state directory (six pages: box, folder, a two-page letter, two documents; every chunk consumed; the wire
+    stubbed), under Automatic, raised no review at all: no per-page review, no box/folder confirmation and no final
+    review, and wrote tags on 6 of 6 outputs. A fresh Automatic run on the same kind of input raises all three
+    (`s033-noyear`). The comment at `:1786-1788` calls skipping the redo-review loop deliberate ("a resumed batch has no
+    interactive session"); nothing records the other two, yet the same resume does raise the collection-name sheet and
+    the per-collection review when they are on. Asked, as the comment's reason could be meant to cover them.
 
 ### S-036 · An edited collection name is used as typed when the user clicks Confirm
 
@@ -782,10 +823,20 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** call `organizeOutput` (as `scripts/test-collection-organize.sh` does) with the names `a/b`,
   `..` and empty, in a scratch directory.
 - **Would clear it:** each is normalised or refused before anything is filed.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-filing-check`); `ArchiveProcessor/scripts/repro-suspects-filing.sh` `s036-dotdot`, `s036-slash`, `s036-empty`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-filing — reproduced, with one detail corrected. The code is unchanged
+    (`Views/OCRView+CollectionReviewSheet.swift:124-130`, `OCR/OCRProcessor+ReviewFlows.swift:219-225`,
+    `Tagging/CollectionSegmenter.swift:306`). Real Process Files runs (Automatic, Collection ID, Confirm collection names,
+    six scratch photos), with a name typed into the sheet's box row and Confirm and Organize pressed without Return:
+    `..` filed all six PDFs in the PARENT of the chosen output folder (`000001 ...pdf`), and the run warned that two
+    label PDFs "were not where the run left them"; `a/b` did not throw (the suspect's guess) but filed each PDF as
+    `a/b/000001 a/b.pdf`, that is, a file `b.pdf` inside a new folder `000001 a`; an empty name left the six PDFs
+    loose in the output folder as `000001 .pdf`. Nothing says this is deliberate; README promises normalised names
+    and Live Capture's own sanitiser refuses dot-only names (`Capture/LiveCaptureProcessor.swift:3241-3248`).
+    `normalizeCollectionName`, which Return runs, would also pass `..` through.
 
 ### S-037 · No pairing QR at all when the Mac's address is not on en0 or en1
 
@@ -959,3 +1010,79 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-fix-s042 — raised.
+
+### S-046 · "Review document segmentation" changes nothing on a fresh Process Files run
+
+- **Raised:** 2026-11-20 · W49.proc-suspects-filing · while reproducing S-017.
+- **Suspected behaviour:** both fresh paths pass a literal `reviewDocumentSegmentation: false` to
+  `performCollectionSegmentation` (`OCR/OCRProcessor+Pipeline.swift:3621`, `OCR/OCRProcessor+OCR.swift:254`); only the
+  two resume paths pass the stored setting (`:1831`, `:2243`). The Settings help promises "Pause after OCR to review
+  and correct each page's classification … before tagging" (`Views/SettingsPanels/SettingsDocumentsPanel.swift:100-106`).
+  On a fresh run the whole-run review comes whatever the toggle says, and the per-collection review it switches never
+  appears; on a resume it does. `verification/processor.md` P-32 already notes the toggle is forced off.
+- **Where:** ledger `P-32`.
+- **Seen:** `ArchiveProcessor/scripts/repro-suspects-filing.sh s017-images-toggle`: Automatic + Collection ID, toggle on
+  and off, raised the same gates (whole-run review, box/folder confirmation, final review).
+- **Would confirm it:** that run, plus the owner's intent for the toggle (a per-collection pass, or the whole-run one).
+- **Would clear it:** the toggle is removed or wired, and its help says what it does.
+- **Status:** `open`
+- **History:**
+  - 2026-11-20 W49.proc-suspects-filing — raised.
+
+### S-047 · Windows that split a letter the OCR read as one document drop its enclosure's `Sent With`
+
+- **Raised:** 2026-11-20 · W49.proc-suspects-filing · while reproducing S-031.
+- **Suspected behaviour:** a relation survives the window stage only if the cover's page sequence matches the OCR's own
+  boundaries (`Tagging/DocumentSegmenter.swift:102-109`). When the windows split the letter, the enclosure is still a
+  document of its own but loses `enclosureOf`, so it gets no `Sent With`. That is the safe side (never a wrong date),
+  and may be intended by the "never inferred from adjacency" rule (`:11-16`).
+- **Where:** ledger `P-28`, `P-30`.
+- **Seen:** `SegmentationReviewTestDriver` §9b (`repro-suspects-filing.sh s031-window`): folder, a two-page letter,
+  its enclosure marked `[enclosure]`, a document; windows answering "new" between the letter's two pages; the
+  enclosure's cover is none.
+- **Would confirm it:** the owner's call that the enclosure should keep its relation to the letter's first part.
+- **Would clear it:** a ruling that a changed cover boundary drops the relation by design.
+- **Status:** `open`
+- **History:**
+  - 2026-11-20 W49.proc-suspects-filing — raised.
+
+### S-048 · Adding a file Process Files already lists adds it again
+
+- **Raised:** 2026-11-20 · W49.proc-suspects-filing · code reading (the half of S-028 the intake change left).
+- **Suspected behaviour:** `add()` appends the intake's files with no de-duplication (`Views/OCRView.swift:1520-1523`),
+  so dropping or choosing a file already in the list lists it twice, and a run would read it, pay for it and file it
+  twice.
+- **Where:** ledger `P-22`.
+- **Would confirm it:** in the VM, add the same scratch photo twice through the real window and count the rows (or
+  the run's outputs).
+- **Would clear it:** one row, or a de-duplication before the run starts.
+- **Status:** `open`
+- **History:**
+  - 2026-11-20 W49.proc-suspects-filing — raised.
+
+### S-049 · The Processor README says a chosen folder is read only at its top level
+
+- **Raised:** 2026-11-20 · W49.proc-suspects-filing · reading docs while checking S-028.
+- **Suspected behaviour:** `ArchiveProcessor/README.md:282` says "Directory selection — adds the images in the selected
+  folder (for now only its top level: images in sub-folders are not picked up)", but since `W47.ct-processor-intake` the
+  app asks whether to read the folders inside. A user reading the README would not expect the question.
+- **Where:** ledger `P-22`.
+- **Would confirm it:** the README line beside `Views/OCRView.swift:1505-1543`.
+- **Would clear it:** the README describes the question.
+- **Status:** `open`
+- **History:**
+  - 2026-11-20 W49.proc-suspects-filing — raised.
+
+### S-050 · Resuming an interrupted (non-batch) run also skips the per-page review and the box/folder confirmation
+
+- **Raised:** 2026-11-20 · W49.proc-suspects-filing · code reading, beside S-035.
+- **Suspected behaviour:** `resumeRun` segments without the per-page dialog or the box/folder confirmation
+  (`OCR/OCRProcessor+Pipeline.swift:2189-2197`), though unlike a batch resume it then tags through the review loop
+  (`:2202`), so the user can still reclassify there.
+- **Where:** ledger `P-32`, `P-37`.
+- **Would confirm it:** a `RUN_QUIT_RESUME_TEST`-style resume under Automatic with an autopilot that records the gates,
+  as `ResumeReviewGatesProbe` does for a batch.
+- **Would clear it:** both are raised, or the owner's S-035 answer covers resumes in general.
+- **Status:** `open`
+- **History:**
+  - 2026-11-20 W49.proc-suspects-filing — raised.
