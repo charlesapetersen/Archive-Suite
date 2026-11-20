@@ -86,6 +86,7 @@ struct ContentView: View {
             OCRRefusalFallbackTestDriver.runIfRequested()    // $0 W41 second reader for pages Gemini refuses
             OCRCascadeTestDriver.runIfRequested()            // $0 W41 cheap-first OCR cascade, no wire
             InstitutionalComputeImportTestDriver.runIfRequested()       // $0 W41 an institutional-computing bulk run's text, no wire
+            RunQuitResumeContract.runIfRequested()            // $0 W49 a quit waits for the pages in flight; resume reads the rest
             OpenRouterTestDriver.runIfRequested()             // $0 W41 OpenRouter request pinning, no wire
             NewspaperLayoutTestDriver.runIfRequested()
             PageReaderTestDriver.runIfRequested()             // $0 W42 one way to read a page, no wire

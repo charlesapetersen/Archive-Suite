@@ -87,6 +87,25 @@ Optionally send the **previous page's image** alongside the current one to impro
 "previous text context" slider was removed; OCR always runs in parallel now, across a configurable worker
 pool — *Settings › Parallel OCR workers*, default 4.)
 
+### Interrupted runs
+
+A standard Files run saves each page's reading as it lands, with the output path it was given, in
+`~/Library/Application Support/ArchiveProcessor/pending_run.json` (the run's manifest, kept until the run finishes). After a quit,
+a crash or **Stop**, the **Interrupted Run** box offers **Resume Run**: it reuses every saved reading and output
+PDF (rebuilding only a PDF that has gone missing), reads only the pages not yet read, with the run's own model and
+settings, then goes on to tagging and organizing. What it costs:
+
+- **Quit** while pages are being read asks first: **Quit When Pages Are Saved** finishes the pages in flight and
+  starts no new one, so nothing is read twice; **Quit Now** loses those pages, which a resume reads again.
+- **A crash** loses only the pages in flight at that moment (at most one per OCR worker).
+- **Sleep**: while a run reads pages the app holds off idle sleep (not while it waits on a review sheet). Closing the lid still sleeps the Mac; the run
+  carries on after waking, and a page whose request failed meanwhile is offered for retry at the end of the pass.
+- **If the input folder changed in between**: the run reads its own list of files, not the folder. A page moved,
+  renamed or deleted since is named in the Interrupted Run box and fails without being sent unless you put it
+  back; files added since are not part of the run; a file replaced at the same path keeps its saved reading if it
+  was already read, and is read as it is now if not.
+- A crash during tagging or collection review starts that step again (its OCR is not repeated).
+
 ### Batch Processing
 
 Anthropic, Gemini, and Mistral support batch processing for lower-cost, asynchronous OCR (OpenAI's Batch API is a later phase):

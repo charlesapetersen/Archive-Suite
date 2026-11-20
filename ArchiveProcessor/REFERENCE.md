@@ -301,6 +301,7 @@ above, ownership lanes + shared hotspots under "Concurrent / multi-agent develop
 ```
 ArchiveProcessorApp.swift      @main App; main window + ⌘, Settings scene.
 ContentView.swift              Top-level tab host (Process Files · Live Capture · Tools).
+ProcessorAppDelegate.swift     Quit during a run: wait for the pages being read, then quit (W49.proc-resume-standard-runs).
 Models/                        UI-free settings, pricing, keys, shared enums:
   ProviderModels.swift         Persisted, String-backed shared enums (LLMProvider/ThinkingLevel/
                                DocumentClassification/TaggingMode/RotationMode) + GatewayConfig. SHARED HOTSPOT.

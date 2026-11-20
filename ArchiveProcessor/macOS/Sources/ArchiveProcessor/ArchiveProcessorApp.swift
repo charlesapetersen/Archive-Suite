@@ -3,6 +3,8 @@ import ArchiveCore
 
 @main
 struct ArchiveProcessorApp: App {
+    @NSApplicationDelegateAdaptor(ProcessorAppDelegate.self) private var appDelegate
+
     init() {
         var appearanceForced = false
 #if DEBUG

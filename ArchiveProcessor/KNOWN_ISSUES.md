@@ -2,6 +2,21 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W49.proc-resume-standard-runs, 2026-11-20): what an interrupted standard run can still lose
+
+`ProcessorAppDelegate.applicationShouldTerminate`, `OCRProcessor.finishQuitDrainIfAsked`, `pendingRunMissingNote`;
+contract `scripts/test-run-quit-resume.sh`. A quit now waits for the pages being read; these cases still cost pages.
+- **Stop drops the pages in flight.** A reading that lands after Stop is not saved, so Resume Run reads that page
+  again and pays for it again; only the quit waits. The mixed-PDF route and a batch submission offer no wait on quit
+  either (plain "Quit", and the mixed route then holds its resume as "may have been billed"). (queued:
+  W49.proc-stop-saves-inflight)
+- **A crash loses the pages in flight**, at most one per OCR worker (Settings › Parallel OCR workers, default 4);
+  a resume reads them again. (accepted: a request whose process dies has no answer to save, and the count is the
+  user's own worker setting)
+- **A crash or quit during tagging, segmentation or collection review starts that step again.** Its OCR is not
+  repeated, but automatic tagging's text calls are bought again (a window segmenter's answers are kept). (queued:
+  W49.proc-resume-tagging-progress)
+
 ## ⚠️ LIMITATION (W47.wh-whole-page-large, 2026-11-20): Qwen3.6 27B reads newspapers whole on a tie measured elsewhere
 
 `OCR/NewspaperPageReader.swift` `wholePageReaderIDs`, applied in `PageReaders.reader`; row `whole-page-large` and rule

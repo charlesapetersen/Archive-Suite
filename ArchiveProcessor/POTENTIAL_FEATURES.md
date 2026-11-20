@@ -9,7 +9,6 @@
 ### Workflow
 - **Queue system** — add files to a processing queue and process in the background (queued: W49.proc-run-queue behind nice-to-have, owner 2026-11-20)
 - **Undo/redo for review changes** — general undo across review dialogs (a redo-tagging loop already exists) (queued: W49.proc-review-undo behind nice-to-have, owner 2026-11-20)
-- **Resume interrupted processing (standard runs)** — persist non-batch Files-processing state across restart (Live Capture already resumes via its staging manifest) (queued: W49.proc-resume-standard-runs, owner 2026-11-20)
 
 ## Medium Priority
 

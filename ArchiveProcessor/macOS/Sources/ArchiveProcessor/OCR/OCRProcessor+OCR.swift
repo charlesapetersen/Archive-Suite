@@ -1440,6 +1440,8 @@ extension OCRProcessor {
         segmentationContext: SegmentationContext,
         runConfig: SessionProcessingConfig? = nil
     ) async {
+        ocrPhaseActive = true
+        defer { ocrPhaseActive = false; finishQuitDrainIfAsked() }   // W49.proc-resume-standard-runs
         if segmentationContext.previousTextCharCount == 0 {
             // No dependency on prior OCR text — can run in parallel
             await performOCRParallel(
@@ -1489,7 +1491,7 @@ extension OCRProcessor {
         var previousImageURL: URL? = nil
 
         for index in 0..<total {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, !quitWhenPagesSaved else { return }
             let url = fileURLs[index]
             jobs[index].status = .processing
             // W16.bat10 — bound with the index, before the round-trip that gives Stop/Clear/Start its window.
@@ -1633,8 +1635,10 @@ extension OCRProcessor {
                 progress = Double(completed) / Double(total) * 0.7
                 statusMessage = "OCR \(completed)/\(total) complete (parallel)" + Self.rateLimitSuffix
 
-                // Add next task if available
-                if nextIndex < total {
+                // Add next task if available; a quit waiting for the pages in flight starts no new one.
+                if quitWhenPagesSaved {
+                    statusMessage = Self.quitWaitMessage
+                } else if nextIndex < total {
                     let idx = nextIndex
                     let nextURL = fileURLs[idx]
                     let nextJobID = jobIDs[idx]
@@ -1900,6 +1904,13 @@ extension OCRProcessor {
         readers: PageReaderPlan = .empty,
         imported: InstitutionalComputeImport? = nil
     ) async -> OCRResult {
+        // W49.proc-resume-standard-runs: a page moved or deleted since the run began (a resume reads the run's own list)
+        // fails here, before any route is asked, so no reader or rotation call is made for a file that is not there.
+        guard FileManager.default.fileExists(atPath: imageURL.path) else {
+            return OCRResult(text: nil, classification: nil,
+                             errorMessage: "The file is no longer where the run found it, so it was not read.",
+                             errorCode: "source_missing")
+        }
         // W41.app-institutional-compute: a page an institutional-computing bulk run already read is not bought again. Before the rotation
         // task, which would be a paid call too. Direct providers only, as for the page readers (the run start clears
         // the import elsewhere); its classification comes from the run's model on the text alone.

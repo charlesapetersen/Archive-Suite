@@ -1489,6 +1489,7 @@ extension OCRProcessor {
                 let completed = pending.completedResults.count
                 let total = pending.fileURLs.count
                 pendingRunInfo = "Interrupted run from \(dateStr): \(completed)/\(total) files completed via \(pending.provider.rawValue) \(pending.model.displayName)."
+                    + Self.pendingRunMissingNote(pending)
                 pendingRunBackend = Self.pendingRunBackend(of: pending)
             } else {
                 pendingRunBackend = nil
@@ -1595,6 +1596,19 @@ extension OCRProcessor {
         }
         Self.deletePendingBatch()
         pendingBatchInfo = nil
+    }
+    /// W49.proc-resume-standard-runs: a resume reads the run's own file list, so a page moved, renamed or deleted since
+    /// is not found. Said in the Interrupted Run box before Resume, rather than discovered as failures afterwards.
+    /// Files added to the folder since are not part of the run and are not mentioned.
+    nonisolated static func pendingRunMissingNote(_ pending: PendingRun) -> String {
+        let fm = FileManager.default
+        let missing = remainingIndices(totalFiles: pending.fileURLs.count, completedResults: pending.completedResults)
+            .filter { !fm.fileExists(atPath: pending.fileURLs[$0].path) }.count
+        guard missing > 0 else { return "" }
+        let noun = missing == 1 ? "file" : "files"
+        return " \(missing) \(noun) not yet read \(missing == 1 ? "is" : "are") no longer where the run found "
+            + "\(missing == 1 ? "it" : "them"): put \(missing == 1 ? "it" : "them") back before resuming, or "
+            + "\(missing == 1 ? "it fails" : "they fail") without being sent."
     }
     /// Dismiss a pending run notification.
     func dismissPendingRun() {
@@ -2318,6 +2332,8 @@ extension OCRProcessor {
         alreadyCompleted: Int,
         runConfig: SessionProcessingConfig? = nil
     ) async {
+        ocrPhaseActive = true
+        defer { ocrPhaseActive = false; finishQuitDrainIfAsked() }   // W49.proc-resume-standard-runs
         let remaining = indices.count
         let gateway = currentGateway
         let localAgent = currentLocalAgent
@@ -2381,7 +2397,9 @@ extension OCRProcessor {
                     progress = Double(alreadyCompleted + completed) / Double(totalFiles) * 0.7
                     statusMessage = "OCR \(alreadyCompleted + completed)/\(totalFiles) complete (parallel)" + Self.rateLimitSuffix
 
-                    if nextSlot < remaining {
+                    if quitWhenPagesSaved {
+                        statusMessage = Self.quitWaitMessage
+                    } else if nextSlot < remaining {
                         let idx = indices[nextSlot]
                         let url = fileURLs[idx]
                         let nextJobID = jobIDs[nextSlot]
@@ -2412,7 +2430,7 @@ extension OCRProcessor {
         } else {
             // Sequential: OCR remaining indices, using previous results for context
             for (attempt, index) in indices.enumerated() {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, !quitWhenPagesSaved else { return }
                 let url = fileURLs[index]
                 jobs[index].status = .processing
                 // W16.bat10 — bound with the index, before this file's round-trip.
@@ -2729,7 +2747,74 @@ extension OCRProcessor {
                                         attemptedChunkIds: attempted)
     }
 
+    // MARK: - Quitting during a run (W49.proc-resume-standard-runs)
+
+    /// Holds off App Nap while the processor works and idle sleep during its main OCR pass, and enrols it in the quit
+    /// check.
+    func updateRunActivity() {
+        if isProcessing {
+            Self.processorsThatRan.removeAll { $0.processor == nil }
+            if !Self.processorsThatRan.contains(where: { $0.processor === self }) {
+                Self.processorsThatRan.append(WeakProcessor(processor: self))
+            }
+        }
+        let holdSleep = isProcessing && ocrPhaseActive
+        if let activity = runActivity, !isProcessing || holdSleep != runActivityHoldsSleep {
+            ProcessInfo.processInfo.endActivity(activity)
+            runActivity = nil
+        }
+        if isProcessing, runActivity == nil {
+            runActivity = ProcessInfo.processInfo.beginActivity(
+                options: holdSleep ? [.userInitiated, .idleSystemSleepDisabled] : .userInitiatedAllowingIdleSystemSleep,
+                reason: "Processing files")
+            runActivityHoldsSleep = holdSleep
+        }
+    }
+
+    /// The processors still working when the app is asked to quit.
+    static var processorsStillRunning: [OCRProcessor] {
+        processorsThatRan.compactMap(\.processor).filter(\.isProcessing)
+    }
+
+    /// Set once every waiting run has stopped, so the second quit goes through without asking again.
+    static var quitApproved = false
+
+    /// The app's own quit (`ProcessorAppDelegate` sets it); the quit contract replaces it.
+    static var quitApp: (() -> Void)?
+
+    static let quitWaitMessage = "Quitting once the pages being read now are saved…"
+
+    /// The quit's "wait" answer: finish the pages in flight, start no new one, then stop the run and quit. Only
+    /// meaningful in the main OCR pass (`ocrPhaseActive`); anywhere else there is no page in flight to wait for.
+    func beginQuitWhenPagesSaved() {
+        guard isProcessing, ocrPhaseActive else { return }
+        quitWhenPagesSaved = true
+        statusMessage = Self.quitWaitMessage
+    }
+
+    /// Called as the main OCR pass ends, however it ends. When a quit is waiting, every page started has been saved
+    /// to the run's manifest by now, so Stop keeps a run that Resume Run continues from the first page not read.
+    func finishQuitDrainIfAsked() {
+        guard quitWhenPagesSaved else { return }
+        quitWhenPagesSaved = false
+        let run = processingTask
+        cancel()
+        statusMessage = "The pages being read are saved. Quitting…"
+        Task {
+            // Let the stopped run unwind (and its ledger line land) before the process ends.
+            await run?.value
+            await Task.yield()
+            // Another window's run still draining quits for both when it is done; a run started meanwhile was not
+            // asked about, so the quit then waits for a new ⌘Q.
+            guard Self.processorsStillRunning.isEmpty else { return }
+            Self.quitApproved = true
+            Self.quitApp?()
+        }
+    }
+
     func cancel() {
+        // A Stop pressed while a quit waits for its pages takes the quit back: the run stops and the app stays open.
+        quitWhenPagesSaved = false
         // Kept after the handle is dropped, for the cancellation task at the bottom of this function: the
         // run this Stop is ending goes on unwinding on its own task afterwards, and writes its own
         // `statusMessage` on the way out. That is what the kept-journal warning has to outlive (W16.bat6).

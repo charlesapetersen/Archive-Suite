@@ -6,7 +6,20 @@ import ArchiveCore
 @MainActor
 class OCRProcessor: ObservableObject {
     @Published var jobs: [OCRJob] = []
-    @Published var isProcessing = false { didSet { updateOpenRouterPolicy() } }
+    @Published var isProcessing = false { didSet { updateOpenRouterPolicy(); updateRunActivity() } }
+    /// W49.proc-resume-standard-runs: while a run works App Nap is held off, and in its main OCR pass idle sleep too, so
+    /// a laptop left alone does not stall a long run mid-page. A run waiting on a review sheet lets the Mac idle-sleep.
+    /// Closing the lid still sleeps; the run's saved pages then resume.
+    var runActivity: NSObjectProtocol?
+    var runActivityHoldsSleep = false
+    /// W49.proc-resume-standard-runs: a quit is waiting for the pages being read to be saved. The OCR loops start no
+    /// new page while it is set; when the last one is saved the run stops (its manifest kept) and the app quits.
+    @Published var quitWhenPagesSaved = false
+    /// Whether the run is in its main OCR pass, the one stage a quit can wait on (`performOCRPhase` and its resume twin).
+    var ocrPhaseActive = false { didSet { updateRunActivity() } }
+    /// Every processor that has run, so the app's quit can ask about those still working.
+    static var processorsThatRan: [WeakProcessor] = []
+    struct WeakProcessor { weak var processor: OCRProcessor? }
     @Published private var displayedProgress: Double = 0
     /// A mixed Process Files run has two sequential routes. Each route continues reporting its own
     /// 0…1 progress; map that fraction into its share of the one run's progress bar.
