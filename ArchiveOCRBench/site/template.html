@@ -949,7 +949,10 @@ document.getElementById('r6-rows').innerHTML = R6.rows.map(r => '<tr><td>' + r.r
 document.getElementById('r6-note').textContent = 'Same pages, same scorer; panel routes are their stored panel replies on these ' + R6.pages + '. Against Mistral OCR 4.1, paired: Azure ' +
   R6.vs_mistral.azure[0] + ' NES points (' + R6.vs_mistral.azure[1] + ' to ' + R6.vs_mistral.azure[2] + '), Textract ' + R6.vs_mistral.textract[0] + ' (' +
   R6.vs_mistral.textract[1] + ' to ' + R6.vs_mistral.textract[2] + ', a tie at this n)' +
-  (R6.vs_mistral.transkribus ? ', Transkribus ' + R6.vs_mistral.transkribus[0] + ' (' + R6.vs_mistral.transkribus[1] + ' to ' + R6.vs_mistral.transkribus[2] + ')' : '') + '. A spot check, not on the 96 charts. ' + R6.splitters + ' Source: ' + R6.source + '.';
+  (R6.vs_mistral.transkribus ? ', Transkribus ' + R6.vs_mistral.transkribus[0] + ' (' + R6.vs_mistral.transkribus[1] + ' to ' + R6.vs_mistral.transkribus[2] + ')' : '') + '. A spot check, not on the 96 charts. ' + R6.splitters + ' Source: ' + R6.source + '.' +
+  (R6.all96 ? ' On all ' + R6.all96.pages + ' (p081 apart, ' + R6.all96.spent + '): ' + R6.all96.rows.map(r => r.route + ' ' + r.nes.toFixed(2) + (r.handwritten ? ' (handwritten ' + r.handwritten.toFixed(2) + ')' : '')).join(', ') +
+   '; paired against Mistral OCR 4.1, Azure ' + R6.all96.vs_mistral.azure[0] + ' (' + R6.all96.vs_mistral.azure[1] + ' to ' + R6.all96.vs_mistral.azure[2] + '), Textract ' +
+   R6.all96.vs_mistral.textract[0] + ' (' + R6.all96.vs_mistral.textract[1] + ' to ' + R6.all96.vs_mistral.textract[2] + '). Transkribus is ' + R6.all96.transkribus + '.' : '');
 
 // Part 4: FarmShare.
 const FS = DATA.farmshare;

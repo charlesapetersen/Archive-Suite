@@ -1,17 +1,105 @@
 {
-  "_about": "W46.r6-spot: commercial document services on 25 of the owner's 96, beside the panel's stored replies on the same pages. Entered by hand from the report below; re-enter if it is rerun.",
-  "source": "ArchiveProcessor/segbench-results/r6-spot.md",
-  "pages": 25,
-  "seed": 4625,
-  "rows": [
-    {"route": "gpt5.4-mini", "kind": "panel", "nes": 96.4},
-    {"route": "claude-sonnet5.5", "kind": "panel", "nes": 95.9, "note": "a relative of the Claude Opus 5.5 drafter of the 96's truth"},
-    {"route": "qwen3.5-397b", "kind": "panel", "nes": 95.4},
-    {"route": "mistral-ocr-4-1", "kind": "panel", "nes": 92.5},
-    {"route": "Azure Document Intelligence, prebuilt-layout", "kind": "vendor", "nes": 89.6, "usd_1000": 10.0, "price_note": "list; run on the F0 free tier, $0"},
-    {"route": "AWS Textract, AnalyzeDocument LAYOUT (+ date query)", "kind": "vendor", "nes": 86.6, "usd_1000": 19.0, "price_note": "list, LAYOUT $4 + QUERIES $15; $0.475 spent"},
-    {"route": "Transkribus, Text Titan I with layout analysis (TrHtr 2.52.0, model 356425)", "kind": "vendor", "nes": 82.5, "note": "the owner's hand upload on free credits, $0; Text Titan II was not offered on his account"}
+ "_about": "W46.r6-spot: commercial document services on 25 of the owner's 96, beside the panel's stored replies on the same pages. Entered by hand from the report below; re-enter if it is rerun.",
+ "source": "ArchiveProcessor/segbench-results/r6-spot.md",
+ "pages": 25,
+ "seed": 4625,
+ "rows": [
+  {
+   "route": "gpt5.4-mini",
+   "kind": "panel",
+   "nes": 96.4
+  },
+  {
+   "route": "claude-sonnet5.5",
+   "kind": "panel",
+   "nes": 95.9,
+   "note": "a relative of the Claude Opus 5.5 drafter of the 96's truth"
+  },
+  {
+   "route": "qwen3.5-397b",
+   "kind": "panel",
+   "nes": 95.4
+  },
+  {
+   "route": "mistral-ocr-4-1",
+   "kind": "panel",
+   "nes": 92.5
+  },
+  {
+   "route": "Azure Document Intelligence, prebuilt-layout",
+   "kind": "vendor",
+   "nes": 89.6,
+   "usd_1000": 10.0,
+   "price_note": "list; run on the F0 free tier, $0"
+  },
+  {
+   "route": "AWS Textract, AnalyzeDocument LAYOUT (+ date query)",
+   "kind": "vendor",
+   "nes": 86.6,
+   "usd_1000": 19.0,
+   "price_note": "list, LAYOUT $4 + QUERIES $15; $0.475 spent"
+  },
+  {
+   "route": "Transkribus, Text Titan I with layout analysis (TrHtr 2.52.0, model 356425)",
+   "kind": "vendor",
+   "nes": 82.5,
+   "note": "the owner's hand upload on free credits, $0; Text Titan II was not offered on his account"
+  }
+ ],
+ "splitters": "Custom splitters were priced, not run: $5 (Google Document AI) and $3 (Azure custom classification) per 1,000 pages at list, so $500 and $300 per 100,000 pages and hundreds of dollars for a corpus pass, which needs the owner under the $7 rule (W46.r6-spot-price).",
+ "vs_mistral": {
+  "azure": [
+   -2.9,
+   -6.3,
+   -0.2
   ],
-  "splitters": "Custom splitters were priced, not run: $5 (Google Document AI) and $3 (Azure custom classification) per 1,000 pages at list, so $500 and $300 per 100,000 pages and hundreds of dollars for a corpus pass, which needs the owner under the $7 rule (W46.r6-spot-price).",
-  "vs_mistral": {"azure": [-2.9, -6.3, -0.2], "textract": [-5.8, -13.4, 1.5], "transkribus": [-10.0, -16.9, -4.5]}
+  "textract": [
+   -5.8,
+   -13.4,
+   1.5
+  ],
+  "transkribus": [
+   -10.0,
+   -16.9,
+   -4.5
+  ]
+ },
+ "all96": {
+  "_about": "W47.wh-readers-lost-vendors-read, 2026-11-20: Azure and Textract read the other 71 the same way, so both are on the 95 the headline table scores (p081 apart). Entered by hand from r6-spot.md §\"All 96\".",
+  "pages": 95,
+  "rows": [
+   {
+    "route": "Mistral OCR 4.1",
+    "kind": "panel",
+    "nes": 93.01,
+    "note": "equal to its headline figure"
+   },
+   {
+    "route": "Azure Document Intelligence, prebuilt-layout",
+    "kind": "vendor",
+    "nes": 90.9,
+    "handwritten": 81.77
+   },
+   {
+    "route": "AWS Textract, AnalyzeDocument LAYOUT",
+    "kind": "vendor",
+    "nes": 88.45,
+    "handwritten": 72.92
+   }
+  ],
+  "vs_mistral": {
+   "azure": [
+    -2.11,
+    -3.5,
+    -0.91
+   ],
+   "textract": [
+    -4.55,
+    -7.41,
+    -1.76
+   ]
+  },
+  "spent": "Textract $1.349 for the 71 ($1.824 on all 96); Azure on the F0 free tier, $0",
+  "transkribus": "still on the 25: the other 71 wait for the owner's hand upload"
+ }
 }

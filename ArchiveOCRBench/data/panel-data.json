@@ -4697,6 +4697,44 @@
     -16.9,
     -4.5
    ]
+  },
+  "all96": {
+   "_about": "W47.wh-readers-lost-vendors-read, 2026-11-20: Azure and Textract read the other 71 the same way, so both are on the 95 the headline table scores (p081 apart). Entered by hand from r6-spot.md \u00a7\"All 96\".",
+   "pages": 95,
+   "rows": [
+    {
+     "route": "Mistral OCR 4.1",
+     "kind": "panel",
+     "nes": 93.01,
+     "note": "equal to its headline figure"
+    },
+    {
+     "route": "Azure Document Intelligence, prebuilt-layout",
+     "kind": "vendor",
+     "nes": 90.9,
+     "handwritten": 81.77
+    },
+    {
+     "route": "AWS Textract, AnalyzeDocument LAYOUT",
+     "kind": "vendor",
+     "nes": 88.45,
+     "handwritten": 72.92
+    }
+   ],
+   "vs_mistral": {
+    "azure": [
+     -2.11,
+     -3.5,
+     -0.91
+    ],
+    "textract": [
+     -4.55,
+     -7.41,
+     -1.76
+    ]
+   },
+   "spent": "Textract $1.349 for the 71 ($1.824 on all 96); Azure on the F0 free tier, $0",
+   "transkribus": "still on the 25: the other 71 wait for the owner's hand upload"
   }
  },
  "farmshare": {
