@@ -3464,6 +3464,10 @@ extension OCRProcessor {
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
 
+            // Page 2's Classification: every review is done, and merge copies these pages next
+            // (W40.fix-processor-review-classification-stale).
+            writeClassificationHeaders(runConfig: runConfig)
+
             // Live Capture: layer per-page phone Quality on top now that box/folder Red/Purple is
             // final, and before merge folds appliedTags into merged PDFs. The companion wire already
             // carries only canonical Q tokens, with an omitted field for Unrated.

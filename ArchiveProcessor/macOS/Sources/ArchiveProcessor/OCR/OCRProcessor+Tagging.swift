@@ -1417,6 +1417,54 @@ extension OCRProcessor {
         return outcome
     }
 
+    /// W40.fix-processor-review-classification-stale — bring one output's `Classification:` header line to the job's
+    /// current class. Every page is rendered with the reader's proposal; the per-page review, the box/folder
+    /// confirmation, the final review's edit sheet, Segment & Tag and the window stage change the class afterwards.
+    /// Through `OutputFileSafety.replaceGeneratedOutput`, which keeps the file's Finder tags and label. An output it
+    /// cannot safely rewrite (a merged document, a pre-OCRed source, a page whose text is not this run's) is left as it
+    /// is and logged.
+    @discardableResult
+    func writeClassificationHeader(forJobAt index: Int, runConfig: SessionProcessingConfig?) -> PDFGenerator.DateEvidenceRewrite {
+        guard jobs.indices.contains(index), jobs[index].status != .removed,
+              let result = jobs[index].result, let text = result.text, !text.isEmpty else { return .skipped("no text") }
+        let source = jobs[index].sourceURL
+        guard let outputPDF = outputURLMap[source], !reOCRSourceURLs.contains(source) else { return .skipped("no output") }
+        let wanted = result.classification?.displayName
+        // Most pages keep their proposal: settle that from the text page alone, unread bytes.
+        if let doc = PDFDocument(url: outputPDF), doc.pageCount == 2, PDFPageRole.roles(of: doc) == [.image, .text],
+           let page = doc.page(at: 1), let header = PDFHeaderParser.parse(page).header, header.classification == wanted {
+            return .unchanged
+        }
+        guard !OutputFileSafety.isSameFile(outputPDF, source), let data = try? Data(contentsOf: outputPDF) else {
+            return .skipped("not a readable generated output")
+        }
+        let columns = Self.pdfGenerationSettings(for: runConfig).textColumns
+        let outcome = PDFGenerator().classificationRewrite(of: data, sourceName: source.lastPathComponent,
+                                                           classification: wanted, body: text,
+                                                           textColumns: columns)
+        switch outcome {
+        case .rewrite(let new):
+            do {
+                try OutputFileSafety.replaceGeneratedOutput(outputPDF, for: source, with: new)
+            } catch {
+                os_log(.error, "Classification not written to %{public}@: %{public}@",
+                       outputPDF.lastPathComponent, String(describing: error))
+                return .skipped(String(describing: error))
+            }
+        case .skipped(let why):
+            os_log(.info, "Classification left as it was in %{public}@: %{public}@", outputPDF.lastPathComponent, why)
+        case .unchanged:
+            break
+        }
+        return outcome
+    }
+
+    /// Every output's `Classification:` line brought to its job's class, once the reviews are done and before merge
+    /// folds the pages into documents (`writeClassificationHeader`).
+    func writeClassificationHeaders(runConfig: SessionProcessingConfig?) {
+        for index in jobs.indices { writeClassificationHeader(forJobAt: index, runConfig: runConfig) }
+    }
+
     /// W37.dual-date — after a POST-tagging reclassification, bring every written `Sent With` token (and
     /// each sidecar's `sent_with` / `sent_with_uncertain` / `enclosure_of`) back in line with the
     /// relation the CURRENT segmentation still supports: a relation that no longer holds (the enclosure

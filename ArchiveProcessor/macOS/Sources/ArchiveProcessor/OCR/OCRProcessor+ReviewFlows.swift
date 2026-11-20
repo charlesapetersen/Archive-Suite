@@ -330,6 +330,10 @@ extension OCRProcessor {
                 rotationDegrees: existingResult.rotationDegrees
             )
         }
+        // Page 2's Classification follows the edit (W40.fix-processor-review-classification-stale).
+        if oldClassification != newClassification {
+            writeClassificationHeader(forJobAt: index, runConfig: runConfig)
+        }
         // Update tags on the output file (W23.m5-fu2 — see `applyReviewEdits`).
         if oldClassification != newClassification,
            let outputURL = outputURLMap[jobs[index].sourceURL] {

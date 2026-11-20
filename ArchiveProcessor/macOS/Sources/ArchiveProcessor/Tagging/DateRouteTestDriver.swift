@@ -441,6 +441,59 @@ enum DateRouteTestDriver {
         do { try OutputFileSafety.replaceGeneratedOutput(tmp.appendingPathComponent("gone.pdf"), for: image, with: added) }
         catch { missing = (error as? OutputFileSafety.ReplaceError) == .missing }
         check("4 replace never creates a missing output", missing && !fm.fileExists(atPath: tmp.appendingPathComponent("gone.pdf").path))
+
+        // W40.fix-processor-review-classification-stale — the Classification line follows a review's class.
+        if case .rewrite(let boxed) = gen.classificationRewrite(of: added, sourceName: "scan_001.jpg", classification: "Box",
+                                                                 body: text, textColumns: 1) {
+            let bp = PDFDocument(data: boxed)?.page(at: 1).map { PDFHeaderParser.parse($0) }
+            var want = expected
+            want.classification = "Box"
+            check("4c rewrite changes the Classification line; the evidence, every other line and the body read back unchanged",
+                  bp?.header == want && PDFGenerator.squashed(bp?.body ?? "") == PDFGenerator.squashed(text)
+                  && PDFDocument(data: boxed)?.page(at: 0)?.bounds(for: .mediaBox) == image0, "\(String(describing: bp))")
+            check("4c the same class again: unchanged",
+                  gen.classificationRewrite(of: boxed, sourceName: "scan_001.jpg", classification: "Box", body: text,
+                                            textColumns: 1) == .unchanged)
+        } else { check("4c rewrite changes the Classification line", false) }
+        if case .rewrite(let bare) = gen.classificationRewrite(of: added, sourceName: "scan_001.jpg", classification: nil,
+                                                                body: text, textColumns: 1) {
+            check("4c nil removes the line",
+                  PDFDocument(data: bare)?.page(at: 1).map { PDFHeaderParser.parse($0) }?.header?.classification == nil)
+        } else { check("4c nil removes the line", false) }
+        if let twoData = try? Data(contentsOf: two), case .skipped = gen.classificationRewrite(
+            of: twoData, sourceName: "scan_001.jpg", classification: "Box", body: text, textColumns: 1) {
+            check("4c a file of more than one pair is left alone", true)
+        } else { check("4c a file of more than one pair is left alone", false) }
+
+        // Through the processor: the file pane's edit, then a review that set the class on the job alone (the per-page
+        // review, Segment & Tag) and the pass before merge. The Finder tags stay; a merged output is left alone.
+        let p = OCRProcessor()
+        p.taggingMode = .automatic
+        var job = OCRJob(sourceURL: image)
+        job.classification = .documentStart
+        job.result = OCRResult(text: text, classification: .documentStart, errorMessage: nil, errorCode: nil)
+        job.appliedTags = ["1957", "Date Uncertain"]
+        p.jobs = [job]
+        p.outputURLMap = [image: pdf]
+        func pageTwo(_ url: URL) -> PDFPageHeader? { PDFDocument(url: url)?.page(at: 1).flatMap { PDFHeaderParser.parse($0).header } }
+        p.updateClassification(at: 0, to: .boxLabel)
+        let edited = pageTwo(pdf)
+        check("4c an edit rewrites page 2's Classification, the evidence line kept",
+              edited?.classification == "Box" && edited?.dateEvidence == line, "\(String(describing: edited))")
+        check("4c ...and the file keeps its Finder tags", ((try? MacOSTagger.readTags(from: pdf)) ?? []).contains("1957"))
+        p.jobs[0].classification = .folderLabel
+        p.jobs[0].result = p.jobs[0].result?.with(classification: .folderLabel, rotationDegrees: 0)
+        p.writeClassificationHeaders(runConfig: nil)
+        check("4c the pass before merge writes a class set on the job alone", pageTwo(pdf)?.classification == "Folder")
+        p.writeClassificationHeaders(runConfig: nil)
+        check("4c ...and leaves a page that already agrees as it is", pageTwo(pdf)?.classification == "Folder")
+        let twoBefore = try? Data(contentsOf: two)
+        p.outputURLMap = [image: two]
+        p.writeClassificationHeaders(runConfig: nil)
+        check("4c a merged output is left as it is", (try? Data(contentsOf: two)) == twoBefore)
+        p.outputURLMap = [image: image]
+        p.writeClassificationHeaders(runConfig: nil)
+        check("4c an output that is its own source is never written", (try? Data(contentsOf: image)) == imageBytes)
     }
 
     // MARK: 3. End to end

@@ -27,10 +27,30 @@ extension PDFGenerator {
     func dateEvidenceRewrite(of pdf: Data, sourceName: String, evidence: String?,
                              itemFields: PDFItemFields = PDFItemFields(), body: String,
                              textColumns: Int) -> DateEvidenceRewrite {
+        headerRewrite(of: pdf, sourceName: sourceName, body: body, textColumns: textColumns) {
+            $0.dateEvidence = evidence
+            $0.itemFields = itemFields
+        }
+    }
+
+    /// W40.fix-processor-review-classification-stale — the bytes `pdf` should have so its text page's
+    /// `Classification:` line reads `classification` (a `DocumentClassification.displayName`; nil removes the line).
+    /// Each page is rendered with the reader's proposal, and a review that changes the class afterwards must reach the
+    /// header too, which SPEC §2-page PDF structure makes the value consumers read. Same checks as the evidence line.
+    func classificationRewrite(of pdf: Data, sourceName: String, classification: String?, body: String,
+                               textColumns: Int) -> DateEvidenceRewrite {
+        headerRewrite(of: pdf, sourceName: sourceName, body: body, textColumns: textColumns) {
+            $0.classification = classification
+        }
+    }
+
+    /// The text page laid out again with `change` applied to its header, every other line and the body read back
+    /// unchanged; the image page kept as it is.
+    private func headerRewrite(of pdf: Data, sourceName: String, body: String, textColumns: Int,
+                               change: (inout PDFPageHeader) -> Void) -> DateEvidenceRewrite {
         guard let doc = PDFDocument(data: pdf), !doc.isLocked else { return .skipped("not readable") }
         if PDFPageRole.roles(of: doc).contains(.searchable) {
-            return searchableDateEvidenceRewrite(doc, original: pdf, sourceName: sourceName, evidence: evidence,
-                                                 itemFields: itemFields, body: body)
+            return searchableHeaderRewrite(doc, original: pdf, sourceName: sourceName, body: body, change: change)
         }
         guard doc.pageCount == 2, let image = doc.page(at: 0), let text = doc.page(at: 1) else {
             return .skipped("not one image page and one text page")
@@ -38,12 +58,13 @@ extension PDFGenerator {
         let parsed = PDFHeaderParser.parse(text)
         guard let old = parsed.header, let provenance = old.rawProvenance, old.provenance != nil,
               old.diagnostics.allSatisfy({ $0 == .missingKind }) else { return .skipped("the header does not parse cleanly") }
-        if old.dateEvidence == evidence, old.itemFields == itemFields { return .unchanged }
+        var expected = old
+        change(&expected)
+        if expected == old { return .unchanged }
         guard Self.squashed(parsed.body) == Self.squashed(body) else { return .skipped("the page's text is not this run's") }
         guard Self.namesSource(old, sourceName) else { return .skipped("the name line does not read back as the source's name") }
 
-        let (header, fit) = Self.headerText(old, name: sourceName, provenance: provenance, evidence: evidence,
-                                            itemFields: itemFields)
+        let (header, fit) = Self.headerText(expected, name: sourceName, provenance: provenance)
         let page = layoutTextPage(headerLine: header + "\n\n", fitRanges: fit, bodyText: body, textColumns: textColumns)
 
         let out = PDFDocument()
@@ -52,7 +73,7 @@ extension PDFGenerator {
         // Written as `generate` writes the pair (PDF/A, the unwritten object freed), not `dataRepresentation`, whose
         // xref lists an object at offset 0.
         guard let data = Self.archivalData(out) else { return .skipped("the new page was not made") }
-        // It must read back as the old page did, with only the evidence changed.
+        // It must read back as the old page did, with only the changed lines changed.
         guard let made = PDFDocument(data: data), made.pageCount == 2, let madeImage = made.page(at: 0),
               let madeText = made.page(at: 1) else {
             return .skipped("the new file does not read back")
@@ -65,9 +86,6 @@ extension PDFGenerator {
         // The name line reads back as the old one did: PDFKit cannot tell a U+00A0 from a space, so this checks the
         // layout, and the name's characters are the source's because `headerText` writes them from it.
         let back = PDFHeaderParser.parse(madeText)
-        var expected = old
-        expected.dateEvidence = evidence
-        expected.itemFields = itemFields
         guard back.header == expected, Self.squashed(back.body) == Self.squashed(body) else {
             return .skipped("the new header does not read back as the old one")
         }
@@ -81,17 +99,15 @@ extension PDFGenerator {
         return squashed(name) == squashed(headerFileName(sourceName))
     }
 
-    /// `old`'s header lines, its name line `name` as `generate` writes it, with `evidence` as its date-evidence line (nil:
-    /// none) and `itemFields` as its item-field lines, and the lines fitted to one line each.
-    private static func headerText(_ old: PDFPageHeader, name: String, provenance: String, evidence: String?,
-                                   itemFields: PDFItemFields) -> (String, [NSRange]) {
+    /// `old`'s header lines, its name line `name` as `generate` writes it, and the lines fitted to one line each.
+    private static func headerText(_ old: PDFPageHeader, name: String, provenance: String) -> (String, [NSRange]) {
         var header = "Extracted text.\n" + headerFileName(name)
         var fit = [NSRange(location: header.utf16.count + 1, length: provenance.utf16.count)]
         header += "\n" + provenance
         if let c = old.classification { header += "\nClassification: " + c }
         if let k = old.kind { header += "\n" + PDFHeaderParser.kindPrefix + k.rawValue }
-        let dates = PDFSourceDates(documentDate: old.documentDate, sentWith: old.sentWith, dateEvidence: evidence,
-                                   itemFields: itemFields)
+        let dates = PDFSourceDates(documentDate: old.documentDate, sentWith: old.sentWith, dateEvidence: old.dateEvidence,
+                                   itemFields: old.itemFields)
         for line in dates.headerLines {
             if PDFSourceDates.isFitted(line) {
                 fit.append(NSRange(location: header.utf16.count + 1, length: line.utf16.count))
@@ -102,22 +118,23 @@ extension PDFGenerator {
     }
 
     /// The searchable form's rewrite: one page, its header in the XMP. The page is copied as it is (or, without qpdf,
-    /// drawn again unchanged), so it must read back with the same size, turn and text; the header must read back as the old one with only the evidence changed.
-    private func searchableDateEvidenceRewrite(_ doc: PDFDocument, original: Data, sourceName: String, evidence: String?,
-                                               itemFields: PDFItemFields, body: String) -> DateEvidenceRewrite {
+    /// drawn again unchanged), so it must read back with the same size, turn and text; the header must read back as the old one with only `change` applied.
+    private func searchableHeaderRewrite(_ doc: PDFDocument, original: Data, sourceName: String, body: String,
+                                         change: (inout PDFPageHeader) -> Void) -> DateEvidenceRewrite {
         guard doc.pageCount == 1, let page = doc.page(at: 0),
               let carried = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:)), carried.count == 1,
               let oldText = carried[0] else { return .skipped("not one searchable page") }
         let parsed = PDFHeaderParser.parse(oldText)
         guard let old = parsed.header, let provenance = old.rawProvenance, old.provenance != nil, parsed.body.isEmpty,
               old.diagnostics.allSatisfy({ $0 == .missingKind }) else { return .skipped("the header does not parse cleanly") }
-        if old.dateEvidence == evidence, old.itemFields == itemFields { return .unchanged }
+        var changed = old
+        change(&changed)
+        if changed == old { return .unchanged }
         // The page is not laid out again, but the line must be about this run's reading: a searchable page's layer holds
         // every word of it (`searchableImagePage`).
         guard OutputForm.holds(page.string ?? "", every: body) else { return .skipped("the page's text is not this run's") }
         guard Self.namesSource(old, sourceName) else { return .skipped("the name line does not read back as the source's name") }
-        let header = Self.headerText(old, name: sourceName, provenance: provenance, evidence: evidence,
-                                     itemFields: itemFields).0
+        let header = Self.headerText(changed, name: sourceName, provenance: provenance).0
         guard let data = Self.searchableRewrite(doc, original: original, pageHeaders: [header]),
               let made = PDFDocument(data: data), made.pageCount == 1, let madePage = made.page(at: 0) else {
             return .skipped("the new file does not read back")
@@ -127,10 +144,8 @@ extension PDFGenerator {
             return .skipped("the page does not read back")
         }
         // The XMP keeps the header's characters, so here the name reads back exactly.
-        var expected = old
+        var expected = changed
         expected.originalFilename = Self.headerFileName(sourceName)
-        expected.dateEvidence = evidence
-        expected.itemFields = itemFields
         guard let back = made.documentRef.flatMap(PDFHeaderCarrier.pages(of:)), back.count == 1,
               let backText = back[0], PDFHeaderParser.parse(backText).header == expected else {
             return .skipped("the new header does not read back as the old one")
