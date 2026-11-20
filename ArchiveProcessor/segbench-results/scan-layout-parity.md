@@ -26,7 +26,9 @@ LayoutProcessor and the bench arm's keep_regions. App: `ScanNewspaperLayout` (th
 | newsbench__mss425490669-55 | 39 / 39 | 0 / 0 | 34 / 34 | yes | 1.0000 |
 
 Time on this Mac (headless Debug Processor, the 15 pages one after another): Core ML detection median 2.05 s a page
-(at most 2.47 s, pages 3,357-3,812 px wide), the layout processing in the shared runtime median 0.18 s.
+(at most 2.47 s, pages 3,357-3,812 px wide), the layout processing in the shared runtime median 0.18 s; a second run
+gave 2.02 s and 0.17 s. Memory: the whole Processor process's peak physical footprint (the kernel's ledger) was 350 MB
+after the first page and 636 MB after the fifteenth, the model loaded once.
 
 ## Measurement card
 

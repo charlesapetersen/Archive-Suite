@@ -141,6 +141,8 @@ struct SettingsSheetModel {
         let note: String?
         /// The hand placement switch, while the placer is not downloaded: the row offers the download.
         var offersHandDownload = false
+        /// The scanned-newspaper detector switch, while its detector is not downloaded (W47.wh-yolo-scans).
+        var offersScanLayoutDownload = false
     }
 
     struct RuleStage: Identifiable {
@@ -995,8 +997,10 @@ struct SettingsSheetModel {
             return SwitchRow(id: sw.id, key: key, label: Self.switchLabel(key) ?? sw.label, isOn: resolved.value.bool ?? sw.defaultValue,
                              source: Self.sourceWords(resolved),
                              note: Self.switchPending.contains(key) ? Self.pendingNote
-                                 : key == .placeHandOnImage && !HandPlacer.isInstalled() ? Self.handDownloadNote : nil,
-                             offersHandDownload: key == .placeHandOnImage && !HandPlacer.isInstalled())
+                                 : key == .placeHandOnImage && !HandPlacer.isInstalled() ? Self.handDownloadNote
+                                 : key == .scanNewspapersDocLayoutYOLO ? Self.scanLayoutNote : nil,
+                             offersHandDownload: key == .placeHandOnImage && !HandPlacer.isInstalled(),
+                             offersScanLayoutDownload: key == .scanNewspapersDocLayoutYOLO && !ScanNewspaperLayout.isInstalled())
         }
     }
 
@@ -1026,6 +1030,15 @@ struct SettingsSheetModel {
             + "downloaded, handwritten pages get only their separate text page."
     }
     static let pendingNote = "Saved, but not used yet: it takes effect in a later version of the Processor."
+    /// The scanned-newspaper switch's figures, as any row carries its own (owner, call 15), and what it needs.
+    static var scanLayoutNote: String {
+        "Measured on 15 scanned newspaper pages, 14 of them from one Library of Congress collection: 4.6 points of "
+            + "reading accuracy above PP-DocLayoutV3 (95% interval 1.1 to 8.0) across four readers, a direction rather "
+            + "than a settled gap; not measured on photographed newspapers, which keep PP-DocLayoutV3. "
+            + (ScanNewspaperLayout.isInstalled() ? ""
+                : "Needs its detector, a \(ScanNewspaperLayout.downloadMB) MB download whose weights are "
+                    + "\(ScanNewspaperLayout.licence); until it is downloaded, scanned newspapers use the default helper.")
+    }
 
     static func switchLabel(_ key: SettingsKey) -> String? {
         switch key {
@@ -1036,6 +1049,9 @@ struct SettingsSheetModel {
         case .dateImageEveryDocument:
             return "Search the page image on every document, not only those whose text has no year: finds stamp dates "
                 + "(kept beside the document's own date); about $1.93 more per 1,000 documents"
+        case .scanNewspapersDocLayoutYOLO:
+            return "On scanned newspapers, find the columns with DocLayout-YOLO (newspaper-ocr's route) instead of "
+                + "PP-DocLayoutV3"
         default: return nil
         }
     }
@@ -1046,6 +1062,7 @@ struct SettingsSheetModel {
         case "reading_copy.straighten": return .straightenReadingCopy
         case "place.hand_on_image": return .placeHandOnImage
         case "dating.image_every_document": return .dateImageEveryDocument
+        case "layout.scan_newspapers_yolo": return .scanNewspapersDocLayoutYOLO
         default: return nil
         }
     }
@@ -1153,6 +1170,9 @@ struct SettingsSheetWords {
                 + "text outside every region is read in small pieces of its own. An unsuccessful layout or region "
                 + "reading uses the whole page. "
                 + "Download the helper below to use regions; until then, newspapers read whole. "
+                + "Scanned newspapers can instead have their columns found by DocLayout-YOLO, newspaper-ocr's route, "
+                + "which leaves pictures out: switch it on below; it is a separate download. Photographs always use "
+                + "the default helper. "
                 + "Everything else reads whole. Handwriting, registers, ledgers and uncertain kinds are never split."
         case "placement":
             return "On typed and printed pages the text is laid over the page image line by line, so you can select and "

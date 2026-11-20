@@ -52,3 +52,11 @@ region detector using the existing shared runtime. It keeps all labels and the d
 Processor owns the kind gate, crops, fill and fallback. Its public model pin has the same 857 tensors as the
 measured lab copy. `PageReaderInput.costScale` keeps the estimator's area fraction separate from the encoder's
 linear dimension scale. No corpus or settings are changed by detection.
+
+`ScanNewspaperLayout` (W47.wh-yolo-scans) is the scanned-newspaper alternative: newspaper-ocr 0.11.0's DocLayout-YOLO
+route, which W46.ocr-regions measured on the 15 L9 scans. Its imgsz1280-2501 checkpoint (AGPL-3.0) is converted to Core
+ML (`ops/convert-scan-layout.py`, built and archived by `ops/make-scan-newspaper-layout.sh`) and fetched as
+`doclayout-yolo-1280.tgz`, never bundled; the library's LayoutProcessor (MIT) is vendored unchanged as
+`Resources/npo_layout.py` and runs in the shared runtime with the bench arm's region filter (`order-scan-newspaper.py`).
+`ArchiveProcessor/scripts/segbench/scan_layout_parity.sh` checks it against the route itself in PyTorch: the same region
+list on 15 of 15 pages.

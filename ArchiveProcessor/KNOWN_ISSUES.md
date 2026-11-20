@@ -2,6 +2,29 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W47.wh-yolo-scans, 2026-11-20): what the scanned-newspaper detector does not yet do
+
+`OCR/NewspaperPageReader.swift` (`NewspaperDetector`), VisionOCRKit `ScanNewspaperLayout`; the switch is in Settings →
+Rules → Columns and reading order, off by default.
+- **The download is not published yet.** The app pins `doclayout-yolo-1280.tgz` (64,147,778 B, sha256 `99c62ee6…`) at
+  the `models-1` release of `charlesapetersen/vision-ocr`, where nothing has been attached, so "Download the
+  scanned-newspaper layout helper" fails until the owner uploads the archive kept in the autonomous state's
+  `model-files/scan-layout-build/`. Until then a scan with the switch on keeps PP-DocLayoutV3, as the switch says
+  (queued: W47.wh-yolo-scans-publish).
+- **Measured on scans from one collection, and on raw regions.** The 4.6-point lead is 15 L9 scans, 14 from one Library
+  of Congress collection, read on the regions as newspaper-ocr cut them, not through the app's partition
+  (W46.layout-partition-fix); photographed newspapers are unmeasured and always use PP-DocLayoutV3 (accepted: owner,
+  2026-11-19, call 15, "release as measured"; the photographed half is W46.layout-photo-newspapers, behind
+  W46.nice-to-have).
+- **Pictures are left out on this route.** As the measured arm did, DocLayout-YOLO's figure boxes (some headlines among
+  them) are not read as regions; text Vision finds in them is read as leftover lines (accepted: owner, 2026-11-19,
+  call 15, "release as measured": the measured arm drops them).
+- **Time and memory:** about 2 s a page for Core ML detection on the CPU (median 2.05 s over the 15 scans) and 0.18 s
+  for the layout processing, against PP-DocLayoutV3's 0.19 s on other pages; the whole Processor's peak footprint was
+  636 MB over the 15 pages (`scan-layout-parity.md`) (accepted: the measured cost of the detector the owner released).
+- **Re-OCR of existing PDFs uses PP-DocLayoutV3.** `ReOCRJob.reader` has no run settings snapshot, so the switch is not
+  followed there; Process Files (resumes and retries included) and Live Capture follow it (queued: W47.wh-yolo-scans-reocr).
+
 ## ⚠️ LIMITATION (W40.fix-processor-review-classification-stale, 2026-11-20): where page 2's Classification is not rewritten
 
 `OCR/OCRProcessor+Tagging.swift` `writeClassificationHeader`; the rewrite is `PDFGenerator.classificationRewrite`.

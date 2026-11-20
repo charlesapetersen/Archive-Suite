@@ -382,6 +382,7 @@ struct SheetSwitchRow: View {
             toggle(sw)
         }
         if sw.offersHandDownload { HandPlacerDownloadRow().settingsLevel(.downloads) }
+        if sw.offersScanLayoutDownload { ScanNewspaperLayoutDownloadRow().settingsLevel(.downloads) }
     }
 
     private func toggle(_ sw: SettingsSheetModel.SwitchRow) -> some View {

@@ -33,7 +33,7 @@ Sheet text is `SettingsSheetWords.ruleText("layout")`: newspapers use every read
 
 ## 4. Table rows
 
-The stage object, replacing the design's fixed text (figures.json "fixed" layout rule names PP-DocLayoutV3 and the two never-run kinds; this note adds the quad and the fallback). Its `routes` list is the two rows in the second block:
+The stage object, replacing the design's fixed text (figures.json "fixed" layout rule names PP-DocLayoutV3 and the two never-run kinds; this note adds the quad and the fallback). Its `routes` list is the three rows in the second block (the third, DocLayout-YOLO on scans, added by W47.wh-yolo-scans at the owner's call 15 of 2026-11-19, with its switch):
 
 ```
 {"id":"layout","name":"Layout and reading order","unit":"pages","choice":false,
@@ -42,7 +42,8 @@ The stage object, replacing the design's fixed text (figures.json "fixed" layout
  "rules":[{"id":"layout-regions-newspapers","text":"Newspapers and dense multi-column print: PP-DocLayoutV3 regions, the detector's own order, quad correction first on a photograph.","source":"layout-photo-tables.md §L9","switch":null},
   {"id":"layout-whole-otherwise","text":"Every other kind, and an uncertain kind, reads the whole page in the reader's line order.","source":"layout-photo-tables.md §the 96","switch":null},
   {"id":"layout-never-hands-registers","text":"No detector on handwritten pages or registers.","source":"layout-photo-tables.md §handwritten","switch":null},
-  {"id":"layout-fallback-whole","text":"A page the detector fails reads whole.","source":"layout-photo-tables.md §the 96","switch":null}],
+  {"id":"layout-fallback-whole","text":"A page the detector fails reads whole.","source":"layout-photo-tables.md §the 96","switch":null},
+  {"id":"layout-scans-doclayout-yolo","text":"Scanned newspapers may use DocLayout-YOLO through newspaper-ocr's route instead, the user's choice, off by default: 4.6 NES above PP-DocLayoutV3 (1.1 to 8.0) on 15 L9 scans, 14 from one collection, a direction; unmeasured on photographs, which keep PP-DocLayoutV3. An optional download, its weights AGPL-3.0.","source":"layout-pair-newspapers.md §What this says","switch":{"id":"layout.scan_newspapers_yolo","label":"On scanned newspapers, find the columns with DocLayout-YOLO (newspaper-ocr's route)","default":false}}],
  "fallback":"whole-page"}
 ```
 
@@ -61,6 +62,15 @@ The stage object, replacing the design's fixed text (figures.json "fixed" layout
  "caveats":["time re-taken like for like (LAY-3): 0.19 s a page beside Vision's 0.19 s on the same 16 pages; the lab's 0.47 s (E-layout claim 36) and the 0.27 s of layout-photo-hands.md were other runs and inputs","memory: the lab's 794 MB peak RSS stands in the table; the like-for-like run saw a 441 MB process RSS and a 1.52 GB MLX peak, not the same measure","L9 is scans; photographed newspapers unmeasured","on L9 scans DocLayout-YOLO leads it by 4.6 NES paired, a direction on 15 pages (at most 12 items, one collection), descriptive (layout-pair-newspapers.md)","regions drop marks (LAY-2)","96 deltas order-sensitive (OCR-6)","one reader, GLM-OCR (layout-photo.md card)"],
  "kind_rules":["newspapers and dense multi-column: regions","handwritten, registers: never","all other kinds: whole page"],
  "fallback":"whole-page","conditions":["quad correction first on a photograph"]}
+{"id":"doclayout-yolo-scans","name":"DocLayout-YOLO regions through newspaper-ocr's route, then the reader (scanned newspapers)","family":"mac","app_route":null,"status":"measured",
+ "needs":{"key":[],"plan":[],"cluster":false,"mac_gb":16,"gpus":0},
+ "figures":{"newspapers":{"value":91.1,"n":15,"truth":"L9 published transcriptions","source":{"file":"layout-photo-tables.md","route":"L9 yolo_newsocr","attribute":"NES strict","value":"91.1"}}},
+ "cost":{"usd_1000_list":0,"usd_1000_batch":0,"price_read":null,"source":{"file":"E-layout.md","route":"section 7","attribute":"detectors are free everywhere","value":"free"}},
+ "time":{"per_unit_s":2.05,"measured":true,"measured_on":"this Mac, headless Debug Processor: median Core ML detection on the CPU over the 15 L9 scans, 3,357-3,812 px wide, layout processing (0.18 s) apart (W47.wh-yolo-scans)","source":{"file":"scan-layout-parity.md","route":"Core ML detection","attribute":"median s a page","value":"2.05"}},
+ "licence":"weights AGPL-3.0 (juliozhao/DocLayout-YOLO-DocStructBench-imgsz1280-2501), a separate optional download, never bundled (call 12); newspaper-ocr's layout processing MIT, vendored",
+ "caveats":["paired over four readers on the 15 L9 scans: 4.6 NES above PP-DocLayoutV3 (1.1 to 8.0), beyond the interval for 3 of 4 readers, PaddleOCR-VL 1.5 a tie (layout-pair-newspapers.md)","15 pages, 14 from one Library of Congress collection and four from one item: a direction, not a settled gap","scans only: photographed newspapers unmeasured, so they keep PP-DocLayoutV3; on photographed modern print and the owner's 96 the same detector with the app's sort trails it (layout-photo-tables.md)","measured on the regions as the library cut them, not on the app's partition (W46.layout-partition-fix)","the app's regions equal the measured route's on all 15 pages (scan-layout-parity.md)","memory not measured"],
+ "kind_rules":["scanned newspapers: regions, when the user turns it on","photographed newspapers: PP-DocLayoutV3","all other kinds: whole page"],
+ "fallback":"whole-page","conditions":["the user's switch, off by default","PP-DocLayoutV3 while its detector is not downloaded"]}
 {"id":"whole-page","name":"Whole page, no layout stage","family":"mac","status":"shipped",
  "figures":{"typed":{"value":94.0,"n":41,"truth":"owner-96","source":{"file":"layout-photo-tables.md","route":"typed whole","attribute":"NES strict","value":"94.0"}},
   "clippings":{"value":86.9,"n":13,"truth":"owner-96","source":{"file":"layout-photo-tables.md","route":"clippings whole","attribute":"NES strict","value":"86.9"}},

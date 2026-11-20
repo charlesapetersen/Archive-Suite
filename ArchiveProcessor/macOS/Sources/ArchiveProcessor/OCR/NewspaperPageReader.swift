@@ -6,6 +6,40 @@ import UniformTypeIdentifiers
 import Vision
 import VisionOCRKit
 
+/// Which detector finds a newspaper page's regions (W47.wh-yolo-scans). PP-DocLayoutV3 is the default and the only
+/// one measured after the quad on photographs; DocLayout-YOLO through newspaper-ocr's route is the user's choice for
+/// scanned newspapers (owner, 2026-11-19, call 15), measured 4.6 points above it on 15 L9 scans.
+enum NewspaperDetector: String, Sendable, Equatable {
+    case ppDocLayoutV3, docLayoutYOLO
+
+    /// A frozen settings snapshot's choice for scanned newspapers; the built-in default without one.
+    static func scans(_ values: [String: ResolvedSetting]?) -> Self {
+        values?[SettingsKey.scanNewspapersDocLayoutYOLO.rawValue]?.value.bool == true ? .docLayoutYOLO : .ppDocLayoutV3
+    }
+
+    /// The detector a page gets: a photograph always PP-DocLayoutV3; a scan the run's choice, or PP-DocLayoutV3 while
+    /// the chosen detector is not downloaded (what the switch's note says).
+    static func forPage(photographed: Bool, scans: Self,
+                        environment: [String: String] = ProcessInfo.processInfo.environment) -> Self {
+        guard !photographed, scans == .docLayoutYOLO, ScanNewspaperLayout.isInstalled(environment) else { return .ppDocLayoutV3 }
+        return .docLayoutYOLO
+    }
+
+    func isInstalled() -> Bool {
+        switch self {
+        case .ppDocLayoutV3: return NewspaperLayout.isInstalled()
+        case .docLayoutYOLO: return ScanNewspaperLayout.isInstalled()
+        }
+    }
+
+    func detect(_ image: CGImage, isCancelled: () -> Bool) throws -> [NewspaperLayout.Region] {
+        switch self {
+        case .ppDocLayoutV3: return try NewspaperLayout.detect(image: image, isCancelled: isCancelled)
+        case .docLayoutYOLO: return try ScanNewspaperLayout.detect(image: image, isCancelled: isCancelled)
+        }
+    }
+}
+
 /// The fixed layout stage (W46.layout-newspapers). The selected reader reads every region, pictures included,
 /// in PP's native order. A failed region replaces the assembled reading with a whole-page reading. Never use
 /// textual deduplication: repeated headings and repeated words on a newspaper can both be real.
@@ -13,6 +47,9 @@ struct NewspaperPageReader: PageReader {
     /// Set by the run's call boundary, inherited by cascade/refusal readers. It outlives a cancelled read.
     @TaskLocal static var spend: NewspaperReadingSpend?
     @TaskLocal static var hasBasePageAllowance = true
+    /// The run's detector for scanned newspapers (W47.wh-yolo-scans), set at the same call boundary from its frozen
+    /// settings (`NewspaperDetector.scans(_:)`). Photographed newspapers always use PP-DocLayoutV3.
+    @TaskLocal static var scanDetector: NewspaperDetector = .ppDocLayoutV3
     let client: any PageReader<OCRResult>
     var route: String { client.route }
 
@@ -31,8 +68,9 @@ struct NewspaperPageReader: PageReader {
 
     static func preparePage(_ page: PageReaderInput) async throws -> (plan: NewspaperPagePlan?, fallback: String?) {
         let cancelled = CancellationFlag()
+        let scans = scanDetector
         return try await withTaskCancellationHandler {
-            let prepared = try await Preparation.shared.prepare(page, cancelled: cancelled)
+            let prepared = try await Preparation.shared.prepare(page, scans: scans, cancelled: cancelled)
             switch prepared {
             case .whole(let reason): return (nil, reason)
             case .regions(let plan): return (plan, nil)
@@ -77,7 +115,7 @@ struct NewspaperPageReader: PageReader {
     private actor Preparation {
         static let shared = Preparation()
         private var busy = false
-        func prepare(_ page: PageReaderInput, cancelled: CancellationFlag) async throws -> Prepared {
+        func prepare(_ page: PageReaderInput, scans: NewspaperDetector, cancelled: CancellationFlag) async throws -> Prepared {
             while busy { try await Task.sleep(for: .milliseconds(50)) }
             try Task.checkCancellation()
             busy = true
@@ -92,13 +130,14 @@ struct NewspaperPageReader: PageReader {
             let kind = await PageKindClassifier.classify(url: page.imageURL)
             try Task.checkCancellation()
             guard NewspaperPagePlan.usesRegions(kind) else { return .whole(nil) }
-            guard NewspaperLayout.isInstalled() else {
+            let detector = NewspaperDetector.forPage(photographed: kind?.photographed == true, scans: scans)
+            guard detector.isInstalled() else {
                 return .whole("download the newspaper layout helper in Settings, Columns and reading order")
             }
             do {
                 let plan = try await NewspaperPageReader.queue.run {
                     try NewspaperPagePlan.prepare(page.imageURL, photographed: kind?.photographed == true,
-                                                  isCancelled: { cancelled.isCancelled })
+                                                  detector: detector, isCancelled: { cancelled.isCancelled })
                 }
                 if Task.isCancelled { plan.removeScratch(); throw CancellationError() }
                 return .regions(plan)
@@ -252,7 +291,8 @@ struct NewspaperPagePlan: Sendable {
 
     enum Failure: Error { case image, geometry, regions, cancelled }
 
-    static func prepare(_ url: URL, photographed: Bool, isCancelled: () -> Bool) throws -> Self {
+    static func prepare(_ url: URL, photographed: Bool, detector: NewspaperDetector = .ppDocLayoutV3,
+                        isCancelled: () -> Bool) throws -> Self {
         guard !isCancelled() else { throw Failure.cancelled }
         guard let upright = PageKindClassifier.loadImage(url) else { throw Failure.image }
         let image: CGImage
@@ -260,7 +300,7 @@ struct NewspaperPagePlan: Sendable {
             guard let corrected = quad(upright) else { throw Failure.geometry }
             image = corrected
         } else { image = upright }
-        let regions = try NewspaperLayout.detect(image: image, isCancelled: isCancelled)
+        let regions = try detector.detect(image, isCancelled: isCancelled)
         guard !regions.isEmpty, regions.count <= maximumRegions else { throw Failure.regions }
         let rawBoxes = regions.compactMap { pixelBox($0.box, width: image.width, height: image.height) }
         guard rawBoxes.count == regions.count else { throw Failure.regions }

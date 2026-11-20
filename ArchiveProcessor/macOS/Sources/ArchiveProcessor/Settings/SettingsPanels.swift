@@ -64,7 +64,7 @@ enum SettingsPanelOwnership {
             DefaultsKeys.visionMinimumConfidence, DefaultsKeys.visionCustomVocabulary,
             DefaultsKeys.ocrCascadeRoute, DefaultsKeys.ocrCascadeOnDisagreement,
             DefaultsKeys.ocrPageKindRouting, DefaultsKeys.ocrHandwritingOnTyped,
-            SettingsSheetModel.overrideKey("reading").rawValue,
+            SettingsSheetModel.overrideKey("reading").rawValue, SettingsKey.scanNewspapersDocLayoutYOLO.rawValue,
         ] + LLMProvider.allCases.map { ModelSelectionStore.modelKey(for: $0) })
         add(.documents, [
             DefaultsKeys.taggingModeRaw, DefaultsKeys.itemTypeColourBox, DefaultsKeys.itemTypeColourFolder,
@@ -100,7 +100,8 @@ enum SettingsPanelOwnership {
     }()
 
     /// The sheet's switches (its rules tab and the dating card), each owned by the panel that holds its stage.
-    static let sheetSwitches: [SettingsKey] = [.straightenReadingCopy, .placeHandOnImage, .dateImageEveryDocument, .searchableFor]
+    static let sheetSwitches: [SettingsKey] = [.straightenReadingCopy, .placeHandOnImage, .dateImageEveryDocument,
+                                               .scanNewspapersDocLayoutYOLO, .searchableFor]
 
     /// Which panel holds each settings-sheet stage: the four cards and the rule stages (`SettingsSheetModel`).
     static let stagePanels: [String: SettingsPanel] = [
@@ -120,6 +121,7 @@ enum SettingsPanelOwnership {
         ("Settings sheet › the Dates card", SettingsKey.dateImageEveryDocument.rawValue),
         ("Settings sheet › Rules", SettingsKey.straightenReadingCopy.rawValue),
         ("Settings sheet › Rules", SettingsKey.placeHandOnImage.rawValue),
+        ("Settings sheet › Rules", SettingsKey.scanNewspapersDocLayoutYOLO.rawValue),
         ("Settings sheet › Rules", SettingsKey.searchableFor.rawValue),
     ]
 

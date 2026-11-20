@@ -13,6 +13,7 @@ import json
 import sys
 from pathlib import Path
 
+sys.dont_write_bytecode = True   # never a __pycache__ in the app's signed resources
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from PIL import Image  # noqa: E402
 from npo_layout import BBox, LayoutProcessor, PageLayout, Region  # noqa: E402

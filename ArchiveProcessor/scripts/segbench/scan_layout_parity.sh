@@ -34,6 +34,8 @@ PY
     scripts/segbench/scan_layout_parity.py oracle --npo "$WORK/npo/src" --pages "$WORK/pages.tsv" --out "$WORK/oracle.json"
 home="$WORK/model-home"
 mkdir -p "$home/Models" "$WORK/app"
+# A report left by an earlier run would end the wait at once and compare its stale dumps.
+rm -f "$WORK/app/report.txt" "$WORK"/app/*.json
 [ -e "$home/Runtime" ] || ln -s "$runtime" "$home/Runtime"
 if [ ! -d "$home/Models/doclayout-yolo-1280.mlmodelc" ]; then
     python3 - "$WORK/doclayout-yolo-1280.tgz" <<'PY'

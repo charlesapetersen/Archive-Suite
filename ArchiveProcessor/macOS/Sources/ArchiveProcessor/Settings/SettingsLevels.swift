@@ -65,7 +65,7 @@ enum SettingsLevels {
         .appearance, .level, .setupQuestions, .collection, .keys, .skipProcessed, .straighten, .taggingMode, .capture,
         .overrides, .backend, .providerModel, .cascade, .pageKind, .handwritingOnTyped, .visionLanguages,
         .visionJudgement, .gatewayLocal, .cliAgent, .preOCRed, .batch, .outputSizes, .rotation, .vocabularyColours,
-        .collectionID, .segmentationReview, .segmentationApproach, .dateImage, .placeHand, .searchable, .downloads,
+        .collectionID, .segmentationReview, .segmentationApproach, .dateImage, .scanNewspapers, .placeHand, .searchable, .downloads,
         .driveRelay, .thinking, .cascadeDisagreement, .visionTuning, .gatewayFields, .cliFields, .customModels,
         .imageSize, .workers, .logFile, .previousImage, .customPrompt, .localSegmenter,
     ]
@@ -220,6 +220,7 @@ extension SettingsLevels.Row {
     static let segmentationApproach = Self("segmentation-approach", .standard,
                                            [DefaultsKeys.segmentationApproach, DefaultsKeys.segmentationClaudeRoute])
     static let dateImage = Self("date-image", .standard, [SettingsKey.dateImageEveryDocument.rawValue])
+    static let scanNewspapers = Self("scan-newspapers", .standard, [SettingsKey.scanNewspapersDocLayoutYOLO.rawValue])
     static let placeHand = Self("place-hand", .standard, [SettingsKey.placeHandOnImage.rawValue])
     static let searchable = Self("searchable", .standard, [SettingsKey.searchableFor.rawValue])
     static let downloads = Self("downloads", .standard, [])

@@ -1026,7 +1026,8 @@ final class LiveCaptureProcessor: ObservableObject {
                 localAgent: config.localAgent,
                 rotationMode: config.rotationMode, standardImageMB: config.standardImageMB,
                 visionSettings: config.visionSettings, cascade: config.cascade,
-                visionTextLLM: config.visionTextLLM)
+                visionTextLLM: config.visionTextLLM,
+                scanDetector: NewspaperDetector.scans(liveSettings(config)))
         }
 
         let pageCount = session.groups.first(where: { $0.id == photo.groupId })?.photos.count ?? 1
@@ -1868,7 +1869,8 @@ final class LiveCaptureProcessor: ObservableObject {
         imageURL: URL, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
         apiKey: String, customPrompt: String?, imageScale: Double, gateway: GatewayConfig?,
         localAgent: LocalAgentConfig?, rotationMode: RotationMode, standardImageMB: Double,
-        visionSettings: VisionOCRSettings, cascade: OCRCascade, visionTextLLM: LLMTextConfiguration?
+        visionSettings: VisionOCRSettings, cascade: OCRCascade, visionTextLLM: LLMTextConfiguration?,
+        scanDetector: NewspaperDetector
     ) -> Task<OCRResult, Never> {
         Task.detached(priority: .userInitiated) {
             let ocrResult = await OCRProcessor.performOCRCall(
@@ -1876,7 +1878,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 apiKey: apiKey, previousText: nil, previousImageURL: nil,
                 customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway,
                 localAgent: localAgent, rotationMode: rotationMode, standardImageMB: standardImageMB,
-                visionSettings: visionSettings, cascade: cascade)
+                visionSettings: visionSettings, cascade: cascade, scanDetector: scanDetector)
             return await OCRProcessor.applyingVisionTextClassification(
                 to: ocrResult, previousText: nil, customPrompt: customPrompt,
                 configuration: provider == .appleVision ? visionTextLLM : nil)

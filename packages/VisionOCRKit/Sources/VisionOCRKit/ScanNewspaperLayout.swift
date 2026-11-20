@@ -222,11 +222,13 @@ public enum ScanNewspaperLayout {
         defer { try? fm.removeItem(at: dir) }
         let inURL = dir.appendingPathComponent("detections.json"), out = dir.appendingPathComponent("regions.json")
         try JSONEncoder().encode(Input(width: width, height: height, detections: found)).write(to: inURL)
-        var env = ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "PYTHONDONTWRITEBYTECODE": "1"]
+        // `-I` ignores PYTHON* variables, so `-B` (and the script's own `sys.dont_write_bytecode`) keeps its sibling
+        // import from writing a `__pycache__` into the app's signed resources.
+        var env = ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
         for key in ["HOME", "TMPDIR"] { env[key] = environment[key] }
         let command = NewspaperLayout.Command(
             executable: ModelRuntime.home(environment).appendingPathComponent("Runtime/bin/python3"),
-            arguments: ["-I", script.path, inURL.path, out.path], environment: env)
+            arguments: ["-I", "-B", script.path, inURL.path, out.path], environment: env)
         try NewspaperLayout.run(command, memoryGB: memoryGB, isCancelled: isCancelled)
         if isCancelled() { throw CancellationError() }
         guard let data = try? Data(contentsOf: out) else { throw NewspaperLayout.Failure.failed("the scanned-newspaper detector wrote nothing") }
@@ -234,17 +236,17 @@ public enum ScanNewspaperLayout {
     }
 
     /// The script's regions, in its order; a malformed reply is a failed page, a degenerate box is skipped.
-    static func decode(_ data: Data) throws -> [NewspaperLayout.Region] {
+    public static func decode(_ data: Data) throws -> [NewspaperLayout.Region] {
         struct Row: Decodable { let label: String; let score: Double; let box: [Double] }
         guard let rows = try? JSONDecoder().decode([Row].self, from: data) else {
             throw NewspaperLayout.Failure.failed("the scanned-newspaper detector's output could not be read")
         }
-        return rows.enumerated().compactMap { i, row in
+        let boxes: [(String, Double, CGRect)] = rows.compactMap { row in
             guard row.box.count == 4, row.box.allSatisfy(\.isFinite), row.score.isFinite else { return nil }
             let x0 = max(0, row.box[0]), y0 = max(0, row.box[1]), x1 = min(1, row.box[2]), y1 = min(1, row.box[3])
             guard x1 > x0, y1 > y0 else { return nil }
-            return NewspaperLayout.Region(box: CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0),
-                                          order: i + 1, label: row.label, score: row.score)
+            return (row.label, row.score, CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0))
         }
+        return boxes.enumerated().map { i, b in NewspaperLayout.Region(box: b.2, order: i + 1, label: b.0, score: b.1) }
     }
 }

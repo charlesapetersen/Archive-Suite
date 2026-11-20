@@ -2322,6 +2322,7 @@ extension OCRProcessor {
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let ocrRun = Self.ocrCallValues(for: runConfig)
+        let scanDetector = NewspaperDetector.scans(activeResolvedSettings?.values)
         let newspaperSpend = activeRunHistory?.newspaperSpend
         let visionTextLLM = provider == .appleVision ? runConfig?.visionTextLLM : nil
 
@@ -2358,7 +2359,7 @@ extension OCRProcessor {
                             gatewayConfig: gateway, localAgent: localAgent,
                             rotationMode: ocrRun.rotationMode,
                             standardImageMB: ocrRun.standardImageMB,
-                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
+                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
                         )
                         let result = await Self.applyingVisionTextClassification(
                             to: ocrResult, previousText: nil,
@@ -2397,7 +2398,7 @@ extension OCRProcessor {
                                 gatewayConfig: gateway, localAgent: localAgent,
                                 rotationMode: ocrRun.rotationMode,
                                 standardImageMB: ocrRun.standardImageMB,
-                                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
+                                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
                             )
                             let result = await Self.applyingVisionTextClassification(
                                 to: ocrResult, previousText: nil,
@@ -2435,7 +2436,7 @@ extension OCRProcessor {
                     gatewayConfig: gateway, localAgent: localAgent,
                     rotationMode: ocrRun.rotationMode,
                     standardImageMB: ocrRun.standardImageMB,
-                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
+                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
                 )
 
                 if Self.isTimeoutError(result) {
@@ -2449,7 +2450,7 @@ extension OCRProcessor {
                         gatewayConfig: gateway, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB,
-                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend
+                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
                     )
                 }
 
@@ -3650,6 +3651,7 @@ extension OCRProcessor {
         let jobID = jobs[index].id
         let ocrURL = imageURL ?? jobs[index].sourceURL
         let ocrRun = Self.ocrCallValues(for: effectiveRunConfig)
+        let scanDetector = NewspaperDetector.scans(activeResolvedSettings?.values)
         let newspaperSpend = activeRunHistory?.newspaperSpend
         var result = await Self.performOCRCall(
             imageURL: ocrURL, provider: effectiveRunConfig.provider, model: effectiveRunConfig.model,
@@ -3659,7 +3661,8 @@ extension OCRProcessor {
             standardImageMB: ocrRun.standardImageMB,
             // W41.app-institutional-compute: no import here. A Retry (or Rotate & re-run) is the user asking for a fresh
             // read, and an imported page matches its institutional-computing text again by its bytes (Tier-2 review).
-            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: nil, newspaperSpend: newspaperSpend)
+            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: nil, newspaperSpend: newspaperSpend,
+            scanDetector: scanDetector)
         if let rotation {
             result = OCRResult(text: result.text, classification: result.classification,
                                rotationDegrees: ((rotation % 360) + 360) % 360,

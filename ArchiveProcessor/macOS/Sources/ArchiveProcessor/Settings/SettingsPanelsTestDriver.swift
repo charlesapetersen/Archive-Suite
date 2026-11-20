@@ -78,6 +78,9 @@ enum SettingsPanelsTestDriver {
             }
             check("4 the dating card carries its image-pass switch",
                   model.stageSwitches["dating"]?.contains { $0.key == .dateImageEveryDocument } == true)
+            check("4 the layout stage carries its scanned-newspaper detector switch, off by default (W47.wh-yolo-scans)",
+                  model.ruleStages.first { $0.id == "layout" }?.switches.contains {
+                      $0.key == .scanNewspapersDocLayoutYOLO && !$0.isOn } == true)
             let switchKeys = Set(drawn.map(\.1))
             check("4 every sheet switch is drawn", SettingsPanelOwnership.sheetSwitches.allSatisfy { switchKeys.contains($0.rawValue) },
                   SettingsPanelOwnership.sheetSwitches.map(\.rawValue).filter { !switchKeys.contains($0) }.joined(separator: ", "))
@@ -159,6 +162,7 @@ enum SettingsPanelsTestDriver {
             (DefaultsKeys.selectedProvider, .standard), (DefaultsKeys.ocrCascadeRoute, .standard),
             (DefaultsKeys.rotationModeRaw, .standard), (DefaultsKeys.batchMode, .standard),
             (DefaultsKeys.segmentationApproach, .standard), (SettingsKey.dateImageEveryDocument.rawValue, .standard),
+            (SettingsKey.scanNewspapersDocLayoutYOLO.rawValue, .standard),
             (SettingsSheetModel.overrideKey("reading").rawValue, .standard),
             (DefaultsKeys.taggingModeRaw, .basic), (DefaultsKeys.skipAlreadyProcessed, .basic),
             (SettingsKey.straightenReadingCopy.rawValue, .basic), (DefaultsKeys.liveProcessingMode, .basic),

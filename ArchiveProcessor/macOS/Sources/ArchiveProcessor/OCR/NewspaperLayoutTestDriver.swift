@@ -103,6 +103,16 @@ enum NewspaperLayoutTestDriver {
                                                          atomically: true, encoding: .utf8)
     }
 
+    /// The app's peak physical footprint so far (the kernel's ledger), for the dump's memory figure.
+    nonisolated private static func peakFootprintMB() -> Double {
+        var info = task_vm_info_data_t()
+        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+        let kr = withUnsafeMutablePointer(to: &info) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count) }
+        }
+        return kr == KERN_SUCCESS ? Double(info.ledger_phys_footprint_peak) / 1_048_576 : -1
+    }
+
     /// W47.wh-yolo-scans: the scanned-newspaper detector's two steps on each page, the Core ML detections and the
     /// ordered regions, written as `<out>/<id>.json` for `scan_layout_parity.py compare`. Pages are only read.
     private static func dumpScanLayout(list: URL, out: URL) async {
@@ -123,6 +133,7 @@ enum NewspaperLayoutTestDriver {
                         "width": image.width, "height": image.height,
                         "detect_seconds": detected.timeIntervalSince(started),
                         "order_seconds": Date().timeIntervalSince(detected),
+                        "peak_footprint_mb": Self.peakFootprintMB(),
                         "raw": raw.map { ["label": $0.label, "score": Double($0.confidence), "box": $0.box] as [String: Any] },
                         "regions": regions.map { ["label": $0.label, "score": $0.score,
                                                   "box": [$0.box.minX, $0.box.minY, $0.box.maxX, $0.box.maxY]] as [String: Any] }]
@@ -178,6 +189,47 @@ enum NewspaperLayoutTestDriver {
             }
             check("unknown and uncertain are whole", !NewspaperPagePlan.usesRegions(nil)
                   && !NewspaperPagePlan.usesRegions(PageKind(kind: .newspapers, confidence: 0.7)))
+            // W47.wh-yolo-scans: the scanned-newspaper detector is the run's choice, off by default, scans only.
+            let yes = [SettingsKey.scanNewspapersDocLayoutYOLO.rawValue: ResolvedSetting(value: .bool(true))]
+            let no = [SettingsKey.scanNewspapersDocLayoutYOLO.rawValue: ResolvedSetting(value: .bool(false))]
+            check("scan detector: PP-DocLayoutV3 without a snapshot or switched off, DocLayout-YOLO switched on",
+                  NewspaperDetector.scans(nil) == .ppDocLayoutV3 && NewspaperDetector.scans(no) == .ppDocLayoutV3
+                      && NewspaperDetector.scans(yes) == .docLayoutYOLO
+                      && SettingsKey.scanNewspapersDocLayoutYOLO.defaultValue == .bool(false))
+            let bareHome = ["VISIONOCR_MODEL_HOME": dir.appendingPathComponent("no-models").path]
+            check("scan detector: a scan keeps PP-DocLayoutV3 while DocLayout-YOLO is not downloaded",
+                  !ScanNewspaperLayout.isInstalled(bareHome)
+                      && NewspaperDetector.forPage(photographed: false, scans: .docLayoutYOLO, environment: bareHome) == .ppDocLayoutV3)
+            let runtime = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support/Vision OCR/Runtime")
+            if FileManager.default.isExecutableFile(atPath: runtime.appendingPathComponent("bin/python3").path) {
+                let home = dir.appendingPathComponent("scan-home")
+                try FileManager.default.createDirectory(at: home.appendingPathComponent("Models/doclayout-yolo-1280.mlmodelc"),
+                                                        withIntermediateDirectories: true)
+                try FileManager.default.createSymbolicLink(at: home.appendingPathComponent("Runtime"), withDestinationURL: runtime)
+                let env = ["VISIONOCR_MODEL_HOME": home.path]
+                check("scan detector: an installed DocLayout-YOLO reads scans only; a photograph keeps PP-DocLayoutV3",
+                      ScanNewspaperLayout.isInstalled(env)
+                          && NewspaperDetector.forPage(photographed: false, scans: .docLayoutYOLO, environment: env) == .docLayoutYOLO
+                          && NewspaperDetector.forPage(photographed: true, scans: .docLayoutYOLO, environment: env) == .ppDocLayoutV3
+                          && NewspaperDetector.forPage(photographed: false, scans: .ppDocLayoutV3, environment: env) == .ppDocLayoutV3)
+            } else {
+                log.append("SKIP scan detector installed case: no shared runtime on this Mac")
+            }
+            let inherited = await NewspaperPageReader.$scanDetector.withValue(.docLayoutYOLO) {
+                await Task { NewspaperPageReader.scanDetector }.value
+            }
+            check("scan detector: the run's choice reaches the page reader's tasks, and is PP-DocLayoutV3 outside a run",
+                  inherited == .docLayoutYOLO && NewspaperPageReader.scanDetector == .ppDocLayoutV3)
+            // The layout processing's reply: regions in its order, a degenerate or malformed row dropped, bad JSON a failure.
+            let reply = #"[{"label":"title","score":0.9,"box":[0.1,0.1,0.5,0.2]},{"label":"plain_text","score":0.8,"box":[0.6,0.1,0.5,0.9]},"# +
+                #"{"label":"plain_text","score":0.7,"box":[0.1,0.3,0.5,1.2]}]"#
+            let decoded = try ScanNewspaperLayout.decode(Data(reply.utf8))
+            check("scan detector: its regions keep the processing's order and drop a degenerate box",
+                  decoded.map(\.label) == ["title", "plain_text"] && decoded.map(\.order) == [1, 2]
+                      && abs(decoded[1].box.maxY - 1) < 1e-9)
+            check("scan detector: an unreadable reply is a failed page",
+                  (try? ScanNewspaperLayout.decode(Data("{}".utf8))) == nil)
             let line = CGRect(x: 0.2, y: 0.3, width: 0.6, height: 0.1)
             let crop = CGRect(x: 0, y: 0, width: 0.5, height: 1)
             check("union coverage counts overlapping lines only once", abs((NewspaperPagePlan.coverage(lines: [line, line], crops: [crop]) ?? 0) - 0.5) < 1e-9)

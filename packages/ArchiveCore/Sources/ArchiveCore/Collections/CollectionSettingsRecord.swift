@@ -454,6 +454,7 @@ public enum CollectionSettingsVocabulary {
         "straightenReadingCopy": "Straighten the copy you read",
         "placeHandOnImage": "Place handwritten text on the page image",
         "dateImageEveryDocument": "Search the page image for dates on every document",
+        "scanNewspapersDocLayoutYOLO": "Scanned newspapers' columns found by DocLayout-YOLO",
         "searchableFor": "Pages written as one searchable page, with no text page",
     ]
 
