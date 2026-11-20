@@ -23,6 +23,7 @@ Counts and hashes only are written (the repo is public; texts stay in the cache)
     python3 ops/autonomous/heavy-run.py run -- <torch-env python> vision_short_reads.py split       # 26.6 caches
     python3 ops/autonomous/heavy-run.py run -- <torch-env python> vision_short_reads.py place-print # all 121 pages
     python3 ops/autonomous/heavy-run.py run -- <torch-env python> vision_short_reads.py reproduce
+    python3 ops/autonomous/heavy-run.py run -- <torch-env python> vision_short_reads.py rest        # P17-6's caches
 
 Each writes segbench-results/vision-short-reads/<command>.json; the report is segbench-results/vision-short-reads.md.
 """
@@ -412,6 +413,169 @@ def cmd_reproduce(a):
         print(s['condition'], s['reader'], s['seconds'], s['lines'], s['words'], len(s['changed']), s['short'])
 
 
+# ---------------------------------------------------------------- rest: the Vision caches the first pass missed
+# W46.p17-vision-caches-rest (measurement review pass 17, P17-6). layout_order.swift's helper is a third reader:
+# VNRecognizeTextRequest lines as JSON, run as `layout-order lines IMG OUT ...`; it is not one of the guard's tools, so
+# an empty guarded run brackets it, as place_print_vision is bracketed.
+LAYOUT_BIN = REH / 'layout-order/bin/layout-order'
+
+
+def rest_ppocrv6():
+    import ocr_ppocrv6_hands as H
+    jobs = [(p, H.owner_image(p)) for p in H.owner_pages()] + [(H.R.job_id(r), Path(r['image'])) for r in H.public_rows()]
+    return [(img, H.RUN / 'vision' / f'{i}.json') for i, img in jobs]
+
+
+def rest_marks():
+    import layout_order_marks as M
+    return ([(Path(p['image']), M.WORK / 'vision' / f"{p['id']}.json") for p in M.owner_pages()]
+            + [(M.MARK_IMAGES / f'{p}.jpg', M.WORK / 'vision' / f'{p}.json') for p in M.marks_truth()])
+
+
+def rest_newsbench():
+    return [(REH / 'bench-corpus/pages/newsbench' / (f.stem.split('__', 1)[1] + '.jpg'), f)
+            for f in sorted((REH / 'layout-order/vision').glob('newsbench__*.json'))]
+
+
+def rest_unfiltered():
+    """The 19 pages the 96's draw replaced, read from ocr-truth's prepared images (ocr_vision_unfiltered)."""
+    return [(REH / 'ocr-truth/prep' / (f.name.split('.')[0] + '.jpg'), f)
+            for f in sorted((REH / 'ocr-vision-unfiltered/img').glob('*.vision.txt'))]
+
+
+def rest_jobs(jf):
+    return lambda: pairs(REH / jf)
+
+
+REST = [
+    ('ppocrv6-hands', 'ocr-ppocrv6-hands (Vision lines as page XML)', 'layout-order lines', rest_ppocrv6),
+    ('layout-order', 'layout-order L9 panel (newsbench)', 'layout-order lines', rest_newsbench),
+    ('layout-order-marks', 'layout-order-marks', 'layout-order lines', rest_marks),
+    ('date-tagging traceable', 'date-image, date-traceable-vision', 'segbench-ocr',
+     rest_jobs('date-tagging/traceable/vision/jobs-date-image.tsv')),
+    ('mixed-route', 'mixed-route', 'segbench-ocr', rest_jobs('mixed-route/vision-jobs.tsv')),
+    ('date-undated sheet', 'date-undated sheet', 'segbench-dewarp lines', rest_jobs('date-undated/sheet/lines-jobs.tsv')),
+    ('ocr-vision-unfiltered replaced', 'ocr-vision-unfiltered (the 96 Selection note)', 'segbench-ocr', rest_unfiltered),
+]
+# Partners for the cross check only: ocr-truth's own reading of each prepared page (the 96's draw).
+REST_PARTNERS = [('ocr-truth prep', 'segbench-ocr', lambda: [(f, f.with_suffix('.vision.txt'))
+                                                            for f in sorted((REH / 'ocr-truth/prep').glob('*.jpg'))])]
+REST_WHOLE = ('date-tagging traceable', 'layout-order-marks')
+REST_NOT_CHECKED = {
+    'ent-score-paid': 'its page images (pages/) were deleted; vision/ holds 261 texts of 2026-11-03',
+    'ent-feature': 'its page images (pages/) were deleted',
+    'item-fields-retruth': 'the full-size pages Vision read (full/) were deleted; send/ holds the downsized copies sent '
+                           'to the gateway, not the bytes Vision read',
+    'marks-detect': 'the mark crops Vision read were deleted (read/vision holds only the 48 texts)',
+    'ocr-vision-unfiltered (prep, jpeg, turned)': 'the 241 prepared copies and JPEG originals it read were deleted; '
+                                                  'only the 19 replaced pages are checked, from ocr-truth/prep',
+    'vision-kind': 'no reading is cached, only per-page counts (bulk-*.tsv), and the pages are gone',
+    'date-undated (txt)': 'the 1,127 turned and downsized pages (img/) were deleted; only the 29-page sheet is checked',
+}
+
+
+def rest_pairs():
+    out = {}
+    for cache, _, tool, fn in REST:
+        out[cache] = [(i, r) for i, r in fn() if i.exists() and r.exists()]
+    return out
+
+
+def layout_read(rows, t: Path, tag):
+    d = t / tag
+    d.mkdir(parents=True, exist_ok=True)
+    VG.cmd_check(None)
+    subprocess.run([str(LAYOUT_BIN), 'lines', *[a for k, img in rows for a in (str(img), str(d / f'{k}.json'))]],
+                   check=True, capture_output=True)
+    VG.cmd_check(None)
+    return {k: safe_counts(d / f'{k}.json') for k, _ in rows}
+
+
+def cmd_rest(a):
+    tr = power_log()
+    rp = rest_pairs()
+    # cross: a reading of these caches against any other cached reading of the same bytes by the same tool
+    groups = collections.defaultdict(list)
+    for cache, _, tool, _ in REST:
+        for img, out in rp[cache]:
+            groups[tool, sha(img)].append((cache, out, True))
+    for cache, _, tool, jf in JOBS:
+        for img, out in pairs(REH / jf):
+            if (tool, sha(img)) in groups:
+                groups[tool, sha(img)].append((cache, out, False))
+    for cache, tool, fn in REST_PARTNERS:
+        for img, out in fn():
+            if out.exists() and (tool, sha(img)) in groups:
+                groups[tool, sha(img)].append((cache, out, False))
+    cross, short_rows = [], []
+    for (tool, key), rs in groups.items():
+        cs = [(c, p, mine, safe_counts(p)) for c, p, mine in rs]
+        cs = [x for x in cs if x[3]]
+        if len({str(p) for _, p, _, _ in cs}) < 2:
+            continue
+        top = max(cs, key=lambda x: (x[3]['lines'], x[3]['words']))[3]
+        for c, p, mine, n in cs:
+            row = {'tool': tool, 'image': key, 'cache': c, 'reading': str(p.relative_to(REH)), **n,
+                   'max_lines': top['lines'], 'max_words': top['words'], 'made': mtime(p).isoformat(' ')}
+            cross.append(row)
+            if mine and VG.short(n, top):
+                short_rows.append(row)
+    print(f"cross: {len({r['image'] for r in cross})} images read more than once, {len(cross)} readings, "
+          f"{len(short_rows)} short", flush=True)
+    rows = []
+    with tempfile.TemporaryDirectory(prefix='vision-short-rest-') as t:
+        t = Path(t)
+        for cache, feeds, tool, _ in REST:
+            rnd = random.Random(f'W46.p17-vision-caches-rest {cache}')
+            pick = rnd.sample(rp[cache], min(a.n, len(rp[cache])))
+            keyed = [(f'{i:03d}', img, out) for i, (img, out) in enumerate(pick)]
+            got = {}
+            for tag in ('a', 'b'):
+                if tool == 'layout-order lines':
+                    got[tag] = layout_read([(k, img) for k, img, _ in keyed], t / cache.replace(' ', '-'), tag)
+                else:
+                    got[tag] = guarded_read(tool, [(k, img) for k, img, _ in keyed], t / cache.replace(' ', '-'),
+                                            tag)[0]
+            for k, img, out in keyed:
+                c = safe_counts(out)
+                rows.append({'cache': cache, 'feeds': feeds, 'tool': tool, 'key': str(out.relative_to(REH)),
+                             'cached': c, 'a': got['a'][k], 'b': got['b'][k], 'made': mtime(out).isoformat(' '),
+                             'power': power_at(tr, mtime(out)), **compare(c, got['a'][k], got['b'][k])})
+            print(cache, len(rp[cache]), 'cached;', collections.Counter(r['cached_vs_a'] for r in rows
+                                                                       if r['cache'] == cache), flush=True)
+        # whole: the 26.6 cache judged by direction as `split` does, and layout-order-marks read again as the one batch
+        # it was made in (p050 reads differently alone and in a batch)
+        whole = {}
+        for cache in REST_WHOLE:
+            tool = next(r[2] for r in REST if r[0] == cache)
+            keyed = [(f'{i:04d}', img, out) for i, (img, out) in enumerate(rp[cache])]
+            rows_ = [(k, img) for k, img, _ in keyed]
+            d = t / ('whole-' + cache.replace(' ', '-'))
+            got = (layout_read(rows_, d, 'whole') if tool == 'layout-order lines'
+                   else guarded_read(tool, rows_, d, 'whole')[0])
+            c = collections.Counter(direction(safe_counts(out), got[k]) for k, _, out in keyed)
+            whole[cache] = {'pages': len(keyed), **c,
+                            'lines_cached': sum(safe_counts(out)['lines'] for *_, out in keyed),
+                            'lines_now': sum(got[k]['lines'] for k, *_ in keyed if got[k]),
+                            'differ': [{'reading': out.name, 'cached': safe_counts(out), 'now': got[k]}
+                                       for k, _, out in keyed if direction(safe_counts(out), got[k]) != 'identical'
+                                       and tool == 'layout-order lines']}
+            print('whole', cache, {x: c.get(x, 0) for x in ('shorter', 'longer', 'within slack', 'identical')},
+                  flush=True)
+        img50 = next(img for img, out in rp['layout-order-marks'] if out.stem == 'p050')
+        alone = [layout_read([('p050', img50)], t / 'alone', f'p050-{i}')['p050'] for i in range(3)]
+        print('p050 alone', [(x['lines'], x['words']) for x in alone], flush=True)
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / 'rest.json').write_text(json.dumps({'whole': whole, 'p050_alone': alone,
+        'os_build': VG.os_build(), 'read_at': dt.datetime.now().isoformat(' ', 'seconds'),
+        'power_now': power_at(tr, dt.datetime.now()), 'sample': a.n,
+        'cached': {c: len(v) for c, v in rp.items()},
+        'made': {c: sorted({mtime(r).strftime('%Y-%m-%d') for _, r in v}) for c, v in rp.items()},
+        'cross': {'images': len({r['image'] for r in cross}), 'readings': len(cross),
+                  'by_cache': dict(collections.Counter(r['cache'] for r in cross)), 'short': short_rows},
+        'not_checked': REST_NOT_CHECKED, 'rows': rows}, indent=1) + '\n')
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -422,6 +586,9 @@ def main():
     sub.add_parser('split').set_defaults(f=cmd_split)
     sub.add_parser('place-print').set_defaults(f=cmd_place_print)
     sub.add_parser('reproduce').set_defaults(f=cmd_reproduce)
+    r = sub.add_parser('rest')
+    r.add_argument('--n', type=int, default=SAMPLE)
+    r.set_defaults(f=cmd_rest)
     a = ap.parse_args()
     a.f(a)
 

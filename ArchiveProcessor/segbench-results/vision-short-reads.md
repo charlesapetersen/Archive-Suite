@@ -6,7 +6,8 @@ readings were discarded, and that runner now reads twice. It was the second such
 on 2026-11-11 read 58 of the 96 short. This item checked the cached readings that committed results rest on, looked for
 the cause, and widened the guard.
 
-**No committed result rests on a short reading that could be found.** Every cache read on macOS 27.2 re-reads the same
+**No committed result rests on a short reading that could be found** (seven more caches were checked on 2026-11-20, and
+the ones whose images are gone are listed under "Not checked"). Every cache read on macOS 27.2 re-reads the same
 (identical, or within the guard's slack on a handwritten page). The caches read on 26.6 cannot be compared page by page,
 because the OS update changed nearly every text. But none of their 13 batches leans short beyond what the update alone
 does. The cause is still unknown. Neither battery power, Low Power Mode, background QoS, concurrent readers nor CPU or GPU
@@ -78,6 +79,48 @@ The faulty batches read 60-70% of their pages short. No batch here comes near th
 about evenly, like their baseline. The 440 set leans short (54-55%), and so does its baseline (54%); that is the update,
 not a fault.
 
+## The caches the first pass missed (rest, W46.p17-vision-caches-rest, 2026-11-20)
+
+Measurement review pass 17 (P17-6) found twelve Vision caches with committed reports that this item neither checked
+nor listed. Seven of them still hold the images Vision read. `vision_short_reads.py rest` checks those seven: a cross
+check against every other cached reading of the same bytes by the same reader, a seeded sample of 20 read twice, and
+the two caches in question read whole. layout-order's helper (`layout-order lines`, VNRecognizeTextRequest lines) is a
+third reader. The guard does not know it, so an empty guarded run brackets each read. Output:
+`vision-short-reads/rest.json`. macOS 27.2.1 (26B131), on AC, $0, under the heavy lock. macOS 27.2 went in on
+2026-10-30 at 12:06 (install.log), so a cache made before that is a 26.6 reading.
+
+| cache (the result it feeds) | read on | cached | n | identical | within slack | cached shorter | cached longer | the two new reads |
+|---|---|---|---|---|---|---|---|---|
+| ppocrv6-hands (Vision lines as page XML) | 10-31 | 261 | 20 | 20 | 0 | 0 | 0 | identical 20 |
+| layout-order-marks | 11-04 | 128 | 20 | 20 | 0 | 0 | 0 | identical 20 |
+| mixed-route | 11-05 | 32 | 20 | 20 | 0 | 0 | 0 | identical 20 |
+| date-undated sheet | 10-31 | 29 | 20 | 20 | 0 | 0 | 0 | identical 20 |
+| ocr-vision-unfiltered, the 19 replaced pages (the 96's Selection note) | 11-11 03:36 | 19 | 19 | 19 | 0 | 0 | 0 | identical 19 |
+| date-tagging traceable (26.6) | 10-30 09:39 | 464 | 20 | 0 | 5 | 5 | 10 | identical 20 |
+| layout-order newsbench (26.6) | 10-28 | 15 | 15 | 0 | 0 | 3 | 12 | identical 15 |
+
+- **Whole reads.** date-tagging traceable, all 464 read on 27.2: cached shorter on 80, longer on 230, within slack on
+  146, identical on 8. That leans the opposite way from a short batch, which reads 60-70% of its pages short.
+  layout-order-marks, all 128 read again in one batch as they were made: 127 identical, and p048 within slack.
+- **p050 depends on the batch.** The cross check put layout-order-marks' p050 (22 lines, 100 words) beside
+  ppocrv6-hands' reading of the same original by the same helper (26, 123). Read alone, three times, p050 gives 26 / 123
+  each time. Read in layout-order-marks' own 128-page batch it gives 22 / 100, byte for byte the cached reading. It is
+  the same kind of thing as p048 and p053 above, a handwritten page that moves, here with the batch it is read in. It is
+  not the fault, which reads a whole run short and does not come back on a re-read. layout-order-marks' result has
+  four fewer lines of p050 than a lone read gives.
+- **ocr-vision-unfiltered.** On 6 of its 19 replaced pages, its readings are shorter than ocr-truth's own readings of the
+  same prepared images (2 to 10 lines against 3 to 19). Those ocr-truth readings date from 2026-10-14 (26.6), and the 03:36 readings
+  of 11 November re-read identically on 27.2, so this is the update and not the fault (the fault came at 04:49).
+- **layout-order newsbench.** All 15 cached readings equal, line for line, the Vision lab's own whole-page readings of
+  the same pages (7 October, `newsbench/ocr-results/apple-vision-wholepage`). So the 26.6 readings are reproducible,
+  not short. On 27.2 the same helper reads 12 of the 15 newspaper pages with far fewer lines, and 3 with more: 8,135
+  lines cached against 4,082 now, 84 for 397 at worst on one page. The two new reads agree with each other. This is the
+  update, and on newspapers it is large: the layout-order L9 panel's figures are 26.6 figures and would move on 27.2.
+
+**Headline, restated.** Among the caches that could be checked, no committed result rests on a short reading. (The
+first pass's commit subject dropped "that could be found".) The caches whose images are gone are listed below and
+stay unchecked.
+
 ## Not checked
 
 - `dewarp-placement`: its flattened images and their readings were deleted with the item's scratch. Its committed
@@ -85,6 +128,14 @@ not a fault.
   arm and line, and DvD's run 1 lies inside its rerun floor (`dewarp-placement.md`).
 - `enh-ocr-input`: no Vision reading or arm image is left in its cache.
 - `place-hands`, `place-truth-lines`, `place-geom`: no Vision line cache (their hypotheses come from other readers).
+- Added by W46.p17-vision-caches-rest, all for want of the images Vision read: `ent-score-paid` (its `pages/` deleted;
+  261 texts of 2026-11-03), `ent-feature` (`pages/` deleted), `item-fields-retruth` (the full-size pages in `full/`
+  deleted; `send/` holds the downsized copies sent to the gateway, not the bytes Vision read), `marks-detect` (the mark
+  crops deleted), `ocr-vision-unfiltered`'s 241 prepared copies and JPEG originals (only its 19 replaced pages are
+  checked, from `ocr-truth/prep`), `vision-kind` (per-page counts only, no reading, the pages gone) and `date-undated`'s
+  1,127 turned and downsized pages (only its 29-page sheet is checked). Most of ocr-vision-unfiltered's 425 readings of
+  11 November about 03:00 stay unchecked. They came before the 04:49 fault, and the 19 that can be checked re-read
+  identically.
 
 ## Looking for the cause
 
