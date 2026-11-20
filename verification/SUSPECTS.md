@@ -209,10 +209,18 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     `uiTestPasteImage()`, then inspect `string` and the scratch `assets/`.
 - **Would clear it:** the raw-mode paste is declined (no asset written), or it inserts the literal
   `![](assets/…)` text.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.notes-suspects-text-check`); test `ArchiveNotesTests/NotesTextLossSuspectTests` `s009RawModeImagePaste`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-text` under phase rule 5a.
+  - 2026-11-20 W49.notes-suspects-text — reproduced. The code is unchanged in substance (`tryPasteImage`, now
+    `Editor/EditorTextView.swift:1218`, checks `isEditable` and the asset store, not raw mode; the store stays wired in
+    raw mode, `MarkdownEditorView.swift:138`, `:252`). An app-hosted test puts a real `EditorTextView` in raw mode
+    (`applyRawMode(true, …)`) with a scratch asset store, seeds PNG bytes and sends `paste(nil)`, the ⌘V action.
+    `assets/pasted-….png` is written and the text becomes `"Raw body\n\u{FFFC}"`, which is what raw write-back saves
+    (`currentSerialization` returns `textView.string`). No comment or document promises an image paste in raw mode;
+    G4 switches to styled mode first. Not run in the VM: the second session may confirm it there with the G4 variant
+    above.
 
 ### S-010 · Removing several sole-instance notes from a folder at once asks about only the last one
 
@@ -426,10 +434,18 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a unit test: decode a note whose body is `<!-- block: reader-doc\n link: x\nSome prose\nA --> B`,
   encode it, decode again, and look for "Some prose" in the blocks' markdown.
 - **Would clear it:** "Some prose" survives.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.notes-suspects-text-check`); test `ArchiveNotesTests/NotesTextLossSuspectTests` `s019TypedCloserAfterUnclosedHeader`
 - **History:**
   - 2026-10-20 W40.e6 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-text` under phase rule 5a.
+  - 2026-11-20 W49.notes-suspects-text — reproduced through the editor, not only the parser. A scratch note whose
+    file ends in the cut-off header `<!-- block: reader-doc\n     link: …a.pdf\n` is loaded from a scratch
+    `NoteStore`, rendered into a real `EditorTextView`, and the user's typing is sent at the end (Return, `Some prose`,
+    Return, `A --> B`); the editor's text is saved with `saveBody` and loaded again. The file then holds
+    `link: …a.pdf\n\nSome prose\ -->` as the header and the block reloads as a `reader-doc` whose text is ` B`:
+    `Some prose` is gone (`parseHeader` skips a line with no colon, `Store/BlockParser.swift:287`), and the next save
+    writes it off disk. Without the first Return the prose is joined onto the link line (see S-043) and ends up inside
+    the `link:` value. No comment calls the dropped lines deliberate.
 
 ### S-020 · An extract built from a degraded Notes block may detach its text from the passage
 
@@ -442,10 +458,16 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a unit test: build an extract from a note holding a degraded block, encode, decode, and
   check that the passage's block still holds the text.
 - **Would clear it:** the passage keeps its text and its source.
-- **Status:** `open`
+- **Status:** `cleared` — not reproduced; test `ArchiveNotesTests/NotesTextLossSuspectTests` `s020ExtractOfDegradedBlock`
 - **History:**
   - 2026-10-20 W40.e6 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-text` under phase rule 5a.
+  - 2026-11-20 W49.notes-suspects-text — cleared. `flattenedNestedHeaders` no longer exists:
+    `W40.fix-notes-block-marker-in-text` replaced it with the header-line escape, so `BlockParser.serialize` writes the
+    opener inside a passage as `\<!-- block: reader-doc`, which reads back as text. The user's path, run on a scratch
+    store: a note of `Intro line.` and a degraded block with `Quoted prose.`, rendered in a real `EditorTextView`,
+    select all, `createExtract(fromSelectionIn:)`, reload. Both blocks of the extract are note-passages with their
+    source, and the degraded block's opener and `Quoted prose.` stay inside the second passage.
 
 ### S-021 · Android's Drive relay reports a segment signal as sent when the Drive write failed
 
@@ -829,3 +851,22 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **History:**
   - 2026-11-18 W40.d1 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-fix-s042` (seen in a run: fix with that run as its test).
+
+### S-043 · Text typed after an unclosed Notes block header is joined onto the header's last line
+
+- **Raised:** 2026-11-20 · W49.notes-suspects-text · seen in the S-019 reproduce run (phase rule 5a(5)).
+- **Suspected behaviour:** a degraded block's text is its unclosed opener, which the editor holds as raw HTML. The
+  file's newline after the opener's last line is dropped on save, so text typed at the end of such a note, without a
+  Return first, is written on that line: `link: archivereader://reveal?rel=a.pdfSome prose`. The typed text then reads
+  back as part of the opener (hidden inside the HTML comment, or a corrupted `link:` value once a `-->` closes it), and
+  the block's source link no longer names the file.
+- **Where:** `Editor/MarkdownBridge.swift` `plainLines` (raw HTML's own trailing newline is not written as a line,
+  `MarkdownBridgeTests.rawHTMLNewlinesAreKept`); the S-019 run's `returnFirst → false` case.
+- **Would confirm it:** the same run as S-019 without `-->`: type `Some prose` at the end of the loaded degraded note,
+  save, reload, and look for `a.pdfSome prose` in the file. Then check what the user sees in the editor before saving:
+  whether the caret stands on a new line after the link, which would make the join a surprise rather than what was
+  typed.
+- **Would clear it:** the typed text lands on a line of its own, or the editor shows it joined before saving.
+- **Status:** `open`
+- **History:**
+  - 2026-11-20 W49.notes-suspects-text — raised.
