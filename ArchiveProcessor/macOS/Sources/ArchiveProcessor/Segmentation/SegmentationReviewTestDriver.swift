@@ -402,6 +402,55 @@ enum SegmentationReviewTestDriver {
         eq("8 the same flagged gap", kr.flaggedGapItems.map(\.id), [2])
         kr.cancel()
         check("8 the resumed stage ends", await waitFor { afterCrash.value == .stopped })
+
+        // 9. W49.proc-suspects-filing (S-031): an enclosure the OCR marked keeps its cover through the window stage.
+        // Five photos: folder, a two-page letter, its enclosure (OCR `[enclosure]`), another document. (a) windows
+        // that agree with the OCR; (b) windows that split the letter, which the OCR read as one document.
+        for (label, splitLetter) in [("a", false), ("b", true)] {
+            let five = Array(urls.prefix(5))
+            let e = OCRProcessor()
+            e.taggingMode = .automatic
+            let ocr: [(DocumentClassification, Bool?)] = [(.folderLabel, nil), (.documentStart, nil),
+                                                         (.documentContinuation, nil), (.documentStart, true),
+                                                         (.documentStart, nil)]
+            e.jobs = zip(five, ocr).map { u, c in
+                var j = OCRJob(sourceURL: u)
+                j.status = .succeeded
+                j.classification = c.0
+                j.result = OCRResult(text: "text of \(u.deletingPathExtension().lastPathComponent)",
+                                     classification: c.0, rotationDegrees: 0, errorMessage: nil, errorCode: nil,
+                                     enclosure: c.1)
+                return j
+            }
+            e.windowTransportOverride = FakeTransport(verdicts: [2: (splitLetter ? "new" : "continue", 0.99),
+                                                                 3: ("new", 0.99), 4: ("new", 0.99)])
+            e.pendingRunSaveOverride = { _ in }
+            let done = Box<WindowStageOutcome>()
+            Task { done.value = await e.runWindowSegmentationStage(files: five, approach: .claude, runConfig: nil,
+                                                                   outputDirectory: dir, settings: nil) }
+            for _ in 0..<60 where done.value == nil {
+                if e.awaitingBoxFolderConfirmation { e.confirmBoxFolderReview() }
+                else if e.awaitingFlaggedReview { e.confirmFlaggedReview() }
+                else if e.awaitingDocumentReview { e.confirmDocumentReview() }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            let shape = e.segments.map { s in
+                s.texts.map { $0.replacingOccurrences(of: "text of ", with: "") }.joined(separator: "+")
+                    + (s.enclosureOf.map { " enclosureOf \($0)" } ?? "")
+            }
+            lines.append("INFO 9\(label) segments: \(shape.joined(separator: " | "))")
+            let enclosureSegment = e.segments.firstIndex { $0.texts.first == "text of page-4" }
+            let cover = enclosureSegment.flatMap { e.segments[$0].enclosureOf }
+            if splitLetter {
+                lines.append("INFO 9b the enclosure's cover after windows split the letter: \(cover.map(String.init) ?? "none")")
+            } else {
+                check("9a the stage finishes", done.value == .done)
+                check("9a the enclosure keeps its cover (the letter)",
+                      cover.map { e.segments[$0].texts.first == "text of page-2" } == true,
+                      "cover \(String(describing: cover))")
+            }
+            e.cancel()
+        }
     }
 
     /// Answers the window whose pages are `answers` as `FakeTransport` does; every other window waits until its

@@ -36,6 +36,8 @@ enum ProcessFilesTestDriver {
     /// Set when the driven run's `startProcessing` returns, so the batch watcher knows the run is over.
     private static var runFinished = false
     private static let imageExts = Set(ImageEncoding.acceptedImageExtensions)
+    /// The review gates the autopilot answered, in order (gates.tsv).
+    @MainActor private final class GateLog { var lines: [String] = [] }
 
     static func runIfRequested() {
         guard !didRun,
@@ -115,9 +117,13 @@ enum ProcessFilesTestDriver {
         // --- inputs: top-level images, plus PDFs only for the mixed-route regression ---
         let cap = max(1, Int(env["PROCESSFILES_MAXIMAGES"] ?? "") ?? 8)
         let mixedRoute = env["PROCESSFILES_TEST_MIXED"] == "1"
+        // W49.proc-suspects-filing: PROCESSFILES_PREOCRED=1 takes TESTIN's PDFs as Pre-OCRed input, which the app
+        // tags IN PLACE (`outputURLMap[url] = url`), so the harness must hand over a scratch copy.
+        let preOCRed = env["PROCESSFILES_PREOCRED"] == "1"
         let all = (try? FileManager.default.contentsOfDirectory(at: inDir, includingPropertiesForKeys: nil)) ?? []
         var inputs = all
-            .filter { imageExts.contains($0.pathExtension.lowercased())
+            .filter { preOCRed ? $0.pathExtension.lowercased() == "pdf"
+                : imageExts.contains($0.pathExtension.lowercased())
                 || (mixedRoute && $0.pathExtension.lowercased() == "pdf") }
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
             .prefix(cap)
@@ -209,14 +215,38 @@ enum ProcessFilesTestDriver {
         // suspends on each awaiting* continuation and we resume it here. Each confirm* sets its
         // awaiting flag false + nils its continuation synchronously, so no gate is ever
         // double-resumed; the single-branch `else if` keeps it to one confirmation per cycle.
+        // W49.proc-suspects-filing: the collection switches Process Files' settings give (Collection ID, Confirm
+        // collection names, Review document segmentation), each gate the autopilot answered in gates.tsv (a
+        // document review with the collection it was raised for, empty for the whole-run review), and
+        // PROCESSFILES_COLLNAME — a name typed into every box row of the collection sheet before Confirm is pressed,
+        // without Return, as `CollectionReviewRow`'s binding stores it.
+        let collectionSegmentation = env["PROCESSFILES_COLLSEG"] == "1"
+        let confirmCollections = env["PROCESSFILES_CONFIRMCOLL"] == "1"
+        let reviewDocSegmentation = env["PROCESSFILES_REVIEWDOCSEG"] == "1"
+        let typedCollectionName = env["PROCESSFILES_COLLNAME"]
+        let gates = GateLog()
         let autopilot = Task { @MainActor in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 300_000_000)
-                if processor.awaitingRetryDecision { processor.continueWithoutRetry() }
-                else if processor.awaitingDocumentReview { processor.confirmDocumentReview() }
-                else if processor.awaitingBoxFolderConfirmation { processor.confirmBoxFolderReview() }
-                else if processor.awaitingCollectionConfirmation { processor.confirmCollectionReview() }
-                else if processor.awaitingFinalReview { processor.confirmFinalReview() }
+                if processor.awaitingRetryDecision { gates.lines.append("retry"); processor.continueWithoutRetry() }
+                else if processor.awaitingDocumentReview {
+                    gates.lines.append("documentReview\t\(processor.currentReviewCollectionName)")
+                    processor.confirmDocumentReview()
+                }
+                else if processor.awaitingBoxFolderConfirmation {
+                    gates.lines.append("boxFolderConfirmation"); processor.confirmBoxFolderReview()
+                }
+                else if processor.awaitingCollectionConfirmation {
+                    gates.lines.append("collectionConfirmation")
+                    if let typedCollectionName {
+                        for i in processor.collectionReviewItems.indices {
+                            processor.collectionReviewItems[i].collectionName = typedCollectionName
+                        }
+                        processor.noBoxCollectionName = typedCollectionName
+                    }
+                    processor.confirmCollectionReview()
+                }
+                else if processor.awaitingFinalReview { gates.lines.append("finalReview"); processor.confirmFinalReview() }
             }
         }
 
@@ -258,10 +288,10 @@ enum ProcessFilesTestDriver {
             batchMode: batch,
             enableTagging: mode.enablesTagging,
             enableSegmentJSON: true,
-            enableCollectionSegmentation: false,
-            confirmCollectionIDs: false,
-            reviewDocumentSegmentation: false,
-            preOCRedInput: false,
+            enableCollectionSegmentation: collectionSegmentation,
+            confirmCollectionIDs: confirmCollections,
+            reviewDocumentSegmentation: reviewDocSegmentation,
+            preOCRedInput: preOCRed,
             segmentationContext: SegmentationContext(
                 previousTextCharCount: 0, sendPreviousImage: false, customPrompt: nil, imageScale: 1.0),
             gatewayConfig: gateway)
@@ -311,6 +341,7 @@ enum ProcessFilesTestDriver {
         // W49.proc-fix-s042: the status line and the failed tagging calls, in the run folder the journey brings back,
         // so the checker can hold every untagged document to being named.
         writeMarker(runDir.appendingPathComponent("status.txt").path, processor.statusMessage + "\n")
+        writeMarker(runDir.appendingPathComponent("gates.tsv").path, gates.lines.map { $0 + "\n" }.joined())
         writeMarker(runDir.appendingPathComponent("tagging-failures.tsv").path,
                     processor.taggingFailureNames.map { "\($0.name)\t\($0.reason)\n" }.joined())
 

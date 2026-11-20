@@ -10,11 +10,13 @@ split it produces means nothing; a tagging request gets the tag JSON. Every repl
 A request without `Authorization: Bearer <key>` (default `stand-in-key`, the key file the journey's fake route
 hands over) gets a 401, so the run proves the key reached every call. The tagging calls numbered in the fifth argument
 (comma-separated, counted from 1 in arrival order; W49.proc-fix-s042) get a provider 500 with no usage, so a run can
-prove a failed tagging call is reported rather than filed as tagged. Each request is one line in the log, with the
+prove a failed tagging call is reported rather than filed as tagged. A Pre-OCRed run's classification-only request takes
+its class from the same cycle, and FAKE_GATEWAY_TAGS_JSON replaces the tag JSON (W49.proc-suspects-filing). Each request is one line in the log, with the
 start of its prompt. It runs in the VM guest, started by `ops/gui/vm-gui-runner.sh` when
 W40D1_FAKE_GATEWAY=1; it is never pointed at real material and sends nothing anywhere.
 """
 import json
+import os
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -40,7 +42,11 @@ def answer(text, cls, page):
     tag JSON, or 'ok'. Shared with fake_local_agent.py (W40.d2)."""
     if 'TRANSCRIBE' in text:
         return 'ocr', f'[{cls}]\n[rotate_0]\nW40.d1 stand-in transcription, page {page}.'
+    if 'You are classifying a page' in text:
+        return 'ocr', f'[{cls}]'
     if 'subject_tags' in text:
+        if os.environ.get('FAKE_GATEWAY_TAGS_JSON'):
+            return 'tags', os.environ['FAKE_GATEWAY_TAGS_JSON']
         return 'tags', json.dumps({'year': '1918', 'month': '3', 'day': '12', 'date_uncertain': False,
                                    'subject_tags': ['War Department', 'Military Intelligence'],
                                    'format': 'Letter'})
