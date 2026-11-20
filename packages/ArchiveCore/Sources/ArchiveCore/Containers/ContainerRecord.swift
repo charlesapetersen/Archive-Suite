@@ -203,7 +203,11 @@ public struct ContainerFile: Equatable, Sendable {
     public static let folderName = ".archivesuite"
     public static let fileName = "containers.json"
     public static let schemaVersion = 1
-    public static let maxFileBytes = 1024 * 1024
+    /// The largest container, item-field or names file read or written. Measured (W49.ct-file-size-cap): a run is
+    /// about 350 bytes with one value and 1,300 with every field of its level, so a selection scattered through the
+    /// corpus's largest folder (7,124 files) needs 2.5 MB, and every file there starting a run at every level with
+    /// every field set needs 27.5 MB. 64 MB keeps that with room for longer values and still bounds a broken file.
+    public static let maxFileBytes = 64 * 1024 * 1024
 
     /// Values for every file in this directory and below.
     public var directory: ContainerFieldSet

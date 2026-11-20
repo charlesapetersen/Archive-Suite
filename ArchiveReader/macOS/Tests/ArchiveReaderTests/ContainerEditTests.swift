@@ -460,6 +460,45 @@ final class ContainerEditTests: XCTestCase {
         }
     }
 
+    /// W49.ct-file-size-cap: every other file of a folder the corpus's largest size (7,124) is 3,562 stretches and
+    /// 7,124 runs, past the old 1 MB cap; it is written in one go now.
+    func testEveryOtherFileOfTheLargestFolderIsSet() throws {
+        let box = root.appendingPathComponent("Riesman", isDirectory: true)
+        try FileManager.default.createDirectory(at: box, withIntermediateDirectories: true)
+        let names = (1...7_124).map { String(format: "%05d ", $0) + String(repeating: "n", count: 120) + ".pdf" }
+        for name in names { FileManager.default.createFile(atPath: box.appendingPathComponent(name).path, contents: nil) }
+        let selected = Set(names.enumerated().filter { $0.offset % 2 == 0 }.map(\.element))
+        XCTAssertNotNil(try NavigationModel.setForSelection(.date, user("1961"), in: [(box, selected)]))
+        let read = try XCTUnwrap(ContainerFileStore.load(directory: box).document)
+        XCTAssertEqual(read.runs.count, 7_124)
+        for name in names.prefix(4) + names.suffix(4) {
+            XCTAssertEqual(ContainerResolver.resolve(fileName: name, scopes: [ContainerScope(file: read)]).shown(.date),
+                           selected.contains(name) ? "1961" : nil, name)
+        }
+    }
+
+    /// Only the second folder passes the cap: it is refused when it is prepared, so the first is never written (a
+    /// refusal at the write would have written the first and put it back).
+    func testAFolderPastTheCapRefusesTheSelectionBeforeAnyIsWritten() throws {
+        let first = try makeFolder("A"), second = try makeFolder("B")
+        func padded(_ n: Int) -> ContainerFile {
+            ContainerFile(directory: ContainerFieldSet([.other: user(String(repeating: "x", count: n))]),
+                          updatedAt: now)
+        }
+        let empty = try ContainerFileStore.write(padded(0), directory: second, expecting: nil)
+        let full = padded(ContainerFile.maxFileBytes - Int(empty.size) - 50)   // 50 bytes short of the cap
+        XCTAssertNoThrow(try ContainerFileStore.checkSize(full))
+        try ContainerFileStore.write(full, directory: second, expecting: empty)
+        let before = try snapshot()
+        XCTAssertThrowsError(try NavigationModel.setForSelection(.date, user("1961"),
+                                                                 in: [(first, ["a.pdf"]), (second, ["b.pdf"])])) {
+            XCTAssertEqual($0 as? ContainerWriteError, .tooBig, "refused whole, not written and put back")
+            XCTAssertTrue(containerEditWriteMessage($0).contains("64 MB limit"), containerEditWriteMessage($0))
+        }
+        XCTAssertEqual(try snapshot(), before, "no .archivesuite in A, B's file as it was")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.appendingPathComponent(ContainerFile.folderName).path))
+    }
+
     /// W49.reader-set-selection-date-offer: a date set for a selection notes every run it is in, each by its first
     /// selected file: one per stretch of neighbours, and one more where a run of the folder starts inside a stretch.
     func testADateSetForASelectionNotesEveryRunItIsIn() throws {

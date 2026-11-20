@@ -527,6 +527,7 @@ extension NavigationModel {
         }
         guard var edited = change(file), edited != file else { return nil }
         edited.updatedAt = Date()
+        try ContainerFileStore.checkSize(edited)
         return PreparedContainerEdit(directory: directory, before: file, stamp: stamp, edited: edited,
                                      settingAside: settingAside)
     }
@@ -723,7 +724,8 @@ func itemFieldEditWriteMessage(_ error: Error) -> String {
     case .refusedExisting?: return "This folder's item-field file (“.archivesuite/\(UserItemFields.fileName)”) was written "
         + "by a newer version, or is not one this version can read, so it is left as it is and nothing was changed."
     case .notOrdinary?: return "This folder's “.archivesuite” is a link or not a folder, so nothing was written."
-    case .tooBig?: return "This folder's item-field file would pass its 1 MB limit, so nothing was written."
+    case .tooBig?: return "This folder's item-field file would pass its \(ContainerFile.maxFileBytes >> 20) MB limit, "
+        + "so nothing was written."
     default: return "The change could not be saved: \(error.localizedDescription)"
     }
 }
@@ -751,7 +753,8 @@ func containerEditWriteMessage(_ error: Error) -> String {
     case .refusedExisting?: return "This folder's container file was written by a newer version, or holds values this "
         + "version cannot read, so it is left as it is and nothing was changed."
     case .notOrdinary?: return "This folder's “.archivesuite” is a link or not a folder, so nothing was written."
-    case .tooBig?: return "This folder's container file would pass its 1 MB limit, so nothing was written."
+    case .tooBig?: return "This folder's container file would pass its \(ContainerFile.maxFileBytes >> 20) MB limit, "
+        + "so nothing was written."
     default: return "The change could not be saved: \(error.localizedDescription)"
     }
 }

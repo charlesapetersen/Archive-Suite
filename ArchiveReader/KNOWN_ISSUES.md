@@ -73,9 +73,9 @@ What it does not do, deliberately or not yet:
   documents of every folder run it is in, in every folder, as one offer that names the folders (at most 10, then a
   count), dates them in one ledger group (one Undo) and rechecks each run's date at the answer; an Undo or Redo of the
   edit offers for every run whose date it changed (W49.reader-set-selection-date-offer). A selection scattered through one folder makes
-  two runs per stretch of neighbours, and a container file is at most 1 MB (SPEC §The container file), so several thousand
-  stretches in one folder are refused at the write with "would pass its 1 MB limit", the folders already written put
-  back (queued: W49.ct-file-size-cap).
+  two runs per stretch of neighbours; a container file holds up to 64 MB (SPEC §The container file), which every other
+  file of the corpus's largest folder (2.5 MB) and every field at every level for every file there (27.5 MB) both fit,
+  and each folder's size is checked when it is prepared, so a refusal writes nothing (W49.ct-file-size-cap).
 - **Warnings: disagreements and long unmarked runs only** (`ContainerInference.warnings`). The Inspector lists the
   selected file's folder; the Library health popover lists every folder's, each with its folder and a Show that
   reaches a file the list hides by lifting the folder and filters as Show in All Files does, at most 200 listed and

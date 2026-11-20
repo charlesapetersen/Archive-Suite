@@ -187,6 +187,7 @@ extension NavigationModel {
         var edited = change(fields)
         guard edited.files != fields.files || edited.dates != fields.dates else { return nil }
         edited.updatedAt = Date()
+        try ContainerFileStore.checkSize(edited)
         return PreparedItemFieldEdit(directory: directory, before: fields, stamp: stamp, edited: edited)
     }
 }

@@ -283,7 +283,7 @@ public enum ContainerFileStore {
         var st = stat()
         guard fstat(fd, &st) == 0 else { return .unreadable("cannot look at it") }
         guard (st.st_mode & S_IFMT) == S_IFREG else { return .unreadable("not an ordinary file") }
-        guard st.st_size <= Int64(ContainerFile.maxFileBytes) else { return .unreadable("over 1 MB") }
+        guard st.st_size <= Int64(ContainerFile.maxFileBytes) else { return .unreadable("over \(ContainerFile.maxFileBytes >> 20) MB") }
         guard let data = readAll(fd) else { return .unreadable("cannot read") }
         guard let v = try? decoder.decode(VersionDTO.self, from: data) else { return .unreadable("no schemaVersion") }
         if v.schemaVersion > version { return .newer }
@@ -436,6 +436,12 @@ public enum ContainerFileStore {
 
     // MARK: Helpers
 
+    /// Throws `.tooBig` when `document` would be written past `limit`, as `write` would: a caller that writes several
+    /// folders all or nothing checks each when it prepares it, before any is written (W49.ct-file-size-cap).
+    public static func checkSize<D: Encodable>(_ document: D, limit: Int = ContainerFile.maxFileBytes) throws {
+        guard try encoder.encode(document).count <= limit else { throw ContainerWriteError.tooBig }
+    }
+
     /// `document` as it reads back once written: dates in whole seconds, as the file stores them. nil if it does not
     /// encode. Lets a writer compare what it wrote with what a later read finds.
     public static func asStored<D: Codable>(_ document: D) -> D? {
@@ -466,12 +472,16 @@ public enum ContainerFileStore {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .custom { decoder in
             let s = try decoder.singleValueContainer().decode(String.self)
-            let whole = ISO8601DateFormatter()
-            let fractional = ISO8601DateFormatter()
-            fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            if let date = whole.date(from: s) ?? fractional.date(from: s) { return date }
+            if let date = isoWhole.date(from: s) ?? isoFractional.date(from: s) { return date }
             throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "not ISO 8601"))
         }
         return d
     }
+    // Shared: making two formatters per date cost most of a large file's read (W49.ct-file-size-cap).
+    nonisolated(unsafe) private static let isoWhole = ISO8601DateFormatter()
+    nonisolated(unsafe) private static let isoFractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
 }

@@ -157,7 +157,7 @@ the container file (`SPEC/containers.md`).
   Inspector is not written into the PDF (page 2 stays the Processor's output-time snapshot). It goes to
   `<the file's folder>/.archivesuite/item-fields.json`, written through `ContainerFileStore` exactly as the container
   file is (`SPEC/containers.md` §The container file: no link followed, `flock`, the read's stamp checked, a temporary
-  file renamed in place, nothing deleted). UTF-8 JSON, sorted keys, at most 1 MB:
+  file renamed in place, nothing deleted). UTF-8 JSON, sorted keys, at most 64 MB (the container file's size):
   `{ "schemaVersion": 1, "files": { "<file name>": { "<field>": "<value>", … } }, "updatedAt": "<ISO 8601>" }`, the
   file name as it is in the folder (compared composed, NFC), the field keys `documentKind`, `title`, `byline`,
   `publication`, `publicationDate`, `recipientPlace`, and for the sidecar's names `sender`, `recipient`, `sendingPlace`

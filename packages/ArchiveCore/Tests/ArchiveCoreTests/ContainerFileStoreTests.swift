@@ -361,6 +361,42 @@ final class ContainerFileStoreTests: XCTestCase {
                        root.resolvingSymlinksInPath().standardizedFileURL.pathComponents)
         XCTAssertNil(ContainerFileStore.locateLevelMap(from: FileManager.default.temporaryDirectory, within: deep))
     }
+
+    // MARK: Size (W49.ct-file-size-cap)
+
+    /// A run for every file of the corpus's largest folder (7,124), as a scattered selection there makes: 2.5 MB,
+    /// refused under the old 1 MB cap, written and read back now.
+    func testARunForEveryFileOfTheLargestFolderIsWrittenAndRead() throws {
+        let at = Date(timeIntervalSince1970: 1_800_000_000)
+        let file = ContainerFile(runs: (0..<7_124).map {
+            ContainerRun(start: String(format: "%05d ", $0) + String(repeating: "n", count: 128), level: .folder,
+                         fields: ContainerFieldSet([.date: ContainerValue("1965", source: .user, at: at)]))
+        }, updatedAt: at)
+        XCTAssertNoThrow(try ContainerFileStore.checkSize(file))
+        try ContainerFileStore.write(file, directory: dir, expecting: nil)
+        let size = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: target.path)[.size] as? Int)
+        XCTAssertGreaterThan(size, 2 * 1024 * 1024)
+        XCTAssertEqual(ContainerFileStore.load(directory: dir).document, file)
+    }
+
+    func testCheckSizeRefusesWhatWriteWouldRefuse() throws {
+        let data = try ContainerFileStore.encoder.encode(sample())
+        XCTAssertNoThrow(try ContainerFileStore.checkSize(sample(), limit: data.count))
+        XCTAssertThrowsError(try ContainerFileStore.checkSize(sample(), limit: data.count - 1)) {
+            XCTAssertEqual($0 as? ContainerWriteError, .tooBig)
+        }
+    }
+
+    /// A file past the cap is not read, whatever it holds; the size is looked at before any byte is read.
+    func testAFilePastTheCapIsNotRead() throws {
+        try ContainerFileStore.write(sample(), directory: dir, expecting: nil)
+        let fd = open(target.path, O_WRONLY)
+        XCTAssertGreaterThanOrEqual(fd, 0)
+        XCTAssertEqual(ftruncate(fd, off_t(ContainerFile.maxFileBytes + 1)), 0)   // sparse: no 64 MB written
+        close(fd)
+        guard case .unreadable(let why) = ContainerFileStore.load(directory: dir) else { return XCTFail("read") }
+        XCTAssertEqual(why, "over 64 MB")
+    }
 }
 
 private final class ContainerTestCounter: @unchecked Sendable {

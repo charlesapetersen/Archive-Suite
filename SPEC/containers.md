@@ -191,7 +191,11 @@ Owner, 2026-10-31: a dated folder dates the otherwise undated documents inside i
 ## The container file
 
 `<directory>/.archivesuite/containers.json`, in the directory that holds the files it describes; it moves with the
-folder. UTF-8 JSON, sorted keys, dates ISO 8601 in whole seconds (read with or without fractions), at most 1 MB.
+folder. UTF-8 JSON, sorted keys, dates ISO 8601 in whole seconds (read with or without fractions), at most 64 MB (67,108,864 bytes). That size, the
+same for the level map, the standard names and the item-field file, is what the corpus's largest folder (7,124 files)
+needs with every file starting a run at every level and every field set (27.5 MB measured; a run is about 350 bytes
+with one value), with room for longer values. A reader leaves a larger file unread; a writer refuses to write one, and
+one that writes several folders together checks each before writing any (W49.ct-file-size-cap).
 
 | key | meaning |
 |---|---|
