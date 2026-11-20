@@ -7,7 +7,7 @@ in the root `CLAUDE.md` (owner, 2026-10-15) adds those as they land. That includ
 its measured pages per hour per GPU) and the Mac-local 4-bit run.
 - **Kind prices for the rest.** The cloud and local panels are priced by kind (`W49.bench-kind-price`). The gateway's
   Gemini 3.7 Flash, Gemini 4 Hydrogen and the FarmShare/Sherlock runs still use their price over all 96 on the kind
-  charts; their per-page tokens would give each its own.
+  charts; their per-page tokens would give each its own (queued: W49.bench-kind-price-rest, owner 2026-11-20).
 - **More kinds and tags.** Clippings, tables and table forms are in the groups CSVs already. Mixed pages (2) are
   too few to chart.
 - **Newspapers.** NewsBench is the lab's newspaper truth set (`W41.farmshare-news-layout`); its scores would make

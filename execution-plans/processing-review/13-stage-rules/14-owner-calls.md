@@ -171,6 +171,21 @@ calls are section 1.
     from Qwen3-VL 8B on images, publication date 0.89 [0.69, 0.95] from Qwen3.5 4B on Vision text, on his checked
     values. On by default for Mac and Local Agent users, each value marked lower confidence; the other three fields
     stay empty. W47.wh-item-fields-mac-fill builds it. The bar itself is unchanged for other routes.
+24. **The walkthrough of 2026-11-20 06:07.** The two model downloads he released in call 15 (the scanned-newspaper
+    detector, the mixed-page pre-flag) uploaded to models-1 at his yes. Sender, Recipient and Sending place in the
+    Reader's Inspector, editable and checkable like the other item fields ("Can't all fields like this be checked and
+    updated by the user?"; W49.reader-sender-row-check). Notes stores a visible .archivenotes library package, plus
+    the "inside an archive?" question (W49.notes-store-format). Folder dates: the earlier middle year of an even span
+    stays; a mid-point year shows Date Uncertain alone, without its figure; a stamp's year on the page beats the
+    folder's, since "the folder year should only be used when we don't otherwise know the date of a document"
+    (W46.folder-date-midpoint-call, W49.folder-date-stamp-first). Item-field corrections on a Processor re-run and
+    through renames: not answered as asked; he questioned whether fields users are expected to correct belong on
+    page 2 at all (W49.item-fields-home, a design note that both wait on). "Read handwriting on typed pages" on by
+    default, with or without the pre-flag (call 3 answered; W47.wh-mixed-preflag-default). The read-poorly flag off
+    for the five readers that catch nothing the app can see (W46.p17-flag-unflag-five); refused readings stay with the
+    refusal second reader and the failed-page retry. Backlog: Vision OCR's Zotero library sweep moved here behind
+    nice-to-have (W49.zotero-library-sweep); the bench's remaining kind prices and reproduce attempts for suspects
+    S-004 and S-005 queued; the rest kept as wishes or as earlier calls left them.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 

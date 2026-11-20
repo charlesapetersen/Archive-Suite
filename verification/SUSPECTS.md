@@ -75,6 +75,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-12 W40.b1 — raised.
+  - 2026-11-20 owner walkthrough (call 24) — reproduce attempt queued as `W49.reader-s004-reproduce`.
 
 ### S-005 · The Reader does not recognise an encrypted PDF
 
@@ -92,6 +93,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-12 W40.b1 — raised.
+  - 2026-11-20 owner walkthrough (call 24) — reproduce attempt queued as `W49.reader-s005-reproduce`.
 
 ### S-006 · A Notes subject spelled "ArchiveSuite" loses its Finder tag on the note's next save
 
