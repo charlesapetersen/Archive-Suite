@@ -48,7 +48,7 @@ never the real `Test files/` corpus. Mark-Read / tag edits therefore never touch
       HOLDS it** through the next discovery emission (an FSEvents-driven re-inspection, or a re-walk;
       re-worded 2026-08-07 — the criterion used to say "the Spotlight-update window", which no longer
       exists). **PASS** (fresh build). This is the fix for the two compounding bugs below.
-- [x] **O. Undo (Tags→Undo Tag Change)** — 00015 reverts to "Unread" (display + disk), status
+- [x] **O. Undo (Edit→Undo Tag Change; under Tags until W49.reader-undo-menu-names)** — 00015 reverts to "Unread" (display + disk), status
       "Undid 1 change"; holds. **PASS**.
 - [~] **P. Mark Unread** — covered by O (undo restored the "Unread" token and the row re-rendered to
       "Unread"); the mark path is symmetric with N. Not driven via the explicit Mark-Unread command.

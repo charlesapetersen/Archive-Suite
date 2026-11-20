@@ -6,7 +6,7 @@ Running log of quirks, risks, and things verified/unverified. Keep current.
 
 Shipped: setting or confirming a folder run's date in the Container section offers to date the run's documents that
 have no date of their own, by the owner's folder-date rule (`SPEC/containers.md` §The folder-date rule). The tags go
-through `TagWriter` in one undo group (Tags ▸ Undo Tag Change); the `Date evidence:` value is kept in the folder's
+through `TagWriter` in one undo group (Edit ▸ Undo Tag Change); the `Date evidence:` value is kept in the folder's
 `.archivesuite/item-fields.json` and the Checks name the folder for those dates.
 - **Clearing or widening the folder's date un-dates nothing**, and choosing Not Now does not ask again until the
   date is edited again (queued: W49.reader-folder-date-undo).
@@ -33,9 +33,8 @@ the section, each with Show. Writes only `<folder>/.archivesuite/containers.json
 `container-names.json`, each read fresh and written with its stamp (`NavigationModel+ContainerEdits`). A value the
 user set ends its disagreement warning (`SPEC/containers.md` §Warnings). Contract: `SPEC/containers.md`.
 What it does not do, deliberately or not yet:
-- **Undo is Edit ▸ Undo and Redo, from the menu** (W47.ct-reader-edit-undo). ⌘Z stays Tags ▸ Undo Tag Change, so a
-  container edit is undone by choosing Edit ▸ Undo, which reads a bare "Undo": SwiftUI's Edit menu does not show the
-  undo manager's action name (queued: W49.reader-undo-menu-names).
+- **Undo is Edit ▸ Undo and Redo** (W47.ct-reader-edit-undo; W49.reader-undo-menu-names): ⌘Z and ⇧⌘Z take the newest
+  change of any kind, a container edit, a tag change or a turn, and the item names it ("Undo Container Change").
   Undo puts back what each touched file held, read fresh, and leaves alone, with the reason, a file that changed
   after the edit; a replaced label read comes back with it. Where there was no file, undo leaves an empty one, since
   the store deletes nothing: an empty container file reads as none, and an empty standard-names file is only ever at

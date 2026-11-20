@@ -279,7 +279,7 @@ toggles (`W40.reader-thumbnails-toggle`), and `⌥⌘6` Contact Sheet (`W40.read
 - `Space` Quick-Look-style **Preview** (2-up peek; fires only when the list has key focus) · `⌘Y` Preview (menu) ·
   double-click or `⌘O` open in the document window (`⏎` has no handler; ledger R-35)
 - `⌃⌘P` Tags ▸ Flag as Poor OCR / Remove Poor OCR Flag (the `OCR Poor` tag, through `TagWriter`; W44.reocr-reader)
-- `⌘R` Mark Read · `⌘U` Mark Unread · `⌥⌘I` View ▸ Show/Hide Inspector (Edit Info until `W40.reader-commands-table`; `⌘I` is now free, as in Notes, where it is Italic) · `⌘⇧F` Toggle Flag · `⌘Z` Undo tag change (grouped) · `⇧⌘Z` Redo tag change (the newest undo, until a new change; `W40.fix-reader-redo`); with the caret in a text field ⌘Z / ⇧⌘Z undo and redo the typing instead (`TextUndoGuard`)
+- `⌘R` Mark Read · `⌘U` Mark Unread · `⌥⌘I` View ▸ Show/Hide Inspector (Edit Info until `W40.reader-commands-table`; `⌘I` is now free, as in Notes, where it is Italic) · `⌘⇧F` Toggle Flag · `⌘Z` Edit ▸ Undo, named for the newest change of the tag ledger (grouped), the viewer's turns and the window's container edits · `⇧⌘Z` Edit ▸ Redo (the newest undo, until a new change; `W40.fix-reader-redo`, `W49.reader-undo-menu-names`); with the caret in a text field ⌘Z / ⇧⌘Z undo and redo the typing instead (`TextUndoGuard`)
 - `⌘[`/`⌘]` Go ▸ Back/Forward through the folders, smart folders and unsaved Advanced Searches shown, the selection put
   back on return, as in Finder; also the toolbar's ‹ › buttons, disabled at the ends (`W40.reader-back-forward`). A
   smart folder's edit, rename or deletion and a new archive folder are not moves; a deleted smart folder is skipped
@@ -371,8 +371,9 @@ toggles (`W40.reader-thumbnails-toggle`), and `⌥⌘6` Contact Sheet (`W40.read
 *Across the suite* (`W40.fix-suite-shortcuts`, 2026-11-06). Shared commands use matching keys, except the
 owner’s 2026-11-08 Reader preference for prose copy (`⇧⌘C`) and file links (`⌥⌘C`); the
 Mac's standard keys (Edit, Window, ⌘, ⌘W ⌘Q ⌘M ⌘H, ⌃⌘F full screen, ⌃⌘S sidebar, ⌥⌘T toolbar) are left to the
-system. `MenuShortcutTests` (Reader and Notes unit bundles) fails on any key two menu-bar commands share; the one
-allowed pair here is ⌘Z/⇧⌘Z, Tags ▸ Undo/Redo Tag Change beside Edit ▸ Undo/Redo (`TextUndoGuard`).
+system. `MenuShortcutTests` (Reader and Notes unit bundles) fails on any key two menu-bar commands share. The
+Reader's Edit ▸ Undo/Redo are its own, one pair for every kind of change (W49.reader-undo-menu-names; they were Tags ▸
+Undo/Redo Tag Change beside the system's); typing in a field takes ⌘Z/⇧⌘Z first (`TextUndoGuard`).
 
 | Command | Reader | Notes | Processor |
 |---|---|---|---|
