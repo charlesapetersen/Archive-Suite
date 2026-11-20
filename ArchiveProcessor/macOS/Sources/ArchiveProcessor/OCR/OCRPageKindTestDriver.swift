@@ -463,7 +463,7 @@ enum OCRPageKindTestDriver {
         // Scratch JPEG -> real OCR seam -> Codable record -> generated two-page PDF. The semantic kind stays
         // clippings for layout and sidecars; every classifier hand keeps its own reader and four-kind header.
         await script.set(["anthropic": (200, claudeText), "generativelanguage": (200, geminiText),
-                          "openrouter": (200, #"{"choices":[{"finish_reason":"stop","message":{"content":"FORM-TEXT"}}]}"#)])
+                          "openrouter": (200, #"{"choices":[{"finish_reason":"stop","message":{"content":"[document_start]\nFORM-TEXT"}}]}"#)])
         for hand in PageKindName.classifierKinds {
             let classified = PageKind(kind: hand, confidence: 0.95)
             let clipping = PageKind.detect(classified: classified, newspaper: false,

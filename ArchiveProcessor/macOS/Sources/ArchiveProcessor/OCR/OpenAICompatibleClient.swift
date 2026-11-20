@@ -143,7 +143,23 @@ struct OpenAICompatibleClient: Sendable {
             return OCRResult(text: nil, classification: nil, errorMessage: "The local model's reply held no transcription",
                              errorCode: OCRFailureCode.unparsable)
         }
+        // W40.fix-processor-non-reading-reply: an OpenRouter or OpenAI reply with no classification tag is not a
+        // reading (Qwen3.8 Flash answered 3 of 113 photos "The user wants me to identify the object in the image."):
+        // unparsable, so the page fails, counts in the failed total and reaches the cascade's second reader, instead
+        // of keeping the chatter as page text. A user's gateway keeps the lenient parse: it may serve an OCR model
+        // that writes text only (`LocalModelRoute`).
+        if keepsPromptFormat, classification == nil {
+            return OCRResult(text: nil, classification: nil,
+                             errorMessage: "The model's reply was not a reading of the page (no classification line)",
+                             errorCode: OCRFailureCode.unparsable)
+        }
         return OCRResult(text: ocrText, classification: classification, rotationDegrees: rotationDegrees, errorMessage: nil, errorCode: nil, enclosure: OCRPrompt.parseEnclosureFlag(content))
+    }
+
+    /// Whether a reply that does not follow the OCR prompt's format fails: the app's own OpenRouter and OpenAI routes,
+    /// not a user's gateway.
+    private var keepsPromptFormat: Bool {
+        !localModel && (openRouterRoute != nil || baseURL == Self.openAIBaseURL)
     }
 
     /// A model on this Mac (W41.app-local-models-fu1): the reply streamed and closed once it loops, and a page that

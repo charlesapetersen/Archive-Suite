@@ -8,8 +8,9 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b3`, 2026-10-21.
   checklist §2.0-2.14, Tier 2D driver list), `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md` (Runs A-C, Mac side
   only), and `SPEC/tag-format.md` (§Invariants 3, 5, 6, 7 and §2-page PDF structure).
 - **Sources read at:** `8a03097c`; code traced at the same commit.
-- **Count:** `unproven 39 · works 10 · broken 3 · unverifiable-here 1` (2026-11-19, after `W40.d2`; works: P-19, P-27,
-  P-33, P-34, P-38, P-40, P-45, P-47, P-50, P-53; broken: P-23, P-29, P-32).
+- **Count:** `unproven 39 · works 10 · broken 2 · fixed-pending-recheck 1 · unverifiable-here 1` (2026-11-19, after
+  `W40.fix-processor-non-reading-reply`; works: P-19, P-27, P-33, P-34, P-38, P-40, P-45, P-47, P-50, P-53; broken: P-23,
+  P-32; fixed-pending-recheck: P-29).
 
 **Order of work (rule 3).** The *Promise* and *Promised in* of every row were committed first, before any
 implementation file was opened (`d3db14f3`). The rest was traced afterwards by four read-only passes, and every
@@ -640,10 +641,13 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   exercises the Mistral heuristic.
 - **Runtime evidence:** W40.d1, 2026-11-18: 110 of 113 photos classified, 97 as the truth has them; 3 replies that were not a
   reading kept as the page text with no classification and the job `succeeded` ([`evidence/processor/W40.d1-bulk-ocr.md`](evidence/processor/W40.d1-bulk-ocr.md)).
-- **Status:** `broken` — `W40.fix-processor-non-reading-reply` (S3)
+- **Status:** `fixed-pending-recheck` — `W40.fix-processor-non-reading-reply`: an OpenRouter or OpenAI reply with no
+  classification line is now `unparsable` (`OCR/OpenAICompatibleClient.swift` `completedReply`), so the page fails and a
+  cascade reads it again; stubbed in `scripts/test-ocr-cascade.sh`. Not yet rechecked on a real run.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-18 W40.d1 — `unproven` → `broken`: a non-reading reply leaves the image unclassified and counted as succeeded.
+  - 2026-11-19 W40.fix-processor-non-reading-reply — `broken` → `fixed-pending-recheck`.
 - **Notes:** **Drift.** For pre-OCRed PDFs Mistral classifies with a `mistral-small-latest` chat call
   (`OCR/OCRProcessor+OCR.swift:614-615`), not heuristics. Apple Vision returns no classification
   (`OCR/VisionClient.swift:112-114`) unless its LLM judgement is on.

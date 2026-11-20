@@ -162,6 +162,29 @@ enum OCRCascadeTestDriver {
         check("a success is kept and the escalation route is never called",
               r.text?.contains("QWEN-TEXT") == true && r.secondReader == nil && calls.count == 1)
 
+        // W40.fix-processor-non-reading-reply — chatter with no classification line (Qwen3.8 Flash on 3 of 113 photos,
+        // W40.d1) is not a reading: the page fails, and with a cascade it goes to the second reader. A fresh cascade, so
+        // `toClaude`'s breaker count is untouched.
+        let chatter = #"{"choices":[{"finish_reason":"stop","message":{"content":"The user wants me to identify the object in the image."}}]}"#
+        await script.set(["openrouter": (200, chatter), "anthropic": (200, claudeText)])
+        r = await ocr(cascade: .off)
+        calls = await script.calls()
+        check("cascade off: a reply with no classification line fails as unparsable, not page text",
+              r.text == nil && r.errorCode == OCRFailureCode.unparsable && r.errorMessage != nil && calls.count == 1)
+        r = await ocr(cascade: OCRCascade(routeID: OCRCascade.routeID(for: claude)))
+        check("a reply with no classification line reaches the second reader: Claude's text is kept",
+              r.text?.contains("CLAUDE-TEXT") == true && r.secondReader?.firstCode == OCRFailureCode.unparsable)
+        await script.set(["openai": (200, chatter)])
+        r = await ocr(.openai, gpt, cascade: .off)
+        check("OpenAI's own route fails a reply with no classification line too",
+              r.text == nil && r.errorCode == OCRFailureCode.unparsable)
+        let tagless = GatewayConfig(baseURL: "https://tagless-gateway.invalid/v1", modelID: "gw", displayName: "GW",
+                                    inputCostPer1M: 1, outputCostPer1M: 1)
+        await script.set(["tagless-gateway": (200, #"{"choices":[{"finish_reason":"stop","message":{"content":"PLAIN-TEXT"}}]}"#)])
+        r = await ocr(.openai, gpt, cascade: .off, gateway: tagless)
+        check("a user's gateway keeps a reply with no classification line as the page's text (an OCR-only model)",
+              r.text == "PLAIN-TEXT" && r.errorCode == nil)
+
         // W40.fix-processor-failed-ocr-wrapped — an exhausted cascade carries both readings' codes, so Live Capture
         // fails a page neither read (a 500, then a 402 or no key) and files one the first reader judged (`length`).
         // Fresh cascades, so `toClaude`'s breaker count is untouched for the checks below.
