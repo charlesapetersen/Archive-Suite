@@ -23,6 +23,20 @@ final class SourceAnchorBox: @unchecked Sendable {
         self.unknownHeaderFields = unknownHeaderFields
         self.headerless = headerless
     }
+
+    /// The page an attachment block opens its PDF at in Zotero: a `zotero-attachment` block with a positive
+    /// `page:`. An item block keeps `zotero://select`, whatever page it names (W49.notes-zotero-page-links).
+    var zoteroPage: Int? {
+        guard kind == .zoteroAttachment, anchor.zoteroSelect != nil, let page = anchor.page, page > 0 else { return nil }
+        return page
+    }
+
+    /// What Open in Zotero opens: the PDF at `zoteroPage` (`zotero://open-pdf`) when there is one, else the
+    /// block's `zotero://select` link.
+    var zoteroOpenURL: URL? {
+        guard let select = anchor.zoteroSelect else { return nil }
+        return zoteroPage.flatMap { ZoteroSelectLink.openPDFLink(selectLink: select, page: $0) } ?? URL(string: select)
+    }
 }
 
 /// NSTextAttachment for source-block header chips. Each chip is a single atomic character
@@ -213,6 +227,12 @@ enum BlockHeaderChipAction: Int, CaseIterable {
         }
     }
 
+    /// The tooltip for this action on `box`'s chip: Open in Zotero says when it opens the PDF at a page.
+    func toolTip(for box: SourceAnchorBox) -> String? {
+        if self == .openInZotero, let page = box.zoteroPage { return "Open the PDF in Zotero at page \(page)" }
+        return toolTip
+    }
+
     var toolTip: String? {
         switch self {
         case .copyForZotero:
@@ -342,7 +362,7 @@ final class BlockHeaderChipView: NSView {
             button.bezelStyle = .inline
             button.controlSize = .small
             button.font = .systemFont(ofSize: 10)
-            button.toolTip = action.toolTip
+            button.toolTip = action.toolTip(for: box)
             button.setAccessibilityIdentifier(action.identifier)
             if action == .jump {
                 button.image = NSImage(systemSymbolName: "arrow.up.forward.square",
@@ -499,9 +519,10 @@ final class BlockHeaderChipView: NSView {
         if let window = alertWindow { alert.beginSheetModal(for: window) } else { alert.runModal() }
     }
 
+    /// An attachment block that names a page opens the PDF there (`zotero://open-pdf`); any other Zotero block
+    /// selects its item or attachment in the library (W49.notes-zotero-page-links).
     private func openInZotero() {
-        guard let select = box.anchor.zoteroSelect,
-              let url = URL(string: select) else { return }
+        guard let url = box.zoteroOpenURL else { return }
         // Shared choke-point: records under a UITest launch (G11), opens for real otherwise.
         openExternalURL(url)
     }

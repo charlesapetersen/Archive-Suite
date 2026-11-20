@@ -1530,8 +1530,7 @@ final class EditorTextView: NSTextView {
         var fired = false
         storage.enumerateAttribute(.attachment, in: NSRange(location: 0, length: storage.length)) { value, _, stop in
             guard let chip = value as? BlockHeaderAttachment,
-                  let select = chip.sourceBox.anchor.zoteroSelect,
-                  let url = URL(string: select) else { return }
+                  let url = chip.sourceBox.zoteroOpenURL else { return }
             openExternalURL(url)
             fired = true
             stop.pointee = true

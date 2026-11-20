@@ -581,7 +581,7 @@ projects as date facets; see the A11 deviation below); a single merged unified-w
 page-2 header *builder*; a shared suite-wide storage path; page-within-merged-PDF scroll navigation; editor
 tables/footnotes/task-lists/strikethrough/HTML (undo across the raw toggle shipped: W49.notes-undo-across-toggle); per-block stable GUIDs and the
 reverse "N extracts derive from this note" index; Scrivener round-trip confirmation; extract
-re-snapshot/refresh; author inheritance; `zotero://open-pdf` page-anchored links; Zotero write-back;
+re-snapshot/refresh; author inheritance (`zotero://open-pdf` page-anchored links shipped: W49.notes-zotero-page-links); Zotero write-back;
 multi-root Reader; Universal-Clipboard cross-Mac confirmation (owner-eye, W8); and the GUI checks documented
 as owner-eye in `scripts/GUI-HARNESS.md` (G2 typing gesture, G6 real Reader launch, G11 real Zotero launch,
 chip-button click gestures — dispatch auto-asserted via spies/DEBUG seams). Wishlist entries for several of

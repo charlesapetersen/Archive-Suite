@@ -46,6 +46,9 @@ struct ZoteroRef: Sendable, Equatable, Identifiable {
     var parentKey: String?
     var citation: String?
     var fetchedAt: Date?
+    /// The page a pasted `zotero://open-pdf/…?page=N` link named (W49.notes-zotero-page-links). It goes into
+    /// the source block's `page:` field; the front matter does not keep it.
+    var page: Int?
 
     /// Unknown front-matter keys preserved for round-trip fidelity (§6).
     var unknown: [UnknownKey]
@@ -54,7 +57,7 @@ struct ZoteroRef: Sendable, Equatable, Identifiable {
 
     init(selectLink: String, itemKey: String, library: ZoteroLibrary,
          kind: ZoteroRefKind = .item, parentKey: String? = nil,
-         citation: String? = nil, fetchedAt: Date? = nil,
+         citation: String? = nil, fetchedAt: Date? = nil, page: Int? = nil,
          unknown: [UnknownKey] = []) {
         self.selectLink = selectLink
         self.itemKey = itemKey
@@ -63,6 +66,7 @@ struct ZoteroRef: Sendable, Equatable, Identifiable {
         self.parentKey = parentKey
         self.citation = citation
         self.fetchedAt = fetchedAt
+        self.page = page
         self.unknown = unknown
     }
 }

@@ -108,11 +108,13 @@ final class ZoteroSelectLinkTests: XCTestCase {
     }
 
     func testRejectNonSelectHost() {
-        XCTAssertNil(ZoteroSelectLink.parse("zotero://open-pdf/library/items/ABCD1234"))
+        XCTAssertNil(ZoteroSelectLink.parse("zotero://attachment/library/items/ABCD1234"))
     }
 
-    func testRejectOpenPDF() {
+    /// Since W49.notes-zotero-page-links an open-pdf link is read (ZoteroPageLinkTests); a malformed one is not.
+    func testRejectMalformedOpenPDF() {
         XCTAssertNil(ZoteroSelectLink.parse("zotero://open-pdf/0_ABCD1234"))
+        XCTAssertNil(ZoteroSelectLink.parse("zotero://open-pdf/0_ABCD1234/p5"))
     }
 
     func testRejectShortKey() {

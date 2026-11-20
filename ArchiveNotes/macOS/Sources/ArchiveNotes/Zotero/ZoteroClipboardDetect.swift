@@ -17,7 +17,9 @@ enum ZoteroClipboardDetect {
     static func detect(pasteboardString: String?,
                        attachedLinks: Set<String> = []) -> ZoteroRef? {
         guard let raw = pasteboardString,
-              let ref = ZoteroSelectLink.parse(raw) else { return nil }
+              var ref = ZoteroSelectLink.parse(raw) else { return nil }
+        // A note-level reference keeps no page (the front matter has no field for one).
+        ref.page = nil
         // Dedup against already-attached links using the canonical form so a legacy
         // variant of an already-attached link is still recognized as a duplicate.
         guard !attachedLinks.contains(ref.selectLink) else { return nil }
@@ -26,9 +28,10 @@ enum ZoteroClipboardDetect {
 
     /// The Zotero links a plain-text paste is made of (W40.fix-notes-zotero-paste, notes-2 row 27: ⌘V of a
     /// Zotero link attaches it, as ⌘V of a Reader link makes a source block). Every non-blank line must be a
-    /// `zotero://select/…` link, or the paste is text and this returns `[]`: a link quoted inside a sentence
-    /// stays in the sentence. Lines split as `SourceBlockPaster.scanURLs` splits them (CRLF, CR); a link
-    /// repeated in one paste is attached once; at most 100, the source-block paste's cap.
+    /// `zotero://select/…` or `zotero://open-pdf/…` link, or the paste is text and this returns `[]`: a link
+    /// quoted inside a sentence stays in the sentence. Lines split as `SourceBlockPaster.scanURLs` splits them
+    /// (CRLF, CR); a link repeated in one paste is attached once, and two pages of one attachment are two
+    /// links; at most 100, the source-block paste's cap.
     static func pastedLinks(in text: String) -> [ZoteroRef] {
         var refs: [ZoteroRef] = []
         var seen: Set<String> = []
@@ -36,7 +39,7 @@ enum ZoteroClipboardDetect {
             let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { continue }
             guard let ref = ZoteroSelectLink.parse(trimmed) else { return [] }
-            if seen.insert(ref.selectLink).inserted { refs.append(ref) }
+            if seen.insert("\(ref.selectLink)#\(ref.page.map(String.init) ?? "")").inserted { refs.append(ref) }
         }
         return Array(refs.prefix(100))
     }

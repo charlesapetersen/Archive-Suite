@@ -220,7 +220,7 @@ final class FormattingContext: ObservableObject {
 
         let alert = NSAlert()
         alert.messageText = "Attach Zotero Link"
-        alert.informativeText = "Paste a zotero://select/… link."
+        alert.informativeText = "Paste a zotero://select/… link, or a zotero://open-pdf/… link to a page."
         alert.addButton(withTitle: "Attach")
         alert.addButton(withTitle: "Cancel")
         let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
@@ -236,10 +236,11 @@ final class FormattingContext: ObservableObject {
     }
 
     /// Insert a Zotero source block (§6 `zotero:` header) at the caret. The chip
-    /// renders with an "Open in Zotero" affordance; the ref persists via the block header.
+    /// renders with an "Open in Zotero" affordance; the ref persists via the block header, and the page of
+    /// an `open-pdf` link in its `page:` field (W49.notes-zotero-page-links).
     func insertZoteroBlock(_ ref: ZoteroRef) {
         let kind: Block.Kind = (ref.kind == .attachment) ? .zoteroAttachment : .zoteroItem
-        let anchor = SourceAnchor(display: ref.citation ?? ref.itemKey,
+        let anchor = SourceAnchor(display: ref.citation ?? ref.itemKey, page: ref.page,
                                   zoteroSelect: ref.selectLink)
         guard let coordinator else { return }
         // The chip goes in at once with the item key; the citation follows when Zotero answers.

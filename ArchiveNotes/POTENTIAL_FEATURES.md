@@ -43,8 +43,6 @@ evidence these are one suite.
   owner 2026-11-20; undo across the raw/styled toggle shipped as W49.notes-undo-across-toggle)
 - **Per-block stable GUIDs + reverse back-index** — queued: W49.notes-block-ids behind nice-to-have (owner, 2026-11-20, call 28) — give blocks durable per-block identity and build the inverse
   "N extracts derive from this note" index for a source note. _(`00-overview` §17 out-of-scope.)_
-- **`zotero://open-pdf` page-anchored links** — queued: W49.notes-zotero-page-links (owner, 2026-11-20, call 28) — support page-anchored attachment links in addition to
-  `zotero://select` item/attachment links. _(`00-overview` §17 out-of-scope.)_
 - **Page-within-merged-PDF scroll navigation** — queued: W49.notes-preview-scroll behind nice-to-have (owner, 2026-11-20, call 28) — from the source-block quick preview, scroll to a specific page
   inside a merged/multi-doc PDF. _(`00-overview` §17 out-of-scope.)_
 - **Unify the page-2 (OCR) PDF header *builder* across apps** — closed (owner, 2026-11-20, call 28): only the Processor builds that header. — W0 unified the reader/parser side of the 2-page
