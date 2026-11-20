@@ -29,7 +29,8 @@ evidence these are one suite.
   demand. _(`00-overview` §17 out-of-scope.)_
 - **Multi-root Reader corpus support** — durable-link resolution currently resolves against a single granted
   Reader root; supporting multiple corpus roots is deferred. _(00-overview §2 deferred list, §17.)_
-- **Notes + Reader unified window / shared view** — an open architectural question of whether Notes and Reader
+- **Notes + Reader unified window / shared view** — declined (owner, 2026-11-20, call 27): they stay separate apps,
+  linked by source blocks. Was: an open architectural question of whether Notes and Reader
   should ever share one window (or a unified view) rather than remaining separate apps. _(00-overview §15.3.)_
 
 ## Lower priority / long-term

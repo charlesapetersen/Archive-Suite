@@ -11,7 +11,8 @@ its measured pages per hour per GPU) and the Mac-local 4-bit run.
 - **More kinds and tags.** Clippings, tables and table forms are in the groups CSVs already. Mixed pages (2) are
   too few to chart.
 - **Newspapers.** NewsBench is the lab's newspaper truth set (`W41.farmshare-news-layout`); its scores would make
-  a fifth chart.
+  a fifth chart (queued: W49.bench-news-chart behind nice-to-have, owner 2026-11-20).
 - **A checking chart for segmentation.** Checks per 100 pages against pages right after checking, if the table
-  turns out to be hard to read. Claude only and Claude with ChatGPT sit on the same point there.
+  turns out to be hard to read. Claude only and Claude with ChatGPT sit on the same point there (queued: W49.bench-seg-check-chart behind
+  nice-to-have, owner 2026-11-20).
 - **Share it publicly.** Publish `site/index.html` on GitHub Pages, if the owner wants a public link.

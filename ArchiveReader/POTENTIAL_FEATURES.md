@@ -48,9 +48,10 @@ The P2 triage pass shipped (see `CLAUDE.md` §Implementation map):
   `scripts/prose-model/`. Queued behind the nice-to-have gate as `W40.reader-prose-more` (owner, 2026-11-12), with
   a stronger truth and the rules' own failures first.
 - **Cloud-drive support** (Google Drive / File Provider): conflict-copy handling, materialization
-  policy, cloud-side tag-durability verification. (v1 assumes local disk.)
-- **Creation-date mirror** for native Finder chronological browsing (1678–2262 only; a bonus, never
-  the sort key).
+  policy, cloud-side tag-durability verification. (v1 assumes local disk.) (queued: W49.reader-cloud-drives behind
+  nice-to-have, and W49.cloud-drive-first-launch-warning, owner 2026-11-20)
+- **Creation-date mirror** — declined (owner, 2026-11-20, call 27): for native Finder chronological browsing
+  (1678–2262 only; a bonus, never the sort key); it would overwrite the file's real creation date.
 - Zotero / Tropy integration. _(IIIF manifest / EAD / Dublin Core export removed 2026-07-15 — owner: out of scope.)_
 
 ## Archive Suite convergence — ✅ SHIPPED (W0, 2026-07)

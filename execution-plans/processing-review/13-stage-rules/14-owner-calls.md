@@ -206,6 +206,14 @@ calls are section 1.
     nothing failed; it is collected after it runs. Revisited the same morning: the Notes editor's undo across the ⌘/
     switch queued (W49.notes-undo-across-toggle) and its missing constructs behind nice-to-have, with the question of
     what can be borrowed (W49.notes-editor-constructs); the CMIF export stays parked on his 2026-11-06 call.
+    The entries settled without him that morning were then put to him one at a time (his new rule: only an earlier
+    call or a stale record settles an entry): S-006 and S-007's reproduce attempts stay queued; cloud-drive support
+    behind nice-to-have (W49.reader-cloud-drives), and "warn users at first launch that material must not be in a
+    cloud drive" (W49.cloud-drive-first-launch-warning); the creation-date mirror declined; Notes and the Reader stay
+    separate apps; the NewsBench chart and the segmentation checking chart behind nice-to-have (W49.bench-news-chart,
+    W49.bench-seg-check-chart). From Vision OCR, which merges into the Processor: symbol-mode JBIG2 is never used,
+    as his rule (the Xerox digit-swap mechanism; this carries over to the Processor's PDF writing), and `--roi`
+    region selection is dropped.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
