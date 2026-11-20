@@ -738,7 +738,7 @@ final class CaptureSession: ObservableObject {
                 return nil
             }
         }
-        let name = String(format: "%05d-%@.jpg", seq, groupId)
+        let name = "\(CollectionNumbering.format(seq))-\(groupId).jpg"
         let finalURL = incomingFolder.appendingPathComponent(name)
         let tempURL = incomingFolder.appendingPathComponent("." + name + ".part")
         do {

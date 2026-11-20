@@ -82,7 +82,9 @@ folder run with no fields). The user may start a run anywhere ("set for selectio
 runs).
 
 - **Order.** Files are taken in Finder's order within one directory: `localizedStandardCompare`, ties broken by
-  plain string comparison (`ContainerOrder`). Hidden files and folders take no part.
+  plain string comparison (`ContainerOrder`). Hidden files and folders take no part. The Processor files names
+  that start with a six-digit number (`000001 Collection Name.pdf`; five digits before 2026-11-20, never renamed),
+  and this order compares that number by value, so a folder holding both widths keeps its filing order.
 - **Cover.** A run covers the files from its `start` up to, not including, the next run of its own level or a
   shallower one (a new box ends the folder run; a new collection ends both). Its `start` need not exist: a run
   begins where its name would sort, so removing the label photo does not move the run.

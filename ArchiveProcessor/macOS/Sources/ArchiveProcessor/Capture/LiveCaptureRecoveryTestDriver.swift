@@ -202,7 +202,7 @@ enum LiveCaptureRecoveryTestDriver {
         check("MISSING-output segment B is NOT filed (its source would be kept)", !mixed.filedGroupIds.contains("B"))
         check("movedFiles counts only the real output (1)", mixed.movedFiles == 1)
         check("allFiled is false when any segment is unfiled", mixed.allFiled == false)
-        check("A.pdf actually landed in the collection folder", fm.fileExists(atPath: out.appendingPathComponent("00001 Coll.pdf").path))
+        check("A.pdf actually landed in the collection folder", fm.fileExists(atPath: out.appendingPathComponent("000001 Coll.pdf").path))
 
         // --- Test 2: the total-loss shape — a lone segment whose PDF is missing → filedGroupIds EMPTY. ---
         let out2 = tmp.appendingPathComponent("out2", isDirectory: true)
@@ -260,15 +260,15 @@ enum LiveCaptureRecoveryTestDriver {
              segments: [(groupId: "E1", pdfURLs: [pdfE1], imageURLs: [], jsonURL: nil, complete: true)])
         ])
         let pdfE2 = staging.appendingPathComponent("E2.pdf"); try? Data("E2".utf8).write(to: pdfE2)
-        // Second finalize: SAME folder + name, "New collection" (appending:false) — must not restart at 00001.
+        // Second finalize: SAME folder + name, "New collection" (appending:false) — must not restart at 000001.
         let retry = LiveCaptureProcessor._recoveryTestFinalizeMove([
             (folder: out6, name: "Reuse", appending: false,
              segments: [(groupId: "E2", pdfURLs: [pdfE2], imageURLs: [], jsonURL: nil, complete: true)])
         ])
-        let firstStillThere = fm.fileExists(atPath: out6.appendingPathComponent("00001 Reuse.pdf").path)
-        let secondNumbered = fm.fileExists(atPath: out6.appendingPathComponent("00002 Reuse.pdf").path)
+        let firstStillThere = fm.fileExists(atPath: out6.appendingPathComponent("000001 Reuse.pdf").path)
+        let secondNumbered = fm.fileExists(atPath: out6.appendingPathComponent("000002 Reuse.pdf").path)
         check("retry into a populated folder does NOT overwrite the first file", firstStillThere)
-        check("retry continues numbering at 00002 (no collision)", secondNumbered && retry.filedGroupIds.contains("E2"))
+        check("retry continues numbering at 000002 (no collision)", secondNumbered && retry.filedGroupIds.contains("E2"))
 
         // --- Test 7 (KNOWN_ISSUES #1): legacy staging-manifest migration DROPS a re-processable segment
         // (all sources present → delete its stale staged output so resume can regenerate it → a complete
@@ -358,12 +358,12 @@ enum LiveCaptureRecoveryTestDriver {
               jsonFailed.filedGroupIds == ["G"] && jsonFailed.failedMoves == 1 && jsonFailed.allFiled == false
                 && fm.fileExists(atPath: jsonG.path))
         // P11 — a destination collision. Numbering continues from the collection folder's highest number, but
-        //       `JSON Output/` is not counted, so a stray `00001 <name>.json` there collides with the next
+        //       `JSON Output/` is not counted, so a stray `000001 <name>.json` there collides with the next
         //       segment's JSON. The displaced file must go to the Trash (recoverable), never a hard delete.
         let out4c = tmp.appendingPathComponent("out4c", isDirectory: true)
         let jsonDir4c = out4c.appendingPathComponent("JSON Output", isDirectory: true)
         try? fm.createDirectory(at: jsonDir4c, withIntermediateDirectories: true)
-        let displaced = jsonDir4c.appendingPathComponent("00001 Clash.json")
+        let displaced = jsonDir4c.appendingPathComponent("000001 Clash.json")
         try? Data("old json".utf8).write(to: displaced)
         let pdfH = staging.appendingPathComponent("H.pdf"); try? Data("pdfH".utf8).write(to: pdfH)
         let jsonH = staging.appendingPathComponent("H.json"); try? Data("new json".utf8).write(to: jsonH)
@@ -375,7 +375,7 @@ enum LiveCaptureRecoveryTestDriver {
         check("W40 P11: the collision really happened and the new JSON took the slot",
               clash.allFiled && (try? Data(contentsOf: displaced)) == Data("new json".utf8))
         check("W40 P11: a displaced destination goes to the Trash, never a hard delete",
-              rfmClash.trashed.map(\.lastPathComponent) == ["00001 Clash.json"] && rfmClash.removed.isEmpty
+              rfmClash.trashed.map(\.lastPathComponent) == ["000001 Clash.json"] && rfmClash.removed.isEmpty
                 && rfmClash.landedInTrash.count == 1
                 && (try? Data(contentsOf: rfmClash.landedInTrash[0])) == Data("old json".utf8))
 
@@ -624,7 +624,7 @@ enum LiveCaptureRecoveryTestDriver {
                  imageURLs: selectedQualitySeg.imageURLs, jsonURL: nil, complete: true)
             ])
         ])
-        let finalizedQualityArtifacts = ["00001 Selected Quality.pdf", "00001 Selected Quality.jpg"]
+        let finalizedQualityArtifacts = ["000001 Selected Quality.pdf", "000001 Selected Quality.jpg"]
             .map { selectedQualityOut.appendingPathComponent($0) }
         check("W19.q6: Q3 survives the Live Capture finalize move on PDF and image mirror",
               selectedQualityFinal.filedGroupIds == ["Q3"]
@@ -897,7 +897,7 @@ enum LiveCaptureRecoveryTestDriver {
                   manifestGroupIds(keepDir) == ["straggler"])
             check("...while the PLANNED segment really did file (the fix costs nothing)",
                   !fm.fileExists(atPath: plannedPDF.path)
-                      && fm.fileExists(atPath: keepOut.appendingPathComponent("00001 r6keep.pdf").path))
+                      && fm.fileExists(atPath: keepOut.appendingPathComponent("000001 r6keep.pdf").path))
             check("...and the operator is TOLD, instead of seeing a clean \"Finalized\"",
                   keepProc.finalizeSummary?.contains("finished processing while this batch was being filed") == true)
 

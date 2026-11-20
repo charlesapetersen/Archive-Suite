@@ -505,9 +505,9 @@ enum ManifestPersistenceTestDriver {
 
         typealias Entry = CaptureSession.ManifestEntry
         let entries = [
-            Entry(name: "00001-gDoc.jpg", groupId: "gDoc", seq: 1, type: "document", quality: "Q1", year: 1968, month: 3),
-            Entry(name: "00002-gDoc.jpg", groupId: "gDoc", seq: 2, type: "document", quality: nil, year: 1968, month: 3),
-            Entry(name: "00003-gBox.jpg", groupId: "gBox", seq: 3, type: "box", quality: nil, year: nil, month: nil),
+            Entry(name: "000001-gDoc.jpg", groupId: "gDoc", seq: 1, type: "document", quality: "Q1", year: 1968, month: 3),
+            Entry(name: "000002-gDoc.jpg", groupId: "gDoc", seq: 2, type: "document", quality: nil, year: 1968, month: 3),
+            Entry(name: "000003-gBox.jpg", groupId: "gBox", seq: 3, type: "box", quality: nil, year: nil, month: nil),
         ]
         let completed: Set<String> = ["gDoc"]   // gDoc's segment was signalled complete; gBox is a marker
 
@@ -706,7 +706,7 @@ enum ManifestPersistenceTestDriver {
               && session.macTags["gCard"]?.subjects == ["oral history"]
               && session.macTags["gCard"]?.quality == 2)
         let taggedHandoff = session.orderedFilesAndGroups()
-        let cardHandoffIndex = taggedHandoff.files.firstIndex { $0.lastPathComponent == "00102-gCard.jpg" }
+        let cardHandoffIndex = taggedHandoff.files.firstIndex { $0.lastPathComponent == "000102-gCard.jpg" }
         check("W19.q7: a Mac Quality choice overrides the phone's Q3 before Process Files handoff",
               cardHandoffIndex.map { taggedHandoff.qualities[$0] == "Q2" } == true)
         check("W23.m7: live processing is told exactly once, and only for the durable decision",

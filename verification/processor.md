@@ -859,7 +859,7 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 
 - **Promise:** with collection segmentation on, collection names are read from box-label text, similar names are
   clustered and title-cased, the user reviews and corrects them, and output PDFs are filed into collection folders
-  as `00001 Collection Name.pdf`, never overwriting an existing file.
+  as `000001 Collection Name.pdf` (continuing past an older folder's five-digit names), never overwriting an existing file.
 - **Promised in:** `README.md` §Collection Segmentation & Organization, §Collection Name Review; `CLAUDE.md`
   Tier-2 list (collection numbering); `TESTING.md` Tier 2D `test-collection-organize.sh`.
 - **Reached by:** ⌘, → Collection ID + file renaming (`Views/SettingsView.swift:889`) → `performCollectionSegmentation`

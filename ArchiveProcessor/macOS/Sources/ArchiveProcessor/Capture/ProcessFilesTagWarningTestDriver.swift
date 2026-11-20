@@ -140,7 +140,7 @@ enum ProcessFilesTagWarningTestDriver {
               tagsOf(boxPDF).filter { $0 == "Red" }.count == 1)
 
         // --- 3. The record is keyed by the INPUT file and self-heals. The key matters: `organizeOutput`
-        // both MOVES and RENUMBERS every output ("00003 Box 12.pdf"), so an output name or URL recorded
+        // both MOVES and RENUMBERS every output ("000003 Box 12.pdf"), so an output name or URL recorded
         // during the run names a file that no longer exists by the time the summary is written. ---
         let recorder = OCRProcessor()
         let photo = verdictDir.appendingPathComponent("IMG_2043.jpg")

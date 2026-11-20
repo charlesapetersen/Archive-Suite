@@ -278,7 +278,7 @@ class OCRProcessor: ObservableObject {
     /// cost is findability: the Reader's tag-driven triage silently omits an untagged file, so it must
     /// be said out loud at the end of the run instead of discarded into a `try?`.
     /// Keyed by SOURCE, not by output: `CollectionSegmenter.organizeOutput` both moves AND renumbers
-    /// outputs after tagging (`00003 Box 12.pdf`), so any output name or URL recorded during the run is
+    /// outputs after tagging (`000003 Box 12.pdf`), so any output name or URL recorded during the run is
     /// a file that no longer exists by the time the summary is written. The input name never changes,
     /// and it is what the operator recognizes.
     /// Maintained by `recordTagWrite(succeeded:forSource:)`: a later successful re-write clears the

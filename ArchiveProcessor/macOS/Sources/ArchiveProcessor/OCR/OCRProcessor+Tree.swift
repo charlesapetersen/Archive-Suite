@@ -139,8 +139,9 @@ enum ProcessFilesTree {
     }
 
     /// The files `urls` give. Without `readSubfolders`, or when no folder among them holds files in subfolders, as
-    /// before the tree: a folder gives its own files, each folder's in name order, and with `sortAll` the whole list in
-    /// name order (a drop). With it, when one does, every folder among them is read as a tree (`ContainerTree.files`):
+    /// before the tree: a folder gives its own files, each folder's in Finder order, and with `sortAll` the whole list in
+    /// Finder order (a drop). Finder order (`ContainerOrder`) compares a leading number by value, so a collection
+    /// folder holding both five- and six-digit filed names (W49.proc-six-digit-names) is read in filing order. With it, when one does, every folder among them is read as a tree (`ContainerTree.files`):
     /// its files depth-first in Finder order, each with its folders from the given folder down, so the outputs are
     /// filed the same way below the output folder. A file given on its own is taken as it is, with no folder.
     nonisolated static func collect(_ urls: [URL], accept: (URL) -> Bool, sortAll: Bool,
@@ -157,12 +158,12 @@ enum ProcessFilesTree {
                 if isFolder(url) {
                     let contents = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
                     let accepted = contents.filter(accept)
-                    files.append(contentsOf: sortAll ? accepted : accepted.sorted { $0.lastPathComponent < $1.lastPathComponent })
+                    files.append(contentsOf: sortAll ? accepted : accepted.sorted { ContainerOrder.precedes($0.lastPathComponent, $1.lastPathComponent) })
                 } else if accept(url) {
                     files.append(url)
                 }
             }
-            return Intake(files: sortAll ? files.sorted { $0.lastPathComponent < $1.lastPathComponent } : files)
+            return Intake(files: sortAll ? files.sorted { ContainerOrder.precedes($0.lastPathComponent, $1.lastPathComponent) } : files)
         }
         var intake = Intake()
         for (url, tree) in zip(urls, trees) {

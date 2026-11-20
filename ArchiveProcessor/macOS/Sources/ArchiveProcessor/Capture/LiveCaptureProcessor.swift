@@ -2835,7 +2835,7 @@ final class LiveCaptureProcessor: ObservableObject {
             try? fm.createDirectory(at: plan.folder, withIntermediateDirectories: true)
             // ALWAYS continue numbering from the folder's existing max (not only when appending). A "new
             // collection" whose folder already holds numbered files — e.g. a Finish-again retry after a
-            // partial finalize, or the operator reusing a name — must NOT restart at 00001 and collide with
+            // partial finalize, or the operator reusing a name — must NOT restart at 000001 and collide with
             // (and overwrite) an already-filed file. `appending` no longer affects numbering; both paths are
             // now collision-proof.
             var seq = CollectionNumbering.highestLeadingNumber(in: plan.folder, fm: fm)
@@ -2856,7 +2856,7 @@ final class LiveCaptureProcessor: ObservableObject {
                     for pdf in seg.pdfURLs {
                         seq += 1
                         if firstNum == nil { firstNum = seq }
-                        let numStr = String(format: "%05d", seq)
+                        let numStr = CollectionNumbering.format(seq)
                         pdfExpected += 1
                         let dest = plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf")
                         if doMove(pdf, to: dest) { pdfLanded += 1; landed.append(dest.lastPathComponent) }
@@ -2867,13 +2867,13 @@ final class LiveCaptureProcessor: ObservableObject {
                     for img in seg.imageURLs {
                         seq += 1
                         if firstNum == nil { firstNum = seq }
-                        let numStr = String(format: "%05d", seq)
+                        let numStr = CollectionNumbering.format(seq)
                         let ext = img.pathExtension.isEmpty ? "jpg" : img.pathExtension
                         _ = doMove(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"))
                     }
                     if let fn = firstNum, let pdf = seg.pdfURLs.first {
                         pdfExpected += 1
-                        let dest = plan.folder.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).pdf")
+                        let dest = plan.folder.appendingPathComponent("\(CollectionNumbering.format(fn)) \(plan.name).pdf")
                         if doMove(pdf, to: dest) { pdfLanded += 1; landed.append(dest.lastPathComponent) }
                     }
                 } else {
@@ -2886,7 +2886,7 @@ final class LiveCaptureProcessor: ObservableObject {
                     for pdf in seg.pdfURLs {
                         seq += 1
                         if firstNum == nil { firstNum = seq }
-                        let numStr = String(format: "%05d", seq)
+                        let numStr = CollectionNumbering.format(seq)
                         if let img = imgByBase[pdf.deletingPathExtension().lastPathComponent] {
                             let ext = img.pathExtension.isEmpty ? "jpg" : img.pathExtension
                             _ = doMove(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"))
@@ -2899,7 +2899,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 if let json = seg.jsonURL, let fn = firstNum {
                     let jf = plan.folder.appendingPathComponent("JSON Output", isDirectory: true)
                     try? fm.createDirectory(at: jf, withIntermediateDirectories: true)
-                    _ = doMove(json, to: jf.appendingPathComponent("\(String(format: "%05d", fn)) \(plan.name).json"))
+                    _ = doMove(json, to: jf.appendingPathComponent("\(CollectionNumbering.format(fn)) \(plan.name).json"))
                 }
                 // Filed iff it produced ≥1 PDF and ALL of them landed. (No PDF → never filed → source kept.)
                 if pdfExpected > 0 && pdfLanded == pdfExpected {

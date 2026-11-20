@@ -87,7 +87,7 @@ struct SettingsDocumentsPanel: View {
                 Toggle(isOn: $enableCollectionSegmentation) {
                     HStack {
                         Text("Collection ID + file renaming")
-                        HelpButton(text: "Identify archival collections from box-label photos and organize outputs into per-collection folders with sequential names (e.g. “00001 Collection Name.pdf”).")
+                        HelpButton(text: "Identify archival collections from box-label photos and organize outputs into per-collection folders with sequential names (e.g. “000001 Collection Name.pdf”).")
                     }
                 }
                 if enableCollectionSegmentation {

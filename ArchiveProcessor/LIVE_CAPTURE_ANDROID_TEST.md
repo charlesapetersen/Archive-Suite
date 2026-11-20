@@ -64,7 +64,7 @@ but it has no walkthrough of its own yet.)
 13. Tap **Finish session** on the phone (or finish on the Mac).
     - ✅ Mac: for **Process live**, each segment was OCR'd on arrival; at finish you get a **collection-name confirm** per collection, auto-suggested from the box-label OCR and **fuzzy-matched to existing folders**.
 14. Confirm/adjust the collection name → finalize.
-    - ✅ Output: **PDF + renamed original image** per document (dual output), multi-page docs merged, `NNNNN` numbering continues an existing folder if matched.
+    - ✅ Output: **PDF + renamed original image** per document (dual output), multi-page docs merged, six-digit `NNNNNN` numbering continues an existing folder if matched.
     - ✅ Tags on output: year/month/subjects, Red/Purple markers, **`Unread` last**.
     - ✅ Only after a **successful finalize** does the session's backup folder get cleared/pruned — verify the backup folder emptied only post-success.
 

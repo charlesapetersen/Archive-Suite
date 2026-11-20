@@ -38,7 +38,7 @@ enum CollectionOrganizeTestDriver {
         // ============================================================================================
         // Case 1 — THE BUG: merged 2-page document + dual output. Per-page images page1.jpg/page2.jpg
         // exist; merge collapsed page1.pdf+page2.pdf into page1_merged.pdf and repointed BOTH source URLs
-        // at it. Expect: both images filed + numbered in the folder, merged PDF at 00001, output root
+        // at it. Expect: both images filed + numbered in the folder, merged PDF at 000001, output root
         // left with NO loose page images.
         // ============================================================================================
         do {
@@ -63,13 +63,13 @@ enum CollectionOrganizeTestDriver {
             } catch { check("merged: organizeOutput threw \(error)", false) }
 
             let folder = out.appendingPathComponent("Test Coll")
-            let jpg1 = folder.appendingPathComponent("00001 Test Coll.jpg")
-            let jpg2 = folder.appendingPathComponent("00002 Test Coll.jpg")
-            let pdf = folder.appendingPathComponent("00001 Test Coll.pdf")
-            let json = folder.appendingPathComponent("JSON Output/00001 Test Coll.json")
-            check("merged: page-1 image filed as 00001 (numbered, in collection folder)", fm.fileExists(atPath: jpg1.path))
-            check("merged: page-2 image filed as 00002 (numbered, in collection folder)", fm.fileExists(atPath: jpg2.path))
-            check("merged: merged PDF filed at the first image's number (00001)", fm.fileExists(atPath: pdf.path))
+            let jpg1 = folder.appendingPathComponent("000001 Test Coll.jpg")
+            let jpg2 = folder.appendingPathComponent("000002 Test Coll.jpg")
+            let pdf = folder.appendingPathComponent("000001 Test Coll.pdf")
+            let json = folder.appendingPathComponent("JSON Output/000001 Test Coll.json")
+            check("merged: page-1 image filed as 000001 (numbered, in collection folder)", fm.fileExists(atPath: jpg1.path))
+            check("merged: page-2 image filed as 000002 (numbered, in collection folder)", fm.fileExists(atPath: jpg2.path))
+            check("merged: merged PDF filed at the first image's number (000001)", fm.fileExists(atPath: pdf.path))
             check("merged: JSON sidecar filed", fm.fileExists(atPath: json.path))
             // The bug's signature: page images left loose in the output ROOT. Must be gone (moved).
             check("merged: NO loose page image left in the output root", !fm.fileExists(atPath: img1.path) && !fm.fileExists(atPath: img2.path))
@@ -87,7 +87,7 @@ enum CollectionOrganizeTestDriver {
             let folder = out.appendingPathComponent("JC")
             let jsonFolder = folder.appendingPathComponent("JSON Output")
             try? fm.createDirectory(at: jsonFolder, withIntermediateDirectories: true)
-            let existingJSON = jsonFolder.appendingPathComponent("00001 JC.json")
+            let existingJSON = jsonFolder.appendingPathComponent("000001 JC.json")
             writeFile(existingJSON, "KEEP")
             let source = out.appendingPathComponent("source.jpg")
             let pdf = out.appendingPathComponent("source.pdf")
@@ -102,11 +102,11 @@ enum CollectionOrganizeTestDriver {
                     exportedImageMap: [source: collisionRenamedImage])
             } catch { check("JSON collision: organizeOutput threw \(error)", false) }
             let preserved = (try? String(contentsOf: existingJSON, encoding: .utf8)) == "KEEP"
-            check("JSON collision: existing 00001 sidecar preserved", preserved)
-            check("JSON collision: new PDF/JSON/image advanced together to 00002",
-                  fm.fileExists(atPath: folder.appendingPathComponent("00002 JC.pdf").path)
-                  && fm.fileExists(atPath: jsonFolder.appendingPathComponent("00002 JC.json").path)
-                  && fm.fileExists(atPath: folder.appendingPathComponent("00002 JC.jpg").path))
+            check("JSON collision: existing 000001 sidecar preserved", preserved)
+            check("JSON collision: new PDF/JSON/image advanced together to 000002",
+                  fm.fileExists(atPath: folder.appendingPathComponent("000002 JC.pdf").path)
+                  && fm.fileExists(atPath: jsonFolder.appendingPathComponent("000002 JC.json").path)
+                  && fm.fileExists(atPath: folder.appendingPathComponent("000002 JC.jpg").path))
             try? fm.removeItem(at: out)
         }
 
@@ -128,10 +128,10 @@ enum CollectionOrganizeTestDriver {
                 outputURLMap: [s1: p1, s2: p2], moveSiblingImages: true,
                 exportedImageMap: [s1: i1, s2: i2])   // present but each source has its OWN pdf → sibling-by-name path
             let folder = out.appendingPathComponent("NM")
-            let ok = fm.fileExists(atPath: folder.appendingPathComponent("00001 NM.pdf").path)
-                && fm.fileExists(atPath: folder.appendingPathComponent("00001 NM.jpg").path)
-                && fm.fileExists(atPath: folder.appendingPathComponent("00002 NM.pdf").path)
-                && fm.fileExists(atPath: folder.appendingPathComponent("00002 NM.jpg").path)
+            let ok = fm.fileExists(atPath: folder.appendingPathComponent("000001 NM.pdf").path)
+                && fm.fileExists(atPath: folder.appendingPathComponent("000001 NM.jpg").path)
+                && fm.fileExists(atPath: folder.appendingPathComponent("000002 NM.pdf").path)
+                && fm.fileExists(atPath: folder.appendingPathComponent("000002 NM.jpg").path)
             check("non-merged dual output: each page filed as its own numbered PDF + image (unchanged)", ok)
             try? fm.removeItem(at: out)
         }
@@ -150,15 +150,16 @@ enum CollectionOrganizeTestDriver {
                 collections: [coll], outputDirectory: out,
                 outputURLMap: [s1: merged, s2: merged], moveSiblingImages: false)
             let folder = out.appendingPathComponent("NE")
-            check("no-export merged: merged PDF filed once at 00001 (unchanged)",
-                  fm.fileExists(atPath: folder.appendingPathComponent("00001 NE.pdf").path)
+            check("no-export merged: merged PDF filed once at 000001 (unchanged)",
+                  fm.fileExists(atPath: folder.appendingPathComponent("000001 NE.pdf").path)
                   && !fm.fileExists(atPath: merged.path))
             try? fm.removeItem(at: out)
         }
 
         // ============================================================================================
-        // Case 4 — safety: never overwrite. Pre-populate the collection folder with an existing 00001
-        // file; the merged run must continue numbering (00002/00003) and leave the existing file intact.
+        // Case 4 — safety: never overwrite. Pre-populate the collection folder with an existing file filed
+        // under the old five-digit width (00001); the merged run must continue numbering at six digits
+        // (000002/000003, W49.proc-six-digit-names) and leave the existing file intact and unrenamed.
         // ============================================================================================
         do {
             let out = fm.temporaryDirectory.appendingPathComponent("APOrgTest-nooverwrite-\(UUID().uuidString)", isDirectory: true)
@@ -175,11 +176,29 @@ enum CollectionOrganizeTestDriver {
                 outputURLMap: [s1: merged, s2: merged], moveSiblingImages: true,
                 exportedImageMap: [s1: i1, s2: i2])
             let preserved = (try? String(contentsOf: existing, encoding: .utf8)) == "EXISTING"
-            let newImg = fm.fileExists(atPath: folder.appendingPathComponent("00002 OW.jpg").path)
-                && fm.fileExists(atPath: folder.appendingPathComponent("00003 OW.jpg").path)
-            let newPdf = fm.fileExists(atPath: folder.appendingPathComponent("00002 OW.pdf").path)
+            let newImg = fm.fileExists(atPath: folder.appendingPathComponent("000002 OW.jpg").path)
+                && fm.fileExists(atPath: folder.appendingPathComponent("000003 OW.jpg").path)
+            let newPdf = fm.fileExists(atPath: folder.appendingPathComponent("000002 OW.pdf").path)
             check("no-overwrite: existing 00001 file preserved (not overwritten/deleted)", preserved)
-            check("no-overwrite: merged run continued numbering at 00002/00003", newImg && newPdf)
+            check("no-overwrite: merged run continued numbering at 000002/000003", newImg && newPdf)
+            check("no-overwrite: nothing filed at the old width beyond the existing file",
+                  !fm.fileExists(atPath: folder.appendingPathComponent("00002 OW.pdf").path))
+            try? fm.removeItem(at: out)
+        }
+
+        // W49.proc-six-digit-names — the leading number reads both widths, and only those.
+        do {
+            let cases: [(String, Int?)] = [("00041 A.pdf", 41), ("000042 A.pdf", 42), ("123456 A.jpg", 123456),
+                                           ("0042 A.pdf", nil), ("1234567 A.pdf", nil), ("A 00001.pdf", nil),
+                                           ("000007-g1.jpg", 7), (".archivesuite", nil)]
+            let wrong = cases.filter { CollectionNumbering.leadingNumber(of: $0.0) != $0.1 }.map(\.0)
+            check("six digits: leadingNumber reads five- and six-digit names only (wrong: \(wrong))", wrong.isEmpty)
+            check("six digits: format pads to six", CollectionNumbering.format(42) == "000042")
+            let out = fm.temporaryDirectory.appendingPathComponent("APOrgTest-mixedwidth-\(UUID().uuidString)", isDirectory: true)
+            try? fm.createDirectory(at: out, withIntermediateDirectories: true)
+            for name in ["00040 W.pdf", "00041 W.jpg", "000039 W.pdf"] { writeFile(out.appendingPathComponent(name), "x") }
+            check("six digits: a mixed folder continues past its highest number (41)",
+                  CollectionNumbering.highestLeadingNumber(in: out, fm: fm) == 41)
             try? fm.removeItem(at: out)
         }
 
@@ -189,7 +208,7 @@ enum CollectionOrganizeTestDriver {
             let folder = out.appendingPathComponent("MJ")
             let jsonFolder = folder.appendingPathComponent("JSON Output")
             try? fm.createDirectory(at: jsonFolder, withIntermediateDirectories: true)
-            let existingJSON = jsonFolder.appendingPathComponent("00001 MJ.json")
+            let existingJSON = jsonFolder.appendingPathComponent("000001 MJ.json")
             writeFile(existingJSON, "KEEP")
             let s1 = out.appendingPathComponent("p1.src"); let s2 = out.appendingPathComponent("p2.src")
             let i1 = out.appendingPathComponent("p1.jpg"); let i2 = out.appendingPathComponent("p2.jpg")
@@ -203,13 +222,13 @@ enum CollectionOrganizeTestDriver {
                     outputURLMap: [s1: merged, s2: merged], moveSiblingImages: true,
                     exportedImageMap: [s1: i1, s2: i2])
             } catch { check("merged JSON collision: organizeOutput threw \(error)", false) }
-            check("merged JSON collision: existing 00001 JSON preserved",
+            check("merged JSON collision: existing 000001 JSON preserved",
                   (try? String(contentsOf: existingJSON, encoding: .utf8)) == "KEEP")
-            check("merged JSON collision: new set advanced together to 00002/00003",
-                  fm.fileExists(atPath: folder.appendingPathComponent("00002 MJ.jpg").path)
-                  && fm.fileExists(atPath: folder.appendingPathComponent("00003 MJ.jpg").path)
-                  && fm.fileExists(atPath: folder.appendingPathComponent("00002 MJ.pdf").path)
-                  && fm.fileExists(atPath: jsonFolder.appendingPathComponent("00002 MJ.json").path))
+            check("merged JSON collision: new set advanced together to 000002/000003",
+                  fm.fileExists(atPath: folder.appendingPathComponent("000002 MJ.jpg").path)
+                  && fm.fileExists(atPath: folder.appendingPathComponent("000003 MJ.jpg").path)
+                  && fm.fileExists(atPath: folder.appendingPathComponent("000002 MJ.pdf").path)
+                  && fm.fileExists(atPath: jsonFolder.appendingPathComponent("000002 MJ.json").path))
             try? fm.removeItem(at: out)
         }
 
@@ -256,8 +275,8 @@ enum CollectionOrganizeTestDriver {
             } catch { check("labels: organizeOutput threw \(error)", false) }
             let folder = out.appendingPathComponent("Glotzer")
             check("labels: organizeOutput reports each PDF's new place",
-                  moves[pdfs[0]] == folder.appendingPathComponent("00001 Glotzer.pdf")
-                  && moves[pdfs[2]] == folder.appendingPathComponent("00003 Glotzer.pdf") && moves.count == 4)
+                  moves[pdfs[0]] == folder.appendingPathComponent("000001 Glotzer.pdf")
+                  && moves[pdfs[2]] == folder.appendingPathComponent("000003 Glotzer.pdf") && moves.count == 4)
 
             let texts = ["HOOVER INSTITUTION ARCHIVES\nBOX NO. 17", "Dear Sir", "Folder 8\nCorrespondence", "More"]
             let kinds: [DocumentClassification] = [.boxLabel, .documentStart, .folderLabel, .documentStart]
@@ -281,16 +300,16 @@ enum CollectionOrganizeTestDriver {
             processor.outputURLMap = map
             let problem = await processor.recordContainerLabels(moves: moves, outputDirectory: out, preOCRedInput: false)
             let file = ContainerFileStore.load(directory: folder).document
-            let at4 = file.map { ContainerResolver.resolve(fileName: "00004 Glotzer.pdf", scopes: [ContainerScope(file: $0)]) }
-            let at2 = file.map { ContainerResolver.resolve(fileName: "00002 Glotzer.pdf", scopes: [ContainerScope(file: $0)]) }
+            let at4 = file.map { ContainerResolver.resolve(fileName: "000004 Glotzer.pdf", scopes: [ContainerScope(file: $0)]) }
+            let at2 = file.map { ContainerResolver.resolve(fileName: "000002 Glotzer.pdf", scopes: [ContainerScope(file: $0)]) }
             check("labels: the box and folder labels' runs are written beside the filed PDFs, as proposals",
                   problem == nil && at4?.values[.container]?.value == "Box 17" && at4?.values[.folder]?.value == "8"
                   && at4?.values[.container]?.source == .label && at2?.values[.folder] == nil
                   && at2?.values[.repository]?.value == "HOOVER INSTITUTION ARCHIVES")
             let filed = (try? fm.contentsOfDirectory(atPath: folder.path))?.sorted() ?? []
             check("labels: nothing but .archivesuite is added, and no PDF is changed",
-                  filed == [".archivesuite", "00001 Glotzer.pdf", "00002 Glotzer.pdf", "00003 Glotzer.pdf", "00004 Glotzer.pdf"]
-                  && (try? String(contentsOf: folder.appendingPathComponent("00003 Glotzer.pdf"), encoding: .utf8))
+                  filed == [".archivesuite", "000001 Glotzer.pdf", "000002 Glotzer.pdf", "000003 Glotzer.pdf", "000004 Glotzer.pdf"]
+                  && (try? String(contentsOf: folder.appendingPathComponent("000003 Glotzer.pdf"), encoding: .utf8))
                       == "PDF folder.pdf")
             try? fm.removeItem(at: out)
         }
@@ -335,6 +354,16 @@ enum CollectionOrganizeTestDriver {
             let flatOnly = ProcessFilesTree.collect([flat], accept: isJPEG, sortAll: true)
             check("tree: a folder with no subfolders is read flat, as before",
                   flatOnly.files.map(\.lastPathComponent) == ["a.jpg", "b.jpg"] && flatOnly.subfolders.isEmpty)
+            // W49.proc-six-digit-names: a folder filed under both widths is read in filing order, not string order
+            // (where "000042" would sort before "00040").
+            let mixed = fm.temporaryDirectory.appendingPathComponent("APOrgTest-mixedintake-\(UUID().uuidString)", isDirectory: true)
+            try? fm.createDirectory(at: mixed, withIntermediateDirectories: true)
+            for n in ["000042 M.jpg", "00041 M.jpg", "00040 M.jpg"] { writeFile(mixed.appendingPathComponent(n), "m") }
+            let mixedOrder = ["00040 M.jpg", "00041 M.jpg", "000042 M.jpg"]
+            check("six digits: a mixed-width folder is read in filing order, dropped or chosen",
+                  ProcessFilesTree.collect([mixed], accept: isJPEG, sortAll: true).files.map(\.lastPathComponent) == mixedOrder
+                  && ProcessFilesTree.collect([mixed], accept: isJPEG, sortAll: false).files.map(\.lastPathComponent) == mixedOrder)
+            try? fm.removeItem(at: mixed)
             let intake = ProcessFilesTree.collect([input.appendingPathComponent("Glotzer papers"), loose],
                                                   accept: isJPEG, sortAll: true)
             // The tree's own URLs from here on (the walk may spell the scratch path with /private).

@@ -290,8 +290,8 @@ class CollectionSegmenter {
     // MARK: - Organize Output
 
     /// Create collection folders and move/rename output PDFs and JSONs into them.
-    /// PDFs are renamed with sequential numbering: "00001 Collection Name.pdf"
-    /// JSON files are similarly renamed: "00001 Collection Name.json"
+    /// PDFs are renamed with sequential numbering: "000001 Collection Name.pdf"
+    /// JSON files are similarly renamed: "000001 Collection Name.json"
     /// - Parameter exportedImageMap: source-URL → its per-page exported original image URL, captured
     ///   BEFORE document merging (which repoints `outputURLMap` to a single merged PDF and so loses the
     ///   per-page image names). Also carries collision-renamed images whose base no longer matches the PDF.
@@ -316,8 +316,9 @@ class CollectionSegmenter {
             // Move/rename PDFs and JSONs. A merged multi-page document has several source URLs that map
             // to the SAME output PDF; move it once and only advance the sequence number on an actual
             // move, so numbering stays contiguous (no gaps from the skipped duplicates).
-            // Continue numbering from any existing NNNNN files so re-running a collection into an existing
-            // output folder APPENDS instead of restarting at 00001 and deleting/overwriting the earlier run.
+            // Continue numbering from any existing numbered files (five or six digits) so re-running a
+            // collection into an existing output folder APPENDS instead of restarting at 000001 and
+            // deleting/overwriting the earlier run.
             var movedCount = CollectionNumbering.highestLeadingNumber(in: folderURL, fm: fm)
             var movedOutputs = Set<URL>()
             // Pre-build reverse map (output PDF → source URLs) to avoid O(n²) filter per merged doc.
@@ -361,13 +362,13 @@ class CollectionSegmenter {
                             var occupied = false
                             for (offset, image) in pageImages.enumerated() {
                                 let number = firstNumber + offset
-                                let base = "\(String(format: "%05d", number)) \(collection.collectionName)"
+                                let base = "\(CollectionNumbering.format(number)) \(collection.collectionName)"
                                 let ext = image.pathExtension.isEmpty ? "jpg" : image.pathExtension
                                 if fm.fileExists(atPath: folderURL.appendingPathComponent(base + "." + ext).path) {
                                     occupied = true; break
                                 }
                             }
-                            let firstBase = "\(String(format: "%05d", firstNumber)) \(collection.collectionName)"
+                            let firstBase = "\(CollectionNumbering.format(firstNumber)) \(collection.collectionName)"
                             occupied = occupied || fm.fileExists(atPath: folderURL.appendingPathComponent(firstBase + ".pdf").path)
                             if hasMergedJSON {
                                 occupied = occupied || fm.fileExists(atPath:
@@ -379,11 +380,11 @@ class CollectionSegmenter {
 
                         var artifactMoves: [OutputFileSafety.ArtifactMove] = pageImages.enumerated().map { offset, image in
                             let number = firstNumber + offset
-                            let base = "\(String(format: "%05d", number)) \(collection.collectionName)"
+                            let base = "\(CollectionNumbering.format(number)) \(collection.collectionName)"
                             let ext = image.pathExtension.isEmpty ? "jpg" : image.pathExtension
                             return .init(source: image, destination: folderURL.appendingPathComponent(base + "." + ext))
                         }
-                        let firstBase = "\(String(format: "%05d", firstNumber)) \(collection.collectionName)"
+                        let firstBase = "\(CollectionNumbering.format(firstNumber)) \(collection.collectionName)"
                         artifactMoves.append(.init(source: pdfURL,
                                                    destination: folderURL.appendingPathComponent(firstBase + ".pdf")))
                         if hasMergedJSON {
@@ -427,7 +428,7 @@ class CollectionSegmenter {
                 var destJSON: URL?
                 var destImage: URL?
                 while true {
-                    let seqNum = String(format: "%05d", sequence)
+                    let seqNum = CollectionNumbering.format(sequence)
                     newBaseName = "\(seqNum) \(collection.collectionName)"
                     destPDF = folderURL.appendingPathComponent(newBaseName + ".pdf")
                     destJSON = hasJSON
