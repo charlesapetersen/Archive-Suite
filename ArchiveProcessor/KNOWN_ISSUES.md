@@ -53,7 +53,14 @@ Rules → Columns and reading order, off by default.
   false alarms; W47.wh-read-flag-cm declined).
 - A route the bench has not read (a typed gateway or OpenRouter model, Claude on the plan, the Local Agent, the older
   Gemini, GPT and Claude models) is not flagged, nor is a page another route read in its place, an imported page, a
-  newspaper page read in regions, a page the app turned, a page Vision failed on, or a batch run's pages (queued: W49.proc-read-flag-wiring).
+  page the app turned, a page Vision failed on, or a batch run's pages (queued: W49.proc-read-flag-wiring).
+- A newspaper page read in regions is not flagged. Vision reads a whole newspaper scan at 21.8 NES, so comparing
+  with it says nothing; Vision reading the same region crops (84.8 NES) does, at one cut of 0.45 for every reader
+  (`segbench-results/post-read-flag-newspaper.md`, 15 scans from one collection) (queued: W49.proc-read-flag-newspaper-app).
+- A newspaper scan read whole (always for Qwen3.6 27B since W47.wh-whole-page-large; otherwise when the layout model is not
+  downloaded, the detector fails or the kind is uncertain) is checked against that
+  poor whole-page Vision reading, so at the readers' cuts of about 0.70 a good reading is almost always flagged (46 of
+  53 good whole readings on L9; Gemini 3.7 Flash's 0.976 cut flags none) (queued: W49.proc-read-flag-newspaper-whole).
 - Each checked page costs one extra Apple Vision reading on this Mac (time not measured; no money) (accepted: the
   check needs Vision's text, and Vision is free and local).
 
