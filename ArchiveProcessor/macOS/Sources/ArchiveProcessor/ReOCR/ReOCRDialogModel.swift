@@ -17,6 +17,8 @@ final class ReOCRDialogModel {
         let eligibility: Result<[ReOCRPairs.Pair], ReOCRPairs.Refusal>
         /// The reader its first text page names, for display only.
         let currentReader: PDFReaderProvenance?
+        /// W47.wh-yolo-scans-reocr: its collection's detector for scanned newspapers, which its pages are read with.
+        let scanDetector: NewspaperDetector
     }
 
     struct Group: Sendable {
@@ -41,7 +43,8 @@ final class ReOCRDialogModel {
     /// `selectedPairs` keeps, for a file the Reader named pairs for, only those pairs (0-based); a pair past the end of
     /// the file is ignored.
     init(files urls: [URL], selectedPairs: [URL: [Int]] = [:], table: SettingsRouteTable, pairs: OCRPairMatrix?,
-         resources: SettingsResources, staysOnMac: Bool, noTraining: Bool = false) {
+         resources: SettingsResources, staysOnMac: Bool, noTraining: Bool = false,
+         scanDetectors: [URL: NewspaperDetector] = [:]) {
         self.table = table
         self.pairs = pairs
         self.resources = resources
@@ -51,7 +54,8 @@ final class ReOCRDialogModel {
             let data = (try? Data(contentsOf: url)) ?? Data()
             let eligibility = ReOCRPairs.validate(data)
             let found = (try? eligibility.get()) ?? []
-            files.append(FileEntry(id: url.path, url: url, eligibility: eligibility, currentReader: found.first?.header.provenance))
+            files.append(FileEntry(id: url.path, url: url, eligibility: eligibility, currentReader: found.first?.header.provenance,
+                                   scanDetector: scanDetectors[url] ?? .ppDocLayoutV3))
             let wanted = selectedPairs[url].map { Set($0.map { $0 * 2 + 1 }) }
             for pair in found where wanted?.contains(pair.textIndex) ?? true {
                 pages.append(ReOCRPageChoice(fileID: url.path, pairIndex: pair.textIndex, kind: pair.header.kind,
@@ -185,8 +189,11 @@ final class ReOCRDialogModel {
                 pageModels[p.pairIndex] = models[k]
             }
             do {
-                let review = try await job.start(file: file.url, root: root, textPages: Set(mine.map(\.pairIndex)),
-                                                 kinds: kinds, model: model, pageModels: pageModels, read: routed)
+                // The file's collection's detector reaches the reader as the run's task-local (`ReOCRJob.reader`).
+                let review = try await NewspaperPageReader.$scanDetector.withValue(file.scanDetector) {
+                    try await job.start(file: file.url, root: root, textPages: Set(mine.map(\.pairIndex)),
+                                        kinds: kinds, model: model, pageModels: pageModels, read: routed)
+                }
                 out.append(FileRun(fileID: file.id, outcome: .success(review), error: nil))
             } catch let f as ReOCRJob.Failure {
                 out.append(FileRun(fileID: file.id, outcome: .failure(f), error: nil))

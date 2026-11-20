@@ -98,7 +98,8 @@ final class ImproveOCRController: ObservableObject {
         let switches = Self.collectionSwitches(for: files)
         resources.trainingOff = Set(SettingsLayerStore.shared.resolver(for: nil).resolve(.trainingOff).value.strings ?? [])
         model = ReOCRDialogModel(files: files, selectedPairs: selectedPairs, table: table, pairs: OCRPairMatrix.bundled,
-                                 resources: resources, staysOnMac: switches.staysOnMac, noTraining: switches.noTraining)
+                                 resources: resources, staysOnMac: switches.staysOnMac, noTraining: switches.noTraining,
+                                 scanDetectors: switches.scanDetectors)
         loadProblem = nil
         root = Self.findRoot(for: files)
         if root == nil { rootProblem = "these files are not inside one archive folder with a suite root marker" }
@@ -136,11 +137,14 @@ final class ImproveOCRController: ObservableObject {
     /// (nil) rather than being looked past, as in the Reader.
     /// "Stays on this Mac" and "must not train" for the files' collections: each file's folder, or the nearest folder
     /// above it holding a collection's settings, resolved with its project and the general layer. Either is on when it
-    /// is on for any file's collection.
-    static func collectionSwitches(for files: [URL]) -> (staysOnMac: Bool, noTraining: Bool) {
+    /// is on for any file's collection. W47.wh-yolo-scans-reocr: `scanDetectors` is each file's own collection's choice
+    /// for scanned newspapers, as Process Files and Live Capture take it from the output folder's layers.
+    static func collectionSwitches(for files: [URL])
+        -> (staysOnMac: Bool, noTraining: Bool, scanDetectors: [URL: NewspaperDetector]) {
         var staysOnMac = false
         var noTraining = false
-        var seen = Set<String>()
+        var scanDetectors: [URL: NewspaperDetector] = [:]
+        var byFolder: [String: NewspaperDetector] = [:]
         for url in files {
             var dir = url.deletingLastPathComponent().standardizedFileURL
             var doc: CollectionSettingsDocument?
@@ -150,8 +154,11 @@ final class ImproveOCRController: ObservableObject {
                 if (try? RootMarker.read(at: dir)) != nil { break }
                 dir = dir.deletingLastPathComponent()
             }
-            guard seen.insert(dir.path).inserted else { continue }
+            if let known = byFolder[dir.path] { scanDetectors[url] = known; continue }
             let r = SettingsLayerStore.shared.resolver(for: doc)
+            let detector = NewspaperDetector.scans(r.resolveAll())
+            byFolder[dir.path] = detector
+            scanDetectors[url] = detector
             // With no collection anywhere above, the general layer answers. "Stays on this Mac" counts only where a
             // layer set it: its built-in value is the skipped interview's, which would hide every online reader from
             // a user who never answered, where the dialog offered them before.
@@ -159,7 +166,7 @@ final class ImproveOCRController: ObservableObject {
             staysOnMac = staysOnMac || (stays.layer != nil && stays.value.bool == true)
             noTraining = noTraining || (r.resolve(.noTraining).value.bool ?? false)
         }
-        return (staysOnMac, noTraining)
+        return (staysOnMac, noTraining, scanDetectors)
     }
 
     static func findRoot(for files: [URL]) -> ReOCRJob.Root? {

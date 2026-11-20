@@ -22,8 +22,6 @@ Rules → Columns and reading order, off by default.
 - **Time and memory:** about 2 s a page for Core ML detection on the CPU (median 2.05 s over the 15 scans) and 0.18 s
   for the layout processing, against PP-DocLayoutV3's 0.19 s on other pages; the whole Processor's peak footprint was
   636 MB over the 15 pages (`scan-layout-parity.md`) (accepted: the measured cost of the detector the owner released).
-- **Re-OCR of existing PDFs uses PP-DocLayoutV3.** `ReOCRJob.reader` has no run settings snapshot, so the switch is not
-  followed there; Process Files (resumes and retries included) and Live Capture follow it (queued: W47.wh-yolo-scans-reocr).
 
 ## ⚠️ LIMITATION (W40.fix-processor-review-classification-stale, 2026-11-20): where page 2's Classification is not rewritten
 

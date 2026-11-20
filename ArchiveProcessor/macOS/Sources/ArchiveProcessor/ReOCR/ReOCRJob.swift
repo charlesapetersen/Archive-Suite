@@ -374,7 +374,9 @@ struct ReOCRJob {
     /// The reader for a ranked row (plan §4): exactly the route the person chose. No cascade and no refusal fallback, so
     /// no model the person did not choose reads a page or is paid for it; rotation off, since a suite file's image
     /// pages were turned upright when it was made. Nil when the row cannot run now or names no model this app has.
-    /// The caller passes the row's key (empty for a route on this Mac) and the prompt its settings use.
+    /// The caller passes the row's key (empty for a route on this Mac) and the prompt its settings use. A newspaper page
+    /// is read with the detector for scans in force where the reader is called (`NewspaperPageReader.scanDetector`,
+    /// which `ReOCRDialogModel.run` sets to each file's collection's choice; W47.wh-yolo-scans-reocr).
     static func reader(for row: ReOCRRanking.Row, apiKey: String, customPrompt: String? = nil, standardImageMB: Double = 4,
                        visionSettings: VisionOCRSettings = .default, models: [LLMModel]? = nil) -> Reader? {
         guard row.readiness == .ready,
@@ -387,7 +389,8 @@ struct ReOCRJob {
                 imageURL: image, provider: provider, model: model, thinkingLevel: model.supportsThinking ? .low : nil,
                 apiKey: apiKey, previousText: nil, previousImageURL: nil, customPrompt: customPrompt, imageScale: 1,
                 gatewayConfig: nil, localAgent: nil, rotationMode: .off, standardImageMB: standardImageMB,
-                visionSettings: visionSettings, cascade: .off, refusalFallback: false)
+                visionSettings: visionSettings, cascade: .off, refusalFallback: false,
+                scanDetector: NewspaperPageReader.scanDetector)
         }
     }
 

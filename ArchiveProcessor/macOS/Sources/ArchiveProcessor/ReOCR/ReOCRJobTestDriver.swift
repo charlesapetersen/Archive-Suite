@@ -626,6 +626,42 @@ enum ReOCRJobTestDriver {
                 }
             }
 
+            // 13b. W47.wh-yolo-scans-reocr: each file is read with its own collection's detector for scanned newspapers.
+            do {
+                guard let table = SettingsRouteTable.bundled else { check("13b the bundled route table loads", false); return }
+                let a = try folder("yolo")
+                func collection(_ name: String, yolo: Bool) throws -> URL {
+                    let d = a.appendingPathComponent(name, isDirectory: true)
+                    try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
+                    var doc = CollectionSettingsDocument(name: name, createdAt: Date())
+                    doc.collection.set(.scanNewspapersDocLayoutYOLO, .bool(yolo), source: .setByUser(Date()))
+                    try CollectionSettingsFile.write(doc, in: d)
+                    return try file(d, pairs: 1)
+                }
+                let on = try collection("on", yolo: true), off = try collection("off", yolo: false)
+                let switches = ImproveOCRController.collectionSwitches(for: [on, off])
+                check("13b each file gets its collection's choice", switches.scanDetectors[on] == .docLayoutYOLO
+                      && switches.scanDetectors[off] == .ppDocLayoutV3, "\(switches.scanDetectors)")
+                var res = SettingsResources(macMemoryGB: 16)
+                res.keys = ["gemini", "openai", "anthropic", "mistral", "openrouter"]
+                let m = ReOCRDialogModel(files: [on, off], table: table, pairs: OCRPairMatrix.bundled, resources: res,
+                                         staysOnMac: false, scanDetectors: switches.scanDetectors)
+                final class Seen: @unchecked Sendable {
+                    let lock = NSLock()
+                    var detectors: [NewspaperDetector] = []
+                }
+                let seen = Seen()
+                let runs = await m.run(job: job(a), root: archive(a), model: model, readerFor: { _ in { _, _, _ in
+                    seen.lock.withLock { seen.detectors.append(NewspaperPageReader.scanDetector) }
+                    return OCRResult(text: "New reading.", classification: nil, errorMessage: nil, errorCode: nil)
+                } })
+                let order = seen.lock.withLock { seen.detectors }
+                check("13b the reader sees each file's detector, in file order",
+                      runs.count == 2 && order == [.docLayoutYOLO, .ppDocLayoutV3],
+                      "\(order) \(m.runBlocker ?? "") \(runs.map { $0.error ?? "\($0.outcome)" })")
+                check("13b outside the run the default stands", NewspaperPageReader.scanDetector == .ppDocLayoutV3)
+            }
+
             // 14. A hand-off from the Reader: it only resolves files inside the named archive, once.
             do {
                 let suite = "ImproveOCR.handoff.\(UUID().uuidString)"

@@ -17221,3 +17221,15 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   <!-- /W47.wh-yolo-scans -->
 - [x] **W49.notes-same-window-jump — a jump into the note being edited lands on the passage [XS]** · §Known limits are queued, accepted or asked (lane: notes) — Owner, 2026-11-19 (call 21, `17-accepted-review.json` `n-same-window-jump`): flush the edit and re-apply content before scrolling. SHIPPED 2026-11-20: when a jump reaches an editor that is first responder, `MarkdownEditorView.updateNSView` defers one turn, flushes the pending write-back, installs the model's body if the view never received it (`Coordinator.installModelMarkdownIfStale`) and scrolls (`scrollToBlock`, extracted unchanged). Also covers a cross-window jump whose target editor kept first responder in its non-key window. Tests: `SameWindowJumpTests` (3); Notes unit bundle 1234/1234. No bench cache used.
   <!-- /W49.notes-same-window-jump -->
+- [x] **W47.wh-yolo-scans-reocr — Re-OCR follows the scanned-newspaper detector switch [S]** · §The withheld features — the owner's calls of 2026-11-19 (W47.wh) (lane: processor) — Filed by W47.wh-yolo-scans, 2026-11-20.
+  SHIPPED 2026-11-20, $0. Improve OCR now reads each file's newspaper scans with its own collection's detector choice:
+  `ImproveOCRController.collectionSwitches` resolves `scanNewspapersDocLayoutYOLO` per file (the same collection walk
+  as "stays on this Mac" and "must not train", cached per folder), `ReOCRDialogModel` carries it on each `FileEntry`
+  and sets `NewspaperPageReader.scanDetector` around that file's `job.start`, and `ReOCRJob.reader` passes the
+  task-local on as `performOCRCall(scanDetector:)` (which otherwise resets it to PP-DocLayoutV3). Files from two
+  collections in one run each keep their own choice. Photographs and a not-downloaded detector still fall back to
+  PP-DocLayoutV3 (`NewspaperDetector.forPage`). The KNOWN_ISSUES bullet under §W47.wh-yolo-scans is removed.
+  Tests: `scripts/test-reocr-job.sh` ALL PASS, with new check 13b (two collections, on and off: each file's choice,
+  the reader sees DocLayout-YOLO then PP-DocLayoutV3 in file order, the default stands outside the run). Clean build,
+  no new warnings. No bench cache scratch. No migration: nothing to migrate.
+  <!-- /W47.wh-yolo-scans-reocr -->
