@@ -301,10 +301,12 @@ not done until the trackers match reality:
 - flip the shipped item's `SUITE_TODO.md` checkbox to `[x]` (cite the commit) and add/close any
   `KNOWN_ISSUES.md` entry — **in the same commit as the code**, not "later";
 - end every `KNOWN_ISSUES.md` bullet you add or reword with its disposition (owner, 2026-11-19): `(queued: TAG)`
-  naming the open item that fixes it, filed in the same commit if none exists; `(accepted: …)` with the design reason
-  or the owner's call; or `(asked: GATE)` with the owner gate and a Daemon Report entry that asks it. A limit that is
+  naming the open item that fixes it, filed in the same commit if none exists; `(accepted: …)` only for fixed history, a measured
+  cost, a provider or platform fact that leaves no choice, or the owner's call (cite it); or `(asked: GATE)` with the owner gate and a Daemon Report entry that asks it. A limit that is
   only written down is how the Luna label cost went unqueued. `W49.ki-lint` enforces it; `W49.ki-audit-*` cover the
-  older bullets;
+  older bullets. **A limit the suite could lift at some cost is a choice, not a fact (owner, 2026-11-19):** a
+  "by design", "safe side", "not possible" or "no money for this item" reason with no owner call is `(asked: GATE)`, not
+  accepted. The 2026-11-19 audits accepted 35 such bullets; `17-accepted-review.json` puts them to him;
 - delete a shipped `execution-plans/` plan.
 
 `SUITE_TODO.md` is the **tracker of record.** An unattended/autonomous run must **reconcile it before it
@@ -319,7 +321,9 @@ Three tiers, so nothing sprawls or goes stale:
   edit an existing line (`merge=union` in `.gitattributes` depends on this). Retain the commit references and
   rationale. `next-queue-item.sh` and `check-tracker-sync.sh` read it; never rename it without updating them.
   History: [`REFERENCE.md`](REFERENCE.md) §"Completed tracker record".
-- **Long-term ideas → each app's `POTENTIAL_FEATURES.md`** — the durable wishlist tier.
+- **Long-term ideas → each app's `POTENTIAL_FEATURES.md`** — the durable wishlist tier. **Not an unreviewed backlog (owner,
+  2026-11-19):** a session that adds an entry also writes a Daemon Report line (no decision) naming it, so it reaches
+  the walkthrough; an entry that would change what users get today is an item or an owner question, not a wish.
 - **In-flight progress notes → `execution-plans/items/<TAG>.md`** — checkpoint notes, session notes and saved-draft branches for one open item, written by its claimant; the `SUITE_TODO.md` entry carries only a pointer line, never the notes (they made that shared file a rebase-conflict hotspot). Deleted when the item ships, useful lines folded into its `SUITE_TODO_DONE.md` entry. Detail: `ops/autonomous/README.md` §L2.
 - **Short-term execution plans → `execution-plans/`** (root) — one detailed plan per in-flight feature, tracked from `SUITE_TODO.md`; **delete a plan once its feature ships** (git keeps the history). Don't let shipped plans linger.
 

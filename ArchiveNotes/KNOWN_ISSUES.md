@@ -1968,9 +1968,7 @@ paste in an extract editor → note-passage blocks). Model + codec paths are uni
 - ✅ **FIXED (W14.4b, 2026-07-17):** Create-Extract (and Append-to-Extract) now auto-select + raise the
   extract in the Extracts window. `NotesModel.createExtract`/`appendToExtract` route the new/updated extract
   through `openItem(id:)` after re-index, so the Extracts window's pane consumes the `pendingOpen`, selects
-  it, and (if open) raises itself (see the raise fix above). Note: a *closed* Extracts window is not
-  auto-opened on create (deliberate — avoids an intrusive pop-up); the extract is still selected the next
-  time that window opens. +2 model tests assert the open-request is published. **Live GUI drive → Morning
+  it, and (if open) raises itself (see the raise fix above). (Superseded by W9.b5-fu1, 2026-10-06, below: a closed Extracts window now opens on create.) +2 model tests assert the open-request is published. **Live GUI drive → Morning
   Review.** (accepted: fixed, the item named at its start).
 - **Driven live (W40.notes-w7-gui-checks, 2026-11-04), all held.** The real ⌘⌥E on a two-block selection makes
   one extract with two note-passage blocks in the source's order, the source untouched
