@@ -147,6 +147,10 @@ calls are section 1.
     plan's weekly reset on Sat 21 Nov 13:25, since a request on the spent week could not be told from a real failure.
     W49.proc-chatgpt-real-signin then runs one real segmentation window and fixes what fails. Reason: the suite is
     for other users, and one with only a ChatGPT plan would take this route.
+20. **Notes keeps what is typed (2026-11-19, after the walkthrough of 16:07; W49.notes-keep-blank-lines).** The four
+    blank-line and empty-list losses W40.fix-notes-editor-lines accepted as "Markdown has no form for it" were the
+    session's trade-off, not a limit: Markdown can hold them (`&nbsp;` paragraphs, a bare `-` item) at the cost of
+    some clutter in the raw file. The owner chose fidelity to what is typed over a tidier file.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 

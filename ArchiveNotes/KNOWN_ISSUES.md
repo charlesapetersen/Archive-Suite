@@ -213,14 +213,14 @@ Now:
   there. (accepted: fixed, W40.fix-notes-editor-lines; how the editor behaves now).
 - Lists draw •/◦/▪ and numbers. (accepted: fixed, W40.fix-notes-editor-lines; how the editor behaves now).
 
-Evidence: `verification/evidence/notes/W40.fix-notes-editor-lines.md`. These limits remain, because Markdown
-has no form for them:
+Evidence: `verification/evidence/notes/W40.fix-notes-editor-lines.md`. These limits remain. They were accepted as having no Markdown form; the owner ruled
+2026-11-19 (call 20) that the editor keeps what is typed:
 - **Blank lines typed at the end of text, right before a heading, list, quote or code block, are not kept.**
-  The boundary is written as one blank line. (accepted: Markdown has no form for it, W40.fix-notes-editor-lines).
-- **An empty line between two list items is not kept.** (accepted: Markdown has no form for it, W40.fix-notes-editor-lines).
+  The boundary is written as one blank line. (queued: W49.notes-keep-blank-lines).
+- **An empty line between two list items is not kept.** (queued: W49.notes-keep-blank-lines).
 - **A list toggled on an empty last line is lost if the caret moves away before anything is typed.** The line
-  holds no character to carry the kind. (accepted: Markdown has no form for it, W40.fix-notes-editor-lines).
-- **A file with several blank lines between a heading and its text shows one newline there.** (accepted: Markdown has no form for it, W40.fix-notes-editor-lines).
+  holds no character to carry the kind. (queued: W49.notes-keep-blank-lines).
+- **A file with several blank lines between a heading and its text shows one newline there.** (queued: W49.notes-keep-blank-lines).
 
 ## ✅ FIXED (W40.d9, 2026-10-15) — writing-session defects, reproduced in the VM
 
