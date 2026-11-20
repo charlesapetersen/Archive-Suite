@@ -395,9 +395,6 @@ alone and 0.568 s with the alignment; two unrelated 1,500-word pages 0.046 s. Li
   copies apart; the diff picks one of the equally good alignments).
 - **An image page with no text layer gets no highlight** (the test corpus's image pages have none): there are
   no positions to draw from. The hit still shows on the text page. (accepted: an image page with no text layer has no positions to draw from).
-- **The extracted-text pane's matches come from a string search** on the same text as PDFKit's, so a query
-  PDFKit matches across a line break or ligature may be marked one match off there. (It does scroll to the
-  current hit: an `NSTextView` since W40.fix-reader-copy-text-pane, tested since W49.reader-find-scroll-text.) (queued: W49.reader-find-text-match-parity).
 
 ## ✅ CLOSED (W40.fix-reader-a11y-labels, 2026-10-25) — unnamed Reader controls and PDF pages
 

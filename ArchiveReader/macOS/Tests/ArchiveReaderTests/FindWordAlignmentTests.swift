@@ -9,8 +9,15 @@ import CoreText
 /// later hit by one. GUI-free.
 @MainActor
 final class FindWordAlignmentTests: XCTestCase {
+    /// Each case-insensitive, non-overlapping match's UTF-16 offset, as PDFKit's find reports them here.
     private func offsets(_ query: String, in text: String) -> [Int] {
-        DocumentFindScanner.ranges(of: query, in: text).map { NSRange($0, in: text).location }
+        var found: [Int] = []
+        var from = text.startIndex
+        while let r = text.range(of: query, options: [.caseInsensitive], range: from..<text.endIndex) {
+            found.append(NSRange(r, in: text).location)
+            from = r.upperBound
+        }
+        return found
     }
 
     private func hits(_ query: String, left: String, right: String) -> [PairHit] {

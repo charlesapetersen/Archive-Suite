@@ -132,17 +132,24 @@ enum DocumentFindScanner {
         return matches
     }
 
-    /// The ranges of `query` in `text`, case-insensitive, in order — the extracted-text pane's matches,
-    /// which are the image page's own text layer, so their k-th is the image pane's k-th.
-    static func ranges(of query: String, in text: String) -> [Range<String.Index>] {
-        guard !query.isEmpty else { return [] }
-        var found: [Range<String.Index>] = []
-        var from = text.startIndex
-        while from < text.endIndex,
-              let r = text.range(of: query, options: [.caseInsensitive], range: from..<text.endIndex) {
-            found.append(r)
-            from = r.upperBound > r.lowerBound ? r.upperBound : text.index(after: r.lowerBound)
+    /// `query`'s matches on `page` as PDFKit's find makes them, as ranges into the page's `string` — the
+    /// extracted-text pane's matches (W49.reader-find-text-match-parity). That pane shows this string, and
+    /// the image pane beside it searches a one-page document of this page, so the k-th range here is the
+    /// image pane's k-th match even where PDFKit matches across a line break or ligature, which a string
+    /// search would not. A match spanning several ranges on the page is covered from its first to its last;
+    /// one with none keeps its place as `NSNotFound`, so later ordinals stay aligned. Read-only: the page is
+    /// searched through a copy, so its document is never touched.
+    static func textMatchRanges(of query: String, on page: PDFPage) -> [NSRange] {
+        guard !query.isEmpty, let copy = page.copy() as? PDFPage else { return [] }
+        let doc = PDFDocument()
+        doc.insert(copy, at: 0)
+        return doc.findString(query, withOptions: [.caseInsensitive]).map { match in
+            let ranges = (0..<match.numberOfTextRanges(on: copy)).map { match.range(at: $0, on: copy) }
+                .filter { $0.location != NSNotFound }
+            guard let start = ranges.map(\.location).min(), let end = ranges.map(NSMaxRange).max() else {
+                return NSRange(location: NSNotFound, length: 0)
+            }
+            return NSRange(location: start, length: end - start)
         }
-        return found
     }
 }

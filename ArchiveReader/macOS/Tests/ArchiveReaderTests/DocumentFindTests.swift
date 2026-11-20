@@ -91,18 +91,55 @@ final class DocumentFindTests: XCTestCase {
 
     // MARK: the extracted-text pane's matches (W40.fix-reader-find-both-panes)
 
-    func testRangesFindEveryCaseInsensitiveMatchInOrder() {
-        let text = "Alpha bravo ALPHA alphalpha"
-        let found = DocumentFindScanner.ranges(of: "alpha", in: text).map { String(text[$0]) }
-        XCTAssertEqual(found, ["Alpha", "ALPHA", "alpha"], "non-overlapping, like PDFKit's find")
-        XCTAssertTrue(DocumentFindScanner.ranges(of: "", in: text).isEmpty)
-        XCTAssertTrue(DocumentFindScanner.ranges(of: "zulu", in: text).isEmpty)
+    func testTextMatchRangesAreEveryCaseInsensitiveMatchOnThePageInOrder() throws {
+        let page = try XCTUnwrap(TestPDFBuilder.textPDF(pages: ["Alpha bravo ALPHA alphalpha"]).page(at: 0))
+        let text = try XCTUnwrap(page.string)
+        let found = DocumentFindScanner.textMatchRanges(of: "alpha", on: page).map { (text as NSString).substring(with: $0) }
+        XCTAssertEqual(found.map { $0.lowercased() }, ["alpha", "alpha", "alpha"], "non-overlapping, as PDFKit finds")
+        XCTAssertTrue(DocumentFindScanner.textMatchRanges(of: "", on: page).isEmpty)
+        XCTAssertTrue(DocumentFindScanner.textMatchRanges(of: "zulu", on: page).isEmpty)
+    }
+
+    /// W49.reader-find-text-match-parity: the text pane's matches are PDFKit's own on the page, mapped onto
+    /// the page string the pane shows, so its k-th is the image pane's k-th — one range per PDFKit match, at
+    /// that match's place, whichever way PDFKit matched it.
+    func testTextMatchRangesAreExactlyPDFKitsMatches() throws {
+        let doc = TestPDFBuilder.textPDF(pages: ["The ﬁrst ﬁle: Wash-\nington wrote; Straße and\nWashington signed."])
+        let page = try XCTUnwrap(doc.page(at: 0))
+        for query in ["washington", "first", "strasse", "ss", "an", "zulu"] {
+            let pdfKit = doc.findString(query, withOptions: [.caseInsensitive]).map { $0.range(at: 0, on: page) }
+            XCTAssertEqual(DocumentFindScanner.textMatchRanges(of: query, on: page), pdfKit, query)
+        }
+    }
+
+    /// A match PDFKit makes across a line break is one range from its start on the first line to its end on
+    /// the next, and the hits after it keep their ordinals.
+    func testATextMatchAcrossALineBreakIsOneRangeOverBothLines() throws {
+        let doc = TestPDFBuilder.textPDF(pages: ["Letter to Wash-\nington, then wash-\nington again."])
+        let page = try XCTUnwrap(doc.page(at: 0))
+        let text = try XCTUnwrap(page.string) as NSString
+        let query = "wash-\nington"
+        XCTAssertEqual(doc.findString(query, withOptions: [.caseInsensitive]).count, 2,
+                       "precondition: PDFKit matches across each line break")
+        let ranges = DocumentFindScanner.textMatchRanges(of: query, on: page)
+        XCTAssertEqual(ranges.map { text.substring(with: $0).lowercased() }, ["wash-\nington", "wash-\nington"])
+        XCTAssertLessThan(ranges[0].location, ranges[1].location, "in PDFKit's order")
+
+        let storage = NSTextStorage(string: text as String)
+        XCTAssertEqual(ExtractedTextPane.highlight(storage, find: (ranges: ranges, current: 1)), ranges[1],
+                       "the image pane's second hit is the text pane's current hit")
+        var marked: [String] = []
+        storage.enumerateAttribute(.backgroundColor, in: NSRange(location: 0, length: storage.length)) { v, r, _ in
+            if v != nil { marked.append(text.substring(with: r).lowercased()) }
+        }
+        XCTAssertEqual(marked, ["wash-\nington", "wash-\nington"], "each match is marked across both its lines")
     }
 
     func testExtractedTextHighlightsEveryMatchAndMarksTheCurrentHit() {
         let text = "zulu one zulu two"
         let storage = NSTextStorage(string: text)
-        let current = ExtractedTextPane.highlight(storage, find: (query: "ZULU", current: 1))
+        let ranges = [NSRange(location: 0, length: 4), NSRange(location: 9, length: 4)]
+        let current = ExtractedTextPane.highlight(storage, find: (ranges: ranges, current: 1))
         var backgrounds: [(String, NSColor)] = []
         storage.enumerateAttribute(.backgroundColor, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
             if let color = value as? NSColor { backgrounds.append(((text as NSString).substring(with: range), color)) }
@@ -142,15 +179,15 @@ final class DocumentFindTests: XCTestCase {
             rect.origin.y += view.textContainerOrigin.y
             return view.visibleRect.contains(rect)
         }
-        let ranges = ExtractedTextPane.highlightRanges(query: "zulu", in: text)
-        XCTAssertEqual(ranges.count, 2)
+        let ranges = [(text as NSString).range(of: "zulu"), (text as NSString).range(of: "zulu", options: .backwards)]
+        XCTAssertNotEqual(ranges[0], ranges[1])
         XCTAssertTrue(visible(ranges[0]) && !visible(ranges[1]), "the pane opens at the top")
 
-        ExtractedTextPane.applyHighlights((query: "zulu", current: 1), to: view)
+        ExtractedTextPane.applyHighlights((ranges: ranges, current: 1), to: view)
         XCTAssertTrue(visible(ranges[1]), "the last hit is scrolled to")
         XCTAssertFalse(visible(ranges[0]))
 
-        ExtractedTextPane.applyHighlights((query: "zulu", current: 0), to: view)
+        ExtractedTextPane.applyHighlights((ranges: ranges, current: 0), to: view)
         XCTAssertTrue(visible(ranges[0]), "and back to the first")
     }
 

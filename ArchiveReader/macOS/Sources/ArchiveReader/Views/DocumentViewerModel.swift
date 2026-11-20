@@ -761,6 +761,7 @@ final class DocumentViewerModel: ObservableObject {
         findQuery = ""
         lastFoundQuery = nil
         findNavigator = FindNavigator()
+        textFindRanges = nil
         refreshFindPublished()
         leftController.clearFind()
         rightController.clearFind()
@@ -813,14 +814,21 @@ final class DocumentViewerModel: ObservableObject {
         if !loc.holds(focusedPane) { focusedPane = loc.right != nil ? .right : .left }
     }
 
-    /// What the extracted-text pane highlights: the searched query, and which of its matches is the
-    /// current hit — whatever the image pane beside it selects, since that pane shows the same text layer
-    /// (so paging away and back drops the current hit in both, as `prepareFindForManualCycle` does).
-    /// `nil` while no query has been searched.
-    var extractedTextFind: (query: String, current: Int?)? {
-        guard let query = lastFoundQuery, !query.isEmpty else { return nil }
-        return (query, leftController.findCurrentIndex)
+    /// What the extracted-text pane highlights: the searched query's matches on the image page as PDFKit
+    /// makes them (W49.reader-find-text-match-parity), and which of them is the current hit — whatever the
+    /// image pane beside it selects, since that pane shows the same text layer (so paging away and back
+    /// drops the current hit in both, as `prepareFindForManualCycle` does). `nil` while no query has been
+    /// searched. The matches are kept per page and query: SwiftUI reads this on every redraw.
+    var extractedTextFind: (ranges: [NSRange], current: Int?)? {
+        guard let query = lastFoundQuery, !query.isEmpty, let page = imagePage else { return nil }
+        if let cached = textFindRanges, cached.query == query, cached.page === page {
+            return (cached.ranges, leftController.findCurrentIndex)
+        }
+        let ranges = DocumentFindScanner.textMatchRanges(of: query, on: page)
+        textFindRanges = (query, page, ranges)
+        return (ranges, leftController.findCurrentIndex)
     }
+    private var textFindRanges: (query: String, page: PDFPage, ranges: [NSRange])?
 
     // MARK: Page-level durable links (W23.m4)
 

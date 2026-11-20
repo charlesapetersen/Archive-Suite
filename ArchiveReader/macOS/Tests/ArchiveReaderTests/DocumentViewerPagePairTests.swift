@@ -245,7 +245,7 @@ final class DocumentViewerPagePairTests: XCTestCase {
         model.findQuery = "zulu"
         model.performFind()
         XCTAssertEqual(model.findTotal, 2)
-        XCTAssertEqual(model.extractedTextFind?.query, "zulu")
+        XCTAssertEqual(model.extractedTextFind?.ranges, [NSRange(location: 0, length: 4), NSRange(location: 9, length: 4)])
         XCTAssertEqual(model.extractedTextFind?.current, 0)
         model.findNext()
         XCTAssertEqual(model.extractedTextFind?.current, 1)

@@ -203,13 +203,6 @@ final class DocumentCopyTextPaneTests: XCTestCase {
         let stats = PixelStats.from(cgImage: image)
         XCTAssertFalse(stats.isEffectivelyBlank(), "the text pane drew nothing: \(stats)")
     }
-
-    func testFindHighlightRangesMatchTheScanner() {
-        let text = "Zulu one, zulu two"
-        XCTAssertEqual(ExtractedTextPane.highlightRanges(query: "zulu", in: text),
-                       [NSRange(location: 0, length: 4), NSRange(location: 10, length: 4)])
-        XCTAssertEqual(ExtractedTextPane.highlightRanges(query: "", in: text), [])
-    }
 }
 
 private final class WhiteBacking: NSView {

@@ -61,8 +61,9 @@ struct ExtractedTextPane: NSViewRepresentable {
     let text: String
     let scale: CGFloat
     var controller: ExtractedTextController? = nil
-    /// The searched query and which of its matches is the current hit; nil = no find highlight.
-    var find: (query: String, current: Int?)? = nil
+    /// The find matches in `text` (PDFKit's, `DocumentFindScanner.textMatchRanges`) and which of them is
+    /// the current hit; nil = no find highlight.
+    var find: (ranges: [NSRange], current: Int?)? = nil
     var id: String = ""
 
     static let baseSize = NSFont.systemFontSize
@@ -71,7 +72,7 @@ struct ExtractedTextPane: NSViewRepresentable {
 
     @MainActor final class Coordinator: NSObject, NSTextViewDelegate {
         var controller: ExtractedTextController?
-        var shown: (text: String, scale: CGFloat, query: String?, current: Int?)?
+        var shown: (text: String, scale: CGFloat, ranges: [NSRange]?, current: Int?)?
 
         func textViewDidChangeSelection(_ note: Notification) {
             guard let v = note.object as? NSTextView, v.selectedRange().length > 0,
@@ -135,38 +136,35 @@ struct ExtractedTextPane: NSViewRepresentable {
             view.font = Self.font(scale: scale)
             view.textColor = .labelColor
         }
-        if changedText || c.shown?.query != find?.query || c.shown?.current != find?.current {
+        if changedText || c.shown?.ranges != find?.ranges || c.shown?.current != find?.current {
             Self.applyHighlights(find, to: view)
         }
-        c.shown = (text, scale, find?.query, find?.current)
+        c.shown = (text, scale, find?.ranges, find?.current)
     }
 
     /// Every match of the query behind the PDF panes' match yellow, the current hit behind the system
     /// find-highlight colour, and the current hit scrolled into view. Attributes only, so the user's
     /// selection stays where it is.
-    static func applyHighlights(_ find: (query: String, current: Int?)?, to view: NSTextView) {
+    static func applyHighlights(_ find: (ranges: [NSRange], current: Int?)?, to view: NSTextView) {
         guard let storage = view.textStorage else { return }
         if let current = highlight(storage, find: find) { view.scrollRangeToVisible(current) }
     }
 
-    /// Mark `storage`'s matches; returns the current hit's range, if there is one.
+    /// Mark `storage`'s matches; returns the current hit's range, if there is one. A range outside the
+    /// storage (none is expected: both come from the same page string) is skipped, keeping its ordinal.
     @discardableResult
-    static func highlight(_ storage: NSTextStorage, find: (query: String, current: Int?)?) -> NSRange? {
+    static func highlight(_ storage: NSTextStorage, find: (ranges: [NSRange], current: Int?)?) -> NSRange? {
         storage.removeAttribute(.backgroundColor, range: NSRange(location: 0, length: storage.length))
         guard let find else { return nil }
         var current: NSRange?
-        for (k, range) in highlightRanges(query: find.query, in: storage.string).enumerated() {
+        for (k, range) in find.ranges.enumerated()
+        where range.location != NSNotFound && range.length > 0 && NSMaxRange(range) <= storage.length {
             if k == find.current { current = range }
             storage.addAttribute(.backgroundColor, value: k == find.current
                                  ? NSColor.findHighlightColor : NSColor.systemYellow.withAlphaComponent(0.5),
                                  range: range)
         }
         return current
-    }
-
-    /// The query's matches in `text` as NSRanges, in the order `DocumentFindScanner` counts them.
-    static func highlightRanges(query: String, in text: String) -> [NSRange] {
-        DocumentFindScanner.ranges(of: query, in: text).map { NSRange($0, in: text) }
     }
 }
 
