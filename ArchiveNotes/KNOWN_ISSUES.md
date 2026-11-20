@@ -3,6 +3,14 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ⚠️ BUG (W49.notes-s006-reproduce, 2026-11-20) — a subject spelled `ArchiveSuite` never reaches Finder
+
+A note whose subject is exactly `ArchiveSuite` keeps it in its front matter, but the `.md` never carries the Finder
+tag: every save's facet reconciliation (`NotesModel.projectFacetTags`) removes the retired `ArchiveSuite` stamp
+because its narrow `desired` set holds only date and Q-looking subjects, and it runs after the subject projection
+in the same save. Only that one spelling is affected, and only the Finder mirror; the note's YAML is right.
+Reproduced by `QualityWriteTests.archiveSuiteSubjectSurvivesBodySave`; suspect S-006 (queued: W49.notes-s006-fix).
+
 ## ✅ CHANGED (W40.notes-remove-authors, 2026-11-11) — notes have no authors
 
 The owner does not want an Authors field (Notes session 2, row 14). It is gone from the note and template inspectors,

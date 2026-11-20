@@ -120,10 +120,16 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 
   Confirmed if `ArchiveSuite` is gone while `store.load(id).tags` still holds it.
 - **Would clear it:** the tag is still present after the body save.
-- **Status:** `open`
+- **Status:** `reproduced` — fix filed as `W49.notes-s006-fix`; test
+  `QualityWriteTests.archiveSuiteSubjectSurvivesBodySave` (ArchiveNotesTests)
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner walkthrough (call 27) — reproduce attempt queued as `W49.notes-s006-reproduce`.
+  - 2026-11-20 W49.notes-s006-reproduce — reproduced with the unit test above on a scratch store, and worse than
+    suspected: the tag is already missing straight after `setTags(["ArchiveSuite"])`, before any body save, because
+    `mutateItem` runs the facet reconciliation after the subject projection in the same save. The front-matter
+    subject stays `ArchiveSuite` throughout, so the Finder mirror never carries it. The test's Finder checks are
+    wrapped in `withKnownIssue` until `W49.notes-s006-fix` lands; the fix removes the wrapper.
 
 ### S-007 · Notes' source-block preview may download a cloud placeholder
 
