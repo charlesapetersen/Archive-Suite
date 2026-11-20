@@ -178,10 +178,15 @@ public struct FolderDateRecord: Equatable, Sendable, Codable {
     /// The ledger group (Reader `AuditLedger`) that took the folder's date from the file since: Update N Documents, or
     /// an Undo or Redo Tag Change. The record then speaks for nothing until that group is reversed and the date is back,
     /// so one typed again in Finder, or put back by any other change, is the user's (W49.reader-folder-date-undo-fu).
+    /// `externalRetirement` where the date was changed outside the Reader (W49.reader-folder-date-undo-fu2).
     public var retiredBy: String?
 
     /// Retired: `retiredBy` is set.
     public var retired: Bool { retiredBy != nil }
+
+    /// `retiredBy` for a record whose file's date the Reader's library watcher saw change in Finder or another app:
+    /// no ledger group, so nothing revives it (W49.reader-folder-date-undo-fu2).
+    public static let externalRetirement = "external"
 
     /// A date as `date` and `uncertain` are written.
     public struct Replaced: Equatable, Sendable, Codable {

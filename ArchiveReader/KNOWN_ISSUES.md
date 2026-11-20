@@ -11,9 +11,12 @@ through `TagWriter` in one undo group (Edit ▸ Undo Tag Change); the `Date evid
 - **Choosing Not Now does not ask again until the folder's date is edited again**; its Edit ▸ Confirm asks again
   (accepted: the user's own answer to the offer; owner call 21, 2026-11-19, asked only that the dates follow the
   folder's, W49.reader-folder-date-undo).
-- **A folder's date removed and typed again in Finder reads as the folder's**: the record is retired only when the
-  Reader takes the date away (Update N Documents, Undo or Redo Tag Change), so a later folder-date edit offers to
-  replace or remove that date (queued: W49.reader-folder-date-undo-fu2).
+- **A folder's date removed and typed again in Finder while the Reader is not running reads as the folder's.** While
+  it runs, its library watcher sees the date change and retires the record for good (W49.reader-folder-date-undo-fu2);
+  a removal and retyping both made while it is closed (or both inside one full rescan) leave the file's tags as they
+  were, so a later folder-date edit offers to replace or remove that date (accepted: a platform fact, Finder keeps no
+  history of a tag edit and the tags read the same afterwards; a removal while it is closed and a retyping while it
+  runs is seen).
 - **The offer is made only from the Container section.** A folder date written into the container file elsewhere
   (Live Capture's Finish, another app) dates nothing already written until it is set or confirmed here (accepted: the
   offer answers the user's own edit; Live Capture dates its own session's documents, W47.ct-folder-date-live).

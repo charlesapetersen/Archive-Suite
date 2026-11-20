@@ -180,7 +180,8 @@ Owner, 2026-10-31: a dated folder dates the otherwise undated documents inside i
   stands; otherwise its Year or Decade, Month, Day and `Date Uncertain` are removed. No check is written; one undo
   group. Accepting reads the folder's date again: one set since, or a file that left the run, changes nothing. The
   records of the files undated are retired; Undo Tag Change of that change revives them with the date, and Redo
-  retires them again, so the same date typed later in Finder, or put back by another change, is the user's. An Undo or Redo of the Container section's date edit itself
+  retires them again; a change of a file's date seen made in Finder or another app while the Reader runs retires its
+  record for good. So the same date typed later in Finder, or put back by another change, is the user's. An Undo or Redo of the Container section's date edit itself
   offers as the edit does. A record holds only while the file's date tags are a form it gives (no Day without a Month, no Month or
   Year beside a Decade), so one added in Finder is the user's.
 

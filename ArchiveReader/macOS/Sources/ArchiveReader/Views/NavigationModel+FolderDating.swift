@@ -308,6 +308,49 @@ extension NavigationModel {
         }
     }
 
+    /// After the library watcher saw files' tags change outside the Reader (W49.reader-folder-date-undo-fu2): a record
+    /// whose file's date changed (in Finder or another app) is retired by `externalRetirement`, which no Undo reverses;
+    /// one already retired by a ledger group is too, so that group's reversal cannot revive it over a date typed since.
+    /// So a date removed in Finder and typed there again is the user's, as is one typed over the folder's. A change
+    /// that leaves the date as it was (a Read mark, a subject) leaves the record alone.
+    func folderDateRecordsSeeExternal(_ changes: [ArchiveLibrary.ExternalTagChange]) {
+        guard let tree = containerTree else { return }
+        var byFolder: [[String]: Set<String>] = [:]
+        for c in changes where Self.dateDiffers(c.old, c.new) {
+            guard let (dir, name) = ContainerCatalog.split(c.url.path, under: tree.path) else { continue }
+            byFolder[dir, default: []].insert(name)
+        }
+        guard !byFolder.isEmpty else { return }
+        let folders = byFolder
+        Self.folderDateRecordQueue.async {
+            for (dir, names) in folders {
+                guard let url = try? Self.containerDirectoryURL(tree.url, dir) else { continue }
+                // Most folders keep no records; their item fields are not rewritten.
+                guard let fields = ContainerFileStore.loadItemFields(directory: url).document,
+                      names.contains(where: { Self.retiresExternally(fields.dateRecord(for: $0)) }) else { continue }
+                Self.editFolderDateRecords(at: url) { fields in
+                    for name in names {
+                        guard var record = fields.dateRecord(for: name), Self.retiresExternally(record) else { continue }
+                        record.retiredBy = FolderDateRecord.externalRetirement
+                        fields.setDateRecord(record, for: name)
+                    }
+                }
+            }
+        }
+    }
+
+    nonisolated private static func retiresExternally(_ record: FolderDateRecord?) -> Bool {
+        record.map { $0.retiredBy != FolderDateRecord.externalRetirement } ?? false
+    }
+
+    /// Whether two tag sets give the file a different date, as `FolderDateRecord.carries` reads it: its Year, Decade,
+    /// Month, Day, `Date Uncertain`, or a date tag carried twice (a covering letter's aside).
+    nonisolated static func dateDiffers(_ a: DocumentTags, _ b: DocumentTags) -> Bool {
+        func twice(_ t: DocumentTags) -> [DateAmbiguity] { t.dateAmbiguities.filter { $0.facet != .sentWith } }
+        return a.year != b.year || a.decade != b.decade || a.month != b.month || a.day != b.day
+            || a.dateUncertain != b.dateUncertain || twice(a) != twice(b)
+    }
+
     /// The record edits made after a tag write, one at a time and in the order made, so a retirement and the Undo
     /// that revives it land in that order.
     nonisolated static let folderDateRecordQueue = DispatchQueue(label: "ArchiveReader.folderDateRecords", qos: .utility)

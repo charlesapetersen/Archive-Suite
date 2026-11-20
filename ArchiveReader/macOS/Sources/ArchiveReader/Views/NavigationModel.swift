@@ -343,6 +343,7 @@ final class NavigationModel: ObservableObject {
             guard let self, let url = self.rootStore.reResolveSavedRoot() else { return nil }
             return ResolvedLibraryRoot(url: url, markerGUID: self.rootStore.rootMarker?.guid)
         }
+        library.onExternalTagChanges = { [weak self] in self?.folderDateRecordsSeeExternal($0) }   // W49…fu2
         filter.read = AppSettings.defaultReadFilter
         restoreViewState()   // last session's filter + sort override the defaults (C2)
         filterSearchText = filter.searchText   // seed from restored state

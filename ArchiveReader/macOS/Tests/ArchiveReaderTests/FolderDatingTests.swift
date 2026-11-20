@@ -384,6 +384,79 @@ final class FolderDatingTests: XCTestCase {
         XCTAssertEqual(record("0002.pdf")?.retired, true, "the user's date stays the user's")
     }
 
+    /// W49.reader-folder-date-undo-fu2: a folder's date removed in Finder and typed there again is the user's. The
+    /// library watcher sees the date change and retires the record for good; a Finder edit that leaves the date alone
+    /// keeps it.
+    func testADateRemovedAndRetypedInFinderIsTheUsers() throws {
+        try makeFolder(date: "Feb. 1966")
+        let model = fixtureNavigationModel(pinnedTo: root)
+        wait { model.library.files.count >= 7 }
+        try datedFromTheFolder(model)
+        XCTAssertEqual(record("0002.pdf")?.holds(for: try tags("0002.pdf")), true)
+        func row(_ name: String) -> ArchiveFile? { model.library.files.first { $0.path.hasSuffix("/" + name) } }
+        // As the watcher reports a Finder edit (the test host's FSEvents are not relied on).
+        func seen(_ names: String...) {
+            let paths = names.map { folder.appendingPathComponent($0).path }
+            model.library.receiveWatchRequestForTesting(CorpusWatchRequest(paths: CorpusWatchPathSet(paths)))
+        }
+
+        try (folder.appendingPathComponent("0003.pdf") as NSURL)
+            .setResourceValue(["Unread", "1966", "2 February", "Harbours"], forKey: .tagNamesKey)
+        try (folder.appendingPathComponent("0002.pdf") as NSURL)
+            .setResourceValue(["Unread", "Harbours"], forKey: .tagNamesKey)
+        seen("0002.pdf", "0003.pdf")
+        wait { row("0002.pdf")?.tags.year == nil && row("0003.pdf")?.tags.subjects.isEmpty == false }
+        XCTAssertNil(row("0002.pdf")?.tags.year)
+        wait { self.record("0002.pdf")?.retired == true }
+        XCTAssertEqual(record("0002.pdf")?.retiredBy, FolderDateRecord.externalRetirement)
+        XCTAssertEqual(record("0003.pdf")?.retired, false, "a subject added in Finder leaves the folder's date")
+
+        try (folder.appendingPathComponent("0002.pdf") as NSURL)
+            .setResourceValue(["Unread", "Harbours", "1966", "2 February"], forKey: .tagNamesKey)
+        seen("0002.pdf")
+        wait { row("0002.pdf")?.tags.year == 1966 }
+        NavigationModel.folderDateRecordQueue.sync {}
+        let retyped = try tags("0002.pdf")
+        let kept = try XCTUnwrap(record("0002.pdf"))
+        XCTAssertEqual(kept.retiredBy, FolderDateRecord.externalRetirement)
+        XCTAssertNil(FolderDateRecord.evidence(kept, page: nil, tags: retyped), "the retyped date is the user's")
+
+        // Taking the folder's date away leaves the user's date and takes the one the folder still gives.
+        try setFolderDate(nil)
+        let offer = try offered(model)
+        let names = offer.paths.map { ($0 as NSString).lastPathComponent }
+        XCTAssertTrue(names.contains("0003.pdf"), "\(names)")
+        XCTAssertFalse(names.contains("0002.pdf"), "\(names)")
+    }
+
+    /// W49.reader-folder-date-undo-fu2 (review): a record the Reader retired that then sees its file's date changed in
+    /// Finder is the user's for good, so the Undo of the change that retired it does not revive it.
+    func testAFinderDateChangeOnARetiredRecordIsNotRevivedByUndo() throws {
+        try makeFolder(date: "Feb. 1966")
+        let model = fixtureNavigationModel(pinnedTo: root)
+        wait { model.library.files.count >= 7 }
+        try datedFromTheFolder(model)
+        try setFolderDate(nil)
+        model.applyFolderDating(try offered(model))
+        wait { model.statusMessage.hasPrefix("Took ") }
+        wait { self.record("0002.pdf")?.retired == true }
+        let url = folder.appendingPathComponent("0002.pdf")
+        func finder(_ tags: [String], year: Int?) throws {
+            try (url as NSURL).setResourceValue(tags, forKey: .tagNamesKey)
+            model.library.receiveWatchRequestForTesting(CorpusWatchRequest(paths: CorpusWatchPathSet([url.path])))
+            wait { model.library.files.first { $0.path.hasSuffix("/0002.pdf") }?.tags.year == year }
+            NavigationModel.folderDateRecordQueue.sync {}
+        }
+        try finder(["Unread", "Harbours", "1970"], year: 1970)
+        XCTAssertEqual(record("0002.pdf")?.retiredBy, FolderDateRecord.externalRetirement)
+        try finder(["Unread", "Harbours"], year: nil)
+
+        model.undoLast()
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours", "1966", "2 February"])
+        NavigationModel.folderDateRecordQueue.sync {}
+        XCTAssertEqual(record("0002.pdf")?.retiredBy, FolderDateRecord.externalRetirement, "not revived")
+    }
+
     /// W49.reader-folder-date-undo-fu: a stamp's or estimate's date the user deleted before the folder dated the file is
     /// not put back when the folder's date is taken away.
     func testADateDeletedBeforeTheFolderDatedTheFileIsNotPutBack() throws {

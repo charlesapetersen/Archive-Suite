@@ -226,6 +226,16 @@ final class ArchiveLibrary: ObservableObject {
     // usually settles.
     private struct VerifiedWrite { let after: [String]; let afterLabel: Int?; let seq: UInt64 }
     private var verifiedWrites: [URL: VerifiedWrite] = [:]
+
+    /// A row whose tags a watch batch changed from the disk, not from a verified write of the Reader's own: an edit
+    /// in Finder or another app (W49.reader-folder-date-undo-fu2).
+    struct ExternalTagChange: Sendable {
+        let url: URL
+        let old: DocumentTags
+        let new: DocumentTags
+    }
+    /// Told, after a watch batch has merged, of its `ExternalTagChange`s. A walk or a warm snapshot tells nothing.
+    var onExternalTagChanges: (([ExternalTagChange]) -> Void)?
     private var clock: UInt64 = 0
     /// Generation of the pass whose result may still be published. Bumped per pass, so a superseded
     /// pass's late completion is dropped rather than publishing stale rows over a newer root's
@@ -1142,12 +1152,20 @@ final class ArchiveLibrary: ObservableObject {
             commit(patch.rows)
             finishApply(failures: patch.failures, folderFailures: patch.folderFailures,
                         changes: changes, readGeneration: readGeneration)
+            if !patch.external.isEmpty { onExternalTagChanges?(patch.external) }
             return
         }
         var rows = Dictionary(uniqueKeysWithValues: files.map { (LibraryIndexPath($0.url), $0) })
         let priorRows = rows
         var failures: [CorpusReadFailure] = []
         var folderFailures = 0
+        var external: [ExternalTagChange] = []
+        func placed(_ row: ArchiveFile, at path: LibraryIndexPath) {
+            rows[path] = row
+            if let prior = priorRows[path], prior.tags != row.tags {
+                external.append(ExternalTagChange(url: row.url, old: prior.tags, new: row.tags))
+            }
+        }
 
         for change in changes.paths {
             let path = LibraryIndexPath(change.url)
@@ -1181,7 +1199,7 @@ final class ArchiveLibrary: ObservableObject {
 
             switch change.inspection {
             case let .tracked(entry):
-                rows[path] = Self.row(entry, tagNames: entry.tagNames, labelNumber: entry.labelNumber)
+                placed(Self.row(entry, tagNames: entry.tagNames, labelNumber: entry.labelNumber), at: path)
             case .untracked:
                 break
             case .directorySymbolicLink, .nonRegular, .vanished:
@@ -1215,8 +1233,7 @@ final class ArchiveLibrary: ObservableObject {
                         rows.removeValue(forKey: path)
                     }
                 } else {
-                    rows[path] = Self.row(entry, tagNames: entry.tagNames,
-                                          labelNumber: entry.labelNumber)
+                    placed(Self.row(entry, tagNames: entry.tagNames, labelNumber: entry.labelNumber), at: path)
                 }
             }
 
@@ -1240,6 +1257,7 @@ final class ArchiveLibrary: ObservableObject {
         if nextFiles != files { replaceFiles(nextFiles) }
         finishApply(failures: failures, folderFailures: folderFailures,
                     changes: changes, readGeneration: readGeneration)
+        if !external.isEmpty { onExternalTagChanges?(external) }
     }
 
     /// The listed order: `localizedStandardCompare` of the paths.
@@ -1252,6 +1270,7 @@ final class ArchiveLibrary: ObservableObject {
         var rows: [(path: String, row: ArchiveFile?)] = []
         var failures: [CorpusReadFailure] = []
         var folderFailures = 0
+        var external: [ExternalTagChange] = []
     }
 
     /// `apply`'s merge, worked out for the touched paths alone, or nil when the batch needs the
@@ -1310,7 +1329,11 @@ final class ArchiveLibrary: ObservableObject {
                 // The walker's entry is always for the path it inspected; if not, the row's own path
                 // decides where it goes, and only the merge places it.
                 guard LibraryIndexPath(entry.url).value == path else { return nil }
-                set(path, Self.row(entry, tagNames: entry.tagNames, labelNumber: entry.labelNumber))
+                let row = Self.row(entry, tagNames: entry.tagNames, labelNumber: entry.labelNumber)
+                set(path, row)
+                if let prior = index.position(of: path).map({ files[$0] }), prior.tags != row.tags {
+                    patch.external.append(ExternalTagChange(url: row.url, old: prior.tags, new: row.tags))
+                }
             case .untracked, .directorySymbolicLink, .nonRegular, .vanished:
                 break
             case let .unreadable(failure):
