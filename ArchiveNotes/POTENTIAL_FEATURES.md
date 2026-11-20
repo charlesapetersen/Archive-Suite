@@ -31,9 +31,6 @@ evidence these are one suite.
   Reader root; supporting multiple corpus roots is deferred. _(00-overview §2 deferred list, §17.)_
 - **Notes + Reader unified window / shared view** — an open architectural question of whether Notes and Reader
   should ever share one window (or a unified view) rather than remaining separate apps. _(00-overview §15.3.)_
-- **Source/passage chip buttons XCUITest-hittable (accessibility)** — the TextKit-2 attachment-view chip buttons
-  (`an.chip.{jump,reveal,preview,zoteroOpen}`) are not in the accessibility tree; making them hittable would also
-  help VoiceOver. May not be possible for TextKit-2 attachment subviews. _(KNOWN_ISSUES W8-S8 pass 6.)_
 
 ## Lower priority / long-term
 

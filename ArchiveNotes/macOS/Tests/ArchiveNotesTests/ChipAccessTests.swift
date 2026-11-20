@@ -136,7 +136,13 @@ final class ChipAccessTests: XCTestCase {
             let children = (element as? NSView)?.accessibilityChildren()
                 ?? (element as? NSAccessibilityElement)?.accessibilityChildren() ?? []
             return children.flatMap { child -> [String] in
-                if let button = child as? NSButton { return [button.accessibilityIdentifier()] }
+                // AppKit's element for a button is its cell; a bare button view here has no role (the audit's
+                // "Unknown role" in the VM).
+                XCTAssertFalse(child is NSButton, "a chip's child must be the button's accessibility element")
+                if let cell = child as? NSButtonCell, let button = cell.controlView as? NSButton {
+                    XCTAssertEqual(cell.accessibilityRole(), .button)
+                    return [button.accessibilityIdentifier()]
+                }
                 return axButtons(child)
             }
         }

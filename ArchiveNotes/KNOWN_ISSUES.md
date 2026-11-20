@@ -1571,7 +1571,9 @@ failures; ~13 s each); 189 XCTest + Swift-Testing green; **Release build clean (
   `uiTestOpenFirstZotero()` (runs the real zotero-open dispatch). The harness reads the dispatched URL back from a
   visible control-strip static text `an.editor.test.lastOpenedURL` (deliberately NOT a 1×1 hidden element — that's
   the `an.status.indexReady` queryability hazard). Only the button CLICK gesture is bypassed; the **real
-  Reader/Zotero launch stays owner-eye** (like G2's typing). (queued: W49.notes-chip-access).
+  Reader/Zotero launch stays owner-eye** (like G2's typing). (accepted: fixed, W49.notes-chip-access, 2026-11-20 — the
+  editor now adds its installed chips to the accessibility tree, so `an.chip.*` resolve and G10b clicks the real
+  Jump button; the seams stay for the dispatched-URL checks).
 - File-safe (read-only dispatch, no store/corpus writes): post-run the real `Store` is **absent**, real
   `notes-index-v1.sqlite3` untouched, `notesStoreRootBookmark` not persisted; all writes confined to the scratch fixture. (accepted: done, W8-S8 pass 7).
 - **RESOLVED (W8-S8b, above):** the `an.status.indexReady` probe queryability fix + the G2/G6/G11 owner-eye
@@ -1592,7 +1594,8 @@ SUCCEEDED**, 0 failures); 189 XCTest + Swift-Testing green; Release build clean 
   attempt clicking it timed out at `waitForExistence`). The chip is a TextKit-2 attachment-view-provider
   subview (`BlockHeaderChipView` inside `BlockHeaderAttachment.viewProvider`); such subviews aren't hit-testable
   by XCUITest (same class of limit as PDFView content panes in the Reader harness). This is exactly why the
-  plan's ORIGINAL G10 spec (08-testing §Design) said **cliclick**, not XCUITest. (queued: W49.notes-chip-access).
+  plan's ORIGINAL G10 spec (08-testing §Design) said **cliclick**, not XCUITest. (accepted: fixed, W49.notes-chip-access,
+  2026-11-20 — `EditorTextView.accessibilityChildren` adds the installed chips; G10b clicks `an.chip.jump`).
 - **Drove the jump through a DEBUG seam** (same plan-blessed precedent as G4/G9): `EditorTextView.uiTestJumpFirstPassage()`
   scans the text storage for the first note-passage `BlockHeaderAttachment` and fires its **real `onJump`
   callback with the real `SourceAnchor`** — the identical closure + anchor the chip button's `jumpClicked`
@@ -1603,7 +1606,9 @@ SUCCEEDED**, 0 failures); 189 XCTest + Swift-Testing green; Release build clean 
   Read-only navigation (no write-back, no store/corpus write). (accepted: done, W8-S8 pass 6; the seam is DEBUG-only).
 - **Future (low-pri, owner-eye today):** making the chip buttons (`an.chip.{jump,reveal,preview,zoteroOpen}`)
   XCUITest-hittable would also help VoiceOver — may not be possible for TextKit-2 attachment subviews; not
-  attempted this pass. Logged to Daemon Report. (queued: W49.notes-chip-access).
+  attempted this pass. Logged to Daemon Report. (accepted: fixed, W49.notes-chip-access, 2026-11-20 — each chip is
+  a VoiceOver group with its buttons as children and its actions as custom actions, a right-click menu, the
+  editor's context menu, and Note-menu commands ⌃⌘J/R/Y/O for the chip under the caret).
 - **REMAINING (W8-S8 still open — oversized, recommend re-split):** G6 (reveal → Reader) + G11 (Zotero chip
   open), both needing a DEBUG `NSWorkspace.open` spy (assert the dispatched URL; real external launch owner-eye);
   the `an.status.indexReady` probe queryability fix; G2/G6/G11 owner-eye docs in the harness README. Only then

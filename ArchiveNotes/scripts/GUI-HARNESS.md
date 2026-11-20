@@ -96,11 +96,11 @@ File ▸ Choose Store Folder… (it persists over the owner's real root).
   item present). *(Automated coverage: G11 asserts the exact `zotero://select/library/items/<key>` URL
   is dispatched; the real Zotero launch is owner-eye.)*
 
-- **Chip-button click gestures (`an.chip.*`).** For G6/G10/G11 the automated checks fire the buttons'
-  real callbacks via DEBUG seams because the chip buttons aren't XCUITest-hittable. A human should, at
-  least once, confirm the on-screen chip buttons (Reveal / Jump to Source / Open in Zotero) are visible,
-  correctly labelled, and respond to a real click. Making these subviews hit-testable would also help
-  VoiceOver, but may be impossible for TextKit-2 attachment subviews (tracked in `KNOWN_ISSUES.md`).
+- **Chip-button click gestures (`an.chip.*`).** G6/G11 fire the Reveal and Zotero buttons' real callbacks
+  via DEBUG seams so they can read back the dispatched URL without launching Reader or Zotero. The buttons
+  are in the accessibility tree since W49.notes-chip-access (the editor adds its installed chips, each an
+  `an.chip` group), and G10b clicks the real Jump to Source button; G10c drives ⌃⌘J for the chip under the
+  caret. The real Reader/Zotero launch after a click stays owner-eye.
 
 ## Files
 

@@ -1714,6 +1714,57 @@ final class NotesGUITests: NotesFixtureUITestCase {
                       "Jump to Source should select the source note and load its body into the editor")
     }
 
+    /// W49.notes-chip-access — the chip's own Jump button is in the accessibility tree now (the editor adds the
+    /// installed chips as children), so it is clicked here for real rather than through the seam G10 uses.
+    func testG10b_ChipJumpButtonIsReachableAndClickable() throws {
+        try withFixture {
+            let (win, ed) = try selectExtractInNoteWindow()
+            let jump = win.buttons.matching(identifier: "an.chip.jump").firstMatch
+            XCTAssertTrue(jump.waitForExistence(timeout: 10), "the chip's Jump button must be in the accessibility tree")
+            // The extract has one passage chip; a second match would be the same chip listed twice for VoiceOver.
+            XCTAssertEqual(win.buttons.matching(identifier: "an.chip.jump").count, 1)
+            XCTAssertEqual(win.groups.matching(identifier: "an.chip").count, 1,
+                           "the chip is one element, a group around its buttons")
+            jump.click()
+            XCTAssertTrue(pollUntil(timeout: 15) { ((ed.value as? String) ?? "").contains("Moore on Intel") },
+                          "clicking the chip's Jump to Source should select the source note and load its body")
+        }
+    }
+
+    /// W49.notes-chip-access — Note ▸ Jump to Source (⌃⌘J) runs the action of the chip whose block holds the caret.
+    func testG10c_JumpToSourceKeyboardCommandUsesTheChipUnderTheCaret() throws {
+        try withFixture {
+            let (_, ed) = try selectExtractInNoteWindow()
+            let body = ed.value as? String ?? ""
+            let caret = (body as NSString).range(of: "Moore says")
+            XCTAssertNotEqual(caret.location, NSNotFound)
+            // The seam places the caret and makes the editor first responder, where the command looks for it.
+            XCTAssertTrue(setEditorSelection(location: caret.location + 2, length: 0),
+                          "the DEBUG selection strip must be drivable")
+            app.activate()
+            app.typeKey("j", modifierFlags: [.command, .control])
+            XCTAssertTrue(pollUntil(timeout: 15) { ((ed.value as? String) ?? "").contains("Moore on Intel") },
+                          "⌃⌘J in the extract's passage should jump to its source note")
+        }
+    }
+
+    /// The extract selected in the Note window, its body and passage chip loaded (G10's setup).
+    private func selectExtractInNoteWindow() throws -> (XCUIElement, XCUIElement) {
+        let win = app.windows["Archive Notes"]
+        XCTAssertTrue(win.waitForExistence(timeout: 10), "the Note window should exist")
+        let ed = win.textViews["an.editor.text"]
+        XCTAssertTrue(setKind(to: "All", in: win), "should switch the kind filter to All")
+        let extractCell = win.descendants(matching: .any)["an.cell.title.\(Self.idExtract)"]
+        XCTAssertTrue(extractCell.waitForExistence(timeout: 20), "the extract row should appear once All is shown")
+        _ = pollUntil(timeout: 10) { app.activate(); return extractCell.isHittable }
+        if extractCell.isHittable { extractCell.click() }
+        else { extractCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).click() }
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor should exist")
+        XCTAssertTrue(pollUntil(timeout: 12) { ((ed.value as? String) ?? "").contains("Moore says") },
+                      "selecting the extract should load its body into the editor")
+        return (win, ed)
+    }
+
     // MARK: - G10 helper
 
     /// Switch the kind segmented control (`an.filter.kind`) to the named segment ("All"/"Notes"/

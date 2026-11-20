@@ -383,7 +383,8 @@ final class BlockHeaderChipView: NSView {
     }
 
     /// The chip is one accessibility element, so AppKit no longer offers its subviews as children; its buttons
-    /// are, for VoiceOver to step through.
+    /// are, for VoiceOver to step through. Each as AppKit exposes it (its cell): the button view itself has no
+    /// role, and the audit reported it as an element of unknown role beside the real button.
     override func accessibilityChildren() -> [Any]? {
         var buttons: [NSButton] = []
         func visit(_ view: NSView) {
@@ -392,10 +393,7 @@ final class BlockHeaderChipView: NSView {
             }
         }
         visit(self)
-        return buttons.filter { !$0.isHidden }.map { button in
-            button.setAccessibilityParent(self)
-            return button
-        }
+        return buttons.filter { !$0.isHidden }.compactMap { NSAccessibility.unignoredDescendant(of: $0) }
     }
 
     /// The chip's actions as menu items, for its right-click menu.

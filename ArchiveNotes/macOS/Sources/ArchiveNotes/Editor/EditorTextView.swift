@@ -169,8 +169,18 @@ final class EditorTextView: NSTextView {
     /// and XCUITest never reached a chip's buttons. The chips in the viewport are added here, each a group whose
     /// children are its buttons.
     override func accessibilityChildren() -> [Any]? {
-        var children = super.accessibilityChildren() ?? []
-        for chip in installedChipViews() {
+        // A chip view this editor rehosted as its own subview (`installStrandedChipViews`) may already be among
+        // AppKit's children; VoiceOver would then read it twice, so the chips are listed once, here.
+        var children = (super.accessibilityChildren() ?? []).filter { child in
+            var view = child as? NSView
+            while let current = view, current !== self {
+                if current is BlockHeaderChipView { return false }
+                view = current.superview
+            }
+            return true
+        }
+        var seen = Set<ObjectIdentifier>()
+        for chip in installedChipViews() where seen.insert(ObjectIdentifier(chip)).inserted {
             chip.setAccessibilityParent(self)
             children.append(chip)
         }
