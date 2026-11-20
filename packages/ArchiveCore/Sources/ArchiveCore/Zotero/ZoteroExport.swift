@@ -111,7 +111,8 @@ public enum ZoteroExport {
 
     /// The CSL-JSON item for `source`. `id` is the file name, unique within one export (`export` numbers repeats).
     public static func item(_ source: ZoteroSource, id: String? = nil) -> [String: Any] {
-        let side = source.sidecar ?? ZoteroSidecar()
+        // The user's corrected names replace the sidecar's (W49.reader-sender-row-check).
+        let side = UserItemFields.applied(source.userItemFields, to: source.sidecar ?? ZoteroSidecar())
         let fields = UserItemFields.applied(source.userItemFields, to: merged(source.itemFields, side.itemFields))
         // The tagging call's format stands in for a kind only where it names one exactly, and not where the user said
         // the document has none.

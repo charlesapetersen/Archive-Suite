@@ -75,7 +75,7 @@ final class ItemFieldEditTests: XCTestCase {
         try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: true)
         let doc = suite.appendingPathComponent(UserItemFields.fileName)
         for bytes in [#"{"schemaVersion": 2, "files": {}}"#, #"{"schemaVersion": 1, "files": {}, "future": 1}"#,
-                      #"{"schemaVersion": 1, "files": {"a.pdf": {"sender": "X"}}}"#, "{ no"] {
+                      #"{"schemaVersion": 1, "files": {"a.pdf": {"signatory": "X"}}}"#, "{ no"] {
             try Data(bytes.utf8).write(to: doc)
             XCTAssertThrowsError(try set(.title, "X", "a.pdf", in: dir)) {
                 XCTAssertEqual($0 as? ContainerWriteError, .refusedExisting(UserItemFields.fileName))
@@ -169,5 +169,47 @@ final class ItemFieldEditTests: XCTestCase {
         XCTAssertEqual(rows.map(\.value), ["Page Two"])
         XCTAssertEqual(rows.first?.status.level, .unchecked)
         XCTAssertEqual(ContainerFileStore.loadItemFields(directory: dir).document?.files, [:])
+    }
+
+    /// W49.reader-sender-row-check: the sidecar's sender, recipient and sending place are listed after the item fields,
+    /// names only with the evidence in the tooltip, and a correction beside the file replaces them, checked.
+    func testTheSidecarsNamesAreListedAndCorrectable() throws {
+        let dir = try makeFolder()
+        let sidecar = """
+        {"entities": {"status": "extracted",
+          "sender": [{"name": "Max Shachtman", "evidence": "quoted", "quote": "Max"}],
+          "recipient": [{"name": "Albert Glotzer", "evidence": "inferred", "inferred_because": "the inside address"},
+                        {"name": "J. Cannon", "evidence": "quoted", "quote": "Jim"}],
+          "sending_place": [{"name": "Unknown", "evidence": "unknown"}]}}
+        """
+        try Data(sidecar.utf8).write(to: dir.appendingPathComponent("a.json"))
+        let before = try snapshot()
+        let tags = DocumentTags.parse(raw: ["Checked Recipient"], labelNumber: nil)
+        var header = try XCTUnwrap(FieldStatusSection.HeaderFields.read(dir.appendingPathComponent("a.pdf"),
+                                                                        isDataless: false))
+        XCTAssertEqual(try snapshot(), before, "reading writes nothing")
+        var rows = FieldStatusList.rows(tags: tags, header: header)
+        XCTAssertEqual(rows.map(\.field), [.sender, .recipient])
+        XCTAssertEqual(rows.map(\.value), ["Max Shachtman", "Albert Glotzer; J. Cannon"])
+        XCTAssertEqual(rows.map(\.status.level), [.lowerConfidence, .checked])
+        XCTAssertTrue(rows[0].status.detail.contains("“Max”"), rows[0].status.detail)
+        XCTAssertFalse(rows[0].value.contains("Max”"), "names only in the row")
+        // A placeholder's sidecar is not read.
+        XCTAssertNil(try XCTUnwrap(FieldStatusSection.HeaderFields.read(dir.appendingPathComponent("a.pdf"),
+                                                                        isDataless: true)).sidecar)
+
+        try set(.sender, "Albert Glotzer", "a.pdf", in: dir)
+        try set(.sendingPlace, "New York", "a.pdf", in: dir)
+        try set(.recipient, "", "a.pdf", in: dir)
+        header = try XCTUnwrap(FieldStatusSection.HeaderFields.read(dir.appendingPathComponent("a.pdf"),
+                                                                    isDataless: false))
+        rows = FieldStatusList.rows(tags: tags, header: header)
+        XCTAssertEqual(rows.map(\.field), [.sender, .recipient, .sendingPlace])
+        XCTAssertEqual(rows.map(\.value), ["Albert Glotzer", FieldStatusList.noneText, "New York"])
+        XCTAssertEqual(rows.map(\.userSet), [true, true, true])
+        XCTAssertTrue(rows[0].status.source.contains("sidecar reads “Max Shachtman”"))
+        XCTAssertTrue(rows[2].status.source.contains("sidecar has none"))
+        XCTAssertEqual(try Data(contentsOf: dir.appendingPathComponent("a.json")), Data(sidecar.utf8),
+                       "the sidecar is never rewritten")
     }
 }

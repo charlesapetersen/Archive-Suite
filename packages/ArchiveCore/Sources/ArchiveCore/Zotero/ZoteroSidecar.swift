@@ -17,6 +17,11 @@ public struct ZoteroSidecar: Equatable, Sendable {
     public var format: String?
     /// The item-field call's fields, when it read them (`item_fields.status == "read"`).
     public var itemFields = PDFItemFields()
+    /// W49.reader-sender-row-check: why the entity call gave each kept name, one line a name in the list's order
+    /// (`Name: “quote”`, `Name: inferred, because …`), for the Inspector's tooltip. Empty for the tagging call's names.
+    public var evidence: [CheckableField: [String]] = [:]
+    /// The names are the entity call's (`entities.status == "extracted"`, at least one name kept), not the tagging call's.
+    public var namesFromEntityCall = false
 
     public init() {}
 
@@ -63,16 +68,31 @@ public struct ZoteroSidecar: Equatable, Sendable {
             // The entity call's lists (`EntityExtractor.sidecarObject`): a placeholder "Unknown" entry is no name,
             // and a sending place is kept only where the document writes it (owner, W46.ent-truth-owner-fold).
             if entities["status"] as? String == "extracted" {
-                func names(_ key: String, quotedOnly: Bool) -> [String] {
-                    (entities[key] as? [[String: Any]] ?? []).compactMap { e in
+                func names(_ key: String, quotedOnly: Bool, field: CheckableField) -> [String] {
+                    var lines: [String] = []
+                    let kept: [String] = (entities[key] as? [[String: Any]] ?? []).compactMap { e in
                         let evidence = e["evidence"] as? String
-                        guard evidence != "unknown", !quotedOnly || evidence == "quoted" else { return nil }
-                        return string(e["name"])
+                        guard evidence != "unknown", !quotedOnly || evidence == "quoted",
+                              let name = string(e["name"]) else { return nil }
+                        switch evidence {
+                        case "quoted":
+                            let quote = (e["quote"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                            lines.append(quote.isEmpty ? "\(name): quoted" : "\(name): “\(quote)”")
+                        case "inferred":
+                            let why = (e["inferred_because"] as? String)?
+                                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                            lines.append(why.isEmpty ? "\(name): inferred" : "\(name): inferred, \(why)")
+                        default: lines.append(name)
+                        }
+                        return name
                     }
+                    if !lines.isEmpty { s.evidence[field] = lines }
+                    return kept
                 }
-                s.authors = names("sender", quotedOnly: false)
-                s.recipients = names("recipient", quotedOnly: false)
-                s.authorPlaces = names("sending_place", quotedOnly: true)
+                s.authors = names("sender", quotedOnly: false, field: .sender)
+                s.recipients = names("recipient", quotedOnly: false, field: .recipient)
+                s.authorPlaces = names("sending_place", quotedOnly: true, field: .sendingPlace)
+                s.namesFromEntityCall = !(s.authors.isEmpty && s.recipients.isEmpty && s.authorPlaces.isEmpty)
             }
         } else {
             s.authors = strings(o["author_name"])

@@ -42,7 +42,7 @@ struct IndexedItemFields: Equatable, Sendable {
 
     /// The user's values as the index searches them: every non-empty one, one per line.
     static func searchText(_ user: [CheckableField: String]) -> String {
-        CheckableField.itemFields.compactMap { f in user[f].flatMap { $0.isEmpty ? nil : $0 } }.joined(separator: "\n")
+        CheckableField.correctable.compactMap { f in user[f].flatMap { $0.isEmpty ? nil : $0 } }.joined(separator: "\n")
     }
 
     // MARK: Stored form (a JSON object keyed by `CheckableField.jsonKey`)
@@ -59,7 +59,7 @@ struct IndexedItemFields: Equatable, Sendable {
         else { return [:] }
         var out: [CheckableField: String] = [:]
         for (key, value) in raw {
-            if let f = CheckableField.itemFields.first(where: { $0.jsonKey == key }) { out[f] = value }
+            if let f = CheckableField(jsonKey: key) { out[f] = value }
         }
         return out
     }

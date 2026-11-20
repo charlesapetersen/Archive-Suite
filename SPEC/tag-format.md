@@ -90,7 +90,7 @@ recognized **before** the bare-number year test, so `Q2`, `P7`, or `Day 25` is n
 | **Sent With Date Uncertain** | literal `Sent With Date Uncertain` (exact case) | 0–1 | Speculative sent-with date. Independent of `Date Uncertain`; written only beside a `Sent With` value, and cleared with it. |
 | **Quality** *(the rating facet)* | exactly one of `Q1` `Q2` `Q3` (higher = better) | 0–1 | **The single importance/quality rating (W19, 2026-07-18) — MERGED with + supersedes the legacy Priority facet** (`Q3` = old `P10`). A human 0–3 rating; **`Q0`/unrated writes NO tag** (absence *is* 0 stars, so the wire only ever carries `Q1`/`Q2`/`Q3`). Human-set everywhere, **never LLM-emitted**: Notes (front-matter `quality`), Reader (edit), Processor's interactive tagging (Live Capture tag card + Process Files manual tagging), and the **phone companions** (per-page/segment — the old priority control now emits `Q`). Q-prefix can never collide with the digits-only Year test. |
 | **Priority** *(legacy → Quality)* | `P7`–`P10`, on pre-W19 files only | 0–1 | **RETIRED — merged into Quality (W19, 2026-07-18).** No longer written by any app or companion. **Read-only alias:** `P8`/`P9`/`P10` parse as `Q1`/`Q2`/`Q3` and `P7` as unrated, so pre-W19 phone-captured files still resolve without a corpus rewrite. |
-| **Field check** *(W40.reader-field-status)* | `Checked <Field>`: `Checked Date`, `Checked Sent With`, `Checked Document Kind`, `Checked Title`, `Checked Byline`, `Checked Publication`, `Checked Publication Date`, `Checked Recipient Place` | 0–8 | The user has checked that field's current value (§Field checks). Whole token, case-insensitive, surrounding spaces ignored, like `Date Uncertain`; any other `Checked …` stays a subject. Never a subject, never in the tag cloud. Core: `CheckableField` (`Tags/FieldCheck.swift`), `DocumentTags.checkedFields`. |
+| **Field check** *(W40.reader-field-status)* | `Checked <Field>`: `Checked Date`, `Checked Sent With`, `Checked Document Kind`, `Checked Title`, `Checked Byline`, `Checked Publication`, `Checked Publication Date`, `Checked Recipient Place`, `Checked Sender`, `Checked Recipient`, `Checked Sending Place` | 0–11 | The user has checked that field's current value (§Field checks). Whole token, case-insensitive, surrounding spaces ignored, like `Date Uncertain`; any other `Checked …` stays a subject. Never a subject, never in the tag cloud. Core: `CheckableField` (`Tags/FieldCheck.swift`), `DocumentTags.checkedFields`. |
 | **Read state** | `Read` or `Unread` | 0–1 | Matched **exact whole-string, case-insensitive**. Processor stamps `Unread` **last** on new real-tagging output. |
 | **Subject** | free-ish strings, title-cased | ~2–6 | Everything not claimed above, kept **verbatim**. Case variants are one tag (Safety rule 4). Processor caps the LLM at 6 (`TagGenerator.parseTagResponse`). OCR failures carry `OCR Failed`; a person flags inadequate transcription with `OCR Poor` (below). |
 | **Item type** | literal `Box` or `Folder` (exact spelling) | 0–1 | A photo of a box label or of a folder label (§Item type). Last token wins; an earlier one reads as a subject, but the words are reserved, so setting the type removes every `Box`/`Folder` token. `box`, `BOX`, `" Box "` are subjects. |
@@ -113,8 +113,13 @@ the shared flag-generation protocol and acceptance clearing (the Processor) are 
 cancel/reject/failure leaves the flag. Improve OCR also works without a flag and never adds it implicitly.
 
 **Field checks (W40.reader-field-status, owner 2026-11-13).** A `Checked <Field>` tag says the user has looked at
-that field's current value and accepts it; it never holds the value. The fields are the item's dates (from its tags)
-and the page-2 item fields (§2-page PDF, "Item fields"). Container fields carry no tag: their check is a `user` value in
+that field's current value and accepts it; it never holds the value. The fields are the item's dates (from its tags),
+the page-2 item fields (§2-page PDF, "Item fields") and the sender, recipient and sending place the Processor's names
+feature writes only to the JSON sidecar (its `entities` object, a sending place there kept only where the document
+writes it; else the tagging call's `author_name`, `recipient_name` and `author_location`, which are not measured;
+W49.reader-sender-row-check, owner call 24).
+The Reader lists the names only, several joined with "; ", each name's quote or "inferred" in the tooltip; the sidecar
+is read, never written. Container fields carry no tag: their check is a `user` value in
 the container file (`SPEC/containers.md`).
 - **Only a person's action writes one**: "Mark checked" in the Reader's Inspector, or the user's own change to a date's
   value there (`TagEditing.userDelta`), which checks that date in the same write and undo step. Clearing a date, or
@@ -144,6 +149,10 @@ the container file (`SPEC/containers.md`).
   its box number on a folder photo is 28 of 35, and every other field and reader falls short. Path values are not
   measured on the owner's folders. A `user` container value is checked. A value's own `confidence` is shown as a hint and never ranks it. When a new measurement moves a
   field across the rule, the table moves with it, in the same commit.
+- **The sidecar's names** (sender, recipient, sending place) are measured only against model truth, never against
+  owner-checked pairs, so none clears the rule and each shows **Unchecked, lower confidence**, with the shipped call's
+  quoted-name precision: senders 88 of 115, recipients 146 of 160, sending places 55 of 64
+  (`segbench-results/ent-8k-paired.md`, "Precision (ed2)", first run).
 - **The user's own value (W40.reader-item-field-edit).** A page-2 item field the user corrects in the Reader's
   Inspector is not written into the PDF (page 2 stays the Processor's output-time snapshot). It goes to
   `<the file's folder>/.archivesuite/item-fields.json`, written through `ContainerFileStore` exactly as the container
@@ -151,7 +160,10 @@ the container file (`SPEC/containers.md`).
   file renamed in place, nothing deleted). UTF-8 JSON, sorted keys, at most 1 MB:
   `{ "schemaVersion": 1, "files": { "<file name>": { "<field>": "<value>", … } }, "updatedAt": "<ISO 8601>" }`, the
   file name as it is in the folder (compared composed, NFC), the field keys `documentKind`, `title`, `byline`,
-  `publication`, `publicationDate`, `recipientPlace`. A value replaces page 2's wherever an app shows or exports the
+  `publication`, `publicationDate`, `recipientPlace`, and for the sidecar's names `sender`, `recipient`, `sendingPlace`
+(W49.reader-sender-row-check; several names kept separated by "; ", a value of separators alone stored as `""`; the
+sidecar left as it is; a name is shown in the Checks and exported to Zotero in place of the sidecar's and searched, but
+not yet shown in the Item fields column, W49.reader-sidecar-names-index). A value replaces page 2's wherever an app shows or exports the
   field (the Reader's Checks, its search and Item fields column through the disposable content index, the Zotero
   export); `""` says the file has no such field, hiding page 2's (and, for the
   kind, the tagging call's format standing in for one). Taking the user's value away removes its key, and a file left

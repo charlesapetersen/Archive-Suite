@@ -35,6 +35,11 @@ final class ZoteroExportTests: XCTestCase {
         XCTAssertEqual(s.recipientPlaces, ["Chicago"])
         XCTAssertEqual(s.itemFields.documentKind, "letter")
         XCTAssertEqual(s.itemFields.recipientPlace, "Chicago, IL")
+        // W49.reader-sender-row-check: each kept name's quote or inference, for the Inspector's tooltip.
+        XCTAssertEqual(s.evidence[.sender], ["Max Shachtman: “Max”"])
+        XCTAssertEqual(s.evidence[.recipient], ["Albert Glotzer: inferred, addressed"])
+        XCTAssertEqual(s.evidence[.sendingPlace], ["Chicago: quoted"])
+        XCTAssertTrue(s.namesFromEntityCall)
     }
 
     func testSidecarUnknownPlaceholdersAndFailedCallsGiveNothing() throws {

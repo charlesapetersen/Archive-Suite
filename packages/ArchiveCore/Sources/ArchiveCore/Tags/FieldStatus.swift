@@ -73,7 +73,7 @@ public enum FieldStatusPolicy {
         case .publicationDate: figure = "0.98 [0.88, 0.98] on the bench"
         case .recipientPlace: figure = "1.00 [0.92, 1.00] on the bench"
         case .title: figure = "0.91 [0.86, 0.94] on the bench"
-        case .date, .sentWith: figure = nil
+        case .date, .sentWith, .sender, .recipient, .sendingPlace: figure = nil
         }
         if checked { return FieldStatus(level: .checked, source: source, measured: figure ?? "") }
         if let figure {
@@ -81,6 +81,39 @@ public enum FieldStatusPolicy {
         }
         return FieldStatus(level: .lowerConfidence, source: source,
                            measured: "Not measured as an item field.")
+    }
+
+    /// W49.reader-sender-row-check: a name from the Processor's JSON sidecar (the names feature, `EntityExtractor`).
+    /// None is measured against owner-checked truth, so none clears the fill rule; the figures are the shipped call's
+    /// quoted names against model truth (`segbench-results/ent-8k-paired.md`, "Precision (ed2)", first run).
+    /// `evidence` is each name's quote or "inferred" line (`ZoteroSidecar.evidence`), shown in the tooltip. A sidecar
+    /// written where the names feature did not run carries the tagging call's names, which have no figure.
+    public static func nameField(_ field: CheckableField, checked: Bool, evidence: [String],
+                                 fromEntityCall: Bool = true) -> FieldStatus {
+        guard fromEntityCall else {
+            let source = "From the Processor’s tagging call, in the JSON sidecar"
+            return checked ? FieldStatus(level: .checked, source: source, measured: "")
+                : FieldStatus(level: .lowerConfidence, source: source, measured: "Not measured.")
+        }
+        var source = "From the Processor’s names feature, in the JSON sidecar"
+        if !evidence.isEmpty { source += " (" + evidence.joined(separator: "; ") + ")" }
+        let figure: String
+        switch field {
+        case .sender: figure = "quoted senders 88 of 115 right"
+        case .recipient: figure = "quoted recipients 146 of 160 right"
+        case .sendingPlace: figure = "quoted sending places 55 of 64 right"
+        default: figure = "not measured"
+        }
+        if checked { return FieldStatus(level: .checked, source: source, measured: "") }
+        return FieldStatus(level: .lowerConfidence, source: source,
+                           measured: "Not measured against owner-checked truth; against model truth, \(figure).")
+    }
+
+    /// A sidecar name the user set in the Reader (`UserItemFields`): checked, as an item field the user set is.
+    public static func userNameField(sidecarValue: String?) -> FieldStatus {
+        let source = sidecarValue.map { "Set by the user; the JSON sidecar reads “\($0)”" }
+            ?? "Set by the user; the JSON sidecar has none"
+        return FieldStatus(level: .checked, source: source, measured: "")
     }
 
     /// A page-2 item field whose value the user set in the Reader (`UserItemFields`): checked, as a container value

@@ -12,6 +12,10 @@ import ArchiveCoreUI
 /// W40.reader-item-field-edit: an item field's value can be corrected, set to none or added. The user's value is kept
 /// in the folder's `.archivesuite/item-fields.json` (`UserItemFields`, `NavigationModel.editItemField`) and shown in
 /// place of page 2's, as checked; page 2 itself is never rewritten.
+///
+/// W49.reader-sender-row-check: the sender, recipient and sending place the Processor's names feature writes to the
+/// JSON sidecar (`ZoteroSidecar`) are listed after the item fields, names only (the quote or "inferred" is in the
+/// tooltip), and checked and corrected the same way; the sidecar itself is never rewritten.
 struct FieldStatusSection: View {
     let files: [ArchiveFile]
     let apply: (TagEditOp) -> Void
@@ -41,6 +45,8 @@ struct FieldStatusSection: View {
         /// W47.ct-folder-date-reader: the folder date the Reader gave the file, with its evidence; it stands for
         /// page 2's evidence while the file still carries that date.
         var dateRecord: FolderDateRecord?
+        /// The Processor's JSON sidecar beside the file, when there is one: its sender, recipient and sending place.
+        var sidecar: ZoteroSidecar?
         /// Why the folder's item-field file cannot be read or written, when it cannot; editing is then off.
         var userProblem: String?
 
@@ -51,14 +57,16 @@ struct FieldStatusSection: View {
             dateEvidence = all.lazy.compactMap(\.dateEvidence).first
         }
 
-        /// Reads `url`'s headers and the user's values in its folder. A file that is not a PDF gives none; a
-        /// placeholder that is not on disk gives the user's values alone.
+        /// Reads `url`'s headers, its JSON sidecar and the user's values in its folder. A file that is not a PDF gives
+        /// none; a placeholder that is not on disk gives the user's values alone.
         static func read(_ url: URL, isDataless: Bool) -> HeaderFields? {
             guard url.pathExtension.lowercased() == "pdf" else { return nil }
             var fields = HeaderFields(headers: [])
             if !isDataless, let doc = PDFDocument(url: url), !doc.isLocked {
                 fields = HeaderFields(headers: PDFHeaderParser.textPageHeaders(doc))
             }
+            // A placeholder's sidecar is not read either, so selecting it never downloads anything.
+            if !isDataless { fields.sidecar = ZoteroSidecar.read(pdf: url) }
             let folder = url.deletingLastPathComponent().resolvingSymlinksInPath()
             switch ContainerFileStore.loadItemFields(directory: folder) {
             case .missing: break
@@ -174,7 +182,9 @@ struct ItemFieldSelectionEditor: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Picker("Item field", selection: $field) {
-                    ForEach(IndexedItemFields.columnOrder, id: \.self) { Text($0.label).tag($0) }
+                    ForEach(IndexedItemFields.columnOrder + CheckableField.nameFields, id: \.self) {
+                        Text($0.label).tag($0)
+                    }
                 }
                 .labelsHidden().frame(width: 160)
                 .accessibilityIdentifier("ar.itemFieldSelection.field")
@@ -190,9 +200,10 @@ struct ItemFieldSelectionEditor: View {
                     .accessibilityIdentifier("ar.itemFieldSelection.set")
                 Menu("More") {
                     Button("None for \(count) Files") { onEdit(field, .none) }
-                        .help("Say these files have no \(field.label.lowercased()), whatever page 2 reads.")
+                        .help("Say these files have no \(field.label.lowercased()), whatever "
+                              + "\(FieldStatusList.source(field)) reads.")
                     Button("Remove Your \(field.label) from \(count) Files") { onEdit(field, .remove) }
-                        .help("Take your value away, so page 2's shows again.")
+                        .help("Take your value away, so \(FieldStatusList.source(field))'s shows again.")
                 }
                 .controlSize(.small).fixedSize()
                 .disabled(saving)
@@ -229,7 +240,7 @@ struct FieldStatusList: View {
         let status: FieldStatus
         /// The value is the user's (`UserItemFields`), not page 2's.
         var userSet = false
-        /// What page 2 reads, for an item field.
+        /// What page 2 reads, for an item field; what the JSON sidecar reads, for a name.
         var pageValue: String?
     }
 
@@ -258,7 +269,27 @@ struct FieldStatusList: View {
                                 pageValue: page))
             }
         }
+        for field in CheckableField.nameFields {
+            let side = header?.sidecar.flatMap { field.value(in: $0) }
+            if let user = header?.user[field] {
+                rows.append(Row(field: field, value: user.isEmpty ? Self.noneText : user,
+                                status: FieldStatusPolicy.userNameField(sidecarValue: side), userSet: true,
+                                pageValue: side))
+            } else if let side {
+                rows.append(Row(field: field, value: side,
+                                status: FieldStatusPolicy.nameField(field, checked: tags.checkedFields.contains(field),
+                                                                    evidence: header?.sidecar?.evidence[field] ?? [],
+                                                                    fromEntityCall: header?.sidecar?.namesFromEntityCall
+                                                                        ?? true),
+                                pageValue: side))
+            }
+        }
         return rows
+    }
+
+    /// Where a field's value comes from, as a menu names it.
+    static func source(_ field: CheckableField) -> String {
+        CheckableField.nameFields.contains(field) ? "the JSON sidecar" : "page 2"
     }
 
     /// How a user's "none" is shown.
@@ -279,14 +310,14 @@ struct FieldStatusList: View {
                                    identifier: "ar.fieldStatus.\(row.field)",
                                    onToggle: row.userSet ? nil
                                        : { apply(.setChecked(row.field, row.status.level != .checked)) })
-                    if editable, CheckableField.itemFields.contains(row.field) {
+                    if editable, CheckableField.correctable.contains(row.field) {
                         if editing == row.field { editor(row.field) } else { rowMenu(row) }
                     }
                 }
             }
             if editable {
                 let shown = Set(rows.map(\.field))
-                let missing = CheckableField.itemFields.filter { !shown.contains($0) }
+                let missing = CheckableField.correctable.filter { !shown.contains($0) }
                 if let field = editing, missing.contains(field) {
                     Text(field.label).font(.callout).foregroundStyle(.secondary)
                     editor(field)
@@ -302,17 +333,20 @@ struct FieldStatusList: View {
             Button("Change…") { begin(f, text: header?.user[f] == "" ? "" : row.value) }
             if header?.user[f] != "" {
                 Button("None") { onEdit(f, .none) }
-                    .help("Say this file has no \(f.label.lowercased()), whatever page 2 reads.")
+                    .help("Say this file has no \(f.label.lowercased()), whatever \(Self.source(f)) reads.")
             }
             if row.userSet {
-                Button(row.pageValue.map { "Remove Your Value (page 2 reads “\($0)”)" } ?? "Remove Your Value") {
+                Button(row.pageValue.map { "Remove Your Value (\(Self.source(f)) reads “\($0)”)" } ?? "Remove Your Value") {
                     onEdit(f, .remove)
                 }
             }
         }
         .menuStyle(.borderlessButton).fixedSize().controlSize(.small)
         .disabled(saving)
-        .help("Correct the \(f.label.lowercased()) for this file. Page 2 is not rewritten; your value is kept beside it.")
+        .help(CheckableField.nameFields.contains(f)
+              ? "Correct the \(f.label.lowercased()) for this file; separate several names with “;”. The JSON sidecar "
+                + "is not rewritten; your value is kept beside it."
+              : "Correct the \(f.label.lowercased()) for this file. Page 2 is not rewritten; your value is kept beside it.")
         .accessibilityIdentifier("ar.fieldStatus.\(f).edit")
     }
 
@@ -324,7 +358,8 @@ struct FieldStatusList: View {
         }
         .menuStyle(.borderlessButton).fixedSize().controlSize(.small)
         .disabled(saving)
-        .help("Give this file a kind, title, byline, publication, publication date or recipient place page 2 lacks.")
+        .help("Give this file a kind, title, byline, publication, publication date, recipient place, sender, recipient "
+              + "or sending place it lacks.")
         .accessibilityIdentifier("ar.fieldStatus.add")
     }
 

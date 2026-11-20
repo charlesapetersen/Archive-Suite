@@ -7,7 +7,8 @@ import Foundation
 // the user has looked at the field's current value and accepts it; it never holds the value. Container fields are
 // not checked by tag: their check is a `user` value in the container file (`SPEC/containers.md`).
 
-/// The item's own fields that can carry a check: its dates (tags) and the page-2 item fields.
+/// The item's own fields that can carry a check: its dates (tags), the page-2 item fields and the names the
+/// Processor's names feature writes to the JSON sidecar (W49.reader-sender-row-check).
 public enum CheckableField: String, Sendable, CaseIterable, Hashable {
     case date = "Date"
     case sentWith = "Sent With"
@@ -17,6 +18,9 @@ public enum CheckableField: String, Sendable, CaseIterable, Hashable {
     case publication = "Publication"
     case publicationDate = "Publication Date"
     case recipientPlace = "Recipient Place"
+    case sender = "Sender"
+    case recipient = "Recipient"
+    case sendingPlace = "Sending Place"
 
     public static let tokenPrefix = "Checked "
 
@@ -44,6 +48,9 @@ public enum CheckableField: String, Sendable, CaseIterable, Hashable {
         case .publication: return "Publication"
         case .publicationDate: return "Publication date"
         case .recipientPlace: return "Recipient place"
+        case .sender: return "Sender"
+        case .recipient: return "Recipient"
+        case .sendingPlace: return "Sending place"
         }
     }
 
@@ -51,11 +58,17 @@ public enum CheckableField: String, Sendable, CaseIterable, Hashable {
     public static let itemFields: [CheckableField] = [.documentKind, .title, .byline, .publication, .publicationDate,
                                                      .recipientPlace]
 
+    /// The names the JSON sidecar carries and page 2 does not (`ZoteroSidecar`), in the order the Inspector lists them.
+    public static let nameFields: [CheckableField] = [.sender, .recipient, .sendingPlace]
+
+    /// Every field whose value the user can correct beside the file (`UserItemFields`): the item fields, then the names.
+    public static let correctable: [CheckableField] = itemFields + nameFields
+
     /// This field's value on a page-2 header; nil for the dates, which are tags.
     public func value(in fields: PDFItemFields) -> String? {
         let v: String?
         switch self {
-        case .date, .sentWith: return nil
+        case .date, .sentWith, .sender, .recipient, .sendingPlace: return nil
         case .documentKind: v = fields.documentKind
         case .title: v = fields.title
         case .byline: v = fields.byline
@@ -65,5 +78,17 @@ public enum CheckableField: String, Sendable, CaseIterable, Hashable {
         }
         guard let t = v?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty else { return nil }
         return t
+    }
+
+    /// This name field's value in a sidecar, several names joined with "; "; nil for any other field or no name.
+    public func value(in sidecar: ZoteroSidecar) -> String? {
+        let names: [String]
+        switch self {
+        case .sender: names = sidecar.authors
+        case .recipient: names = sidecar.recipients
+        case .sendingPlace: names = sidecar.authorPlaces
+        default: return nil
+        }
+        return names.isEmpty ? nil : names.joined(separator: "; ")
     }
 }

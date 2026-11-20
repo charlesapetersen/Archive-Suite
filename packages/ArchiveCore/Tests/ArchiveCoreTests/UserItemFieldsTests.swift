@@ -71,7 +71,7 @@ final class UserItemFieldsTests: XCTestCase {
     func testUnknownKeysAndFieldsAreUnreadableAndNeverOverwritten() throws {
         let suite = dir.appendingPathComponent(ContainerFile.folderName, isDirectory: true)
         try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: false)
-        for body in [#"{"schemaVersion":1,"files":{"a.pdf":{"sender":"X"}}}"#,
+        for body in [#"{"schemaVersion":1,"files":{"a.pdf":{"signatory":"X"}}}"#,
                      #"{"schemaVersion":1,"files":{},"extra":1}"#,
                      #"{"schemaVersion":1,"files":{"a.pdf":{"title":null}}}"#,
                      #"{"files":{}}"#] {
@@ -124,5 +124,53 @@ final class UserItemFieldsTests: XCTestCase {
         f.set(.publication, to: "Other", for: "0002.pdf")
         try ContainerFileStore.writeItemFields(f, directory: dir, expecting: nil)
         XCTAssertEqual(ZoteroSource.gather(pdf: pdf, lookup: nil).userItemFields, [.publication: "The Times"])
+    }
+
+    // MARK: W49.reader-sender-row-check — the sidecar's names
+
+    func testNamesRoundTripOnAScratchFolderAndUnknownKeysStayStrict() throws {
+        var f = UserItemFields()
+        f.set(.sender, to: " Max Shachtman ", for: "0001.pdf")
+        f.set(.recipient, to: "A. Glotzer; J. Cannon", for: "0001.pdf")
+        f.set(.sendingPlace, to: "", for: "0001.pdf")
+        f.set(.date, to: "1958", for: "0001.pdf")
+        XCTAssertEqual(f.values(for: "0001.pdf"), [.sender: "Max Shachtman", .recipient: "A. Glotzer; J. Cannon",
+                                                   .sendingPlace: ""])
+        f.set(.recipient, to: " ; ", for: "0002.pdf")
+        XCTAssertEqual(f.values(for: "0002.pdf"), [.recipient: ""], "separators alone are none")
+        f.set(.recipient, to: "A ;B;", for: "0002.pdf")
+        XCTAssertEqual(f.values(for: "0002.pdf"), [.recipient: "A; B"])
+        f.set(.recipient, to: nil, for: "0002.pdf")
+        try ContainerFileStore.writeItemFields(f, directory: dir, expecting: nil)
+        let raw = try String(contentsOf: target, encoding: .utf8)
+        XCTAssertTrue(raw.contains("\"sender\"") && raw.contains("\"sendingPlace\""), raw)
+        XCTAssertEqual(ContainerFileStore.loadItemFields(directory: dir).document, f)
+        // A key no build knows is still refused.
+        try Data(raw.replacingOccurrences(of: "sendingPlace", with: "sendingTown").utf8).write(to: target)
+        XCTAssertNil(ContainerFileStore.loadItemFields(directory: dir).document)
+    }
+
+    func testCorrectedNamesReplaceTheSidecarsAndReachZotero() {
+        var side = ZoteroSidecar()
+        side.authors = ["Wrong Name"]
+        side.recipients = ["Political Committee"]
+        side.authorPlaces = ["New York"]
+        let values: [CheckableField: String] = [.sender: "Max Shachtman; Albert Glotzer", .sendingPlace: "",
+                                                .title: "ignored here"]
+        let applied = UserItemFields.applied(values, to: side)
+        XCTAssertEqual(applied.authors, ["Max Shachtman", "Albert Glotzer"])
+        XCTAssertEqual(applied.recipients, ["Political Committee"], "a field the user did not set is the sidecar's")
+        XCTAssertEqual(applied.authorPlaces, [], "None hides the sidecar's place")
+        var source = ZoteroSource(fileName: "m.pdf", itemFields: PDFItemFields(documentKind: "letter"), sidecar: side)
+        source.userItemFields = values
+        let item = ZoteroExport.item(source)
+        XCTAssertEqual((item["author"] as? [[String: String]])?.compactMap { $0["literal"] },
+                       ["Max Shachtman", "Albert Glotzer"])
+        XCTAssertFalse((item["note"] as? String ?? "").contains("New York"))
+        // With no sidecar at all, a name the user gave is still exported.
+        var bare = ZoteroSource(fileName: "b.pdf", itemFields: PDFItemFields(documentKind: "letter"))
+        bare.userItemFields = [.recipient: "J. Cannon"]
+        XCTAssertEqual((ZoteroExport.item(bare)["recipient"] as? [[String: String]])?.compactMap { $0["literal"] },
+                       ["J. Cannon"])
     }
 }

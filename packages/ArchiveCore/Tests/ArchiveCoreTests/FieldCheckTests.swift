@@ -170,4 +170,25 @@ final class FieldCheckTests: XCTestCase {
         XCTAssertEqual(CheckableField.recipientPlace.value(in: f), "Boston")
         XCTAssertNil(CheckableField.date.value(in: f))
     }
+
+    /// W49.reader-sender-row-check: the sidecar's names are checkable fields of their own, below the fill rule.
+    func testNameFieldsCheckAndCarryTheirEvidence() {
+        XCTAssertEqual(tags(["Checked Sender", "checked recipient", "Checked Sending Place"]).checkedFields,
+                       [.sender, .recipient, .sendingPlace])
+        XCTAssertEqual(TagEditing.delta(for: .setChecked(.sender, true), given: tags(["1958"])),
+                       TagDelta(add: ["Checked Sender"]))
+        let s = FieldStatusPolicy.nameField(.sender, checked: false, evidence: ["Max: “Max”"])
+        XCTAssertEqual(s.level, .lowerConfidence)
+        XCTAssertTrue(s.source.contains("“Max”") && s.measured.contains("88 of 115"), s.detail)
+        XCTAssertEqual(FieldStatusPolicy.nameField(.recipient, checked: true, evidence: []).level, .checked)
+        XCTAssertEqual(FieldStatusPolicy.userNameField(sidecarValue: nil).level, .checked)
+        let tagging = FieldStatusPolicy.nameField(.sender, checked: false, evidence: [], fromEntityCall: false)
+        XCTAssertTrue(tagging.source.contains("tagging call") && !tagging.measured.contains("88"), tagging.detail)
+        var side = ZoteroSidecar()
+        side.recipients = ["A", "B"]
+        XCTAssertEqual(CheckableField.recipient.value(in: side), "A; B")
+        XCTAssertNil(CheckableField.sender.value(in: side))
+        XCTAssertNil(CheckableField.title.value(in: side))
+        XCTAssertNil(CheckableField.sender.value(in: PDFItemFields(title: "x")))
+    }
 }

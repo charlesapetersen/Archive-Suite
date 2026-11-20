@@ -58,7 +58,7 @@ extension NavigationModel {
     /// Edits `field` of the file at `path`, under the folder the Reader was given.
     func editItemField(_ field: CheckableField, _ edit: ItemFieldEdit, forPath path: String,
                        undo: UndoManager? = nil) {
-        guard CheckableField.itemFields.contains(field), let value = edit.stored else { return }
+        guard CheckableField.correctable.contains(field), let value = edit.stored else { return }
         itemFieldEditPath = path
         guard let root = itemFieldRoot, let (dir, name) = ContainerCatalog.split(path, under: root.path) else {
             itemFieldEditError = "This file is outside the archive folder the Reader was given, so a correction "
@@ -82,7 +82,7 @@ extension NavigationModel {
     /// One Undo takes the whole edit back. A file outside the folder the Reader was given refuses the whole edit.
     func editItemFieldForSelection(_ field: CheckableField, _ edit: ItemFieldEdit, paths: [String],
                                    undo: UndoManager? = nil) {
-        guard CheckableField.itemFields.contains(field), let value = edit.stored, !paths.isEmpty else { return }
+        guard CheckableField.correctable.contains(field), let value = edit.stored, !paths.isEmpty else { return }
         itemFieldEditPath = nil   // shown for a selection, whatever is selected when it lands
         itemFieldEditForSelection = true
         guard let root = itemFieldRoot else { return }

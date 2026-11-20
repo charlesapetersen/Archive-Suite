@@ -9,6 +9,9 @@ import Foundation
 // such field, hiding the header's. Strict, as the level map: a key or field this build does not know makes the document
 // unreadable, so a writer leaves it alone rather than erase what a newer build put there.
 //
+// W49.reader-sender-row-check: the sidecar's sender, recipient and sending place are corrected the same way; a value
+// with several names separates them with ";". No schema change: the keys are new, and nothing is written to migrate.
+//
 // W47.ct-folder-date-reader: `dates` keeps, per file, the folder date the Reader gave it and the `Date evidence:` value
 // page 2 would carry (`FolderDateRecord`), trusted only while the file's tags still carry that date. No migration: the
 // key is new, and there is nothing written to migrate.
@@ -27,7 +30,7 @@ public struct UserItemFields: Equatable, Sendable {
                 updatedAt: Date? = nil) {
         var kept: [String: [CheckableField: String]] = [:]
         for (name, values) in files {
-            let v = values.filter { CheckableField.itemFields.contains($0.key) }
+            let v = values.filter { CheckableField.correctable.contains($0.key) }
             if !v.isEmpty { kept[Self.key(name), default: [:]].merge(v) { _, new in new } }
         }
         self.files = kept
@@ -52,10 +55,15 @@ public struct UserItemFields: Equatable, Sendable {
     /// Sets the user's value of `field` for `fileName`, trimmed; "" says the file has none, nil takes the user's value
     /// away. A date field is not an item field and is ignored (dates are tags).
     public mutating func set(_ field: CheckableField, to value: String?, for fileName: String) {
-        guard CheckableField.itemFields.contains(field) else { return }
+        guard CheckableField.correctable.contains(field) else { return }
         let k = Self.key(fileName)
         var values = files[k] ?? [:]
-        values[field] = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+        values[field] = value.map { v in
+            // A name field's names are kept as the Inspector shows them, "; " between; separators alone are none.
+            guard CheckableField.nameFields.contains(field) else { return v.trimmingCharacters(in: .whitespacesAndNewlines) }
+            return v.split(separator: ";").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }.joined(separator: "; ")
+        }
         files[k] = values.isEmpty ? nil : values
     }
 
@@ -82,10 +90,27 @@ public struct UserItemFields: Equatable, Sendable {
             case .publication: f.publication = v
             case .publicationDate: f.publicationDate = v
             case .recipientPlace: f.recipientPlace = v
-            case .date, .sentWith: continue
+            case .date, .sentWith, .sender, .recipient, .sendingPlace: continue
             }
         }
         return f
+    }
+
+    /// `sidecar` with the user's name `values` in place: a value replaces the sidecar's names (several separated by
+    /// ";"), "" removes them. The item fields are left to `applied(_:to:)` on the header.
+    public static func applied(_ values: [CheckableField: String], to sidecar: ZoteroSidecar) -> ZoteroSidecar {
+        var s = sidecar
+        for (field, value) in values {
+            let names = value.split(separator: ";").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            switch field {
+            case .sender: s.authors = names
+            case .recipient: s.recipients = names
+            case .sendingPlace: s.authorPlaces = names
+            default: continue
+            }
+        }
+        return s
     }
 }
 
@@ -94,6 +119,9 @@ extension CheckableField {
     public var jsonKey: String? {
         switch self {
         case .date, .sentWith: return nil
+        case .sender: return "sender"
+        case .recipient: return "recipient"
+        case .sendingPlace: return "sendingPlace"
         case .documentKind: return "documentKind"
         case .title: return "title"
         case .byline: return "byline"
@@ -103,8 +131,8 @@ extension CheckableField {
         }
     }
 
-    init?(jsonKey: String) {
-        guard let f = CheckableField.itemFields.first(where: { $0.jsonKey == jsonKey }) else { return nil }
+    public init?(jsonKey: String) {
+        guard let f = CheckableField.correctable.first(where: { $0.jsonKey == jsonKey }) else { return nil }
         self = f
     }
 }
