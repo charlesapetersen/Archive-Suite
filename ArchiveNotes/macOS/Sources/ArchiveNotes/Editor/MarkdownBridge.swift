@@ -688,7 +688,7 @@ enum MarkdownBridge {
             // The text after an image's line opens with that boundary (`leading`), written before it as always
             // (W49 review: a chip's text opens with its thumbnail line, and the guard here dropped its Returns).
             // After an HTML block the first of those newlines is the blank line that ends it (W49.notes-lines-after-html).
-            if endsNote {
+            if endsNote, !plain.endsInOpenHTML {
                 let empty = plain.trailingBreaks + (range.length - contentRange.length)
                 if empty > 0 {
                     return plain.leading + plain.lines + emptyLines(empty, afterBlockHTML: plain.endsInBlockHTML) + emptyLineMarker
@@ -696,11 +696,11 @@ enum MarkdownBridge {
             }
             // An empty line read back after an HTML block is an `&nbsp;` paragraph of its own, which leaves only its
             // separator beside the block's: the newlines past the first are those empty lines.
-            if followed, plain.endsInBlockHTML, !separatorSuffix.isEmpty, separatorSuffix.allSatisfy(\.isNewline) {
+            if followed, plain.endsInBlockHTML, separatorSuffix.isStackedAfterHTMLBlock {
                 let empty = plain.trailingBreaks + separatorSuffix.count
                 return plain.leading + plain.lines + emptyLines(empty, afterBlockHTML: true) + emptyLineMarker
             }
-            if followed, separatorSuffix.isEmpty {
+            if followed, !plain.endsInOpenHTML, separatorSuffix.isEmpty {
                 let empty = oneNewlineSeparator ? plain.trailingBreaks : plain.trailingBreaks - 1
                 if plain.lines.isEmpty, plain.leading.isEmpty, empty >= 0 {
                     return String(repeating: "\\\n", count: empty) + emptyLineMarker
@@ -722,7 +722,10 @@ enum MarkdownBridge {
             // W49.notes-keep-trailing-lines — the empty quote lines after its text are kept as text's are, as breaks
             // ending in an `&nbsp;` quote line, counted the same way.
             let oneNewlineSeparator = separatorSuffix.isEmpty && contentRange.length < range.length
-            let empty = endsNote ? plain.trailingBreaks + (range.length - contentRange.length)
+            let empty = plain.endsInOpenHTML ? 0
+                : endsNote ? plain.trailingBreaks + (range.length - contentRange.length)
+                : followed && plain.endsInBlockHTML && separatorSuffix.isStackedAfterHTMLBlock   // as text's, above
+                    ? plain.trailingBreaks + separatorSuffix.count
                 : followed && separatorSuffix.isEmpty ? (oneNewlineSeparator ? plain.trailingBreaks : plain.trailingBreaks - 1)
                 : 0
             if empty > 0 {
@@ -795,13 +798,14 @@ enum MarkdownBridge {
     /// the paragraph; a run at the end is the boundary to what follows, which `serializeBodySegment` writes.
     /// The newline `endLine` puts before a chip counts as two: it ended a block.
     /// `trailingBreaks` is the count of newlines after the last line of text (or, with no text, of typed ones), and
-    /// `endsInBlockHTML` whether that text ends in an HTML block.
+    /// `endsInBlockHTML` whether that text ends in an HTML block a blank line ends, `endsInOpenHTML` in one it does not.
     /// W49.notes-lines-after-html — only an HTML block keeps a line break after it as its own text; after HTML inside a
     /// paragraph (`a <b>x</b>`) the lines are written as after any text. After the block, the newlines that follow are
     /// written as a paragraph break (the blank line that ends the block, read back as one newline) and a hard break for
     /// each one more.
     private static func plainLines(_ storage: NSAttributedString,
-                                   range: NSRange) -> (leading: String, lines: String, trailingBreaks: Int, endsInBlockHTML: Bool) {
+                                   range: NSRange) -> (leading: String, lines: String, trailingBreaks: Int, endsInBlockHTML: Bool,
+                                                            endsInOpenHTML: Bool) {
         let text = storage.string as NSString
         let end = range.location + range.length
         // The width of the newline at `k` (CRLF is one), or 0 for any other character. Raw HTML's newlines are
@@ -816,6 +820,9 @@ enum MarkdownBridge {
         var lines = ""
         var breaks = 0          // newlines since the last line of text
         var previousEndsInBlockHTML = false
+        // An HTML block that a blank line does not end (an unclosed comment, a headerless chip's opener): everything
+        // after it is its text, so its Returns are dropped as before (W49 review: written, `&nbsp;` showed as text).
+        var previousEndsInOpenHTML = false
         var i = range.location
         var start = i
         func emit(_ upTo: Int) {
@@ -829,14 +836,16 @@ enum MarkdownBridge {
             // one, as a paragraph break and a hard break for each newline more (W49.notes-lines-after-html).
             let isHTML = startsWithRawHTML(storage, range: piece)
             if !lines.isEmpty {
-                lines += isHTML ? "\n\n"
+                lines += isHTML || previousEndsInOpenHTML ? "\n\n"
                     : previousEndsInBlockHTML ? emptyLines(max(breaks, 1), afterBlockHTML: true)
                     : breaks == 1 ? "\\\n" : "\n\n" + String(repeating: "\\\n", count: max(breaks - 2, 0))
             } else if breaks > 0, !isHTML {
                 lines += String(repeating: "\\\n", count: breaks)
             }
             lines += isHTML ? serialized : escapingBlockStart(serialized)
-            previousEndsInBlockHTML = storage.attribute(.noteBlockHTML, at: upTo - 1, effectiveRange: nil) as? Bool == true
+            let endsInBlockHTML = storage.attribute(.noteBlockHTML, at: upTo - 1, effectiveRange: nil) as? Bool == true
+            previousEndsInOpenHTML = endsInBlockHTML && !htmlBlockEndsAtABlankLine(storage, endingAt: upTo - 1)
+            previousEndsInBlockHTML = endsInBlockHTML && !previousEndsInOpenHTML
             breaks = 0
         }
         while i < end {
@@ -875,7 +884,37 @@ enum MarkdownBridge {
             start = i
         }
         emit(end)
-        return (leading, lines, breaks, previousEndsInBlockHTML)
+        return (leading, lines, breaks, previousEndsInBlockHTML, previousEndsInOpenHTML)
+    }
+
+    /// Whether the HTML block ending at `last` is one a blank line ends (CommonMark kinds 6 and 7), or one whose own
+    /// end (`-->`, `?>`, `>`, `]]>`, `</pre>` …) its text holds. Apple gives adjacent HTML blocks as one run, without
+    /// the blank lines between them, so where each starts cannot be told: any line that opens one of the others with
+    /// no end after it counts as open, even inside a block a blank line would end. There the Returns are dropped.
+    private static func htmlBlockEndsAtABlankLine(_ storage: NSAttributedString, endingAt last: Int) -> Bool {
+        var block = NSRange(location: 0, length: 0)
+        storage.attribute(.noteBlockHTML, at: last, longestEffectiveRange: &block,
+                          in: NSRange(location: 0, length: last + 1))
+        let html = (storage.string as NSString).substring(with: block).lowercased()
+        var rest = Substring(html)
+        while !rest.isEmpty {
+            let line = rest.drop(while: { $0 == " " || $0 == "\t" })
+            let next = line.firstIndex(where: \.isNewline).map { line.index(after: $0) } ?? line.endIndex
+            let type1 = ["script", "pre", "style", "textarea"]
+            let closers: [String]
+            if line.hasPrefix("<!--") { closers = ["-->"] }
+            else if line.hasPrefix("<![cdata[") { closers = ["]]>"] }
+            else if line.hasPrefix("<!"), line.dropFirst(2).first?.isLetter == true { closers = [">"] }
+            else if line.hasPrefix("<?") { closers = ["?>"] }
+            else if type1.contains(where: { name in
+                line.hasPrefix("<" + name) && line.dropFirst(name.count + 1).first.map { $0 == ">" || $0.isWhitespace } != false
+            }) { closers = type1.map { "</\($0)>" } }   // any of the four ends it
+            else { closers = [] }
+            // The end may share the opener's characters (`<!-->`, `<?>`).
+            if !closers.isEmpty, !closers.contains(where: { line.dropFirst(1).contains($0) }) { return false }
+            rest = line[next...]
+        }
+        return true
     }
 
     /// `count` newlines ending a line of text, each a hard break; after an HTML block the first is the blank line that
@@ -1190,4 +1229,10 @@ enum MarkdownBridge {
         }
         return "`\(text)`"
     }
+}
+
+private extension String {
+    /// A trailing separator of newlines only, past the first: an empty line read back after an HTML block, whose
+    /// `&nbsp;` paragraph left only its separator beside the block's (W49.notes-lines-after-html).
+    var isStackedAfterHTMLBlock: Bool { !isEmpty && allSatisfy(\.isNewline) }
 }

@@ -517,7 +517,7 @@ struct MarkdownBridgeTests {
         let storage = NSMutableAttributedString(attributedString: MarkdownBridge.parse(markdown: md))
         let at = location ?? storage.length
         var attrs = storage.attributes(at: max(at - 1, 0), effectiveRange: nil)
-        for key in [NSAttributedString.Key.noteBlockSeparator, .noteHardLineBreak, .noteRawHTML, .noteChipLineEnd] {
+        for key in [NSAttributedString.Key.noteBlockSeparator, .noteHardLineBreak, .noteRawHTML, .noteBlockHTML, .noteChipLineEnd] {
             attrs.removeValue(forKey: key)   // as `EditorTextView.typingAttributes` strips them
         }
         storage.insert(NSAttributedString(string: text, attributes: attrs), at: at)

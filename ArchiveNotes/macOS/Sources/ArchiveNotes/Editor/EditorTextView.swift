@@ -689,6 +689,7 @@ final class EditorTextView: NSTextView {
             clean.removeValue(forKey: .noteBlockSeparator)
             clean.removeValue(forKey: .noteHardLineBreak)
             clean.removeValue(forKey: .noteRawHTML)
+            clean.removeValue(forKey: .noteBlockHTML)
             clean.removeValue(forKey: .noteChipLineEnd)
             // On the empty last line, seeded from the newline before it, the line's own kind is on that newline
             // (W49.notes-keep-blank-lines). It is never typed onward.

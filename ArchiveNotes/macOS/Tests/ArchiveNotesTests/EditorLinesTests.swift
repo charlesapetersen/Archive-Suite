@@ -641,11 +641,51 @@ struct EditorLinesTests {
         }
     }
 
+    /// From the Tier-2 review: text typed below an HTML block is not the block's, so its own Returns are line breaks;
+    /// a quoted block keeps the empty line above a block or chip on every save; and after a block a blank line does not
+    /// end (an unclosed comment or `<pre>`), where everything after is its text, Returns are dropped as before rather
+    /// than written as an `&nbsp;` that would show.
+    @Test func linesAfterAnHTMLBlockFromTheReview() throws {
+        let (tv, storage) = try editor("<div>\nx\n</div>")
+        tv.insertNewline(nil); type(tv, "a"); tv.insertNewline(nil); type(tv, "b"); tv.insertNewline(nil)
+        #expect(storage.string == "<div>\nx\n</div>\na\nb\n")
+        #expect(expectKept(tv, storage, "typed below an HTML block") == "<div>\nx\n</div>\n\na\\\nb\\\n&nbsp;")
+        let chip = "<!-- block: freeform -->\nBody."
+        for (file, below) in [("> <div>x</div>\n\n# H", "\n\n# H"), ("> <div>x</div>\n" + chip, "\n" + chip)] {
+            for count in 1...2 {
+                let (tv, storage) = try editor(file)
+                caret(tv, at: NSMaxRange((storage.string as NSString).range(of: "</div>")))
+                for _ in 0..<count { tv.insertNewline(nil) }
+                let saved = expectKept(tv, storage, "\(count) Returns in \(file.debugDescription)")
+                #expect(saved == "> <div>x</div>\n>\n" + String(repeating: "> \\\n", count: count - 1) + "> &nbsp;" + below,
+                        "\(file.debugDescription): saved \(saved.debugDescription)")
+                reselect(tv, storage)
+                #expect(MarkdownBridge.serialize(storage) == saved, "\(file.debugDescription): the second save")
+            }
+        }
+        // Blocks whose end shares the opener's characters, or that end with another kind-1 tag, are closed.
+        for file in ["<?>", "<!-->", "<pre>x</script>", "<!DOCTYPE html>"] {
+            let (tv, storage) = try editor(file)
+            tv.insertNewline(nil)
+            #expect(expectKept(tv, storage, file) == file + "\n\n&nbsp;")
+        }
+        // Apple gives adjacent HTML blocks as one run, so an open comment after a closed block counts as open too.
+        for file in ["<!-- open\nx", "<pre>\nx", "<!-- block: freeform\nfoo", "<div>a</div>\n\n<!-- open\nx"] {
+            let (tv, storage) = try editor(file)
+            tv.insertNewline(nil)
+            let saved = reselect(tv, storage)
+            #expect(!saved.contains("&nbsp;") && !storage.string.contains("&nbsp;"),
+                    "\(file.debugDescription): saved \(saved.debugDescription), reopened \(storage.string.debugDescription)")
+            #expect(MarkdownBridge.serialize(storage) == saved, "\(file.debugDescription): a reopened note must save the same")
+        }
+    }
+
     /// An HTML block is one newline from what follows it, as other blocks are: the blank line that ends it in the file
     /// is not an empty line, so one Return typed after it stays one.
     @Test func anHTMLBlockIsOneNewlineFromWhatFollows() throws {
         for (file, shown) in [("<div>\nx\n</div>\n\nafter", "<div>\nx\n</div>\nafter"),
                               ("<!-- c -->\n\nText", "<!-- c -->\nText"),
+                              ("<?>\n\nText", "<?>\nText"), ("<pre>x</script>\n\nText", "<pre>x</script>\nText"),
                               ("<div>\nx\n</div>\n\n- a", "<div>\nx\n</div>\na"),
                               ("<div>\nx\n</div>\n\n# H", "<div>\nx\n</div>\nH")] {
             let (tv, storage) = try editor(file)

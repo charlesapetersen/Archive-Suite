@@ -216,6 +216,29 @@ Now:
 Evidence: `verification/evidence/notes/W40.fix-notes-editor-lines.md`. The four limits it left, accepted then as
 having no Markdown form, are fixed by `W49.notes-keep-blank-lines` (entry below; owner call 20, 2026-11-19).
 
+## ✅ FIXED (W49.notes-lines-after-html, 2026-11-19) — Returns after raw HTML are kept
+
+Owner call 20: keep what I type. Returns typed after text ending in raw HTML read from a file were dropped on save:
+- **After an HTML block** (`<div>…</div>`, `<!-- … -->` on its own line), the Returns are kept at the end of the note,
+  before a block or a chip, before text, and in a quote. The block ends at a blank line, which is written first, and
+  each further Return is a line break (`</div>`, a blank line, `\` lines, then `&nbsp;`). (accepted: fixed,
+  W49.notes-lines-after-html).
+- **An HTML block is one newline from what follows it** in the editor, as other blocks are. The blank line that ends it
+  in the file showed as an empty line, so one Return typed after it came back as two. (accepted: fixed,
+  W49.notes-lines-after-html).
+- **After HTML inside a paragraph** (`a <b>x</b>`), Returns are written as after any text. (accepted: fixed,
+  W49.notes-lines-after-html).
+- **Still dropped after an HTML block that a blank line does not end:** an unclosed `<!--`, `<pre>`, `<script>`, `<?`
+  or `<![CDATA[`, or a headerless chip's opener. The block runs to the end of the text, so a Return cannot be written
+  outside it. (accepted: platform fact, CommonMark ends these blocks only at their closing marker).
+- **Also dropped after a `<div>` block that holds such an opener line** (`<div>`, `<!-- x`, `</div>`), which a blank
+  line does end. Apple gives adjacent HTML blocks as one run, without the blank lines between them (measured), so the
+  editor cannot tell that block from a closed one followed by an open comment, and treats any opener line with no end
+  after it as open. Reading the block starts from the file's lines would lift it. (queued:
+  W49.notes-html-block-starts).
+
+Evidence: `verification/evidence/notes/W49.notes-lines-after-html.md`.
+
 ## ✅ FIXED (W49.notes-keep-trailing-lines, 2026-11-19) — Returns at the end of a note and above a chip are kept
 
 Owner call 20: keep what I type. W49.notes-keep-blank-lines left two places where nothing follows the empty lines
@@ -231,9 +254,8 @@ in the file, and they were dropped on save:
   lines are trimmed, unless they belong to a code block or raw HTML. A selected line therefore does not bring an
   empty line into the extract. (accepted: fixed, W49.notes-keep-trailing-lines).
 
-Still dropped: **Returns typed after text that ends in raw HTML** (an HTML block such as `<div>…</div>`), at the end
-or before a block, as before this item. A line break there would be part of the HTML block, and a paragraph break
-shows as two lines, so it needs a form of its own that round-trips. (queued: W49.notes-lines-after-html).
+Returns typed after text that ends in raw HTML were still dropped here; they are kept since
+W49.notes-lines-after-html (entry above). (accepted: fixed, W49.notes-lines-after-html).
 
 Evidence: `verification/evidence/notes/W49.notes-keep-trailing-lines.md`.
 
