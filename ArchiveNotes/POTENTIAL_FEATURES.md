@@ -45,8 +45,5 @@ evidence these are one suite.
   `zotero://select` item/attachment links. _(`00-overview` §17 out-of-scope.)_
 - **Page-within-merged-PDF scroll navigation** — from the source-block quick preview, scroll to a specific page
   inside a merged/multi-doc PDF. _(`00-overview` §17 out-of-scope.)_
-- **Front-matter whitespace-normalization tightening** — tighten `FrontMatterCodec.needsQuoting` so leading/
-  trailing non-U+0020 whitespace (tab / NBSP) in a scalar survives a round-trip instead of being normalized away
-  (marginal — regular edge-spaces already survive). _(KNOWN_ISSUES W8-S1.)_
 - **Unify the page-2 (OCR) PDF header *builder* across apps** — W0 unified the reader/parser side of the 2-page
   PDF header; the *builder* is still per-app. Shared-code dedup. _(`00-overview` §17 out-of-scope.)_

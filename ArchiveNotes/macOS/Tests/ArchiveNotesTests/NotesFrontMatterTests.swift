@@ -143,28 +143,29 @@ struct NotesFrontMatterTests {
         }
     }
 
-    // MARK: - Characterization: edge Unicode-whitespace in scalars
+    // MARK: - Edge Unicode-whitespace in scalars
 
-    /// CHARACTERIZATION (not an endorsement): a scalar with a LEADING/TRAILING tab or non-U+0020
-    /// Unicode-whitespace (e.g. NBSP) is normalized away on read — `decode` trims the value with
-    /// `.whitespaces` (which includes tab + category-Zs), while `encode`'s `needsQuoting` only
-    /// quotes a leading/trailing regular space, so such an edge char is not round-tripped.
-    /// Interior whitespace and edge regular-spaces (which DO get quoted) are unaffected.
-    /// Pinned so a future tightening of `needsQuoting` is an intentional, reviewed change.
-    /// (Flagged to Daemon Report 2026-07-14 — W8-S1.)
+    /// A scalar with a leading/trailing space, tab or other Zs whitespace (NBSP, en space) keeps
+    /// it through encode → decode: `decode` trims unquoted values with `.whitespaces`, so
+    /// `needsQuoting` quotes any such edge character (W49.notes-title-edge-space; was W8-S1's
+    /// pinned trim). Flow-list tags go through the same check.
     @Test
-    func leadingTrailingEdgeWhitespaceInScalarIsNormalized() throws {
+    func edgeWhitespaceInScalarRoundTrips() throws {
         let uuid = "22222222-3333-4444-5555-666666666666"
-        // Leading tab on the title value.
+        for title in ["  Spaced  ", "\tTabbed", "Tabbed\t", "\u{00A0}NBSP", "NBSP\u{00A0}",
+                      "\u{2002}En space\u{2002}", "Inner\ttab\u{00A0}kept"] {
+            let item = Item(id: UUID(uuidString: uuid)!, kind: .note, title: title,
+                            date: nil, datePrecision: nil, dateUncertain: false,
+                            quality: nil, tags: [title], zotero: [], roundup: false,
+                            created: Date(timeIntervalSince1970: 1), modified: Date(timeIntervalSince1970: 1),
+                            schema: 1, blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil)
+            let back = try FrontMatterCodec.decode(FrontMatterCodec.encode(item))
+            #expect(back.title == title)
+            #expect(back.tags == [title])
+        }
+        // A hand-written unquoted value is still read trimmed, as YAML does.
         let tabbed = "---\nid: \(uuid)\nkind: note\ntitle: \tTabbed\n---\n"
         #expect(try FrontMatterCodec.decode(tabbed).title == "Tabbed")
-        // Edge regular-space DOES survive (encode quotes it).
-        let spaced = Item(id: UUID(uuidString: uuid)!, kind: .note, title: "  Spaced  ",
-                          date: nil, datePrecision: nil, dateUncertain: false,
-                          quality: nil, tags: [], zotero: [], roundup: false,
-                          created: Date(timeIntervalSince1970: 1), modified: Date(timeIntervalSince1970: 1),
-                          schema: 1, blocks: [], unknownFrontMatter: [], trailingBodyRaw: nil)
-        #expect(try FrontMatterCodec.decode(FrontMatterCodec.encode(spaced)).title == "  Spaced  ")
     }
 
     // MARK: - Fuzz: never crash, only typed errors

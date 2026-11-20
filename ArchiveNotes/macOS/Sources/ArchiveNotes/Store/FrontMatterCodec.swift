@@ -617,7 +617,10 @@ enum FrontMatterCodec {
         if indicators.contains(first) { return true }
         if first == ":" && s.count > 1 && s[s.index(after: s.startIndex)] == " " { return true }
         if first == "-" && s.count > 1 && s[s.index(after: s.startIndex)] == " " { return true }
-        if s.hasPrefix(" ") || s.hasSuffix(" ") { return true }
+        // `decode` trims an unquoted value with `.whitespaces` (space, tab, and every Zs
+        // character such as NBSP), so any of those at an edge is quoted to survive the round-trip.
+        if let head = s.unicodeScalars.first, let tail = s.unicodeScalars.last,
+           CharacterSet.whitespaces.contains(head) || CharacterSet.whitespaces.contains(tail) { return true }
         if s.contains(": ") || s.contains(" #") || s.contains("\n") { return true }
         return false
     }

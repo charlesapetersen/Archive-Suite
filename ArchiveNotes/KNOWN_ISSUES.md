@@ -1946,13 +1946,11 @@ one real bug plus two benign edge-normalizations:
   `"`, and `\`+`"` combos by the fuzz suite + the well-formed-`Item` loop; no regression across
   `FrontMatterCodecTests`/`ZoteroFrontMatterRoundTripTests`/`NoteStoreTests`/`NotesIndexTests`. Scalar
   values (e.g. `title`) were never affected (`unquoteScalar` only strips *both-end* quotes). (accepted: fixed, W8-S1).
-- **PINNED (characterization, not fixed) — leading/trailing non-U+0020 whitespace in a scalar is trimmed
-  on read.** `decode` trims a scalar value with `.whitespaces` (which includes tab + category-Zs like
-  NBSP), but `encode`'s `needsQuoting` only quotes a *leading/trailing regular space*, so a leading/
-  trailing **tab** or **NBSP** on e.g. a title is normalized away (`"\tTabbed"` → `"Tabbed"`). Edge
-  regular-spaces DO survive (they're quoted); interior whitespace is unaffected. Pinned by
-  `leadingTrailingEdgeWhitespaceInScalarIsNormalized` so a future `needsQuoting` tightening is intentional.
-  Marginal (who titles a note with an edge tab?) → flagged to Daemon Report, not fixed this session. (accepted: marginal, a title with an edge tab or NBSP; pinned by a test so a change is deliberate).
+- **FIXED — W49.notes-title-edge-space (2026-11-20): a tab, NBSP or other Zs whitespace at a scalar's edge
+  survives a round-trip.** `decode` trims an unquoted value with `.whitespaces`; `needsQuoting` now quotes any
+  value whose first or last scalar is in that set (it used to quote only a regular space), so `"\tTabbed"` no
+  longer reads back as `"Tabbed"`. Titles and flow-list tags both; a hand-written unquoted value is still read
+  trimmed, as YAML does. Test: `edgeWhitespaceInScalarRoundTrips` (was the W8-S1 pin). (accepted: fixed, W49.notes-title-edge-space).
 - **NOTED (marginal) — `\r\r\n` in body text leaves a residual `\r\n` after one decode.** `decode`'s
   `replacingOccurrences("\r\n" → "\n")` is a single left-to-right pass, so `CR CR LF` collapses to a
   *residual* `\r\n` that then normalizes on a second decode → a body containing raw CR-soup isn't
