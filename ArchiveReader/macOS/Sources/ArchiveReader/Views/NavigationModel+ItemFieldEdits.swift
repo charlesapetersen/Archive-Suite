@@ -133,6 +133,39 @@ extension NavigationModel {
         }
     }
 
+    /// W49.reader-sidecar-names-refresh: after the watcher saw a `.json` written, the content index reads the sidecar
+    /// names of the files in those folders again where a sidecar changed, so search and the Item fields column follow
+    /// at once rather than at the next pass. One sync at a time; folders announced while it runs are taken after it.
+    func syncSidecarNamesToIndex() {
+        guard !sidecarSyncRunning else { return }
+        let folders = library.takeTouchedSidecarFolders()
+        guard !folders.isEmpty else { return }
+        sidecarSyncRunning = true
+        let files = Self.files(library.files, under: folders)
+        Task { [weak self] in
+            guard let self else { return }
+            let changed = await self.indexer.syncSidecarNames(files)
+            self.sidecarSyncRunning = false
+            if changed {
+                self.refreshFormatStatuses()
+                self.refreshFullTextSearchIfActive()
+            }
+            self.syncSidecarNamesToIndex()   // folders announced meanwhile
+        }
+    }
+
+    /// The files of `files` inside any of `folders`, at any depth.
+    nonisolated static func files(_ files: [ArchiveFile], under folders: Set<String>) -> [ArchiveFile] {
+        files.filter { file in
+            var folder = (file.path as NSString).deletingLastPathComponent
+            while folder.count > 1 {
+                if folders.contains(folder) { return true }
+                folder = (folder as NSString).deletingLastPathComponent
+            }
+            return folders.contains(folder)
+        }
+    }
+
     /// Reads `directory`'s item-field file, applies `change` and writes it with the read's stamp; nil when nothing
     /// changed. A document this build cannot read, or of a newer version, is refused before `change` runs.
     nonisolated static func editItemFields(at directory: URL, _ change: (UserItemFields) -> UserItemFields) throws

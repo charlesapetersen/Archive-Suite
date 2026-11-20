@@ -134,11 +134,6 @@ What it does not do, deliberately or not yet:
   over the new page 2 (queued: W49.proc-item-fields-rerun, owner call 24).
 - **Container fields have their own Inspector section** (W47.ct-reader-view), with the same badge and no check
   button: a container value is confirmed or corrected from its Edit menu (W47.ct-reader-edit). (accepted: by design, W47.ct-reader-edit; a container value is confirmed by being the user's own).
-- **The index reads the JSON sidecar's names when it extracts the file's text, not when the sidecar alone changes**
-  (W49.reader-sidecar-names-index): search and the Item fields column find the sender, recipient and sending place,
-  the user's correction over them, but a sidecar written or rewritten after its PDF was indexed (the Processor writes
-  it after the PDF; a tagging re-run that leaves the PDF alone) is read again only when the PDF changes or the index
-  is rebuilt. The Inspector reads the sidecar each time, so it is current (queued: W49.reader-sidecar-names-refresh).
 - **A group selection counts the checked dates** and checks them all at once; item fields are listed one file at a
   time. (accepted: item fields are per document, so a group has no one value to show).
 - **A check is not tied to the value it checked.** It names the field. Another writer that changes the value

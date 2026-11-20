@@ -211,6 +211,14 @@ final class ContentIndexer: ObservableObject {
                 guard let stored = existing[f.path] else { return true }
                 return stored != Self.stamp(f)
             }
+            // W49.reader-sidecar-names-refresh: a file whose text is current has its sidecar's names read again when
+            // the sidecar changed since; one extracted below reads them with its text, at this stamp.
+            let sidecarStamps = SidecarStamp.stamps(of: files)
+            let textCurrent = files.filter { f in !f.isDataless && existing[f.path].map { $0 == Self.stamp(f) } == true }
+            if let changed = try? await idx.setSidecarNames(Self.sidecarChanges(
+                stored: await idx.storedSidecarStamps(), current: sidecarStamps, among: textCurrent)), changed > 0 {
+                await self?.didCommit(gen)
+            }
             let total = files.count
             let skipped = total - work.count
             await self?.report((skipped, total), gen)
@@ -238,7 +246,8 @@ final class ContentIndexer: ObservableObject {
                 while queued < workers, let f = workIter.next() {
                     group.addTask(priority: .utility) {
                         guard !Task.isCancelled else { return nil }
-                        return Self.extractRow(f, user: userFields[f.path] ?? [:], extractPDF: extractPDF)
+                        return Self.extractRow(f, user: userFields[f.path] ?? [:],
+                                               sidecarStamp: sidecarStamps[f.path] ?? "", extractPDF: extractPDF)
                     }
                     queued += 1
                 }
@@ -270,7 +279,8 @@ final class ContentIndexer: ObservableObject {
                     if let f = workIter.next() {
                         group.addTask(priority: .utility) {
                             guard !Task.isCancelled else { return nil }
-                            return Self.extractRow(f, user: userFields[f.path] ?? [:], extractPDF: extractPDF)
+                            return Self.extractRow(f, user: userFields[f.path] ?? [:],
+                                               sidecarStamp: sidecarStamps[f.path] ?? "", extractPDF: extractPDF)
                         }
                     }
                 }
@@ -295,24 +305,26 @@ final class ContentIndexer: ObservableObject {
     /// PDF open. The outer `isDataless` filter is the ordinary path; this guard closes the race where
     /// a local file becomes a placeholder after discovery but before `PDFDocument(url:)`.
     private nonisolated static func extractRow(
-        _ file: ArchiveFile, user: [CheckableField: String],
+        _ file: ArchiveFile, user: [CheckableField: String], sidecarStamp: String,
         extractPDF: @Sendable (URL) -> ExtractedContent?
     ) -> IndexRow {
         CorpusWalker.withDatalessMaterializationDisabled {
             let path = file.path
             let stamp = Self.stamp(file)
+            // Read whether or not the PDF opens: a damaged PDF's sidecar still names its sender.
+            let names = sidecarStamp.isEmpty ? [:] : IndexedItemFields.names(of: ZoteroSidecar.read(pdf: file.url))
             if let content = extractPDF(file.url) {
                 return IndexRow(path: path, mtime: stamp.mtime, identity: stamp.identity, name: file.name,
                                 classification: content.classification, body: content.fullBody,
                                 pageCount: content.pageCount,
                                 hasText: !content.fullBody.isEmpty, readable: true,
                                 headerFields: IndexedItemFields.values(of: IndexedItemFields.header(of: content)),
-                                userFields: user,
-                                sidecarNames: IndexedItemFields.names(of: ZoteroSidecar.read(pdf: file.url)))
+                                userFields: user, sidecarNames: names, sidecarStamp: sidecarStamp)
             }
             return IndexRow(path: path, mtime: stamp.mtime, identity: stamp.identity, name: file.name,
                             classification: nil, body: "",
-                            pageCount: 0, hasText: false, readable: false, userFields: user)
+                            pageCount: 0, hasText: false, readable: false, userFields: user,
+                            sidecarNames: names, sidecarStamp: sidecarStamp)
         }
     }
 
@@ -356,6 +368,36 @@ final class ContentIndexer: ObservableObject {
             let current = Self.userFields(of: files)
             let changes = Self.userFieldChanges(stored: await idx.storedUserFields(), current: current, among: files)
             return (try? await idx.setUserFields(changes)) ?? 0
+        }.value
+        return changed > 0
+    }
+
+    /// The sidecar names to store for each indexed file among `files` whose sidecar stamp differs from the stored one,
+    /// read again now (W49.reader-sidecar-names-refresh). A file with no row is left to the pass that indexes it.
+    nonisolated static func sidecarChanges(stored: [String: String], current: [String: String],
+                                           among files: [ArchiveFile]) -> [String: SidecarRead] {
+        CorpusWalker.withDatalessMaterializationDisabled {
+            var out: [String: SidecarRead] = [:]
+            for file in files where !file.isDataless {
+                guard let was = stored[file.path] else { continue }
+                let now = current[file.path] ?? ""
+                guard was != now else { continue }
+                let names = now.isEmpty ? [:] : IndexedItemFields.names(of: ZoteroSidecar.read(pdf: file.url))
+                out[file.path] = SidecarRead(stamp: now, names: names)
+            }
+            return out
+        }
+    }
+
+    /// Reads the sidecars of `files` again where they changed since the index read them (the watcher saw a `.json`
+    /// written, W49.reader-sidecar-names-refresh). True when a row changed.
+    func syncSidecarNames(_ files: [ArchiveFile]) async -> Bool {
+        guard !files.isEmpty, await openForQuery() else { return false }
+        let idx = index
+        let changed = await Task.detached(priority: .userInitiated) { () -> Int in
+            let changes = Self.sidecarChanges(stored: await idx.storedSidecarStamps(),
+                                              current: SidecarStamp.stamps(of: files), among: files)
+            return (try? await idx.setSidecarNames(changes)) ?? 0
         }.value
         return changed > 0
     }

@@ -17,8 +17,16 @@ struct IndexRow: Sendable {
     /// Page 2's item fields and the user's corrections beside the file (W49.reader-item-fields-search).
     var headerFields: [CheckableField: String] = [:]
     var userFields: [CheckableField: String] = [:]
-    /// The JSON sidecar's names (W49.reader-sidecar-names-index).
+    /// The JSON sidecar's names (W49.reader-sidecar-names-index), and the sidecar's stamp when they were read
+    /// (`SidecarStamp`, empty for none; W49.reader-sidecar-names-refresh).
     var sidecarNames: [CheckableField: String] = [:]
+    var sidecarStamp = ""
+}
+
+/// A sidecar's names read again, and the `SidecarStamp` they were read at (W49.reader-sidecar-names-refresh).
+struct SidecarRead: Equatable, Sendable {
+    let stamp: String
+    let names: [CheckableField: String]
 }
 
 /// What the index compares to decide a file's text is current (W44.reocr-reader-freshness): the content
@@ -74,14 +82,14 @@ actor ContentIndex {
             // that is dropped with its text and rebuilt by the next pass — no migration, the index is a
             // cache, and dropping inside the same file leaves no orphan behind.
             // W49.reader-item-fields-search: the same for `header_fields`/`user_fields` and the FTS `fields` column;
-            // W49.reader-sidecar-names-index: and for `sidecar_names`.
+            // W49.reader-sidecar-names-index: and for `sidecar_names`; W49.reader-sidecar-names-refresh: `sidecar_stamp`.
             let columns = try columnNames("files")
             if !columns.isEmpty,
-               !columns.contains("inode") || !columns.contains("user_fields") || !columns.contains("sidecar_names") {
+               !columns.contains("inode") || !columns.contains("user_fields") || !columns.contains("sidecar_stamp") {
                 try exec("DROP TABLE IF EXISTS fts;")
                 try exec("DROP TABLE files;")
             }
-            try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL, inode INTEGER, size INTEGER, page_count INTEGER, has_text INTEGER, readable INTEGER, header_fields TEXT, user_fields TEXT, sidecar_names TEXT);")
+            try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL, inode INTEGER, size INTEGER, page_count INTEGER, has_text INTEGER, readable INTEGER, header_fields TEXT, user_fields TEXT, sidecar_names TEXT, sidecar_stamp TEXT);")
             try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(body, classification, name, fields, path UNINDEXED);")
         } catch {
             // `sqlite3_open_v2` is lazy: a corrupt or foreign file opens cleanly and fails on the
@@ -165,12 +173,13 @@ actor ContentIndex {
                 classification: String?, body: String,
                 pageCount: Int = 0, hasText: Bool = true, readable: Bool = true,
                 headerFields: [CheckableField: String] = [:], userFields: [CheckableField: String] = [:],
-                sidecarNames: [CheckableField: String] = [:]) throws {
+                sidecarNames: [CheckableField: String] = [:], sidecarStamp: String = "") throws {
         try exec("BEGIN IMMEDIATE;")
         do {
             try upsertRow(path: path, mtime: mtime, identity: identity, name: name, classification: classification,
                           body: body, pageCount: pageCount, hasText: hasText, readable: readable,
-                          headerFields: headerFields, userFields: userFields, sidecarNames: sidecarNames)
+                          headerFields: headerFields, userFields: userFields, sidecarNames: sidecarNames,
+                          sidecarStamp: sidecarStamp)
             try exec("COMMIT;")
         } catch {
             try? exec("ROLLBACK;")
@@ -190,7 +199,7 @@ actor ContentIndex {
                               classification: row.classification, body: row.body,
                               pageCount: row.pageCount, hasText: row.hasText, readable: row.readable,
                               headerFields: row.headerFields, userFields: row.userFields,
-                              sidecarNames: row.sidecarNames)
+                              sidecarNames: row.sidecarNames, sidecarStamp: row.sidecarStamp)
             }
             try exec("COMMIT;")
         } catch {
@@ -205,7 +214,7 @@ actor ContentIndex {
                            classification: String?,
                            body: String, pageCount: Int, hasText: Bool, readable: Bool,
                            headerFields: [CheckableField: String], userFields: [CheckableField: String],
-                           sidecarNames: [CheckableField: String]) throws {
+                           sidecarNames: [CheckableField: String], sidecarStamp: String) throws {
         let header = IndexedItemFields.encode(headerFields), user = IndexedItemFields.encode(userFields)
         let names = IndexedItemFields.encode(sidecarNames)
         let fields = IndexedItemFields.searchText(userFields, names: sidecarNames)
@@ -217,7 +226,7 @@ actor ContentIndex {
         }
         if let rowid {
             try run("DELETE FROM fts WHERE rowid = ?;") { sqlite3_bind_int64($0, 1, rowid) }
-            try run("UPDATE files SET mtime = ?, inode = ?, size = ?, page_count = ?, has_text = ?, readable = ?, header_fields = ?, user_fields = ?, sidecar_names = ? WHERE rowid = ?;") {
+            try run("UPDATE files SET mtime = ?, inode = ?, size = ?, page_count = ?, has_text = ?, readable = ?, header_fields = ?, user_fields = ?, sidecar_names = ?, sidecar_stamp = ? WHERE rowid = ?;") {
                 sqlite3_bind_double($0, 1, mtime)
                 self.bindIdentity($0, 2, identity)
                 sqlite3_bind_int($0, 4, Int32(pageCount))
@@ -226,11 +235,12 @@ actor ContentIndex {
                 self.bindText($0, 7, header)
                 self.bindText($0, 8, user)
                 self.bindText($0, 9, names)
-                sqlite3_bind_int64($0, 10, rowid)
+                self.bindText($0, 10, sidecarStamp)
+                sqlite3_bind_int64($0, 11, rowid)
             }
             try insertFTS(rowid: rowid, body: body, classification: classification, name: name, fields: fields, path: path)
         } else {
-            try run("INSERT INTO files(path, mtime, inode, size, page_count, has_text, readable, header_fields, user_fields, sidecar_names) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);") {
+            try run("INSERT INTO files(path, mtime, inode, size, page_count, has_text, readable, header_fields, user_fields, sidecar_names, sidecar_stamp) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);") {
                 self.bindText($0, 1, path); sqlite3_bind_double($0, 2, mtime)
                 self.bindIdentity($0, 3, identity)
                 sqlite3_bind_int($0, 5, Int32(pageCount))
@@ -239,6 +249,7 @@ actor ContentIndex {
                 self.bindText($0, 8, header)
                 self.bindText($0, 9, user)
                 self.bindText($0, 10, names)
+                self.bindText($0, 11, sidecarStamp)
             }
             let newRow = sqlite3_last_insert_rowid(db)
             try insertFTS(rowid: newRow, body: body, classification: classification, name: name, fields: fields, path: path)
@@ -503,6 +514,56 @@ actor ContentIndex {
                 }
                 try run("UPDATE fts SET fields = ? WHERE rowid = ?;") {
                     self.bindText($0, 1, IndexedItemFields.searchText(values, names: names))
+                    sqlite3_bind_int64($0, 2, rowid)
+                }
+                changed += 1
+            }
+            try exec("COMMIT;")
+            return changed
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
+    }
+
+    /// Every indexed path's stored sidecar stamp, empty for a row read with no sidecar (W49.reader-sidecar-names-refresh).
+    func storedSidecarStamps() -> [String: String] {
+        guard let stmt = prepare("SELECT path, sidecar_stamp FROM files;") else { return [:] }
+        defer { sqlite3_finalize(stmt) }
+        var out: [String: String] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            guard let p = sqlite3_column_text(stmt, 0) else { continue }
+            out[String(cString: p)] = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
+        }
+        return out
+    }
+
+    /// Stores each path's sidecar names read again and the stamp they were read at, and recomputes its search
+    /// `fields` from them and the stored corrections; the text is left alone. Paths not indexed are skipped. The
+    /// number of rows changed.
+    func setSidecarNames(_ changes: [String: SidecarRead]) throws -> Int {
+        guard !changes.isEmpty else { return 0 }
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            var changed = 0
+            for (path, change) in changes {
+                var rowid: Int64?, user: [CheckableField: String] = [:]
+                if let sel = prepare("SELECT rowid, user_fields FROM files WHERE path = ?;") {
+                    bindText(sel, 1, path)
+                    if sqlite3_step(sel) == SQLITE_ROW {
+                        rowid = sqlite3_column_int64(sel, 0)
+                        user = IndexedItemFields.decode(sqlite3_column_text(sel, 1).map { String(cString: $0) } ?? "")
+                    }
+                    sqlite3_finalize(sel)
+                }
+                guard let rowid else { continue }
+                try run("UPDATE files SET sidecar_names = ?, sidecar_stamp = ? WHERE rowid = ?;") {
+                    self.bindText($0, 1, IndexedItemFields.encode(change.names))
+                    self.bindText($0, 2, change.stamp)
+                    sqlite3_bind_int64($0, 3, rowid)
+                }
+                try run("UPDATE fts SET fields = ? WHERE rowid = ?;") {
+                    self.bindText($0, 1, IndexedItemFields.searchText(user, names: change.names))
                     sqlite3_bind_int64($0, 2, rowid)
                 }
                 changed += 1

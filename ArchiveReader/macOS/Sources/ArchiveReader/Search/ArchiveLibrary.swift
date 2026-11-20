@@ -78,6 +78,11 @@ final class ArchiveLibrary: ObservableObject {
     /// change, written by another app or another copy of the Reader (this one's own writes are marked and skipped),
     /// so the model reads the corrections into the index again rather than at the next pass.
     @Published private(set) var userItemFieldsRevision: UInt64 = 0
+    /// W49.reader-sidecar-names-refresh: bumped when the watcher sees a `.json` written (a Processor sidecar, beside
+    /// its PDF or in `JSON Output`), so the model reads those folders' sidecar names into the index again rather
+    /// than at the next pass. The folders wait in `touchedSidecarFolders` until the model takes them.
+    @Published private(set) var sidecarRevision: UInt64 = 0
+    private var touchedSidecarFolders: Set<String> = []
 
     /// The root being walked, so `rescan()` needs no argument.
     private var root: URL?
@@ -1046,6 +1051,11 @@ final class ArchiveLibrary: ObservableObject {
             refreshJPEGPartnerIndex(scope: root)
         }
         if Self.touchesUserItemFields(request) { userItemFieldsRevision &+= 1 }
+        let sidecarFolders = Self.sidecarFolders(request)
+        if !sidecarFolders.isEmpty {
+            touchedSidecarFolders.formUnion(sidecarFolders)
+            sidecarRevision &+= 1
+        }
         if request.fullRescan {
             pendingWatchRequest = CorpusWatchRequest()
             requestRootRescan(urgent: false)
@@ -1060,6 +1070,26 @@ final class ArchiveLibrary: ObservableObject {
     nonisolated static func touchesUserItemFields(_ request: CorpusWatchRequest) -> Bool {
         let suffix = "/" + ContainerFile.folderName + "/" + UserItemFields.fileName
         return !request.subtrees.isEmpty || request.paths.contains { $0.hasSuffix(suffix) }
+    }
+
+    /// The folders whose files' sidecars `request` may have changed: each named `.json`'s folder (the PDFs' folder
+    /// for one in `JSON Output`), and each subtree. A full rescan needs none: the pass compares every sidecar.
+    nonisolated static func sidecarFolders(_ request: CorpusWatchRequest) -> Set<String> {
+        var out = Set(request.subtrees.map { $0 })
+        for path in request.paths where path.lowercased().hasSuffix(".json") {
+            var folder = (path as NSString).deletingLastPathComponent
+            let name = (folder as NSString).lastPathComponent
+            if name == ContainerFile.folderName { continue }   // the item-field file, read by its own signal
+            if name == ZoteroSidecar.folderName { folder = (folder as NSString).deletingLastPathComponent }
+            out.insert(folder)
+        }
+        return out
+    }
+
+    /// The folders `sidecarRevision` has announced since the last call, emptied.
+    func takeTouchedSidecarFolders() -> Set<String> {
+        defer { touchedSidecarFolders.removeAll() }
+        return touchedSidecarFolders
     }
 
     private func requestTouchesJPEGPartnerTree(_ request: CorpusWatchRequest, root: URL) -> Bool {

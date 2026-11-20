@@ -548,8 +548,12 @@ Search/                       Discovery + disposable caches (never the corpus):
                               2's item fields and the user's corrections (`files.header_fields`/`user_fields`,
                               FTS `fields`, searched with the body: W49.reader-item-fields-search).
   IndexedItemFields.swift     A file's item fields as the index keeps them; the Item fields column's text.
+  SidecarStamp.swift          The JSON sidecar's stamp (where, mtime ns, size, inode) the index keeps beside
+                              its names (`files.sidecar_stamp`, W49.reader-sidecar-names-refresh).
   ContentIndexer.swift        Background (detached) incremental indexing; async search/classification;
                               each pass and each item-field edit (`syncUserFields`) reads the corrections;
+                              each pass, and a watched `.json` write (`syncSidecarNames`), reads a sidecar
+                              again whose stamp changed, without extracting the text again;
                               publishes `Failure` (unavailable/incomplete) → amber status-bar line (W23.m9).
   PDFTextExtractor.swift      PDFKit text + Classification-line extraction (guards corrupt/non-PDF).
   FlagStore.swift             Per-file flag in UserDefaults (outside the corpus); notes are Archive Notes' job.

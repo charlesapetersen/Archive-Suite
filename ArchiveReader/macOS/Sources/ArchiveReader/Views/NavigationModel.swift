@@ -233,6 +233,8 @@ final class NavigationModel: ObservableObject {
     /// `syncItemFieldsToIndex`: a sync is running, and another was asked for while it ran.
     var itemFieldSyncRunning = false
     var itemFieldSyncQueued = false
+    /// `syncSidecarNamesToIndex`: a sync is running (W49.reader-sidecar-names-refresh).
+    var sidecarSyncRunning = false
     var containerGeneration = 0
     /// `LibraryChangeSignature.containers` of the catalog last published (W47.ct-reader-facet-rules).
     private var containerValuesSig = 0
@@ -468,6 +470,11 @@ final class NavigationModel: ObservableObject {
                 self?.itemFieldRevision &+= 1   // the Checks read the user's values again
                 self?.syncItemFieldsToIndex()
             } }
+            .store(in: &cancellables)
+        library.$sidecarRevision
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.syncSidecarNamesToIndex() } }
             .store(in: &cancellables)
         library.$jpegPartnerIndex
             .receive(on: DispatchQueue.main)
