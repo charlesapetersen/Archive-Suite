@@ -279,10 +279,9 @@ struct QualityWriteTests {
     /// Suspect S-006 (`verification/SUSPECTS.md`): the facet path runs on every `mutateItem` save and
     /// strips the retired `ArchiveSuite` stamp unless it is in its narrow `desired` set, which holds
     /// only date/Q-looking subjects. A current subject of that spelling must survive a body save.
-    /// Reproduced 2026-11-20: the tag is gone already after `setTags`, because that save's own facet
-    /// reconciliation runs after the subject projection. The Finder checks stay a known issue until
-    /// W49.notes-s006-fix lands; that fix turns this into a plain pass (a known issue that stops
-    /// occurring fails the test, so the wrapper must come off with the fix).
+    /// Reproduced 2026-11-20: the tag was gone already after `setTags`, because that save's own facet
+    /// reconciliation runs after the subject projection. Fixed by W49.notes-s006-fix: the facet path's
+    /// `desired` keeps a current retired-token subject. Removing the subject still removes the tag.
     @Test("a subject spelled ArchiveSuite keeps its Finder tag across a body save (S-006)")
     func archiveSuiteSubjectSurvivesBodySave() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
@@ -295,10 +294,12 @@ struct QualityWriteTests {
 
         #expect(try await env.store.load(id).tags == ["ArchiveSuite"])
         let afterBody = try await finderTags(env, id)
-        withKnownIssue("S-006: the facet path strips the retired ArchiveSuite stamp (W49.notes-s006-fix)") {
-            #expect(afterTags.contains("ArchiveSuite"))
-            #expect(afterBody.contains("ArchiveSuite"),
-                    "the Finder mirror must still carry the current front-matter subject")
-        }
+        #expect(afterTags.contains("ArchiveSuite"))
+        #expect(afterBody.contains("ArchiveSuite"),
+                "the Finder mirror must still carry the current front-matter subject")
+
+        #expect(await env.model.removeTag("ArchiveSuite", from: id))
+        #expect(!(try await finderTags(env, id)).contains("ArchiveSuite"),
+                "a removed subject's tag goes, and the legacy cleanup keeps it gone")
     }
 }

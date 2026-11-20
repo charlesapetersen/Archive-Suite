@@ -3,13 +3,13 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
-## ⚠️ BUG (W49.notes-s006-reproduce, 2026-11-20) — a subject spelled `ArchiveSuite` never reaches Finder
+## ✅ FIXED (W49.notes-s006-fix, 2026-11-20) — a subject spelled `ArchiveSuite` now reaches Finder
 
-A note whose subject is exactly `ArchiveSuite` keeps it in its front matter, but the `.md` never carries the Finder
-tag: every save's facet reconciliation (`NotesModel.projectFacetTags`) removes the retired `ArchiveSuite` stamp
-because its narrow `desired` set holds only date and Q-looking subjects, and it runs after the subject projection
-in the same save. Only that one spelling is affected, and only the Finder mirror; the note's YAML is right.
-Reproduced by `QualityWriteTests.archiveSuiteSubjectSurvivesBodySave`; suspect S-006 (queued: W49.notes-s006-fix).
+A note whose subject was exactly `ArchiveSuite` never carried the Finder tag: every save's facet reconciliation
+(`NotesModel.projectFacetTags`) removed the retired `ArchiveSuite` stamp, because its narrow `desired` set held only
+date and Q-looking subjects. `NotesTagVocabulary.facetProjectionTokens` now also keeps a current subject that is a
+retired token; it is not adopted into the date-facet ledger. A legacy stamp with no such subject is still removed.
+`QualityWriteTests.archiveSuiteSubjectSurvivesBodySave` passes plainly; suspect S-006 cleared (accepted: fixed history).
 
 ## ✅ CHANGED (W40.notes-remove-authors, 2026-11-11) — notes have no authors
 

@@ -42,8 +42,9 @@ enum NotesTagProjector {
     /// The former membership token is a one-way cleanup exception to the usual "remove only what
     /// this caller previously managed" rule. The owner chose the clean end state: remove every
     /// legacy exact-match stamp on the next projection, while a current front-matter subject of the
-    /// same spelling remains in `desired` and therefore survives.
-    private static let retiredTokens: Set<String> = ["ArchiveSuite"]
+    /// same spelling remains in `desired` and therefore survives. Every caller's `desired` must carry
+    /// such a subject, the facet path's included (`NotesTagVocabulary.facetProjectionTokens`, S-006).
+    static let retiredTokens: Set<String> = ["ArchiveSuite"]
 
     enum ProjectError: Error, Sendable {
         case verificationFailed(String)

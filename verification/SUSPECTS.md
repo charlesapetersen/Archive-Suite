@@ -120,8 +120,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 
   Confirmed if `ArchiveSuite` is gone while `store.load(id).tags` still holds it.
 - **Would clear it:** the tag is still present after the body save.
-- **Status:** `reproduced` — fix filed as `W49.notes-s006-fix`; test
-  `QualityWriteTests.archiveSuiteSubjectSurvivesBodySave` (ArchiveNotesTests)
+- **Status:** `cleared` — fixed by `W49.notes-s006-fix`; test
+  `QualityWriteTests.archiveSuiteSubjectSurvivesBodySave` (ArchiveNotesTests) passes without `withKnownIssue`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner walkthrough (call 27) — reproduce attempt queued as `W49.notes-s006-reproduce`.
@@ -130,6 +130,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     `mutateItem` runs the facet reconciliation after the subject projection in the same save. The front-matter
     subject stays `ArchiveSuite` throughout, so the Finder mirror never carries it. The test's Finder checks are
     wrapped in `withKnownIssue` until `W49.notes-s006-fix` lands; the fix removes the wrapper.
+  - 2026-11-20 W49.notes-s006-fix — cleared: the facet path's `desired` keeps a current `ArchiveSuite` subject. The
+    test now passes plainly, and also checks that removing the subject removes the tag. Notes unit bundle: 1244 passed.
 
 ### S-007 · Notes' source-block preview may download a cloud placeholder
 

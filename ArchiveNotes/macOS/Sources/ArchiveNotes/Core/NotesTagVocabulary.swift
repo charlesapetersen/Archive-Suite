@@ -80,10 +80,13 @@ enum NotesTagVocabulary {
     /// The intentionally narrow projection used by the date/Quality metadata path. Keep a current
     /// subject that looks like a date or Q token in `desired`, so a date change cannot remove it; the
     /// explicit facet tokens are ordered separately by `NotesTagProjector` and therefore still win
-    /// ArchiveCore's last-token-wins parsing.
+    /// ArchiveCore's last-token-wins parsing. A current subject spelled like a retired token
+    /// (`ArchiveSuite`) is kept here too, or the projector's one-way legacy cleanup would strip it on
+    /// every save (S-006); it is a subject, so the caller never adopts it into the date-facet ledger.
     static func facetProjectionTokens(for item: Item) -> Set<String> {
         var tokens = Set(item.tags.map { titleCased($0) }.filter {
             qualityTokens.contains($0) || DocumentTags.isDateFacetLike($0)
+                || NotesTagProjector.retiredTokens.contains($0)
         })
         tokens.formUnion(dateFacetTokens(for: item))
         if let quality = qualityToken(for: item.quality) {
