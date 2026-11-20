@@ -133,7 +133,7 @@ safety, verdict) is in audit run `wf_4373722d-e70`.
   shared text-completion client; `TagGenerator` + `CollectionSegmenter` both delegate to it, each keeping its own
   maxTokens so request bodies stay byte-identical (the Mistral-signature drift was reconciled, not blind-merged).
   This shipped BEFORE the 2026-07-15 promotion re-listed it in error; SUITE_TODO reconciled `[x]` 2026-07-16.
-- **Shared finalize/organize helpers.** startProcessing / resumeRun / resumeBatch each duplicate the
+- **Shared finalize/organize helpers** (queued: W49.proc-finalize-helpers behind nice-to-have, 2026-11-20). startProcessing / resumeRun / resumeBatch each duplicate the
   "organize into collection folders" + run-completion blocks verbatim. Extract `organizeCollectionFolders` +
   `finalizeRun`. Touches the Tier-2 file-move path → adversarial-review before shipping.
 - **Unify the box/folder color-retag logic** across applyReviewEdits / updateClassification /

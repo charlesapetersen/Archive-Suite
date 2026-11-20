@@ -1,0 +1,510 @@
+{
+ "opening": "These are the last backlog entries no walkthrough has shown you: 30 suspected bugs and 38 wishlist and deferred-run entries from Archive Suite and Vision OCR. Each wishlist entry was checked against the code today, so the sheet says what is already built.",
+ "intro": "The entries are every open entry of the registered backlog files (Agent Manager backlogs.json) not yet marked seen on 2026-11-20. Suspected bugs are from verification/SUSPECTS.md, grouped by app and by what would go wrong. Wishlist entries were checked against the code by a read-only pass the same day. Entries an earlier call of yours settles are in the last section, answered by that call unless you reopen one.",
+ "excluded": [
+  "The Agent Manager's 27 entries: engineering housekeeping, settled by the session on 2026-11-20 (12 closed as built or fixed, 14 accepted, 1 queued) under your rule of 2026-11-19.",
+  "Two code-tidying entries, settled by the session as housekeeping: shared finalize and organize helpers in the Processor (the block is still copied four times on a file-moving path, so it is queued behind nice-to-have with a review), and the retag call sites (closed above).",
+  "Entries walked with you earlier today or in earlier walkthroughs."
+ ],
+ "sections": [
+  {
+   "key": "bugs",
+   "title": "Suspected bugs, in six batches",
+   "lead": "One answer covers a batch. If you want one suspect handled differently, say so in that batch's notes."
+  },
+  {
+   "key": "close",
+   "title": "Recommended to close",
+   "lead": "Entries already built, no longer true, or covered by an open item."
+  },
+  {
+   "key": "decide",
+   "title": "Wishlist and deferred runs",
+   "lead": "Each needs a call: queue, park behind nice-to-have, keep as a wish, or drop."
+  },
+  {
+   "key": "release",
+   "title": "Releasing the apps",
+   "lead": "Two decisions about how the apps reach other users. Neither spends anything without coming back to you."
+  },
+  {
+   "key": "settled",
+   "title": "Already settled by an earlier call of yours",
+   "lead": "Shown so nothing is hidden. Each stays as your call says unless you reopen it."
+  }
+ ],
+ "items": [
+  {
+   "id": "bugs-processor-filing",
+   "section": "bugs",
+   "app": "Processor",
+   "seconds": 60,
+   "rec": "queue",
+   "choices": {
+    "queue": "Queue it: one reproduce attempt per suspect, a fix item filed for each that is real",
+    "nice": "Behind nice-to-have",
+    "open": "Leave them open on the suspects list, unqueued"
+   },
+   "where": "verification/SUSPECTS.md; found by code reading in October (W40.b2, W40.b3, W40.e5, W40.e6, W40.i2, W40.d1)",
+   "now": "None has been reproduced. They were found by reading the code a month or more ago, so some may already be fixed by later work; the reproduce attempt says so and clears those with the evidence.",
+   "title": "Processor: nine suspected bugs that could file or tag documents wrongly, with no warning",
+   "what": "Each of these, if real, writes something wrong into a user's filed PDFs or tags, or leaves work out, and says nothing. These paths have no undo.",
+   "list": [
+    "S-028 · A chosen folder is read one level deep: photos in sub-folders of a box are silently left out.",
+    "S-034 · With collection segmentation on, \"No tagging\" and \"Copy source tags\" still write Box and Folder tags, replacing the copied tags.",
+    "S-036 · A collection name edited in the review sheet is used exactly as typed: a \"/\" stops filing part-way, \"..\" files outside the output folder.",
+    "S-035 · Resuming a batch files documents without the per-page review and the box/folder confirmation.",
+    "S-042 · When the tagging call fails, the document is filed with no subjects or date, and the run still reports it tagged.",
+    "S-033 · A model reply with no year and no \"uncertain\" flag gives a document no date tags at all, not even Date Uncertain.",
+    "S-031 · Under a window segmentation approach, a letter's enclosure may not get the letter's date.",
+    "S-017 · On already-OCRed input, the \"review document segmentation\" step is skipped even when it is turned on.",
+    "S-040 · A year typed on the phone is combined with the day and month the OCR read from a different date."
+   ],
+   "rec_why": "These touch irreversible paths in what users file, which is where a bug costs most, and each check is a small scratch-folder test."
+  },
+  {
+   "id": "bugs-processor-money",
+   "section": "bugs",
+   "app": "Processor",
+   "seconds": 45,
+   "rec": "queue",
+   "choices": {
+    "queue": "Queue it: one reproduce attempt per suspect, a fix item filed for each that is real",
+    "nice": "Behind nice-to-have",
+    "open": "Leave them open on the suspects list, unqueued"
+   },
+   "where": "verification/SUSPECTS.md; found by code reading in October (W40.b2, W40.b3, W40.e5, W40.e6, W40.i2, W40.d1)",
+   "now": "None has been reproduced. They were found by reading the code a month or more ago, so some may already be fixed by later work; the reproduce attempt says so and clears those with the evidence.",
+   "title": "Processor: five suspected bugs that make users pay more than they expect",
+   "what": "Each of these, if real, spends a user's API money twice, for nothing, or beyond the estimate shown.",
+   "list": [
+    "S-039 · \"Stage for later\" can hand the same photos to Process Files twice, so they are read and paid for twice.",
+    "S-032 · A segmentation approach with no key can be started; the run reads every page, then fails after the reading is paid for.",
+    "S-041 · The cost estimate leaves out the dating and item-field calls, about half the calls in a measured run.",
+    "S-026 · Batch reading sends large scans at full size, so batch runs cost more than the estimate.",
+    "S-027 · Batch mode is offered for providers that have no batch; the run goes standard but the panes show the batch price, and turning it on still switches off other features."
+   ],
+   "rec_why": "Wrong spending is the kind of bug a user notices on their bill, and each is checkable on scratch with the $0 stand-in."
+  },
+  {
+   "id": "bugs-processor-messages",
+   "section": "bugs",
+   "app": "Processor",
+   "seconds": 40,
+   "rec": "queue",
+   "choices": {
+    "queue": "Queue it: one reproduce attempt per suspect, a fix item filed for each that is real",
+    "nice": "Behind nice-to-have",
+    "open": "Leave them open on the suspects list, unqueued"
+   },
+   "where": "verification/SUSPECTS.md; found by code reading in October (W40.b2, W40.b3, W40.e5, W40.e6, W40.i2, W40.d1)",
+   "now": "None has been reproduced. They were found by reading the code a month or more ago, so some may already be fixed by later work; the reproduce attempt says so and clears those with the evidence.",
+   "title": "Processor: five suspected bugs where the app says something untrue",
+   "what": "Each of these, if real, tells the user something false about a setting, a result or a failure.",
+   "list": [
+    "S-024 · The key wizard shows a key as validated when the Keychain refused to save it; the run then fails for want of a key.",
+    "S-025 · The gateway's \"Fill in OpenAI preset\" picks a model the gateway request cannot drive, so every page would fail.",
+    "S-018 · The app says it paces to the subscription window and retries, but the reading step does not pace.",
+    "S-029 · When rotation by the model fails, the app silently uses the weaker built-in detector, so sideways pages can be filed.",
+    "S-030 · The run log can give one failed file another file's reason when two share a name."
+   ],
+   "rec_why": "Each is small, and a false message sends the user looking in the wrong place."
+  },
+  {
+   "id": "bugs-relay",
+   "section": "bugs",
+   "app": "Phone companions",
+   "seconds": 30,
+   "rec": "queue",
+   "choices": {
+    "queue": "Queue it: one reproduce attempt per suspect, a fix item filed for each that is real",
+    "nice": "Behind nice-to-have",
+    "open": "Leave them open on the suspects list, unqueued"
+   },
+   "where": "verification/SUSPECTS.md; found by code reading in October (W40.b2, W40.b3, W40.e5, W40.e6, W40.i2, W40.d1)",
+   "now": "None has been reproduced. They were found by reading the code a month or more ago, so some may already be fixed by later work; the reproduce attempt says so and clears those with the evidence.",
+   "title": "Phone over the Drive relay: two suspected bugs",
+   "what": "The Drive relay carries photos from the phone to the Mac through Google Drive when they are not on the same network.",
+   "list": [
+    "S-021 · Android reports a segment as sent when the Drive write failed, so the Mac shows no tag card for it until Finish.",
+    "S-038 · Over the relay, Finish cannot wait for the phone to finish sending, so it can close a run while photos are still on the phone."
+   ],
+   "rec_why": "Both lose or delay a user's captures on a path users rely on away from home. The relay's on-device check on a real iPhone is still open (a later item on this sheet)."
+  },
+  {
+   "id": "bugs-notes-text",
+   "section": "bugs",
+   "app": "Notes",
+   "seconds": 35,
+   "rec": "queue",
+   "choices": {
+    "queue": "Queue it: one reproduce attempt per suspect, a fix item filed for each that is real",
+    "nice": "Behind nice-to-have",
+    "open": "Leave them open on the suspects list, unqueued"
+   },
+   "where": "verification/SUSPECTS.md; found by code reading in October (W40.b2, W40.b3, W40.e5, W40.e6, W40.i2, W40.d1)",
+   "now": "None has been reproduced. They were found by reading the code a month or more ago, so some may already be fixed by later work; the reproduce attempt says so and clears those with the evidence.",
+   "title": "Notes: three suspected bugs that could lose or corrupt text",
+   "what": "Each of these, if real, loses typed text or breaks a passage's link to its source.",
+   "list": [
+    "S-019 · Typing \"-->\" after a broken block header can make the lines before it vanish on the next save.",
+    "S-020 · An extract built from a broken block can separate its text from the passage it quotes, losing the provenance.",
+    "S-009 · Pasting or dropping an image in the raw view writes an unused image file and a stray invisible character into the note."
+   ],
+   "rec_why": "Losing typed text is the worst thing a notes app can do."
+  },
+  {
+   "id": "bugs-notes-small",
+   "section": "bugs",
+   "app": "Notes",
+   "seconds": 40,
+   "rec": "queue",
+   "choices": {
+    "queue": "Queue it: one reproduce attempt per suspect, a fix item filed for each that is real",
+    "nice": "Behind nice-to-have",
+    "open": "Leave them open on the suspects list, unqueued"
+   },
+   "where": "verification/SUSPECTS.md; found by code reading in October (W40.b2, W40.b3, W40.e5, W40.e6, W40.i2, W40.d1)",
+   "now": "None has been reproduced. They were found by reading the code a month or more ago, so some may already be fixed by later work; the reproduce attempt says so and clears those with the evidence.",
+   "title": "Notes: six smaller suspected bugs",
+   "what": "Each of these, if real, is an annoyance or a misleading result rather than lost work.",
+   "list": [
+    "S-012 · The tag filter finds nothing unless the tag is typed with the capitals it was stored with (\"intel\" misses \"Intel\").",
+    "S-016 · Clicking a column header in the notes list moves the sort arrow but may not re-sort the list.",
+    "S-010 · Removing several notes from a folder at once asks about only the last one; the others quietly stay.",
+    "S-011 · \"New from Template\" from a row's menu can miss the template's last second of edits.",
+    "S-014 · If the archive folder is moved or its drive ejected while Notes runs, links report \"Source file not found\" instead of asking to find it.",
+    "S-008 · A window resized just before quitting may reopen at its old size."
+   ],
+   "rec_why": "Each is cheap to check, and the tag filter and sorting ones would make the app look broken to a new user."
+  },
+  {
+   "id": "close-built",
+   "section": "close",
+   "app": "Processor and Notes",
+   "seconds": 45,
+   "rec": "close",
+   "choices": {
+    "close": "Close all of them as built or no longer true",
+    "keep": "Keep them on the lists (say which in the notes)"
+   },
+   "title": "Eight wishlist entries that are already built or no longer true",
+   "what": "A check of the code today found each of these done, or its premise gone.",
+   "list": [
+    "Handwriting recognition mode (Processor): built. Handwritten pages go to the handwriting reader, and \"Read handwriting on typed pages\" is on by default since call 24.",
+    "Newspaper and periodical layouts (Processor): built. Newspaper pages are read region by region with the layout detector.",
+    "Collection-level metadata (Processor): built as the containers work (repository, collection, series, box, folder), approved by you on 21 Oct.",
+    "First-run wizard, forced or dismissible (Processor): settled in the shipped app. It is dismissible, with \"Skip: free, on this Mac\", and reopens from Settings.",
+    "Provider caveats in the app's text (Processor): built. The EU/UK/Switzerland paid-tier warning and the free-tier training notes are in the key wizard and Settings.",
+    "Smaller code de-duplications (Processor): the remainder shipped on 26 Sep.",
+    "Box and folder colour retagging, three drifted copies (Processor): the drift is fixed; all three use one shared rule. Three short call sites remain, which is harmless.",
+    "One page-2 header builder across the apps (Notes): no longer true. Only the Processor builds that header; the Reader and Notes only read it through the shared package."
+   ],
+   "rec_why": "Leaving built work on a wishlist makes the lists unreadable, which is what W49.potential-features-tidy was filed to fix.",
+   "where": "ArchiveProcessor/POTENTIAL_FEATURES.md; ArchiveNotes/POTENTIAL_FEATURES.md; checked against the code on 2026-11-20"
+  },
+  {
+   "id": "close-covered",
+   "section": "close",
+   "app": "Processor",
+   "seconds": 35,
+   "rec": "close",
+   "choices": {
+    "close": "Close them as covered by those items",
+    "keep": "Keep them on the list as well (say which in the notes)"
+   },
+   "title": "Five wishlist entries already covered by open items",
+   "what": "Each of these is the subject of an item already in the queue, so the wishlist line duplicates it.",
+   "list": [
+    "Tag editing in the Processor's file pane: the Reader already edits tags for one file or a group; the Processor's Tags window is W40.tag-window-processor.",
+    "Bulk tag operations: built in the Reader for a group of files; renaming or merging a tag everywhere is W40.tag-rename-suite and W40.tag-window-core.",
+    "Tag frequency analysis: the Reader shows a count per tag and a library-health summary; every tag in use is W40.tag-window-core. Date charts and subject clusters are not covered.",
+    "Drive-relay test on a real iPhone: part of W40.i4, your real-iPhone pass (its Wi-Fi and Drive half was not run on 31 Oct).",
+    "Camera capture and pairing on a physical device: also W40.i4. The camera worked over the cable on 31 Oct; box and folder capture and the wireless routes were not run."
+   ],
+   "rec_why": "One record per piece of work. If you want date charts and subject clusters, say so in the notes and they get their own entry.",
+   "where": "ArchiveProcessor/POTENTIAL_FEATURES.md"
+  },
+  {
+   "id": "drop-july",
+   "section": "decide",
+   "app": "Processor",
+   "seconds": 50,
+   "rec": "drop",
+   "choices": {
+    "drop": "Drop all five",
+    "keep": "Keep them as wishes (say which in the notes)"
+   },
+   "title": "Five early ideas from July, recommended to drop",
+   "what": "These were written before the app took its present shape. None has been asked for since.",
+   "list": [
+    "Spreading a large job across several API keys for speed: providers treat this as getting round their rate limits, and it can breach their terms.",
+    "Streaming batch results instead of holding them in memory: no memory problem has been measured; the PDF writer's memory is its own item (W49.proc-pdfa-memory).",
+    "A plugin system for custom classification and tagging: a large build for developers, not for the archive users the app is for.",
+    "A headless REST server mode: the same; the only server today is Live Capture's pairing link.",
+    "Accuracy metrics against the user's own ground truth: users will not have truth files; the bench measures this for the app, and Tools ▸ Compare Models shows readers side by side."
+   ],
+   "rec_why": "Each is a large build that serves developers or a problem nobody has seen.",
+   "where": "ArchiveProcessor/POTENTIAL_FEATURES.md"
+  },
+  {
+   "id": "lang-detect",
+   "section": "decide",
+   "app": "Processor",
+   "seconds": 30,
+   "rec": "queue",
+   "title": "Language detection on the built-in Apple Vision route",
+   "what": "The Processor's Apple Vision reader uses a language list the user picks and does not detect the language. The Vision engine it already includes (VisionOCRKit) detects the language itself when the list is left empty, but the Processor's own Vision client does not use that. The cloud and local model readers handle languages without a setting.",
+   "now": "Small [S]: let the Vision route detect the language when the user has not chosen one, and measure it on the bench's non-English pages.",
+   "rec_why": "A user with French or German papers on the free on-device route gets worse reading today for want of a setting they may never find.",
+   "where": "ArchiveProcessor/POTENTIAL_FEATURES.md \"Language detection\"; OCR/VisionClient.swift; packages/VisionOCRKit Recogniser.swift",
+   "choices": {
+    "queue": "Queue it",
+    "nice": "Behind nice-to-have",
+    "keep": "Keep as a wish",
+    "drop": "Drop it"
+   }
+  },
+  {
+   "id": "table-export",
+   "section": "decide",
+   "app": "Processor",
+   "seconds": 30,
+   "rec": "nice",
+   "title": "Export tables as structured data (CSV)",
+   "what": "Pages of kind \"Form or table\" are detected and read by the forms reader, but the result is text, not a table. This would export a table's rows and columns as CSV for a spreadsheet.",
+   "now": "Cell-level reading is still bench work (W46.ocr-cells-l4-more, behind nice-to-have, which waits on cell truth you said you could not rule).",
+   "rec_why": "It depends on cell reading that is not yet measured well enough to trust.",
+   "where": "ArchiveProcessor/POTENTIAL_FEATURES.md \"Table extraction\"",
+   "choices": {
+    "queue": "Queue it",
+    "nice": "Behind nice-to-have",
+    "keep": "Keep as a wish",
+    "drop": "Drop it"
+   }
+  },
+  {
+   "id": "nearby-subjects",
+   "section": "decide",
+   "app": "Processor",
+   "seconds": 30,
+   "rec": "keep",
+   "title": "Subject tags informed by nearby documents",
+   "what": "The tagger already sees up to three neighbouring documents, but uses them only to estimate dates. This would let neighbours inform the subject tags too, for example a letter whose subject is clear only from the reply next to it.",
+   "now": "Nothing measures whether it would help; it would need a bench comparison before any build.",
+   "rec_why": "It could as easily spread one document's subjects onto its neighbours, and nothing suggests the current tags are short of context.",
+   "where": "ArchiveProcessor/POTENTIAL_FEATURES.md \"Tag suggestions from nearby documents\"; Tagging/TagGenerator.swift",
+   "choices": {
+    "queue": "Queue it",
+    "nice": "Behind nice-to-have",
+    "keep": "Keep as a wish",
+    "drop": "Drop it"
+   }
+  },
+  {
+   "id": "shortcuts",
+   "section": "decide",
+   "app": "Processor",
+   "seconds": 25,
+   "rec": "keep",
+   "title": "Apple Shortcuts actions",
+   "what": "Expose actions such as \"process this folder\" to the Shortcuts app, so users can automate them. Nothing like it exists in any of the three apps.",
+   "rec_why": "A modest build that only a few users would use; worth doing once the apps are public and someone asks.",
+   "where": "ArchiveProcessor/POTENTIAL_FEATURES.md \"Apple Shortcuts integration\"",
+   "choices": {
+    "queue": "Queue it",
+    "nice": "Behind nice-to-have",
+    "keep": "Keep as a wish",
+    "drop": "Drop it"
+   }
+  },
+  {
+   "id": "tropy",
+   "section": "decide",
+   "app": "Reader",
+   "seconds": 25,
+   "rec": "keep",
+   "title": "Tropy integration in the Reader",
+   "what": "Tropy is a free desktop tool historians use to organise research photos. The Zotero half of this entry has shipped (Export to Zotero and Add to Zotero); nothing exists for Tropy.",
+   "rec_why": "Zotero covers the common case; Tropy users are a smaller group and nobody has asked.",
+   "where": "ArchiveReader/POTENTIAL_FEATURES.md \"Zotero / Tropy integration\"",
+   "choices": {
+    "queue": "Queue it",
+    "nice": "Behind nice-to-have",
+    "keep": "Keep as a wish",
+    "drop": "Drop it"
+   }
+  },
+  {
+   "id": "zotero-page-links",
+   "section": "decide",
+   "app": "Notes",
+   "seconds": 25,
+   "rec": "nice",
+   "title": "Zotero links that open a PDF at a page",
+   "what": "Notes links to Zotero items with zotero://select, which shows the item. Zotero also supports zotero://open-pdf, which opens the attachment at a given page, so a citation could jump straight to the page quoted.",
+   "rec_why": "A small, useful step for Zotero users, but nothing depends on it.",
+   "where": "ArchiveNotes/POTENTIAL_FEATURES.md",
+   "choices": {
+    "queue": "Queue it",
+    "nice": "Behind nice-to-have",
+    "keep": "Keep as a wish",
+    "drop": "Drop it"
+   }
+  },
+  {
+   "id": "block-guids",
+   "section": "decide",
+   "app": "Notes",
+   "seconds": 30,
+   "rec": "keep",
+   "title": "Stable block identities and \"extracts made from this note\"",
+   "what": "Extracts point at a passage by its position in the source note. Giving each block a permanent identity would let Notes show, on a note, how many extracts were made from it, and keep an extract's link firm if the source is rearranged.",
+   "rec_why": "Extracts are snapshots by design (you declined refreshing them today), so a firmer link matters less.",
+   "where": "ArchiveNotes/POTENTIAL_FEATURES.md",
+   "choices": {
+    "queue": "Queue it",
+    "nice": "Behind nice-to-have",
+    "keep": "Keep as a wish",
+    "drop": "Drop it"
+   }
+  },
+  {
+   "id": "merged-pdf-scroll",
+   "section": "decide",
+   "app": "Notes",
+   "seconds": 25,
+   "rec": "keep",
+   "title": "Scrolling within a merged PDF from a source preview",
+   "what": "Clicking a source block shows the cited page alone. In a PDF that merges several documents, this would let the preview scroll to neighbouring pages.",
+   "rec_why": "Opening the source in the Reader already gives the whole PDF.",
+   "where": "ArchiveNotes/POTENTIAL_FEATURES.md",
+   "choices": {
+    "queue": "Queue it",
+    "nice": "Behind nice-to-have",
+    "keep": "Keep as a wish",
+    "drop": "Drop it"
+   }
+  },
+  {
+   "id": "bench-public",
+   "section": "decide",
+   "app": "Bench page",
+   "seconds": 30,
+   "rec": "keep",
+   "choices": {
+    "queue": "Publish it publicly now",
+    "keep": "Keep it private for now",
+    "drop": "Never publish it"
+   },
+   "title": "Publish the bench results page publicly",
+   "what": "The page of measured OCR, segmentation and handwriting results is published today as a private artifact. This would put it on GitHub Pages with a public link, next to the public repository.",
+   "now": "The page shows scores on your own 96 pages, though not the pages themselves.",
+   "rec_why": "It is most useful beside a public release of the apps, which has not happened yet; nothing is lost by waiting.",
+   "where": "ArchiveOCRBench/POTENTIAL_FEATURES.md \"Share it publicly\""
+  },
+  {
+   "id": "vocr-visible-text",
+   "section": "decide",
+   "app": "Vision OCR",
+   "seconds": 20,
+   "rec": "drop",
+   "choices": {
+    "drop": "Drop it",
+    "keep": "Keep as a wish"
+   },
+   "title": "A visible-text mode for debugging the searchable text layer",
+   "what": "Make the invisible text layer of a searchable PDF visible, to check where words sit. The file itself argues against it: two probe tools already measure that numerically, and a visible-text setting is one users would find and turn on by accident.",
+   "rec_why": "As the file says. Vision OCR is merging into the Processor, so the answer carries over.",
+   "where": "vision-ocr FEATURES.md"
+  },
+  {
+   "id": "mac-distribution",
+   "section": "release",
+   "app": "All three apps",
+   "seconds": 60,
+   "rec": "devid",
+   "choices": {
+    "devid": "A notarized Developer ID download, enrolling in Apple's programme when the first public release is near",
+    "store": "The Mac App Store",
+    "later": "Decide when a public release is near"
+   },
+   "title": "How the Mac apps reach other users",
+   "what": "Today the apps are signed with a self-made certificate and not notarized, so a new user has to go to Privacy & Security and press Open Anyway, and no public release is posted. The two routes to a normal install both need Apple's Developer Program ($99 a year): a notarized download from GitHub Releases, or the Mac App Store.",
+   "now": "No decision of yours is recorded; the wishlist marks it undecided. Enrolling is real money over the $7 rule, so it comes back to you before anything is paid.",
+   "rec_why": "The App Store's sandbox would forbid things the Processor does today, such as running the Claude and ChatGPT command-line tools for the plan routes, so a notarized download keeps the app as it is.",
+   "where": "ArchiveProcessor/POTENTIAL_FEATURES.md \"[D1] macOS distribution channel (UNDECIDED)\""
+  },
+  {
+   "id": "phone-stores",
+   "section": "release",
+   "app": "Phone companions",
+   "seconds": 50,
+   "rec": "defer",
+   "choices": {
+    "defer": "Keep store publishing deferred until the Mac release route is settled",
+    "plan": "Plan it now as part of the first public release",
+    "drop": "Drop store publishing"
+   },
+   "title": "Publishing the phone companions to the App Store and Google Play",
+   "what": "Five entries describe the steps: the Apple programme ($99 a year) and a Google Play account ($25 once); store screenshots; Google's rule that a new account runs a closed test with 12 testers for 14 days first; and Apple's rule against apps that do nothing alone, so the listing must say the companion needs the Mac app (its connect screen already says so). Without the stores, users can install the Android app from a file but not the iPhone app.",
+   "list": [
+    "Apple: enrol, App ID and certificates, test on a real iPhone, upload, privacy form, review.",
+    "Google: Play Console account, sign the app bundle, data-safety form, submit.",
+    "Store screenshots and a short recording of each companion (only you can make these on a device).",
+    "Play's closed test: 12 testers for 14 days before production.",
+    "Apple's \"minimal functionality\" risk: the listing and first run must state the Mac dependency."
+   ],
+   "rec_why": "The steps follow from the Mac release decision and the real-iPhone pass (W40.i4), neither of which is done.",
+   "where": "ArchiveProcessor/POTENTIAL_FEATURES.md Phase 4 store publishing"
+  },
+  {
+   "id": "paid-azure-public",
+   "section": "decide",
+   "app": "Bench (paid run)",
+   "seconds": 25,
+   "rec": "drop",
+   "choices": {
+    "drop": "Drop it",
+    "keep": "Leave it for the final price pass"
+   },
+   "title": "Azure and Textract on the 895 public pages",
+   "what": "The two vendors were scored on your 96 pages this morning (Azure 90.90, Textract 88.45, against Mistral OCR 4.1's 93.01). This run would add their public-set scores, about $3.60 for Textract.",
+   "now": "In call 25 you declined writing readers for them, so the app will not offer them.",
+   "rec_why": "A public score for readers the app will not offer changes nothing a user gets.",
+   "where": "execution-plans/paid-runs-deferred.md"
+  },
+  {
+   "id": "paid-qwen27b",
+   "section": "settled",
+   "app": "Bench (paid run)",
+   "seconds": 15,
+   "rec": "leave",
+   "choices": {
+    "leave": "Leave it for the final price pass, as your hold says",
+    "run": "Run it now (about $0.17)"
+   },
+   "title": "Qwen3.5 27B on your 96 pages again, about $0.17",
+   "what": "Its earlier run lost 14 of the 96 pages to transport errors. A full run would give it a reading row; it would be the best open-weights hosted pick.",
+   "now": "Settled by your 17 Oct hold on paid benchmarking: paid runs wait for the final price pass (W43.sweep), which asks you before spending.",
+   "rec_why": "Your hold covers it.",
+   "where": "execution-plans/paid-runs-deferred.md"
+  },
+  {
+   "id": "paid-hydrogen",
+   "section": "settled",
+   "app": "Bench (paid run)",
+   "seconds": 15,
+   "rec": "leave",
+   "choices": {
+    "leave": "Leave it for the final price pass, as your hold says",
+    "run": "Run it now (about $10.20, over the $7 rule)"
+   },
+   "title": "Gemini 4 Hydrogen on the 895 public pages, about $10.20",
+   "what": "The public half of the Hydrogen run. On your 96 it tied with Gemini 3.8 Flash, so nothing waits on it.",
+   "now": "Settled by your 17 Oct hold, and over the $7 rule in any case.",
+   "rec_why": "Your hold covers it, and the 96 already found a tie.",
+   "where": "execution-plans/paid-runs-deferred.md"
+  }
+ ]
+}
