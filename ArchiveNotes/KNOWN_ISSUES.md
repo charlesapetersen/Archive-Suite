@@ -213,14 +213,37 @@ Now:
   there. (accepted: fixed, W40.fix-notes-editor-lines; how the editor behaves now).
 - Lists draw •/◦/▪ and numbers. (accepted: fixed, W40.fix-notes-editor-lines; how the editor behaves now).
 
-Evidence: `verification/evidence/notes/W40.fix-notes-editor-lines.md`. These limits remain. They were accepted as having no Markdown form; the owner ruled
-2026-11-19 (call 20) that the editor keeps what is typed:
-- **Blank lines typed at the end of text, right before a heading, list, quote or code block, are not kept.**
-  The boundary is written as one blank line. (queued: W49.notes-keep-blank-lines).
-- **An empty line between two list items is not kept.** (queued: W49.notes-keep-blank-lines).
-- **A list toggled on an empty last line is lost if the caret moves away before anything is typed.** The line
-  holds no character to carry the kind. (queued: W49.notes-keep-blank-lines).
-- **A file with several blank lines between a heading and its text shows one newline there.** (queued: W49.notes-keep-blank-lines).
+Evidence: `verification/evidence/notes/W40.fix-notes-editor-lines.md`. The four limits it left, accepted then as
+having no Markdown form, are fixed by `W49.notes-keep-blank-lines` (entry below; owner call 20, 2026-11-19).
+
+## ✅ FIXED (W49.notes-keep-blank-lines, 2026-11-19) — the editor keeps the blank lines and empty items typed
+
+Owner call 20: keep what I type. Markdown has no empty paragraph or empty list item, so the file now holds them as
+`&nbsp;` lines, which the editor reads back as empty lines (the raw view ⌘/ shows them; Notes README):
+- **Blank lines typed at the end of text, right before a heading, list, quote or code block, are kept.** Written as
+  hard breaks ending in an `&nbsp;` line (`A\` `&nbsp;` then the block). An empty line alone between two blocks is an
+  `&nbsp;` paragraph. (accepted: fixed, W49.notes-keep-blank-lines).
+- **An empty line between two list items is an empty item, kept** as `- &nbsp;` (`2. &nbsp;` in a numbered list).
+  (accepted: fixed, W49.notes-keep-blank-lines).
+- **A list toggled on an empty last line stays when the caret moves away**, and is saved as `- &nbsp;`; so does the
+  empty item Return makes at the end of a list. The kind is kept on the newline before the line. (accepted: fixed,
+  W49.notes-keep-blank-lines).
+- **A file with several blank lines between two blocks shows each one past the first as an empty line**, and is saved
+  as the editor writes typed ones. Not inside a list, between two quotes or beside raw HTML, where the blank lines are
+  the block's own. (accepted: fixed, W49.notes-keep-blank-lines).
+- **A typed `&nbsp;`, `&amp;` or other entity reference is written escaped (`\&nbsp;`)** and reopens as typed; it used
+  to reopen as the character it names. (accepted: fixed, W49.notes-keep-blank-lines).
+- **The blank line after an inline image's line was written twice**, one more than the editor showed; it is written
+  once now. (accepted: fixed, W49.notes-keep-blank-lines).
+
+These remain:
+- **Returns typed at the very end of a note, or just above a source-block chip, are not kept.** Nothing follows
+  them in the file there, so they are dropped on save as before; a copied passage depends on the first. (queued: W49.notes-keep-trailing-lines).
+- **A lone U+00A0 typed on a line by itself (⌥Space) reopens as an empty line.** It shows nothing either way.
+  (accepted: platform fact, Apple's parser reads `&nbsp;` and a typed U+00A0 as the same character, so the
+  file cannot tell them apart, and the character shows nothing either way).
+
+Evidence: `verification/evidence/notes/W49.notes-keep-blank-lines.md`.
 
 ## ✅ FIXED (W40.d9, 2026-10-15) — writing-session defects, reproduced in the VM
 
