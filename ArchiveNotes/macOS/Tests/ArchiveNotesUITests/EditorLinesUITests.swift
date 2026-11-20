@@ -209,10 +209,7 @@ class EditorLinesUITests: NotesFixtureUITestCase {
             // Text and two Returns typed above the reader note's chip, which opens its text.
             let reader = Self.idReader
             try loadReaderNote()
-            func focused() -> Bool { (editor.value(forKey: "hasKeyboardFocus") as? Bool) == true }
-            for _ in 0..<4 where !focused() { app.activate(); editor.click(); _ = pollUntil(timeout: 2, focused) }
-            app.typeKey(.upArrow, modifierFlags: .command)
-            editor.typeText("Intro\n\n")
+            try typeIntoEditor("Intro\n\n", atStart: true)
             XCTAssertTrue(pollUntil(timeout: 10) { (self.noteBody(uuid: reader) ?? "").contains("Intro\\\n&nbsp;\n<!-- block: reader-page") },
                           "the Returns above the chip should save — disk: \((noteBody(uuid: reader) ?? "").debugDescription)")
             selectItem(uuid: id)
@@ -272,8 +269,8 @@ class EditorLinesUITests: NotesFixtureUITestCase {
         XCTAssertTrue(pollUntil(timeout: 10) { self.editorText.contains("A plain note") }, "the note should load again")
     }
 
-    /// Click the styled editor until it holds keyboard focus, caret to the end (⌘↓), then type.
-    private func typeIntoEditor(_ text: String) throws {
+    /// Click the styled editor until it holds keyboard focus, caret to the end (⌘↓) or the start (⌘↑), then type.
+    private func typeIntoEditor(_ text: String, atStart: Bool = false) throws {
         func focused() -> Bool { (editor.value(forKey: "hasKeyboardFocus") as? Bool) == true }
         for _ in 0..<4 where !focused() {
             app.activate()
@@ -283,7 +280,7 @@ class EditorLinesUITests: NotesFixtureUITestCase {
         guard focused() else {
             throw StepError("the styled editor never took keyboard focus — focus is on \(keyboardFocusDescription())")
         }
-        app.typeKey(.downArrow, modifierFlags: .command)
+        app.typeKey(atStart ? .upArrow : .downArrow, modifierFlags: .command)
         if !text.isEmpty { editor.typeText(text) }
     }
 
