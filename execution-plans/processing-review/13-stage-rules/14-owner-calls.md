@@ -193,6 +193,10 @@ calls are section 1.
     how much the app has developed"): W49.item-fields-home weighs it.
     The handwriting placer (hands.tgz) uploaded to models-1 at his yes; fuzzy OCR search in the Reader queued behind
     nice-to-have (W49.reader-fuzzy-search).
+26. **File names and where facts are stored (2026-11-20).** Filed names stay simple and unchanging (the collection name
+    and a sequence number, as in his corpus), now with six digits (W49.proc-six-digit-names; nothing already filed is
+    renamed). The many places dates are saved look like an artifact of development: survey them and similar facts
+    and propose one home each (W49.storage-simplify-audit, which W49.item-fields-home now waits on).
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
