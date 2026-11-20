@@ -149,7 +149,26 @@ class Queue(Fixture):
         self.assertIn("unknown uses value: lots", items["A.bad"]["reason"])
         for d in items.values():
             self.assertTrue(set(d) <= {"tag", "status", "reason", "text", "lanes", "uses", "effort", "estimate",
-                                       "blocked_on", "attempts", "sessions_since_progress"}, d)
+                                       "blocked_on", "attempts", "sessions_since_progress", "agents"}, d)
+        self.assertNotIn("agents", one)
+
+    def test_an_agent_marker_keeps_the_item_to_that_agent(self):
+        plan = PLAN.replace("(uses: light) (effort: high)", "(uses: light) (effort: high) (agent: codex)") \
+            .replace("- [ ] **A.three — waits on two**", "- [ ] **A.three — waits on two** (agents: Claude, codex)")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", plan)
+        items = {d["tag"]: d for d in self.jsonl(self.hook("queue").stdout)}
+        self.assertEqual((items["A.one"]["status"], items["A.one"]["agents"]), ("ok", ["codex"]))
+        self.assertEqual(items["A.three"]["agents"], ["claude", "codex"])
+        self.assertNotIn("agents", items["A.two"])
+
+    def test_an_agent_marker_naming_a_model_blocks_the_item(self):
+        plan = PLAN.replace("(uses: light) (effort: high)", "(uses: light) (effort: high) (agent: sonnet)")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", plan)
+        r = self.hook("queue")
+        one = {d["tag"]: d for d in self.jsonl(r.stdout)}["A.one"]
+        self.assertEqual(one["status"], "blocked")
+        self.assertIn("names sonnet, not claude or codex", one["reason"])
+        self.assertNotIn("agents", one)
 
     def test_sessions_since_progress_from_the_state(self):
         os.makedirs(os.path.join(self.state, "item-progress"))

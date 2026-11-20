@@ -11,7 +11,7 @@ import time
 
 # hooks.py's HOLD_MARK, and the markers a note must not smuggle into a queue line.
 HOLD = re.compile(r"\[hold\]|needs:\s*owner", re.I)
-MARKERS = re.compile(r"\((?:blocked-on|uses|cluster|lane|needs|effort)\s*:", re.I)
+MARKERS = re.compile(r"\((?:blocked-on|uses|cluster|lane|needs|effort|agents?)\s*:", re.I)
 
 
 def section(text, heading):

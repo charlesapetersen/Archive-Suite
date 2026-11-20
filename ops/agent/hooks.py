@@ -29,6 +29,8 @@ PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 HOLD_MARK = re.compile(r"\[hold\]|needs:\s*owner", re.I)     # worker-state.py's hold test
 EFFORT = re.compile(r"\(effort:\s*(low|medium|high|xhigh|max)\)")
+AGENT = re.compile(r"\(agents?:\s*([^)]*)\)", re.I)                # the engine's per-item agents (Agent Manager CONTRACT.md)
+AGENTS = ("claude", "codex")
 ESTIMATE = re.compile(r"~\d+(?:-\d+)?\s+sessions?\b")         # the daemon's estimate_sessions evidence
 CHECKBOX = re.compile(r"^\s*[-*]\s+\[([ xX])\]\s*")
 DATE = re.compile(r"\b(20\d\d-\d\d-\d\d)\b")
@@ -161,6 +163,16 @@ def queue():
                 runnable += 1
             else:
                 d["status"], d["reason"] = "blocked", why
+        m = AGENT.search(text)
+        if m:
+            names = [a.strip().lower() for a in m.group(1).split(",") if a.strip()]
+            bad = [a for a in names if a not in AGENTS]
+            if names and not bad:
+                d["agents"] = names
+            elif d["status"] == "ok":
+                d["status"], d["reason"] = "blocked", "its (agent: ...) marker names %s, not claude or codex" \
+                    % (", ".join(bad) or "no agent")
+                runnable -= 1
         m = EFFORT.search(text)
         if m:
             d["effort"] = m.group(1)

@@ -1390,6 +1390,12 @@ tag-parse).
 
 ## Cluster items — `(cluster: farmshare|sherlock)` (`cluster-reach.py`, W46.engine-cluster)
 
+An item that must run on one agent says so with `(agent: codex)` (or `(agents: claude, codex)`): the queue hook
+sends it to the Agent Manager as the item's `agents`, and the engine offers the item only to those agents, waiting
+while none of them has room and giving the other agents the next item meanwhile (Agent Manager CONTRACT.md, section
+2; owner, 2026-11-20). A name other than claude or codex blocks the item with the reason. It names an agent, not a
+model: a Claude model is the engine's `item_start` in the registry.
+
 An item that needs a cluster says so with a `(cluster: NAME)` marker. It is not a `(uses: …)` value, because
 `worker-state.py` and the Agent Manager refuse unknown ones. The queue hook (`ops/agent/hooks.py`) offers such an
 item only when `cluster-reach.py`'s `offer()` allows it, and only once its `(blocked-on:)` prerequisites are met:
