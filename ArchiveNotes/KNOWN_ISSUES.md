@@ -216,6 +216,27 @@ Now:
 Evidence: `verification/evidence/notes/W40.fix-notes-editor-lines.md`. The four limits it left, accepted then as
 having no Markdown form, are fixed by `W49.notes-keep-blank-lines` (entry below; owner call 20, 2026-11-19).
 
+## ✅ FIXED (W49.notes-keep-trailing-lines, 2026-11-19) — Returns at the end of a note and above a chip are kept
+
+Owner call 20: keep what I type. W49.notes-keep-blank-lines left two places where nothing follows the empty lines
+in the file, and they were dropped on save:
+- **Returns typed at the very end of a note are kept.** Every newline after the last text is written as a line
+  break, ending in an `&nbsp;` line (`A\` then `&nbsp;`). On reading, that last `&nbsp;` is deleted and the newlines
+  stay. This holds after a heading, a list left with Return and a quote (`> q\` then `> &nbsp;`), after underlined
+  or highlighted text, and in a chip's text below its thumbnail line. (accepted: fixed, W49.notes-keep-trailing-lines).
+- **Returns typed just above a source-block chip are kept**, written as before another block. The newline the
+  editor puts before every chip is the boundary, so a reopen shows the same lines. (accepted: fixed,
+  W49.notes-keep-trailing-lines).
+- **A copied passage still ends where its text does.** The selection's trailing newlines and the spaces on those
+  lines are trimmed, unless they belong to a code block or raw HTML. A selected line therefore does not bring an
+  empty line into the extract. (accepted: fixed, W49.notes-keep-trailing-lines).
+
+Still dropped: **Returns typed after text that ends in raw HTML** (an HTML block such as `<div>…</div>`), at the end
+or before a block, as before this item. A line break there would be part of the HTML block, and a paragraph break
+shows as two lines, so it needs a form of its own that round-trips. (queued: W49.notes-lines-after-html).
+
+Evidence: `verification/evidence/notes/W49.notes-keep-trailing-lines.md`.
+
 ## ✅ FIXED (W49.notes-keep-blank-lines, 2026-11-19) — the editor keeps the blank lines and empty items typed
 
 Owner call 20: keep what I type. Markdown has no empty paragraph or empty list item, so the file now holds them as
@@ -237,8 +258,8 @@ Owner call 20: keep what I type. Markdown has no empty paragraph or empty list i
   once now. (accepted: fixed, W49.notes-keep-blank-lines).
 
 These remain:
-- **Returns typed at the very end of a note, or just above a source-block chip, are not kept.** Nothing follows
-  them in the file there, so they are dropped on save as before; a copied passage depends on the first. (queued: W49.notes-keep-trailing-lines).
+- **Returns typed at the very end of a note, or just above a source-block chip, are kept now** (entry above,
+  W49.notes-keep-trailing-lines). (accepted: fixed, W49.notes-keep-trailing-lines).
 - **A lone U+00A0 typed on a line by itself (⌥Space) reopens as an empty line.** It shows nothing either way.
   (accepted: platform fact, Apple's parser reads `&nbsp;` and a typed U+00A0 as the same character, so the
   file cannot tell them apart, and the character shows nothing either way).
