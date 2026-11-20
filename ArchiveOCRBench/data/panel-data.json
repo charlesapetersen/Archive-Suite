@@ -1514,6 +1514,20 @@
      16,
      16
     ]
+   },
+   "prices": {
+    "typewritten": {
+     "std": 1.91,
+     "batch": null
+    },
+    "printed": {
+     "std": 2.24,
+     "batch": null
+    },
+    "handwritten": {
+     "std": 1.6,
+     "batch": null
+    }
    }
   },
   {
@@ -1549,6 +1563,20 @@
      14,
      16
     ]
+   },
+   "prices": {
+    "typewritten": {
+     "std": 1.91,
+     "batch": null
+    },
+    "printed": {
+     "std": 2.24,
+     "batch": null
+    },
+    "handwritten": {
+     "std": 1.6,
+     "batch": null
+    }
    }
   }
  ],
@@ -2920,6 +2948,134 @@
     "qwen3.6-35b-a3b": {
      "std": 0.57,
      "batch": null
+    },
+    "gemini3.7-flash-gw": {
+     "std": 3.99,
+     "batch": null
+    },
+    "gemini4-hydrogen": {
+     "std": 10.81,
+     "batch": null
+    },
+    "qwen3.6-27b-farmshare": {
+     "std": 1.91,
+     "batch": null
+    },
+    "qwen3.5-27b-farmshare": {
+     "std": 2.07,
+     "batch": null
+    },
+    "qwen3.6-35b-a3b-farmshare": {
+     "std": 0.85,
+     "batch": null
+    },
+    "qwen3.5-122b-a10b-farmshare": {
+     "std": 1.99,
+     "batch": null
+    },
+    "qwen3.8-27b-farmshare": {
+     "std": 0.77,
+     "batch": null
+    },
+    "ling3-flash-vl-farmshare": {
+     "std": 0.32,
+     "batch": null
+    },
+    "qwen3-vl-8b-farmshare": {
+     "std": 1.35,
+     "batch": null
+    },
+    "qwen3.5-9b-sherlock": {
+     "std": 0.48,
+     "batch": null
+    },
+    "qwen3.8-27b-sherlock": {
+     "std": 0.76,
+     "batch": null
+    },
+    "regions-qwen3.6-27b-doclayout_yolo": {
+     "std": 2.54,
+     "batch": null
+    },
+    "regions-qwen3.6-27b-pp-doclayoutv3": {
+     "std": 2.37,
+     "batch": null
+    },
+    "regions-qwen3.6-27b-tiles": {
+     "std": 2.9,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-quad": {
+     "std": 1.88,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-uvdoc": {
+     "std": 1.87,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-docres": {
+     "std": 1.85,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-enc-2048-q85": {
+     "std": 1.68,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-enc-1600-q90": {
+     "std": 1.43,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-quad": {
+     "std": 3.25,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-uvdoc": {
+     "std": 3.51,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-docres": {
+     "std": 3.42,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-enc-2048-q85": {
+     "std": 3.64,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-enc-1600-q90": {
+     "std": 3.36,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-shading": {
+     "std": 3.4,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-gcdrnet": {
+     "std": 3.42,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-sbb": {
+     "std": 3.32,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-docres-appearance": {
+     "std": 3.33,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-docres-deshadow": {
+     "std": 3.61,
+     "batch": null
+    },
+    "colour-gemini3.7-flash-gw-gated": {
+     "std": 4.05,
+     "batch": null
+    },
+    "gw-regions-pp-doclayoutv3": {
+     "std": 14.14,
+     "batch": null
+    },
+    "gw-regions-tiles": {
+     "std": 9.31,
+     "batch": null
     }
    }
   },
@@ -3652,6 +3808,134 @@
     "qwen3.6-35b-a3b": {
      "std": 0.8,
      "batch": null
+    },
+    "gemini3.7-flash-gw": {
+     "std": 3.87,
+     "batch": null
+    },
+    "gemini4-hydrogen": {
+     "std": 14.31,
+     "batch": null
+    },
+    "qwen3.6-27b-farmshare": {
+     "std": 2.24,
+     "batch": null
+    },
+    "qwen3.5-27b-farmshare": {
+     "std": 2.43,
+     "batch": null
+    },
+    "qwen3.6-35b-a3b-farmshare": {
+     "std": 1.05,
+     "batch": null
+    },
+    "qwen3.5-122b-a10b-farmshare": {
+     "std": 2.34,
+     "batch": null
+    },
+    "qwen3.8-27b-farmshare": {
+     "std": 1.03,
+     "batch": null
+    },
+    "ling3-flash-vl-farmshare": {
+     "std": 0.35,
+     "batch": null
+    },
+    "qwen3-vl-8b-farmshare": {
+     "std": 1.44,
+     "batch": null
+    },
+    "qwen3.5-9b-sherlock": {
+     "std": 0.48,
+     "batch": null
+    },
+    "qwen3.8-27b-sherlock": {
+     "std": 1.03,
+     "batch": null
+    },
+    "regions-qwen3.6-27b-doclayout_yolo": {
+     "std": 2.78,
+     "batch": null
+    },
+    "regions-qwen3.6-27b-pp-doclayoutv3": {
+     "std": 3.33,
+     "batch": null
+    },
+    "regions-qwen3.6-27b-tiles": {
+     "std": 3.7,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-quad": {
+     "std": 2.17,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-uvdoc": {
+     "std": 2.13,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-docres": {
+     "std": 1.86,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-enc-2048-q85": {
+     "std": 2.03,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-enc-1600-q90": {
+     "std": 1.8,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-quad": {
+     "std": 4.1,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-uvdoc": {
+     "std": 4.12,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-docres": {
+     "std": 4.11,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-enc-2048-q85": {
+     "std": 3.81,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-enc-1600-q90": {
+     "std": 3.98,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-shading": {
+     "std": 3.7,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-gcdrnet": {
+     "std": 4.16,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-sbb": {
+     "std": 4.11,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-docres-appearance": {
+     "std": 3.86,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-docres-deshadow": {
+     "std": 4.17,
+     "batch": null
+    },
+    "colour-gemini3.7-flash-gw-gated": {
+     "std": 3.87,
+     "batch": null
+    },
+    "gw-regions-pp-doclayoutv3": {
+     "std": 26.52,
+     "batch": null
+    },
+    "gw-regions-tiles": {
+     "std": 9.1,
+     "batch": null
     }
    }
   },
@@ -4383,6 +4667,134 @@
     },
     "qwen3.6-35b-a3b": {
      "std": 0.35,
+     "batch": null
+    },
+    "gemini3.7-flash-gw": {
+     "std": 3.84,
+     "batch": null
+    },
+    "gemini4-hydrogen": {
+     "std": 8.35,
+     "batch": null
+    },
+    "qwen3.6-27b-farmshare": {
+     "std": 1.59,
+     "batch": null
+    },
+    "qwen3.5-27b-farmshare": {
+     "std": 1.7,
+     "batch": null
+    },
+    "qwen3.6-35b-a3b-farmshare": {
+     "std": 0.68,
+     "batch": null
+    },
+    "qwen3.5-122b-a10b-farmshare": {
+     "std": 1.66,
+     "batch": null
+    },
+    "qwen3.8-27b-farmshare": {
+     "std": 0.48,
+     "batch": null
+    },
+    "ling3-flash-vl-farmshare": {
+     "std": 0.31,
+     "batch": null
+    },
+    "qwen3-vl-8b-farmshare": {
+     "std": 1.3,
+     "batch": null
+    },
+    "qwen3.5-9b-sherlock": {
+     "std": 0.49,
+     "batch": null
+    },
+    "qwen3.8-27b-sherlock": {
+     "std": 0.48,
+     "batch": null
+    },
+    "regions-qwen3.6-27b-doclayout_yolo": {
+     "std": 0.29,
+     "batch": null
+    },
+    "regions-qwen3.6-27b-pp-doclayoutv3": {
+     "std": 1.94,
+     "batch": null
+    },
+    "regions-qwen3.6-27b-tiles": {
+     "std": 2.89,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-quad": {
+     "std": 1.55,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-uvdoc": {
+     "std": 2.53,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-docres": {
+     "std": 1.47,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-enc-2048-q85": {
+     "std": 1.31,
+     "batch": null
+    },
+    "dewarp-qwen3.6-27b-enc-1600-q90": {
+     "std": 1.01,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-quad": {
+     "std": 3.65,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-uvdoc": {
+     "std": 3.61,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-docres": {
+     "std": 2.43,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-enc-2048-q85": {
+     "std": 3.57,
+     "batch": null
+    },
+    "dewarp-gemini3.7-flash-gw-enc-1600-q90": {
+     "std": 3.35,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-shading": {
+     "std": 3.71,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-gcdrnet": {
+     "std": 3.27,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-sbb": {
+     "std": 2.84,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-docres-appearance": {
+     "std": 4.03,
+     "batch": null
+    },
+    "enh-gemini3.7-flash-gw-docres-deshadow": {
+     "std": 2.87,
+     "batch": null
+    },
+    "colour-gemini3.7-flash-gw-gated": {
+     "std": 3.84,
+     "batch": null
+    },
+    "gw-regions-pp-doclayoutv3": {
+     "std": 11.06,
+     "batch": null
+    },
+    "gw-regions-tiles": {
+     "std": 9.29,
      "batch": null
     }
    }

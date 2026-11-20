@@ -98,10 +98,10 @@ def report():
     (H.RESULTS / 'gemini4-hydrogen-96.json').write_text(json.dumps(out, indent=1))
     with (H.RESULTS / 'gemini4-hydrogen-96-groups.csv').open('w', newline='') as f:
         w = csv.writer(f)
-        w.writerow(['route', 'attribute', 'value', 'n', 'ok', 'nes', 'chrf', 'miss', 'add', 'words'])
+        w.writerow(['route', 'attribute', 'value', 'n', 'ok', 'nes', 'chrf', 'miss', 'add', 'words', 'cost'])
         for k in sorted({d['kind'] for d in detail}):
             g = S.aggregate([d for d in detail if d['kind'] == k])
-            w.writerow([LABEL, 'kind', k, g['n'], g['ok'], g['nes'], g['chrf'], g['miss'], g['add'], g['words']])
+            w.writerow([LABEL, 'kind', k, g['n'], g['ok'], g['nes'], g['chrf'], g['miss'], g['add'], g['words'], g['cost']])
     (H.RESULTS / 'gemini4-hydrogen-96.md').write_text(markdown(out, S.aggregate(detail), len(pages)))
     print(markdown(out, S.aggregate(detail), len(pages)))
 

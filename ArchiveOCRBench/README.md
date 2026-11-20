@@ -317,11 +317,13 @@ Python standard library.
   A dotted line joins the two points.
 - **The best-value line** links the points that no other point beats on both price and score. It is worked out
   across standard and batch prices together.
-- **The kind charts** price each cloud- and local-panel route at what that kind's pages cost it: the `cost`
-  column of `ocr-panel-cloud-groups.csv` and `ocr-panel-local-groups.csv`, over the group's pages, per 1,000
-  (`charts[].prices` in `panel-data.json`). Claude Sonnet 5.5 (a subscription, priced from counted tokens), the
-  gateway's Gemini 3.7 Flash, Gemini 4 Hydrogen and the routes on our own hardware have no cost by page, so they
-  keep their price over all 96. A chart whose cheapest paid point is under $0.25 moves its free column left with it.
+- **The kind charts** price each route at what that kind's pages cost it (`charts[].prices` in `panel-data.json`,
+  per 1,000): for the cloud and local panels, the gateway's Gemini 3.7 Flash and Gemini 4 Hydrogen, the `cost`
+  column of their groups CSVs over the group's pages (the last two are list-price estimates from each page's
+  billed tokens); for a FarmShare or Sherlock run OpenRouter sells, OpenRouter's rate for the run's mean tokens over
+  that kind's answered pages in its `pages.csv`, as its overall price is over all its answered pages. Claude Sonnet
+  5.5 (a subscription, priced from counted tokens) keeps its price over all 96, and routes that are free stay free.
+  A chart whose cheapest paid point is under $0.25 moves its free column left with it.
 - **Segmentation's "no checking"** is the share of document pages that land in exactly the right document if
   nobody checks anything. Its "checks per 100 pages" counts every page photographed, box and folder photos
   included. Each approach is at the flag level frozen on the development boxes for the 98% bar (`options-frozen.json`,

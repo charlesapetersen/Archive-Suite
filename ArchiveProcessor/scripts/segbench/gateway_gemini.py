@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import collections
 import csv
 import hashlib
 import json
@@ -242,6 +243,11 @@ def report():
     import ocr_panel_score as S
     m, jobs = panel_manifest()
     by_page = {r['page']: r for r in P.rows()}
+    agreement = {j['id'] for j in jobs if j['page'] in P.AGREEMENT}
+    calls = [c for c in ledger() if c['set'] == 'panel' and c['http'] == 200 and c['job'] not in agreement]
+    job_cost = collections.Counter()  # each page's list-price estimate, so the groups CSV prices a kind on its own
+    for c in calls:
+        job_cost[c['job']] += c['cost']
     rows, detail = [], []
     for j in jobs:
         page = j['page']
@@ -251,7 +257,8 @@ def report():
         new = parsed(json.loads(f.read_text())) if f.exists() else None
         o = old.get('parsed')
         full = S.score(truth, new['text'] if new else '')
-        detail.append({**full, 'ok': bool(new), 'kind': by_page[page]['kind'], 'agreement': page in P.AGREEMENT})
+        detail.append({**full, 'ok': bool(new), 'kind': by_page[page]['kind'], 'agreement': page in P.AGREEMENT,
+                       'cost': job_cost[j['id']]})
         rows.append({'page': page, 'agreement': page in P.AGREEMENT, 'kind': by_page[page]['kind'],
                      'ok38': bool(o), 'ok37': bool(new),
                      'nes38': S.score(truth, o['text'])['nes'] if o else 0.0,
@@ -262,8 +269,6 @@ def report():
     both = [r for r in scored if r['ok38'] and r['ok37']]
     mean = lambda xs: sum(xs) / len(xs) if xs else float('nan')
     diff = S.paired([r['nes37'] for r in both], [r['nes38'] for r in both])
-    agreement = {j['id'] for j in jobs if j['page'] in P.AGREEMENT}
-    calls = [c for c in ledger() if c['set'] == 'panel' and c['http'] == 200 and c['job'] not in agreement]
     usage = {k: sum((c['usage'].get(k) or 0) for c in calls) for k in ('prompt_tokens', 'completion_tokens')}
     reasoning = sum(((c['usage'].get('completion_tokens_details') or {}).get('reasoning_tokens') or 0) for c in calls)
     old_cost = sum(json.loads((PANEL / 'responses/gemini3.8-flash' / (j['id'] + '.json')).read_text())['meta'].get('cost', 0)
@@ -319,10 +324,10 @@ def report():
           f"{round(100 * out['kind_correct37'] / len(scored))} | ${per_page:.5f} (estimate) |"]
     with (RESULTS / 'gemini37-vs-38-groups.csv').open('w', newline='') as f:
         w = csv.writer(f)
-        w.writerow(['route', 'attribute', 'value', 'n', 'ok', 'nes', 'chrf', 'miss', 'add', 'words'])
+        w.writerow(['route', 'attribute', 'value', 'n', 'ok', 'nes', 'chrf', 'miss', 'add', 'words', 'cost'])
         for k in sorted({d['kind'] for d in detail}):
             g = S.aggregate([d for d in detail if d['kind'] == k])
-            w.writerow([LABEL, 'kind', k, g['n'], g['ok'], g['nes'], g['chrf'], g['miss'], g['add'], g['words']])
+            w.writerow([LABEL, 'kind', k, g['n'], g['ok'], g['nes'], g['chrf'], g['miss'], g['add'], g['words'], g['cost']])
     (RESULTS / 'gemini37-vs-38.md').write_text('\n'.join(L) + '\n')
     print('\n'.join(L))
 

@@ -153,6 +153,25 @@ def cents(v):
     return float(Decimal(str(v)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
+def kind_cents(rid, kind, usd, ratio=None):
+    """A route's price on one kind chart, standard and batch per 1,000 pages, in cents (W49.bench-kind-price)."""
+    if not cents(usd):
+        sys.exit(f"{rid}: {kind} pages cost under half a cent per 1,000")
+    return {"std": cents(usd), "batch": cents(usd * ratio) if ratio else None}
+
+
+def tokens_usd(op, preset, row):
+    """A cluster arm's group row priced as its overall row is: OpenRouter's rate for its tokens over its pages."""
+    if not row["n"] or row.get("prompt_tokens") is None:
+        return None
+    return openrouter_price(op, preset, row["prompt_tokens"] / row["n"], row["completion_tokens"] / row["n"])
+
+
+def cost_usd(row):
+    """A gateway arm's group row priced as its overall row is: its estimated token cost over its pages."""
+    return 1000 * row["cost"] / row["n"] if row["n"] and row.get("cost") else None
+
+
 def openrouter_price(op, preset, prompt, completion):
     """Dollars per 1,000 requests at OpenRouter's list price for the same open-weight model (inputs.json ->
     openrouter_open_weights), from a run's mean tokens a request. None for a model that fits on the Mac, which stays free."""
@@ -278,7 +297,8 @@ def farmshare_run(run, kinds, op, price=None):
     summary = json.loads((d / "summary.json").read_text())
     agree = agreement_pages()
     with (d / "pages.csv").open(newline="") as f:
-        pages = [r for r in csv.DictReader(f) if r["page"] not in agree]
+        every = list(csv.DictReader(f))
+    pages = [r for r in every if r["page"] not in agree]
     acc = summary["accuracy_96"]
 
     def sc(rr):
@@ -287,10 +307,27 @@ def farmshare_run(run, kinds, op, price=None):
     if overall[1:] != [acc["ok"], acc["n"]] or abs(overall[0] - round(100 * acc["nes"], 2)) > 1e-9:
         sys.exit(f"{run}: pages.csv over the 96 accuracy pages gives {overall}, summary.json says {acc}")
     tp = summary["throughput"]
+    preset = summary["env"]["FS_PRESET"]
+
+    # W49.bench-kind-price-rest: a kind's price is the run's mean tokens over that kind's answered pages, as the
+    # overall price is its mean over every answered page (all 99, the collectors' throughput figures), checked here.
+    def tokens(rr):
+        ok = [r for r in rr if r["ok"] == "True"]
+        return {k: sum(int(r[k.removeprefix("mean_")] or 0) for r in ok) / len(ok) if ok else None
+                for k in ("mean_prompt_tokens", "mean_completion_tokens")}
+    usd = run_price(op, preset, tp, price)
+    by_kind = {}
+    if usd is not None:
+        if any(abs(v - (tp.get(k) or 0)) > 1e-6 for k, v in tokens(every).items()):
+            sys.exit(f"{run}: pages.csv's tokens over the answered pages give {tokens(every)}, summary.json says {tp}")
+        for k in kinds:
+            t = tokens([r for r in pages if r["kind"] == k])
+            if t["mean_prompt_tokens"] is not None:
+                by_kind[k] = run_price(op, preset, t, price)
     return ({"overall": overall, **{k: sc([r for r in pages if r["kind"] == k]) for k in kinds}},
             {"photos_per_hour": tp["pages_per_hour_per_gpu"], "gpus": tp["gpus"],
              "gpu_hours_per_100k": 100000 / tp["pages_per_hour_per_gpu"],
-             "usd_per_1000": run_price(op, summary["env"]["FS_PRESET"], tp, price)})
+             "usd_per_1000": usd, "usd_per_1000_by_kind": by_kind})
 
 
 def run_price(op, preset, tp, price=None):
@@ -1291,7 +1328,9 @@ def region_chart_routes(data, kinds, op):
                         "panel": "farmshare", "cluster": "Sherlock" + (" (38 pilot crops on FarmShare)" if route == "glm-ocr" else ""),
                         "std": cents(price) if price is not None else 0.0, "batch": None,
                         "free_cluster": price is None, "machine": "one NVIDIA L40S per job",
-                        "hw": {"photos_per_hour": None, "gpu_hours_per_100k": None}, "scores": scores})
+                        "hw": {"photos_per_hour": None, "gpu_hours_per_100k": None}, "scores": scores,
+                        "kind_usd": {k: tokens_usd(op, route, by[(route, arm, "kind:" + k)]) for k in kinds}
+                                    if price is not None else {}})
     return out
 
 
@@ -1312,7 +1351,8 @@ def gateway_region_routes(data, kinds):
         scores = {key: [round(100 * by[(arm, g)]["nes"], 2), by[(arm, g)]["ok"], by[(arm, g)]["n"]]
                   for key, g in [("overall", "the 96"), *((k, "kind:" + k) for k in kinds)]}
         out.append({"id": f"gw-regions-{arm}", "name": "Gemini 3.7 Flash (Stanford gateway, price estimated) · " + label,
-                    "panel": "cloud", "std": cents(1000 * overall["cost"] / overall["n"]), "batch": None, "scores": scores})
+                    "panel": "cloud", "std": cents(1000 * overall["cost"] / overall["n"]), "batch": None, "scores": scores,
+                    "kind_usd": {k: cost_usd(by[(arm, "kind:" + k)]) for k in kinds}})
     return out
 
 
@@ -1341,14 +1381,17 @@ def dewarp_chart_routes(data, kinds, op):
         if route == "apple-vision":
             out.append({**common, "panel": "local", "std": 0.0})
             continue
+        kind_rows = {k: by[(route, arm, "kind:" + k)] for k in kinds}
         if route in GATEWAY_ROUTES:
-            out.append({**common, "panel": "cloud", "std": cents(1000 * overall["cost"] / overall["n"])})
+            out.append({**common, "panel": "cloud", "std": cents(1000 * overall["cost"] / overall["n"]),
+                        "kind_usd": {k: cost_usd(r) for k, r in kind_rows.items()}})
             continue
         price = openrouter_price(op, route, overall["prompt_tokens"] / overall["n"],
                                  overall["completion_tokens"] / overall["n"])
         out.append({**common, "panel": "farmshare", "cluster": "Sherlock", "std": cents(price) if price is not None else 0.0,
                     "free_cluster": price is None, "machine": "one NVIDIA L40S per job",
-                    "hw": {"photos_per_hour": None, "gpu_hours_per_100k": None}})
+                    "hw": {"photos_per_hour": None, "gpu_hours_per_100k": None},
+                    "kind_usd": {k: tokens_usd(op, route, r) for k, r in kind_rows.items()} if price is not None else {}})
     return out
 
 
@@ -1375,14 +1418,17 @@ def enh_ocr_chart_routes(data, kinds, op):
         if route == "apple-vision":
             out.append({**common, "panel": "local", "std": 0.0})
             continue
+        kind_rows = {k: by[(route, arm, "kind:" + k)] for k in kinds}
         if route in GATEWAY_ROUTES:
-            out.append({**common, "panel": "cloud", "std": cents(1000 * overall["cost"] / overall["n"])})
+            out.append({**common, "panel": "cloud", "std": cents(1000 * overall["cost"] / overall["n"]),
+                        "kind_usd": {k: cost_usd(r) for k, r in kind_rows.items()}})
             continue
         price = openrouter_price(op, route, overall["prompt_tokens"] / overall["n"],
                                  overall["completion_tokens"] / overall["n"])
         out.append({**common, "panel": "farmshare", "cluster": "Sherlock", "std": cents(price) if price is not None else 0.0,
                     "free_cluster": price is None, "machine": "one NVIDIA L40S per job",
-                    "hw": {"photos_per_hour": None, "gpu_hours_per_100k": None}})
+                    "hw": {"photos_per_hour": None, "gpu_hours_per_100k": None},
+                    "kind_usd": {k: tokens_usd(op, route, r) for k, r in kind_rows.items()} if price is not None else {}})
     return out
 
 
@@ -1405,7 +1451,8 @@ def colour_dropout_chart_routes(data, kinds):
         if route == "apple-vision":
             out.append({**common, "panel": "local", "std": 0.0})
         else:
-            out.append({**common, "panel": "cloud", "std": cents(1000 * overall["cost"] / overall["n"])})
+            out.append({**common, "panel": "cloud", "std": cents(1000 * overall["cost"] / overall["n"]),
+                        "kind_usd": {k: cost_usd(by[(route, arm, "kind:" + k)]) for k in kinds}})
     return out
 
 
@@ -1519,14 +1566,11 @@ def main():
                     kinds.setdefault(row["value"], {})[rid] = (
                         round(100 * float(row["nes"]), 2), int(row["ok"]), int(row["n"]), int(row["words"]))
                     # W49.bench-kind-price: a kind chart draws a route at what that kind's pages cost it, where its
-                    # groups CSV measured it. A subscription route (cost 0) keeps its overall estimate, as do the
-                    # gateway and Hydrogen routes, whose CSVs carry no cost.
+                    # groups CSV measured it (the gateway's and Hydrogen's: their list-price estimates, page by page,
+                    # W49.bench-kind-price-rest). A subscription route (cost 0) keeps its overall estimate.
                     usd = float(row.get("cost") or 0) / int(row["n"]) * 1000
                     if usd:
-                        if not cents(usd):
-                            sys.exit(f"{rid}: {row['value']} pages cost under half a cent per 1,000")
-                        kind_price.setdefault(row["value"], {})[rid] = {
-                            "std": cents(usd), "batch": cents(usd * ratio[rid]) if rid in ratio else None}
+                        kind_price.setdefault(row["value"], {})[rid] = kind_cents(rid, row["value"], usd, ratio.get(rid))
 
     routes = [{"id": rid, "name": names[rid]["name"], "panel": panel[rid], "std": cents(std[rid]),
                "batch": cents(std[rid] * ratio[rid]) if rid in ratio else None} for rid in names]
@@ -1559,10 +1603,16 @@ def main():
                        "batch": None, "free_cluster": free_cluster, "machine": spec["machine"], "hw": hw})
         for c in charts:
             c["scores"][rid] = scores[c["key"]]
+            # A cluster run OpenRouter sells is priced on a kind chart from that kind's own tokens.
+            if c["key"] in hw.get("usd_per_1000_by_kind", {}):
+                c["prices"][rid] = kind_cents(rid, c["key"], hw["usd_per_1000_by_kind"][c["key"]])
+        hw.pop("usd_per_1000_by_kind", None)
     for spec in own["table_only"]:
         scores, hw = farmshare_run(spec["run"], inputs["kinds"], op)
+        by_kind = hw.pop("usd_per_1000_by_kind")
         extra.append({"name": spec["name"], "panel": "farmshare", "under": spec["under"], "std": cents(hw["usd_per_1000"]), "machine": spec["machine"],
-                      "hw": hw, "scores": scores})
+                      "hw": hw, "scores": scores,
+                      "prices": {k: kind_cents(spec["name"], k, v) for k, v in by_kind.items()}})
     # W46.r1-foundation: Apple's macOS 27 on-device model, free on this Mac, on the 96 charts only. Its public figures
     # are 100 Latin pages of the 440 reference set (L5-L8), not the 895, so they stay off the public tables (README).
     fm96 = json.loads(FOUNDATION.read_text())["ocr"].get("96") if FOUNDATION.exists() else None
@@ -1587,34 +1637,44 @@ def main():
     layout_photo_data = json.loads(LAYOUT_PHOTO.read_text()) if LAYOUT_PHOTO.exists() else None
     for route in [*region_chart_routes(regions, inputs["kinds"], op),
                   *layout_photo_chart_routes(layout_photo_data, inputs["kinds"], op)]:
-        scores = route.pop("scores")
+        scores, kind_usd = route.pop("scores"), route.pop("kind_usd", {})
         routes.append(route)
         for c in charts:
             c["scores"][route["id"]] = scores[c["key"]]
+            if kind_usd.get(c["key"]):  # W49.bench-kind-price-rest: the arm's own price for that kind's pages
+                c["prices"][route["id"]] = kind_cents(route["id"], c["key"], kind_usd[c["key"]])
     dewarp = json.loads(DEWARP.read_text()) if DEWARP.exists() else None
     for route in dewarp_chart_routes(dewarp, inputs["kinds"], op):
-        scores = route.pop("scores")
+        scores, kind_usd = route.pop("scores"), route.pop("kind_usd", {})
         routes.append(route)
         for c in charts:
             c["scores"][route["id"]] = scores[c["key"]]
+            if kind_usd.get(c["key"]):  # W49.bench-kind-price-rest: the arm's own price for that kind's pages
+                c["prices"][route["id"]] = kind_cents(route["id"], c["key"], kind_usd[c["key"]])
     enh_ocr = json.loads(ENH_OCR.read_text()) if ENH_OCR.exists() else None
     for route in enh_ocr_chart_routes(enh_ocr, inputs["kinds"], op):
-        scores = route.pop("scores")
+        scores, kind_usd = route.pop("scores"), route.pop("kind_usd", {})
         routes.append(route)
         for c in charts:
             c["scores"][route["id"]] = scores[c["key"]]
+            if kind_usd.get(c["key"]):  # W49.bench-kind-price-rest: the arm's own price for that kind's pages
+                c["prices"][route["id"]] = kind_cents(route["id"], c["key"], kind_usd[c["key"]])
     colour = json.loads(COLOUR_DROPOUT.read_text()) if COLOUR_DROPOUT.exists() else None
     for route in colour_dropout_chart_routes(colour, inputs["kinds"]):
-        scores = route.pop("scores")
+        scores, kind_usd = route.pop("scores"), route.pop("kind_usd", {})
         routes.append(route)
         for c in charts:
             c["scores"][route["id"]] = scores[c["key"]]
+            if kind_usd.get(c["key"]):  # W49.bench-kind-price-rest: the arm's own price for that kind's pages
+                c["prices"][route["id"]] = kind_cents(route["id"], c["key"], kind_usd[c["key"]])
     regions_gw = json.loads(REGIONS_GW.read_text()) if REGIONS_GW.exists() else None
     for route in gateway_region_routes(regions_gw, inputs["kinds"]):
-        scores = route.pop("scores")
+        scores, kind_usd = route.pop("scores"), route.pop("kind_usd", {})
         routes.append(route)
         for c in charts:
             c["scores"][route["id"]] = scores[c["key"]]
+            if kind_usd.get(c["key"]):  # W49.bench-kind-price-rest: the arm's own price for that kind's pages
+                c["prices"][route["id"]] = kind_cents(route["id"], c["key"], kind_usd[c["key"]])
             if scores[c["key"]][2] != c["n"]:
                 sys.exit(f"{route['id']}'s {c['key']} page count differs from the panel's {c['n']}")
     if regions and regions_gw:  # the open readers' table gains Gemini's rows; its public rows are a labelled sample of pages
