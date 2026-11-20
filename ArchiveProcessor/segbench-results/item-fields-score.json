@@ -248,6 +248,390 @@
    44,
    102
   ],
+  "mac-qwen3-vl-8b-image|base|byline": [
+   37,
+   40
+  ],
+  "mac-qwen3-vl-8b-image|base|kind": [
+   185,
+   213
+  ],
+  "mac-qwen3-vl-8b-image|base|publication": [
+   34,
+   67
+  ],
+  "mac-qwen3-vl-8b-image|base|publication_date": [
+   8,
+   18
+  ],
+  "mac-qwen3-vl-8b-image|base|recipient_place": [
+   49,
+   70
+  ],
+  "mac-qwen3-vl-8b-image|base|title": [
+   71,
+   93
+  ],
+  "mac-qwen3-vl-8b-image|clippings|byline": [
+   35,
+   39
+  ],
+  "mac-qwen3-vl-8b-image|clippings|kind": [
+   49,
+   60
+  ],
+  "mac-qwen3-vl-8b-image|clippings|publication": [
+   47,
+   54
+  ],
+  "mac-qwen3-vl-8b-image|clippings|publication_date": [
+   13,
+   16
+  ],
+  "mac-qwen3-vl-8b-image|clippings|recipient_place": [
+   1,
+   1
+  ],
+  "mac-qwen3-vl-8b-image|clippings|title": [
+   43,
+   54
+  ],
+  "mac-qwen3-vl-8b-image|handwritten|kind": [
+   18,
+   19
+  ],
+  "mac-qwen3-vl-8b-image|handwritten|publication": [
+   0,
+   0
+  ],
+  "mac-qwen3-vl-8b-image|handwritten|recipient_place": [
+   2,
+   7
+  ],
+  "mac-qwen3-vl-8b-image|handwritten|title": [
+   1,
+   1
+  ],
+  "mac-qwen3-vl-8b-mac|base|byline": [
+   26,
+   30
+  ],
+  "mac-qwen3-vl-8b-mac|base|kind": [
+   161,
+   213
+  ],
+  "mac-qwen3-vl-8b-mac|base|publication": [
+   28,
+   43
+  ],
+  "mac-qwen3-vl-8b-mac|base|publication_date": [
+   13,
+   22
+  ],
+  "mac-qwen3-vl-8b-mac|base|recipient_place": [
+   44,
+   59
+  ],
+  "mac-qwen3-vl-8b-mac|base|title": [
+   43,
+   69
+  ],
+  "mac-qwen3-vl-8b-mac|clippings|byline": [
+   27,
+   34
+  ],
+  "mac-qwen3-vl-8b-mac|clippings|kind": [
+   31,
+   60
+  ],
+  "mac-qwen3-vl-8b-mac|clippings|publication": [
+   39,
+   47
+  ],
+  "mac-qwen3-vl-8b-mac|clippings|publication_date": [
+   29,
+   32
+  ],
+  "mac-qwen3-vl-8b-mac|clippings|recipient_place": [
+   1,
+   1
+  ],
+  "mac-qwen3-vl-8b-mac|clippings|title": [
+   29,
+   53
+  ],
+  "mac-qwen3-vl-8b-mac|handwritten|kind": [
+   15,
+   19
+  ],
+  "mac-qwen3-vl-8b-mac|handwritten|publication": [
+   0,
+   0
+  ],
+  "mac-qwen3-vl-8b-mac|handwritten|recipient_place": [
+   2,
+   3
+  ],
+  "mac-qwen3-vl-8b-mac|handwritten|title": [
+   1,
+   2
+  ],
+  "mac-qwen3-vl-8b-vision|base|byline": [
+   26,
+   30
+  ],
+  "mac-qwen3-vl-8b-vision|base|kind": [
+   161,
+   213
+  ],
+  "mac-qwen3-vl-8b-vision|base|publication": [
+   28,
+   43
+  ],
+  "mac-qwen3-vl-8b-vision|base|publication_date": [
+   13,
+   22
+  ],
+  "mac-qwen3-vl-8b-vision|base|recipient_place": [
+   44,
+   59
+  ],
+  "mac-qwen3-vl-8b-vision|base|title": [
+   43,
+   69
+  ],
+  "mac-qwen3-vl-8b-vision|clippings|byline": [
+   27,
+   34
+  ],
+  "mac-qwen3-vl-8b-vision|clippings|kind": [
+   31,
+   60
+  ],
+  "mac-qwen3-vl-8b-vision|clippings|publication": [
+   39,
+   47
+  ],
+  "mac-qwen3-vl-8b-vision|clippings|publication_date": [
+   29,
+   32
+  ],
+  "mac-qwen3-vl-8b-vision|clippings|recipient_place": [
+   1,
+   1
+  ],
+  "mac-qwen3-vl-8b-vision|clippings|title": [
+   29,
+   53
+  ],
+  "mac-qwen3-vl-8b-vision|handwritten|kind": [
+   17,
+   19
+  ],
+  "mac-qwen3-vl-8b-vision|handwritten|publication": [
+   0,
+   0
+  ],
+  "mac-qwen3-vl-8b-vision|handwritten|recipient_place": [
+   1,
+   1
+  ],
+  "mac-qwen3-vl-8b-vision|handwritten|title": [
+   0,
+   0
+  ],
+  "mac-qwen3.5-4b-image|base|byline": [
+   39,
+   49
+  ],
+  "mac-qwen3.5-4b-image|base|kind": [
+   168,
+   203
+  ],
+  "mac-qwen3.5-4b-image|base|publication": [
+   30,
+   64
+  ],
+  "mac-qwen3.5-4b-image|base|publication_date": [
+   35,
+   47
+  ],
+  "mac-qwen3.5-4b-image|base|recipient_place": [
+   48,
+   90
+  ],
+  "mac-qwen3.5-4b-image|base|title": [
+   67,
+   91
+  ],
+  "mac-qwen3.5-4b-image|clippings|byline": [
+   34,
+   42
+  ],
+  "mac-qwen3.5-4b-image|clippings|kind": [
+   47,
+   58
+  ],
+  "mac-qwen3.5-4b-image|clippings|publication": [
+   43,
+   53
+  ],
+  "mac-qwen3.5-4b-image|clippings|publication_date": [
+   42,
+   49
+  ],
+  "mac-qwen3.5-4b-image|clippings|recipient_place": [
+   1,
+   2
+  ],
+  "mac-qwen3.5-4b-image|clippings|title": [
+   40,
+   52
+  ],
+  "mac-qwen3.5-4b-image|handwritten|kind": [
+   19,
+   19
+  ],
+  "mac-qwen3.5-4b-image|handwritten|publication": [
+   0,
+   1
+  ],
+  "mac-qwen3.5-4b-image|handwritten|recipient_place": [
+   2,
+   12
+  ],
+  "mac-qwen3.5-4b-image|handwritten|title": [
+   3,
+   4
+  ],
+  "mac-qwen3.5-4b-mac|base|byline": [
+   35,
+   52
+  ],
+  "mac-qwen3.5-4b-mac|base|kind": [
+   172,
+   212
+  ],
+  "mac-qwen3.5-4b-mac|base|publication": [
+   26,
+   37
+  ],
+  "mac-qwen3.5-4b-mac|base|publication_date": [
+   19,
+   27
+  ],
+  "mac-qwen3.5-4b-mac|base|recipient_place": [
+   49,
+   100
+  ],
+  "mac-qwen3.5-4b-mac|base|title": [
+   35,
+   74
+  ],
+  "mac-qwen3.5-4b-mac|clippings|byline": [
+   32,
+   49
+  ],
+  "mac-qwen3.5-4b-mac|clippings|kind": [
+   44,
+   60
+  ],
+  "mac-qwen3.5-4b-mac|clippings|publication": [
+   36,
+   46
+  ],
+  "mac-qwen3.5-4b-mac|clippings|publication_date": [
+   41,
+   43
+  ],
+  "mac-qwen3.5-4b-mac|clippings|recipient_place": [
+   1,
+   1
+  ],
+  "mac-qwen3.5-4b-mac|clippings|title": [
+   23,
+   52
+  ],
+  "mac-qwen3.5-4b-mac|handwritten|kind": [
+   14,
+   19
+  ],
+  "mac-qwen3.5-4b-mac|handwritten|publication": [
+   0,
+   0
+  ],
+  "mac-qwen3.5-4b-mac|handwritten|recipient_place": [
+   1,
+   12
+  ],
+  "mac-qwen3.5-4b-mac|handwritten|title": [
+   3,
+   4
+  ],
+  "mac-qwen3.5-4b-vision|base|byline": [
+   35,
+   52
+  ],
+  "mac-qwen3.5-4b-vision|base|kind": [
+   172,
+   212
+  ],
+  "mac-qwen3.5-4b-vision|base|publication": [
+   26,
+   37
+  ],
+  "mac-qwen3.5-4b-vision|base|publication_date": [
+   19,
+   27
+  ],
+  "mac-qwen3.5-4b-vision|base|recipient_place": [
+   49,
+   100
+  ],
+  "mac-qwen3.5-4b-vision|base|title": [
+   35,
+   74
+  ],
+  "mac-qwen3.5-4b-vision|clippings|byline": [
+   32,
+   49
+  ],
+  "mac-qwen3.5-4b-vision|clippings|kind": [
+   44,
+   60
+  ],
+  "mac-qwen3.5-4b-vision|clippings|publication": [
+   36,
+   46
+  ],
+  "mac-qwen3.5-4b-vision|clippings|publication_date": [
+   41,
+   43
+  ],
+  "mac-qwen3.5-4b-vision|clippings|recipient_place": [
+   1,
+   1
+  ],
+  "mac-qwen3.5-4b-vision|clippings|title": [
+   23,
+   52
+  ],
+  "mac-qwen3.5-4b-vision|handwritten|kind": [
+   11,
+   19
+  ],
+  "mac-qwen3.5-4b-vision|handwritten|publication": [
+   0,
+   1
+  ],
+  "mac-qwen3.5-4b-vision|handwritten|recipient_place": [
+   2,
+   13
+  ],
+  "mac-qwen3.5-4b-vision|handwritten|title": [
+   1,
+   2
+  ],
   "tagging|base|byline": [
    31,
    36
@@ -408,6 +792,12 @@
    "draft-gemini": 299,
    "draft-luna": 299,
    "extractor": 218,
+   "mac-qwen3-vl-8b-image": 299,
+   "mac-qwen3-vl-8b-mac": 299,
+   "mac-qwen3-vl-8b-vision": 299,
+   "mac-qwen3.5-4b-image": 299,
+   "mac-qwen3.5-4b-mac": 299,
+   "mac-qwen3.5-4b-vision": 299,
    "tagging": 299
   },
   "sheets": {
@@ -652,6 +1042,150 @@
    43,
    74
   ],
+  "mac-qwen3-vl-8b-image|byline": [
+   26,
+   30
+  ],
+  "mac-qwen3-vl-8b-image|kind": [
+   34,
+   38
+  ],
+  "mac-qwen3-vl-8b-image|publication": [
+   44,
+   49
+  ],
+  "mac-qwen3-vl-8b-image|publication_date": [
+   6,
+   10
+  ],
+  "mac-qwen3-vl-8b-image|recipient_place": [
+   26,
+   32
+  ],
+  "mac-qwen3-vl-8b-image|title": [
+   105,
+   120
+  ],
+  "mac-qwen3-vl-8b-mac|byline": [
+   16,
+   22
+  ],
+  "mac-qwen3-vl-8b-mac|kind": [
+   25,
+   38
+  ],
+  "mac-qwen3-vl-8b-mac|publication": [
+   37,
+   42
+  ],
+  "mac-qwen3-vl-8b-mac|publication_date": [
+   13,
+   15
+  ],
+  "mac-qwen3-vl-8b-mac|recipient_place": [
+   26,
+   34
+  ],
+  "mac-qwen3-vl-8b-mac|title": [
+   68,
+   100
+  ],
+  "mac-qwen3-vl-8b-vision|byline": [
+   16,
+   22
+  ],
+  "mac-qwen3-vl-8b-vision|kind": [
+   25,
+   38
+  ],
+  "mac-qwen3-vl-8b-vision|publication": [
+   37,
+   42
+  ],
+  "mac-qwen3-vl-8b-vision|publication_date": [
+   13,
+   15
+  ],
+  "mac-qwen3-vl-8b-vision|recipient_place": [
+   26,
+   34
+  ],
+  "mac-qwen3-vl-8b-vision|title": [
+   67,
+   99
+  ],
+  "mac-qwen3.5-4b-image|byline": [
+   27,
+   36
+  ],
+  "mac-qwen3.5-4b-image|kind": [
+   29,
+   37
+  ],
+  "mac-qwen3.5-4b-image|publication": [
+   41,
+   47
+  ],
+  "mac-qwen3.5-4b-image|publication_date": [
+   25,
+   30
+  ],
+  "mac-qwen3.5-4b-image|recipient_place": [
+   28,
+   35
+  ],
+  "mac-qwen3.5-4b-image|title": [
+   103,
+   117
+  ],
+  "mac-qwen3.5-4b-mac|byline": [
+   24,
+   35
+  ],
+  "mac-qwen3.5-4b-mac|kind": [
+   27,
+   38
+  ],
+  "mac-qwen3.5-4b-mac|publication": [
+   36,
+   42
+  ],
+  "mac-qwen3.5-4b-mac|publication_date": [
+   21,
+   23
+  ],
+  "mac-qwen3.5-4b-mac|recipient_place": [
+   28,
+   37
+  ],
+  "mac-qwen3.5-4b-mac|title": [
+   56,
+   103
+  ],
+  "mac-qwen3.5-4b-vision|byline": [
+   24,
+   35
+  ],
+  "mac-qwen3.5-4b-vision|kind": [
+   27,
+   38
+  ],
+  "mac-qwen3.5-4b-vision|publication": [
+   36,
+   42
+  ],
+  "mac-qwen3.5-4b-vision|publication_date": [
+   21,
+   23
+  ],
+  "mac-qwen3.5-4b-vision|recipient_place": [
+   28,
+   37
+  ],
+  "mac-qwen3.5-4b-vision|title": [
+   55,
+   102
+  ],
   "tagging|byline": [
    26,
    31
@@ -678,8 +1212,117 @@
   ]
  },
  "fourth_sheet_open": false,
- "mac_owner_verdicts": {},
- "mac_runs": {},
+ "mac_owner_verdicts": {
+  "mac-qwen3-vl-8b-image|byline": "too close",
+  "mac-qwen3-vl-8b-image|kind": "too close",
+  "mac-qwen3-vl-8b-image|publication": "below the bar",
+  "mac-qwen3-vl-8b-image|publication_date": "below the bar",
+  "mac-qwen3-vl-8b-image|recipient_place": "too close",
+  "mac-qwen3-vl-8b-image|title": "below the bar",
+  "mac-qwen3-vl-8b-mac|byline": "too close",
+  "mac-qwen3-vl-8b-mac|kind": "below the bar",
+  "mac-qwen3-vl-8b-mac|publication": "below the bar",
+  "mac-qwen3-vl-8b-mac|publication_date": "below the bar",
+  "mac-qwen3-vl-8b-mac|recipient_place": "below the bar",
+  "mac-qwen3-vl-8b-mac|title": "below the bar",
+  "mac-qwen3-vl-8b-vision|byline": "too close",
+  "mac-qwen3-vl-8b-vision|kind": "below the bar",
+  "mac-qwen3-vl-8b-vision|publication": "below the bar",
+  "mac-qwen3-vl-8b-vision|publication_date": "below the bar",
+  "mac-qwen3-vl-8b-vision|recipient_place": "below the bar",
+  "mac-qwen3-vl-8b-vision|title": "below the bar",
+  "mac-qwen3.5-4b-image|byline": "below the bar",
+  "mac-qwen3.5-4b-image|kind": "below the bar",
+  "mac-qwen3.5-4b-image|publication": "below the bar",
+  "mac-qwen3.5-4b-image|publication_date": "too close",
+  "mac-qwen3.5-4b-image|recipient_place": "below the bar",
+  "mac-qwen3.5-4b-image|title": "below the bar",
+  "mac-qwen3.5-4b-mac|byline": "below the bar",
+  "mac-qwen3.5-4b-mac|kind": "below the bar",
+  "mac-qwen3.5-4b-mac|publication": "below the bar",
+  "mac-qwen3.5-4b-mac|publication_date": "too close",
+  "mac-qwen3.5-4b-mac|recipient_place": "below the bar",
+  "mac-qwen3.5-4b-mac|title": "below the bar",
+  "mac-qwen3.5-4b-vision|byline": "below the bar",
+  "mac-qwen3.5-4b-vision|kind": "below the bar",
+  "mac-qwen3.5-4b-vision|publication": "below the bar",
+  "mac-qwen3.5-4b-vision|publication_date": "too close",
+  "mac-qwen3.5-4b-vision|recipient_place": "below the bar",
+  "mac-qwen3.5-4b-vision|title": "below the bar"
+ },
+ "mac_runs": {
+  "lighton": {
+   "at_max_tokens": 0,
+   "median_s": 11.4,
+   "pages": 28
+  },
+  "mac-qwen3-vl-8b-image": {
+   "at_max_tokens": 0,
+   "docs": 299,
+   "median_prompt_tokens": 3244,
+   "median_s": 15.52,
+   "of": 299,
+   "peak_gb": 9.01,
+   "salvaged": 0,
+   "total_h": 1.69,
+   "unparsed": 0
+  },
+  "mac-qwen3-vl-8b-mac": {
+   "at_max_tokens": 0,
+   "docs": 20,
+   "median_prompt_tokens": 817,
+   "median_s": 5.35,
+   "of": 20,
+   "peak_gb": 6.32,
+   "salvaged": 0,
+   "total_h": 0.03,
+   "unparsed": 0
+  },
+  "mac-qwen3-vl-8b-vision": {
+   "at_max_tokens": 0,
+   "docs": 299,
+   "median_prompt_tokens": 1263,
+   "median_s": 6.68,
+   "of": 299,
+   "peak_gb": 6.78,
+   "salvaged": 0,
+   "total_h": 0.69,
+   "unparsed": 0
+  },
+  "mac-qwen3.5-4b-image": {
+   "at_max_tokens": 6,
+   "docs": 299,
+   "median_prompt_tokens": 3301,
+   "median_s": 9.87,
+   "of": 299,
+   "peak_gb": 6.22,
+   "salvaged": 0,
+   "total_h": 1.08,
+   "unparsed": 12
+  },
+  "mac-qwen3.5-4b-mac": {
+   "at_max_tokens": 0,
+   "docs": 20,
+   "median_prompt_tokens": 845,
+   "median_s": 3.71,
+   "of": 20,
+   "peak_gb": 4.45,
+   "salvaged": 0,
+   "total_h": 0.02,
+   "unparsed": 0
+  },
+  "mac-qwen3.5-4b-vision": {
+   "at_max_tokens": 2,
+   "docs": 299,
+   "median_prompt_tokens": 1299,
+   "median_s": 5.03,
+   "of": 299,
+   "peak_gb": 4.76,
+   "salvaged": 5,
+   "total_h": 0.5,
+   "unparsed": 1
+  }
+ },
  "off_kind": {
   "byline": {
    "kinds": {
@@ -726,6 +1369,42 @@
      "filled": 66,
      "read": 141,
      "truth empty": 66
+    },
+    "mac-qwen3-vl-8b-image": {
+     "filled": 58,
+     "read": 164,
+     "right": 0,
+     "truth empty": 57
+    },
+    "mac-qwen3-vl-8b-mac": {
+     "filled": 14,
+     "read": 164,
+     "right": 1,
+     "truth empty": 12
+    },
+    "mac-qwen3-vl-8b-vision": {
+     "filled": 13,
+     "read": 164,
+     "right": 1,
+     "truth empty": 11
+    },
+    "mac-qwen3.5-4b-image": {
+     "filled": 57,
+     "read": 164,
+     "right": 2,
+     "truth empty": 54
+    },
+    "mac-qwen3.5-4b-mac": {
+     "filled": 75,
+     "read": 164,
+     "right": 1,
+     "truth empty": 72
+    },
+    "mac-qwen3.5-4b-vision": {
+     "filled": 77,
+     "read": 164,
+     "right": 1,
+     "truth empty": 74
     },
     "tagging": {
      "filled": 113,
@@ -779,6 +1458,40 @@
      "read": 141,
      "truth empty": 4
     },
+    "mac-qwen3-vl-8b-image": {
+     "filled": 11,
+     "read": 164,
+     "right": 0,
+     "truth empty": 10
+    },
+    "mac-qwen3-vl-8b-mac": {
+     "filled": 1,
+     "read": 164,
+     "truth empty": 1
+    },
+    "mac-qwen3-vl-8b-vision": {
+     "filled": 1,
+     "read": 164,
+     "truth empty": 1
+    },
+    "mac-qwen3.5-4b-image": {
+     "filled": 112,
+     "read": 164,
+     "right": 1,
+     "truth empty": 111
+    },
+    "mac-qwen3.5-4b-mac": {
+     "filled": 2,
+     "read": 164,
+     "right": 1,
+     "truth empty": 1
+    },
+    "mac-qwen3.5-4b-vision": {
+     "filled": 2,
+     "read": 164,
+     "right": 1,
+     "truth empty": 1
+    },
     "tagging": {
      "filled": 164,
      "read": 164,
@@ -830,6 +1543,42 @@
      "filled": 5,
      "read": 83,
      "truth empty": 5
+    },
+    "mac-qwen3-vl-8b-image": {
+     "filled": 4,
+     "read": 146,
+     "right": 1,
+     "truth empty": 3
+    },
+    "mac-qwen3-vl-8b-mac": {
+     "filled": 2,
+     "read": 146,
+     "right": 1,
+     "truth empty": 1
+    },
+    "mac-qwen3-vl-8b-vision": {
+     "filled": 2,
+     "read": 146,
+     "right": 1,
+     "truth empty": 1
+    },
+    "mac-qwen3.5-4b-image": {
+     "filled": 7,
+     "read": 146,
+     "right": 1,
+     "truth empty": 6
+    },
+    "mac-qwen3.5-4b-mac": {
+     "filled": 13,
+     "read": 146,
+     "right": 1,
+     "truth empty": 12
+    },
+    "mac-qwen3.5-4b-vision": {
+     "filled": 13,
+     "read": 146,
+     "right": 1,
+     "truth empty": 12
     },
     "tagging": {
      "filled": 4,
@@ -2010,6 +2759,942 @@
    "truth_filled": 96,
    "wrong_when_filled": 42
   },
+  "mac-qwen3-vl-8b-image|drafted|byline": {
+   "docs": 119,
+   "ed2": 72,
+   "exact": 72,
+   "fill_rate": 0.6638655462184874,
+   "filled_when_empty": 1,
+   "null_when_truth": 8,
+   "precision_ed2": 0.9113924050632911,
+   "pred_filled": 79,
+   "recall_ed2": 0.8372093023255814,
+   "truth_filled": 86,
+   "wrong_when_filled": 7
+  },
+  "mac-qwen3-vl-8b-image|drafted|kind": {
+   "docs": 292,
+   "ed2": 252,
+   "exact": 236,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.863013698630137,
+   "pred_filled": 292,
+   "recall_ed2": 0.863013698630137,
+   "truth_filled": 292,
+   "wrong_when_filled": 40
+  },
+  "mac-qwen3-vl-8b-image|drafted|publication": {
+   "docs": 285,
+   "ed2": 81,
+   "exact": 80,
+   "fill_rate": 0.4245614035087719,
+   "filled_when_empty": 29,
+   "null_when_truth": 1,
+   "precision_ed2": 0.6694214876033058,
+   "pred_filled": 121,
+   "recall_ed2": 0.8709677419354839,
+   "truth_filled": 93,
+   "wrong_when_filled": 40
+  },
+  "mac-qwen3-vl-8b-image|drafted|publication_date": {
+   "docs": 121,
+   "ed2": 21,
+   "exact": 20,
+   "fill_rate": 0.2809917355371901,
+   "filled_when_empty": 8,
+   "null_when_truth": 66,
+   "precision_ed2": 0.6176470588235294,
+   "pred_filled": 34,
+   "recall_ed2": 0.22826086956521738,
+   "truth_filled": 92,
+   "wrong_when_filled": 13
+  },
+  "mac-qwen3-vl-8b-image|drafted|recipient_place": {
+   "docs": 147,
+   "ed2": 52,
+   "exact": 32,
+   "fill_rate": 0.5306122448979592,
+   "filled_when_empty": 17,
+   "null_when_truth": 0,
+   "precision_ed2": 0.6666666666666666,
+   "pred_filled": 78,
+   "recall_ed2": 0.8524590163934426,
+   "truth_filled": 61,
+   "wrong_when_filled": 26
+  },
+  "mac-qwen3-vl-8b-image|drafted|title": {
+   "docs": 285,
+   "ed2": 115,
+   "exact": 114,
+   "fill_rate": 0.519298245614035,
+   "filled_when_empty": 14,
+   "null_when_truth": 18,
+   "precision_ed2": 0.777027027027027,
+   "pred_filled": 148,
+   "recall_ed2": 0.756578947368421,
+   "truth_filled": 152,
+   "wrong_when_filled": 33
+  },
+  "mac-qwen3-vl-8b-image|owner|byline": {
+   "docs": 57,
+   "ed2": 38,
+   "exact": 38,
+   "fill_rate": 0.7368421052631579,
+   "filled_when_empty": 0,
+   "null_when_truth": 5,
+   "precision_ed2": 0.9047619047619048,
+   "pred_filled": 42,
+   "recall_ed2": 0.8085106382978723,
+   "truth_filled": 47,
+   "wrong_when_filled": 4
+  },
+  "mac-qwen3-vl-8b-image|owner|kind": {
+   "docs": 76,
+   "ed2": 58,
+   "exact": 50,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.7631578947368421,
+   "pred_filled": 76,
+   "recall_ed2": 0.7631578947368421,
+   "truth_filled": 76,
+   "wrong_when_filled": 18
+  },
+  "mac-qwen3-vl-8b-image|owner|publication": {
+   "docs": 80,
+   "ed2": 57,
+   "exact": 56,
+   "fill_rate": 0.875,
+   "filled_when_empty": 2,
+   "null_when_truth": 1,
+   "precision_ed2": 0.8142857142857143,
+   "pred_filled": 70,
+   "recall_ed2": 0.8260869565217391,
+   "truth_filled": 69,
+   "wrong_when_filled": 13
+  },
+  "mac-qwen3-vl-8b-image|owner|publication_date": {
+   "docs": 56,
+   "ed2": 9,
+   "exact": 9,
+   "fill_rate": 0.30357142857142855,
+   "filled_when_empty": 3,
+   "null_when_truth": 33,
+   "precision_ed2": 0.5294117647058824,
+   "pred_filled": 17,
+   "recall_ed2": 0.19148936170212766,
+   "truth_filled": 47,
+   "wrong_when_filled": 8
+  },
+  "mac-qwen3-vl-8b-image|owner|recipient_place": {
+   "docs": 59,
+   "ed2": 39,
+   "exact": 27,
+   "fill_rate": 0.8135593220338984,
+   "filled_when_empty": 1,
+   "null_when_truth": 0,
+   "precision_ed2": 0.8125,
+   "pred_filled": 48,
+   "recall_ed2": 0.8297872340425532,
+   "truth_filled": 47,
+   "wrong_when_filled": 9
+  },
+  "mac-qwen3-vl-8b-image|owner|title": {
+   "docs": 166,
+   "ed2": 115,
+   "exact": 114,
+   "fill_rate": 0.8253012048192772,
+   "filled_when_empty": 3,
+   "null_when_truth": 18,
+   "precision_ed2": 0.8394160583941606,
+   "pred_filled": 137,
+   "recall_ed2": 0.756578947368421,
+   "truth_filled": 152,
+   "wrong_when_filled": 22
+  },
+  "mac-qwen3-vl-8b-mac|drafted|byline": {
+   "docs": 119,
+   "ed2": 53,
+   "exact": 53,
+   "fill_rate": 0.5378151260504201,
+   "filled_when_empty": 3,
+   "null_when_truth": 25,
+   "precision_ed2": 0.828125,
+   "pred_filled": 64,
+   "recall_ed2": 0.6162790697674418,
+   "truth_filled": 86,
+   "wrong_when_filled": 11
+  },
+  "mac-qwen3-vl-8b-mac|drafted|kind": {
+   "docs": 292,
+   "ed2": 207,
+   "exact": 194,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.708904109589041,
+   "pred_filled": 292,
+   "recall_ed2": 0.708904109589041,
+   "truth_filled": 292,
+   "wrong_when_filled": 85
+  },
+  "mac-qwen3-vl-8b-mac|drafted|publication": {
+   "docs": 285,
+   "ed2": 67,
+   "exact": 64,
+   "fill_rate": 0.3157894736842105,
+   "filled_when_empty": 9,
+   "null_when_truth": 12,
+   "precision_ed2": 0.7444444444444445,
+   "pred_filled": 90,
+   "recall_ed2": 0.7204301075268817,
+   "truth_filled": 93,
+   "wrong_when_filled": 23
+  },
+  "mac-qwen3-vl-8b-mac|drafted|publication_date": {
+   "docs": 121,
+   "ed2": 42,
+   "exact": 39,
+   "fill_rate": 0.4462809917355372,
+   "filled_when_empty": 3,
+   "null_when_truth": 41,
+   "precision_ed2": 0.7777777777777778,
+   "pred_filled": 54,
+   "recall_ed2": 0.45652173913043476,
+   "truth_filled": 92,
+   "wrong_when_filled": 12
+  },
+  "mac-qwen3-vl-8b-mac|drafted|recipient_place": {
+   "docs": 147,
+   "ed2": 47,
+   "exact": 29,
+   "fill_rate": 0.42857142857142855,
+   "filled_when_empty": 9,
+   "null_when_truth": 7,
+   "precision_ed2": 0.746031746031746,
+   "pred_filled": 63,
+   "recall_ed2": 0.7704918032786885,
+   "truth_filled": 61,
+   "wrong_when_filled": 16
+  },
+  "mac-qwen3-vl-8b-mac|drafted|title": {
+   "docs": 285,
+   "ed2": 73,
+   "exact": 69,
+   "fill_rate": 0.43508771929824563,
+   "filled_when_empty": 10,
+   "null_when_truth": 38,
+   "precision_ed2": 0.5887096774193549,
+   "pred_filled": 124,
+   "recall_ed2": 0.48026315789473684,
+   "truth_filled": 152,
+   "wrong_when_filled": 51
+  },
+  "mac-qwen3-vl-8b-mac|owner|byline": {
+   "docs": 57,
+   "ed2": 28,
+   "exact": 28,
+   "fill_rate": 0.5964912280701754,
+   "filled_when_empty": 1,
+   "null_when_truth": 14,
+   "precision_ed2": 0.8235294117647058,
+   "pred_filled": 34,
+   "recall_ed2": 0.5957446808510638,
+   "truth_filled": 47,
+   "wrong_when_filled": 6
+  },
+  "mac-qwen3-vl-8b-mac|owner|kind": {
+   "docs": 76,
+   "ed2": 45,
+   "exact": 38,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.5921052631578947,
+   "pred_filled": 76,
+   "recall_ed2": 0.5921052631578947,
+   "truth_filled": 76,
+   "wrong_when_filled": 31
+  },
+  "mac-qwen3-vl-8b-mac|owner|publication": {
+   "docs": 80,
+   "ed2": 48,
+   "exact": 45,
+   "fill_rate": 0.7625,
+   "filled_when_empty": 0,
+   "null_when_truth": 8,
+   "precision_ed2": 0.7868852459016393,
+   "pred_filled": 61,
+   "recall_ed2": 0.6956521739130435,
+   "truth_filled": 69,
+   "wrong_when_filled": 13
+  },
+  "mac-qwen3-vl-8b-mac|owner|publication_date": {
+   "docs": 56,
+   "ed2": 18,
+   "exact": 17,
+   "fill_rate": 0.42857142857142855,
+   "filled_when_empty": 0,
+   "null_when_truth": 23,
+   "precision_ed2": 0.75,
+   "pred_filled": 24,
+   "recall_ed2": 0.3829787234042553,
+   "truth_filled": 47,
+   "wrong_when_filled": 6
+  },
+  "mac-qwen3-vl-8b-mac|owner|recipient_place": {
+   "docs": 59,
+   "ed2": 36,
+   "exact": 24,
+   "fill_rate": 0.7796610169491526,
+   "filled_when_empty": 3,
+   "null_when_truth": 4,
+   "precision_ed2": 0.782608695652174,
+   "pred_filled": 46,
+   "recall_ed2": 0.7659574468085106,
+   "truth_filled": 47,
+   "wrong_when_filled": 10
+  },
+  "mac-qwen3-vl-8b-mac|owner|title": {
+   "docs": 166,
+   "ed2": 73,
+   "exact": 69,
+   "fill_rate": 0.7048192771084337,
+   "filled_when_empty": 3,
+   "null_when_truth": 38,
+   "precision_ed2": 0.6239316239316239,
+   "pred_filled": 117,
+   "recall_ed2": 0.48026315789473684,
+   "truth_filled": 152,
+   "wrong_when_filled": 44
+  },
+  "mac-qwen3-vl-8b-vision|drafted|byline": {
+   "docs": 119,
+   "ed2": 53,
+   "exact": 53,
+   "fill_rate": 0.5378151260504201,
+   "filled_when_empty": 3,
+   "null_when_truth": 25,
+   "precision_ed2": 0.828125,
+   "pred_filled": 64,
+   "recall_ed2": 0.6162790697674418,
+   "truth_filled": 86,
+   "wrong_when_filled": 11
+  },
+  "mac-qwen3-vl-8b-vision|drafted|kind": {
+   "docs": 292,
+   "ed2": 209,
+   "exact": 195,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.7157534246575342,
+   "pred_filled": 292,
+   "recall_ed2": 0.7157534246575342,
+   "truth_filled": 292,
+   "wrong_when_filled": 83
+  },
+  "mac-qwen3-vl-8b-vision|drafted|publication": {
+   "docs": 285,
+   "ed2": 67,
+   "exact": 64,
+   "fill_rate": 0.3157894736842105,
+   "filled_when_empty": 9,
+   "null_when_truth": 12,
+   "precision_ed2": 0.7444444444444445,
+   "pred_filled": 90,
+   "recall_ed2": 0.7204301075268817,
+   "truth_filled": 93,
+   "wrong_when_filled": 23
+  },
+  "mac-qwen3-vl-8b-vision|drafted|publication_date": {
+   "docs": 121,
+   "ed2": 42,
+   "exact": 39,
+   "fill_rate": 0.4462809917355372,
+   "filled_when_empty": 3,
+   "null_when_truth": 41,
+   "precision_ed2": 0.7777777777777778,
+   "pred_filled": 54,
+   "recall_ed2": 0.45652173913043476,
+   "truth_filled": 92,
+   "wrong_when_filled": 12
+  },
+  "mac-qwen3-vl-8b-vision|drafted|recipient_place": {
+   "docs": 147,
+   "ed2": 46,
+   "exact": 29,
+   "fill_rate": 0.41496598639455784,
+   "filled_when_empty": 8,
+   "null_when_truth": 8,
+   "precision_ed2": 0.7540983606557377,
+   "pred_filled": 61,
+   "recall_ed2": 0.7540983606557377,
+   "truth_filled": 61,
+   "wrong_when_filled": 15
+  },
+  "mac-qwen3-vl-8b-vision|drafted|title": {
+   "docs": 285,
+   "ed2": 72,
+   "exact": 68,
+   "fill_rate": 0.4280701754385965,
+   "filled_when_empty": 9,
+   "null_when_truth": 39,
+   "precision_ed2": 0.5901639344262295,
+   "pred_filled": 122,
+   "recall_ed2": 0.47368421052631576,
+   "truth_filled": 152,
+   "wrong_when_filled": 50
+  },
+  "mac-qwen3-vl-8b-vision|owner|byline": {
+   "docs": 57,
+   "ed2": 28,
+   "exact": 28,
+   "fill_rate": 0.5964912280701754,
+   "filled_when_empty": 1,
+   "null_when_truth": 14,
+   "precision_ed2": 0.8235294117647058,
+   "pred_filled": 34,
+   "recall_ed2": 0.5957446808510638,
+   "truth_filled": 47,
+   "wrong_when_filled": 6
+  },
+  "mac-qwen3-vl-8b-vision|owner|kind": {
+   "docs": 76,
+   "ed2": 45,
+   "exact": 38,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.5921052631578947,
+   "pred_filled": 76,
+   "recall_ed2": 0.5921052631578947,
+   "truth_filled": 76,
+   "wrong_when_filled": 31
+  },
+  "mac-qwen3-vl-8b-vision|owner|publication": {
+   "docs": 80,
+   "ed2": 48,
+   "exact": 45,
+   "fill_rate": 0.7625,
+   "filled_when_empty": 0,
+   "null_when_truth": 8,
+   "precision_ed2": 0.7868852459016393,
+   "pred_filled": 61,
+   "recall_ed2": 0.6956521739130435,
+   "truth_filled": 69,
+   "wrong_when_filled": 13
+  },
+  "mac-qwen3-vl-8b-vision|owner|publication_date": {
+   "docs": 56,
+   "ed2": 18,
+   "exact": 17,
+   "fill_rate": 0.42857142857142855,
+   "filled_when_empty": 0,
+   "null_when_truth": 23,
+   "precision_ed2": 0.75,
+   "pred_filled": 24,
+   "recall_ed2": 0.3829787234042553,
+   "truth_filled": 47,
+   "wrong_when_filled": 6
+  },
+  "mac-qwen3-vl-8b-vision|owner|recipient_place": {
+   "docs": 59,
+   "ed2": 36,
+   "exact": 24,
+   "fill_rate": 0.7796610169491526,
+   "filled_when_empty": 3,
+   "null_when_truth": 4,
+   "precision_ed2": 0.782608695652174,
+   "pred_filled": 46,
+   "recall_ed2": 0.7659574468085106,
+   "truth_filled": 47,
+   "wrong_when_filled": 10
+  },
+  "mac-qwen3-vl-8b-vision|owner|title": {
+   "docs": 166,
+   "ed2": 72,
+   "exact": 68,
+   "fill_rate": 0.6987951807228916,
+   "filled_when_empty": 3,
+   "null_when_truth": 39,
+   "precision_ed2": 0.6206896551724138,
+   "pred_filled": 116,
+   "recall_ed2": 0.47368421052631576,
+   "truth_filled": 152,
+   "wrong_when_filled": 44
+  },
+  "mac-qwen3.5-4b-image|drafted|byline": {
+   "docs": 119,
+   "ed2": 73,
+   "exact": 72,
+   "fill_rate": 0.7647058823529411,
+   "filled_when_empty": 10,
+   "null_when_truth": 5,
+   "precision_ed2": 0.8021978021978022,
+   "pred_filled": 91,
+   "recall_ed2": 0.8488372093023255,
+   "truth_filled": 86,
+   "wrong_when_filled": 18
+  },
+  "mac-qwen3.5-4b-image|drafted|kind": {
+   "docs": 292,
+   "ed2": 234,
+   "exact": 204,
+   "fill_rate": 0.958904109589041,
+   "filled_when_empty": 0,
+   "null_when_truth": 12,
+   "precision_ed2": 0.8357142857142857,
+   "pred_filled": 280,
+   "recall_ed2": 0.8013698630136986,
+   "truth_filled": 292,
+   "wrong_when_filled": 46
+  },
+  "mac-qwen3.5-4b-image|drafted|publication": {
+   "docs": 285,
+   "ed2": 73,
+   "exact": 72,
+   "fill_rate": 0.41403508771929826,
+   "filled_when_empty": 32,
+   "null_when_truth": 7,
+   "precision_ed2": 0.6186440677966102,
+   "pred_filled": 118,
+   "recall_ed2": 0.7849462365591398,
+   "truth_filled": 93,
+   "wrong_when_filled": 45
+  },
+  "mac-qwen3.5-4b-image|drafted|publication_date": {
+   "docs": 121,
+   "ed2": 77,
+   "exact": 73,
+   "fill_rate": 0.7933884297520661,
+   "filled_when_empty": 13,
+   "null_when_truth": 9,
+   "precision_ed2": 0.8020833333333334,
+   "pred_filled": 96,
+   "recall_ed2": 0.8369565217391305,
+   "truth_filled": 92,
+   "wrong_when_filled": 19
+  },
+  "mac-qwen3.5-4b-image|drafted|recipient_place": {
+   "docs": 147,
+   "ed2": 51,
+   "exact": 40,
+   "fill_rate": 0.7074829931972789,
+   "filled_when_empty": 47,
+   "null_when_truth": 4,
+   "precision_ed2": 0.49038461538461536,
+   "pred_filled": 104,
+   "recall_ed2": 0.8360655737704918,
+   "truth_filled": 61,
+   "wrong_when_filled": 53
+  },
+  "mac-qwen3.5-4b-image|drafted|title": {
+   "docs": 285,
+   "ed2": 110,
+   "exact": 107,
+   "fill_rate": 0.5157894736842106,
+   "filled_when_empty": 15,
+   "null_when_truth": 20,
+   "precision_ed2": 0.7482993197278912,
+   "pred_filled": 147,
+   "recall_ed2": 0.7236842105263158,
+   "truth_filled": 152,
+   "wrong_when_filled": 37
+  },
+  "mac-qwen3.5-4b-image|owner|byline": {
+   "docs": 57,
+   "ed2": 40,
+   "exact": 40,
+   "fill_rate": 0.8596491228070176,
+   "filled_when_empty": 4,
+   "null_when_truth": 2,
+   "precision_ed2": 0.8163265306122449,
+   "pred_filled": 49,
+   "recall_ed2": 0.851063829787234,
+   "truth_filled": 47,
+   "wrong_when_filled": 9
+  },
+  "mac-qwen3.5-4b-image|owner|kind": {
+   "docs": 76,
+   "ed2": 53,
+   "exact": 44,
+   "fill_rate": 0.9605263157894737,
+   "filled_when_empty": 0,
+   "null_when_truth": 3,
+   "precision_ed2": 0.726027397260274,
+   "pred_filled": 73,
+   "recall_ed2": 0.6973684210526315,
+   "truth_filled": 76,
+   "wrong_when_filled": 20
+  },
+  "mac-qwen3.5-4b-image|owner|publication": {
+   "docs": 80,
+   "ed2": 53,
+   "exact": 52,
+   "fill_rate": 0.85,
+   "filled_when_empty": 2,
+   "null_when_truth": 3,
+   "precision_ed2": 0.7794117647058824,
+   "pred_filled": 68,
+   "recall_ed2": 0.7681159420289855,
+   "truth_filled": 69,
+   "wrong_when_filled": 15
+  },
+  "mac-qwen3.5-4b-image|owner|publication_date": {
+   "docs": 56,
+   "ed2": 37,
+   "exact": 36,
+   "fill_rate": 0.7857142857142857,
+   "filled_when_empty": 3,
+   "null_when_truth": 6,
+   "precision_ed2": 0.8409090909090909,
+   "pred_filled": 44,
+   "recall_ed2": 0.7872340425531915,
+   "truth_filled": 47,
+   "wrong_when_filled": 7
+  },
+  "mac-qwen3.5-4b-image|owner|recipient_place": {
+   "docs": 59,
+   "ed2": 38,
+   "exact": 30,
+   "fill_rate": 0.8135593220338984,
+   "filled_when_empty": 5,
+   "null_when_truth": 4,
+   "precision_ed2": 0.7916666666666666,
+   "pred_filled": 48,
+   "recall_ed2": 0.8085106382978723,
+   "truth_filled": 47,
+   "wrong_when_filled": 10
+  },
+  "mac-qwen3.5-4b-image|owner|title": {
+   "docs": 166,
+   "ed2": 110,
+   "exact": 107,
+   "fill_rate": 0.8132530120481928,
+   "filled_when_empty": 3,
+   "null_when_truth": 20,
+   "precision_ed2": 0.8148148148148148,
+   "pred_filled": 135,
+   "recall_ed2": 0.7236842105263158,
+   "truth_filled": 152,
+   "wrong_when_filled": 25
+  },
+  "mac-qwen3.5-4b-mac|drafted|byline": {
+   "docs": 119,
+   "ed2": 67,
+   "exact": 67,
+   "fill_rate": 0.8487394957983193,
+   "filled_when_empty": 21,
+   "null_when_truth": 6,
+   "precision_ed2": 0.6633663366336634,
+   "pred_filled": 101,
+   "recall_ed2": 0.7790697674418605,
+   "truth_filled": 86,
+   "wrong_when_filled": 34
+  },
+  "mac-qwen3.5-4b-mac|drafted|kind": {
+   "docs": 292,
+   "ed2": 230,
+   "exact": 207,
+   "fill_rate": 0.9965753424657534,
+   "filled_when_empty": 0,
+   "null_when_truth": 1,
+   "precision_ed2": 0.7903780068728522,
+   "pred_filled": 291,
+   "recall_ed2": 0.7876712328767124,
+   "truth_filled": 292,
+   "wrong_when_filled": 61
+  },
+  "mac-qwen3.5-4b-mac|drafted|publication": {
+   "docs": 285,
+   "ed2": 62,
+   "exact": 60,
+   "fill_rate": 0.2912280701754386,
+   "filled_when_empty": 7,
+   "null_when_truth": 17,
+   "precision_ed2": 0.7469879518072289,
+   "pred_filled": 83,
+   "recall_ed2": 0.6666666666666666,
+   "truth_filled": 93,
+   "wrong_when_filled": 21
+  },
+  "mac-qwen3.5-4b-mac|drafted|publication_date": {
+   "docs": 121,
+   "ed2": 60,
+   "exact": 53,
+   "fill_rate": 0.5785123966942148,
+   "filled_when_empty": 4,
+   "null_when_truth": 26,
+   "precision_ed2": 0.8571428571428571,
+   "pred_filled": 70,
+   "recall_ed2": 0.6521739130434783,
+   "truth_filled": 92,
+   "wrong_when_filled": 10
+  },
+  "mac-qwen3.5-4b-mac|drafted|recipient_place": {
+   "docs": 147,
+   "ed2": 51,
+   "exact": 39,
+   "fill_rate": 0.7687074829931972,
+   "filled_when_empty": 54,
+   "null_when_truth": 2,
+   "precision_ed2": 0.45132743362831856,
+   "pred_filled": 113,
+   "recall_ed2": 0.8360655737704918,
+   "truth_filled": 61,
+   "wrong_when_filled": 62
+  },
+  "mac-qwen3.5-4b-mac|drafted|title": {
+   "docs": 285,
+   "ed2": 61,
+   "exact": 57,
+   "fill_rate": 0.45614035087719296,
+   "filled_when_empty": 13,
+   "null_when_truth": 35,
+   "precision_ed2": 0.46923076923076923,
+   "pred_filled": 130,
+   "recall_ed2": 0.40131578947368424,
+   "truth_filled": 152,
+   "wrong_when_filled": 69
+  },
+  "mac-qwen3.5-4b-mac|owner|byline": {
+   "docs": 57,
+   "ed2": 37,
+   "exact": 37,
+   "fill_rate": 0.8596491228070176,
+   "filled_when_empty": 6,
+   "null_when_truth": 4,
+   "precision_ed2": 0.7551020408163265,
+   "pred_filled": 49,
+   "recall_ed2": 0.7872340425531915,
+   "truth_filled": 47,
+   "wrong_when_filled": 12
+  },
+  "mac-qwen3.5-4b-mac|owner|kind": {
+   "docs": 76,
+   "ed2": 49,
+   "exact": 41,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.6447368421052632,
+   "pred_filled": 76,
+   "recall_ed2": 0.6447368421052632,
+   "truth_filled": 76,
+   "wrong_when_filled": 27
+  },
+  "mac-qwen3.5-4b-mac|owner|publication": {
+   "docs": 80,
+   "ed2": 45,
+   "exact": 44,
+   "fill_rate": 0.725,
+   "filled_when_empty": 0,
+   "null_when_truth": 11,
+   "precision_ed2": 0.7758620689655172,
+   "pred_filled": 58,
+   "recall_ed2": 0.6521739130434783,
+   "truth_filled": 69,
+   "wrong_when_filled": 13
+  },
+  "mac-qwen3.5-4b-mac|owner|publication_date": {
+   "docs": 56,
+   "ed2": 27,
+   "exact": 25,
+   "fill_rate": 0.5535714285714286,
+   "filled_when_empty": 0,
+   "null_when_truth": 16,
+   "precision_ed2": 0.8709677419354839,
+   "pred_filled": 31,
+   "recall_ed2": 0.574468085106383,
+   "truth_filled": 47,
+   "wrong_when_filled": 4
+  },
+  "mac-qwen3.5-4b-mac|owner|recipient_place": {
+   "docs": 59,
+   "ed2": 40,
+   "exact": 31,
+   "fill_rate": 0.8813559322033898,
+   "filled_when_empty": 7,
+   "null_when_truth": 2,
+   "precision_ed2": 0.7692307692307693,
+   "pred_filled": 52,
+   "recall_ed2": 0.851063829787234,
+   "truth_filled": 47,
+   "wrong_when_filled": 12
+  },
+  "mac-qwen3.5-4b-mac|owner|title": {
+   "docs": 166,
+   "ed2": 61,
+   "exact": 57,
+   "fill_rate": 0.7289156626506024,
+   "filled_when_empty": 4,
+   "null_when_truth": 35,
+   "precision_ed2": 0.5041322314049587,
+   "pred_filled": 121,
+   "recall_ed2": 0.40131578947368424,
+   "truth_filled": 152,
+   "wrong_when_filled": 60
+  },
+  "mac-qwen3.5-4b-vision|drafted|byline": {
+   "docs": 119,
+   "ed2": 67,
+   "exact": 67,
+   "fill_rate": 0.8487394957983193,
+   "filled_when_empty": 21,
+   "null_when_truth": 6,
+   "precision_ed2": 0.6633663366336634,
+   "pred_filled": 101,
+   "recall_ed2": 0.7790697674418605,
+   "truth_filled": 86,
+   "wrong_when_filled": 34
+  },
+  "mac-qwen3.5-4b-vision|drafted|kind": {
+   "docs": 292,
+   "ed2": 227,
+   "exact": 203,
+   "fill_rate": 0.9965753424657534,
+   "filled_when_empty": 0,
+   "null_when_truth": 1,
+   "precision_ed2": 0.7800687285223368,
+   "pred_filled": 291,
+   "recall_ed2": 0.7773972602739726,
+   "truth_filled": 292,
+   "wrong_when_filled": 64
+  },
+  "mac-qwen3.5-4b-vision|drafted|publication": {
+   "docs": 285,
+   "ed2": 62,
+   "exact": 60,
+   "fill_rate": 0.29473684210526313,
+   "filled_when_empty": 8,
+   "null_when_truth": 17,
+   "precision_ed2": 0.7380952380952381,
+   "pred_filled": 84,
+   "recall_ed2": 0.6666666666666666,
+   "truth_filled": 93,
+   "wrong_when_filled": 22
+  },
+  "mac-qwen3.5-4b-vision|drafted|publication_date": {
+   "docs": 121,
+   "ed2": 60,
+   "exact": 53,
+   "fill_rate": 0.5785123966942148,
+   "filled_when_empty": 4,
+   "null_when_truth": 26,
+   "precision_ed2": 0.8571428571428571,
+   "pred_filled": 70,
+   "recall_ed2": 0.6521739130434783,
+   "truth_filled": 92,
+   "wrong_when_filled": 10
+  },
+  "mac-qwen3.5-4b-vision|drafted|recipient_place": {
+   "docs": 147,
+   "ed2": 52,
+   "exact": 39,
+   "fill_rate": 0.7755102040816326,
+   "filled_when_empty": 55,
+   "null_when_truth": 2,
+   "precision_ed2": 0.45614035087719296,
+   "pred_filled": 114,
+   "recall_ed2": 0.8524590163934426,
+   "truth_filled": 61,
+   "wrong_when_filled": 62
+  },
+  "mac-qwen3.5-4b-vision|drafted|title": {
+   "docs": 285,
+   "ed2": 59,
+   "exact": 54,
+   "fill_rate": 0.44912280701754387,
+   "filled_when_empty": 12,
+   "null_when_truth": 36,
+   "precision_ed2": 0.4609375,
+   "pred_filled": 128,
+   "recall_ed2": 0.3881578947368421,
+   "truth_filled": 152,
+   "wrong_when_filled": 69
+  },
+  "mac-qwen3.5-4b-vision|owner|byline": {
+   "docs": 57,
+   "ed2": 37,
+   "exact": 37,
+   "fill_rate": 0.8596491228070176,
+   "filled_when_empty": 6,
+   "null_when_truth": 4,
+   "precision_ed2": 0.7551020408163265,
+   "pred_filled": 49,
+   "recall_ed2": 0.7872340425531915,
+   "truth_filled": 47,
+   "wrong_when_filled": 12
+  },
+  "mac-qwen3.5-4b-vision|owner|kind": {
+   "docs": 76,
+   "ed2": 49,
+   "exact": 41,
+   "fill_rate": 1.0,
+   "filled_when_empty": 0,
+   "null_when_truth": 0,
+   "precision_ed2": 0.6447368421052632,
+   "pred_filled": 76,
+   "recall_ed2": 0.6447368421052632,
+   "truth_filled": 76,
+   "wrong_when_filled": 27
+  },
+  "mac-qwen3.5-4b-vision|owner|publication": {
+   "docs": 80,
+   "ed2": 45,
+   "exact": 44,
+   "fill_rate": 0.725,
+   "filled_when_empty": 0,
+   "null_when_truth": 11,
+   "precision_ed2": 0.7758620689655172,
+   "pred_filled": 58,
+   "recall_ed2": 0.6521739130434783,
+   "truth_filled": 69,
+   "wrong_when_filled": 13
+  },
+  "mac-qwen3.5-4b-vision|owner|publication_date": {
+   "docs": 56,
+   "ed2": 27,
+   "exact": 25,
+   "fill_rate": 0.5535714285714286,
+   "filled_when_empty": 0,
+   "null_when_truth": 16,
+   "precision_ed2": 0.8709677419354839,
+   "pred_filled": 31,
+   "recall_ed2": 0.574468085106383,
+   "truth_filled": 47,
+   "wrong_when_filled": 4
+  },
+  "mac-qwen3.5-4b-vision|owner|recipient_place": {
+   "docs": 59,
+   "ed2": 40,
+   "exact": 31,
+   "fill_rate": 0.8813559322033898,
+   "filled_when_empty": 7,
+   "null_when_truth": 2,
+   "precision_ed2": 0.7692307692307693,
+   "pred_filled": 52,
+   "recall_ed2": 0.851063829787234,
+   "truth_filled": 47,
+   "wrong_when_filled": 12
+  },
+  "mac-qwen3.5-4b-vision|owner|title": {
+   "docs": 166,
+   "ed2": 59,
+   "exact": 54,
+   "fill_rate": 0.7228915662650602,
+   "filled_when_empty": 4,
+   "null_when_truth": 36,
+   "precision_ed2": 0.49166666666666664,
+   "pred_filled": 120,
+   "recall_ed2": 0.3881578947368421,
+   "truth_filled": 152,
+   "wrong_when_filled": 61
+  },
   "tagging|drafted|byline": {
    "docs": 115,
    "ed2": 65,
@@ -2290,6 +3975,30 @@
   "extractor": [
    2,
    8
+  ],
+  "mac-qwen3-vl-8b-image": [
+   4,
+   5
+  ],
+  "mac-qwen3-vl-8b-mac": [
+   3,
+   5
+  ],
+  "mac-qwen3-vl-8b-vision": [
+   3,
+   5
+  ],
+  "mac-qwen3.5-4b-image": [
+   4,
+   9
+  ],
+  "mac-qwen3.5-4b-mac": [
+   3,
+   7
+  ],
+  "mac-qwen3.5-4b-vision": [
+   3,
+   7
   ],
   "tagging": [
    4,
@@ -3137,6 +4846,798 @@
    },
    "precision": 0.43137254901960786
   },
+  "mac-qwen3-vl-8b-image|byline": {
+   "census": [
+    12,
+    12
+   ],
+   "filled": 79,
+   "hi": 0.9556415718989373,
+   "lo": 0.7393682100846181,
+   "pool": {
+    "image prompt empty": [
+     1,
+     0,
+     0
+    ],
+    "image prompt filled": [
+     66,
+     30,
+     26
+    ]
+   },
+   "precision": 0.8871794871794872
+  },
+  "mac-qwen3-vl-8b-image|kind": {
+   "census": [
+    24,
+    38
+   ],
+   "filled": 292,
+   "hi": 0.9157798559078866,
+   "lo": 0.742149619012007,
+   "pool": {
+    "image prompt empty": [
+     0,
+     0,
+     0
+    ],
+    "image prompt filled": [
+     254,
+     38,
+     34
+    ]
+   },
+   "precision": 0.8604902667627974
+  },
+  "mac-qwen3-vl-8b-image|publication": {
+   "census": [
+    13,
+    21
+   ],
+   "filled": 121,
+   "hi": 0.8694250374674488,
+   "lo": 0.599938868476346,
+   "pool": {
+    "image prompt empty": [
+     30,
+     3,
+     1
+    ],
+    "image prompt filled": [
+     70,
+     46,
+     43
+    ]
+   },
+   "precision": 0.7308659719726913
+  },
+  "mac-qwen3-vl-8b-image|publication_date": {
+   "census": [
+    3,
+    7
+   ],
+   "filled": 34,
+   "hi": 0.7868626171272096,
+   "lo": 0.331385432519297,
+   "pool": {
+    "image prompt empty": [
+     9,
+     4,
+     1
+    ],
+    "image prompt filled": [
+     18,
+     6,
+     5
+    ]
+   },
+   "precision": 0.5955882352941176
+  },
+  "mac-qwen3-vl-8b-image|recipient_place": {
+   "census": [
+    13,
+    16
+   ],
+   "filled": 78,
+   "hi": 0.9091136537098091,
+   "lo": 0.5481747686248164,
+   "pool": {
+    "image prompt empty": [
+     16,
+     0,
+     0
+    ],
+    "image prompt filled": [
+     46,
+     32,
+     26
+    ]
+   },
+   "precision": 0.8125
+  },
+  "mac-qwen3-vl-8b-image|title": {
+   "census": [
+    10,
+    17
+   ],
+   "filled": 148,
+   "hi": 0.8703887354505258,
+   "lo": 0.7218305495619274,
+   "pool": {
+    "image prompt empty": [
+     13,
+     2,
+     0
+    ],
+    "image prompt filled": [
+     118,
+     118,
+     105
+    ]
+   },
+   "precision": 0.777027027027027
+  },
+  "mac-qwen3-vl-8b-mac|byline": {
+   "census": [
+    12,
+    12
+   ],
+   "filled": 64,
+   "hi": 0.9089487577330205,
+   "lo": 0.6078925755242264,
+   "pool": {
+    "image prompt empty": [
+     3,
+     1,
+     0
+    ],
+    "image prompt filled": [
+     49,
+     21,
+     16
+    ]
+   },
+   "precision": 0.7708333333333334
+  },
+  "mac-qwen3-vl-8b-mac|kind": {
+   "census": [
+    20,
+    38
+   ],
+   "filled": 292,
+   "hi": 0.7538389079890214,
+   "lo": 0.5024835669104429,
+   "pool": {
+    "image prompt empty": [
+     0,
+     0,
+     0
+    ],
+    "image prompt filled": [
+     254,
+     38,
+     25
+    ]
+   },
+   "precision": 0.6407714491708724
+  },
+  "mac-qwen3-vl-8b-mac|publication": {
+   "census": [
+    11,
+    19
+   ],
+   "filled": 90,
+   "hi": 0.8620020337814491,
+   "lo": 0.6471748325932374,
+   "pool": {
+    "image prompt empty": [
+     10,
+     1,
+     0
+    ],
+    "image prompt filled": [
+     61,
+     41,
+     37
+    ]
+   },
+   "precision": 0.7338753387533875
+  },
+  "mac-qwen3-vl-8b-mac|publication_date": {
+   "census": [
+    5,
+    9
+   ],
+   "filled": 54,
+   "hi": 0.8968677826770909,
+   "lo": 0.575728709875244,
+   "pool": {
+    "image prompt empty": [
+     3,
+     0,
+     0
+    ],
+    "image prompt filled": [
+     42,
+     15,
+     13
+    ]
+   },
+   "precision": 0.8117647058823529
+  },
+  "mac-qwen3-vl-8b-mac|recipient_place": {
+   "census": [
+    10,
+    12
+   ],
+   "filled": 63,
+   "hi": 0.8641043187989372,
+   "lo": 0.600268521037831,
+   "pool": {
+    "image prompt empty": [
+     8,
+     2,
+     0
+    ],
+    "image prompt filled": [
+     43,
+     32,
+     26
+    ]
+   },
+   "precision": 0.7132936507936508
+  },
+  "mac-qwen3-vl-8b-mac|title": {
+   "census": [
+    5,
+    17
+   ],
+   "filled": 124,
+   "hi": 0.701640138049055,
+   "lo": 0.5119505241151869,
+   "pool": {
+    "image prompt empty": [
+     9,
+     2,
+     0
+    ],
+    "image prompt filled": [
+     98,
+     98,
+     68
+    ]
+   },
+   "precision": 0.5887096774193549
+  },
+  "mac-qwen3-vl-8b-vision|byline": {
+   "census": [
+    12,
+    12
+   ],
+   "filled": 64,
+   "hi": 0.9089487577330205,
+   "lo": 0.6078925755242264,
+   "pool": {
+    "image prompt empty": [
+     3,
+     1,
+     0
+    ],
+    "image prompt filled": [
+     49,
+     21,
+     16
+    ]
+   },
+   "precision": 0.7708333333333334
+  },
+  "mac-qwen3-vl-8b-vision|kind": {
+   "census": [
+    20,
+    38
+   ],
+   "filled": 292,
+   "hi": 0.7538389079890214,
+   "lo": 0.5024835669104429,
+   "pool": {
+    "image prompt empty": [
+     0,
+     0,
+     0
+    ],
+    "image prompt filled": [
+     254,
+     38,
+     25
+    ]
+   },
+   "precision": 0.6407714491708724
+  },
+  "mac-qwen3-vl-8b-vision|publication": {
+   "census": [
+    11,
+    19
+   ],
+   "filled": 90,
+   "hi": 0.8620020337814491,
+   "lo": 0.6471748325932374,
+   "pool": {
+    "image prompt empty": [
+     10,
+     1,
+     0
+    ],
+    "image prompt filled": [
+     61,
+     41,
+     37
+    ]
+   },
+   "precision": 0.7338753387533875
+  },
+  "mac-qwen3-vl-8b-vision|publication_date": {
+   "census": [
+    5,
+    9
+   ],
+   "filled": 54,
+   "hi": 0.8968677826770909,
+   "lo": 0.575728709875244,
+   "pool": {
+    "image prompt empty": [
+     3,
+     0,
+     0
+    ],
+    "image prompt filled": [
+     42,
+     15,
+     13
+    ]
+   },
+   "precision": 0.8117647058823529
+  },
+  "mac-qwen3-vl-8b-vision|recipient_place": {
+   "census": [
+    10,
+    12
+   ],
+   "filled": 61,
+   "hi": 0.8667186602718737,
+   "lo": 0.609344455457911,
+   "pool": {
+    "image prompt empty": [
+     7,
+     2,
+     0
+    ],
+    "image prompt filled": [
+     42,
+     32,
+     26
+    ]
+   },
+   "precision": 0.7233606557377049
+  },
+  "mac-qwen3-vl-8b-vision|title": {
+   "census": [
+    5,
+    17
+   ],
+   "filled": 122,
+   "hi": 0.6994682139973315,
+   "lo": 0.5124292858085554,
+   "pool": {
+    "image prompt empty": [
+     8,
+     2,
+     0
+    ],
+    "image prompt filled": [
+     97,
+     97,
+     67
+    ]
+   },
+   "precision": 0.5901639344262295
+  },
+  "mac-qwen3.5-4b-image|byline": {
+   "census": [
+    13,
+    13
+   ],
+   "filled": 91,
+   "hi": 0.8926512440827856,
+   "lo": 0.6528235721271952,
+   "pool": {
+    "image prompt empty": [
+     10,
+     4,
+     0
+    ],
+    "image prompt filled": [
+     68,
+     32,
+     27
+    ]
+   },
+   "precision": 0.7733516483516484
+  },
+  "mac-qwen3.5-4b-image|kind": {
+   "census": [
+    24,
+    36
+   ],
+   "filled": 280,
+   "hi": 0.8579187160043871,
+   "lo": 0.6330109803276441,
+   "pool": {
+    "image prompt empty": [
+     0,
+     0,
+     0
+    ],
+    "image prompt filled": [
+     244,
+     37,
+     29
+    ]
+   },
+   "precision": 0.7687258687258688
+  },
+  "mac-qwen3.5-4b-image|publication": {
+   "census": [
+    12,
+    21
+   ],
+   "filled": 118,
+   "hi": 0.7883756488453882,
+   "lo": 0.5452185961403813,
+   "pool": {
+    "image prompt empty": [
+     33,
+     3,
+     0
+    ],
+    "image prompt filled": [
+     64,
+     44,
+     41
+    ]
+   },
+   "precision": 0.6070878274268104
+  },
+  "mac-qwen3.5-4b-image|publication_date": {
+   "census": [
+    12,
+    14
+   ],
+   "filled": 96,
+   "hi": 0.9201977062638912,
+   "lo": 0.6689758394820279,
+   "pool": {
+    "image prompt empty": [
+     14,
+     4,
+     1
+    ],
+    "image prompt filled": [
+     68,
+     26,
+     24
+    ]
+   },
+   "precision": 0.8153044871794872
+  },
+  "mac-qwen3.5-4b-image|recipient_place": {
+   "census": [
+    10,
+    13
+   ],
+   "filled": 104,
+   "hi": 0.7310530703300478,
+   "lo": 0.4211045144309647,
+   "pool": {
+    "image prompt empty": [
+     46,
+     4,
+     0
+    ],
+    "image prompt filled": [
+     45,
+     31,
+     28
+    ]
+   },
+   "precision": 0.4869727047146402
+  },
+  "mac-qwen3.5-4b-image|title": {
+   "census": [
+    7,
+    18
+   ],
+   "filled": 147,
+   "hi": 0.8450733518353856,
+   "lo": 0.6941455800524464,
+   "pool": {
+    "image prompt empty": [
+     14,
+     2,
+     0
+    ],
+    "image prompt filled": [
+     115,
+     115,
+     103
+    ]
+   },
+   "precision": 0.7482993197278912
+  },
+  "mac-qwen3.5-4b-mac|byline": {
+   "census": [
+    13,
+    14
+   ],
+   "filled": 101,
+   "hi": 0.8189739736749478,
+   "lo": 0.5628940952100383,
+   "pool": {
+    "image prompt empty": [
+     20,
+     6,
+     0
+    ],
+    "image prompt filled": [
+     67,
+     29,
+     24
+    ]
+   },
+   "precision": 0.6777057016046433
+  },
+  "mac-qwen3.5-4b-mac|kind": {
+   "census": [
+    22,
+    38
+   ],
+   "filled": 291,
+   "hi": 0.7971894884981099,
+   "lo": 0.5558889387853604,
+   "pool": {
+    "image prompt empty": [
+     0,
+     0,
+     0
+    ],
+    "image prompt filled": [
+     253,
+     38,
+     27
+    ]
+   },
+   "precision": 0.6933441852052813
+  },
+  "mac-qwen3.5-4b-mac|publication": {
+   "census": [
+    9,
+    16
+   ],
+   "filled": 83,
+   "hi": 0.8579148367443107,
+   "lo": 0.6376956685202595,
+   "pool": {
+    "image prompt empty": [
+     8,
+     1,
+     0
+    ],
+    "image prompt filled": [
+     59,
+     41,
+     36
+    ]
+   },
+   "precision": 0.7325888921539818
+  },
+  "mac-qwen3.5-4b-mac|publication_date": {
+   "census": [
+    6,
+    8
+   ],
+   "filled": 70,
+   "hi": 0.9513941323768637,
+   "lo": 0.692258364387221,
+   "pool": {
+    "image prompt empty": [
+     4,
+     0,
+     0
+    ],
+    "image prompt filled": [
+     58,
+     23,
+     21
+    ]
+   },
+   "precision": 0.8932806324110673
+  },
+  "mac-qwen3.5-4b-mac|recipient_place": {
+   "census": [
+    12,
+    15
+   ],
+   "filled": 113,
+   "hi": 0.6929852474216818,
+   "lo": 0.3990125760971605,
+   "pool": {
+    "image prompt empty": [
+     52,
+     5,
+     0
+    ],
+    "image prompt filled": [
+     46,
+     32,
+     28
+    ]
+   },
+   "precision": 0.46238938053097345
+  },
+  "mac-qwen3.5-4b-mac|title": {
+   "census": [
+    5,
+    18
+   ],
+   "filled": 130,
+   "hi": 0.5928169812647683,
+   "lo": 0.39406098239427934,
+   "pool": {
+    "image prompt empty": [
+     12,
+     3,
+     0
+    ],
+    "image prompt filled": [
+     100,
+     100,
+     56
+    ]
+   },
+   "precision": 0.46923076923076923
+  },
+  "mac-qwen3.5-4b-vision|byline": {
+   "census": [
+    13,
+    14
+   ],
+   "filled": 101,
+   "hi": 0.8189739736749478,
+   "lo": 0.5628940952100383,
+   "pool": {
+    "image prompt empty": [
+     20,
+     6,
+     0
+    ],
+    "image prompt filled": [
+     67,
+     29,
+     24
+    ]
+   },
+   "precision": 0.6777057016046433
+  },
+  "mac-qwen3.5-4b-vision|kind": {
+   "census": [
+    22,
+    38
+   ],
+   "filled": 291,
+   "hi": 0.7971894884981099,
+   "lo": 0.5558889387853604,
+   "pool": {
+    "image prompt empty": [
+     0,
+     0,
+     0
+    ],
+    "image prompt filled": [
+     253,
+     38,
+     27
+    ]
+   },
+   "precision": 0.6933441852052813
+  },
+  "mac-qwen3.5-4b-vision|publication": {
+   "census": [
+    9,
+    16
+   ],
+   "filled": 84,
+   "hi": 0.8571474780750462,
+   "lo": 0.6301040534188278,
+   "pool": {
+    "image prompt empty": [
+     9,
+     1,
+     0
+    ],
+    "image prompt filled": [
+     59,
+     41,
+     36
+    ]
+   },
+   "precision": 0.7238675958188153
+  },
+  "mac-qwen3.5-4b-vision|publication_date": {
+   "census": [
+    6,
+    8
+   ],
+   "filled": 70,
+   "hi": 0.9513941323768637,
+   "lo": 0.692258364387221,
+   "pool": {
+    "image prompt empty": [
+     4,
+     0,
+     0
+    ],
+    "image prompt filled": [
+     58,
+     23,
+     21
+    ]
+   },
+   "precision": 0.8932806324110673
+  },
+  "mac-qwen3.5-4b-vision|recipient_place": {
+   "census": [
+    12,
+    15
+   ],
+   "filled": 114,
+   "hi": 0.6907177583631765,
+   "lo": 0.3955124657805188,
+   "pool": {
+    "image prompt empty": [
+     53,
+     5,
+     0
+    ],
+    "image prompt filled": [
+     46,
+     32,
+     28
+    ]
+   },
+   "precision": 0.4583333333333333
+  },
+  "mac-qwen3.5-4b-vision|title": {
+   "census": [
+    4,
+    18
+   ],
+   "filled": 128,
+   "hi": 0.5818837594140183,
+   "lo": 0.38503551414555676,
+   "pool": {
+    "image prompt empty": [
+     11,
+     3,
+     0
+    ],
+    "image prompt filled": [
+     99,
+     99,
+     55
+    ]
+   },
+   "precision": 0.4609375
+  },
   "tagging|byline": {
    "census": [
     10,
@@ -3384,6 +5885,36 @@
    "filled": 17,
    "right": 13
   },
+  "mac-qwen3-vl-8b-image": {
+   "docs": 109,
+   "filled": 35,
+   "right": 22
+  },
+  "mac-qwen3-vl-8b-mac": {
+   "docs": 109,
+   "filled": 52,
+   "right": 38
+  },
+  "mac-qwen3-vl-8b-vision": {
+   "docs": 109,
+   "filled": 52,
+   "right": 38
+  },
+  "mac-qwen3.5-4b-image": {
+   "docs": 109,
+   "filled": 89,
+   "right": 72
+  },
+  "mac-qwen3.5-4b-mac": {
+   "docs": 109,
+   "filled": 66,
+   "right": 53
+  },
+  "mac-qwen3.5-4b-vision": {
+   "docs": 109,
+   "filled": 66,
+   "right": 53
+  },
   "tagging": {
    "docs": 109,
    "filled": 109,
@@ -3498,6 +6029,42 @@
   "extractor|publication_date": "too close",
   "extractor|recipient_place": "below the bar",
   "extractor|title": "below the bar",
+  "mac-qwen3-vl-8b-image|byline": "too close",
+  "mac-qwen3-vl-8b-image|kind": "too close",
+  "mac-qwen3-vl-8b-image|publication": "too close",
+  "mac-qwen3-vl-8b-image|publication_date": "too close",
+  "mac-qwen3-vl-8b-image|recipient_place": "too close",
+  "mac-qwen3-vl-8b-image|title": "too close",
+  "mac-qwen3-vl-8b-mac|byline": "too close",
+  "mac-qwen3-vl-8b-mac|kind": "too close",
+  "mac-qwen3-vl-8b-mac|publication": "too close",
+  "mac-qwen3-vl-8b-mac|publication_date": "too close",
+  "mac-qwen3-vl-8b-mac|recipient_place": "too close",
+  "mac-qwen3-vl-8b-mac|title": "too close",
+  "mac-qwen3-vl-8b-vision|byline": "too close",
+  "mac-qwen3-vl-8b-vision|kind": "too close",
+  "mac-qwen3-vl-8b-vision|publication": "too close",
+  "mac-qwen3-vl-8b-vision|publication_date": "too close",
+  "mac-qwen3-vl-8b-vision|recipient_place": "too close",
+  "mac-qwen3-vl-8b-vision|title": "too close",
+  "mac-qwen3.5-4b-image|byline": "too close",
+  "mac-qwen3.5-4b-image|kind": "too close",
+  "mac-qwen3.5-4b-image|publication": "too close",
+  "mac-qwen3.5-4b-image|publication_date": "too close",
+  "mac-qwen3.5-4b-image|recipient_place": "below the bar",
+  "mac-qwen3.5-4b-image|title": "too close",
+  "mac-qwen3.5-4b-mac|byline": "too close",
+  "mac-qwen3.5-4b-mac|kind": "too close",
+  "mac-qwen3.5-4b-mac|publication": "too close",
+  "mac-qwen3.5-4b-mac|publication_date": "too close",
+  "mac-qwen3.5-4b-mac|recipient_place": "below the bar",
+  "mac-qwen3.5-4b-mac|title": "below the bar",
+  "mac-qwen3.5-4b-vision|byline": "too close",
+  "mac-qwen3.5-4b-vision|kind": "too close",
+  "mac-qwen3.5-4b-vision|publication": "too close",
+  "mac-qwen3.5-4b-vision|publication_date": "too close",
+  "mac-qwen3.5-4b-vision|recipient_place": "below the bar",
+  "mac-qwen3.5-4b-vision|title": "below the bar",
   "tagging|byline": "too close",
   "tagging|kind": "too close",
   "tagging|publication": "too close",
