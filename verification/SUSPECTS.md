@@ -806,10 +806,11 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   (the UI test's tag-sheet step with that fixture alone), filed with `Day 3` or `12 December`.
 - **Would clear it:** the phone's year drops the day and month the model read (or keeps them only when the model's
   year matched).
-- **Status:** `open`
+- **Status:** `cleared` — fixed by `W49.proc-fix-s040`; test `scripts/test-date-route.sh` §6 Live D and E
 - **History:**
   - 2026-10-23 W40.i-sim-ui — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-fix-s040` (seen in a run: fix with that run as its test).
+  - 2026-11-20 W49.proc-fix-s040 — fixed: a typed year other than the read one replaces the whole date; cleared.
 
 ### S-041 · Process Files' cost estimate leaves out the dating and item-field calls
 

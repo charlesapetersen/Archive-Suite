@@ -1508,7 +1508,8 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     /// A document's tags with its date: the dating decision over the tags before any dating, then the phone's
-    /// in-the-room date (a Mac card's beats the phone's), which wins over all; a decade takes no month
+    /// in-the-room date (a Mac card's beats the phone's), which wins over all (keeping a read day and month only under
+    /// the year, and a read day only under the month, they were read with); a decade takes no month
     /// (`SPEC/tag-format.md`). A saved Mac tag card is the operator's explicit Quality decision, including 0/unrated;
     /// the phone's Q input is only the default when the card was skipped. One function, so staging and Finish's
     /// re-date (`redateFromFolders`) cannot come apart.
@@ -1516,8 +1517,14 @@ final class LiveCaptureProcessor: ObservableObject {
                                   group: CaptureGroup) -> GeneratedTags {
         var tags = preDating
         dating?.apply(to: &tags)
-        if let y = mac?.year ?? group.year { tags.year = String(y); tags.dateUncertain = false }
+        // W49.proc-fix-s040: a typed year other than the one read replaces the whole date, so the day and month read
+        // from another date do not stay on it; a typed month other than the one read drops the read day the same way.
+        if let y = mac?.year ?? group.year {
+            if tags.year != String(y) { tags.month = nil; tags.day = nil }
+            tags.year = String(y); tags.dateUncertain = false
+        }
         if let m = mac?.month ?? group.month, let mt = GeneratedTags.monthTag(m), tags.year?.hasSuffix("s") != true {
+            if tags.month != mt { tags.day = nil }
             tags.month = mt
         }
         if let mac { tags.quality = mac.quality }

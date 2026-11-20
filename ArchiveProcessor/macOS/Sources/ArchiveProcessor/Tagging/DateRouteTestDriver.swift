@@ -971,10 +971,11 @@ enum DateRouteTestDriver {
         try? fm.createDirectory(at: tmp, withIntermediateDirectories: true)
 
         // A, its year in the text · B, no year in the text, dated on the page image · C, no year, an estimate that cites
-        // a neighbour Live never sends · D, a phone year. Every tagging reply names a year; each page's width names it.
+        // a neighbour Live never sends · D, a phone year · E, a phone year equal to the read one. Every tagging reply names a year; each page's width names it.
         let docs: [(gid: String, text: String, width: Int, phoneYear: Int?)] = [
             ("A", "DOCA Washington\nMarch 3, 1947\nDear Mr. Hale:", 110, nil), ("B", "DOCB MEMORANDUM\nTo: Files", 120, nil),
-            ("C", "DOCC Note to the files", 130, nil), ("D", "DOCD Another note", 140, 1933)]
+            ("C", "DOCC Note to the files", 130, nil), ("D", "DOCD Another note", 140, 1933),
+            ("E", "DOCE A fifth note", 150, 1950)]
         let anyYear = #"{"year": "1950", "month": "05 May", "day": "Day 9", "date_uncertain": false, "format": "memo"}"#
         wire.taggingReply = Dictionary(uniqueKeysWithValues: markers.map { ($0, anyYear) })
         wire.traceReply = [
@@ -1029,8 +1030,8 @@ enum DateRouteTestDriver {
             return PDFHeaderParser.parse(page).header?.dateEvidence
         }
 
-        check("6 Live: tagged four times, dated three (not D, whose phone year wins)",
-              wire.tagging == 4 && wire.trace.sorted() == ["DOCA", "DOCB", "DOCC"], "\(wire.tagging) \(wire.trace)")
+        check("6 Live: tagged five times, dated three (not D or E, whose phone years win)",
+              wire.tagging == 5 && wire.trace.sorted() == ["DOCA", "DOCB", "DOCC"], "\(wire.tagging) \(wire.trace)")
         check("6 Live: the image pass on B and C only, as the measured model",
               wire.images.map { $0.first ?? 0 }.sorted() == [120, 130] && wire.models.contains(DateRoute.gatewayModel),
               "\(wire.images)")
@@ -1052,12 +1053,23 @@ enum DateRouteTestDriver {
         let d = tags("D")
         check("6 Live D: the phone's 1933, no dating object", d.contains("1933") && !d.contains("1950")
               && dating("D") == nil && json(staged("D")?.jsonURL)["subjects"] != nil, "\(d)")
+        // W49.proc-fix-s040 (S-040, run /tmp/ap-e2e-ui-r5: Q2 + 1962 on a page read 1974-12-03 was filed `1962, Day 3`):
+        // a typed year other than the read one takes the read day and month with it, on the tags and in the sidecar.
+        let dJSON = json(staged("D")?.jsonURL)
+        check("6 Live D: the phone's year drops the day and month read from the tagging call's 1950-05-09",
+              !d.contains("Day 9") && !d.contains("5 May") && dJSON["date"] as? String == "1933",
+              "\(d) \(String(describing: dJSON["date"]))")
+        let e = tags("E")
+        check("6 Live E: a phone year equal to the read one keeps the read day and month",
+              e.contains("1950") && e.contains("5 May") && e.contains("Day 9") && dating("E") == nil
+              && json(staged("E")?.jsonURL)["date"] as? String == "1950-05-09",
+              "\(e) \(String(describing: json(staged("E")?.jsonURL)["date"]))")
 
         // W47.item-fields-build: the item-field call on Live documents too (the gateway is the measured route).
         func fields(_ gid: String) -> [String: Any]? { json(staged(gid)?.jsonURL)["item_fields"] as? [String: Any] }
         check("6 Live: an item-field call per document, its object in each sidecar",
-              wire.lock.withLock { wire.itemFields } == 4
-              && ["A", "B", "C", "D"].allSatisfy { fields($0)?["status"] as? String == "read" }
+              wire.lock.withLock { wire.itemFields } == 5
+              && ["A", "B", "C", "D", "E"].allSatisfy { fields($0)?["status"] as? String == "read" }
               && fields("A")?["route"] as? String == "Gateway · " + ItemFieldExtractor.gatewayModel,
               "\(wire.itemFields) \(String(describing: fields("A")))")
 
