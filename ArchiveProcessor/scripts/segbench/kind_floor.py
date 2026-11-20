@@ -8,7 +8,7 @@ the run's model otherwise (PageKindRouting.choose; a form call, form probability
 PageKind.decide). This scores that rule at other cuts, and with a prior that gives an unsure page the kind of the sure
 pages beside it, against keeping the run's model for every page. Three parts:
 
-1. The 141 labelled owner pages (kind_classifier's labels, at their own resolution): each page's probabilities from a
+1. The 144 labelled owner pages (kind_classifier's labels, at their own resolution): each page's probabilities from a
    model of the shipped form (Vision signals + feature print, the hand and the form regressions, lam 0.05) fitted
    without any page of its folder, so a page's confidence is not flattered by its own label. How often the top class
    is right above and below each cut.

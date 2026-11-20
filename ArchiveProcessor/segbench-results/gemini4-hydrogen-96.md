@@ -6,7 +6,7 @@ Gemini 4 Hydrogen (`gemini-4-hydrogen`, returned as gemini-4-hydrogen), read on 
 
 Hydrogen does not resolve ahead of Gemini 3.8 Flash on the 96 (a tie under the rerun tie rule, 0.49 points or an interval across 0), so the app's default reader stays Gemini 3.8 Flash. From 1 Jan 2027 the two cost the same per token, so only the reading would separate them.
 
-Per page Hydrogen costs more than the same price suggests: at low thinking it spent 751 thinking tokens a page, billed as output, where 3.8 Flash's cached calls billed none, so it is $11.39 per 1,000 pages against 3.8's $6.44 at the January price ($3.22 today). It answered every page (3.8 Flash refused two printed pages) and named the page kind right more often. The bench's headline sets p081 apart (no correctable truth): there 3.8 Flash is 96.47, Hydrogen 96.90 and Qwen3.6 27B 95.38.
+Per page Hydrogen costs more than the same price suggests: at low thinking it spent 751 thinking tokens a page, billed as output, where 3.8 Flash's cached calls billed little (10 of its 99 report thinking, 11,206 tokens in all, in the usage fields; the dollar figures below count them), so it is $11.39 per 1,000 pages against 3.8's $6.44 at the January price ($3.22 today). It answered every page (3.8 Flash refused two printed pages) and named the page kind right more often. The bench's headline sets p081 apart (no correctable truth): there 3.8 Flash is 96.47, Hydrogen 96.90 and Qwen3.6 27B 95.38.
 
 | | Gemini 4 Hydrogen (drafter's relative) | Gemini 3.8 Flash (the truth's drafter) | Qwen3.6 27B (non-drafter) |
 |---|---:|---:|---:|

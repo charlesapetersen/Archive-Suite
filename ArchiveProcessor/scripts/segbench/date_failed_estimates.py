@@ -18,6 +18,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import date_route_pipeline as RP  # noqa: E402
+import date_undated as DU  # noqa: E402
 
 OUT = HERE.parent.parent / "segbench-results" / "date-failed-estimates.json"
 MODELS = (RP.GEMINI, RP.QWEN)
@@ -65,6 +66,8 @@ def in_decade(r):
 def score(model):
     rows = [json.loads(l) for l in open(RP.CACHE / f"rows-{model}.jsonl", encoding="utf-8")]
     raw = raw_replies(model)
+    rp = DU.SHEET / DU.RULINGS_NAME             # the owner's rulings on 20 undated documents (W46.date-undated-fold)
+    rul = {v["id"]: v["owner"] for v in json.loads(rp.read_text())["documents"].values()} if rp.exists() else {}
     out = {}
     for st in ("owner", "undated"):
         R = [r for r in rows if r["set"] == st]
@@ -89,8 +92,15 @@ def score(model):
             o["right_refused_no_year_in_quote_by_digits"] = dict(collections.Counter(
                 digits_form(r["trace_y"], quote_of(raw(r))) for r in rr
                 if r["reason"] == "quote does not carry the year given"))
-        else:
-            o["newly_shown_false_years"] = len(new)          # every document of the undated set is undated
+        else:     # judged as date_route_pipeline.undated_summary: the owner's ruling where he ruled, else the page pass
+            def own_year(r):
+                o_ = rul.get(r["id"][2:])
+                if o_ is None:
+                    return r.get("page_own") == r["trace_y"]
+                return bool(o_["own"] and o_["lo"] is not None and o_["lo"] <= r["trace_y"] <= o_["hi"])
+            o["newly_shown_owner_ruled"] = {"documents": sorted(r["id"][2:] for r in new if r["id"][2:] in rul),
+                                            "own_date_of_that_year": sorted(r["id"][2:] for r in new if own_year(r))}
+            o["newly_shown_false_years"] = sum(1 for r in new if not own_year(r))
         out[st] = o
     return out
 

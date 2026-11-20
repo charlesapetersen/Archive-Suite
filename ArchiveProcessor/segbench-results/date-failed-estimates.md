@@ -25,8 +25,10 @@ check still refuses and what showing those estimates would add. Script: `scripts
   sits beside a year another step wrote (9 the same year, 13 another), so a shown suggestion would there be a second,
   competing year.
 - **The same on the 27B (cluster route):** 23 of the 25 owner documents with no year would get one: 8 right, 7 wrong
-  (by 1, 1, 1, 2, 2, 4 and 4 years), 8 decade-tagged with 5 inside the decade. On the undated 90, 8 more false
-  years. 21 more sit beside a written year (7 the same).
+  (by 1, 1, 1, 2, 2, 4 and 4 years), 8 decade-tagged with 5 inside the decade. On the undated 90, 8 more suggested
+  years, 7 of them false: the eighth (`cf9b4cc5865cc5a6`, 1982) is a document the owner ruled to carry its own
+  1982 date (W46.date-undated-fold), judged as `date-route-pipeline.md` judges the undated set. None of Gemini's 7 is
+  on a ruled document, so its 7 stand. 21 more sit beside a written year (7 the same).
 - **So the condition as written is about met; what is left is the old question.** Nearly every estimate still
   refused fails because its quote does not carry the year, which is the "untraceable guess" the owner's rule forbids
   writing. Showing it as an unwritten suggestion gives the user, on Gemini, a year for 9 more documents of which 3-7 are
@@ -36,7 +38,10 @@ check still refuses and what showing those estimates would add. Script: `scripts
 ## Measurement card
 
 - **Truth:** the owner's date tags (the 300; years and decades), used only to say whether a suggested year is right;
-  the undated 100 (90 readable) are documents the owner tagged with no date, so any year there is false. The
+  the undated 100 (90 readable) are documents the owner tagged with no date: a year there is false unless the
+  owner's ruling on that document (20 ruled, W46.date-undated-fold) gives it its own date of that year, else unless
+  the Gemini image pass read one (as `date_route_pipeline.undated_summary`; measurement review pass 17 found the
+  first count took every year as false). The
   refusal reasons are the checker's own. The sorting of refused quotes is by their digits only; no session read them.
 - **Selection:** every trace-neigh reply on the owner's 272 with a confirmed JPEG original and the 90 readable
   undated, as W46.date-route-pipeline sampled them; none chosen by a tested route or by ABBYY text.

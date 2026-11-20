@@ -43,6 +43,10 @@
    "newly_shown_reasons": {
     "quote does not carry the year given": 7
    },
+   "newly_shown_owner_ruled": {
+    "documents": [],
+    "own_date_of_that_year": []
+   },
    "newly_shown_false_years": 7
   }
  },
@@ -95,7 +99,15 @@
    "newly_shown_reasons": {
     "quote does not carry the year given": 8
    },
-   "newly_shown_false_years": 8
+   "newly_shown_owner_ruled": {
+    "documents": [
+     "cf9b4cc5865cc5a6"
+    ],
+    "own_date_of_that_year": [
+     "cf9b4cc5865cc5a6"
+    ]
+   },
+   "newly_shown_false_years": 7
   }
  }
 }

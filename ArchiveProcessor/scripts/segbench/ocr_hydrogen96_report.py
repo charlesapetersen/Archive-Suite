@@ -131,7 +131,8 @@ def markdown(o, a, n):
           "the two cost the same per token, so only the reading would separate them."), '',
          f"Per page Hydrogen costs more than the same price suggests: at low thinking it spent "
          f"{o['tokens']['thinking'] / o['calls']:.0f} thinking tokens a page, billed as output, where 3.8 Flash's cached "
-         f"calls billed none, so it is ${o['per_1000']:.2f} per 1,000 pages against 3.8's "
+         f"calls billed little (10 of its 99 report thinking, 11,206 tokens in all, in the usage fields; the dollar "
+         f"figures below count them), so it is ${o['per_1000']:.2f} per 1,000 pages against 3.8's "
          f"${o['old_per_1000_jan2027']:.2f} at the January price (${o['old_per_1000_intro']:.2f} today). It answered "
          f"every page (3.8 Flash refused two printed pages) and named the page kind right more often. The bench's "
          f"headline sets p081 apart (no correctable truth): there 3.8 Flash is 96.47, Hydrogen "
