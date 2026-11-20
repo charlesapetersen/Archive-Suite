@@ -160,6 +160,72 @@ final class BlockHeaderViewProvider: NSTextAttachmentViewProvider {
     }
 }
 
+// MARK: - Chip actions
+
+/// W49.notes-chip-access — what a chip offers, in its buttons' order. One list feeds the buttons, the chip's
+/// right-click menu, VoiceOver's actions and the editor's keyboard commands, so no route can offer an action the
+/// block does not support.
+enum BlockHeaderChipAction: Int, CaseIterable {
+    case jump, reveal, preview, copyForZotero, addToZotero, openInZotero
+
+    /// By what the block supports: a note-passage (extract) anchor jumps to its source note (W7-S3); a source
+    /// anchor (`link`) reveals and previews; a Reader page or document also goes to Zotero (W47.ct-zotero); a
+    /// Zotero ref (`zoteroSelect`) opens in Zotero.
+    static func available(for box: SourceAnchorBox) -> [Self] {
+        var actions: [Self] = []
+        if box.anchor.notePassageTarget != nil { actions.append(.jump) }
+        if box.anchor.link != nil { actions += [.reveal, .preview] }
+        if box.anchor.link != nil && (box.kind == .readerPage || box.kind == .readerDoc) {
+            actions += [.copyForZotero, .addToZotero]
+        }
+        if box.anchor.zoteroSelect != nil { actions.append(.openInZotero) }
+        return actions
+    }
+
+    var buttonTitle: String {
+        switch self {
+        case .jump: "Jump to Source"
+        case .reveal: "Reveal"
+        case .preview: "Preview"
+        case .copyForZotero: "Copy for Zotero"
+        case .addToZotero: "Add to Zotero"
+        case .openInZotero: "Open in Zotero"
+        }
+    }
+
+    /// The menus' and VoiceOver's name, which has no chip beside it to say what is revealed or previewed.
+    var menuTitle: String {
+        switch self {
+        case .reveal: "Reveal Source in Reader"
+        case .preview: "Preview Source"
+        default: buttonTitle
+        }
+    }
+
+    var identifier: String {
+        switch self {
+        case .jump: "an.chip.jump"
+        case .reveal: "an.chip.reveal"
+        case .preview: "an.chip.preview"
+        case .copyForZotero: "an.chip.copyForZotero"
+        case .addToZotero: "an.chip.addToZotero"
+        case .openInZotero: "an.chip.zoteroOpen"
+        }
+    }
+
+    var toolTip: String? {
+        switch self {
+        case .copyForZotero:
+            "Copy this source's archival location, dates, people and item fields as CSL-JSON; "
+                + "in Zotero, choose File ▸ Import from Clipboard"
+        case .addToZotero:
+            "Add this source to Zotero on this Mac, with its subjects as tags, into the library "
+                + "or collection selected there"
+        default: nil
+        }
+    }
+}
+
 // MARK: - Chip view (AppKit)
 
 /// The visible chip: a rounded-rect pill with display label + Reveal button.
@@ -175,6 +241,10 @@ final class BlockHeaderChipView: NSView {
     private let sourceMissing: Bool
     /// W47.ct-zotero — the source's archival location, shown once read.
     private let containerLabel = NSTextField(labelWithString: "")
+    /// What this chip offers, in button order (W49.notes-chip-access).
+    private var actions: [BlockHeaderChipAction] { BlockHeaderChipAction.available(for: box) }
+    /// Retitled "Added to Zotero" once the add succeeds, by whichever route asked.
+    private weak var addButton: NSButton?
 #if DEBUG
     var uiTestSourceNoteID: String? { box.anchor.notePassageTarget?.id.uuidString.lowercased() }
 #endif
@@ -192,6 +262,14 @@ final class BlockHeaderChipView: NSView {
         self.sourceMissing = sourceMissing
         super.init(frame: .zero)
         setupSubviews()
+    }
+
+    /// A chip view for `attachment` with the callbacks its own view was given (the editor's keyboard route, for a
+    /// chip whose view is not installed).
+    convenience init(attachment: BlockHeaderAttachment) {
+        self.init(box: attachment.sourceBox, onReveal: attachment.onReveal, onPreview: attachment.onPreview,
+                  onJump: attachment.onJump, liveLabel: attachment.passageLiveLabel,
+                  sourceMissing: attachment.passageSourceMissing)
     }
 
     @available(*, unavailable)
@@ -241,17 +319,13 @@ final class BlockHeaderChipView: NSView {
         label.lineBreakMode = .byTruncatingMiddle
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-        // Assemble action buttons by what the block actually supports:
-        //  - a source anchor (`link`) gets Reveal + Preview (reader-page / reader-doc);
-        //  - a Zotero ref (`zoteroSelect`) gets "Open in Zotero";
-        //  - a note-passage (extract) anchor gets "Jump to Source" (W7-S3).
-        // A block with none of these (plain freeform) shows just its label rather than dead buttons.
+        // Assemble action buttons by what the block actually supports (`BlockHeaderChipAction.available`).
+        // A block with none (plain freeform) shows just its label rather than dead buttons.
         var views: [NSView] = [label]
 
         // W47.ct-zotero: a Reader source shows where its document sits in the archive, filled in once the file's
         // container is read, and offers its gathered metadata to Zotero.
-        let isReaderSource = box.anchor.link != nil && (box.kind == .readerPage || box.kind == .readerDoc)
-        if isReaderSource {
+        if box.anchor.link != nil && (box.kind == .readerPage || box.kind == .readerDoc) {
             containerLabel.font = .systemFont(ofSize: 10)
             containerLabel.textColor = .secondaryLabelColor
             containerLabel.lineBreakMode = .byTruncatingTail
@@ -262,65 +336,36 @@ final class BlockHeaderChipView: NSView {
             loadContainerLine()
         }
 
-        if isPassage {
-            let jumpButton = NSButton(title: "Jump to Source", target: self,
-                                      action: #selector(jumpClicked))
-            jumpButton.bezelStyle = .inline
-            jumpButton.controlSize = .small
-            jumpButton.font = .systemFont(ofSize: 10)
-            jumpButton.image = NSImage(systemSymbolName: "arrow.up.forward.square",
+        for action in actions {
+            let button = NSButton(title: action.buttonTitle, target: self, action: #selector(buttonClicked(_:)))
+            button.tag = action.rawValue
+            button.bezelStyle = .inline
+            button.controlSize = .small
+            button.font = .systemFont(ofSize: 10)
+            button.toolTip = action.toolTip
+            button.setAccessibilityIdentifier(action.identifier)
+            if action == .jump {
+                button.image = NSImage(systemSymbolName: "arrow.up.forward.square",
                                        accessibilityDescription: "Jump to source")
-            jumpButton.imagePosition = .imageLeading
-            jumpButton.setAccessibilityIdentifier("an.chip.jump")
-            views.append(jumpButton)
+                button.imagePosition = .imageLeading
+            }
+            if action == .addToZotero { addButton = button }
+            views.append(button)
         }
 
-        if box.anchor.link != nil {
-            let revealButton = NSButton(title: "Reveal", target: self, action: #selector(revealClicked))
-            revealButton.bezelStyle = .inline
-            revealButton.controlSize = .small
-            revealButton.font = .systemFont(ofSize: 10)
-            revealButton.setAccessibilityIdentifier("an.chip.reveal")
-
-            let previewButton = NSButton(title: "Preview", target: self, action: #selector(previewClicked))
-            previewButton.bezelStyle = .inline
-            previewButton.controlSize = .small
-            previewButton.font = .systemFont(ofSize: 10)
-            previewButton.setAccessibilityIdentifier("an.chip.preview")
-
-            views.append(revealButton)
-            views.append(previewButton)
-        }
-
-        if isReaderSource {
-            let copyButton = NSButton(title: "Copy for Zotero", target: self, action: #selector(copyForZoteroClicked))
-            copyButton.bezelStyle = .inline
-            copyButton.controlSize = .small
-            copyButton.font = .systemFont(ofSize: 10)
-            copyButton.toolTip = "Copy this source's archival location, dates, people and item fields as CSL-JSON; "
-                + "in Zotero, choose File ▸ Import from Clipboard"
-            copyButton.setAccessibilityIdentifier("an.chip.copyForZotero")
-            views.append(copyButton)
-
-            let addButton = NSButton(title: "Add to Zotero", target: self, action: #selector(addToZoteroClicked))
-            addButton.bezelStyle = .inline
-            addButton.controlSize = .small
-            addButton.font = .systemFont(ofSize: 10)
-            addButton.toolTip = "Add this source to Zotero on this Mac, with its subjects as tags, into the library "
-                + "or collection selected there"
-            addButton.setAccessibilityIdentifier("an.chip.addToZotero")
-            views.append(addButton)
-        }
-
-        if box.anchor.zoteroSelect != nil {
-            let zoteroButton = NSButton(title: "Open in Zotero", target: self,
-                                        action: #selector(openZoteroClicked))
-            zoteroButton.bezelStyle = .inline
-            zoteroButton.controlSize = .small
-            zoteroButton.font = .systemFont(ofSize: 10)
-            zoteroButton.setAccessibilityIdentifier("an.chip.zoteroOpen")
-            views.append(zoteroButton)
-        }
+        // W49.notes-chip-access — the same actions without the pointer on a button: a right-click on the chip,
+        // and VoiceOver's actions on the chip as one element (its buttons stay reachable as its children).
+        menu = actions.isEmpty ? nil : actionMenu()
+        setAccessibilityElement(true)
+        setAccessibilityRole(.group)
+        setAccessibilityLabel("Source: \(displayText)")
+        setAccessibilityIdentifier("an.chip")
+        setAccessibilityCustomActions(actions.map { action in
+            NSAccessibilityCustomAction(name: action.menuTitle) { [weak self] in
+                self?.perform(action)
+                return self != nil
+            }
+        })
 
         let stack = NSStackView(views: views)
         stack.orientation = .horizontal
@@ -337,17 +382,61 @@ final class BlockHeaderChipView: NSView {
         ])
     }
 
-    @objc private func revealClicked() {
-        onReveal?(box.anchor)
+    /// The chip is one accessibility element, so AppKit no longer offers its subviews as children; its buttons
+    /// are, for VoiceOver to step through.
+    override func accessibilityChildren() -> [Any]? {
+        var buttons: [NSButton] = []
+        func visit(_ view: NSView) {
+            for child in view.subviews {
+                if let button = child as? NSButton { buttons.append(button) } else { visit(child) }
+            }
+        }
+        visit(self)
+        return buttons.filter { !$0.isHidden }.map { button in
+            button.setAccessibilityParent(self)
+            return button
+        }
     }
 
-    @objc private func previewClicked() {
-        onPreview?(box.anchor, self)
+    /// The chip's actions as menu items, for its right-click menu.
+    func actionMenu() -> NSMenu {
+        let menu = NSMenu(title: "Source")
+        for action in actions {
+            let item = NSMenuItem(title: action.menuTitle, action: #selector(menuItemChosen(_:)), keyEquivalent: "")
+            item.target = self
+            item.tag = action.rawValue
+            menu.addItem(item)
+        }
+        return menu
     }
 
-    @objc private func jumpClicked() {
-        onJump?(box.anchor)
+    @objc private func buttonClicked(_ sender: NSButton) {
+        BlockHeaderChipAction(rawValue: sender.tag).map { perform($0) }
     }
+
+    @objc private func menuItemChosen(_ sender: NSMenuItem) {
+        BlockHeaderChipAction(rawValue: sender.tag).map { perform($0) }
+    }
+
+    /// Runs one of the chip's actions, whichever route asked: a button, the menu, VoiceOver or the editor's
+    /// keyboard command. `presenter` is the view a preview popover or an alert attaches to when this chip view
+    /// is not on screen itself (the editor makes a detached one for a chip scrolled out of its viewport).
+    func perform(_ action: BlockHeaderChipAction, presenter: NSView? = nil) {
+        guard actions.contains(action) else { return }
+        self.presenter = presenter
+        switch action {
+        case .jump: onJump?(box.anchor)
+        case .reveal: onReveal?(box.anchor)
+        case .preview: onPreview?(box.anchor, presenter ?? self)
+        case .copyForZotero: copyForZotero()
+        case .addToZotero: addToZotero()
+        case .openInZotero: openInZotero()
+        }
+    }
+
+    /// Where alerts go: this chip's window, else the presenter's.
+    private weak var presenter: NSView?
+    private var alertWindow: NSWindow? { window ?? presenter?.window }
 
     private func loadContainerLine() {
         let anchor = box.anchor
@@ -359,7 +448,7 @@ final class BlockHeaderChipView: NSView {
         }
     }
 
-    @objc private func copyForZoteroClicked() {
+    private func copyForZotero() {
         let anchor = box.anchor
         Task { @MainActor [weak self] in
             guard let json = await SourceArchiveInfo.shared?.zoteroJSON(for: anchor),
@@ -374,7 +463,7 @@ final class BlockHeaderChipView: NSView {
 
     /// W47.ct-zotero-tags: the source straight into the Zotero on this Mac, through its connector, with the
     /// subjects as tags (the clipboard's CSL-JSON cannot carry them).
-    @objc private func addToZoteroClicked(_ sender: NSButton) {
+    private func addToZotero() {
         let anchor = box.anchor
         Task { @MainActor [weak self] in
             guard let source = await SourceArchiveInfo.shared?.zoteroSource(for: anchor) else {
@@ -383,7 +472,7 @@ final class BlockHeaderChipView: NSView {
             }
             do {
                 try await ZoteroConnector().save([source])
-                sender.title = "Added to Zotero"
+                self?.addButton?.title = "Added to Zotero"
             } catch {
                 self?.reportZoteroFailure(error as? ZoteroConnector.Failure ?? .notRunning)
             }
@@ -401,7 +490,7 @@ final class BlockHeaderChipView: NSView {
             alert.informativeText = "It answered \(status). Select a library or collection you can edit in Zotero and "
                 + "try again."
         }
-        if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
+        if let window = alertWindow { alert.beginSheetModal(for: window) } else { alert.runModal() }
     }
 
     private func reportCopyFailure(action: String = "Copy for Zotero") {
@@ -409,10 +498,10 @@ final class BlockHeaderChipView: NSView {
         alert.messageText = "This source's file could not be read."
         alert.informativeText = "\(action) reads the document at its recorded path in an archive folder Notes "
             + "can open. Use Preview to find it, or choose its archive folder from the File menu (Choose Archive Folder…)."
-        if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
+        if let window = alertWindow { alert.beginSheetModal(for: window) } else { alert.runModal() }
     }
 
-    @objc private func openZoteroClicked() {
+    private func openInZotero() {
         guard let select = box.anchor.zoteroSelect,
               let url = URL(string: select) else { return }
         // Shared choke-point: records under a UITest launch (G11), opens for real otherwise.

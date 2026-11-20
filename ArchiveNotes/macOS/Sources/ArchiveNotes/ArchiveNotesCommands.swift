@@ -319,6 +319,41 @@ struct ZoteroCommands: Commands {
                 Button(reason) {}
                     .disabled(true)
             }
+            Divider()
+            SourceChipMenuItems()
+        }
+    }
+}
+
+/// Note menu: the actions of the source chip whose block holds the caret (W49.notes-chip-access), so a chip's
+/// buttons work from the keyboard. ⌃⌘, beside ⌃⌘Z's Zotero commands. With the caret in no chip's block, or on a
+/// chip that lacks the action, the command beeps.
+struct SourceChipMenuItems: View {
+    var body: some View {
+        item(.jump, "j")
+        item(.reveal, "r")
+        item(.preview, "y")
+        item(.copyForZotero, nil)
+        item(.addToZotero, nil)
+        item(.openInZotero, "o")
+    }
+
+    @ViewBuilder
+    private func item(_ action: BlockHeaderChipAction, _ key: Character?) -> some View {
+        let button = Button(action.menuTitle) { Self.perform(action) }
+        if let key {
+            button.keyboardShortcut(KeyEquivalent(key), modifiers: [.command, .control])
+        } else {
+            button
+        }
+    }
+
+    @MainActor
+    static func perform(_ action: BlockHeaderChipAction) {
+        guard let editor = NSApp.keyWindow?.firstResponder as? EditorTextView,
+              editor.performChipActionAtCursor(action) else {
+            NSSound.beep()
+            return
         }
     }
 }
