@@ -29,6 +29,10 @@ extension NSAttributedString.Key {
     /// Raw HTML read from the file, a headerless chip's unclosed `<!-- block:` opener included (Bool). Its
     /// newlines are its own, so the serializer writes them as they are rather than as paragraph breaks.
     static let noteRawHTML = NSAttributedString.Key("an.rawHTML")
+    /// Raw HTML that is an HTML block of its own (`<div>…`, `<!-- … -->` on its line), not HTML inside a paragraph
+    /// (Bool, set beside `noteRawHTML`). Only a blank line ends such a block, so a line break after it would be its
+    /// text (W49.notes-lines-after-html).
+    static let noteBlockHTML = NSAttributedString.Key("an.blockHTML")
     /// The newline `MarkdownBridge.endLine` puts before a chip (Bool), which ends a block's text. Where text has
     /// come to follow it (typed above the chip, or the chip left out of a passage) it is a paragraph break, not
     /// a line break (W40.fix-notes-editor-lines).
@@ -218,7 +222,8 @@ enum MarkdownStyler {
 
             if let previous, previous.intent != run.presentationIntent {
                 dropRawHTMLLineEnd(result)
-                let separator = blockSeparator(from: previous.intent, to: run.presentationIntent)
+                let separator = previous.attrs[.noteBlockHTML] as? Bool == true ? "\n"
+                    : blockSeparator(from: previous.intent, to: run.presentationIntent)
                 let extra = extraBlankLines(after: previous, endLine: previousEndLine, before: run, attrs: attrs,
                                             sourceLines: sourceLines)
                 let extraText = NSAttributedString(string: String(repeating: "\n", count: extra), attributes: [
@@ -285,7 +290,9 @@ enum MarkdownStyler {
     /// The text that separates two adjacent blocks (W40.fix-notes-editor-lines): only two paragraphs of text (or of one quote) are a blank line apart. A
     /// heading, list, quote or code block is one newline from what borders it, which is what a Return typed
     /// there makes: Markdown writes those boundaries the same with or without a blank line, so a blank line
-    /// shown there came back after every Backspace that deleted it.
+    /// shown there came back after every Backspace that deleted it. An HTML block is one newline from what follows
+    /// it too (W49.notes-lines-after-html; `style` checks it, as Apple marks it on the run, not in the intent): the
+    /// blank line that ends it in the file showed as an empty line, so one Return typed after it came back as two.
     private static func blockSeparator(from previous: PresentationIntent?,
                                        to next: PresentationIntent?) -> String {
         let a = previous.map(blockKind(from:)) ?? .plain
@@ -386,6 +393,7 @@ enum MarkdownStyler {
             if inlineIntent.contains(.blockHTML) || inlineIntent.contains(.inlineHTML) {
                 attrs[.noteRawHTML] = true
             }
+            if inlineIntent.contains(.blockHTML) { attrs[.noteBlockHTML] = true }
         }
 
         attrs[.font] = font

@@ -254,6 +254,7 @@ struct EditorLinesTests {
         let (tv, storage) = try editor("<div>\nx\n</div>")
         tv.insertNewline(nil); type(tv, "after")
         #expect(MarkdownBridge.serialize(storage) == "<div>\nx\n</div>\n\nafter")
+        _ = expectKept(tv, storage, "one Return after an HTML block")   // W49.notes-lines-after-html: it read back as two
         // Raw HTML is written as it is, with no backslash added on each save.
         let html = "<!-- a_b *c* [d] \\e -->\n\nz"
         #expect(MarkdownBridge.serialize(MarkdownBridge.parse(markdown: html)) == html)
@@ -608,6 +609,67 @@ struct EditorLinesTests {
                               ("A\r\n\r\n\r\n\r\nB", "A\n\n\n\nB")] {
             let (_, storage) = try editor(file)
             #expect(storage.string == shown, "\(file.debugDescription): shown \(storage.string.debugDescription)")
+        }
+    }
+
+    // MARK: - W49.notes-lines-after-html (owner call 20: keep what I type)
+
+    /// Returns typed after an HTML block read from the file are kept: at the end of the note, before a block, above a
+    /// chip, before text and in a quote. The blank line that ends the block is the first of them.
+    @Test func returnsAfterAnHTMLBlockAreKept() throws {
+        let html = "<div>\nx\n</div>"
+        let chip = "<!-- block: freeform -->\nBody."
+        for count in 1...3 {
+            let breaks = "\n\n" + String(repeating: "\\\n", count: count - 1)
+            for (file, written) in [(html, html + breaks + "&nbsp;"),
+                                    (html + "\n\n# H", html + breaks + "&nbsp;\n\n# H"),
+                                    (html + "\n" + chip, html + breaks + "&nbsp;\n" + chip),
+                                    (html + "\n\nafter", html + breaks + "\\\nafter"),
+                                    ("> <div>x</div>", "> <div>x</div>\n>\n" + String(repeating: "> \\\n", count: count - 1) + "> &nbsp;")] {
+                let (tv, storage) = try editor(file)
+                let end = (storage.string as NSString).range(of: "</div>")
+                caret(tv, at: NSMaxRange(end))
+                for _ in 0..<count { tv.insertNewline(nil) }
+                let saved = expectKept(tv, storage, "\(count) Returns after \(file.debugDescription)")
+                #expect(saved == written, "\(count) Returns after \(file.debugDescription): saved \(saved.debugDescription)")
+                #expect(!storage.string.contains("\u{00A0}"), "\(file.debugDescription): \(storage.string.debugDescription)")
+                // Typing on the last of those lines after the reopen gives it text, kept as a line of its own.
+                caret(tv, at: NSMaxRange((storage.string as NSString).range(of: "</div>")) + count)
+                type(tv, "T")
+                _ = expectKept(tv, storage, "\(count) Returns after \(file.debugDescription), then text")
+            }
+        }
+    }
+
+    /// An HTML block is one newline from what follows it, as other blocks are: the blank line that ends it in the file
+    /// is not an empty line, so one Return typed after it stays one.
+    @Test func anHTMLBlockIsOneNewlineFromWhatFollows() throws {
+        for (file, shown) in [("<div>\nx\n</div>\n\nafter", "<div>\nx\n</div>\nafter"),
+                              ("<!-- c -->\n\nText", "<!-- c -->\nText"),
+                              ("<div>\nx\n</div>\n\n- a", "<div>\nx\n</div>\na"),
+                              ("<div>\nx\n</div>\n\n# H", "<div>\nx\n</div>\nH")] {
+            let (tv, storage) = try editor(file)
+            #expect(storage.string == shown, "\(file.debugDescription): shown \(storage.string.debugDescription)")
+            #expect(expectKept(tv, storage, file.debugDescription) == file)
+        }
+    }
+
+    /// After HTML inside a paragraph (`a <b>x</b>`), Returns are written as after any text: the hard break is the
+    /// paragraph's.
+    @Test func returnsAfterInlineHTMLAreKept() throws {
+        for count in 1...3 {
+            for (file, suffix) in [("a <b>x</b>", "&nbsp;"), ("a <b>x</b>\n\n# H", "&nbsp;\n\n# H")] {
+                let (tv, storage) = try editor(file)
+                caret(tv, at: NSMaxRange((storage.string as NSString).range(of: "</b>")))
+                for _ in 0..<count { tv.insertNewline(nil) }
+                let saved = expectKept(tv, storage, "\(count) Returns after \(file.debugDescription)")
+                #expect(saved == "a <b>x</b>" + String(repeating: "\\\n", count: count) + suffix,
+                        "\(file.debugDescription): saved \(saved.debugDescription)")
+            }
+            let (tv, storage) = try editor("a <b>x</b>")
+            for _ in 0..<count { tv.insertNewline(nil) }
+            type(tv, "B")
+            _ = expectKept(tv, storage, "\(count) Returns after inline HTML, then text")
         }
     }
 
