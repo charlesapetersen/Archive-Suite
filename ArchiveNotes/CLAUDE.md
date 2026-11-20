@@ -8,9 +8,9 @@ per-file descriptions and backstory are in [`REFERENCE.md`](REFERENCE.md), read 
 
 ## Core Directive — file safety
 
-- Notes writes **only its own store** (UUID‑folder Markdown+assets under `Application Support/ArchiveNotes/Store`,
-  which is inside the sandbox container — not the bare `~/Library/Application Support/ArchiveNotes/`; path in
-  REFERENCE.md; a user-picked store is not wired yet, W40.fix-notes-choose-store). The archive corpus is **read‑only** —
+- Notes writes **only its own store**: UUID‑folder Markdown+assets inside the `.archivenotes` library package
+  the user made or opened (File ▸ New Library… / Open Library…; no hidden default store since
+  W49.notes-store-format; detail in REFERENCE.md). The archive corpus is **read‑only** —
   durable‑link resolution and page rendering only; no tag writes, no moves, no deletes on corpus files. ⚠️ That
   holds **by code discipline, not by the OS**: a granted archive root *is* writable from Notes. Nothing may write
   there; treat any code near a corpus URL as Tier-2.

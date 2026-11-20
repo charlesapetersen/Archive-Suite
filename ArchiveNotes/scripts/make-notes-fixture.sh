@@ -341,12 +341,13 @@ ditto "$DST" "$PRISTINE"
 echo "make-notes-fixture: wrote pristine snapshot ($PRISTINE)" >&2
 
 # --- A second store, to adopt (W40.fix-notes-choose-store) --------------------
-# ChooseStoreFolderUITests picks this with File ▸ Choose Store Folder… and relaunches into it. It sits
+# ChooseStoreFolderUITests picks this with File ▸ Open Library… and relaunches into it: a library, so its
+# name ends in .archivenotes (W49.notes-store-format). It sits
 # BESIDE the fixture, not inside it: a store inside another store is refused. Rebuilt on every run, as a
 # store copied from another computer arrives: marker, one note, no index, no organization.json.
-ADOPT="$DST Adopted Store"
+ADOPT="$DST Adopted Store.archivenotes"
 case "$ADOPT" in
-  */"$FIXTURE_NAME Adopted Store") : ;;
+  */"$FIXTURE_NAME Adopted Store.archivenotes") : ;;
   *) echo "make-notes-fixture: REFUSING — unexpected adopted-store path: $ADOPT" >&2; exit 2 ;;
 esac
 ADOPT_ID="55555555-5555-5555-5555-555555555555"

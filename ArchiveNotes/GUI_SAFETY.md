@@ -23,14 +23,14 @@ suite therefore routes through the projector against **scratch copies only**.
 2. **Confirm the granted root is scratch before ANY write.** A read-only visual check (does the panel
    collapse, does the list render) is always safe; a **write** check (inline subject edit, replicate,
    delete-last-instance) runs **only** when the active store is a confirmed scratch copy.
-3. **Never drive the store picker.** Driving *File ▸ Choose Store Folder…* would persist a bookmark over
+3. **Never drive the library pickers.** Driving *File ▸ New Library…* or *Open Library…* would persist a bookmark over
    the owner's real `notesStoreRootBookmark`. GUI runs point the app at scratch via the **volatile**
    `-ANUITestStorePath` launch argument (`RootFolderStore.adoptTestStore`, DEBUG-only), which sets the
    store root **in memory only** and **never** writes a bookmark. `NotesStoreLocatorOverrideTests` keeps
    the bookmark-untouched invariant green. The one exception is `ChooseStoreFolderUITests` (VM), which
    drives it with `-ANUITestStoreBookmarkSuite <suite>` so the pick lands in a throwaway defaults suite,
    never `notesStoreRootBookmark`, and `-ANUITestStorePickPath` in place of the panel
-   (W40.fix-notes-choose-store). Without that argument the rule stands. Its restart passes the launch
+   (W40.fix-notes-choose-store; `-ANUITestNewLibraryPath` does the same for New Library…'s Save panel). Without that argument the rule stands. Its restart passes the launch
    arguments on (`StoreFolderChooser.relaunchApp`), so the relaunched app opens the same scratch stores.
    Likewise the note a window had open is remembered only under `-ANUITestLastOpenSuite <suite>`
    (`ReopenLastNoteUITests`); any other UITest launch neither reads nor writes it (W40.fix-notes-small-wins).

@@ -230,7 +230,8 @@ final class NotesModel: ObservableObject {
                   rootStore: rootStore)
     }
 
-    /// File ▸ Choose Store Folder… (W40.fix-notes-choose-store). `nil` for an injected (test) store.
+    /// File ▸ New Library… and Open Library… (W40.fix-notes-choose-store, W49.notes-store-format). `nil` for
+    /// an injected (test) store.
     lazy var storeFolderChooser: StoreFolderChooser? = {
         guard let rootStore else { return nil }
         let chooser = StoreFolderChooser(rootStore: rootStore)
@@ -243,24 +244,40 @@ final class NotesModel: ObservableObject {
            let pick = UserDefaults.standard.string(forKey: "ANUITestStorePickPath"), !pick.isEmpty {
             chooser.pickFolder = { URL(fileURLWithPath: pick, isDirectory: true) }
         }
+        // `-ANUITestNewLibraryPath` does the same for New Library…'s Save panel.
+        if let p = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !p.isEmpty,
+           let new = UserDefaults.standard.string(forKey: "ANUITestNewLibraryPath"), !new.isEmpty {
+            chooser.pickNewLibrary = { _ in URL(fileURLWithPath: new, isDirectory: true) }
+        }
 #endif
         return chooser
     }()
 
+    /// The first launch has no library (there is no hidden default store; owner, 2026-11-20, call 24), so it
+    /// offers the Save panel at once, with `~/Documents` proposed. Cancelling leaves the app with no library and
+    /// the status line saying how to make or open one. Never under a test host: a panel there has nobody to
+    /// answer it.
+    private func askForFirstLibrary() {
+        guard !ArchiveTestHost.isUnitTestHost, let chooser = storeFolderChooser else { return }
+        Task { @MainActor in
+            // A launch by double-clicking a library asks to switch to that one instead.
+            guard !StoreFolderChooser.libraryArrivedFromFinder else { return }
+            chooser.newLibrary(readerRoots: ReaderRootStore.savedRootFolders(), firstLaunch: true)
+        }
+    }
+
     /// The index database for a store. The folder graph lives in the index first and in the store's
     /// `organization.json` second (`OrganizationStore.load`), so two stores must never share one: the
-    /// second would show the first one's folders and then write them over its own mirror. The default
-    /// store keeps `notes-index-v1.sqlite3`; any other gets a file named for its marker's GUID and its
-    /// path together, so a store picked for the first time (one copied from another computer, or a
+    /// second would show the first one's folders and then write them over its own mirror. Each store gets
+    /// a file named for its marker's GUID and its path together, so a store picked for the first time (one copied from another computer, or a
     /// different store later put at the same path) starts from an empty index and reads its own
     /// `organization.json` (W40.fix-notes-choose-store). The index is a rebuildable cache, so a store
     /// that moves only costs a rebuild.
-    nonisolated static func indexFileName(storeRoot: URL?, storeGUID: UUID?,
-                                          defaultRoot: URL? = RootFolderStore.standardDefaultRoot) -> String {
+    /// With no store open (`storeRoot` nil) nothing is indexed; that launch gets a name of its own, never
+    /// `notes-index-v1.sqlite3`, which belonged to the container store used before W49.notes-store-format.
+    nonisolated static func indexFileName(storeRoot: URL?, storeGUID: UUID?) -> String {
         func canonical(_ url: URL) -> String { url.resolvingSymlinksInPath().standardizedFileURL.path }
-        guard let storeRoot, let defaultRoot, canonical(storeRoot) != canonical(defaultRoot) else {
-            return "notes-index-v1.sqlite3"
-        }
+        guard let storeRoot else { return "notes-index-v1-no-library.sqlite3" }
         let identity = (storeGUID?.uuidString.lowercased() ?? "no-marker") + "\n" + canonical(storeRoot)
         let digest = SHA256.hash(data: Data(identity.utf8))
         let hex = digest.prefix(8).map { String(format: "%02x", $0) }.joined()
@@ -341,8 +358,12 @@ final class NotesModel: ObservableObject {
         guard let index, let rootStore, let root = rootStore.root else {
             // No store chosen yet: nothing to index. Still flip ready so the probe resolves.
             if rootStore?.savedRootUnavailable == true {
-                statusMessage = "The chosen store folder can't be opened, or no longer holds a notes store. "
-                    + "Choose a store with File ▸ Choose Store Folder…."
+                statusMessage = "The chosen library can't be opened, or is not an Archive Notes library. "
+                    + "Open a library with File ▸ Open Library…, or make one with File ▸ New Library…."
+            } else if rootStore?.needsLibrary == true {
+                statusMessage = "No library is open. Make one with File ▸ New Library…, "
+                    + "or open one with File ▸ Open Library…."
+                askForFirstLibrary()
             }
             rebuild(); markIndexReady(generation: max(indexGeneration, 1)); return
         }

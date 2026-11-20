@@ -120,16 +120,20 @@ Full Notes smoke passes (245 XCTest + 1159 Swift Testing), including the existin
 1968 date: unchanged date/tag blur, replacement, Escape and clearing; all three PNGs were inspected.
 The broader VM-suite fixes remain tracked separately by W40.vm-macos27-notes.
 
-## ⚠️ LIMIT (W40.fix-notes-choose-store, 2026-10-29) — Choose Store Folder… cannot always see an enclosing archive
+## ⚠️ LIMIT (W40.fix-notes-choose-store, 2026-10-29; narrowed by W49.notes-store-format, 2026-11-20) — a library inside an archive no Suite app has used is not recognised
 
-File ▸ Choose Store Folder… refuses a Reader archive, any folder inside one, a folder inside another store and a
-folder that already holds other files (`StoreFolderChooser.check`; the next launch checks again). A folder
-counts as inside an archive when a parent holds an `.archive-suite-root.json`, or when it is under an archive
-granted to Notes with Choose Archive Folder…. The sandbox gives Notes the picked folder only, not its parents,
-so in the shipping app the first sign is usually unreadable. An **empty** folder inside an archive that was
-never granted to Notes is therefore accepted as a new store. Nothing already in the archive is changed then:
-the store's marker, `items/` and `organization.json` are added inside that empty folder. Granting the archive
-to Notes first closes the gap. Whether to ask "inside an archive?" when a parent cannot be read, and whether the store becomes a `.archivenotes` package, is put to the owner in `execution-plans/items/W49.notes-store-format.md` (asked: W49.notes-store-format-owner-ok).
+The store is an `.archivenotes` library (File ▸ New Library… / Open Library…, owner call 24). Both refuse a
+Reader archive, any place inside one, a place inside another library, and anything that is not a library
+(`StoreFolderChooser.check` / `placeCheck`; the next launch checks again). A place counts as inside an archive
+when a parent holds an `.archive-suite-root.json`, or when it is under an archive granted with Choose Archive
+Folder…. Measured 2026-11-20 with the production entitlements: the sandbox will not list an ungranted parent but
+lets `stat` see the marker in it, on the Desktop too, so an archive the Reader or Notes has opened (both write
+the marker) is recognised without a grant. The earlier entry's "the parents are usually unreadable" was wrong.
+What is left: an archive whose top carries no marker, because no Suite app has used it, has nothing to recognise,
+so a library can be made inside it. Nothing already in the archive is changed then; the package is added beside
+it. When a parent cannot be looked at at all (`stat` fails other than "not found"), Notes asks "Is it inside an
+archive?" and offers Choose Archive Folder… first (accepted: owner, 2026-11-20, call 24, chose this question as
+the remedy; a folder with no marker anywhere above it carries no sign to detect).
 
 ## ⚠️ LIMIT (W40.root-marker-auto, 2026-11-06) — Choose Archive Folder… gives a plain folder an archive identity
 
@@ -141,9 +145,12 @@ or is inside it, one inside or holding an archive already granted to Notes, one 
 parent carries a marker, and one that cannot be written. The bookmark is made before the file, so a refused
 grant writes nothing. With a link in hand (the preview popover) Notes never creates one: a fresh identity
 could not be the one the link names, so a folder without one is "not the archive this link was copied from".
-The sandbox limit above applies: a subfolder of an archive never granted to Notes cannot be recognised, so
-picking one gives that subfolder an identity of its own. No existing file is changed; the small file can be
-deleted. Tests: `ReaderRootChooserTests` (scratch folders). The "inside an archive?" question that would close it is put to the owner with the store format (asked: W49.notes-store-format-owner-ok).
+A subfolder of an archive whose top carries a marker is refused, even when the archive was never granted
+(`stat` sees the marker; measured, W49.notes-store-format). A subfolder of an archive with no marker anywhere
+above it cannot be recognised, so picking one gives that subfolder an identity of its own; when a parent cannot
+be looked at, Notes first asks "Is it the top folder of its archive?". No existing file is changed; the small
+file can be deleted. Tests: `ReaderRootChooserTests` (scratch folders) (accepted: owner, 2026-11-20, call 24,
+chose the question as the remedy; an unmarked archive carries no sign to detect).
 
 ## ✅ FIXED (W40.fix-notes-stale-body-on-switch, 2026-10-25) — the outgoing editor remained writable during loading
 

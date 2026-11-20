@@ -61,6 +61,10 @@ final class ReaderRootChooser {
     /// How the folder is asked for. A test seam, not a policy knob — see the type doc.
     var pickFolder: @MainActor () -> URL? = { ReaderRootChooser.runOpenPanel() }
 
+    /// "Is it the archive's top folder?", asked when a parent could not be looked at. Seam for the same
+    /// reason. `true` goes on with the grant.
+    var confirmTopFolder: @MainActor (URL) -> Bool = { ReaderRootChooser.runTopFolderQuestion(folder: $0) }
+
     /// How an outcome is shown. Seam for the same reason.
     var report: @MainActor (Outcome) -> Void = { ReaderRootChooser.presentAlert(for: $0) }
 
@@ -78,6 +82,12 @@ final class ReaderRootChooser {
     @discardableResult
     func chooseRoot() -> Outcome {
         guard let url = pickFolder() else { return .cancelled }
+        // The owner's question (call 24, W49.notes-store-format): a subfolder of an archive whose marker
+        // cannot be seen would get an identity of its own, so ask when a parent could not be looked at.
+        if StoreFolderChooser.enclosingMarker(of: url.resolvingSymlinksInPath().standardizedFileURL.path)
+            == .cannotLook, !confirmTopFolder(url) {
+            return .cancelled
+        }
         let outcome: Outcome
         switch rootStore.grantRoot(url, createIdentity: true) {
         case let .granted(marker):
@@ -118,6 +128,16 @@ final class ReaderRootChooser {
             + "so source links can be previewed here."
         guard panel.runModal() == .OK else { return nil }
         return panel.url
+    }
+
+    static func runTopFolderQuestion(folder: URL) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Is “\(folder.lastPathComponent)” the top folder of its archive?"
+        alert.informativeText = "Archive Notes can't look at the folders around it. If it is inside a larger "
+            + "archive, choose that archive's top folder instead, so source links match the archive."
+        alert.addButton(withTitle: "This Is the Top Folder")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
     }
 
     static func presentAlert(for outcome: Outcome) {

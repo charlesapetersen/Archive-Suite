@@ -155,9 +155,9 @@ it a **portable identity** (§8). Not per-file; per-root.
 ## 4. On-disk layout
 
 ```
-<NotesStore>/                         # user-chosen folder (security-scoped bookmark; picker not yet wired —
-                                      #   W40.fix-notes-choose-store) OR app-default on first run:
-                                      #   <app container>/Data/Library/Application Support/ArchiveNotes/Store
+<Name>.archivenotes/                  # the library package the user made or opened (File ▸ New Library… /
+                                      #   Open Library…; security-scoped bookmark). No hidden default: the first
+                                      #   launch offers ~/Documents (W49.notes-store-format, owner call 24)
   .archive-suite-root.json            # RootMarker {guid,name,kind:notes} (§8)
   items/
     7f3a9c21-…/                        # one folder per item; folder name = id (UUID)

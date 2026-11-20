@@ -65,19 +65,30 @@ struct FormatCommands: Commands {
 /// single app-lifetime `@StateObject` the App itself owns, not per-window editor state, and
 /// SwiftUI's `.commands` builder does not inherit `@EnvironmentObject`s set on a window's content.
 ///
-/// Also File ▸ Choose Store Folder… (W40.fix-notes-choose-store), in the same group so the two folder
-/// choices sit together. `notesModel` is passed in for the same reason as `previewState`.
+/// Also File ▸ New Library… and Open Library… (W40.fix-notes-choose-store, W49.notes-store-format), in the
+/// same group so the folder choices sit together. `notesModel` is passed in for the same reason as
+/// `previewState`.
 struct ReaderRootCommands: Commands {
     let previewState: SourceBlockPreviewState
     let notesModel: NotesModel
+
+    /// "Is it inside an archive?" answered with Choose Archive Folder…: grant the archive first.
+    private func grantArchiveIfAsked(_ outcome: StoreFolderChooser.Outcome?) {
+        if case .chooseArchiveFirst = outcome { previewState.chooseArchiveFolder() }
+    }
 
     var body: some Commands {
         CommandGroup(after: .newItem) {
             // ⇧⌘O, as in the Reader (W40.fix-suite-shortcuts).
             Button("Choose Archive Folder\u{2026}") { previewState.chooseArchiveFolder() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
-            Button("Choose Store Folder\u{2026}") {
-                notesModel.storeFolderChooser?.choose(readerRoots: previewState.grantedArchiveFolders)
+            Button("New Library\u{2026}") {
+                grantArchiveIfAsked(notesModel.storeFolderChooser?
+                    .newLibrary(readerRoots: previewState.grantedArchiveFolders))
+            }
+            Button("Open Library\u{2026}") {
+                grantArchiveIfAsked(notesModel.storeFolderChooser?
+                    .choose(readerRoots: previewState.grantedArchiveFolders))
             }
         }
     }

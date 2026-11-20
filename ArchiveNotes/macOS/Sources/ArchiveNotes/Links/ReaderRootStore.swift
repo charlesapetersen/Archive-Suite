@@ -381,8 +381,9 @@ final class ReaderRootStore: ObservableObject {
         if let store = notesStoreFolder().map(canonical), contains(path, store) || contains(store, path) {
             return .overlapsNotesStore(picked)
         }
-        // Inside an archive already granted here. The sandbox shows Notes the picked folder and not
-        // its parents, so this, not the walk below, is what catches a subfolder in the shipping app.
+        // Inside an archive already granted here, or (the parent walk below) under any folder whose marker
+        // can be seen: the sandbox refuses to list a parent but lets `stat` see its marker (measured,
+        // W49.notes-store-format).
         if Self.readerLayoutFolderNames.contains(target.lastPathComponent.lowercased()) {
             return .readerLayoutSubfolder(picked)
         }
@@ -393,12 +394,11 @@ final class ReaderRootStore: ObservableObject {
         if granted.contains(where: { $0 != path && contains(path, $0) }) {
             return .holdsAnotherRoot(picked)
         }
-        var parent = target.resolvingSymlinksInPath().standardizedFileURL.deletingLastPathComponent()
-        while parent.path != "/" && !parent.path.isEmpty {
-            if FileManager.default.fileExists(atPath: parent.appendingPathComponent(RootMarker.filename).path) {
-                return .insideAnotherRoot(picked)
-            }
-            parent = parent.deletingLastPathComponent()
+        // The real-case path: `path` is case folded for comparing, and a case-sensitive volume would
+        // answer "no such file" for every folded parent.
+        if StoreFolderChooser.enclosingMarker(of: target.resolvingSymlinksInPath().standardizedFileURL.path)
+            == .marker {
+            return .insideAnotherRoot(picked)
         }
         return nil
     }

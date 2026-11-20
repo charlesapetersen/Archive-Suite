@@ -58,6 +58,17 @@ struct ArchiveNotesApp: App {
                         NSApp.activate(ignoringOtherApps: true)
                         deepLinkRouter.handle(url)
                     }
+                    .onAppear {
+                        // A library double-clicked in Finder (W49.notes-store-format): switch to it, with
+                        // Open Library…'s checks and confirmation.
+                        appDelegate.openLibrary = { url in
+                            NSApp.activate(ignoringOtherApps: true)
+                            if case .chooseArchiveFirst = notesModel.storeFolderChooser?
+                                .use(url, readerRoots: previewState.grantedArchiveFolders) {
+                                previewState.chooseArchiveFolder()
+                            }
+                        }
+                    }
                     // A link can arrive while this first window is still bootstrapping. Hold it until
                     // the complete item list is available, rather than mistaking its target for a
                     // deleted note in the empty pre-bootstrap list.
@@ -132,6 +143,42 @@ final class NotesAppDelegate: NSObject, NSApplicationDelegate {
     /// (Dock Quit, logout) would start coordinator tasks that cannot run until the alert is dismissed.
     /// Cancelling the terminate instead keeps the user in the one dialog they are already answering.
     private var isAskingAfterFailedClose = false
+
+    /// Switches to a library opened from Finder; set by the main window. Libraries that arrive before it is
+    /// set (a launch by double-click) wait in `pendingLibraries`.
+    var openLibrary: (@MainActor (URL) -> Void)? {
+        didSet { flushPendingLibraries() }
+    }
+    private var pendingLibraries: [URL] = []
+
+    /// Finder's open-documents event, taken here rather than left to SwiftUI: a `Window`-scene app never
+    /// passed the library to `onOpenURL` (measured in the VM, W49.notes-store-format). `archivenotes://`
+    /// links come as a different event (get-URL) and still reach `onOpenURL`.
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        NSAppleEventManager.shared().setEventHandler(
+            self, andSelector: #selector(handleOpenDocuments(_:withReply:)),
+            forEventClass: AEEventClass(kCoreEventClass), andEventID: AEEventID(kAEOpenDocuments))
+    }
+
+    @objc private func handleOpenDocuments(_ event: NSAppleEventDescriptor,
+                                           withReply reply: NSAppleEventDescriptor) {
+        guard let direct = event.paramDescriptor(forKeyword: keyDirectObject) else { return }
+        let items = direct.numberOfItems > 0
+            ? (1...direct.numberOfItems).compactMap { direct.atIndex($0) } : [direct]
+        // One library at a time: a second would only ask to switch again once the first has.
+        guard let library = items.compactMap(\.fileURLValue).first(where: StoreFolderChooser.isLibraryName)
+        else { return }
+        StoreFolderChooser.libraryArrivedFromFinder = true
+        pendingLibraries.append(library)
+        flushPendingLibraries()
+    }
+
+    private func flushPendingLibraries() {
+        guard let openLibrary, let library = pendingLibraries.first else { return }
+        pendingLibraries.removeAll()
+        // After the event returns, so the confirmation's modal loop does not run inside the event handler.
+        Task { @MainActor in openLibrary(library) }
+    }
 
     override init() {
         super.init()

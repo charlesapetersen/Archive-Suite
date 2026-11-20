@@ -1,15 +1,18 @@
 import AppKit
 import ArchiveCore
 
-/// Persists (as a security-scoped bookmark) the Notes store root folder the user
-/// granted, so the app can access it across launches within the sandbox.
+/// Persists (as a security-scoped bookmark) the Notes library the user made or opened, so the app can
+/// access it across launches within the sandbox.
 ///
 /// Copied from Reader's `RootFolderStore` with the following changes:
 /// - Defaults key is `"notesStoreRootBookmark"`.
-/// - Provides a first-run app-default folder (`Application Support/ArchiveNotes/Store`).
 /// - Calls `RootMarkerStore.ensureMarker` after resolving a root.
 ///
-/// A picked store (File ▸ Choose Store Folder…, `StoreFolderChooser`) takes effect at the next launch:
+/// The store is an `.archivenotes` library package the user can see, name and move (owner, 2026-11-20,
+/// call 24; W49.notes-store-format). There is no default store: until one is made or opened `root` is nil
+/// and `needsLibrary` is true, and the first launch asks where to make one (`StoreFolderChooser.newLibrary`).
+///
+/// A picked library (File ▸ New Library… or Open Library…, `StoreFolderChooser`) takes effect at the next launch:
 /// `rememberRootAtQuit` writes the bookmark as the app terminates, and the app quits so the index, the
 /// folder graph and every open editor are rebuilt against the new store rather than swapped underneath
 /// (W40.fix-notes-choose-store).
@@ -18,13 +21,13 @@ final class RootFolderStore: ObservableObject {
     @Published private(set) var root: URL?
     @Published private(set) var marker: RootMarker?
     /// A store was chosen, but its bookmark no longer opens (a moved, deleted or unmounted folder).
-    /// The default store is then NOT opened in its place: notes written there would land in a store
-    /// the user did not pick, so the app shows no store and asks for the folder again.
+    /// The app then shows no store and asks for the library again.
     private(set) var savedRootUnavailable = false
+    /// No library was ever made or opened: the first launch, which asks for one.
+    var needsLibrary: Bool { root == nil && !savedRootUnavailable }
 
     private let key = "notesStoreRootBookmark"
     private var defaults: UserDefaults
-    private let defaultRoot: URL?
     private let notificationCenter: NotificationCenter
     private let readerRoots: [URL]
     /// A pick waiting for the quit that makes it take effect.
@@ -34,13 +37,6 @@ final class RootFolderStore: ObservableObject {
     private var terminateObserver: NSObjectProtocol?
     /// The pending pick was written, because the app is terminating.
     private(set) var committedPendingRoot = false
-
-    /// `Application Support/ArchiveNotes/Store` — the store a first launch opens.
-    nonisolated static var standardDefaultRoot: URL? {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
-            .appendingPathComponent("ArchiveNotes", isDirectory: true)
-            .appendingPathComponent("Store", isDirectory: true)
-    }
 
     /// The store folder a launch opens, resolved and nothing more: no scope started, nothing written.
     /// For `ReaderRootStore.grantRoot`, which must not give an archive identity to a folder that holds
@@ -56,33 +52,31 @@ final class RootFolderStore: ObservableObject {
             return try? URL(resolvingBookmarkData: data, options: [.withSecurityScope, .withoutMounting],
                             relativeTo: nil, bookmarkDataIsStale: &stale)
         }
-        return standardDefaultRoot
+        return nil
     }
 
     /// - Parameters:
     ///   - defaults: where the chosen store's bookmark persists. Injected so a test never reads or
     ///     writes the app's real `notesStoreRootBookmark`.
-    ///   - defaultRoot: the store opened when none was ever chosen. Injected for the same reason.
     ///   - notificationCenter: where `willTerminateNotification` arrives. Injected so a test can stand in
     ///     for the quit.
     ///   - readerRoots: the Reader archive folders Notes has been granted. A chosen store that is one of
     ///     them, or inside one, is not opened.
-    init(defaults: UserDefaults = .standard, defaultRoot: URL? = RootFolderStore.standardDefaultRoot,
+    init(defaults: UserDefaults = .standard,
          notificationCenter: NotificationCenter = .default, readerRoots: [URL] = []) {
         self.readerRoots = readerRoots
         self.defaults = defaults
-        self.defaultRoot = defaultRoot
         self.notificationCenter = notificationCenter
 #if DEBUG
         // XCUITest sets -ANUITestStorePath <path> via launchArguments. The argument domain is
         // volatile (never written to disk), so this can never shadow a normal launch. We set
         // `root` directly without persisting a bookmark and without reading/writing
-        // `notesStoreRootBookmark` — the real store root is never touched, and no default store
-        // is bootstrapped (the override returns before resolveSaved()/bootstrapDefaultRoot()).
+        // `notesStoreRootBookmark` — the real store root is never touched (the override returns
+        // before resolveSaved()).
         if let path = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !path.isEmpty {
-            // `-ANUITestStoreBookmarkSuite <suite>` lets a UITest drive Choose Store Folder… and the
+            // `-ANUITestStoreBookmarkSuite <suite>` lets a UITest drive Open Library… and the
             // relaunch after it: the pick persists into that throwaway suite, never the real key, and
-            // the fixture stands in for the default store until something has been picked.
+            // the fixture stands in for the store until something has been picked.
             if let suite = UserDefaults.standard.string(forKey: "ANUITestStoreBookmarkSuite"), !suite.isEmpty,
                let scratch = UserDefaults(suiteName: suite) {
                 self.defaults = scratch
@@ -94,9 +88,6 @@ final class RootFolderStore: ObservableObject {
         }
 #endif
         resolveSaved()
-        if root == nil, !savedRootUnavailable, let defaultRoot {
-            bootstrapDefaultRoot(defaultRoot)
-        }
     }
 
     /// Remember a user-picked store folder for the next launch, written only when the app actually
@@ -144,10 +135,8 @@ final class RootFolderStore: ObservableObject {
         do {
             let url = try URL(resolvingBookmarkData: data, options: .withSecurityScope,
                               relativeTo: nil, bookmarkDataIsStale: &stale)
-            // Must start scope; if that fails, leave root nil (user re-picks). The default store is the
-            // exception: it is inside the app's own container, reachable with no scope at all.
-            let isDefault = defaultRoot.map { Self.samePath($0, url) } ?? false
-            guard url.startAccessingSecurityScopedResource() || isDefault else {
+            // Must start scope; if that fails, leave root nil (user re-picks).
+            guard url.startAccessingSecurityScopedResource() else {
                 NSLog("RootFolderStore(Notes): saved root is no longer accessible; user must re-pick.")
                 savedRootUnavailable = true
                 return
@@ -173,21 +162,6 @@ final class RootFolderStore: ObservableObject {
             NSLog("RootFolderStore(Notes): could not resolve saved bookmark: \(error)")
             savedRootUnavailable = true
         }
-    }
-
-    private func bootstrapDefaultRoot(_ defaultDir: URL) {
-        do {
-            try FileManager.default.createDirectory(at: defaultDir,
-                                                    withIntermediateDirectories: true)
-            root = defaultDir
-            ensureMarkerQuietly()
-        } catch {
-            NSLog("RootFolderStore(Notes): could not create default store: \(error)")
-        }
-    }
-
-    private static func samePath(_ a: URL, _ b: URL) -> Bool {
-        a.resolvingSymlinksInPath().standardizedFileURL.path == b.resolvingSymlinksInPath().standardizedFileURL.path
     }
 
     private func ensureMarkerQuietly() {

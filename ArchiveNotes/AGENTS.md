@@ -31,7 +31,7 @@ worktree." Notes depends on the local `packages/ArchiveCore` Swift package.
   (`scripts/make-notes-fixture.sh` → `…/ArchiveNotes/AN-GUI-Fixture`, a *sibling* of the real `Store`).
   A DEBUG-only scratch-write guard in `NotesTagProjector` mechanically aborts any tag write outside
   scratch under a test / GUI-drive context — see [GUI_SAFETY.md](GUI_SAFETY.md).
-- **Never drive the store picker** (File ▸ Choose Store Folder…) in a GUI run — it persists a bookmark
+- **Never drive the library pickers** (File ▸ New Library… / Open Library…) in a GUI run — it persists a bookmark
   over the owner's real `notesStoreRootBookmark`. Point the app at scratch via the DEBUG
   `-ANUITestStorePath` launch arg (in-memory only; never writes a bookmark). The exception is
   `ChooseStoreFolderUITests`, whose `-ANUITestStoreBookmarkSuite` keeps the pick out of the real key.

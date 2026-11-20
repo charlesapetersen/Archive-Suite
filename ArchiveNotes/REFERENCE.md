@@ -53,10 +53,13 @@ macOS/Sources/ArchiveNotes/
                                    writeReservedAsset (pre-named, no re-disambiguation, never-overwrite,
                                    component-boundary) + nonisolated static path helpers + rootURL (W7-S5);
                                    allItemRefs() read-only enumeration for the full index (re)build (W8-S7)
-    RootFolderStore.swift          Security-scoped bookmark to the Notes store root; a chosen store that no
-                                   longer opens leaves no store (never the default in its place)
-    StoreFolderChooser.swift       File ▸ Choose Store Folder…: adopts a store in place or starts one in an
-                                   empty folder, refuses anything else; remembers it, quits and starts
+    RootFolderStore.swift          Security-scoped bookmark to the Notes library; none chosen (first launch,
+                                   needsLibrary) or one that no longer opens leaves no store: no hidden default
+    StoreFolderChooser.swift       File ▸ New Library… / Open Library… and a library opened from Finder: the
+                                   `.archivenotes` package (com.archivenotes.library, Info.plist); adopts a
+                                   library in place or makes an empty one, never replaces, refuses anything
+                                   else; enclosingMarker (stat sees an ungranted parent's marker) and the
+                                   "inside an archive?" question when a parent can't be looked at; remembers it, quits and starts
                                    Notes again in it (Restart and Switch, W40.fix-notes-small-wins;
                                    W40.fix-notes-choose-store). Each store has its own index file
                                    (NotesModel.indexFileName)
@@ -741,7 +744,7 @@ in the Reader and the Processor, is in `ArchiveReader/REFERENCE.md` §Keyboard m
 | Menu | Command | Key |
 |---|---|---|
 | File | New Note · New Extract · New Template… | `⌘N` · `⌥⌘N` · — |
-| File | Choose Archive Folder… · Choose Store Folder… | `⇧⌘O` (the Reader's key) · — |
+| File | Choose Archive Folder… · New Library… · Open Library… | `⇧⌘O` (the Reader's key) · — · — |
 | Edit | Paste as Source Block(s) | `⇧⌘V` |
 | Edit | Find ▸ Find… · Find Next · Find Previous · Use Selection for Find (the Mac's own, `TextEditingCommands`; the editor's find bar) | `⌘F` · `⌘G` · `⇧⌘G` · `⌘E` |
 | View | Show/Hide Folders · Show/Hide Inspector · Show/Hide Note Header · Formatting Bar · Tag Bar · Layout (Side by Side / List Above Note) | `⌃⌘S` · `⌥⌘I` (`⌘I` is Italic) · — · — · — · — |
@@ -762,9 +765,12 @@ in the Reader and the Processor, is in `ArchiveReader/REFERENCE.md` §Keyboard m
 
 ## Core Directive — file safety (detail)
 
-- **Store location.** The app is sandboxed, so `Application Support/ArchiveNotes/Store` is inside its container,
-  `~/Library/Containers/com.archivenotes.app/Data/Library/Application Support/ArchiveNotes/`, not the bare
-  `~/Library/Application Support/ArchiveNotes/`. A user-picked store is not wired yet (`W40.fix-notes-choose-store`).
+- **Store location.** The store is an `.archivenotes` library package the user makes (File ▸ New Library…, a Save
+  panel; the first launch offers `~/Documents/Archive Notes.archivenotes`) or opens (Open Library…, or a
+  double-click in Finder), bookmarked as `notesStoreRootBookmark` (owner, 2026-11-20, call 24;
+  W49.notes-store-format). There is no hidden default: the container folder
+  `Application Support/ArchiveNotes/Store` used before is no longer opened, and nothing was migrated from it,
+  because there is nothing to migrate. The search index stays in the container, one file per library.
 - **Why the corpus is read-only by discipline, not by the OS.** The sandbox has `files.user-selected.read-write`
   and `ReaderRootStore` mints the Reader-root bookmark without `.securityScopeAllowOnlyReadAccess`, so a granted
   archive root *is* writable from Notes.

@@ -89,6 +89,41 @@ struct ReaderRootChooserTests {
         }
     }
 
+    // W49.notes-store-format (owner, call 24): a parent that cannot be looked at may hide an archive's
+    // marker, so the user is asked whether the folder is the archive's top; a parent that can be looked at
+    // asks nothing.
+    @Test("A parent that cannot be looked at asks whether the folder is the archive's top")
+    func unreadableParentAsksIfTopFolder() async throws {
+        let outer = try makePlainFolder("locked")
+        let picked = outer.appendingPathComponent("inner/Box 2", isDirectory: true)
+        try FileManager.default.createDirectory(at: picked, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: outer) }
+        let plain = try makePlainFolder("open")
+        defer { try? FileManager.default.removeItem(at: plain) }
+
+        try await ScratchDefaults.with { defaults in
+            let store = ReaderRootStore(defaults: defaults)
+            store.notesStoreFolder = { nil }
+            let chooser = ReaderRootChooser(rootStore: store, resolver: ReaderLinkResolver(rootStore: store))
+            var asked: [URL] = []
+            chooser.confirmTopFolder = { asked.append($0); return false }
+            chooser.report = { _ in }
+
+            chooser.pickFolder = { plain }
+            _ = chooser.chooseRoot()
+            #expect(asked.isEmpty, "every parent could be looked at")
+
+            try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: outer.path)
+            defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: outer.path) }
+            chooser.pickFolder = { picked }
+            let outcome = chooser.chooseRoot()
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: outer.path)
+            #expect(outcome == .cancelled)
+            #expect(asked == [picked])
+            #expect(try listing(picked).isEmpty, "declined: no identity is written")
+        }
+    }
+
     private func makePlainFolder(_ label: String) throws -> URL {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("ArchiveNotes-chooser-\(label)-\(UUID().uuidString)", isDirectory: true)

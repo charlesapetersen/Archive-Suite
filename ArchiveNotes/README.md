@@ -13,9 +13,8 @@ words**.
 
 ## Prime directive — file safety
 
-- Archive Notes writes **only its own store** (UUID-folder Markdown + assets under
-  `Application Support/ArchiveNotes/Store` inside the app's sandbox container,
-  `~/Library/Containers/com.archivenotes.app/Data/Library/…`). The archive **corpus is read-only** — durable-link
+- Archive Notes writes **only its own store** (UUID-folder Markdown + assets inside the `.archivenotes` library
+  the user made with File ▸ New Library… or opened with Open Library…; the first launch offers `~/Documents`). The archive **corpus is read-only** — durable-link
   resolution and page rendering only; never a tag write, move, rename, or delete on a corpus file. (The
   code guarantees this, not the OS: a granted archive folder is writable from Notes' sandbox.)
 - The **only** Finder-tag writer is `NotesTagProjector`, which mirrors a note's front-matter subjects,

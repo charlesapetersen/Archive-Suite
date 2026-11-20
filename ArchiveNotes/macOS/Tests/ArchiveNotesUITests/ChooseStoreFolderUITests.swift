@@ -1,7 +1,7 @@
 import XCTest
 import AppKit
 
-/// W40.fix-notes-choose-store (ledger N-48) — File ▸ Choose Store Folder… adopts a store where it lies and
+/// W40.fix-notes-choose-store (ledger N-48), W49.notes-store-format — File ▸ Open Library… adopts a library where it lies and
 /// the pick survives a relaunch: pick a folder holding a store, confirm, the app restarts itself, and the
 /// notes are read from the picked store.
 ///
@@ -16,13 +16,14 @@ final class ChooseStoreFolderUITests: NotesFixtureUITestCase {
 
     private static let adoptedNoteID = "55555555-5555-5555-5555-555555555555"
     private static let bookmarkSuite = "com.archivenotes.app.uitest-store-bookmark.\(UUID().uuidString)"
-    private static var adoptedStorePath: String { canonicalFixturePath + " Adopted Store" }
+    private static var adoptedStorePath: String { canonicalFixturePath + " Adopted Store.archivenotes" }
 
     override var extraLaunchArguments: [String] {
         ["-ANUITestStorePickPath", Self.adoptedStorePath, "-ANUITestStoreBookmarkSuite", Self.bookmarkSuite]
     }
 
     func testChooseStoreFolderAdoptsAStoreThatSurvivesRelaunch() throws {
+        terminateStrayNotesInstances()
         try withFixture {
             try requireCanonicalScratchFixtureForStoreWrites()
             let markerPath = Self.adoptedStorePath + "/.archive-suite-root.json"
@@ -31,8 +32,8 @@ final class ChooseStoreFolderUITests: NotesFixtureUITestCase {
 
             app.activate()
             app.menuBars.menuBarItems["File"].click()
-            let choose = app.menuBars.menuItems["Choose Store Folder\u{2026}"]
-            XCTAssertTrue(choose.waitForExistence(timeout: 5), "File ▸ Choose Store Folder… should be present")
+            let choose = app.menuBars.menuItems["Open Library\u{2026}"]
+            XCTAssertTrue(choose.waitForExistence(timeout: 5), "File ▸ Open Library… should be present")
             choose.click()
 
             // The alert's button is reported twice (the alert and its window); either is the one control.
@@ -59,5 +60,70 @@ final class ChooseStoreFolderUITests: NotesFixtureUITestCase {
                            "the fixture store's notes should no longer be listed")
             XCTAssertEqual(FileManager.default.contents(atPath: markerPath), marker, "the store is adopted where it lies: its marker is not rewritten")
         }
+    }
+}
+
+/// W49.notes-store-format: a library opened from Finder. A class of its own, so its launch does not resolve the
+/// pick `ChooseStoreFolderUITests` remembers; its own throwaway bookmark suite keeps even a mis-click away from
+/// `notesStoreRootBookmark`.
+final class OpenLibraryFromFinderUITests: NotesFixtureUITestCase {
+
+    private static let bookmarkSuite = "com.archivenotes.app.uitest-finder-bookmark.\(UUID().uuidString)"
+    private static var adoptedStorePath: String { canonicalFixturePath + " Adopted Store.archivenotes" }
+
+    override var extraLaunchArguments: [String] { ["-ANUITestStoreBookmarkSuite", Self.bookmarkSuite] }
+
+    /// A library opened from Finder reaches Notes (the declared document type, the open-documents event
+    /// `NotesAppDelegate` takes) and asks before switching. LaunchServices does not hand a document to an
+    /// instance XCUITest launched (it starts a second one, measured in the VM), so the test quits that one and
+    /// lets LaunchServices launch Notes with the library, as a double-click on a closed app does, passing this
+    /// run's scratch arguments on. Cancelled, so nothing is remembered and the app does not restart.
+    func testLibraryOpenedFromFinderAsksToSwitch() throws {
+        terminateStrayNotesInstances()
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let library = URL(fileURLWithPath: Self.adoptedStorePath, isDirectory: true)
+            let running = try XCTUnwrap(NSRunningApplication.runningApplications(
+                withBundleIdentifier: "com.archivenotes.app").first)
+            let appURL = try XCTUnwrap(running.bundleURL)
+            let arguments = app.launchArguments
+            app.terminate()
+            XCTAssertTrue(pollUntil(timeout: 15) {
+                NSRunningApplication.runningApplications(withBundleIdentifier: "com.archivenotes.app").isEmpty
+            }, "no other Notes instance should be left to receive the library")
+
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.arguments = arguments
+            let opened = expectation(description: "LaunchServices hands the library to Notes")
+            NSWorkspace.shared.open([library], withApplicationAt: appURL, configuration: configuration) { _, error in
+                XCTAssertNil(error, "LaunchServices should open the library with Notes")
+                opened.fulfill()
+            }
+            wait(for: [opened], timeout: 20)
+
+            app.activate()
+            let confirm = app.buttons["Restart and Switch"].firstMatch
+            XCTAssertTrue(confirm.waitForExistence(timeout: 20), "a library from Finder should ask before switching")
+            XCTAssertFalse(app.sheets.firstMatch.exists, "no first-launch panel beside it")
+            app.buttons["Cancel"].firstMatch.click()
+            XCTAssertTrue(mainWindow.descendants(matching: .any)["an.cell.title.\(Self.idPlain)"]
+                .waitForExistence(timeout: 15), "cancelling keeps the fixture library")
+            XCTAssertEqual(NSRunningApplication.runningApplications(withBundleIdentifier: "com.archivenotes.app").count,
+                           1, "one instance, no restart")
+        }
+    }
+}
+
+/// A Notes instance left by an earlier run, started by LaunchServices without this run's arguments: it holds no
+/// library, only the first-launch Save panel (seen in the VM, W49.notes-store-format), and would take the
+/// relaunch's or the library's place. VM-only scratch instances with no store, so nothing is lost.
+func terminateStrayNotesInstances() {
+    for stray in NSRunningApplication.runningApplications(withBundleIdentifier: "com.archivenotes.app") {
+        stray.forceTerminate()
+    }
+    let deadline = Date().addingTimeInterval(10)
+    while !NSRunningApplication.runningApplications(withBundleIdentifier: "com.archivenotes.app").isEmpty,
+          Date() < deadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
     }
 }
