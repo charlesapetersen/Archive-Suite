@@ -620,6 +620,12 @@
      "switch": null
     },
     {
+     "id": "layout-large-reader-whole",
+     "text": "Qwen3.6 27B reads newspapers whole, with no detector: 0.967 whole against 0.965 on DocLayout-YOLO's regions on 15 L9 pages, a tie that goes to the faster, cheaper whole page. Measured on the raw regions, not the app's partition. Every other reader keeps the detector.",
+     "source": "E-layout.md §3 claim 34",
+     "switch": null
+    },
+    {
      "id": "layout-scans-doclayout-yolo",
      "text": "Scanned newspapers may use DocLayout-YOLO through newspaper-ocr's route instead, the user's choice, off by default: 4.6 NES above PP-DocLayoutV3 (1.1 to 8.0) on 15 L9 scans, 14 from one collection, a direction; unmeasured on photographs, which keep PP-DocLayoutV3. An optional download, its weights AGPL-3.0.",
      "source": "layout-pair-newspapers.md §What this says",
@@ -836,6 +842,55 @@
       "PP-DocLayoutV3 while its detector is not downloaded"
      ],
      "licence": "weights AGPL-3.0 (juliozhao/DocLayout-YOLO-DocStructBench-imgsz1280-2501), a separate optional download, never bundled (call 12); newspaper-ocr's layout processing MIT, vendored"
+    },
+    {
+     "id": "whole-page-large",
+     "name": "Whole page for a 27B-class reader on newspapers (Qwen3.6 27B)",
+     "family": "cloud",
+     "app_route": "openrouter|qwen/qwen3.6-27b",
+     "status": "shipped",
+     "needs": {
+      "key": [
+       "openrouter"
+      ],
+      "plan": [],
+      "cluster": false,
+      "gpus": null,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "newspapers": {
+       "value": 0.967,
+       "n": 15,
+       "truth": "L9 published transcriptions",
+       "source": {
+        "file": "E-layout.md",
+        "route": "claim 34 Qwen3.6-27B whole",
+        "attribute": "NewsBench overall, 1-CER on lowercased alphanumerics",
+        "value": "0.967"
+       }
+      }
+     },
+     "cost": null,
+     "time": null,
+     "memory": null,
+     "caveats": [
+      "NewsBench overall (1-CER), not strict NES: not comparable with the other rows' newspaper figures",
+      "against 0.965 on DocLayout-YOLO's raw regions and 0.936 on PaddleX's, the same 15 pages (E-layout.md claim 34): a tie, so the faster wins; not measured on PP-DocLayoutV3 or the app's partition",
+      "measured on FarmShare's vLLM build of Qwen3.6-27B, not the OpenRouter route the app pins (chutes fp8)",
+      "one request a page instead of one a region, and no detector run: not timed on newspapers",
+      "15 pages, one set: a direction"
+     ],
+     "kind_rules": [
+      "newspapers: whole page, no detector, for Qwen3.6 27B only",
+      "all other kinds: whole page"
+     ],
+     "fallback": null,
+     "conditions": [
+      "the reader is Qwen3.6 27B"
+     ]
     },
     {
      "id": "whole-page",

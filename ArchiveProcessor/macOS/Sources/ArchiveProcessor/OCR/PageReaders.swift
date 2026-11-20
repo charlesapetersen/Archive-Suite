@@ -21,7 +21,9 @@ enum PageReaders {
     ) throws -> any PageReader<OCRResult> {
         let client = try rawReader(provider: provider, model: model, apiKey: apiKey, thinkingLevel: thinkingLevel,
                                    gateway: gateway, localAgent: localAgent, visionSettings: visionSettings)
-        return newspaperLayout ? NewspaperPageReader(client: client) : client
+        // A reader measured to tie the detector on newspapers reads them whole (W47.wh-whole-page-large).
+        let whole = localAgent == nil && NewspaperPageReader.readsWhole(modelID: gateway?.modelID ?? model.id)
+        return newspaperLayout && !whole ? NewspaperPageReader(client: client) : client
     }
 
     private static func rawReader(

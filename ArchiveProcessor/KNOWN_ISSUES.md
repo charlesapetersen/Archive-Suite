@@ -2,6 +2,18 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W47.wh-whole-page-large, 2026-11-20): Qwen3.6 27B reads newspapers whole on a tie measured elsewhere
+
+`OCR/NewspaperPageReader.swift` `wholePageReaderIDs`, applied in `PageReaders.reader`; row `whole-page-large` and rule
+`layout-large-reader-whole` in `03-layout.md` §4.
+- **The tie is 15 pages in another metric, on raw regions and another build.** Qwen3.6-27B scored 0.967 whole against
+  0.965 on DocLayout-YOLO's raw regions (NewsBench overall, 1-CER, 15 L9 pages, `E-layout.md` claim 34), on FarmShare's
+  vLLM build, not the OpenRouter route the app pins (chutes fp8), and not on PP-DocLayoutV3 or the app's partition
+  (accepted: owner, 2026-11-19, call 15, "release as measured").
+- **Only Qwen3.6 27B.** No other reader has whole against regions measured on newspapers, so premium readers keep the
+  detector (accepted: owner, 2026-11-06, call 5, "detector until the measured exception exists"); the app offers no
+  27B-class Mac reader (queued: W46.ocr-mac-27b).
+
 ## ⚠️ LIMITATION (W47.wh-yolo-scans, 2026-11-20): what the scanned-newspaper detector does not yet do
 
 `OCR/NewspaperPageReader.swift` (`NewspaperDetector`), VisionOCRKit `ScanNewspaperLayout`; the switch is in Settings →
@@ -202,7 +214,8 @@ loop does not. Ink outside every region that Vision does not see as a line is no
 
 ## FIXED (W46.layout-newspapers, 2026-11-15): newspapers read in detector regions with every reader
 
-`PageReaders.reader` wraps every provider, gateway and Local Agent with `NewspaperPageReader`; the independent
+`PageReaders.reader` wraps every provider, gateway and Local Agent with `NewspaperPageReader` (since W47.wh-whole-page-large
+every reader but Qwen3.6 27B, which reads newspapers whole: the entry at the top); the independent
 Vision disagreement baseline and a failed page's whole-page fallback bypass layout deliberately. Only confirmed
 newspaper kinds run PP-DocLayoutV3, in native order, with pictures retained. Download its checked 134 MB weights
 (and the shared runtime if missing) in Settings → Rules → Columns and reading order; without it newspapers read

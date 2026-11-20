@@ -55,6 +55,15 @@ struct NewspaperPageReader: PageReader {
 
     static let queue = VisionQueue(name: "ArchiveProcessor.NewspaperLayout", width: 1)
 
+    /// Readers that read a newspaper page whole, with no detector (W47.wh-whole-page-large; owner, 2026-11-19, call
+    /// 15). Qwen3.6 27B scored 0.967 whole against 0.965 on DocLayout-YOLO's raw regions on the 15 L9 scans
+    /// (NewsBench overall, E-layout.md claim 34): a tie, and one whole-page request is faster and cheaper than one per
+    /// region, so the tie goes to the whole page. Measured on raw regions, not the app's partition. No other reader has
+    /// that tie measured, so every other one keeps the detector (call 5).
+    static let wholePageReaderIDs: Set<String> = ["qwen/qwen3.6-27b"]
+
+    static func readsWhole(modelID: String) -> Bool { wholePageReaderIDs.contains(modelID) }
+
     func read(_ page: PageReaderInput) async throws -> PageReading<OCRResult> {
         try Task.checkCancellation()
         let prepared = try await Self.preparePage(page)

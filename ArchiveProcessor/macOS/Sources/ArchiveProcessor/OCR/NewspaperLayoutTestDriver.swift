@@ -189,6 +189,18 @@ enum NewspaperLayoutTestDriver {
             }
             check("unknown and uncertain are whole", !NewspaperPagePlan.usesRegions(nil)
                   && !NewspaperPagePlan.usesRegions(PageKind(kind: .newspapers, confidence: 0.7)))
+            // W47.wh-whole-page-large: Qwen3.6 27B reads newspapers whole; every other reader keeps the detector.
+            func wrapped(_ id: String) -> Bool? {
+                guard let model = OpenRouterRoute.catalog.first(where: { $0.model.id == id })?.model,
+                      let reader = try? PageReaders.reader(provider: .openrouter, model: model, apiKey: "test",
+                                                           thinkingLevel: nil) else { return nil }
+                return reader is NewspaperPageReader
+            }
+            check("large reader: Qwen3.6 27B reads newspapers whole, Qwen3-VL 235B and Apple Vision keep the detector",
+                  wrapped("qwen/qwen3.6-27b") == false && wrapped("qwen/qwen3-vl-235b-a22b-instruct") == true
+                      && (try? PageReaders.reader(provider: .appleVision, model: LLMModel.appleVisionModels[0], apiKey: "",
+                                                  thinkingLevel: nil)) is NewspaperPageReader
+                      && NewspaperPageReader.wholePageReaderIDs == ["qwen/qwen3.6-27b"])
             // W47.wh-yolo-scans: the scanned-newspaper detector is the run's choice, off by default, scans only.
             let yes = [SettingsKey.scanNewspapersDocLayoutYOLO.rawValue: ResolvedSetting(value: .bool(true))]
             let no = [SettingsKey.scanNewspapersDocLayoutYOLO.rawValue: ResolvedSetting(value: .bool(false))]
