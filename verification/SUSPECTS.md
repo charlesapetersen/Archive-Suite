@@ -1006,10 +1006,16 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a run with names ranked on a box with letters, its calls by kind against the estimate's
   terms (the item-fields driver's part 6 counts them the same way).
 - **Would clear it:** names are never ranked in a run the estimate prices, or the call is free on every route.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-s044-check`); [`evidence/processor/W49.proc-s044-reproduce.md`](evidence/processor/W49.proc-s044-reproduce.md), `ArchiveProcessor/scripts/repro-s044-names.sh`
 - **History:**
   - 2026-11-20 W49.proc-fix-s041 — raised.
   - 2026-11-20 owner walkthrough of 13:42 (call 29) — queued as `W49.proc-s044-reproduce` under phase rule 5a.
+  - 2026-11-20 W49.proc-s044-reproduce — reproduced. The code still says it (`OCR/OCRProcessor+Tagging.swift:1239-1244`;
+    `Models/CostEstimator.swift` has no names term). Two real Process Files runs on six scratch photos, Automatic,
+    sidecars on, the stand-in gateway reading every document as a Letter: with names ranked in the collection's
+    settings, 3 names calls of 23 (one per document, 3 sidecars with `entities`), without, 0 of 24; both runs' estimates
+    were the same, $0.0158, with no names term. Nothing calls the omission deliberate (`EntityRunPolicy.decide` says the
+    call "costs money on a cloud route"), so no owner question.
 
 ### S-045 · A failed tagging call in Live Capture is filed silently
 

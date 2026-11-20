@@ -114,6 +114,15 @@ enum ProcessFilesTestDriver {
         } catch {
             return fail("cannot create run dir: \(error.localizedDescription)", marker: donePath)
         }
+        // W49.proc-s044-reproduce: PROCESSFILES_PRIORITIES (comma-separated `SettingsPriority` names, most important
+        // first) gives the run's output folder a collection layer ranking them, as the collection interview writes it
+        // before a run, so the run resolves them like any collection's settings.
+        if let ranked = env["PROCESSFILES_PRIORITIES"] {
+            var doc = CollectionSettingsDocument(name: runDir.lastPathComponent)
+            doc.collection.set(.priorities, .strings(ranked.split(separator: ",").map(String.init)), source: .setByUser(Date()))
+            do { try CollectionSettingsFile.write(doc, in: runDir) }
+            catch { return fail("cannot write the collection's settings: \(error)", marker: donePath) }
+        }
         // --- inputs: top-level images, plus PDFs only for the mixed-route regression ---
         let cap = max(1, Int(env["PROCESSFILES_MAXIMAGES"] ?? "") ?? 8)
         let mixedRoute = env["PROCESSFILES_TEST_MIXED"] == "1"
