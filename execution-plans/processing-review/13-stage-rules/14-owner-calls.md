@@ -151,6 +151,15 @@ calls are section 1.
     blank-line and empty-list losses W40.fix-notes-editor-lines accepted as "Markdown has no form for it" were the
     session's trade-off, not a limit: Markdown can hold them (`&nbsp;` paragraphs, a bare `-` item) at the cost of
     some clutter in the raw file. The owner chose fidelity to what is typed over a tidier file.
+21. **The accepted-issues sheet (2026-11-19, after the walkthrough; W49.accepted-review-owner-ok).** Of 31 items,
+    17 answered: change all 14 recommended changes; change four the sheet recommended keeping (Improve OCR on
+    searchable files, compressing the image-and-text pair at a handwriting-fit quality, PDF pages in the kind sample,
+    aligned Find pairing, and Set for Selection without arbitrary limits); check the sender row first. His notes set
+    three more: refuse encrypted and signed files only for Improve OCR; do the three settings rules properly; a
+    changed folder date updates the dates it gave that nothing else has changed or confirmed. Two design notes are
+    queued: preservation copies under lossy compression, and how Notes stores its material (folder, bundle or
+    package). The rest are answered in the session that folded the sheet. Answers:
+    `answers/17-accepted-review-answers-20261119.json`; the items are filed under `W49.` in SUITE_TODO.md.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 

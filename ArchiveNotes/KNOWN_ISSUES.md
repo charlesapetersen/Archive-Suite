@@ -1528,7 +1528,7 @@ failures; ~13 s each); 189 XCTest + Swift-Testing green; **Release build clean (
   `uiTestOpenFirstZotero()` (runs the real zotero-open dispatch). The harness reads the dispatched URL back from a
   visible control-strip static text `an.editor.test.lastOpenedURL` (deliberately NOT a 1×1 hidden element — that's
   the `an.status.indexReady` queryability hazard). Only the button CLICK gesture is bypassed; the **real
-  Reader/Zotero launch stays owner-eye** (like G2's typing). (accepted: TextKit-2 attachment subviews may not be reachable by XCUITest or VoiceOver; the DEBUG seams cover the tests, and making the chips reachable is a wish in ArchiveNotes/POTENTIAL_FEATURES.md).
+  Reader/Zotero launch stays owner-eye** (like G2's typing). (queued: W49.notes-chip-access).
 - File-safe (read-only dispatch, no store/corpus writes): post-run the real `Store` is **absent**, real
   `notes-index-v1.sqlite3` untouched, `notesStoreRootBookmark` not persisted; all writes confined to the scratch fixture. (accepted: done, W8-S8 pass 7).
 - **RESOLVED (W8-S8b, above):** the `an.status.indexReady` probe queryability fix + the G2/G6/G11 owner-eye
@@ -1549,7 +1549,7 @@ SUCCEEDED**, 0 failures); 189 XCTest + Swift-Testing green; Release build clean 
   attempt clicking it timed out at `waitForExistence`). The chip is a TextKit-2 attachment-view-provider
   subview (`BlockHeaderChipView` inside `BlockHeaderAttachment.viewProvider`); such subviews aren't hit-testable
   by XCUITest (same class of limit as PDFView content panes in the Reader harness). This is exactly why the
-  plan's ORIGINAL G10 spec (08-testing §Design) said **cliclick**, not XCUITest. (accepted: TextKit-2 attachment subviews may not be reachable by XCUITest or VoiceOver; the DEBUG seams cover the tests, and making the chips reachable is a wish in ArchiveNotes/POTENTIAL_FEATURES.md).
+  plan's ORIGINAL G10 spec (08-testing §Design) said **cliclick**, not XCUITest. (queued: W49.notes-chip-access).
 - **Drove the jump through a DEBUG seam** (same plan-blessed precedent as G4/G9): `EditorTextView.uiTestJumpFirstPassage()`
   scans the text storage for the first note-passage `BlockHeaderAttachment` and fires its **real `onJump`
   callback with the real `SourceAnchor`** — the identical closure + anchor the chip button's `jumpClicked`
@@ -1560,7 +1560,7 @@ SUCCEEDED**, 0 failures); 189 XCTest + Swift-Testing green; Release build clean 
   Read-only navigation (no write-back, no store/corpus write). (accepted: done, W8-S8 pass 6; the seam is DEBUG-only).
 - **Future (low-pri, owner-eye today):** making the chip buttons (`an.chip.{jump,reveal,preview,zoteroOpen}`)
   XCUITest-hittable would also help VoiceOver — may not be possible for TextKit-2 attachment subviews; not
-  attempted this pass. Logged to Daemon Report. (accepted: TextKit-2 attachment subviews may not be reachable by XCUITest or VoiceOver; the DEBUG seams cover the tests, and making the chips reachable is a wish in ArchiveNotes/POTENTIAL_FEATURES.md).
+  attempted this pass. Logged to Daemon Report. (queued: W49.notes-chip-access).
 - **REMAINING (W8-S8 still open — oversized, recommend re-split):** G6 (reveal → Reader) + G11 (Zotero chip
   open), both needing a DEBUG `NSWorkspace.open` spy (assert the dispatched URL; real external launch owner-eye);
   the `an.status.indexReady` probe queryability fix; G2/G6/G11 owner-eye docs in the harness README. Only then
@@ -2051,7 +2051,7 @@ is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscio
   window* (its text view is first responder), freeze-during-edit skips the content re-apply, so the
   scroll maps against possibly-stale content (falls back to top if out of range — non-crashing). The
   realistic jump is cross-window (Extract → Note window), where the target window isn't first responder,
-  so content re-applies and the scroll is exact. (accepted: the realistic jump is cross-window, where the scroll is exact; the same-window case falls back to the top without crashing).
+  so content re-applies and the scroll is exact. (queued: W49.notes-same-window-jump).
 - ✅ **FIXED (W40.fix-notes-jump-pending-template, 2026-11-03): folder-scope-hidden target.** A jump
   cleared the window's *user* filters but left a shared *folder scope* that excludes the note, so the
   editor loaded it with no list row highlighted. `NotesNavigationModel.revealForOpen` now also widens such

@@ -65,7 +65,7 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   the window. With mlx-vlm, start it with the model (`mlx_vlm.server --model mlx-community/gemma-3-12b-it-4bit`): its
   0.7.4 cache listing skips that build, whose index names five shards where the repo has two, so a server that has
   not loaded it does not list it. Settings has no switch for it apart from the label-reading toggle. The reader is recorded as
-  `gemma-3-12b` whichever build the server lists. (accepted: by design the app starts no server and downloads no model; the Vision + parser route is the fallback).
+  `gemma-3-12b` whichever build the server lists. (queued: W49.proc-gemma-offer-download).
 - **Gemma beside a local OCR model swaps models.** With a local model as the gateway, Gemma (about 8 GB) is asked on
   that same server first; LM Studio and Ollama may unload the OCR model to load it, and load it again for the next
   page, tens of seconds each way on an 18 GB Mac, inside Live Capture's segment work (Finish waits). Not measured
@@ -95,7 +95,7 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 ## ⚠️ LIMITATION (W47.ct-backfill, 2026-11-19): Tools ▸ Read Box and Folder Labels
 - **Markers are found by tag or colour only.** The label classifier is not run over existing material, so a box or
   folder photo with neither a `Box`/`Folder` tag nor the colour given for older material is read as a document
-  (accepted: classifying every page of a corpus is an OCR pass of its own; the owner's corpus marks them by colour).
+  (queued: W49.proc-backfill-classify-optin).
 - **Vision reads the page as stored.** No turn is tried, so a label photographed sideways may read nothing and is
   listed as a marker with no read; the PDF's own text layer is never a fallback (accepted: owner, 2026-10-30, no
   ABBYY text; `ct-read.md` read the corpus's markers at their stored turn, and trying the others doubled the time).
@@ -153,7 +153,7 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 - **Its estimate is OpenRouter's generic one.** Image tokens are counted as for any OpenRouter model, reasoning as
   1,024 tokens a page whatever the level (High may spend up to its 8,000-token budget more), and `max_price` caps
   the price per token, not the number of tokens. A model the listing gives a per-image or per-request charge is not
-  listed (typed, it is unpriced), since neither the estimate nor `max_price` counts that charge. (accepted: an unmeasured model has only OpenRouter's listing to go on).
+  listed (typed, it is unpriced), since neither the estimate nor `max_price` counts that charge. (queued: W49.proc-openrouter-list-image-priced).
 - **A listed model that leaves the listing leaves the picker.** A selection that no longer resolves falls back to
   the provider's first model (Gemini 3.8 Flash through OpenRouter), as a deleted custom model's does; the picker
   and the estimate show the change, nothing warns. A run already going has no client for it, so its pages fail. (queued: W49.proc-openrouter-gone-warn).
@@ -242,14 +242,14 @@ written where the `searchableFor` setting names the input's format and the page'
   layers at the engine's defaults (`Prefs.register`: balanced photo detail), so fine tone and colour in stamps and
   photographs are softer than in the pair's JPEG (accepted: lossy MRC layers are what compression is; the pair keeps the JPEG).
 - **The settings sheet chooses by kind only** (the rules tab, placement: "Every page" and one switch a kind, for any
-  input format). An entry naming one format (`jpeg/printed`) is set in the settings file and shown as such (accepted: the sheet's design; a format-specific entry stays a settings-file choice).
+  input format). An entry naming one format (`jpeg/printed`) is set in the settings file and shown as such (queued: W49.proc-settings-rules-proper).
 - **Merges and date rewrites preserve compression where qpdf succeeds.** If qpdf is unavailable or refuses the
   file, they fall back to the Quartz PDF/A writer, which can expand compressed images. A merge logs that fallback;
   a date rewrite does not. Compression children also have no per-page timeout or connection to run cancellation (queued: W49.proc-child-cancel).
 - **An unplaced layer selects in the wrong place.** Where the reading's words do not all land on Vision's lines
   (handwriting, a missed note, a reading that does not align), the layer is the reading's own lines spread down the
   image: searchable and selectable, but a selection's highlight is not on the words. The run log names those pages (accepted: the reading has no word positions to place by; the run log names the pages).
-- **Improve OCR refuses a searchable file** (it replaces text pages, and there is none): reprocess it instead (accepted: by design, a searchable file has no text page to replace).
+- **Improve OCR refuses a searchable file** (it replaces text pages, and there is none): reprocess it instead (queued: W49.proc-reocr-searchable).
 - **A file edited elsewhere can lose its headers.** A list whose count is not the page count is ignored (the file was
   edited, so which entry is which page is unknown), and the file is then read as pairs (accepted: the safe fallback for a file whose page order is unknown).
 - **Live Capture and the multi-page PDF path drop the run-log notes** (unplaced pages, pages written as pairs instead),
@@ -316,10 +316,10 @@ layer on 9 of 20 owner hand pages (`place-hands-lines.md`, Qwen3.6-27B). Open:
 - **A handwritten page of no known kind can still go without a text page**: under "Every page" (`*/*`) of the
   searchable form, a page no classifier called and no tag named is not known to be handwritten, so it is written as
   one searchable page with its reading unplaced (W46.place-hands-textpage keeps the text page on every page whose
-  kind, or whose reading's hand, is handwritten, mixed or registers) (accepted: a page no classifier or tag names is not known to be handwritten).
+  kind, or whose reading's hand, is handwritten, mixed or registers) (queued: W49.proc-settings-rules-proper).
 - **Cancelling a run does not stop a page's placer**: it finishes its page (up to 600 s) or its wait for a slot (queued: W49.proc-child-cancel).
 - **The reflow rule is by name**: a reader whose model name holds Infinity-Parser, LightOnOCR, PaddleOCR-VL or
-  Xiaomi-OCR gets the text page on hand pages; a renamed build of one is not caught (accepted: reflowing is a property of those model families, which only the name identifies).
+  Xiaomi-OCR gets the text page on hand pages; a renamed build of one is not caught (queued: W49.proc-settings-rules-proper).
 - **Accented readings align worse**: McCATMuS is an NFD model and the reading is not normalised to NFD (as on the
   bench), so a precomposed accent scores 0 and lowers the page's confidence (queued: W49.proc-hand-nfd).
 
@@ -345,7 +345,7 @@ limits in their own section). Open:
 - **Image-plus-text is 2.6 to 17 times Vision OCR's size** (measured 2026-11-13, `scripts/measure-output.sh` on three
   UIUC pages and the drawn memo): 2.1-2.3 MB a photographed page against Vision OCR 1.16.0's 0.12-0.87 MB, because
   the image page is the 2 MB JPEG copy. The searchable form is compressed as Vision OCR compresses
-  (W42.int-s5-compress); the pair is not (accepted: the measured record; the pair's image page is the reading copy by design, and the searchable form is the compressed one).
+  (W42.int-s5-compress); the pair is not (queued: W49.proc-pair-compress-hands).
 - **A straightened page's only full-geometry copy is the exported image.** The PDF shows the level copy; with
   "output image file" off, Live Capture's finalize leaves no unturned copy of a skewed photo. Nothing in the PDF says
   the page was turned (`PDFGenerator.Output.straightenedDegrees` is returned, not written). Live Capture reads the
@@ -421,7 +421,7 @@ What remains: a box with many such pages has more gaps to check than the figures
 
 - **Refused for in-place improvement:** encrypted or signed files, files ending in a cross-reference stream (the
   pinned PDFium 8046d writes a revision Quartz cannot open after one; the Processor's own output uses tables), raw
-  one-page originals and any file not in suite image/text pairs (accepted: refused to keep in-place improvement safe).
+  one-page originals and any file not in suite image/text pairs (queued: W49.proc-reocr-allow-more).
 - **Apple Vision fails inside the macOS 27.2 VM guest** ("Foundation._GenericObjCError 0") while it reads the same
   page on the host; the VM UI journey uses a DEBUG stand-in reader, the host self-test the real Vision (accepted: a VM guest platform limit; the host self-test uses the real Vision).
 - **The dialog offers Run once per opening:** after Run its file list is stale (an accepted file has a new reader);
@@ -461,7 +461,7 @@ record on the job the colour it was tagged with.
   `provider.data_collection: "deny"` (`OpenRouterDataPolicy`); with the provider pinned and no fallbacks, a
   Chutes-pinned model's calls then fail instead of reading. The deny is process-wide, so another job working at the
   same time is refused the same way; Live Capture holds it while its session's settings are loaded, not only while
-  it reads. (accepted: deliberately conservative; while any job with the switch on works, a concurrent job is refused rather than sent to a training upstream)
+  it reads. (queued: W49.proc-training-deny-per-job)
 - **The default segmenter reads the general layer only.** `SegmentationApproach.preferredDefault` is saved once for
   the app, before any collection is known, so it takes the general layer's switch, not a collection's. (accepted: the default is saved for the whole app before any collection is known)
 - **The billed and opted-out answers are the user's word.** The general interview asks, for each key and plan found
@@ -478,7 +478,7 @@ record on the job the colour it was tagged with.
   HEIC, TIFF), not PDF pages, and needs macOS 26 for the classifier. A Claude plan counts only after "Check the
   sign-in" passes (one short message on the plan). The period, language and script rules that pick a public test set
   are the bench's strata read by the period's middle year; they are a reading, not a measurement. The money habit
-  "No limit" can be chosen only in the general settings. (accepted: design limits of the interviews: a photo-only kind sample, the classifier's macOS 26 floor, a plan counted once it answers, the strata read as a rule, and "No limit" a general-layer choice)
+  "No limit" can be chosen only in the general settings. (queued: W49.proc-kind-sample-pdf)
 - **The run still reads the app's processing settings, not the solver's picks.** The frozen record carries both: the
   resolved layers and the `UserDefaults` processing settings the run actually used. Running a batch from the
   solver's picks is the sheet's job. (accepted: the run reads the processing settings by design; the settings sheet's apply button carries a pick into them, W46.settings-sheet)
@@ -608,7 +608,7 @@ fails such a page for Retry when none of those readings was a verdict (`LiveCapt
 `Recitation`) or a cut-off first reading still files image-only. Anthropic's low-credit reply (a 400
 `invalid_request_error`) is now recorded as a 402. Two edges remain:
 - A page AI Studio refuses with a bare 500 on every try, for a user with no second reader set up, now holds its
-  document back until a second reader is added (the failure message says how); before, it filed image-only. (accepted: fixed, W40.fix-processor-failed-ocr-wrapped; a never-read page waits for a second reader rather than filing image-only, by design)
+  document back until a second reader is added (the failure message says how); before, it filed image-only. (queued: W49.proc-unread-page-files-image)
 - Bare HTTP statuses from OpenAI, Mistral and OpenRouter (a 400, a 413) count as request failures, while
   Anthropic's `invalid_request_error` and `request_too_large` count as verdicts, so the same faulty request is
   failed on one route and filed image-only on another. (queued: W49.proc-request-failure-codes)
@@ -955,7 +955,7 @@ Runtime evidence and the final unattended rerun are under `verification/evidence
   than run the window segmenter on whatever Settings holds now, the resume pins `manual`. Its journal is also
   retired before segmentation, so a batch run that hits a usage limit offers only "check the rest myself", not
   Stop. A non-batch run keeps its approach and its answers (`PendingRunRuntimeConfig.segmentationApproach`,
-  `PendingRun.segmentationWindows`/`segmentationAnswers`) and can stop and resume. (accepted: pinning manual is the safe choice over running the window segmenter on whatever Settings holds now)
+  `PendingRun.segmentationWindows`/`segmentationAnswers`) and can stop and resume. (queued: W49.proc-batch-resume-approach)
 - **A window approach sends page images to its model even in an Apple Vision run** that has a judgment LLM. The
   approach is an explicit opt-in with its cost shown, so this is by design, but it is not text-only. (accepted: the window approach is an explicit opt-in with its cost shown, by design)
 - **Every page's window image is held in memory for the run** (about 1,600 px JPEGs, so roughly 150 MB for 500
@@ -968,7 +968,7 @@ Runtime evidence and the final unattended rerun are under `verification/evidence
 - **Process Files PDFs carry no `Document date:` / `Sent with:` header lines.** Those PDFs are rendered at
   OCR time, before tagging, and finished PDFs are not rewritten to add them (rewriting risks tags and bytes).
   Live Capture renders after tagging and writes the `Document date:` line. The Finder tags are the live
-  value either way; the header is only a snapshot. (accepted: finished PDFs are not rewritten, which risks tags and bytes; the Finder tags are the live value)
+  value either way; the header is only a snapshot. (queued: W49.proc-header-date-lines)
 - **Enclosure proposals come only from the OCR prompt's `[enclosure]` marker**, so Mistral, Apple Vision and
   pre-OCRed classification-only runs propose none; the owner can still type a sent-with date in the manual
   tag sheet. Nothing checks that the covering unit is actually a letter. (queued: W49.proc-enclosure-other-routes)

@@ -9,7 +9,7 @@ have no date of their own, by the owner's folder-date rule (`SPEC/containers.md`
 through `TagWriter` in one undo group (Tags ▸ Undo Tag Change); the `Date evidence:` value is kept in the folder's
 `.archivesuite/item-fields.json` and the Checks name the folder for those dates.
 - **Clearing or widening the folder's date un-dates nothing**, and choosing Not Now does not ask again until the
-  date is edited again (accepted: the offer only adds dates; Undo, or the Inspector's date editor, takes them back).
+  date is edited again (queued: W49.reader-folder-date-undo).
 - **The offer is made only from the Container section.** A folder date written into the container file elsewhere
   (Live Capture's Finish, another app) dates nothing already written until it is set or confirmed here (accepted: the
   offer answers the user's own edit; Live Capture dates its own session's documents, W47.ct-folder-date-live).
@@ -17,8 +17,7 @@ through `TagWriter` in one undo group (Tags ▸ Undo Tag Change); the `Date evid
   one with no date is dated (accepted: the Core Directive forbids materialising a placeholder).
 - **Page 2's evidence is not tied to the tags.** A year retyped in Finder (which adds no check) on a document whose
   page 2 says the year was a stamp's or the estimate's is still treated as that, and the folder's date replaces it
-  (accepted: a date edited in the Inspector is checked, and a checked date always stands; Finder edits are outside
-  the suite).
+  (queued: W49.reader-finder-year-stands).
 - **The evidence record is keyed by file name**: a renamed file loses it and its Checks fall back to page 2's evidence
   (accepted: as the item-field values and container runs are keyed).
 
@@ -36,7 +35,7 @@ user set ends its disagreement warning (`SPEC/containers.md` §Warnings). Contra
 What it does not do, deliberately or not yet:
 - **Undo is Edit ▸ Undo and Redo, from the menu** (W47.ct-reader-edit-undo). ⌘Z stays Tags ▸ Undo Tag Change, so a
   container edit is undone by choosing Edit ▸ Undo, which reads a bare "Undo": SwiftUI's Edit menu does not show the
-  undo manager's action name (accepted: the status line says what was undone, "Container Change undone.").
+  undo manager's action name (queued: W49.reader-undo-menu-names).
   Undo puts back what each touched file held, read fresh, and leaves alone, with the reason, a file that changed
   after the edit; a replaced label read comes back with it. Where there was no file, undo leaves an empty one, since
   the store deletes nothing: an empty container file reads as none, and an empty standard-names file is only ever at
@@ -55,8 +54,7 @@ What it does not do, deliberately or not yet:
 - **Set for selection** takes fields with a level (not date or other marks), at most 5,000 files, and the files in
   each folder's order on disk, so a file the list does not show still keeps its value. Across several folders it is
   all or nothing: every folder's file is checked before any is written, and a write failing partway puts the
-  folders already written back and says so; one changed again in that moment is named as not put back (accepted:
-  two writers racing within one save, and the message names the folder).
+  folders already written back and says so; one changed again in that moment is named as not put back (queued: W49.reader-set-selection-limits).
 - **Warnings: disagreements and long unmarked runs only** (`ContainerInference.warnings`). The Inspector lists the
   selected file's folder; the Library health popover lists every folder's, each with its folder and a Show that
   reaches a file the list hides by lifting the folder and filters as Show in All Files does, at most 200 listed and
@@ -109,12 +107,11 @@ What it does not do, deliberately or not yet:
   `Checked <Field>` tag set before the correction stays and speaks for page 2's value again once the correction is
   removed; only the Inspector and the Zotero export (and Notes' Copy for Zotero, through the same gather) read the
   corrections, not the Processor, search or the list's columns; one file at a time, no set for selection; editing needs
-  the file under the archive's main folder (accepted: a name key as a container run's start; the check is the tag's
-  alone; nothing else shows item fields yet; titles are per document; `.archivesuite` writes are allowed only there).
+  the file under the archive's main folder (queued: W49.reader-item-fields-search).
 - **Container fields have their own Inspector section** (W47.ct-reader-view), with the same badge and no check
   button: a container value is confirmed or corrected from its Edit menu (W47.ct-reader-edit). (accepted: by design, W47.ct-reader-edit; a container value is confirmed by being the user's own).
 - **Sender and recipient have no row**: no route writes them where the Reader can read them (the bench's item-field
-  scope leaves them to W46), and the Reader does not read the JSON sidecar. (accepted: no route writes sender or recipient where the Reader can read them; the row comes with such a route).
+  scope leaves them to W46), and the Reader does not read the JSON sidecar. (queued: W49.reader-sender-row-check).
 - **A group selection counts the checked dates** and checks them all at once; item fields are listed one file at a
   time. (accepted: item fields are per document, so a group has no one value to show).
 - **A check is not tied to the value it checked.** It names the field. Another writer that changes the value
@@ -377,12 +374,12 @@ A find hit is the k-th match of each pane of its page pair, selected in both and
 JPEG original gets boxes at the PDF image page's match positions (a page overlay — `PDFPage.copy()` shares
 annotations with the original and removing one from the copy leaves it there, measured). Limits that stay:
 - **Pairing is by ordinal.** If the image page's text layer misses or splits an occurrence the OCR text page
-  has, later hits on that pair select different words in the two panes. Nothing in the PDF links them better. (accepted: nothing in the PDF links the two panes' words better).
+  has, later hits on that pair select different words in the two panes. Nothing in the PDF links them better. (queued: W49.reader-find-word-align).
 - **An image page with no text layer gets no highlight** (the test corpus's image pages have none): there are
   no positions to draw from. The hit still shows on the text page. (accepted: an image page with no text layer has no positions to draw from).
 - **The extracted-text pane highlights but does not scroll to the current hit** (a SwiftUI `Text` cannot
   scroll to a range); the image pane beside it does. Its matches come from a string search on the same text
-  as PDFKit's, so a query PDFKit matches across a line break or ligature may be marked one match off there. (accepted: a SwiftUI Text cannot scroll to a range; the image pane beside it does).
+  as PDFKit's, so a query PDFKit matches across a line break or ligature may be marked one match off there. (queued: W49.reader-find-scroll-text).
 
 ## ✅ CLOSED (W40.fix-reader-a11y-labels, 2026-10-25) — unnamed Reader controls and PDF pages
 
