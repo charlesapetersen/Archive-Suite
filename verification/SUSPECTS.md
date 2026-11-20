@@ -123,6 +123,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
+  - 2026-11-20 owner walkthrough (call 27) — reproduce attempt queued as `W49.notes-s006-reproduce`.
 
 ### S-007 · Notes' source-block preview may download a cloud placeholder
 
@@ -143,6 +144,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
+  - 2026-11-20 owner walkthrough (call 27) — reproduce attempt queued as `W49.notes-s007-reproduce`.
 
 ### S-008 · Notes may not remember a window size changed just before ⌘Q
 

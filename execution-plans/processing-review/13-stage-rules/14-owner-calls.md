@@ -197,6 +197,13 @@ calls are section 1.
     and a sequence number, as in his corpus), now with six digits (W49.proc-six-digit-names; nothing already filed is
     renamed). The many places dates are saved look like an artifact of development: survey them and similar facts
     and propose one home each (W49.storage-simplify-audit, which W49.item-fields-home now waits on).
+27. **The walkthrough of 2026-11-20 08:05.** No open questions. Backlog: resuming an interrupted standard Files run
+    queued (W49.proc-resume-standard-runs); reproduce attempts for suspects S-006 and S-007 queued
+    (W49.notes-s006-reproduce, W49.notes-s007-reproduce); the Gemini dated-set run and the OpenRouter JPEG panels stay
+    deferred; the NewsBench chart behind nice-to-have and the segmentation checking chart conditional on the table;
+    the CMIF export, cloud drives, creation-date mirror, a shared Notes and Reader window and a richer Markdown editor
+    kept as wishes. The Sherlock family-coverage batch (submitted 2026-11-17) was still pending on priority, with
+    nothing failed; it is collected after it runs.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
