@@ -1978,16 +1978,17 @@ autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two con
   skip-preexisting, retarget, no-target-throw, never-overwrite, path-traversal-reject). Residual edges
   (non-blocking, documented for a future touch): (a) an async write *failure* (e.g. disk full) leaves a
   dangling ref → missing-asset placeholder (no data loss; reported on the status line since
-  `W40.fix-notes-asset-write-silent`, 2026-10-31); (b) two
-  windows editing the **same** note and pasting the same-named image in the same second have independent
-  `reserved` sets, so the second write is refused by the no-overwrite guard (safe — no clobber — but that
-  paste shows a placeholder); a shared name authority would need a single store, which can't serve two
-  windows' differing selections. **Driven live (W40.notes-w7-gui-checks, 2026-11-04):** a pasted PNG lands in
+  `W40.fix-notes-asset-write-silent`, 2026-10-31); (b) ~~two
+  windows editing the **same** note and pasting in the same second picked the same name~~ — fixed
+  (W49.notes-paste-name, 2026-11-20): each window still has its own `reserved` set, but a pasted name is now
+  `pasted-<yyyyMMdd-HHmmss-SSS>-<4 hex>.png`, so two windows no longer pick one name and the second paste no
+  longer shows a placeholder (`ItemAssetStoreTests.twoWindowsSameSecondDoNotClash`). **Driven live (W40.notes-w7-gui-checks, 2026-11-04):** a pasted PNG lands in
   the note's `assets/` with the pasted bytes and draws them (no placeholder) after the paste, after selecting
   another note and back, and after a relaunch, with the Markdown unrewritten
   (`NotesW7ChecksUITests.testS1a_PastedImageReloadsAfterReselectAndRelaunch`, VM, through the
   `an.editor.test.pasteImage` seam that calls the real `tryPasteImage`; ⌘V of an image and a drag are not sent).
-  Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`. (queued: W49.notes-paste-name).
+  Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`. (accepted: fixed history; edge (a) is
+  reported on the status line, edge (b) fixed by W49.notes-paste-name).
 - **Load/autosave, driven live (W40.notes-w7-gui-checks, 2026-11-04).** Select A, type, select B at once: A's
   edit is in A's file exactly once, B loads its own text and its file is untouched; the run recorded that the
   idle autosave had not yet written the file, so the switch saved it

@@ -1237,8 +1237,7 @@ final class EditorTextView: NSTextView {
 
         guard let data = imageData else { return false }
 
-        let dateSuffix = Self.pastedImageDateSuffix()
-        let preferredName = "pasted-\(dateSuffix).png"
+        let preferredName = Self.pastedImageName()
 
         do {
             let relPath = try store.addAsset(data, preferredName: preferredName)
@@ -1331,10 +1330,17 @@ final class EditorTextView: NSTextView {
         return rep.representation(using: .png, properties: [:])
     }
 
-    private static func pastedImageDateSuffix() -> String {
+    /// `pasted-<yyyyMMdd-HHmmss-SSS>-<4 hex>.png` (W49.notes-paste-name). Each window's `ItemAssetStore`
+    /// keeps its own reserved names, so two windows on one note pasting in the same second used to pick
+    /// the same name, and the second write was refused (a Missing placeholder). The milliseconds and the
+    /// random part make that clash vanishingly unlikely; the per-store `-N` disambiguator still covers
+    /// same-window repeats. Only `[A-Za-z0-9-]`, so the Markdown destination stays bare.
+    static func pastedImageName(at date: Date = Date(),
+                                random: UInt16 = UInt16.random(in: .min ... .max)) -> String {
         let df = DateFormatter()
-        df.dateFormat = "yyyyMMdd-HHmmss"
-        return df.string(from: Date())
+        df.locale = Locale(identifier: "en_US_POSIX")
+        df.dateFormat = "yyyyMMdd-HHmmss-SSS"
+        return "pasted-\(df.string(from: date))-\(String(format: "%04x", random)).png"
     }
 
     // MARK: - Raw mode

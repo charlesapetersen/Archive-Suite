@@ -205,4 +205,43 @@ struct ItemAssetStoreTests {
         #expect(!FileManager.default.fileExists(atPath: itemsDir.appendingPathComponent("evil.png").path))
         #expect(!FileManager.default.fileExists(atPath: tmp.appendingPathComponent("evil.png").path))
     }
+
+    // MARK: - Two windows, one note, one second (W49.notes-paste-name)
+
+    @Test("two windows' stores pasting in the same second get distinct names; both images land")
+    func twoWindowsSameSecondDoNotClash() async throws {
+        let (store, tmp) = try makeScratchStore()
+        defer { cleanup(tmp) }
+        let item = makeItem()
+        _ = try await store.create(item)
+
+        // One ItemAssetStore per window, each with its own reserved set, on the same note.
+        let windowA = ItemAssetStore(store: store, root: store.rootURL, itemID: item.id)
+        let windowB = ItemAssetStore(store: store, root: store.rootURL, itemID: item.id)
+        let second = Date(timeIntervalSince1970: 1_800_000_000)
+        let nameA = EditorTextView.pastedImageName(at: second.addingTimeInterval(0.120))
+        let nameB = EditorTextView.pastedImageName(at: second.addingTimeInterval(0.480))
+        #expect(nameA != nameB)
+
+        let refA = try windowA.addAsset(Data("FROM-A".utf8), preferredName: nameA)
+        let refB = try windowB.addAsset(Data("FROM-B".utf8), preferredName: nameB)
+        await windowA.awaitPendingWrites()
+        await windowB.awaitPendingWrites()
+
+        #expect(refA == "assets/\(nameA)")
+        #expect(refB == "assets/\(nameB)")
+        let dir = await store.itemDir(item.id)
+        #expect(try Data(contentsOf: dir.appendingPathComponent(refA)) == Data("FROM-A".utf8))
+        #expect(try Data(contentsOf: dir.appendingPathComponent(refB)) == Data("FROM-B".utf8))
+
+        // Same millisecond too: the random part still separates them.
+        let same = second.addingTimeInterval(0.250)
+        #expect(EditorTextView.pastedImageName(at: same, random: 0x1a2b)
+                != EditorTextView.pastedImageName(at: same, random: 0x3c4d))
+        // The name stays a bare Markdown destination: only letters, digits and hyphens before `.png`.
+        let stem = nameA.dropLast(".png".count)
+        #expect(nameA.hasPrefix("pasted-") && nameA.hasSuffix(".png"))
+        #expect(stem.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") })
+        #expect(InlineImageMarkdown.destination("assets/\(nameA)") == "assets/\(nameA)")
+    }
 }
