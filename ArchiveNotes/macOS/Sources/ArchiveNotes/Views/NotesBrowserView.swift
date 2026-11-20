@@ -156,7 +156,7 @@ struct NotesBrowserView: View {
             if let w = window {
                 NotesAppSettings.persistWindowSizeOnDisappear(
                     w.frame.size,
-                    isUITestHarness: Self.isUITestHarness
+                    isUITestHarness: Self.suppressesWindowSizePersistence
                 )
             }
         }
@@ -306,10 +306,17 @@ struct NotesBrowserView: View {
         if let p = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !p.isEmpty { return true }
         return false
     }
+
+    /// The harness skips saving the window size; `-ANUITestPersistWindowSize YES` saves it as a normal launch does,
+    /// so a UITest can check what a quit keeps (W49.notes-suspects-small, S-008).
+    private static var suppressesWindowSizePersistence: Bool {
+        isUITestHarness && !UserDefaults.standard.bool(forKey: "ANUITestPersistWindowSize")
+    }
 #else
     /// Release / non-UITest builds carry no probe (the harness is DEBUG-only).
     private var indexReadyProbe: some View { EmptyView() }
     private static var isUITestHarness: Bool { false }
+    private static var suppressesWindowSizePersistence: Bool { false }
 #endif
 
     private var kindLabel: String { nav.windowKind == .extract ? "Extract" : "Note" }

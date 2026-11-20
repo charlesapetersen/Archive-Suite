@@ -182,10 +182,16 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 
   Confirmed if the frame is not the size it was resized to.
 - **Would clear it:** the relaunched window has the resized size.
-- **Status:** `open`
+- **Status:** `cleared` — `W49.notes-suspects-small`, VM test `ArchiveNotesUITests/NotesWindowSizeQuitUITests` `testB_ResizeThenQuitKeepsTheSize`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
+  - 2026-11-20 W49.notes-suspects-small — cleared. The code is unchanged (the size is still written only from
+    `onDisappear`, `Views/NotesBrowserView.swift:155`), but a quit runs it. In the VM (macOS 27.2), with
+    `-ANUITestPersistWindowSize YES` (new, DEBUG: saves the size as a normal launch does): the control resized the
+    window to 1536×699, closed it, quit, and relaunched at 1536×699; then, with that size saved, the window was
+    resized to 1479×612 and quit from Archive Notes ▸ Quit at once, and it relaunched at 1479×612. Two runs, same
+    result. Had the quit not saved it, the relaunch would have applied the older 1536×699.
 
 ### S-009 · Pasting or dropping an image in raw mode may write an orphan asset and a stray character into the note
 
@@ -244,10 +250,17 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would clear it:** the loop produces a confirmation for each sole-instance item, one after another, or one
   batched confirmation naming both. After confirming, neither A nor B is still filed in F without having been
   asked about.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.notes-suspects-small-check`); test `ArchiveNotesTests/NotesSmallSuspectTests` `s010MultiRemove`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
+  - 2026-11-20 W49.notes-suspects-small — reproduced. The code is unchanged in substance (the row menu's loop is now
+    `Views/NotesContextMenu.swift:140`, `pendingDeletion` assigned in `NotesNavigationModel.removeMembership`, `:580`).
+    On a scratch store, notes A and B filed only in F and C in F and G, scoped to F: the real row menu's
+    "Remove 3 Items from “F”" item fired. C left F quietly and one alert was pending, for A or B (the selection is a
+    set, so which one varies). Confirming it trashed the note it named, and only that one; the other stayed filed in
+    F with no alert. Nothing was deleted beyond what was confirmed. The menu comment says "confirms one at a time",
+    which promises more than happens, so this is not intended behaviour.
 
 ### S-011 · Row-menu "New from Template" skips the template-body flush and failed-save guard
 
@@ -269,10 +282,17 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   call the row-menu closure's `model.newItem`, and assert that a note is created.
 - **Would clear it:** the row-menu path flushes and refuses the same way the toolbar path does, or the new note
   holds the marker.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.notes-suspects-small-check`); tests `ArchiveNotesTests/NotesSmallSuspectTests` `s011RowMenuSkipsFlush`, `s011RowMenuSkipsFailedSaveGuard`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
+  - 2026-11-20 W49.notes-suspects-small — reproduced, both halves. The toolbar's route is now
+    `NewItemFlow.create` (`ArchiveNotesCommands.swift:166`), whose comment calls it "the one creation path behind
+    every New"; the row menu (`Views/NotesContextMenu.swift:56`) still calls `model.newItem` directly. With note
+    template T open in a template body editor wired as `TemplateBodyEditorPane` wires it (scratch store): a marker
+    typed and still waiting to save is missing from the note the row menu's New from Template ▸ T makes, and
+    present in one `NewItemFlow` makes. With T's last body save refused (read-only template folder),
+    `NewItemFlow` makes nothing and the row menu makes a note from the stale body.
 
 ### S-012 · The tag filter may miss every tag entered in the app unless it is typed with the stored capitals
 
@@ -292,10 +312,19 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   assert that `nav.displayed` contains the note. Confirmed if it is empty.
 - **Would clear it:** the note is displayed, i.e. the filter or the stored tag is normalised somewhere this
   reading missed.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.notes-suspects-small-check`); test `ArchiveNotesTests/NotesSmallSuspectTests` `s012TagFilterCase`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
+  - 2026-11-20 W49.notes-suspects-small — reproduced, narrower than raised. Since the suspect was written the
+    filter bar's field became `NoteTagChipsField` over `SubjectEntryField` with `fillsInAnyCase`, so a prefix
+    ("inte") fills in "Intel" and Return adds the stored spelling. A tag typed in full in another case gets no
+    completion (`TagEntry.completions` leaves out a case-insensitive exact match, and `filledInIndex` fills in
+    nothing for one), so Return adds "intel" as typed (`NoteTagChipsField.add` only trims) and
+    `NotesFilter.matches` compares exactly (`Models/NotesFilter.swift:101`). On a scratch store a note given
+    "intel" through `NotesModel.addTag` is stored "Intel" and the list filtered by "intel" is empty. The comment
+    there says "the filter bar supplies canonical tokens", which it does not for this case. Advanced Search
+    lower-cases both sides (`NotesAdvancedSearch.swift:242`), so it finds the note.
 
 ### S-013 · An `archivenotes://` link may be dropped when the Notes window is closed
 
@@ -338,10 +367,18 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   tracking.
 - **Would clear it:** the in-session case yields `.needsRootGrant` or `.searchIncomplete`, or the owner rules that
   "not found" is correct for a vanished root and `W40.b5` corrects the promise.
-- **Status:** `open`
+- **Status:** `reproduced` — the code calls it the W8-S9 rule, so the owner is asked first (rule 5a(3), Daemon Report 2026-11-20); then the independent check, `W49.notes-suspects-small-check`; test `ArchiveNotesTests/NotesSmallSuspectTests` `s014MovedRoot`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
+  - 2026-11-20 W49.notes-suspects-small — reproduced, and asked rather than queued (rule 5a(3)). The code is
+    unchanged (`ReaderRootStore.root(for:)` returns the active scope's URL; the basename scan's
+    `rootIsWhollyAbsent` branch returns `.exhausted`, `Links/ReaderLinkResolver.swift:352-360`). A scratch root
+    granted with its marker, a link into it resolved once, the folder renamed: the same resolver then answers
+    `.notFound` ("Source file not found in the archive."). A fresh `ReaderRootStore`, as after a relaunch,
+    resolves the link at the moved folder through its bookmark. The comment beside the branch, and the accepted
+    `KNOWN_ISSUES.md` bullet from W23.m14, call "a stale root reports the file missing" the shipped W8-S9 rule, so
+    whether the in-session answer should ask for the folder instead is the owner's call.
 
 ### S-015 · The list's `[`, `]` and `\` keys may fire inside the inline tag editor, and `\` would mark a file Read
 
@@ -377,10 +414,16 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   unit test that sets `tableView.sortDescriptors` on the live table and checks `NotesNavigationModel`'s sort.
   Confirmed if the order does not change.
 - **Would clear it:** the rows reorder by title.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.notes-suspects-small-check`); test `ArchiveNotesTests/NotesSmallSuspectTests` `s016HeaderSort`
 - **History:**
   - 2026-10-16 W40.e5 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
+  - 2026-11-20 W49.notes-suspects-small — reproduced. The code is unchanged (the callback is now
+    `Views/NotesTableView.swift:531`, on `Coordinator`, the delegate; `NotesTableDataSource`, `:799`, does not
+    answer it). The real `NotesTableView` hosted over two scratch notes, and the Title column's own sort prototype
+    set as the table's sort descriptors (what a header click does): the header takes the Title sort, the model's
+    sort and the row order stay by date, and the data source does not respond to
+    `tableView(_:sortDescriptorsDidChange:)`. Called by hand, the coordinator's handler sorts by title.
 
 ### S-017 · A pre-OCRed Processor run drops the operator's per-document segmentation review
 
