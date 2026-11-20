@@ -35,6 +35,98 @@
   "folders": 481,
   "folders_all": 301,
   "folders_none": 106,
+  "written_exact": [
+   1763,
+   674
+  ],
+  "by_form": {
+   "single year": [
+    1034,
+    458,
+    458,
+    587
+   ],
+   "mid-point": [
+    416,
+    350,
+    128,
+    325
+   ],
+   "mid-point, span 2": [
+    199,
+    159,
+    72,
+    167
+   ],
+   "mid-point, span 3": [
+    78,
+    67,
+    23,
+    67
+   ],
+   "mid-point, span 4": [
+    66,
+    60,
+    27,
+    51
+   ],
+   "mid-point, span 5": [
+    32,
+    27,
+    3,
+    19
+   ],
+   "mid-point, span 6": [
+    23,
+    20,
+    0,
+    13
+   ],
+   "mid-point, span 7": [
+    18,
+    17,
+    3,
+    8
+   ],
+   "decade": [
+    225,
+    186,
+    88,
+    88
+   ],
+   "nothing": [
+    88,
+    85,
+    0,
+    0
+   ]
+  },
+  "folder_bootstrap": {
+   "reps": 10000,
+   "seed": 17,
+   "folders": 481,
+   "inside": [
+    0.541,
+    0.684
+   ],
+   "exact": [
+    0.331,
+    0.439
+   ]
+  },
+  "even_span_middles": {
+   "earlier": [
+    288,
+    99,
+    231
+   ],
+   "later": [
+    288,
+    98,
+    221
+   ],
+   "folders": 79
+  },
   "undated_dated": 135
  },
  "truth_photos": {
@@ -65,6 +157,80 @@
   "folders": 17,
   "folders_all": 14,
   "folders_none": 0,
+  "written_exact": [
+   56,
+   33
+  ],
+  "by_form": {
+   "single year": [
+    14,
+    13,
+    13,
+    14
+   ],
+   "mid-point": [
+    42,
+    36,
+    20,
+    33
+   ],
+   "mid-point, span 2": [
+    19,
+    13,
+    11,
+    15
+   ],
+   "mid-point, span 3": [
+    5,
+    5,
+    5,
+    5
+   ],
+   "mid-point, span 5": [
+    2,
+    2,
+    1,
+    2
+   ],
+   "mid-point, span 6": [
+    13,
+    13,
+    0,
+    8
+   ],
+   "mid-point, span 7": [
+    3,
+    3,
+    3,
+    3
+   ]
+  },
+  "folder_bootstrap": {
+   "reps": 10000,
+   "seed": 17,
+   "folders": 17,
+   "inside": [
+    0.727,
+    1.0
+   ],
+   "exact": [
+    0.344,
+    0.889
+   ]
+  },
+  "even_span_middles": {
+   "earlier": [
+    32,
+    11,
+    23
+   ],
+   "later": [
+    32,
+    6,
+    22
+   ],
+   "folders": 7
+  },
   "undated_dated": 9
  },
  "vision_on_truth_photos": {
@@ -91,6 +257,68 @@
   "folders": 17,
   "folders_all": 11,
   "folders_none": 3,
+  "written_exact": [
+   48,
+   21
+  ],
+  "by_form": {
+   "single year": [
+    23,
+    12,
+    12,
+    21
+   ],
+   "mid-point": [
+    25,
+    24,
+    9,
+    20
+   ],
+   "mid-point, span 2": [
+    9,
+    8,
+    6,
+    9
+   ],
+   "mid-point, span 6": [
+    13,
+    13,
+    0,
+    8
+   ],
+   "mid-point, span 7": [
+    3,
+    3,
+    3,
+    3
+   ]
+  },
+  "folder_bootstrap": {
+   "reps": 10000,
+   "seed": 17,
+   "folders": 17,
+   "inside": [
+    0.485,
+    0.929
+   ],
+   "exact": [
+    0.209,
+    0.765
+   ]
+  },
+  "even_span_middles": {
+   "earlier": [
+    22,
+    6,
+    17
+   ],
+   "later": [
+    22,
+    6,
+    17
+   ],
+   "folders": 6
+  },
   "undated_dated": 2
  },
  "decade_check": [

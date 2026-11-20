@@ -38,7 +38,38 @@ The documents in the same runs that the owner did date are the check: is his yea
 | Vision + parser, every dated folder | 1,763 (481 folders) | 1,079 (61%, 59–63) | 1,241 (70%) | 458 of 1,034 (44%; 587 within a year) | 621 of 729 (85%) | 301 / 106 |
 
 The intervals are Wilson 95% by document. Documents in one folder are not independent: the truth row rests on 17
-folders.
+folders, and one folder of 10 documents holds 5 of its 7 misses. Resampling the 17 folders (10,000 draws, every
+document of a drawn folder kept) gives 73–100% for inside the date.
+
+## What the rule writes, scored by its form (W46.p17-folder-date-forms)
+
+"Inside the date" is not what the shipped rule writes. The owner's rule (`ContainerFolderDate.inherited`,
+SPEC/containers.md §The folder-date rule) writes a single year as it is, the mid-point year for a span of 2 to 7
+years (an even span the earlier middle year), the decade for 8 to 19, and nothing from 20. Each form scored against
+the owner's Year tag (exact: the written year is his year; for a decade, his year is in it):
+
+| Folder date from | Form written | Documents | Inside the date | Written value exact | Within a year |
+|---|---|---|---|---|---|
+| **Owner-checked label truth** | single year | 14 | 13 | **13** | 14 |
+| | mid-point year | 42 | 36 | **20 (48%)** | 33 (79%) |
+| | · span 2 / 3 / 5 / 6 / 7 | 19 / 5 / 2 / 13 / 3 | 13 / 5 / 2 / 13 / 3 | 11 / 5 / 1 / 0 / 3 | 15 / 5 / 2 / 8 / 3 |
+| | decade (8–19 years) | 0 | | unmeasured | |
+| | every written year | 56 | 49 | **33 (59%)** | 47 |
+| Vision + parser, every dated folder | single year | 1,034 | 458 | 458 (44%) | 587 |
+| | mid-point year | 416 | 350 | 128 (31%) | 325 |
+| | decade | 225 | 186 | 88 (39%) | |
+| | nothing (20 years or more) | 88 | 85 | | |
+
+Clustered by folder (10,000 draws over the 17 folders), the truth row's written value is exact for 34–89%.
+
+**The mid-point year is exact for about half the documents it dates, within a year for four in five.** The single year
+is right 13 of 14. The 13 documents under one six-year folder (1978-1983) take 1980 and none is 1980 (4 are 1979, 4 are 1981, 5
+are 1982); all 13 are inside the span. The decade form has no document in the truth runs, so it is unmeasured on owner truth.
+
+**The even-span middle.** On the 32 truth documents under an even span (7 folders) the earlier middle year, which
+the rule writes, is exact for 11 and within a year for 23; the later middle would be exact for 6 and within a year
+for 22. Vision + parser's 288 (79 folders): 99 against 98 exact. The earlier middle does no worse here; 7 folders do
+not settle it.
 
 **The folder's real date holds.** Where the date is the one the owner checked, 88% of the dated documents fall inside
 it and 93% within a year, and no folder's date is wrong for all its documents.
@@ -98,8 +129,10 @@ parser's own read is right for 44% of single years.
   for W47.ct-truth.
 - **Comparison.** Vision + parser and the label truth on the same 17 folders: the truth row against the Vision row
   above it. The folder run rule is the SPEC's, applied to filenames in capture order.
-- **Noise.** Wilson 95% by document, clustered by folder. Folder counts are given beside them. The truth row's n is
-  small (56 documents, 17 folders).
+- **Noise.** Wilson 95% by document, with folder counts beside them; for the truth row also a bootstrap over its 17
+  folders (10,000 draws, seed 17): inside 73–100%, the written value exact 34–89%. The truth row's n is small (56
+  documents, 17 folders; one folder of 10 documents holds 5 of the 7 misses), so a by-form gap under that width is a
+  tie.
 - **Scope.** It does not measure Luna's or Gemma's date read on these photos (only the label truth and Vision). It
   does not say how often a folder's date holds for undated documents, since those have no truth year; the dated
   neighbours stand in for them. It does not count unmarked folder photos in the corpus. Not on the bench page:

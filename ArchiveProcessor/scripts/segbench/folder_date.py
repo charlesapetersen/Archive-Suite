@@ -17,6 +17,9 @@ cached Vision lines (ct_read corpus-lines, the first turn that reads one), parse
 the $0 route; the design reads the date with GPT 5.6 Luna (else Gemma 3 12B), which scored higher on label dates
 (ct-read.md), so the counts of dated folders here are a floor. No ABBYY text (owner, 2026-10-30), no call, no upload.
 
+W46.p17-folder-date-forms adds the shipped rule's written value (`written`, as ContainerFolderDate.inherited) scored
+by its form, the even-span middle compared, and a bootstrap over the folders for the intervals.
+
     python3 folder_date.py     # segbench-results/folder-date.md and .json
 
 READ ONLY on the corpus (tags read with corpus_survey.read_tags). Run from scripts/segbench.
@@ -25,6 +28,7 @@ import collections
 import hashlib
 import json
 import os
+import random
 import re
 import sys
 
@@ -119,6 +123,82 @@ def label_truth():
     return out
 
 
+def written(r):
+    """What the shipped rule writes for a folder range (ContainerFolderDate.inherited, SPEC/containers.md): the form
+    and the year, or the decade's first year. One year as it is; a 2-7-year span its mid-point (an even span the earlier
+    middle year); 8-19 the decade holding most of its years (a tie the earlier); 20 or more nothing."""
+    lo, hi = r
+    span = hi - lo + 1
+    if span == 1:
+        return "single year", lo
+    if span <= 7:
+        return "mid-point", lo + (span - 1) // 2
+    if span <= 19:
+        best, n = lo // 10 * 10, 0
+        for d in range(lo // 10 * 10, hi + 1, 10):
+            k = min(hi, d + 9) - max(lo, d) + 1
+            if k > n:
+                best, n = d, k
+        return "decade", best
+    return "nothing", None
+
+
+def right(x, slack=0):
+    """Is the written value right for the owner's year: the year within `slack`, or the year inside the decade."""
+    form, v = written(x["range"])
+    if form == "decade":
+        return v <= x["year"] <= v + 9
+    return v is not None and abs(x["year"] - v) <= slack
+
+
+def by_form(rows):
+    """[documents, inside the range, the written value exact, within a year] by the form the rule writes; the
+    mid-point split by span."""
+    out = collections.OrderedDict()
+    for x in rows:
+        form, _ = written(x["range"])
+        span = x["range"][1] - x["range"][0] + 1
+        for k in ([form] + ([f"mid-point, span {span}"] if form == "mid-point" else [])):
+            out.setdefault(k, [0, 0, 0, 0])
+            out[k][0] += 1
+            out[k][1] += within(x["year"], x["range"])
+            out[k][2] += right(x)
+            out[k][3] += right(x, 1)
+    order = ("single year", "mid-point", "decade", "nothing")
+    return dict(sorted(out.items(), key=lambda kv: (order.index(kv[0].split(",")[0]), kv[0])))
+
+
+def even_middles(rows):
+    """The owner's question on an even 2-7-year span (W46.p17-folder-date-forms): the earlier middle year, which the
+    rule writes, against the later one, each [documents, exact, within a year]."""
+    ev = [x for x in rows if written(x["range"])[0] == "mid-point" and (x["range"][1] - x["range"][0]) % 2 == 1]
+    later = [abs(x["year"] - (x["range"][0] + (x["range"][1] - x["range"][0] + 1) // 2)) for x in ev]
+    return {"earlier": [len(ev), sum(right(x) for x in ev), sum(right(x, 1) for x in ev)],
+            "later": [len(ev), sum(d == 0 for d in later), sum(d <= 1 for d in later)],
+            "folders": len({x["photo"] for x in ev})}
+
+
+def folder_boot(rows, reps=10000, seed=17):
+    """Percentile 95% intervals clustered by folder: the folders resampled with replacement, every document of a drawn
+    folder kept. For inside the range and for the written value exact."""
+    by = collections.defaultdict(list)
+    for x in rows:
+        by[x["photo"]].append((within(x["year"], x["range"]), right(x)))
+    folders = list(by.values())
+    if not folders:
+        return None
+    rnd = random.Random(seed)
+    ins, ex = [], []
+    for _ in range(reps):
+        draw = [d for _ in folders for d in rnd.choice(folders)]
+        ins.append(sum(a for a, _ in draw) / len(draw))
+        ex.append(sum(b for _, b in draw) / len(draw))
+    def ci(v):
+        v.sort()
+        return [round(v[int(0.025 * reps)], 3), round(v[int(0.975 * reps) - 1], 3)]
+    return {"reps": reps, "seed": seed, "folders": len(folders), "inside": ci(ins), "exact": ci(ex)}
+
+
 def check(runs, date_of):
     """The owner's year tags in the runs of the photos date_of dates, against the folder's range."""
     rows = []
@@ -137,6 +217,9 @@ def check(runs, date_of):
             "single_year_within_1": share(single, 1), "range": share(span),
             "folders": len(by_photo), "folders_all": sum(all(v) for v in by_photo.values()),
             "folders_none": sum(not any(v) for v in by_photo.values()),
+            "written_exact": [len(rows), sum(right(x) for x in rows)], "by_form": by_form(rows),
+            "folder_bootstrap": folder_boot(rows),
+            "even_span_middles": even_middles(rows),
             "undated_dated": sum(len(runs[p]["undated"]) for p in runs if date_of(p))}
 
 
