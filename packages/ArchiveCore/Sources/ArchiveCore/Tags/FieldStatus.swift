@@ -126,7 +126,7 @@ public enum FieldStatusPolicy {
     }
 
     /// The folder rule's figure for the form it wrote, read from the evidence's quoted folder value
-    /// (`folder; from <start>; "<value>"; year <y>`, the text between the first and last quote mark):
+    /// (`folder; from <start>; "<value>"; gave <date>`, the text between the first and last quote mark):
     /// `segbench-results/folder-date.md`, "What the rule writes, scored by its form", the owner's Year tags on the dated
     /// documents of 17 checked folders.
     static func folderFigure(_ evidence: String?) -> String {

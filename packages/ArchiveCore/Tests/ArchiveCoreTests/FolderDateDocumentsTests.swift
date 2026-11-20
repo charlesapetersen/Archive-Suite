@@ -58,20 +58,20 @@ final class FolderDateDocumentsTests: XCTestCase {
     }
 
     func testTheEvidenceLineIsProcessFiles() {
-        XCTAssertEqual(folder("1965-1967", start: "IMG_0101.pdf").evidence, "folder; from IMG_0101.pdf; \"1965-1967\"; year 1966")
-        XCTAssertEqual(folder("1960s", start: "").evidence, "folder; from the folder; \"1960s\"; decade 1960s")
+        XCTAssertEqual(folder("1965-1967", start: "IMG_0101.pdf").evidence, "folder; from IMG_0101.pdf; \"1965-1967\"; gave 1966, Date Uncertain")
+        XCTAssertEqual(folder("1960s", start: "").evidence, "folder; from the folder; \"1960s\"; gave 1960s, Date Uncertain")
         XCTAssertEqual(ContainerFolderDate.evidenceClass("folder; from x"), "folder")
         XCTAssertNil(ContainerFolderDate.evidenceClass(nil))
     }
 
     func testTheRecordHoldsOnlyWhileTheFileCarriesItsDate() throws {
         let record = try XCTUnwrap(folder("Feb. 1970").record)
-        XCTAssertEqual(record, FolderDateRecord(date: "1970-02", uncertain: false, evidence: "folder; from 0001.pdf; \"Feb. 1970\"; year 1970"))
+        XCTAssertEqual(record, FolderDateRecord(date: "1970-02", uncertain: false, evidence: "folder; from 0001.pdf; \"Feb. 1970\"; gave 1970-02"))
         XCTAssertTrue(record.holds(for: tags(["1970", "2 February", "Unread"])))
         XCTAssertFalse(record.holds(for: tags(["1970", "2 February", "Date Uncertain"])), "undone to the estimate's")
         XCTAssertFalse(record.holds(for: tags(["1958"])))
         XCTAssertFalse(record.holds(for: tags([])))
-        let page = "estimate; from 0003.pdf; year 1958"
+        let page = "estimate; from 0003.pdf; gave 1958, Date Uncertain"
         XCTAssertEqual(FolderDateRecord.evidence(record, page: page, tags: tags(["1970", "2 February"])), record.evidence)
         XCTAssertEqual(FolderDateRecord.evidence(record, page: page, tags: tags(["1958", "Date Uncertain"])), page)
         let decade = try XCTUnwrap(folder("1962-1975").record)
@@ -79,27 +79,57 @@ final class FolderDateDocumentsTests: XCTestCase {
         XCTAssertTrue(decade.holds(for: tags(["1960s", "Date Uncertain"])))
     }
 
-    /// W49.reader-finder-year-stands: page 2's evidence speaks for the date only while the file still carries the year
-    /// it gave. A year retyped in Finder (which records nothing) is the user's, so no folder date replaces it.
-    func testPageEvidenceStandsOnlyForTheYearItGave() {
-        let stamp = "stamp; page 1; top; \"RECEIVED MAR 1958\"; year 1958"
-        XCTAssertEqual(FolderDateRecord.evidence(nil, page: stamp, tags: tags(["1958", "3 March"])), stamp)
-        XCTAssertNil(FolderDateRecord.evidence(nil, page: stamp, tags: tags(["1961"])), "retyped in Finder")
+    /// W49.reader-finder-year-stands, W49.reader-finder-month-stands: page 2's evidence speaks for the date only while
+    /// the file still carries the date it gave, month, day and `Date Uncertain` included. A date changed in Finder (which
+    /// records nothing) is the user's, so no folder date replaces it.
+    func testPageEvidenceStandsOnlyForTheDateItGave() {
+        let stamp = "stamp; page 1; top; \"RECEIVED MAR 1958\"; gave 1958-03"
+        XCTAssertEqual(FolderDateRecord.evidence(nil, page: stamp, tags: tags(["1958", "3 March", "Unread"])), stamp)
+        XCTAssertNil(FolderDateRecord.evidence(nil, page: stamp, tags: tags(["1961", "3 March"])), "year retyped in Finder")
+        XCTAssertNil(FolderDateRecord.evidence(nil, page: stamp, tags: tags(["1958", "4 April"])), "month changed")
+        XCTAssertNil(FolderDateRecord.evidence(nil, page: stamp, tags: tags(["1958"])), "month removed")
+        XCTAssertNil(FolderDateRecord.evidence(nil, page: stamp, tags: tags(["1958", "3 March", "Day 9"])), "day added")
+        XCTAssertNil(FolderDateRecord.evidence(nil, page: stamp, tags: tags(["1958", "3 March", "Date Uncertain"])),
+                     "Date Uncertain added")
+        XCTAssertNil(FolderDateRecord.evidence(nil, page: stamp, tags: tags(["1958", "1959", "3 March"])),
+                     "a second Year added: the date is ambiguous")
         XCTAssertNil(FolderDateRecord.evidence(nil, page: stamp, tags: tags(["1950s"])), "a decade is not the year")
-        XCTAssertNil(FolderDateRecord.evidence(nil, page: "stamp; page 1", tags: tags(["1958"])), "no year recorded")
-        XCTAssertNil(FolderDateRecord.evidence(nil, page: "estimate; from a.pdf; \"x; year 1958\"", tags: tags(["1958"])),
-                     "a quote's text is not the recorded year")
-        let decade = "folder; from 0001.pdf; \"1962-1975\"; decade 1960s"
+        XCTAssertNil(FolderDateRecord.evidence(nil, page: "stamp; page 1", tags: tags(["1958"])), "no date recorded")
+        XCTAssertNil(FolderDateRecord.evidence(nil, page: "stamp; page 1; year 1958", tags: tags(["1958"])),
+                     "the year-only form speaks for nothing")
+        XCTAssertNil(FolderDateRecord.evidence(nil, page: "estimate; from a.pdf; \"x; gave 1958\"", tags: tags(["1958"])),
+                     "a quote's text is not the recorded date")
+        let day = "image; page 1; \"March 30, 1961\"; gave 1961-03-30"
+        XCTAssertEqual(FolderDateRecord.evidence(nil, page: day, tags: tags(["1961", "3 March", "Day 30"])), day)
+        XCTAssertNil(FolderDateRecord.evidence(nil, page: day, tags: tags(["1961", "3 March", "Day 31"])), "day changed")
+        let uncertain = "estimate; from a.pdf; gave 1957, Date Uncertain"
+        XCTAssertEqual(FolderDateRecord.evidence(nil, page: uncertain, tags: tags(["1957", "Date Uncertain"])), uncertain)
+        XCTAssertNil(FolderDateRecord.evidence(nil, page: uncertain, tags: tags(["1957"])), "Date Uncertain removed")
+        let decade = "folder; from 0001.pdf; \"1962-1975\"; gave 1960s, Date Uncertain"
         XCTAssertEqual(FolderDateRecord.evidence(nil, page: decade, tags: tags(["1960s", "Date Uncertain"])), decade)
         XCTAssertNil(FolderDateRecord.evidence(nil, page: decade, tags: tags(["1964", "Date Uncertain"])))
         let f = folder("1965-1967")
-        let retyped = tags(["1961", "Date Uncertain"])
-        XCTAssertFalse(f.dates(retyped, evidence: FolderDateRecord.evidence(nil, page: stamp, tags: retyped)),
-                       "the user's year stands")
-        let kept = tags(["1958"])
+        for changed in [["1961", "3 March"], ["1958"], ["1958", "3 March", "Date Uncertain"]] {
+            let t = tags(changed)
+            XCTAssertFalse(f.dates(t, evidence: FolderDateRecord.evidence(nil, page: stamp, tags: t)),
+                           "the user's \(changed) stands")
+        }
+        let kept = tags(["1958", "3 March"])
         XCTAssertTrue(f.dates(kept, evidence: FolderDateRecord.evidence(nil, page: stamp, tags: kept)))
         XCTAssertNil(FolderDateRecord.evidence(nil, page: stamp, tags: tags([])))
         XCTAssertTrue(f.dates(tags([]), evidence: nil), "an undated file still takes the folder's")
+    }
+
+    /// The last part is the parsed date's own form, so the Processor's tags and the Reader's read the same.
+    func testTheGaveFormReadsTheTags() {
+        XCTAssertEqual(ContainerFolderDate.evidenceGave(tags(["1958", "3 March", "Day 2", "Date Uncertain"])),
+                       "gave 1958-03-02, Date Uncertain")
+        XCTAssertEqual(ContainerFolderDate.evidenceGave(tags(["1958", "Day 2"])), "", "a day with no month names nothing")
+        XCTAssertEqual(ContainerFolderDate.evidenceGave(tags(["1958", "1950s"])), "", "nor a decade beside a year")
+        XCTAssertNil(FolderDateRecord.evidence(nil, page: "estimate; gave 1958", tags: tags(["1958", "Day 5"])),
+                     "a Day added in Finder to a year-only date stands")
+        XCTAssertEqual(ContainerFolderDate.evidenceGave(tags(["1960s"])), "gave 1960s")
+        XCTAssertEqual(ContainerFolderDate.evidenceGave(tags(["Unread"])), "")
     }
 
     func testTheRecordsRoundTripInTheItemFieldsDocument() throws {

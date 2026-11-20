@@ -15,10 +15,6 @@ through `TagWriter` in one undo group (Edit ▸ Undo Tag Change); the `Date evid
   offer answers the user's own edit; Live Capture dates its own session's documents, W47.ct-folder-date-live).
 - **A placeholder PDF (not on disk) is never opened**, so a date it carries is treated as its own text's and stands;
   one with no date is dated (accepted: the Core Directive forbids materialising a placeholder).
-- **Page 2's evidence is tied to the year only.** Its `Date evidence:` line names the Year or Decade it gave, and a
-  year retyped in Finder no longer matches it, so it stands (W49.reader-finder-year-stands). A month, day or `Date
-  Uncertain` changed in Finder with the year left as it was still reads as the evidence's, and the folder's date
-  replaces them (queued: W49.reader-finder-month-stands).
 - **The evidence record is keyed by file name**: a renamed file loses it and its Checks fall back to page 2's evidence
   (accepted: as the item-field values and container runs are keyed).
 

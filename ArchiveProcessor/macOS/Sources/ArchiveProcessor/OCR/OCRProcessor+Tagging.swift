@@ -644,7 +644,8 @@ extension OCRProcessor {
                 appliedGeneratedTags[sourceURL] = tags
                 if let outputPDF = outputURLMap[sourceURL] {
                     if let dating {
-                        writeDateEvidence(dating.headerEvidence, to: outputPDF, source: sourceURL, runConfig: runConfig)
+                        writeDateEvidence(dating.headerEvidence(giving: tags), to: outputPDF, source: sourceURL,
+                                          runConfig: runConfig)
                     }
                     // Manual tagging modes are real-tagging modes; follow the run's mode.
                     tagOutput(tags, at: outputPDF, source: sourceURL, stampUnread: stampUnread)
@@ -943,7 +944,8 @@ extension OCRProcessor {
                 appliedGeneratedTags[sourceURL] = gtags
                 if let outputPDF = outputURLMap[sourceURL] {
                     if let dating {
-                        writeDateEvidence(dating.headerEvidence, to: outputPDF, source: sourceURL, runConfig: runConfig)
+                        writeDateEvidence(dating.headerEvidence(giving: gtags), to: outputPDF, source: sourceURL,
+                                          runConfig: runConfig)
                     }
                     // Manual segment tagging is a real-tagging mode; follow the run's mode.
                     tagOutput(gtags, at: outputPDF, source: sourceURL, stampUnread: outputSettings.stampUnread)
@@ -1334,8 +1336,10 @@ extension OCRProcessor {
         // W47.ct-folder-date: then, with no date of its own nor a cover's, the folder's confirmed date (step 3b).
         if let folderDate { dating?.inherit(fromFolder: folderDate) }
         dating?.apply(to: &tags)
-        // W46.date-route-header: the evidence of a non-explicit year, for the outputs' header line.
-        var headerEvidence = dating?.headerEvidence
+        // W46.date-route-header: the evidence of a non-explicit year, for the outputs' header line, naming the date the
+        // route gave, before the phone's: a phone month then no longer matches it, so the Reader leaves it as the user's
+        // (W49.reader-finder-month-stands).
+        var headerEvidence = dating?.headerEvidence(giving: tags)
         // Live Capture: the phone's in-the-room date wins over the LLM's inferred date.
         if let firstURL = segment.pdfURLs.first,
            let fileIdx = jobs.firstIndex(where: { $0.sourceURL == firstURL }) {

@@ -23,6 +23,8 @@ import PDFKit
 ///      path with the $0 OCR stand-in; the staging manifest keeps the decision for a regeneration.
 private extension DateRoute.Decision {
     func with(measured: Bool) -> Self { var d = self; d.measured = measured; d.route = "r"; return d }
+    /// The line for the decision's own date tags, as a document with no tagging-call date is given.
+    var headerEvidence: String? { headerEvidence(giving: dateTags) }
 }
 
 @MainActor
@@ -265,7 +267,7 @@ enum DateRouteTestDriver {
               t7.year == "1960" && t7.dateUncertain && t7.month == "5 May" && t7.day == "Day 2" && byStamp.evidenceClass == .stamp
               && so["class"] as? String == "stamp" && so["quote"] as? String == "RECEIVED MAY 2 1960"
               && so["where"] as? String == "stamp" && so["page"] as? Int == 1 && so["interval_90"] == nil
-              && byStamp.with(measured: true).headerEvidence == "stamp; page 1; stamp; \"RECEIVED MAY 2 1960\"; year 1960",
+              && byStamp.with(measured: true).headerEvidence == "stamp; page 1; stamp; \"RECEIVED MAY 2 1960\"; gave 1960-05-02, Date Uncertain",
               "\(t7.allTags) \(so) \(String(describing: byStamp.headerEvidence))")
         var stampCovered = byStamp
         stampCovered.inherit(fromCover: GeneratedTags(year: "1958"), coverFile: "L.pdf")
@@ -283,7 +285,7 @@ enum DateRouteTestDriver {
               t8.year == "1970" && t8.month == "2 February" && t8.day == nil && !t8.dateUncertain
               && single.evidenceClass == .folder && fo8["class"] as? String == "folder"
               && fo8["source"] as? String == "00012.pdf" && fo8["folder_date"] as? String == "Feb. 1970"
-              && single.headerEvidence == "folder; from 00012.pdf; \"Feb. 1970\"; year 1970",
+              && single.headerEvidence == "folder; from 00012.pdf; \"Feb. 1970\"; gave 1970-02",
               "\(t8.allTags) \(fo8) \(String(describing: single.headerEvidence))")
         var mid = byStamp
         mid.inherit(fromFolder: folder("1965-1967"))
@@ -297,7 +299,7 @@ enum DateRouteTestDriver {
         dec.apply(to: &t10)
         check("2 folder: 8 to 19 years is the decade with Date Uncertain",
               t10.year == "1960s" && t10.dateUncertain && t10.month == nil && dec.year == nil
-              && dec.headerEvidence == "folder; from 00012.pdf; \"1958-1969\"; decade 1960s"
+              && dec.headerEvidence == "folder; from 00012.pdf; \"1958-1969\"; gave 1960s, Date Uncertain"
               && dec.sidecarObject()["decade"] as? String == "1960s")
         var wide = failed
         wide.inherit(fromFolder: folder("1939-1978"))
@@ -343,9 +345,9 @@ enum DateRouteTestDriver {
         let est = DateRoute.decide(text: memo, near: near, traceRaw: #"{"year": 1957, "lo": 1956, "hi": 1958, "evidence": {"neighbour": "P1", "quote": "June 2, 1957"}}"#,
                                    image: nil, imageNote: "")
         check("4 estimate, measured: class, source, quote and interval",
-              est.with(measured: true).headerEvidence == "estimate; from P1.pdf; \"June 2, 1957\"; 90% interval 1956-1958; year 1957",
+              est.with(measured: true).headerEvidence == "estimate; from P1.pdf; \"June 2, 1957\"; 90% interval 1956-1958; gave 1957, Date Uncertain",
               "\(String(describing: est.with(measured: true).headerEvidence))")
-        check("4 estimate, unmeasured: no interval", est.with(measured: false).headerEvidence == "estimate; from P1.pdf; \"June 2, 1957\"; year 1957")
+        check("4 estimate, unmeasured: no interval", est.with(measured: false).headerEvidence == "estimate; from P1.pdf; \"June 2, 1957\"; gave 1957, Date Uncertain")
         let letter = "Washington\nMarch 3, 1947\nDear Sir:"
         let explicit = DateRoute.decide(text: letter, near: [], traceRaw: #"{"year": 1947, "date_uncertain": true, "evidence": {"neighbour": "self", "quote": "March 3, 1947"}}"#,
                                         image: nil, imageNote: "")
@@ -355,7 +357,7 @@ enum DateRouteTestDriver {
               explicit.headerEvidence == nil && explicit.evidenceClass == .text && failed.headerEvidence == nil)
         var inherited = failed
         inherited.inherit(fromCover: GeneratedTags(year: "1958"), coverFile: "L.pdf")
-        check("4 inherited: the cover's file, no quote", inherited.headerEvidence == "inherited; from L.pdf; year 1958")
+        check("4 inherited: the cover's file, no quote", inherited.headerEvidence == "inherited; from L.pdf; gave 1958, Date Uncertain")
         var hostile = est.with(measured: false)
         hostile.quote = "Line one\nKind: printed \u{00B7} " + String(repeating: "x", count: 200)
         hostile.sourceFile = "a\u{0007}b.pdf"
@@ -693,11 +695,11 @@ enum DateRouteTestDriver {
               header(gOut, "DOCA")?.header != nil && header(gOut, "DOCA")?.header?.dateEvidence == nil
               && header(gOut, "DOCD")?.header != nil && header(gOut, "DOCD")?.header?.dateEvidence == nil)
         check("4 e2e B: the image class, its page, place and quote",
-              header(gOut, "DOCB")?.header?.dateEvidence == "image; page 1; dateline; \"March 30, 1961\"; year 1961",
+              header(gOut, "DOCB")?.header?.dateEvidence == "image; page 1; dateline; \"March 30, 1961\"; gave 1961-03-30",
               "\(String(describing: header(gOut, "DOCB")?.header?.dateEvidence))")
         let ch = header(gOut, "DOCC")
         check("4 e2e C: the estimate's source, quote and measured interval; the body and every other line kept",
-              ch?.header?.dateEvidence == "estimate; from gateway-DOCA.jpg; \"March 3, 1947\"; 90% interval 1946-1949; year 1947"
+              ch?.header?.dateEvidence == "estimate; from gateway-DOCA.jpg; \"March 3, 1947\"; 90% interval 1946-1949; gave 1947, Date Uncertain"
               && ch?.body == texts[3] && ch?.header?.classification == "Document Start"
               && ch?.header?.originalFilename == "gateway-DOCC.jpg" && ch?.header?.provenance != nil,
               "\(String(describing: ch))")
@@ -707,7 +709,7 @@ enum DateRouteTestDriver {
               cTags.contains("1947") && cTags.contains("Date Uncertain")
               && PDFDocument(url: cPDF)?.page(at: 0)?.string?.isEmpty != false, "\(cTags)")
         check("4 e2e E: the inherited class and the cover's file",
-              header(gOut, "DOCE")?.header?.dateEvidence == "inherited; from gateway-DOCA.jpg; year 1947",
+              header(gOut, "DOCE")?.header?.dateEvidence == "inherited; from gateway-DOCA.jpg; gave 1947, Date Uncertain",
               "\(String(describing: header(gOut, "DOCE")?.header?.dateEvidence))")
         check("4 e2e: no scratch sibling left behind",
               ((try? fm.contentsOfDirectory(atPath: cPDF.deletingLastPathComponent().path)) ?? []).allSatisfy { !$0.hasSuffix(".tmp") })
@@ -809,7 +811,7 @@ enum DateRouteTestDriver {
               db.contains("1947") && db.contains("Date Uncertain") && dbd["image_pass"] as? String == DateRoute.imageNoRoute
               && dbd["interval_90"] == nil && dbd["class"] as? String == "estimate", "\(db) \(dbd)")
         check("4 e2e direct key: the estimate's line has no interval (the route did not measure one)",
-              header(dOut, "DOCB")?.header?.dateEvidence == "estimate; from direct-DOCA.jpg; \"March 3, 1947\"; year 1947",
+              header(dOut, "DOCB")?.header?.dateEvidence == "estimate; from direct-DOCA.jpg; \"March 3, 1947\"; gave 1947, Date Uncertain",
               "\(String(describing: header(dOut, "DOCB")?.header?.dateEvidence))")
 
         // Sidecars off: the route still dates the tags; no sidecar is written.
@@ -861,7 +863,7 @@ enum DateRouteTestDriver {
               sa["class"] as? String == "text" && sb["class"] as? String == "image"
               && (json(sOut["DOCD"])["dating"] as? [String: Any])?["class"] as? String == "none", "\(sa) \(sb)")
         check("5 sheet B: the header line names the image evidence",
-              header(sOut, "DOCB")?.header?.dateEvidence == "image; page 1; dateline; \"March 30, 1961\"; year 1961",
+              header(sOut, "DOCB")?.header?.dateEvidence == "image; page 1; dateline; \"March 30, 1961\"; gave 1961-03-30",
               "\(String(describing: header(sOut, "DOCB")?.header?.dateEvidence))")
         let sc = applied(sheet, sFiles[3])
         check("5 sheet C, retyped: the user's 1948, no dating object, no evidence line",
@@ -1042,7 +1044,7 @@ enum DateRouteTestDriver {
               && (dating("B")?["second_role_dates"] as? [[String: Any]])?.first?["quote"] as? String == "RECEIVED APR 4 1961",
               "\(b)")
         check("6 Live B: the staged PDF's header names the image evidence",
-              evidence("B") == "image; page 1; dateline; \"March 30, 1961\"; year 1961", "\(String(describing: evidence("B")))")
+              evidence("B") == "image; page 1; dateline; \"March 30, 1961\"; gave 1961-03-30", "\(String(describing: evidence("B")))")
         let c = tags("C")
         check("6 Live C: an estimate with no neighbour sent writes no year (not the tagging call's 1950), Date Uncertain",
               !c.contains("1947") && !c.contains("1950") && c.contains("Date Uncertain")
@@ -1077,7 +1079,7 @@ enum DateRouteTestDriver {
             let done = await settle { !s.liveProcessor.isFinalizing }
             check("6 Live: the regenerated B keeps its dating object and header line, no second call",
                   done && ((dating("B") ?? [:]) as NSDictionary) == before
-                  && evidence("B") == "image; page 1; dateline; \"March 30, 1961\"; year 1961"
+                  && evidence("B") == "image; page 1; dateline; \"March 30, 1961\"; gave 1961-03-30"
                   && wire.lock.withLock { wire.trace.count + wire.images.count + wire.itemFields } == calls
                   && !fieldsBefore.allKeys.isEmpty && ((fields("B") ?? [:]) as NSDictionary) == fieldsBefore,
                   "\(String(describing: dating("B")))")
@@ -1102,14 +1104,14 @@ enum DateRouteTestDriver {
             return PDFHeaderParser.parse(page).header?.dateEvidence
         }
         var seq = 0
-        func capture(_ gid: String, _ type: CaptureGroupType, _ text: String) async -> Bool {
+        func capture(_ gid: String, _ type: CaptureGroupType, _ text: String, month: Int? = nil) async -> Bool {
             seq += 1
             let page = tmp.appendingPathComponent("folder-\(gid).jpg")
             writeJPEG(page, width: 300 + seq)
             LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(text: text, classification: nil, errorMessage: nil,
                                                                   errorCode: nil)
             _ = f.ingest(jpeg: (try? Data(contentsOf: page)) ?? Data(), groupId: gid, seq: seq, type: type,
-                         quality: nil, year: nil, month: nil, deviceName: "TestPhone")
+                         quality: nil, year: nil, month: month, deviceName: "TestPhone")
             if type == .document { f.liveProcessor.segmentResolved(groupId: gid) }
             await f.liveProcessor._testAwaitFinalizes()
             let done = fStaged(gid) != nil
@@ -1126,13 +1128,22 @@ enum DateRouteTestDriver {
                                   ("F2", .folder, "FOLDER 4"), ("K", .document, "DOCC Note to the files"),
                                   ("X", .box, "BOX 7"), ("L", .document, "DOCC Note to the files")] {
             captured = await capture(gid, type, text) && captured
+            if gid == "G" { captured = await capture("M", .document, "DOCC Note to the files", month: 4) && captured }
         }
         check("6 Live folder: every marker and document stages", captured, "\(f.liveProcessor.staged.map(\.groupId))")
         let g = fTags("G")
         check("6 Live folder G: an undated document after a saved folder card takes its mid-point 1966, Date Uncertain",
               g.contains("1966") && g.contains("Date Uncertain") && fDating("G")?["class"] as? String == "folder"
               && fDating("G")?["folder_date"] as? String == "1965-1967"
-              && fEvidence("G") == "folder; from the folder; \"1965-1967\"; year 1966", "\(g) \(String(describing: fEvidence("G")))")
+              && fEvidence("G") == "folder; from the folder; \"1965-1967\"; gave 1966, Date Uncertain", "\(g) \(String(describing: fEvidence("G")))")
+        let m = fTags("M"), mEvidence = fEvidence("M")
+        check("6 Live folder M: the phone's month over the folder's year; the line names the folder's date alone, so the "
+              + "Reader reads the month as the user's (W49.reader-finder-month-stands)",
+              m.contains("1966") && m.contains("4 April") && m.contains("Date Uncertain")
+              && mEvidence == "folder; from the folder; \"1965-1967\"; gave 1966, Date Uncertain"
+              && !ContainerFolderDate.evidenceDescribes(mEvidence, tags: DocumentTags.parse(raw: m, labelNumber: nil))
+              && ContainerFolderDate.evidenceDescribes(fEvidence("G"), tags: DocumentTags.parse(raw: g, labelNumber: nil)),
+              "\(m) \(String(describing: mEvidence))")
         let h = fTags("H")
         check("6 Live folder H: its own text year wins", h.contains("1947") && !h.contains("1966")
               && !h.contains("Date Uncertain"), "\(h)")
@@ -1146,7 +1157,7 @@ enum DateRouteTestDriver {
         let k = fTags("K")
         check("6 Live folder K: Finish re-dates it from the card saved later: 1970, its month, no Date Uncertain",
               saved && finished && k.contains("1970") && k.contains("2 February") && !k.contains("Date Uncertain")
-              && fDating("K")?["class"] as? String == "folder" && fEvidence("K") == "folder; from the folder; \"Feb. 1970\"; year 1970"
+              && fDating("K")?["class"] as? String == "folder" && fEvidence("K") == "folder; from the folder; \"Feb. 1970\"; gave 1970-02"
               && f.liveProcessor._datingTestRetained("K")?.evidenceClass == .folder, "\(k)")
         let l = fTags("L")
         check("6 Live folder L: after a box, no folder date, and a box's date dates nothing",

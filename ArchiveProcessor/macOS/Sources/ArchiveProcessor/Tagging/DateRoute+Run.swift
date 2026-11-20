@@ -267,10 +267,10 @@ extension DateRoute.Decision {
 
     /// W46.date-route-header — the PDF header's `Date evidence:` value (owner call 9): for a non-explicit date only (read
     /// off the page image, taken from a stamp on it, estimated, or inherited from the cover), its class, source, place and quote, and the 90%
-    /// interval where the route measured it, and last the Year or Decade it gave (`year 1958`, `decade 1960s`). Nil for an
-    /// explicit text year and for no year. One line, never holding the provenance separator, the quote cut to
-    /// `headerQuoteChars`.
-    var headerEvidence: String? {
+    /// interval where the route measured it, and last the date `tags` were given with it (`gave 1958-03-02`, `gave 1960s,
+    /// Date Uncertain`). Nil for an explicit text year and for no year. One line, never holding the provenance
+    /// separator, the quote cut to `headerQuoteChars`.
+    func headerEvidence(giving tags: GeneratedTags) -> String? {
         guard year != nil || decade != nil else { return nil }
         var parts: [String]
         switch evidenceClass {
@@ -295,10 +295,10 @@ extension DateRoute.Decision {
         if evidenceClass == .estimate, measured, let lo = trace.lo, let hi = trace.hi {
             parts.append("90% interval \(lo)-\(hi)")
         }
-        // W49.reader-finder-year-stands: last, the Year or Decade tag `apply` writes, so a reader can tell when the tag
-        // was changed since (in Finder) and the line no longer speaks for it.
-        let folderDecade = evidenceClass == .folder ? decade : nil
-        let gave = ContainerFolderDate.evidenceGave(year: folderDecade == nil ? year : nil, decade: folderDecade)
+        // W49.reader-finder-year-stands, W49.reader-finder-month-stands: last, the date the file is tagged with (its Year
+        // or Decade, Month, Day and Date Uncertain, whichever call gave the month and day), so a reader can tell when the
+        // date was changed since (in Finder) and the line no longer speaks for it.
+        let gave = ContainerFolderDate.evidenceGave(DocumentTags.parse(raw: tags.allTags, labelNumber: nil))
         if !gave.isEmpty { parts.append(gave) }
         return parts.joined(separator: "; ")
     }

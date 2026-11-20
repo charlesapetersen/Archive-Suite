@@ -1293,8 +1293,8 @@ final class LiveCaptureProcessor: ObservableObject {
                                    pages: pages, baseTags: baseTags, doMerge: doMerge, model: model,
                                    gatewayName: gatewayName, localAgentDisplayName: localAgentDisplayName,
                                    localAgentModelName: localAgentModelName, stagingDir: stagingDir, writeJSON: writeJSON,
-                                   jsonTags: jsonTags, entities: entities, dating: dating, itemFields: itemFields,
-                                   texts: texts,
+                                   jsonTags: jsonTags, entities: entities, dating: dating,
+                                   preDatingTags: preDatingTags, itemFields: itemFields, texts: texts,
                                    boxLabelText: gType == .box ? texts.first : nil,
                                    outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
                                    exportedImageMB: exportedImageMB, textColumns: textColumns,
@@ -1655,7 +1655,8 @@ final class LiveCaptureProcessor: ObservableObject {
         pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
         localAgentDisplayName: String?, localAgentModelName: String?,
         stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, entities: EntityResult? = nil,
-        dating: DateRoute.Decision? = nil, itemFields: ItemFieldResult? = nil, texts: [String],
+        dating: DateRoute.Decision? = nil, preDatingTags: GeneratedTags? = nil, itemFields: ItemFieldResult? = nil,
+        texts: [String],
         boxLabelText: String?,
         outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
         taggingMode: TaggingMode,
@@ -1680,7 +1681,13 @@ final class LiveCaptureProcessor: ObservableObject {
             ? EnclosureDates.pdfSourceDates(for: jsonTags) : nil
         // W46.date-route-header — the evidence of a non-explicit year, on the same pages as the dates (a year implies
         // the document-date line, so there is a header to carry it).
-        if sourceDates != nil, let evidence = dating?.headerEvidence { sourceDates?.dateEvidence = evidence }
+        // W49.reader-finder-month-stands: the line names the date the route gave (on the tagging call's tags), not a
+        // month the phone or the Mac card set over it, so the Reader leaves that month alone as the user's.
+        if sourceDates != nil, let dating {
+            var given = preDatingTags ?? jsonTags
+            if preDatingTags != nil { dating.apply(to: &given) }
+            if let evidence = dating.headerEvidence(giving: given) { sourceDates?.dateEvidence = evidence }
+        }
         // W47.item-fields-build — the filled item fields, on the same documents' pages.
         if type == .document, taggingMode.stampsUnread, let fields = itemFields?.headerFields, !fields.isEmpty {
             sourceDates = sourceDates ?? PDFSourceDates()
@@ -2230,7 +2237,8 @@ final class LiveCaptureProcessor: ObservableObject {
                                            localAgentDisplayName: seg.localAgentDisplayName,
                                            localAgentModelName: seg.localAgentModelName,
                                            stagingDir: stagingDir, writeJSON: seg.writeJSON, jsonTags: seg.jsonTags,
-                                           entities: seg.entities, dating: seg.dating, itemFields: seg.itemFields,
+                                           entities: seg.entities, dating: seg.dating,
+                                           preDatingTags: seg.preDatingTags, itemFields: seg.itemFields,
                                            texts: seg.texts, boxLabelText: seg.boxLabelText,
                                            outputImageFile: seg.outputImageFile, pdfImageMB: seg.pdfImageMB,
                                            exportedImageMB: seg.exportedImageMB, textColumns: seg.textColumns,

@@ -137,8 +137,8 @@ Owner, 2026-10-31: a dated folder dates the otherwise undated documents inside i
 - **Where.** Process Files' automatic dating route, for a file tagged where it already is (the pre-OCRed route,
   output = source), from its folder's container file, read and never written. A new output is not dated by it: its
   name was never in the runs, it would sort into another batch's run, and collection organisation renames and moves
-  it. Its `Date evidence:` line is `folder; from <the run's first file>; "<the date>"; year <y>` (or `decade <d>s`;
-  `SPEC/tag-format.md`). The
+  it. Its `Date evidence:` line is `folder; from <the run's first file>; "<the date>"; gave <date>[, Date Uncertain]`
+  (`SPEC/tag-format.md`). The
   manual tagging modes' auto-date (the tagging sheet and the manual segment card) take it the same way, on the same
   files, into the date they fill; the sheet puts no cover's year into a card's own date (its Sent With carries it),
   so there an enclosure takes the folder's. A date confirmed in the Reader after the run is offered there for the
@@ -155,8 +155,9 @@ Owner, 2026-10-31: a dated folder dates the otherwise undated documents inside i
   folder run's `date` in the Inspector's Container section and the value dates documents, the Reader offers to date
   the run's PDFs (every file on disk the same folder run is live at) that take it: no date at all, a document with no
   text included; or a date whose evidence is a stamp, the estimate or a folder (an earlier folder date gives way),
-  while page 2's evidence still names the file's Year or Decade (W49.reader-finder-year-stands: a year retyped in
-  Finder, which records nothing, no longer matches it, so it is the user's and stands). A
+  while page 2's evidence still names the file's date and `Date Uncertain` (W49.reader-finder-year-stands,
+  W49.reader-finder-month-stands: a year, month, day or `Date Uncertain` changed in Finder, which records nothing, no
+  longer matches it, so it is the user's and stands). A
   date with no evidence line (the document's text, or typed), one read off the page image, a covering letter's year
   (except the folder's own single year), a checked date, a date carried twice, a file tagged `Box`/`Folder` or whose
   page 2 classifies it so, and a placeholder's date (never opened, so its evidence is unknown) stand. Accepting

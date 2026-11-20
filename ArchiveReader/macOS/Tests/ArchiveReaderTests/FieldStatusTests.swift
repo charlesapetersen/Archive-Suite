@@ -31,7 +31,7 @@ final class FieldStatusTests: XCTestCase {
         Extracted text.
         Gemini · gemini-3.7-flash · 7 November 2026
         Classification: Document Start
-        Date evidence: image; page 1; "1958"; year 1958
+        Date evidence: image; page 1; "1958"; gave 1958
         Document kind: letter
         Recipient place: Boston, Massachusetts
 
@@ -41,7 +41,7 @@ final class FieldStatusTests: XCTestCase {
     private func header() -> FieldStatusSection.HeaderFields {
         var h = FieldStatusSection.HeaderFields(headers: [])
         h.itemFields = PDFItemFields(documentKind: "letter", recipientPlace: "Boston, Massachusetts")
-        h.dateEvidence = "image; page 1; top right; \"12 March 1958\"; year 1958"
+        h.dateEvidence = "image; page 1; top right; \"12 March 1958\"; gave 1958-03-12"
         return h
     }
 
@@ -54,7 +54,8 @@ final class FieldStatusTests: XCTestCase {
         XCTAssertEqual(rows[0].value, "Mar 12, 1958")
         XCTAssertEqual(rows[1].value, "letter")
         // Unchecked, the date is lower confidence and says it was read off the image.
-        let unchecked = FieldStatusList.rows(tags: DocumentTags.parse(raw: ["1958"], labelNumber: nil), header: header())
+        let unchecked = FieldStatusList.rows(tags: DocumentTags.parse(raw: ["1958", "3 March", "Day 12"], labelNumber: nil),
+                                             header: header())
         XCTAssertEqual(unchecked[0].status.level, .lowerConfidence)
         XCTAssertTrue(unchecked[0].status.source.contains("image"))
         // No header yet (or no PDF): the dates alone.
