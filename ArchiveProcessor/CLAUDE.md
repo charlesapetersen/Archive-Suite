@@ -243,9 +243,8 @@ login or real corpus) or
 
 **Phone↔Mac E2E** (`scripts/E2E-PHONE-MAC.md`): `OCR_KEY=<key> caffeinate -di ArchiveProcessor/scripts/e2e-phone-mac.sh`
 (a few cents): the Tier-2 gate for `Capture/`/`Net/`, **not** per-commit. Needs the Mac free + awake (don't drive
-its GUI meanwhile), the `ap_test36` emulator + android-36 image, `xcodegen` on PATH, a Gemini key. Auto-finalize is gated on `LIVECAPTURE_TESTOUT` so it can
-never file into the real corpus; its inject seam is debug-only, stripped from release. It pairs over `10.0.2.2`, never USB (`adb reverse`:
-`scripts/usb-reverse-probe.sh`, free).
+its GUI meanwhile). Auto-finalize is gated on `LIVECAPTURE_TESTOUT` so it can never file into the real corpus; its
+inject seam is debug-only. Prerequisites and pairing (never USB): REFERENCE.md §Verification & review policy.
 
 **Cadence:** push often (clean build + Tier-1, plus Tier-2 where it applies); a DMG + GitHub release is the sparse
 milestone, gated by the Tier-3 review. Push often, release rarely.

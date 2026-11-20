@@ -633,6 +633,24 @@ mv "$QTMP" "$PLAN"; rm -f "$QDROP" "$SAFEF"
 echo "compact-plan: archived $QD WORK QUEUE line(s) of completed items; plan $QO -> $QK lines; archive=$QUEUE_ARCHIVE"
 ) || { echo "compact-plan: Pass 3 (WORK QUEUE) exited nonzero — plan left untouched by Pass 3 (see message above)"; ABORTED="$ABORTED pass3"; }
 
+# ===== Pass 4: answered HOLD gates (2026-11-20, doc-fix) =====
+# The HOLD region is unmanaged by Passes 1-3. `plan-edit.py archive-answered` (51b19c73) archives each answered
+# gate verbatim to AUTONOMOUS_HOLD_QUEUE_ARCHIVE.md beside the plan, under the plan lock, and leaves a completed
+# stub pointing at it. It was only ever run by hand, so by 2026-11-20 35 answered gates had put the plan back
+# over budget with Passes 1-3 correctly no-op'ing. Open gates and ambiguous spans are left inline by the helper.
+PLAN_EDIT="$REPO/ops/autonomous/plan-edit.py"
+[ -f "$PLAN_EDIT" ] || PLAN_EDIT="$(cd "$(dirname "$0")" && pwd)/plan-edit.py"
+if [ -f "$PLAN_EDIT" ] && [ -f "$PLAN" ] && grep -q '^## HOLD QUEUE' "$PLAN"; then
+  P4_BEFORE=$(wc -c < "$PLAN")
+  if python3 "$PLAN_EDIT" "$PLAN" archive-answered; then
+    P4_AFTER=$(wc -c < "$PLAN")
+    [ "$P4_AFTER" -lt "$P4_BEFORE" ] && echo "compact-plan: archived answered HOLD gates; plan $((P4_BEFORE)) -> $((P4_AFTER)) B"
+  else
+    echo "compact-plan: Pass 4 (answered HOLD gates) exited nonzero — plan left untouched by Pass 4 (see message above)"
+    ABORTED="$ABORTED pass4"
+  fi
+fi
+
 # ===== CEILING RECONCILIATION (2026-08-12, BUG 5) — is this script even CAPABLE of holding the plan? =====
 # prove-compact.sh asserts the CONSTANTS half of BUG 5's sum (it runs on fixtures and must not read the real
 # plan). This is the other half, and it can only be done here: UNMANAGED is PROSE — the directive banners, the
