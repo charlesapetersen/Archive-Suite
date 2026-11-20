@@ -110,8 +110,9 @@ What it does not do, deliberately or not yet:
   the file under the archive's main folder (queued: W49.reader-item-fields-search).
 - **Container fields have their own Inspector section** (W47.ct-reader-view), with the same badge and no check
   button: a container value is confirmed or corrected from its Edit menu (W47.ct-reader-edit). (accepted: by design, W47.ct-reader-edit; a container value is confirmed by being the user's own).
-- **Sender and recipient have no row**: no route writes them where the Reader can read them (the bench's item-field
-  scope leaves them to W46), and the Reader does not read the JSON sidecar. (queued: W49.reader-sender-row-check).
+- **Sender and recipient have no row**: the Processor writes them only to the JSON sidecar (the names feature's
+  `entities` object, else the tagging call's names), never to page 2, and the Inspector does not read the sidecar,
+  though the Zotero export does (`ZoteroSidecar`). (asked: W49.reader-sender-row-check-owner-ok).
 - **A group selection counts the checked dates** and checks them all at once; item fields are listed one file at a
   time. (accepted: item fields are per document, so a group has no one value to show).
 - **A check is not tied to the value it checked.** It names the field. Another writer that changes the value
