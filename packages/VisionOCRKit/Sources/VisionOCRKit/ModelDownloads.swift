@@ -55,6 +55,9 @@ enum ModelDownloads {
         /// detector choice (W47.wh-yolo-scans, `ScanNewspaperLayout`); built by `ops/make-scan-newspaper-layout.sh`.
         /// Separate from `layout`, the 1,024 checkpoint the regions arrangement runs.
         case scanNewspaperLayout
+        /// ATRIUM's page classifier (ufal/vit-historical-page v4.3: MIT, on CC BY-NC 4.0 base weights) as Core ML, the mixed-page pre-flag
+        /// (W47.wh-mixed-preflag, `MixedPagePreflag`); built by `ops/make-atrium.sh`. Needs nothing of the runtime.
+        case atrium
 
         var name: String {
             switch self {
@@ -66,6 +69,7 @@ enum ModelDownloads {
             case .hands: return "the handwriting placer"
             case .newspaperLayout: return "the newspaper layout detector"
             case .scanNewspaperLayout: return "the scanned-newspaper layout detector"
+            case .atrium: return "the mixed-page pre-flag"
             }
         }
 
@@ -87,6 +91,10 @@ enum ModelDownloads {
                 return .archive(File(path: "doclayout-yolo-1280.tgz", bytes: 64_147_778,
                                      sha256: "99c62ee608f9f5d63fcaf21295d102b918c1545d6b6f275dac2d8669de8eeec9"),
                                 top: "doclayout-yolo-1280.mlmodelc", destination: "Models/doclayout-yolo-1280.mlmodelc")
+            case .atrium:
+                return .archive(File(path: "atrium-page-kind.tgz", bytes: 299_939_558,
+                                     sha256: "e69ec9ca066fdeba4fbf246c69262c7656382bb7b4244928e38f4d4571d42279"),
+                                top: "atrium-page-kind.mlmodelc", destination: "Models/atrium-page-kind.mlmodelc")
             case .newspaperLayout:
                 return .hub(repo: "HashNuke/pp-doclayout-v3-mlx", revision: "cd50996ad0c7e35a7e20c27480f99cec1822cf7b", files: [
                     File(path: "config.json", bytes: 2460,

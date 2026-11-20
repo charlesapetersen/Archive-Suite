@@ -37,7 +37,8 @@ ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
 # The child has inherited these; later benchmark launches should not repeat or overwrite this parity run.
 unset OCRPAGEKIND_PARITY_LIST OCRPAGEKIND_PARITY_OUT
 
-wait_for_test_report "$report" "$log" "$pid" "OCR-page-kind" "OCRPAGEKIND" 600
+# A long optional run (the mixed pre-flag's 144-page parity) may give more time; the contract itself stays at 600 s.
+wait_for_test_report "$report" "$log" "$pid" "OCR-page-kind" "OCRPAGEKIND" "${OCRPAGEKIND_WAIT:-600}"
 cat "$report"
 grep -q '^ALL PASS$' "$report"
 

@@ -45,16 +45,20 @@ enum PageKindRouting {
         let modelID: String
     }
 
-    /// The kinds "Read handwriting on typed pages" acts on: every typed or printed page, since no pre-flag tells a
-    /// mixed page before it is read (Phase 4, `13-stage-rules/10-kinds-and-routing.md` §7 call 1).
+    /// The kinds "Read handwriting on typed pages" acts on: every typed or printed page, or with the mixed-page
+    /// pre-flag downloaded only those it flags (W47.wh-mixed-preflag; Phase 4, `13-stage-rules/10-kinds-and-routing.md`
+    /// §7 call 1).
     static let typedKinds: Set<PageKindName> = [.typewritten, .printed]
 
     /// The page's reader. `available` is every built-in model the user can run now (a keyed provider, or a local
     /// route), in no order; the guide's order decides. A user override wins over everything. With
     /// `handwritingOnTyped`, a sure typed or printed page goes to the handwritten kind's first runnable pick; when
-    /// none can run here it is routed by its own kind, as with the switch off.
+    /// none can run here it is routed by its own kind, as with the switch off. `mixedFlag` is the pre-flag's call on
+    /// the page (`MixedPagePreflag`): false keeps the page on its own kind's pick, true or nil (no pre-flag, or none
+    /// yet for this page) lets the switch act, so a page the pre-flag has not read is never left unread for its hand.
     static func choose(kind: PageKind?, guidance: OCRPageGuidance?, available: Set<Candidate>,
-                       runDefault: Candidate, override: Candidate? = nil, handwritingOnTyped: Bool = false) -> Choice {
+                       runDefault: Candidate, override: Candidate? = nil, handwritingOnTyped: Bool = false,
+                       mixedFlag: Bool? = nil) -> Choice {
         if let o = override { return Choice(provider: o.provider, modelID: o.modelID, reason: .override) }
         func keep(_ r: Reason) -> Choice { Choice(provider: runDefault.provider, modelID: runDefault.modelID, reason: r) }
         guard let kind, let guidance else { return keep(.unknown) }
@@ -69,7 +73,7 @@ enum PageKindRouting {
             }
             return nil
         }
-        if handwritingOnTyped, typedKinds.contains(kind.routingKind), let c = firstPick("handwritten") {
+        if handwritingOnTyped, mixedFlag != false, typedKinds.contains(kind.routingKind), let c = firstPick("handwritten") {
             return c == runDefault ? keep(.same) : Choice(provider: c.provider, modelID: c.modelID, reason: .handwriting)
         }
         guard let c = firstPick(kind.routingKind.rawValue) else { return keep(.noPick) }
@@ -152,8 +156,9 @@ enum PageKindRouting {
 
     /// How the page's reader reads in the run history and the file list: "Typewritten (93%) → Gemini 3.8 Flash".
     /// A kind the guide has no row for (newspapers, clippings, registers, mixed) takes its `routingKind`'s pick.
-    static func summary(kind: PageKind?, choice: Choice, modelName: String) -> String {
+    static func summary(kind: PageKind?, choice: Choice, modelName: String, mixedFlag: Bool? = nil) -> String {
         let k = kind?.summary ?? "Kind not told"
+        if mixedFlag == true, choice.reason == .handwriting { return "\(k), flagged mixed → \(modelName), for its handwriting" }
         switch choice.reason {
         case .kind: return "\(k) → \(modelName)"
         case .same: return "\(k) → \(modelName), the run's model"
@@ -174,6 +179,8 @@ struct PageReaderPlan: Codable, Equatable, Sendable {
     struct Entry: Codable, Equatable, Sendable {
         let kind: PageKind?
         let choice: PageKindRouting.Choice
+        /// The mixed-page pre-flag's call (W47.wh-mixed-preflag); nil when it did not read the page.
+        var mixedFlag: Bool? = nil
     }
 
     var pages: [String: Entry] = [:]

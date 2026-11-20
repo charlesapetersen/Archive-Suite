@@ -43,6 +43,21 @@ Rules → Columns and reading order, off by default.
   for the layout processing, against PP-DocLayoutV3's 0.19 s on other pages; the whole Processor's peak footprint was
   636 MB over the 15 pages (`scan-layout-parity.md`) (accepted: the measured cost of the detector the owner released).
 
+## ⚠️ LIMITATION (W47.wh-mixed-preflag, 2026-11-20): what the mixed-page pre-flag does not do
+
+VisionOCRKit `MixedPagePreflag` (ATRIUM v4.3 as Core ML), `Views/OCRView+PageKind.swift` (`PageKindStore`); the
+download row is under "Read handwriting on typed pages" in Settings › Reading.
+- **The download is not published yet.** The app pins `atrium-page-kind.tgz` (299,939,558 B, sha256 `e69ec9ca…`) at
+  the `models-1` release of `charlesapetersen/vision-ocr`, where nothing has been attached, so "Download the mixed-page
+  pre-flag" fails until the owner uploads the archive kept in the autonomous state's `model-files/atrium-build/`.
+  Until then the switch acts on every typed or printed page, as before (queued: W47.wh-mixed-preflag-publish).
+- **About half the pages with handwriting are not flagged, and so not read for it.** With the pre-flag downloaded an
+  unflagged typed or printed page keeps its kind's reader: on the 2,000 bulk pages it found 51-60% of the pages with
+  handwriting at 69.8% precision (finite bounds 18-95% precision, 7-97% recall; `kind-atrium.md` §5). The switch's note
+  says so (accepted: owner, 2026-11-19, call 15, "release with a label").
+- **The default is still off.** Whether the switch should be on by default now that the pre-flag exists is call 3,
+  re-asked with the like-for-like timing (asked: W47.wh-mixed-preflag-default-owner-ok).
+
 ## ⚠️ LIMITATION (W40.fix-processor-review-classification-stale, 2026-11-20): where page 2's Classification is not rewritten
 
 `OCR/OCRProcessor+Tagging.swift` `writeClassificationHeader`; the rewrite is `PDFGenerator.classificationRewrite`.

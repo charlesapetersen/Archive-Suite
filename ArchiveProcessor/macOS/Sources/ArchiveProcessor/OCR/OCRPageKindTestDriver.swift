@@ -576,6 +576,152 @@ enum OCRPageKindTestDriver {
             check("11 kind pages measured (\(outRows.count))", !outRows.isEmpty)
         }
 
+        // 12. The mixed-page pre-flag (W47.wh-mixed-preflag): with it, the switch sends only the pages it flags.
+        check("12 a page the pre-flag does not flag keeps its own kind's pick; a flagged page goes for its hand",
+              route(PageKind(kind: .typewritten, confidence: 0.95), hand: true) == choose(.typewritten, hand: true)
+              && PageKindRouting.choose(kind: PageKind(kind: .typewritten, confidence: 0.95), guidance: guide,
+                                        available: all, runDefault: runDefault, handwritingOnTyped: true,
+                                        mixedFlag: false) == choose(.typewritten)
+              && PageKindRouting.choose(kind: PageKind(kind: .printed, confidence: 0.95), guidance: guide,
+                                        available: all, runDefault: runDefault, handwritingOnTyped: true,
+                                        mixedFlag: true).reason == .handwriting
+              && PageKindRouting.choose(kind: PageKind(kind: .typewritten, confidence: 0.95), guidance: guide,
+                                        available: all, runDefault: runDefault, handwritingOnTyped: false,
+                                        mixedFlag: true) == choose(.typewritten))
+        check("12 the flag never moves a handwritten page, a form, an unsure page or a user's choice",
+              PageKindRouting.choose(kind: PageKind(kind: .handwritten, confidence: 0.95), guidance: guide, available: all,
+                                     runDefault: runDefault, handwritingOnTyped: true, mixedFlag: false) == choose(.handwritten)
+              && PageKindRouting.choose(kind: PageKind(kind: .forms, confidence: 0.95), guidance: guide, available: all,
+                                        runDefault: runDefault, handwritingOnTyped: true, mixedFlag: true) == choose(.forms)
+              && PageKindRouting.choose(kind: PageKind(kind: .typewritten, confidence: 0.5), guidance: guide, available: all,
+                                        runDefault: runDefault, handwritingOnTyped: true, mixedFlag: true).reason == .uncertain
+              && PageKindRouting.choose(kind: PageKind(kind: .typewritten, confidence: 0.95), guidance: guide, available: all,
+                                        runDefault: runDefault, override: cand(qwen), handwritingOnTyped: true,
+                                        mixedFlag: true).reason == .override)
+        do {
+            let p = root.appendingPathComponent("p.jpg"), q = root.appendingPathComponent("q.jpg")
+            let r = root.appendingPathComponent("r.jpg"), hw = root.appendingPathComponent("h.jpg")
+            let kinds: [String: PageKind] = [PageReaderPlan.key(p): PageKind(kind: .typewritten, confidence: 0.95),
+                                             PageReaderPlan.key(q): PageKind(kind: .printed, confidence: 0.95),
+                                             PageReaderPlan.key(r): PageKind(kind: .typewritten, confidence: 0.95),
+                                             PageReaderPlan.key(hw): PageKind(kind: .handwritten, confidence: 0.95)]
+            let flags: [String: Bool] = [PageReaderPlan.key(p): true, PageReaderPlan.key(q): false]   // r: the read fails
+            final class Asked: @unchecked Sendable { let lock = NSLock(); var urls: [String] = [] }
+            let asked = Asked()
+            PageKindStore.classifyOverride = { kinds[PageReaderPlan.key($0)] }
+            PageKindStore.availableOverride = all
+            PageKindStore.flagOverride = { url in
+                asked.lock.withLock { asked.urls.append(url.lastPathComponent) }
+                return flags[PageReaderPlan.key(url)]
+            }
+            defer { PageKindStore.classifyOverride = nil; PageKindStore.availableOverride = nil; PageKindStore.flagOverride = nil }
+            let s = PageKindStore()
+            s.update([p, q, r, hw])
+            for _ in 0..<200 where s.pending > 0 { try? await Task.sleep(nanoseconds: 10_000_000) }
+            check("12 with the switch off the pre-flag reads nothing", asked.urls.isEmpty && s.mixedFlags.isEmpty)
+            s.handwritingOnTyped = true
+            for _ in 0..<200 where s.pending > 0 { try? await Task.sleep(nanoseconds: 10_000_000) }
+            check("12 turning the switch on has the pre-flag read the typed and printed pages already told, not the hand",
+                  asked.urls.sorted() == ["p.jpg", "q.jpg", "r.jpg"]
+                  && s.mixedFlags == [PageReaderPlan.key(p): true, PageReaderPlan.key(q): false], "\(asked.urls)")
+            let planned = s.plan([p, q, r, hw], guidance: guide, runDefault: runDefault)
+            check("12 the plan sends the flagged page and the page it could not read for their hand; the unflagged keeps its kind",
+                  planned.entry(for: p)?.choice.reason == .handwriting && planned.entry(for: p)?.mixedFlag == true
+                  && planned.entry(for: q)?.choice == choose(.printed) && planned.entry(for: q)?.mixedFlag == false
+                  && planned.entry(for: r)?.choice.reason == .handwriting && planned.entry(for: r)?.mixedFlag == nil
+                  && planned.entry(for: hw)?.choice == choose(.handwritten))
+            s.update([p, q, r, hw])
+            for _ in 0..<200 where s.pending > 0 { try? await Task.sleep(nanoseconds: 10_000_000) }
+            check("12 a page the pre-flag read is not read again; one it failed on is tried once more",
+                  asked.urls.sorted() == ["p.jpg", "q.jpg", "r.jpg", "r.jpg"], "\(asked.urls)")
+            check("12 the row line says a page was flagged",
+                  PageKindRowLine(store: s, url: p, guidance: guide, runDefault: runDefault, runModel: claude)
+                    .label?.text.contains("flagged mixed") == true
+                  && PageKindRowLine(store: s, url: q, guidance: guide, runDefault: runDefault, runModel: claude)
+                    .label?.text.contains("flagged") == false)
+            // The pre-flag's download finishing has the pages already listed read, with the switch already on.
+            let late = PageKindStore()
+            PageKindStore.flagOverride = nil
+            late.handwritingOnTyped = true
+            late.update([p, q])
+            for _ in 0..<200 where late.pending > 0 { try? await Task.sleep(nanoseconds: 10_000_000) }
+            let before = late.mixedFlags.isEmpty
+            PageKindStore.flagOverride = { flags[PageReaderPlan.key($0)] }
+            NotificationCenter.default.post(name: PageKindStore.preflagInstalledNotification, object: nil)
+            for _ in 0..<200 where late.mixedFlags.count < 2 { try? await Task.sleep(nanoseconds: 10_000_000) }
+            check("12 when the pre-flag installs, the pages already in the list are read",
+                  before && late.mixedFlags == [PageReaderPlan.key(p): true, PageReaderPlan.key(q): false])
+            s.handwritingOnTyped = false
+            check("12 with the switch off again the flags are not used",
+                  s.plan([p, q], guidance: guide, runDefault: runDefault).entry(for: p)?.choice == choose(.typewritten)
+                  && s.mixedFlag(for: p) == nil)
+            if let data = try? JSONEncoder().encode(planned), let back = try? JSONDecoder().decode(PageReaderPlan.self, from: data),
+               let old = try? JSONDecoder().decode(PageReaderPlan.Entry.self,
+                                                   from: Data(#"{"choice":{"provider":"Anthropic","modelID":"x","reason":"kind"}}"#.utf8)) {
+                check("12 the flag round-trips in the run record, and an entry without one decodes", back == planned && old.mixedFlag == nil)
+            } else { check("12 the flag round-trips in the run record, and an entry without one decodes", false) }
+        }
+        let ramp = (0..<(40 * 30)).map { UInt8(($0 % 40) * 6) }
+        let flat = [UInt8](repeating: 77, count: 500 * 300)
+        check("12 Pillow's bicubic: same size is the input, a flat page stays flat when squeezed, a ramp stays in range",
+              MixedPagePreflag.bicubicResize(ramp, width: 40, height: 30, to: 40, 30) == ramp
+              && MixedPagePreflag.bicubicResize(flat, width: 500, height: 300, to: 384, 384).allSatisfy { $0 == 77 }
+              && MixedPagePreflag.bicubicResize(ramp, width: 40, height: 30, to: 384, 384).count == 384 * 384)
+        // Pillow 13.0.0's own output (Image.BICUBIC, computed in the shared torch env) for a 6 x 4 ramp squeezed to
+        // 3 x 2 and a 13 x 11 scramble, value (i * 37 + 11) % 256, squeezed to 5 x 4.
+        let tiny: [UInt8] = [0, 40, 80, 120, 160, 200, 10, 50, 90, 130, 170, 210, 20, 60, 100, 140, 180, 220,
+                             30, 70, 110, 150, 190, 230]
+        let scramble = (0..<(13 * 11)).map { UInt8(($0 * 37 + 11) % 256) }
+        let scrambled: [UInt8] = [105, 103, 179, 91, 131, 189, 111, 117, 173, 64, 101, 168, 83, 129, 158, 110, 114,
+                                  185, 95, 144]
+        check("12 Pillow's bicubic matches Pillow on two fixed cases",
+              MixedPagePreflag.bicubicResize(tiny, width: 6, height: 4, to: 3, 2) == [28, 106, 184, 46, 124, 202]
+              && MixedPagePreflag.bicubicResize(scramble, width: 13, height: 11, to: 5, 4) == scrambled,
+              "\(MixedPagePreflag.bicubicResize(tiny, width: 6, height: 4, to: 3, 2)) "
+              + "\(MixedPagePreflag.bicubicResize(scramble, width: 13, height: 11, to: 5, 4))")
+        // And a page-sized squeeze, 26 to 1: a 260 x 390 scramble, value (i * 53 + 7) % 256, to 10 x 15.
+        let wide = (0..<(390 * 260)).map { UInt8(($0 * 53 + 7) % 256) }
+        let squeezed: [UInt8] = [
+                                       126, 125, 126, 127, 128, 129, 130, 129, 129, 127, 127, 129, 129, 129, 129, 127, 126, 126, 126, 127,
+                                       129, 127, 126, 126, 126, 127, 128, 129, 129, 129, 126, 126, 128, 129, 130, 129, 129, 127, 126, 126,
+                                       129, 129, 129, 127, 126, 126, 126, 127, 128, 129, 126, 126, 126, 127, 128, 129, 130, 129, 128, 127,
+                                       128, 129, 130, 129, 128, 127, 126, 125, 126, 127, 128, 127, 126, 125, 126, 127, 128, 129, 130, 129,
+                                       126, 127, 128, 129, 130, 129, 128, 127, 126, 126, 129, 129, 128, 127, 126, 125, 126, 127, 128, 129,
+                                       126, 126, 126, 127, 128, 129, 130, 129, 128, 127, 128, 129, 130, 129, 128, 127, 126, 126, 126, 127,
+                                       128, 127, 126, 126, 126, 127, 128, 129, 130, 129, 126, 127, 128, 129, 129, 129, 128, 126, 126, 126,
+                                       130, 129, 128, 127, 126, 125, 126, 127, 128, 129]
+        check("12 Pillow's bicubic matches Pillow at a page's 26 to 1",
+              MixedPagePreflag.bicubicResize(wide, width: 260, height: 390, to: 10, 15) == squeezed)
+        let bare = ["VISIONOCR_MODEL_HOME": root.appendingPathComponent("no models").path]
+        check("12 without the download the pre-flag is not installed and offers its whole size",
+              !MixedPagePreflag.isInstalled(bare) && MixedPagePreflag.downloadMB(environment: bare) == 300
+              && MixedPagePreflag.licence.contains("CC BY-NC 4.0"))
+
+        // 12b. Parity with the bench (only when the script gives the pages and a model source): the app's own installer
+        // fetches the pinned download into a scratch home, then ATRIUM reads each page.
+        if let list = env["MIXED_PREFLAG_LIST"], let out = env["MIXED_PREFLAG_OUT"],
+           let rows = try? String(contentsOfFile: list, encoding: .utf8) {
+            var e = env
+            if let home = env["MIXED_PREFLAG_HOME"] { e["VISIONOCR_MODEL_HOME"] = home }
+            do {
+                try await MixedPagePreflag.download(environment: e)
+                check("12b the download installs through the app's installer", MixedPagePreflag.isInstalled(e))
+                var lines: [String] = []
+                for row in rows.split(whereSeparator: \.isNewline) where !row.hasPrefix("#") {
+                    let f = row.split(separator: "\t").map(String.init)
+                    guard f.count >= 2 else { continue }
+                    let t0 = Date()
+                    guard let reading = try? MixedPagePreflag.read(url: URL(fileURLWithPath: f[1]), environment: e) else {
+                        lines.append("\(f[0])\tunread"); continue
+                    }
+                    lines.append(([f[0], reading.top, String(format: "%.4f", Date().timeIntervalSince(t0))]
+                                  + reading.probabilities.map { String(format: "%.6f", $0) }).joined(separator: "\t"))
+                }
+                try? (lines.joined(separator: "\n") + "\n").write(toFile: out, atomically: true, encoding: .utf8)
+                check("12b parity pages read (\(lines.count))", !lines.isEmpty)
+            } catch { check("12b the download installs through the app's installer: \(error)", false) }
+        }
+
         finish(results)
     }
 
