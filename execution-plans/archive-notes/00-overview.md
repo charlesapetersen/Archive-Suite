@@ -579,7 +579,7 @@ then `git show <sha>^:<path>`). These two lists outlive it, so a future reviewer
 **Out of scope (deliberate deferrals, not gaps).** Mirroring **author** into Finder tags (date already
 projects as date facets; see the A11 deviation below); a single merged unified-writer signature; unifying the
 page-2 header *builder*; a shared suite-wide storage path; page-within-merged-PDF scroll navigation; editor
-tables/footnotes/task-lists/strikethrough/HTML and undo-across-raw-toggle; per-block stable GUIDs and the
+tables/footnotes/task-lists/strikethrough/HTML (undo across the raw toggle shipped: W49.notes-undo-across-toggle); per-block stable GUIDs and the
 reverse "N extracts derive from this note" index; Scrivener round-trip confirmation; extract
 re-snapshot/refresh; author inheritance; `zotero://open-pdf` page-anchored links; Zotero write-back;
 multi-root Reader; Universal-Clipboard cross-Mac confirmation (owner-eye, W8); and the GUI checks documented

@@ -37,9 +37,9 @@ evidence these are one suite.
 
 ## Lower priority / long-term
 
-- **Richer Markdown editor** — tables, footnotes, task-lists, strikethrough, inline HTML, and preserving undo
-  history across the raw/styled toggle, beyond the shipped construct set. _(`00-overview` §17 out-of-scope.)_ (queued: W49.notes-undo-across-toggle; the constructs
-  W49.notes-editor-constructs behind nice-to-have, owner 2026-11-20)
+- **Richer Markdown editor** — tables, footnotes, task-lists, strikethrough and inline HTML, beyond the shipped
+  construct set. _(`00-overview` §17 out-of-scope.)_ (queued: W49.notes-editor-constructs behind nice-to-have,
+  owner 2026-11-20; undo across the raw/styled toggle shipped as W49.notes-undo-across-toggle)
 - **Per-block stable GUIDs + reverse back-index** — queued: W49.notes-block-ids behind nice-to-have (owner, 2026-11-20, call 28) — give blocks durable per-block identity and build the inverse
   "N extracts derive from this note" index for a source note. _(`00-overview` §17 out-of-scope.)_
 - **`zotero://open-pdf` page-anchored links** — queued: W49.notes-zotero-page-links (owner, 2026-11-20, call 28) — support page-anchored attachment links in addition to

@@ -3,6 +3,21 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W49.notes-undo-across-toggle, 2026-11-20) — undo survives the ⌘/ switch between styled and raw
+
+Switching views used to clear undo (`switchMode`'s `removeAllActions`), so an edit made before ⌘/ could not be undone
+after it. The old view's entries hold ranges into the old storage and still cannot cross, so the switch now walks
+the old view's redo stack forward and its undo stack back, without saving, collecting the note's Markdown at each
+step, and rebuilds them in the new view as whole-note steps (`Coordinator.restoreUndoState`) with the redo side kept.
+⌘Z after a switch undoes the last edit in either view, across any number of switches, and is saved like any edit; it
+never switches the view back. A redo puts back the exact styled storage an undo replaced, so native redo steps above
+it stay valid; a state the styled view cannot parse is passed over rather than saved through the plain-text
+fallback. The walk carries at most 100 steps a side within 0.3 s, dropping the oldest undo steps past that, and
+carries nothing if it cannot retrace to the current state. Every load that replaces the storage in `updateNSView` now
+clears undo too: the template editor reuses one text view across templates, and a carried step must not put one
+template's body back into another. Tests: `EditorBindingTests` (both directions, several switches, redo, typing on
+top of a carried step), VM `testG3b_UndoCrossesRawToggle` (accepted: fixed history).
+
 ## ✅ FIXED (W49.notes-s007-fix, 2026-11-20) — the source-block preview no longer downloads a cloud placeholder
 
 Clicking a source block whose PDF is a dataless cloud placeholder (OneDrive, iCloud, Google Drive) used to download
