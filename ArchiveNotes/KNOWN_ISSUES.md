@@ -96,7 +96,7 @@ granted to Notes with Choose Archive Folder…. The sandbox gives Notes the pick
 so in the shipping app the first sign is usually unreadable. An **empty** folder inside an archive that was
 never granted to Notes is therefore accepted as a new store. Nothing already in the archive is changed then:
 the store's marker, `items/` and `organization.json` are added inside that empty folder. Granting the archive
-to Notes first closes the gap (accepted: the sandbox gives Notes the picked folder only, not its parents).
+to Notes first closes the gap. Whether to ask "inside an archive?" when a parent cannot be read, and whether the store becomes a `.archivenotes` package, is put to the owner in `execution-plans/items/W49.notes-store-format.md` (asked: W49.notes-store-format-owner-ok).
 
 ## ⚠️ LIMIT (W40.root-marker-auto, 2026-11-06) — Choose Archive Folder… gives a plain folder an archive identity
 
@@ -110,7 +110,7 @@ grant writes nothing. With a link in hand (the preview popover) Notes never crea
 could not be the one the link names, so a folder without one is "not the archive this link was copied from".
 The sandbox limit above applies: a subfolder of an archive never granted to Notes cannot be recognised, so
 picking one gives that subfolder an identity of its own. No existing file is changed; the small file can be
-deleted. Tests: `ReaderRootChooserTests` (scratch folders) (accepted: the sandbox limit above; nothing existing is changed).
+deleted. Tests: `ReaderRootChooserTests` (scratch folders). The "inside an archive?" question that would close it is put to the owner with the store format (asked: W49.notes-store-format-owner-ok).
 
 ## ✅ FIXED (W40.fix-notes-stale-body-on-switch, 2026-10-25) — the outgoing editor remained writable during loading
 
