@@ -972,10 +972,16 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   whether the caret stands on a new line after the link, which would make the join a surprise rather than what was
   typed.
 - **Would clear it:** the typed text lands on a line of its own, or the editor shows it joined before saving.
-- **Status:** `open`
+- **Status:** `cleared` — not a defect: the editor shows the join before saving; test `ArchiveNotesTests/NotesTextLossSuspectTests` `s043TypedTextAfterUnclosedHeader`
 - **History:**
   - 2026-11-20 W49.notes-suspects-text — raised.
   - 2026-11-20 owner walkthrough of 13:42 (call 29) — queued as `W49.notes-s043-reproduce` under phase rule 5a.
+  - 2026-11-20 W49.notes-s043-reproduce — cleared. The join is real: the file ends
+    `link: archivereader://reveal?rel=a.pdfSome prose`. But the newline is dropped on load, not on save
+    (`MarkdownBridge.dropRawHTMLLineEnd`, documented as deliberate so a save adds no blank line), so the editor's
+    text ends `a.pdf` and the caret stands at the end of the `link:` line. The opener is drawn as ordinary text (the
+    system text colour at 14 pt, as the typed text), so `Some prose` appears joined on that line before the save, and
+    the reopened note renders exactly what the editor showed. Run on a scratch store through a real `EditorTextView`.
 
 ### S-044 · Process Files' cost estimate leaves out the names call
 

@@ -2,7 +2,8 @@ import Testing
 import AppKit
 @testable import ArchiveNotes
 
-/// W49.notes-suspects-text — the reproduce attempts for suspects S-019, S-020 and S-009 (phase rule 5a): each
+/// W49.notes-suspects-text — the reproduce attempts for suspects S-019, S-020 and S-009 (phase rule 5a), and
+/// W49.notes-s043-reproduce's for S-043: each
 /// runs the user's own path on scratch data. A note file is written to a scratch `NoteStore` the way a cut-off
 /// or hand-edited file arrives, loaded, rendered into a real `EditorTextView` as the editor renders it, edited
 /// through the text view's own editing calls, saved with `saveBody` and loaded again.
@@ -77,6 +78,45 @@ struct NotesTextLossSuspectTests {
         withKnownIssue("S-019: the typed --> closes the unclosed header, and the prose before it leaves the text") {
             #expect(text.contains("Some prose"), "the typed line is gone after the reopen; the file holds:\n\(onDisk)")
         }
+    }
+
+    // MARK: - S-043
+
+    /// S-043 (W49.notes-s043-reproduce): the S-019 run without `-->`. The user types at the end of the loaded
+    /// degraded note with no Return first, saves and reopens. Cleared 2026-11-20: the join is real, but the editor
+    /// shows it before the save. The opener is ordinary visible text whose trailing newline is dropped on load
+    /// (`MarkdownBridge.dropRawHTMLLineEnd`), so the caret stands at the end of the `link:` line and the typed text
+    /// appears on it; the file and the reopened note hold exactly what the editor showed, and nothing is lost.
+    @Test("S-043: text typed at the end of a degraded note is saved and reopened as the editor showed it")
+    func s043TypedTextAfterUnclosedHeader() async throws {
+        let (store, tmp) = try scratchStore(); defer { try? FileManager.default.removeItem(at: tmp) }
+        let id = try await writeNote(Self.degradedBody, in: store)
+        let before = try await loadedBody(id, in: store)
+        let (tv, storage) = try editor(showing: before)
+        // Before typing: the caret is on the `link:` line, not on a new line after it.
+        #expect(storage.string.hasSuffix("link: archivereader://reveal?rel=a.pdf"), "\(storage.string.debugDescription)")
+        tv.insertText("Some prose", replacementRange: tv.selectedRange())
+        let shown = storage.string
+        let lastLine = shown.components(separatedBy: "\n").last ?? ""
+        #expect(lastLine == "     link: archivereader://reveal?rel=a.pdfSome prose", "the editor shows \(shown.debugDescription)")
+        // The opener is drawn like the typed text: the system text colour at the body size, nothing hidden.
+        let ns = shown as NSString
+        let opener = storage.attributes(at: ns.range(of: "link:").location, effectiveRange: nil)
+        let typed = storage.attributes(at: ns.range(of: "Some prose").location, effectiveRange: nil)
+        #expect(opener[.foregroundColor] as? NSColor == typed[.foregroundColor] as? NSColor)
+        #expect((opener[.font] as? NSFont)?.pointSize == (typed[.font] as? NSFont)?.pointSize)
+        #expect(((opener[.font] as? NSFont)?.pointSize ?? 0) >= 10)
+
+        let saved = MarkdownBridge.serialize(storage)
+        _ = try await store.saveBody(saved, basedOn: before, for: id)
+        let onDisk = try String(contentsOf: await store.mdURL(for: id), encoding: .utf8)
+        #expect(onDisk.hasSuffix("<!-- block: reader-doc\n     link: archivereader://reveal?rel=a.pdfSome prose"),
+                "\(onDisk.debugDescription)")
+        // Reopened, the note shows what the editor showed before the save, typed text included.
+        let reopened = try await store.load(id)
+        let (_, again) = try editor(showing: BlockParser.serialize(leadingText: reopened.trailingBodyRaw,
+                                                                   blocks: reopened.blocks))
+        #expect(again.string == shown, "reopened as \(again.string.debugDescription)")
     }
 
     // MARK: - S-020
