@@ -68,6 +68,8 @@ struct SettingsSheetModel {
         let name: String
         /// Why it cannot be chosen; nil when it can.
         let blocked: String?
+        /// The level its route row sits at (W47.settings-level-switch); the menu lists it from that level up.
+        var level: SettingsLevel = .standard
     }
 
     struct Card: Identifiable {
@@ -600,7 +602,8 @@ struct SettingsSheetModel {
             .map { r in
                 Option(id: r.id, name: words.display(stage.id, r),
                        blocked: appBlocked[r.id]?.first.map(words.reason)
-                        ?? (namesUnranked && r.id != "none" ? "names are found only when they are among what matters most" : nil))
+                        ?? (namesUnranked && r.id != "none" ? "names are found only when they are among what matters most" : nil),
+                       level: SettingsLevels.level(of: r))
             }
             .sorted { ($0.blocked == nil ? 0 : 1, $0.name) < ($1.blocked == nil ? 0 : 1, $1.name) }
         _ = blocked

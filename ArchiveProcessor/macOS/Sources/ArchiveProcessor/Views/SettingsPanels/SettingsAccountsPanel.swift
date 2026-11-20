@@ -30,9 +30,11 @@ struct SettingsAccountsPanel: View {
                 }
                 .help("The plans are asked about, checked and signed in to with the setup questions.")
             } header: { Text("Plans") }
-            Section {
-                localAgentControls
-            } header: { Text("Command-line agent") }
+            SettingsLevelSection([.cliAgent, .cliFields]) {
+                Section {
+                    localAgentControls
+                } header: { Text("Command-line agent") }
+            }
         }
         .formStyle(.grouped)
         .onAppear { reloadKeys() }
@@ -57,40 +59,46 @@ struct SettingsAccountsPanel: View {
     /// The Local Agent backend's tool, path and model, and its check (the backend itself is chosen in Settings › Reading).
     /// Detect & Verify is inert until tapped.
     @ViewBuilder private var localAgentControls: some View {
-        Picker(selection: $localAgentTool) {
-            ForEach(LocalAgentTool.allCases, id: \.self) { Text($0.displayName).tag($0) }
-        } label: {
-            HStack {
-                Text("CLI tool")
-                HelpButton(text: "Which locally installed CLI performs OCR and tagging. Each authenticates with its own subscription login (Claude Code, Gemini CLI, or OpenAI Codex CLI) — no API key is used. Only Claude Code is verified on this machine so far; Gemini/Codex support is best-effort pending their setup check.")
-            }
-        }
-        .accessibilityIdentifier("ap.settings.localAgentToolPicker")
-        SettingsField("CLI path") {
-            TextField("CLI path", text: $localAgentBinaryPath, prompt: Text("Optional — auto-detected if blank"))
-        }
-        SettingsField("Model") {
-            TextField("Model", text: $localAgentModel, prompt: Text("Optional — the CLI's default if blank"))
-        }
-        HStack {
-            Button {
-                runLocalAgentDetectVerify()
+        SettingsLevelRows(.cliAgent) {
+            Picker(selection: $localAgentTool) {
+                ForEach(LocalAgentTool.allCases, id: \.self) { Text($0.displayName).tag($0) }
             } label: {
-                Label(localAgentChecking ? "Checking…" : "Detect & Verify", systemImage: "checkmark.seal")
+                HStack {
+                    Text("CLI tool")
+                    HelpButton(text: "Which locally installed CLI performs OCR and tagging. Each authenticates with its own subscription login (Claude Code, Gemini CLI, or OpenAI Codex CLI) — no API key is used. Only Claude Code is verified on this machine so far; Gemini/Codex support is best-effort pending their setup check.")
+                }
             }
-            .disabled(localAgentChecking)
-            HelpButton(text: "Checks that the selected CLI is installed and signed in by running one tiny prompt through it. No API key is used and no document is sent — the CLI authenticates with your subscription.")
-            Button { showLocalAgentWizard = true } label: {
-                Label("Set up (guided)…", systemImage: "wand.and.stars")
+            .accessibilityIdentifier("ap.settings.localAgentToolPicker")
+        }
+        SettingsLevelRows(.cliFields) {
+            SettingsField("CLI path") {
+                TextField("CLI path", text: $localAgentBinaryPath, prompt: Text("Optional — auto-detected if blank"))
             }
-            .accessibilityIdentifier("ap.settings.localAgentGuidedSetup")
-            HelpButton(text: "Step-by-step setup for Claude Code or the Gemini CLI: how to install, sign in with your subscription, and verify — no API key needed.")
+            SettingsField("Model") {
+                TextField("Model", text: $localAgentModel, prompt: Text("Optional — the CLI's default if blank"))
+            }
         }
-        if !localAgentStatus.isEmpty {
-            Text(localAgentStatus).font(.caption).foregroundStyle(.primary)
+        SettingsLevelRows(.cliAgent, changed: SettingsLevels.changed(.cliAgent) || SettingsLevels.changed(.cliFields)) {
+            HStack {
+                Button {
+                    runLocalAgentDetectVerify()
+                } label: {
+                    Label(localAgentChecking ? "Checking…" : "Detect & Verify", systemImage: "checkmark.seal")
+                }
+                .disabled(localAgentChecking)
+                HelpButton(text: "Checks that the selected CLI is installed and signed in by running one tiny prompt through it. No API key is used and no document is sent — the CLI authenticates with your subscription.")
+                Button { showLocalAgentWizard = true } label: {
+                    Label("Set up (guided)…", systemImage: "wand.and.stars")
+                }
+                .accessibilityIdentifier("ap.settings.localAgentGuidedSetup")
+                HelpButton(text: "Step-by-step setup for Claude Code or the Gemini CLI: how to install, sign in with your subscription, and verify — no API key needed.")
+            }
+            if !localAgentStatus.isEmpty {
+                Text(localAgentStatus).font(.caption).foregroundStyle(.primary)
+            }
+            Text("No API key needed — the CLI uses your existing subscription login. Personal use of your own subscription on your own archive is intended use.")
+                .font(.caption).foregroundStyle(.primary)
         }
-        Text("No API key needed — the CLI uses your existing subscription login. Personal use of your own subscription on your own archive is intended use.")
-            .font(.caption).foregroundStyle(.primary)
     }
 
     /// Run detect-and-verify off the main actor and surface the plain-English result. Spawns the CLI

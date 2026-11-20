@@ -180,6 +180,7 @@ struct LocalPartnerControls: View {
                 routes.localPartner = SegmentationApproach(rawValue: raw)
                     .flatMap { SegmentationOptions.partnerApproaches.contains($0) ? $0 : nil }
             }
+            .settingsLevel(.localSegmenter)   // W47.settings-level-switch: an option, never a default
         }
     }
 }
@@ -211,6 +212,7 @@ struct LocalSegmenterControls: View {
             Text(LocalSegmenter.startHint).font(.caption2).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .settingsLevel(.localSegmenter)   // W47.settings-level-switch: raw fields; the defaults are the measured ones
     }
 
     private func check() {

@@ -995,8 +995,12 @@ enum UITestLaunch {
     /// open-file requests and starts this `WindowGroup` with no Process Files window at all.
     static let deterministicWindowState = ["-NSTreatUnknownArgumentsAsOpen", "NO"]
 
+    /// W47.settings-level-switch: Settings shows every row unless a test asks for a level itself, so the suites that
+    /// drive a Standard or Advanced control find it. What each level shows is `SettingsLevelsUITests`' subject.
+    static let allSettingsShown = ["-settingsLevel", "advanced"]
+
     static func arguments(_ extra: [String]) -> [String] {
-        deterministicWindowState + extra
+        deterministicWindowState + (extra.contains("-settingsLevel") ? [] : allSettingsShown) + extra
     }
 }
 

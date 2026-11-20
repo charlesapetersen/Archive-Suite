@@ -83,6 +83,7 @@ struct SettingsCapturePanel: View {
                     .font(.caption2).foregroundStyle(.primary)
             }
             .onAppear { loadDriveState() }
+            .settingsLevel(.driveRelay)
         } header: {
             Text("Live Capture")
         }

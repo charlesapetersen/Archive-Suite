@@ -38,7 +38,7 @@ struct SettingsDocumentsPanel: View {
             Section {
                 SettingsStageCards(cards: ["segmentation"])
             } header: { Text("The app's pick") }
-            segmentationSection
+            SettingsLevelSection([.segmentationApproach, .localSegmenter]) { segmentationSection }
             taggingSection
         }
         .formStyle(.grouped)
@@ -78,28 +78,34 @@ struct SettingsDocumentsPanel: View {
                     HelpButton(text: "\(taggingMode.detail)\n\nProcess Files' Tagging dropdown is a shortcut to this setting: changing either changes both. The estimate in Settings › Collection shows each mode's cost and time.")
                 }
             }
-            itemTypeColourPicker("Box colour", selection: $itemTypeColourBox)
-            itemTypeColourPicker("Folder colour", selection: $itemTypeColourFolder)
-            Toggle(isOn: $enableCollectionSegmentation) {
-                HStack {
-                    Text("Collection ID + file renaming")
-                    HelpButton(text: "Identify archival collections from box-label photos and organize outputs into per-collection folders with sequential names (e.g. “00001 Collection Name.pdf”).")
-                }
+            SettingsLevelRows(.vocabularyColours, changed: SettingsLevels.changed(.vocabularyColours)) {
+                itemTypeColourPicker("Box colour", selection: $itemTypeColourBox)
+                itemTypeColourPicker("Folder colour", selection: $itemTypeColourFolder)
             }
-            if enableCollectionSegmentation {
-                Toggle(isOn: $confirmCollectionIDs) {
+            SettingsLevelRows(.collectionID, changed: SettingsLevels.changed(.collectionID)
+                              || SettingsLevels.changed(DefaultsKeys.reviewDocumentSegmentation)) {
+                Toggle(isOn: $enableCollectionSegmentation) {
                     HStack {
-                        Text("Confirm identifications before organizing")
-                        HelpButton(text: "Pause before filing so you can review and correct the collection names the model extracted from box labels.")
+                        Text("Collection ID + file renaming")
+                        HelpButton(text: "Identify archival collections from box-label photos and organize outputs into per-collection folders with sequential names (e.g. “00001 Collection Name.pdf”).")
                     }
                 }
-                Toggle(isOn: $reviewDocumentSegmentation) {
-                    HStack {
-                        Text("Review document segmentation")
-                        HelpButton(text: "Pause after OCR to review and correct each page's classification (document start / continuation / box / folder) before tagging. Only applies when a model proposes the segmentation (Automatic tagging, or any Segmentation approach other than Manual).")
+                if enableCollectionSegmentation {
+                    Toggle(isOn: $confirmCollectionIDs) {
+                        HStack {
+                            Text("Confirm identifications before organizing")
+                            HelpButton(text: "Pause before filing so you can review and correct the collection names the model extracted from box labels.")
+                        }
                     }
+                    Toggle(isOn: $reviewDocumentSegmentation) {
+                        HStack {
+                            Text("Review document segmentation")
+                            HelpButton(text: "Pause after OCR to review and correct each page's classification (document start / continuation / box / folder) before tagging. Only applies when a model proposes the segmentation (Automatic tagging, or any Segmentation approach other than Manual).")
+                        }
+                    }
+                    .disabled(!segmentationPlan.reviewShowsDocumentClasses)
+                .settingsLevel(.segmentationReview)
                 }
-                .disabled(!segmentationPlan.reviewShowsDocumentClasses)
             }
             if taggingMode.enablesTagging && taggingMode != .copySource {
                 Toggle(isOn: $enableSegmentJSON) {
@@ -108,6 +114,7 @@ struct SettingsDocumentsPanel: View {
                         HelpButton(text: "Write a .json sidecar per document with structured metadata (date, subjects, author/recipient, body text) next to the PDF.")
                     }
                 }
+                .settingsLevel(.segmentationReview)
                 Toggle(isOn: $sendPreviousImage) {
                     HStack {
                         Text("Send previous page image")
@@ -115,6 +122,7 @@ struct SettingsDocumentsPanel: View {
                     }
                 }
                 .disabled(!segmentationPlan.usesPerPageClassifier || preOCRedInput)
+                .settingsLevel(.previousImage)
                 if taggingMode == .automatic {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -129,6 +137,7 @@ struct SettingsDocumentsPanel: View {
                             .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
                             .onDrop(of: [.fileURL], isTargeted: nil) { providers in loadTagVocabularyFromDrop(providers) }
                     }
+                    .settingsLevel(.vocabularyColours)
                 }
             }
             Toggle(isOn: $mergeDocuments) {
@@ -137,6 +146,7 @@ struct SettingsDocumentsPanel: View {
                     HelpButton(text: "Combine a document's continuation pages into one multi-page PDF (each page's image followed by its text) instead of a separate PDF per page.")
                 }
             }
+            .settingsLevel(.segmentationReview)
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Custom prompt (optional)").font(.caption)
@@ -145,6 +155,7 @@ struct SettingsDocumentsPanel: View {
                 TextEditor(text: $customOCRPrompt).font(.caption).frame(height: 50)
                     .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
             }
+            .settingsLevel(.customPrompt)
         } header: {
             Text("Tagging and filing")
         }

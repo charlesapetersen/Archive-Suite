@@ -60,7 +60,7 @@ struct SettingsReadingPanel: View {
             Section {
                 SettingsStageCards(cards: ["reading"])
             } header: { Text("The app's pick") }
-            providerSection
+            SettingsLevelSection(Self.providerRows) { providerSection }
             Section {
                 SettingsStageCards(rules: ["ocr-input", "layout"])
             } header: { Text("The image read and the reading order") }
@@ -100,6 +100,12 @@ struct SettingsReadingPanel: View {
         )
     }
 
+    /// The rows of Provider & Model, by level (W47.settings-level-switch): at Basic the reading card's pick is all.
+    private static let providerRows: [SettingsLevels.Row] = [
+        .backend, .providerModel, .thinking, .cascade, .cascadeDisagreement, .pageKind, .handwritingOnTyped,
+        .visionLanguages, .visionTuning, .visionJudgement, .gatewayLocal, .gatewayFields, .customModels,
+    ]
+
     @ViewBuilder private var providerSection: some View {
         Section("Provider & Model") {
             Picker(selection: backendMode) {
@@ -114,55 +120,32 @@ struct SettingsReadingPanel: View {
                 }
             }
             .accessibilityIdentifier("ap.settings.backendPicker")
+            .settingsLevel(.backend)
 
             if useGateway {
                 Text("The gateway's key is in Settings › Accounts.").font(.caption).foregroundStyle(.primary)
-                LocalModelSettingsView()   // W41.app-local-models
-                HStack {
-                    Button {
-                        applyOpenAIGatewayPreset()
-                    } label: {
-                        Label("Fill in OpenAI preset", systemImage: "sparkles")
-                    }
-                    HelpButton(text: "One-click fill for OpenAI's public API: sets the Gateway URL to https://api.openai.com/v1, a cost-effective OpenAI model, a display name, and its pricing. Paste your OpenAI key into the Gateway key field in Settings › Accounts. The gateway sends standard chat-completions requests, so this fills a non-reasoning model; for GPT-5 reasoning models pick OpenAI under the Direct API mode instead. For Azure OpenAI or another OpenAI-compatible proxy, apply this then edit the Gateway URL to your endpoint.")
-                }
-                HStack {
-                    SettingsField("Gateway URL") {
-                        TextField("Gateway URL", text: $gatewayBaseURL, prompt: Text("https://…/v1"))
-                            .onSubmit { gatewayBaseURL = GatewayConfig.normalizedBaseURL(gatewayBaseURL) }
-                    }
-                    HelpButton(text: "The gateway's base address, ending at the API version, e.g. https://aiapi-prod.stanford.edu/v1 or https://api.openai.com/v1. The app adds /chat/completions itself; a pasted full endpoint has that ending dropped.")
-                }
-                SettingsField("Model ID") {
-                    TextField("Model ID", text: $gatewayModelID, prompt: Text("The model name the gateway expects"))
-                }
-                SettingsField("Display name") {
-                    TextField("Display name", text: $gatewayDisplayName, prompt: Text("Shown in PDF headers"))
-                }
-                SettingsField("Input $/1M tokens") {
-                    TextField("Input $/1M tokens", value: Binding(get: { gatewayInputCost >= 0 ? gatewayInputCost : nil }, set: { gatewayInputCost = $0 ?? -1 }), format: .number, prompt: Text("For the cost estimate"))
-                }
-                SettingsField("Output $/1M tokens") {
-                    TextField("Output $/1M tokens", value: Binding(get: { gatewayOutputCost >= 0 ? gatewayOutputCost : nil }, set: { gatewayOutputCost = $0 ?? -1 }), format: .number, prompt: Text("For the cost estimate"))
-                }
-                Picker(selection: $gatewayUpstreamProvider) {
-                    ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { Text($0.rawValue).tag($0) }
-                } label: {
+                SettingsLevelRows(.gatewayLocal) {
+                    LocalModelSettingsView()   // W41.app-local-models
                     HStack {
-                        Text("Cost profile")
-                        HelpButton(text: "Which provider's per-image token cost to assume for the cost/time estimate. Set this to the model family your gateway actually fronts — a Gemini-class model uses ~6.7× more image tokens than Anthropic, so the wrong profile makes the estimate far off. Estimate only; does not affect the actual request.")
-                    }
-                }
-                if gatewayLocalModel {   // a local model's looped page needs a fallback, if the user allows the cloud
-                    Toggle(isOn: $gatewayLocalEscalates) {
-                        HStack {
-                            Text("Send pages it fails to the escalation model")
-                            HelpButton(text: "A page the local model loops on, cuts off or cannot answer is read again by the model you pick below, in the cloud, at that model's price. Off, such a page fails and stays on this Mac.")
+                        Button {
+                            applyOpenAIGatewayPreset()
+                        } label: {
+                            Label("Fill in OpenAI preset", systemImage: "sparkles")
                         }
+                        HelpButton(text: "One-click fill for OpenAI's public API: sets the Gateway URL to https://api.openai.com/v1, a cost-effective OpenAI model, a display name, and its pricing. Paste your OpenAI key into the Gateway key field in Settings › Accounts. The gateway sends standard chat-completions requests, so this fills a non-reasoning model; for GPT-5 reasoning models pick OpenAI under the Direct API mode instead. For Azure OpenAI or another OpenAI-compatible proxy, apply this then edit the Gateway URL to your endpoint.")
                     }
-                    .accessibilityIdentifier("ap.settings.localModelEscalates")
-                    if gatewayLocalEscalates { cascadeControls }
+                    if gatewayLocalModel {   // a local model's looped page needs a fallback, if the user allows the cloud
+                        Toggle(isOn: $gatewayLocalEscalates) {
+                            HStack {
+                                Text("Send pages it fails to the escalation model")
+                                HelpButton(text: "A page the local model loops on, cuts off or cannot answer is read again by the model you pick below, in the cloud, at that model's price. Off, such a page fails and stays on this Mac.")
+                            }
+                        }
+                        .accessibilityIdentifier("ap.settings.localModelEscalates")
+                        if gatewayLocalEscalates { cascadeControls }
+                    }
                 }
+                SettingsLevelRows(.gatewayFields) { gatewayFields }
             } else if useLocalAgent {
                 Text("The command-line agent, its model and its check are in Settings › Accounts.")
                     .font(.caption).foregroundStyle(.primary)
@@ -170,40 +153,42 @@ struct SettingsReadingPanel: View {
             } else if useAppleVision {
                 appleVisionControls
             } else {
-                // Plain `$selectedProvider`: the model follows automatically, because `selectedModel`
-                // reads the store keyed by whatever the provider currently is.
-                Picker(selection: $selectedProvider) {
-                    ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { Text($0.rawValue).tag($0) }
-                } label: {
-                    HStack {
-                        Text("Provider")
-                        HelpButton(text: "Which LLM service performs OCR and tagging. Each has its own models, pricing, and API key.")
-                    }
-                }
-                .accessibilityIdentifier("ap.settings.providerPicker")
-                Picker(selection: Binding(get: { selectedModel }, set: { selectedModel = $0 })) {
-                    ForEach(models) { m in
-                        Text(customModelStore.isCustom(m) ? "\(m.displayName) (custom)" : m.displayName).tag(m)
-                    }
-                } label: {
-                    HStack {
-                        Text("Model")
-                        HelpButton(text: "The model used for OCR and tagging. Fast, cheap models (e.g. Flash Lite) handle most archival documents well; larger models may read difficult handwriting or dense layouts better, at higher cost and time.")
-                    }
-                }
-                if selectedProvider == .openrouter {
-                    // `openRouterPricesRead` re-renders the note and the model list once OpenRouter's endpoint prices
-                    // (W42.int-s2) and its model listing (W41.app-openrouter-unmeasured) have been read.
-                    Text(openRouterPricesRead >= 0
-                         ? (OpenRouterRoute.forModel(selectedModel.id)?.settingsNote ?? OpenRouterRoute.unmeasuredNote(selectedModel))
-                         : "")
-                        .font(.caption).foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("ap.settings.openRouterRoute")
-                        .task {
-                            await OpenRouterListing.refreshAllIfStale()
-                            openRouterPricesRead += 1
+                SettingsLevelRows(.providerModel) {
+                    // Plain `$selectedProvider`: the model follows automatically, because `selectedModel`
+                    // reads the store keyed by whatever the provider currently is.
+                    Picker(selection: $selectedProvider) {
+                        ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { Text($0.rawValue).tag($0) }
+                    } label: {
+                        HStack {
+                            Text("Provider")
+                            HelpButton(text: "Which LLM service performs OCR and tagging. Each has its own models, pricing, and API key.")
                         }
+                    }
+                    .accessibilityIdentifier("ap.settings.providerPicker")
+                    Picker(selection: Binding(get: { selectedModel }, set: { selectedModel = $0 })) {
+                        ForEach(models) { m in
+                            Text(customModelStore.isCustom(m) ? "\(m.displayName) (custom)" : m.displayName).tag(m)
+                        }
+                    } label: {
+                        HStack {
+                            Text("Model")
+                            HelpButton(text: "The model used for OCR and tagging. Fast, cheap models (e.g. Flash Lite) handle most archival documents well; larger models may read difficult handwriting or dense layouts better, at higher cost and time.")
+                        }
+                    }
+                    if selectedProvider == .openrouter {
+                        // `openRouterPricesRead` re-renders the note and the model list once OpenRouter's endpoint prices
+                        // (W42.int-s2) and its model listing (W41.app-openrouter-unmeasured) have been read.
+                        Text(openRouterPricesRead >= 0
+                             ? (OpenRouterRoute.forModel(selectedModel.id)?.settingsNote ?? OpenRouterRoute.unmeasuredNote(selectedModel))
+                             : "")
+                            .font(.caption).foregroundStyle(.primary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("ap.settings.openRouterRoute")
+                            .task {
+                                await OpenRouterListing.refreshAllIfStale()
+                                openRouterPricesRead += 1
+                            }
+                    }
                 }
                 // What reads which pages best is the reading card at the top of this panel (W47.settings-panels), in
                 // place of the guide that sat here (W41.app-ocr-hierarchy); its "Read with this" sets the model above.
@@ -216,37 +201,74 @@ struct SettingsReadingPanel: View {
                             HelpButton(text: "Extended reasoning for models that support it. High can improve hard pages but costs more and is slower. Tagging always runs without thinking.")
                         }
                     }
+                    .settingsLevel(.thinking)
                 }
                 cascadeControls
                 pageKindControls
                 Button("Manage custom models…") { showManageModels = true }
+                    .settingsLevel(.customModels, changed: !customModelStore.allCustomModels.isEmpty)
+            }
+        }
+    }
+
+    /// The gateway's raw fields: its address, model, name, prices and cost profile (Advanced; the presets fill them).
+    @ViewBuilder private var gatewayFields: some View {
+        HStack {
+            SettingsField("Gateway URL") {
+                TextField("Gateway URL", text: $gatewayBaseURL, prompt: Text("https://…/v1"))
+                    .onSubmit { gatewayBaseURL = GatewayConfig.normalizedBaseURL(gatewayBaseURL) }
+            }
+            HelpButton(text: "The gateway's base address, ending at the API version, e.g. https://aiapi-prod.stanford.edu/v1 or https://api.openai.com/v1. The app adds /chat/completions itself; a pasted full endpoint has that ending dropped.")
+        }
+        SettingsField("Model ID") {
+            TextField("Model ID", text: $gatewayModelID, prompt: Text("The model name the gateway expects"))
+        }
+        SettingsField("Display name") {
+            TextField("Display name", text: $gatewayDisplayName, prompt: Text("Shown in PDF headers"))
+        }
+        SettingsField("Input $/1M tokens") {
+            TextField("Input $/1M tokens", value: Binding(get: { gatewayInputCost >= 0 ? gatewayInputCost : nil }, set: { gatewayInputCost = $0 ?? -1 }), format: .number, prompt: Text("For the cost estimate"))
+        }
+        SettingsField("Output $/1M tokens") {
+            TextField("Output $/1M tokens", value: Binding(get: { gatewayOutputCost >= 0 ? gatewayOutputCost : nil }, set: { gatewayOutputCost = $0 ?? -1 }), format: .number, prompt: Text("For the cost estimate"))
+        }
+        Picker(selection: $gatewayUpstreamProvider) {
+            ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { Text($0.rawValue).tag($0) }
+        } label: {
+            HStack {
+                Text("Cost profile")
+                HelpButton(text: "Which provider's per-image token cost to assume for the cost/time estimate. Set this to the model family your gateway actually fronts — a Gemini-class model uses ~6.7× more image tokens than Anthropic, so the wrong profile makes the estimate far off. Estimate only; does not affect the actual request.")
             }
         }
     }
 
     /// W41.app-ocr-cascade — where a page the run's model fails goes (`OCRCascade`). Off by default.
     @ViewBuilder private var cascadeControls: some View {
-        Picker(selection: $ocrCascadeRoute) {
-            Text("Off").tag("")
-            // Keyed by route ID: a model ID alone is not unique across providers.
-            ForEach(OCRCascade.candidates.map { (OCRCascade.routeID(for: $0), $0) }, id: \.0) { routeID, m in
-                Text("\(m.provider.rawValue) · \(m.displayName)").tag(routeID)
+        SettingsLevelRows(.cascade) {
+            Picker(selection: $ocrCascadeRoute) {
+                Text("Off").tag("")
+                // Keyed by route ID: a model ID alone is not unique across providers.
+                ForEach(OCRCascade.candidates.map { (OCRCascade.routeID(for: $0), $0) }, id: \.0) { routeID, m in
+                    Text("\(m.provider.rawValue) · \(m.displayName)").tag(routeID)
+                }
+            } label: {
+                HStack {
+                    Text("Escalate failed pages to")
+                    HelpButton(text: "Read every page with the model above, and send a page it fails on (a refusal, a reply cut off at the token limit, an unparsable reply, a server error) to this stronger model. On the bench's 96 pages this beat one model alone at every budget up to $5 per 1,000 pages, and few pages fail, so the stronger model reads few. Where accuracy matters more than price, one strong model alone is still best. Each page records which model's text was kept. Uses that provider's API key.")
+                }
             }
-        } label: {
-            HStack {
-                Text("Escalate failed pages to")
-                HelpButton(text: "Read every page with the model above, and send a page it fails on (a refusal, a reply cut off at the token limit, an unparsable reply, a server error) to this stronger model. On the bench's 96 pages this beat one model alone at every budget up to $5 per 1,000 pages, and few pages fail, so the stronger model reads few. Where accuracy matters more than price, one strong model alone is still best. Each page records which model's text was kept. Uses that provider's API key.")
+            .accessibilityIdentifier("ap.settings.cascadeRoute")
+            if let target = OCRCascade(routeID: ocrCascadeRoute).escalationModel {
+                if OCRCascade.routeID(for: target) == OCRCascade.routeID(for: selectedModel) {
+                    Text("That is the model above, so nothing is escalated.")
+                        .font(.caption).foregroundStyle(.primary)
+                } else if storedKey(for: target.provider).isEmpty {
+                    Text("No \(target.provider.rawValue) key is saved: escalated pages will fail until one is.")
+                        .font(.caption).foregroundStyle(.orange)
+                }
             }
         }
-        .accessibilityIdentifier("ap.settings.cascadeRoute")
-        if let target = OCRCascade(routeID: ocrCascadeRoute).escalationModel {
-            if OCRCascade.routeID(for: target) == OCRCascade.routeID(for: selectedModel) {
-                Text("That is the model above, so nothing is escalated.")
-                    .font(.caption).foregroundStyle(.primary)
-            } else if storedKey(for: target.provider).isEmpty {
-                Text("No \(target.provider.rawValue) key is saved: escalated pages will fail until one is.")
-                    .font(.caption).foregroundStyle(.orange)
-            }
+        if OCRCascade(routeID: ocrCascadeRoute).escalationModel != nil {
             Toggle(isOn: $ocrCascadeOnDisagreement) {
                 HStack {
                     Text("Also escalate pages whose word count disagrees with Apple Vision's")
@@ -254,6 +276,7 @@ struct SettingsReadingPanel: View {
                 }
             }
             .accessibilityIdentifier("ap.settings.cascadeDisagreement")
+            .settingsLevel(.cascadeDisagreement)
         }
     }
 
@@ -266,6 +289,7 @@ struct SettingsReadingPanel: View {
             }
         }
         .accessibilityIdentifier("ap.settings.pageKindRouting")
+        .settingsLevel(.pageKind)
         // W46.mixed-route-setting: one switch on every typed or printed page, off by default (Phase 4, owner call 3).
         Toggle(isOn: $ocrHandwritingOnTyped) {
             HStack {
@@ -276,6 +300,7 @@ struct SettingsReadingPanel: View {
         .disabled(!ocrPageKindRouting)
         .padding(.leading, 18)
         .accessibilityIdentifier("ap.settings.handwritingOnTyped")
+        .settingsLevel(.handwritingOnTyped)
     }
 
     /// The key field's current value for a provider (loaded from the Keychain once, with the fields above).
@@ -299,46 +324,33 @@ struct SettingsReadingPanel: View {
             TextField("Languages", text: $visionLanguages, prompt: Text("Comma-separated BCP-47 tags, e.g. en-US, fr-FR"))
                 .accessibilityIdentifier("ap.settings.visionLanguages")
         }
-        Toggle("Fast recognition", isOn: $visionFastRecognition)
-            .accessibilityIdentifier("ap.settings.visionFastRecognition")
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("Minimum confidence")
-                Spacer()
-                Text("\(Int((visionMinimumConfidence * 100).rounded()))%")
-                    .foregroundStyle(.primary)
+        .settingsLevel(.visionLanguages)
+        SettingsLevelRows(.visionTuning) { visionTuning }
+        SettingsLevelRows(.visionJudgement) {
+            Toggle("Use an LLM for text-only judgement", isOn: $visionUseLLMJudgment)
+                .accessibilityIdentifier("ap.settings.visionUseLLMJudgment")
+            if visionUseLLMJudgment {
+                Picker("Judgement provider", selection: $selectedProvider) {
+                    ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { Text($0.rawValue).tag($0) }
+                }
+                .accessibilityIdentifier("ap.settings.visionJudgmentProviderPicker")
+                Picker("Judgement model", selection: Binding(get: { selectedModel }, set: { selectedModel = $0 })) {
+                    ForEach(models) { model in
+                        Text(customModelStore.isCustom(model) ? "\(model.displayName) (custom)" : model.displayName).tag(model)
+                    }
+                }
+                .accessibilityIdentifier("ap.settings.visionJudgmentModelPicker")
+                if selectedModel.supportsThinking {
+                    Picker("Judgement thinking", selection: $selectedThinking) {
+                        ForEach(ThinkingLevel.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .settingsLevel(.thinking)
+                }
+                Text("Vision performs every image read locally. Only its extracted text is sent to this LLM for classification, segmentation, dates, and tags. Add this provider's API key in Settings › Accounts.")
+                    .font(.caption2).foregroundStyle(.primary)
             }
-            Slider(value: $visionMinimumConfidence, in: 0...1, step: 0.05)
-                .accessibilityIdentifier("ap.settings.visionMinimumConfidence")
         }
-        TextEditor(text: $visionCustomVocabulary)
-            .font(.caption)
-            .frame(height: 58)
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
-            .accessibilityIdentifier("ap.settings.visionCustomVocabulary")
-        Text("Custom vocabulary — one word per line or comma-separated.")
-            .font(.caption2).foregroundStyle(.primary)
-        Toggle("Use an LLM for text-only judgement", isOn: $visionUseLLMJudgment)
-            .accessibilityIdentifier("ap.settings.visionUseLLMJudgment")
-        if visionUseLLMJudgment {
-            Picker("Judgement provider", selection: $selectedProvider) {
-                ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { Text($0.rawValue).tag($0) }
-            }
-            .accessibilityIdentifier("ap.settings.visionJudgmentProviderPicker")
-            Picker("Judgement model", selection: Binding(get: { selectedModel }, set: { selectedModel = $0 })) {
-                ForEach(models) { model in
-                    Text(customModelStore.isCustom(model) ? "\(model.displayName) (custom)" : model.displayName).tag(model)
-                }
-            }
-            .accessibilityIdentifier("ap.settings.visionJudgmentModelPicker")
-            if selectedModel.supportsThinking {
-                Picker("Judgement thinking", selection: $selectedThinking) {
-                    ForEach(ThinkingLevel.allCases) { Text($0.rawValue).tag($0) }
-                }
-            }
-            Text("Vision performs every image read locally. Only its extracted text is sent to this LLM for classification, segmentation, dates, and tags. Add this provider's API key in Settings › Accounts.")
-                .font(.caption2).foregroundStyle(.primary)
-        } else {
+        if !visionUseLLMJudgment {
             Text("Transcription-only is fully offline and free. Use No tagging or Copy source file tags in Process Files.")
                 .font(.caption2).foregroundStyle(.primary)
             // W40.fix-processor-settings-backend-mismatch — the line above used to sit beside a Tagging mode that
@@ -360,6 +372,29 @@ struct SettingsReadingPanel: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+    /// Vision's recognition knobs: speed, confidence and vocabulary (Advanced: none is measured on the bench).
+    @ViewBuilder private var visionTuning: some View {
+        Toggle("Fast recognition", isOn: $visionFastRecognition)
+            .accessibilityIdentifier("ap.settings.visionFastRecognition")
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Minimum confidence")
+                Spacer()
+                Text("\(Int((visionMinimumConfidence * 100).rounded()))%")
+                    .foregroundStyle(.primary)
+            }
+            Slider(value: $visionMinimumConfidence, in: 0...1, step: 0.05)
+                .accessibilityIdentifier("ap.settings.visionMinimumConfidence")
+        }
+        TextEditor(text: $visionCustomVocabulary)
+            .font(.caption)
+            .frame(height: 58)
+            .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.3)))
+            .accessibilityIdentifier("ap.settings.visionCustomVocabulary")
+        Text("Custom vocabulary — one word per line or comma-separated.")
+            .font(.caption2).foregroundStyle(.primary)
     }
 
     /// One-click "OpenAI" gateway preset — prefills the public OpenAI endpoint plus a default OpenAI model

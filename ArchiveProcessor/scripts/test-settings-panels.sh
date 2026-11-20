@@ -1,9 +1,12 @@
 #!/bin/bash
-# Key-free ($0) self-test of the Settings window's eight panels (W47.settings-panels): runs SettingsPanelsTestDriver
-# headless, which checks that every setting has exactly one owning panel (`SettingsPanelOwnership`), then holds each
-# panel's source to that table: a stored setting a panel's file writes (a `$binding`, an assignment or a toggle) must be
-# one the table gives that panel, unless the line says `// side effect`. No model call, no network, no Keychain read,
-# no window, never the corpus.
+# Key-free ($0) self-test of the Settings window's eight panels (W47.settings-panels) and its three levels
+# (W47.settings-level-switch): runs SettingsPanelsTestDriver headless, which checks that every setting has exactly one
+# owning panel (`SettingsPanelOwnership`) and one level (`SettingsLevels`), that every route row has a level and that a
+# value changed from its default shows at every level. Then holds each panel's source to the owner table: a stored
+# setting a panel's file writes (a `$binding`, an assignment or a toggle) must be one the table gives that panel, unless
+# the line says `// side effect`; and holds the level table's defaults to every `@AppStorage` declaration of the same
+# key with a literal default, so "changed from its default" means what the app means. No model call, no network, no
+# Keychain read, no window, never the corpus.
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -34,7 +37,7 @@ if [ ! -f "$report" ]; then
     exit 1
 fi
 
-grep -v '^OWNER ' "$report"
+grep -v '^OWNER \|^LEVEL \|^DEFAULT ' "$report"
 grep -q '^ALL PASS$' "$report" || exit 1
 
 # The source check: each file a panel draws, and the panel it belongs to.
@@ -81,4 +84,38 @@ for rel, panel in files.items():
 if bad:
     print('FAIL source: a panel writes a setting it does not own'); print('\n'.join(bad)); sys.exit(1)
 print(f'PASS source: the {checked} stored settings the panels write are each written by their owning panel only')
+
+# The level table's defaults against the app's own declarations (W47.settings-level-switch).
+import glob, json
+table = {}
+for line in open(report):
+    if line.startswith('DEFAULT '):
+        key, value = line[len('DEFAULT '):].rstrip('\n').split('\t', 1)
+        try: table[key] = json.loads(value)
+        except ValueError: sys.exit(f"FAIL levels: unreadable DEFAULT line {line!r}")
+names = {v: k for k, v in defaults.items()}
+wrong, compared = [], 0
+for path in glob.glob(f'{src}/**/*.swift', recursive=True):
+    text = open(path).read()
+    for m in re.finditer(r'@AppStorage\(DefaultsKeys\.(\w+)\)\s+(?:private\s+)?var\s+\w+(?:\s*:\s*[\w.]+)?\s*=\s*([^\n]+)', text):
+        key = defaults.get(m.group(1))
+        expr = m.group(2).strip().split('//')[0].strip()
+        if key not in table:
+            continue
+        if expr in ('true', 'false'):
+            lit = expr == 'true'
+        elif re.fullmatch(r'-?\d+(\.\d+)?', expr):
+            lit = float(expr)
+        elif re.fullmatch(r'"[^"]*"', expr):
+            lit = expr[1:-1]
+        else:
+            continue   # an enum case or a constant: the driver's own checks cover the table's value
+        compared += 1
+        want = table[key]
+        same = (abs(float(want) - lit) < 1e-9) if isinstance(lit, float) and not isinstance(want, (bool, str)) else want == lit
+        if not same:
+            wrong.append(f'{path[len(src)+1:]}: {key} defaults to {expr}, the level table says {want!r}')
+if wrong:
+    print('FAIL levels: a default differs from the level table'); print('\n'.join(wrong)); sys.exit(1)
+print(f'PASS levels: the {compared} literal @AppStorage defaults of levelled settings match the level table')
 PY

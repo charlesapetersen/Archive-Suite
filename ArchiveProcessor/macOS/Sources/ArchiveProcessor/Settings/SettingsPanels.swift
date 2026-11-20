@@ -50,7 +50,7 @@ enum SettingsPanelOwnership {
         var out: [(String, SettingsPanel)] = []
         func add(_ panel: SettingsPanel, _ keys: [String]) { out += keys.map { ($0, panel) } }
 
-        add(.general, [AppAppearance.defaultsKey] + SettingsKey.generalOnly.map(\.rawValue))
+        add(.general, [AppAppearance.defaultsKey, DefaultsKeys.settingsLevel] + SettingsKey.generalOnly.map(\.rawValue))
         // The collection interview's answers; the setup interview's answers to the same questions are the general
         // layer under them, shown in the Collection panel with their source.
         add(.collection, [DefaultsKeys.outputDirectory] + SettingsKey.anyLayer.filter { !sheetSwitches.contains($0) }.map(\.rawValue))

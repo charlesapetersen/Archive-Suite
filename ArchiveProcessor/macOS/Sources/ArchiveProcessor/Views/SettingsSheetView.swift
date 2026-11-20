@@ -372,6 +372,19 @@ struct SheetSwitchRow: View {
 
     var body: some View {
         let sw = row
+        // W47.settings-level-switch: the switch is shown from its key's level up, and below it while it is not its
+        // default (judged on the value the layers resolve, wherever it was set).
+        let builtIn: Bool? = { if case .bool(let b) = sw.key.defaultValue { return b } else { return nil } }()
+        let changed = builtIn.map { $0 != sw.isOn } ?? false
+        if let levelRow = SettingsLevels.rows.first(where: { $0.keys.contains(sw.key.rawValue) }) {
+            SettingsLevelRows(levelRow, changed: changed, reset: builtIn.map { b in { setSwitch(sw.key, b) } }) { toggle(sw) }
+        } else {
+            toggle(sw)
+        }
+        if sw.offersHandDownload { HandPlacerDownloadRow().settingsLevel(.downloads) }
+    }
+
+    private func toggle(_ sw: SettingsSheetModel.SwitchRow) -> some View {
         Toggle(isOn: Binding(get: { sw.isOn }, set: { setSwitch(sw.key, $0) })) {
             VStack(alignment: .leading, spacing: 0) {
                 Text(sw.label)
@@ -383,7 +396,6 @@ struct SheetSwitchRow: View {
             }
         }
         .accessibilityIdentifier("ap.sheet.switch.\(sw.id)")
-        if sw.offersHandDownload { HandPlacerDownloadRow() }
     }
 }
 
@@ -406,8 +418,12 @@ struct RuleStageBox: View {
                         .accessibilityIdentifier("ap.sheet.home.\(stage.id)")
                 }
                 ForEach(stage.switches) { sw in SheetSwitchRow(row: sw, setSwitch: setSwitch) }
-                if stage.id == "layout" { NewspaperLayoutDownloadRow() }
-                if let forms = stage.forms { formsRow(forms) }
+                if stage.id == "layout" { NewspaperLayoutDownloadRow().settingsLevel(.downloads) }
+                if let forms = stage.forms {
+                    SettingsLevelRows(.searchable, changed: forms.all || !forms.others.isEmpty
+                                        || SettingsSheetModel.FormsRow.kinds.contains(where: forms.isOn),
+                                      reset: { setStrings(.searchableFor, []) }) { formsRow(forms) }
+                }
                 SheetDisclosure("The rules in detail") {
                     VStack(alignment: .leading, spacing: 3) {
                         ForEach(stage.rules) { r in
@@ -508,6 +524,10 @@ struct StageCardView: View {
     var seeRange: (() -> Void)? = nil
     /// Where the card's stage is set, in the modal sheet (W47.settings-panels).
     var homeNote: String? = nil
+    /// W47.settings-level-switch: at Basic the card is the app's pick with its figures; choosing another route starts
+    /// at Standard. A card already set by hand keeps its "Back to the app's pick" at every level.
+    @AppStorage(DefaultsKeys.settingsLevel) private var levelRaw = SettingsLevel.defaultLevel.rawValue
+    private var level: SettingsLevel { SettingsLevel(rawValue: levelRaw) ?? .defaultLevel }
 
     var body: some View {
         SheetBox {
@@ -600,7 +620,7 @@ struct StageCardView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.08)))
 
-                if !card.alternatives.isEmpty {
+                if !card.alternatives.isEmpty && level >= SettingsLevels.Row.overrides.level {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Nearest alternatives you could use").font(.caption.weight(.semibold))
                         ForEach(card.alternatives) { a in
@@ -611,14 +631,16 @@ struct StageCardView: View {
                 }
 
                 HStack {
-                    Menu("Use instead…") {
-                        ForEach(card.options) { o in
-                            Button(o.blocked.map { "\(o.name) (\($0))" } ?? o.name) { choose(o.id) }
-                                .disabled(o.blocked != nil || o.id == card.routeID)
+                    if level >= SettingsLevels.Row.overrides.level {
+                        Menu("Use instead…") {
+                            ForEach(card.options.filter { $0.level <= level || $0.id == card.routeID }) { o in
+                                Button(o.blocked.map { "\(o.name) (\($0))" } ?? o.name) { choose(o.id) }
+                                    .disabled(o.blocked != nil || o.id == card.routeID)
+                            }
                         }
+                        .fixedSize()
+                        .accessibilityIdentifier("ap.sheet.override.\(card.id)")
                     }
-                    .fixedSize()
-                    .accessibilityIdentifier("ap.sheet.override.\(card.id)")
                     if let seeRange {
                         Button("See the range") { seeRange() }
                             .buttonStyle(.link)

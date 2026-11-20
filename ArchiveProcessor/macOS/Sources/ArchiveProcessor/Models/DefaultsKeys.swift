@@ -125,6 +125,8 @@ enum DefaultsKeys {
     static let keychainExplained = "keychainExplained"
     /// The general interview (W46.settings-interviews) has been shown once, answered or skipped.
     static let hasSeenGeneralInterview = "hasSeenGeneralInterview"
+    /// W47.settings-level-switch: which rows the Settings window shows (`SettingsLevel`). Absent ⇒ Basic.
+    static let settingsLevel = "settingsLevel"
 
     // Tools
     static let modelTestSelections = "modelTestSelections"
