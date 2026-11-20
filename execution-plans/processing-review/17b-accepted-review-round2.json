@@ -1,75 +1,133 @@
 {
  "opening": "These are the eight items you left with a question on the first accepted-issues sheet. Each now has the answer, found in the code, and a suggestion. Your other answers from that sheet are already filed as work (owner call 21).",
- "labels": {"what": "What it is", "reason": "What we found", "other": "What I suggest"},
+ "labels": {
+  "what": "What it is",
+  "reason": "What we found",
+  "other": "What I suggest"
+ },
  "intro": "Round two of the accepted-issues review, 2026-11-19: the items 17-accepted-review.json left unanswered with a note, each answered by a read-only survey of the code (cited in 'where').",
- "excluded": ["n-ungranted-archive (how Notes stores its material) is queued as the design note W49.notes-store-format, at your note's request, and comes back to you as its own question."],
+ "excluded": [
+  "n-ungranted-archive (how Notes stores its material) is queued as the design note W49.notes-store-format, at your note's request, and comes back to you as its own question."
+ ],
  "entries": [
-  {"id": "p-intel-tools", "app": "Processor", "rec": "change", "seconds": 60,
+  {
+   "id": "p-intel-tools",
+   "app": "Processor",
+   "rec": "change",
+   "seconds": 60,
    "title": "Intel Macs: what works, and whether to build the compression tools for them",
    "what": "You asked whether other parts of the app cannot run on Intel. The app itself is built for both kinds of Mac, and Apple Vision, the PDF library, the rotation model and every cloud route work on Intel.",
    "reason": "Three features cannot run on Intel, because the models behind them need Apple silicon: the handwriting placer, the newspaper layout detector and the local models (the Mac segmenter and the Gemma label reader). The compression tools are Apple-silicon builds only because the release copies them from this Mac's Homebrew, which installs one architecture; an Intel Mac writes uncompressed pages, about 2 MB each. No app code would change: the app already uses the tools whenever they run. An Intel user can also download 287 MB of handwriting support that then reads as not installed.",
    "other": "Build the two compression tools for both kinds of Mac, and hide the Apple-silicon-only downloads on Intel with a line saying why. The tools are packaging work, a few hours: install Intel copies through a second Homebrew run under Rosetta, merge each tool and library with its Apple-silicon twin into one file, and have the release step do that. They can be tested here under Rosetta; nobody can check them on a real Intel Mac.",
    "rec_why": "Compression is the one missing piece an Intel user would hit on every run, and it costs a few hours; the other three are optional extras, and hiding them stops a useless download.",
    "rec_text": "both",
-   "choices": {"change": "Both: build the compression tools for Intel, and hide the downloads that cannot run there",
-               "hide": "Only hide the downloads that cannot run on Intel",
-               "keep": "Neither: leave Intel as it is. This becomes my decision",
-               "later": "Not sure yet: ask me again"},
-   "where": "ArchiveProcessor/KNOWN_ISSUES.md:232; scripts/bundle-compression-tools.py:28,55; VisionOCRKit Runner.swift:60-79; ModelDownloads.swift:52,151; Vendor/pdfium/lib/libpdfium.a is x86_64+arm64"},
-  {"id": "p-flag-unmeasured", "app": "Processor", "rec": "change", "seconds": 60,
+   "choices": {
+    "change": "Both: build the compression tools for Intel, and hide the downloads that cannot run there",
+    "hide": "Only hide the downloads that cannot run on Intel",
+    "keep": "Neither: leave Intel as it is. This becomes my decision",
+    "later": "Not sure yet: ask me again"
+   },
+   "where": "ArchiveProcessor/KNOWN_ISSUES.md:232; scripts/bundle-compression-tools.py:28,55; VisionOCRKit Runner.swift:60-79; ModelDownloads.swift:52,151; Vendor/pdfium/lib/libpdfium.a is x86_64+arm64"
+  },
+  {
+   "id": "p-flag-unmeasured",
+   "app": "Processor",
+   "rec": "change",
+   "seconds": 60,
    "title": "The \"may be read poorly\" flag: which pages it skips, and why",
    "what": "After a reader finishes a page, Apple Vision reads it too, and the page is flagged when the two disagree by more than that reader's measured cut.",
    "reason": "You were right that the reasons were confused. Only two skips are real: readers the bench never measured have no cut, and a page Vision could not read has nothing to compare. The rest are wiring. Batch pages are pages sent through the providers' half-price overnight services; the model is the same, but the results come back by a path that never runs the check. Imported pages come from a cluster run of a model the bench has a cut for. A page another reader read should use that reader's cut. A turned page fails only because the check's Vision reads it still sideways. Newspapers read in regions are the hard case: their text comes out column by column, so comparing it with Vision's whole-page reading would raise false alarms until they get a fit of their own.",
    "other": "Fix the four wiring cases (each small), and queue the newspaper case as a measurement.",
    "rec_why": "The flag then covers almost every page a user reads, and the one case that needs new figures gets them.",
-   "choices": {"change": "Fix the four wiring cases, and queue the newspaper measurement",
-               "keep": "Leave the flag as it is. This becomes my decision",
-               "later": "Not sure yet: ask me again"},
-   "where": "ArchiveProcessor/KNOWN_ISSUES.md:14; OCR/ReadQualityDisagreement.swift:121-138; OCRProcessor+OCR.swift ~824-836, ~1890-1900; BatchOCR.swift; segbench-results/post-read-flag.md:94-115"},
-  {"id": "p-preocr-labels", "app": "Processor", "rec": "change", "seconds": 40,
+   "choices": {
+    "change": "Fix the four wiring cases, and queue the newspaper measurement",
+    "keep": "Leave the flag as it is. This becomes my decision",
+    "later": "Not sure yet: ask me again"
+   },
+   "where": "ArchiveProcessor/KNOWN_ISSUES.md:14; OCR/ReadQualityDisagreement.swift:121-138; OCRProcessor+OCR.swift ~824-836, ~1890-1900; BatchOCR.swift; segbench-results/post-read-flag.md:94-115"
+  },
+  {
+   "id": "p-preocr-labels",
+   "app": "Processor",
+   "rec": "later",
+   "seconds": 40,
    "title": "Re-tagging PDFs you already have does not read box and folder labels",
    "what": "This route takes PDFs that already have text, such as an earlier run's output, and tags and groups them without reading them again. \"Its outputs are its inputs\" meant it makes no new files: it tags your existing ones.",
    "reason": "It skips label photos because a label's reading is written as a small file next to the PDF, and the rule is never to drop new files into your original folders. A label page in a PDF also has to be turned back into an image before it can be read.",
    "other": "Read the label pages, and write their record only once grouping has moved the file into the run's output folder, so the rule about your original folders still holds.",
-   "rec_why": "Re-tagging then gets the same box and folder information an ordinary run does.",
-   "where": "ArchiveProcessor/KNOWN_ISSUES.md:75; OCR/OCRProcessor+Containers.swift:4-35,64; performPreOCRedProcessing (outputURLMap[url] = url)"},
-  {"id": "p-openrouter-rotation", "app": "Processor", "rec": "change", "seconds": 30,
+   "rec_why": "Re-tagging PDFs you already have mostly serves your own existing corpus. You asked (2026-11-19) for code that exists only for your corpus to be looked at as one migration rather than built into the app, so this waits on that audit (W49.corpus-specific-audit), which comes back to you with what belongs where.",
+   "where": "ArchiveProcessor/KNOWN_ISSUES.md:75; OCR/OCRProcessor+Containers.swift:4-35,64; performPreOCRedProcessing (outputURLMap[url] = url)",
+   "rec_text": "wait for the corpus audit",
+   "choices": {
+    "later": "Wait for the corpus audit, then ask me again",
+    "change": "Build it now anyway",
+    "keep": "Leave re-tagging without labels. This becomes my decision"
+   }
+  },
+  {
+   "id": "p-openrouter-rotation",
+   "app": "Processor",
+   "rec": "change",
+   "seconds": 30,
    "title": "Asking a model which way up a page is, through OpenRouter",
    "what": "Rotation runs on the Mac first: Apple Vision and a small bundled model each judge which way is up. Only when they disagree is a model asked. That works through a Gemini, Anthropic or OpenAI key and through the gateway; only the gateway route has been measured.",
    "reason": "OpenRouter was left out with the reason \"no batch interface\", which has nothing to do with rotation. OpenRouter takes the same kind of request as the gateway, so it can reach the same measured Gemini model.",
    "other": "Add OpenRouter as a rotation route using the measured model, with its calls counted in the cost estimate.",
    "rec_why": "A user whose only key is OpenRouter then gets the same rotation check as everyone else. It is a small change.",
-   "where": "ArchiveProcessor/KNOWN_ISSUES.md:33; OCR/LLMRotationDetector.swift:14-50,117-121,192-202"},
-  {"id": "r-crash-undo", "app": "Reader", "rec": "change", "seconds": 50,
+   "where": "ArchiveProcessor/KNOWN_ISSUES.md:33; OCR/LLMRotationDetector.swift:14-50,117-121,192-202"
+  },
+  {
+   "id": "r-crash-undo",
+   "app": "Reader",
+   "rec": "change",
+   "seconds": 50,
    "title": "Undo history after the app crashes in the middle of an action",
    "what": "Every tag change is logged before and after it is written. If the app crashes mid-action, the log cannot tell whether every change of that action was recorded, so it hides that action and everything before it.",
    "reason": "Offering older undo would not damage files: undo re-reads each file and only steps a tag back towards where it was. The risk is quieter: undoing an older action on a file the crashed action had also changed could remove a tag that action had set without a record, which then could not itself be undone. The result would be unexpected tags, not damaged files.",
    "other": "Have each action record, before it writes, which files it will touch. After a crash the app can see whether the action actually finished; if it did not, older undo stays available for every file the crashed action did not touch.",
    "rec_why": "You keep nearly all of your undo history after a crash, and the one risky case stays closed. It is a medium-sized change.",
-   "where": "ArchiveReader/KNOWN_ISSUES.md:1275; Core/AuditLedger.swift:27-35,223-245,359-366; TagWriter.swift:90"},
-  {"id": "r-menu-limits", "app": "Reader", "rec": "change", "seconds": 45,
+   "where": "ArchiveReader/KNOWN_ISSUES.md:1275; Core/AuditLedger.swift:27-35,223-245,359-366; TagWriter.swift:90"
+  },
+  {
+   "id": "r-menu-limits",
+   "app": "Reader",
+   "rec": "change",
+   "seconds": 45,
    "title": "\"Nested\" folder maps, and the 100-value Containers menu",
    "what": "You asked what nested folders are. They are folders on disk, not an archival idea. The Reader reads the archive's folder tree as collection, box and folder from a small settings file at the tree's top. A second such file can sit in a subfolder, mostly when a Processor output folder ends up inside a Reader archive. That is uncommon but real, and the sheet cannot edit it.",
    "reason": "The 100 limit is worse than written. The Containers menu shows each facet's 100 most common values across the whole library and is not narrowed by what you have already chosen, though the code says it is. A collection with 300 boxes leaves 200 of them out of reach of the menu.",
    "other": "Replace the menu with a searchable list over every value, narrowed by the facets already chosen, and let the sheet edit whichever settings file governs the folder you have selected.",
    "rec_why": "No value is out of reach at any size, which is what you asked for.",
-   "where": "ArchiveReader/KNOWN_ISSUES.md:87-92; SPEC/containers.md:211-241; Views/NavigationWindowView.swift:608-629; AdvancedSearchSheet.swift:335; Core/ContainerCatalog.swift:217-232"},
-  {"id": "n-paste-race", "app": "Notes", "rec": "change", "seconds": 25,
+   "where": "ArchiveReader/KNOWN_ISSUES.md:87-92; SPEC/containers.md:211-241; Views/NavigationWindowView.swift:608-629; AdvancedSearchSheet.swift:335; Core/ContainerCatalog.swift:217-232"
+  },
+  {
+   "id": "n-paste-race",
+   "app": "Notes",
+   "rec": "change",
+   "seconds": 25,
    "title": "Two windows pasting an image into the same note",
    "what": "You asked what \"the same second\" means. It is literal: a pasted image is named by the second it was pasted, for example pasted-20261119-213200.png.",
    "reason": "A clash needs one note open in two windows, a paste in each within the same clock second, and the second paste landing before the first image has been written, which takes milliseconds. Nothing is overwritten; the second image shows a placeholder.",
    "other": "Add milliseconds or a short random part to the name. It is a tiny change.",
    "rec_why": "It removes the case entirely for almost no cost.",
-   "where": "ArchiveNotes/KNOWN_ISSUES.md:1900; Editor/EditorTextView.swift:1090-1091,1184-1187; InlineImageAttachment.swift:352,424-439"},
-  {"id": "n-assets-boundary", "app": "Notes", "rec": "change", "seconds": 40,
+   "where": "ArchiveNotes/KNOWN_ISSUES.md:1900; Editor/EditorTextView.swift:1090-1091,1184-1187; InlineImageAttachment.swift:352,424-439"
+  },
+  {
+   "id": "n-assets-boundary",
+   "app": "Notes",
+   "rec": "change",
+   "seconds": 40,
    "title": "Images a note names outside its assets folder",
    "what": "You asked what \"written in by hand\" means. Pasting or dropping an image already copies it into the note's assets folder. The case here is a note whose text names an image somewhere else: typed in the raw Markdown view, edited in another app, copied in from elsewhere, or brought in by an import such as DEVONthink.",
    "reason": "Such images show as Blocked on purpose, because a path could point into another note or outside the notes store.",
    "other": "When a blocked image sits inside the note's own folder, offer a button that copies it into assets and fixes the reference (small). An image elsewhere on the Mac needs you to pick the file because of the Mac's sandbox, so that part waits for the import work.",
    "rec_why": "It matches what you described: images end up copied into the assets folder.",
-   "choices": {"change": "Add the copy-into-assets button now; images elsewhere wait for the import work",
-               "keep": "Leave them blocked. This becomes my decision",
-               "later": "Not sure yet: ask me again"},
-   "where": "ArchiveNotes/KNOWN_ISSUES.md:1328-1355; InlineImageAttachment.swift:373-395; Store/NoteStore.swift:688"}
+   "choices": {
+    "change": "Add the copy-into-assets button now; images elsewhere wait for the import work",
+    "keep": "Leave them blocked. This becomes my decision",
+    "later": "Not sure yet: ask me again"
+   },
+   "where": "ArchiveNotes/KNOWN_ISSUES.md:1328-1355; InlineImageAttachment.swift:373-395; Store/NoteStore.swift:688"
+  }
  ]
 }
