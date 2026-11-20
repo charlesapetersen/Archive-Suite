@@ -34,6 +34,8 @@ suite therefore routes through the projector against **scratch copies only**.
    arguments on (`StoreFolderChooser.relaunchApp`), so the relaunched app opens the same scratch stores.
    Likewise the note a window had open is remembered only under `-ANUITestLastOpenSuite <suite>`
    (`ReopenLastNoteUITests`); any other UITest launch neither reads nor writes it (W40.fix-notes-small-wins).
+   The window size is saved under the harness only with `-ANUITestPersistWindowSize YES`
+   (`NotesWindowSizeQuitUITests`, W49.notes-suspects-small); it writes the app's own size keys, so only in the VM.
 4. **The harness only READS tags to assert.** `gui-drive-notes.sh` uses `tag -l` (read) to verify a
    write landed; it never writes tags itself — writes go through the app's projector.
 
