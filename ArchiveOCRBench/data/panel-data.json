@@ -4,8 +4,8 @@
    "id": "claude-sonnet5.5",
    "name": "Claude Sonnet 5.5",
    "panel": "cloud",
-   "std": 11.5,
-   "batch": 5.75
+   "std": 17.79,
+   "batch": 8.9
   },
   {
    "id": "gemini3.1-pro",
@@ -4979,7 +4979,7 @@
    {
     "id": "claude-sonnet5.5",
     "name": "Claude Sonnet 5.5",
-    "price": 11.5,
+    "price": 17.79,
     "app": true,
     "strict": 96.47,
     "answered": 96,
@@ -7815,7 +7815,7 @@
      "trigger": "disagree@0.90",
      "nes": 96.44,
      "family": "disagree",
-     "usd": 4.48,
+     "usd": 6.38,
      "escalated": 29,
      "failed": 0
     },
@@ -7828,7 +7828,7 @@
      "trigger": "disagree@0.95",
      "nes": 96.54,
      "family": "disagree",
-     "usd": 5.64,
+     "usd": 8.07,
      "escalated": 37,
      "failed": 0
     },
@@ -7928,7 +7928,7 @@
      "trigger": "single",
      "nes": 96.47,
      "family": "single",
-     "usd": 11.5,
+     "usd": 17.79,
      "escalated": 0,
      "failed": 0
     }
@@ -8146,7 +8146,7 @@
         "failed": 0
        },
        "split_in": 95.09,
-       "split_out": 94.04
+       "split_out": 94.07
       },
       "fail+kind": {
        "best": {
@@ -8336,7 +8336,7 @@
         "trigger": "fail+kind",
         "nes": 95.5,
         "family": "fail+kind",
-        "usd": 3.36,
+        "usd": 4.86,
         "escalated": 23,
         "failed": 0
        },
@@ -8362,20 +8362,20 @@
       },
       "disagree": {
        "best": {
-        "label": "Qwen3.6 35B-A3B, checked against Gemma 4 26B-A4B at 0.90 \u2192 Claude Sonnet 5.5",
+        "label": "Qwen3.8 Flash, checked against Mistral Small 24B at 0.85 \u2192 Claude Sonnet 5.5",
         "stages": [
-         "qwen3.6-35b-a3b",
+         "qwen3.8-flash",
          "claude-sonnet5.5"
         ],
-        "trigger": "disagree@0.90",
-        "nes": 96.44,
+        "trigger": "disagree@0.85",
+        "nes": 96.19,
         "family": "disagree",
-        "usd": 4.48,
-        "escalated": 29,
+        "usd": 4.63,
+        "escalated": 20,
         "failed": 0
        },
-       "split_in": 96.84,
-       "split_out": 94.55
+       "split_in": 96.74,
+       "split_out": 94.15
       }
      }
     },
@@ -8391,7 +8391,7 @@
         "trigger": "single",
         "nes": 96.47,
         "family": "single",
-        "usd": 11.5,
+        "usd": 17.79,
         "escalated": 0,
         "failed": 0
        },
@@ -8459,7 +8459,7 @@
         "trigger": "disagree@0.95",
         "nes": 96.54,
         "family": "disagree",
-        "usd": 5.64,
+        "usd": 8.07,
         "escalated": 37,
         "failed": 0
        },
@@ -8539,7 +8539,7 @@
       "trigger": "single",
       "nes": 96.47,
       "family": "single",
-      "usd": 11.5,
+      "usd": 17.79,
       "escalated": 0,
       "failed": 0
      }
@@ -8805,7 +8805,7 @@
       "trigger": "fail",
       "nes": 96.47,
       "family": "fail",
-      "usd": 11.5,
+      "usd": 17.79,
       "escalated": 0,
       "failed": 0
      },
@@ -8976,7 +8976,7 @@
       "trigger": "fail+kind",
       "nes": 95.5,
       "family": "fail+kind",
-      "usd": 3.36,
+      "usd": 4.86,
       "escalated": 23,
       "failed": 0
      },
@@ -9331,21 +9331,21 @@
       "trigger": "disagree@0.85",
       "nes": 96.19,
       "family": "disagree",
-      "usd": 3.32,
+      "usd": 4.63,
       "escalated": 20,
       "failed": 0
      },
      {
-      "label": "Qwen3.5-9B 4-bit (Mac), checked against Gemma 4 31B at 0.90 \u2192 Claude Sonnet 5.5",
+      "label": "Qwen3.5-9B 4-bit (Mac), checked against Qwen3.8 Flash at 0.90 \u2192 Gemini 3.1 Pro",
       "stages": [
        "qwen3.5-9b-mlx4",
-       "claude-sonnet5.5"
+       "gemini3.1-pro"
       ],
       "trigger": "disagree@0.90",
-      "nes": 96.22,
+      "nes": 96.19,
       "family": "disagree",
-      "usd": 3.73,
-      "escalated": 28,
+      "usd": 5.12,
+      "escalated": 21,
       "failed": 0
      },
      {
@@ -9357,7 +9357,7 @@
       "trigger": "disagree@0.90",
       "nes": 96.35,
       "family": "disagree",
-      "usd": 3.91,
+      "usd": 5.55,
       "escalated": 25,
       "failed": 0
      },
@@ -9370,7 +9370,7 @@
       "trigger": "disagree@0.90",
       "nes": 96.44,
       "family": "disagree",
-      "usd": 4.48,
+      "usd": 6.38,
       "escalated": 29,
       "failed": 0
      },
@@ -9383,7 +9383,7 @@
       "trigger": "disagree@0.95",
       "nes": 96.54,
       "family": "disagree",
-      "usd": 5.64,
+      "usd": 8.07,
       "escalated": 37,
       "failed": 0
      }

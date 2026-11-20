@@ -137,7 +137,7 @@ the builder rejects stale provenance. Sasha's held-out comparison is unchanged.
 | Path | What it is |
 |---|---|
 | `build.py` | Builds the two outputs below from the panel's committed results. `--check` fails if they are stale. |
-| `data/inputs.json` | The figures the panel reports do not hold, each with its source: route display names, the estimated API price for Claude Sonnet 5.5, which routes have a batch price, and the names and machines of the routes on our own hardware (`own_hardware`). |
+| `data/inputs.json` | The figures the panel reports do not hold, each with its source: route display names, the API price for Claude Sonnet 5.5 (input tokens counted, output from the subscription run), which routes have a batch price, and the names and machines of the routes on our own hardware (`own_hardware`). |
 | `data/vision-ocr-handwriting.json` | The Vision OCR lab's handwriting figures, entered by hand from its repository with the file and commit they came from. |
 | `difficulty.py` | Part 5's analysis, called by `build.py`: rankings, difficulty, cascades, flags. Standard library only; `test_difficulty.py` checks its statistics. |
 | `difficulty.md` | Built. Part 5 as a readable report, every table included. |
@@ -311,7 +311,8 @@ Python standard library.
   charts, part 4's Qwen tables and the 2,000-page pilot, the segmentation teacher and the dating runs. Models that
   fit on the Mac (CHURRO-3B, GLM-OCR, the 2B and 4B fine-tunes) stay free, except a FarmShare run of one OpenRouter
   sells (Qwen3-VL 8B, at $0.25/$0.75 read 2026-10-21), which the completeness rule below prices at that rate. Claude Sonnet 5.5 ran on the subscription, so its
-  price is an estimate (`data/inputs.json` → `sonnet_api_estimate`).
+  price uses input tokens counted by Anthropic's free count_tokens call and the subscription run's output tokens
+  (`data/inputs.json` → `sonnet_api_price`).
 - **Batch points** sit at half the measured cost, for routes whose batch price is half their standard price.
   A dotted line joins the two points.
 - **The best-value line** links the points that no other point beats on both price and score. It is worked out

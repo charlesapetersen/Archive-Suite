@@ -1477,9 +1477,9 @@ def main():
         std[rid] = dollars_per_1000(cells[-1])
         panel[rid] = "local"
 
-    est = inputs["sonnet_api_estimate"]
-    std[est["route"]] = (((est["image_tokens_standard"] + est["prompt_tokens"]) * est["input_usd_per_mtok"]
-                               + est["output_tokens"] * est["output_usd_per_mtok"]) / 1e6 * 1000)
+    sp = inputs["sonnet_api_price"]  # input tokens counted by count_tokens; output tokens the claude -p mean
+    std[sp["route"]] = ((sp["input_tokens"] * sp["input_usd_per_mtok"]
+                         + sp["output_tokens"] * sp["output_usd_per_mtok"]) / 1e6 * 1000)
 
     missing = sorted(set(names) ^ set(overall))
     if missing:

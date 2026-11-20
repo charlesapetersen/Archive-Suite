@@ -11,7 +11,7 @@ The owner's framing (2026-10-15): what matters most is that the text that comes 
 | route | $ / 1,000 | answered | NES on answered | NES at average difficulty | page mix | poor readings | failed | failed pages that are hard | strict NES (bench) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | Gemini 3.1 Pro | $21.92 | 94 | 96.84 | 96.82 | +0.14 | 10 | 2 | 1 | 94.82 |
-| Claude Sonnet 5.5 | $11.50 | 96 | 96.47 | 96.59 | +0.00 | 8 | 0 | – | 96.47 |
+| Claude Sonnet 5.5 | $17.79 | 96 | 96.47 | 96.59 | +0.00 | 8 | 0 | – | 96.47 |
 | Gemini 3.8 Flash | $3.22 | 94 | 96.44 | 96.42 | +0.14 | 6 | 2 | 1 | 94.43 |
 | Qwen3.5 27B | $1.80 | 82 | 95.80 | 95.10 | +0.82 | 10 | 14 | 6 | 81.83 |
 | Gemini 3.5 Flash | $6.23 | 94 | 95.44 | 95.42 | +0.14 | 8 | 2 | 1 | 93.45 |
@@ -143,7 +143,7 @@ Choosing the best of thousands of candidates on 96 pages flatters the choice. So
 | 0.5 | on failure, Vision's handwriting pages sent straight on | Qwen3-VL 8B 4-bit (Mac) → Qwen3.6 27B (Vision's handwriting pages straight to Qwen3.6 27B) | 93.98 | $0.32 | 18 | 94.46 → 92.70 |
 | 0.5 | on failure or two cheap readers disagreeing | LightOnOCR-3-4B 8-bit (Mac), checked against Qwen3.5 9B at 0.90 → Qwen3.8 Flash | 95.01 | $0.44 | 32 | 95.61 → 92.59 |
 | 1 | one route | Qwen3.6 35B-A3B | 93.02 | $0.60 | – | 93.56 → 91.26 |
-| 1 | escalate on failure | Qwen3.8 Flash → Gemini 3.1 Flash Lite | 95.04 | $0.64 | 3 | 95.09 → 94.04 |
+| 1 | escalate on failure | Qwen3.8 Flash → Gemini 3.1 Flash Lite | 95.04 | $0.64 | 3 | 95.09 → 94.07 |
 | 1 | on failure or a handwritten/mixed label | Qwen3.8 Flash → Gemini 3.5 Flash Lite (and its handwritten or mixed pages) | 95.05 | $0.86 | 23 | 95.42 → 93.52 |
 | 1 | on failure, Vision's handwriting pages sent straight on | Qwen3.8 Flash → Qwen3.6 27B (Vision's handwriting pages straight to Qwen3.6 27B) | 95.29 | $0.83 | 18 | 95.44 → 94.02 |
 | 1 | on failure or two cheap readers disagreeing | Qwen3.6 35B-A3B, checked against Qwen3.5 9B at 0.90 → Qwen3.8 Flash | 95.46 | $0.95 | 16 | 96.19 → 93.41 |
@@ -154,20 +154,20 @@ Choosing the best of thousands of candidates on 96 pages flatters the choice. So
 | 2 | on failure or two cheap readers disagreeing | Qwen3.8 Flash, checked against Qwen3.5 9B at 0.85 → Gemini 3.8 Flash | 96.13 | $1.39 | 16 | 96.63 → 94.10 |
 | 5 | one route | Gemini 3.8 Flash | 94.43 | $3.22 | – | 95.35 → 92.82 |
 | 5 | escalate on failure | Gemini 3.8 Flash → Qwen3.5 35B-A3B | 96.36 | $3.24 | 2 | 96.56 → 94.84 |
-| 5 | on failure or a handwritten/mixed label | Qwen3.8 Flash → Claude Sonnet 5.5 (and its handwritten or mixed pages) | 95.50 | $3.36 | 23 | 95.90 → 94.01 |
+| 5 | on failure or a handwritten/mixed label | Qwen3.8 Flash → Claude Sonnet 5.5 (and its handwritten or mixed pages) | 95.50 | $4.86 | 23 | 95.90 → 94.01 |
 | 5 | on failure, Vision's handwriting pages sent straight on | Qwen3.8 Flash → Gemini 3.8 Flash (Vision's handwriting pages straight to Gemini 3.8 Flash) | 95.81 | $1.25 | 18 | 95.85 → 94.97 |
-| 5 | on failure or two cheap readers disagreeing | Qwen3.6 35B-A3B, checked against Gemma 4 26B-A4B at 0.90 → Claude Sonnet 5.5 | 96.44 | $4.48 | 29 | 96.84 → 94.55 |
-| 25 | one route | Claude Sonnet 5.5 | 96.47 | $11.50 | – | 96.55 → 95.55 |
+| 5 | on failure or two cheap readers disagreeing | Qwen3.8 Flash, checked against Mistral Small 24B at 0.85 → Claude Sonnet 5.5 | 96.19 | $4.63 | 20 | 96.74 → 94.15 |
+| 25 | one route | Claude Sonnet 5.5 | 96.47 | $17.79 | – | 96.55 → 95.55 |
 | 25 | escalate on failure | Gemini 3.1 Pro → Qwen3.5 35B-A3B | 96.75 | $21.94 | 2 | 96.96 → 95.25 |
 | 25 | on failure or a handwritten/mixed label | Qwen3.8 Flash → Gemini 3.1 Pro (and its handwritten or mixed pages) | 95.71 | $5.33 | 23 | 95.97 → 94.25 |
 | 25 | on failure, Vision's handwriting pages sent straight on | Qwen3.8 Flash → Gemini 3.8 Flash (Vision's handwriting pages straight to Gemini 3.8 Flash) | 95.81 | $1.25 | 18 | 95.85 → 94.97 |
-| 25 | on failure or two cheap readers disagreeing | Qwen3.5 35B-A3B, checked against Gemma 4 31B at 0.95 → Claude Sonnet 5.5 | 96.54 | $5.64 | 37 | 96.89 → 94.75 |
+| 25 | on failure or two cheap readers disagreeing | Qwen3.5 35B-A3B, checked against Gemma 4 31B at 0.95 → Claude Sonnet 5.5 | 96.54 | $8.07 | 37 | 96.89 → 94.75 |
 
 What holds up on pages the choice did not see:
 
 - **Escalating on failure is the robust gain.** At every budget up to $5 per 1,000 pages, a cascade that sends failures on, chosen on half the pages, beat one route chosen the same way by 0.8 to 2.8 NES points on the other half. Much of that is simply the failed pages coming back: a failure scores 0, and a cascade turns it into a second reading.
-- **The disagreement check** finds answered-but-wrong pages (part 5) and tops most budgets on all pages, but it is the most flattered family. On unseen pages it is +0.45 at $0.5, -0.63 at $1, +0.41 at $2, -0.29 at $5 against escalation on failure alone.
-- **A hard-kind label** (the reader's own handwritten or mixed label) is +0.61 at $0.5, -0.52 at $1, +0.14 at $2, -0.83 at $5 against failure alone on unseen pages: no reliable gain. The labels are weak (part 5).
+- **The disagreement check** finds answered-but-wrong pages (part 5) and tops most budgets on all pages, but it is the most flattered family. On unseen pages it is +0.45 at $0.5, -0.66 at $1, +0.41 at $2, -0.69 at $5 against escalation on failure alone.
+- **A hard-kind label** (the reader's own handwritten or mixed label) is +0.61 at $0.5, -0.55 at $1, +0.14 at $2, -0.83 at $5 against failure alone on unseen pages: no reliable gain. The labels are weak (part 5).
 - **At the top, one strong reader still wins**: at $25 the single-route choice gives 95.55 on unseen pages, the best cascade family 95.25.
 
 ### The frontier on all pages
@@ -193,8 +193,8 @@ What holds up on pages the choice did not see:
 | Qwen3.8 Flash, checked against Qwen3.5 9B at 0.85 → Gemini 3.8 Flash | 96.13 | $1.39 | 16 | 0 |
 | Gemini 3.8 Flash → Qwen3.5-9B 4-bit (Mac) | 96.35 | $3.22 | 2 | 0 |
 | Gemini 3.8 Flash → Qwen3.5 35B-A3B | 96.36 | $3.24 | 2 | 0 |
-| Qwen3.6 35B-A3B, checked against Gemma 4 26B-A4B at 0.90 → Claude Sonnet 5.5 | 96.44 | $4.48 | 29 | 0 |
-| Qwen3.5 35B-A3B, checked against Gemma 4 31B at 0.95 → Claude Sonnet 5.5 | 96.54 | $5.64 | 37 | 0 |
+| Qwen3.6 35B-A3B, checked against Gemma 4 26B-A4B at 0.90 → Claude Sonnet 5.5 | 96.44 | $6.38 | 29 | 0 |
+| Qwen3.5 35B-A3B, checked against Gemma 4 31B at 0.95 → Claude Sonnet 5.5 | 96.54 | $8.07 | 37 | 0 |
 | Gemini 3.1 Pro → Qwen3.5-9B 4-bit (Mac) | 96.74 | $21.92 | 2 | 0 |
 | Gemini 3.1 Pro → Qwen3.5 35B-A3B | 96.75 | $21.94 | 2 | 0 |
 
@@ -248,7 +248,7 @@ It calls 15 pages handwriting, 14 of them handwritten in the truth (1 mixed), an
 
 **As a flag for a poor reading** (part 5), Vision's handwriting call has AUC 0.51 to 0.70 across the cheap readers, against 0.57 to 0.70 for the readers' own labels. Poor readings are spread over typed and printed pages too, so no kind label can find most of them.
 
-**As a routing rule** (part 4's cascades, with a fifth family): the pages Vision calls handwriting go straight to the second route, unread and unpaid by the first, and the first route's failures follow them. Chosen on half the pages and scored on the other half, against escalation on failure alone: +0.56 at $0.5, -0.02 at $1, +1.36 at $2, +0.13 at $5 NES. The best such cascade on all pages at $1 per 1,000: Qwen3.8 Flash → Qwen3.6 27B (Vision's handwriting pages straight to Qwen3.6 27B), 95.29 NES for $0.83.
+**As a routing rule** (part 4's cascades, with a fifth family): the pages Vision calls handwriting go straight to the second route, unread and unpaid by the first, and the first route's failures follow them. Chosen on half the pages and scored on the other half, against escalation on failure alone: +0.56 at $0.5, -0.05 at $1, +1.36 at $2, +0.13 at $5 NES. The best such cascade on all pages at $1 per 1,000: Qwen3.8 Flash → Qwen3.6 27B (Vision's handwriting pages straight to Qwen3.6 27B), 95.29 NES for $0.83.
 
 ### On the real corpus
 

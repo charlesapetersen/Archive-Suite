@@ -30,14 +30,12 @@
     "qwen3.5-27b": {"name": "Qwen3.5 27B"},
     "apple-vision": {"name": "Apple Vision"}
   },
-  "sonnet_api_estimate": {
+  "sonnet_api_price": {
     "route": "claude-sonnet5.5",
-    "source": "The panel ran Sonnet through the subscription (claude -p), so it has no measured price. Estimate: (image tokens + prompt tokens) x $2/M input + output tokens x $10/M output, at the Claude API list price for claude-sonnet-5-5 (claude-api skill, cached 2026-10-06). Image tokens = w x h / 750 over the 99 panel images (long side 999-2400 px): mean 1,522 if the API downsizes to 1568 px / 1.15 MP, 4,505 at 2576 px / 3.75 MP. Prompt about 150 tokens (the Gemini and Qwen routes report 1,337-1,404 input tokens including the image). Output 816 tokens a page, the claude -p mean in ocr-panel-cloud.md, which may include some harness overhead. Not measured: token counting needs an API key this Mac does not have.",
+    "source": "The panel ran Sonnet through the subscription (claude -p), so it has no billed price. Input tokens are measured: Anthropic's free count_tokens call for claude-sonnet-5-5 on the 99 panel images (the panel's JPEGs, 2,400 px cap, each sent as a base64 image block followed by the panel prompt), counted 2026-11-19 by ArchiveProcessor/scripts/segbench/sonnet_count_tokens.py; per-page counts in ArchiveProcessor/segbench-results/ocr-panel-sonnet-tokens.json. Mean 4,815 input tokens a page (median 5,273, range 1,505-5,312; the prompt alone is 530). Output tokens are not measured, since count_tokens cannot count them: 816 a page is the claude -p mean in ocr-panel-cloud.md, which may include some harness overhead. Price per token is the Claude API list price for claude-sonnet-5-5, $2/M input and $10/M output (claude-api skill, cached 2026-10-06).",
     "input_usd_per_mtok": 2.0,
     "output_usd_per_mtok": 10.0,
-    "image_tokens_standard": 1522,
-    "image_tokens_high_res": 4505,
-    "prompt_tokens": 150,
+    "input_tokens": 4815.1,
     "output_tokens": 816
   },
   "batch": {

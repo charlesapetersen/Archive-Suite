@@ -5,8 +5,6 @@ part 5 of the page (`W41.bench-difficulty`); a model-independent page kind for i
 `W41.bench-vision-kind`. New measured results are not on this list: the standing rule
 in the root `CLAUDE.md` (owner, 2026-10-15) adds those as they land. That includes the FarmShare run (priced from
 its measured pages per hour per GPU) and the Mac-local 4-bit run.
-- **Measure Sonnet's API price.** Replace the estimate in `data/inputs.json` with a token count from the API's
-  free `count_tokens` call on the 99 panel images, or a small paid run.
 - **Price each page kind on its own.** The local CSV already carries a cost per group; the cloud CSV would need
   the same, so a kind chart could use that kind's real price.
 - **More kinds and tags.** Clippings, tables and table forms are in the groups CSVs already. Mixed pages (2) are

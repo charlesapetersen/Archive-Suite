@@ -537,7 +537,7 @@ footer p { font-size: 13px; }
   </section>
 
   <footer>
-    <p><strong>OCR costs.</strong> Measured charges for the panel's pinned OpenRouter endpoint (Mistral's published rate for Mistral OCR), as dollars per 1,000 pages, averaged over all 96 pages; the same route cost is used on every chart, so the kind charts compare accuracy at a route's average price. Apple Vision runs on the device and costs nothing, and so do the three models read on our Mac (an M3 Pro with 18 GB): Qwen3-VL 8B (about 41 seconds a page), LightOnOCR-3-4B (about 24) and Qwen3.5-9B (about 38). Qwen3.6 27B ran on FarmShare, which bills nothing, but it does not fit on the Mac, so it is priced at OpenRouter's list rate for the same model ($0.25 and $2 per million input and output tokens, read 2026-10-20) applied to its own measured tokens; its GPU time is in the tables as GPU-hours per 100,000 photos. Claude Sonnet 5.5 ran through the subscription; its price is an estimate from its token counts at $2 and $10 per million input and output tokens, using the standard image size, and was not measured.</p>
+    <p><strong>OCR costs.</strong> Measured charges for the panel's pinned OpenRouter endpoint (Mistral's published rate for Mistral OCR), as dollars per 1,000 pages, averaged over all 96 pages; the same route cost is used on every chart, so the kind charts compare accuracy at a route's average price. Apple Vision runs on the device and costs nothing, and so do the three models read on our Mac (an M3 Pro with 18 GB): Qwen3-VL 8B (about 41 seconds a page), LightOnOCR-3-4B (about 24) and Qwen3.5-9B (about 38). Qwen3.6 27B ran on FarmShare, which bills nothing, but it does not fit on the Mac, so it is priced at OpenRouter's list rate for the same model ($0.25 and $2 per million input and output tokens, read 2026-10-20) applied to its own measured tokens; its GPU time is in the tables as GPU-hours per 100,000 photos. Claude Sonnet 5.5 ran through the subscription, so it was not billed; its price is its input tokens as counted by Anthropic's free count_tokens call on the same images (4,815 a page on average) and the subscription run's output tokens (816 a page), at $2 and $10 per million input and output tokens.</p>
     <p id="vision-os" hidden><strong>Apple Vision's OS.</strong> <span id="vision-os-text"></span></p>
     <p id="vision-fail" hidden><strong>Apple Vision's failure rate.</strong> <span id="vision-fail-text"></span></p>
     <p><strong>Batch prices.</strong> Half the measured cost, where OpenRouter lists a batch version of the model at half its standard price (Gemini 3.8 Flash's batch price is half of what the run paid). Mistral OCR's batch price follows Mistral's published 50% batch discount. Routes with no batch point have no batch version in the catalogue.</p>
@@ -553,8 +553,8 @@ const DATA = {
 "id":"claude-sonnet5.5",
 "name":"Claude Sonnet 5.5",
 "panel":"cloud",
-"std":11.5,
-"batch":5.75
+"std":17.79,
+"batch":8.9
 },
 {
 "id":"gemini3.1-pro",
@@ -5528,7 +5528,7 @@ const DATA = {
 {
 "id":"claude-sonnet5.5",
 "name":"Claude Sonnet 5.5",
-"price":11.5,
+"price":17.79,
 "app":true,
 "strict":96.47,
 "answered":96,
@@ -8364,7 +8364,7 @@ const DATA = {
 "trigger":"disagree@0.90",
 "nes":96.44,
 "family":"disagree",
-"usd":4.48,
+"usd":6.38,
 "escalated":29,
 "failed":0
 },
@@ -8377,7 +8377,7 @@ const DATA = {
 "trigger":"disagree@0.95",
 "nes":96.54,
 "family":"disagree",
-"usd":5.64,
+"usd":8.07,
 "escalated":37,
 "failed":0
 },
@@ -8477,7 +8477,7 @@ const DATA = {
 "trigger":"single",
 "nes":96.47,
 "family":"single",
-"usd":11.5,
+"usd":17.79,
 "escalated":0,
 "failed":0
 }
@@ -8695,7 +8695,7 @@ const DATA = {
 "failed":0
 },
 "split_in":95.09,
-"split_out":94.04
+"split_out":94.07
 },
 "fail+kind":{
 "best":{
@@ -8885,7 +8885,7 @@ const DATA = {
 "trigger":"fail+kind",
 "nes":95.5,
 "family":"fail+kind",
-"usd":3.36,
+"usd":4.86,
 "escalated":23,
 "failed":0
 },
@@ -8911,20 +8911,20 @@ const DATA = {
 },
 "disagree":{
 "best":{
-"label":"Qwen3.6 35B-A3B, checked against Gemma 4 26B-A4B at 0.90 \u2192 Claude Sonnet 5.5",
+"label":"Qwen3.8 Flash, checked against Mistral Small 24B at 0.85 \u2192 Claude Sonnet 5.5",
 "stages":[
-"qwen3.6-35b-a3b",
+"qwen3.8-flash",
 "claude-sonnet5.5"
 ],
-"trigger":"disagree@0.90",
-"nes":96.44,
+"trigger":"disagree@0.85",
+"nes":96.19,
 "family":"disagree",
-"usd":4.48,
-"escalated":29,
+"usd":4.63,
+"escalated":20,
 "failed":0
 },
-"split_in":96.84,
-"split_out":94.55
+"split_in":96.74,
+"split_out":94.15
 }
 }
 },
@@ -8940,7 +8940,7 @@ const DATA = {
 "trigger":"single",
 "nes":96.47,
 "family":"single",
-"usd":11.5,
+"usd":17.79,
 "escalated":0,
 "failed":0
 },
@@ -9008,7 +9008,7 @@ const DATA = {
 "trigger":"disagree@0.95",
 "nes":96.54,
 "family":"disagree",
-"usd":5.64,
+"usd":8.07,
 "escalated":37,
 "failed":0
 },
@@ -9088,7 +9088,7 @@ const DATA = {
 "trigger":"single",
 "nes":96.47,
 "family":"single",
-"usd":11.5,
+"usd":17.79,
 "escalated":0,
 "failed":0
 }
@@ -9354,7 +9354,7 @@ const DATA = {
 "trigger":"fail",
 "nes":96.47,
 "family":"fail",
-"usd":11.5,
+"usd":17.79,
 "escalated":0,
 "failed":0
 },
@@ -9525,7 +9525,7 @@ const DATA = {
 "trigger":"fail+kind",
 "nes":95.5,
 "family":"fail+kind",
-"usd":3.36,
+"usd":4.86,
 "escalated":23,
 "failed":0
 },
@@ -9880,21 +9880,21 @@ const DATA = {
 "trigger":"disagree@0.85",
 "nes":96.19,
 "family":"disagree",
-"usd":3.32,
+"usd":4.63,
 "escalated":20,
 "failed":0
 },
 {
-"label":"Qwen3.5-9B 4-bit (Mac), checked against Gemma 4 31B at 0.90 \u2192 Claude Sonnet 5.5",
+"label":"Qwen3.5-9B 4-bit (Mac), checked against Qwen3.8 Flash at 0.90 \u2192 Gemini 3.1 Pro",
 "stages":[
 "qwen3.5-9b-mlx4",
-"claude-sonnet5.5"
+"gemini3.1-pro"
 ],
 "trigger":"disagree@0.90",
-"nes":96.22,
+"nes":96.19,
 "family":"disagree",
-"usd":3.73,
-"escalated":28,
+"usd":5.12,
+"escalated":21,
 "failed":0
 },
 {
@@ -9906,7 +9906,7 @@ const DATA = {
 "trigger":"disagree@0.90",
 "nes":96.35,
 "family":"disagree",
-"usd":3.91,
+"usd":5.55,
 "escalated":25,
 "failed":0
 },
@@ -9919,7 +9919,7 @@ const DATA = {
 "trigger":"disagree@0.90",
 "nes":96.44,
 "family":"disagree",
-"usd":4.48,
+"usd":6.38,
 "escalated":29,
 "failed":0
 },
@@ -9932,7 +9932,7 @@ const DATA = {
 "trigger":"disagree@0.95",
 "nes":96.54,
 "family":"disagree",
-"usd":5.64,
+"usd":8.07,
 "escalated":37,
 "failed":0
 }
@@ -71856,7 +71856,7 @@ function render() {
             money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' at list price' : '')), r.checks.toFixed(1) + ' checks per 100 pages to reach ' + pct1(r.after)];
             return ['NES ' + p.y.toFixed(2) + ' (' + p.s[1] + ' of ' + p.s[2] + ' pages answered)',
             r.free_cluster ? 'no hosted price: free on a university cluster · ' + gpuText(r)
-              : r.panel === 'farmshare' ? money(p.x) + ' per 1,000 pages at OpenRouter\'s rate for the same model · ' + gpuText(r) : r.std === 0 ? 'free, on device' : money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' standard' : '')) + (r.id === 'claude-sonnet5.5' ? ', estimated' : ''),
+              : r.panel === 'farmshare' ? money(p.x) + ' per 1,000 pages at OpenRouter\'s rate for the same model · ' + gpuText(r) : r.std === 0 ? 'free, on device' : money(p.x) + ' per 1,000 pages' + (p.b ? ' by batch' : (r.batch ? ' standard' : '')) + (r.id === 'claude-sonnet5.5' ? ', counted tokens at list price' : ''),
             r.pair ? 'run ' + OWN[r.panel] + '; hosted as ' + byId[r.pair].num + ', NES ' + o.c.scores[r.pair][0].toFixed(2)
               : r.panel === 'mac' ? 'run on our Mac; no hosted route serves it' : r.panel === 'farmshare' ? 'run on ' + clusterName(r) : r.panel === 'local' ? 'local panel, run hosted' : 'cloud panel']; } } } },
         scales: {
