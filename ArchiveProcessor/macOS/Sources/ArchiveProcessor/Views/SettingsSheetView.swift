@@ -26,8 +26,13 @@ struct SettingsSheetView: View {
     static func running(segmentation: SegmentationApproach, useAppleVision: Bool, useGateway: Bool,
                         useLocalAgent: Bool, provider: LLMProvider, model: LLMModel,
                         table: SettingsRouteTable?, localAgentTool: LocalAgentTool = .claude,
-                        localAgentModel: String = "") -> SettingsSheetModel.Running {
+                        localAgentModel: String = "", appleVisionModelID: String = "macos-vision") -> SettingsSheetModel.Running {
         if useAppleVision {
+            // W47.wh-readers-lost-clients: the Mac's reader is Vision unless the reading card chose the on-device model.
+            if appleVisionModelID == OnDeviceModelClient.modelID {
+                return .init(readingRouteID: SettingsSheetModel.onDeviceRouteID, readingName: "the macOS on-device model on this Mac",
+                             segmentation: segmentation)
+            }
             return .init(readingRouteID: "apple-vision", readingName: "Apple Vision on this Mac", segmentation: segmentation)
         }
         if useLocalAgent {
@@ -150,7 +155,8 @@ struct SettingsSheetHost<Content: View>: View {
             segmentation: SegmentationApproach(rawValue: segmentationRaw) ?? .defaultApproach,
             useAppleVision: useAppleVision, useGateway: useGateway, useLocalAgent: useLocalAgent,
             provider: selectedProvider, model: modelStore.model(for: selectedProvider), table: table,
-            localAgentTool: LocalAgentTool(rawValue: localAgentToolRaw) ?? .claude, localAgentModel: localAgentModel)
+            localAgentTool: LocalAgentTool(rawValue: localAgentToolRaw) ?? .claude, localAgentModel: localAgentModel,
+            appleVisionModelID: modelStore.model(for: .appleVision).id)
         return SettingsSheetModel(table: table, pairs: OCRPairMatrix.bundled, resolver: resolver,
                                   macMemoryGB: SettingsLayerStore.thisMacMemoryGB, pages: pages,
                                   month: store.monthSpend(), running: running)
@@ -188,11 +194,14 @@ struct SettingsSheetHost<Content: View>: View {
         switch a {
         case .segmentation(let approach):
             segmentationRaw = approach.rawValue
-        case .appleVision:
+        case .appleVision(let modelID):
             useGateway = false
             useLocalAgent = false
             useAppleVision = true
             batchMode = false
+            if let m = LLMProvider.appleVision.models.first(where: { $0.id == modelID }) {
+                modelStore.setModel(m, for: .appleVision)
+            }
         case .reading(let appRoute):
             let parts = appRoute.split(separator: "|", maxSplits: 1).map(String.init)
             guard parts.count == 2,

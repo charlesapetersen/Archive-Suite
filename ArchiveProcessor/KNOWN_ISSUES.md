@@ -14,16 +14,13 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   detector (accepted: owner, 2026-11-06, call 5, "detector until the measured exception exists"); the app offers no
   27B-class Mac reader (queued: W46.ocr-mac-27b).
 
-## ⚠️ LIMITATION (W47.wh-readers-lost, 2026-11-20): lower-scoring readers the Processor cannot run yet
+## ⚠️ LIMITATION (W47.wh-readers-lost, 2026-11-20): lower-scoring readers the Processor does not offer yet
 
 `Settings/SettingsRouteTable.swift` (`Route.lowerScoring`), `Settings/SettingsLevels.swift`; the rows are in
-`segbench-results/settings-routes.json`, at the Advanced level of Settings › Reading and in Improve OCR.
-- **The macOS 27 on-device model is a choice the app cannot carry out yet.** It has no reader in the Processor: chosen
-  on the reading card, the card says "The Processor cannot run this reading program yet", and Improve OCR lists it as
-  not in the app yet. Qwen3-VL 8B, Qwen3-VL 30B-A3B, Qwen3.5 35B-A3B and Mistral Medium 3.5 run since
-  W47.wh-readers-lost-clients, each pinned on OpenRouter to the endpoint the bench read (queued: W47.wh-readers-lost-clients).
+`segbench-results/settings-routes.json`, at the Advanced level of Settings › Reading and in Improve OCR. Every
+lower-scoring row runs since W47.wh-readers-lost-clients (the on-device model through `OCR/OnDeviceModelClient.swift`).
 - **Azure Document Intelligence, AWS Textract and Transkribus are not offered at all.** Their figures are on 25 of the 96
-  only, not comparable with the rows' 95, and there is no client for any of them (queued: W47.wh-readers-lost-clients).
+  only, not comparable with the rows' 95, and there is no client for any of them (queued: W47.wh-readers-lost-vendors-read).
 
 ## ⚠️ LIMITATION (W47.wh-yolo-scans, 2026-11-20): what the scanned-newspaper detector does not yet do
 

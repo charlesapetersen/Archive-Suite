@@ -230,7 +230,8 @@ struct ReOCRRanking: Sendable {
     static func executable(_ r: SettingsRouteTable.Route, builtInModels: [LLMModel],
                            keys: Set<String> = []) -> (LLMProvider, LLMModel)? {
         if r.id == "apple-vision" {
-            return builtInModels.first { $0.provider == .appleVision }.map { (.appleVision, $0) }
+            return builtInModels.first { $0.provider == .appleVision && $0.id == LLMModel.appleVisionModels[0].id }
+                .map { (.appleVision, $0) }
         }
         guard let ar = r.appRoute(keys: keys) else { return nil }
         let parts = ar.split(separator: "|", maxSplits: 1).map(String.init)
@@ -307,7 +308,12 @@ struct ReOCRRanking: Sendable {
     /// Marks the row the header names. Display strings only, matched against built-in models' names.
     static func matches(_ row: Row, _ current: PDFReaderProvenance, builtInModels: [LLMModel]) -> Bool {
         guard row.provider.rawValue.caseInsensitiveCompare(current.provider) == .orderedSame else { return false }
-        if row.provider == .appleVision { return true }
+        // Vision's header names no model of the list; the on-device model's names its own (W47.wh-readers-lost-clients).
+        if row.provider == .appleVision {
+            let onDevice = builtInModels.first { $0.id == OnDeviceModelClient.modelID }?.displayName ?? ""
+            let readOnDevice = current.model.caseInsensitiveCompare(onDevice) == .orderedSame
+            return (row.modelID == OnDeviceModelClient.modelID) == readOnDevice
+        }
         return builtInModels.contains { $0.provider == row.provider && $0.id == row.modelID
             && $0.displayName.caseInsensitiveCompare(current.model) == .orderedSame }
     }

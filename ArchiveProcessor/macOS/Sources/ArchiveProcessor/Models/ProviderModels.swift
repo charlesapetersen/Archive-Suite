@@ -212,7 +212,20 @@ struct LLMModel: Identifiable, Hashable, Codable {
             inputCostPer1M: 0,
             outputCostPer1M: 0,
             batchDiscount: 1
-        )
+        ),
+        // W47.wh-readers-lost-clients: the macOS 27 on-device model (`OnDeviceModelClient`), the route table's
+        // lower-scoring row `apple-fm-27` (42.4 NES strict on the 96 against Vision's 83.1). Second, so Vision stays
+        // the default and every Vision reference (`appleVisionModels[0]`) stays Vision; chosen only on the reading card.
+        LLMModel(
+            id: OnDeviceModelClient.modelID,
+            displayName: "macOS 27 on-device model",
+            provider: .appleVision,
+            supportsThinking: false,
+            returnsMd: false,
+            inputCostPer1M: 0,
+            outputCostPer1M: 0,
+            batchDiscount: 1
+        ),
     ]
 
     // W41.app-openrouter-claude: Claude Sonnet 5.5 is the one Claude model the bench read the owner's 96 with (the

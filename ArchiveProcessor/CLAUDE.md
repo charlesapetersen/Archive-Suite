@@ -43,6 +43,9 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 - **One way to read a page** (W42.int-s2): every client is a VisionOCRKit `PageReader`, and `PageReaders.reader`
   (`OCR/PageReaders.swift`) is the only place that picks one (Local Agent, then gateway, then provider). Never call a
   client's `ocr` elsewhere: `scripts/check-page-reader-seam.sh` fails on it, and on a provider with no reader.
+- **The macOS 27 on-device model** (`OCR/OnDeviceModelClient.swift`, W47.wh-readers-lost-clients) is the second
+  Apple Vision model (`apple-fm-27`), chosen only on the reading card (lower-scoring, owner call 15); its loop stop
+  fails a page whose reply starts repeating, as a page at the token cap fails on every client.
 - **Apple Vision** is additive, never the default. Its optional text-only judgement call goes to a **direct** LLM
   with the extracted text only — no image bytes, image URL, gateway or Local Agent. With judgement off, Vision is
   fully offline (No tagging / Copy source tags only).

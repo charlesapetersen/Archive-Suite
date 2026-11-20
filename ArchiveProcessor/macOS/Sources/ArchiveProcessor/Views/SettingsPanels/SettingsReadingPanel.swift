@@ -92,6 +92,10 @@ struct SettingsReadingPanel: View {
             set: { mode in
                 useGateway = (mode == .gateway)
                 useLocalAgent = (mode == .localAgent)
+                // Picked here, the Mac's reader is Vision; the on-device model is chosen on the reading card only.
+                if mode == .appleVision, !useAppleVision {
+                    modelStore.setModel(LLMModel.appleVisionModels[0], for: .appleVision)
+                }
                 useAppleVision = (mode == .appleVision)
                 if mode == .appleVision {
                     batchMode = false   // side effect: Apple Vision has nothing to batch (the switch is in Pages and output)
@@ -112,7 +116,8 @@ struct SettingsReadingPanel: View {
                 Text("Direct API").tag(OCRBackendMode.direct)
                 Text("API Gateway").tag(OCRBackendMode.gateway)
                 Text("Local CLI Agent").tag(OCRBackendMode.localAgent)
-                Text("Apple Vision (on this Mac)").tag(OCRBackendMode.appleVision)
+                Text(modelStore.model(for: .appleVision).id == OnDeviceModelClient.modelID
+                     ? "macOS on-device model (on this Mac)" : "Apple Vision (on this Mac)").tag(OCRBackendMode.appleVision)
             } label: {
                 HStack {
                     Text("OCR backend")

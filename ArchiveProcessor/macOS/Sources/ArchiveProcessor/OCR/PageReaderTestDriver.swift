@@ -46,6 +46,19 @@ enum PageReaderTestDriver {
 
     static func run() async {
         defer { finish() }
+        // W47.wh-readers-lost-clients: PAGEREADER_FM_IMAGES (image paths, colon-separated) reads each with the real
+        // on-device model and records what came back. A model run, so only by hand under the heavy lock; never the corpus.
+        if let images = ProcessInfo.processInfo.environment["PAGEREADER_FM_IMAGES"], !images.isEmpty {
+            let fm = LLMProvider.appleVision.models.first { $0.id == OnDeviceModelClient.modelID }
+            let reader = fm.flatMap { try? PageReaders.reader(provider: .appleVision, model: $0, apiKey: "", thinkingLevel: nil,
+                                                              newspaperLayout: false) }
+            for path in images.split(separator: ":").map(String.init) {
+                let start = Date()
+                let r = try? await reader?.read(PageReaderInput(imageURL: URL(fileURLWithPath: path))).detail
+                lines.append("INFO fm \(URL(fileURLWithPath: path).lastPathComponent): \(String(format: "%.1f", Date().timeIntervalSince(start))) s, "
+                    + "code \(r?.errorCode ?? "none"), \(r?.text?.count ?? 0) characters: \(r?.text?.prefix(120).replacingOccurrences(of: "\n", with: " / ") ?? r?.errorMessage ?? "threw")")
+            }
+        }
         check("0 seam dormant before install", !NetworkSession.testTransportIsActive)
         let current = Current()
         NetworkSession.testTransport = { request in
@@ -162,6 +175,26 @@ enum PageReaderTestDriver {
                              returnsMd: false, inputCostPer1M: 1, outputCostPer1M: 1, batchDiscount: 1)
         check("2 an unpinned OpenRouter model gets no reader",
               (try? PageReaders.reader(provider: .openrouter, model: stray, apiKey: "k", thinkingLevel: nil)) == nil)
+        // W47.wh-readers-lost-clients: the Mac's second model is the on-device reader; Vision stays the first.
+        let fm = LLMProvider.appleVision.models.first { $0.id == OnDeviceModelClient.modelID }
+        check("2 the on-device model is a Mac model after Vision",
+              LLMProvider.appleVision.models.first?.id == "macos-vision" && fm != nil)
+        if let fm {
+            let r = try? PageReaders.reader(provider: .appleVision, model: fm, apiKey: "", thinkingLevel: nil, newspaperLayout: false)
+            check("2 the on-device model reads with its own client", r?.route == "Apple Vision|apple-fm-27", r?.route ?? "nil")
+        }
+        // The loop stop, on the shapes the bench's replies took (r1-foundation's cache): a word run, a repeated line, a
+        // number run; and what it must leave alone.
+        let page = (1...40).map { "Line \($0) of a typed letter, with its own words and figures \($0 * 7)." }.joined(separator: "\n")
+        check("2 loop stop: a long page that never repeats reads on", !OnDeviceModelClient.isLooping(page))
+        check("2 loop stop: a short repeat is not a loop", !OnDeviceModelClient.isLooping("Dear Sir,\n" + String(repeating: "Yes.\n", count: 6)))
+        check("2 loop stop: dot leaders under 400 characters are not a loop",
+              !OnDeviceModelClient.isLooping("Contents " + String(repeating: ".", count: 380) + " 7"))
+        check("2 loop stop: a word run is a loop", OnDeviceModelClient.isLooping(page + "\n" + String(repeating: "of the ", count: 70)))
+        check("2 loop stop: a repeated line is a loop",
+              OnDeviceModelClient.isLooping(page + String(repeating: "\nThe committee met on Tuesday and agreed.", count: 12)))
+        check("2 loop stop: a counting run is not caught (the cap stops it)",
+              !OnDeviceModelClient.isLooping((700...800).map { "(\($0))" }.joined(separator: " ")))
         current.text = "failed"
     }
 

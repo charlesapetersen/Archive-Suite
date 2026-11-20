@@ -188,7 +188,8 @@ struct OCRView: View {
     }
     private var effectiveProvider: LLMProvider { useAppleVision ? .appleVision : selectedProvider }
     private var effectiveModel: LLMModel {
-        useAppleVision ? LLMModel.appleVisionModels[0] : (currentGatewayConfig?.asLLMModel() ?? selectedModel)
+        // The Mac's reader: Vision, or the on-device model when the reading card chose it (W47.wh-readers-lost-clients).
+        useAppleVision ? modelStore.model(for: .appleVision) : (currentGatewayConfig?.asLLMModel() ?? selectedModel)
     }
     /// W41.app-page-kind applies to a direct API model reading pages one by one: not a paid batch (one model), the
     /// gateway or the Local Agent (the user's single route), Apple Vision (free; the guide never sends a page to it,

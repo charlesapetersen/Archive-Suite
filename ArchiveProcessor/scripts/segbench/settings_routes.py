@@ -250,12 +250,13 @@ def reading_rows():
     fm = figs(None, "apple-fm-27")
     fm["overall"] = {"value": 64.5, "n": "63/96 answered, all 96 (p081 included)", "strict": 42.4, "failures": {"cap": 33},
                      "truth": "owner-96", "source": src(R1F, "apple-fm-27", "The owner's 96: NES % answered", 64.5)}
-    add("apple-fm-27", "macOS 27 on-device model", "mac", None, "measured", {"mac": True, "built_in": True},
+    # W47.wh-readers-lost-clients: the app reads with it (`OnDeviceModelClient`, the bench's request and a loop stop).
+    add("apple-fm-27", "macOS 27 on-device model", "mac", "apple vision|apple-fm-27", "measured", {"mac": True, "built_in": True},
         fm, cost("apple-fm-27"),
         lfl_time("apple-fm-27"),
         {"peak_gb": None, "measured_on": "runs in the OS", "source": None},
         ["42.4 strict against Vision's 83.1, both 27.2, -40.7 (-49.0 to -32.5); 33 of 96 loop to the 4,096-token cap (r1-foundation.md)", "not in the ranking table (no ocr-pages.csv rows)", "its 100 public pages are L5-L8 of the 440, drawn where Vision is cached (P7-6); off the public tables",
-         "the Processor has no reader for it yet (W47.wh-readers-lost's report)"],
+         "the app stops a reply that starts repeating itself and fails the page, as the bench scored a loop: empty"],
         [], None, [lower("Apple Vision (apple-vision) reads 83.1 strict on the same 96 against 42.4, at no more cost")])
     add("ppocrv6-kraken-blla", "kraken PP-OCRv6 medium on blla lines (Mac CPU)", "mac", None, "measured", {"mac": True},
         figs(lk="ppocrv6-kraken-blla", ohk="ppocrv6-kraken-blla"), {"usd_1000_list": 0.0, "source": None},

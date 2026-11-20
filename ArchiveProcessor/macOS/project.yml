@@ -75,7 +75,9 @@ targets:
         INFOPLIST_FILE: Sources/ArchiveProcessor/Info.plist
         SWIFT_VERSION: "6.0"
         SWIFT_INCLUDE_PATHS: "$(PROJECT_DIR)/PDFium"
-        OTHER_LDFLAGS: ["$(inherited)", "$(PROJECT_DIR)/Vendor/pdfium/lib/libpdfium.a"]
+        # FoundationModels (the macOS 27 on-device reader, OnDeviceModelClient) is weak, so the app still launches on
+        # macOS 14-26, where the reader says it needs macOS 27.
+        OTHER_LDFLAGS: ["$(inherited)", "$(PROJECT_DIR)/Vendor/pdfium/lib/libpdfium.a", "-weak_framework", "FoundationModels"]
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
       configs:
         Debug:

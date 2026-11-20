@@ -84,8 +84,10 @@ enum ReOCRRankingTestDriver {
             let adv = rank(kind, level: .advanced)
             check("1 \(kind.rawValue): at Advanced every lower-scoring reader is listed", listed(adv) == lowerIDs,
                   lowerIDs.subtracting(listed(adv)).sorted().joined(separator: ", "))
-            check("1 \(kind.rawValue): at Advanced apple-fm-27 is listed as not in the app yet",
-                  adv.leftOut.contains { $0.id == "apple-fm-27" && $0.reason == "not in the app yet" })
+            // W47.wh-readers-lost-clients: each of them now runs in the app.
+            check("1 \(kind.rawValue): at Advanced no lower-scoring reader is listed as not in the app yet",
+                  !adv.leftOut.contains { lowerIDs.contains($0.id) && $0.reason == "not in the app yet" },
+                  adv.leftOut.filter { lowerIDs.contains($0.id) }.map { "\($0.id): \($0.reason)" }.joined(separator: "; "))
             check("1 \(kind.rawValue): at Advanced the suggestion and reference are not lower-scoring",
                   adv.suggestedID.map { !lowerIDs.contains($0) } ?? true
                     && adv.rows.allSatisfy { row in !(lowerIDs.contains(row.id) && row.tie == .reference) })
@@ -262,6 +264,18 @@ enum ReOCRRankingTestDriver {
         let vision = rank(.printed, current: PDFReaderProvenance(provider: "Apple Vision", model: "macOS Vision",
                                                                  processingDate: "1 January 2026"))
         eq("5 Apple Vision is marked from its header", vision.rows.filter(\.isCurrent).map(\.id), ["apple-vision"])
+        // W47.wh-readers-lost-clients: the Mac's two readers run as their own models and are told apart by the header.
+        eq("5 apple-vision runs as Vision", route("apple-vision").flatMap { ReOCRRanking.executable($0, builtInModels: models) }?.1.id,
+           "macos-vision")
+        eq("5 apple-fm-27 runs as the on-device model",
+           route("apple-fm-27").flatMap { ReOCRRanking.executable($0, builtInModels: models) }?.1.id, OnDeviceModelClient.modelID)
+        let onDevice = rank(.printed, current: PDFReaderProvenance(provider: "Apple Vision", model: "macOS 27 on-device model",
+                                                                   processingDate: "1 January 2026"), level: .advanced)
+        check("5 the on-device model's header does not mark Vision",
+              !onDevice.rows.contains { $0.id == "apple-vision" && $0.isCurrent })
+        check("5 and marks the on-device row wherever it is a row",
+              onDevice.rows.filter(\.isCurrent).map(\.id) == (onDevice.rows.contains { $0.id == "apple-fm-27" } ? ["apple-fm-27"] : []),
+              onDevice.rows.filter(\.isCurrent).map(\.id).joined(separator: ", "))
 
         // 6. Grouping.
         let pages = [

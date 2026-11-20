@@ -320,6 +320,44 @@ enum SettingsSheetTestDriver {
         } else {
             lines.append("SKIP 3a key only: the reading pick is \(card(keySheet, "reading")?.routeID ?? "nil")")
         }
+        // 3c. W47.wh-readers-lost-clients: a lower-scoring reader chosen on the reading card switches on.
+        let chooseFM = layer(.general, [(.staysOnMac, .bool(true)), (SettingsSheetModel.overrideKey("reading"), .string("apple-fm-27"))])
+        let wasUnavailable = SettingsSheetModel.onDeviceUnavailable
+        SettingsSheetModel.onDeviceUnavailable = { nil }
+        if let r = card(sheet("on-device-chosen", general: chooseFM), "reading") {
+            check("3c the on-device model chosen is the card's reader", r.routeID == "apple-fm-27", r.routeID ?? "nil")
+            check("3c Read with this switches the Mac's reader to it", r.apply == .appleVision(modelID: OnDeviceModelClient.modelID),
+                  String(describing: r.apply))
+        } else { check("3c the on-device reading card", false) }
+        SettingsSheetModel.onDeviceUnavailable = { "The macOS on-device model needs macOS 27." }
+        if let r = card(sheet("on-device-unavailable", general: chooseFM), "reading") {
+            check("3c a Mac that cannot run it offers no switch and says why",
+                  r.apply == nil && r.runsNow?.contains("needs macOS 27") == true, r.runsNow ?? "nil")
+        }
+        SettingsSheetModel.onDeviceUnavailable = wasUnavailable
+        let fmRunning = SettingsSheetView.running(segmentation: .manual, useAppleVision: true, useGateway: false, useLocalAgent: false,
+                                                  provider: .gemini, model: LLMProvider.gemini.models[0], table: table,
+                                                  appleVisionModelID: OnDeviceModelClient.modelID)
+        check("3c reading with the on-device model is its row", fmRunning.readingRouteID == "apple-fm-27",
+              fmRunning.readingRouteID ?? "nil")
+        check("3c reading with Vision is Vision's row", SettingsSheetView.running(
+            segmentation: .manual, useAppleVision: true, useGateway: false, useLocalAgent: false, provider: .gemini,
+            model: LLMProvider.gemini.models[0], table: table).readingRouteID == "apple-vision")
+        if let r = card(sheet("on-device-running", general: chooseFM, running: fmRunning), "reading") {
+            check("3c already reading with it: nothing to switch", r.apply == nil, String(describing: r.apply))
+        }
+        if let r = card(sheet("vision-chosen-on-device-running", general: layer(.general, [
+            (.staysOnMac, .bool(true)), (SettingsSheetModel.overrideKey("reading"), .string("apple-vision"))]), running: fmRunning), "reading") {
+            check("3c Vision chosen while the on-device model reads: switches back to Vision",
+                  r.apply == .appleVision(modelID: "macos-vision"), String(describing: r.apply))
+        }
+        let chooseQwen = layer(.general, [(.keys, .strings(["openrouter"])), (.staysOnMac, .bool(false)),
+                                          (SettingsSheetModel.overrideKey("reading"), .string("qwen3-vl-8b"))])
+        if let r = card(sheet("qwen3-vl-8b-chosen", general: chooseQwen), "reading") {
+            check("3c a lower-scoring OpenRouter reader chosen switches on its pinned route",
+                  r.routeID == "qwen3-vl-8b" && r.apply == .reading(appRoute: "openrouter|qwen/qwen3-vl-8b-instruct"),
+                  "\(r.routeID ?? "nil") \(String(describing: r.apply))")
+        } else { check("3c the Qwen3-VL 8B reading card", false) }
         check("3 limits: the ceiling", paid.limits.first { $0.id == "ceiling" }?.value == "$10.00")
         check("3 a batch limit shows no month line", paid.limits.first { $0.id == "month" } == nil)
 

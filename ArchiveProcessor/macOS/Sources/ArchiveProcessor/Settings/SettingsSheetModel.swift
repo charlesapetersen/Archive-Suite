@@ -114,8 +114,14 @@ struct SettingsSheetModel {
         /// W41.app-claude-plan-reading: the row read through the user's Claude plan — the Local Agent backend running
         /// `claude` at `model` — when the plan is what reaches it, so the sheet's "no money" is what the run pays.
         case readingByPlan(model: String)
-        case appleVision
+        /// Apple Vision (`macos-vision`) or the macOS 27 on-device model (`OnDeviceModelClient.modelID`), on this Mac.
+        case appleVision(modelID: String)
     }
+
+    /// W47.wh-readers-lost-clients: the route table's row for the macOS 27 on-device model, and why this Mac cannot run
+    /// it (nil when it can). A seam, so the sheet's tests do not depend on the Mac they run on.
+    static let onDeviceRouteID = "apple-fm-27"
+    nonisolated(unsafe) static var onDeviceUnavailable: () -> String? = { OnDeviceModelClient.unavailableReason }
 
     /// The model the Claude plan reads a reading row with: the row's Anthropic model, when the user's Claude plan
     /// reaches the row. Nil otherwise (no plan, or not a Claude row), so a key or nothing applies.
@@ -662,7 +668,15 @@ struct SettingsSheetModel {
             if let r = route, lead?.flag == nil, r.id != running.readingRouteID || (planModel != nil && !running.onPlan) {
                 if r.id == "apple-vision" {
                     runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” switches it on."
-                    apply = .appleVision
+                    apply = .appleVision(modelID: LLMModel.appleVisionModels[0].id)
+                } else if r.id == Self.onDeviceRouteID {
+                    // W47.wh-readers-lost-clients: offered only where this Mac can run it.
+                    if let why = Self.onDeviceUnavailable() {
+                        runsNow = why + " Process Files reads with \(running.readingName)."
+                    } else {
+                        runsNow = "Not switched on yet: Process Files now reads with \(running.readingName). “Read with this” switches it on."
+                        apply = .appleVision(modelID: OnDeviceModelClient.modelID)
+                    }
                 } else if let model = planModel {
                     // Priced at no money because the plan reaches it, so it must run on the plan, never on a key.
                     let onKey = r.id == running.readingRouteID ? " on a key, which is money" : ""

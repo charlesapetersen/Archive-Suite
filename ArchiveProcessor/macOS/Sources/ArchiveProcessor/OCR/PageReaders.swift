@@ -58,6 +58,7 @@ enum PageReaders {
                             route: OCRCascade.routeID(for: model), dollars: OpenRouterRoute.isUnpriced(model) ? nil : price,
                             pricedModel: OpenRouterRoute.isUnpriced(model) ? nil : model)
         case .appleVision:
+            if model.id == OnDeviceModelClient.modelID { return Measured(OnDeviceModelClient(), dollars: nil) }
             return Measured(VisionClient(settings: visionSettings), dollars: nil)
         }
     }
@@ -146,6 +147,14 @@ extension LocalAgentClient: PageReader {
         PageReaders.reading(try await ocr(imageURL: page.imageURL, previousText: page.previousText,
                                           previousImageURL: page.previousImageURL, customPrompt: page.customPrompt,
                                           imageScale: page.imageScale))
+    }
+}
+
+extension OnDeviceModelClient: PageReader {
+    var route: String { "\(LLMProvider.appleVision.rawValue)|\(Self.modelID)" }
+    /// The bench's request: the page alone, no prompt of the app's, no previous page (`fm_ocr.swift`).
+    func read(_ page: PageReaderInput) async throws -> PageReading<OCRResult> {
+        PageReaders.reading(try await ocr(imageURL: page.imageURL))
     }
 }
 
