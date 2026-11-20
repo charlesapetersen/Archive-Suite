@@ -98,18 +98,157 @@ struct EditorBindingTests {
     }
 
     @Test @MainActor
-    func switchModeClearsUndo() {
+    func switchModeWithNoEditsLeavesNothingToUndo() {
         let holder = BindingHolder("hello")
         let coordinator = makeCoordinator(holder: holder)
         let tv = coordinator.textView!
-        tv.string = "hello world"
-        coordinator.flushWriteBack()
         coordinator.switchMode(to: true)
         #expect(coordinator.currentIsRaw == true)
-        // Without a window the undo manager may be nil; when present it must be empty.
-        if let um = tv.undoManager {
-            #expect(um.canUndo == false, "Undo stack should be cleared after mode switch")
-        }
+        #expect(tv.undoManager?.canUndo == false, "a switch is not itself an undoable edit")
+    }
+
+    // MARK: - Undo across the ⌘/ switch (W49.notes-undo-across-toggle)
+
+    /// Types `text` at the end of the note as one undo group (the test has no event loop to group by),
+    /// then saves, as the debounce would.
+    @MainActor
+    private func type(_ text: String, into coordinator: MarkdownEditorView.Coordinator) {
+        let tv = coordinator.textView!
+        let um = tv.undoManager!
+        um.groupsByEvent = false
+        let end = NSRange(location: (tv.string as NSString).length, length: 0)
+        tv.setSelectedRange(end)
+        um.beginUndoGrouping()
+        tv.insertText(text, replacementRange: end)
+        um.endUndoGrouping()
+        coordinator.flushWriteBack()
+    }
+
+    @MainActor
+    private func makeStyledCoordinator(holder: BindingHolder) -> MarkdownEditorView.Coordinator {
+        let coordinator = makeCoordinator(holder: holder)
+        coordinator.textView!.applyRawMode(false, fontSize: 14)
+        coordinator.textView!.replaceStyledDocument(with: MarkdownBridge.parse(markdown: holder.markdown))
+        coordinator.recordAppliedSerialization()
+        return coordinator
+    }
+
+    @Test @MainActor
+    func styledEditsUndoAfterSwitchToRaw() {
+        let holder = BindingHolder("Alpha")
+        let coordinator = makeStyledCoordinator(holder: holder)
+        let tv = coordinator.textView!
+        type(" one", into: coordinator)
+        type(" two", into: coordinator)
+        #expect(holder.markdown.contains("Alpha one two"))
+
+        holder.isRaw = true
+        #expect(coordinator.switchMode(to: true))
+        #expect(tv.string.contains("Alpha one two"), "the switch shows the latest text")
+        #expect(tv.undoManager?.canUndo == true, "the styled edits stay undoable in raw")
+
+        tv.undoManager!.undo()
+        #expect(tv.string.contains("Alpha one") && !tv.string.contains("two"))
+        #expect(holder.markdown.contains("Alpha one") && !holder.markdown.contains("two"),
+                "an undo after the switch is saved like any edit")
+        tv.undoManager!.undo()
+        #expect(tv.string.contains("Alpha") && !tv.string.contains("one"))
+        #expect(tv.undoManager?.canUndo == false)
+
+        tv.undoManager!.redo()
+        #expect(tv.string.contains("Alpha one") && !tv.string.contains("two"), "redo steps forward again")
+        #expect(holder.markdown.contains("Alpha one"))
+    }
+
+    @Test @MainActor
+    func rawEditsUndoAfterSwitchToStyled() {
+        let holder = BindingHolder("Alpha")
+        holder.isRaw = true
+        let coordinator = makeCoordinator(holder: holder)
+        coordinator.currentIsRaw = true
+        coordinator.recordAppliedSerialization()
+        let tv = coordinator.textView!
+        type(" **bold**", into: coordinator)
+        #expect(holder.markdown == "Alpha **bold**")
+
+        holder.isRaw = false
+        #expect(coordinator.switchMode(to: false))
+        #expect(tv.string.contains("bold") && !tv.string.contains("**"), "styled view renders the edit")
+        tv.undoManager!.undo()
+        #expect(!tv.string.contains("bold"), "the raw edit is undone in the styled view")
+        #expect(!holder.markdown.contains("bold"))
+        #expect(!coordinator.currentIsRaw, "undo does not switch the view back")
+
+        // Typing on top of a carried step, then undoing both and redoing both: the carried redo puts back
+        // the exact storage the typing's own redo was recorded against.
+        let um = tv.undoManager!
+        um.redo()
+        #expect(tv.string.contains("bold"))
+        type(" more", into: coordinator)
+        let typed = tv.string
+        um.undo()
+        um.undo()
+        #expect(!tv.string.contains("bold"))
+        um.redo()
+        um.redo()
+        coordinator.flushWriteBack()
+        #expect(tv.string == typed)
+        #expect(holder.markdown.contains("bold") && holder.markdown.contains("more"))
+    }
+
+    @Test @MainActor
+    func undoCrossesSeveralSwitches() {
+        let holder = BindingHolder("Start")
+        let coordinator = makeStyledCoordinator(holder: holder)
+        let tv = coordinator.textView!
+        type(" A", into: coordinator)            // styled
+        holder.isRaw = true
+        #expect(coordinator.switchMode(to: true))
+        type(" B", into: coordinator)            // raw
+        holder.isRaw = false
+        #expect(coordinator.switchMode(to: false))
+        type(" C", into: coordinator)            // styled
+        holder.isRaw = true
+        #expect(coordinator.switchMode(to: true))
+        #expect(holder.markdown.contains("Start A B C"))
+
+        let um = tv.undoManager!
+        um.undo()
+        #expect(holder.markdown.contains("Start A B") && !holder.markdown.contains("C"))
+        um.undo()
+        #expect(holder.markdown.contains("Start A") && !holder.markdown.contains("B"))
+        um.undo()
+        #expect(holder.markdown.contains("Start") && !holder.markdown.contains("A"))
+        #expect(um.canUndo == false)
+
+        // Back to styled with the undone steps on the redo side: they cross the switch too.
+        holder.isRaw = false
+        #expect(coordinator.switchMode(to: false))
+        #expect(tv.string.contains("Start") && !tv.string.contains("A"), "the text is where the undos left it")
+        #expect(um.canUndo == false)
+        #expect(um.canRedo == true)
+        um.redo()
+        #expect(holder.markdown.contains("Start A") && !holder.markdown.contains("B"))
+        um.redo()
+        #expect(holder.markdown.contains("Start A B") && !holder.markdown.contains("C"))
+        um.undo()
+        #expect(holder.markdown.contains("Start A") && !holder.markdown.contains("B"), "undo after redo")
+        um.redo()
+        um.redo()
+        #expect(holder.markdown.contains("Start A B C"))
+        #expect(um.canRedo == false)
+
+        // A new edit after a carried undo drops the redo side, as for any edit.
+        um.undo()
+        type(" D", into: coordinator)
+        #expect(holder.markdown.contains("Start A B D"))
+        #expect(um.canRedo == false)
+        um.undo()
+        coordinator.flushWriteBack()   // a typing undo saves through the debounce
+        #expect(holder.markdown.contains("Start A B") && !holder.markdown.contains("D"))
+        um.undo()
+        #expect(holder.markdown.contains("Start A") && !holder.markdown.contains("B"),
+                "the carried steps are still under the new edit")
     }
 
     @Test @MainActor

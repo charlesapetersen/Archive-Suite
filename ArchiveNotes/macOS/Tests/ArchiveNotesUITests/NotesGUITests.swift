@@ -1219,6 +1219,50 @@ final class NotesGUITests: NotesFixtureUITestCase {
         XCTAssertEqual(bodyAfter?.contains("# Plain Note"), true, "the heading source must survive the round-trip")
     }
 
+    /// G3b — Undo crosses the raw/styled switch (W49.notes-undo-across-toggle): an edit typed in styled
+    /// mode and one typed in raw mode are each undone by ⌘Z after a later switch, through the real key
+    /// and menu path, and redo brings one back. Disk-asserted; ends with both edits undone.
+    func testG3b_UndoCrossesRawToggle() throws {
+        try withFixture { try runG3b_UndoCrossesRawToggle() }
+    }
+
+    private func runG3b_UndoCrossesRawToggle() throws {
+        let uuid = Self.idPlain
+        selectItem(uuid: uuid)
+        XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor text view should exist")
+        XCTAssertTrue(pollUntil(timeout: 10) { !((editor.value as? String) ?? "").isEmpty })
+        func editorText() -> String { (editor.value as? String) ?? "" }
+        func body() -> String { noteBody(uuid: uuid) ?? "" }
+
+        XCTAssertTrue(setEditorSelection(location: editorText().utf16.count, length: 0),
+                      "the selection seam must focus the editor")
+        app.typeText(" styledword")
+        XCTAssertTrue(pollUntil(timeout: 10) { body().contains("styledword") }, "the styled edit must save")
+
+        XCTAssertTrue(rawToggle.waitForExistence(timeout: 5), "raw toggle should exist")
+        rawToggle.click()
+        XCTAssertTrue(pollUntil(timeout: 6) { editorText().contains("**bold**") }, "raw mode should show the source")
+        XCTAssertTrue(setEditorSelection(location: editorText().utf16.count, length: 0))
+        app.typeText(" rawword")
+        XCTAssertTrue(pollUntil(timeout: 10) { body().contains("rawword") }, "the raw edit must save")
+
+        rawToggle.click()
+        XCTAssertTrue(pollUntil(timeout: 6) { !editorText().contains("**bold**") }, "back in styled mode")
+        XCTAssertTrue(setEditorSelection(location: 0, length: 0))
+        app.typeKey("z", modifierFlags: .command)
+        XCTAssertTrue(pollUntil(timeout: 10) { !body().contains("rawword") && body().contains("styledword") },
+                      "⌘Z in styled mode must undo the edit typed in raw mode: \(body().debugDescription)")
+        app.typeKey("z", modifierFlags: .command)
+        XCTAssertTrue(pollUntil(timeout: 10) { !body().contains("styledword") },
+                      "a second ⌘Z must undo the styled edit from before both switches: \(body().debugDescription)")
+        app.typeKey("z", modifierFlags: [.command, .shift])
+        XCTAssertTrue(pollUntil(timeout: 10) { body().contains("styledword") && !body().contains("rawword") },
+                      "⇧⌘Z must redo the styled edit")
+        app.typeKey("z", modifierFlags: .command)
+        XCTAssertTrue(pollUntil(timeout: 10) { !body().contains("styledword") && body().contains("**bold**") },
+                      "the note ends as it began: \(body().debugDescription)")
+    }
+
     /// G4 — Paste an image → the item's `assets/pasted-….png` is written AND an `![](assets/pasted-…)`
     /// inline-image reference lands in the note's on-disk `.md`. This is the last un-GUI-verified
     /// file-WRITE path in Notes: it drives W3-S4's image-paste handler (`EditorTextView.tryPasteImage`)

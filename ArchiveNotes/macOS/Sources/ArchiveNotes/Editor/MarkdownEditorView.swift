@@ -328,9 +328,6 @@ struct MarkdownEditorView: NSViewRepresentable {
                 textView.refreshUITestPassageChipStateSnapshot()
 #endif
                 if let savedSelection {
-                    // The re-parse can change the character count, so undo entries recorded against the
-                    // old storage would land at wrong offsets (or out of range). Same rule as switchMode.
-                    textView.undoManager?.removeAllActions()
                     let length = (textView.string as NSString).length
                     textView.selectedRanges = savedSelection.map {
                         let range = $0.rangeValue
@@ -345,6 +342,12 @@ struct MarkdownEditorView: NSViewRepresentable {
                     scrollView.reflectScrolledClipView(scrollView.contentView)
                 }
             }
+            // Undo entries recorded against the old storage would land at wrong offsets (or out of range),
+            // and the whole-note steps a ⌘/ switch carries belong to the body that was there: an editor
+            // reused for another body (the template editor has no per-item identity) must not put the old
+            // one back on ⌘Z (W49.notes-undo-across-toggle).
+            textView.breakUndoCoalescing()
+            textView.undoManager?.removeAllActions()
             coordinator.isApplyingProgrammaticChange = false
             coordinator.lastAppliedMarkdown = markdown
             coordinator.lastPassageGeneration = passageGeneration
@@ -624,6 +627,7 @@ struct MarkdownEditorView: NSViewRepresentable {
             guard let textView else { return false }
             // Flush any pending write-back so we don't lose edits.
             flushWriteBack()
+            var carried = CarriedHistory()
 
             if !raw {
                 // Probe before changing display mode. The parser's plain-text fallback preserves
@@ -647,6 +651,7 @@ struct MarkdownEditorView: NSViewRepresentable {
                     DispatchQueue.main.async { [weak self] in self?.parent.isRaw = true }
                     return false
                 }
+                carried = undoHistoryStates()
                 currentIsRaw = false
                 textView.applyRawMode(false, fontSize: currentFontSize)
                 textView.replaceStyledDocument(with: parsed.attributed)
@@ -655,6 +660,7 @@ struct MarkdownEditorView: NSViewRepresentable {
 #endif
                 parent.onParseFailure?(nil)
             } else {
+                carried = undoHistoryStates()
                 currentIsRaw = raw
                 textView.applyRawMode(raw, fontSize: currentFontSize)
                 // Entering raw: show the plain Markdown string
@@ -662,14 +668,146 @@ struct MarkdownEditorView: NSViewRepresentable {
                 parent.onParseFailure?(nil)
             }
 
-            // Clear undo across the toggle — intentional design decision (plan §6).
+            // The old view's undo entries hold ranges into the old storage, so they cannot stay. Their
+            // states go into the new view's history instead (W49.notes-undo-across-toggle).
+            textView.breakUndoCoalescing()
             textView.undoManager?.removeAllActions()
+            // The current state is what the new view just installed, byte for byte.
+            if !carried.timeline.isEmpty { carried.timeline[carried.current] = parent.markdown }
+            registerCarriedUndo(carried)
 
             // Sync binding
             if parent.isRaw != raw {
                 parent.isRaw = raw
             }
             return true
+        }
+
+        // MARK: Undo across the raw-mode toggle (W49.notes-undo-across-toggle)
+
+        /// The most steps a ⌘/ switch carries into the other view on each side (undo and redo). Each costs
+        /// one undo or redo and one serialization of the note at the switch.
+        static let carriedUndoLimit = 100
+        /// How long a switch may spend walking the history, so ⌘/ on a long note with a deep history stays
+        /// quick. Steps past it are dropped (the oldest undo steps first).
+        static let carriedUndoTimeBudget: TimeInterval = 0.3
+
+        /// The note's history as whole-Markdown states, oldest first, and where the note is in it.
+        struct CarriedHistory {
+            var timeline: [String] = []
+            var current = 0
+        }
+
+        /// One whole-note undo step: Markdown, or (styled view) the exact storage an undo replaced, so a
+        /// redo puts back the very characters later native redo steps were recorded against.
+        enum UndoState {
+            case markdown(String)
+            case storage(NSAttributedString)
+        }
+
+        /// Walks the current view's redo stack forward and then its whole undo stack back, and returns the
+        /// Markdown after each step, skipping steps that leave it unchanged. The view is left at an older
+        /// state; the caller installs `parent.markdown` (flushed already) right after. Returns no history
+        /// when the walk runs out of time before it is back past the current state, or does not come back
+        /// to it, so the steps are never put on the wrong side.
+        private func undoHistoryStates() -> CarriedHistory {
+            guard let textView, let manager = textView.undoManager, manager.canUndo || manager.canRedo,
+                  let start = currentSerialization() else { return CarriedHistory() }
+            let deadline = Date().addingTimeInterval(Self.carriedUndoTimeBudget)
+            textView.breakUndoCoalescing()
+            isApplyingProgrammaticChange = true
+            defer { isApplyingProgrammaticChange = false }
+            var redoSteps = 0
+            var last = start
+            while manager.canRedo, redoSteps < Self.carriedUndoLimit, Date() < deadline {
+                manager.redo()
+                guard let state = currentSerialization() else { break }
+                if state != last { redoSteps += 1; last = state }
+            }
+            var newestFirst = [last]
+            while manager.canUndo, newestFirst.count <= redoSteps + Self.carriedUndoLimit,
+                  newestFirst.count <= redoSteps || Date() < deadline {
+                manager.undo()
+                guard let state = currentSerialization() else { break }
+                if state != last { newestFirst.append(state); last = state }
+            }
+            guard newestFirst.count > redoSteps, newestFirst[redoSteps] == start else { return CarriedHistory() }
+            return CarriedHistory(timeline: newestFirst.reversed(), current: newestFirst.count - 1 - redoSteps)
+        }
+
+        /// Rebuilds `history` in the new view as whole-note steps, each its own top-level group, so ⌘Z and
+        /// ⇧⌘Z walk through the edits made before the switch. The chain is registered as if the note were at
+        /// the newest state, then undone (as replay, no saves) to the current one, which leaves the newer
+        /// states on the redo side and the view showing the current state.
+        private func registerCarriedUndo(_ history: CarriedHistory) {
+            let timeline = history.timeline
+            guard timeline.count > 1, let manager = textView?.undoManager, manager.groupingLevel == 0 else { return }
+            let groupedByEvent = manager.groupsByEvent
+            manager.groupsByEvent = false
+            defer { manager.groupsByEvent = groupedByEvent }
+            for index in 0..<(timeline.count - 1) {
+                let state = timeline[index], inverse = timeline[index + 1]
+                manager.beginUndoGrouping()
+                manager.registerUndo(withTarget: self) {
+                    $0.restoreUndoState(.markdown(state), inverse: .markdown(inverse))
+                }
+                manager.endUndoGrouping()
+            }
+            guard history.current < timeline.count - 1 else { return }
+            isApplyingProgrammaticChange = true
+            defer { isApplyingProgrammaticChange = false }
+            for _ in history.current..<(timeline.count - 1) where manager.canUndo { manager.undo() }
+        }
+
+        /// Installs a whole-note state in the current view and registers `inverse` (by default the exact
+        /// state it replaces), so redo, and undo after redo, step back. Outside a switch's own replay it is a
+        /// real edit and is pushed to the model at once. A Markdown state the styled view cannot parse is
+        /// passed over, as `switchMode` refuses one, rather than saved through the plain-text fallback.
+        private func restoreUndoState(_ state: UndoState, inverse: UndoState? = nil) {
+            guard let textView, let manager = textView.undoManager, let storage = textView.textStorage else { return }
+            let current = inverse ?? (currentIsRaw ? .markdown(textView.string)
+                                                   : .storage(NSAttributedString(attributedString: storage)))
+            manager.registerUndo(withTarget: self) { $0.restoreUndoState(current) }
+            let styled: NSAttributedString?
+            switch state {
+            case .storage(let attributed):
+                styled = attributed
+            case .markdown(let markdown) where !currentIsRaw:
+                let parsed = MarkdownBridge.parseWithStatus(
+                    markdown: markdown, fontSize: currentFontSize, assetStore: assetStore,
+                    onRevealBlock: onRevealBlock, onPreviewBlock: onPreviewBlock,
+                    onJumpBlock: onJumpBlock, passageSummaries: passageSummaries)
+                guard !parsed.failed else { return }
+                styled = parsed.attributed
+            case .markdown:
+                styled = nil
+            }
+            let before = textView.string as NSString
+            let replaying = isApplyingProgrammaticChange
+            isApplyingProgrammaticChange = true
+            if currentIsRaw {
+                switch state {
+                case .markdown(let markdown): textView.string = markdown
+                case .storage(let attributed): textView.string = attributed.string
+                }
+            } else if let styled {
+                textView.replaceStyledDocument(with: styled)
+#if DEBUG
+                textView.refreshUITestPassageChipStateSnapshot()
+#endif
+            }
+            isApplyingProgrammaticChange = replaying
+            // Typing after this must open a new undo step, not coalesce into one the install replaced.
+            textView.breakUndoCoalescing()
+            guard !replaying else { return }
+            // The caret goes where the two states first differ, as a text undo leaves it near its edit.
+            let after = textView.string as NSString
+            var caret = 0
+            let shorter = min(before.length, after.length)
+            while caret < shorter, before.character(at: caret) == after.character(at: caret) { caret += 1 }
+            textView.setSelectedRange(NSRange(location: caret, length: 0))
+            textView.scrollRangeToVisible(NSRange(location: caret, length: 0))
+            flushWriteBack()
         }
 
         // MARK: Insert block (W4 seam)
