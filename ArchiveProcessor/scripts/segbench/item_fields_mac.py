@@ -118,8 +118,24 @@ def reading(model, inp, doc_id):
     p = reading_path(model, inp, doc_id)
     if not os.path.exists(p):
         return None
-    r = IF.parse(json.load(open(p, encoding="utf-8"))["raw"])
+    r, _how = parse_reply(json.load(open(p, encoding="utf-8"))["raw"])
     return r if r is not None else {f: None for f in IF.FIELDS}   # an unparsed reply fills nothing
+
+
+def parse_reply(raw):
+    """(reading, how): how is "parsed", "salvaged" or "unparsed". The small models copy OCR text into `quotes`
+    unescaped (a stray quote mark, a runaway string), which breaks the whole reply though the fields before it are
+    whole; `quotes` is never scored, so a reply that fails is read again cut at its `"quotes"` key."""
+    r = IF.parse(raw)
+    if r is not None:
+        return r, "parsed"
+    i = (raw or "").find('"quotes"')
+    if i > 0:
+        head = raw[:i].rstrip().rstrip(",")
+        r = IF.parse(head + "}")
+        if r is not None:
+            return r, "salvaged"
+    return None, "unparsed"
 
 
 _HAND = None
@@ -266,7 +282,8 @@ def run_summary():
             if got:
                 out[f"mac-{m}-{inp}"] = {
                     "docs": len(got), "of": sum(wanted(d, inp) for d in docs),
-                    "unparsed": sum(IF.parse(r["raw"]) is None for r in got),
+                    "salvaged": sum(parse_reply(r["raw"])[1] == "salvaged" for r in got),
+                    "unparsed": sum(parse_reply(r["raw"])[1] == "unparsed" for r in got),
                     "median_s": median([r["wall_s"] for r in got]), "total_h": round(sum(r["wall_s"] for r in got) / 3600, 2),
                     "median_prompt_tokens": median([r["tokens"][0] for r in got]),
                     "at_max_tokens": sum(r["tokens"][1] >= MAX_TOKENS for r in got),
@@ -290,7 +307,7 @@ def cmd_status(a):
                    if os.path.exists(reading_path(m, inp, d["id"]))]
             walls = sorted(r["wall_s"] for r in got)
             med = walls[len(walls) // 2] if walls else None
-            bad = sum(IF.parse(r["raw"]) is None for r in got)
+            bad = sum(parse_reply(r["raw"])[1] == "unparsed" for r in got)
             print(f"{m} {inp}: {len(got)} of {len(n)}, median {med} s, unparsed {bad}, "
                   f"peak {max((r.get('peak_gb') or 0) for r in got) if got else '-'} GB")
 

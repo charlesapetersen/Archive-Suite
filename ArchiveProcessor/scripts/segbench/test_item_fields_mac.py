@@ -61,6 +61,12 @@ class MacText(unittest.TestCase):
         r = M.reading("qwen3.5-4b", "image", "u")
         self.assertTrue(all(v is None for v in r.values()))
 
+    def test_a_broken_quotes_key_is_read_past(self):
+        raw = '{"kind": "memo", "byline": ["Ann Lee"],\n "quotes": {"byline": "FROM: "Ann" Lee"}}'
+        r, how = M.parse_reply(raw)
+        self.assertEqual((how, r["kind"], r["byline"]), ("salvaged", "memo", ["Ann Lee"]))
+        self.assertEqual(M.parse_reply("no json")[1], "unparsed")
+
 
 if __name__ == "__main__":
     unittest.main()

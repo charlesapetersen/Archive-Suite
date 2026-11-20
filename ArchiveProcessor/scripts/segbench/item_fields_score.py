@@ -440,6 +440,8 @@ def stratified(pred, gem, frows, field, skip, controls_out=False):
     parts = [(c[0], c[2], c[1]) for c in pool.values() if c[0]]
     bounds = [wilson(k, n) if n else (0.0, 1.0) for _N, k, n in parts]
     seen = [(N, k, n) for N, k, n in parts if n]
+    if not census[1] and not seen:
+        return None   # filled only pairs the owner never saw: no owner evidence for its precision
     point = (census[0] + sum(N * k / n for N, k, n in seen)) / (census[1] + sum(N for N, _k, _n in seen))
     return {"precision": point, "lo": (census[0] + sum(N * b[0] for (N, _k, _n), b in zip(parts, bounds))) / filled,
             "hi": (census[0] + sum(N * b[1] for (N, _k, _n), b in zip(parts, bounds))) / filled,
@@ -853,11 +855,13 @@ def mac_section(o):
          "4-bit weights are about 16 GB and this Mac has 18 GB of memory. No ABBYY text; $0. Every row is in the "
          "field tables above, judged on the drafted truth like the other local rows; the second verdict below is "
          "on the owner's values alone (the stratified figure), which the item asks for.", "",
-         "| route | documents | unparsed | median s a document | hours | peak GB |", "|---|---|---|---|---|---|"]
+         "| route | documents | read past a broken `quotes` key | unparsed | median s a document | hours | peak GB |",
+         "|---|---|---|---|---|---|---|"]
     for rk in MAC:
         r = runs.get(rk)
         if r:
-            L.append(f"| {lab[rk]} | {r['docs']} of {r['of']} | {r['unparsed']} | {r['median_s']} | {r['total_h']} | "
+            L.append(f"| {lab[rk]} | {r['docs']} of {r['of']} | {r['salvaged']} | {r['unparsed']} | {r['median_s']} | "
+                     f"{r['total_h']} | "
                      f"{r['peak_gb']} |")
     if runs.get("lighton"):
         lt = runs["lighton"]
