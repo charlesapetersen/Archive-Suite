@@ -17,6 +17,8 @@ struct IndexRow: Sendable {
     /// Page 2's item fields and the user's corrections beside the file (W49.reader-item-fields-search).
     var headerFields: [CheckableField: String] = [:]
     var userFields: [CheckableField: String] = [:]
+    /// The JSON sidecar's names (W49.reader-sidecar-names-index).
+    var sidecarNames: [CheckableField: String] = [:]
 }
 
 /// What the index compares to decide a file's text is current (W44.reocr-reader-freshness): the content
@@ -71,13 +73,15 @@ actor ContentIndex {
             // W44.reocr-reader-freshness: the freshness key gained `inode`/`size`. A table written before
             // that is dropped with its text and rebuilt by the next pass — no migration, the index is a
             // cache, and dropping inside the same file leaves no orphan behind.
-            // W49.reader-item-fields-search: the same for `header_fields`/`user_fields` and the FTS `fields` column.
+            // W49.reader-item-fields-search: the same for `header_fields`/`user_fields` and the FTS `fields` column;
+            // W49.reader-sidecar-names-index: and for `sidecar_names`.
             let columns = try columnNames("files")
-            if !columns.isEmpty, !columns.contains("inode") || !columns.contains("user_fields") {
+            if !columns.isEmpty,
+               !columns.contains("inode") || !columns.contains("user_fields") || !columns.contains("sidecar_names") {
                 try exec("DROP TABLE IF EXISTS fts;")
                 try exec("DROP TABLE files;")
             }
-            try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL, inode INTEGER, size INTEGER, page_count INTEGER, has_text INTEGER, readable INTEGER, header_fields TEXT, user_fields TEXT);")
+            try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL, inode INTEGER, size INTEGER, page_count INTEGER, has_text INTEGER, readable INTEGER, header_fields TEXT, user_fields TEXT, sidecar_names TEXT);")
             try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(body, classification, name, fields, path UNINDEXED);")
         } catch {
             // `sqlite3_open_v2` is lazy: a corrupt or foreign file opens cleanly and fails on the
@@ -160,12 +164,13 @@ actor ContentIndex {
     func upsert(path: String, mtime: Double, identity: ContentIdentity? = nil, name: String,
                 classification: String?, body: String,
                 pageCount: Int = 0, hasText: Bool = true, readable: Bool = true,
-                headerFields: [CheckableField: String] = [:], userFields: [CheckableField: String] = [:]) throws {
+                headerFields: [CheckableField: String] = [:], userFields: [CheckableField: String] = [:],
+                sidecarNames: [CheckableField: String] = [:]) throws {
         try exec("BEGIN IMMEDIATE;")
         do {
             try upsertRow(path: path, mtime: mtime, identity: identity, name: name, classification: classification,
                           body: body, pageCount: pageCount, hasText: hasText, readable: readable,
-                          headerFields: headerFields, userFields: userFields)
+                          headerFields: headerFields, userFields: userFields, sidecarNames: sidecarNames)
             try exec("COMMIT;")
         } catch {
             try? exec("ROLLBACK;")
@@ -184,7 +189,8 @@ actor ContentIndex {
                 try upsertRow(path: row.path, mtime: row.mtime, identity: row.identity, name: row.name,
                               classification: row.classification, body: row.body,
                               pageCount: row.pageCount, hasText: row.hasText, readable: row.readable,
-                              headerFields: row.headerFields, userFields: row.userFields)
+                              headerFields: row.headerFields, userFields: row.userFields,
+                              sidecarNames: row.sidecarNames)
             }
             try exec("COMMIT;")
         } catch {
@@ -198,9 +204,11 @@ actor ContentIndex {
     private func upsertRow(path: String, mtime: Double, identity: ContentIdentity?, name: String,
                            classification: String?,
                            body: String, pageCount: Int, hasText: Bool, readable: Bool,
-                           headerFields: [CheckableField: String], userFields: [CheckableField: String]) throws {
+                           headerFields: [CheckableField: String], userFields: [CheckableField: String],
+                           sidecarNames: [CheckableField: String]) throws {
         let header = IndexedItemFields.encode(headerFields), user = IndexedItemFields.encode(userFields)
-        let fields = IndexedItemFields.searchText(userFields)
+        let names = IndexedItemFields.encode(sidecarNames)
+        let fields = IndexedItemFields.searchText(userFields, names: sidecarNames)
         var rowid: Int64? = nil
         if let sel = prepare("SELECT rowid FROM files WHERE path = ?;") {
             bindText(sel, 1, path)
@@ -209,7 +217,7 @@ actor ContentIndex {
         }
         if let rowid {
             try run("DELETE FROM fts WHERE rowid = ?;") { sqlite3_bind_int64($0, 1, rowid) }
-            try run("UPDATE files SET mtime = ?, inode = ?, size = ?, page_count = ?, has_text = ?, readable = ?, header_fields = ?, user_fields = ? WHERE rowid = ?;") {
+            try run("UPDATE files SET mtime = ?, inode = ?, size = ?, page_count = ?, has_text = ?, readable = ?, header_fields = ?, user_fields = ?, sidecar_names = ? WHERE rowid = ?;") {
                 sqlite3_bind_double($0, 1, mtime)
                 self.bindIdentity($0, 2, identity)
                 sqlite3_bind_int($0, 4, Int32(pageCount))
@@ -217,11 +225,12 @@ actor ContentIndex {
                 sqlite3_bind_int($0, 6, readable ? 1 : 0)
                 self.bindText($0, 7, header)
                 self.bindText($0, 8, user)
-                sqlite3_bind_int64($0, 9, rowid)
+                self.bindText($0, 9, names)
+                sqlite3_bind_int64($0, 10, rowid)
             }
             try insertFTS(rowid: rowid, body: body, classification: classification, name: name, fields: fields, path: path)
         } else {
-            try run("INSERT INTO files(path, mtime, inode, size, page_count, has_text, readable, header_fields, user_fields) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?);") {
+            try run("INSERT INTO files(path, mtime, inode, size, page_count, has_text, readable, header_fields, user_fields, sidecar_names) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);") {
                 self.bindText($0, 1, path); sqlite3_bind_double($0, 2, mtime)
                 self.bindIdentity($0, 3, identity)
                 sqlite3_bind_int($0, 5, Int32(pageCount))
@@ -229,6 +238,7 @@ actor ContentIndex {
                 sqlite3_bind_int($0, 7, readable ? 1 : 0)
                 self.bindText($0, 8, header)
                 self.bindText($0, 9, user)
+                self.bindText($0, 10, names)
             }
             let newRow = sqlite3_last_insert_rowid(db)
             try insertFTS(rowid: newRow, body: body, classification: classification, name: name, fields: fields, path: path)
@@ -431,11 +441,12 @@ actor ContentIndex {
     /// The FTS column index of `fields`, for `snippet()`.
     nonisolated static let fieldsColumn: Int32 = 3
 
-    /// Page 2's item fields and the user's corrections, per indexed path among `paths` that has either. One scan of
-    /// the rows that have any, since most files (made before the apps) have none.
+    /// Page 2's item fields, the sidecar's names and the user's corrections, per indexed path among `paths` that has
+    /// any. One scan of the rows that have any, since most files (made before the apps) have none.
     func itemFields(for paths: [String]) -> [String: IndexedItemFields] {
-        guard !paths.isEmpty, let stmt = prepare("SELECT path, header_fields, user_fields FROM files "
-                                                 + "WHERE header_fields <> '' OR user_fields <> '';") else { return [:] }
+        guard !paths.isEmpty, let stmt = prepare("SELECT path, header_fields, user_fields, sidecar_names FROM files "
+                                                 + "WHERE header_fields <> '' OR user_fields <> '' "
+                                                 + "OR sidecar_names <> '';") else { return [:] }
         defer { sqlite3_finalize(stmt) }
         let wanted = Set(paths)
         var out: [String: IndexedItemFields] = [:]
@@ -445,8 +456,10 @@ actor ContentIndex {
             guard wanted.contains(path) else { continue }
             let header = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
             let user = sqlite3_column_text(stmt, 2).map { String(cString: $0) } ?? ""
+            let names = sqlite3_column_text(stmt, 3).map { String(cString: $0) } ?? ""
             let fields = IndexedItemFields(header: IndexedItemFields.fields(IndexedItemFields.decode(header)),
-                                           user: IndexedItemFields.decode(user))
+                                           user: IndexedItemFields.decode(user),
+                                           names: IndexedItemFields.decode(names))
             if !fields.isEmpty { out[path] = fields }
         }
         return out
@@ -474,10 +487,13 @@ actor ContentIndex {
         do {
             var changed = 0
             for (path, values) in changes {
-                var rowid: Int64?
-                if let sel = prepare("SELECT rowid FROM files WHERE path = ?;") {
+                var rowid: Int64?, names: [CheckableField: String] = [:]
+                if let sel = prepare("SELECT rowid, sidecar_names FROM files WHERE path = ?;") {
                     bindText(sel, 1, path)
-                    if sqlite3_step(sel) == SQLITE_ROW { rowid = sqlite3_column_int64(sel, 0) }
+                    if sqlite3_step(sel) == SQLITE_ROW {
+                        rowid = sqlite3_column_int64(sel, 0)
+                        names = IndexedItemFields.decode(sqlite3_column_text(sel, 1).map { String(cString: $0) } ?? "")
+                    }
                     sqlite3_finalize(sel)
                 }
                 guard let rowid else { continue }
@@ -486,7 +502,7 @@ actor ContentIndex {
                     sqlite3_bind_int64($0, 2, rowid)
                 }
                 try run("UPDATE fts SET fields = ? WHERE rowid = ?;") {
-                    self.bindText($0, 1, IndexedItemFields.searchText(values))
+                    self.bindText($0, 1, IndexedItemFields.searchText(values, names: names))
                     sqlite3_bind_int64($0, 2, rowid)
                 }
                 changed += 1

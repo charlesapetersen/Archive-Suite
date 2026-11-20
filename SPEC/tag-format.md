@@ -162,8 +162,8 @@ the container file (`SPEC/containers.md`).
   file name as it is in the folder (compared composed, NFC), the field keys `documentKind`, `title`, `byline`,
   `publication`, `publicationDate`, `recipientPlace`, and for the sidecar's names `sender`, `recipient`, `sendingPlace`
 (W49.reader-sender-row-check; several names kept separated by "; ", a value of separators alone stored as `""`; the
-sidecar left as it is; a name is shown in the Checks and exported to Zotero in place of the sidecar's and searched, but
-not yet shown in the Item fields column, W49.reader-sidecar-names-index). A value replaces page 2's wherever an app shows or exports the
+sidecar left as it is; a name is shown in the Checks, the Reader's search and Item fields column, and exported to Zotero
+in place of the sidecar's, W49.reader-sidecar-names-index). A value replaces page 2's wherever an app shows or exports the
   field (the Reader's Checks, its search and Item fields column through the disposable content index, the Zotero
   export); `""` says the file has no such field, hiding page 2's (and, for the
   kind, the tagging call's format standing in for one). Taking the user's value away removes its key, and a file left

@@ -307,7 +307,8 @@ final class ContentIndexer: ObservableObject {
                                 pageCount: content.pageCount,
                                 hasText: !content.fullBody.isEmpty, readable: true,
                                 headerFields: IndexedItemFields.values(of: IndexedItemFields.header(of: content)),
-                                userFields: user)
+                                userFields: user,
+                                sidecarNames: IndexedItemFields.names(of: ZoteroSidecar.read(pdf: file.url)))
             }
             return IndexRow(path: path, mtime: stamp.mtime, identity: stamp.identity, name: file.name,
                             classification: nil, body: "",

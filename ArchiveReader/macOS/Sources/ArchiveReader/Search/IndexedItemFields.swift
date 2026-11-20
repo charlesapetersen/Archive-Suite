@@ -6,43 +6,63 @@ import ArchiveCore
 // Page 2's item fields are read when the file's text is extracted; the user's corrections (`UserItemFields`, the
 // folder's `.archivesuite/item-fields.json`) are read beside them on every pass and after every correction, undo or
 // redo. Both are kept in the disposable content index, so search matches a corrected value and the list's Item fields
-// column shows what the Inspector shows. Display and search only; nothing here is written to an archive file.
+// column shows what the Inspector shows. The JSON sidecar's sender, recipient and sending place are read with the text
+// and kept beside page 2's values (W49.reader-sidecar-names-index). Display and search only; nothing here is written
+// to an archive file.
 
 struct IndexedItemFields: Equatable, Sendable {
     /// Page 2's values, as the Processor wrote them.
     var header = PDFItemFields()
     /// The user's values; "" is "none", hiding page 2's.
     var user: [CheckableField: String] = [:]
+    /// The JSON sidecar's names (`CheckableField.nameFields`), several joined with "; ".
+    var names: [CheckableField: String] = [:]
 
-    var isEmpty: Bool { header.isEmpty && user.isEmpty }
+    var isEmpty: Bool { header.isEmpty && user.isEmpty && names.isEmpty }
 
     /// What the Inspector shows: the user's values over page 2's.
     var shown: PDFItemFields { UserItemFields.applied(user, to: header) }
 
-    /// The fields the list's column gives, title first, as one line.
+    /// The names the Inspector shows: the user's over the sidecar's, "none" giving no name.
+    var shownNames: [CheckableField: String] { Self.shownNames(names, user: user) }
+
+    static func shownNames(_ names: [CheckableField: String],
+                           user: [CheckableField: String]) -> [CheckableField: String] {
+        var out: [CheckableField: String] = [:]
+        for f in CheckableField.nameFields {
+            if let v = user[f] ?? names[f], !v.isEmpty { out[f] = v }
+        }
+        return out
+    }
+
+    /// The fields the list's column gives, title first, as one line. The names follow them (`nameFields`): a letter
+    /// often has no title, and its sender is then the first thing the column shows; where there is a title, the
+    /// column's width truncates the names first, and the tooltip lists them all.
     static let columnOrder: [CheckableField] = [.title, .byline, .publication, .publicationDate, .documentKind,
                                                 .recipientPlace]
 
     /// The column's text: each shown value in `columnOrder`, joined; nil when none is shown.
     var columnText: String? {
-        let s = shown
-        let values = Self.columnOrder.compactMap { $0.value(in: s) }
+        let s = shown, n = shownNames
+        let values = Self.columnOrder.compactMap { $0.value(in: s) } + CheckableField.nameFields.compactMap { n[$0] }
         return values.isEmpty ? nil : values.joined(separator: " · ")
     }
 
     /// The column's tooltip: one line per shown field, a corrected one marked as the user's.
     var columnToolTip: String? {
-        let s = shown
-        let lines = Self.columnOrder.compactMap { field -> String? in
-            guard let v = field.value(in: s) else { return nil }
+        let s = shown, n = shownNames
+        let lines = (Self.columnOrder + CheckableField.nameFields).compactMap { field -> String? in
+            guard let v = field.value(in: s) ?? n[field] else { return nil }
             return "\(field.label): \(v)" + (user[field] != nil ? " (your value)" : "")
         }
         return lines.isEmpty ? nil : lines.joined(separator: "\n")
     }
 
-    /// The user's values as the index searches them: every non-empty one, one per line.
-    static func searchText(_ user: [CheckableField: String]) -> String {
-        CheckableField.correctable.compactMap { f in user[f].flatMap { $0.isEmpty ? nil : $0 } }.joined(separator: "\n")
+    /// The values the index searches beside the text, one per line: every non-empty one of the user's, and the
+    /// sidecar's names the user has not corrected. Page 2's own values are in the text already.
+    static func searchText(_ user: [CheckableField: String], names: [CheckableField: String] = [:]) -> String {
+        CheckableField.correctable.compactMap { f in (user[f] ?? names[f]).flatMap { $0.isEmpty ? nil : $0 } }
+            .joined(separator: "\n")
     }
 
     // MARK: Stored form (a JSON object keyed by `CheckableField.jsonKey`)
@@ -68,6 +88,14 @@ struct IndexedItemFields: Equatable, Sendable {
     static func values(of fields: PDFItemFields) -> [CheckableField: String] {
         var out: [CheckableField: String] = [:]
         for f in CheckableField.itemFields { if let v = f.value(in: fields) { out[f] = v } }
+        return out
+    }
+
+    /// A sidecar's names as stored values.
+    static func names(of sidecar: ZoteroSidecar?) -> [CheckableField: String] {
+        guard let sidecar else { return [:] }
+        var out: [CheckableField: String] = [:]
+        for f in CheckableField.nameFields { if let v = f.value(in: sidecar) { out[f] = v } }
         return out
     }
 

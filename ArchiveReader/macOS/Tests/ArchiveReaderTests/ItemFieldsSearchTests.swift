@@ -205,6 +205,131 @@ final class ItemFieldsSearchTests: XCTestCase {
     }
 }
 
+// MARK: - W49.reader-sidecar-names-index: the JSON sidecar's names reach search and the column
+
+@MainActor
+final class SidecarNamesIndexTests: XCTestCase {
+    private let root = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("SidecarNamesIndex-\(UUID().uuidString)", isDirectory: true)
+
+    override func setUpWithError() throws {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    private var database: URL { root.appendingPathComponent("content.sqlite3") }
+
+    /// The sidecar's names are searched with the text; the user's correction replaces them, and "none" hides them.
+    func testTheIndexSearchesTheNamesUnderTheUsersCorrection() async throws {
+        let index = ContentIndex(url: database)
+        try await index.open()
+        try await index.upsertBatch([
+            IndexRow(path: "/a.pdf", mtime: 1, name: "a.pdf", classification: nil, body: "Dear Sir,", pageCount: 2,
+                     hasText: true, readable: true,
+                     sidecarNames: [.sender: "Eleanor Vance", .recipient: "John Doe; Mary Roe", .sendingPlace: "Boston"]),
+            IndexRow(path: "/b.pdf", mtime: 1, name: "b.pdf", classification: nil, body: "Nothing.", pageCount: 2,
+                     hasText: true, readable: true),
+        ])
+        var hits = await index.search("Vance")
+        XCTAssertEqual(hits, ["/a.pdf"], "the sender is found though the text does not name her")
+        hits = await index.search("Roe")
+        XCTAssertEqual(hits, ["/a.pdf"], "each of several recipients is found")
+        var fields = await index.itemFields(for: ["/a.pdf", "/b.pdf"])
+        XCTAssertEqual(fields["/a.pdf"]?.shownNames[.sendingPlace], "Boston")
+        XCTAssertNil(fields["/b.pdf"], "a file with no names and no item fields has no entry")
+
+        try await index.setUserFields(["/a.pdf": [.sender: "Eleanor Vane", .sendingPlace: ""]])
+        hits = await index.search("Vance")
+        XCTAssertEqual(hits, [], "a corrected sender replaces the sidecar's")
+        hits = await index.search("Vane")
+        XCTAssertEqual(hits, ["/a.pdf"])
+        hits = await index.search("Boston")
+        XCTAssertEqual(hits, [], "\"none\" hides the sidecar's sending place")
+        hits = await index.search("Doe")
+        XCTAssertEqual(hits, ["/a.pdf"], "a name the user did not correct is still found")
+        fields = await index.itemFields(for: ["/a.pdf"])
+        XCTAssertEqual(fields["/a.pdf"]?.shownNames, [.sender: "Eleanor Vane", .recipient: "John Doe; Mary Roe"])
+
+        try await index.setUserFields(["/a.pdf": [:]])
+        hits = await index.search("Boston")
+        XCTAssertEqual(hits, ["/a.pdf"], "removing the correction brings the sidecar's name back")
+        await index.close()
+    }
+
+    /// An index written before `sidecar_names` is dropped and rebuilt, so every file's names are read.
+    func testAnIndexWithoutTheNamesColumnIsRebuilt() async throws {
+        var db: OpaquePointer?
+        XCTAssertEqual(sqlite3_open(database.path, &db), SQLITE_OK)
+        for sql in ["CREATE TABLE files(path TEXT PRIMARY KEY, mtime REAL, inode INTEGER, size INTEGER, page_count INTEGER, has_text INTEGER, readable INTEGER, header_fields TEXT, user_fields TEXT);",
+                    "CREATE VIRTUAL TABLE fts USING fts5(body, classification, name, fields, path UNINDEXED);",
+                    "INSERT INTO files(path, mtime) VALUES('/old.pdf', 1);"] {
+            XCTAssertEqual(sqlite3_exec(db, sql, nil, nil, nil), SQLITE_OK, sql)
+        }
+        sqlite3_close(db)
+        let index = ContentIndex(url: database)
+        try await index.open()
+        let stamps = await index.existingStamps()
+        XCTAssertTrue(stamps.isEmpty, "the old rows are gone, so every file is extracted again")
+        await index.close()
+    }
+
+    private func waitForPasses(_ driver: ContentIndexer, _ n: Int) async throws {
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline, driver.completedPassesForTesting < n { try await Task.sleep(nanoseconds: 10_000_000) }
+        XCTAssertEqual(driver.completedPassesForTesting, n)
+    }
+
+    /// A pass reads each extracted file's sidecar, beside it or in its folder's `JSON Output`, as the Inspector does.
+    func testAPassReadsTheSidecarBesideTheFileAndInJSONOutput() async throws {
+        let dir = root.appendingPathComponent("Box 4", isDirectory: true)
+        let output = dir.appendingPathComponent(ZoteroSidecar.folderName, isDirectory: true)
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        let a = dir.appendingPathComponent("a.pdf"), b = dir.appendingPathComponent("b.pdf")
+        let c = dir.appendingPathComponent("c.pdf")
+        for u in [a, b, c] { try Data("scratch fixture".utf8).write(to: u) }
+        try Data(#"{"author_name": "Eleanor Vance", "recipient_name": ["John Doe"]}"#.utf8)
+            .write(to: dir.appendingPathComponent("a.json"))
+        try Data((#"{"entities": {"status": "extracted", "sender": [{"name": "Harold Pike", "evidence": "inferred"}], "#
+                  + #""sending_place": [{"name": "Salem", "evidence": "inferred"}]}}"#).utf8)
+            .write(to: output.appendingPathComponent("b.json"))
+        let files = [a, b, c].map {
+            ArchiveFile(url: $0, name: $0.lastPathComponent, fileType: "PDF",
+                        tags: DocumentTags.parse(raw: ["Unread"], labelNumber: nil),
+                        contentModified: Date(timeIntervalSince1970: 20))
+        }
+        let driver = ContentIndexer(url: database, extractPDFForTesting: { _ in
+            ExtractedContent(fullBody: "plain text", strippedBody: "plain text", classification: nil, pageCount: 2)
+        })
+        driver.startIndexing(files)
+        try await waitForPasses(driver, 1)
+        var hits = await driver.search("Vance")
+        XCTAssertEqual(hits, [a.path])
+        hits = await driver.search("Pike")
+        XCTAssertEqual(hits, [b.path], "the JSON Output folder's sidecar is read")
+        hits = await driver.search("Salem")
+        XCTAssertEqual(hits, [], "an inferred sending place is not one the sidecar keeps")
+        let shown = await driver.itemFields(for: [a.path, b.path, c.path])
+        XCTAssertEqual(shown[a.path]?.columnText, "Eleanor Vance · John Doe")
+        XCTAssertEqual(shown[b.path]?.columnText, "Harold Pike")
+        XCTAssertNil(shown[c.path], "a file with no sidecar has no entry")
+        await driver.closeForTesting()
+    }
+
+    func testTheColumnGivesTheNamesAfterTheItemFields() {
+        let fields = IndexedItemFields(header: PDFItemFields(documentKind: "letter"),
+                                       user: [.recipient: "Mary Roe", .sendingPlace: ""],
+                                       names: [.sender: "Eleanor Vance", .recipient: "John Doe",
+                                               .sendingPlace: "Boston"])
+        XCTAssertEqual(fields.columnText, "letter · Eleanor Vance · Mary Roe", "the user's over the sidecar's")
+        XCTAssertEqual(fields.columnToolTip, "Kind: letter\nSender: Eleanor Vance\nRecipient: Mary Roe (your value)")
+        XCTAssertEqual(IndexedItemFields.searchText(fields.user, names: fields.names), "Eleanor Vance\nMary Roe")
+        XCTAssertNil(IndexedItemFields(user: [.sender: ""], names: [.sender: "X"]).columnText)
+    }
+}
+
 private final class ExtractionCounter: @unchecked Sendable {
     private let lock = NSLock()
     private var value = 0
