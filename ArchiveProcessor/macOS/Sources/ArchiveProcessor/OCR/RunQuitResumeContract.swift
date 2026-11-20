@@ -1,12 +1,14 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import AppKit
 import Foundation
+import PDFKit
 
 /// Key-free, no-network contract for W49.proc-resume-standard-runs. An interrupted standard Files run, resumed through
 /// the REAL `resumeRun` over the injected HTTP transport, is asked to quit while pages are being read: it must start no
 /// new page, save the pages in flight to the run's manifest, stop with the manifest kept and then quit; a second
 /// resume reads only the pages left, and no page is read twice. Also the Interrupted Run box's note for pages missing
 /// since the run began, the guard that sends nothing for them, the sleep hold, and a Stop that takes the quit back.
+/// W49.proc-stop-saves-inflight: Stop waits the same way (and Stop Now does not), and the mixed-PDF route waits too.
 /// The journal is redirected into a temporary directory the way `InstitutionalComputeImportTestDriver` does it;
 /// nothing outside it is read or written.
 ///
@@ -59,7 +61,7 @@ enum RunQuitResumeContract {
         let input = root.appendingPathComponent("input", isDirectory: true)
         let output = root.appendingPathComponent("output", isDirectory: true)
         try? fm.createDirectory(at: output, withIntermediateDirectories: true)
-        let pages = (1...6).map { input.appendingPathComponent(String(format: "p%02d.jpg", $0)) }
+        let pages = (1...8).map { input.appendingPathComponent(String(format: "p%02d.jpg", $0)) }
         guard pages.dropLast().allSatisfy({ makeJPEG($0, shade: 0.1 * Double(pages.firstIndex(of: $0)! + 1)) }) else {
             finish(["FAIL: fixture JPEGs could not be created"])
             return
@@ -121,12 +123,12 @@ enum RunQuitResumeContract {
         check("the note is part of the box's text", box.pendingRunInfo?.hasSuffix(note) == true,
               box.pendingRunInfo ?? "nil")
         let missing = await OCRProcessor.performOCRCall(
-            imageURL: pages[5], provider: .gemini, model: model, thinkingLevel: nil, apiKey: "test-key",
+            imageURL: pages[pages.count - 1], provider: .gemini, model: model, thinkingLevel: nil, apiKey: "test-key",
             previousText: nil, previousImageURL: nil, rotationMode: .off, standardImageMB: 3, cascade: .off)
         let requestsForMissing = await gate.count()
         check("a missing page fails before any request", missing.text == nil && missing.errorCode == "source_missing"
               && requestsForMissing == 0, "\(missing.errorCode ?? "nil"), \(requestsForMissing) requests")
-        guard makeJPEG(pages[5], shade: 0.9) else { finish(results + ["FAIL: the sixth page is put back"]); return }
+        guard makeJPEG(pages[pages.count - 1], shade: 0.9) else { finish(results + ["FAIL: the sixth page is put back"]); return }
         check("with the page back the note is gone", OCRProcessor.pendingRunMissingNote(run).isEmpty)
 
         // 2. Quit while pages are being read.
@@ -201,13 +203,146 @@ enum RunQuitResumeContract {
         check("Stop takes a waiting quit back", !third.quitWhenPagesSaved && quits.value == 2
               && !OCRProcessor.quitApproved && fm.fileExists(atPath: manifest.path), "quits \(quits.value)")
 
-        // 5. Outside the main pass there is nothing in flight to wait for.
+        // 5. Stop waits for the pages in flight too, and the app stays open (W49.proc-stop-saves-inflight).
+        await gate.close()
+        let savedBeforeStop = OCRProcessor._testReadPendingRun(from: manifest)?.completedResults.count ?? -1
+        let requestsBeforeStop = await gate.count()
+        let fourth = OCRProcessor()
+        let fourthRun = Task { await fourth.resumeRun(apiKey: "test-key") }
+        fourth.processingTask = fourthRun
+        _ = await waitFor { await gate.count() > requestsBeforeStop }
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        let stopInFlight = await gate.count() - requestsBeforeStop
+        fourth.requestStop()
+        check("Stop in the main pass waits for the pages in flight", fourth.stopWhenPagesSaved && fourth.isProcessing
+              && fourth.statusMessage == OCRProcessor.stopWaitMessage, fourth.statusMessage)
+        await gate.release()
+        await fourthRun.value
+        _ = await waitFor { !fourth.isProcessing }
+        let afterStop = OCRProcessor._testReadPendingRun(from: manifest)
+        let requestsAfterStop = await gate.count()
+        check("no page is started once Stop is asked", requestsAfterStop == requestsBeforeStop + stopInFlight,
+              "\(stopInFlight) in flight, \(requestsAfterStop - requestsBeforeStop) sent")
+        check("every page in flight at Stop is saved to the manifest",
+              stopInFlight > 0 && afterStop?.completedResults.count == savedBeforeStop + stopInFlight,
+              "\(savedBeforeStop) before, \(afterStop?.completedResults.count ?? -1) after, \(stopInFlight) in flight")
+        check("the waited Stop keeps the manifest and does not quit", !fourth.isProcessing && !fourth.drainingPages
+              && quits.value == 2 && !OCRProcessor.quitApproved && afterStop != nil
+              && fourth.statusMessage.hasSuffix(OCRProcessor.stoppedAfterDrainNote),
+              "quits \(quits.value), \(fourth.statusMessage)")
+
+        // 6. Stop Now, the second press, stops at once for a page that hangs.
+        await gate.close()
+        let requestsBeforeStopNow = await gate.count()
+        let fifth = OCRProcessor()
+        let fifthRun = Task { await fifth.resumeRun(apiKey: "test-key") }
+        fifth.processingTask = fifthRun
+        _ = await waitFor { await gate.count() > requestsBeforeStopNow }
+        fifth.requestStop()
+        let waiting = fifth.drainingPages
+        fifth.requestStop()
+        check("Stop Now stops at once while the page is still out", waiting && !fifth.drainingPages
+              && !fifth.isProcessing && fm.fileExists(atPath: manifest.path) && quits.value == 2)
+        await gate.release()
+        await fifthRun.value
+
+        // 7. Outside the main pass there is nothing in flight to wait for.
         let idle = OCRProcessor()
         idle.beginQuitWhenPagesSaved()
         check("a processor not reading pages does not wait", !idle.quitWhenPagesSaved)
+        idle.isProcessing = true
+        idle.requestStop()
+        check("Stop outside the main pass stops at once", !idle.drainingPages && !idle.isProcessing)
+
+        // 8. A run stopped at once that is still unwinding neither unmarks nor stops a newer run's pass.
+        let reused = OCRProcessor()
+        reused.isProcessing = true
+        let stale = reused.beginDrainablePass()
+        let current = reused.beginDrainablePass()
+        reused.requestStop()
+        reused.endDrainablePass(stale)
+        check("an older pass ending leaves the newer one waiting", reused.ocrPhaseActive && reused.stopWhenPagesSaved
+              && reused.isProcessing)
+        reused.endDrainablePass(current)
+        check("the newer pass ending finishes its own Stop", !reused.ocrPhaseActive && !reused.drainingPages
+              && !reused.isProcessing)
 
         try? fm.removeItem(at: manifest)
+        await mixedRouteWaits(root: root, gate: gate) { check($0, $1, $2) }
         finish(results)
+    }
+
+    /// The mixed-PDF route, whose recovery record keeps each page's reading as it lands: a Stop asked while a page is
+    /// read lets it land in the record (not held as "may have been billed") and starts no new page; the record stays.
+    private static func mixedRouteWaits(root: URL, gate: Gate,
+                                        check: (String, Bool, String) -> Void) async {
+        let fm = FileManager.default
+        let out = root.appendingPathComponent("mixed-out", isDirectory: true)
+        try? fm.createDirectory(at: out, withIntermediateDirectories: true)
+        let image = root.appendingPathComponent("mixed-image.jpg")
+        let pdf = root.appendingPathComponent("mixed.pdf")
+        let document = PDFDocument()
+        for i in 0..<3 {
+            let page = NSImage(size: NSSize(width: 60, height: 80))
+            page.lockFocus()
+            NSColor(white: 0.2 + 0.2 * Double(i), alpha: 1).setFill()
+            NSRect(x: 0, y: 0, width: 60, height: 80).fill()
+            page.unlockFocus()
+            if let pdfPage = PDFPage(image: page) { document.insert(pdfPage, at: i) }
+        }
+        guard makeJPEG(image, shade: 0.5), document.write(to: pdf) else {
+            check("the mixed fixture is written", false, "")
+            return
+        }
+        let files = [image, pdf]
+        let model = LLMModel.geminiModels[0]
+        let config = SessionProcessingConfig.fromProcessFilesRunStart()
+        let mixed = OCRProcessor()
+        mixed.taggingMode = .none
+        guard mixed.beginMixedPDFJournal(
+            originalFiles: files, pdfIndices: [1], outputDirectory: out, provider: .gemini, model: model,
+            thinkingLevel: nil, batchMode: false, enableTagging: false, enableSegmentJSON: false,
+            enableCollectionSegmentation: false, confirmCollectionIDs: false, reviewDocumentSegmentation: false,
+            segmentationContext: SegmentationContext(previousTextCharCount: 0, sendPreviousImage: false,
+                                                     customPrompt: nil, imageScale: 1),
+            gatewayConfig: nil, localAgent: nil, runConfig: config) else {
+            check("the mixed run's recovery record is started", false, "")
+            return
+        }
+        mixed.jobs = files.map { OCRJob(sourceURL: $0) }
+        mixed.isProcessing = true
+        await gate.close()
+        let before = await gate.count()
+        let run = Task {
+            await mixed.performMultiPagePDFReOCR(
+                files: [(jobIndex: 1, url: pdf)], provider: .gemini, model: model, thinkingLevel: nil, apiKey: "",
+                outputDirectory: out, runConfig: config, ocrOverride: { _ in
+                    await gate.arrive()
+                    while !(await gate.isOpen()) { try? await Task.sleep(nanoseconds: 20_000_000) }
+                    return OCRResult(text: "MIXED-PAGE", classification: nil, errorMessage: nil, errorCode: nil)
+                })
+        }
+        mixed.processingTask = run
+        _ = await waitFor { await gate.count() > before }
+        check("the mixed route counts as the pass a quit can wait on", mixed.ocrPhaseActive, "")
+        mixed.requestStop()
+        check("Stop in the mixed route waits for the page being read", mixed.stopWhenPagesSaved, mixed.statusMessage)
+        await gate.release()
+        await run.value
+        _ = await waitFor { !mixed.isProcessing }
+        let record = OCRProcessor.loadPendingMixedPDF()
+        let sent = await gate.count() - before
+        let firstPage = OCRProcessor.mixedPDFPageKey(index: 1, page: 0)
+        check("the mixed route starts no page after Stop and keeps the one read", sent == 1
+              && record?.pageResults[firstPage]?.text == "MIXED-PAGE"
+              && record?.pageResults.count == 1 && record?.inFlightPage == nil,
+              "\(sent) sent, \(record?.pageResults.keys.sorted() ?? []), in flight \(record?.inFlightPage ?? "none")")
+        check("the mixed run stops with its record kept", !mixed.isProcessing && !mixed.drainingPages
+              && !mixed.ocrPhaseActive && record != nil, "")
+        _ = await waitFor { !mixed.mixedPDFCancellationUnwinding }
+        check("the mixed run says the page being read was saved",
+              mixed.statusMessage.hasSuffix(OCRProcessor.stoppedAfterDrainNote), mixed.statusMessage)
+        OCRProcessor.deletePendingMixedPDF()
     }
 
     private static func waitFor(_ condition: @MainActor () async -> Bool) async -> Bool {

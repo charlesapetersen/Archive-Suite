@@ -456,7 +456,7 @@ struct OCRView: View {
         .onReceive(NotificationCenter.default.publisher(for: .stopProcessingRequested)) { _ in
             guard !TextEditingGuard.isEditingText, !SheetGuard.sheetIsUp, processor.isProcessing || isInReviewMode
             else { return }
-            processor.cancel()
+            processor.requestStop()   // W49.proc-stop-saves-inflight: waits for the pages being read, as the button does
         }
         .onReceive(NotificationCenter.default.publisher(for: .addFilesRequested)) { _ in
             guard !SheetGuard.sheetIsUp, !isInReviewMode, !processor.isProcessing else { return }
@@ -961,7 +961,8 @@ struct OCRView: View {
                 }
 
                 if processor.isProcessing || isInReviewMode {
-                    Button("Cancel") { processor.cancel() }
+                    // W49.proc-stop-saves-inflight: in the OCR pass the first press waits for the pages being read.
+                    Button(processor.drainingPages ? "Stop Now" : "Cancel") { processor.requestStop() }
                         .buttonStyle(.bordered)
                         .frame(maxWidth: .infinity)
                 }

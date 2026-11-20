@@ -97,6 +97,10 @@ settings, then goes on to tagging and organizing. What it costs:
 
 - **Quit** while pages are being read asks first: **Quit When Pages Are Saved** finishes the pages in flight and
   starts no new one, so nothing is read twice; **Quit Now** loses those pages, which a resume reads again.
+- **Stop** (the Cancel button, ⌘.) while pages are being read does the same wait: the pages in flight are saved,
+  no new one starts, and the run stops with its manifest kept. The button then reads **Stop Now**, which stops at
+  once (for a page that hangs) and loses those pages. A mixed run's PDF half waits the same way for the page it is
+  reading, which its recovery record then keeps.
 - **A crash** loses only the pages in flight at that moment (at most one per OCR worker).
 - **Sleep**: while a run reads pages the app holds off idle sleep (not while it waits on a review sheet). Closing the lid still sleeps the Mac; the run
   carries on after waking, and a page whose request failed meanwhile is offered for retry at the end of the pass.

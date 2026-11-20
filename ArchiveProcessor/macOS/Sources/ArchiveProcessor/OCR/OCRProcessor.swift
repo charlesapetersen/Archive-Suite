@@ -15,8 +15,16 @@ class OCRProcessor: ObservableObject {
     /// W49.proc-resume-standard-runs: a quit is waiting for the pages being read to be saved. The OCR loops start no
     /// new page while it is set; when the last one is saved the run stops (its manifest kept) and the app quits.
     @Published var quitWhenPagesSaved = false
-    /// Whether the run is in its main OCR pass, the one stage a quit can wait on (`performOCRPhase` and its resume twin).
+    /// W49.proc-stop-saves-inflight: Stop asked in the main OCR pass waits the same way, so a reading already bought is
+    /// saved rather than read (and paid for) again on Resume Run; the run then stops and the app stays open.
+    @Published var stopWhenPagesSaved = false
+    /// Either wait: the OCR loops start no new page while it holds.
+    var drainingPages: Bool { quitWhenPagesSaved || stopWhenPagesSaved }
+    /// Whether the run is in its main OCR pass, the one stage a quit or Stop can wait on (`performOCRPhase`, its resume
+    /// twin, and the mixed-PDF route while its recovery record keeps each page).
     var ocrPhaseActive = false { didSet { updateRunActivity() } }
+    /// The pass `ocrPhaseActive` belongs to (`beginDrainablePass`).
+    var drainablePass: UUID?
     /// Every processor that has run, so the app's quit can ask about those still working.
     static var processorsThatRan: [WeakProcessor] = []
     struct WeakProcessor { weak var processor: OCRProcessor? }

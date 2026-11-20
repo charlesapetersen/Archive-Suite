@@ -321,9 +321,17 @@ extension OCRProcessor {
         let gatewayName = currentGateway?.displayName
         let localAgentDisplayName = localAgent?.provenanceDisplayName
         let localAgentModelName = localAgent?.provenanceModelName
+        // W49.proc-stop-saves-inflight: with a recovery record each page's reading is kept as it lands, so a quit or
+        // Stop can wait for the page being read rather than lose it (the record would hold it as "may have been
+        // billed"). Without one (a PDF-only run) nothing read before the PDF is rebuilt survives a stop, so it does
+        // not wait.
+        let pass = activePendingMixedPDF != nil ? beginDrainablePass() : nil
+        defer { if let pass { endDrainablePass(pass) } }
 
         for (ordinal, input) in files.enumerated() {
             guard !Task.isCancelled else { cleanupTempFiles(); return }
+            // The PDFs already rebuilt are in the record; the next one would start a new page.
+            guard !drainingPages else { cleanupTempFiles(); return }
             let index = input.jobIndex
             let pdfURL = input.url
             if let pending = activePendingMixedPDF,
@@ -387,7 +395,7 @@ extension OCRProcessor {
             var pageResults: [OCRResult] = []
             pageResults.reserveCapacity(pageImages.count)
             for (p, img) in pageImages.enumerated() {
-                if Task.isCancelled {
+                if Task.isCancelled || drainingPages {
                     for u in pageImages { try? FileManager.default.removeItem(at: u) }
                     cleanupTempFiles()
                     return
@@ -1440,8 +1448,8 @@ extension OCRProcessor {
         segmentationContext: SegmentationContext,
         runConfig: SessionProcessingConfig? = nil
     ) async {
-        ocrPhaseActive = true
-        defer { ocrPhaseActive = false; finishQuitDrainIfAsked() }   // W49.proc-resume-standard-runs
+        let pass = beginDrainablePass()
+        defer { endDrainablePass(pass) }   // W49.proc-resume-standard-runs
         if segmentationContext.previousTextCharCount == 0 {
             // No dependency on prior OCR text — can run in parallel
             await performOCRParallel(
@@ -1491,7 +1499,7 @@ extension OCRProcessor {
         var previousImageURL: URL? = nil
 
         for index in 0..<total {
-            guard !Task.isCancelled, !quitWhenPagesSaved else { return }
+            guard !Task.isCancelled, !drainingPages else { return }
             let url = fileURLs[index]
             jobs[index].status = .processing
             // W16.bat10 — bound with the index, before the round-trip that gives Stop/Clear/Start its window.
@@ -1635,9 +1643,9 @@ extension OCRProcessor {
                 progress = Double(completed) / Double(total) * 0.7
                 statusMessage = "OCR \(completed)/\(total) complete (parallel)" + Self.rateLimitSuffix
 
-                // Add next task if available; a quit waiting for the pages in flight starts no new one.
-                if quitWhenPagesSaved {
-                    statusMessage = Self.quitWaitMessage
+                // Add next task if available; a quit or Stop waiting for the pages in flight starts no new one.
+                if drainingPages {
+                    statusMessage = pageDrainMessage
                 } else if nextIndex < total {
                     let idx = nextIndex
                     let nextURL = fileURLs[idx]

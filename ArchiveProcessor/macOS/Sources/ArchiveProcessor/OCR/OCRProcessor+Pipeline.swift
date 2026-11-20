@@ -2332,8 +2332,8 @@ extension OCRProcessor {
         alreadyCompleted: Int,
         runConfig: SessionProcessingConfig? = nil
     ) async {
-        ocrPhaseActive = true
-        defer { ocrPhaseActive = false; finishQuitDrainIfAsked() }   // W49.proc-resume-standard-runs
+        let pass = beginDrainablePass()
+        defer { endDrainablePass(pass) }   // W49.proc-resume-standard-runs
         let remaining = indices.count
         let gateway = currentGateway
         let localAgent = currentLocalAgent
@@ -2397,8 +2397,8 @@ extension OCRProcessor {
                     progress = Double(alreadyCompleted + completed) / Double(totalFiles) * 0.7
                     statusMessage = "OCR \(alreadyCompleted + completed)/\(totalFiles) complete (parallel)" + Self.rateLimitSuffix
 
-                    if quitWhenPagesSaved {
-                        statusMessage = Self.quitWaitMessage
+                    if drainingPages {
+                        statusMessage = pageDrainMessage
                     } else if nextSlot < remaining {
                         let idx = indices[nextSlot]
                         let url = fileURLs[idx]
@@ -2430,7 +2430,7 @@ extension OCRProcessor {
         } else {
             // Sequential: OCR remaining indices, using previous results for context
             for (attempt, index) in indices.enumerated() {
-                guard !Task.isCancelled, !quitWhenPagesSaved else { return }
+                guard !Task.isCancelled, !drainingPages else { return }
                 let url = fileURLs[index]
                 jobs[index].status = .processing
                 // W16.bat10 — bound with the index, before this file's round-trip.
@@ -2792,13 +2792,49 @@ extension OCRProcessor {
         statusMessage = Self.quitWaitMessage
     }
 
-    /// Called as the main OCR pass ends, however it ends. When a quit is waiting, every page started has been saved
-    /// to the run's manifest by now, so Stop keeps a run that Resume Run continues from the first page not read.
-    func finishQuitDrainIfAsked() {
-        guard quitWhenPagesSaved else { return }
-        quitWhenPagesSaved = false
+    static let stoppedAfterDrainNote = "The pages being read were saved; Resume Run continues from the first page not read."
+    static let stopWaitMessage = "Stopping once the pages being read now are saved… Stop Now stops at once."
+
+    /// What the run says while it waits for the pages in flight.
+    var pageDrainMessage: String { quitWhenPagesSaved ? Self.quitWaitMessage : Self.stopWaitMessage }
+
+    /// W49.proc-stop-saves-inflight: the Stop button and ⌘. In the main OCR pass the first press waits for the pages
+    /// being read (a reading that lands after a plain Stop is not saved, so Resume Run would read and pay for that page
+    /// again); a second press, shown as Stop Now, stops at once, for a page that hangs. Anywhere else, and with a quit
+    /// already waiting, it stops at once as before.
+    func requestStop() {
+        guard isProcessing, ocrPhaseActive, !drainingPages else { cancel(); return }
+        stopWhenPagesSaved = true
+        statusMessage = Self.stopWaitMessage
+    }
+
+    /// Marks the start of a pass a quit or Stop can wait on. The token ties its end to this run: a run stopped at once
+    /// goes on unwinding, and its end must neither unmark nor stop a newer run started on the same processor.
+    func beginDrainablePass() -> UUID {
+        let pass = UUID()
+        drainablePass = pass
+        ocrPhaseActive = true
+        return pass
+    }
+
+    func endDrainablePass(_ pass: UUID) {
+        guard drainablePass == pass else { return }
+        drainablePass = nil
+        ocrPhaseActive = false
+        finishPageDrainIfAsked()
+    }
+
+    /// Called as the main OCR pass ends, however it ends. When a quit or Stop is waiting, every page started has been
+    /// saved to the run's record by now, so Stop keeps a run that Resume Run continues from the first page not read.
+    func finishPageDrainIfAsked() {
+        guard drainingPages else { return }
+        let quitting = quitWhenPagesSaved
         let run = processingTask
         cancel()
+        guard quitting else {
+            statusMessage += " " + Self.stoppedAfterDrainNote
+            return
+        }
         statusMessage = "The pages being read are saved. Quitting…"
         Task {
             // Let the stopped run unwind (and its ledger line land) before the process ends.
@@ -2814,7 +2850,9 @@ extension OCRProcessor {
 
     func cancel() {
         // A Stop pressed while a quit waits for its pages takes the quit back: the run stops and the app stays open.
+        // Pressed while a Stop waits, it is Stop Now.
         quitWhenPagesSaved = false
+        stopWhenPagesSaved = false
         // Kept after the handle is dropped, for the cancellation task at the bottom of this function: the
         // run this Stop is ending goes on unwinding on its own task afterwards, and writes its own
         // `statusMessage` on the way out. That is what the kept-journal warning has to outlive (W16.bat6).
