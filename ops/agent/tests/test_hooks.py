@@ -505,6 +505,20 @@ class Holds(Fixture):
         self.assertTrue(report[0]["text"].startswith("Daemon Report: 3 decisions"), report[0]["text"])  # the fixture's own
         self.assertNotIn("A.cells", report[0]["text"] + report[0]["detail"])
 
+    def test_a_finished_items_needs_you_question_still_counts(self):
+        # 2026-11-19: W47.wh-item-fields-mac completed and asked "(needs you)" in one session; the item was ticked,
+        # so the entry read as answered and the walkthrough said "Open questions: 0". A ticked gate still answers it.
+        plan = PLAN.replace("follow-ups\n\n", "follow-ups\n\nA.done (needs you, owner call 13): keep it withheld?\n\n")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", plan)
+        report = [d for d in self.jsonl(self.hook("holds").stdout) if d["source"] == "Daemon Report"]
+        self.assertEqual(len(report), 1)
+        self.assertTrue(report[0]["detail"].startswith("A.done (needs you"), report[0]["detail"])
+        plan = plan.replace("- [x] **H.done — answered**", "- [x] **H.done — answered**\n"
+                            "- [x] **A.done-owner-ok — OWNER GATE for A.done** — OWNER ANSWERED 2026-11-19: keep")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", plan)
+        report = [d for d in self.jsonl(self.hook("holds").stdout) if d["source"] == "Daemon Report"]
+        self.assertNotIn("A.done", "".join(d["text"] + d["detail"] for d in report))
+
     def test_a_walked_report_has_no_item(self):
         plan = PLAN.replace("## Daemon Report \u2014 owner decisions / follow-ups\n\n",
                             "## Daemon Report \u2014 owner decisions / follow-ups\n\n"

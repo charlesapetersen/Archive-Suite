@@ -36,6 +36,7 @@ WALKED = re.compile(r"^### .*✅.*[Ww]alkthrough")         # status-digest.sh's 
 REPORT_HEADER = re.compile(r"^## (Daemon Report|Morning Review)")
 DETAIL_MAX = 4000   # the email's full text of an item; `text` stays one short line
 NO_DECISION = re.compile(r"\bno decision\b", re.I)   # the writer's own label for a mention (resume-prompt.txt)
+NEEDS_YOU = re.compile(r"\bneeds you\b", re.I)   # the writer's own label for a question (resume-prompt.txt)
 
 
 def read(path):
@@ -354,7 +355,11 @@ def holds():
             if not h.get("asked"):
                 h["detail"], h["asked"] = clean(e, DETAIL_MAX), True
             continue
-        if t and (t in done or t + "-owner-ok" in done):
+        # A finished item's own "(needs you)" question is not answered by the item being ticked: an item that
+        # completes and asks in the same session (W47.wh-item-fields-mac, 2026-11-19) was dropped and the
+        # walkthrough said "Open questions: 0". Only its ticked owner gate answers it.
+        answered = (t + "-owner-ok" in done) if NEEDS_YOU.search(e) else (t in done or t + "-owner-ok" in done)
+        if t and answered:
             continue
         asks.append(e)
     for d in out:
