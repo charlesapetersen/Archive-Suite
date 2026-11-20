@@ -207,7 +207,7 @@ enum TagWriter {
                                         transform: ([String], Int?) -> ([String], Int?)?) throws -> TagWriteResult {
         try CoordinatedTagWriter.write(url, expectedIdentity: identity) { current, label in
             let change = transform(current, label)
-            if change != nil { AuditLedger.shared.writeAhead() }
+            if change != nil { AuditLedger.shared.writeAhead(url) }
             return change
         }
     }

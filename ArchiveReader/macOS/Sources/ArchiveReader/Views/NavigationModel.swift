@@ -2554,7 +2554,9 @@ final class NavigationModel: ObservableObject {
         }
         var verified: [TagWriteResult] = []
         let group = UUID()                       // §12: the whole action is one ledger group, as it is one undo
-        ReaderStages.measure("tagWriter.writes") { AuditLedger.withContext(group: group) {
+        // The intent lists the files expected to change, so a crash leaves only those in doubt.
+        let expected = files.filter { $0.readState.map { $0 != target } == true }.map(\.url)
+        ReaderStages.measure("tagWriter.writes") { AuditLedger.withContext(group: group, files: expected) {
             for f in files {
                 let identity = f.liveIdentity()   // §6: capture lazily at edit time, per selected file
                 do {
@@ -2821,10 +2823,10 @@ final class NavigationModel: ObservableObject {
         var verified: [TagWriteResult] = []
         var failures = reverified.rejected
         let group = UUID()                       // §12: one ledger group, as it is one undo
-        AuditLedger.withContext(group: group) {
-            for f in files {
-                let delta = TagEditing.userDelta(for: op, given: f.tags)   // a date edit is its check too
-                if delta.isEmpty { continue }
+        let planned = files.map { (f: $0, delta: TagEditing.userDelta(for: op, given: $0.tags)) }   // a date edit is its check too
+            .filter { !$0.delta.isEmpty }
+        AuditLedger.withContext(group: group, files: planned.map(\.f.url)) {
+            for (f, delta) in planned {
                 let identity = f.liveIdentity()   // §6: capture lazily at edit time, per selected file
                 do {
                     let r = try TagWriter.apply(delta, to: f.url, expecting: identity)
@@ -2892,7 +2894,7 @@ final class NavigationModel: ObservableObject {
         // one failure does not stop its neighbours.
         let items = affected.map { (url: $0.url, identity: $0.liveIdentity()) }
         let group = UUID()                                  // §12: one ledger group, as it is one undo
-        AuditLedger.withContext(group: group) {
+        AuditLedger.withContext(group: group, files: items.map(\.url)) {
             for item in items {
                 switch Result(catching: {
                     try TagWriter.renameToken(from: old, to: new, on: item.url,

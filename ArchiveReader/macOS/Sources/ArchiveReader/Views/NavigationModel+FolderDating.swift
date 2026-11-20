@@ -319,23 +319,27 @@ extension NavigationModel {
         var failures = reverified.rejected
         var dated: Set<String> = []
         let group = UUID()
-        AuditLedger.withContext(group: group) {   // §12: one ledger group, as it is one undo
-            for f in reverified.files {
-                let e = offer.evidence[f.path]
-                let evidence = FolderDateRecord.evidence(e?.record, page: e?.page, tags: f.tags)
-                guard f.itemType == nil, let part = partOf[f.path] else { continue }
-                let delta: TagDelta?
-                if let date = part.date {
-                    // A file whose date changed since the offer, so that its record would keep another date as the
-                    // one replaced, is left alone too (W49.reader-folder-date-undo-fu).
-                    let same = ContainerFolderDate.replacedDate(f.tags, evidence: evidence, record: e?.record)
-                        == offer.replaced[f.path]
-                    delta = same && date.dates(f.tags, evidence: evidence) ? date.delta(given: f.tags) : nil
-                } else {
-                    delta = ContainerFolderDate.folderGave(f.tags, evidence: evidence)
-                        ? ContainerFolderDate.undatingDelta(given: f.tags, page: e?.page, record: e?.record) : nil
-                }
-                guard let delta, !delta.isEmpty else { continue }
+        let planned = reverified.files.compactMap { f -> (f: ArchiveFile, delta: TagDelta)? in
+            let e = offer.evidence[f.path]
+            let evidence = FolderDateRecord.evidence(e?.record, page: e?.page, tags: f.tags)
+            guard f.itemType == nil, let part = partOf[f.path] else { return nil }
+            let delta: TagDelta?
+            if let date = part.date {
+                // A file whose date changed since the offer, so that its record would keep another date as the
+                // one replaced, is left alone too (W49.reader-folder-date-undo-fu).
+                let same = ContainerFolderDate.replacedDate(f.tags, evidence: evidence, record: e?.record)
+                    == offer.replaced[f.path]
+                delta = same && date.dates(f.tags, evidence: evidence) ? date.delta(given: f.tags) : nil
+            } else {
+                delta = ContainerFolderDate.folderGave(f.tags, evidence: evidence)
+                    ? ContainerFolderDate.undatingDelta(given: f.tags, page: e?.page, record: e?.record) : nil
+            }
+            guard let delta, !delta.isEmpty else { return nil }
+            return (f, delta)
+        }
+        // §12: one ledger group, as it is one undo; its intent lists the files it expects to change.
+        AuditLedger.withContext(group: group, files: planned.map(\.f.url)) {
+            for (f, delta) in planned {
                 do {
                     let r = try TagWriter.apply(delta, to: f.url, expecting: f.liveIdentity())
                     verified.append(r)

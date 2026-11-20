@@ -1294,20 +1294,40 @@ same batch recovers storage.
 journalled: an `actionIntent` line is flushed (`F_FULLFSYNC`) inside coordination before its first
 tag write, and an `actionDone` is flushed once every record of the action has been appended. An intent
 with no `actionDone` (the process or the Mac died mid-action, a record failed, or a write failed its
-verification so its change is uncertain) is a permanent
-barrier: neither that action nor anything older is offered, so the gap no longer depends on the
-in-memory flag surviving. The live file is cut into numbered segments at 4 MiB
+verification so its change is uncertain) leaves its files in doubt, so the gap no longer depends on the
+in-memory flag surviving. **Since W49.reader-undo-after-crash (2026-11-20)** the intent lists the files
+the action expects to write (bulk actions declare them; a write to an undeclared file synchronizes an
+extending intent first) and the process that wrote it. After a crash an unclosed action counts as
+complete when every listed file has its record, nothing else from that process touched those files
+after it began, and each file is still the recorded object reading as its newest record's after-state.
+Otherwise the action is withheld, with every older change to a file it listed or recorded, every change
+to those files by the same process, and transitively whatever those withheld groups touched; older
+actions on other files stay undoable. An intent without a file list is still a full barrier. The live file is cut into numbered segments at 4 MiB
 (`audit-ledger.000001.jsonl`, …) that are kept, not pruned (§12 is append-only); undo reads them newest
 first and stops at a barrier or a full window. A file that exists but cannot be read, or a segment cut
 by another running copy during the read, offers nothing rather than older history. Appends use
 `O_APPEND`, so two running copies never write over each other's lines. What is still not covered:
-- **A double fault.** If the intent itself cannot be written (storage failing) and the process dies
-  before storage recovers, the change is on disk with no line at all, and the older history is offered
-  after relaunch. The in-process warning and barrier still cover the case while the app runs. (accepted: the in-process warning and barrier cover it while the app runs; it needs a second fault before storage recovers).
+- **A double fault.** If an intent itself cannot be written (storage failing: the first one, or an
+  extending one for an undeclared file) and the process dies before storage recovers, the change is on
+  disk with no line at all, and older history of that file is offered after relaunch. The tag write
+  still goes ahead, because a ledger failure never fails a tag write. The in-process warning and barrier still cover the case while the app runs. (accepted: the in-process warning and barrier cover it while the app runs; it needs a second fault before storage recovers).
 - **The disk keeps everything:** about 1 KB per changed file (mostly the bookmark). Deleting old segments
   would lose audit history, which §12 keeps; ask before adding a retention. (accepted: Safety §12 keeps the audit history; a retention is the owner's to ask for).
-- **An action that crashes hides the history before it for good**, even when every write in it was
-  recorded and only the `actionDone` was lost. That is the safe direction; later actions are offered. (queued: W49.reader-undo-after-crash).
+- **Two running copies.** The same-process rule cannot see a second copy of the Reader (another
+  launch) that changed a crashed action's file between its last line and the crash, so that copy's
+  newer change can be offered over the crashed write. (accepted: a platform fact: macOS runs one copy
+  of an app per login unless it is started with `open -n`, and another login has its own container
+  and ledger).
+- **An action left open without a crash** (an unverified write, which sets no recording gap) withholds,
+  for the rest of that session, every later change its own process makes to the action's files, even
+  after the action ended. That is the safe direction, and it clears on relaunch. (accepted: the owner's call 22,
+  2026-11-19, keeps an unproven action's files out of the history).
+- **A crashed bulk action that skipped a declared file is never proven complete.** A file it declared
+  but did not write (already in the target state, or refused for its identity) has no record, so the
+  action and older history of every file it declared stay withheld. Callers declare only the files
+  their cached tags say will change, which keeps this small. (accepted: the owner's call 22, 2026-11-19,
+  `17b-accepted-review-round2.json` entry `r-crash-undo`: an action not proven complete keeps its listed
+  files out of the history).
 - **Reading is bounded only once the window fills.** An archive with fewer than 100 actions since the
   last barrier still decodes every segment on each undo refresh (on the main actor), as it did before. (accepted: under 100 actions since the last barrier the read is small).
 - Two running copies cutting a segment at the same moment: the second rename fails, is logged, and the

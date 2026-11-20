@@ -178,12 +178,20 @@ add {"1981"}`. All of the following hold for every delta.
     tags. The ledger remains append-only and is kept in full on disk, cut into numbered 4 MiB segments
     that undo reads newest first only as far as its window needs. Each forward action is write-ahead
     journalled (`actionIntent` flushed with `F_FULLFSYNC` before its first tag write, `actionDone` after
-    its last record); an unclosed intent is a permanent barrier (W40.fix-reader-ledger-durability).
+    its last record; W40.fix-reader-ledger-durability). The intent lists the files the action expects
+    to write (`files`, declared by the caller; a write to an undeclared file synchronizes an extending
+    intent, `extends`, naming it first). After a crash an unclosed action counts as complete when every
+    listed file has its record and still reads as the newest record's after-state, and no other change
+    by the same process (`launch`) touched those files after it began; otherwise the action, every older
+    change to a file it listed or recorded and every change to them by its process are withheld,
+    transitively, while older
+    actions on other files stay undoable. An intent without `files` stays a full barrier
+    (W49.reader-undo-after-crash).
     Unavailable bookmarks fall back to path + device/inode; missing identity or a disagreeing
     bookmark refuses the file. A forward recording failure warns and disables older undo until a
     successful append persists a synchronized history barrier; even recovery during a batch warns
     that its history is incomplete. A crash mid-action leaves the action's intent unclosed, which
-    barriers it after relaunch; only an intent that could not be written at all, followed by process
+    withholds its files after relaunch unless they prove it complete; only an intent that could not be written at all, followed by process
     death before storage recovers, still loses the gap (`KNOWN_ISSUES.md` §W40.audit-ledger-undo).
 13. **PDF panes are provably non-writing:** PDFViews non-editable, annotations disabled, no
     `PDFDocument.write` path exists. The write-surface lint covers *all* write spellings

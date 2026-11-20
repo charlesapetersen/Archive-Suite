@@ -29,8 +29,12 @@ import os
 //  action has been appended, a synchronized `actionDone` closes it. The records between them are not
 //  synchronized one by one: the closing `fsync` makes them durable together. An intent with no
 //  `actionDone` after it (the process or the machine died mid-action, or a record could not be
-//  appended) is a history barrier: neither that action nor anything older is offered as undo, since a
-//  change may be on disk with no record. The live file is closed off as a numbered segment beside it
+//  appended) is not closed. The intent lists the files the action expects to write (the caller declares
+//  them; a write to a file it did not declare synchronizes another intent naming that file first), so
+//  after a crash only those files are in doubt (W49.reader-undo-after-crash): an unclosed action whose
+//  every listed file has its record and still reads as that record's after-state counts as complete;
+//  otherwise neither the action nor any older change to a file it listed or recorded (nor one by the same
+//  process, which ran beside it) is offered, while older actions on other files stay undoable. The live file is closed off as a numbered segment beside it
 //  once it passes `segmentByteLimit`; segments are kept (the record stays append-only) and undo reads
 //  them newest first only as far as its 100-group window needs.
 // ============================================================================================
@@ -49,45 +53,92 @@ final class AuditLedger: @unchecked Sendable {
     }
     @TaskLocal static var context: Context?
 
+    /// Groups whose journal is open in this process: an action still running is never offered, nor proven
+    /// complete by its files, which it may not have finished writing.
+    private static let runningActions = OSAllocatedUnfairLock(initialState: Set<UUID>())
+
     /// Run `body` with every ledger entry it produces tagged with `group` (and `undoes` / `redoes`). A
     /// forward action or a redo is journalled (`writeAhead`), since either is an undo source; an undo is
     /// not, because `beginUndo` consumed its group durably first and an undo write is never itself an undo
-    /// source.
-    static func withContext<T>(group: UUID, undoes: UUID? = nil, redoes: UUID? = nil,
+    /// source. `files` are the files the action expects to write, listed in its intent: a bulk action
+    /// declares them so that its intent costs one synchronized append, not one per file.
+    static func withContext<T>(group: UUID, undoes: UUID? = nil, redoes: UUID? = nil, files: [URL] = [],
                                _ body: () throws -> T) rethrows -> T {
         // Nested inside the same action: keep its journal, so one `actionDone` cannot close the other's intent.
         if let outer = context, outer.group == group, outer.undoes == undoes, outer.redoes == redoes {
             return try body()
         }
-        let journal = undoes == nil ? ActionJournal(group: group) : nil
+        let journal = undoes == nil ? ActionJournal(group: group, declared: files) : nil
         defer { journal?.close() }
         return try $context.withValue(Context(group: group, undoes: undoes, redoes: redoes, journal: journal),
                                       operation: body)
     }
 
     /// The write-ahead state of one forward action: whether its intent is durable, and whether any of
-    /// its records failed (then the action is never closed, and its intent stays a barrier).
+    /// its records failed (then the action is never closed, and its intent stays open), and which files its
+    /// intents have listed.
     final class ActionJournal: @unchecked Sendable {
         let group: UUID
+        private let declared: [URL]
         private let openLock = NSLock()
         private let stateLock = NSLock()
         private var ledger: AuditLedger?
         private var incomplete = false
+        private var listedPaths: Set<String> = []
+        private var listedFiles: Set<FileNumber> = []
 
-        init(group: UUID) { self.group = group }
+        init(group: UUID, declared: [URL] = []) {
+            self.group = group
+            self.declared = declared
+            AuditLedger.runningActions.withLock { _ = $0.insert(group) }
+        }
 
         /// Held across the append, so a second write of the same action cannot start before the intent
-        /// is synchronized.
-        func open(on ledger: AuditLedger) {
+        /// naming its file is synchronized. The first write lists every declared file and its own. A later
+        /// write to a file no intent has listed lists it in an extending intent first, also once a record
+        /// has failed, so a crash never leaves a written file outside every intent of its action.
+        func open(on ledger: AuditLedger, for url: URL) {
             openLock.withLock {
-                guard stateLock.withLock({ self.ledger == nil && !incomplete }) else { return }
-                if ledger.append(AuditLedger.marker(.actionIntent, group: group), synchronize: true,
-                                 recordsChange: true) {
-                    stateLock.withLock { self.ledger = ledger }
-                } else {
-                    markIncomplete()
+                let (current, failed) = stateLock.withLock { (self.ledger, incomplete) }
+                let number = AuditLedger.fileNumber(url)
+                if let current {
+                    // By device/inode when the file has one: a path listed for another object does not list it.
+                    let listed = stateLock.withLock {
+                        number.map(listedFiles.contains) ?? listedPaths.contains(url.path)
+                    }
+                    if !listed {
+                        list([AuditLedger.IntentFile(path: url.path, file: number)], extending: true, on: current)
+                    }
+                } else if !failed {
+                    // Not opened yet, or already closed: a write after close opens a new intent that is never
+                    // closed. A first intent that failed leaves nothing to extend; the in-process gap covers it.
+                    var seen: Set<String> = []
+                    let files = (declared + [url]).filter { seen.insert($0.path).inserted }.map {
+                        AuditLedger.IntentFile(path: $0.path,
+                                               file: $0.path == url.path ? number : AuditLedger.fileNumber($0))
+                    }
+                    if list(files, extending: false, on: ledger) { stateLock.withLock { self.ledger = ledger } }
                 }
             }
+        }
+
+        @discardableResult
+        private func list(_ files: [AuditLedger.IntentFile], extending: Bool, on ledger: AuditLedger) -> Bool {
+            var intent = AuditLedger.marker(.actionIntent, group: group)
+            intent.files = files
+            intent.launch = AuditLedger.launch
+            if extending { intent.extends = true }
+            guard ledger.append(intent, synchronize: true, recordsChange: true) else {
+                markIncomplete()
+                return false
+            }
+            stateLock.withLock {
+                for f in files {
+                    listedPaths.insert(f.path)
+                    if let n = f.file { listedFiles.insert(n) }
+                }
+            }
+            return true
         }
 
         func markIncomplete() { stateLock.withLock { incomplete = true } }
@@ -95,12 +146,16 @@ final class AuditLedger: @unchecked Sendable {
         /// A failed close leaves the intent open, which is the safe direction: it reads as a barrier.
         /// A write after close (a task that outlived the action) writes a new intent that is never
         /// closed: a barrier, never a record outside any journalled action.
+        /// Under `openLock`, so a write after close cannot put its new intent before the `actionDone`.
         func close() {
-            let ledger: AuditLedger? = stateLock.withLock {
-                defer { self.ledger = nil }
-                return incomplete ? nil : self.ledger
+            openLock.withLock {
+                let ledger: AuditLedger? = stateLock.withLock {
+                    defer { self.ledger = nil }
+                    return incomplete ? nil : self.ledger
+                }
+                ledger?.append(AuditLedger.marker(.actionDone, group: group), synchronize: true)
+                AuditLedger.runningActions.withLock { _ = $0.remove(group) }
             }
-            ledger?.append(AuditLedger.marker(.actionDone, group: group), synchronize: true)
         }
     }
 
@@ -119,6 +174,12 @@ final class AuditLedger: @unchecked Sendable {
     struct FileNumber: Codable, Hashable, Sendable {
         var device: Int64
         var inode: UInt64
+    }
+
+    /// One file an action's intent expects to write: its path, and its device/inode when it had one.
+    struct IntentFile: Codable, Hashable, Sendable {
+        var path: String
+        var file: FileNumber?
     }
 
     struct Entry: Codable, Equatable, Sendable {
@@ -148,12 +209,28 @@ final class AuditLedger: @unchecked Sendable {
         /// W44.reocr-reader: set when the write named `OCR Poor` and ran under the shared flag protocol: the file's
         /// root GUID and relative path, the operation, and the flag generation before and after.
         var flag: PoorOCRFlagGuard.Record? = nil
+        /// On an `actionIntent`: the files the action expects to write, and whether this intent extends an
+        /// earlier one of the same action (a write to a file the first did not list). An intent without
+        /// `files` is a full barrier, as every intent was before W49.reader-undo-after-crash.
+        var files: [IntentFile]? = nil
+        var extends: Bool? = nil
+        /// On an `actionIntent`: the process that wrote it. An action that ran beside a crashed one in the same
+        /// process may have written a listed file before the crashed action's unrecorded write did.
+        var launch: UUID? = nil
     }
+
+    /// This process, as named in each intent it writes.
+    static var launch: UUID { currentLaunch.withLock { $0 } }
+    private static let currentLaunch = OSAllocatedUnfairLock(initialState: UUID())
+
+    /// What a relaunch changes for the ledger, for tests that write after a simulated crash.
+    static func simulateRelaunch() { currentLaunch.withLock { $0 = UUID() } }
 
     private let lock = NSLock()
     private var _fileURL: URL
     private var _lastError: String?
     private var _hasRecordingGap = false
+    private var _proven: [UUID: Int] = [:]   // unclosed actions whose files proved them complete, and on how many lines
     private var _recordingFailureCount: UInt64 = 0
     private var _segmentByteLimit: UInt64 = 4 << 20
     private static let log = Logger(subsystem: "com.archivereader.app", category: "AuditLedger")
@@ -216,8 +293,8 @@ final class AuditLedger: @unchecked Sendable {
     /// Called by `TagWriter` before each write of a forward action: the first one of the action
     /// synchronizes the action's intent. A failure to write it warns and disables older undo like a
     /// failed record, and the write still goes ahead.
-    func writeAhead() {
-        Self.context?.journal?.open(on: self)
+    func writeAhead(_ url: URL) {
+        Self.context?.journal?.open(on: self, for: url)
     }
 
     static func marker(_ op: Operation, group: UUID) -> Entry {
@@ -350,37 +427,176 @@ final class AuditLedger: @unchecked Sendable {
         var closed = Set<UUID>()
         var order: [UUID] = []
         var groups: [UUID: [Entry]] = [:]
+        var positions: [UUID: [Int]] = [:]          // each group member's line, counted from the newest
+        var unclosed: [UUID: UnclosedAction] = [:]  // journalled lines read before their `actionDone`
+        var launches: [UUID: UUID] = [:]            // the process each action's intents name
+        var position = 0
+        var stoppedEarly = false                    // at a barrier or a full window, not the start of history
         let files = historyFilesNewestFirst()
         history: for file in files {
           guard let lines = Self.decodeEntries(file) else { return [] }
-          for entry in lines.reversed() where entry.v == 1 && entry.unverified == nil {
-            if entry.op == .historyBarrier { break history }
+          for entry in lines.reversed() where entry.v == 1 {
+            position += 1
+            if entry.op == .historyBarrier { stoppedEarly = true; break history }
             if entry.op == .actionDone { closed.insert(entry.group); continue }
+            // A line of an action read before its `actionDone` (none, or a write after it): the action's
+            // files are in doubt unless they prove it complete. Undo lines are not journalled.
+            let journalled = entry.undoes == nil && entry.op != .undoAttempt && entry.op != .redoAttempt
+            if journalled, !closed.contains(entry.group) || unclosed[entry.group] != nil {
+                unclosed[entry.group, default: UnclosedAction(newest: position)].note(entry, at: position)
+            }
             if entry.op == .actionIntent {
-                if closed.contains(entry.group) { continue }
-                // Unclosed: some change of this action may be on disk unrecorded. Offer neither this
-                // action (it may be incomplete) nor anything older.
+                if let launch = entry.launch { launches[entry.group] = launch }
+                if entry.files != nil || closed.contains(entry.group) { continue }
+                // An intent that lists no files left unclosed: any change may be on disk unrecorded.
+                // Offer neither this action nor anything older.
                 groups[entry.group] = nil
                 order.removeAll { $0 == entry.group }
+                stoppedEarly = true
                 break history
             }
+            if entry.unverified != nil { continue }
             if let undone = entry.undoes { consumed.insert(undone); continue }
             guard entry.op != .undo && entry.op != .undoAttempt && entry.op != .redoAttempt,
                   Self.isContained(entry, in: roots)
             else { continue }
             if groups[entry.group] == nil {
-                guard order.count < Self.undoGroupLimit else { break history }
+                guard order.count < Self.undoGroupLimit else { stoppedEarly = true; break history }
                 order.append(entry.group)
                 groups[entry.group] = []
             }
             // Already reversed: undo multiple writes to the same file in reverse write order.
             groups[entry.group, default: []].append(entry)
+            positions[entry.group, default: []].append(position)
           }
         }
         // Another running copy cut a segment while this one read: the files read may have skipped its
         // newest lines. Offer nothing; the next refresh reads the settled files.
         guard historyFilesNewestFirst() == files else { return [] }
-        return order.reversed().filter { !consumed.contains($0) }.compactMap { groups[$0] }
+        let held = withheld(unclosed, groups: groups, positions: positions, launches: launches,
+                                     stoppedEarly: stoppedEarly)
+        return order.reversed().filter { !consumed.contains($0) && !held.contains($0) }.compactMap { groups[$0] }
+    }
+
+    /// What the history read of one action whose `actionDone` it did not reach first: its intents' files,
+    /// its records (newest first) and any unverified line. Positions count lines from the newest.
+    private struct UnclosedAction {
+        var newest: Int
+        var oldest = 0
+        var lines = 0
+        var opened = false           // its first (not extending) intent was read
+        var intents = 0
+        var listedPaths: Set<String> = []
+        var listedFiles: Set<FileNumber> = []
+        var records: [Entry] = []
+        var unverified: [Entry] = []
+
+        mutating func note(_ entry: Entry, at position: Int) {
+            oldest = position
+            lines += 1
+            if entry.op == .actionIntent {
+                intents += 1
+                if entry.extends != true { opened = true }
+                for f in entry.files ?? [] {
+                    listedPaths.insert(f.path)
+                    if let n = f.file { listedFiles.insert(n) }
+                }
+            } else if entry.unverified != nil {
+                unverified.append(entry)
+            } else {
+                records.append(entry)
+            }
+        }
+
+        var paths: [String] { Array(listedPaths) + (records + unverified).map(\.path) }
+        var numbers: [FileNumber] { Array(listedFiles) + (records + unverified).compactMap(\.file) }
+
+        /// Every listed file has its record, every record its listed file, nothing is unverified, and each
+        /// file is still the recorded object and reads as its newest record's after-state: whatever was lost
+        /// was only the `actionDone`. Reads the files, so only for an action with no `actionDone`.
+        func provenComplete() -> Bool {
+            guard opened, unverified.isEmpty, !records.isEmpty else { return false }
+            let recordedPaths = Set(records.map(\.path))
+            guard listedPaths.allSatisfy({ recordedPaths.contains($0) }),
+                  records.allSatisfy({ listedPaths.contains($0.path) || $0.file.map(listedFiles.contains) == true })
+            else { return false }
+            var checked: Set<String> = []
+            for record in records where checked.insert(record.path).inserted {
+                let url = URL(fileURLWithPath: record.path)
+                guard let number = record.file, AuditLedger.fileNumber(url) == number,
+                      case let .success(names, label) = TagReading.read(url),
+                      multisetEqual(names, record.after), (label ?? 0) == (record.afterLabel ?? 0)
+                else { return false }
+            }
+            return true
+        }
+    }
+
+    /// The offered groups an unclosed action takes out of the history: the action itself, unless its files
+    /// prove it complete (never while it is still running here), and every group with a change older than
+    /// the action's newest line to a file the action listed or recorded. Newer changes to those files are
+    /// withheld too when the same process wrote them: it ran beside the action, which may have written the
+    /// file after them unrecorded. A group taken out takes its own files with it, so nothing older is undone
+    /// beneath a change that stays.
+    ///
+    /// A proof is kept for the life of this ledger object: it shows that only the `actionDone` was lost, which
+    /// a later change to the files does not undo, and re-reading every file of a big batch on each refresh
+    /// would cost the main thread.
+    private func withheld(_ unclosed: [UUID: UnclosedAction], groups: [UUID: [Entry]],
+                          positions: [UUID: [Int]], launches: [UUID: UUID], stoppedEarly: Bool) -> Set<UUID> {
+        let running = Self.runningActions.withLock { $0 }
+        // Records with no intent read are not journalled (a retry group) or were written before the journal,
+        // unless the read stopped early: then the intent may lie beyond where it stopped.
+        let candidates = unclosed.filter { group, action in
+            action.intents > 0 || running.contains(group)
+                || stoppedEarly && action.records.contains(where: { $0.retryOf == nil })
+        }
+        guard !candidates.isEmpty else { return [] }
+        var byPath: [String: [(group: UUID, position: Int)]] = [:]
+        var byNumber: [FileNumber: [(group: UUID, position: Int)]] = [:]
+        for (group, members) in groups {
+            for (e, position) in zip(members, positions[group] ?? []) {
+                byPath[e.path, default: []].append((group, position))
+                if let n = e.file { byNumber[n, default: []].append((group, position)) }
+            }
+        }
+        func hits(_ paths: [String], _ numbers: [FileNumber]) -> [(group: UUID, position: Int)] {
+            paths.flatMap { byPath[$0] ?? [] } + numbers.flatMap { byNumber[$0] ?? [] }
+        }
+        var withheld = Set<UUID>()
+        var queue: [(paths: [String], numbers: [FileNumber], after: Int, unclosed: Bool, launch: UUID?)] = []
+        for (group, action) in candidates {
+            if !running.contains(group) {
+                // Proven on exactly these lines: a line the action gained since (another copy's write) re-proves.
+                if lock.withLock({ _proven[group] == action.lines }) { continue }
+                // Another change to one of its files, made by the same process after the action began, may sit
+                // between two of its writes, so the file's state no longer shows which of them landed. A change
+                // whose process is unknown counts as the same one.
+                let interleaved = hits(action.paths, action.numbers).contains {
+                    $0.group != group && $0.position < action.oldest
+                        && (launches[$0.group] == nil || launches[$0.group] == launches[group])
+                }
+                if !interleaved, action.provenComplete() {
+                    lock.withLock { _proven[group] = action.lines }
+                    continue
+                }
+            }
+            withheld.insert(group)
+            queue.append((action.paths, action.numbers, action.newest, true, launches[group]))
+        }
+        while let next = queue.popLast() {
+            // For the unclosed action itself, a newer change by its process counts; an unknown process (a retry
+            // group has no intent) counts as its own, as above.
+            for hit in hits(next.paths, next.numbers) where !withheld.contains(hit.group)
+                && (hit.position > next.after || next.unclosed
+                    && (next.launch == nil || launches[hit.group] == nil || launches[hit.group] == next.launch)) {
+                withheld.insert(hit.group)
+                let members = groups[hit.group] ?? []
+                queue.append((members.map(\.path), members.compactMap(\.file), positions[hit.group]?.first ?? 0,
+                              false, nil))
+            }
+        }
+        return withheld
     }
 
     /// The undos a redo may reverse, oldest first like `undoGroups`: every completed undo newer than the

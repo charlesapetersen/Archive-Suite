@@ -52,7 +52,7 @@ extension NavigationModel {
             var refusal: String?
             let unfinished = PoorOCRFlagGuard.Unfinished()
             PoorOCRFlagGuard.$unfinished.withValue(unfinished) { PoorOCRFlagGuard.$annotations.withValue(notes) {
-                AuditLedger.withContext(group: group) {
+                AuditLedger.withContext(group: group, files: items.map(\.url)) {
                     for item in items {
                         do { verified.append(try TagWriter.apply(delta, to: item.url, expecting: item.identity)) }
                         catch let r as PoorOCRFlagGuard.Refusal { failed += 1; refusal = refusal ?? r.description }
