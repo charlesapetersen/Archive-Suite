@@ -158,3 +158,9 @@ owner per key, the window's UITest in the VM), then W47.settings-level-switch (t
 "set at a higher level" rule, a unit test that every catalog key and every route row has a level). W47.wh-readers-lost,
 W47.wh-post-correction, W47.wh-date-8b-image and W47.wh-names-small-mac wait on the level switch and put their rows at
 Advanced.
+
+Built (W47.settings-level-switch, 2026-11-19): the table is `SettingsLevels` in the Processor. The level is kept for the
+whole app rather than in the layered general settings file: it is the general layer's in that it describes the person
+and no collection holds it, and keeping it out of the layers keeps it out of every run's settings record, since it
+changes no value a run uses. A later item adds a route row at Advanced by its table row (`offered` false) and the card
+lists it from Advanced up (`Option.level`).
