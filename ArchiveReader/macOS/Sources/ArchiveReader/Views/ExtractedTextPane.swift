@@ -83,6 +83,16 @@ struct ExtractedTextPane: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> NSScrollView {
+        let scroll = Self.makeScrollView()
+        guard let view = scroll.documentView as? ExtractedTextView else { return scroll }
+        view.delegate = context.coordinator
+        if !id.isEmpty { view.setAccessibilityIdentifier(id) }
+        update(view, context: context)
+        return scroll
+    }
+
+    /// The pane's scroll view and read-only text view, before any text or find is applied.
+    static func makeScrollView() -> NSScrollView {
         let scroll = NSScrollView()
         scroll.hasVerticalScroller = true
         scroll.borderType = .noBorder
@@ -101,10 +111,7 @@ struct ExtractedTextPane: NSViewRepresentable {
         view.importsGraphics = false
         view.usesFindBar = false
         view.drawsBackground = false
-        view.textContainerInset = Self.inset
-        view.delegate = context.coordinator
-        if !id.isEmpty { view.setAccessibilityIdentifier(id) }
-        update(view, context: context)
+        view.textContainerInset = inset
         return scroll
     }
 
@@ -137,7 +144,7 @@ struct ExtractedTextPane: NSViewRepresentable {
     /// Every match of the query behind the PDF panes' match yellow, the current hit behind the system
     /// find-highlight colour, and the current hit scrolled into view. Attributes only, so the user's
     /// selection stays where it is.
-    private static func applyHighlights(_ find: (query: String, current: Int?)?, to view: NSTextView) {
+    static func applyHighlights(_ find: (query: String, current: Int?)?, to view: NSTextView) {
         guard let storage = view.textStorage else { return }
         if let current = highlight(storage, find: find) { view.scrollRangeToVisible(current) }
     }

@@ -119,6 +119,41 @@ final class DocumentFindTests: XCTestCase {
         XCTAssertFalse(any, "no search, no highlight")
     }
 
+    /// W49.reader-find-scroll-text: the current hit is scrolled into the pane's view, whichever match it is,
+    /// in the pane's own scroll view and text view.
+    func testExtractedTextScrollsTheCurrentHitIntoView() throws {
+        let scroll = ExtractedTextPane.makeScrollView()
+        scroll.frame = NSRect(x: 0, y: 0, width: 300, height: 200)
+        let view = try XCTUnwrap(scroll.documentView as? ExtractedTextView)
+        view.frame.size.width = scroll.contentSize.width
+        let filler = (1...200).map { "Line \($0) of the extracted text." }
+        let text = (["zulu at the top"] + filler + ["zulu at the bottom"]).joined(separator: "\n")
+        view.textStorage?.setAttributedString(NSAttributedString(string: text))
+        view.font = ExtractedTextPane.font(scale: 1)
+        let manager = try XCTUnwrap(view.layoutManager), container = try XCTUnwrap(view.textContainer)
+        manager.ensureLayout(for: container)
+        view.sizeToFit()
+        XCTAssertGreaterThan(view.frame.height, scroll.contentSize.height * 5, "the text overflows the pane")
+
+        func visible(_ range: NSRange) -> Bool {
+            let glyphs = manager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            var rect = manager.boundingRect(forGlyphRange: glyphs, in: container)
+            rect.origin.x += view.textContainerOrigin.x
+            rect.origin.y += view.textContainerOrigin.y
+            return view.visibleRect.contains(rect)
+        }
+        let ranges = ExtractedTextPane.highlightRanges(query: "zulu", in: text)
+        XCTAssertEqual(ranges.count, 2)
+        XCTAssertTrue(visible(ranges[0]) && !visible(ranges[1]), "the pane opens at the top")
+
+        ExtractedTextPane.applyHighlights((query: "zulu", current: 1), to: view)
+        XCTAssertTrue(visible(ranges[1]), "the last hit is scrolled to")
+        XCTAssertFalse(visible(ranges[0]))
+
+        ExtractedTextPane.applyHighlights((query: "zulu", current: 0), to: view)
+        XCTAssertTrue(visible(ranges[0]), "and back to the first")
+    }
+
     // MARK: DocumentPagePairs — the interleaved image/OCR-text page-pair arithmetic (W23.m2)
 
     func testPairCountRoundsUpSoATrailingScanIsNotLost() {

@@ -378,9 +378,9 @@ annotations with the original and removing one from the copy leaves it there, me
   has, later hits on that pair select different words in the two panes. Nothing in the PDF links them better. (queued: W49.reader-find-word-align).
 - **An image page with no text layer gets no highlight** (the test corpus's image pages have none): there are
   no positions to draw from. The hit still shows on the text page. (accepted: an image page with no text layer has no positions to draw from).
-- **The extracted-text pane highlights but does not scroll to the current hit** (a SwiftUI `Text` cannot
-  scroll to a range); the image pane beside it does. Its matches come from a string search on the same text
-  as PDFKit's, so a query PDFKit matches across a line break or ligature may be marked one match off there. (queued: W49.reader-find-scroll-text).
+- **The extracted-text pane's matches come from a string search** on the same text as PDFKit's, so a query
+  PDFKit matches across a line break or ligature may be marked one match off there. (It does scroll to the
+  current hit: an `NSTextView` since W40.fix-reader-copy-text-pane, tested since W49.reader-find-scroll-text.) (queued: W49.reader-find-text-match-parity).
 
 ## ✅ CLOSED (W40.fix-reader-a11y-labels, 2026-10-25) — unnamed Reader controls and PDF pages
 
