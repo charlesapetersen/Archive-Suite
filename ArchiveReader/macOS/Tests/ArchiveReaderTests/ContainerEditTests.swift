@@ -192,7 +192,144 @@ final class ContainerEditTests: XCTestCase {
         XCTAssertEqual(ContainerEdits.contiguousGroups(selected: ["page 10.pdf", "page 9.pdf"],
                                                        fileNames: ["page 10.pdf", "page 9.pdf", "page 11.pdf"]),
                        [["page 9.pdf", "page 10.pdf"]], "in Finder's order")
-        XCTAssertTrue(ContainerEdits.selectionFields.allSatisfy { $0.homeLevel != nil })
+        XCTAssertEqual(ContainerEdits.selectionFields, ContainerField.allCases, "dates and other marks too")
+    }
+
+    // MARK: Set for selection without limits (W49.reader-set-selection-limits)
+
+    func testADateSetForASelectionIsAFolderRunsDateForThemAlone() throws {
+        let file = ContainerFile(runs: [
+            ContainerRun(start: "a.pdf", level: .box, fields: ContainerFieldSet([.container: label("Box 1"),
+                                                                                  .date: label("1950-1960")])),
+            ContainerRun(start: "e.pdf", level: .folder, fields: ContainerFieldSet([.folder: label("3"),
+                                                                                     .date: user("1958")])),
+        ])
+        let edited = try XCTUnwrap(ContainerEdits.setForSelection(.date, to: user("1953"), group: ["b.pdf", "c.pdf"],
+                                                                  after: "d.pdf", in: file))
+        XCTAssertEqual(shown(.date, edited), ["1950-1960", "1953", "1953", "1950-1960", "1958", "1958"])
+        XCTAssertEqual(shown(.container, edited), Array(repeating: "Box 1", count: 6))
+        XCTAssertEqual(shown(.folder, edited), ["-", "-", "-", "-", "3", "3"])
+        XCTAssertEqual(ContainerFolderDate.confirmed(at: "c.pdf", in: edited.runs)?.text, "1953",
+                       "a folder run's own date, so the folder-date rule reads it")
+        XCTAssertNil(ContainerFolderDate.confirmed(at: "d.pdf", in: edited.runs))
+
+        let marks = try XCTUnwrap(ContainerEdits.setForSelection(.other, to: user("Restricted"),
+                                                                 group: ["e.pdf"], after: "f.pdf", in: file))
+        XCTAssertEqual(shown(.other, marks), ["-", "-", "-", "-", "Restricted", "-"])
+        XCTAssertEqual(shown(.date, marks), ["1950-1960", "1950-1960", "1950-1960", "1950-1960", "1958", "1958"],
+                       "the folder run's date is carried across the split")
+    }
+
+    /// The one-pass edit of every group is the groups' edits made one after another, as the editor did before
+    /// (`referenceSetForSelection`), on many generated folders, for every field.
+    func testSetForManyGroupsAtOnceIsTheGroupsEditsInTurn() throws {
+        var seed: UInt64 = 0x5EED
+        func next(_ n: Int) -> Int {
+            seed = seed &* 6364136223846793005 &+ 1442695040888963407
+            return Int((seed >> 33) % UInt64(n))
+        }
+        let names = (1...24).map { "p\($0).pdf" }
+        let values = ["A", "B", "C"]
+        for round in 0..<300 {
+            var runs: [ContainerRun] = []
+            for _ in 0..<next(9) {
+                var fields = ContainerFieldSet()
+                for _ in 0..<next(4) {
+                    let f = ContainerField.allCases[next(ContainerField.allCases.count)]
+                    let v = values[next(values.count)]
+                    fields[f] = next(2) == 0 ? label(v) : user(v)
+                }
+                // Starts on files and between them ("p5a.pdf" sorts after p5), as a run need not start at a file.
+                let start = names[next(names.count)].replacingOccurrences(of: ".pdf", with: next(4) == 0 ? "a.pdf" : ".pdf")
+                runs.append(ContainerRun(start: start, level: ContainerLevel.allCases[next(3)], fields: fields))
+            }
+            let file = ContainerFile(runs: runs)
+            let selected = Set(names.filter { _ in next(3) == 0 })
+            guard !selected.isEmpty else { continue }
+            let groups = ContainerEdits.selectionGroups(selected: selected, fileNames: names)
+            for field in ContainerField.allCases {
+                let value = user("set")
+                let once = try XCTUnwrap(ContainerEdits.setForSelection(field, to: value, groups: groups, in: file))
+                var inTurn = file
+                for group in groups {
+                    inTurn = try XCTUnwrap(Self.referenceSetForSelection(field, to: value, group: group.names,
+                                                                         after: group.after, in: inTurn))
+                }
+                XCTAssertEqual(once.runs, inTurn.runs, "round \(round), \(field)")
+                for name in names {
+                    XCTAssertEqual(ContainerResolver.resolve(fileName: name, scopes: [ContainerScope(file: once)]).values,
+                                   ContainerResolver.resolve(fileName: name, scopes: [ContainerScope(file: inTurn)]).values)
+                    let shownValue = ContainerResolver.resolve(fileName: name, scopes: [ContainerScope(file: once)])
+                        .values[field]
+                    if selected.contains(name) { XCTAssertEqual(shownValue, value, "round \(round), \(field), \(name)") }
+                }
+            }
+        }
+    }
+
+    func testTenThousandScatteredGroupsAreSetInOnePass() throws {
+        let names = (1...20_000).map { "page \($0).pdf" }
+        let selected = Set(names.enumerated().filter { $0.offset % 2 == 0 }.map(\.element))
+        let file = ContainerFile(runs: [
+            ContainerRun(start: "page 1.pdf", level: .box, fields: ContainerFieldSet([.container: label("Box 1")])),
+        ])
+        let groups = ContainerEdits.selectionGroups(selected: selected, fileNames: names)
+        XCTAssertEqual(groups.count, 10_000)
+        let started = Date()
+        let edited = try XCTUnwrap(ContainerEdits.setForSelection(.container, to: user("Box 2"), groups: groups,
+                                                                  in: file))
+        XCTAssertLessThan(Date().timeIntervalSince(started), 20, "one pass, not one per group")
+        XCTAssertEqual(edited.runs.count, 20_000, "the box run at page 1 is the first group's own; one run after each")
+        for name in ["page 1.pdf", "page 2.pdf", "page 9999.pdf", "page 20000.pdf"] {
+            XCTAssertEqual(ContainerResolver.resolve(fileName: name, scopes: [ContainerScope(file: edited)]).shown(.container),
+                           selected.contains(name) ? "Box 2" : "Box 1", name)
+        }
+    }
+
+    /// The editor's set for selection before W49.reader-set-selection-limits, one group at a time, with the level
+    /// "set for selection" now gives `date` and `other`.
+    private static func referenceSetForSelection(_ field: ContainerField, to value: ContainerValue, group: [String],
+                                                 after: String?, in file: ContainerFile) -> ContainerFile? {
+        let level = ContainerEdits.selectionLevel(field)
+        guard let first = group.first, let last = group.last else { return nil }
+        let old = file.runs
+        var points = [first]
+        for run in old where run.level <= level && ContainerOrder.precedes(first, run.start)
+            && ContainerOrder.atOrBefore(run.start, last) && !points.contains(run.start) {
+            points.append(run.start)
+        }
+        var runs = old
+        func ensureCopies(at point: String) {
+            let live = ContainerResolver.liveRuns(at: point, in: old)
+            if !runs.contains(where: { $0.start == point && $0.level == level }) {
+                var fields = live.first { $0.level == level }?.fields ?? ContainerFieldSet()
+                if !live.contains(where: { $0.level == level }) {
+                    let held = ContainerResolver.runValues(live.filter { $0.level < level })
+                    for (f, values) in held where f.homeLevel.map({ $0 >= level }) ?? false {
+                        let usable = values.filter { $0.source == .user || $0.shown != nil }
+                        fields[f] = usable.reduce(nil as ContainerValue?) { best, v in
+                            best.map { v.source > $0.source ? v : $0 } ?? v
+                        }
+                    }
+                }
+                runs.append(ContainerRun(start: point, level: level, fields: fields))
+            }
+            for deeper in live where deeper.level > level && !runs.contains(where: { $0.start == point && $0.level == deeper.level }) {
+                runs.append(ContainerRun(start: point, level: deeper.level, fields: deeper.fields))
+            }
+        }
+        if let after, !old.contains(where: { $0.start == after && $0.level <= level }) { ensureCopies(at: after) }
+        for point in points { ensureCopies(at: point) }
+        runs = runs.map { run in
+            guard ContainerOrder.atOrBefore(first, run.start), ContainerOrder.atOrBefore(run.start, last) else { return run }
+            var run = run
+            if run.level == level { run.fields[field] = value }
+            else if run.level > level { run.fields[field] = nil }
+            return run
+        }
+        var edited = file
+        edited.runs = runs
+        return edited
     }
 
     // MARK: Standard names
@@ -307,6 +444,40 @@ final class ContainerEditTests: XCTestCase {
             .map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path }
         XCTAssertTrue(changed.allSatisfy { $0.contains("/.archivesuite") || $0 == box.path },
                       "only .archivesuite, and the box folder's listing gaining it: \(changed)")
+    }
+
+    func testSetForSelectionTakesMoreThanFiveThousandFilesInOneWrite() throws {
+        let box = root.appendingPathComponent("Box 9", isDirectory: true)
+        try FileManager.default.createDirectory(at: box, withIntermediateDirectories: true)
+        let names = (1...6_000).map { "page \($0).pdf" }
+        for name in names { FileManager.default.createFile(atPath: box.appendingPathComponent(name).path, contents: nil) }
+        let selected = Set(names.prefix(5_500))
+        XCTAssertNotNil(try NavigationModel.setForSelection(.date, user("1961"), selected: selected, in: box))
+        let read = try XCTUnwrap(ContainerFileStore.load(directory: box).document)
+        for name in ["page 1.pdf", "page 5500.pdf", "page 5501.pdf", "page 6000.pdf"] {
+            XCTAssertEqual(ContainerResolver.resolve(fileName: name, scopes: [ContainerScope(file: read)]).shown(.date),
+                           selected.contains(name) ? "1961" : nil, name)
+        }
+    }
+
+    /// The folder-dating offer is armed only for an edit that made one run: a run starting inside the selection
+    /// splits it, and an offer for the first part would leave the rest undated.
+    func testADateSetForOneRunNotesItsStartAndOneSplitByARunNotesNone() throws {
+        let box = try makeBox()
+        try ContainerFileStore.write(ContainerFile(runs: [
+            ContainerRun(start: "a.pdf", level: .folder, fields: ContainerFieldSet([.date: user("1950")])),
+            ContainerRun(start: "d.pdf", level: .folder, fields: ContainerFieldSet([.date: user("1960")])),
+        ]), directory: box, expecting: nil)
+        let split = FolderDateSelection()
+        _ = try NavigationModel.setForSelection(.date, user("1953"), in: [(box, ["b.pdf", "c.pdf", "d.pdf", "e.pdf"])],
+                                                noting: split)
+        XCTAssertNil(split.start, "the run at d.pdf split the selection in two")
+        let one = FolderDateSelection()
+        _ = try NavigationModel.setForSelection(.date, user("1954"), in: [(box, ["b.pdf", "c.pdf"])], noting: one)
+        XCTAssertEqual(one.start, "b.pdf")
+        XCTAssertTrue(one.datedBefore, "the 1953 just set dated b.pdf before")
+        let read = try XCTUnwrap(ContainerFileStore.load(directory: box).document)
+        XCTAssertEqual(shown(.date, read), ["1950", "1954", "1954", "1953", "1953", "1960"])
     }
 
     func testNoChangeWritesNothing() throws {

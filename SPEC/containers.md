@@ -78,7 +78,8 @@ renaming a folder renames its value. A stored `path` value from another writer i
 A **run** is a record per container, not per item. It has a `level` (`collection`, `box` or `folder`), a `start`
 (the file name it begins at) and its `fields`. A box or folder label photo starts a run of its level at itself, the
 item type telling which (`SPEC/tag-format.md` §Item type; a "No Folder" sheet is recognised by its text and starts a
-folder run with no fields). The user may start a run anywhere ("set for selection" splits runs).
+folder run with no fields). The user may start a run anywhere ("set for selection" splits runs; it puts a `date` or `other` value in folder
+runs).
 
 - **Order.** Files are taken in Finder's order within one directory: `localizedStandardCompare`, ties broken by
   plain string comparison (`ContainerOrder`). Hidden files and folders take no part.

@@ -93,7 +93,7 @@ enum ContainerEdits {
             runs[i].fields[field] = value
             file.runs = runs
         case let .newRun(start, level):
-            guard let value, field.homeLevel == level else { return nil }
+            guard let value, selectionLevel(field) == level else { return nil }
             return setForSelection(field, to: value, group: [start], after: nil, in: file)
         }
         return file
@@ -108,76 +108,146 @@ enum ContainerEdits {
 
     // MARK: Set for selection
 
-    /// The fields "set for selection" offers: those with a home level, which says what run the value starts.
-    static let selectionFields: [ContainerField] = ContainerField.allCases.filter { $0.homeLevel != nil }
+    /// The fields "set for selection" offers: every one (W49.reader-set-selection-limits).
+    static let selectionFields: [ContainerField] = ContainerField.allCases
+
+    /// The level of the runs "set for selection" makes for `field`: its home level, and for `date` and `other`, which
+    /// take the level of the run that holds them, a folder's. That is the deepest, so no run masks the value for the
+    /// selected files, and a date set there is the folder date the folder-date rule reads (SPEC §The folder-date rule).
+    static func selectionLevel(_ field: ContainerField) -> ContainerLevel { field.homeLevel ?? .folder }
 
     /// The selected names of one directory in runs of neighbours, by `ContainerOrder`, among `fileNames` (all the
     /// directory's files). A gap is a file of the directory that is not selected.
     static func contiguousGroups(selected: Set<String>, fileNames: [String]) -> [[String]] {
-        var groups: [[String]] = []
+        selectionGroups(selected: selected, fileNames: fileNames).map(\.names)
+    }
+
+    /// `contiguousGroups`, each with the name of the file after it (nil when the group ends the directory).
+    static func selectionGroups(selected: Set<String>, fileNames: [String]) -> [SelectionGroup] {
+        var groups: [SelectionGroup] = []
         var current: [String] = []
         for name in fileNames.sorted(by: ContainerOrder.precedes) {
             if selected.contains(name) {
                 current.append(name)
             } else if !current.isEmpty {
-                groups.append(current)
+                groups.append(SelectionGroup(names: current, after: name))
                 current = []
             }
         }
-        if !current.isEmpty { groups.append(current) }
+        if !current.isEmpty { groups.append(SelectionGroup(names: current, after: nil)) }
         return groups
     }
 
+    /// Neighbouring selected files of one directory, in order, and the name of the file after them.
+    struct SelectionGroup: Equatable, Sendable {
+        let names: [String]
+        let after: String?
+    }
+
     /// Sets `field` to `value` for the files `group` (neighbours in the directory, in order) and for no other file:
-    /// splitting runs (SPEC §Runs: the user may start a run anywhere).
-    ///
-    /// A run of the field's home level L is made at the group's first file, and at each run of level L or shallower
-    /// starting inside the group, each a copy of what was live there, holding the value. Deeper runs live there are
-    /// copied too, so only `field` changes for the selected files, and they lose `field` inside the group so the new
-    /// value shows. At the file after the group the runs of level L and deeper that were live there are copied back,
-    /// so every later file keeps what it had. `after` is that file's name; nil when the group ends the directory.
+    /// splitting runs (SPEC §Runs: the user may start a run anywhere). `after` is the name of the file after the group;
+    /// nil when the group ends the directory.
     static func setForSelection(_ field: ContainerField, to value: ContainerValue, group: [String], after: String?,
                                 in file: ContainerFile) -> ContainerFile? {
-        guard let level = field.homeLevel, let first = group.first, let last = group.last else { return nil }
-        let old = file.runs
-        var points = [first]
-        for run in old where run.level <= level && ContainerOrder.precedes(first, run.start)
-            && ContainerOrder.atOrBefore(run.start, last) && !points.contains(run.start) {
-            points.append(run.start)
+        setForSelection(field, to: value, groups: [SelectionGroup(names: group, after: after)], in: file)
+    }
+
+    /// Sets `field` to `value` for every group's files and for no other file, in one pass over the runs, so a
+    /// selection of many scattered files costs about as much as one (W49.reader-set-selection-limits). `groups` are
+    /// in order and apart, each followed by a file that is not selected.
+    ///
+    /// For each group: a run of the field's selection level L is made at the group's first file, and at each run of
+    /// level L or shallower starting inside the group, each a copy of what was live there, holding the value. Deeper
+    /// runs live there are copied too, so only `field` changes for the selected files, and they lose `field` inside
+    /// the group so the new value shows. At the file after the group the runs of level L and deeper that were live
+    /// there are copied back, so every later file keeps what it had. Each group's copies end at its `after` and read
+    /// only what was live from its first file, so the result is the groups' edits made one after another.
+    static func setForSelection(_ field: ContainerField, to value: ContainerValue, groups: [SelectionGroup],
+                                in file: ContainerFile) -> ContainerFile? {
+        let level = selectionLevel(field)
+        let groups = groups.filter { !$0.names.isEmpty }
+        guard !groups.isEmpty else { return nil }
+        let old = file.runs   // `ContainerFile.normalised` order
+        struct Key: Hashable { let start: String, level: ContainerLevel }
+        var existing = Set(old.map { Key(start: $0.start, level: $0.level) })
+        var added: [ContainerRun] = []
+        // Each copy's group (an index into `groups`), or nil for a copy at a group's `after`.
+        var addedGroup: [Int?] = []
+
+        // The points to copy at, in order: each with its group, or nil for an `after`.
+        var points: [(name: String, group: Int?)] = []
+        var j = 0
+        for (g, group) in groups.enumerated() {
+            let first = group.names[0], last = group.names[group.names.count - 1]
+            points.append((first, g))
+            while j < old.count, ContainerOrder.atOrBefore(old[j].start, first) { j += 1 }
+            var k = j
+            var seen: Set<String> = [first]
+            while k < old.count, ContainerOrder.atOrBefore(old[k].start, last) {
+                if old[k].level <= level, seen.insert(old[k].start).inserted { points.append((old[k].start, g)) }
+                k += 1
+            }
+            if let after = group.after {
+                // A run of level L or shallower already at `after` ends the group's runs itself.
+                var ended = false
+                while k < old.count, ContainerOrder.atOrBefore(old[k].start, after) {
+                    if old[k].start == after, old[k].level <= level { ended = true }
+                    k += 1
+                }
+                if !ended { points.append((after, nil)) }
+            }
+            j = k   // the next group starts after this one's `after`
         }
-        var runs = old
-        func ensureCopies(at point: String) {
-            let live = ContainerResolver.liveRuns(at: point, in: old)
-            if !runs.contains(where: { $0.start == point && $0.level == level }) {
-                var fields = live.first { $0.level == level }?.fields ?? ContainerFieldSet()
-                if !live.contains(where: { $0.level == level }) {
-                    // No run of this level was live: carry what shallower runs gave the fields this run masks, the
-                    // value the resolver would choose (highest source, then the deepest).
-                    let held = ContainerResolver.runValues(live.filter { $0.level < level })
-                    for (f, values) in held where f.homeLevel.map({ $0 >= level }) ?? false {
-                        let usable = values.filter { $0.source == .user || $0.shown != nil }
-                        fields[f] = usable.reduce(nil as ContainerValue?) { best, v in
-                            best.map { v.source > $0.source ? v : $0 } ?? v
-                        }
+
+        // One sweep for what was live at each point (they are in order).
+        var live: [ContainerRun] = []
+        var r = 0
+        for point in points {
+            while r < old.count, ContainerOrder.atOrBefore(old[r].start, point.name) {
+                live.removeAll { $0.level >= old[r].level }
+                live.append(old[r])
+                r += 1
+            }
+            func add(_ run: ContainerRun) {
+                guard existing.insert(Key(start: run.start, level: run.level)).inserted else { return }
+                added.append(run)
+                addedGroup.append(point.group)
+            }
+            var fields = live.first { $0.level == level }?.fields ?? ContainerFieldSet()
+            if !live.contains(where: { $0.level == level }) {
+                // No run of this level was live: carry what shallower runs gave the fields this run masks, the value
+                // the resolver would choose (highest source, then the deepest).
+                let held = ContainerResolver.runValues(live.filter { $0.level < level })
+                for (f, values) in held where f.homeLevel.map({ $0 >= level }) ?? false {
+                    let usable = values.filter { $0.source == .user || $0.shown != nil }
+                    fields[f] = usable.reduce(nil as ContainerValue?) { best, v in
+                        best.map { v.source > $0.source ? v : $0 } ?? v
                     }
                 }
-                runs.append(ContainerRun(start: point, level: level, fields: fields))
             }
-            for deeper in live where deeper.level > level && !runs.contains(where: { $0.start == point && $0.level == deeper.level }) {
-                runs.append(ContainerRun(start: point, level: deeper.level, fields: deeper.fields))
+            add(ContainerRun(start: point.name, level: level, fields: fields))
+            for deeper in live where deeper.level > level {
+                add(ContainerRun(start: point.name, level: deeper.level, fields: deeper.fields))
             }
         }
-        if let after, !old.contains(where: { $0.start == after && $0.level <= level }) { ensureCopies(at: after) }
-        for point in points { ensureCopies(at: point) }
-        runs = runs.map { run in
-            guard ContainerOrder.atOrBefore(first, run.start), ContainerOrder.atOrBefore(run.start, last) else { return run }
-            var run = run
+
+        func edit(_ run: inout ContainerRun) {
             if run.level == level { run.fields[field] = value }
             else if run.level > level { run.fields[field] = nil }
-            return run
         }
+        // The old runs inside a group, found with the groups in order.
+        var runs = old
+        var g = 0
+        for i in runs.indices {
+            while g < groups.count, ContainerOrder.precedes(groups[g].names[groups[g].names.count - 1], runs[i].start) {
+                g += 1
+            }
+            guard g < groups.count else { break }
+            if ContainerOrder.atOrBefore(groups[g].names[0], runs[i].start) { edit(&runs[i]) }
+        }
+        for i in added.indices where addedGroup[i] != nil { edit(&added[i]) }
         var edited = file
-        edited.runs = runs
+        edited.runs = runs + added
         return edited
     }
 

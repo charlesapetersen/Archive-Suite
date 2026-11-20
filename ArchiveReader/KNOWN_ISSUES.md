@@ -54,10 +54,18 @@ What it does not do, deliberately or not yet:
 - **An edit to the folder's own values reaches the folders inside it** and outranks their label reads, as the SPEC's
   precedence says (user, then label, then path). The row says "every file in this folder and the folders inside
   it". It is chosen only where the folder has no run of that field's level. (accepted: the SPEC's precedence, user then label then path, SPEC/containers.md).
-- **Set for selection** takes fields with a level (not date or other marks), at most 5,000 files, and the files in
-  each folder's order on disk, so a file the list does not show still keeps its value. Across several folders it is
-  all or nothing: every folder's file is checked before any is written, and a write failing partway puts the
-  folders already written back and says so; one changed again in that moment is named as not put back (queued: W49.reader-set-selection-limits).
+- **Set for selection** takes every field, a date and other marks included, for any number of files
+  (W49.reader-set-selection-limits): a date or other marks goes in folder runs, the deepest level, so the folder-date
+  rule reads a date set there. It takes the files in each folder's order on disk, so a file the list does not show
+  still keeps its value, and edits each folder in one pass and one write. Across several folders it is all or
+  nothing: every folder's file is checked before any is written, and a write failing partway puts the folders
+  already written back and says so; one changed again in that moment is named as not put back (accepted: putting
+  it back would overwrite the other app's change, which the Reader's Core Directive on file safety forbids). A date set this way offers to date the
+  folder's documents only when the selection is one run of neighbours in one folder; a selection that makes several
+  runs offers nothing (queued: W49.reader-set-selection-date-offer). A selection scattered through one folder makes
+  two runs per stretch of neighbours, and a container file is at most 1 MB (SPEC §The container file), so several thousand
+  stretches in one folder are refused at the write with "would pass its 1 MB limit", the folders already written put
+  back (queued: W49.ct-file-size-cap).
 - **Warnings: disagreements and long unmarked runs only** (`ContainerInference.warnings`). The Inspector lists the
   selected file's folder; the Library health popover lists every folder's, each with its folder and a Show that
   reaches a file the list hides by lifting the folder and filters as Show in All Files does, at most 200 listed and

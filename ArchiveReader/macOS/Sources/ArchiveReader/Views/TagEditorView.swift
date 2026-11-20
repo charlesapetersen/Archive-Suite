@@ -49,8 +49,7 @@ struct TagEditorView: View {
                     Divider()
                     // W49.reader-item-fields-follow: for several files, one value set for them all.
                     FieldStatusSection(files: files, apply: apply, revision: model.itemFieldRevision,
-                                       editable: files.count <= Self.maxContainerSelection
-                                           && files.allSatisfy { model.canEditItemFields($0.path) },
+                                       editable: files.allSatisfy { model.canEditItemFields($0.path) },
                                        saving: model.containerEditSaving,
                                        // A selection's error is shown for a selection only; an undo's (no
                                        // path either) for one file too.
@@ -82,7 +81,7 @@ struct TagEditorView: View {
                                          onShowWarning: { model.selectContainerWarning($0) })
                             .id(file.path)
                         Divider()
-                    } else if hasContainerTree, files.count > 1, files.count <= Self.maxContainerSelection {
+                    } else if hasContainerTree, files.count > 1 {
                         ContainerSelectionSection(count: files.count, error: model.containerEditError,
                                                   saving: model.containerEditSaving,
                                                   onSet: { model.setContainerFieldForSelection($0, $1,
@@ -131,9 +130,6 @@ struct TagEditorView: View {
     }
 
     private static let maxCollectionCheck = 500
-
-    /// The most files "set for selection" is offered for at once.
-    private static let maxContainerSelection = 5000
 
     /// The catalog is the open tree's, so its files can be edited (W47.ct-reader-edit).
     private var hasContainerTree: Bool {

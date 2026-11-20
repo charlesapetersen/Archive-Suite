@@ -92,11 +92,13 @@ extension NavigationModel {
     /// the field's level, ended after the last (`ContainerEdits.setForSelection`). Files are taken in each folder's
     /// order on disk, so a file the library does not list still keeps its value. All or nothing: every folder's file
     /// is read and checked before any is written, and a write that still fails partway puts the folders already
-    /// written back (`setForSelection(_:_:in:)`).
+    /// written back (`setForSelection(_:_:in:)`). Any field, a date or other marks too, for any number of files: each
+    /// folder is read and written once (W49.reader-set-selection-limits).
     func setContainerFieldForSelection(_ field: ContainerField, _ text: String, paths: [String],
                                        undo: UndoManager? = nil) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let tree = containerTree, containerCatalog.rootPath == tree.path, field.homeLevel != nil else { return }
+        guard let tree = containerTree, containerCatalog.rootPath == tree.path else { return }
+        folderDatingOffer = nil   // an offer made before this edit no longer stands
         var byDirectory: [[String]: Set<String>] = [:]
         for path in paths {
             guard let (dir, name) = ContainerCatalog.split(path, under: tree.path) else { continue }
@@ -109,21 +111,34 @@ extension NavigationModel {
         let now = Date()
         let count = paths.count
         let directories = byDirectory.sorted { $0.key.joined(separator: "/") < $1.key.joined(separator: "/") }
+        // W47.ct-folder-date-reader: a date set for neighbours in one folder is that folder run's date, so it may date
+        // their documents, as a date typed for one file does. The run starts at the first selected file.
+        var onSaved: (@MainActor () -> Void)?
+        let run = FolderDateSelection()
+        if field == .date, directories.count == 1 {
+            let window = undo.map { ObjectIdentifier($0) }
+            onSaved = { [weak self] in
+                guard let name = run.start, let path = paths.first(where: { ($0 as NSString).lastPathComponent == name })
+                else { return }
+                self?.offerFolderDating(at: path, window: window, datedBefore: run.datedBefore)
+            }
+        }
         runContainerEdit(done: "\(field.label) set for \(count) file\(count == 1 ? "" : "s").",
-                         action: "Set \(field.label) for Selection", undo: undo) {
+                         action: "Set \(field.label) for Selection", undo: undo, {
             let value = ContainerValue(trimmed, source: .user, at: now)
             let folders = try directories.map { (try Self.containerDirectoryURL(tree.url, $0.key), $0.value) }
-            return try Self.setForSelection(field, value, in: folders)
-        }
+            return try Self.setForSelection(field, value, in: folders, noting: field == .date ? run : nil)
+        }, onSaved: onSaved)
     }
 
     /// "Set for selection" across folders, all or nothing. Every folder's file is read, checked and edited first, and
     /// one refusal writes nothing. A write that still fails (another app in between) puts back the folders already
     /// written, with the same restore Undo uses, and the error says whether that worked.
     nonisolated static func setForSelection(_ field: ContainerField, _ value: ContainerValue,
-                                            in folders: [(URL, Set<String>)]) throws -> ContainerUndoStep? {
+                                            in folders: [(URL, Set<String>)],
+                                            noting run: FolderDateSelection? = nil) throws -> ContainerUndoStep? {
         let prepared = try folders.compactMap { directory, selected in
-            try prepareSetForSelection(field, value, selected: selected, in: directory)
+            try prepareSetForSelection(field, value, selected: selected, in: directory, noting: run)
         }
         return try commitAll(prepared)
     }
@@ -151,21 +166,24 @@ extension NavigationModel {
         try prepareSetForSelection(field, value, selected: selected, in: directory)?.commit()
     }
 
+    /// `run`, when given, is told the one run the edit makes: its first file and whether a confirmed folder date
+    /// dated documents there before; it is left empty when the selection makes several (a gap in it, or a run of the
+    /// folder starting inside it).
     nonisolated static func prepareSetForSelection(_ field: ContainerField, _ value: ContainerValue,
-                                                   selected: Set<String>, in directory: URL) throws
+                                                   selected: Set<String>, in directory: URL,
+                                                   noting run: FolderDateSelection? = nil) throws
         -> PreparedContainerEdit? {
-        let all = Array(Set(try fileNames(in: directory)).union(selected)).sorted(by: ContainerOrder.precedes)
-        let groups = ContainerEdits.contiguousGroups(selected: selected, fileNames: all)
+        let all = Set(try fileNames(in: directory)).union(selected)
+        let groups = ContainerEdits.selectionGroups(selected: selected, fileNames: Array(all))
         return try prepareContainerEdit(at: directory) { file in
-            var file = file
-            for group in groups {
-                guard let last = group.last, let i = all.firstIndex(of: last) else { continue }
-                let after = i + 1 < all.count ? all[i + 1] : nil
-                guard let edited = ContainerEdits.setForSelection(field, to: value, group: group, after: after,
-                                                                  in: file) else { return nil }
-                file = edited
+            // One run only where no run starts inside the group: each one would be split into a run of its own.
+            if let run, groups.count == 1, let start = groups.first?.names.first, let last = groups.first?.names.last,
+               !file.runs.contains(where: { ContainerOrder.precedes(start, $0.start)
+                                             && ContainerOrder.atOrBefore($0.start, last) }) {
+                run.start = start
+                run.datedBefore = ContainerFolderDate.confirmed(at: start, in: file.runs)?.inherited != nil
             }
-            return file
+            return ContainerEdits.setForSelection(field, to: value, groups: groups, in: file)
         }
     }
 

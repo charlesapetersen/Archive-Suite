@@ -97,6 +97,14 @@ final class FolderDateBefore: @unchecked Sendable {
     var dated = false
 }
 
+/// The one folder run a date set for a selection made (W49.reader-set-selection-limits): its first file, and whether a
+/// confirmed folder date dated documents there before (`FolderDateBefore`). Set off the main thread by the edit's work
+/// and read after it finished; `start` stays nil when the selection made several runs.
+final class FolderDateSelection: @unchecked Sendable {
+    var start: String?
+    var datedBefore = false
+}
+
 /// A folder run whose confirmed date can date documents: the date, the folder on disk and the run's files.
 struct FolderDatingRun: Sendable {
     /// Nil when the run's date dates nothing (`NavigationModel.folderDateRun`).
