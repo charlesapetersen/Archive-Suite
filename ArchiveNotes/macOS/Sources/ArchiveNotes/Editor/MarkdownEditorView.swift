@@ -360,32 +360,28 @@ struct MarkdownEditorView: NSViewRepresentable {
         // just been (re)applied when the loaded item changed, so the block-ordinal map is current; the
         // host only sets `scrollRequest` once the target item's body is loaded (gated on `loadedID`).
         if !wantRaw, let req = scrollRequest, coordinator.lastScrollToken != req.token,
-           coordinator.lastContentID == contentID, coordinator.lastAppliedMarkdown == markdown {
-            coordinator.lastScrollToken = req.token
-            let rendered = textView.textStorage ?? NSAttributedString()
-            let range = NotePassageResolve.scrollRange(forBlock: req.block, in: rendered)
-            let hitExact = (req.block == nil) || (range != nil)
-            if let range {
-                // Placed now, then again once the new editor's relayout passes are done (each re-lays the whole
-                // document, and the viewport comes back at estimated positions), and once more a turn after that,
-                // past a resize's place restore (W40.fix-notes-jump-scroll-short).
-                if !textView.scrollBlockToTop(range) { textView.scrollRangeToVisible(range) }
-                @MainActor func isCurrent() -> Bool {
-                    coordinator.lastScrollToken == req.token && coordinator.lastContentID == contentID
-                        && coordinator.lastAppliedMarkdown == markdown
+           coordinator.lastContentID == contentID {
+            if isEditing {
+                // W49.notes-same-window-jump: a jump into the note being typed in. Freeze-during-edit skipped
+                // the re-apply above, so the text view and the model can disagree: an edit still waiting for
+                // its write-back, or a body the model reloaded that the view never installed. One turn later
+                // (the flush publishes, which a view update may not do): push the edit, install what the model
+                // then holds, and scroll against that.
+                coordinator.lastScrollToken = req.token
+                DispatchQueue.main.async { [weak coordinator] in
+                    guard let coordinator, let textView = coordinator.textView,
+                          coordinator.lastScrollToken == req.token, !coordinator.currentIsRaw,
+                          coordinator.lastContentID == contentID,
+                          coordinator.parent.contentID == contentID else { return }
+                    coordinator.flushWriteBack()
+                    coordinator.installModelMarkdownIfStale()
+                    coordinator.parent.scrollToBlock(req, in: textView, coordinator: coordinator,
+                                                     contentID: contentID, markdown: coordinator.parent.markdown)
                 }
-                textView.whenLayoutSettles { [weak textView] in
-                    guard let textView, isCurrent() else { return }
-                    textView.scrollBlockToTop(range)
-                    DispatchQueue.main.async { [weak textView] in
-                        guard let textView, isCurrent() else { return }
-                        textView.scrollBlockToTop(range)
-                    }
-                }
-            } else {
-                textView.scrollRangeToVisible(NSRange(location: 0, length: 0))
+            } else if coordinator.lastAppliedMarkdown == markdown {
+                coordinator.lastScrollToken = req.token
+                scrollToBlock(req, in: textView, coordinator: coordinator, contentID: contentID, markdown: markdown)
             }
-            onScrollOutcome?(hitExact)
         }
         if let token = focusRequestToken, coordinator.lastFocusToken != token,
            coordinator.pendingFocusToken != token, let contentID,
@@ -414,6 +410,37 @@ struct MarkdownEditorView: NSViewRepresentable {
                 coordinator.parent.onFocusApplied?()
             }
         }
+    }
+
+    /// Scrolls the current content to `req`'s block (or the top when the ordinal is stale or absent) and
+    /// reports the outcome. The caller has checked that `markdown` is what the text view holds.
+    @MainActor
+    private func scrollToBlock(_ req: EditorScrollRequest, in textView: EditorTextView, coordinator: Coordinator,
+                               contentID: UUID?, markdown: String) {
+        let rendered = textView.textStorage ?? NSAttributedString()
+        let range = NotePassageResolve.scrollRange(forBlock: req.block, in: rendered)
+        let hitExact = (req.block == nil) || (range != nil)
+        if let range {
+            // Placed now, then again once the new editor's relayout passes are done (each re-lays the whole
+            // document, and the viewport comes back at estimated positions), and once more a turn after that,
+            // past a resize's place restore (W40.fix-notes-jump-scroll-short).
+            if !textView.scrollBlockToTop(range) { textView.scrollRangeToVisible(range) }
+            @MainActor func isCurrent() -> Bool {
+                coordinator.lastScrollToken == req.token && coordinator.lastContentID == contentID
+                    && coordinator.lastAppliedMarkdown == markdown
+            }
+            textView.whenLayoutSettles { [weak textView] in
+                guard let textView, isCurrent() else { return }
+                textView.scrollBlockToTop(range)
+                DispatchQueue.main.async { [weak textView] in
+                    guard let textView, isCurrent() else { return }
+                    textView.scrollBlockToTop(range)
+                }
+            }
+        } else {
+            textView.scrollRangeToVisible(NSRange(location: 0, length: 0))
+        }
+        onScrollOutcome?(hitExact)
     }
 
     @MainActor
@@ -528,6 +555,37 @@ struct MarkdownEditorView: NSViewRepresentable {
 
         func recordAppliedSerialization() {
             appliedSerialization = currentSerialization()
+        }
+
+        /// Installs the model's body when it is not what the styled text view last received
+        /// (W49.notes-same-window-jump: freeze-during-edit skips that re-apply while the view is focused).
+        /// Keeps the selection, clamped; clears undo, whose ranges point into the old storage.
+        func installModelMarkdownIfStale() {
+            let markdown = parent.markdown
+            guard let textView, !currentIsRaw, lastAppliedMarkdown != markdown else { return }
+            let savedSelection = textView.selectedRanges
+            isApplyingProgrammaticChange = true
+            let styled = MarkdownBridge.parse(markdown: markdown, fontSize: currentFontSize,
+                                               assetStore: assetStore,
+                                               onRevealBlock: onRevealBlock,
+                                               onPreviewBlock: onPreviewBlock,
+                                               onJumpBlock: onJumpBlock,
+                                               passageSummaries: passageSummaries)
+            textView.replaceStyledDocument(with: styled)
+#if DEBUG
+            textView.refreshUITestPassageChipStateSnapshot()
+#endif
+            textView.undoManager?.removeAllActions()
+            let length = (textView.string as NSString).length
+            textView.selectedRanges = savedSelection.map {
+                let range = $0.rangeValue
+                let location = min(range.location, length)
+                return NSValue(range: NSRange(location: location, length: min(range.length, length - location)))
+            }
+            isApplyingProgrammaticChange = false
+            lastAppliedMarkdown = markdown
+            lastPassageGeneration = parent.passageGeneration
+            recordAppliedSerialization()
         }
 
         private func writeBack() {

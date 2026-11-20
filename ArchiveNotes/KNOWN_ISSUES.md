@@ -2049,7 +2049,7 @@ paste in an extract editor → note-passage blocks). Model + codec paths are uni
   gives provenanced blocks with the image bytes (`NotesGUITests.testG13_…`, through the copy/paste seams, not the
   ⌘C/⌘V keystrokes); Create/Append raise the Extracts window (`testG14_…`, `testG15_…`). Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`. (accepted: done, W40.notes-w7-gui-checks).
 
-## Extracts jump-to-source + provenance chips — follow-ups (W7-S3, 2026-07-13): the template-pane and folder-scope edges are fixed (W40.fix-notes-jump-pending-template, 2026-11-03); the same-window edge stays a limitation; the live GUI checks ran (W40.notes-w7-gui-checks, 2026-11-04): the jump lands short of the block (W40.fix-notes-jump-scroll-short), the rest held
+## Extracts jump-to-source + provenance chips — follow-ups (W7-S3, 2026-07-13): the template-pane and folder-scope edges are fixed (W40.fix-notes-jump-pending-template, 2026-11-03); the same-window edge is fixed (W49.notes-same-window-jump, 2026-11-20); the live GUI checks ran (W40.notes-w7-gui-checks, 2026-11-04): the jump lands short of the block (W40.fix-notes-jump-scroll-short), the rest held
 
 W7-S3 shipped the note-passage provenance chip's **Jump to Source** button + live-title label + the
 in-app navigation channel (`NotesModel.openItem`/`pendingOpen`) and the Note-window consume side
@@ -2094,11 +2094,13 @@ is unit-tested (`NotePassageResolveTests`, 20 tests incl. `openAction`); conscio
   rename in the *other* window recolors the chip while the extract sits idle. Gated to docs that carry a
   note-passage chip (plain notes never re-style on unrelated changes); scroll offset preserved across the
   refresh so a reader isn't yanked. **Live cross-window recolor GUI drive → Daemon Report.** (accepted: fixed, the item named at its start).
-- **Same-window active-editing edge.** If the jump target note is being actively edited *in the same
-  window* (its text view is first responder), freeze-during-edit skips the content re-apply, so the
-  scroll maps against possibly-stale content (falls back to top if out of range — non-crashing). The
-  realistic jump is cross-window (Extract → Note window), where the target window isn't first responder,
-  so content re-applies and the scroll is exact. (queued: W49.notes-same-window-jump).
+- ✅ **FIXED (W49.notes-same-window-jump, 2026-11-20): a jump into the note being typed in.** Freeze-during-edit
+  skips the content re-apply while the target's text view is first responder (AppKit keeps it so in a window that
+  is not key, so this was not only a same-window case), so the jump could map against content the model no longer
+  held, or wait on it. When a jump reaches a focused editor, `MarkdownEditorView` now waits one main-loop turn
+  (the flush publishes, which a view update may not), flushes the pending edit, installs the model's body if the
+  view never received it (`Coordinator.installModelMarkdownIfStale`: selection clamped, undo cleared), and
+  scrolls. `SameWindowJumpTests`. (accepted: fixed, the item named at its start).
 - ✅ **FIXED (W40.fix-notes-jump-pending-template, 2026-11-03): folder-scope-hidden target.** A jump
   cleared the window's *user* filters but left a shared *folder scope* that excludes the note, so the
   editor loaded it with no list row highlighted. `NotesNavigationModel.revealForOpen` now also widens such
