@@ -929,7 +929,7 @@ Runtime evidence and the final unattended rerun are under `verification/evidence
   plan request takes inline `input_image` parts (if not, it fails with `subscription_sharing_unsupported_capability`,
   which stops the run, and the window would have to be sent another way); whether it takes `reasoning.effort`; and
   how the issued client id behaves when a different account signs in after a sign-out (the app starts a new
-  registration then, which OpenAI's docs allow). (asked: W49.proc-chatgpt-real-signin-owner-ok)
+  registration then, which OpenAI's docs allow). (queued: W49.proc-chatgpt-real-signin)
 - **No meter, so no share.** OpenAI gives an app no usage figure, so the ChatGPT line is the bench's token figure
   and its API list price, labelled approximate, never a share of the plan. A usage limit stops the run resumably
   with the Manage usage link; there is no 90% pause as Claude's plan route has. (accepted: OpenAI gives an app no usage figure, so the approximate token and list-price line is the most the route can show)

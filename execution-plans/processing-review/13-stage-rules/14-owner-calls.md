@@ -141,6 +141,12 @@ calls are section 1.
     correspondence documents (Gemini 3.8 Flash), the sender rises 0.70 to 0.81 (+0.107, 95% +0.038 to +0.189), all on
     the 48 letters past 3,000 characters; recipient and place tie; +$0.55 per 1,000 letters
     (`ArchiveProcessor/segbench-results/ent-8k-paired.md`). W47.wh-ent-8k-apply builds it.
+19. **The ChatGPT plan route against OpenAI's real servers (2026-11-19, walkthrough of 16:07;
+    W49.proc-chatgpt-real-signin-owner-ok).** Yes: the owner signs in once with a real ChatGPT account in the Processor's
+    own Sign in with ChatGPT (the Codex login does not carry over: the route registers its own client id) after the
+    plan's weekly reset on Sat 21 Nov 13:25, since a request on the spent week could not be told from a real failure.
+    W49.proc-chatgpt-real-signin then runs one real segmentation window and fixes what fails. Reason: the suite is
+    for other users, and one with only a ChatGPT plan would take this route.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
