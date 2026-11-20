@@ -17341,3 +17341,25 @@ surviving code/doc citations were confirmed self-sufficient before deleting.
   <!-- /W49.proc-fix-s041 -->
 - [x] **W49.notes-suspects-small — reproduce the six smaller Notes suspects under the strict rule [M]** · §Known limits are queued, accepted or asked (lane: notes) — Owner, 2026-11-20 (call 28, the Backlog review sheet). SHIPPED 2026-11-20. One reproduce attempt each under phase rule 5a, after checking the code still says what each suspect says. Five in the unit bundle through the app's own objects on scratch data (`ArchiveNotesTests/NotesSmallSuspectTests`, 6 tests, green with 7 known issues): **S-012 reproduced, narrower than raised**: the filter bar's field now fills in a prefix in the stored spelling, but a tag typed in full in another case ("intel") gets no completion, is added as typed, and the exact match finds nothing for a note tagged "Intel" (Advanced Search lower-cases, so it finds it). **S-016 reproduced**: on the hosted real list table, the Title column's sort prototype set as the sort descriptors moves the header arrow but not the order; the data source does not answer `sortDescriptorsDidChange`, and the coordinator's handler, called by hand, sorts. **S-010 reproduced**: the real row menu's "Remove 3 Items from “F”" over two sole-instance notes and a replicant asks about one; confirming trashes exactly that one, and the other stays in F unasked. **S-011 reproduced, both halves**: the row menu's New from Template misses a template edit still waiting to save and makes a note from a template whose last save failed; `NewItemFlow` (every other New) does neither. **S-014 reproduced and asked** (rule 5a(3)): a granted root renamed in session answers `.notFound`, a fresh root store (a relaunch) resolves it at the new place; the code and an accepted KNOWN_ISSUES bullet call this the W8-S9 rule, so the owner is asked in the Daemon Report. **S-008 cleared** in the VM (`ArchiveNotesUITests/NotesWindowSizeQuitUITests`, 2/2, run twice): with a new DEBUG flag `-ANUITestPersistWindowSize YES` (the harness otherwise skips saving the size; `NotesBrowserView.suppressesWindowSizePersistence`), a window resized from the saved 1536×699 to 1479×612 and quit at once relaunched at 1479×612. Full Notes unit bundle 1257/1257, 11 known issues. Fix items wait on the independent check, filed as `W49.notes-suspects-small-check` (rule 5a(4)). Nothing kept in the bench cache (none used).
   <!-- /W49.notes-suspects-small -->
+
+### History moved from SUITE_TODO.md (doc-fix, 2026-11-20) · §P2 — Reader features, §P2 — Processor
+
+Moved verbatim; nothing in either is open.
+
+#### ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
+All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
+flash; text selection after cycling (fresh `PDFView` per page); zoom persistence across cycling *and* as
+default incl. trackpad-pinch (`PDFViewScaleChanged` capture); top-anchored zoom; splitter persistence.
+Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`ArchiveReaderApp`.
+
+> **✅ INTEGRATED 2026-07-07.** The standalone clone's `feat/live-capture-cloud-transport` work — a full
+> **Drive-relay cloud-transport** system (D1–D8: `DriveClient`/`DriveObjectStore`/`DriveAuth`/
+> `DriveRelayTransport` for Mac+iOS+Android, `FileRelay`, phone queue-depth + Finish drain-gate;
+> LIVE-validated, already adversarially reviewed) — was ported into the monorepo under `ArchiveProcessor/`
+> as **27 commits (history preserved)** via `git am --directory`, merged to `main`, and pushed. Both apps
+> build; offline invariant tests pass (RELAY GOLDEN ✅, FileRelay 8/8). The standalone clone was then
+> **retired**: its 6.3 GB `Test Files` corpus moved into `ArchiveProcessor/Test Files/` (gitignored), the
+> folder deleted, and the stale `com.archivereader.autobuild` launchd relic removed. This **supersedes** the
+> "connectivity UX" item above (cloud/USB transport is the new direction). The architecture now lives in
+> `ArchiveProcessor/CLAUDE.md` §Function 3; the relay contract in `SPEC/relay-object-format.md`; the
+> on-device walkthrough in `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md`.

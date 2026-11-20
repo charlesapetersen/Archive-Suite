@@ -910,12 +910,6 @@ unfinished features — Processor `b3` and `d1`-`d4` on `W36.seg-decision`, the 
 - [ ] **`W40.fix-processor-merged-classification-stale` — a class changed after merge leaves the merged document's page 2 lines stale [XS · S4 · Tier-2]** (lane: processor) (uses: build) — Found by `W40.fix-processor-review-classification-stale`'s review, 2026-11-20: a file-pane class edit after the run merged a document rewrites the merged PDF's tags, but `writeClassificationHeader` (`OCR/OCRProcessor+Tagging.swift`) handles one image page and one text page, so each text page in the merged file keeps its old `Classification:` line. Rewrite the edited page's text page inside the merged document (the searchable form's pages too), with the same read-back checks as `PDFGenerator.classificationRewrite`, or say in the edit that page 2 is unchanged. Tier-2: it rewrites an output PDF. Test: DateRouteTestDriver section 4c's merged case, made to expect the new line.
 - [ ] **`W40.fix-processor-pending-run-caption` — the Interrupted Run box names the stored provider for a Local Agent run [XS · S4]** (lane: processor) (uses: build) — Found by `W40.d2` 2026-11-19 (evidence file above, defect 3; shot `W40.d2-pending-run-caption.jpg`): after a Local Agent run was killed mid-review the box read "6/6 files completed via Gemini Gemini 3.8 Flash" beside "Click Resume to continue with the Local Agent". `OCR/OCRProcessor+Pipeline.swift` builds `pendingRunInfo` from `pending.provider` and `pending.model` whatever `pendingRunBackend` is; name the backend that ran (Local Agent, the gateway and its model, or the provider). Test: the caption for a pending-run record of each backend (the `-APUITestPendingRun` VM test shows a fixed caption of its own, so it does not cover this).
 - [ ] **`W40.reader-plain-pdf` — show ordinary PDFs as ordinary pages [M · Tier-2]** (lane: reader,suite) (uses: build,vm) — Owner's Reader notes, 2026-11-17: a PDF not made by the Processor (e.g. a scanned dissertation, every page real) opens with page 2 in the OCR text pane and Next stepping two pages. packages/ArchiveCore PDFPageRole.roles(of:) (PDF/ExtractedContent.swift:110-136) falls back to image/text pairs whenever the XMP carrier list is missing. Pair only when an odd page parses with a SPEC header; otherwise treat every page as its own page with no text pane, in the viewer and the index (PDFHeaderParser.extract, :146-178). Tests with a plain multi-page PDF fixture.
-## ✅ Document-viewer bugs (owner-reported 2026-07-06) — RESOLVED & owner-verified
-All fixed and confirmed by the owner (round-3 commit `d4eedba`): open-maximized + remember-size with no
-flash; text selection after cycling (fresh `PDFView` per page); zoom persistence across cycling *and* as
-default incl. trackpad-pinch (`PDFViewScaleChanged` capture); top-anchored zoom; splitter persistence.
-Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`ArchiveReaderApp`.
-
 ## P2 — Reader features (no network; local build/test)
 **→ Reader P2 is COMPLETE** (non-standard-PDF cluster · tag near-duplicate finder · document-viewer bugs · dup-filename; side-by-side dropped).
 
@@ -941,17 +935,7 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
 **Done:**
 **Heads-down doable now (macOS, build-verifiable, NOT phone-gated):**
 **Live-session / phone-gated (drive Live Capture — ideally a paired phone — to verify; do interactively, like the viewer bugs):**
-> **✅ INTEGRATED 2026-07-07.** The standalone clone's `feat/live-capture-cloud-transport` work — a full
-> **Drive-relay cloud-transport** system (D1–D8: `DriveClient`/`DriveObjectStore`/`DriveAuth`/
-> `DriveRelayTransport` for Mac+iOS+Android, `FileRelay`, phone queue-depth + Finish drain-gate;
-> LIVE-validated, already adversarially reviewed) — was ported into the monorepo under `ArchiveProcessor/`
-> as **27 commits (history preserved)** via `git am --directory`, merged to `main`, and pushed. Both apps
-> build; offline invariant tests pass (RELAY GOLDEN ✅, FileRelay 8/8). The standalone clone was then
-> **retired**: its 6.3 GB `Test Files` corpus moved into `ArchiveProcessor/Test Files/` (gitignored), the
-> folder deleted, and the stale `com.archivereader.autobuild` launchd relic removed. This **supersedes** the
-> "connectivity UX" item above (cloud/USB transport is the new direction). The architecture now lives in
-> `ArchiveProcessor/CLAUDE.md` §Function 3; the relay contract in `SPEC/relay-object-format.md`; the
-> on-device walkthrough in `ArchiveProcessor/LIVE_CAPTURE_ANDROID_TEST.md`.
+> Drive-relay cloud transport: integrated 2026-07-07; the record moved to `SUITE_TODO_DONE.md` §"History moved from SUITE_TODO.md (doc-fix, 2026-11-20)".
 
 ## Excluded (not "now": need cost / owner accounts)
 - Processor Tier-1 `test-smoke.sh` / Tier-2 `test-tier2.sh` (real OCR → keys + API cost); Reader cloud-drive support; Reader creation-date-mirror (would write metadata onto the real corpus).

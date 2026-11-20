@@ -87,4 +87,23 @@ with tempfile.TemporaryDirectory(prefix="plan archive with space ") as scratch:
     check(subprocess.run(command + ["extra"], env=env, capture_output=True).returncode == 2
           and plan.read_text() == after, "unexpected arguments refuse without changing plan")
 
+    # A stub nothing cites any more is dropped; a cited one, or one whose answer is not archived, stays.
+    stub = lambda t: ("- [x] **" + t + "** — ANSWER ARCHIVED: read [question, answer and binding constraints]("
+                      "AUTONOMOUS_HOLD_QUEUE_ARCHIVE.md#" + t + ") before dependent work.\n")
+    with archive.open("a") as out:
+        for t in ("W2.gone-ok", "W2.todo-ok", "W2.near-ok"):
+            out.write('\n<a id="' + t + '"></a>\n\n- [x] **' + t + "** — OWNER ANSWERED: yes\n")
+    extra = stub("W2.gone-ok") + stub("W2.todo-ok") + stub("W2.near-ok") + stub("W2.noanchor-ok")
+    plan.write_text(after.replace("## RECURRING\n", extra + "## RECURRING\n")
+                    .replace("keep question\n", "keep question; W2.near-ok2 and W2.near-ok.x are other tags\n"))
+    (repo / "SUITE_TODO.md").write_text("- [ ] **W2.later** (blocked-on: W2.todo-ok)\n")
+    check(invoke().returncode == 0, "stub drop succeeds")
+    pruned = plan.read_text()
+    check(stub("W2.gone-ok") not in pruned and stub("W2.near-ok") not in pruned,
+          "unreferenced stubs dropped (a longer tag sharing the prefix is not a citation)")
+    check(stub("W2.todo-ok") in pruned and stub("W2.noanchor-ok") in pruned and stub("W1.owner-ok") in pruned,
+          "stubs cited by SUITE_TODO or the plan, or without an archived answer, stay")
+    check('<a id="W2.gone-ok"></a>' in archive.read_text(), "a dropped gate's answer stays in the archive")
+    check(before_queue == resolve(), "resolver output unchanged by the drop")
+
 print(f"prove-plan-archive: {PASSED} passed")

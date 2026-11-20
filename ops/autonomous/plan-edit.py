@@ -117,19 +117,44 @@ def edit(plan, action, values):
                         + archive.name + "#" + tag + ") before dependent work.\n")
                 if len(stub.encode()) < len(original.encode()):
                     moves.append((tag, lo, hi, original, stub))
-            if not moves:
+            if moves:
+                # Archive first, under the SAME plan lock; a failed append must never
+                # remove an answer. An interruption before replacement may duplicate
+                # an archive record on retry, but cannot lose one.
+                with archive.open("a") as out:
+                    for tag, _, _, original, _ in moves:
+                        out.write('\n<a id="' + tag + '"></a>\n\n' + original + "\n")
+                    out.flush()
+                    os.fsync(out.fileno())
+                for _, lo, hi, _, stub in reversed(moves):
+                    body = body[:lo] + stub + body[hi:]
+                text = text[:start] + body + text[end:]
+            # A stub only keeps its tag resolvable. Once no line of the plan or SUITE_TODO.md
+            # names the gate (its dependants shipped and left both), the stub is dropped; the
+            # answer stays in the archive under its anchor (doc-fix, 2026-11-20: 103 stubs, 62
+            # unreferenced). A later item citing a dropped gate reads it as missing, which the
+            # resolvers treat as unmet: blocked and surfaced, never run out of order.
+            todo = Path(os.environ.get("AUTONOMOUS_SUITE_TODO") or plan.parent.parent / "SUITE_TODO.md")
+            kept = archive.read_text() if archive.is_file() else ""
+            if todo.is_file():
+                cited = todo.read_text()
+                start, end = section(text, "## HOLD QUEUE")
+                body = text[start:end]
+                drops = []
+                for tag, lo, hi in entries(body):
+                    line = body[lo:hi]
+                    if not re.fullmatch(r"- \[x\] \*\*" + re.escape(tag) + r"\*\* — ANSWER ARCHIVED: [^\n]*\n", line):
+                        continue
+                    if '<a id="' + tag + '"></a>' not in kept:
+                        continue
+                    name = re.compile(r"(?<![A-Za-z0-9._-])" + re.escape(tag) + r"(?![A-Za-z0-9_-]|\.[A-Za-z0-9])")
+                    if not name.search(text[:start + lo] + text[start + hi:]) and not name.search(cited):
+                        drops.append((lo, hi))
+                for lo, hi in reversed(drops):
+                    body = body[:lo] + body[hi:]
+                text = text[:start] + body + text[end:]
+            if text == plan.read_text():
                 return
-            # Archive first, under the SAME plan lock; a failed append must never
-            # remove an answer. An interruption before replacement may duplicate
-            # an archive record on retry, but cannot lose one.
-            with archive.open("a") as out:
-                for tag, _, _, original, _ in moves:
-                    out.write('\n<a id="' + tag + '"></a>\n\n' + original + "\n")
-                out.flush()
-                os.fsync(out.fileno())
-            for _, lo, hi, _, stub in reversed(moves):
-                body = body[:lo] + stub + body[hi:]
-            text = text[:start] + body + text[end:]
         elif action in ("complete", "block"):
             tag, sha, result = values
             if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", tag):

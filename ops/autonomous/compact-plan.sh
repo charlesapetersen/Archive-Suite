@@ -638,6 +638,7 @@ echo "compact-plan: archived $QD WORK QUEUE line(s) of completed items; plan $QO
 # gate verbatim to AUTONOMOUS_HOLD_QUEUE_ARCHIVE.md beside the plan, under the plan lock, and leaves a completed
 # stub pointing at it. It was only ever run by hand, so by 2026-11-20 35 answered gates had put the plan back
 # over budget with Passes 1-3 correctly no-op'ing. Open gates and ambiguous spans are left inline by the helper.
+# The same helper drops a stub once neither the plan nor SUITE_TODO.md names its gate (the answer stays archived).
 PLAN_EDIT="$REPO/ops/autonomous/plan-edit.py"
 [ -f "$PLAN_EDIT" ] || PLAN_EDIT="$(cd "$(dirname "$0")" && pwd)/plan-edit.py"
 if [ -f "$PLAN_EDIT" ] && [ -f "$PLAN" ] && grep -q '^## HOLD QUEUE' "$PLAN"; then
