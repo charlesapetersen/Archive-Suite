@@ -223,6 +223,16 @@ calls are section 1.
     (W49.bench-more-kinds, W49.proc-run-queue, W49.proc-review-undo); refreshing an extract from its source is
     declined. Sonnet's measured price and the per-kind prices had already shipped ($0). The rest of those two
     walkthroughs' entries were settled by earlier calls of his or were his own answers.
+28. **The Backlog review sheet (2026-11-20).** Every backlog entry no walkthrough had shown him, 68 in all, on one
+    sheet (`18-backlog-review.json`; he asked for it, with the bugs batched). Suspected bugs: the three seen in real runs
+    get fixes with the run as their test (W49.proc-fix-s040, -s041, -s042); the 27 found by reading the code are
+    reproduced only under a new strict rule, phase rule 5a, because "LLM reviews can produce ghost bugs which then
+    produce more ghost bugs" (six W49.*-suspects-* items). Wishlists: 13 entries closed as built or covered, five July
+    ideas and Tropy declined, Vision language detection and Zotero page links queued, table CSV export, neighbour-informed
+    subjects, Shortcuts actions, Notes block identities and merged-PDF scrolling behind nice-to-have, the bench page kept
+    private. Releasing: the Mac route is decided when a public release is near, and store publishing for the phones waits
+    on it. Paid runs: Azure and Textract on the public 895 declined; the two others stay with his 17 Oct hold. Vision
+    OCR's visible-text debugging mode declined.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 

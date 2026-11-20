@@ -47,6 +47,15 @@ mirrored by the `W40` section of `SUITE_TODO.md`, tags byte-identical. `next-que
 5. **Reproduce before filing.** A bug enters the queue only with a reproduction: a failing test, or a scripted run
    on scratch data with its artifact. Anything weaker goes in `verification/SUSPECTS.md` with what would confirm it.
    AI-generated findings are suspects until reproduced.
+5a. **A reproduce attempt for a code-reading suspect (owner, 2026-11-20, call 28).** Code-reading findings can be
+   wrong, and a fix for a bug that is not there makes new ones. So: (1) first check that the code at that place still
+   says what the suspect says; (2) reproduce it the way a user meets it, through the app or its real pipeline on
+   scratch data, not with a test written around the suspicion; (3) if the behaviour could be intended (a comment calls
+   it deliberate, or a document promises it), ask the owner in the Daemon Report instead of fixing; (4) a claimed
+   reproduction is checked by a second, independent session on a different model before any fix item is filed;
+   (5) one attempt: if it does not reproduce, clear it in SUSPECTS.md with the evidence, and anything new noticed on
+   the way is written down as a suspect, never fixed directly; (6) a fix follows the usual review, with the reproducing
+   run kept as its test. A suspect seen in a real run already has its reproduction and skips (1)-(4).
 6. **Builder is not verifier.** The session that fixes a bug or wires a feature may move its ledger row only to
    `fixed-pending-recheck`. A later, separate item (`W40.h2`, or the next journey re-run) moves it to `works`.
 7. **Feature freeze, per area (owner, 2026-10-07: "Start the independent parts now").** No new features in this

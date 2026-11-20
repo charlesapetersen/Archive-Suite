@@ -16,20 +16,20 @@
 - **Correspondence export (CMIF or a four-field CSV)** — the entity feature's sender, recipient, place and date fields exported for correspSearch (CMIF carries inferred marks) or as CSV; parked 2026-11-06 (Phase 4 of the processing review, owner: neither until a user asks). The sidecar fields are the same either way.
 
 ### Tagging Enhancements
-- **Tag suggestions from nearby documents** — use surrounding document context to improve tag accuracy
-- **Tag editing UI** — edit applied tags directly in the file pane without reprocessing
-- **Bulk tag operations** — apply/remove tags across multiple files at once
+- **Tag suggestions from nearby documents** — queued: W49.proc-nearby-subjects behind nice-to-have (owner, 2026-11-20, call 28) — use surrounding document context to improve tag accuracy
+- **Tag editing UI** — closed (owner, 2026-11-20, call 28): covered by W40.tag-window-processor. — edit applied tags directly in the file pane without reprocessing
+- **Bulk tag operations** — closed (owner, 2026-11-20, call 28): built in the Reader; W40.tag-rename-suite. — apply/remove tags across multiple files at once
   _(Hierarchical/nested tags removed 2026-07-15 — owner: out of scope; the flat Finder-tag vocabulary in
   `SPEC/tag-format.md` stays the contract.)_
 
 ### Document Processing
-- **Handwriting recognition mode** — specialized prompts and processing for handwritten documents
-- **Table extraction** — detect and extract tabular data from documents into structured formats
-- **Language detection** — identify document language and adjust OCR accordingly
-- **Newspaper/periodical layout analysis** — handle multi-column layouts, headlines, captions
+- **Handwriting recognition mode** — shipped (owner, 2026-11-20, call 28): Handwritten pages go to the handwriting reader. — specialized prompts and processing for handwritten documents
+- **Table extraction** — queued: W49.proc-table-csv behind nice-to-have (owner, 2026-11-20, call 28) — detect and extract tabular data from documents into structured formats
+- **Language detection** — queued: W49.proc-vision-language-auto (owner, 2026-11-20, call 28) — identify document language and adjust OCR accordingly
+- **Newspaper/periodical layout analysis** — shipped (owner, 2026-11-20, call 28): region-by-region newspaper reading. — handle multi-column layouts, headlines, captions
 
 ### Collection Management
-- **Collection-level metadata** — assign metadata to entire collections, not just individual documents
+- **Collection-level metadata** — shipped (owner, 2026-11-20, call 28): the W47 containers. — assign metadata to entire collections, not just individual documents
   _(Nested collection hierarchy (Box > Folder > Document) removed 2026-07-15 — owner: out of scope. Reversed
   2026-10-21: the owner approved repository, collection, accession, series, box and folder as W47,
   `execution-plans/containers/00-plan.md`.)_
@@ -37,18 +37,18 @@
 ## Lower Priority
 
 ### Performance & Scale
-- **Distributed batch processing** — split large jobs across multiple API keys for faster throughput
-- **Memory-efficient streaming** — stream batch results instead of loading all into memory
+- **Distributed batch processing** — declined (owner, 2026-11-20, call 28) — split large jobs across multiple API keys for faster throughput
+- **Memory-efficient streaming** — declined (owner, 2026-11-20, call 28) — stream batch results instead of loading all into memory
 
 ### API & Extensibility
 - **Offline local model support** — integrate with Ollama or llama.cpp for fully offline, on-device processing. _(The subscription-authed **Local Agent CLI** backend — Claude Code / Gemini / Codex, no API key — shipped in W13.cli-1…4; this line now covers only the distinct **offline/on-device** case.)_ ⚠️ **Apple Vision is a separate, already-queued item, not this one** — `SUITE_TODO.md` **W13.vision-1/-2** (owner, 2026-08-07). Vision is a pure OCR engine, so it transcribes but cannot classify/segment/tag; an offline **VLM** would do both. Don't close either line by shipping the other.
-- **Plugin system** — allow custom classification and tagging plugins
-- **REST API server mode** — run Archive Processor as a headless service for automation
-- **Apple Shortcuts integration** — expose processing actions via Shortcuts app
+- **Plugin system** — declined (owner, 2026-11-20, call 28) — allow custom classification and tagging plugins
+- **REST API server mode** — declined (owner, 2026-11-20, call 28) — run Archive Processor as a headless service for automation
+- **Apple Shortcuts integration** — queued: W49.shortcuts-actions behind nice-to-have (owner, 2026-11-20, call 28) — expose processing actions via Shortcuts app
 
 ### Data & Analytics
-- **Accuracy metrics** — compare OCR results against ground truth files for benchmarking
-- **Tag frequency analysis** — show most common tags, date distributions, subject clusters
+- **Accuracy metrics** — declined (owner, 2026-11-20, call 28) — compare OCR results against ground truth files for benchmarking
+- **Tag frequency analysis** — closed (owner, 2026-11-20, call 28): covered by W40.tag-window-core. — show most common tags, date distributions, subject clusters
 
 ---
 
@@ -70,11 +70,11 @@ The v3.2.0 Live Capture wired mode uses `adb reverse`, which requires **USB debu
 **Policy (owner 2026-07-08): iOS *development* continues near-term as normal, but all iOS *on-device
 testing* is postponed to this long-term list** until an iPhone is available. Code + mock-test iOS freely;
 just don't gate near-term work on device verification. Deferred device checks:
-- **Drive-relay live E2E** — phone→Drive→Mac on a real iPhone (sign-in, single photo, multi-page segment +
+- **Drive-relay live E2E** — closed (owner, 2026-11-20, call 28): covered by W40.i4. — phone→Drive→Mac on a real iPhone (sign-in, single photo, multi-page segment +
   Mac tag card, Box/Folder markers, Finish), mirroring the verified Android run. (The OAuth *implementation*
   — `ASWebAuthenticationSession` — is tracked as near-term dev in `SUITE_TODO.md`; only its on-device
   verification lives here.)
-- **Camera capture + full connect/capture UX** — the simulator has no camera, so real capture, pairing,
+- **Camera capture + full connect/capture UX** — closed (owner, 2026-11-20, call 28): covered by W40.i4. — the simulator has no camera, so real capture, pairing,
   and the LAN / USB / cloud transports can only be verified on a physical device.
 
 ---
@@ -90,13 +90,13 @@ apps to the App Store and Google Play — is intentionally deferred** and captur
 Phase 4 is mostly **owner (not Claude) work**, because it needs paid accounts, real hardware, and
 signing identities Claude cannot access:
 
-- **[USER] Apple:** enroll in the Apple Developer Program ($99/yr); create the App ID, signing
+- **[USER] Apple:** — settled (owner, 2026-11-20, call 28): store publishing deferred until the Mac release route is settled. enroll in the Apple Developer Program ($99/yr); create the App ID, signing
   certificate, and provisioning profile; run the iOS companion on a physical iPhone to smoke-test the
   camera + LAN pairing (the simulator can't exercise the camera); archive and upload via Xcode /
   App Store Connect; complete the App Privacy questionnaire; submit for review.
-- **[USER] Google:** create a Google Play Console account (one-time $25); generate an upload key and
+- **[USER] Google:** — settled (owner, 2026-11-20, call 28): deferred with the Apple steps. create a Google Play Console account (one-time $25); generate an upload key and
   sign the Android app bundle (`.aab`); complete the Data Safety form; submit.
-- **[USER] Assets:** capture screenshots / a short screen-recording of each companion for the store
+- **[USER] Assets:** — settled (owner, 2026-11-20, call 28): deferred with the store steps. capture screenshots / a short screen-recording of each companion for the store
   listings (Claude can't produce device screenshots of a live camera session).
 
 What **Claude can draft on request** (no accounts needed): the privacy policy, the Play **Data
@@ -112,11 +112,11 @@ review feedback demands a change.
 ### Open decisions & logistics (migrated from the retired distribution plan)
 
 - **Android `targetSdk` 36** — ✅ **DONE `8eb4ef4`** (toolchain upgrade + `targetSdk`/`compileSdk` 34→36, compiles clean; on-device smoke remains an owner tail). This unblocks the ~**2026-08-31** Play-update mandate; no further bump needed before submission.
-- **Play closed-testing gate:** new personal Play Console accounts must run a **closed test with ≥12 testers for ≥14 days** before production access — plan for that lead time.
-- **[D1] macOS distribution channel (UNDECIDED):** Mac App Store (free) vs. a notarized Developer-ID DMG. Today the Mac app ships as an owner-only, ad-hoc-signed DMG (see CLAUDE.md → Releasing).
-- **iOS "minimal functionality" risk (App Store guidelines 2.1 / 4.2):** the companion is useless without the paired Mac, so the listing and first-run must clearly state the Mac-app dependency.
-- **[D3] first-run wizard behavior:** forced vs. dismissible banner — verify against the shipped `ContentView` first-run flow before treating as open.
-- **Provider caveats to keep in the in-app copy:** Gemini's free tier may train on inputs and requires the **paid** tier in the EEA/UK/CH (already handled by a locale pre-warn); free-tier rate limits are dynamic — keep copy provider-agnostic / user-refreshable rather than hardcoded.
+- **Play closed-testing gate:** — settled (owner, 2026-11-20, call 28): deferred with the store steps. new personal Play Console accounts must run a **closed test with ≥12 testers for ≥14 days** before production access — plan for that lead time.
+- **[D1] macOS distribution channel (UNDECIDED):** — settled (owner, 2026-11-20, call 28): decide when a public release is near. Mac App Store (free) vs. a notarized Developer-ID DMG. Today the Mac app ships as an owner-only, ad-hoc-signed DMG (see CLAUDE.md → Releasing).
+- **iOS "minimal functionality" risk (App Store guidelines 2.1 / 4.2):** — settled (owner, 2026-11-20, call 28): deferred with the store steps. the companion is useless without the paired Mac, so the listing and first-run must clearly state the Mac-app dependency.
+- **[D3] first-run wizard behavior:** — settled (owner, 2026-11-20, call 28): dismissible in the shipped app. forced vs. dismissible banner — verify against the shipped `ContentView` first-run flow before treating as open.
+- **Provider caveats to keep in the in-app copy:** — shipped (owner, 2026-11-20, call 28): in the key wizard and Settings. Gemini's free tier may train on inputs and requires the **paid** tier in the EEA/UK/CH (already handled by a locale pre-warn); free-tier rate limits are dynamic — keep copy provider-agnostic / user-refreshable rather than hardcoded.
 
 ## Maintainability / refactor backlog (deferred from the 2026-07-04 audit)
 
@@ -136,9 +136,9 @@ safety, verdict) is in audit run `wf_4373722d-e70`.
 - **Shared finalize/organize helpers** (queued: W49.proc-finalize-helpers behind nice-to-have, 2026-11-20). startProcessing / resumeRun / resumeBatch each duplicate the
   "organize into collection folders" + run-completion blocks verbatim. Extract `organizeCollectionFolders` +
   `finalizeRun`. Touches the Tier-2 file-move path → adversarial-review before shipping.
-- **Unify the box/folder color-retag logic** across applyReviewEdits / updateClassification /
+- **Unify the box/folder color-retag logic** — closed (owner, 2026-11-20, call 28): the drift is fixed (one shared rule). across applyReviewEdits / updateClassification /
   applyDocumentReviewEdits (three copies that have slightly drifted — confirm the intended behavior first).
-- ◐ **Smaller de-dups — PARTIALLY SHIPPED `f1d2263` (suite-v1.2.0).** Already done in f1d2263 (do NOT redo):
+- ◐ **Smaller de-dups — PARTIALLY SHIPPED `f1d2263` (suite-v1.2.0).** — shipped (owner, 2026-11-20, call 28): the remainder shipped 2026-09-26. Already done in f1d2263 (do NOT redo):
   `highestLeadingNumber` (→ `Capture/CollectionNumbering.swift`), `monthTag`/`englishMonthNames` (→ `GeneratedTags`),
   `acceptedImageExtensions` (→ `ImageEncoding`), `GatewayConfig.fromDefaults()`, `liveProcessingMode` enum.
   REMAINING (~6): a shared transient-status friendly-message helper (4 OCR clients); `ThinkingLevel.budgetTokens`

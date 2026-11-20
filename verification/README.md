@@ -115,7 +115,9 @@ Phase rule 1: **evidence or it did not happen.** A `works` or `broken` status ci
 
 Rule 5: a bug enters the work queue only with a reproduction. Anything weaker lands in `SUSPECTS.md` — an
 AI finder's report, an owner note that could not be reproduced yet, a doc claim that looks wrong, a hunch from a
-journey. Suspects never become queue items directly.
+journey. Suspects never become queue items directly. A reproduce attempt follows phase rule 5a
+(`execution-plans/verification-phase/01-daemon-plan.md`, owner 2026-11-20): user's path, an independent check of
+any reproduction before a fix, one attempt, nothing new fixed directly.
 
 One `###` section per suspect, newest at the bottom:
 

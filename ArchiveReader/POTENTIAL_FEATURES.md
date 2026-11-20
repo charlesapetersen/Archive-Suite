@@ -52,7 +52,7 @@ The P2 triage pass shipped (see `CLAUDE.md` §Implementation map):
   nice-to-have, and W49.cloud-drive-first-launch-warning, owner 2026-11-20)
 - **Creation-date mirror** — declined (owner, 2026-11-20, call 27): for native Finder chronological browsing
   (1678–2262 only; a bonus, never the sort key); it would overwrite the file's real creation date.
-- Zotero / Tropy integration. _(IIIF manifest / EAD / Dublin Core export removed 2026-07-15 — owner: out of scope.)_
+- Zotero / Tropy integration. — declined (owner, 2026-11-20, call 28): Zotero shipped (Export to Zotero, Add to Zotero); Tropy dropped. _(IIIF manifest / EAD / Dublin Core export removed 2026-07-15 — owner: out of scope.)_
 
 ## Archive Suite convergence — ✅ SHIPPED (W0, 2026-07)
 - ✅ **Shared `ArchiveCore` Swift package** — the UI-free tag/PDF model AND the unified audited writer both

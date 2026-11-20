@@ -174,6 +174,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
 
 ### S-009 · Pasting or dropping an image in raw mode may write an orphan asset and a stray character into the note
 
@@ -200,6 +201,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-text` under phase rule 5a.
 
 ### S-010 · Removing several sole-instance notes from a folder at once asks about only the last one
 
@@ -226,6 +228,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
 
 ### S-011 · Row-menu "New from Template" skips the template-body flush and failed-save guard
 
@@ -250,6 +253,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
 
 ### S-012 · The tag filter may miss every tag entered in the app unless it is typed with the stored capitals
 
@@ -272,6 +276,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
 
 ### S-013 · An `archivenotes://` link may be dropped when the Notes window is closed
 
@@ -317,6 +322,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
 
 ### S-015 · The list's `[`, `]` and `\` keys may fire inside the inline tag editor, and `\` would mark a file Read
 
@@ -355,6 +361,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-16 W40.e5 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
 
 ### S-017 · A pre-OCRed Processor run drops the operator's per-document segmentation review
 
@@ -374,6 +381,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-16 W40.e5 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
 
 ### S-018 · The Processor tells the user it paces to the subscription window, but OCR does not
 
@@ -393,6 +401,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-16 W40.e5 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
 
 ### S-019 · Typing `-->` after an unclosed Notes block header may drop the lines before it
 
@@ -409,6 +418,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-20 W40.e6 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-text` under phase rule 5a.
 
 ### S-020 · An extract built from a degraded Notes block may detach its text from the passage
 
@@ -424,6 +434,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-20 W40.e6 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-text` under phase rule 5a.
 
 ### S-021 · Android's Drive relay reports a segment signal as sent when the Drive write failed
 
@@ -440,6 +451,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.i2 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.relay-suspects` under phase rule 5a.
 
 ### S-022 · iOS may write a HEIC photo, or a wrongly rotated one, into a `.jpg` the Mac reads as JPEG
 
@@ -506,6 +518,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
 
 ### S-025 · The gateway's "Fill in OpenAI preset" picks a reasoning model the gateway request cannot drive
 
@@ -522,6 +535,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
 
 ### S-026 · Batch OCR is not size-based: large images go up at full size
 
@@ -536,6 +550,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
 
 ### S-027 · Batch mode is offered for providers with no batch, and still changes the run
 
@@ -551,6 +566,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
 
 ### S-028 · A chosen folder is read one level deep; nested photos are silently left out
 
@@ -564,6 +580,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
 
 ### S-029 · An LLM rotation failure silently falls back to the weaker local detector
 
@@ -579,6 +596,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
 
 ### S-030 · The run log can give one failed file another's reason
 
@@ -592,6 +610,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
 
 ### S-031 · Under a window segmentation approach, enclosures may get no `Sent With` date
 
@@ -607,6 +626,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
 
 ### S-032 · A segmentation approach with no key can be started, and fails only after the OCR is paid for
 
@@ -622,6 +642,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
 
 ### S-033 · A tag reply with no year and `date_uncertain: false` gets no date tags at all
 
@@ -635,6 +656,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
 
 ### S-034 · No tagging and Copy source tags still write Box/Folder tags when collection segmentation is on
 
@@ -651,6 +673,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
 
 ### S-035 · Resuming a batch skips the per-page review and the box/folder confirmation
 
@@ -666,6 +689,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
 
 ### S-036 · An edited collection name is used as typed when the user clicks Confirm
 
@@ -682,6 +706,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
 
 ### S-037 · No pairing QR at all when the Mac's address is not on en0 or en1
 
@@ -718,6 +743,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.relay-suspects` under phase rule 5a.
 
 ### S-039 · Stage for later can hand the same photos to Process Files twice
 
@@ -731,6 +757,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
 
 ### S-040 · A year typed on the phone keeps the day the OCR read from another date
 
@@ -749,6 +776,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-10-23 W40.i-sim-ui — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-fix-s040` (seen in a run: fix with that run as its test).
 
 ### S-041 · Process Files' cost estimate leaves out the dating and item-field calls
 
@@ -772,6 +800,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   - 2026-11-18 W40.d1 — still `open`: the paid run went through OpenRouter (Qwen3.8 Flash), not the gateway; there the
     metered ceiling, $0.1056 for 113 photos in 195 calls, ran under the estimate of $0.1267. The gateway's dating and
     item-field calls are still unmeasured.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-fix-s041` (seen in a run: fix with that run as its test).
 
 ### S-042 · A failed tagging call leaves a document untagged, and the run still reports it tagged
 
@@ -788,3 +817,4 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-18 W40.d1 — raised.
+  - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-fix-s042` (seen in a run: fix with that run as its test).
