@@ -8,12 +8,18 @@ other, rec_why) and folds the technical pointer (where) under each item; the pag
 
   python3 ops/review/accepted_review_sheet.py sheet               # REHEARSAL/accepted-review/index.html
   python3 ops/review/accepted_review_sheet.py fold ANSWERS.json   # the owner's answers, one line each
+  ... --data FILE --out DIR                                       # another round (17b: the questions he left open)
+
+An entry may carry "choices" ({key: label}) to replace the three standard answers' wording, a fourth answer
+included, and "rec_text" for its recommendation line; its "rec" is still change, keep or later, which places it.
+A data file may carry "opening" for the sheet's first paragraph.
 
 No model runs and no network: a reading page. Answers save in the browser and download as JSON; each item has a notes
 box (typing in it never picks an answer); nothing changes until a session folds the answers.
 """
 import argparse
 import html
+import re
 import json
 import sys
 from pathlib import Path
@@ -21,6 +27,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / 'execution-plans/processing-review/17-accepted-review.json'
 OUT = Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/accepted-review'
+KEY = 'accepted-review-20261119'
 CHOICES = {'change': 'Change it as suggested',
            'keep': 'Keep it as it is. This becomes my decision and is not asked again',
            'later': 'Not sure yet: check what is open and ask me again'}
@@ -36,6 +43,7 @@ SECTIONS = [
      'use the button for the rest.'),
 ]
 NEED = ['id', 'app', 'rec', 'seconds', 'title', 'what', 'reason', 'other', 'rec_why', 'where']
+LABELS = {'what': 'What happens', 'reason': 'The reason it was accepted', 'other': 'The other way'}
 
 
 def load():
@@ -61,21 +69,23 @@ def cmd_sheet(_):
     for key, head, lead in SECTIONS:
         mine = [e for e in d['entries'] if e['rec'] == key]
         groups[key] = [e['id'] for e in mine]
+        if not mine:
+            continue
         body.append(f'<h2 class="sec">{esc(head)} <span class="n">{len(mine)} items</span></h2>'
                     f'<p class="lead">{esc(lead)}</p>')
         for e in mine:
             n += 1
-            rows = [('What happens', e['what']), ('The reason it was accepted', e['reason']),
-                    ('The other way', e['other'])]
+            lab = dict(LABELS, **d.get('labels', {}))
+            rows = [(lab['what'], e['what']), (lab['reason'], e['reason']), (lab['other'], e['other'])]
             dl = ''.join(f'<dt>{esc(k)}</dt><dd>{esc(v)}</dd>' for k, v in rows)
             opts = ''.join(
                 f'<label class="{"pick" if k == e["rec"] else ""}"><input type="radio" name="{e["id"]}" value="{k}"> '
                 f'{esc(v)}' + (' <span class="tag">recommended</span>' if k == e['rec'] else '') + '</label>'
-                for k, v in CHOICES.items())
+                for k, v in (e.get('choices') or CHOICES).items())
             body.append(
                 f'<section class="item" id="{e["id"]}"><p class="grp">{n} of {total} · {esc(e["app"])}</p>'
                 f'<h3>{esc(e["title"])}</h3><dl>{dl}</dl>'
-                f'<p class="rec"><b>Recommendation: {esc(REC[e["rec"]])}.</b> {esc(e["rec_why"])}</p>'
+                f'<p class="rec"><b>Recommendation: {esc(e.get("rec_text") or REC[e["rec"]])}.</b> {esc(e["rec_why"])}</p>'
                 f'<div class="opts">{opts}</div>'
                 f'<textarea data-id="{e["id"]}" placeholder="Notes (optional): a condition, a different fix, or your '
                 f'reason"></textarea><details class="tech"><summary>Where this is written</summary>'
@@ -83,7 +93,15 @@ def cmd_sheet(_):
         if key == 'keep':
             body.append('<p class="all"><button id="keepall">Keep as it is every item in this group I have not '
                         'answered</button> <span id="keepn"></span></p>')
-    page = (PAGE.replace('__N__', str(total)).replace('__MIN__', str(mins))
+    page = PAGE
+    if d.get('opening'):
+        page = re.sub(r'<p>Each app keeps a list.*?minutes\.</p>', lambda _: '<p>' + esc(d['opening']) + ' It takes about '
+                      '__MIN__ minutes.</p>', page, count=1, flags=re.S)
+    nc, nl, nk = (len(groups[k]) for k in ('change', 'later', 'keep'))
+    sorted_p = ('<p>They are sorted by recommendation: %d to change, %d to check first, and %d to keep, which can be '
+                'confirmed together with one button.</p>' % (nc, nl, nk)) if nl or nk else ''
+    page = page.replace('__SORTED__', sorted_p)
+    page = (page.replace('__N__', str(total)).replace('__MIN__', str(mins))
             .replace('__NC__', str(len(groups['change']))).replace('__NL__', str(len(groups['later'])))
             .replace('__NK__', str(len(groups['keep']))).replace('__ITEMS__', ''.join(body))
             .replace('__EXCL__', ''.join(f'<li>{esc(x)}</li>' for x in d['excluded']))
@@ -91,7 +109,8 @@ def cmd_sheet(_):
             .replace('__IDS__', json.dumps([e['id'] for e in d['entries']]))
             .replace('__KEEP__', json.dumps(groups['keep'])))
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / 'index.html').write_text(page)
+    (OUT / 'index.html').write_text(page.replace("'accepted-review-20261119'", json.dumps(KEY))
+                                    .replace("'accepted-review-answers.json'", json.dumps(KEY + '-answers.json')))
     print(OUT / 'index.html', total, 'entries, about', mins, 'min')
 
 
@@ -101,7 +120,8 @@ def cmd_fold(a):
     notes = ans.get('_notes', {})
     for i, e in enumerate(d['entries'], 1):
         pick = ans.get(e['id'])
-        line = f"{i}. {e['id']} ({e['app']}): " + (REC.get(pick, pick) if pick else 'UNANSWERED')
+        names = e.get('choices') or REC
+        line = f"{i}. {e['id']} ({e['app']}): " + ((pick + ' = ' + names[pick]) if pick in names else pick or 'UNANSWERED')
         if pick and pick != e['rec']:
             line += f" (recommended: {REC[e['rec']]})"
         if notes.get(e['id']):
@@ -145,8 +165,7 @@ details.tech{margin-top:.6em;font-size:.82em;color:#555}details.tech summary{cur
 __N__ accepted, giving a reason that made them sound settled or outside the suite's control. Each is really a choice
 about what users get, and none was put to you. This sheet asks you to confirm or overturn each one. It takes about
 __MIN__ minutes.</p>
-<p>They are sorted by recommendation: __NC__ to change, __NL__ to check first, and __NK__ to keep, which can be
-confirmed together with one button.</p>
+__SORTED__
 <div class="box"><h2>What each answer sets in motion</h2><table>
 <tr><td>Change it</td><td>A piece of work is queued to make the change.</td></tr>
 <tr><td>Keep it</td><td>It stays as it is, recorded as your decision, and is not asked again.</td></tr>
@@ -164,13 +183,13 @@ let A={};try{A=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}A._notes=A.
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(A))}catch(e){}prog()};
 function prog(){const n=IDS.filter(i=>A[i]).length;document.getElementById('prog').textContent=n+' of '+IDS.length+' answered';
 IDS.forEach(i=>document.getElementById(i).classList.toggle('done',!!A[i]));
-const k=KEEP.filter(i=>!A[i]).length;document.getElementById('keepn').textContent=k?k+' not yet answered':'all answered';
-document.getElementById('keepall').disabled=!k;document.getElementById('next').disabled=n===IDS.length}
+const k=KEEP.filter(i=>!A[i]).length,kn=document.getElementById('keepn'),ka=document.getElementById('keepall');
+if(kn)kn.textContent=k?k+' not yet answered':'all answered';if(ka)ka.disabled=!k;document.getElementById('next').disabled=n===IDS.length}
 document.querySelectorAll('input[type=radio]').forEach(r=>{if(A[r.name]===r.value)r.checked=true;
 r.addEventListener('change',()=>{A[r.name]=r.value;save()})});
 document.querySelectorAll('textarea').forEach(t=>{t.value=A._notes[t.dataset.id]||'';t.addEventListener('keydown',e=>e.stopPropagation());
 t.addEventListener('input',()=>{if(t.value)A._notes[t.dataset.id]=t.value;else delete A._notes[t.dataset.id];save()})});
-document.getElementById('keepall').onclick=()=>{KEEP.filter(i=>!A[i]).forEach(i=>{A[i]='keep';
+const kb=document.getElementById('keepall');if(kb)kb.onclick=()=>{KEEP.filter(i=>!A[i]).forEach(i=>{A[i]='keep';
 document.querySelector('input[name="'+i+'"][value="keep"]').checked=true});save()};
 document.getElementById('next').onclick=()=>{const i=IDS.find(i=>!A[i]);
 if(i)document.getElementById(i).scrollIntoView({behavior:'smooth',block:'center'})};
@@ -180,13 +199,21 @@ document.getElementById('dl').onclick=()=>{const a=document.createElement('a');a
 
 
 def main(argv=None):
+    global DATA, OUT, KEY
     p = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    p.add_argument('--data', help='the data file (default 17-accepted-review.json)')
+    p.add_argument('--out', help='the output folder (default REHEARSAL/accepted-review)')
     s = p.add_subparsers(dest='cmd', required=True)
     s.add_parser('sheet').set_defaults(f=cmd_sheet)
     f = s.add_parser('fold')
     f.add_argument('answers')
     f.set_defaults(f=cmd_fold)
     a = p.parse_args(argv)
+    if a.data:
+        DATA = Path(a.data).resolve()
+    if a.out:
+        OUT = Path(a.out).expanduser()
+    KEY = 'accepted-review-20261119' if DATA.name == '17-accepted-review.json' else DATA.stem
     a.f(a)
 
 
