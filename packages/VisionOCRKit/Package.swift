@@ -23,6 +23,9 @@ let package = Package(
                 .copy("Resources/read-model.py"),
                 .copy("Resources/place-hands.py"),
                 .copy("Resources/detect-newspaper.py"),
+                .copy("Resources/order-scan-newspaper.py"),
+                .copy("Resources/npo_layout.py"),
+                .copy("Resources/newspaper-ocr-LICENSE"),
                 .copy("Resources/mac-ocr-LICENSE"),
             ]
         ),

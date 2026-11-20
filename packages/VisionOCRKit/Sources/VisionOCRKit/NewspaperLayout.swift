@@ -174,7 +174,7 @@ public enum NewspaperLayout {
         }
     }
 
-    private static func run(_ command: Command, memoryGB: Double, isCancelled: () -> Bool) throws {
+    static func run(_ command: Command, memoryGB: Double, isCancelled: () -> Bool) throws {
         let locks = try Recogniser.takeReaderSlot(1, isCancelled: isCancelled)
         defer { locks.forEach { close($0) } }
         if isCancelled() { throw CancellationError() }

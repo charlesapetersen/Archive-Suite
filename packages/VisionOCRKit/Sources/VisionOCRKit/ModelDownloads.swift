@@ -51,6 +51,10 @@ enum ModelDownloads {
         /// PP-DocLayoutV3's weights for the app's newspaper rule (W46.layout-newspapers). The shared runtime already
         /// carries its MLX implementation; this is separate from `layout`, which remains the engine's YOLO model.
         case newspaperLayout
+        /// newspaper-ocr's DocLayout-YOLO checkpoint (imgsz1280-2501, AGPL-3.0) as Core ML, for the "scanned newspapers"
+        /// detector choice (W47.wh-yolo-scans, `ScanNewspaperLayout`); built by `ops/make-scan-newspaper-layout.sh`.
+        /// Separate from `layout`, the 1,024 checkpoint the regions arrangement runs.
+        case scanNewspaperLayout
 
         var name: String {
             switch self {
@@ -61,6 +65,7 @@ enum ModelDownloads {
             case .lighton: return Prefs.AccurateReader.lighton.name
             case .hands: return "the handwriting placer"
             case .newspaperLayout: return "the newspaper layout detector"
+            case .scanNewspaperLayout: return "the scanned-newspaper layout detector"
             }
         }
 
@@ -78,6 +83,10 @@ enum ModelDownloads {
                 return .archive(File(path: "hands.tgz", bytes: 286_946_670,
                                      sha256: "f835149bf6f4921b28becd063953b538004f6e1247a38e3ad8e7343289dc1470"),
                                 top: "hands", destination: "Hands")
+            case .scanNewspaperLayout:
+                return .archive(File(path: "doclayout-yolo-1280.tgz", bytes: 64_147_778,
+                                     sha256: "99c62ee608f9f5d63fcaf21295d102b918c1545d6b6f275dac2d8669de8eeec9"),
+                                top: "doclayout-yolo-1280.mlmodelc", destination: "Models/doclayout-yolo-1280.mlmodelc")
             case .newspaperLayout:
                 return .hub(repo: "HashNuke/pp-doclayout-v3-mlx", revision: "cd50996ad0c7e35a7e20c27480f99cec1822cf7b", files: [
                     File(path: "config.json", bytes: 2460,

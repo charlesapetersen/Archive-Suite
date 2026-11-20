@@ -16,6 +16,10 @@ enum NewspaperLayoutTestDriver {
             Task { await dumpPlans(list: URL(fileURLWithPath: list), out: URL(fileURLWithPath: out)) }
             return
         }
+        if let list = env["SCAN_LAYOUT_DUMP"], let out = env["SCAN_LAYOUT_OUT"] {
+            Task { await dumpScanLayout(list: URL(fileURLWithPath: list), out: URL(fileURLWithPath: out)) }
+            return
+        }
         guard env["NEWSPAPER_TEST"] == "1" else { return }
         Task { await run() }
     }
@@ -90,6 +94,42 @@ enum NewspaperLayoutTestDriver {
                 let same = (record["kept"] as? Int) == plan.regionCount
                 log.append("\(same ? "PASS" : "FAIL") \(id) regions \(plan.regionCount) fill \(plan.hasFill)")
                 if !same { failures += 1 }
+            } catch {
+                log.append("FAIL \(id): \(error)"); failures += 1
+            }
+        }
+        log.append(failures == 0 ? "ALL PASS" : "FAILURES \(failures)")
+        try? (log.joined(separator: "\n") + "\n").write(to: out.appendingPathComponent("report.txt"),
+                                                         atomically: true, encoding: .utf8)
+    }
+
+    /// W47.wh-yolo-scans: the scanned-newspaper detector's two steps on each page, the Core ML detections and the
+    /// ordered regions, written as `<out>/<id>.json` for `scan_layout_parity.py compare`. Pages are only read.
+    private static func dumpScanLayout(list: URL, out: URL) async {
+        var log: [String] = [], failures = 0
+        let pages = ((try? String(contentsOf: list, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
+        for line in pages where !line.isEmpty {
+            let parts = line.split(separator: "\t").map(String.init)
+            guard parts.count == 2 else { log.append("FAIL bad line \(line)"); failures += 1; continue }
+            let (id, url) = (parts[0], URL(fileURLWithPath: parts[1]))
+            do {
+                let data = try await NewspaperPageReader.queue.run { () throws -> Data in
+                    guard let image = PageKindClassifier.loadImage(url) else { throw NewspaperPagePlan.Failure.image }
+                    let started = Date()
+                    let raw = try ScanNewspaperLayout.detections(image: image)
+                    let detected = Date()
+                    let regions = try ScanNewspaperLayout.ordered(raw, width: image.width, height: image.height)
+                    let record: [String: Any] = [
+                        "width": image.width, "height": image.height,
+                        "detect_seconds": detected.timeIntervalSince(started),
+                        "order_seconds": Date().timeIntervalSince(detected),
+                        "raw": raw.map { ["label": $0.label, "score": Double($0.confidence), "box": $0.box] as [String: Any] },
+                        "regions": regions.map { ["label": $0.label, "score": $0.score,
+                                                  "box": [$0.box.minX, $0.box.minY, $0.box.maxX, $0.box.maxY]] as [String: Any] }]
+                    return try JSONSerialization.data(withJSONObject: record, options: [.sortedKeys])
+                }
+                try data.write(to: out.appendingPathComponent("\(id).json"))
+                log.append("PASS \(id)")
             } catch {
                 log.append("FAIL \(id): \(error)"); failures += 1
             }
