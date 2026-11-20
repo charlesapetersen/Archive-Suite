@@ -895,10 +895,13 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a stubbed tagging reply that errors (500, and a malformed body) on one segment of a small
   run: the PDF untagged, the job `succeeded`, and nothing in the status line or the log naming the document.
 - **Would clear it:** the document is flagged in the file pane, the status line or the run log.
-- **Status:** `open`
+- **Status:** `cleared` — fixed by `W49.proc-fix-s042`, [`evidence/processor/W49.proc-fix-s042.md`](evidence/processor/W49.proc-fix-s042.md)
 - **History:**
   - 2026-11-18 W40.d1 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-fix-s042` (seen in a run: fix with that run as its test).
+  - 2026-11-20 W49.proc-fix-s042 — reproduced and fixed: a failed tagging call (a throw after the network retries, a
+    reply that is not the tag JSON) is now named in the status line and the run log and not counted as tagged. The
+    W40.d1 cap test reports `00012 — RG 165`; a stand-in 500 on two tagging calls reports both.
 
 ### S-043 · Text typed after an unclosed Notes block header is joined onto the header's last line
 
@@ -934,3 +937,20 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-fix-s041 — raised.
+
+### S-045 · A failed tagging call in Live Capture is filed silently
+
+- **Raised:** 2026-11-20 · W49.proc-fix-s042 · code reading (its adversarial review).
+- **Suspected behaviour:** Live Capture's Automatic tagging (`LiveCaptureProcessor.computeTags`) calls
+  `TagGenerator.generateTags`, which drops the failure reason `generateTagsReporting` now returns. A segment whose
+  tagging call fails (a 5xx or timeout, which `NetworkSession` does not retry for a paid call, or a reply that is not
+  the tag JSON) is filed with no subject tags and nothing in the session's status or the Mac's file list says so,
+  as S-042 was in Process Files.
+- **Where:** ledger `P-33`; `Capture/LiveCaptureProcessor.swift` `computeTags`; `Tagging/TagGenerator.swift`
+  `generateTagsReporting`.
+- **Would confirm it:** the Live Capture recovery driver's injected transport answering one segment's tagging call
+  with a 500: the staged document has no subject tags and no status line or row names it.
+- **Would clear it:** the session names the document, or a failed call holds the segment for retry.
+- **Status:** `open`
+- **History:**
+  - 2026-11-20 W49.proc-fix-s042 — raised.

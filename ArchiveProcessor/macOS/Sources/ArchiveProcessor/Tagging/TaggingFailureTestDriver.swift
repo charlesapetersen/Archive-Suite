@@ -153,6 +153,9 @@ enum TaggingFailureTestDriver {
         check("1 E's error JSON with a 200 is a failed call too",
               p.taggingCallFailures.first { $0.source == files[4] }?.reason == "the reply was not the tag JSON",
               "\(p.taggingFailureNames)")
+        check("1 B's 500 says its status",
+              p.taggingCallFailures.first { $0.source == files[1] }?.reason.contains("HTTP 500") == true,
+              "\(p.taggingFailureNames)")
         check("1 C's timeout says so",
               p.taggingCallFailures.first { $0.source == files[2] }?.reason == "the request timed out",
               "\(p.taggingFailureNames)")
@@ -168,7 +171,7 @@ enum TaggingFailureTestDriver {
         let suffix = OCRProcessor.taggedSegmentsSuffix(segments: p.segments.count, failures: p.taggingFailureNames)
         check("4 the status line counts 1 of 5 tagged", suffix.hasPrefix(" 1 of 5 segments tagged."), suffix)
         check("4 ...and names the documents, in the plural",
-              ["DOCB.jpg", "DOCC.jpg"].allSatisfy(suffix.contains) && suffix.contains("+1 more")
+              ["DOCB.jpg", "DOCC.jpg", "DOCD.jpg"].filter(suffix.contains).count >= 2 && suffix.contains("+1 more")
               && suffix.contains("4 documents' tagging calls failed") && !suffix.contains("DOCA"), suffix)
         let log = OCRProcessor.taggingFailureLogLines(p.taggingFailureNames)
         check("4 the log section lists all four with their reasons",

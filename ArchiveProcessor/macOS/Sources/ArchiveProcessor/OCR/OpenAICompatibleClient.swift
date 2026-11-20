@@ -248,6 +248,10 @@ struct OpenAICompatibleClient: Sendable {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 200
                 throw OCRError.networkError(Self.parseErrorResponse(data: data, statusCode: status, provider: billingProvider))
             }
+            // W49.proc-fix-s042: a refusal says its status, so a failed tagging call's reason is not just "bad response".
+            if let status = (response as? HTTPURLResponse)?.statusCode, !(200..<300).contains(status) {
+                throw OCRError.networkError("HTTP \(status): bad response")
+            }
             throw OCRError.networkError("bad response")
         }
         // An OpenRouter reply with no answer (a provider failure, or reasoning that used the budget) is an error,

@@ -499,6 +499,9 @@ existing scratch, key-free, no-network execution remains unchanged.
 - **`test-processing-history.sh`** — cost tracking + the run log.
 - **`test-processfiles-tagwarn.sh`** — the OUTPUT-WARNING contract (W23.m5 + W23.h5-fu): the run may only
   report tags it actually wrote.
+- **`test-tagging-failure.sh`** — a failed tagging CALL (W49.proc-fix-s042): a 500, a timeout, a non-JSON reply and
+  an error JSON with a 200 are named in the status line and the log and not counted as tagged; a Redo clears them.
+  In the VM, `journey-bulk-ocr.sh --route fake --fail-tags N,M` does the same through Process Files.
 
 **File & tag safety (no undo → Tier-2 territory)**
 - **`scripts/lint-write-surface.sh`** — source-level backstop for Processor's write boundary: direct

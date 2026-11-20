@@ -747,6 +747,9 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-18 W40.d1 — `unproven` → `works`: Automatic tagging on the whole box (S-042, the failed-call path, stays open).
+  - 2026-11-20 W49.proc-fix-s042 — the failed-call path: a call that fails is named in the status line and the log,
+    not counted as tagged (`scripts/test-tagging-failure.sh`; the W40.d1 cap test and a stand-in 500 in the VM). S-042
+    cleared; Live Capture's same path is S-045.
 - **Notes:** "never an estimated month" and "2-6 subjects" are prompt rules only (`Tagging/TagGenerator.swift:61`,
   `:64`); code enforces only the cap of 6 (`Tagging/ControlledVocabulary.swift:14`). Suspect `S-033`.
 
