@@ -1,6 +1,6 @@
 {
- "built": "2026-11-19",
- "table_built": "2026-11-19",
+ "built": "2026-11-20",
+ "table_built": "2026-11-20",
  "noise": {
   "ocr_tie": "on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 a pick takes the stratum's leader (the interval across 0 makes no tie there either, W46.pairs-redecide; it decides only a stratum row's admission); NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3",
   "seg_rerun_pages_exact_points": "a paired 95% interval of test-box pages exact holding 0, the two routes compared page by page on the same windows (offset 0) and the truth's documents resampled; each pair's entry in the stage's pairs (seg-pair-ties.json). Replaces twice the larger window-offset range (owner review of the pipeline doc, 2026-11-17, W46.seg-truth-audit); in gap accuracy the paired interval decides as before",
@@ -274,12 +274,13 @@
    "s_page": 3.97,
    "s_est": false,
    "peak_gb": 0,
-   "note": "not a reader: 42.4 strict against Vision's 83.1, both 27.2, -40.7 (-49.0 to -32.5); 33 of 96 loop (r1-foundation.md); not in the ranking table (no ocr-pages.csv rows)",
+   "note": "42.4 strict against Vision's 83.1, both 27.2, -40.7 (-49.0 to -32.5); 33 of 96 loop to the 4,096-token cap (r1-foundation.md); not in the ranking table (no ocr-pages.csv rows)",
    "source": "settings-routes.json, stage reading, row apple-fm-27",
    "nes": {
     "typewritten": 46.14,
     "printed": 27.97,
-    "handwritten": 54.81
+    "handwritten": 54.81,
+    "overall": 42.4
    },
    "n": {
     "typewritten": [
@@ -293,6 +294,10 @@
     "handwritten": [
      13,
      16
+    ],
+    "overall": [
+     63,
+     96
     ]
    },
    "hands16": null,
@@ -1153,6 +1158,270 @@
    "public_n": null
   },
   {
+   "id": "azure-di-layout",
+   "name": "Azure Document Intelligence, prebuilt-layout (vendor service)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "azure"
+    ]
+   },
+   "usd_1000": 10.0,
+   "usd_1000_batch": null,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "read on the F0 free tier ($0); list price $10 per 1,000 pages; 96 only",
+   "source": "settings-routes.json, stage reading, row azure-di-layout",
+   "nes": {
+    "typewritten": 95.57,
+    "printed": 88.07,
+    "handwritten": 81.77,
+    "overall": 90.9
+   },
+   "n": {
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     95,
+     95
+    ]
+   },
+   "hands16": null,
+   "public895": null,
+   "public_n": null
+  },
+  {
+   "id": "textract-layout",
+   "name": "AWS Textract, AnalyzeDocument LAYOUT (vendor service)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "aws"
+    ]
+   },
+   "usd_1000": 4.0,
+   "usd_1000_batch": null,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "lines in LAYOUT block order (+3.2 over raw line order on the 25); read with the date QUERY as well ($15 per 1,000 more); the row's price is LAYOUT's",
+   "source": "settings-routes.json, stage reading, row textract-layout",
+   "nes": {
+    "typewritten": 94.08,
+    "printed": 87.76,
+    "handwritten": 72.92,
+    "overall": 88.45
+   },
+   "n": {
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     95,
+     95
+    ]
+   },
+   "hands16": null,
+   "public895": null,
+   "public_n": null
+  },
+  {
+   "id": "qwen3-vl-8b",
+   "name": "Qwen3-VL 8B (OpenRouter)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openrouter"
+    ]
+   },
+   "usd_1000": 1.49,
+   "usd_1000_batch": null,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "96 only: no public run of its own",
+   "source": "settings-routes.json, stage reading, row qwen3-vl-8b",
+   "nes": {
+    "typewritten": 95.56,
+    "printed": 91.23,
+    "handwritten": 84.98,
+    "overall": 91.87
+   },
+   "n": {
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     27,
+     28
+    ],
+    "handwritten": [
+     15,
+     16
+    ],
+    "overall": [
+     93,
+     95
+    ]
+   },
+   "hands16": 84.98,
+   "public895": null,
+   "public_n": null
+  },
+  {
+   "id": "qwen3-vl-30b-a3b",
+   "name": "Qwen3-VL 30B-A3B (OpenRouter)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openrouter"
+    ]
+   },
+   "usd_1000": 0.98,
+   "usd_1000_batch": null,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "96 only: no public run of its own",
+   "source": "settings-routes.json, stage reading, row qwen3-vl-30b-a3b",
+   "nes": {
+    "typewritten": 95.56,
+    "printed": 88.17,
+    "handwritten": 77.72,
+    "overall": 89.86
+   },
+   "n": {
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     27,
+     28
+    ],
+    "handwritten": [
+     15,
+     16
+    ],
+    "overall": [
+     93,
+     95
+    ]
+   },
+   "hands16": 77.72,
+   "public895": null,
+   "public_n": null
+  },
+  {
+   "id": "qwen3.5-35b-a3b",
+   "name": "Qwen3.5 35B-A3B (OpenRouter)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openrouter"
+    ]
+   },
+   "usd_1000": 0.83,
+   "usd_1000_batch": null,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "96 only: no public run of its own; the second stage of casc-5-fail",
+   "source": "settings-routes.json, stage reading, row qwen3.5-35b-a3b",
+   "nes": {
+    "typewritten": 92.25,
+    "printed": 91.09,
+    "handwritten": 88.43,
+    "overall": 90.86
+   },
+   "n": {
+    "typewritten": [
+     48,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     93,
+     95
+    ]
+   },
+   "hands16": 88.43,
+   "public895": null,
+   "public_n": null
+  },
+  {
+   "id": "mistral-medium3.5",
+   "name": "Mistral Medium 3.5 (OpenRouter)",
+   "family": "cloud",
+   "needs": {
+    "key": [
+     "openrouter"
+    ]
+   },
+   "usd_1000": 7.29,
+   "usd_1000_batch": 3.65,
+   "s_page": 6.0,
+   "s_est": true,
+   "peak_gb": 0,
+   "note": "96 only: no public run of its own",
+   "source": "settings-routes.json, stage reading, row mistral-medium3.5",
+   "nes": {
+    "typewritten": 94.67,
+    "printed": 87.98,
+    "handwritten": 85.06,
+    "overall": 90.94
+   },
+   "n": {
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     95,
+     95
+    ]
+   },
+   "hands16": 85.06,
+   "public895": null,
+   "public_n": null
+  },
+  {
    "id": "claude-sonnet5.5",
    "name": "Claude Sonnet 5.5 (your Claude plan, or an Anthropic or OpenRouter key)",
    "family": "plan",
@@ -1600,6 +1869,495 @@
    "public_n": [
     403,
     440
+   ]
+  },
+  {
+   "id": "qwen3.5-122b-a10b-farmshare",
+   "name": "Qwen3.5 122B-A10B (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 4.94,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "four GPUs; 96 only in the scorer tables",
+   "source": "settings-routes.json, stage reading, row qwen3.5-122b-a10b-farmshare",
+   "nes": {
+    "typewritten": 96.49,
+    "printed": 94.94,
+    "handwritten": 89.67,
+    "overall": 94.67
+   },
+   "n": {
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     95,
+     95
+    ]
+   },
+   "hands16": null,
+   "public895": null,
+   "public_n": null
+  },
+  {
+   "id": "ling3-flash-vl-farmshare",
+   "name": "Ling3 Flash VL fp8 (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 47.0,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "four GPUs; N5 82.29, a tie with qwen3.6-35b-a3b-farmshare and with the N5 leader by the interval (04-reading.md §4)",
+   "source": "settings-routes.json, stage reading, row ling3-flash-vl-farmshare",
+   "nes": {
+    "typewritten": 96.8,
+    "printed": 91.24,
+    "handwritten": 91.18,
+    "overall": 93.81
+   },
+   "n": {
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     95,
+     95
+    ]
+   },
+   "hands16": 91.32,
+   "public895": 60.23,
+   "public_n": [
+    814,
+    895
+   ]
+  },
+  {
+   "id": "qwen3-vl-8b-farmshare",
+   "name": "Qwen3-VL 8B (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 3.26,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "",
+   "source": "settings-routes.json, stage reading, row qwen3-vl-8b-farmshare",
+   "nes": {
+    "typewritten": 95.37,
+    "printed": 91.2,
+    "handwritten": 89.72,
+    "overall": 92.57
+   },
+   "n": {
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     27,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     94,
+     95
+    ]
+   },
+   "hands16": 89.84,
+   "public895": 53.25,
+   "public_n": [
+    659,
+    895
+   ]
+  },
+  {
+   "id": "qwen3.8-27b-sherlock",
+   "name": "Qwen3.8 27B (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 1.25,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "",
+   "source": "settings-routes.json, stage reading, row qwen3.8-27b-sherlock",
+   "nes": {
+    "typewritten": 96.61,
+    "printed": 91.29,
+    "handwritten": 89.98,
+    "overall": 93.48
+   },
+   "n": {
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     95,
+     95
+    ]
+   },
+   "hands16": 90.14,
+   "public895": 56.09,
+   "public_n": [
+    722,
+    895
+   ]
+  },
+  {
+   "id": "qwen3.8-27b-farmshare",
+   "name": "Qwen3.8 27B, FarmShare build (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 3.39,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "96 only: the public and hand figures are the Sherlock run's (row qwen3.8-27b-sherlock)",
+   "source": "settings-routes.json, stage reading, row qwen3.8-27b-farmshare",
+   "nes": {
+    "typewritten": 96.18,
+    "printed": 90.77,
+    "handwritten": 90.17,
+    "overall": 93.17
+   },
+   "n": {
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     95,
+     95
+    ]
+   },
+   "hands16": null,
+   "public895": null,
+   "public_n": null
+  },
+  {
+   "id": "glm-ocr-farmshare",
+   "name": "GLM-OCR (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 1.04,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "whole page fails newspapers (29.2 on L9, cap or empty on 9 of 15): needs the layout stage (layout-photo.md); its layout role is note 03's",
+   "source": "settings-routes.json, stage reading, row glm-ocr-farmshare",
+   "nes": {
+    "typewritten": 93.49,
+    "printed": 90.24,
+    "handwritten": 85.61,
+    "overall": 91.08
+   },
+   "n": {
+    "typewritten": [
+     49,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     94,
+     95
+    ]
+   },
+   "hands16": 85.78,
+   "public895": 48.61,
+   "public_n": [
+    680,
+    895
+   ]
+  },
+  {
+   "id": "qwen3.5-4b-farmshare",
+   "name": "Qwen3.5 4B (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 1.86,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "",
+   "source": "settings-routes.json, stage reading, row qwen3.5-4b-farmshare",
+   "nes": {
+    "typewritten": 93.57,
+    "printed": 90.78,
+    "handwritten": 85.53,
+    "overall": 90.97
+   },
+   "n": {
+    "typewritten": [
+     49,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     94,
+     95
+    ]
+   },
+   "hands16": 85.86,
+   "public895": 51.04,
+   "public_n": [
+    648,
+    895
+   ]
+  },
+  {
+   "id": "nemotron-parse-2-sherlock",
+   "name": "Nemotron Parse 2 (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 3.39,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "",
+   "source": "settings-routes.json, stage reading, row nemotron-parse-2-sherlock",
+   "nes": {
+    "typewritten": 90.69,
+    "printed": 90.32,
+    "handwritten": 52.43,
+    "overall": 83.21
+   },
+   "n": {
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     13,
+     16
+    ],
+    "overall": [
+     91,
+     95
+    ]
+   },
+   "hands16": 52.43,
+   "public895": 33.08,
+   "public_n": [
+    605,
+    895
+   ]
+  },
+  {
+   "id": "unlimited-ocr-sherlock",
+   "name": "Unlimited-OCR (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 17.75,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "",
+   "source": "settings-routes.json, stage reading, row unlimited-ocr-sherlock",
+   "nes": {
+    "typewritten": 89.75,
+    "printed": 84.32,
+    "handwritten": 66.84,
+    "overall": 84.56
+   },
+   "n": {
+    "typewritten": [
+     49,
+     50
+    ],
+    "printed": [
+     27,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     94,
+     95
+    ]
+   },
+   "hands16": 66.84,
+   "public895": 41.54,
+   "public_n": [
+    790,
+    895
+   ]
+  },
+  {
+   "id": "lightonocr3-0.8b-farmshare",
+   "name": "LightOnOCR-3 0.8B (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 0.65,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "",
+   "source": "settings-routes.json, stage reading, row lightonocr3-0.8b-farmshare",
+   "nes": {
+    "typewritten": 91.01,
+    "printed": 86.01,
+    "handwritten": 84.78,
+    "overall": 88.04
+   },
+   "n": {
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     95,
+     95
+    ]
+   },
+   "hands16": 84.95,
+   "public895": 56.66,
+   "public_n": [
+    750,
+    895
+   ]
+  },
+  {
+   "id": "ppocrv6-medium-farmshare",
+   "name": "PP-OCRv6 medium (your cluster)",
+   "family": "cluster",
+   "needs": {
+    "cluster": true
+   },
+   "usd_1000": 0.0,
+   "usd_1000_batch": null,
+   "s_page": 0.44,
+   "s_est": false,
+   "peak_gb": 0,
+   "note": "its Mac form is ppocrv6-kraken-blla",
+   "source": "settings-routes.json, stage reading, row ppocrv6-medium-farmshare",
+   "nes": {
+    "typewritten": 90.56,
+    "printed": 61.44,
+    "handwritten": 62.79,
+    "overall": 77.17
+   },
+   "n": {
+    "typewritten": [
+     50,
+     50
+    ],
+    "printed": [
+     28,
+     28
+    ],
+    "handwritten": [
+     16,
+     16
+    ],
+    "overall": [
+     95,
+     95
+    ]
+   },
+   "hands16": 62.74,
+   "public895": 38.67,
+   "public_n": [
+    893,
+    895
    ]
   }
  ],
@@ -2298,7 +3056,7 @@
     "gemini3.1-flash-lite"
    ],
    "trigger": "fail",
-   "nes": 94.04,
+   "nes": 94.07,
    "usd_1000": 0.64,
    "escalated_of_96": 3
   },
@@ -2365,8 +3123,8 @@
    "source": "enh-ocr-input.md §Measurement card; enh-ocr-marks.md §Verdict; rotation-routes.md §Held out; place-geom-real5.md §Verdict; enh-dewarp.md §The app's encoding"
   },
   "layout": {
-   "rule": "Newspapers and dense multi-column print: PP-DocLayoutV3 regions, the detector's own order, quad correction first on a photograph. Every other kind, and an uncertain kind, reads the whole page in the reader's line order. No detector on handwritten pages or registers. A page the detector fails reads whole.",
-   "source": "layout-photo-tables.md §L9; layout-photo-tables.md §the 96; layout-photo-tables.md §handwritten"
+   "rule": "Newspapers and dense multi-column print: PP-DocLayoutV3 regions, the detector's own order, quad correction first on a photograph. Every other kind, and an uncertain kind, reads the whole page in the reader's line order. No detector on handwritten pages or registers. A page the detector fails reads whole. Qwen3.6 27B reads newspapers whole, with no detector: 0.967 whole against 0.965 on DocLayout-YOLO's regions on 15 L9 pages, a tie that goes to the faster, cheaper whole page. Measured on the raw regions, not the app's partition. Every other reader keeps the detector. Scanned newspapers may use DocLayout-YOLO through newspaper-ocr's route instead, the user's choice, off by default: 4.6 NES above PP-DocLayoutV3 (1.1 to 8.0) on 15 L9 scans, 14 from one collection, a direction; unmeasured on photographs, which keep PP-DocLayoutV3. An optional download, its weights AGPL-3.0.",
+   "source": "layout-photo-tables.md §L9; layout-photo-tables.md §the 96; layout-photo-tables.md §handwritten; E-layout.md §3 claim 34; layout-pair-newspapers.md §What this says"
   },
   "marks": {
    "rule": "No marks layer is offered; marks stay on the untouched reading copy. The reading copy and the OCR input stay the raw image; shading division is not offered for viewing.",

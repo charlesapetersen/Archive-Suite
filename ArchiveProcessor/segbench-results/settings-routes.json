@@ -10316,16 +10316,16 @@
      },
      "figures": {
       "overall": {
-       "value": 94.04,
+       "value": 94.07,
        "basis": "strict, split half: chosen on half the 96, scored on the other half",
        "escalated": 3,
-       "split_half": "95.09 -> 94.04",
+       "split_half": "95.09 -> 94.07",
        "truth": "owner-96",
        "source": {
         "file": "ArchiveOCRBench/difficulty.md",
         "route": "budget 1, escalate on failure",
         "attribute": "NES; split half",
-        "value": "95.04; 95.09 -> 94.04"
+        "value": "95.04; 95.09 -> 94.07"
        }
       }
      },
