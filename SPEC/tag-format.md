@@ -365,8 +365,9 @@ Recipient place: <place>; <place>
   input image's SHA-256, never its name.
 - **Classification — verified values (exact strings):** `Document Start`, `Continuation`, `Box`,
   `Folder`. (These are `DocumentClassification.displayName`; the enum's Codable rawValues
-  `document_start`/`document_continuation`/`box_label`/`folder_label` appear only in JSON sidecars,
-  **never** in the PDF text.)
+  `document_start`/`document_continuation`/`box_label`/`folder_label` appear only in the Processor's own
+  saved state and, for box and folder labels, the JSON sidecar's `format`; **never** in the PDF text.
+  W49.storage-simplify-audit, 2026-11-20: the sidecar carries no classification key.)
 - **Classification may be ABSENT.** It is written only when the Processor knows it; consumers **must
   degrade gracefully** (fall back to filename-sequence order + manual grouping). Never build a core
   behavior that assumes it exists.

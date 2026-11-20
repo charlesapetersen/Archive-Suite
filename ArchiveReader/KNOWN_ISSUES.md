@@ -2,6 +2,15 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## Data keyed by absolute path — the limits (W49.storage-simplify-audit, 2026-11-20)
+
+Found by the storage survey (`execution-plans/storage-simplify.md` §2, §6).
+- **Flags and page turns are keyed by the file's absolute path** (`FlagStore` in the `flaggedPaths` setting; page
+  turns in the library index), so moving or renaming a file, or moving or renaming the archive root, loses them.
+  They are the user's data kept in a cache. (queued: W49.reader-root-movable)
+- **The content index and page thumbnails are keyed by absolute path too**, so a moved root re-extracts every
+  file's text and redraws thumbnails; old rows are never removed. (queued: W49.reader-root-movable)
+
 ## Dating a folder's documents from its confirmed date — the limits (W47.ct-folder-date-reader, 2026-11-19)
 
 Shipped: setting or confirming a folder run's date in the Container section offers to date the run's documents that
