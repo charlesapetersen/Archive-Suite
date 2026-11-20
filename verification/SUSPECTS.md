@@ -379,6 +379,9 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     resolves the link at the moved folder through its bookmark. The comment beside the branch, and the accepted
     `KNOWN_ISSUES.md` bullet from W23.m14, call "a stale root reports the file missing" the shipped W8-S9 rule, so
     whether the in-session answer should ask for the folder instead is the owner's call.
+  - 2026-11-20 owner walkthrough of 13:42 (call 29) — option (a): when the root was moved or renamed in session,
+    Notes asks for the folder (Choose Archive Folder) or says the search could not finish; it never says the file is
+    gone. The fix follows the independent check `W49.notes-suspects-small-check`.
 
 ### S-015 · The list's `[`, `]` and `\` keys may fire inside the inline tag editor, and `\` would mark a file Read
 
@@ -921,6 +924,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.notes-suspects-text — raised.
+  - 2026-11-20 owner walkthrough of 13:42 (call 29) — queued as `W49.notes-s043-reproduce` under phase rule 5a.
 
 ### S-044 · Process Files' cost estimate leaves out the names call
 
@@ -937,6 +941,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-fix-s041 — raised.
+  - 2026-11-20 owner walkthrough of 13:42 (call 29) — queued as `W49.proc-s044-reproduce` under phase rule 5a.
 
 ### S-045 · A failed tagging call in Live Capture is filed silently
 

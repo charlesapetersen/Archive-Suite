@@ -233,6 +233,14 @@ calls are section 1.
     private. Releasing: the Mac route is decided when a public release is near, and store publishing for the phones waits
     on it. Paid runs: Azure and Textract on the public 895 declined; the two others stay with his 17 Oct hold. Vision
     OCR's visible-text debugging mode declined.
+29. **The walkthrough of 2026-11-20 13:42.** Storage (W49.storage-one-home-owner-ok): none of A, B or C. He leans
+    toward the sidecar over the Finder-tag scheme ("easily transferrable to other apps but it doesn't need to be
+    directly readable by other apps"), wants tag and page-2 facts shown as specific Reader fields, and asks for a
+    deeper analysis first: page 2 against sidecar, whether a sidecar is right at all, and user toggles for Spotlight and
+    Finder tags (W49.storage-model-analysis; the gate waits on it). S-014: a Notes link whose root was moved or renamed in
+    session asks for the folder or says the search could not finish, never "not found". Backlog: S-043 and S-044
+    reproduced under phase rule 5a (W49.notes-s043-reproduce, W49.proc-s044-reproduce). Sherlock family-coverage batch
+    still pending on priority (11 GPU jobs, fair-share 0.32; 11 public nodes have 48 or 80 GB cards), nothing failed.
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 

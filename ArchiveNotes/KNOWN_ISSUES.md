@@ -955,7 +955,7 @@ than "not found in the archive". Two boundaries worth not re-litigating:
   file missing, never a wrong file) — `DurableLinkE2ETests` caught the first attempt, which reported the
   vanished root as an incomplete search. **W23.m14-fu re-confirmed the narrower unplugged-volume case is
   already handled:** `ReaderRootStore.root(for:)` returns `nil` when its scope cannot start, before any
-  basename scan, and the resolver returns `.needsRootGrant` rather than `.notFound`. (accepted: by design, W23.m14; keeps the W8-S9 rule that a stale root reports the file missing).
+  basename scan, and the resolver returns `.needsRootGrant` rather than `.notFound`. (queued: W49.notes-suspects-small-check, whose fix follows the owner's call 29 of 2026-11-20: a root moved or renamed while Notes runs asks for the folder or says the search could not finish, never "not found"; a root that is truly gone still reports the file missing).
 
 Pinned by 10 scratch tests (`ReaderLinkScanTests`). The off-actor proof is structural rather than
 timing-based: the raw progress callback runs on the scanning thread, so `Thread.isMainThread` inside it
