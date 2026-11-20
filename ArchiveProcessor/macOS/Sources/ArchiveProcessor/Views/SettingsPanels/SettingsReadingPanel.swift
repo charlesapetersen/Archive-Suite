@@ -421,10 +421,16 @@ struct SettingsReadingPanel: View {
         gatewayBaseURL = "https://api.openai.com/v1"
         gatewayDisplayName = "OpenAI"
         gatewayUpstreamProvider = .openai
-        if let m = LLMModel.openaiModels.first(where: { !$0.supportsThinking }) ?? LLMModel.openaiModels.first {
+        if let m = Self.openAIGatewayPresetModel {
             gatewayModelID = m.id
             gatewayInputCost = m.inputCostPer1M
             gatewayOutputCost = m.outputCostPer1M
         }
+    }
+
+    /// The model "Fill in OpenAI preset" puts in the gateway's fields (W49.proc-suspects-messages: the driver's
+    /// `PROCESSFILES_GATEWAY_PRESET=openai` takes it from here).
+    static var openAIGatewayPresetModel: LLMModel? {
+        LLMModel.openaiModels.first(where: { !$0.supportsThinking }) ?? LLMModel.openaiModels.first
     }
 }

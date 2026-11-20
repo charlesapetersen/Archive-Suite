@@ -196,6 +196,24 @@ enum ProcessFilesTestDriver {
                 inputCostPer1M: env["PROCESSFILES_GATEWAY_IN_PER_1M"].flatMap(Double.init),
                 outputCostPer1M: env["PROCESSFILES_GATEWAY_OUT_PER_1M"].flatMap(Double.init))
         }
+        // W49.proc-suspects-messages (S-025): PROCESSFILES_GATEWAY_PRESET=openai fills the gateway's fields as Settings'
+        // "Fill in OpenAI preset" does (`SettingsReadingPanel.applyOpenAIGatewayPreset`); send it to the stand-in with
+        // PROCESSFILES_REDIRECT_URL.
+        if env["PROCESSFILES_GATEWAY_PRESET"] == "openai" {
+            guard let m = SettingsReadingPanel.openAIGatewayPresetModel else { return fail("no OpenAI preset model", marker: donePath) }
+            gateway = GatewayConfig(baseURL: GatewayConfig.normalizedBaseURL("https://api.openai.com/v1"), modelID: m.id,
+                                    displayName: "OpenAI", inputCostPer1M: m.inputCostPer1M, outputCostPer1M: m.outputCostPer1M)
+        }
+        // W49.proc-suspects-messages (S-018): PROCESSFILES_LOCALAGENT=<tool>:<absolute CLI path> reads with the Local
+        // Agent, as Process Files does with that backend chosen in Settings (`LocalAgentConfig.fromDefaults`).
+        var localAgent: LocalAgentConfig?
+        if let spec = env["PROCESSFILES_LOCALAGENT"] {
+            let parts = spec.split(separator: ":", maxSplits: 1).map(String.init)
+            guard parts.count == 2, let tool = LocalAgentTool(rawValue: parts[0]) else {
+                return fail("PROCESSFILES_LOCALAGENT is <tool>:<path>", marker: donePath)
+            }
+            localAgent = LocalAgentConfig(tool: tool, binaryPath: parts[1], modelOverride: nil)
+        }
         let model = gateway?.asLLMModel() ?? provider.models.first { $0.id == modelId } ?? provider.models[0]
 
         // W40.d4: the provider's batch path (submit, poll, collect), as Process Files takes it with Batch mode on;
@@ -248,6 +266,11 @@ enum ProcessFilesTestDriver {
         processor.taggingMode = mode
         processor.passSourceTags = (mode == .copySource)
         processor.rotationMode = .off          // macOS Vision rotation hangs without a window server
+        // W49.proc-suspects-messages (S-029): PROCESSFILES_ROTATION names the rotation mode Settings holds.
+        if let raw = env["PROCESSFILES_ROTATION"] {
+            guard let rotation = RotationMode(rawValue: raw) else { return fail("unknown rotation mode \(raw)", marker: donePath) }
+            processor.rotationMode = rotation
+        }
         processor.reviewRotation = false
         processor.mergeDocuments = false       // 1 source image → 1 two-page PDF (stable paths)
         processor.exportOriginals = env["PROCESSFILES_EXPORTORIGINALS"] == "1"
@@ -381,7 +404,8 @@ enum ProcessFilesTestDriver {
             preOCRedInput: preOCRed,
             segmentationContext: SegmentationContext(
                 previousTextCharCount: 0, sendPreviousImage: false, customPrompt: nil, imageScale: 1.0),
-            gatewayConfig: gateway)
+            gatewayConfig: gateway,
+            localAgent: localAgent)
             runFinished = true }
         processor.processingTask = run
 
@@ -440,6 +464,12 @@ enum ProcessFilesTestDriver {
         // so the checker can hold every untagged document to being named.
         writeMarker(runDir.appendingPathComponent("status.txt").path, processor.statusMessage + "\n")
         writeMarker(runDir.appendingPathComponent("gates.tsv").path, gates.lines.map { $0 + "\n" }.joined())
+        if env["PROCESSFILES_ROTATION"] != nil {
+            writeMarker(runDir.appendingPathComponent("rotation.tsv").path, processor.jobs.map {
+                "\($0.sourceURL.lastPathComponent)\trotation=\($0.result.map { String($0.rotationDegrees) } ?? "none")"
+                    + "\tunsure=\($0.result?.rotationUnsure == true)\n"
+            }.joined())
+        }
         writeMarker(runDir.appendingPathComponent("tagging-failures.tsv").path,
                     processor.taggingFailureNames.map { "\($0.name)\t\($0.reason)\n" }.joined())
 
@@ -483,9 +513,12 @@ final class RequestLog: @unchecked Sendable {
             }
             run.removeAll(keepingCapacity: true)
         }
-        let model = ((try? JSONSerialization.jsonObject(with: body)) as? [String: Any])?["model"] as? String ?? ""
+        let json = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
+        let model = json?["model"] as? String ?? ""
+        // W49.proc-suspects-messages: the token-limit and reasoning parameters the body carries.
+        let params = ["max_tokens", "max_completion_tokens", "reasoning_effort"].compactMap { k in json?[k].map { "\(k):\($0)" } }
         let line = "\(request.url?.host ?? "")\(request.url?.path ?? "")\tbody_bytes=\(body.count)"
-            + "\timages=\(images.joined(separator: ","))\tmodel=\(model)"
+            + "\timages=\(images.joined(separator: ","))\tmodel=\(model)\tparams=\(params.joined(separator: ","))"
         lock.lock(); lines.append(line); lock.unlock()
     }
 

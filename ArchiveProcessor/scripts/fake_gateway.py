@@ -11,7 +11,9 @@ A request without `Authorization: Bearer <key>` (default `stand-in-key`, the key
 hands over) gets a 401, so the run proves the key reached every call. The tagging calls numbered in the fifth argument
 (comma-separated, counted from 1 in arrival order; W49.proc-fix-s042) get a provider 500 with no usage, so a run can
 prove a failed tagging call is reported rather than filed as tagged. A Pre-OCRed run's classification-only request takes
-its class from the same cycle, and FAKE_GATEWAY_TAGS_JSON replaces the tag JSON (W49.proc-suspects-filing). Each request is one line in the log, with the
+its class from the same cycle, and FAKE_GATEWAY_TAGS_JSON replaces the tag JSON (W49.proc-suspects-filing).
+W49.proc-suspects-messages: FAKE_GATEWAY_FAIL_OCR (comma-separated OCR call numbers) answers those calls 400 with a
+message naming the call, and FAKE_GATEWAY_FAIL_OTHER=1 answers every other request (a rotation vote) 500. Each request is one line in the log, with the
 start of its prompt. It runs in the VM guest, started by `ops/gui/vm-gui-runner.sh` when
 W40D1_FAKE_GATEWAY=1; it is never pointed at real material and sends nothing anywhere.
 """
@@ -70,13 +72,16 @@ class Handler(BaseHTTPRequestHandler):
         with lock:
             kind, reply = answer(text, CYCLE[count['ocr'] % len(CYCLE)], count['ocr'] + 1)
             count[kind] += 1
-            fail = kind == 'tags' and count[kind] in FAIL_TAGS
+            fail = (kind == 'tags' and count[kind] in FAIL_TAGS) or (kind == 'other' and FAIL_OTHER)
+            refuse = kind == 'ocr' and count[kind] in FAIL_OCR
+            n = count[kind]
             with open(LOG, 'a', encoding='utf-8') as f:
                 head = ' '.join(text.split())[:90].replace('\t', ' ')
-                f.write(f'{kind}{"-500" if fail else ""}\t{body.get("model")}\t{count[kind]}\t{head}\n')
-        if fail:
-            err = b'{"error": {"message": "stand-in upstream error", "code": 500}}'
-            self.send_response(500)
+                f.write(f'{kind}{"-500" if fail else "-400" if refuse else ""}\t{body.get("model")}\t{n}\t{head}\n')
+        if fail or refuse:
+            err = json.dumps({'error': {'message': f'stand-in refusal of OCR call {n}' if refuse
+                                        else 'stand-in upstream error', 'code': 400 if refuse else 500}}).encode()
+            self.send_response(400 if refuse else 500)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Content-Length', str(len(err)))
             self.end_headers()
@@ -99,4 +104,6 @@ if __name__ == '__main__':
     COMPLETION = int(sys.argv[3]) if len(sys.argv) > 3 else 500
     KEY = sys.argv[4] if len(sys.argv) > 4 else 'stand-in-key'
     FAIL_TAGS = {int(n) for n in sys.argv[5].split(',') if n} if len(sys.argv) > 5 else set()
+    FAIL_OCR = {int(n) for n in os.environ.get('FAKE_GATEWAY_FAIL_OCR', '').split(',') if n}
+    FAIL_OTHER = os.environ.get('FAKE_GATEWAY_FAIL_OTHER') == '1'
     ThreadingHTTPServer(('127.0.0.1', port), Handler).serve_forever()

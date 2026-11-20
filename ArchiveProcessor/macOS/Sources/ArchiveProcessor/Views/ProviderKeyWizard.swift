@@ -204,11 +204,7 @@ private struct ProviderKeyStep: View {
             let result = await spec.validate(trimmed)
             validating = false
             status = result
-            if result.isUsable {
-                KeychainHelper.save(account: spec.account, password: trimmed)
-                UserDefaults.standard.set(true, forKey: "keyValidated_\(spec.account)")
-                NotificationCenter.default.post(name: .apiKeyChanged, object: nil)
-            }
+            if result.isUsable { ProviderKeyWizard.recordUsableKey(account: spec.account, key: trimmed) }
         }
     }
 
@@ -244,5 +240,15 @@ private struct ProviderKeyStep: View {
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 8).fill((ok ? Color.green : Color.orange).opacity(0.12)))
+    }
+}
+
+extension ProviderKeyWizard {
+    /// What the wizard does with a key its live check passed: store it and mark the account Validated
+    /// (W49.proc-suspects-messages: `KeyWizardTestDriver` runs this as the wizard does).
+    static func recordUsableKey(account: String, key: String, defaults: UserDefaults = .standard) {
+        KeychainHelper.save(account: account, password: key)
+        defaults.set(true, forKey: "keyValidated_\(account)")
+        NotificationCenter.default.post(name: .apiKeyChanged, object: nil)
     }
 }

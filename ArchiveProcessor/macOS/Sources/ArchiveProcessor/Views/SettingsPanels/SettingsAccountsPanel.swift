@@ -169,14 +169,26 @@ struct SettingsAccountsPanel: View {
 
     /// Small status chip: green "Validated" once the guided wizard's live check passed, else "Saved".
     @ViewBuilder private func keyStatusChip(account: String, hasKey: Bool) -> some View {
-        if hasKey && UserDefaults.standard.bool(forKey: "keySaveFailed_\(account)") {
+        switch Self.keyChip(account: account, hasKey: hasKey) {
+        case .saveFailed:
             Label("Save failed", systemImage: "exclamationmark.triangle.fill")
                 .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.red)
-        } else if UserDefaults.standard.bool(forKey: "keyValidated_\(account)") {
+        case .validated:
             Label("Validated", systemImage: "checkmark.seal.fill")
                 .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.green)
-        } else if hasKey {
+        case .saved:
             Text("Saved").font(.caption).foregroundStyle(.primary)
+        case .none:
+            EmptyView()
         }
+    }
+
+    enum KeyChip: String { case saveFailed, validated, saved, none }
+
+    /// Which chip the key row shows (W49.proc-suspects-messages: `KeyWizardTestDriver` reads it as the row does).
+    static func keyChip(account: String, hasKey: Bool, defaults: UserDefaults = .standard) -> KeyChip {
+        if hasKey && defaults.bool(forKey: "keySaveFailed_\(account)") { return .saveFailed }
+        if defaults.bool(forKey: "keyValidated_\(account)") { return .validated }
+        return hasKey ? .saved : .none
     }
 }
