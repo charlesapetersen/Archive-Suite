@@ -206,6 +206,35 @@ final class ReaderPreviewPopover {
         }
     }
 
+    /// The "Download and Show" button for a cloud placeholder: the one place the preview may download.
+    ///
+    /// The download runs off the main actor behind a spinner, since it takes as long as the file does, and its
+    /// answer goes back on the same anchor as the basename search's. A failed download says so rather than
+    /// offering the same button again.
+    private func downloadAction(fileURL: URL, page: Int?, relativeTo view: NSView) -> () -> Void {
+        { [weak self, weak view] in
+            guard let self, let view else { return }
+            self.searchTask?.cancel()
+            _ = self.searchModel.beginSearch()
+            self.showSearching("Downloading \u{201C}\(fileURL.lastPathComponent)\u{201D}\u{2026}", relativeTo: view)
+            self.searchTask = Task { [weak self] in
+                let downloaded = await Task.detached(priority: .userInitiated) {
+                    PreviewCloudFile.download(fileURL)
+                }.value
+                guard let self, !Task.isCancelled else { return }
+                guard let target = self.anchorView, target === view, target.window != nil else {
+                    self.closePopover()
+                    return
+                }
+                if downloaded {
+                    self.showPDF(fileURL: fileURL, page: page, relativeTo: target)
+                } else {
+                    self.showMessage("The PDF could not be downloaded from the cloud.", relativeTo: target)
+                }
+            }
+        }
+    }
+
     private func showSearching(_ headline: String, relativeTo anchor: NSView) {
         closePopover()
         let content = PreviewSearchingView(headline: headline, model: searchModel)
@@ -224,8 +253,21 @@ final class ReaderPreviewPopover {
         popover = nil
     }
 
+    /// The message for a source PDF that is a cloud placeholder (W49.notes-s007-fix).
+    static let inCloudMessage = "This PDF is in the cloud and has not been downloaded to this Mac.\n"
+        + "Showing it downloads the whole file."
+
     private func showPDF(fileURL: URL, page: Int?, relativeTo anchorView: NSView) {
-        guard let doc = PDFDocument(url: fileURL) else {
+        let doc: PDFDocument
+        switch PreviewCloudFile.opening(fileURL) {
+        case .show(let opened):
+            doc = opened
+        case .inCloud:
+            showMessage(Self.inCloudMessage, relativeTo: anchorView,
+                        actionTitle: "Download and Show",
+                        action: downloadAction(fileURL: fileURL, page: page, relativeTo: anchorView))
+            return
+        case .unreadable:
             showMessage("Could not open PDF.", relativeTo: anchorView)
             return
         }

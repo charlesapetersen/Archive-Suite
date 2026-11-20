@@ -3,13 +3,15 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
-## ⚠️ OPEN (W49.notes-s007-reproduce, 2026-11-20) — the source-block preview downloads a cloud placeholder
+## ✅ FIXED (W49.notes-s007-fix, 2026-11-20) — the source-block preview no longer downloads a cloud placeholder
 
-Clicking a source block whose PDF is a dataless cloud placeholder (OneDrive, iCloud, Google Drive) downloads the
-whole file. `ReaderPreviewPopover.showPDF` opens it with a bare `PDFDocument(url:)`; only the chip thumbnail runs
-inside `CorpusWalker.withDatalessMaterializationDisabled`. Measured on a real OneDrive placeholder: 6.2 MB downloaded
-in 1.9 s, and the file stayed materialised. Bandwidth and disk only, no data loss. Evidence:
-`verification/evidence/notes/W49.notes-s007-dataless-preview.md`; suspect S-007 (queued: W49.notes-s007-fix).
+Clicking a source block whose PDF is a dataless cloud placeholder (OneDrive, iCloud, Google Drive) used to download
+the whole file: `ReaderPreviewPopover.showPDF` opened it with a bare `PDFDocument(url:)` (6.2 MB in 1.9 s on a real
+OneDrive placeholder). `PreviewCloudFile.opening` now checks `SF_DATALESS` first and opens inside
+`CorpusWalker.withDatalessMaterializationDisabled`; a placeholder shows "This PDF is in the cloud…" with a
+"Download and Show" button, which downloads off the main actor behind a spinner and then shows the page. Re-probed on
+the same placeholder (`verification/evidence/notes/W49.notes-s007-fix-probe.swift`); suspect S-007 cleared
+(accepted: fixed history).
 
 ## ✅ FIXED (W49.notes-s006-fix, 2026-11-20) — a subject spelled `ArchiveSuite` now reaches Finder
 
