@@ -559,7 +559,7 @@ struct SettingsSheetModel {
         var betterAll = better
         if let base, !betterAll.contains(where: { stage.route($0.id)?.family == .mac }),
            let m = stage.routes.filter({ r in
-               r.family == .mac && !r.afterTraining && r.offered
+               r.family == .mac && !r.afterTraining && r.offered && !r.lowerScoring
                    && (appBlocked[r.id] ?? []).contains { $0.contains("GB") }
                    && (appBlocked[r.id] ?? []).allSatisfy { $0.contains("GB") || $0.contains("download") }
            }).compactMap({ r in cmp.of(r).map { (r, $0) } }).filter({ $0.1 > base }).max(by: { $0.1 < $1.1 }) {
@@ -574,7 +574,9 @@ struct SettingsSheetModel {
         let pickFigure = base
         let used = Set(usedRoutes.map(\.id))
         let alternatives = stage.routes
-            .filter { !$0.afterTraining && $0.offered && !used.contains($0.id) && $0.id != route?.id && appBlocked[$0.id] == nil }
+            // A lower-scoring row is never put forward; it is only in the Advanced menu of choices (owner call 15).
+            .filter { !$0.afterTraining && $0.offered && !$0.lowerScoring && !used.contains($0.id) && $0.id != route?.id
+                && appBlocked[$0.id] == nil }
             .compactMap { r -> (SettingsRouteTable.Route, Double)? in cmp.of(r).map { (r, $0) } }
             .sorted { abs($0.1 - (pickFigure ?? 0)) < abs($1.1 - (pickFigure ?? 0)) }
             .prefix(3)
@@ -751,7 +753,7 @@ struct SettingsSheetModel {
         let units = stage.unit == "documents" ? Double(a.documentCount) : Double(a.pages)
         let blocked = app.blocked[stage.id] ?? [:]
         let hidden = stage.routes.filter { r in
-            guard !r.afterTraining, r.offered, let b = blocked[r.id], !b.isEmpty,
+            guard !r.afterTraining, r.offered, !r.lowerScoring, let b = blocked[r.id], !b.isEmpty,
                   b.allSatisfy({ $0.hasPrefix(SettingsTraining.blockerPrefix) }) else { return false }
             return a.ceilingUSD.map { solver.usdPer1000(r, stage: stage.id) * units / 1000 <= $0 + 1e-9 } ?? true
         }

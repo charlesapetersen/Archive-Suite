@@ -538,7 +538,10 @@ struct SettingsSolver {
     func solveReading(_ stage: SettingsRouteTable.Stage, _ state: inout SolveState) -> [SettingsPick] {
         let score = answers.readingFallback ? "answered" : "strict"
         let pages = Double(answers.pages)
-        let rows = stage.routes.filter { !$0.afterTraining && $0.id != "apple-fm-27" }   // rule no-apple-fm
+        // Rules no-apple-fm and lower-scoring-advanced (owner call 15): a lower-scoring row is never the pick; it runs
+        // only where the user chose it for this stage (`onlyRoutes`, a card's override).
+        let chosen = answers.onlyRoutes["reading"] ?? []
+        let rows = stage.routes.filter { !$0.afterTraining && (!$0.lowerScoring || chosen.contains($0.id)) }
         let singles = rows.filter { $0.stages == nil }
         let cascades = rows.filter { $0.stages != nil }
         func overall(_ r: SettingsRouteTable.Route) -> Double? {

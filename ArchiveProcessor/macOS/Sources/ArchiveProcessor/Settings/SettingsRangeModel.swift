@@ -174,7 +174,9 @@ extension SettingsSheetModel {
             let why: String?
             let ownHours: Double
         }
-        let built: [Built] = stage.routes.filter { !$0.afterTraining }.map { r in
+        // A lower-scoring row is drawn from the Advanced level up, or while it is the card's choice (owner call 15).
+        let advanced = SettingsLevel.current() >= .advanced
+        let built: [Built] = stage.routes.filter { !$0.afterTraining && (!$0.lowerScoring || advanced || $0.id == card.routeID) }.map { r in
             let v = cmp.of(r)
             let c = solver.cand(r, stage: stage.id, value: v ?? 0, units: units)
             var blockers = app.blockers(stage.id, r.id)

@@ -186,7 +186,7 @@ enum SettingsPanelsTestDriver {
             for r in stage.routes {
                 routes += 1
                 let level = SettingsLevels.level(of: r)
-                if !r.offered || r.afterTraining {
+                if !r.offered || r.afterTraining || r.lowerScoring {   // lower-scoring: W47.wh-readers-lost
                     if level != .advanced { wrong.append("\(stage.id)/\(r.id)") }
                     check("8 \(stage.id)/\(r.id) says why it is Advanced", !(SettingsLevels.why(r) ?? "").isEmpty)
                 } else if level != .standard {
@@ -196,6 +196,12 @@ enum SettingsPanelsTestDriver {
         }
         check("8 every route row has a level", routes > 0 && wrong.isEmpty,
               "\(routes) rows; wrong: " + wrong.joined(separator: ", "))
+        if let fm = table.stage("reading")?.route("apple-fm-27") {
+            check("8 a lower-scoring row says what scored higher", SettingsLevels.why(fm)?.hasPrefix("scored lower: Apple Vision") == true,
+                  SettingsLevels.why(fm) ?? "nil")
+        } else {
+            check("8 apple-fm-27 is a reading row", false)
+        }
         let model = SettingsSheetModel(
             table: table, pairs: OCRPairMatrix.bundled,
             resolver: SettingsResolver(general: SettingsLayer(kind: .general, name: "General"), project: nil, collection: nil),
@@ -209,6 +215,15 @@ enum SettingsPanelsTestDriver {
             check("8 the \(card.id) card's choices each carry their row's level", card.options.allSatisfy { o in
                 stageRoutes.first { $0.id == o.id }.map { SettingsLevels.level(of: $0) == o.level } ?? false
             })
+            check("8 the \(card.id) card puts forward no lower-scoring row",
+                  !card.alternatives.contains { a in stageRoutes.first { $0.id == a.id }?.lowerScoring == true }
+                    && !card.better.contains { b in stageRoutes.first { $0.id == b.id }?.lowerScoring == true })
+            if card.id == "reading" {
+                let lower = Set(stageRoutes.filter(\.lowerScoring).map(\.id))
+                let offered = Set(card.options.filter { $0.level == .advanced }.map(\.id)).intersection(lower)
+                check("8 the reading card offers the lower-scoring rows at Advanced", offered == lower,
+                      lower.subtracting(offered).sorted().joined(separator: ", "))
+            }
         }
 
         // 9. A value changed from its default is shown at every level, and Reset puts it back (a scratch domain).

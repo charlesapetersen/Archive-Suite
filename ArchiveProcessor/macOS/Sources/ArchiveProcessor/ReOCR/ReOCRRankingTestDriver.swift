@@ -56,9 +56,10 @@ enum ReOCRRankingTestDriver {
         func route(_ id: String) -> SettingsRouteTable.Route? { reading?.route(id) }
 
         func rank(_ kind: OCRPageKind, pages: Int = 10, resources: SettingsResources = keyed, staysOnMac: Bool = false,
-                  current: PDFReaderProvenance? = nil, in t: SettingsRouteTable = table) -> ReOCRRanking {
+                  current: PDFReaderProvenance? = nil, in t: SettingsRouteTable = table,
+                  level: SettingsLevel = .standard) -> ReOCRRanking {
             ReOCRRanking.rank(kind: kind, pages: pages, table: t, pairs: pairs, resources: resources,
-                              staysOnMac: staysOnMac, current: current)
+                              staysOnMac: staysOnMac, current: current, level: level)
         }
 
         // 1. Each kind's own figure, best first, app routes only.
@@ -72,8 +73,22 @@ enum ReOCRRankingTestDriver {
                   r.rows.allSatisfy { row in route(row.id).map { $0.stages == nil && $0.family != .cluster } ?? false })
             check("1 \(kind.rawValue): cluster readings listed apart",
                   !r.institutional.isEmpty && r.institutional.allSatisfy { route($0.id)?.family == .cluster })
-            check("1 \(kind.rawValue): apple-fm-27 left out by its rule",
-                  r.leftOut.contains { $0.id == "apple-fm-27" && $0.reason.contains("no-apple-fm") })
+            // W47.wh-readers-lost (owner call 15): the lower-scoring readers are listed from the Advanced level up only,
+            // and are never the reference or the suggestion.
+            let lowerIDs = Set(reading?.routes.filter(\.lowerScoring).map(\.id) ?? [])
+            let listed = { (x: ReOCRRanking) in
+                Set(x.rows.map(\.id) + x.leftOut.map(\.id) + x.institutional.map(\.id)).intersection(lowerIDs)
+            }
+            check("1 \(kind.rawValue): no lower-scoring reader is listed below Advanced", !lowerIDs.isEmpty && listed(r).isEmpty,
+                  listed(r).sorted().joined(separator: ", "))
+            let adv = rank(kind, level: .advanced)
+            check("1 \(kind.rawValue): at Advanced every lower-scoring reader is listed", listed(adv) == lowerIDs,
+                  lowerIDs.subtracting(listed(adv)).sorted().joined(separator: ", "))
+            check("1 \(kind.rawValue): at Advanced apple-fm-27 is listed as not in the app yet",
+                  adv.leftOut.contains { $0.id == "apple-fm-27" && $0.reason == "not in the app yet" })
+            check("1 \(kind.rawValue): at Advanced the suggestion and reference are not lower-scoring",
+                  adv.suggestedID.map { !lowerIDs.contains($0) } ?? true
+                    && adv.rows.allSatisfy { row in !(lowerIDs.contains(row.id) && row.tie == .reference) })
             check("1 \(kind.rawValue): unoffered app-less routes left out with a reason",
                   r.leftOut.contains { $0.reason == "not in the app yet" })
         }

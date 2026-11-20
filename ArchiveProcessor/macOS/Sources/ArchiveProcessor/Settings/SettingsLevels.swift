@@ -160,15 +160,21 @@ enum SettingsLevels {
 
     /// The level of a measured route row (§3-4): a row the notes keep as a loss or a floor (`offered == false`,
     /// rule (a)) and a trained model admitted under the kit gate's minimums (`afterTraining`, rule (c), owner's call)
-    /// are Advanced; every other row is a choice the bench supports, Standard. The card's own pick is shown at every
-    /// level, and the solver never picks an Advanced row.
+    /// are Advanced, and so is a row that scored below one it is measured against (`lowerScoring`, owner call 15,
+    /// W47.wh-readers-lost); every other row is a choice the bench supports, Standard. The card's own pick is shown at
+    /// every level, and the solver never picks an Advanced row.
     static func level(of route: SettingsRouteTable.Route) -> SettingsLevel {
-        (!route.offered || route.afterTraining) ? .advanced : .standard
+        (!route.offered || route.afterTraining || route.lowerScoring) ? .advanced : .standard
     }
 
     /// Why an Advanced route row sits there, in its route row's own words.
     static func why(_ route: SettingsRouteTable.Route) -> String? {
         if route.afterTraining { return "a trained model checked on a small held-out set" }
+        if route.lowerScoring, let c = route.conditions.first(where: { $0.hasPrefix("lower-scoring") }) {
+            // "lower-scoring: <why>; offered at the Advanced level only, …": the measured reason alone.
+            let why = c.dropFirst("lower-scoring: ".count)
+            return "scored lower: " + (why.components(separatedBy: "; offered").first ?? String(why))
+        }
         if !route.offered {
             return route.conditions.first { $0.hasPrefix("not offered") || $0.hasPrefix("never offered") }
         }

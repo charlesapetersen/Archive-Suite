@@ -90,6 +90,7 @@ PH = "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.json"
 KL = "ArchiveProcessor/segbench-results/reader-keeps-lines.json"
 ML = "ArchiveProcessor/segbench-results/ocr-mac-local-hw.md"
 M8 = "ArchiveProcessor/segbench-results/ocr-mac-local.md"
+R1F = "ArchiveProcessor/segbench-results/r1-foundation.md"
 OT = "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json"   # W46.ocr-time-like-for-like
 
 
@@ -244,12 +245,18 @@ def reading_rows():
         _, m = mac_speed_memory(f, rid if f == ML else None)
         t = lfl_time(rid)
         add(rid, nm, "mac", None, "measured", {"mac": True}, figs(rid, rid, rid), cost(rid), t, m, cav, kr)
+    # W47.wh-readers-lost (owner call 15, 2026-11-19): offered at Advanced with its figures, never a default or a pick.
+    # Its overall figure is r1-foundation.md's, over all 96 (p081 included; no ocr-pages.csv rows, so no pair entries).
+    fm = figs(None, "apple-fm-27")
+    fm["overall"] = {"value": 64.5, "n": "63/96 answered, all 96 (p081 included)", "strict": 42.4, "failures": {"cap": 33},
+                     "truth": "owner-96", "source": src(R1F, "apple-fm-27", "The owner's 96: NES % answered", 64.5)}
     add("apple-fm-27", "macOS 27 on-device model", "mac", None, "measured", {"mac": True, "built_in": True},
-        figs(None, "apple-fm-27"), cost("apple-fm-27"),
+        fm, cost("apple-fm-27"),
         lfl_time("apple-fm-27"),
         {"peak_gb": None, "measured_on": "runs in the OS", "source": None},
-        ["not a reader: 42.4 strict against Vision's 83.1, both 27.2, -40.7 (-49.0 to -32.5); 33 of 96 loop (r1-foundation.md)", "not in the ranking table (no ocr-pages.csv rows)", "its 100 public pages are L5-L8 of the 440, drawn where Vision is cached (P7-6); off the public tables"],
-        ["every kind: not offered as a reader"])
+        ["42.4 strict against Vision's 83.1, both 27.2, -40.7 (-49.0 to -32.5); 33 of 96 loop to the 4,096-token cap (r1-foundation.md)", "not in the ranking table (no ocr-pages.csv rows)", "its 100 public pages are L5-L8 of the 440, drawn where Vision is cached (P7-6); off the public tables",
+         "the Processor has no reader for it yet (W47.wh-readers-lost's report)"],
+        [], None, [lower("Apple Vision (apple-vision) reads 83.1 strict on the same 96 against 42.4, at no more cost")])
     add("ppocrv6-kraken-blla", "kraken PP-OCRv6 medium on blla lines (Mac CPU)", "mac", None, "measured", {"mac": True},
         figs(lk="ppocrv6-kraken-blla", ohk="ppocrv6-kraken-blla"), {"usd_1000_list": 0.0, "source": None},
         lfl_time("ppocrv6-kraken-blla"),
@@ -297,6 +304,23 @@ def reading_rows():
         add(rid, nm, "cloud", None, "measured", {"key": keys}, figs(rid, rid, "mistral-ocr" if rid == "mistral-ocr-4-1" else rid), cost(rid),
             cloud_time(rid, {"per_unit_s": None, "measured": False, "measured_on": "no time in its call log (ocr-time-like-for-like.md)", "source": None}), {"peak_gb": 0, "source": None}, cav)
 
+    def hosted_by(dom):
+        return lower(f"{dom} scores higher on the 96, "
+                     f"{head[dom]['nes_answered']} answered, and costs no more, ${routes[dom]['std']:.2f} per 1,000 pages")
+
+    # W47.wh-readers-lost (owner call 15, 2026-11-19): the hosted routes a row of the same family dominates on the 96
+    # (04-reading.md §4, "Not in the table"), offered at Advanced with their figures, never a default or a pick. None
+    # has a client in the app (no pinned OpenRouter route, no Mistral Medium model); the item's report says what one takes.
+    for rid, nm, keys, hk, dom, cav in [
+        ("qwen3-vl-8b", "Qwen3-VL 8B (OpenRouter)", ["openrouter"], "qwen3-vl-8b (local panel)", "qwen3.8-flash", ["96 only: no public run of its own"]),
+        ("qwen3-vl-30b-a3b", "Qwen3-VL 30B-A3B (OpenRouter)", ["openrouter"], None, "qwen3.8-flash", ["96 only: no public run of its own"]),
+        ("qwen3.5-35b-a3b", "Qwen3.5 35B-A3B (OpenRouter)", ["openrouter"], None, "qwen3.8-flash", ["96 only: no public run of its own", "the second stage of casc-5-fail"]),
+        ("mistral-medium3.5", "Mistral Medium 3.5", ["mistral", "openrouter"], None, "mistral-large4", ["96 only: no public run of its own"]),
+    ]:
+        add(rid, nm, "cloud", None, "measured", {"key": keys}, figs(rid, rid, hk or rid), cost(rid),
+            cloud_time(rid, {"per_unit_s": None, "measured": False, "measured_on": "no time in its call log (ocr-time-like-for-like.md)", "source": None}), {"peak_gb": 0, "source": None},
+            cav + ["the Processor has no reader for it yet (W47.wh-readers-lost's report)"], conditions=[hosted_by(dom)])
+
     # ---- plans (R5), read by the plan or by key
     # W41.app-claude-plan-reading (owner, 2026-11-19): measured through `claude -p` on the owner's plan, and the app reads
     # it the same way (the Local Agent backend, `claude` at this model), so a Claude plan reaches it at no money, using
@@ -337,6 +361,33 @@ def reading_rows():
     ]:
         add(rid, nm, "cluster", None, "measured", {"cluster": True, "gpus": fsrows[label].get("gpus")}, figs(rid, rid, hk, pk, lk), cost(rid, money=False), cluster_time(label),
             {"peak_gb": None, "measured_on": "GPU memory not tabulated", "source": None}, cav)
+
+    def cluster_by(dom, dom_label):
+        return lower(f"{dom} scores higher on the 96, {head[dom]['nes_answered']} answered, and reads more pages an hour, "
+                     f"{fsrows[dom_label]['per_hour']:,} on {fsrows[dom_label].get('gpus') or 1} GPU")
+
+    # W47.wh-readers-lost (owner call 15, 2026-11-19): the cluster routes a faster cluster row dominates on the 96
+    # (04-reading.md §4, "Not in the table"), offered at Advanced with their figures, never a default or a pick.
+    Q9, P16 = ("qwen3.5-9b-sherlock", "qwen3.5-9b-49202328"), ("paddleocr-vl1.6-sherlock", "paddleocr-vl1.6-49202331")
+    for rid, nm, hk, pk, lk, label, dom, cav in [
+        ("qwen3.5-122b-a10b-farmshare", "Qwen3.5 122B-A10B (your cluster)", None, None, None, "qwen3.5-122b-a10b-1850212", Q9, ["four GPUs", "96 only in the scorer tables"]),
+        ("ling3-flash-vl-farmshare", "Ling3 Flash VL fp8 (your cluster)", "ling3-flash-vl-fp8", ("ling3-flash-vl-fp8", "FarmShare panel"), "ling3-flash-vl-fp8", "ling3-flash-vl-fp8-1861703", Q9,
+         ["four GPUs", "N5 82.29, a tie with qwen3.6-35b-a3b-farmshare and with the N5 leader by the interval (04-reading.md §4)"]),
+        ("qwen3-vl-8b-farmshare", "Qwen3-VL 8B (your cluster)", "qwen3-vl-8b (FarmShare panel)", ("qwen3-vl-8b", "FarmShare panel"), "qwen3-vl-8b", "qwen3-vl-8b-1861701", Q9, []),
+        ("qwen3.8-27b-sherlock", "Qwen3.8 27B (your cluster)", "qwen3.8-27b", ("qwen3.8-27b", "Sherlock panel"), "qwen3.8-27b", "qwen3.8-27b-sherlock-49202336", Q9, []),
+        ("qwen3.8-27b-farmshare", "Qwen3.8 27B, FarmShare build (your cluster)", None, None, None, "qwen3.8-27b-1850053", Q9,
+         ["96 only: the public and hand figures are the Sherlock run's (row qwen3.8-27b-sherlock)"]),
+        ("glm-ocr-farmshare", "GLM-OCR (your cluster)", "glm-ocr", ("glm-ocr", "FarmShare native"), "glm-ocr", "glm-ocr-1861696", Q9,
+         ["whole page fails newspapers (29.2 on L9, cap or empty on 9 of 15): needs the layout stage (layout-photo.md); its layout role is note 03's"]),
+        ("qwen3.5-4b-farmshare", "Qwen3.5 4B (your cluster)", "qwen3.5-4b", ("qwen3.5-4b", "FarmShare panel"), "qwen3.5-4b", "qwen3.5-4b-1861700", Q9, []),
+        ("nemotron-parse-2-sherlock", "Nemotron Parse 2 (your cluster)", "nemotron-parse-2", ("nemotron-parse-2", "Sherlock native"), "nemotron-parse-2", "nemotron-parse-2-50569394", Q9, []),
+        ("unlimited-ocr-sherlock", "Unlimited-OCR (your cluster)", "unlimited-ocr", ("unlimited-ocr", "Sherlock native"), "unlimited-ocr", "unlimited-ocr-50550130", Q9, []),
+        ("lightonocr3-0.8b-farmshare", "LightOnOCR-3 0.8B (your cluster)", "lightonocr3-0.8b", ("lightonocr3-0.8b", "FarmShare native"), "lightonocr3-0.8b", "lightonocr3-0.8b-1861697", P16, []),
+        ("ppocrv6-medium-farmshare", "PP-OCRv6 medium (your cluster)", "ppocrv6-medium", ("ppocrv6-medium", "FarmShare pipeline"), "ppocrv6-medium", "ppocrv6-medium-1861702", P16,
+         ["its Mac form is ppocrv6-kraken-blla"]),
+    ]:
+        add(rid, nm, "cluster", None, "measured", {"cluster": True, "gpus": fsrows[label].get("gpus")}, figs(rid, rid, hk, pk, lk), cost(rid, money=False), cluster_time(label),
+            {"peak_gb": None, "measured_on": "GPU memory not tabulated", "source": None}, cav, conditions=[cluster_by(*dom)])
     for rid, nm in [("german-handwriting", "kraken German handwriting model"), ("tridis", "kraken TRIDIS"), ("catmus-medieval", "kraken CATMuS Medieval"), ("greek-minuscule", "kraken Greek minuscule"), ("biblia", "kraken BiblIA")]:
         add(f"kraken-{rid}", f"{nm} (script specialist, kraken)", "mac", None, "measured", {"mac": True},
             figs(pk=(rid, "kraken specialist")), {"usd_1000_list": 0.0, "source": None}, lfl_time(f"kraken-{rid}"), {"peak_gb": None, "source": None},
@@ -363,7 +414,8 @@ HEADERS = {
     {"id": "nonlatin-not-vision", "text": "Apple Vision is not offered on non-Latin scripts (N1-N6); a route with no reading of a stratum shows not read, never 0.", "source": "vision-27-reread.md", "switch": None},
     {"id": "newspapers-layout-first", "text": "Newspapers and multi-column clippings: the layout stage's regions run first for every reader; required for GLM-OCR and PaddleOCR-VL. Never on handwriting or registers.", "source": "layout-photo.md §Answer", "switch": None},
     {"id": "free-default", "text": "Free: typed and printed pages with Apple Vision; handwritten pages on a 16 GB Mac get LightOnOCR-3 4B 8-bit proposed as a download, else flagged needs a download or a key; a page Vision returns empty for is flagged, never skipped.", "source": "14-owner-calls.md §1. The owner's calls", "switch": None},
-    {"id": "no-apple-fm", "text": "The macOS 27 on-device model is never offered as a reader.", "source": "r1-foundation.md", "switch": None},
+    {"id": "no-apple-fm", "text": "The macOS 27 on-device model is never the app's pick for reading; it is offered at the Advanced level with its figures (owner call 15).", "source": "r1-foundation.md", "switch": None},
+    {"id": "lower-scoring-advanced", "text": "A route that scored below a row it is measured against (a row of its family higher on the 96 at no more cost, or more pages an hour on a cluster) is offered at the Advanced level with its figures, never as a default or the app's pick.", "source": "14-owner-calls.md §1. The owner's calls", "switch": None},
     {"id": "no-post-correction", "text": "No post-correction stage; a log-probability score is a check-this-reading flag, not a trigger.", "source": "ocr-postcorrect.md", "switch": None},
     {"id": "cascade-as-route", "text": "Each measured cascade is a route row, picked when it beats the single routes within the limits; failure is its only trigger, the Vision word-count trigger opt-in.", "source": "14-owner-calls.md §1. The owner's calls", "switch": None},
     {"id": "loop-fallback", "text": "A local reader's loop falls to a second reader or kraken PP-OCRv6 on lines, never a half-size retry.", "source": "bench-corpus/loop-rerun-20261021.md", "switch": None},
@@ -462,6 +514,13 @@ APP_ROUTES = {
  "qwen3.5-9b": "openrouter|qwen/qwen3.5-9b",
 }
 KEY_NAMES = {"stanford-gateway": "gateway"}
+
+
+def lower(why):
+    """W47.wh-readers-lost: a reading row that scored below a row it is measured against. The owner released them on
+    2026-11-19 (call 15): selectable at the Advanced level with their figures, never a default or a solver pick. The
+    app reads the prefix (`SettingsRouteTable.Route.lowerScoring`)."""
+    return f"lower-scoring: {why}; offered at the Advanced level only, never the app's pick (owner call 15)"
 
 
 def norm_needs(n, family):

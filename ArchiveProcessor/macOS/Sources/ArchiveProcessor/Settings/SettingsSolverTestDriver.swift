@@ -609,6 +609,38 @@ enum SettingsSolverTestDriver {
         eq("G5 the tie chain picks Qwen3-VL 235B, never Qwen3.5 9B", pick(solve("G5", orOnly, chain), "reading"),
            "qwen3-vl-235b")
 
+        // G6. W47.wh-readers-lost (owner call 15): a lower-scoring reader is never the pick, with every key, plan and
+        // a cluster, at any batch size; chosen on its card, it is what the stage reads with.
+        let lowerIDs = Set(table.stage("reading")?.routes.filter(\.lowerScoring).map(\.id) ?? [])
+        check("G6 the sixteen lower-scoring readers are rows",
+              lowerIDs.count == 16 && lowerIDs.contains("apple-fm-27") && lowerIDs.contains("qwen3-vl-8b")
+                && lowerIDs.contains("ppocrv6-medium-farmshare"), lowerIDs.sorted().joined(separator: ", "))
+        var everything = SettingsResources(macMemoryGB: 128)
+        everything.keys = ["gemini", "openrouter", "openai", "mistral", "anthropic", "gateway"]
+        everything.plans = ["claude", "chatgpt"]
+        everything.cluster = true
+        everything.gpusPerJob = 4
+        for pages in [10, 1000, 100_000] {
+            var a = SettingsAnswers()
+            a.pages = pages
+            for (res, label) in [(everything, "everything"), (mac(16), "Mac 16 GB"), (mac(8), "Mac 8 GB")] {
+                _ = solve("G6 \(label) \(pages)", res, a)
+            }
+        }
+        let lowerPicks = solved.flatMap { name, s in
+            s.picks.filter { $0.route?.lowerScoring == true }.map { "\(name) \($0.stage)/\($0.part) \($0.route!.id)" }
+        }
+        check("G6 no pick is a lower-scoring reader", lowerPicks.isEmpty, lowerPicks.prefix(5).joined(separator: " | "))
+        var chosen = SettingsAnswers()
+        chosen.onlyRoutes["reading"] = ["qwen3-vl-8b"]
+        eq("G6 chosen on its card, Qwen3-VL 8B reads", pick(solve("G6 chosen", orOnly, chosen), "reading"), "qwen3-vl-8b")
+        var chosenCluster = SettingsAnswers()
+        chosenCluster.onlyRoutes["reading"] = ["glm-ocr-farmshare"]
+        var cluster = SettingsResources(macMemoryGB: 16)
+        cluster.cluster = true
+        eq("G6 chosen on its card, a lower-scoring cluster reader reads", pick(solve("G6 chosen cluster", cluster, chosenCluster), "reading"),
+           "glm-ocr-farmshare")
+
         // Every pick explains itself in one sentence naming its evidence row.
         var unexplained: [String] = []
         for (name, s) in solved {

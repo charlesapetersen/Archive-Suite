@@ -73,7 +73,12 @@ cascades) keep the floor alone and "pair not measured". A tie goes to the cheape
   "needs a download or a key", not read; a page Vision returns empty for is flagged, never skipped, on every profile.
 - Forms and registers (L4): no route reads them well open; the sheet shows the L4 figure beside the route.
 - Cyrillic (N2): the best figure is 27.06 (Xiaomi-OCR-0, Sherlock); the sheet says no route reads it well.
-- The macOS 27 on-device model is never offered as a reader (42.4 against Vision's 83.1, r1-foundation.md).
+- The macOS 27 on-device model is never the app's pick (42.4 against Vision's 83.1, r1-foundation.md); since owner
+  call 15 (2026-11-19, W47.wh-readers-lost) it is a lower-scoring row, offered at the Advanced level with its figures.
+- Lower-scoring rows (owner call 15, W47.wh-readers-lost): a route a row of its family dominates on the 96 (below) is
+  a row with a `lower-scoring: …` condition naming what beats it. It sits at the Advanced level with its figures and is
+  never a default, the solver's pick, a suggested alternative or the Improve OCR suggestion; chosen on the card, it is
+  what the stage reads with (the solver keeps it only where `onlyRoutes` names it).
 - No post-correction stage for the owner's material: an image-grounded corrector is no better than reading the band
   page again with the same 27B (-0.42, -1.47 to +0.64), and text-only correction is never used
   (`ocr-postcorrect.md`). A log-probability score is a per-page "check this reading" flag, not a trigger
@@ -177,8 +182,11 @@ chosen and scored on the same pages, is a caveat. Costs are `difficulty.md`'s "$
 ]
 ```
 
-Not in the table: 18 of the 53 headline routes have no row (W46.ocr-rows-omitted, 2026-11-11, added five: the four cheap
-hosted routes and `churro-3b-farmshare`; each of the 18 below has its stated reason) (panel-data.json `headline`, answered NES; prices
+Not in the table: 18 of the 53 headline routes had no row (W46.ocr-rows-omitted, 2026-11-11, added five: the four cheap
+hosted routes and `churro-3b-farmshare`; each of the 18 below has its stated reason). Since W47.wh-readers-lost
+(2026-11-20, owner call 15) the fifteen dominated routes below, the four hosted and the eleven cluster, are rows with a
+`lower-scoring` condition, offered at the Advanced level only; three remain without a row (`qwen3.5-27b`,
+`paddleocr-vl1.5-farmshare`, `granite-docling-258m-mlx`) (panel-data.json `headline`, answered NES; prices
 `routes.std`; cluster pages an hour `farmshare.truth`). "Dominated" means a row in the same family scores higher on
 the 96 and costs no more (hosted) or reads more pages an hour (cluster).
 - `qwen3.5-27b` (hosted, 95.86, 5th): 14 of 96 pages lost to transport errors, strict 81.73, so its answered figure
@@ -213,7 +221,8 @@ CHURRO-DS, the source of those strata, so its row carries OCR-15 until item 8 co
 −1.72 [−6.76, +3.17], each a tie by the interval (the 895 has no floor; the earlier "under the floor" applied a 96
 rule), so no row (four GPUs, 76.6 pages an hour; W46.pair-matrix-cover). The dominated hosted routes have no public run of their own.
 
-R6, commercial document services: none found worth a row. On 25 of the 96 Azure Document Intelligence read 89.6,
+R6, commercial document services: none found worth a row (still none after W47.wh-readers-lost: their figures are on 25
+of the 96 only, not comparable to the rows' 95, and the app has no client for any of them). On 25 of the 96 Azure Document Intelligence read 89.6,
 AWS Textract 86.6 and Transkribus Text Titan I 82.5, each under Mistral OCR 4.1's 92.5 on the same pages (Azure -2.9,
 -6.3 to -0.2; Transkribus -10.0, -16.9 to -4.5; Textract -5.8, -13.4 to +1.5, a tie at n 25), at list prices of $10
 and $19 per 1,000 for the first two (`r6-spot.md`; panel-data.json `r6_spot`) [M].

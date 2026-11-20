@@ -1075,8 +1075,14 @@
     },
     {
      "id": "no-apple-fm",
-     "text": "The macOS 27 on-device model is never offered as a reader.",
+     "text": "The macOS 27 on-device model is never the app's pick for reading; it is offered at the Advanced level with its figures (owner call 15).",
      "source": "r1-foundation.md",
+     "switch": null
+    },
+    {
+     "id": "lower-scoring-advanced",
+     "text": "A route that scored below a row it is measured against (a row of its family higher on the 96 at no more cost, or more pages an hour on a cluster) is offered at the Advanced level with its figures, never as a default or the app's pick.",
+     "source": "14-owner-calls.md §1. The owner's calls",
      "switch": null
     },
     {
@@ -2065,6 +2071,21 @@
         "attribute": "charts.handwritten.scores[0]",
         "value": "54.81"
        }
+      },
+      "overall": {
+       "value": 64.5,
+       "n": "63/96 answered, all 96 (p081 included)",
+       "strict": 42.4,
+       "failures": {
+        "cap": 33
+       },
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/r1-foundation.md",
+        "route": "apple-fm-27",
+        "attribute": "The owner's 96: NES % answered",
+        "value": "64.5"
+       }
       }
      },
      "cost": {
@@ -2096,15 +2117,16 @@
       "source": null
      },
      "caveats": [
-      "not a reader: 42.4 strict against Vision's 83.1, both 27.2, -40.7 (-49.0 to -32.5); 33 of 96 loop (r1-foundation.md)",
+      "42.4 strict against Vision's 83.1, both 27.2, -40.7 (-49.0 to -32.5); 33 of 96 loop to the 4,096-token cap (r1-foundation.md)",
       "not in the ranking table (no ocr-pages.csv rows)",
-      "its 100 public pages are L5-L8 of the 440, drawn where Vision is cached (P7-6); off the public tables"
+      "its 100 public pages are L5-L8 of the 440, drawn where Vision is cached (P7-6); off the public tables",
+      "the Processor has no reader for it yet (W47.wh-readers-lost's report)"
      ],
-     "kind_rules": [
-      "every kind: not offered as a reader"
-     ],
+     "kind_rules": [],
      "fallback": null,
-     "conditions": []
+     "conditions": [
+      "lower-scoring: Apple Vision (apple-vision) reads 83.1 strict on the same 96 against 42.4, at no more cost; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
     },
     {
      "id": "ppocrv6-kraken-blla",
@@ -4890,6 +4912,481 @@
      "conditions": []
     },
     {
+     "id": "qwen3-vl-8b",
+     "name": "Qwen3-VL 8B (OpenRouter)",
+     "family": "cloud",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [
+       "openrouter"
+      ],
+      "plan": [],
+      "cluster": false,
+      "gpus": null,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 93.85,
+       "n": "93/95 answered, p081 apart",
+       "strict": 91.87,
+       "failures": {
+        "model": 2,
+        "cap": 2
+       },
+       "vs_qwen3.6-27b": "-1.66 (-2.84 to -0.64, n 92)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-8b",
+        "attribute": "headline.rows.nes_answered",
+        "value": "93.85"
+       }
+      },
+      "typewritten": {
+       "value": 95.56,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-8b",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "95.56"
+       }
+      },
+      "printed": {
+       "value": 91.23,
+       "answered": 27,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-8b",
+        "attribute": "charts.printed.scores[0]",
+        "value": "91.23"
+       }
+      },
+      "handwritten": {
+       "value": 84.98,
+       "answered": 15,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-8b",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "84.98"
+       }
+      },
+      "hands16": {
+       "value": 84.98,
+       "n": 16,
+       "failed": 1,
+       "unresolved_range": "84.82 to 85.06",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "qwen3-vl-8b (local panel)",
+        "attribute": "routes.after",
+        "value": "84.97586449924115"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 1.49,
+      "usd_1000_batch": null,
+      "price_read": "2026-10 (panel run)",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3-vl-8b",
+       "attribute": "routes.std",
+       "value": "1.49"
+      }
+     },
+     "time": {
+      "per_unit_s": null,
+      "measured": false,
+      "measured_on": "no time in its call log (ocr-time-like-for-like.md)",
+      "source": null
+     },
+     "memory": {
+      "peak_gb": 0,
+      "source": null
+     },
+     "caveats": [
+      "96 only: no public run of its own",
+      "the Processor has no reader for it yet (W47.wh-readers-lost's report)"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: qwen3.8-flash scores higher on the 96, 95.11 answered, and costs no more, $0.60 per 1,000 pages; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
+     "id": "qwen3-vl-30b-a3b",
+     "name": "Qwen3-VL 30B-A3B (OpenRouter)",
+     "family": "cloud",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [
+       "openrouter"
+      ],
+      "plan": [],
+      "cluster": false,
+      "gpus": null,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 91.79,
+       "n": "93/95 answered, p081 apart",
+       "strict": 89.86,
+       "failures": {
+        "model": 2,
+        "cap": 2
+       },
+       "vs_qwen3.6-27b": "-3.57 (-5.15 to -2.12, n 92)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-30b-a3b",
+        "attribute": "headline.rows.nes_answered",
+        "value": "91.79"
+       }
+      },
+      "typewritten": {
+       "value": 95.56,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-30b-a3b",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "95.56"
+       }
+      },
+      "printed": {
+       "value": 88.17,
+       "answered": 27,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-30b-a3b",
+        "attribute": "charts.printed.scores[0]",
+        "value": "88.17"
+       }
+      },
+      "handwritten": {
+       "value": 77.72,
+       "answered": 15,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-30b-a3b",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "77.72"
+       }
+      },
+      "hands16": {
+       "value": 77.72,
+       "n": 16,
+       "failed": 1,
+       "unresolved_range": "77.63 to 77.89",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "qwen3-vl-30b-a3b",
+        "attribute": "routes.after",
+        "value": "77.716027002973"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.98,
+      "usd_1000_batch": null,
+      "price_read": "2026-10 (panel run)",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3-vl-30b-a3b",
+       "attribute": "routes.std",
+       "value": "0.98"
+      }
+     },
+     "time": {
+      "per_unit_s": null,
+      "measured": false,
+      "measured_on": "no time in its call log (ocr-time-like-for-like.md)",
+      "source": null
+     },
+     "memory": {
+      "peak_gb": 0,
+      "source": null
+     },
+     "caveats": [
+      "96 only: no public run of its own",
+      "the Processor has no reader for it yet (W47.wh-readers-lost's report)"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: qwen3.8-flash scores higher on the 96, 95.11 answered, and costs no more, $0.60 per 1,000 pages; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
+     "id": "qwen3.5-35b-a3b",
+     "name": "Qwen3.5 35B-A3B (OpenRouter)",
+     "family": "cloud",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [
+       "openrouter"
+      ],
+      "plan": [],
+      "cluster": false,
+      "gpus": null,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 92.82,
+       "n": "93/95 answered, p081 apart",
+       "strict": 90.86,
+       "failures": {
+        "model": 2,
+        "cap": 2
+       },
+       "vs_qwen3.6-27b": "-2.57 (-4.92 to -0.8, n 92)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-35b-a3b",
+        "attribute": "headline.rows.nes_answered",
+        "value": "92.82"
+       }
+      },
+      "typewritten": {
+       "value": 92.25,
+       "answered": 48,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-35b-a3b",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "92.25"
+       }
+      },
+      "printed": {
+       "value": 91.09,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-35b-a3b",
+        "attribute": "charts.printed.scores[0]",
+        "value": "91.09"
+       }
+      },
+      "handwritten": {
+       "value": 88.43,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-35b-a3b",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "88.43"
+       }
+      },
+      "hands16": {
+       "value": 88.43,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "88.22 to 88.48",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "qwen3.5-35b-a3b",
+        "attribute": "routes.after",
+        "value": "88.43215348638506"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.83,
+      "usd_1000_batch": null,
+      "price_read": "2026-10 (panel run)",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3.5-35b-a3b",
+       "attribute": "routes.std",
+       "value": "0.83"
+      }
+     },
+     "time": {
+      "per_unit_s": null,
+      "measured": false,
+      "measured_on": "no time in its call log (ocr-time-like-for-like.md)",
+      "source": null
+     },
+     "memory": {
+      "peak_gb": 0,
+      "source": null
+     },
+     "caveats": [
+      "96 only: no public run of its own",
+      "the second stage of casc-5-fail",
+      "the Processor has no reader for it yet (W47.wh-readers-lost's report)"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: qwen3.8-flash scores higher on the 96, 95.11 answered, and costs no more, $0.60 per 1,000 pages; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
+     "id": "mistral-medium3.5",
+     "name": "Mistral Medium 3.5",
+     "family": "cloud",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [
+       "mistral",
+       "openrouter"
+      ],
+      "plan": [],
+      "cluster": false,
+      "gpus": null,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 90.94,
+       "n": "95/95 answered, p081 apart",
+       "strict": 90.94,
+       "failures": {},
+       "vs_qwen3.6-27b": "-4.37 (-6.6 to -2.5, n 94)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "mistral-medium3.5",
+        "attribute": "headline.rows.nes_answered",
+        "value": "90.94"
+       }
+      },
+      "typewritten": {
+       "value": 94.67,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "mistral-medium3.5",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "94.67"
+       }
+      },
+      "printed": {
+       "value": 87.98,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "mistral-medium3.5",
+        "attribute": "charts.printed.scores[0]",
+        "value": "87.98"
+       }
+      },
+      "handwritten": {
+       "value": 85.06,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "mistral-medium3.5",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "85.06"
+       }
+      },
+      "hands16": {
+       "value": 85.06,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "84.89 to 85.16",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "mistral-medium3.5",
+        "attribute": "routes.after",
+        "value": "85.05533764818067"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 7.29,
+      "usd_1000_batch": 3.65,
+      "price_read": "2026-10 (panel run)",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "mistral-medium3.5",
+       "attribute": "routes.std",
+       "value": "7.29"
+      }
+     },
+     "time": {
+      "per_unit_s": null,
+      "measured": false,
+      "measured_on": "no time in its call log (ocr-time-like-for-like.md)",
+      "source": null
+     },
+     "memory": {
+      "peak_gb": 0,
+      "source": null
+     },
+     "caveats": [
+      "96 only: no public run of its own",
+      "the Processor has no reader for it yet (W47.wh-readers-lost's report)"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: mistral-large4 scores higher on the 96, 93.25 answered, and costs no more, $2.69 per 1,000 pages; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
      "id": "claude-sonnet5.5",
      "name": "Claude Sonnet 5.5 (your Claude plan, or an Anthropic or OpenRouter key)",
      "family": "plan",
@@ -6919,6 +7416,2268 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": []
+    },
+    {
+     "id": "qwen3.5-122b-a10b-farmshare",
+     "name": "Qwen3.5 122B-A10B (your cluster)",
+     "family": "cluster",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [],
+      "plan": [],
+      "cluster": true,
+      "gpus": 4,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 94.67,
+       "n": "95/95 answered, p081 apart",
+       "strict": 94.67,
+       "failures": {},
+       "vs_qwen3.6-27b": "-0.7 (-1.84 to 0.39, n 94)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-122b-a10b-farmshare",
+        "attribute": "headline.rows.nes_answered",
+        "value": "94.67"
+       }
+      },
+      "typewritten": {
+       "value": 96.49,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-122b-a10b-farmshare",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "96.49"
+       }
+      },
+      "printed": {
+       "value": 94.94,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-122b-a10b-farmshare",
+        "attribute": "charts.printed.scores[0]",
+        "value": "94.94"
+       }
+      },
+      "handwritten": {
+       "value": 89.67,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-122b-a10b-farmshare",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "89.67"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.0,
+      "openrouter_equivalent_usd_1000": 2.02,
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3.5-122b-a10b-farmshare",
+       "attribute": "routes.std (OpenRouter rate for the run's tokens)",
+       "value": "2.02"
+      },
+      "gpu_hours_per_100k": 137.1
+     },
+     "time": {
+      "pages_per_hour_per_gpu_set": 729.4,
+      "gpus": 4,
+      "measured": true,
+      "measured_on": "the 96's cluster run, queue wait excluded",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3.5-122b-a10b-1850212",
+       "attribute": "farmshare.truth.per_hour",
+       "value": "729.4"
+      }
+     },
+     "memory": {
+      "peak_gb": null,
+      "measured_on": "GPU memory not tabulated",
+      "source": null
+     },
+     "caveats": [
+      "four GPUs",
+      "96 only in the scorer tables"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
+     "id": "ling3-flash-vl-farmshare",
+     "name": "Ling3 Flash VL fp8 (your cluster)",
+     "family": "cluster",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [],
+      "plan": [],
+      "cluster": true,
+      "gpus": 4,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 93.81,
+       "n": "95/95 answered, p081 apart",
+       "strict": 93.81,
+       "failures": {},
+       "vs_qwen3.6-27b": "-1.6 (-3.27 to -0.31, n 94)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "ling3-flash-vl-farmshare",
+        "attribute": "headline.rows.nes_answered",
+        "value": "93.81"
+       }
+      },
+      "typewritten": {
+       "value": 96.8,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "ling3-flash-vl-farmshare",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "96.8"
+       }
+      },
+      "printed": {
+       "value": 91.24,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "ling3-flash-vl-farmshare",
+        "attribute": "charts.printed.scores[0]",
+        "value": "91.24"
+       }
+      },
+      "handwritten": {
+       "value": 91.18,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "ling3-flash-vl-farmshare",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "91.18"
+       }
+      },
+      "hands16": {
+       "value": 91.32,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "91.11 to 91.4",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "ling3-flash-vl-fp8",
+        "attribute": "routes.after",
+        "value": "91.3247036251457"
+       }
+      },
+      "public_L1-L3": {
+       "value": 82.82,
+       "n": 240,
+       "strata": {
+        "L1": 83.57,
+        "L2": 72.47,
+        "L3": 92.41
+       },
+       "empty": 6,
+       "truth": "public (independent)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.json",
+        "route": "ling3-flash-vl-fp8",
+        "attribute": "public.nes",
+        "value": "82.81688709994391"
+       }
+      },
+      "public": {
+       "basis": "[NES strict, NES answered, answered/n]",
+       "truth": "public (independent of the routes)",
+       "L1": [
+        83.57,
+        83.57,
+        "80/80"
+       ],
+       "L2": [
+        72.47,
+        76.29,
+        "76/80"
+       ],
+       "L3": [
+        92.41,
+        94.78,
+        "78/80"
+       ],
+       "L4": [
+        64.97,
+        68.39,
+        "76/80"
+       ],
+       "L5": [
+        52.41,
+        60.76,
+        "69/80"
+       ],
+       "L6": [
+        39.84,
+        43.66,
+        "73/80"
+       ],
+       "L7": [
+        34.59,
+        41.93,
+        "66/80"
+       ],
+       "L8": [
+        85.35,
+        85.35,
+        "80/80"
+       ],
+       "L9": [
+        90.19,
+        90.19,
+        "15/15"
+       ],
+       "N1": [
+        46.58,
+        51.76,
+        "36/40"
+       ],
+       "N2": [
+        20.48,
+        24.1,
+        "34/40"
+       ],
+       "N3": [
+        34.07,
+        38.93,
+        "35/40"
+       ],
+       "N4": [
+        22.49,
+        52.93,
+        "17/40"
+       ],
+       "N5": [
+        82.29,
+        84.39,
+        "39/40"
+       ],
+       "N6": [
+        56.78,
+        56.78,
+        "40/40"
+       ],
+       "all": [
+        60.23,
+        66.23,
+        "814/895"
+       ],
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-scorers.json",
+        "route": "ling3-flash-vl-fp8 (FarmShare panel)",
+        "attribute": "summary[set=public895, stratum].nes",
+        "value": "{'L1': 0.8357, 'L2': 0.7247, 'L3': 0.9241, 'L4': 0.6497, 'L5': 0.5241, 'L6': 0.3984, 'L7': 0.3459, 'L8': 0.8535, 'L9': 0.9019, 'N1': 0.4658, 'N2': 0.2048, 'N3': 0.3407, 'N4': 0.2249, 'N5': 0.8229, 'N6': 0.5678, 'all': 0.6023}"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.0,
+      "openrouter_equivalent_usd_1000": 0.33,
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "ling3-flash-vl-farmshare",
+       "attribute": "routes.std (OpenRouter rate for the run's tokens)",
+       "value": "0.33"
+      },
+      "gpu_hours_per_100k": 1305.48
+     },
+     "time": {
+      "pages_per_hour_per_gpu_set": 76.6,
+      "gpus": 4,
+      "measured": true,
+      "measured_on": "the 96's cluster run, queue wait excluded",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "ling3-flash-vl-fp8-1861703",
+       "attribute": "farmshare.truth.per_hour",
+       "value": "76.6"
+      }
+     },
+     "memory": {
+      "peak_gb": null,
+      "measured_on": "GPU memory not tabulated",
+      "source": null
+     },
+     "caveats": [
+      "four GPUs",
+      "N5 82.29, a tie with qwen3.6-35b-a3b-farmshare and with the N5 leader by the interval (04-reading.md §4)"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
+     "id": "qwen3-vl-8b-farmshare",
+     "name": "Qwen3-VL 8B (your cluster)",
+     "family": "cluster",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [],
+      "plan": [],
+      "cluster": true,
+      "gpus": 1,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 93.56,
+       "n": "94/95 answered, p081 apart",
+       "strict": 92.57,
+       "failures": {
+        "model": 1,
+        "cap": 1
+       },
+       "vs_qwen3.6-27b": "-1.9 (-3.04 to -0.86, n 93)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-8b-farmshare",
+        "attribute": "headline.rows.nes_answered",
+        "value": "93.56"
+       }
+      },
+      "typewritten": {
+       "value": 95.37,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-8b-farmshare",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "95.37"
+       }
+      },
+      "printed": {
+       "value": 91.2,
+       "answered": 27,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-8b-farmshare",
+        "attribute": "charts.printed.scores[0]",
+        "value": "91.2"
+       }
+      },
+      "handwritten": {
+       "value": 89.72,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3-vl-8b-farmshare",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "89.72"
+       }
+      },
+      "hands16": {
+       "value": 89.84,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "89.63 to 89.92",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "qwen3-vl-8b (FarmShare panel)",
+        "attribute": "routes.after",
+        "value": "89.8418301366617"
+       }
+      },
+      "public_L1-L3": {
+       "value": 80.58,
+       "n": 240,
+       "strata": {
+        "L1": 83.07,
+        "L2": 65.1,
+        "L3": 93.57
+       },
+       "empty": 18,
+       "truth": "public (independent)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.json",
+        "route": "qwen3-vl-8b",
+        "attribute": "public.nes",
+        "value": "80.58148516271903"
+       }
+      },
+      "public": {
+       "basis": "[NES strict, NES answered, answered/n]",
+       "truth": "public (independent of the routes)",
+       "L1": [
+        83.07,
+        86.31,
+        "77/80"
+       ],
+       "L2": [
+        65.1,
+        78.91,
+        "66/80"
+       ],
+       "L3": [
+        93.57,
+        94.75,
+        "79/80"
+       ],
+       "L4": [
+        53.37,
+        64.69,
+        "66/80"
+       ],
+       "L5": [
+        50.19,
+        66.92,
+        "60/80"
+       ],
+       "L6": [
+        19.98,
+        49.94,
+        "32/80"
+       ],
+       "L7": [
+        32.78,
+        50.43,
+        "52/80"
+       ],
+       "L8": [
+        85.95,
+        87.04,
+        "79/80"
+       ],
+       "L9": [
+        85.29,
+        85.29,
+        "15/15"
+       ],
+       "N1": [
+        25.31,
+        53.29,
+        "19/40"
+       ],
+       "N2": [
+        14.41,
+        24.02,
+        "24/40"
+       ],
+       "N3": [
+        5.94,
+        39.61,
+        "6/40"
+       ],
+       "N4": [
+        5.21,
+        26.05,
+        "8/40"
+       ],
+       "N5": [
+        78.35,
+        84.7,
+        "37/40"
+       ],
+       "N6": [
+        62.35,
+        63.94,
+        "39/40"
+       ],
+       "all": [
+        53.25,
+        72.33,
+        "659/895"
+       ],
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-scorers.json",
+        "route": "qwen3-vl-8b (FarmShare panel)",
+        "attribute": "summary[set=public895, stratum].nes",
+        "value": "{'L1': 0.8307, 'L2': 0.651, 'L3': 0.9357, 'L4': 0.5337, 'L5': 0.5019, 'L6': 0.1998, 'L7': 0.3278, 'L8': 0.8595, 'L9': 0.8529, 'N1': 0.2531, 'N2': 0.1441, 'N3': 0.0594, 'N4': 0.0521, 'N5': 0.7835, 'N6': 0.6235, 'all': 0.5325}"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.0,
+      "openrouter_equivalent_usd_1000": 1.37,
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3-vl-8b-farmshare",
+       "attribute": "routes.std (OpenRouter rate for the run's tokens)",
+       "value": "1.37"
+      },
+      "gpu_hours_per_100k": 90.46
+     },
+     "time": {
+      "pages_per_hour_per_gpu_set": 1105.5,
+      "gpus": 1,
+      "measured": true,
+      "measured_on": "the 96's cluster run, queue wait excluded",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3-vl-8b-1861701",
+       "attribute": "farmshare.truth.per_hour",
+       "value": "1105.5"
+      }
+     },
+     "memory": {
+      "peak_gb": null,
+      "measured_on": "GPU memory not tabulated",
+      "source": null
+     },
+     "caveats": [],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
+     "id": "qwen3.8-27b-sherlock",
+     "name": "Qwen3.8 27B (your cluster)",
+     "family": "cluster",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [],
+      "plan": [],
+      "cluster": true,
+      "gpus": 1,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 93.48,
+       "n": "95/95 answered, p081 apart",
+       "strict": 93.48,
+       "failures": {},
+       "vs_qwen3.6-27b": "-1.89 (-4.33 to -0.11, n 94)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.8-27b-sherlock",
+        "attribute": "headline.rows.nes_answered",
+        "value": "93.48"
+       }
+      },
+      "typewritten": {
+       "value": 96.61,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.8-27b-sherlock",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "96.61"
+       }
+      },
+      "printed": {
+       "value": 91.29,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.8-27b-sherlock",
+        "attribute": "charts.printed.scores[0]",
+        "value": "91.29"
+       }
+      },
+      "handwritten": {
+       "value": 89.98,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.8-27b-sherlock",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "89.98"
+       }
+      },
+      "hands16": {
+       "value": 90.14,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "89.95 to 90.22",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "qwen3.8-27b",
+        "attribute": "routes.after",
+        "value": "90.1371568390568"
+       }
+      },
+      "public_L1-L3": {
+       "value": 83.67,
+       "n": 240,
+       "strata": {
+        "L1": 82.68,
+        "L2": 73.23,
+        "L3": 95.1
+       },
+       "empty": 7,
+       "truth": "public (independent)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.json",
+        "route": "qwen3.8-27b",
+        "attribute": "public.nes",
+        "value": "83.67134989073573"
+       }
+      },
+      "public": {
+       "basis": "[NES strict, NES answered, answered/n]",
+       "truth": "public (independent of the routes)",
+       "L1": [
+        82.68,
+        85.91,
+        "77/80"
+       ],
+       "L2": [
+        73.23,
+        76.08,
+        "77/80"
+       ],
+       "L3": [
+        95.1,
+        96.31,
+        "79/80"
+       ],
+       "L4": [
+        58.36,
+        63.1,
+        "74/80"
+       ],
+       "L5": [
+        50.17,
+        59.9,
+        "67/80"
+       ],
+       "L6": [
+        28.39,
+        45.43,
+        "50/80"
+       ],
+       "L7": [
+        23.48,
+        46.96,
+        "40/80"
+       ],
+       "L8": [
+        82.81,
+        87.17,
+        "76/80"
+       ],
+       "L9": [
+        81.31,
+        93.82,
+        "13/15"
+       ],
+       "N1": [
+        23.44,
+        55.15,
+        "17/40"
+       ],
+       "N2": [
+        10.59,
+        21.18,
+        "20/40"
+       ],
+       "N3": [
+        39.31,
+        42.49,
+        "37/40"
+       ],
+       "N4": [
+        22.4,
+        52.71,
+        "17/40"
+       ],
+       "N5": [
+        81.27,
+        85.54,
+        "38/40"
+       ],
+       "N6": [
+        59.09,
+        59.09,
+        "40/40"
+       ],
+       "all": [
+        56.09,
+        69.53,
+        "722/895"
+       ],
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-scorers.json",
+        "route": "qwen3.8-27b (Sherlock panel)",
+        "attribute": "summary[set=public895, stratum].nes",
+        "value": "{'L1': 0.8268, 'L2': 0.7323, 'L3': 0.951, 'L4': 0.5836, 'L5': 0.5017, 'L6': 0.2839, 'L7': 0.2348, 'L8': 0.8281, 'L9': 0.8131, 'N1': 0.2344, 'N2': 0.1059, 'N3': 0.3931, 'N4': 0.224, 'N5': 0.8127, 'N6': 0.5909, 'all': 0.5609}"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.0,
+      "openrouter_equivalent_usd_1000": 0.79,
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3.8-27b-sherlock",
+       "attribute": "routes.std (OpenRouter rate for the run's tokens)",
+       "value": "0.79"
+      },
+      "gpu_hours_per_100k": 34.64
+     },
+     "time": {
+      "pages_per_hour_per_gpu_set": 2886.8,
+      "gpus": 1,
+      "measured": true,
+      "measured_on": "the 96's cluster run, queue wait excluded",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3.8-27b-sherlock-49202336",
+       "attribute": "farmshare.truth.per_hour",
+       "value": "2886.8"
+      }
+     },
+     "memory": {
+      "peak_gb": null,
+      "measured_on": "GPU memory not tabulated",
+      "source": null
+     },
+     "caveats": [],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
+     "id": "qwen3.8-27b-farmshare",
+     "name": "Qwen3.8 27B, FarmShare build (your cluster)",
+     "family": "cluster",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [],
+      "plan": [],
+      "cluster": true,
+      "gpus": 1,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 93.17,
+       "n": "95/95 answered, p081 apart",
+       "strict": 93.17,
+       "failures": {},
+       "vs_qwen3.6-27b": "-2.21 (-4.64 to -0.4, n 94)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.8-27b-farmshare",
+        "attribute": "headline.rows.nes_answered",
+        "value": "93.17"
+       }
+      },
+      "typewritten": {
+       "value": 96.18,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.8-27b-farmshare",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "96.18"
+       }
+      },
+      "printed": {
+       "value": 90.77,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.8-27b-farmshare",
+        "attribute": "charts.printed.scores[0]",
+        "value": "90.77"
+       }
+      },
+      "handwritten": {
+       "value": 90.17,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.8-27b-farmshare",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "90.17"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.0,
+      "openrouter_equivalent_usd_1000": 0.78,
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3.8-27b-farmshare",
+       "attribute": "routes.std (OpenRouter rate for the run's tokens)",
+       "value": "0.78"
+      },
+      "gpu_hours_per_100k": 94.06
+     },
+     "time": {
+      "pages_per_hour_per_gpu_set": 1063.2,
+      "gpus": 1,
+      "measured": true,
+      "measured_on": "the 96's cluster run, queue wait excluded",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3.8-27b-1850053",
+       "attribute": "farmshare.truth.per_hour",
+       "value": "1063.2"
+      }
+     },
+     "memory": {
+      "peak_gb": null,
+      "measured_on": "GPU memory not tabulated",
+      "source": null
+     },
+     "caveats": [
+      "96 only: the public and hand figures are the Sherlock run's (row qwen3.8-27b-sherlock)"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
+     "id": "glm-ocr-farmshare",
+     "name": "GLM-OCR (your cluster)",
+     "family": "cluster",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [],
+      "plan": [],
+      "cluster": true,
+      "gpus": 1,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 92.05,
+       "n": "94/95 answered, p081 apart",
+       "strict": 91.08,
+       "failures": {
+        "model": 1,
+        "cap": 1
+       },
+       "vs_qwen3.6-27b": "-3.28 (-4.88 to -1.82, n 93)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "glm-ocr-farmshare",
+        "attribute": "headline.rows.nes_answered",
+        "value": "92.05"
+       }
+      },
+      "typewritten": {
+       "value": 93.49,
+       "answered": 49,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "glm-ocr-farmshare",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "93.49"
+       }
+      },
+      "printed": {
+       "value": 90.24,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "glm-ocr-farmshare",
+        "attribute": "charts.printed.scores[0]",
+        "value": "90.24"
+       }
+      },
+      "handwritten": {
+       "value": 85.61,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "glm-ocr-farmshare",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "85.61"
+       }
+      },
+      "hands16": {
+       "value": 85.78,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "85.62 to 85.93",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "glm-ocr",
+        "attribute": "routes.after",
+        "value": "85.78487064624143"
+       }
+      },
+      "public_L1-L3": {
+       "value": 81.09,
+       "n": 240,
+       "strata": {
+        "L1": 78.58,
+        "L2": 72.7,
+        "L3": 91.98
+       },
+       "empty": 3,
+       "truth": "public (independent)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.json",
+        "route": "glm-ocr",
+        "attribute": "public.nes",
+        "value": "81.08910039573966"
+       }
+      },
+      "public": {
+       "basis": "[NES strict, NES answered, answered/n]",
+       "truth": "public (independent of the routes)",
+       "L1": [
+        78.58,
+        79.58,
+        "79/80"
+       ],
+       "L2": [
+        72.7,
+        74.57,
+        "78/80"
+       ],
+       "L3": [
+        91.98,
+        91.98,
+        "80/80"
+       ],
+       "L4": [
+        59.69,
+        60.45,
+        "79/80"
+       ],
+       "L5": [
+        46.82,
+        60.41,
+        "62/80"
+       ],
+       "L6": [
+        23.13,
+        42.05,
+        "44/80"
+       ],
+       "L7": [
+        25.43,
+        29.48,
+        "69/80"
+       ],
+       "L8": [
+        88.3,
+        88.3,
+        "80/80"
+       ],
+       "L9": [
+        29.19,
+        72.96,
+        "6/15"
+       ],
+       "N1": [
+        1.55,
+        10.3,
+        "6/40"
+       ],
+       "N2": [
+        8.19,
+        14.89,
+        "22/40"
+       ],
+       "N3": [
+        2.38,
+        31.76,
+        "3/40"
+       ],
+       "N4": [
+        0.23,
+        0.51,
+        "18/40"
+       ],
+       "N5": [
+        62.37,
+        89.11,
+        "28/40"
+       ],
+       "N6": [
+        28.72,
+        44.18,
+        "26/40"
+       ],
+       "all": [
+        48.61,
+        63.98,
+        "680/895"
+       ],
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-scorers.json",
+        "route": "glm-ocr (FarmShare native)",
+        "attribute": "summary[set=public895, stratum].nes",
+        "value": "{'L1': 0.7858, 'L2': 0.727, 'L3': 0.9198, 'L4': 0.5969, 'L5': 0.4682, 'L6': 0.2313, 'L7': 0.2543, 'L8': 0.883, 'L9': 0.2919, 'N1': 0.0155, 'N2': 0.0819, 'N3': 0.0238, 'N4': 0.0023, 'N5': 0.6237, 'N6': 0.2872, 'all': 0.4861}"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.0,
+      "openrouter_equivalent_usd_1000": null,
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "glm-ocr-farmshare",
+       "attribute": "routes.std (OpenRouter rate for the run's tokens)",
+       "value": "0.0"
+      },
+      "gpu_hours_per_100k": 28.88
+     },
+     "time": {
+      "pages_per_hour_per_gpu_set": 3463.2,
+      "gpus": 1,
+      "measured": true,
+      "measured_on": "the 96's cluster run, queue wait excluded",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "glm-ocr-1861696",
+       "attribute": "farmshare.truth.per_hour",
+       "value": "3463.2"
+      }
+     },
+     "memory": {
+      "peak_gb": null,
+      "measured_on": "GPU memory not tabulated",
+      "source": null
+     },
+     "caveats": [
+      "whole page fails newspapers (29.2 on L9, cap or empty on 9 of 15): needs the layout stage (layout-photo.md); its layout role is note 03's"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
+     "id": "qwen3.5-4b-farmshare",
+     "name": "Qwen3.5 4B (your cluster)",
+     "family": "cluster",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [],
+      "plan": [],
+      "cluster": true,
+      "gpus": 1,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 91.94,
+       "n": "94/95 answered, p081 apart",
+       "strict": 90.97,
+       "failures": {
+        "model": 1,
+        "cap": 1
+       },
+       "vs_qwen3.6-27b": "-3.96 (-5.73 to -2.51, n 93)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-4b-farmshare",
+        "attribute": "headline.rows.nes_answered",
+        "value": "91.94"
+       }
+      },
+      "typewritten": {
+       "value": 93.57,
+       "answered": 49,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-4b-farmshare",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "93.57"
+       }
+      },
+      "printed": {
+       "value": 90.78,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-4b-farmshare",
+        "attribute": "charts.printed.scores[0]",
+        "value": "90.78"
+       }
+      },
+      "handwritten": {
+       "value": 85.53,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "qwen3.5-4b-farmshare",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "85.53"
+       }
+      },
+      "hands16": {
+       "value": 85.86,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "85.68 to 85.97",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "qwen3.5-4b",
+        "attribute": "routes.after",
+        "value": "85.85985626774401"
+       }
+      },
+      "public_L1-L3": {
+       "value": 80.88,
+       "n": 240,
+       "strata": {
+        "L1": 78.66,
+        "L2": 70.77,
+        "L3": 93.21
+       },
+       "empty": 9,
+       "truth": "public (independent)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.json",
+        "route": "qwen3.5-4b",
+        "attribute": "public.nes",
+        "value": "80.88066144440604"
+       }
+      },
+      "public": {
+       "basis": "[NES strict, NES answered, answered/n]",
+       "truth": "public (independent of the routes)",
+       "L1": [
+        78.66,
+        81.73,
+        "77/80"
+       ],
+       "L2": [
+        70.77,
+        75.49,
+        "75/80"
+       ],
+       "L3": [
+        93.21,
+        94.39,
+        "79/80"
+       ],
+       "L4": [
+        61.84,
+        63.43,
+        "78/80"
+       ],
+       "L5": [
+        40.92,
+        61.76,
+        "53/80"
+       ],
+       "L6": [
+        14.62,
+        46.78,
+        "25/80"
+       ],
+       "L7": [
+        27.47,
+        43.09,
+        "51/80"
+       ],
+       "L8": [
+        82.25,
+        85.46,
+        "77/80"
+       ],
+       "L9": [
+        68.89,
+        86.11,
+        "12/15"
+       ],
+       "N1": [
+        30.81,
+        58.68,
+        "21/40"
+       ],
+       "N2": [
+        6.46,
+        18.45,
+        "14/40"
+       ],
+       "N3": [
+        6.34,
+        36.24,
+        "7/40"
+       ],
+       "N4": [
+        2.99,
+        23.9,
+        "5/40"
+       ],
+       "N5": [
+        72.05,
+        84.77,
+        "34/40"
+       ],
+       "N6": [
+        58.08,
+        58.08,
+        "40/40"
+       ],
+       "all": [
+        51.04,
+        70.5,
+        "648/895"
+       ],
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-scorers.json",
+        "route": "qwen3.5-4b (FarmShare panel)",
+        "attribute": "summary[set=public895, stratum].nes",
+        "value": "{'L1': 0.7866, 'L2': 0.7077, 'L3': 0.9321, 'L4': 0.6184, 'L5': 0.4092, 'L6': 0.1462, 'L7': 0.2747, 'L8': 0.8225, 'L9': 0.6889, 'N1': 0.3081, 'N2': 0.0646, 'N3': 0.0634, 'N4': 0.0299, 'N5': 0.7205, 'N6': 0.5808, 'all': 0.5104}"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.0,
+      "openrouter_equivalent_usd_1000": null,
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3.5-4b-farmshare",
+       "attribute": "routes.std (OpenRouter rate for the run's tokens)",
+       "value": "0.0"
+      },
+      "gpu_hours_per_100k": 51.63
+     },
+     "time": {
+      "pages_per_hour_per_gpu_set": 1936.7,
+      "gpus": 1,
+      "measured": true,
+      "measured_on": "the 96's cluster run, queue wait excluded",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "qwen3.5-4b-1861700",
+       "attribute": "farmshare.truth.per_hour",
+       "value": "1936.7"
+      }
+     },
+     "memory": {
+      "peak_gb": null,
+      "measured_on": "GPU memory not tabulated",
+      "source": null
+     },
+     "caveats": [],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
+     "id": "nemotron-parse-2-sherlock",
+     "name": "Nemotron Parse 2 (your cluster)",
+     "family": "cluster",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [],
+      "plan": [],
+      "cluster": true,
+      "gpus": 1,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 86.87,
+       "n": "91/95 answered, p081 apart",
+       "strict": 83.21,
+       "failures": {
+        "model": 4,
+        "cap": 4
+       },
+       "vs_qwen3.6-27b": "-9.21 (-13.02 to -5.78, n 90)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "nemotron-parse-2-sherlock",
+        "attribute": "headline.rows.nes_answered",
+        "value": "86.87"
+       }
+      },
+      "typewritten": {
+       "value": 90.69,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "nemotron-parse-2-sherlock",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "90.69"
+       }
+      },
+      "printed": {
+       "value": 90.32,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "nemotron-parse-2-sherlock",
+        "attribute": "charts.printed.scores[0]",
+        "value": "90.32"
+       }
+      },
+      "handwritten": {
+       "value": 52.43,
+       "answered": 13,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "nemotron-parse-2-sherlock",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "52.43"
+       }
+      },
+      "hands16": {
+       "value": 52.43,
+       "n": 16,
+       "failed": 3,
+       "unresolved_range": "52.4 to 52.47",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "nemotron-parse-2",
+        "attribute": "routes.after",
+        "value": "52.42801579639712"
+       }
+      },
+      "public_L1-L3": {
+       "value": 55.73,
+       "n": 240,
+       "strata": {
+        "L1": 47.47,
+        "L2": 33.07,
+        "L3": 86.64
+       },
+       "empty": 39,
+       "truth": "public (independent)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.json",
+        "route": "nemotron-parse-2",
+        "attribute": "public.nes",
+        "value": "55.72690206163485"
+       }
+      },
+      "public": {
+       "basis": "[NES strict, NES answered, answered/n]",
+       "truth": "public (independent of the routes)",
+       "L1": [
+        47.47,
+        54.25,
+        "70/80"
+       ],
+       "L2": [
+        33.07,
+        47.24,
+        "56/80"
+       ],
+       "L3": [
+        86.64,
+        92.42,
+        "75/80"
+       ],
+       "L4": [
+        27.47,
+        38.55,
+        "57/80"
+       ],
+       "L5": [
+        31.27,
+        48.1,
+        "52/80"
+       ],
+       "L6": [
+        16.92,
+        28.19,
+        "48/80"
+       ],
+       "L7": [
+        11.51,
+        15.88,
+        "58/80"
+       ],
+       "L8": [
+        59.49,
+        69.99,
+        "68/80"
+       ],
+       "L9": [
+        23.23,
+        87.13,
+        "4/15"
+       ],
+       "N1": [
+        5.29,
+        26.45,
+        "8/40"
+       ],
+       "N2": [
+        2.53,
+        5.96,
+        "17/40"
+       ],
+       "N3": [
+        15.85,
+        27.56,
+        "23/40"
+       ],
+       "N4": [
+        14.4,
+        31.99,
+        "18/40"
+       ],
+       "N5": [
+        23.36,
+        54.97,
+        "17/40"
+       ],
+       "N6": [
+        42.37,
+        49.85,
+        "34/40"
+       ],
+       "all": [
+        33.08,
+        48.94,
+        "605/895"
+       ],
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-scorers.json",
+        "route": "nemotron-parse-2 (Sherlock native)",
+        "attribute": "summary[set=public895, stratum].nes",
+        "value": "{'L1': 0.4747, 'L2': 0.3307, 'L3': 0.8664, 'L4': 0.2747, 'L5': 0.3127, 'L6': 0.1692, 'L7': 0.1151, 'L8': 0.5949, 'L9': 0.2323, 'N1': 0.0529, 'N2': 0.0253, 'N3': 0.1585, 'N4': 0.144, 'N5': 0.2336, 'N6': 0.4237, 'all': 0.3308}"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.0,
+      "openrouter_equivalent_usd_1000": null,
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "nemotron-parse-2-sherlock",
+       "attribute": "routes.std (OpenRouter rate for the run's tokens)",
+       "value": "0.0"
+      },
+      "gpu_hours_per_100k": 94.22
+     },
+     "time": {
+      "pages_per_hour_per_gpu_set": 1061.3,
+      "gpus": 1,
+      "measured": true,
+      "measured_on": "the 96's cluster run, queue wait excluded",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "nemotron-parse-2-50569394",
+       "attribute": "farmshare.truth.per_hour",
+       "value": "1061.3"
+      }
+     },
+     "memory": {
+      "peak_gb": null,
+      "measured_on": "GPU memory not tabulated",
+      "source": null
+     },
+     "caveats": [],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
+     "id": "unlimited-ocr-sherlock",
+     "name": "Unlimited-OCR (your cluster)",
+     "family": "cluster",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [],
+      "plan": [],
+      "cluster": true,
+      "gpus": 1,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 85.46,
+       "n": "94/95 answered, p081 apart",
+       "strict": 84.56,
+       "failures": {
+        "model": 1,
+        "cap": 1
+       },
+       "vs_qwen3.6-27b": "-9.42 (-13.46 to -5.82, n 93)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "unlimited-ocr-sherlock",
+        "attribute": "headline.rows.nes_answered",
+        "value": "85.46"
+       }
+      },
+      "typewritten": {
+       "value": 89.75,
+       "answered": 49,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "unlimited-ocr-sherlock",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "89.75"
+       }
+      },
+      "printed": {
+       "value": 84.32,
+       "answered": 27,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "unlimited-ocr-sherlock",
+        "attribute": "charts.printed.scores[0]",
+        "value": "84.32"
+       }
+      },
+      "handwritten": {
+       "value": 66.84,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "unlimited-ocr-sherlock",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "66.84"
+       }
+      },
+      "hands16": {
+       "value": 66.84,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "66.74 to 66.95",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "unlimited-ocr",
+        "attribute": "routes.after",
+        "value": "66.84391046046679"
+       }
+      },
+      "public_L1-L3": {
+       "value": 65.4,
+       "n": 240,
+       "strata": {
+        "L1": 62.59,
+        "L2": 40.12,
+        "L3": 93.49
+       },
+       "empty": 18,
+       "truth": "public (independent)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.json",
+        "route": "unlimited-ocr",
+        "attribute": "public.nes",
+        "value": "65.39666958037927"
+       }
+      },
+      "public": {
+       "basis": "[NES strict, NES answered, answered/n]",
+       "truth": "public (independent of the routes)",
+       "L1": [
+        62.59,
+        65.88,
+        "76/80"
+       ],
+       "L2": [
+        40.12,
+        48.63,
+        "66/80"
+       ],
+       "L3": [
+        93.49,
+        93.49,
+        "80/80"
+       ],
+       "L4": [
+        19.38,
+        22.79,
+        "68/80"
+       ],
+       "L5": [
+        41.57,
+        45.56,
+        "73/80"
+       ],
+       "L6": [
+        19.97,
+        24.96,
+        "64/80"
+       ],
+       "L7": [
+        6.49,
+        9.98,
+        "52/80"
+       ],
+       "L8": [
+        80.23,
+        81.25,
+        "79/80"
+       ],
+       "L9": [
+        55.88,
+        83.82,
+        "10/15"
+       ],
+       "N1": [
+        16.2,
+        17.05,
+        "38/40"
+       ],
+       "N2": [
+        8.08,
+        8.51,
+        "38/40"
+       ],
+       "N3": [
+        10.88,
+        12.08,
+        "36/40"
+       ],
+       "N4": [
+        9.39,
+        12.12,
+        "31/40"
+       ],
+       "N5": [
+        80.7,
+        82.77,
+        "39/40"
+       ],
+       "N6": [
+        55.62,
+        55.62,
+        "40/40"
+       ],
+       "all": [
+        41.54,
+        47.06,
+        "790/895"
+       ],
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-scorers.json",
+        "route": "unlimited-ocr (Sherlock native)",
+        "attribute": "summary[set=public895, stratum].nes",
+        "value": "{'L1': 0.6259, 'L2': 0.4012, 'L3': 0.9349, 'L4': 0.1938, 'L5': 0.4157, 'L6': 0.1997, 'L7': 0.0649, 'L8': 0.8023, 'L9': 0.5588, 'N1': 0.162, 'N2': 0.0808, 'N3': 0.1088, 'N4': 0.0939, 'N5': 0.807, 'N6': 0.5562, 'all': 0.4154}"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.0,
+      "openrouter_equivalent_usd_1000": null,
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "unlimited-ocr-sherlock",
+       "attribute": "routes.std (OpenRouter rate for the run's tokens)",
+       "value": "0.0"
+      },
+      "gpu_hours_per_100k": 493.1
+     },
+     "time": {
+      "pages_per_hour_per_gpu_set": 202.8,
+      "gpus": 1,
+      "measured": true,
+      "measured_on": "the 96's cluster run, queue wait excluded",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "unlimited-ocr-50550130",
+       "attribute": "farmshare.truth.per_hour",
+       "value": "202.8"
+      }
+     },
+     "memory": {
+      "peak_gb": null,
+      "measured_on": "GPU memory not tabulated",
+      "source": null
+     },
+     "caveats": [],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
+     "id": "lightonocr3-0.8b-farmshare",
+     "name": "LightOnOCR-3 0.8B (your cluster)",
+     "family": "cluster",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [],
+      "plan": [],
+      "cluster": true,
+      "gpus": 1,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 88.04,
+       "n": "95/95 answered, p081 apart",
+       "strict": 88.04,
+       "failures": {},
+       "vs_qwen3.6-27b": "-6.86 (-10.1 to -3.99, n 94)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "lightonocr3-0.8b-farmshare",
+        "attribute": "headline.rows.nes_answered",
+        "value": "88.04"
+       }
+      },
+      "typewritten": {
+       "value": 91.01,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "lightonocr3-0.8b-farmshare",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "91.01"
+       }
+      },
+      "printed": {
+       "value": 86.01,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "lightonocr3-0.8b-farmshare",
+        "attribute": "charts.printed.scores[0]",
+        "value": "86.01"
+       }
+      },
+      "handwritten": {
+       "value": 84.78,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "lightonocr3-0.8b-farmshare",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "84.78"
+       }
+      },
+      "hands16": {
+       "value": 84.95,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "84.81 to 85.09",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "lightonocr3-0.8b",
+        "attribute": "routes.after",
+        "value": "84.95112475452605"
+       }
+      },
+      "public_L1-L3": {
+       "value": 82.31,
+       "n": 240,
+       "strata": {
+        "L1": 83.83,
+        "L2": 72.41,
+        "L3": 90.69
+       },
+       "empty": 5,
+       "truth": "public (independent)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.json",
+        "route": "lightonocr3-0.8b",
+        "attribute": "public.nes",
+        "value": "82.31011546926386"
+       }
+      },
+      "public": {
+       "basis": "[NES strict, NES answered, answered/n]",
+       "truth": "public (independent of the routes)",
+       "L1": [
+        83.83,
+        85.97,
+        "78/80"
+       ],
+       "L2": [
+        72.41,
+        75.23,
+        "77/80"
+       ],
+       "L3": [
+        90.69,
+        90.69,
+        "80/80"
+       ],
+       "L4": [
+        52.05,
+        55.52,
+        "75/80"
+       ],
+       "L5": [
+        53.0,
+        66.24,
+        "64/80"
+       ],
+       "L6": [
+        38.88,
+        52.71,
+        "59/80"
+       ],
+       "L7": [
+        27.16,
+        32.43,
+        "67/80"
+       ],
+       "L8": [
+        85.48,
+        85.48,
+        "80/80"
+       ],
+       "L9": [
+        84.51,
+        90.54,
+        "14/15"
+       ],
+       "N1": [
+        43.05,
+        59.38,
+        "29/40"
+       ],
+       "N2": [
+        4.18,
+        13.93,
+        "12/40"
+       ],
+       "N3": [
+        25.81,
+        41.3,
+        "25/40"
+       ],
+       "N4": [
+        22.49,
+        64.27,
+        "14/40"
+       ],
+       "N5": [
+        74.34,
+        82.6,
+        "36/40"
+       ],
+       "N6": [
+        59.32,
+        59.32,
+        "40/40"
+       ],
+       "all": [
+        56.66,
+        67.62,
+        "750/895"
+       ],
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-scorers.json",
+        "route": "lightonocr3-0.8b (FarmShare native)",
+        "attribute": "summary[set=public895, stratum].nes",
+        "value": "{'L1': 0.8383, 'L2': 0.7241, 'L3': 0.9069, 'L4': 0.5205, 'L5': 0.53, 'L6': 0.3888, 'L7': 0.2716, 'L8': 0.8548, 'L9': 0.8451, 'N1': 0.4305, 'N2': 0.0418, 'N3': 0.2581, 'N4': 0.2249, 'N5': 0.7434, 'N6': 0.5932, 'all': 0.5666}"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.0,
+      "openrouter_equivalent_usd_1000": null,
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "lightonocr3-0.8b-farmshare",
+       "attribute": "routes.std (OpenRouter rate for the run's tokens)",
+       "value": "0.0"
+      },
+      "gpu_hours_per_100k": 18.09
+     },
+     "time": {
+      "pages_per_hour_per_gpu_set": 5527.3,
+      "gpus": 1,
+      "measured": true,
+      "measured_on": "the 96's cluster run, queue wait excluded",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "lightonocr3-0.8b-1861697",
+       "attribute": "farmshare.truth.per_hour",
+       "value": "5527.3"
+      }
+     },
+     "memory": {
+      "peak_gb": null,
+      "measured_on": "GPU memory not tabulated",
+      "source": null
+     },
+     "caveats": [],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: paddleocr-vl1.6-sherlock scores higher on the 96, 90.89 answered, and reads more pages an hour, 12,327.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
+    },
+    {
+     "id": "ppocrv6-medium-farmshare",
+     "name": "PP-OCRv6 medium (your cluster)",
+     "family": "cluster",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [],
+      "plan": [],
+      "cluster": true,
+      "gpus": 1,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 77.17,
+       "n": "95/95 answered, p081 apart",
+       "strict": 77.17,
+       "failures": {},
+       "vs_qwen3.6-27b": "-17.99 (-22.88 to -13.35, n 94)",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "ppocrv6-medium-farmshare",
+        "attribute": "headline.rows.nes_answered",
+        "value": "77.17"
+       }
+      },
+      "typewritten": {
+       "value": 90.56,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "ppocrv6-medium-farmshare",
+        "attribute": "charts.typewritten.scores[0]",
+        "value": "90.56"
+       }
+      },
+      "printed": {
+       "value": 61.44,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "ppocrv6-medium-farmshare",
+        "attribute": "charts.printed.scores[0]",
+        "value": "61.44"
+       }
+      },
+      "handwritten": {
+       "value": 62.79,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveOCRBench/data/panel-data.json",
+        "route": "ppocrv6-medium-farmshare",
+        "attribute": "charts.handwritten.scores[0]",
+        "value": "62.79"
+       }
+      },
+      "hands16": {
+       "value": 62.74,
+       "n": 16,
+       "failed": 0,
+       "unresolved_range": "62.64 to 62.8",
+       "truth": "owner-96 after the 2026-10-31 hand sheet (drafter-biased, OCR-1)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-hands-rescore.json",
+        "route": "ppocrv6-medium",
+        "attribute": "routes.after",
+        "value": "62.737176491930455"
+       }
+      },
+      "public_L1-L3": {
+       "value": 62.12,
+       "n": 240,
+       "strata": {
+        "L1": 46.04,
+        "L2": 50.58,
+        "L3": 89.72
+       },
+       "empty": 2,
+       "truth": "public (independent)",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-ppocrv6-hands.json",
+        "route": "ppocrv6-medium",
+        "attribute": "public.nes",
+        "value": "62.115831086791374"
+       }
+      },
+      "public": {
+       "basis": "[NES strict, NES answered, answered/n]",
+       "truth": "public (independent of the routes)",
+       "L1": [
+        46.04,
+        46.63,
+        "79/80"
+       ],
+       "L2": [
+        50.58,
+        50.58,
+        "80/80"
+       ],
+       "L3": [
+        89.72,
+        90.86,
+        "79/80"
+       ],
+       "L4": [
+        44.47,
+        44.47,
+        "80/80"
+       ],
+       "L5": [
+        29.62,
+        29.62,
+        "80/80"
+       ],
+       "L6": [
+        24.47,
+        24.47,
+        "80/80"
+       ],
+       "L7": [
+        23.12,
+        23.12,
+        "80/80"
+       ],
+       "L8": [
+        79.47,
+        79.47,
+        "80/80"
+       ],
+       "L9": [
+        23.63,
+        23.63,
+        "15/15"
+       ],
+       "N1": [
+        3.94,
+        3.94,
+        "40/40"
+       ],
+       "N2": [
+        10.66,
+        10.66,
+        "40/40"
+       ],
+       "N3": [
+        10.7,
+        10.7,
+        "40/40"
+       ],
+       "N4": [
+        5.86,
+        5.86,
+        "40/40"
+       ],
+       "N5": [
+        42.1,
+        42.1,
+        "40/40"
+       ],
+       "N6": [
+        8.21,
+        8.21,
+        "40/40"
+       ],
+       "all": [
+        38.67,
+        38.76,
+        "893/895"
+       ],
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/ocr-scorers.json",
+        "route": "ppocrv6-medium (FarmShare pipeline)",
+        "attribute": "summary[set=public895, stratum].nes",
+        "value": "{'L1': 0.4604, 'L2': 0.5058, 'L3': 0.8972, 'L4': 0.4447, 'L5': 0.2962, 'L6': 0.2447, 'L7': 0.2312, 'L8': 0.7947, 'L9': 0.2363, 'N1': 0.0394, 'N2': 0.1066, 'N3': 0.107, 'N4': 0.0586, 'N5': 0.421, 'N6': 0.0821, 'all': 0.3867}"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 0.0,
+      "openrouter_equivalent_usd_1000": null,
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "ppocrv6-medium-farmshare",
+       "attribute": "routes.std (OpenRouter rate for the run's tokens)",
+       "value": "0.0"
+      },
+      "gpu_hours_per_100k": 12.34
+     },
+     "time": {
+      "pages_per_hour_per_gpu_set": 8106.9,
+      "gpus": 1,
+      "measured": true,
+      "measured_on": "the 96's cluster run, queue wait excluded",
+      "source": {
+       "file": "ArchiveOCRBench/data/panel-data.json",
+       "route": "ppocrv6-medium-1861702",
+       "attribute": "farmshare.truth.per_hour",
+       "value": "8106.9"
+      }
+     },
+     "memory": {
+      "peak_gb": null,
+      "measured_on": "GPU memory not tabulated",
+      "source": null
+     },
+     "caveats": [
+      "its Mac form is ppocrv6-kraken-blla"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: paddleocr-vl1.6-sherlock scores higher on the 96, 90.89 answered, and reads more pages an hour, 12,327.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+     ]
     },
     {
      "id": "kraken-german-handwriting",

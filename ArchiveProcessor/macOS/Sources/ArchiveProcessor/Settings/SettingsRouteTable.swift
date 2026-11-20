@@ -287,6 +287,11 @@ struct SettingsRouteTable: Decodable, Sendable {
             !conditions.contains { $0.hasPrefix("not offered") || $0.hasPrefix("never offered") }
         }
 
+        /// W47.wh-readers-lost (owner call 15, 2026-11-19): a reading row that scored below a row it is measured
+        /// against ("lower-scoring: …"). It is the user's to choose at the Advanced level, with its figures, and never a
+        /// default or the solver's pick.
+        var lowerScoring: Bool { conditions.contains { $0.hasPrefix("lower-scoring") } }
+
         var afterTraining: Bool { status == "after-training" }
 
         /// A model this Mac has to download first. The table marks the OS's own routes `built_in`; rows with no memory

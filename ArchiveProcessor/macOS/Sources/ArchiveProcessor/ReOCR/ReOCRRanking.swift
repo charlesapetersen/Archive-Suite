@@ -90,7 +90,7 @@ struct ReOCRRanking: Sendable {
     /// collection's switches (W46.training-optout-run).
     static func rank(kind: OCRPageKind, pages: Int, table: SettingsRouteTable, pairs: OCRPairMatrix?,
                      resources: SettingsResources, staysOnMac: Bool, noTraining: Bool = false, readingFallback: Bool = true,
-                     current: PDFReaderProvenance? = nil,
+                     current: PDFReaderProvenance? = nil, level: SettingsLevel = .current(),
                      builtInModels: [LLMModel] = OCRCascade.candidates + LLMModel.appleVisionModels) -> ReOCRRanking {
         let metric = metric(for: kind, table: table, readingFallback: readingFallback, builtInModels: builtInModels)
         var answers = SettingsAnswers()
@@ -103,8 +103,15 @@ struct ReOCRRanking: Sendable {
         var rows: [Row] = []
         var institutional: [LeftOut] = []
         var leftOut: [LeftOut] = []
+        // A lower-scoring reader is listed from the Advanced level up and is never the reference or the suggestion
+        // (owner call 15, W47.wh-readers-lost).
+        var lower = Set<String>()
         for r in stage?.routes ?? [] where !r.afterTraining {
             if r.stages != nil { continue }   // a cascade is a batch route, not one reader for these pages
+            if r.lowerScoring {
+                guard level >= .advanced else { continue }
+                lower.insert(r.id)
+            }
             if let rule = ruleExclusion(r, kind: kind) {
                 leftOut.append(LeftOut(id: r.id, name: r.name, reason: rule))
                 continue
@@ -151,7 +158,8 @@ struct ReOCRRanking: Sendable {
             }
         }
         let measured = rows.indices.filter { rows[$0].figure != nil }
-        let ref = measured.first { rows[$0].readiness == .ready } ?? measured.first
+        let eligible = measured.filter { !lower.contains(rows[$0].id) }
+        let ref = eligible.first { rows[$0].readiness == .ready } ?? eligible.first
         var suggested: String?
         if let ref, let refFigure = rows[ref].figure {
             let lead = rows[ref]
@@ -160,7 +168,7 @@ struct ReOCRRanking: Sendable {
                 rows[i].tie = tie(rows[i], rows[i].figure!, lead, refFigure, metric: metric, pairs: pairs, kind: kind)
             }
             if lead.readiness == .ready {
-                let pool = [ref] + measured.filter { i in
+                let pool = [ref] + eligible.filter { i in
                     guard i != ref, rows[i].readiness == .ready, case .tied = rows[i].tie else { return false }
                     return true
                 }
@@ -235,7 +243,6 @@ struct ReOCRRanking: Sendable {
 
     /// A stage rule that keeps a route out for this kind.
     static func ruleExclusion(_ r: SettingsRouteTable.Route, kind: OCRPageKind) -> String? {
-        if r.id == "apple-fm-27" { return "the stage rule no-apple-fm" }
         if kind == .handwritten, r.id == "apple-vision" {
             return "handwriting is not read with Apple Vision (owner call 4)"
         }

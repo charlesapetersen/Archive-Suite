@@ -14,6 +14,17 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   detector (accepted: owner, 2026-11-06, call 5, "detector until the measured exception exists"); the app offers no
   27B-class Mac reader (queued: W46.ocr-mac-27b).
 
+## ⚠️ LIMITATION (W47.wh-readers-lost, 2026-11-20): lower-scoring readers the Processor cannot run yet
+
+`Settings/SettingsRouteTable.swift` (`Route.lowerScoring`), `Settings/SettingsLevels.swift`; the rows are in
+`segbench-results/settings-routes.json`, at the Advanced level of Settings › Reading and in Improve OCR.
+- **Five of the sixteen are a choice the app cannot carry out.** Qwen3-VL 8B, Qwen3-VL 30B-A3B and Qwen3.5 35B-A3B
+  through OpenRouter, Mistral Medium 3.5 and the macOS 27 on-device model have no reader in the Processor: chosen on the
+  reading card, the card says "The Processor cannot run this reading program yet", and Improve OCR lists them as not in
+  the app yet. What each would take is in the item (queued: W47.wh-readers-lost-clients).
+- **Azure Document Intelligence, AWS Textract and Transkribus are not offered at all.** Their figures are on 25 of the 96
+  only, not comparable with the rows' 95, and there is no client for any of them (queued: W47.wh-readers-lost-clients).
+
 ## ⚠️ LIMITATION (W47.wh-yolo-scans, 2026-11-20): what the scanned-newspaper detector does not yet do
 
 `OCR/NewspaperPageReader.swift` (`NewspaperDetector`), VisionOCRKit `ScanNewspaperLayout`; the switch is in Settings →
