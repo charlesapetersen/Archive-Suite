@@ -1,5 +1,6 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
+import ImageIO
 import PDFKit
 
 /// Headless end-to-end verification of the **Process Files** GUI pipeline
@@ -145,6 +146,39 @@ enum ProcessFilesTestDriver {
             inputs = Array(intake.files.prefix(cap))
             processor.plannedOutputSubfolders = intake.subfolders
         }
+        // W49.proc-suspects-money: PROCESSFILES_STAGED=1 takes the inputs from a Live Capture session in Stage for
+        // later, as "Process N →" hands them over (`LiveCaptureView.stageForProcessing` → `orderedFilesAndGroups`, and
+        // OCRView's `preGrouped*`). The session lives under ARCHIVEPROC_TEST_BACKUP_ROOT; a launch whose `CaptureSession`
+        // restores one (a relaunch) hands that over, otherwise TESTIN's images are received into it as two documents.
+        let staged = env["PROCESSFILES_STAGED"] == "1"
+        var stageSession: CaptureSession?
+        var handoffLines: [String] = []
+        if staged {
+            // Never the user's own backup folder: the session must live in the caller's scratch root.
+            guard env["ARCHIVEPROC_TEST_BACKUP_ROOT"] != nil else {
+                return fail("PROCESSFILES_STAGED needs ARCHIVEPROC_TEST_BACKUP_ROOT", marker: donePath)
+            }
+            let session = CaptureSession()
+            let restored = session.photos.count
+            if restored == 0 {
+                session.beginStageSessionForTest()
+                for (i, url) in inputs.enumerated() {
+                    guard let jpeg = try? Data(contentsOf: url) else { continue }
+                    _ = session.ingest(jpeg: jpeg, groupId: i < inputs.count / 2 ? "G1" : "G2", seq: i + 1,
+                                       type: .document, quality: nil, year: nil, month: nil, deviceName: "stand-in")
+                }
+            }
+            let handoff = session.orderedFilesAndGroups()
+            handoffLines.append("handoff\tsession=\(session.sessionId)\trestored=\(restored)\tfiles=\(handoff.files.count)")
+            inputs = handoff.files
+            processor.preGroupedBoundaries = handoff.boundaries
+            processor.preGroupedTypes = handoff.types
+            processor.preGroupedQualities = handoff.qualities
+            processor.preGroupedYears = handoff.years
+            processor.preGroupedMonths = handoff.months
+            processor.preGroupedSubjects = handoff.subjects
+            stageSession = session
+        }
         guard !inputs.isEmpty else { return fail("no accepted inputs in \(inDir.path)", marker: donePath) }
 
         // --- config (rejecting modes that need real human input) ---
@@ -171,6 +205,13 @@ enum ProcessFilesTestDriver {
         if batch && (gateway != nil || !provider.supportsBatch) {
             return fail("\(provider.rawValue) has no batch path here (gateway or provider without batch)", marker: donePath)
         }
+        // W49.proc-suspects-money: PROCESSFILES_BATCH_STORED=1 passes the stored Batch mode flag on as Process Files
+        // does (`OCRView.startProcessing` sends it unless the gateway, the Local Agent or Apple Vision is on), with
+        // no check of the provider, and without the batch watcher below.
+        let storedBatchFlag = env["PROCESSFILES_BATCH_STORED"] == "1"
+        if storedBatchFlag && (batch || gateway != nil) {
+            return fail("PROCESSFILES_BATCH_STORED is for a direct provider without PROCESSFILES_BATCH", marker: donePath)
+        }
         if cancelAfterSubmit && !batch { return fail("PROCESSFILES_BATCH_CANCEL needs PROCESSFILES_BATCH=1", marker: donePath) }
 
         // State the cost first, with the app's own estimator and the same inputs the Cost Estimate box uses, and
@@ -189,7 +230,7 @@ enum ProcessFilesTestDriver {
                     "files=\(inputs.count)\tmodel=\(model.id)\tocr=\(estimate.ocrFormatted)\tclassification=\(estimate.classificationFormatted)"
                     + "\ttagging=\(estimate.taggingFormatted)\tdating=\(estimate.datingFormatted)"
                     + "\titemFields=\(estimate.itemFieldFormatted)\ttotal=\(estimate.totalStandardFormatted)"
-                    + (batch ? "\tbatch=\(CostEstimate.money(estimate.totalBatch))" : "")
+                    + (batch || storedBatchFlag ? "\tbatch=\(CostEstimate.money(estimate.totalBatch))" : "")
                     + "\tcap=\(capUSD.map(CostEstimate.money) ?? "none")\n")
         if gateway != nil && !metered {
             return fail("a gateway run must be metered (\(Self.meterEnvKey)=1 with PROCESSFILES_CAP_USD)", marker: donePath)
@@ -210,8 +251,29 @@ enum ProcessFilesTestDriver {
         processor.reviewRotation = false
         processor.mergeDocuments = false       // 1 source image → 1 two-page PDF (stable paths)
         processor.exportOriginals = env["PROCESSFILES_EXPORTORIGINALS"] == "1"
-        processor.preGroupedBoundaries = []    // force the LLM segmentation path
+        if !staged { processor.preGroupedBoundaries = [] }   // force the LLM segmentation path
         processor.segmentationApproach = .manual   // never a window model's call, whatever Settings holds
+        // W49.proc-suspects-money: PROCESSFILES_SEGAPPROACH names the approach the Segmentation chooser holds, its
+        // windows routed by the production `WindowStageTransport.make` with no window key (never the Keychain).
+        if let raw = env["PROCESSFILES_SEGAPPROACH"] {
+            guard let approach = SegmentationApproach(rawValue: raw) else {
+                return fail("unknown segmentation approach \(raw)", marker: donePath)
+            }
+            processor.segmentationApproach = approach
+            processor.windowTransportFactory = { spec, gate in
+                WindowStageTransport.make(spec, keys: [:], claudeBinary: nil, gate: gate)
+            }
+        }
+        // W49.proc-suspects-money: PROCESSFILES_READER_MODEL gives every input a page reader on that model of the run's
+        // provider (the user's own choice, `.override`), as the page-kind guide's plan reaches `startProcessing`.
+        if let readerModel = env["PROCESSFILES_READER_MODEL"] {
+            var plan = PageReaderPlan()
+            for url in inputs {
+                plan.pages[PageReaderPlan.key(url)] = .init(
+                    kind: nil, choice: .init(provider: provider, modelID: readerModel, reason: .override))
+            }
+            processor.pageReaders = plan
+        }
 
         // Clean up the durable resume-state the non-batch pipeline writes to Application Support
         // (pending_run.json) so a test run never leaves a stale, paid "Resume Run" prompt for a
@@ -256,6 +318,12 @@ enum ProcessFilesTestDriver {
                     processor.confirmCollectionReview()
                 }
                 else if processor.awaitingFinalReview { gates.lines.append("finalReview"); processor.confirmFinalReview() }
+                else if let prompt = processor.windowStopPrompt {
+                    // W49.proc-suspects-money: the pages already read when the window stage asks, then Stop.
+                    let read = processor.jobs.filter { $0.result != nil }.count
+                    gates.lines.append("windowStop\tpagesRead=\(read)/\(processor.jobs.count)\t\(prompt.message)")
+                    processor.answerWindowStop(.stop)
+                }
             }
         }
 
@@ -264,9 +332,19 @@ enum ProcessFilesTestDriver {
         // a request unless what is spent plus every request in flight, each priced at the dearest call so far, stays
         // inside the cap.
         let meter = SpendMeter(inPer1M: model.inputCostPer1M, outPer1M: model.outputCostPer1M, cap: capUSD ?? 0)
+        // W49.proc-suspects-money: PROCESSFILES_REDIRECT_URL (a metered run only) sends every request to that address
+        // instead of its provider's, and requests.tsv records each one as it left the app: where it was going, its
+        // body's bytes, each image in it (bytes and pixels), and the `model` its body names.
+        let redirect = metered ? env["PROCESSFILES_REDIRECT_URL"].flatMap(URL.init(string:)) : nil
+        let requests = RequestLog()
         if metered {
             NetworkSession.testTransport = { request in
                 try meter.admit()
+                var request = request
+                if let redirect {
+                    requests.record(request)
+                    request.url = redirect
+                }
                 do {
                     let (data, response) = try await NetworkSession.shared.data(for: request)
                     meter.record(data, status: (response as? HTTPURLResponse)?.statusCode ?? 0)
@@ -294,7 +372,7 @@ enum ProcessFilesTestDriver {
             thinkingLevel: nil,
             apiKey: key,
             outputDirectory: runDir,
-            batchMode: batch,
+            batchMode: batch || storedBatchFlag,
             enableTagging: mode.enablesTagging,
             enableSegmentJSON: true,
             enableCollectionSegmentation: collectionSegmentation,
@@ -337,6 +415,17 @@ enum ProcessFilesTestDriver {
         if metered {
             writeMarker(runDir.appendingPathComponent("spend.tsv").path, meter.summary + "\n")
         }
+        if redirect != nil {
+            writeMarker(runDir.appendingPathComponent("requests.tsv").path,
+                        "# standardImageMB=\(SessionProcessingConfig.runSizing().standardImageMB)\n" + requests.summary)
+        }
+        if let stageSession {
+            // The pane's "Process N →" again after the run, and after a relaunch (a fresh session object).
+            handoffLines.append("after-run\tfiles=\(stageSession.orderedFilesAndGroups().files.count)")
+            let relaunched = CaptureSession()
+            handoffLines.append("after-relaunch\tsession=\(relaunched.sessionId)\tfiles=\(relaunched.orderedFilesAndGroups().files.count)")
+            writeMarker(runDir.appendingPathComponent("handoff.tsv").path, handoffLines.map { $0 + "\n" }.joined())
+        }
 
         // Write the completion marker FIRST (a plain String write, which the pipeline's own file
         // writes just proved works on this actor), so the harness always sees completion. Then a
@@ -368,6 +457,42 @@ enum ProcessFilesTestDriver {
 
     /// The flag that lets this driver's meter use `NetworkSession`'s seam (`activeTestTransport`).
     nonisolated static let meterEnvKey = "PROCESSFILES_METER"
+}
+
+/// W49.proc-suspects-money: each request a redirected run sent, as the app built it (requests.tsv).
+final class RequestLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lines: [String] = []
+
+    func record(_ request: URLRequest) {
+        let body = request.httpBody ?? Data()
+        // The base64 runs over 10,000 characters are the page images (a prompt never has one this long). JSON may
+        // write each `/` as `\/`, so a backslash continues a run without counting.
+        // Each image as bytes and pixels (long edge), the measure a provider prices it by.
+        var images: [String] = [], run = Data()
+        for byte in body + [0] {
+            if byte == 92 { continue }
+            let isBase64 = (byte >= 65 && byte <= 90) || (byte >= 97 && byte <= 122) || (byte >= 48 && byte <= 57)
+                || byte == 43 || byte == 47 || byte == 61
+            if isBase64 { run.append(byte); continue }
+            if run.count > 10_000, let image = Data(base64Encoded: run) {
+                let props = CGImageSourceCreateWithData(image as CFData, nil)
+                    .flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) } as? [CFString: Any]
+                let w = props?[kCGImagePropertyPixelWidth] as? Int ?? 0, h = props?[kCGImagePropertyPixelHeight] as? Int ?? 0
+                images.append("\(image.count):\(w)x\(h)")
+            }
+            run.removeAll(keepingCapacity: true)
+        }
+        let model = ((try? JSONSerialization.jsonObject(with: body)) as? [String: Any])?["model"] as? String ?? ""
+        let line = "\(request.url?.host ?? "")\(request.url?.path ?? "")\tbody_bytes=\(body.count)"
+            + "\timages=\(images.joined(separator: ","))\tmodel=\(model)"
+        lock.lock(); lines.append(line); lock.unlock()
+    }
+
+    var summary: String {
+        lock.lock(); defer { lock.unlock() }
+        return lines.map { $0 + "\n" }.joined()
+    }
 }
 
 /// W40.d1: what a metered run spent, priced from each reply's OpenAI-shaped `usage` at the model's rates. A 2xx

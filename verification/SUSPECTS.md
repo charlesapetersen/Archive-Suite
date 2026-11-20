@@ -644,10 +644,15 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `P-17`, `P-19`.
 - **Would confirm it:** encode one oversized JPEG through both paths at 100% and compare the bytes sent.
 - **Would clear it:** both paths send the same size.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-money-check`); [`evidence/processor/W49.proc-suspects-money.md`](evidence/processor/W49.proc-suspects-money.md), `ArchiveProcessor/scripts/repro-suspects-money.sh`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-money — reproduced, narrower than raised. The code still says it (batch passes the
+    slider to `loadImageAsJPEG(scale:)`, `OCR/OCRProcessor+OCR.swift:845-859`). Two noise scans at 100%, Gemini direct
+    then batch, redirected to the stand-in: a 2000×1500, 8.8 MB scan went up at 1169×877 (0.9 MB) direct and as the file
+    itself in batch; a 6000×4000 scan at 1606×1071 direct and 2048×1365 in batch. Both paths cap at 2,048 px, so a scan
+    goes up whole only when it is already within the cap. Nothing calls it deliberate.
 
 ### S-027 · Batch mode is offered for providers with no batch, and still changes the run
 
@@ -660,10 +665,16 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** OpenAI selected, Batch on, page kinds on: check the estimate and whether the run read pages
   with the per-kind reader.
 - **Would clear it:** the toggle is disabled there, or those sites test `provider.supportsBatch`.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-money-check`); [`evidence/processor/W49.proc-suspects-money.md`](evidence/processor/W49.proc-suspects-money.md), `ArchiveProcessor/scripts/repro-suspects-money.sh`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-money — half cleared, half reproduced. The toggle is now disabled without a batch
+    provider (W40.fix-processor-settings-backend-mismatch), but a flag left on is still passed on (`Views/OCRView.swift:1762`).
+    OpenAI, every page given a GPT-5 nano reader: with the stored flag on, the run went standard and all four pages were
+    read by GPT-5.4 mini instead, and the estimate's batch figure was $0.0105 against $0.0210; off, all four went to
+    GPT-5 nano. The pane's batch line tests the raw flag (code; not drawn). Nothing intends a run with no batch to lose
+    its readers.
 
 ### S-028 · A chosen folder is read one level deep; nested photos are silently left out
 
@@ -748,10 +759,14 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** choose Gemini only with no Gemini key, three pages on a cheap OCR model; watch when the prompt
   appears.
 - **Would clear it:** Start is disabled, or the run stops before OCR.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-money-check`); [`evidence/processor/W49.proc-suspects-money.md`](evidence/processor/W49.proc-suspects-money.md), `ArchiveProcessor/scripts/repro-suspects-money.sh`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-money — reproduced. `canStartProcessing` still has no segmentation term. Gemini in
+    the chooser with no Gemini key, three photos, Automatic: all three pages were OCRed, then the window stage asked
+    "Gemini needs an API key." (pages read 3/3). The run is resumable, so the reads are kept if the user adds the key and
+    resumes. The chooser's comment promises the start gate, so it is not intended.
 
 ### S-033 · A tag reply with no year and `date_uncertain: false` gets no date tags at all
 
@@ -895,10 +910,14 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `P-50`.
 - **Would confirm it:** in a driver, hand off twice and count the files Process Files receives.
 - **Would clear it:** the second hand-off is empty or refused.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-money-check`); [`evidence/processor/W49.proc-suspects-money.md`](evidence/processor/W49.proc-suspects-money.md), `ArchiveProcessor/scripts/repro-suspects-money.sh`
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
+  - 2026-11-20 W49.proc-suspects-money — reproduced. Six photos received in Stage for later and handed over: after
+    the run the pane hands the same six over again, and a relaunched app restores them and its run OCRs all six again (12
+    OCR calls for six photos). Each hand-off still needs Start pressed. Keeping the photos is deliberate (the backup is
+    the only copy); nothing calls the repeat hand-off deliberate.
 
 ### S-040 · A year typed on the phone keeps the day the OCR read from another date
 
@@ -1109,3 +1128,17 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
+
+### S-051 · A batch create refused outright is reported as an uncertain submission
+
+- **Raised:** 2026-11-20 · W49.proc-suspects-money · seen in a run (the S-026 batch case).
+- **Suspected behaviour:** the stand-in answered the Gemini batch create with a 401, and the run ended "Batch
+  submission outcome is uncertain. No server job was acknowledged, but a create whose reply was lost may still have been
+  accepted. The recovery journal was kept", though a 401 is a reply, and it says the create was refused. The kept journal
+  then asks the user to resume or dismiss a batch that cannot exist.
+- **Where:** `OCR/OCRProcessor+OCR.swift` batch submission (W49.proc-quit-waits-batch-submit's uncertain-outcome path).
+- **Would confirm it:** a submission answered 4xx with no batch ID, its status line and whether the journal is kept.
+- **Would clear it:** only a lost or cut-off reply is reported as uncertain.
+- **Status:** `open`
+- **History:**
+  - 2026-11-20 W49.proc-suspects-money — raised.
