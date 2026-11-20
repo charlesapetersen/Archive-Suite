@@ -99,10 +99,21 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   `kCGPDFContextUserPassword`). Run it through `ContentIndexer`'s row extraction and `DocumentViewerModel.load`,
   and record the format status and the error shown.
 - **Would clear it:** the status is `unreadable` and the viewer names the problem.
-- **Status:** `open`
+- **Status:** `reproduced` (the viewer half) — awaiting the independent check (phase rule 5a(4),
+  `W49.reader-s005-reproduce-check`); tests `ArchiveReaderTests/EncryptedPDFSuspectTests`
 - **History:**
   - 2026-10-12 W40.b1 — raised.
   - 2026-11-20 owner walkthrough (call 24) — reproduce attempt queued as `W49.reader-s005-reproduce`.
+  - 2026-11-20 W49.reader-s005-reproduce (Opus 5.5) — the code still reads as the entry says: nothing in the Reader
+    checks `isLocked`/`isEncrypted`, and `loadDocument` sets `loadError` only for a nil document or zero pages. A
+    two-page text PDF written on scratch with `kCGPDFContextUserPassword` was run through the real pipeline.
+    **Indexer: holds.** `PDFHeaderParser.extract` (ArchiveCore `ExtractedContent.swift`) already returns nil for a
+    locked document, so a real `ContentIndexer` pass stores the row `.unreadable` ("Unreadable"; it does not say
+    why). **Viewer: reproduced.** `DocumentViewerModel.load` gets a locked `PDFDocument` with its real page count
+    (2) and no readable text: `loadError` is nil and `formatNote` says "No OCR text layer — this document is
+    image-only…", which is wrong for a text PDF behind a password, and nothing mentions a password or encryption.
+    Not deliberate: `PDFFormatStatus`'s comment counts an encrypted PDF as unreadable. The viewer check is an
+    `XCTExpectFailure`, so the bundle stays green until a fix removes it. Cosmetic or misleading, no data loss.
 
 ### S-006 · A Notes subject spelled "ArchiveSuite" loses its Finder tag on the note's next save
 
