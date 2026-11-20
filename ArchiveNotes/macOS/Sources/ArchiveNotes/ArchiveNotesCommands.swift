@@ -68,16 +68,33 @@ struct FormatCommands: Commands {
 /// Also File ▸ New Library… and Open Library… (W40.fix-notes-choose-store, W49.notes-store-format), in the
 /// same group so the folder choices sit together. `notesModel` is passed in for the same reason as
 /// `previewState`.
+///
+/// A library double-clicked in Finder takes the same route, wired here rather than from the main window: a launch
+/// by double-click opens no window by itself (the app is launched to open a document, and nothing is restored on
+/// a first launch), so a window's `onAppear` never ran and the library waited unasked (measured with the Release
+/// build in the VM, W49.notes-finder-open-check). The menu bar is built at launch whether or not a window is.
 struct ReaderRootCommands: Commands {
     let previewState: SourceBlockPreviewState
     let notesModel: NotesModel
+    let appDelegate: NotesAppDelegate
+    @Environment(\.openWindow) private var openWindow
 
     /// "Is it inside an archive?" answered with Choose Archive Folder…: grant the archive first.
     private func grantArchiveIfAsked(_ outcome: StoreFolderChooser.Outcome?) {
         if case .chooseArchiveFirst = outcome { previewState.chooseArchiveFolder() }
     }
 
+    /// Opens a library from Finder: the main window first, so the app is there behind the question and after a
+    /// Cancel, then Open Library…'s checks and confirmation.
+    private func openLibraryFromFinder(_ url: URL) {
+        openWindow(id: NotesWindowID.notes)
+        NSApp.activate(ignoringOtherApps: true)
+        grantArchiveIfAsked(notesModel.storeFolderChooser?.use(url, readerRoots: previewState.grantedArchiveFolders))
+    }
+
     var body: some Commands {
+        // Idempotent: a rebuilt menu bar only hands over the same route again.
+        let _ = appDelegate.openLibrary = openLibraryFromFinder
         CommandGroup(after: .newItem) {
             // ⇧⌘O, as in the Reader (W40.fix-suite-shortcuts).
             Button("Choose Archive Folder\u{2026}") { previewState.chooseArchiveFolder() }

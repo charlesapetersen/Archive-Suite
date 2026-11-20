@@ -110,6 +110,12 @@ File ▸ Choose Store Folder… (it persists over the owner's real root).
 - `gui-drive-notes.sh` — sourced cliclick/osascript/capture/tag-read drive library (scratch-only; reads
   tags to assert, never drives the store picker). Calibrate its table geometry against a
   `gui_capture_window` shot before trusting row-index clicks.
+- `vm-finder-open-check.sh` (+ `vm-finder-open-ax.swift`, run in the guest) — a library double-clicked in Finder,
+  checked in the VM with a **Release** build (production entitlements, verified on the built app): `open -a` on a
+  scratch `.archivenotes` at a first launch, "Restart and Switch" pressed through the Accessibility API by pid
+  (XCUITest cannot query an instance LaunchServices started), then the relaunched app must write the library's
+  marker through its bookmark and show no dialog. Boots and stops the VM itself; about 4 minutes. Exit 0 = passed
+  (W49.notes-finder-open-check).
 - `macOS/Tests/ArchiveNotesUITests/` — `SmokeUITest.swift` (launch) + `NotesGUITests.swift`
   (`NotesFixtureUITestCase` base + G0–G20).
 - [`../GUI_SAFETY.md`](../GUI_SAFETY.md) — the authoritative test file-safety protocol + the runtime

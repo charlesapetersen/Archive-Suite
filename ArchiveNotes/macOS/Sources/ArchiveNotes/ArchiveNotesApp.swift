@@ -58,17 +58,6 @@ struct ArchiveNotesApp: App {
                         NSApp.activate(ignoringOtherApps: true)
                         deepLinkRouter.handle(url)
                     }
-                    .onAppear {
-                        // A library double-clicked in Finder (W49.notes-store-format): switch to it, with
-                        // Open Library…'s checks and confirmation.
-                        appDelegate.openLibrary = { url in
-                            NSApp.activate(ignoringOtherApps: true)
-                            if case .chooseArchiveFirst = notesModel.storeFolderChooser?
-                                .use(url, readerRoots: previewState.grantedArchiveFolders) {
-                                previewState.chooseArchiveFolder()
-                            }
-                        }
-                    }
                     // A link can arrive while this first window is still bootstrapping. Hold it until
                     // the complete item list is available, rather than mistaking its target for a
                     // deleted note in the empty pre-bootstrap list.
@@ -82,7 +71,7 @@ struct ArchiveNotesApp: App {
         }
         .commands {
             NewItemCommands(notesModel: notesModel, flushRegistry: appDelegate.flushRegistry)
-            ReaderRootCommands(previewState: previewState, notesModel: notesModel)
+            ReaderRootCommands(previewState: previewState, notesModel: notesModel, appDelegate: appDelegate)
             FormatCommands()
             SourceBlockCommands()
             ZoteroCommands()
@@ -144,8 +133,8 @@ final class NotesAppDelegate: NSObject, NSApplicationDelegate {
     /// Cancelling the terminate instead keeps the user in the one dialog they are already answering.
     private var isAskingAfterFailedClose = false
 
-    /// Switches to a library opened from Finder; set by the main window. Libraries that arrive before it is
-    /// set (a launch by double-click) wait in `pendingLibraries`.
+    /// Switches to a library opened from Finder; set by the menu bar (`ReaderRootCommands`). Libraries that
+    /// arrive before it is set (a launch by double-click) wait in `pendingLibraries`.
     var openLibrary: (@MainActor (URL) -> Void)? {
         didSet { flushPendingLibraries() }
     }
@@ -174,10 +163,21 @@ final class NotesAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func flushPendingLibraries() {
+        guard openLibrary != nil, !pendingLibraries.isEmpty else { return }
+        // After the event returns, so the confirmation's modal loop does not run inside the event handler. A
+        // run-loop perform, not a `Task`: Restart and Switch quits from inside this call, and a quit that waits
+        // for the editors' flush (`applicationShouldTerminate`) needs the main queue, which a nested run loop
+        // started inside a main-queue job never drains, so the app hung there instead of quitting (measured
+        // with the Release build in the VM, W49.notes-finder-open-check).
+        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(deliverPendingLibrary),
+                                               object: nil)
+        perform(#selector(deliverPendingLibrary), with: nil, afterDelay: 0)
+    }
+
+    @objc private func deliverPendingLibrary() {
         guard let openLibrary, let library = pendingLibraries.first else { return }
         pendingLibraries.removeAll()
-        // After the event returns, so the confirmation's modal loop does not run inside the event handler.
-        Task { @MainActor in openLibrary(library) }
+        openLibrary(library)
     }
 
     override init() {

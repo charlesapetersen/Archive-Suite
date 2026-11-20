@@ -42,7 +42,8 @@ per-file descriptions and backstory are in [`REFERENCE.md`](REFERENCE.md), read 
 - **GUI harness:** `scripts/make-notes-fixture.sh` builds a SCRATCH store and prints its path for the `#if DEBUG`
   `-ANUITestStorePath` override; `scripts/gui-drive-notes.sh` is scratch-only, never drives the store picker,
   and is **host-only, so unattended sessions are blocked from it**. The `ArchiveNotesUITests` suite runs
-  **off-screen in the Tart VM** and is part of the periodic health gate. Catalog and owner-eye checks:
+  **off-screen in the Tart VM** and is part of the periodic health gate. A library opened from Finder under the
+  shipping sandbox: `scripts/vm-finder-open-check.sh` (Release build in the VM). Catalog and owner-eye checks:
   [`scripts/GUI-HARNESS.md`](scripts/GUI-HARNESS.md).
 - **Visual / render verification:** `ArchiveNotesUITests` asserts the accessibility tree, not pixels — it
   won't catch a PDF pane / page-thumbnail that renders blank; a render change needs a pixel guard
