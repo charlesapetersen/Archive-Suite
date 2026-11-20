@@ -538,12 +538,13 @@ struct MarkdownBridgeTests {
     }
 
     /// Returns in a row are kept: a paragraph break, then a hard break for each one past two
-    /// (W40.fix-notes-editor-lines; they collapsed to one paragraph break). A Return ending the text writes
-    /// nothing after it.
+    /// (W40.fix-notes-editor-lines; they collapsed to one paragraph break). A Return ending the text is an empty
+    /// last line, kept as a break ending in an `&nbsp;` line (W49.notes-keep-trailing-lines; it was dropped).
     @Test @MainActor
-    func repeatedReturnsAreKeptAndTrailingOnesDropped() {
-        #expect(MarkdownBridge.serialize(typing("\n\n\nB\n", after: "A")) == "A\n\n\\\nB")
-        #expect(MarkdownBridge.serialize(typing("\n", after: "A")) == "A")
+    func repeatedReturnsAreKeptAndTrailingOnesToo() {
+        #expect(MarkdownBridge.serialize(typing("\n\n\nB\n", after: "A")) == "A\n\n\\\nB\\\n&nbsp;")
+        #expect(MarkdownBridge.serialize(typing("\n", after: "A")) == "A\\\n&nbsp;")
+        #expect(MarkdownBridge.parse(markdown: "A\n\n\\\nB\\\n&nbsp;").string == "A\n\n\nB\n")
     }
 
     /// A Return typed inside bold closes the emphasis before the break, rather than enclosing a blank line.
@@ -585,7 +586,8 @@ struct MarkdownBridgeTests {
     }
 
     /// A hard break left at the end of a paragraph, by a Return typed beside it or the text after it deleted,
-    /// writes no backslash: there it would read back as a literal `\`. Beside a separator it is one more
+    /// writes no bare backslash: there it would read back as a literal `\`. At the end of the note it is the empty
+    /// last line, written with the `&nbsp;` line (W49.notes-keep-trailing-lines). Beside a separator it is one more
     /// empty line, written as a break opening the next paragraph, which reads back as one
     /// (W40.fix-notes-editor-lines).
     @Test @MainActor
@@ -595,7 +597,8 @@ struct MarkdownBridgeTests {
                 == "Line one\n\nLine two")
         let storage = NSMutableAttributedString(attributedString: MarkdownBridge.parse(markdown: md))
         storage.deleteCharacters(in: NSRange(location: 9, length: storage.length - 9))
-        #expect(MarkdownBridge.serialize(storage) == "Line one")
+        #expect(MarkdownBridge.serialize(storage) == "Line one\\\n&nbsp;")
+        #expect(MarkdownBridge.parse(markdown: MarkdownBridge.serialize(storage)).string == storage.string)
 
         // The same beside a separator the deleted text leaves behind, after the break or before it.
         let after = NSMutableAttributedString(attributedString: MarkdownBridge.parse(markdown: "Line one\\\nLine two\n\nNext"))

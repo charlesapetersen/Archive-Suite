@@ -39,8 +39,9 @@ words**.
 - **Notes** — a note is a single Markdown file with a title, date, quality rating, and
   subjects, all in durable YAML front-matter. Styled editor with a raw-Markdown toggle (⌘/).
   The styled editor keeps the lines you type. Markdown has no empty paragraph or empty list item, so
-  the file holds an extra empty line next to a heading, list, quote or code block as a line that is
-  `&nbsp;` alone, and an empty list item as `- &nbsp;`. The raw view shows those `&nbsp;` lines; the
+  the file holds an extra empty line next to a heading, list, quote, code block or source block, or at
+  the end of the note, as a line that is `&nbsp;` alone, and an empty list item as `- &nbsp;`. The raw
+  view shows those `&nbsp;` lines; the
   styled view shows them as empty lines.
 - **Provenance** — paste a page/document link copied from Archive Reader to drop a **source block**
   with a chip that jumps back to (and previews) the exact source; links are GUID-based, so they

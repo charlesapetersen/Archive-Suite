@@ -187,7 +187,64 @@ class EditorLinesUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// W49.notes-keep-trailing-lines (owner call 20, keep what I type): Returns typed at the very end of a note, and
+    /// text with Returns typed above a source-block chip, each saved, shown after a reselect, and unchanged by opening
+    /// the note after a relaunch.
+    func testReturnsAtTheEndAndAboveAChipAreKept() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let id = Self.idPlain
+            try loadNote(id)
+
+            // Two Returns at the end of the plain note.
+            try typeIntoEditor("\n\n")
+            XCTAssertTrue(pollUntil(timeout: 10) { (self.noteBody(uuid: id) ?? "").contains(self.original + "\\\n\\\n&nbsp;") },
+                          "the Returns at the end should save — disk: \((noteBody(uuid: id) ?? "").debugDescription)")
+            reselect(id)
+            XCTAssertTrue(editorText.hasSuffix(shown + "\n\n"), "editor after reselect: \(editorText.debugDescription)")
+            try typeIntoEditor("End.")
+            XCTAssertTrue(pollUntil(timeout: 10) { (self.noteBody(uuid: id) ?? "").contains(self.original + "\n\nEnd.") },
+                          "text typed on the kept line is a paragraph below — disk: \((noteBody(uuid: id) ?? "").debugDescription)")
+
+            // Text and two Returns typed above the reader note's chip, which opens its text.
+            let reader = Self.idReader
+            try loadReaderNote()
+            func focused() -> Bool { (editor.value(forKey: "hasKeyboardFocus") as? Bool) == true }
+            for _ in 0..<4 where !focused() { app.activate(); editor.click(); _ = pollUntil(timeout: 2, focused) }
+            app.typeKey(.upArrow, modifierFlags: .command)
+            editor.typeText("Intro\n\n")
+            XCTAssertTrue(pollUntil(timeout: 10) { (self.noteBody(uuid: reader) ?? "").contains("Intro\\\n&nbsp;\n<!-- block: reader-page") },
+                          "the Returns above the chip should save — disk: \((noteBody(uuid: reader) ?? "").debugDescription)")
+            selectItem(uuid: id)
+            XCTAssertTrue(pollUntil(timeout: 10) { self.editorText.contains("A plain note") }, "another note should load")
+            try loadReaderNote()
+            XCTAssertTrue(editorText.hasPrefix("Intro\n\n"), "editor after reselect: \(editorText.debugDescription)")
+            try saveShot("W49.notes-keep-trailing-lines-\(journeyLayout.rawValue)")
+
+            // Quit and relaunch: opening either note rewrites nothing.
+            let savedPlain = noteBody(uuid: id) ?? ""
+            let savedReader = noteBody(uuid: reader) ?? ""
+            app.typeKey("q", modifierFlags: .command)
+            XCTAssertTrue(app.wait(for: .notRunning, timeout: 15), "⌘Q should quit the app")
+            XCTAssertEqual(noteBody(uuid: reader), savedReader, "quitting should not change the saved note")
+            relaunch()
+            try loadReaderNote()
+            XCTAssertTrue(pollUntil(timeout: 10) { self.editorText.hasPrefix("Intro\n\n") }, "relaunched editor: \(editorText.debugDescription)")
+            try loadNote(id)
+            XCTAssertTrue(pollUntil(timeout: 10) { self.editorText.hasSuffix(self.shown + "\n\nEnd.") }, "relaunched editor: \(editorText.debugDescription)")
+            RunLoop.current.run(until: Date().addingTimeInterval(3))
+            XCTAssertEqual(noteBody(uuid: reader), savedReader, "opening the note after relaunch must not rewrite it")
+            XCTAssertEqual(noteBody(uuid: id), savedPlain, "opening the note after relaunch must not rewrite it")
+            print("[trailing-lines] final bodies: \(savedPlain.debugDescription) \(savedReader.debugDescription)")
+        }
+    }
+
     // MARK: - Helpers
+
+    private func loadReaderNote() throws {
+        selectItem(uuid: Self.idReader)
+        XCTAssertTrue(pollUntil(timeout: 10) { self.editorText.contains("Moore on Intel") }, "the reader note's body should load")
+    }
 
     private var editorText: String { (editor.value as? String) ?? "" }
 

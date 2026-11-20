@@ -91,7 +91,7 @@ struct EditorPassageSource: PassageSelectionSource {
         let clamped = NSIntersectionRange(range, NSRange(location: 0, length: rendered.length))
         guard clamped.length > 0 else { return ("", [:]) }
 
-        let sub = Self.strippingBlockChips(rendered.attributedSubstring(from: clamped))
+        let sub = Self.trimmingTrailingNewlines(Self.strippingBlockChips(rendered.attributedSubstring(from: clamped)))
         // The bridge writes the on-disk form, and this becomes one block's text: no chip is left, so every
         // header-looking line in it is escaped text, and the block holds it unescaped
         // (W40.fix-notes-block-marker-in-text).
@@ -146,6 +146,22 @@ struct EditorPassageSource: PassageSelectionSource {
             stripped.deleteCharacters(in: cut)
         }
         return stripped
+    }
+
+    /// A selection that ends in newlines (a line selected whole) ends where the passage's text does. At the end of
+    /// what `MarkdownBridge.serialize` writes, newlines are empty lines the operator typed there, and it keeps them
+    /// (W49.notes-keep-trailing-lines); a passage is its text, so they go here, as they went before, with the spaces
+    /// on those lines. A code block's or raw HTML's own newlines are its text, and stay (W49 review).
+    private static func trimmingTrailingNewlines(_ sub: NSAttributedString) -> NSAttributedString {
+        let text = sub.string as NSString
+        var end = text.length
+        func isText(_ i: Int) -> Bool {
+            if case .codeBlock? = sub.attribute(.noteBlockKind, at: i, effectiveRange: nil) as? BlockKind { return true }
+            return sub.attribute(.noteRawHTML, at: i, effectiveRange: nil) as? Bool == true
+                || sub.attribute(.noteInlineCode, at: i, effectiveRange: nil) as? Bool == true
+        }
+        while end > 0, [0x0A, 0x0D, 0x20, 0x09].contains(text.character(at: end - 1)), !isText(end - 1) { end -= 1 }
+        return end == text.length ? sub : sub.attributedSubstring(from: NSRange(location: 0, length: end))
     }
 }
 

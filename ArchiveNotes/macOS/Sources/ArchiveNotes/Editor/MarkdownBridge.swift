@@ -252,8 +252,9 @@ enum MarkdownBridge {
     /// empty line beside a block, or an empty item, as `&nbsp;`, which reads back as a U+00A0 line. That character
     /// is deleted, and the newline after it is the line. An empty item at the very end has no newline after it: its
     /// kind goes on the newline before it, as `.noteNextLineKind`. A U+00A0 the operator typed alone on a line goes
-    /// the same way; it showed nothing. One in code, inline code or raw HTML is text and stays. One the serializer
-    /// does not write (at the end, or before a chip) is still deleted, so no stray U+00A0 reaches the text.
+    /// the same way; it showed nothing. One in code, inline code or raw HTML is text and stays. At the end of the
+    /// text it is deleted and the newlines before it are the lines; before a chip, the newline `endLine` adds after
+    /// it is the line (W49.notes-keep-trailing-lines). A quote's empty last lines are written the same way.
     @MainActor
     private static func restoreEmptyLines(in text: NSMutableAttributedString) {
         let string = text.string as NSString
@@ -269,7 +270,7 @@ enum MarkdownBridge {
             guard attrs[.noteInlineCode] as? Bool != true, attrs[.noteRawHTML] as? Bool != true else { continue }
             let kind = attrs[.noteBlockKind] as? BlockKind ?? .plain
             switch kind {
-            case .plain, .listItem: break
+            case .plain, .listItem, .blockquote: break   // a quote's empty last lines (W49.notes-keep-trailing-lines)
             default: continue
             }
             if i + 1 < text.length {
@@ -537,7 +538,12 @@ enum MarkdownBridge {
             } else {
                 listState.removeAll()
             }
-            let line = serializeParagraph(sub, range: para.range, kind: kind, followed: index < paragraphs.count - 1)
+            // W49.notes-keep-trailing-lines — a segment ends at a chip or at the end of the note. Before a chip its
+            // last block is followed, as by another block: the chip's header is what comes next in the file.
+            let isLast = index == paragraphs.count - 1
+            let line = serializeParagraph(sub, range: para.range, kind: kind,
+                                          followed: !isLast || NSMaxRange(range) < attributed.length,
+                                          endsNote: isLast && NSMaxRange(range) == attributed.length)
             // W40.fix-notes-editor-lines — two blocks of different kinds are written a blank line apart, as the
             // Styler reads them, whatever newlines sit between them in the editor (it shows them one newline
             // apart). A list item or a quote followed directly by text would otherwise take that text in as a
@@ -645,11 +651,13 @@ enum MarkdownBridge {
     // MARK: - Paragraph serialization
 
     /// `followed`: another block of this text comes after this one, so a newline ending it is the boundary to that
-    /// block rather than an empty line.
+    /// block rather than an empty line (a chip's header after it counts). `endsNote`: nothing comes after it, so every
+    /// newline ending it is an empty line.
     private static func serializeParagraph(_ storage: NSAttributedString,
                                            range: NSRange,
                                            kind: BlockKind,
-                                           followed: Bool) -> String {
+                                           followed: Bool,
+                                           endsNote: Bool = false) -> String {
         // W3.notes-editor-blankline-collapse — a block separator at the END of this paragraph is
         // not part of its text: it separates this block from the next, and `serializeBodySegment`'s
         // join already writes one of its newlines. Emitting the rest AFTER the decorated construct
@@ -671,16 +679,27 @@ enum MarkdownBridge {
             // reads as one newline whatever the file holds. All the newlines left after a one-newline separator are
             // such lines; with no separator, the last newline is the boundary. They are written as breaks ending in
             // an `&nbsp;` line, which `restoreEmptyLines` reads back as empty. A paragraph with no text at all is that
-            // line. At the end of the text, or before a chip, they are dropped as before: nothing follows them, and
-            // a marker there would read back as a stray U+00A0 (W49 review).
+            // line. Before a chip the same holds (W49.notes-keep-trailing-lines): the one-newline separator there is
+            // `endLine`'s, which the reopen puts back after the marker.
+            // At the end of the note nothing follows, so every newline after the text is an empty line, a separator
+            // left there by a deleted block too; the marker on the last line is deleted on reading
+            // (`restoreEmptyLines`), which leaves those newlines.
             let oneNewlineSeparator = separatorSuffix.isEmpty && contentRange.length < range.length
-            if followed, plain.leading.isEmpty, !plain.endsInHTML, separatorSuffix.isEmpty {
+            // The text after an image's line opens with that boundary (`leading`), written before it as always
+            // (W49 review: a chip's text opens with its thumbnail line, and the guard here dropped its Returns).
+            if endsNote, !plain.endsInHTML {
+                let empty = plain.trailingBreaks + (range.length - contentRange.length)
+                if empty > 0 {
+                    return plain.leading + plain.lines + String(repeating: "\\\n", count: empty) + emptyLineMarker
+                }
+            }
+            if followed, !plain.endsInHTML, separatorSuffix.isEmpty {
                 let empty = oneNewlineSeparator ? plain.trailingBreaks : plain.trailingBreaks - 1
-                if plain.lines.isEmpty, empty >= 0 {
+                if plain.lines.isEmpty, plain.leading.isEmpty, empty >= 0 {
                     return String(repeating: "\\\n", count: empty) + emptyLineMarker
                 }
                 if empty > 0 {
-                    return plain.lines + String(repeating: "\\\n", count: empty) + emptyLineMarker
+                    return plain.leading + plain.lines + String(repeating: "\\\n", count: empty) + emptyLineMarker
                 }
             }
             return plain.leading + plain.lines + separatorSuffix
@@ -690,8 +709,21 @@ enum MarkdownBridge {
         // back as `q r`, and one after a blank line leaves the quote.
         if case .blockquote = kind {
             let plain = plainLines(storage, range: contentRange)
-            let (leading, lines) = (plain.leading, plain.lines)
+            let leading = plain.leading
+            var lines = plain.lines
             guard !lines.isEmpty else { return "\(leading)> \(separatorSuffix)" }
+            // W49.notes-keep-trailing-lines — the empty quote lines after its text are kept as text's are, as breaks
+            // ending in an `&nbsp;` quote line, counted the same way.
+            let oneNewlineSeparator = separatorSuffix.isEmpty && contentRange.length < range.length
+            if !plain.endsInHTML {
+                let empty = endsNote ? plain.trailingBreaks + (range.length - contentRange.length)
+                    : followed && separatorSuffix.isEmpty ? (oneNewlineSeparator ? plain.trailingBreaks : plain.trailingBreaks - 1)
+                    : 0
+                if empty > 0 {
+                    lines += String(repeating: "\\\n", count: empty) + emptyLineMarker
+                    separatorSuffix = ""
+                }
+            }
             let quoted = lines.components(separatedBy: "\n").map { $0.isEmpty ? ">" : "> \($0)" }
             return leading + quoted.joined(separator: "\n") + separatorSuffix
         }

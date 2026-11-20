@@ -418,12 +418,12 @@ struct EditorLinesTests {
         #expect(ListMarkers.trailingMarker(in: storage, typingAttributes: tv.typingAttributes, caret: tv.selectedRange())?.text == "•")
         type(tv, "x")   // the caret is at the end after a reselect
         #expect(MarkdownBridge.serialize(storage) == "A\\\n&nbsp;\n\n- x")
-        // Toggled off again, it is a plain empty line, which at the end of the note is not written.
+        // Toggled off again, it is a plain empty line, kept as one at the end of the note (W49.notes-keep-trailing-lines).
         let (tv2, storage2) = try editor("A")
         tv2.insertNewline(nil); tv2.insertNewline(nil)
         EditorFormatting.toggleUnorderedList(tv2, fontSize: 14)
         EditorFormatting.toggleUnorderedList(tv2, fontSize: 14)
-        #expect(MarkdownBridge.serialize(storage2) == "A")
+        #expect(MarkdownBridge.serialize(storage2) == "A\\\n\\\n&nbsp;")
     }
 
     /// Case 3, after Return in a list: the empty item at the end is kept, and Return on it still leaves the list.
@@ -470,8 +470,8 @@ struct EditorLinesTests {
         #expect(expectKept(tv, storage, "typed entities") == "A\n\n\\&nbsp; and \\&amp;")
     }
 
-    /// From the Tier-2 review: where nothing follows (the end of the note, a chip below), no `&nbsp;` is written, and
-    /// none read from such a place stays as a character.
+    /// From the Tier-2 review: no `&nbsp;` read back stays as a character, where nothing follows it too (the end of the
+    /// note, a chip below).
     @Test func noStrayMarkerWhereNothingFollows() throws {
         let chip = "<!-- block: freeform -->\nBody."
         func expectNoStrayCharacter(_ storage: NSTextStorage, _ label: String) {
@@ -486,17 +486,103 @@ struct EditorLinesTests {
             expectNoStrayCharacter(storage, file)
             #expect(MarkdownBridge.serialize(storage) == saved, "\(file.debugDescription): saved \(saved.debugDescription)")
         }
-        // Return after text, then the block below deleted: the empty line is at the end.
+        // Return after text, then the block below deleted: the empty lines are at the end, and kept.
         let (tv, storage) = try editor("A\n\n# T")
         caret(tv, at: 1)
         tv.insertNewline(nil)
         storage.deleteCharacters(in: NSRange(location: storage.length - 1, length: 1))
-        #expect(!reselect(tv, storage).contains("&nbsp;"))
+        #expect(storage.string == "A\n\n")
+        #expect(expectKept(tv, storage, "block deleted") == "A\\\n\\\n&nbsp;")
         expectNoStrayCharacter(storage, "block deleted")
         // Read from such places, the marker is not kept as a character.
         for file in ["A\\\n&nbsp;", "A\\\n&nbsp;\n" + chip, "- a\n- &nbsp;\n" + chip] {
             let (_, storage) = try editor(file)
             expectNoStrayCharacter(storage, file)
+        }
+    }
+
+    // MARK: - W49.notes-keep-trailing-lines (owner call 20: keep what I type)
+
+    /// Returns typed at the very end of a note are kept: written as breaks ending in an `&nbsp;` line, whose marker is
+    /// deleted on reading and leaves the newlines.
+    @Test func returnsAtTheEndOfANoteAreKept() throws {
+        for count in 1...3 {
+            let (tv, storage) = try editor("A")
+            for _ in 0..<count { tv.insertNewline(nil) }
+            #expect(storage.string == "A" + String(repeating: "\n", count: count))
+            let saved = expectKept(tv, storage, "\(count) Returns at the end")
+            #expect(saved == "A" + String(repeating: "\\\n", count: count) + "&nbsp;", "saved \(saved.debugDescription)")
+            // Typing after a reopen goes on the last line, as it would have before the save.
+            type(tv, "B")
+            #expect(storage.string == "A" + String(repeating: "\n", count: count) + "B")
+            _ = expectKept(tv, storage, "\(count) Returns, then text")
+        }
+        // In an empty note, and after a heading, a list left with Return, a quote and a code block.
+        // (In a code block, Returns are the code's own lines, kept as its text.)
+        for (file, label) in [("", "empty note"), ("# H", "heading"), ("- a", "list"), ("> q", "quote"),
+                              ("Some <u>underlined</u>", "underline"), ("Some <mark>marked</mark>", "highlight")] {
+            let (tv, storage) = try editor(file)
+            tv.insertNewline(nil); tv.insertNewline(nil)
+            if file == "- a" { tv.insertNewline(nil) }   // the second Return made an empty item; this one leaves the list
+            let typed = storage.string
+            let saved = expectKept(tv, storage, label)
+            #expect(saved.hasSuffix("&nbsp;"), "\(label): saved \(saved.debugDescription) for \(typed.debugDescription)")
+            #expect(!storage.string.contains("\u{00A0}"), "\(label): \(storage.string.debugDescription)")
+        }
+    }
+
+    /// Returns typed just above a chip are kept, and agree with the newline `endLine` puts before the chip.
+    @Test func returnsAboveAChipAreKept() throws {
+        let chip = "<!-- block: freeform -->\nBody."
+        for count in 1...3 {
+            let (tv, storage) = try editor("A\n" + chip)
+            caret(tv, at: 1)
+            for _ in 0..<count { tv.insertNewline(nil) }
+            let saved = expectKept(tv, storage, "\(count) Returns above a chip")
+            #expect(saved == "A" + String(repeating: "\\\n", count: count) + "&nbsp;\n" + chip, "saved \(saved.debugDescription)")
+            // Text typed on the last of those lines is a line of its own.
+            caret(tv, at: (storage.string as NSString).range(of: "\u{FFFC}").location - 1)
+            type(tv, "B")
+            let withText = expectKept(tv, storage, "\(count) Returns above a chip, then text")
+            #expect(withText.hasPrefix("A") && withText.hasSuffix("B\n" + chip), "saved \(withText.debugDescription)")
+        }
+        // Above a chip after a list item, and at the end of a chip's own text.
+        for (file, at) in [("- a\n" + chip, 1), ("Intro\n" + chip, nil)] {
+            let (tv, storage) = try editor(file)
+            caret(tv, at: at ?? storage.length)
+            tv.insertNewline(nil); tv.insertNewline(nil)
+            _ = expectKept(tv, storage, file.debugDescription)
+            #expect(!storage.string.contains("\u{00A0}"), "\(file.debugDescription): \(storage.string.debugDescription)")
+        }
+    }
+
+    /// From the Tier-2 review: after an image's line (a chip's text opens with its thumbnail), Returns typed after the
+    /// text are kept too, at the end of the note and above the next chip.
+    @Test func returnsAfterTextBelowAnImageAreKept() throws {
+        let chip = "<!-- block: freeform -->\nBody."
+        for file in ["![](x.png)\n\nText", "![](x.png)\n\nText\n" + chip] {
+            let (tv, storage) = try editor(file)
+            let text = (storage.string as NSString).range(of: "Text")
+            caret(tv, at: NSMaxRange(text))
+            tv.insertNewline(nil); tv.insertNewline(nil)
+            let saved = expectKept(tv, storage, file.debugDescription)
+            #expect(saved.hasPrefix("![](x.png)\n\nText\\\n"), "\(file.debugDescription): saved \(saved.debugDescription)")
+            #expect(!storage.string.contains("\u{00A0}"), "\(file.debugDescription): \(storage.string.debugDescription)")
+        }
+    }
+
+    /// A quote's empty last lines are kept as text's are: at the end of the note, before another block and above a
+    /// chip.
+    @Test func emptyQuoteLinesAreKept() throws {
+        for (file, at, written) in [("> q", 3, "> q\\\n> \\\n> &nbsp;"),
+                                    ("> q\n\n# H", 1, "> q\\\n> \\\n> &nbsp;\n\n# H"),
+                                    ("> q\n<!-- block: freeform -->\nBody.", 1, "> q\\\n> \\\n> &nbsp;\n<!-- block: freeform -->\nBody.")] {
+            let (tv, storage) = try editor(file)
+            caret(tv, at: min(at, storage.length))
+            tv.insertNewline(nil); tv.insertNewline(nil)
+            let saved = expectKept(tv, storage, file.debugDescription)
+            #expect(saved == written, "\(file.debugDescription): saved \(saved.debugDescription)")
+            #expect(!storage.string.contains("\u{00A0}"), "\(file.debugDescription): \(storage.string.debugDescription)")
         }
     }
 
@@ -511,7 +597,7 @@ struct EditorLinesTests {
         EditorFormatting.toggleUnorderedList(tv, fontSize: 14)
         tv.deleteBackward(nil)
         #expect(storage.string == "A\n\n")
-        #expect(MarkdownBridge.serialize(storage) == "A")
+        #expect(MarkdownBridge.serialize(storage) == "A\\\n\\\n&nbsp;")
         #expect(ListMarkers.trailingMarker(in: storage, typingAttributes: tv.typingAttributes, caret: NSRange(location: 0, length: 0)) == nil)
     }
 

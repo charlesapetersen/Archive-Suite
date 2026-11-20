@@ -165,6 +165,28 @@ final class NotePassageSourceTests: XCTestCase {
         XCTAssertTrue(assets.isEmpty)
     }
 
+    /// W49.notes-keep-trailing-lines — the editor keeps the Returns at the end of a note, so a selection that ends in
+    /// newlines (a line selected whole, the text above a chip) must not bring them into the passage as empty lines.
+    func testSnapshotMarkdown_trailingNewlinesOfTheSelection_areNotEmptyLines() {
+        let r = MarkdownBridge.parse(markdown: "First line.\n\nSecond line.")
+        let firstLine = ("First line.\n\n" as NSString).length
+        let (md, _) = source(r, ranges: []).snapshotMarkdown(in: NSRange(location: 0, length: firstLine))
+        XCTAssertEqual(md, "First line.")
+        let prose = renderedProsePlusChip()
+        let chip = chipLocation(in: prose)
+        let (above, _) = source(prose, ranges: []).snapshotMarkdown(in: NSRange(location: 0, length: chip))
+        XCTAssertEqual(above, "Intro prose.")
+        // Spaces on the selection's last line go with its newlines; a code block's own last empty line is its text.
+        let spaced = MarkdownBridge.parse(markdown: "First line.\n\nSecond line.")
+        let withSpace = NSMutableAttributedString(attributedString: spaced)
+        withSpace.insert(NSAttributedString(string: "  "), at: firstLine)
+        let (trimmed, _) = source(withSpace, ranges: []).snapshotMarkdown(in: NSRange(location: 0, length: firstLine + 2))
+        XCTAssertEqual(trimmed, "First line.")
+        let code = MarkdownBridge.parse(markdown: "```\nc\n\n```")
+        let (codeMD, _) = source(code, ranges: []).snapshotMarkdown(in: NSRange(location: 0, length: code.length))
+        XCTAssertEqual(codeMD, MarkdownBridge.serialize(code))
+    }
+
     // MARK: W3.notes-extract-smuggles-a-source-header — a snapshot never re-emits the source's chip
 
     /// A selection that covers a whole block starts AT that block's chip (`blockRanges` is
