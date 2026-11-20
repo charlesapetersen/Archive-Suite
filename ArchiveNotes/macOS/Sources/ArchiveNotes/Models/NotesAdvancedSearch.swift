@@ -16,7 +16,7 @@ import Foundation
 import ArchiveCore
 
 enum NotesRuleField: String, Codable, Sendable, CaseIterable {
-    /// Title, tags and body: the columns the filter bar's search box searches.
+    /// Title, tags, linked-document names and body: the columns the filter bar's search box searches.
     case text
     /// The note's body alone (the index's `body` column).
     case noteText

@@ -1848,12 +1848,13 @@ W8-S3 completed the `NotesIndex` verification layer (plan §1.4) and hardened th
   latent risk, not an active bug — but the guarantee now holds inside the method, independent of any
   caller. Pinned by four pure `pruneGate…` tests (empty-snapshot never wipes even when repeated;
   two-emission required; transient drop not deleted; only twice-confirmed absences deleted). (accepted: done, W8-S3).
-- **RECONCILED (plan §1.4 vs shipped) — the FTS index has four weighted columns, not five.** §1.4 lists a
-  `linked-doc-display=3` weight, but the shipped `fts5(title, tags, authors, body, id UNINDEXED)` schema
-  (W2-S4) has no such column and orders by `bm25(fts, 10, 6, 4, 1)`. The existing bm25 tests
-  (`bm25TitleOutranksBody`, `tagsOutrankAuthorsOutrankBody`) therefore already cover every weighted column;
-  no linked-doc-display test was invented. A linked-doc-display column would be a schema + indexer change,
-  not a test gap. (accepted: reconciled, W8-S3; the shipped schema is the record).
+- **The FTS index has the plan's linked-document column (§1.4), added by W49.notes-linked-doc-search.** W8-S3
+  had reconciled the tests to the shipped schema, which had no `linked-doc-display=3` column; a source's display
+  name lives in its block header, so only a block with a thumbnail line was findable by name. The table is now
+  `fts5(title, tags, links, body, id UNINDEXED)` ordered by `bm25(fts, 10, 6, 3, 1)` (authors were removed by
+  W40.notes-remove-authors), and an older cache is dropped and re-read on open. Pinned by
+  `linkedDocNamesRankBetweenTagsAndBody`, `linkedDocNamesComeFromBlockSources`, `cacheWithoutLinksColumnIsRebuilt`.
+  (accepted: fixed, W49.notes-linked-doc-search).
 - **Coverage added to `NotesIndexTests`** (10 → 16): `reindexReplacesOldBody` (body-specific re-index; the
   existing `incrementalMtimeSkip` covered only the title) and `organizationGraphPersistsAndReloads` (the
   NotesIndex DB layer directly — folders + memberships + **template assignments** survive a close/reopen;

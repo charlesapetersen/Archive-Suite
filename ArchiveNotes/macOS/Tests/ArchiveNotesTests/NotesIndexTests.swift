@@ -77,13 +77,15 @@ import Foundation
         created: Date = Date(),
         modified: Date = Date(),
         managedTags: String = "[]",
-        sourceCount: Int = 0
+        sourceCount: Int = 0,
+        linkedDocs: String = ""
     ) -> NoteIndexRow {
         NoteIndexRow(id: id, mtime: mtime, title: title, kind: kind, tags: tags,
                      body: body, date: date,
                      datePrecision: datePrecision, dateUncertain: dateUncertain,
                      sortDate: sortDate, quality: quality, created: created,
-                     modified: modified, managedTags: managedTags, sourceCount: sourceCount)
+                     modified: modified, managedTags: managedTags, sourceCount: sourceCount,
+                     linkedDocs: linkedDocs)
     }
 
     private func cleanup(_ dir: URL) {
@@ -125,6 +127,77 @@ import Foundation
         #expect(results.count == 2)
         #expect(results[0] == tagHit, "Tags (weight 6) should outrank body (weight 1)")
         #expect(results[1] == bodyHit, "Body (weight 1) should be last")
+    }
+
+    /// W49.notes-linked-doc-search: a linked document's name finds the note, ranked between tags and body.
+    @Test func linkedDocNamesRankBetweenTagsAndBody() async throws {
+        let (index, tmp) = try await makeScratchIndex()
+        defer { cleanup(tmp) }
+
+        let tagHit = UUID(), linkHit = UUID(), bodyHit = UUID()
+        try await index.upsertBatch([
+            makeRow(id: bodyHit, title: "Note A", body: "Thornbury minutes discussed"),
+            makeRow(id: linkHit, title: "Note B", linkedDocs: "Thornbury Minutes 1931 \u{2014} p. 4"),
+            makeRow(id: tagHit, title: "Note C", tags: "Thornbury"),
+        ])
+
+        #expect(await index.search("Thornbury") == [tagHit, linkHit, bodyHit],
+                "tags (6) > linked-document names (3) > body (1)")
+        #expect(await index.search("1931") == [linkHit])
+    }
+
+    /// The names come from each block's source display, which lives in the block header and so is not in the
+    /// body: a text-only source block (no thumbnail line) is found only through this column.
+    @Test func linkedDocNamesComeFromBlockSources() async throws {
+        let blocks = [
+            Block(kind: .freeform, source: nil, markdown: "Opening thoughts", unknownHeaderFields: []),
+            Block(kind: .readerDoc, source: SourceAnchor(link: "archivereader://reveal?root=x&rel=A.pdf",
+                                                         display: "Treasury Memo"),
+                  markdown: "Quoted passage", unknownHeaderFields: []),
+            Block(kind: .readerPage, source: SourceAnchor(display: " Treasury Memo "),
+                  markdown: "", unknownHeaderFields: []),
+            Block(kind: .zoteroItem, source: SourceAnchor(display: "Moore, Budget Politics"),
+                  markdown: "", unknownHeaderFields: []),
+            Block(kind: .readerDoc, source: SourceAnchor(display: "  "), markdown: "", unknownHeaderFields: []),
+        ]
+        #expect(NoteIndexRow.linkedDocNames(blocks) == "Treasury Memo\nMoore, Budget Politics")
+
+        let (index, tmp) = try await makeScratchIndex()
+        defer { cleanup(tmp) }
+        let id = UUID()
+        try await index.upsertBatch([makeRow(id: id, body: "Quoted passage",
+                                             linkedDocs: NoteIndexRow.linkedDocNames(blocks))])
+        #expect(await index.search("Treasury") == [id])
+        #expect(await index.search("Budget Politics") == [id])
+    }
+
+    /// A cache from before `links` has the three-column FTS table: it is dropped and every row marked for a
+    /// re-read (mtime -1), which refills the new table. Folders are kept.
+    @Test func cacheWithoutLinksColumnIsRebuilt() async throws {
+        let (index, tmp) = try await makeScratchIndex()
+        defer { cleanup(tmp) }
+        let id = UUID()
+        let folder = VFolder(id: UUID(), name: "Kept", parentId: nil, sortOrder: 0, kind: .normal, queryJSON: nil)
+        try await index.insertFolder(folder)
+        try await index.upsertBatch([makeRow(id: id, mtime: 5, title: "Before")])
+        try await index.executeForTesting("DROP TABLE fts;")
+        try await index.executeForTesting("CREATE VIRTUAL TABLE fts USING fts5(title, tags, body, id UNINDEXED);")
+        try await index.executeForTesting("INSERT INTO fts(title, tags, body, id) VALUES('Before', '', '', '\(id.uuidString)');")
+        await index.close()
+
+        let reopened = NotesIndex(url: tmp.appendingPathComponent("test-index.sqlite3"))
+        try await reopened.open()
+        #expect(await reopened.existingMTimes()[id.uuidString] == -1, "every row is re-read from its file")
+        #expect(try await reopened.allFolders().contains(folder))
+        #expect(await reopened.search("Before").isEmpty)
+        try await reopened.upsertBatch([makeRow(id: id, mtime: 10, title: "After", linkedDocs: "Ledger")])
+        #expect(await reopened.search("Ledger") == [id])
+        await reopened.close()
+
+        let again = NotesIndex(url: tmp.appendingPathComponent("test-index.sqlite3"))
+        try await again.open()
+        #expect(await again.existingMTimes()[id.uuidString] == 10, "a current cache is not rebuilt again")
+        await again.close()
     }
 
     /// W40.notes-remove-authors: a cache from before drops `items.authors` and its four-column FTS table, and

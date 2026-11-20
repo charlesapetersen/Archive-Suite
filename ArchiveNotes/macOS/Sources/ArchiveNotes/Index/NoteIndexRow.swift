@@ -29,6 +29,10 @@ struct NoteIndexRow: Sendable {
     var sentWithUncertain: Bool = false
     /// W24.cal1-toggle: the item's display calendar (`items.display_calendar`); nil = as stored.
     var displayCalendar: DisplayCalendar? = nil
+    /// W49.notes-linked-doc-search: the display names of the documents the item's blocks link to, one per line,
+    /// for the FTS `links` column (weight 3). A name lives in the block header, which the body never carries;
+    /// only a thumbnail's `![display](thumb)` line put it in the body, so a text-only source was unsearchable.
+    var linkedDocs: String = ""
 }
 
 extension NoteIndexRow {
@@ -62,8 +66,21 @@ extension NoteIndexRow {
             roundup: item.roundup,
             sentWith: item.sentWith,
             sentWithUncertain: item.sentWith != nil && item.sentWithUncertain,
-            displayCalendar: item.displayCalendar
+            displayCalendar: item.displayCalendar,
+            linkedDocs: Self.linkedDocNames(item.blocks)
         )
+    }
+
+    /// Each distinct non-empty source display name, in block order.
+    static func linkedDocNames(_ blocks: [Block]) -> String {
+        var seen: Set<String> = []
+        var names: [String] = []
+        for block in blocks {
+            guard let name = block.source?.display?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !name.isEmpty, seen.insert(name).inserted else { continue }
+            names.append(name)
+        }
+        return names.joined(separator: "\n")
     }
 }
 

@@ -7,7 +7,7 @@ import ArchiveCore
 /// deleting this DB loses nothing (it re-indexes on next launch).
 ///
 /// Forked from Reader's `ContentIndex`, adapted for UUID-keyed items with prose-tuned
-/// BM25 weights (title=10, tags=6, body=1) per §16.5 of the overview.
+/// BM25 weights (title=10, tags=6, linked-document names=3, body=1) per §1.4/§16.5 of the overview.
 ///
 /// An `actor` so the SQLite connection is confined to one isolation domain (safe under Swift 6);
 /// indexing runs off the main actor while the UI stays responsive.
@@ -126,8 +126,24 @@ actor NotesIndex {
             }
         }
 
+        // W49.notes-linked-doc-search: the FTS table gained `links`, the names of the documents a note links to.
+        // A cache from before has the three-column table, so it is dropped and every row re-read from its `.md`
+        // (mtime -1, as above). One transaction, for the same reason as the authors rebuild.
+        let ftsColumns = columns(of: "fts")
+        if !ftsColumns.isEmpty, !ftsColumns.contains("links") {
+            try exec("BEGIN IMMEDIATE;")
+            do {
+                try exec("DROP TABLE fts;")
+                try exec("UPDATE items SET mtime = -1;")
+                try exec("COMMIT;")
+            } catch {
+                try? exec("ROLLBACK;")
+                throw error
+            }
+        }
+
         // FTS5 search table: prose-tuned columns. `id` is UNINDEXED (lookup key, not searchable).
-        try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(title, tags, body, id UNINDEXED);")
+        try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(title, tags, links, body, id UNINDEXED);")
 
         // Organizational tables (app-owned durable data — NOT pruned by mtime).
         try exec("""
@@ -348,19 +364,21 @@ actor NotesIndex {
     }
 
     private func insertFTS(rowid: Int64, row: NoteIndexRow) throws {
-        try run("INSERT INTO fts(rowid, title, tags, body, id) VALUES(?, ?, ?, ?, ?);") { stmt in
+        try run("INSERT INTO fts(rowid, title, tags, links, body, id) VALUES(?, ?, ?, ?, ?, ?);") { stmt in
             sqlite3_bind_int64(stmt, 1, rowid)
             self.bindText(stmt, 2, row.title)
             self.bindText(stmt, 3, row.tags)
-            self.bindText(stmt, 4, row.body)
-            self.bindText(stmt, 5, row.id.uuidString)
+            self.bindText(stmt, 4, row.linkedDocs)
+            self.bindText(stmt, 5, row.body)
+            self.bindText(stmt, 6, row.id.uuidString)
         }
     }
 
     // MARK: - Search
 
     /// Full-text search -> matching item UUIDs in **bm25 relevance order** (best match first).
-    /// Column weights (FTS5 column order: title, tags, body): title=10, tags=6, body=1 — prose-tuned per §16.5.
+    /// Column weights (FTS5 column order: title, tags, links, body): title=10, tags=6, linked-document names=3,
+    /// body=1 — prose-tuned per §1.4/§16.5.
     func search(_ query: String, limit: Int? = nil) -> [UUID] {
         search(expression: ftsMatchExpression(query), limit: limit)
     }
@@ -370,8 +388,8 @@ actor NotesIndex {
     func search(expression match: String, limit: Int? = nil) -> [UUID] {
         guard !match.isEmpty else { return [] }
         let sql = limit == nil
-            ? "SELECT id FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 10.0, 6.0, 1.0);"
-            : "SELECT id FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 10.0, 6.0, 1.0) LIMIT ?;"
+            ? "SELECT id FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 10.0, 6.0, 3.0, 1.0);"
+            : "SELECT id FROM fts WHERE fts MATCH ? ORDER BY bm25(fts, 10.0, 6.0, 3.0, 1.0) LIMIT ?;"
         guard let stmt = prepare(sql) else { return [] }
         defer { sqlite3_finalize(stmt) }
         bindText(stmt, 1, match)
@@ -892,12 +910,19 @@ actor NotesIndex {
     /// Whether the `items` table already has `column` — the additive-migration guard (W7-S4). Uses
     /// `PRAGMA table_info` so a fresh DB (new column baked into `CREATE TABLE`) skips the `ALTER`.
     private func itemsHasColumn(_ column: String) -> Bool {
-        guard let stmt = prepare("PRAGMA table_info(items);") else { return false }
+        columns(of: "items").contains(column)
+    }
+
+    /// A table's column names from `PRAGMA table_info` (empty when the table does not exist). Also reads an
+    /// FTS5 virtual table's columns.
+    private func columns(of table: String) -> Set<String> {
+        guard let stmt = prepare("PRAGMA table_info(\(table));") else { return [] }
         defer { sqlite3_finalize(stmt) }
+        var names: Set<String> = []
         while sqlite3_step(stmt) == SQLITE_ROW {
-            if let c = sqlite3_column_text(stmt, 1), String(cString: c) == column { return true }
+            if let c = sqlite3_column_text(stmt, 1) { names.insert(String(cString: c)) }
         }
-        return false
+        return names
     }
 
     private func bindText(_ stmt: OpaquePointer?, _ index: Int32, _ value: String) {
