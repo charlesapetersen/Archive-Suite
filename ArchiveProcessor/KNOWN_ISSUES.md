@@ -13,8 +13,7 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   false alarms; W47.wh-read-flag-cm declined).
 - A route the bench has not read (a typed gateway or OpenRouter model, Claude on the plan, the Local Agent, the older
   Gemini, GPT and Claude models) is not flagged, nor is a page another route read in its place, an imported page, a
-  newspaper page read in regions, a page the app turned, a page Vision failed on, or a batch run's pages (accepted: a cut is only as good as the readings it was fitted on; the refit on real
-  captures adds readers as the bench reads them).
+  newspaper page read in regions, a page the app turned, a page Vision failed on, or a batch run's pages (queued: W49.proc-read-flag-wiring).
 - Each checked page costs one extra Apple Vision reading on this Mac (time not measured; no money) (accepted: the
   check needs Vision's text, and Vision is free and local).
 
@@ -30,7 +29,7 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 - **The estimate counts the maker's thinking tokens at Low only.** At High, a maker's thinking model gets the direct
   clients' 8,000-token budget on top of the bench's 8,192, but the estimate still counts 117 thinking tokens a page for
   Gemini 3.8 Flash and none for the others, as the direct routes' estimates do. (accepted: no High thinking figure is measured; the estimate follows the direct routes').
-- **No batch, no LLM rotation** through OpenRouter: the standard price only, and rotation stays on this Mac. (accepted: OpenRouter has no batch interface).
+- **No batch, no LLM rotation** through OpenRouter: the standard price only, and rotation stays on this Mac. (queued: W49.proc-openrouter-rotation).
 - **The unmeasured Claude models (Sonnet 4.6, Opus 4.6, Opus 5.5, Haiku 4.5) and the unmeasured Gemini and GPT
   built-ins come through OpenRouter only as unmeasured listing models** (W41.app-openrouter-unmeasured): by the listing's
   ids, unpinned, without their makers' handling (Gemini's refusals and second reader, image-token counts) and not as a
@@ -76,7 +75,7 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   editor (the Inspector's Container section, W47.ct-reader-edit). The pre-OCRed PDF route (re-tagging existing PDFs, a new run or a resumed one) reads
   no labels: its outputs are its inputs, and nothing is written beside a source. An output outside the run's output
   folder, missing, or merged into another label's PDF is not recorded, and the summary counts it; so is one whose
-  collection organisation stopped partway (its moves are not reported then). (accepted: by design labels are proposals confirmed in the Reader, and a pre-OCRed run's outputs are its inputs).
+  collection organisation stopped partway (its moves are not reported then). (queued: W49.corpus-specific-audit).
 - **Process Files reads its labels one at a time before the run's summary.** One Vision pass, and with the gateway one
   call of up to 60 s, per label photo, after organisation ("Reading N box and folder labels…"); Stop ends it with
   nothing written. (accepted: labels are known only after organisation; the read is shown and Stop ends it cleanly).
@@ -234,7 +233,7 @@ written where the `searchableFor` setting names the input's format and the page'
   app still runs on Intel, but arm64-only bundled tools are ignored there: install native `jbig2enc` and `qpdf` for
   compression. Debug also uses installed tools. Lookup is Resources, then /opt/homebrew/bin, /usr/local/bin,
   /opt/local/bin, then the login shell's PATH. Without runnable tools the embedded JPEG remains (about 2 MB a
-  photographed page), and the run log says "written uncompressed: jbig2 and qpdf not found" (accepted: shipped, W42.int-s5-compress-ship; the bundled tools are arm64, so an Intel Mac uses installed ones).
+  photographed page), and the run log says "written uncompressed: jbig2 and qpdf not found" (queued: W49.proc-intel-compression).
 - **Compressing costs time**: 3 s the drawn memo, 10 s UIUC 00233, about 67 s each UIUC 00149 and 00156 (the engine's
   rebuild and MRC layering, every page in the app's process; measured 2026-11-14, Debug build). An unplaced page also
   runs Vision once more, to tell the layering where the words are (accepted: the measured cost of compressing).

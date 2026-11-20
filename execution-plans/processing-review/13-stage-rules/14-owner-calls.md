@@ -160,6 +160,12 @@ calls are section 1.
     queued: preservation copies under lossy compression, and how Notes stores its material (folder, bundle or
     package). The rest are answered in the session that folded the sheet. Answers:
     `answers/17-accepted-review-answers-20261119.json`; the items are filed under `W49.` in SUITE_TODO.md.
+22. **The accepted-issues sheet, round two (2026-11-19; W49.accepted-review-owner-ok).** All six changes as
+    suggested: Intel compression tools and hidden Apple-silicon-only downloads (behind nice-to-have, his note), the
+    read-poorly flag's four wiring cases plus a newspaper measurement, OpenRouter rotation, undo surviving a crash,
+    the Containers facets as a searchable narrowed list, and unclashable pasted-image names. His note on images
+    outside a note's assets folder: copy them in automatically wherever Notes can read them. Re-tagging labels waits
+    on W49.corpus-specific-audit (his 2026-11-19 ask to move corpus-only code into a one-time migration).
 
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 

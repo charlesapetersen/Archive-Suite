@@ -1372,7 +1372,7 @@ green, no new warnings.
 - A **hand-authored reference outside `assets/`** — an image at the item root (`![](photo.png)`), or a
   mis-cased `Assets/x.png` — now renders "Blocked" instead of loading. Deliberate: `<item>/assets/` is the
   boundary this item specifies, every in-app writer (`addAsset` / `importAsset` / block thumbs) emits
-  `assets/<name>`, and it is fully recoverable — move the file into `assets/`; nothing is rewritten or lost. (accepted: deliberate, W23.m3; `assets/` is the boundary, and moving the file in recovers it).
+  `assets/<name>`, and it is fully recoverable — move the file into `assets/`; nothing is rewritten or lost. (queued: W49.notes-auto-copy-images).
 - **Hard links are undetectable** by any path-containment rule. An `assets/x.png` hard-linked to another
   item's file still reads those bytes. Nothing in the app creates one. (accepted: no path rule can see a hard link, and nothing in the app makes one).
 - **`W23.m11` (the cache key) was the deliberate leftover** — this item did not change it, because
@@ -1961,7 +1961,7 @@ autosave via `NotesModel.setBody`, flush-on-switch, autosave-race-safe). Two con
   another note and back, and after a relaunch, with the Markdown unrewritten
   (`NotesW7ChecksUITests.testS1a_PastedImageReloadsAfterReselectAndRelaunch`, VM, through the
   `an.editor.test.pasteImage` seam that calls the real `tryPasteImage`; ⌘V of an image and a drag are not sent).
-  Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`. (accepted: resolved, W7-S5; the second-window name clash is refused safely, and a shared name authority cannot serve two windows' selections).
+  Record: `verification/evidence/notes/W40.notes-w7-gui-checks.md`. (queued: W49.notes-paste-name).
 - **Load/autosave, driven live (W40.notes-w7-gui-checks, 2026-11-04).** Select A, type, select B at once: A's
   edit is in A's file exactly once, B loads its own text and its file is untouched; the run recorded that the
   idle autosave had not yet written the file, so the switch saved it

@@ -1,0 +1,12 @@
+{
+ "_notes": {
+  "p-intel-tools": "Put this behind Nice to Have",
+  "n-assets-boundary": "Shouldn't we just prevent this from happening in the first place by automatically copying in such images? "
+ },
+ "p-intel-tools": "change",
+ "p-flag-unmeasured": "change",
+ "p-openrouter-rotation": "change",
+ "r-crash-undo": "change",
+ "r-menu-limits": "change",
+ "n-paste-race": "change"
+}

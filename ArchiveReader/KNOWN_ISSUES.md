@@ -83,11 +83,11 @@ What it does not do, deliberately or not yet:
   for that moment after launch or a root change. It compares the facet's shown value by `ContainerNames.key`, the
   same value the Containers menu offers, so a collection matches by its title when it has one, else its number. (accepted: as a text rule waits for its index answer; the rule applies once the catalog is built).
 - **The facet menu lists each facet's 100 most common values**, counted over the whole library, not narrowed by the
-  other facets chosen. (accepted: a bound on the menu's length; the counts are the library's own).
+  other facets chosen. (queued: W49.reader-facet-list).
 - **The narrowest window scrolls sideways** once Container is shown, as with Capture marker: the default columns
   already take 656 of its 668 pt (`TableColumnFitter`). (accepted: the default columns already fill the narrowest window; a column can be hidden from the header menu).
 - **The sheet edits the tree root's map only**: a nested map (a level map in a subfolder) is read, not edited, and
-  one this build cannot read gives its subtree no folder levels rather than an outer map's. (accepted: the sheet sets the tree's own levels; a nested map overrides one subtree and is read as the SPEC says).
+  one this build cannot read gives its subtree no folder levels rather than an outer map's. (queued: W49.reader-facet-list).
 - **The tree root is the archive's main folder**: the granted folder, or its "Archival Photos" folder when it holds
   one (`ReaderArchiveLayout`). Files outside it (the JPEG partner tree) have no container. (accepted: the main folder is the container tree by design, ReaderArchiveLayout; a JPEG original's partner PDF carries its container).
 
@@ -1270,7 +1270,7 @@ by another running copy during the read, offers nothing rather than older histor
 - **The disk keeps everything:** about 1 KB per changed file (mostly the bookmark). Deleting old segments
   would lose audit history, which §12 keeps; ask before adding a retention. (accepted: Safety §12 keeps the audit history; a retention is the owner's to ask for).
 - **An action that crashes hides the history before it for good**, even when every write in it was
-  recorded and only the `actionDone` was lost. That is the safe direction; later actions are offered. (accepted: the safe direction; later actions are still offered).
+  recorded and only the `actionDone` was lost. That is the safe direction; later actions are offered. (queued: W49.reader-undo-after-crash).
 - **Reading is bounded only once the window fills.** An archive with fewer than 100 actions since the
   last barrier still decodes every segment on each undo refresh (on the main actor), as it did before. (accepted: under 100 actions since the last barrier the read is small).
 - Two running copies cutting a segment at the same moment: the second rename fails, is logged, and the
