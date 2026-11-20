@@ -1890,7 +1890,7 @@ extension OCRProcessor {
         if let note = containerLabelSpendNote { statusMessage += " " + note }   // W47.ct-label-cost
         if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
         if pending.enableTagging && !passSourceTags {
-            statusMessage += " \(segments.count) segments tagged."
+            statusMessage += Self.taggedSegmentsSuffix(segments: segments.count, failures: taggingFailureNames)
             if let checks = segmentationCheckSummary { statusMessage += " \(checks)."; segmentationCheckSummary = nil }
         }
         if passSourceTags {
@@ -2307,7 +2307,7 @@ extension OCRProcessor {
         if let note = containerLabelSpendNote { statusMessage += " " + note }   // W47.ct-label-cost
         if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
         if pending.enableTagging && !passSourceTags {
-            statusMessage += " \(segments.count) segments tagged."
+            statusMessage += Self.taggedSegmentsSuffix(segments: segments.count, failures: taggingFailureNames)
             if let checks = segmentationCheckSummary { statusMessage += " \(checks)."; segmentationCheckSummary = nil }
         }
         if passSourceTags {
@@ -3705,7 +3705,7 @@ extension OCRProcessor {
             statusMessage += " \(incrementalSkipped) already-processed skipped."
         }
         if enableTagging && !passSourceTags {
-            statusMessage += " \(segments.count) segments tagged."
+            statusMessage += Self.taggedSegmentsSuffix(segments: segments.count, failures: taggingFailureNames)
             if let checks = segmentationCheckSummary { statusMessage += " \(checks)."; segmentationCheckSummary = nil }
         }
         if passSourceTags {
@@ -3858,6 +3858,13 @@ extension OCRProcessor {
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }
+    /// W49.proc-fix-s042 — the run log's section for failed tagging calls; empty when every call answered.
+    nonisolated static func taggingFailureLogLines(_ failures: [(name: String, reason: String)]) -> [String] {
+        guard !failures.isEmpty else { return [] }
+        return ["", "Documents whose tagging call failed (filed with no subject tags from the model;"
+                    + " named by their first input file):"]
+            + failures.map { "  \u{2022} \($0.name): \($0.reason)" }
+    }
     private func writeLogFile(outputDirectory: URL) {
         // Opt-in: only write the log when the user has enabled it (default off).
         guard UserDefaults.standard.bool(forKey: DefaultsKeys.writeLogFile) else { return }
@@ -3903,6 +3910,7 @@ extension OCRProcessor {
                        + " (the source image was not touched):")
             for name in placeholderOutputs { lines.append("  \u{2022} \(name)") }
         }
+        lines += Self.taggingFailureLogLines(taggingFailureNames)
         if !textPageOnlyOutputs.isEmpty {
             lines.append("")
             lines.append("Pages with no searchable text on the image (their text is on the text page):")

@@ -15,17 +15,37 @@ class TagGenerator: ObservableObject {
         gatewayConfig: GatewayConfig? = nil,
         localAgent: LocalAgentConfig? = nil
     ) async -> GeneratedTags {
+        await generateTagsReporting(for: segment, nearbySegments: nearbySegments, provider: provider, model: model,
+                                    thinkingLevel: thinkingLevel, apiKey: apiKey, vocabulary: vocabulary,
+                                    gatewayConfig: gatewayConfig, localAgent: localAgent).tags
+    }
+
+    /// W49.proc-fix-s042 — the tags, and why the tagging call gave none when it failed: it threw (after
+    /// `NetworkSession`'s own retries) or its reply was not the tag JSON. nil when the call answered, or when no call
+    /// was made (a label, a document with no text). The tags on a failure are the old fallback, unchanged.
+    func generateTagsReporting(
+        for segment: DocumentSegment,
+        nearbySegments: [DocumentSegment],
+        provider: LLMProvider,
+        model: LLMModel,
+        thinkingLevel: ThinkingLevel?,
+        apiKey: String,
+        vocabulary: [String] = [],
+        gatewayConfig: GatewayConfig? = nil,
+        localAgent: LocalAgentConfig? = nil
+    ) async -> (tags: GeneratedTags, failure: String?) {
         // Box/folder: the item-type token, and the user's colour for it if any (W40.suite-item-types)
         if segment.isBox {
-            return GeneratedTags(subjectTags: [ItemType.box.tokenName], colorTag: ItemTypeColourSetting.colorTag(for: .box))
+            return (GeneratedTags(subjectTags: [ItemType.box.tokenName], colorTag: ItemTypeColourSetting.colorTag(for: .box)),
+                    nil)
         }
         if segment.isFolder {
-            return GeneratedTags(subjectTags: [ItemType.folder.tokenName],
-                                 colorTag: ItemTypeColourSetting.colorTag(for: .folder))
+            return (GeneratedTags(subjectTags: [ItemType.folder.tokenName],
+                                  colorTag: ItemTypeColourSetting.colorTag(for: .folder)), nil)
         }
 
         let text = segment.combinedText
-        guard !text.isEmpty else { return GeneratedTags(ocrFailed: true) }
+        guard !text.isEmpty else { return (GeneratedTags(ocrFailed: true), nil) }
 
         // Build prompt
         let contextText = nearbySegments
@@ -79,9 +99,12 @@ class TagGenerator: ObservableObject {
 
         do {
             let rawResponse = try await callLLM(prompt: prompt, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey, gatewayConfig: gatewayConfig, localAgent: localAgent)
-            return parseTagResponse(rawResponse, vocabulary: vocabulary)
+            guard let tags = parseTagResponse(rawResponse, vocabulary: vocabulary) else {
+                return (GeneratedTags(dateUncertain: true), "the reply was not the tag JSON")
+            }
+            return (tags, nil)
         } catch {
-            return GeneratedTags(dateUncertain: true)
+            return (GeneratedTags(dateUncertain: true), Self.failureReason(error))
         }
     }
 
@@ -100,7 +123,24 @@ class TagGenerator: ObservableObject {
                                          gatewayConfig: gatewayConfig, localAgent: localAgent, maxTokens: 512, timeout: 120)
     }
 
-    private func parseTagResponse(_ raw: String, vocabulary: [String] = []) -> GeneratedTags {
+    /// A failed call's reason for the status line and the run log: the error's own text, cut to one short line.
+    nonisolated static func failureReason(_ error: Error) -> String {
+        if let url = error as? URLError {
+            switch url.code {
+            case .cancelled: return "the request was cancelled (a spend cap or Stop)"
+            case .timedOut: return "the request timed out"
+            case .notConnectedToInternet, .networkConnectionLost: return "the network connection was lost"
+            default: break
+            }
+        }
+        let text = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        let line = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        return line.isEmpty ? String(describing: error) : String(line.prefix(120))
+    }
+
+    /// nil when the reply holds no JSON object, or one with neither `subject_tags` nor `year` (W49.proc-fix-s042: a
+    /// failed call, not an answer).
+    private func parseTagResponse(_ raw: String, vocabulary: [String] = []) -> GeneratedTags? {
         // Extract JSON from the response (model may wrap in markdown code fences)
         var jsonStr = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if jsonStr.hasPrefix("```") {
@@ -113,8 +153,9 @@ class TagGenerator: ObservableObject {
         }
 
         guard let data = jsonStr.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return GeneratedTags(dateUncertain: true)
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              json["subject_tags"] != nil || json["year"] != nil else {
+            return nil   // no JSON, or JSON that is not tags (an `{"error": …}` body with a 200)
         }
 
         var tags = GeneratedTags()

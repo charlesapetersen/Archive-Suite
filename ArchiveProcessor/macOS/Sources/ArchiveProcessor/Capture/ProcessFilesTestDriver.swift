@@ -308,6 +308,11 @@ enum ProcessFilesTestDriver {
         let succeeded = processor.jobs.filter { "\($0.status)" == "succeeded" }.count
         let failed = processor.jobs.filter { "\($0.status)" == "failed" }.count
         writeMarker(donePath, processor.statusMessage.isEmpty ? "DONE" : processor.statusMessage)
+        // W49.proc-fix-s042: the status line and the failed tagging calls, in the run folder the journey brings back,
+        // so the checker can hold every untagged document to being named.
+        writeMarker(runDir.appendingPathComponent("status.txt").path, processor.statusMessage + "\n")
+        writeMarker(runDir.appendingPathComponent("tagging-failures.tsv").path,
+                    processor.taggingFailureNames.map { "\($0.name)\t\($0.reason)\n" }.joined())
 
         var lines = ["# provider=\(provider.rawValue)\tmodel=\(model.id)\tmode=\(mode.rawValue)\tinputs=\(processor.jobs.count)\tsucceeded=\(succeeded)\tfailed=\(failed)\tsegments=\(processor.segments.count)"]
         lines.append("# pdf\tclassification\tstatus")

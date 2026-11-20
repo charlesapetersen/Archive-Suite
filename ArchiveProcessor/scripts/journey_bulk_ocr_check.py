@@ -41,6 +41,7 @@ YEAR = re.compile(r'^\d{3,4}$')
 MONTH = re.compile(r'^([1-9]|1[0-2]) (' + '|'.join(MONTHS) + r')$')
 MONTH_SHAPED = re.compile(r'^0?\d{1,2} [A-Z][a-z]+$')
 DAY = re.compile(r'^Day (?:[1-9]|[12]\d|3[01])$')
+DECADE = re.compile(r'^\d{3}0s$')   # W49.proc-fix-s042: the folder-date route's Decade token
 PROVENANCE = re.compile(r'^.+ · .+ · \d{1,2} (' + '|'.join(MONTHS) + r') \d{4}$')
 QUALITY = {'Q1', 'Q2', 'Q3'}
 COLOURS = {'Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Purple', 'Gray', 'Grey'}
@@ -296,6 +297,54 @@ def main():
             fails.append(f'{label}: document start without its JSON sidecar')
         per_pdf.append({'pdf': r['pdf'], 'classification': r['cls'], 'truth': truth_by_no.get(no), 'tags': names})
 
+    # W49.proc-fix-s042 (suspect S-042): a document filed with no subject tags must be one the run named as a failed
+    # tagging call (by its first input file), and the status line must not count those as tagged. Strict on the
+    # stand-in, which answers every tagging call it does not fail with two subjects; on a real model an empty or fully
+    # filtered subject list is an answer, so there it is a warning.
+    gw_log = os.path.join(a.dir, 'fake-gateway.log')
+    stand_in = os.path.exists(gw_log)
+    strict = fails.append if stand_in else warns.append
+    status_path, failed_path = os.path.join(rd, 'status.txt'), os.path.join(rd, 'tagging-failures.tsv')
+    status = open(status_path, encoding='utf-8').read().strip() if os.path.exists(status_path) else ''
+    failed_calls = []
+    if os.path.exists(failed_path):
+        for line in open(failed_path, encoding='utf-8'):
+            name, _, why = line.rstrip('\n').partition('\t')
+            if name:
+                failed_calls.append((os.path.splitext(name)[0], why))
+    failed_names = {n for n, _ in failed_calls}
+    if a.mode == 'automatic':
+        if not os.path.exists(status_path) or not os.path.exists(failed_path):
+            strict('no status.txt or tagging-failures.tsv in the run: the failed tagging calls cannot be checked')
+        for p in per_pdf:
+            if p['classification'] != 'document_start':
+                continue
+            subjects = [t for t in p['tags'] if t not in ('Unread', 'Date Uncertain', 'Box', 'Folder')
+                        and not t.startswith('Sent With') and not DECADE.match(t)
+                        and not any(r.match(t) for r in (YEAR, MONTH, DAY))]
+            base = os.path.splitext(p['pdf'])[0]
+            if not subjects and base not in failed_names:
+                strict(f'{p["pdf"]}: filed with no subject tags, and the run did not name it as a failed tagging call')
+            if subjects and base in failed_names:
+                strict(f'{p["pdf"]}: named as a failed tagging call but carries subjects {subjects}')
+        m = re.search(r' (?:(\d+) of )?(\d+) segments tagged\.', status)
+        if failed_calls:
+            n = len(failed_calls)
+            if not m or m.group(1) is None or int(m.group(2)) - int(m.group(1)) != n:
+                fails.append(f'{n} failed tagging calls, but the status line does not count them out: {status!r}')
+            if '⚠️' not in status or 'tagging call' not in status:
+                fails.append(f'the status line does not warn of the failed tagging calls: {status!r}')
+            warns.append(f'{n} failed tagging call(s), reported: ' + '; '.join(f'{k}: {v}' for k, v in failed_calls))
+        elif m and m.group(1) is not None:
+            fails.append(f'the status line counts failed tagging calls the run did not record: {status!r}')
+        if stand_in:
+            # Every tagging call the stand-in answered with a 500 (--fail-tags) is a recorded failure.
+            injected = sum(1 for line in open(gw_log, encoding='utf-8') if line.startswith('tags-500\t'))
+            if injected > len(failed_calls):
+                fails.append(f'the stand-in failed {injected} tagging calls with a 500, the run recorded {len(failed_calls)}')
+            elif injected:
+                warns.append(f'{injected} tagging call(s) answered with a 500 by the stand-in, all recorded')
+
     split = score_split(truth_seq, got_seq, numbers)
     spend = open(os.path.join(rd, 'spend.tsv')).read().strip() if os.path.exists(os.path.join(rd, 'spend.tsv')) else ''
     if spend and '\tunmetered=0\t' not in spend:
@@ -311,6 +360,7 @@ def main():
         if float(f['spent_usd']) > float(f['cap_usd']) or float(f['spent_usd']) > 7:
             fails.append(f'spent {f["spent_usd"]} is over the cap {f["cap_usd"]} or the $7 rule')
     result = {'run': os.path.basename(rd), 'manifest': header, 'estimate': estimate, 'spend': spend,
+              'status': status, 'tagging_failures': dict(failed_calls),
               'pdfs': len(per_pdf), 'qpdf_warnings': qpdf_warn, 'provenance': sorted(provs), 'split': split,
               'fails': fails, 'warns': warns, 'files': per_pdf}
     if a.json:
@@ -319,6 +369,7 @@ def main():
     print(f'run {result["run"]}: {header}')
     print(f'estimate: {estimate}')
     print(f'spend: {spend or "(not metered)"}')
+    print(f'status: {status or "(none)"}')
     print(f'pdfs checked: {len(per_pdf)}; provenance: {sorted(provs)}')
     s = split
     print(f'pages labelled as the truth: {s["pages_exact"]}/{s["pages"]}; boundaries right {s["boundaries_right"]} '

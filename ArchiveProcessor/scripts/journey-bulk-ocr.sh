@@ -3,9 +3,10 @@
 # in the Tart VM (never on this Mac's screen), then checked against the truth CSV and SPEC/tag-format.md.
 #
 #   ./scripts/journey-bulk-ocr.sh --route vision [--max N]            free: Apple Vision, No tagging (plumbing)
-#   ./scripts/journey-bulk-ocr.sh --route fake [--max N] [--cap USD] [--completion TOKENS]
+#   ./scripts/journey-bulk-ocr.sh --route fake [--max N] [--cap USD] [--completion TOKENS] [--fail-tags N,M]
 #                                     free: the gateway route against scripts/fake_gateway.py in the guest
-#                                     (the meter, the cap, the key hand-over and Automatic tagging's tags)
+#                                     (the meter, the cap, the key hand-over and Automatic tagging's tags;
+#                                     --fail-tags answers those tagging calls with a 500, W49.proc-fix-s042)
 #   ./scripts/journey-bulk-ocr.sh --route gateway --paid [--cap USD]  the Stanford gateway, Gemini 3.7 Flash,
 #                                                                     Automatic tagging (the journey itself)
 #   ./scripts/journey-bulk-ocr.sh --route openrouter --paid [--max N] [--cap USD]   OpenRouter, Qwen3.8 Flash
@@ -38,7 +39,8 @@ while [ $# -gt 0 ]; do
     --max) MAX="$2"; shift 2 ;;
     --cap) CAP="$2"; shift 2 ;;
     --completion) export W40D1_FAKE_COMPLETION="$2"; shift 2 ;;
-    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+    --fail-tags) export W40D1_FAKE_TAG_FAIL="$2"; shift 2 ;;
+    -h|--help) sed -n '2,27p' "$0"; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done

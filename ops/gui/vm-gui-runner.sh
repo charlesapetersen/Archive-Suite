@@ -776,8 +776,11 @@ prepare_bulk_ocr() {
   # W40D1_FAKE_GATEWAY=1: the $0 proof of the gateway route, against scripts/fake_gateway.py on the guest's loopback.
   if [ "${W40D1_FAKE_GATEWAY:-0}" = 1 ]; then
     [[ "${W40D1_FAKE_COMPLETION:-500}" =~ ^[0-9]+$ ]] || die "W40D1_FAKE_COMPLETION must be a number"
+    # W49.proc-fix-s042: W40D1_FAKE_TAG_FAIL=3,7 answers those tagging calls with a provider 500.
+    [[ "${W40D1_FAKE_TAG_FAIL:-}" =~ ^[0-9,]*$ ]] || die "W40D1_FAKE_TAG_FAIL must be numbers and commas"
     tart exec "$VM" bash -lc "exec python3 '$GUEST_REPO/ArchiveProcessor/scripts/fake_gateway.py' 18471 \
-        '$BULK_GDIR/out/fake-gateway.log' ${W40D1_FAKE_COMPLETION:-500}" > "$APP_ART/fake-gateway.out" 2>&1 &
+        '$BULK_GDIR/out/fake-gateway.log' ${W40D1_FAKE_COMPLETION:-500} stand-in-key '${W40D1_FAKE_TAG_FAIL:-}'" \
+        > "$APP_ART/fake-gateway.out" 2>&1 &
     FAKE_GW_PID=$!
     sleep 2
     kill -0 "$FAKE_GW_PID" 2>/dev/null || die "the stand-in gateway did not start ($(tr '\n' ' ' < "$APP_ART/fake-gateway.out"))"

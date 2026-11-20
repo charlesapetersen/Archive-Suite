@@ -176,6 +176,8 @@ enum NetworkSession {
                || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[ItemFieldsTestDriver.envKey])
                || testTransportIsEnabled(
+                flag: ProcessInfo.processInfo.environment[TaggingFailureTestDriver.envKey])
+               || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[PageReaderTestDriver.envKey])
                || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[ProcessFilesTestDriver.meterEnvKey]))

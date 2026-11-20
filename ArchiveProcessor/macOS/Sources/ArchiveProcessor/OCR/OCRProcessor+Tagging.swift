@@ -222,6 +222,8 @@ extension OCRProcessor {
         placeholderOutputs.removeAll { gone.contains($0) }
         textPageOnlyOutputs.removeAll { gone.contains($0.name) }
         searchableFormNotes.removeAll { gone.contains($0.name) }
+        let goneSources = Set(sources.map(\.standardizedFileURL))
+        taggingCallFailures.removeAll { goneSources.contains($0.source.standardizedFileURL) }
     }
     /// Reset both records at the start of a run.
     func clearOutputWarnings() {
@@ -229,6 +231,7 @@ extension OCRProcessor {
         placeholderOutputs = []
         textPageOnlyOutputs = []
         searchableFormNotes = []
+        taggingCallFailures = []
         outputsOutsideTheirTree = []
     }
 
@@ -276,6 +279,16 @@ extension OCRProcessor {
                     + " touched; re-run \(n == 1 ? "it" : "them") to get the image into the archive."
         }
         return suffix
+    }
+    /// W49.proc-fix-s042 — the end-of-run tagging count: documents whose call failed are named, not counted as tagged.
+    nonisolated static func taggedSegmentsSuffix(segments: Int, failures: [(name: String, reason: String)]) -> String {
+        guard !failures.isEmpty else { return " \(segments) segments tagged." }
+        let n = failures.count
+        let reasons = Array(NSOrderedSet(array: failures.map(\.reason))) as? [String] ?? []
+        return " \(segments - n) of \(segments) segments tagged. ⚠️ \(n) document\(n == 1 ? "'s tagging call" : "s' tagging calls")"
+            + " failed (\(namesForWarning(failures.map(\.name)))): \(reasons.prefix(2).joined(separator: "; ")) —"
+            + " \(n == 1 ? "it was" : "they were") filed with no subject tags from the model. Re-run"
+            + " \(n == 1 ? "it" : "them") to tag \(n == 1 ? "it" : "them")."
     }
     nonisolated static func namesForWarning(_ names: [String]) -> String {
         let shown = names.prefix(3).joined(separator: ", ")
@@ -506,6 +519,12 @@ extension OCRProcessor {
 
             // Interactive Review Point 2: Pause for final review after tagging
             statusMessage = "Review tags and segmentation. Click Complete to finalize, or Redo to re-tag."
+            // W49.proc-fix-s042: Redo is the route that re-asks a failed call, so say which ones failed before Complete.
+            if !taggingCallFailures.isEmpty {
+                let n = taggingCallFailures.count
+                statusMessage += " ⚠️ \(n) document\(n == 1 ? "'s tagging call" : "s' tagging calls") failed"
+                    + " (\(Self.namesForWarning(taggingFailureNames.map(\.name)))): Redo asks again."
+            }
             isProcessing = false
             awaitingFinalReview = true
 
@@ -1133,6 +1152,7 @@ extension OCRProcessor {
         let generator = TagGenerator()
         let snapshot = segments
         let total = snapshot.count
+        taggingCallFailures = []   // W49.proc-fix-s042: this pass re-tags every segment
         guard total > 0 else { return }
         // Capture immutable inputs for the concurrent tasks.
         let vocabulary = tagVocabulary
@@ -1199,11 +1219,12 @@ extension OCRProcessor {
             if !macSubjectsBySeg[i].isEmpty {
                 return (i, GeneratedTags(subjectTags: macSubjectsBySeg[i]), nil, nil, nil)   // Mac-tagged → no LLM
             }
-            let tags = await generator.generateTags(
+            let (tags, failure) = await generator.generateTagsReporting(
                 for: snapshot[i], nearbySegments: nearbyBySeg[i],
                 provider: provider, model: model, thinkingLevel: nil,
                 apiKey: apiKey, vocabulary: vocabulary, gatewayConfig: gateway, localAgent: localAgent
             )
+            if let failure { await MainActor.run { self.recordTaggingCallFailure(failure, segment: snapshot[i]) } }
             var dating: DateRoute.Decision? = nil
             if let input = datingInputs[i], !tags.ocrFailed, !Task.isCancelled {
                 dating = await DateRoute.run(input, backend: datingBackend, imageEveryDocument: imageEveryDocument)
@@ -1272,6 +1293,13 @@ extension OCRProcessor {
                                                    entities: names, dating: dating, folderDate: folderDates[i],
                                                    itemFields: fields, taggingSenderWithheld: senderWithheld[i])
         }
+    }
+    /// W49.proc-fix-s042 — one failed tagging call, named by the document's first input page.
+    func recordTaggingCallFailure(_ reason: String, segment: DocumentSegment) {
+        guard !Task.isCancelled, let source = segment.pdfURLs.first,
+              !taggingCallFailures.contains(where: { $0.source == source }) else { return }
+        taggingCallFailures.append((source, reason))
+        os_log(.error, "Tagging call failed for %{public}@: %{public}@", source.lastPathComponent, reason)
     }
     /// W46.date-route — what segment `i`'s dating route reads, or nil when no dating call is made: a box or folder
     /// label (an input to folder inheritance, never dated as a document), a document with no text, or one whose phone

@@ -320,6 +320,17 @@ class OCRProcessor: ObservableObject {
     /// W42.int-s5-searchable — searchable-form pages whose layer is not placed on the words, and pages chosen for that
     /// form but written with a text page, each with why, for the run log.
     var searchableFormNotes: [(name: String, note: String)] = []
+    /// W49.proc-fix-s042 — documents whose tagging call failed (it threw after `NetworkSession`'s own retries, or the
+    /// reply was not the tag JSON), named by their first page's INPUT file, with the reason. Such a document is still
+    /// filed (its OCR text is the work) with the fallback tags and whatever the dating route found, so it is named in
+    /// the status line and the log, and left out of the "segments tagged" count. Set afresh by each tagging pass, so a
+    /// final review's Redo, the existing route for re-tagging, clears what its new calls answer.
+    /// Keyed by the input's URL, so two inputs that share a name in different folders are two failures.
+    var taggingCallFailures: [(source: URL, reason: String)] = []
+    /// The failures by input file name, for the status line and the log.
+    var taggingFailureNames: [(name: String, reason: String)] {
+        taggingCallFailures.map { ($0.source.lastPathComponent, $0.reason) }
+    }
     /// The model used for the current processing run (for PDF regeneration headers)
     var currentModel: LLMModel?
     /// Gateway configuration for the current run (nil = direct API mode)
