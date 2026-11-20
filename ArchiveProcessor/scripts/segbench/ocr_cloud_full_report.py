@@ -71,7 +71,7 @@ def report():
             by[(r['key'], *g)].append(r)
     write_csv(P.RESULTS / 'ocr-panel-cloud-groups.csv',
               [{'route': k, 'attribute': a, 'value': v, **aggregate(rr)} for (k, a, v), rr in sorted(by.items())],
-              ['route', 'attribute', 'value', 'n', 'ok', 'nes', 'chrf', 'miss', 'add', 'words'])
+              ['route', 'attribute', 'value', 'n', 'ok', 'nes', 'chrf', 'miss', 'add', 'words', 'cost'])
     calls = P.records(); full = [r for r in calls if not r.get('pilot')]
     held = sum(json.loads(p.read_text())['reserve'] for p in (F.CACHE / 'pending').glob('*.json'))
     bills = [json.loads(p.read_text()) for p in (F.CACHE / 'mistral').glob('*.billing.json')]

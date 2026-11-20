@@ -2827,6 +2827,100 @@
      50,
      50
     ]
+   },
+   "prices": {
+    "gemini3.1-pro": {
+     "std": 21.18,
+     "batch": 10.59
+    },
+    "gemini3.5-flash": {
+     "std": 6.25,
+     "batch": 3.13
+    },
+    "gemini3.5-flash-lite": {
+     "std": 1.55,
+     "batch": 0.78
+    },
+    "gemini3.8-flash": {
+     "std": 2.89,
+     "batch": 1.45
+    },
+    "gpt5.4-mini": {
+     "std": 5.31,
+     "batch": 2.66
+    },
+    "gpt5.6-luna": {
+     "std": 1.27,
+     "batch": 0.64
+    },
+    "mistral-large4": {
+     "std": 2.68,
+     "batch": null
+    },
+    "mistral-medium3.5": {
+     "std": 7.28,
+     "batch": 3.64
+    },
+    "mistral-ocr-4-1": {
+     "std": 4.0,
+     "batch": 2.0
+    },
+    "qwen3-vl-235b": {
+     "std": 1.21,
+     "batch": null
+    },
+    "qwen3.5-397b": {
+     "std": 1.96,
+     "batch": null
+    },
+    "qwen3.8-flash": {
+     "std": 0.59,
+     "batch": null
+    },
+    "gemini3.1-flash-lite": {
+     "std": 1.04,
+     "batch": 0.52
+    },
+    "gemma4-26b-a4b": {
+     "std": 0.32,
+     "batch": null
+    },
+    "gemma4-31b": {
+     "std": 0.33,
+     "batch": null
+    },
+    "mistral-small-24b": {
+     "std": 0.31,
+     "batch": null
+    },
+    "qwen3-vl-30b-a3b": {
+     "std": 0.88,
+     "batch": null
+    },
+    "qwen3-vl-8b": {
+     "std": 1.35,
+     "batch": null
+    },
+    "qwen3.5-27b": {
+     "std": 1.84,
+     "batch": null
+    },
+    "qwen3.5-35b-a3b": {
+     "std": 0.96,
+     "batch": null
+    },
+    "qwen3.5-9b": {
+     "std": 0.27,
+     "batch": null
+    },
+    "qwen3.6-27b": {
+     "std": 1.9,
+     "batch": null
+    },
+    "qwen3.6-35b-a3b": {
+     "std": 0.57,
+     "batch": null
+    }
    }
   },
   {
@@ -3465,6 +3559,100 @@
      28,
      28
     ]
+   },
+   "prices": {
+    "gemini3.1-pro": {
+     "std": 25.93,
+     "batch": 12.97
+    },
+    "gemini3.5-flash": {
+     "std": 7.6,
+     "batch": 3.8
+    },
+    "gemini3.5-flash-lite": {
+     "std": 1.99,
+     "batch": 1.0
+    },
+    "gemini3.8-flash": {
+     "std": 3.45,
+     "batch": 1.73
+    },
+    "gpt5.4-mini": {
+     "std": 6.48,
+     "batch": 3.24
+    },
+    "gpt5.6-luna": {
+     "std": 1.53,
+     "batch": 0.77
+    },
+    "mistral-large4": {
+     "std": 2.99,
+     "batch": null
+    },
+    "mistral-medium3.5": {
+     "std": 8.36,
+     "batch": 4.18
+    },
+    "mistral-ocr-4-1": {
+     "std": 4.0,
+     "batch": 2.0
+    },
+    "qwen3-vl-235b": {
+     "std": 1.33,
+     "batch": null
+    },
+    "qwen3.5-397b": {
+     "std": 2.65,
+     "batch": null
+    },
+    "qwen3.8-flash": {
+     "std": 0.68,
+     "batch": null
+    },
+    "gemini3.1-flash-lite": {
+     "std": 1.28,
+     "batch": 0.64
+    },
+    "gemma4-26b-a4b": {
+     "std": 0.68,
+     "batch": null
+    },
+    "gemma4-31b": {
+     "std": 0.59,
+     "batch": null
+    },
+    "mistral-small-24b": {
+     "std": 0.31,
+     "batch": null
+    },
+    "qwen3-vl-30b-a3b": {
+     "std": 1.11,
+     "batch": null
+    },
+    "qwen3-vl-8b": {
+     "std": 1.65,
+     "batch": null
+    },
+    "qwen3.5-27b": {
+     "std": 2.01,
+     "batch": null
+    },
+    "qwen3.5-35b-a3b": {
+     "std": 0.86,
+     "batch": null
+    },
+    "qwen3.5-9b": {
+     "std": 0.27,
+     "batch": null
+    },
+    "qwen3.6-27b": {
+     "std": 2.24,
+     "batch": null
+    },
+    "qwen3.6-35b-a3b": {
+     "std": 0.8,
+     "batch": null
+    }
    }
   },
   {
@@ -4103,6 +4291,100 @@
      16,
      16
     ]
+   },
+   "prices": {
+    "gemini3.1-pro": {
+     "std": 18.89,
+     "batch": 9.45
+    },
+    "gemini3.5-flash": {
+     "std": 4.12,
+     "batch": 2.06
+    },
+    "gemini3.5-flash-lite": {
+     "std": 0.99,
+     "batch": 0.49
+    },
+    "gemini3.8-flash": {
+     "std": 3.95,
+     "batch": 1.98
+    },
+    "gpt5.4-mini": {
+     "std": 4.87,
+     "batch": 2.44
+    },
+    "gpt5.6-luna": {
+     "std": 1.09,
+     "batch": 0.54
+    },
+    "mistral-large4": {
+     "std": 2.31,
+     "batch": null
+    },
+    "mistral-medium3.5": {
+     "std": 5.76,
+     "batch": 2.88
+    },
+    "mistral-ocr-4-1": {
+     "std": 4.0,
+     "batch": 2.0
+    },
+    "qwen3-vl-235b": {
+     "std": 1.1,
+     "batch": null
+    },
+    "qwen3.5-397b": {
+     "std": 1.28,
+     "batch": null
+    },
+    "qwen3.8-flash": {
+     "std": 0.54,
+     "batch": null
+    },
+    "gemini3.1-flash-lite": {
+     "std": 1.43,
+     "batch": 0.72
+    },
+    "gemma4-26b-a4b": {
+     "std": 0.11,
+     "batch": null
+    },
+    "gemma4-31b": {
+     "std": 0.18,
+     "batch": null
+    },
+    "mistral-small-24b": {
+     "std": 0.34,
+     "batch": null
+    },
+    "qwen3-vl-30b-a3b": {
+     "std": 1.12,
+     "batch": null
+    },
+    "qwen3-vl-8b": {
+     "std": 1.68,
+     "batch": null
+    },
+    "qwen3.5-27b": {
+     "std": 1.31,
+     "batch": null
+    },
+    "qwen3.5-35b-a3b": {
+     "std": 0.42,
+     "batch": null
+    },
+    "qwen3.5-9b": {
+     "std": 0.17,
+     "batch": null
+    },
+    "qwen3.6-27b": {
+     "std": 1.59,
+     "batch": null
+    },
+    "qwen3.6-35b-a3b": {
+     "std": 0.35,
+     "batch": null
+    }
    }
   }
  ],

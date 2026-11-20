@@ -79,7 +79,7 @@ footer p { font-size: 13px; }
   <header class="part" id="ocr">
     <div class="eyebrow">Part 1 · OCR panel · 96 truth pages</div>
     <h2>OCR price and accuracy</h2>
-    <p>Each point is one route: its NES score against what 1,000 pages cost. NES is character edit similarity to the adjudicated truth, so 96 means about 4% of characters would need fixing. On the charts a failed page scores 0; the ranking table first gives the score on answered pages, the headline, with the failures beside it. Where a provider sells batch processing, the route appears twice, at its standard and batch price, joined by a dotted line. Some routes ran on our own hardware rather than a paid endpoint. Those on the owner's Mac sit in the free column. Every open-weight model read on these 96 pages on Stanford's FarmShare cluster is here too. FarmShare bills nothing, so a FarmShare run of a model OpenRouter sells (□) is priced at what OpenRouter charges for the same model, from the run's own measured tokens. A run of a model OpenRouter does not sell (✶: GLM-OCR, LightOnOCR-3, PaddleOCR-VL 1.5, PP-OCRv6, CHURRO-3B, Qwen3.5 4B) has no hosted price: it sits in the free column, just right of the Mac routes, as free on a university cluster, and its GPU-hours are in the tables. Native rows use their model card's own prompt, as in part 4. A route on our own hardware that is the same model as a hosted route is listed in the tables under that route.</p>
+    <p>Each point is one route: its NES score against what 1,000 pages cost. NES is character edit similarity to the adjudicated truth, so 96 means about 4% of characters would need fixing. On the charts a failed page scores 0; the ranking table first gives the score on answered pages, the headline, with the failures beside it. Where a provider sells batch processing, the route appears twice, at its standard and batch price, joined by a dotted line. A page-kind chart prices each route at what that kind's pages cost it in the panel run, so a route reading long typed pages costs more there than on short handwritten notes; Claude Sonnet 5.5 (a subscription, priced from counted tokens), the gateway's Gemini 3.7 Flash and Gemini 4 Hydrogen recorded no cost by page, so they keep their price over all 96, as do the routes on our own hardware. Where a kind's cheapest route costs under $0.25, that chart's free column moves left with it. Some routes ran on our own hardware rather than a paid endpoint. Those on the owner's Mac sit in the free column. Every open-weight model read on these 96 pages on Stanford's FarmShare cluster is here too. FarmShare bills nothing, so a FarmShare run of a model OpenRouter sells (□) is priced at what OpenRouter charges for the same model, from the run's own measured tokens. A run of a model OpenRouter does not sell (✶: GLM-OCR, LightOnOCR-3, PaddleOCR-VL 1.5, PP-OCRv6, CHURRO-3B, Qwen3.5 4B) has no hosted price: it sits in the free column, just right of the Mac routes, as free on a university cluster, and its GPU-hours are in the tables. Native rows use their model card's own prompt, as in part 4. A route on our own hardware that is the same model as a hosted route is listed in the tables under that route.</p>
   </header>
 
   <section class="panel" aria-labelledby="headhead">
@@ -3376,6 +3376,100 @@ const DATA = {
 50,
 50
 ]
+},
+"prices":{
+"gemini3.1-pro":{
+"std":21.18,
+"batch":10.59
+},
+"gemini3.5-flash":{
+"std":6.25,
+"batch":3.13
+},
+"gemini3.5-flash-lite":{
+"std":1.55,
+"batch":0.78
+},
+"gemini3.8-flash":{
+"std":2.89,
+"batch":1.45
+},
+"gpt5.4-mini":{
+"std":5.31,
+"batch":2.66
+},
+"gpt5.6-luna":{
+"std":1.27,
+"batch":0.64
+},
+"mistral-large4":{
+"std":2.68,
+"batch":null
+},
+"mistral-medium3.5":{
+"std":7.28,
+"batch":3.64
+},
+"mistral-ocr-4-1":{
+"std":4.0,
+"batch":2.0
+},
+"qwen3-vl-235b":{
+"std":1.21,
+"batch":null
+},
+"qwen3.5-397b":{
+"std":1.96,
+"batch":null
+},
+"qwen3.8-flash":{
+"std":0.59,
+"batch":null
+},
+"gemini3.1-flash-lite":{
+"std":1.04,
+"batch":0.52
+},
+"gemma4-26b-a4b":{
+"std":0.32,
+"batch":null
+},
+"gemma4-31b":{
+"std":0.33,
+"batch":null
+},
+"mistral-small-24b":{
+"std":0.31,
+"batch":null
+},
+"qwen3-vl-30b-a3b":{
+"std":0.88,
+"batch":null
+},
+"qwen3-vl-8b":{
+"std":1.35,
+"batch":null
+},
+"qwen3.5-27b":{
+"std":1.84,
+"batch":null
+},
+"qwen3.5-35b-a3b":{
+"std":0.96,
+"batch":null
+},
+"qwen3.5-9b":{
+"std":0.27,
+"batch":null
+},
+"qwen3.6-27b":{
+"std":1.9,
+"batch":null
+},
+"qwen3.6-35b-a3b":{
+"std":0.57,
+"batch":null
+}
 }
 },
 {
@@ -4014,6 +4108,100 @@ const DATA = {
 28,
 28
 ]
+},
+"prices":{
+"gemini3.1-pro":{
+"std":25.93,
+"batch":12.97
+},
+"gemini3.5-flash":{
+"std":7.6,
+"batch":3.8
+},
+"gemini3.5-flash-lite":{
+"std":1.99,
+"batch":1.0
+},
+"gemini3.8-flash":{
+"std":3.45,
+"batch":1.73
+},
+"gpt5.4-mini":{
+"std":6.48,
+"batch":3.24
+},
+"gpt5.6-luna":{
+"std":1.53,
+"batch":0.77
+},
+"mistral-large4":{
+"std":2.99,
+"batch":null
+},
+"mistral-medium3.5":{
+"std":8.36,
+"batch":4.18
+},
+"mistral-ocr-4-1":{
+"std":4.0,
+"batch":2.0
+},
+"qwen3-vl-235b":{
+"std":1.33,
+"batch":null
+},
+"qwen3.5-397b":{
+"std":2.65,
+"batch":null
+},
+"qwen3.8-flash":{
+"std":0.68,
+"batch":null
+},
+"gemini3.1-flash-lite":{
+"std":1.28,
+"batch":0.64
+},
+"gemma4-26b-a4b":{
+"std":0.68,
+"batch":null
+},
+"gemma4-31b":{
+"std":0.59,
+"batch":null
+},
+"mistral-small-24b":{
+"std":0.31,
+"batch":null
+},
+"qwen3-vl-30b-a3b":{
+"std":1.11,
+"batch":null
+},
+"qwen3-vl-8b":{
+"std":1.65,
+"batch":null
+},
+"qwen3.5-27b":{
+"std":2.01,
+"batch":null
+},
+"qwen3.5-35b-a3b":{
+"std":0.86,
+"batch":null
+},
+"qwen3.5-9b":{
+"std":0.27,
+"batch":null
+},
+"qwen3.6-27b":{
+"std":2.24,
+"batch":null
+},
+"qwen3.6-35b-a3b":{
+"std":0.8,
+"batch":null
+}
 }
 },
 {
@@ -4652,6 +4840,100 @@ const DATA = {
 16,
 16
 ]
+},
+"prices":{
+"gemini3.1-pro":{
+"std":18.89,
+"batch":9.45
+},
+"gemini3.5-flash":{
+"std":4.12,
+"batch":2.06
+},
+"gemini3.5-flash-lite":{
+"std":0.99,
+"batch":0.49
+},
+"gemini3.8-flash":{
+"std":3.95,
+"batch":1.98
+},
+"gpt5.4-mini":{
+"std":4.87,
+"batch":2.44
+},
+"gpt5.6-luna":{
+"std":1.09,
+"batch":0.54
+},
+"mistral-large4":{
+"std":2.31,
+"batch":null
+},
+"mistral-medium3.5":{
+"std":5.76,
+"batch":2.88
+},
+"mistral-ocr-4-1":{
+"std":4.0,
+"batch":2.0
+},
+"qwen3-vl-235b":{
+"std":1.1,
+"batch":null
+},
+"qwen3.5-397b":{
+"std":1.28,
+"batch":null
+},
+"qwen3.8-flash":{
+"std":0.54,
+"batch":null
+},
+"gemini3.1-flash-lite":{
+"std":1.43,
+"batch":0.72
+},
+"gemma4-26b-a4b":{
+"std":0.11,
+"batch":null
+},
+"gemma4-31b":{
+"std":0.18,
+"batch":null
+},
+"mistral-small-24b":{
+"std":0.34,
+"batch":null
+},
+"qwen3-vl-30b-a3b":{
+"std":1.12,
+"batch":null
+},
+"qwen3-vl-8b":{
+"std":1.68,
+"batch":null
+},
+"qwen3.5-27b":{
+"std":1.31,
+"batch":null
+},
+"qwen3.5-35b-a3b":{
+"std":0.42,
+"batch":null
+},
+"qwen3.5-9b":{
+"std":0.17,
+"batch":null
+},
+"qwen3.6-27b":{
+"std":1.59,
+"batch":null
+},
+"qwen3.6-35b-a3b":{
+"std":0.35,
+"batch":null
+}
 }
 }
 ],
@@ -71751,7 +72033,9 @@ const FREE = 0.17;
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const money = v => v === 0 ? 'free' : '$' + v.toFixed(2);
 const OWN = { mac: 'on our Mac', farmshare: 'Stanford FarmShare' };
-const priceCell = r => r.free_cluster ? 'no hosted price (free on the cluster)' : money(r.std) + (r.id === 'claude-sonnet5.5' ? ' (est.)' : r.panel === 'farmshare' ? ' (OpenRouter rate)' : '');
+const priceCell = (r, std) => r.free_cluster ? 'no hosted price (free on the cluster)' : money(std) + (r.id === 'claude-sonnet5.5' ? ' (est.)' : r.panel === 'farmshare' ? ' (OpenRouter rate)' : '');
+// A kind chart prices a route at what that kind's pages cost it, where the panel measured it (W49.bench-kind-price).
+const priceOf = (chart, r) => (chart.prices || {})[r.id] || r;
 const FREE_CLUSTER = 0.19;  // just right of the Mac routes in the free column, so the two kinds of free stay apart
 const clusterName = r => r.cluster || 'Stanford FarmShare';
 const gpuText = r => r.hw.gpu_hours_per_100k == null ? 'per-arm throughput not measured' : Math.round(r.hw.gpu_hours_per_100k) + ' GPU-hours per 100,000 photos';
@@ -71770,10 +72054,14 @@ document.getElementById('nroutes').textContent = routes.length;
 
 function pointsFor(chart) {
   const P = [];
+  // The free column sits left of the cheapest paid point: where a kind's pages cost under $0.25 per 1,000, it moves
+  // down with them, so a cheap paid route is never drawn in or left of it. The overall chart keeps it at FREE.
+  const paid = routes.flatMap(r => { const p = priceOf(chart, r); return [p.std, p.batch].filter(v => v); });
+  P.f = Math.min(1, Math.min(...paid) / 0.25);
   routes.forEach(r => {
-    const s = chart.scores[r.id];
-    P.push({ x: r.std || (r.free_cluster ? FREE_CLUSTER : FREE), c: r.std || FREE, y: s[0], r, b: false, s });
-    if (r.batch) P.push({ x: r.batch, c: r.batch, y: s[0], r, b: true, s });
+    const s = chart.scores[r.id], p = priceOf(chart, r);
+    P.push({ x: p.std || (r.free_cluster ? FREE_CLUSTER : FREE) * P.f, c: p.std, y: s[0], r, b: false, s });
+    if (p.batch) P.push({ x: p.batch, c: p.batch, y: s[0], r, b: true, s });
   });
   // Best value compares money (c), so a route free on the cluster counts as free as a Mac route does.
   P.forEach(p => { p.front = !P.some(q => q !== p && q.c <= p.c && q.y >= p.y && (q.c < p.c || q.y > p.y)); });
@@ -71791,7 +72079,7 @@ DATA.charts.forEach((c, ci) => {
   sec.className = 'panel';
   sec.id = c.key;
   const meta = c.key === 'overall' ? '96 pages' : c.n + ' pages · ' + c.words.toLocaleString() + ' words';
-  const rows = tableOrder.map(r => { const s = r.extra ? r.scores[c.key] : c.scores[r.id]; return '<tr><td>' + r.num + '</td><td>' + r.name + (r.extra ? ' (table only)' : '') + '</td><td>' + s[0].toFixed(2) + '</td><td>' + s[1] + '/' + s[2] + '</td><td>' + priceCell(r) + '</td><td>' + (r.batch ? money(r.batch) : '—') + '</td><td>' + hwText(r) + '</td></tr>'; }).join('');
+  const rows = tableOrder.map(r => { const s = r.extra ? r.scores[c.key] : c.scores[r.id], p = r.extra ? r : priceOf(c, r); return '<tr><td>' + r.num + '</td><td>' + r.name + (r.extra ? ' (table only)' : '') + '</td><td>' + s[0].toFixed(2) + '</td><td>' + s[1] + '/' + s[2] + '</td><td>' + priceCell(r, p.std) + '</td><td>' + (p.batch ? money(p.batch) : '—') + '</td><td>' + hwText(r) + '</td></tr>'; }).join('');
   sec.innerHTML = '<div class="head"><h2>' + c.title + '</h2><span class="meta">' + meta + '</span></div>' +
     '<p class="note">Highest: ' + best.r.name + ' at ' + best.y.toFixed(1) + '. Best-value points: ' +
     P.filter(p => p.front).sort((a, b) => a.x - b.x).map(p => p.r.name + (p.b ? ' (batch)' : '')).join(', ') + '.</p>' +
@@ -71823,7 +72111,7 @@ function labelPlugin(P, freeSep = true) {
     beforeDatasetsDraw(ch) {
       const x = ch.scales.x, y = ch.scales.y, g = ch.ctx, acc = css('--accent'), oth = css('--other');
       g.save(); g.strokeStyle = css('--rule'); g.lineWidth = 1; g.setLineDash([3, 3]);
-      if (freeSep) { const sx = x.getPixelForValue(0.215); g.beginPath(); g.moveTo(sx, y.top); g.lineTo(sx, y.bottom); g.stroke(); }
+      if (freeSep) { const sx = x.getPixelForValue(0.215 * (P.f || 1)); g.beginPath(); g.moveTo(sx, y.top); g.lineTo(sx, y.bottom); g.stroke(); }
       g.setLineDash([]); g.lineWidth = 2;   // a measured range (segmentation: Gemini over three window offsets)
       P.filter(p => p.r.range).forEach(p => { g.strokeStyle = p.front ? acc : oth; const px = x.getPixelForValue(p.x);
         g.beginPath(); g.moveTo(px, y.getPixelForValue(p.r.range[0])); g.lineTo(px, y.getPixelForValue(p.r.range[1])); g.stroke(); });
@@ -71860,10 +72148,10 @@ function render() {
             r.pair ? 'run ' + OWN[r.panel] + '; hosted as ' + byId[r.pair].num + ', NES ' + o.c.scores[r.pair][0].toFixed(2)
               : r.panel === 'mac' ? 'run on our Mac; no hosted route serves it' : r.panel === 'farmshare' ? 'run on ' + clusterName(r) : r.panel === 'local' ? 'local panel, run hosted' : 'cloud panel']; } } } },
         scales: {
-          x: { type: 'logarithmic', min: o.seg ? 0.35 : 0.14, max: o.seg ? 40 : 30, title: { display: true, text: 'Dollars per 1,000 pages (log scale)', color: sec },
+          x: { type: 'logarithmic', min: o.seg ? 0.35 : 0.14 * o.P.f, max: o.seg ? 40 : 30, title: { display: true, text: 'Dollars per 1,000 pages (log scale)', color: sec },
             grid: { color: grid }, border: { color: grid },
-            afterBuildTicks: a => { a.ticks = (o.seg ? [0.5, 1, 2, 5, 10, 20] : [0.17, 0.25, 0.5, 1, 2, 5, 10, 20]).map(v => ({ value: v })); },
-            ticks: { color: mut, autoSkip: false, callback: v => v === 0.17 ? 'free' : '$' + v } },
+            afterBuildTicks: a => { a.ticks = (o.seg ? [0.5, 1, 2, 5, 10, 20] : [FREE * o.P.f, 0.25, 0.5, 1, 2, 5, 10, 20]).map(v => ({ value: v })); },
+            ticks: { color: mut, autoSkip: false, callback: v => !o.seg && v === FREE * o.P.f ? 'free' : '$' + v } },
           y: { min: lo, max: hi, title: { display: true, text: o.seg ? 'Pages in the exact document, no checking (%)' : 'NES %', color: sec }, grid: { color: grid }, border: { display: false },
             ticks: { color: mut, stepSize: 5 } } } },
       plugins: [labelPlugin(o.P, !o.seg)] });

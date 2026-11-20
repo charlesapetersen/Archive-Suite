@@ -1487,15 +1487,25 @@ def main():
     if any(v is None for v in std.values()):
         sys.exit(f"no price for: {[k for k, v in std.items() if v is None]}")
 
-    kinds = {}
+    ratio = inputs["batch"]["ratio"]
+    kinds, kind_price = {}, {}
     for path, key in ((CLOUD_CSV, "route"), (LOCAL_CSV, "model"), (GATEWAY_CSV, "route"), (HYDROGEN_CSV, "route")):
         with path.open(newline="") as f:
             for row in csv.DictReader(f):
                 if row["attribute"] == "kind" and row[key] in names:
-                    kinds.setdefault(row["value"], {})[row[key]] = (
+                    rid = row[key]
+                    kinds.setdefault(row["value"], {})[rid] = (
                         round(100 * float(row["nes"]), 2), int(row["ok"]), int(row["n"]), int(row["words"]))
+                    # W49.bench-kind-price: a kind chart draws a route at what that kind's pages cost it, where its
+                    # groups CSV measured it. A subscription route (cost 0) keeps its overall estimate, as do the
+                    # gateway and Hydrogen routes, whose CSVs carry no cost.
+                    usd = float(row.get("cost") or 0) / int(row["n"]) * 1000
+                    if usd:
+                        if not cents(usd):
+                            sys.exit(f"{rid}: {row['value']} pages cost under half a cent per 1,000")
+                        kind_price.setdefault(row["value"], {})[rid] = {
+                            "std": cents(usd), "batch": cents(usd * ratio[rid]) if rid in ratio else None}
 
-    ratio = inputs["batch"]["ratio"]
     routes = [{"id": rid, "name": names[rid]["name"], "panel": panel[rid], "std": cents(std[rid]),
                "batch": cents(std[rid] * ratio[rid]) if rid in ratio else None} for rid in names]
     charts = [{"key": "overall", "title": "All page kinds", "n": 96, "words": None, "scores": overall}]
@@ -1503,7 +1513,7 @@ def main():
         d = kinds[kind]
         first = d[next(iter(names))]
         charts.append({"key": kind, "title": kind.capitalize(), "n": first[2], "words": first[3],
-                       "scores": {rid: list(d[rid][:3]) for rid in names}})
+                       "scores": {rid: list(d[rid][:3]) for rid in names}, "prices": kind_price.get(kind, {})})
 
     # Routes on our own hardware: free in money, so drawn in the free column with their own marker.
     own = inputs["own_hardware"]
