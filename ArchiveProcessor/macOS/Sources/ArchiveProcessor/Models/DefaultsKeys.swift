@@ -127,6 +127,8 @@ enum DefaultsKeys {
     static let hasSeenGeneralInterview = "hasSeenGeneralInterview"
     /// W47.settings-level-switch: which rows the Settings window shows (`SettingsLevel`). Absent ⇒ Basic.
     static let settingsLevel = "settingsLevel"
+    /// The segmentation approach `SegmentationApproach.preselect` saved for the user: the app's pick, not their change.
+    static let segmentationApproachPreselected = "segmentationApproachPreselected"
 
     // Tools
     static let modelTestSelections = "modelTestSelections"

@@ -129,6 +129,11 @@ enum SettingsLevels {
     static func changed(_ key: String, in defaults: UserDefaults = .standard) -> Bool {
         if key.hasPrefix("keychain:") { return false }   // never read while drawing; the Accounts panel shows each
         guard let stored = defaults.object(forKey: key) else { return false }
+        // The solver's segmentation pick, saved for a user with no choice of their own, is the app's, not a change.
+        if key == DefaultsKeys.segmentationApproach, let s = stored as? String,
+           s == defaults.string(forKey: DefaultsKeys.segmentationApproachPreselected) {
+            return false
+        }
         guard let builtIn = defaultValue(key) else { return true }
         switch (stored, builtIn) {
         case let (s as String, d as String): return s != d

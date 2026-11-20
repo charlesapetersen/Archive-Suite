@@ -89,6 +89,8 @@ enum SegmentationApproach: String, CaseIterable, Identifiable, Codable, Sendable
         let start = preferredDefault(routes)
         guard start != defaultApproach else { return false }
         defaults.set(start.rawValue, forKey: DefaultsKeys.segmentationApproach)
+        // What the app chose, not the user: Settings judges "changed from its default" against it (W47.settings-level-switch).
+        defaults.set(start.rawValue, forKey: DefaultsKeys.segmentationApproachPreselected)
         return true
     }
 }

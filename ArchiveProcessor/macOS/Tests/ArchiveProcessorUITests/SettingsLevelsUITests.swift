@@ -63,7 +63,9 @@ final class SettingsLevelsUITests: XCTestCase {
     }
 
     func testBasicShowsTheAppsPicksAndTheFewSwitchesANewUserNeeds() throws {
-        guard let settings = launch(["-settingsLevel", "basic"]) else { return }
+        // The guest keeps its defaults between runs, and an approach saved there (by another suite, or the app's
+        // preselect) is rightly shown at Basic as a change; pin it to its default so this test sees the level alone.
+        guard let settings = launch(["-settingsLevel", "basic", "-segmentationApproach", "manual"]) else { return }
         expect(settings, panel: "General", shown: ["ap.settings.appearance", "ap.settings.level", "ap.settings.level.detail"],
                hidden: [], level: "Basic")
         shoot(settings, "settings-level-basic-general")
@@ -73,6 +75,7 @@ final class SettingsLevelsUITests: XCTestCase {
         shoot(settings, "settings-level-basic-reading")
         expect(settings, panel: "Documents", shown: ["ap.sheet.card.segmentation"],
                hidden: ["ap.segmentation.picker", "ap.sheet.override.segmentation"], level: "Basic")
+        shoot(settings, "settings-level-basic-documents")
         expect(settings, panel: "Dates and names", shown: ["ap.sheet.card.dating", "ap.sheet.card.entities"],
                hidden: ["ap.sheet.switch.dating.image_every_document"], level: "Basic")
         expect(settings, panel: "Pages and output", shown: ["ap.sheet.rule.reading-copy"],
