@@ -71181,6 +71181,24 @@
     "poor": 58,
     "hit_rate": 0.378448275862069,
     "fa_rate": 0.05343283582089552
+   },
+   {
+    "reader": "12 whole-page readers, pooled",
+    "set": "15 L9 newspaper scans, read whole",
+    "signal": "against Vision's whole page",
+    "auc": 0.6912223133716161,
+    "poor": 115,
+    "hit_rate": 0.18434782608695652,
+    "fa_rate": 0.0660377358490566
+   },
+   {
+    "reader": "12 whole-page readers, pooled",
+    "set": "15 L9 newspaper scans, read whole",
+    "signal": "against Vision on 3 x 3 tiles, order-free",
+    "auc": 0.9831009023789992,
+    "poor": 115,
+    "hit_rate": 0.9669565217391304,
+    "fa_rate": 0.04339622641509434
    }
   ],
   "app_rule": {

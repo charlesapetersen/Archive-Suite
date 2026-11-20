@@ -84,6 +84,7 @@ POSTCORRECT = RESULTS / "ocr-postcorrect.json"  # W46.ocr-postcorrect: postcorre
 LOGPROB = RESULTS / "ocr-logprob.json"  # W46.ocr-logprob: ocr_logprob.py report, log-probabilities as an error flag
 POSTREAD = RESULTS / "post-read-flag.json"  # W46.post-read-quality-flag: post_read_flag.py report, the read-poorly flag
 POSTREAD_NEWS = RESULTS / "post-read-flag-newspaper.json"  # W49.proc-read-flag-newspaper: post_read_flag_newspaper.py
+POSTREAD_NEWS_WHOLE = RESULTS / "post-read-flag-newspaper-whole.json"  # W49.proc-read-flag-newspaper-whole
 LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.py run, ordering with detection fixed
 LAYOUT_ORDER_MARKS = RESULTS / "layout-order-marks.json"  # W46.layout-order-marks: the 96 and the marks core
 MARKS_DETECT = RESULTS / "marks-detect.json"  # W46.marks-detect: marks_detect.py report, trained marks detectors
@@ -1005,6 +1006,16 @@ def postread():
             e = pooled[g]
             rows.append({"reader": f"{n['counts']['region']['systems']} region readers, pooled",
                          "set": "15 L9 newspaper scans, in regions", "signal": label, "auc": e["auc"],
+                         "poor": e["in_sample"]["poor"], "hit_rate": e["crossval"]["hit_rate"],
+                         "fa_rate": e["crossval"]["fa_rate"]})
+    # W49.proc-read-flag-newspaper-whole: newspaper scans read whole, every whole-page reader pooled
+    if POSTREAD_NEWS_WHOLE.exists():
+        n = json.loads(POSTREAD_NEWS_WHOLE.read_text())
+        for g, label in (("whole nes", "against Vision's whole page"),
+                         ("tiles 3x3 bow", "against Vision on 3 x 3 tiles, order-free")):
+            e = n["pooled"]["poor"][g]
+            rows.append({"reader": f"{n['counts']['systems']} whole-page readers, pooled",
+                         "set": "15 L9 newspaper scans, read whole", "signal": label, "auc": e["auc"],
                          "poor": e["in_sample"]["poor"], "hit_rate": e["crossval"]["hit_rate"],
                          "fa_rate": e["crossval"]["fa_rate"]})
     shipped = [e for e in (d.get("app_readers") or {}).values() if e["ships"]]
