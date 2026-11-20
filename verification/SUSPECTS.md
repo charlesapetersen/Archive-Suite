@@ -64,9 +64,18 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   screenshot of the list area. Confirmed if it says "No matches" while the failure line shows.
 - **Would clear it:** the overlay says the index is unavailable, or no overlay is drawn while the failure line
   shows.
-- **Status:** `open`
+- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.reader-s003-reproduce-check`);
+  test `ArchiveReaderTests/DeadIndexEmptyListSuspectTests`, evidence
+  [`evidence/reader/W49.reader-s003-dead-index.md`](evidence/reader/W49.reader-s003-dead-index.md)
 - **History:**
   - 2026-10-12 W40.b1 — raised.
+  - 2026-11-20 W49.reader-s003-reproduce (Opus 5.5) — reproduced on the model, scratch data. With the indexer on a
+    1 KiB garbage index file, an OCR query records `.unavailable` (the amber line) and `searchRanked` returns an empty
+    path set, not nil, so `ftsPaths = []`, the list empties, and `LibraryEmptyState.forPhase` gives `.filteredOut`:
+    the "No matches" overlay, its sentence "The OCR search “smith” hides every file." and a Clear Text button.
+    Nothing on that path reads `indexFailure`. Not deliberate: `openForQuery`'s comment names exactly this outcome
+    as what W23.m9 prevents; the overlay's sentence came later (`W40.fix-reader-filter-bar`). The check is an
+    `XCTExpectFailure`. Pixels not captured; the view's switch has no other input.
 
 ### S-004 · Reader view state from another root may restore everything except the folder prefix
 
