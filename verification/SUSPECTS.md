@@ -73,10 +73,18 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   count.
 - **Would clear it:** the prefix is dropped (or `discoveredPathPrefix` is set before restore) and root B lists its
   files.
-- **Status:** `open`
+- **Status:** `cleared` — not reproduced; tests `ViewStateRootChangeTests` (ArchiveReaderTests)
 - **History:**
   - 2026-10-12 W40.b1 — raised.
   - 2026-11-20 owner walkthrough (call 24) — reproduce attempt queued as `W49.reader-s004-reproduce`.
+  - 2026-11-20 W49.reader-s004-reproduce — cleared with the test the entry asks for, on the real bookmark path (the
+    fixture pin turns view-state restore off, so it could not show the defect): root A is granted, scoped to its
+    "Box 1" and its view state saved; root B is granted in the same defaults domain and a new `NavigationModel` is
+    built. `RootFolderStore.init` resolves the bookmark synchronously (`resolveSaved`), and `rootStore` is assigned
+    before `restoreViewState()` runs, so `discoveredPathPrefix` is already B's: the prefix is dropped, the rest of
+    the view state is kept, and B lists its file. A control test keeps the scope under its own root. The only time
+    the prefix passes through is a launch where the bookmark does not resolve (no root, so no list); a later pick
+    goes through `chooseRoot`, which clears `filter.pathPrefix`.
 
 ### S-005 · The Reader does not recognise an encrypted PDF
 
