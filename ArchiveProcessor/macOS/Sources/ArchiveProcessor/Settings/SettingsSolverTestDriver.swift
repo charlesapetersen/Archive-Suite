@@ -612,9 +612,11 @@ enum SettingsSolverTestDriver {
         // G6. W47.wh-readers-lost (owner call 15): a lower-scoring reader is never the pick, with every key, plan and
         // a cluster, at any batch size; chosen on its card, it is what the stage reads with.
         let lowerIDs = Set(table.stage("reading")?.routes.filter(\.lowerScoring).map(\.id) ?? [])
-        check("G6 the sixteen lower-scoring readers are rows",
-              lowerIDs.count == 16 && lowerIDs.contains("apple-fm-27") && lowerIDs.contains("qwen3-vl-8b")
-                && lowerIDs.contains("ppocrv6-medium-farmshare"), lowerIDs.sorted().joined(separator: ", "))
+        // W47.wh-readers-lost-vendors-read: Azure and Textract on all 96 are the seventeenth and eighteenth.
+        check("G6 the eighteen lower-scoring readers are rows",
+              lowerIDs.count == 18 && lowerIDs.contains("apple-fm-27") && lowerIDs.contains("qwen3-vl-8b")
+                && lowerIDs.contains("ppocrv6-medium-farmshare") && lowerIDs.contains("azure-di-layout")
+                && lowerIDs.contains("textract-layout"), lowerIDs.sorted().joined(separator: ", "))
         var everything = SettingsResources(macMemoryGB: 128)
         everything.keys = ["gemini", "openrouter", "openai", "mistral", "anthropic", "gateway"]
         everything.plans = ["claude", "chatgpt"]

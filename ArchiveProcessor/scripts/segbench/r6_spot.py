@@ -261,6 +261,53 @@ def decades(tags):
     return {int(d) for d in re.findall(r'\b(1[5-9]\d0|20[0-2]0)s\b', tags)}
 
 
+UNCORRECTABLE = 'p081'  # reported apart on the bench page (ArchiveOCRBench/build.py), so the rows' figures are on 95
+
+
+def headline(sel, by_page, R):
+    """W47.wh-readers-lost-vendors-read: each vendor on the 95 the reading rows are scored on (p081 apart), beside the
+    panel's stored replies scored the same way, by page kind, and paired against Mistral OCR 4.1."""
+    every = {j['id']: (P.TRUTH / 'truth' / (j['page'] + '.txt')).read_text() for j in sel}
+    keep = [j for j in sel if j['page'] != UNCORRECTABLE]
+    truth = {j['id']: every[j['id']] for j in keep}
+    hyp = {'azure-di-layout': lambda j: azure_text(json.loads((CACHE / 'azure' / (j['id'] + '.json')).read_text())),
+           'textract-layout': lambda j: textract_text(json.loads((CACHE / 'textract' / (j['id'] + '.json')).read_text()))[0]}
+    per = {k: {j['id']: score(every[j['id']], f(j))['nes'] for j in sel} for k, f in hyp.items()}
+    panel = {}
+    for r in R.all_scores():
+        if r['id'] in every:
+            panel.setdefault(r['key'], {})[r['id']] = r['nes'] if r['ok'] else None
+    print(f'\n## Answered and strict (failure as 0) on the 95, p081 apart; by kind strict on all 96, as the charts\n')
+    print('| route | answered | strict | typewritten | printed | handwritten | mixed |\n|---|---|---|---|---|---|---|')
+    def line(k, m):
+        got = [m[i] for i in truth if m.get(i) is not None]
+        kinds = {}
+        for j in sel:
+            kinds.setdefault(by_page[j['page']]['kind'], []).append(m.get(j['id']) or 0.)
+        cell = lambda kd: f'{100 * sum(kinds[kd]) / len(kinds[kd]):.2f} ({len(kinds[kd])})' if kd in kinds else ''
+        print(f'| {k} | {100 * sum(got) / len(got):.2f} ({len(got)}) | {100 * sum(m.get(i) or 0. for i in truth) / len(keep):.2f} '
+              f'| {cell("typewritten")} | {cell("printed")} | {cell("handwritten")} | {cell("mixed")} |')
+    for k, m in per.items():
+        line(k, m)
+    for k in ('mistral-ocr-4-1', 'gpt5.4-mini', 'qwen3.8-flash', 'apple-vision'):
+        if k in panel and len(panel[k]) == len(sel):
+            line(k, panel[k])
+    base = panel.get('mistral-ocr-4-1', {})
+    for k, m in per.items():
+        ids = [i for i in truth if base.get(i) is not None]
+        d = paired([m[i] for i in ids], [base[i] for i in ids])
+        print(f'\npaired {k} - mistral-ocr-4-1 on {d["n"]}: {100 * d["delta"]:+.2f} ({100 * d["lo"]:+.2f} to {100 * d["hi"]:+.2f})')
+    for k, m in per.items():
+        print(f'{k} on all 96: {100 * sum(m.values()) / len(m):.2f}')
+    d = paired([per['azure-di-layout'][i] for i in truth], [per['textract-layout'][i] for i in truth])
+    print(f'\npaired azure-di-layout - textract-layout on {d["n"]}: {100 * d["delta"]:+.2f} ({100 * d["lo"]:+.2f} to {100 * d["hi"]:+.2f})')
+    p = UNCORRECTABLE
+    j = next((j for j in sel if j['page'] == p), None)
+    if j:
+        t = (P.TRUTH / 'truth' / (p + '.txt')).read_text()
+        print(f'\n{p} apart:', {k: round(100 * score(t, f(j))['nes'], 2) for k, f in hyp.items()})
+
+
 def cmd_report():
     import ocr_cloud_full_report as R
     sel = selection()['jobs']; ids = {j['id'] for j in sel}; N = len(sel)
@@ -287,12 +334,14 @@ def cmd_report():
         if r['id'] in ids and r['ok']:
             rows.setdefault(r['key'], []).append(r['nes'])
     full = {k: v for k, v in rows.items() if len(v) == N}
+    if N == 96:
+        headline(sel, by_page, R)
     print(f'| route | mean NES on the {N} | n |\n|---|---|---|')
     for k, v in sorted(full.items(), key=lambda kv: -sum(kv[1])):
         print(f'| {k} | {100 * sum(v) / N:.1f} | {len(v)} |')
     for base in ('mistral-ocr-4-1',):
         for k in ('azure-di-layout', 'textract-layout', 'transkribus-text-titan'):
-            if base in full:
+            if base in full and k in full:
                 print(f'\npaired {k} - {base}:', paired(full[k], full[base]))
     if 'transkribus-text-titan' in full:
         for k in ('azure-di-layout', 'textract-layout'):

@@ -4912,6 +4912,213 @@
      "conditions": []
     },
     {
+     "id": "azure-di-layout",
+     "name": "Azure Document Intelligence, prebuilt-layout (vendor service)",
+     "family": "cloud",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [
+       "azure"
+      ],
+      "plan": [],
+      "cluster": false,
+      "gpus": null,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 90.9,
+       "n": "95/95 answered, p081 apart",
+       "strict": 90.9,
+       "failures": {},
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/r6-spot.md",
+        "route": "azure-di-layout",
+        "attribute": "All 96: answered (n)",
+        "value": "90.90"
+       }
+      },
+      "typewritten": {
+       "value": 95.57,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/r6-spot.md",
+        "route": "azure-di-layout",
+        "attribute": "All 96: typewritten",
+        "value": "95.57"
+       }
+      },
+      "printed": {
+       "value": 88.07,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/r6-spot.md",
+        "route": "azure-di-layout",
+        "attribute": "All 96: printed",
+        "value": "88.07"
+       }
+      },
+      "handwritten": {
+       "value": 81.77,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/r6-spot.md",
+        "route": "azure-di-layout",
+        "attribute": "All 96: handwritten",
+        "value": "81.77"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 10.0,
+      "usd_1000_batch": null,
+      "price_read": "2026-11-04 (W46.r6-spot)",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/r6-spot.md",
+       "route": "azure-di-layout",
+       "attribute": "list price",
+       "value": "$10 per 1,000"
+      }
+     },
+     "time": {
+      "per_unit_s": null,
+      "measured": false,
+      "measured_on": "no call times recorded",
+      "source": null
+     },
+     "memory": {
+      "peak_gb": 0,
+      "source": null
+     },
+     "caveats": [
+      "read on the F0 free tier ($0); list price $10 per 1,000 pages",
+      "96 only"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: mistral-ocr-4-1 scores higher on the same 95, 93.01 answered against 90.9, and costs no more, $4.00 per 1,000 pages; offered at the Advanced level only, never the app's pick (owner call 15)",
+      "not offered until the Processor has a reader for it (queued: W47.wh-readers-lost-vendors-clients)"
+     ]
+    },
+    {
+     "id": "textract-layout",
+     "name": "AWS Textract, AnalyzeDocument LAYOUT (vendor service)",
+     "family": "cloud",
+     "app_route": null,
+     "status": "measured",
+     "needs": {
+      "key": [
+       "aws"
+      ],
+      "plan": [],
+      "cluster": false,
+      "gpus": null,
+      "mac": false,
+      "mac_gb": null,
+      "built_in": false
+     },
+     "figures": {
+      "overall": {
+       "value": 88.45,
+       "n": "95/95 answered, p081 apart",
+       "strict": 88.45,
+       "failures": {},
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/r6-spot.md",
+        "route": "textract-layout",
+        "attribute": "All 96: answered (n)",
+        "value": "88.45"
+       }
+      },
+      "typewritten": {
+       "value": 94.08,
+       "answered": 50,
+       "n": 50,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/r6-spot.md",
+        "route": "textract-layout",
+        "attribute": "All 96: typewritten",
+        "value": "94.08"
+       }
+      },
+      "printed": {
+       "value": 87.76,
+       "answered": 28,
+       "n": 28,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/r6-spot.md",
+        "route": "textract-layout",
+        "attribute": "All 96: printed",
+        "value": "87.76"
+       }
+      },
+      "handwritten": {
+       "value": 72.92,
+       "answered": 16,
+       "n": 16,
+       "basis": "strict, failure as 0",
+       "truth": "owner-96",
+       "source": {
+        "file": "ArchiveProcessor/segbench-results/r6-spot.md",
+        "route": "textract-layout",
+        "attribute": "All 96: handwritten",
+        "value": "72.92"
+       }
+      }
+     },
+     "cost": {
+      "usd_1000_list": 4.0,
+      "usd_1000_batch": null,
+      "price_read": "2026-11-04 (W46.r6-spot)",
+      "source": {
+       "file": "ArchiveProcessor/segbench-results/r6-spot.md",
+       "route": "textract-layout",
+       "attribute": "list price",
+       "value": "$4 per 1,000"
+      }
+     },
+     "time": {
+      "per_unit_s": null,
+      "measured": false,
+      "measured_on": "no call times recorded",
+      "source": null
+     },
+     "memory": {
+      "peak_gb": 0,
+      "source": null
+     },
+     "caveats": [
+      "lines in LAYOUT block order (+3.2 over raw line order on the 25)",
+      "read with the date QUERY as well ($15 per 1,000 more); the row's price is LAYOUT's",
+      "96 only"
+     ],
+     "kind_rules": [],
+     "fallback": null,
+     "conditions": [
+      "lower-scoring: mistral-ocr-4-1 scores higher on the same 95, 93.01 answered against 88.45, and costs no more, $4.00 per 1,000 pages; offered at the Advanced level only, never the app's pick (owner call 15)",
+      "not offered until the Processor has a reader for it (queued: W47.wh-readers-lost-vendors-clients)"
+     ]
+    },
+    {
      "id": "qwen3-vl-8b",
      "name": "Qwen3-VL 8B (OpenRouter)",
      "family": "cloud",

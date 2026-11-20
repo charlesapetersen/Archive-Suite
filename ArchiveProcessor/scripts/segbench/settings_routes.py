@@ -92,6 +92,7 @@ ML = "ArchiveProcessor/segbench-results/ocr-mac-local-hw.md"
 M8 = "ArchiveProcessor/segbench-results/ocr-mac-local.md"
 R1F = "ArchiveProcessor/segbench-results/r1-foundation.md"
 OT = "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json"   # W46.ocr-time-like-for-like
+R6S = "ArchiveProcessor/segbench-results/r6-spot.md"   # W47.wh-readers-lost-vendors-read
 
 
 def src(f, route, attr, val):
@@ -304,6 +305,28 @@ def reading_rows():
     ]:
         add(rid, nm, "cloud", None, "measured", {"key": keys}, figs(rid, rid, "mistral-ocr" if rid == "mistral-ocr-4-1" else rid), cost(rid),
             cloud_time(rid, {"per_unit_s": None, "measured": False, "measured_on": "no time in its call log (ocr-time-like-for-like.md)", "source": None}), {"peak_gb": 0, "source": None}, cav)
+
+    # W47.wh-readers-lost-vendors-read: the document services on all 96 (r6-spot.md §"All 96"), by the panel's scorer;
+    # both below Mistral OCR 4.1 at no less cost, so lower-scoring (owner call 15). No Processor client reads them yet:
+    # not offered until W47.wh-readers-lost-vendors-clients, so the rows say so rather than "not in the app yet".
+    # Transkribus waits for the owner's upload of the other 71 (W47.wh-readers-lost-vendors-tk).
+    for rid, nm, keys, ov, kinds, usd, cav in [
+        ("azure-di-layout", "Azure Document Intelligence, prebuilt-layout (vendor service)", ["azure"], 90.90,
+         (95.57, 88.07, 81.77), 10.0, ["read on the F0 free tier ($0); list price $10 per 1,000 pages", "96 only"]),
+        ("textract-layout", "AWS Textract, AnalyzeDocument LAYOUT (vendor service)", ["aws"], 88.45,
+         (94.08, 87.76, 72.92), 4.0, ["lines in LAYOUT block order (+3.2 over raw line order on the 25)", "read with the date QUERY as well ($15 per 1,000 more); the row's price is LAYOUT's", "96 only"]),
+    ]:
+        F = {"overall": {"value": ov, "n": "95/95 answered, p081 apart", "strict": ov, "failures": {}, "truth": "owner-96",
+                         "source": src(R6S, rid, "All 96: answered (n)", f"{ov:.2f}")}}
+        for k, v, n in zip(("typewritten", "printed", "handwritten"), kinds, (50, 28, 16)):
+            F[k] = {"value": v, "answered": n, "n": n, "basis": "strict, failure as 0", "truth": "owner-96", "source": src(R6S, rid, f"All 96: {k}", f"{v:.2f}")}
+        dom = "mistral-ocr-4-1"
+        add(rid, nm, "cloud", None, "measured", {"key": keys}, F,
+            {"usd_1000_list": usd, "usd_1000_batch": None, "price_read": "2026-11-04 (W46.r6-spot)", "source": src(R6S, rid, "list price", f"${usd:g} per 1,000")},
+            {"per_unit_s": None, "measured": False, "measured_on": "no call times recorded", "source": None}, {"peak_gb": 0, "source": None}, cav,
+            conditions=[lower(f"{dom} scores higher on the same 95, {head[dom]['nes_answered']} answered against {ov}, and costs no more, "
+                              f"${routes[dom]['std']:.2f} per 1,000 pages"),
+                        "not offered until the Processor has a reader for it (queued: W47.wh-readers-lost-vendors-clients)"])
 
     def hosted_by(dom):
         return lower(f"{dom} scores higher on the 96, "
