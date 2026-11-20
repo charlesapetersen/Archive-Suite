@@ -15565,7 +15565,7 @@
      "switch": {
       "id": "mixed-route",
       "label": "Read handwriting on typed pages (signatures, dates, notes in the margin)",
-      "default": false
+      "default": true
      }
     },
     {

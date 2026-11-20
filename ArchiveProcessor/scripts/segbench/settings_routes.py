@@ -477,7 +477,7 @@ HEADERS = {
     {"id": "classifier-shipped", "text": "The shipped classifier (Vision signals and the feature print) labels each page's kind on the Mac and measures the collection's mix from a sample.", "source": "kind-atrium.md §Verdict", "switch": None},
     {"id": "low-confidence-keeps-model", "text": "A page whose top class is under 0.8 keeps the run's model.", "source": "K-kinds.md", "switch": None},
     {"id": "mixed-to-handwritten", "text": "Mixed pages have no class: they go to the handwritten pick.", "source": "kind-classifier.md", "switch": None},
-    {"id": "mixed-route", "text": "Read handwriting on typed pages (signatures, dates, notes in the margin). Measured level on typed pages, not measured on mixed pages.", "source": "mixed-route-bands.md", "switch": {"id": "mixed-route", "label": "Read handwriting on typed pages (signatures, dates, notes in the margin)", "default": False}},
+    {"id": "mixed-route", "text": "Read handwriting on typed pages (signatures, dates, notes in the margin). Measured level on typed pages, not measured on mixed pages.", "source": "mixed-route-bands.md", "switch": {"id": "mixed-route", "label": "Read handwriting on typed pages (signatures, dates, notes in the margin)", "default": True}},
     {"id": "cascade-breaker", "text": "Escalation is capped after 20 pages at 25% of the run's pages; never on a remote gateway, the Local Agent or Apple Vision as first reader.", "source": "10-kinds-and-routing.md §3. The rule for the settings layer", "switch": None}],
    "fallback": "the run's model (weights fail to load)"},
  "training-kit": {"id": "training-kit", "name": "Training on the user's own material", "unit": "gaps / lines", "choice": True,

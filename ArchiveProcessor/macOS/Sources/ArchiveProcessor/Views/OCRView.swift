@@ -76,7 +76,7 @@ struct OCRView: View {
     @AppStorage(DefaultsKeys.ocrCascadeRoute) private var ocrCascadeRoute: String = ""
     @AppStorage(DefaultsKeys.ocrCascadeOnDisagreement) private var ocrCascadeOnDisagreement: Bool = false
     @AppStorage(DefaultsKeys.ocrPageKindRouting) private var ocrPageKindRouting: Bool = false
-    @AppStorage(DefaultsKeys.ocrHandwritingOnTyped) private var ocrHandwritingOnTyped: Bool = false
+    @AppStorage(DefaultsKeys.ocrHandwritingOnTyped) private var ocrHandwritingOnTyped: Bool = true
     /// W41.app-page-kind — each dropped image's kind and the reader it chose.
     @StateObject private var pageKinds = PageKindStore()
     /// W41.app-institutional-compute — the institutional-computing bulk folder the next run takes text from; chosen per run.

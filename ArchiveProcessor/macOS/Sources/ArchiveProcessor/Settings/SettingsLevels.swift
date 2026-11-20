@@ -105,13 +105,13 @@ enum SettingsLevels {
             return ""
         case DefaultsKeys.useGateway, DefaultsKeys.useLocalAgent, DefaultsKeys.useAppleVision, DefaultsKeys.gatewayLocalModel,
              DefaultsKeys.gatewayLocalEscalates, DefaultsKeys.visionUseLLMJudgment, DefaultsKeys.visionFastRecognition,
-             DefaultsKeys.ocrCascadeOnDisagreement, DefaultsKeys.ocrPageKindRouting, DefaultsKeys.ocrHandwritingOnTyped,
+             DefaultsKeys.ocrCascadeOnDisagreement, DefaultsKeys.ocrPageKindRouting,
              DefaultsKeys.preOCRedInput, DefaultsKeys.batchMode, DefaultsKeys.reviewRotation,
              DefaultsKeys.enableCollectionSegmentation, DefaultsKeys.confirmCollectionIDs,
              DefaultsKeys.reviewDocumentSegmentation, DefaultsKeys.mergeDocuments, DefaultsKeys.sendPreviousImage,
              DefaultsKeys.writeLogFile:
             return false
-        case DefaultsKeys.outputImageFile, DefaultsKeys.enableSegmentJSON: return true
+        case DefaultsKeys.outputImageFile, DefaultsKeys.enableSegmentJSON, DefaultsKeys.ocrHandwritingOnTyped: return true
         case DefaultsKeys.visionMinimumConfidence: return 0.0
         case DefaultsKeys.gatewayInputCost, DefaultsKeys.gatewayOutputCost: return -1.0
         case DefaultsKeys.imageResolutionPercent: return 100.0
