@@ -81,6 +81,14 @@ enum SettingsTraining {
         "chutes": Record(provider: "Chutes, through OpenRouter", terms: .mayTrain,
                          summary: "OpenRouter serves Chutes only to accounts that allow providers to train on prompts",
                          source: "https://x.com/OpenRouterAI/status/1889732807481561112"),
+        // W47.wh-readers-lost-clients: Qwen3-VL 8B's pinned upstream; no terms of Parasail's are on record.
+        "parasail": Record(provider: "Parasail, through OpenRouter", terms: .unknown,
+                           summary: "the app has no terms of Parasail's on record, so whether it keeps or trains on the pages is not known",
+                           source: ""),
+        // Mistral Medium 3.5 on Mistral's own endpoint: OpenRouter pays for Mistral's API, and paid use is opted out.
+        "mistral": Record(provider: "Mistral, through OpenRouter", terms: .never,
+                          summary: "OpenRouter pays for Mistral's API, and Mistral does not train on paid API traffic",
+                          source: "https://help.mistral.ai/en/articles/455207-can-i-opt-out-of-my-input-or-output-data-being-used-for-training"),
         // W41.app-openrouter-any: a maker's own endpoint (`OpenRouterRoute.makerRoutes`) holds the maker's API terms.
         "google-ai-studio": makersThroughOpenRouter["gemini"]!,
         "openai": makersThroughOpenRouter["openai"]!,

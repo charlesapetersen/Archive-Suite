@@ -309,17 +309,18 @@ def reading_rows():
                      f"{head[dom]['nes_answered']} answered, and costs no more, ${routes[dom]['std']:.2f} per 1,000 pages")
 
     # W47.wh-readers-lost (owner call 15, 2026-11-19): the hosted routes a row of the same family dominates on the 96
-    # (04-reading.md §4, "Not in the table"), offered at Advanced with their figures, never a default or a pick. None
-    # has a client in the app (no pinned OpenRouter route, no Mistral Medium model); the item's report says what one takes.
+    # (04-reading.md §4, "Not in the table"), offered at Advanced with their figures, never a default or a pick. Each is
+    # a pinned OpenRouter route since W47.wh-readers-lost-clients (APP_ROUTES); Mistral Medium 3.5 only through OpenRouter,
+    # as the bench read it, since the app's Mistral key sends Mistral OCR alone.
     for rid, nm, keys, hk, dom, cav in [
         ("qwen3-vl-8b", "Qwen3-VL 8B (OpenRouter)", ["openrouter"], "qwen3-vl-8b (local panel)", "qwen3.8-flash", ["96 only: no public run of its own"]),
         ("qwen3-vl-30b-a3b", "Qwen3-VL 30B-A3B (OpenRouter)", ["openrouter"], None, "qwen3.8-flash", ["96 only: no public run of its own"]),
         ("qwen3.5-35b-a3b", "Qwen3.5 35B-A3B (OpenRouter)", ["openrouter"], None, "qwen3.8-flash", ["96 only: no public run of its own", "the second stage of casc-5-fail"]),
-        ("mistral-medium3.5", "Mistral Medium 3.5", ["mistral", "openrouter"], None, "mistral-large4", ["96 only: no public run of its own"]),
+        ("mistral-medium3.5", "Mistral Medium 3.5 (OpenRouter)", ["openrouter"], None, "mistral-large4", ["96 only: no public run of its own"]),
     ]:
         add(rid, nm, "cloud", None, "measured", {"key": keys}, figs(rid, rid, hk or rid), cost(rid),
             cloud_time(rid, {"per_unit_s": None, "measured": False, "measured_on": "no time in its call log (ocr-time-like-for-like.md)", "source": None}), {"peak_gb": 0, "source": None},
-            cav + ["the Processor has no reader for it yet (W47.wh-readers-lost's report)"], conditions=[hosted_by(dom)])
+            cav, conditions=[hosted_by(dom)])
 
     # ---- plans (R5), read by the plan or by key
     # W41.app-claude-plan-reading (owner, 2026-11-19): measured through `claude -p` on the owner's plan, and the app reads
@@ -512,6 +513,12 @@ APP_ROUTES = {
  "qwen3.6-27b": "openrouter|qwen/qwen3.6-27b",
  "qwen3.8-flash": "openrouter|qwen/qwen3.8-flash",
  "qwen3.5-9b": "openrouter|qwen/qwen3.5-9b",
+ # W47.wh-readers-lost-clients: the lower-scoring hosted rows, on the endpoint and precision ocr_panel.py and ocr_cloud.py
+ # pinned (Mistral Medium 3.5 on Mistral's own endpoint through OpenRouter, as ocr_cloud.py read it).
+ "qwen3-vl-8b": "openrouter|qwen/qwen3-vl-8b-instruct",
+ "qwen3-vl-30b-a3b": "openrouter|qwen/qwen3-vl-30b-a3b-instruct",
+ "qwen3.5-35b-a3b": "openrouter|qwen/qwen3.5-35b-a3b",
+ "mistral-medium3.5": "openrouter|mistralai/mistral-medium-3-5",
 }
 KEY_NAMES = {"stanford-gateway": "gateway"}
 

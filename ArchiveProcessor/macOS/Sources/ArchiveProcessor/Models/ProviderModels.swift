@@ -554,6 +554,40 @@ struct OpenRouterRoute: Sendable, Equatable {
             providerTag: "deepinfra/bf16", precision: "bf16", reasoning: .off,
             measured: "Measured on the owner's 96 test pages: 93.38 NES on the pages it answered, $0.25 per 1,000 pages, "
                 + "the cheapest measured reader; 4 pages ran to the token cap."),
+        // W47.wh-readers-lost-clients (owner call 15): the lower-scoring hosted rows, offered at Advanced only, never a
+        // default or a pick. Each on the endpoint and precision the bench pinned (ocr_panel.py, ocr_cloud.py), priced
+        // from its frozen catalog listing (ocr-panel-local and ocr-panel-cloud `catalog/`, 2026-10).
+        OpenRouterRoute(
+            model: LLMModel(id: "qwen/qwen3-vl-8b-instruct", displayName: "Qwen3-VL 8B (parasail bf16)",
+                            provider: .openrouter, supportsThinking: false, returnsMd: false,
+                            inputCostPer1M: 0.25, outputCostPer1M: 0.75, batchDiscount: 1),
+            providerTag: "parasail/bf16", precision: "bf16", reasoning: .none,
+            measured: "Measured on the owner's 96 test pages: 93.85 NES on the pages it answered, $1.49 per 1,000 pages; "
+                + "Qwen3.8 Flash reads them better for less."),
+        OpenRouterRoute(
+            model: LLMModel(id: "qwen/qwen3-vl-30b-a3b-instruct", displayName: "Qwen3-VL 30B-A3B (deepinfra fp8)",
+                            provider: .openrouter, supportsThinking: false, returnsMd: false,
+                            inputCostPer1M: 0.15, outputCostPer1M: 0.60, batchDiscount: 1),
+            providerTag: "deepinfra/fp8", precision: "fp8", reasoning: .none,
+            measured: "Measured on the owner's 96 test pages: 91.79 NES on the pages it answered, $0.98 per 1,000 pages; "
+                + "Qwen3.8 Flash reads them better for less."),
+        OpenRouterRoute(
+            model: LLMModel(id: "qwen/qwen3.5-35b-a3b", displayName: "Qwen3.5 35B-A3B (deepinfra fp8)",
+                            provider: .openrouter, supportsThinking: false, returnsMd: false,
+                            inputCostPer1M: 0.14, outputCostPer1M: 1.00, batchDiscount: 1),
+            providerTag: "deepinfra/fp8", precision: "fp8", reasoning: .off,
+            measured: "Measured on the owner's 96 test pages: 92.82 NES on the pages it answered, $0.83 per 1,000 pages; "
+                + "Qwen3.8 Flash reads them better for less."),
+        // Mistral's own endpoint, which lists no precision; the bench sent none (a maker's route in ocr_cloud.py), and
+        // pinning "unknown" as listed selects the same endpoint, as for Qwen3.8 Flash. Not a maker route: the app has
+        // no Mistral chat model of its own for it to stand for (the Mistral key sends Mistral OCR only).
+        OpenRouterRoute(
+            model: LLMModel(id: "mistralai/mistral-medium-3-5", displayName: "Mistral Medium 3.5 (mistral, precision unknown)",
+                            provider: .openrouter, supportsThinking: false, returnsMd: false,
+                            inputCostPer1M: 1.50, outputCostPer1M: 7.50, batchDiscount: 1),
+            providerTag: "mistral", precision: "unknown", reasoning: .off,
+            measured: "Measured on the owner's 96 test pages: 90.94 NES, every page answered, $7.29 per 1,000 pages; "
+                + "Mistral Large 4 reads them better for less."),
     ]
 
     /// W41.app-openrouter-any — the measured models of another provider, through OpenRouter on their maker's own

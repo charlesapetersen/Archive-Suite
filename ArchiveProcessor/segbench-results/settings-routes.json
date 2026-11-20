@@ -4915,8 +4915,8 @@
      "id": "qwen3-vl-8b",
      "name": "Qwen3-VL 8B (OpenRouter)",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "openrouter|qwen/qwen3-vl-8b-instruct",
+     "status": "shipped",
      "needs": {
       "key": [
        "openrouter"
@@ -5021,8 +5021,7 @@
       "source": null
      },
      "caveats": [
-      "96 only: no public run of its own",
-      "the Processor has no reader for it yet (W47.wh-readers-lost's report)"
+      "96 only: no public run of its own"
      ],
      "kind_rules": [],
      "fallback": null,
@@ -5034,8 +5033,8 @@
      "id": "qwen3-vl-30b-a3b",
      "name": "Qwen3-VL 30B-A3B (OpenRouter)",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "openrouter|qwen/qwen3-vl-30b-a3b-instruct",
+     "status": "shipped",
      "needs": {
       "key": [
        "openrouter"
@@ -5140,8 +5139,7 @@
       "source": null
      },
      "caveats": [
-      "96 only: no public run of its own",
-      "the Processor has no reader for it yet (W47.wh-readers-lost's report)"
+      "96 only: no public run of its own"
      ],
      "kind_rules": [],
      "fallback": null,
@@ -5153,8 +5151,8 @@
      "id": "qwen3.5-35b-a3b",
      "name": "Qwen3.5 35B-A3B (OpenRouter)",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "openrouter|qwen/qwen3.5-35b-a3b",
+     "status": "shipped",
      "needs": {
       "key": [
        "openrouter"
@@ -5260,8 +5258,7 @@
      },
      "caveats": [
       "96 only: no public run of its own",
-      "the second stage of casc-5-fail",
-      "the Processor has no reader for it yet (W47.wh-readers-lost's report)"
+      "the second stage of casc-5-fail"
      ],
      "kind_rules": [],
      "fallback": null,
@@ -5271,13 +5268,12 @@
     },
     {
      "id": "mistral-medium3.5",
-     "name": "Mistral Medium 3.5",
+     "name": "Mistral Medium 3.5 (OpenRouter)",
      "family": "cloud",
-     "app_route": null,
-     "status": "measured",
+     "app_route": "openrouter|mistralai/mistral-medium-3-5",
+     "status": "shipped",
      "needs": {
       "key": [
-       "mistral",
        "openrouter"
       ],
       "plan": [],
@@ -5377,8 +5373,7 @@
       "source": null
      },
      "caveats": [
-      "96 only: no public run of its own",
-      "the Processor has no reader for it yet (W47.wh-readers-lost's report)"
+      "96 only: no public run of its own"
      ],
      "kind_rules": [],
      "fallback": null,

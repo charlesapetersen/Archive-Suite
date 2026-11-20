@@ -680,18 +680,29 @@ enum OpenRouterTestDriver {
     private static func catalogChecks() {
         let c = OpenRouterRoute.openRoutes
         eq("1 models", c.map(\.model.id), ["qwen/qwen3-vl-235b-a22b-instruct", "qwen/qwen3.6-27b", "z-ai/glm-5.3-flash",
-                                            "qwen/qwen3.8-flash", "qwen/qwen3.5-9b"])
-        eq("1 pinned providers", c.map(\.providerTag), ["deepinfra/fp8", "chutes/fp8", "z-ai", "alibaba", "deepinfra/bf16"])
-        eq("1 precisions", c.map(\.precision), ["fp8", "fp8", "fp8", "unknown", "bf16"])
-        eq("1 reasoning as the bench sent it", c.map(\.reasoning), [.none, .off, .effort("minimal"), .off, .off])
+                                            "qwen/qwen3.8-flash", "qwen/qwen3.5-9b", "qwen/qwen3-vl-8b-instruct",
+                                            "qwen/qwen3-vl-30b-a3b-instruct", "qwen/qwen3.5-35b-a3b",
+                                            "mistralai/mistral-medium-3-5"])
+        eq("1 pinned providers", c.map(\.providerTag), ["deepinfra/fp8", "chutes/fp8", "z-ai", "alibaba", "deepinfra/bf16",
+                                                    "parasail/bf16", "deepinfra/fp8", "deepinfra/fp8", "mistral"])
+        eq("1 precisions", c.map(\.precision), ["fp8", "fp8", "fp8", "unknown", "bf16", "bf16", "fp8", "fp8", "unknown"])
+        eq("1 reasoning as the bench sent it", c.map(\.reasoning), [.none, .off, .effort("minimal"), .off, .off,
+                                                         .none, .none, .off, .off])
         // The pinned endpoints' prices: the panel's frozen catalogs, and GLM's from its seg-cheap call log.
-        eq("1 input prices", c.map(\.model.inputCostPer1M), [0.20, 0.25, 0.15, 0.15, 0.10])
-        eq("1 output prices", c.map(\.model.outputCostPer1M), [0.88, 2.00, 0.50, 0.47, 0.15])
+        eq("1 input prices", c.map(\.model.inputCostPer1M), [0.20, 0.25, 0.15, 0.15, 0.10, 0.25, 0.15, 0.14, 1.50])
+        eq("1 output prices", c.map(\.model.outputCostPer1M), [0.88, 2.00, 0.50, 0.47, 0.15, 0.75, 0.60, 1.00, 7.50])
         // W43.app-guide-refresh: every measured model is a reading row of the rule table, linked by its app route.
         let reading = SettingsRouteTable.bundled?.stage("reading")?.routes ?? []
         check("1 every measured model is linked from the rule table",
               c.filter { !$0.settingsNote.contains("not been measured") }.allSatisfy { r in
                   reading.contains { $0.appRoute == "openrouter|\(r.model.id)" } })
+        // W47.wh-readers-lost-clients: and every OpenRouter reading row, the lower-scoring ones included, has its pin.
+        check("1 every OpenRouter reading row runs on a pinned route",
+              reading.compactMap(\.appRoute).filter { $0.hasPrefix("openrouter|") }
+                  .allSatisfy { ar in OpenRouterRoute.catalog.contains { "openrouter|" + $0.model.id == ar } })
+        check("1 the lower-scoring hosted rows run in the app",
+              ["qwen3-vl-8b", "qwen3-vl-30b-a3b", "qwen3.5-35b-a3b", "mistral-medium3.5"].allSatisfy { id in
+                  reading.first { $0.id == id }.map { $0.lowerScoring && $0.appRoute?.hasPrefix("openrouter|") == true } == true })
         check("1 every model is an OpenRouter model", c.allSatisfy { $0.model.provider == .openrouter })
         // W41.app-openrouter-any: the makers' measured models first (the provider's default is the app's), then these.
         // Section 9 checks that nothing else is listed with no listing read and no id typed (the seam hides this

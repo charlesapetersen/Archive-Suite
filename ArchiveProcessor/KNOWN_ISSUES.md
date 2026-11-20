@@ -18,10 +18,10 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 `Settings/SettingsRouteTable.swift` (`Route.lowerScoring`), `Settings/SettingsLevels.swift`; the rows are in
 `segbench-results/settings-routes.json`, at the Advanced level of Settings › Reading and in Improve OCR.
-- **Five of the sixteen are a choice the app cannot carry out.** Qwen3-VL 8B, Qwen3-VL 30B-A3B and Qwen3.5 35B-A3B
-  through OpenRouter, Mistral Medium 3.5 and the macOS 27 on-device model have no reader in the Processor: chosen on the
-  reading card, the card says "The Processor cannot run this reading program yet", and Improve OCR lists them as not in
-  the app yet. What each would take is in the item (queued: W47.wh-readers-lost-clients).
+- **The macOS 27 on-device model is a choice the app cannot carry out yet.** It has no reader in the Processor: chosen
+  on the reading card, the card says "The Processor cannot run this reading program yet", and Improve OCR lists it as
+  not in the app yet. Qwen3-VL 8B, Qwen3-VL 30B-A3B, Qwen3.5 35B-A3B and Mistral Medium 3.5 run since
+  W47.wh-readers-lost-clients, each pinned on OpenRouter to the endpoint the bench read (queued: W47.wh-readers-lost-clients).
 - **Azure Document Intelligence, AWS Textract and Transkribus are not offered at all.** Their figures are on 25 of the 96
   only, not comparable with the rows' 95, and there is no client for any of them (queued: W47.wh-readers-lost-clients).
 
