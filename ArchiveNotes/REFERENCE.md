@@ -445,6 +445,9 @@ macOS/Sources/ArchiveNotes/
                                    (renamedCandidate is a message naming the found file — no button to
                                    preview, open or re-link it; searchIncomplete says the search "did not
                                    finish… may still be there").
+    PreviewCloudFile.swift         The preview's open: never downloads a dataless cloud placeholder
+                                   (stat + guarded open); "Download and Show" downloads on request
+                                   (W49.notes-s007-fix).
                                    Shows the walk-free answer immediately and, when a basename search is
                                    needed, a live "N items checked" state it cancels on dismiss/re-show
                                    (PreviewSearchModel, generation-scoped so a finished search's straggler
