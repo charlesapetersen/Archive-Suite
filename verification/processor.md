@@ -519,13 +519,17 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Runtime evidence:** W40.d1, 2026-11-18: 113 two-page PDFs from the whole RG 165 box (OpenRouter, Qwen3.8 Flash), all with the
   sentinel and provenance line; the 18 that got a `Date evidence:` line have their source-name line changed (U+00A0
   to a space) and a broken xref entry ([`evidence/processor/W40.d1-bulk-ocr.md`](evidence/processor/W40.d1-bulk-ocr.md)).
+  Fixed by `W40.fix-processor-evidence-rewrite-name`, 2026-11-19: the same paid run again, 113 outputs, 10 with a
+  `Date evidence:` line, every name line the file's (U+00A0 kept), qpdf 0 warnings, checker 0 failures (same evidence file).
   W40.d2, 2026-11-19: a class changed in a review (Box, Folder, Continuation) reaches the tags but not page 2, whose
   `Classification:` keeps the reader's proposal, in the per-page review and in Segment & Tag alike ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)).
-- **Status:** `broken` — `W40.fix-processor-evidence-rewrite-name` (S3), `W40.fix-processor-review-classification-stale` (S3)
+- **Status:** `broken` — `W40.fix-processor-review-classification-stale` (S3)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-18 W40.d1 — `unproven` → `broken`: the date-evidence rewrite changes the source-name line on 18 of 113 outputs.
   - 2026-11-19 W40.d2 — stays `broken`: page 2's Classification is not rewritten after a review.
+  - 2026-11-19 W40.fix-processor-evidence-rewrite-name — stays `broken` (W40.d2's defect): the source-name line and the
+    xref entry are fixed, re-run on the whole box.
 
 ### P-24 · Multi-page documents merged into one PDF
 

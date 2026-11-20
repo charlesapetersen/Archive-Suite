@@ -1397,7 +1397,8 @@ extension OCRProcessor {
             return .skipped("not a readable generated output")
         }
         let columns = Self.pdfGenerationSettings(for: runConfig).textColumns
-        let outcome = PDFGenerator().dateEvidenceRewrite(of: data, evidence: evidence, itemFields: itemFields, body: text,
+        let outcome = PDFGenerator().dateEvidenceRewrite(of: data, sourceName: source.lastPathComponent,
+                                                         evidence: evidence, itemFields: itemFields, body: text,
                                                          textColumns: columns)
         switch outcome {
         case .rewrite(let new):

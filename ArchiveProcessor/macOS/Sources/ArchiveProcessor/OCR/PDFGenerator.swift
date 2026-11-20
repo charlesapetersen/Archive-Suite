@@ -747,9 +747,7 @@ struct PDFGenerator {
 
         var headerLine = "Extracted text."
         var provenanceRange: NSRange?
-        if let fileName = originalFileName {
-            headerLine += "\n\(fileName.components(separatedBy: .controlCharacters).joined(separator: " "))"
-        }
+        if let fileName = originalFileName { headerLine += "\n" + Self.headerFileName(fileName) }
         // Keep actual-reader precedence, then sanitize both display positions for every backend.
         // A custom gateway/CLI label cannot inject another separator or a Kind/header line.
         let providerName: String
@@ -804,6 +802,12 @@ struct PDFGenerator {
             bodyText = msg
         }
         return layoutTextPage(headerLine: header.text, fitRanges: header.fitRanges, bodyText: bodyText, textColumns: textColumns)
+    }
+
+    /// The source-name line as written: the source's file name, its control characters made spaces; every other
+    /// character, a U+00A0 included, kept as it is.
+    static func headerFileName(_ fileName: String) -> String {
+        fileName.components(separatedBy: .controlCharacters).joined(separator: " ")
     }
 
     /// Lays out one text page: `headerLine` (ending in its blank separator) above `bodyText`. Each of `fitRanges`

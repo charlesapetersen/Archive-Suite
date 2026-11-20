@@ -383,8 +383,8 @@ enum DateRouteTestDriver {
         }
         let gen = PDFGenerator()
         let line = est.with(measured: true).headerEvidence
-        guard case .rewrite(let added) = gen.dateEvidenceRewrite(of: original, evidence: line, body: text, textColumns: 1) else {
-            check("4 rewrite adds the line", false, "\(gen.dateEvidenceRewrite(of: original, evidence: line, body: text, textColumns: 1))")
+        guard case .rewrite(let added) = gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: line, body: text, textColumns: 1) else {
+            check("4 rewrite adds the line", false, "\(gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: line, body: text, textColumns: 1))")
             return
         }
         let back = PDFDocument(data: added)?.page(at: 1).map { PDFHeaderParser.parse($0) }
@@ -396,25 +396,25 @@ enum DateRouteTestDriver {
         let image0 = PDFDocument(data: original)?.page(at: 0)?.bounds(for: .mediaBox)
         check("4 rewrite keeps the image page", PDFDocument(data: added)?.page(at: 0)?.bounds(for: .mediaBox) == image0)
         check("4 the same evidence again: unchanged",
-              gen.dateEvidenceRewrite(of: added, evidence: line, body: text, textColumns: 1) == .unchanged
-              && gen.dateEvidenceRewrite(of: original, evidence: nil, body: text, textColumns: 1) == .unchanged)
-        if case .rewrite(let removed) = gen.dateEvidenceRewrite(of: added, evidence: nil, body: text, textColumns: 1) {
+              gen.dateEvidenceRewrite(of: added, sourceName: "scan_001.jpg", evidence: line, body: text, textColumns: 1) == .unchanged
+              && gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: nil, body: text, textColumns: 1) == .unchanged)
+        if case .rewrite(let removed) = gen.dateEvidenceRewrite(of: added, sourceName: "scan_001.jpg", evidence: nil, body: text, textColumns: 1) {
             check("4 nil removes a stale line", PDFDocument(data: removed)?.page(at: 1).map { PDFHeaderParser.parse($0) }?.header == oldHeader)
         } else { check("4 nil removes a stale line", false) }
-        if case .rewrite(let long) = gen.dateEvidenceRewrite(of: original, evidence: h, body: text, textColumns: 2) {
+        if case .rewrite(let long) = gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: h, body: text, textColumns: 2) {
             let lp = PDFDocument(data: long)?.page(at: 1).map { PDFHeaderParser.parse($0) }
             check("4 a long line is fitted to one line and reads back whole (two text columns)",
                   lp?.header?.dateEvidence == h && PDFGenerator.squashed(lp?.body ?? "") == PDFGenerator.squashed(text), "\(String(describing: lp))")
         } else { check("4 a long line is fitted to one line and reads back whole (two text columns)", false) }
-        if case .skipped = gen.dateEvidenceRewrite(of: original, evidence: line, body: "Some other text.", textColumns: 1) {
+        if case .skipped = gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: line, body: "Some other text.", textColumns: 1) {
             check("4 a page whose text is not the run's is left alone", true)
         } else { check("4 a page whose text is not the run's is left alone", false) }
         let two = tmp.appendingPathComponent("two.pdf")
         try? gen.mergeDocumentPDFs(sourcePDFs: [pdf, pdf], outputURL: two)
-        if let twoData = try? Data(contentsOf: two), case .skipped = gen.dateEvidenceRewrite(of: twoData, evidence: line, body: text, textColumns: 1) {
+        if let twoData = try? Data(contentsOf: two), case .skipped = gen.dateEvidenceRewrite(of: twoData, sourceName: "scan_001.jpg", evidence: line, body: text, textColumns: 1) {
             check("4 a file of more than one pair is left alone", true)
         } else { check("4 a file of more than one pair is left alone", false) }
-        if case .skipped = gen.dateEvidenceRewrite(of: Data("%PDF-1.4\n%%EOF\n".utf8), evidence: line, body: text, textColumns: 1) {
+        if case .skipped = gen.dateEvidenceRewrite(of: Data("%PDF-1.4\n%%EOF\n".utf8), sourceName: "scan_001.jpg", evidence: line, body: text, textColumns: 1) {
             check("4 an unreadable file is left alone", true)
         } else { check("4 an unreadable file is left alone", false) }
 

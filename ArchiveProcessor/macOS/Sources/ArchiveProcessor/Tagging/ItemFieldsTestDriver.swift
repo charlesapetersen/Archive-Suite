@@ -225,7 +225,7 @@ enum ItemFieldsTestDriver {
                                       byline: "Mary Jones; John Smith",
                                       publication: "The Sun", publicationDate: "1967-03-02"), "\(fields)")
         let gen = PDFGenerator()
-        guard case .rewrite(let added) = gen.dateEvidenceRewrite(of: original, evidence: "image; page 1", itemFields: fields,
+        guard case .rewrite(let added) = gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: "image; page 1", itemFields: fields,
                                                                 body: text, textColumns: 1) else {
             check("5 the rewrite adds the lines", false); return
         }
@@ -237,20 +237,50 @@ enum ItemFieldsTestDriver {
               back?.header == expected && PDFGenerator.squashed(back?.body ?? "") == PDFGenerator.squashed(text)
               && back?.header?.documentDate == "1967", "\(String(describing: back))")
         check("5 the same lines again: unchanged",
-              gen.dateEvidenceRewrite(of: added, evidence: "image; page 1", itemFields: fields, body: text,
+              gen.dateEvidenceRewrite(of: added, sourceName: "scan_001.jpg", evidence: "image; page 1", itemFields: fields, body: text,
                                       textColumns: 1) == .unchanged)
-        if case .rewrite(let removed) = gen.dateEvidenceRewrite(of: added, evidence: nil, body: text, textColumns: 1) {
+        if case .rewrite(let removed) = gen.dateEvidenceRewrite(of: added, sourceName: "scan_001.jpg", evidence: nil, body: text, textColumns: 1) {
             check("5 none removes stale lines", PDFDocument(data: removed)?.page(at: 1)
                     .map { PDFHeaderParser.parse($0) }?.header == oldHeader)
         } else { check("5 none removes stale lines", false) }
         let long = PDFItemFields(documentKind: "report", publication: PDFItemFields.lineValue(String(repeating: "Long ", count: 40)))
-        if case .rewrite(let l) = gen.dateEvidenceRewrite(of: original, evidence: nil, itemFields: long, body: text,
+        if case .rewrite(let l) = gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: nil, itemFields: long, body: text,
                                                           textColumns: 2) {
             let lp = PDFDocument(data: l)?.page(at: 1).map { PDFHeaderParser.parse($0) }
             check("5 a long value is fitted to one line and reads back whole (two text columns)",
                   lp?.header?.itemFields == long && PDFGenerator.squashed(lp?.body ?? "") == PDFGenerator.squashed(text),
                   "\(String(describing: lp?.header?.itemFields))")
         } else { check("5 a long value is fitted to one line and reads back whole (two text columns)", false) }
+        if case .skipped = gen.dateEvidenceRewrite(of: original, sourceName: "scan_002.jpg", evidence: "image; page 1",
+                                                   body: text, textColumns: 1) {
+            check("5 a header that names another file is left alone", true)
+        } else { check("5 a header that names another file is left alone", false) }
+
+        // W40.fix-processor-evidence-rewrite-name: a source name with a U+00A0, as the RG 165 photos have. PDFKit reads
+        // it back as a space, so the script reads the name's characters with pypdf and checks the file with qpdf
+        // (`ITEM_FIELDS_TEST_KEEP`); here, the file is written as `generate` writes one.
+        let nbspName = "00009 \u{2014}\u{00A0}RG 165.jpg"
+        let nbsp = tmp.appendingPathComponent("nbsp.pdf")
+        _ = try? PDFGenerator().generate(imageURL: image, result: result, model: model, outputURL: nbsp,
+                                         originalFileName: nbspName,
+                                         sourceDates: PDFSourceDates(documentDate: "1918"), pageKind: .printed)
+        if let data = try? Data(contentsOf: nbsp),
+           case .rewrite(let dated) = gen.dateEvidenceRewrite(of: data, sourceName: nbspName, evidence: "image; page 1",
+                                                              itemFields: fields, body: text, textColumns: 1) {
+            let bytes = String(decoding: dated, as: UTF8.self)
+            let back = PDFDocument(data: dated)?.page(at: 1).map { PDFHeaderParser.parse($0) }?.header
+            check("5 a U+00A0 name: rewritten with both kinds of line, as PDF/A, with no unwritten object",
+                  back?.dateEvidence == "image; page 1" && back?.itemFields == fields
+                  && bytes.contains("<pdfaid:part>2</pdfaid:part>") && !bytes.contains("0000000000 00000 n"),
+                  "\(String(describing: back))")
+            if let keep = ProcessInfo.processInfo.environment["ITEM_FIELDS_TEST_KEEP"] {
+                let dir = URL(fileURLWithPath: keep, isDirectory: true)
+                try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+                try? data.write(to: dir.appendingPathComponent("nbsp-original.pdf"))
+                try? dated.write(to: dir.appendingPathComponent("nbsp-dated.pdf"))
+                try? Data(nbspName.utf8).write(to: dir.appendingPathComponent("nbsp-name.txt"))
+            }
+        } else { check("5 a U+00A0 name: rewritten with both kinds of line, as PDF/A, with no unwritten object", false) }
 
         // At render time (Live Capture's path): the lines after the source dates.
         let live = tmp.appendingPathComponent("live.pdf")

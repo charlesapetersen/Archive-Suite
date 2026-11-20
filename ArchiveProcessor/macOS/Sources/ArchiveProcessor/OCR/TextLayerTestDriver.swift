@@ -369,7 +369,7 @@ enum TextLayerTestDriver {
 
         // The date-evidence line goes into the XMP; the page stays as it is.
         if let data = try? Data(contentsOf: typed),
-           case .rewrite(let new) = PDFGenerator().dateEvidenceRewrite(of: data, evidence: "image; page 1", body: reading,
+           case .rewrite(let new) = PDFGenerator().dateEvidenceRewrite(of: data, sourceName: name, evidence: "image; page 1", body: reading,
                                                                      textColumns: 1) {
             let out = dir.appendingPathComponent("searchable-dated.pdf")
             try? new.write(to: out)
@@ -381,7 +381,7 @@ enum TextLayerTestDriver {
             archivalChecks("dated searchable output", out)
             check("7 date evidence: still compressed, not redrawn", !tools || (compressed(out)
                   && abs(size(out) - size(typed)) < 4_096), "\(size(out)) bytes against \(size(typed))")
-            if case .unchanged = PDFGenerator().dateEvidenceRewrite(of: new, evidence: "image; page 1", body: reading, textColumns: 1) {
+            if case .unchanged = PDFGenerator().dateEvidenceRewrite(of: new, sourceName: name, evidence: "image; page 1", body: reading, textColumns: 1) {
                 check("7 date evidence: the same line again is no change", true)
             } else { check("7 date evidence: the same line again is no change", false) }
         } else { check("7 date evidence: rewritten", false) }
