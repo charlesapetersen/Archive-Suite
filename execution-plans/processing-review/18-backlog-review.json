@@ -9,8 +9,8 @@
  "sections": [
   {
    "key": "bugs",
-   "title": "Suspected bugs, in six batches",
-   "lead": "One answer covers a batch. If you want one suspect handled differently, say so in that batch's notes."
+   "title": "Suspected bugs, in seven batches",
+   "lead": "Three were seen in real runs. The other 27 are inferences: 24 from an AI session reading the code (most from one pass on 21 Oct that traced each promise in the documents through the code), and 3 flagged by a dead-code tool, then read. Code-reading findings can be wrong, and a fix written for a bug that is not there makes new problems, so those batches are queued only under the strict rule each one states. If you want one suspect handled differently, say so in that batch's notes."
   },
   {
    "key": "close",
@@ -35,30 +35,50 @@
  ],
  "items": [
   {
+   "id": "bugs-observed",
+   "section": "bugs",
+   "app": "Processor",
+   "seconds": 40,
+   "rec": "fix",
+   "where": "verification/SUSPECTS.md; found by code reading in October (W40.b2, W40.b3, W40.e5, W40.e6, W40.i2, W40.d1)",
+   "choices": {
+    "fix": "Queue a fix for each, with the run that showed it as its test",
+    "strict": "Treat them like the others: reproduce under the strict rule first",
+    "open": "Leave them open, unqueued"
+   },
+   "title": "Processor: three bugs already seen in real runs",
+   "what": "Unlike the rest, these were not inferred from the code. Each showed up in the output of an actual run on scratch material.",
+   "list": [
+    "[Seen in a run] S-042 · When the tagging call fails, the document is filed with no subjects or date, and the run still reports it tagged.",
+    "[Seen in a run] S-040 · A year typed on the phone is combined with the day and month the OCR read from a different date.",
+    "[Seen in a run] S-041 · The cost estimate leaves out the dating and item-field calls, about half the calls in a measured run."
+   ],
+   "now": "S-040 came from a scripted run on 23 Oct whose filed PDFs carried the wrong dates. S-041 and S-042 came from the $0 stand-in runs of the RG 165 box on 18 Nov: 171 of 341 calls were not in the estimate, and one PDF came out with no subject tags while the run reported it tagged.",
+   "rec_why": "The run already is the reproduction, so the ghost-bug risk is low. Each fix still gets the usual review."
+  },
+  {
    "id": "bugs-processor-filing",
    "section": "bugs",
    "app": "Processor",
    "seconds": 60,
    "rec": "queue",
    "choices": {
-    "queue": "Queue it: one reproduce attempt per suspect, a fix item filed for each that is real",
+    "queue": "Queue reproduce attempts under the strict rule below",
     "nice": "Behind nice-to-have",
     "open": "Leave them open on the suspects list, unqueued"
    },
    "where": "verification/SUSPECTS.md; found by code reading in October (W40.b2, W40.b3, W40.e5, W40.e6, W40.i2, W40.d1)",
-   "now": "None has been reproduced. They were found by reading the code a month or more ago, so some may already be fixed by later work; the reproduce attempt says so and clears those with the evidence.",
-   "title": "Processor: nine suspected bugs that could file or tag documents wrongly, with no warning",
+   "now": "None has been reproduced. The strict rule for a reproduce attempt: (1) first check that the code at that place still says what the report says, since a month of work has passed; (2) reproduce it the way a user would meet it, through the app or its real pipeline on scratch data, not with a test written around the suspicion; (3) if the behaviour could be intended (a comment calls it deliberate, or a document promises it), ask you instead of fixing; (4) a claimed reproduction is checked by a second, independent session on a different model before any fix is filed; (5) one attempt only: if it does not reproduce, it is cleared with the evidence, and anything new noticed on the way is written down as a suspect, never fixed directly; (6) a fix then follows the usual review, with the reproducing run kept as its test.",
+   "title": "Processor: seven suspected bugs that could file or tag documents wrongly, with no warning",
    "what": "Each of these, if real, writes something wrong into a user's filed PDFs or tags, or leaves work out, and says nothing. These paths have no undo.",
    "list": [
-    "S-028 · A chosen folder is read one level deep: photos in sub-folders of a box are silently left out.",
-    "S-034 · With collection segmentation on, \"No tagging\" and \"Copy source tags\" still write Box and Folder tags, replacing the copied tags.",
-    "S-036 · A collection name edited in the review sheet is used exactly as typed: a \"/\" stops filing part-way, \"..\" files outside the output folder.",
-    "S-035 · Resuming a batch files documents without the per-page review and the box/folder confirmation.",
-    "S-042 · When the tagging call fails, the document is filed with no subjects or date, and the run still reports it tagged.",
-    "S-033 · A model reply with no year and no \"uncertain\" flag gives a document no date tags at all, not even Date Uncertain.",
-    "S-031 · Under a window segmentation approach, a letter's enclosure may not get the letter's date.",
-    "S-017 · On already-OCRed input, the \"review document segmentation\" step is skipped even when it is turned on.",
-    "S-040 · A year typed on the phone is combined with the day and month the OCR read from a different date."
+    "[Code reading only] S-028 · A chosen folder is read one level deep: photos in sub-folders of a box are silently left out.",
+    "[Code reading only] S-034 · With collection segmentation on, \"No tagging\" and \"Copy source tags\" still write Box and Folder tags, replacing the copied tags.",
+    "[Code reading only] S-036 · A collection name edited in the review sheet is used exactly as typed: a \"/\" stops filing part-way, \"..\" files outside the output folder.",
+    "[Code reading only] S-035 · Resuming a batch files documents without the per-page review and the box/folder confirmation.",
+    "[Code reading only] S-033 · A model reply with no year and no \"uncertain\" flag gives a document no date tags at all, not even Date Uncertain.",
+    "[Code reading only] S-031 · Under a window segmentation approach, a letter's enclosure may not get the letter's date.",
+    "[Flagged by a tool, then read] S-017 · On already-OCRed input, the \"review document segmentation\" step is skipped even when it is turned on."
    ],
    "rec_why": "These touch irreversible paths in what users file, which is where a bug costs most, and each check is a small scratch-folder test."
   },
@@ -69,20 +89,19 @@
    "seconds": 45,
    "rec": "queue",
    "choices": {
-    "queue": "Queue it: one reproduce attempt per suspect, a fix item filed for each that is real",
+    "queue": "Queue reproduce attempts under the strict rule below",
     "nice": "Behind nice-to-have",
     "open": "Leave them open on the suspects list, unqueued"
    },
    "where": "verification/SUSPECTS.md; found by code reading in October (W40.b2, W40.b3, W40.e5, W40.e6, W40.i2, W40.d1)",
-   "now": "None has been reproduced. They were found by reading the code a month or more ago, so some may already be fixed by later work; the reproduce attempt says so and clears those with the evidence.",
-   "title": "Processor: five suspected bugs that make users pay more than they expect",
+   "now": "None has been reproduced. The strict rule for a reproduce attempt: (1) first check that the code at that place still says what the report says, since a month of work has passed; (2) reproduce it the way a user would meet it, through the app or its real pipeline on scratch data, not with a test written around the suspicion; (3) if the behaviour could be intended (a comment calls it deliberate, or a document promises it), ask you instead of fixing; (4) a claimed reproduction is checked by a second, independent session on a different model before any fix is filed; (5) one attempt only: if it does not reproduce, it is cleared with the evidence, and anything new noticed on the way is written down as a suspect, never fixed directly; (6) a fix then follows the usual review, with the reproducing run kept as its test.",
+   "title": "Processor: four suspected bugs that make users pay more than they expect",
    "what": "Each of these, if real, spends a user's API money twice, for nothing, or beyond the estimate shown.",
    "list": [
-    "S-039 · \"Stage for later\" can hand the same photos to Process Files twice, so they are read and paid for twice.",
-    "S-032 · A segmentation approach with no key can be started; the run reads every page, then fails after the reading is paid for.",
-    "S-041 · The cost estimate leaves out the dating and item-field calls, about half the calls in a measured run.",
-    "S-026 · Batch reading sends large scans at full size, so batch runs cost more than the estimate.",
-    "S-027 · Batch mode is offered for providers that have no batch; the run goes standard but the panes show the batch price, and turning it on still switches off other features."
+    "[Code reading only] S-039 · \"Stage for later\" can hand the same photos to Process Files twice, so they are read and paid for twice.",
+    "[Code reading only] S-032 · A segmentation approach with no key can be started; the run reads every page, then fails after the reading is paid for.",
+    "[Code reading only] S-026 · Batch reading sends large scans at full size, so batch runs cost more than the estimate.",
+    "[Code reading only] S-027 · Batch mode is offered for providers that have no batch; the run goes standard but the panes show the batch price, and turning it on still switches off other features."
    ],
    "rec_why": "Wrong spending is the kind of bug a user notices on their bill, and each is checkable on scratch with the $0 stand-in."
   },
@@ -93,20 +112,20 @@
    "seconds": 40,
    "rec": "queue",
    "choices": {
-    "queue": "Queue it: one reproduce attempt per suspect, a fix item filed for each that is real",
+    "queue": "Queue reproduce attempts under the strict rule below",
     "nice": "Behind nice-to-have",
     "open": "Leave them open on the suspects list, unqueued"
    },
    "where": "verification/SUSPECTS.md; found by code reading in October (W40.b2, W40.b3, W40.e5, W40.e6, W40.i2, W40.d1)",
-   "now": "None has been reproduced. They were found by reading the code a month or more ago, so some may already be fixed by later work; the reproduce attempt says so and clears those with the evidence.",
+   "now": "None has been reproduced. The strict rule for a reproduce attempt: (1) first check that the code at that place still says what the report says, since a month of work has passed; (2) reproduce it the way a user would meet it, through the app or its real pipeline on scratch data, not with a test written around the suspicion; (3) if the behaviour could be intended (a comment calls it deliberate, or a document promises it), ask you instead of fixing; (4) a claimed reproduction is checked by a second, independent session on a different model before any fix is filed; (5) one attempt only: if it does not reproduce, it is cleared with the evidence, and anything new noticed on the way is written down as a suspect, never fixed directly; (6) a fix then follows the usual review, with the reproducing run kept as its test.",
    "title": "Processor: five suspected bugs where the app says something untrue",
    "what": "Each of these, if real, tells the user something false about a setting, a result or a failure.",
    "list": [
-    "S-024 · The key wizard shows a key as validated when the Keychain refused to save it; the run then fails for want of a key.",
-    "S-025 · The gateway's \"Fill in OpenAI preset\" picks a model the gateway request cannot drive, so every page would fail.",
-    "S-018 · The app says it paces to the subscription window and retries, but the reading step does not pace.",
-    "S-029 · When rotation by the model fails, the app silently uses the weaker built-in detector, so sideways pages can be filed.",
-    "S-030 · The run log can give one failed file another file's reason when two share a name."
+    "[Code reading only] S-024 · The key wizard shows a key as validated when the Keychain refused to save it; the run then fails for want of a key.",
+    "[Code reading only] S-025 · The gateway's \"Fill in OpenAI preset\" picks a model the gateway request cannot drive, so every page would fail.",
+    "[Flagged by a tool, then read] S-018 · The app says it paces to the subscription window and retries, but the reading step does not pace.",
+    "[Code reading only] S-029 · When rotation by the model fails, the app silently uses the weaker built-in detector, so sideways pages can be filed.",
+    "[Code reading only] S-030 · The run log can give one failed file another file's reason when two share a name."
    ],
    "rec_why": "Each is small, and a false message sends the user looking in the wrong place."
   },
@@ -117,17 +136,17 @@
    "seconds": 30,
    "rec": "queue",
    "choices": {
-    "queue": "Queue it: one reproduce attempt per suspect, a fix item filed for each that is real",
+    "queue": "Queue reproduce attempts under the strict rule below",
     "nice": "Behind nice-to-have",
     "open": "Leave them open on the suspects list, unqueued"
    },
    "where": "verification/SUSPECTS.md; found by code reading in October (W40.b2, W40.b3, W40.e5, W40.e6, W40.i2, W40.d1)",
-   "now": "None has been reproduced. They were found by reading the code a month or more ago, so some may already be fixed by later work; the reproduce attempt says so and clears those with the evidence.",
+   "now": "None has been reproduced. The strict rule for a reproduce attempt: (1) first check that the code at that place still says what the report says, since a month of work has passed; (2) reproduce it the way a user would meet it, through the app or its real pipeline on scratch data, not with a test written around the suspicion; (3) if the behaviour could be intended (a comment calls it deliberate, or a document promises it), ask you instead of fixing; (4) a claimed reproduction is checked by a second, independent session on a different model before any fix is filed; (5) one attempt only: if it does not reproduce, it is cleared with the evidence, and anything new noticed on the way is written down as a suspect, never fixed directly; (6) a fix then follows the usual review, with the reproducing run kept as its test.",
    "title": "Phone over the Drive relay: two suspected bugs",
    "what": "The Drive relay carries photos from the phone to the Mac through Google Drive when they are not on the same network.",
    "list": [
-    "S-021 · Android reports a segment as sent when the Drive write failed, so the Mac shows no tag card for it until Finish.",
-    "S-038 · Over the relay, Finish cannot wait for the phone to finish sending, so it can close a run while photos are still on the phone."
+    "[Code reading only] S-021 · Android reports a segment as sent when the Drive write failed, so the Mac shows no tag card for it until Finish.",
+    "[Code reading only] S-038 · Over the relay, Finish cannot wait for the phone to finish sending, so it can close a run while photos are still on the phone."
    ],
    "rec_why": "Both lose or delay a user's captures on a path users rely on away from home. The relay's on-device check on a real iPhone is still open (a later item on this sheet)."
   },
@@ -138,18 +157,18 @@
    "seconds": 35,
    "rec": "queue",
    "choices": {
-    "queue": "Queue it: one reproduce attempt per suspect, a fix item filed for each that is real",
+    "queue": "Queue reproduce attempts under the strict rule below",
     "nice": "Behind nice-to-have",
     "open": "Leave them open on the suspects list, unqueued"
    },
    "where": "verification/SUSPECTS.md; found by code reading in October (W40.b2, W40.b3, W40.e5, W40.e6, W40.i2, W40.d1)",
-   "now": "None has been reproduced. They were found by reading the code a month or more ago, so some may already be fixed by later work; the reproduce attempt says so and clears those with the evidence.",
+   "now": "None has been reproduced. The strict rule for a reproduce attempt: (1) first check that the code at that place still says what the report says, since a month of work has passed; (2) reproduce it the way a user would meet it, through the app or its real pipeline on scratch data, not with a test written around the suspicion; (3) if the behaviour could be intended (a comment calls it deliberate, or a document promises it), ask you instead of fixing; (4) a claimed reproduction is checked by a second, independent session on a different model before any fix is filed; (5) one attempt only: if it does not reproduce, it is cleared with the evidence, and anything new noticed on the way is written down as a suspect, never fixed directly; (6) a fix then follows the usual review, with the reproducing run kept as its test.",
    "title": "Notes: three suspected bugs that could lose or corrupt text",
    "what": "Each of these, if real, loses typed text or breaks a passage's link to its source.",
    "list": [
-    "S-019 · Typing \"-->\" after a broken block header can make the lines before it vanish on the next save.",
-    "S-020 · An extract built from a broken block can separate its text from the passage it quotes, losing the provenance.",
-    "S-009 · Pasting or dropping an image in the raw view writes an unused image file and a stray invisible character into the note."
+    "[Code reading only] S-019 · Typing \"-->\" after a broken block header can make the lines before it vanish on the next save.",
+    "[Code reading only] S-020 · An extract built from a broken block can separate its text from the passage it quotes, losing the provenance.",
+    "[Code reading only] S-009 · Pasting or dropping an image in the raw view writes an unused image file and a stray invisible character into the note."
    ],
    "rec_why": "Losing typed text is the worst thing a notes app can do."
   },
@@ -160,21 +179,21 @@
    "seconds": 40,
    "rec": "queue",
    "choices": {
-    "queue": "Queue it: one reproduce attempt per suspect, a fix item filed for each that is real",
+    "queue": "Queue reproduce attempts under the strict rule below",
     "nice": "Behind nice-to-have",
     "open": "Leave them open on the suspects list, unqueued"
    },
    "where": "verification/SUSPECTS.md; found by code reading in October (W40.b2, W40.b3, W40.e5, W40.e6, W40.i2, W40.d1)",
-   "now": "None has been reproduced. They were found by reading the code a month or more ago, so some may already be fixed by later work; the reproduce attempt says so and clears those with the evidence.",
+   "now": "None has been reproduced. The strict rule for a reproduce attempt: (1) first check that the code at that place still says what the report says, since a month of work has passed; (2) reproduce it the way a user would meet it, through the app or its real pipeline on scratch data, not with a test written around the suspicion; (3) if the behaviour could be intended (a comment calls it deliberate, or a document promises it), ask you instead of fixing; (4) a claimed reproduction is checked by a second, independent session on a different model before any fix is filed; (5) one attempt only: if it does not reproduce, it is cleared with the evidence, and anything new noticed on the way is written down as a suspect, never fixed directly; (6) a fix then follows the usual review, with the reproducing run kept as its test.",
    "title": "Notes: six smaller suspected bugs",
    "what": "Each of these, if real, is an annoyance or a misleading result rather than lost work.",
    "list": [
-    "S-012 · The tag filter finds nothing unless the tag is typed with the capitals it was stored with (\"intel\" misses \"Intel\").",
-    "S-016 · Clicking a column header in the notes list moves the sort arrow but may not re-sort the list.",
-    "S-010 · Removing several notes from a folder at once asks about only the last one; the others quietly stay.",
-    "S-011 · \"New from Template\" from a row's menu can miss the template's last second of edits.",
-    "S-014 · If the archive folder is moved or its drive ejected while Notes runs, links report \"Source file not found\" instead of asking to find it.",
-    "S-008 · A window resized just before quitting may reopen at its old size."
+    "[Code reading only] S-012 · The tag filter finds nothing unless the tag is typed with the capitals it was stored with (\"intel\" misses \"Intel\").",
+    "[Flagged by a tool, then read] S-016 · Clicking a column header in the notes list moves the sort arrow but may not re-sort the list.",
+    "[Code reading only] S-010 · Removing several notes from a folder at once asks about only the last one; the others quietly stay.",
+    "[Code reading only] S-011 · \"New from Template\" from a row's menu can miss the template's last second of edits.",
+    "[Code reading only] S-014 · If the archive folder is moved or its drive ejected while Notes runs, links report \"Source file not found\" instead of asking to find it.",
+    "[Code reading only] S-008 · A window resized just before quitting may reopen at its old size."
    ],
    "rec_why": "Each is cheap to check, and the tag filter and sorting ones would make the app look broken to a new user."
   },
