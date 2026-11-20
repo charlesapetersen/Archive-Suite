@@ -203,4 +203,46 @@ final class FolderDateDocumentsTests: XCTestCase {
         XCTAssertFalse(decade.holds(for: tags(["1960s", "3 March", "Date Uncertain"])), "a Month beside the Decade")
         XCTAssertFalse(decade.holds(for: tags(["1960s", "1966", "Date Uncertain"])), "a Year beside the Decade")
     }
+
+    /// W49.reader-folder-date-undo-fu: a holding record puts back the date it says the folder replaced, or none; a
+    /// retired record holds for nothing; both new keys round-trip and are left out when unset.
+    func testARecordRestoresWhatTheFolderReplacedAndRetires() throws {
+        let tags = DocumentTags.parse(raw: ["1966", "2 February"], labelNumber: nil)
+        let page = "estimate; from 0002.pdf; gave 1958, Date Uncertain"
+        let none = FolderDateRecord(date: "1966-02", uncertain: false, evidence: "folder; from 0001.pdf; gave 1966-02")
+        XCTAssertEqual(Set(ContainerFolderDate.undatingDelta(given: tags, page: page, record: none).remove),
+                       ["1966", "2 February"])
+        XCTAssertTrue(ContainerFolderDate.undatingDelta(given: tags, page: page, record: none).add.isEmpty,
+                      "the estimate the user had deleted stays deleted")
+        var stamp = none
+        stamp.replaced = .init(date: "1961", uncertain: true)
+        XCTAssertEqual(Set(ContainerFolderDate.undatingDelta(given: tags, page: page, record: stamp).add),
+                       ["1961", "Date Uncertain"])
+        XCTAssertEqual(Set(ContainerFolderDate.undatingDelta(given: tags, page: page).add), ["1958", "Date Uncertain"],
+                       "with no record, page 2's line")
+
+        XCTAssertEqual(ContainerFolderDate.replacedDate(tags, evidence: none.evidence, record: stamp), stamp.replaced,
+                       "a date the folder gave carries what it replaced")
+        XCTAssertNil(ContainerFolderDate.replacedDate(tags, evidence: "folder; from 0001.pdf; gave 1966-02", record: nil),
+                     "Process Files' folder date: page 2 does not say")
+        let estimated = DocumentTags.parse(raw: ["1958", "Date Uncertain"], labelNumber: nil)
+        XCTAssertEqual(ContainerFolderDate.replacedDate(estimated, evidence: page, record: nil),
+                       .init(date: "1958", uncertain: true))
+        XCTAssertNil(ContainerFolderDate.replacedDate(DocumentTags.parse(raw: [], labelNumber: nil), evidence: nil,
+                                                      record: nil))
+
+        var retired = stamp
+        retired.retiredBy = UUID().uuidString
+        XCTAssertTrue(retired.carries(tags))
+        XCTAssertFalse(retired.holds(for: tags))
+        XCTAssertNil(FolderDateRecord.evidence(retired, page: nil, tags: tags))
+
+        let encoder = JSONEncoder()
+        XCTAssertEqual(try JSONDecoder().decode(FolderDateRecord.self, from: encoder.encode(retired)), retired)
+        let plain = try XCTUnwrap(String(data: encoder.encode(none), encoding: .utf8))
+        XCTAssertFalse(plain.contains("replaced") || plain.contains("retiredBy"), plain)
+        XCTAssertThrowsError(try JSONDecoder().decode(FolderDateRecord.self, from: Data(
+            #"{"date":"1966","uncertain":false,"evidence":"folder","replaced":{"date":"1958","uncertain":true,"x":1}}"#
+                .utf8)), "strict, as the rest of the document")
+    }
 }

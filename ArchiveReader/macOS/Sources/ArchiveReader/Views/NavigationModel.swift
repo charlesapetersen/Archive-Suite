@@ -2671,7 +2671,8 @@ final class NavigationModel: ObservableObject {
         // alone too: undoing an older write under a newer one that is still on disk, and then retrying the
         // newer one, could put back a tag the step removed. They share the first failure's fate.
         var failedFiles: [AuditLedger.FileNumber: Bool] = [:]
-        AuditLedger.withContext(group: UUID(), undoes: redo ? nil : group, redoes: redo ? group : nil) {
+        let reversal = UUID()
+        AuditLedger.withContext(group: reversal, undoes: redo ? nil : group, redoes: redo ? group : nil) {
             for entry in batch {
                 if let file = entry.file, let mayRetry = failedFiles[file] {
                     if mayRetry, (entry.attempt ?? 1) < AuditLedger.undoAttemptLimit { retryable.append(entry) }
@@ -2705,6 +2706,7 @@ final class NavigationModel: ObservableObject {
         // were written, so the history reads them back newest first again.
         let kept = AuditLedger.shared.keepForRetry(retryable.reversed(), of: group, redo: redo) ? retryable.count : 0
         library.applyVerifiedWrites(verified)
+        folderDateRecordsFollow(verified, reversed: group, reversal: reversal)   // W49.reader-folder-date-undo-fu
         refreshUndoHistory()
         var message = TagChangeStatus.reversal(verified, redo: redo)
         if !failures.isEmpty {

@@ -117,13 +117,17 @@ extension ContainerFolderDate {
     }
 
     /// The tag change that takes away a date a folder gave (`folderGave`) when the folder no longer gives one
-    /// (W49.reader-folder-date-undo). Where page 2's `Date evidence:` is a stamp's, the estimate's or a covering
-    /// letter's (the kinds a folder's date replaces) and names the date it gave, the file goes back to that date and its
-    /// `Date Uncertain`; otherwise its Year or Decade, Month, Day and `Date Uncertain` are removed. Never a check. A year
-    /// the file's covering letter (`Sent With`) also gives is the file's own and stands: empty.
-    public static func undatingDelta(given tags: DocumentTags, page: String?) -> TagDelta {
+    /// (W49.reader-folder-date-undo). Where the Reader's `record` still holds, the file goes back to the date it says the
+    /// folder replaced, or to none (W49.reader-folder-date-undo-fu: a stamp's date the user had deleted stays deleted).
+    /// Otherwise, where page 2's `Date evidence:` is a stamp's, the estimate's or a covering letter's (the kinds a
+    /// folder's date replaces) and names the date it gave, the file goes back to that date and its `Date Uncertain`;
+    /// otherwise its Year or Decade, Month, Day and `Date Uncertain` are removed. Never a check. A year the file's
+    /// covering letter (`Sent With`) also gives is the file's own and stands: empty.
+    public static func undatingDelta(given tags: DocumentTags, page: String?, record: FolderDateRecord? = nil) -> TagDelta {
         var restored: (date: ArchiveDate, uncertain: Bool)?
-        if let page, ["stamp", "estimate", "inherited"].contains(evidenceClass(page) ?? ""),
+        if let record, record.holds(for: tags) {
+            restored = record.replaced.flatMap { r in ArchiveDate.parse(wireValue: r.date).map { ($0, r.uncertain) } }
+        } else if let page, ["stamp", "estimate", "inherited"].contains(evidenceClass(page) ?? ""),
            let last = page.components(separatedBy: "; ").last?.trimmingCharacters(in: .whitespaces),
            last.hasPrefix("gave ") {
             let gave = String(last.dropFirst("gave ".count))
@@ -137,9 +141,27 @@ extension ContainerFolderDate {
         return TagDelta(add: d.add + u.add, remove: d.remove + u.remove)
     }
 
+    /// The date a file with `tags`, whose date rests on `evidence` (as for `dates`), had before a folder dated it, for
+    /// its record (W49.reader-folder-date-undo-fu): for a date a folder gave, the one its holding `record` says the
+    /// folder replaced (none where Process Files gave it, as its page 2 does not say); otherwise the file's own date and
+    /// `Date Uncertain`, or none.
+    public static func replacedDate(_ tags: DocumentTags, evidence: String?,
+                                    record: FolderDateRecord?) -> FolderDateRecord.Replaced? {
+        if evidenceClass(evidence) == "folder" {
+            guard let record, record.holds(for: tags), record.evidence == evidence else { return nil }
+            return record.replaced
+        }
+        return FolderDateRecord.ownDate(tags).map { .init(date: $0.wireValue, uncertain: tags.dateUncertain) }
+    }
+
     /// The record the Reader keeps beside a file it dated by this rule.
-    public var record: FolderDateRecord? {
-        inheritedDate.map { FolderDateRecord(date: $0.date.wireValue, uncertain: $0.uncertain, evidence: evidence) }
+    public var record: FolderDateRecord? { record(replacing: nil) }
+
+    /// The record for a file whose date before this one was `replaced` (`replacedDate`).
+    public func record(replacing replaced: FolderDateRecord.Replaced?) -> FolderDateRecord? {
+        inheritedDate.map {
+            FolderDateRecord(date: $0.date.wireValue, uncertain: $0.uncertain, evidence: evidence, replaced: replaced)
+        }
     }
 }
 
@@ -150,14 +172,44 @@ public struct FolderDateRecord: Equatable, Sendable, Codable {
     public var date: String
     public var uncertain: Bool
     public var evidence: String
+    /// The date the file had before a folder first dated it, which taking the folder's dates away puts back; nil for
+    /// none (W49.reader-folder-date-undo-fu).
+    public var replaced: Replaced?
+    /// The ledger group (Reader `AuditLedger`) that took the folder's date from the file since: Update N Documents, or
+    /// an Undo or Redo Tag Change. The record then speaks for nothing until that group is reversed and the date is back,
+    /// so one typed again in Finder, or put back by any other change, is the user's (W49.reader-folder-date-undo-fu).
+    public var retiredBy: String?
 
-    public init(date: String, uncertain: Bool, evidence: String) {
-        self.date = date; self.uncertain = uncertain; self.evidence = evidence
+    /// Retired: `retiredBy` is set.
+    public var retired: Bool { retiredBy != nil }
+
+    /// A date as `date` and `uncertain` are written.
+    public struct Replaced: Equatable, Sendable, Codable {
+        public var date: String
+        public var uncertain: Bool
+
+        public init(date: String, uncertain: Bool) { self.date = date; self.uncertain = uncertain }
+
+        private enum CodingKeys: String, CodingKey { case date, uncertain }
+
+        public init(from decoder: Decoder) throws {
+            try decoder.refuseUnknownKeys(["date", "uncertain"])
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(date: try c.decode(String.self, forKey: .date), uncertain: try c.decode(Bool.self, forKey: .uncertain))
+        }
     }
 
-    /// The record still describes the file: its own date and `Date Uncertain` are those it gave. After an undo, or any
-    /// later change of the date, it does not, and is ignored.
-    public func holds(for tags: DocumentTags) -> Bool {
+    public init(date: String, uncertain: Bool, evidence: String, replaced: Replaced? = nil, retiredBy: String? = nil) {
+        self.date = date; self.uncertain = uncertain; self.evidence = evidence
+        self.replaced = replaced; self.retiredBy = retiredBy
+    }
+
+    /// The record still describes the file: it is not retired, and the file's own date and `Date Uncertain` are those
+    /// it gave. After an undo, or any later change of the date, it does not, and is ignored.
+    public func holds(for tags: DocumentTags) -> Bool { !retired && carries(tags) }
+
+    /// The file's own date and `Date Uncertain` are those the record gave, retired or not.
+    public func carries(_ tags: DocumentTags) -> Bool {
         // A date tag the form cannot name (a Day with no Month, a Month beside a Decade, a Decade beside a Year) was
         // added since, in Finder, so the date is the user's (W49.reader-folder-date-undo).
         guard let own = Self.ownDate(tags), !tags.dateAmbiguities.contains(where: { $0.facet != .sentWith }),
@@ -183,12 +235,23 @@ public struct FolderDateRecord: Equatable, Sendable, Codable {
         return nil
     }
 
-    private enum CodingKeys: String, CodingKey { case date, uncertain, evidence }
+    private enum CodingKeys: String, CodingKey { case date, uncertain, evidence, replaced, retiredBy }
 
     public init(from decoder: Decoder) throws {
-        try decoder.refuseUnknownKeys(["date", "uncertain", "evidence"])
+        try decoder.refuseUnknownKeys(["date", "uncertain", "evidence", "replaced", "retiredBy"])
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(date: try c.decode(String.self, forKey: .date), uncertain: try c.decode(Bool.self, forKey: .uncertain),
-                  evidence: try c.decode(String.self, forKey: .evidence))
+                  evidence: try c.decode(String.self, forKey: .evidence),
+                  replaced: try c.decodeIfPresent(Replaced.self, forKey: .replaced),
+                  retiredBy: try c.decodeIfPresent(String.self, forKey: .retiredBy))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(date, forKey: .date)
+        try c.encode(uncertain, forKey: .uncertain)
+        try c.encode(evidence, forKey: .evidence)
+        try c.encodeIfPresent(replaced, forKey: .replaced)
+        try c.encodeIfPresent(retiredBy, forKey: .retiredBy)
     }
 }

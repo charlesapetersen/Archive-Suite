@@ -157,11 +157,16 @@ the container file (`SPEC/containers.md`).
   kind, the tagging call's format standing in for one). Taking the user's value away removes its key, and a file left
   with none its entry. **`dates`** (W47.ct-folder-date-reader; optional, absent when empty): `{ "<file name>":
   { "date": "<ArchiveDate wire value: 1966, 1966-02 or 1960s>", "uncertain": <bool>, "evidence": "<the Date evidence:
-  value>" } }`, written when the user accepts the Reader's offer to date a folder run's documents
+  value>", "replaced": { "date": "<wire value>", "uncertain": <bool> }, "retiredBy": "<ledger group UUID>" } }` (`replaced`
+  and `retiredBy` optional, absent for none), written when the user accepts the Reader's offer to date a folder run's documents
   (`SPEC/containers.md` §The folder-date rule). Its evidence stands for page 2's (in the Checks) only while the file's
   own date (Year, Month and Day, or Decade) and `Date Uncertain` read as `date` and `uncertain`, with no date tag that
-  form cannot name (a Day without a Month, a Month or Year beside a Decade); otherwise it is ignored. Taking a folder's
-  dates away (W49.reader-folder-date-undo) keeps the records, so an undo of the tags restores the evidence too. Strict: an unknown key or field, a non-string value or the same name twice makes the document
+  form cannot name (a Day without a Month, a Month or Year beside a Decade), and while it has no `retiredBy`; otherwise it
+  is ignored. `replaced` is the date the file had before a folder first dated it (carried over when a later folder date
+  replaces the folder's), which taking the folder's dates away puts back (W49.reader-folder-date-undo-fu). Taking them
+  away sets `retiredBy` to its ledger group, as an Undo or Redo Tag Change that leaves the file without the record's
+  date sets it to its own; only reversing that group, with the file carrying the date again, clears it. So the same
+  date typed again in Finder, or put back by any other change, is the user's. Strict: an unknown key or field, a non-string value or the same name twice makes the document
   unreadable, and one of a larger `schemaVersion` is not interpreted; either is shown as such and never overwritten.
   A user value **is checked** (`FieldStatusPolicy.userItemField`), as a `user` container value is; a `Checked <Field>`
   tag speaks for page 2's value and is left as it is. The dates are tags and never stored here. Only a person's edit

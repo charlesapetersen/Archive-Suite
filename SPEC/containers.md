@@ -173,12 +173,15 @@ Owner, 2026-10-31: a dated folder dates the otherwise undated documents inside i
   Your Value) offers again for the run the edited file is in. A date that still dates replaces the dates the folder
   gave with the rest (above). One that dates nothing (cleared, no longer the user's, 20 years or more) offers to take
   them away, but only where the run's confirmed date dated documents just before the edit (a box's date, an edit that
-  changed nothing, or folder evidence from elsewhere offers nothing): where page 2's evidence is a stamp's, the
-  estimate's or a covering letter's and ends `gave <date>[, Date Uncertain]` (the date the folder's replaced), the file
-  goes back to that date; a year the file's `Sent With` also gives stands; otherwise its Year or Decade, Month, Day and
-  `Date Uncertain` are removed. No check is written; one undo group. Accepting reads the folder's date again: one set
-  since, or a file that left the run, changes nothing. The records are kept, so an undo puts the date back with its
-  evidence. A record holds only while the file's date tags are a form it gives (no Day without a Month, no Month or
+  changed nothing, or folder evidence from elsewhere offers nothing): where the Reader's record holds, the file goes
+  back to the date it records the folder replaced, or to none (`W49.reader-folder-date-undo-fu`: a date deleted before
+  the folder dated the file stays deleted); otherwise, where page 2's evidence is a stamp's, the estimate's or a
+  covering letter's and ends `gave <date>[, Date Uncertain]`, to that date; a year the file's `Sent With` also gives
+  stands; otherwise its Year or Decade, Month, Day and `Date Uncertain` are removed. No check is written; one undo
+  group. Accepting reads the folder's date again: one set since, or a file that left the run, changes nothing. The
+  records of the files undated are retired; Undo Tag Change of that change revives them with the date, and Redo
+  retires them again, so the same date typed later in Finder, or put back by another change, is the user's. An Undo or Redo of the Container section's date edit itself
+  offers as the edit does. A record holds only while the file's date tags are a form it gives (no Day without a Month, no Month or
   Year beside a Decade), so one added in Finder is the user's.
 
 ## The container file

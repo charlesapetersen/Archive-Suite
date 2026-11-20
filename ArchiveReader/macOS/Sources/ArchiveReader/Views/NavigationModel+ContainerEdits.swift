@@ -297,6 +297,10 @@ extension NavigationModel {
             announce(failure)
         }
         finishEdit(document)
+        // W49.reader-folder-date-undo-fu: undoing or redoing a date edit offers as the edit did.
+        if document == .containers, ["Container Change", "None Here", "Remove Your Value"].contains(action) {
+            offerFolderDatingAfterUndo(result.inverse, window: ObjectIdentifier(undo))
+        }
     }
 
     /// After an edit, undo or redo: the Checks read the user's values again; a container edit keeps the editor off

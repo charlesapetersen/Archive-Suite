@@ -193,7 +193,10 @@ final class FolderDatingTests: XCTestCase {
         let fields = try XCTUnwrap(ContainerFileStore.loadItemFields(directory: folder).document)
         let record = try XCTUnwrap(fields.dateRecord(for: "0003.pdf"))
         XCTAssertEqual(record, FolderDateRecord(date: "1966-02", uncertain: false,
-                                                evidence: "folder; from 0001.pdf; \"Feb. 1966\"; gave 1966-02"))
+                                                evidence: "folder; from 0001.pdf; \"Feb. 1966\"; gave 1966-02",
+                                                replaced: .init(date: "1958", uncertain: true)),
+                       "the estimate's date is kept as the one replaced")
+        XCTAssertNil(fields.dateRecord(for: "0002.pdf")?.replaced, "an undated file replaced none")
         XCTAssertNil(fields.dateRecord(for: "0004.pdf"))
         let dated = DocumentTags.parse(raw: Array(try tagsOnDisk("0003.pdf")), labelNumber: nil)
         XCTAssertEqual(FieldStatusPolicy.date(checked: false, evidence: FolderDateRecord.evidence(
@@ -207,6 +210,9 @@ final class FolderDatingTests: XCTestCase {
         XCTAssertEqual(try tagsOnDisk("0003.pdf"), ["Unread", "1958", "Date Uncertain"])
         let undone = DocumentTags.parse(raw: Array(try tagsOnDisk("0003.pdf")), labelNumber: nil)
         XCTAssertFalse(record.holds(for: undone), "the record no longer describes the file")
+        wait { ContainerFileStore.loadItemFields(directory: folder).document?.dateRecord(for: "0003.pdf")?.retired == true }
+        XCTAssertEqual(ContainerFileStore.loadItemFields(directory: folder).document?.dateRecord(for: "0003.pdf")?.retired,
+                       true, "W49.reader-folder-date-undo-fu: Undo Tag Change retires the record")
         XCTAssertEqual(try bytes(), before)
     }
 
@@ -304,10 +310,133 @@ final class FolderDatingTests: XCTestCase {
         model.undoLast()
         XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours", "1966", "2 February"])
         XCTAssertEqual(try tagsOnDisk("0003.pdf"), ["Unread", "1966", "2 February"])
-        let fields = try XCTUnwrap(ContainerFileStore.loadItemFields(directory: folder).document)
         let restored = DocumentTags.parse(raw: Array(try tagsOnDisk("0003.pdf")), labelNumber: nil)
-        XCTAssertEqual(fields.dateRecord(for: "0003.pdf")?.holds(for: restored), true,
-                       "the record speaks for the restored date again")
+        wait { self.record("0003.pdf")?.holds(for: restored) == true }
+        XCTAssertEqual(record("0003.pdf")?.holds(for: restored), true, "the record speaks for the restored date again")
+    }
+
+    private func record(_ name: String) -> FolderDateRecord? {
+        ContainerFileStore.loadItemFields(directory: folder).document?.dateRecord(for: name)
+    }
+
+    private func tags(_ name: String) throws -> DocumentTags {
+        DocumentTags.parse(raw: Array(try tagsOnDisk(name)), labelNumber: nil)
+    }
+
+    /// W49.reader-folder-date-undo-fu: taking the folder's dates away retires their records, so the same date typed
+    /// again in Finder is the user's; Undo Tag Change revives them, Redo retires them again.
+    func testTakingTheDatesAwayRetiresTheRecordsAndUndoRevivesThem() throws {
+        try makeFolder(date: "Feb. 1966")
+        let model = fixtureNavigationModel(pinnedTo: root)
+        wait { model.library.files.count >= 7 }
+        try datedFromTheFolder(model)
+        try setFolderDate(nil)
+        model.applyFolderDating(try offered(model))
+        wait { model.statusMessage.hasPrefix("Took ") }
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours"])
+        wait { self.record("0002.pdf")?.retired == true }
+        XCTAssertEqual(record("0002.pdf")?.retired, true)
+        XCTAssertEqual(record("0003.pdf")?.retired, true)
+
+        model.undoLast()
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours", "1966", "2 February"])
+        wait { self.record("0002.pdf")?.retired == false }
+        XCTAssertEqual(record("0002.pdf")?.holds(for: try tags("0002.pdf")), true, "Undo revives the record")
+
+        model.redoLast()
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours"])
+        wait { self.record("0002.pdf")?.retired == true }
+        XCTAssertEqual(record("0002.pdf")?.retired, true, "Redo retires it again")
+
+        // The same date typed in Finder: the record carries it, but no longer speaks for it.
+        try (folder.appendingPathComponent("0002.pdf") as NSURL)
+            .setResourceValue(["Unread", "Harbours", "1966", "2 February"], forKey: .tagNamesKey)
+        let retyped = try tags("0002.pdf")
+        let kept = try XCTUnwrap(record("0002.pdf"))
+        XCTAssertTrue(kept.carries(retyped))
+        XCTAssertNil(FolderDateRecord.evidence(kept, page: nil, tags: retyped))
+        XCTAssertFalse(ContainerFolderDate.folderGave(retyped, evidence: FolderDateRecord.evidence(kept, page: nil,
+                                                                                                  tags: retyped)))
+    }
+
+    /// W49.reader-folder-date-undo-fu (review): a record retired by one change is revived only by that change's own
+    /// reversal, never by undoing an unrelated edit that happens to leave the folder's date on the file.
+    func testOnlyTheRetiringChangesReversalRevivesARecord() throws {
+        try makeFolder(date: "Feb. 1966")
+        let model = fixtureNavigationModel(pinnedTo: root)
+        wait { model.library.files.count >= 7 }
+        try datedFromTheFolder(model)
+        model.undoLast()
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours"])
+        wait { self.record("0002.pdf")?.retired == true }
+        XCTAssertEqual(record("0002.pdf")?.retired, true)
+
+        // The user types the same date in Finder, then changes it in the Inspector and undoes that.
+        try (folder.appendingPathComponent("0002.pdf") as NSURL)
+            .setResourceValue(["Unread", "Harbours", "1966", "2 February"], forKey: .tagNamesKey)
+        let path = try XCTUnwrap(model.library.files.first { $0.path.hasSuffix("0002.pdf") }?.path)
+        wait { model.library.files.first { $0.path == path }?.tags.year == 1966 }
+        model.applyEdit(.setDate(try XCTUnwrap(ArchiveDate(year: 1967))), paths: [path])
+        XCTAssertTrue(try tagsOnDisk("0002.pdf").contains("1967"))
+        model.undoLast()
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours", "1966", "2 February"])
+        NavigationModel.folderDateRecordQueue.sync {}
+        XCTAssertEqual(record("0002.pdf")?.retired, true, "the user's date stays the user's")
+    }
+
+    /// W49.reader-folder-date-undo-fu: a stamp's or estimate's date the user deleted before the folder dated the file is
+    /// not put back when the folder's date is taken away.
+    func testADateDeletedBeforeTheFolderDatedTheFileIsNotPutBack() throws {
+        try makeFolder(date: "Feb. 1966")
+        try (folder.appendingPathComponent("0003.pdf") as NSURL).setResourceValue(["Unread"], forKey: .tagNamesKey)
+        let model = fixtureNavigationModel(pinnedTo: root)
+        wait { model.library.files.count >= 7 }
+        try datedFromTheFolder(model)
+        XCTAssertNil(record("0003.pdf")?.replaced)
+        try setFolderDate(nil)
+        model.applyFolderDating(try offered(model))
+        wait { model.statusMessage.hasPrefix("Took ") }
+        XCTAssertEqual(try tagsOnDisk("0003.pdf"), ["Unread"], "not page 2's estimate")
+    }
+
+    /// W49.reader-folder-date-undo-fu: the Container section's Undo of a date edit offers as the edit did, and so
+    /// does its Redo.
+    func testContainerUndoAndRedoOfADateEditOffer() throws {
+        try makeFolder(date: "Feb. 1966")
+        let model = fixtureNavigationModel(pinnedTo: root)
+        wait { model.library.files.count >= 7 }
+        try datedFromTheFolder(model)
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        let tree = try XCTUnwrap(model.containerTree)
+        let edited = ([tree.path] + ["Box 3", "0002.pdf"]).joined(separator: "/")
+        wait { !model.containerEditSaving }
+        model.editContainerField(.date, .noneHere, forPath: edited, undo: undo)
+        wait { model.folderDatingOffer != nil }
+        let away = try XCTUnwrap(model.folderDatingOffer)
+        XCTAssertNil(away.date)
+        model.applyFolderDating(away)
+        wait { model.statusMessage.hasPrefix("Took ") }
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours"])
+
+        wait { !model.containerEditSaving }
+        XCTAssertTrue(undo.canUndo)
+        undo.undo()
+        wait { model.folderDatingOffer != nil }
+        let back = try XCTUnwrap(model.folderDatingOffer, "Undo of None Here offers the folder's date again")
+        XCTAssertNotNil(back.date)
+        XCTAssertEqual(back.paths.map { ($0 as NSString).lastPathComponent }, ["0002.pdf", "0003.pdf", "0006.pdf"])
+        model.applyFolderDating(back)
+        wait { model.statusMessage.hasPrefix("Dated ") }
+        XCTAssertEqual(try tagsOnDisk("0002.pdf"), ["Unread", "Harbours", "1966", "2 February"])
+        XCTAssertEqual(try tagsOnDisk("0003.pdf"), ["Unread", "1966", "2 February"])
+
+        wait { !model.containerEditSaving }
+        model.folderDatingOffer = nil
+        XCTAssertTrue(undo.canRedo)
+        undo.redo()
+        wait { model.folderDatingOffer != nil }
+        XCTAssertNil(try XCTUnwrap(model.folderDatingOffer, "Redo offers to take them away").date)
     }
 
     /// Widening the folder's date replaces the dates it gave with the wider one, and nothing the user checked.
