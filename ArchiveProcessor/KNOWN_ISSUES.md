@@ -2,6 +2,13 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (W40.fix-processor-review-classification-stale, 2026-11-20): where page 2's Classification is not rewritten
+
+`OCR/OCRProcessor+Tagging.swift` `writeClassificationHeader`; the rewrite is `PDFGenerator.classificationRewrite`.
+- A class changed in the file pane after the run has merged a document leaves that document's pages reading the old
+  class: the rewrite handles one image page and one text page, and a merged file is left as it is and logged
+  (queued: W40.fix-processor-merged-classification-stale).
+
 ## ⚠️ LIMITATION (W47.wh-read-flag-readers, 2026-11-19): what the read-poorly flag for other readers does not do
 
 `OCR/ReadQualityDisagreement.swift`; figures in `segbench-results/post-read-flag.md` §"Each reader's own cut".

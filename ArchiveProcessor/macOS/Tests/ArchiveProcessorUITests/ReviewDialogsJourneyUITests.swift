@@ -44,19 +44,14 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         app = nil
     }
 
-    /// Page 2's Classification against the choices made. Until W40.fix-processor-review-classification-stale ships,
-    /// the per-page review's answers reach the tags but not page 2, which keeps the reader's proposal (found by this
-    /// journey, 2026-11-19), so a mismatch is an expected failure that names the fix; once fixed it simply passes.
+    /// Page 2's Classification against the choices made: the reviews' answers reach page 2 as well as the tags
+    /// (W40.fix-processor-review-classification-stale; this journey found page 2 keeping the reader's proposal).
     private func expectClassifications(_ files: [Int: Output], _ want: [Int: String], run: String) {
         let wrong = want.keys.sorted().filter { files[$0]?.classification != want[$0] }
         guard !wrong.isEmpty else { return }
         print("[w40d2] run \(run) page-2 Classification differs from the choice for photos \(wrong): "
               + wrong.map { "\($0) is '\(files[$0]?.classification ?? "-")', chose '\(want[$0]!)'" }.joined(separator: "; "))
-        continueAfterFailure = true
-        XCTExpectFailure("W40.fix-processor-review-classification-stale: page 2 keeps the proposed class", strict: false) {
-            for n in wrong { XCTAssertEqual(files[n]?.classification, want[n], "photo \(n)'s page 2 Classification") }
-        }
-        continueAfterFailure = false
+        for n in wrong { XCTAssertEqual(files[n]?.classification, want[n], "photo \(n)'s page 2 Classification") }
     }
 
     func testReviewDialogsByHand() throws {

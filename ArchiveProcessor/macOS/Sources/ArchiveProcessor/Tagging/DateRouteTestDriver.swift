@@ -52,7 +52,7 @@ enum DateRouteTestDriver {
             lines.append("SKIP: 1r the pipeline's own documents (DATE_ROUTE_REAL_CASES not present)")
         }
         decision()
-        headerLine()
+        await headerLine()
         await endToEnd()
         await liveCapture()
         lines.append(failures == 0 ? "ALL PASS" : "FAILURES \(failures)")
@@ -336,7 +336,7 @@ enum DateRouteTestDriver {
 
     // MARK: 4. The PDF header line (W46.date-route-header)
 
-    private static func headerLine() {
+    private static func headerLine() async {
         let fm = FileManager.default
         let near = [DateRoute.Neighbour(label: "P1", dist: 1, text: "Memo\nJune 2, 1957\nfile", file: "P1.pdf")]
         let memo = "MEMO\nTo: Files"
@@ -483,16 +483,16 @@ enum DateRouteTestDriver {
         check("4c ...and the file keeps its Finder tags", ((try? MacOSTagger.readTags(from: pdf)) ?? []).contains("1957"))
         p.jobs[0].classification = .folderLabel
         p.jobs[0].result = p.jobs[0].result?.with(classification: .folderLabel, rotationDegrees: 0)
-        p.writeClassificationHeaders(runConfig: nil)
+        await p.writeClassificationHeaders(runConfig: nil)
         check("4c the pass before merge writes a class set on the job alone", pageTwo(pdf)?.classification == "Folder")
-        p.writeClassificationHeaders(runConfig: nil)
+        await p.writeClassificationHeaders(runConfig: nil)
         check("4c ...and leaves a page that already agrees as it is", pageTwo(pdf)?.classification == "Folder")
         let twoBefore = try? Data(contentsOf: two)
         p.outputURLMap = [image: two]
-        p.writeClassificationHeaders(runConfig: nil)
+        await p.writeClassificationHeaders(runConfig: nil)
         check("4c a merged output is left as it is", (try? Data(contentsOf: two)) == twoBefore)
         p.outputURLMap = [image: image]
-        p.writeClassificationHeaders(runConfig: nil)
+        await p.writeClassificationHeaders(runConfig: nil)
         check("4c an output that is its own source is never written", (try? Data(contentsOf: image)) == imageBytes)
     }
 

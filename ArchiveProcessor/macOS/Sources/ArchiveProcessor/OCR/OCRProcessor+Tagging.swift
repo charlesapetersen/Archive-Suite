@@ -1425,44 +1425,64 @@ extension OCRProcessor {
     /// is and logged.
     @discardableResult
     func writeClassificationHeader(forJobAt index: Int, runConfig: SessionProcessingConfig?) -> PDFGenerator.DateEvidenceRewrite {
+        guard let work = classificationHeaderWork(forJobAt: index) else { return .skipped("no generated output") }
+        return Self.rewriteClassificationHeader(work, textColumns: Self.pdfGenerationSettings(for: runConfig).textColumns)
+    }
+
+    /// Every output's `Classification:` line brought to its job's class, once the reviews are done and before merge
+    /// folds the pages into documents (`writeClassificationHeader`). The files are read off the main actor.
+    func writeClassificationHeaders(runConfig: SessionProcessingConfig?) async {
+        let work = jobs.indices.compactMap { classificationHeaderWork(forJobAt: $0) }
+        guard !work.isEmpty else { return }
+        let columns = Self.pdfGenerationSettings(for: runConfig).textColumns
+        await Task.detached(priority: .userInitiated) {
+            for w in work { _ = Self.rewriteClassificationHeader(w, textColumns: columns) }
+        }.value
+    }
+
+    /// What one job's header rewrite needs, taken on the main actor; nil when it has no output of its own text.
+    private func classificationHeaderWork(forJobAt index: Int) -> ClassificationHeaderWork? {
         guard jobs.indices.contains(index), jobs[index].status != .removed,
-              let result = jobs[index].result, let text = result.text, !text.isEmpty else { return .skipped("no text") }
+              let result = jobs[index].result, let text = result.text, !text.isEmpty else { return nil }
         let source = jobs[index].sourceURL
-        guard let outputPDF = outputURLMap[source], !reOCRSourceURLs.contains(source) else { return .skipped("no output") }
-        let wanted = result.classification?.displayName
+        guard let outputPDF = outputURLMap[source], !reOCRSourceURLs.contains(source) else { return nil }
+        return ClassificationHeaderWork(outputPDF: outputPDF, source: source,
+                                        classification: result.classification?.displayName, text: text)
+    }
+
+    struct ClassificationHeaderWork: Sendable {
+        let outputPDF: URL, source: URL, classification: String?, text: String
+    }
+
+    nonisolated static func rewriteClassificationHeader(_ w: ClassificationHeaderWork,
+                                                        textColumns: Int) -> PDFGenerator.DateEvidenceRewrite {
         // Most pages keep their proposal: settle that from the text page alone, unread bytes.
-        if let doc = PDFDocument(url: outputPDF), doc.pageCount == 2, PDFPageRole.roles(of: doc) == [.image, .text],
-           let page = doc.page(at: 1), let header = PDFHeaderParser.parse(page).header, header.classification == wanted {
+        if let doc = PDFDocument(url: w.outputPDF), doc.pageCount == 2, PDFPageRole.roles(of: doc) == [.image, .text],
+           let page = doc.page(at: 1), let header = PDFHeaderParser.parse(page).header,
+           header.classification == w.classification {
             return .unchanged
         }
-        guard !OutputFileSafety.isSameFile(outputPDF, source), let data = try? Data(contentsOf: outputPDF) else {
+        guard !OutputFileSafety.isSameFile(w.outputPDF, w.source), let data = try? Data(contentsOf: w.outputPDF) else {
             return .skipped("not a readable generated output")
         }
-        let columns = Self.pdfGenerationSettings(for: runConfig).textColumns
-        let outcome = PDFGenerator().classificationRewrite(of: data, sourceName: source.lastPathComponent,
-                                                           classification: wanted, body: text,
-                                                           textColumns: columns)
+        let outcome = PDFGenerator().classificationRewrite(of: data, sourceName: w.source.lastPathComponent,
+                                                           classification: w.classification, body: w.text,
+                                                           textColumns: textColumns)
         switch outcome {
         case .rewrite(let new):
             do {
-                try OutputFileSafety.replaceGeneratedOutput(outputPDF, for: source, with: new)
+                try OutputFileSafety.replaceGeneratedOutput(w.outputPDF, for: w.source, with: new)
             } catch {
                 os_log(.error, "Classification not written to %{public}@: %{public}@",
-                       outputPDF.lastPathComponent, String(describing: error))
+                       w.outputPDF.lastPathComponent, String(describing: error))
                 return .skipped(String(describing: error))
             }
         case .skipped(let why):
-            os_log(.info, "Classification left as it was in %{public}@: %{public}@", outputPDF.lastPathComponent, why)
+            os_log(.info, "Classification left as it was in %{public}@: %{public}@", w.outputPDF.lastPathComponent, why)
         case .unchanged:
             break
         }
         return outcome
-    }
-
-    /// Every output's `Classification:` line brought to its job's class, once the reviews are done and before merge
-    /// folds the pages into documents (`writeClassificationHeader`).
-    func writeClassificationHeaders(runConfig: SessionProcessingConfig?) {
-        for index in jobs.indices { writeClassificationHeader(forJobAt: index, runConfig: runConfig) }
     }
 
     /// W37.dual-date — after a POST-tagging reclassification, bring every written `Sent With` token (and

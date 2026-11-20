@@ -3466,7 +3466,8 @@ extension OCRProcessor {
 
             // Page 2's Classification: every review is done, and merge copies these pages next
             // (W40.fix-processor-review-classification-stale).
-            writeClassificationHeaders(runConfig: runConfig)
+            await writeClassificationHeaders(runConfig: runConfig)
+            guard !Task.isCancelled else { cleanupTempFiles(); return }
 
             // Live Capture: layer per-page phone Quality on top now that box/folder Red/Purple is
             // final, and before merge folds appliedTags into merged PDFs. The companion wire already
