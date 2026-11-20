@@ -574,8 +574,7 @@ final class LiveCaptureProcessor: ObservableObject {
         for group in session.groups where group.type == .document
             && session.resolvedGroupIds.contains(group.id) && !session.filedGroupIds.contains(group.id)
             && !finalizedGroups.contains(group.id) {
-            let gid = group.id
-            Task { [weak self] in await self?.finalizeSegment(groupId: gid) }
+            startFinalize(group.id)
         }
     }
 
@@ -1035,7 +1034,7 @@ final class LiveCaptureProcessor: ObservableObject {
                      phase: photo.type == .document ? .ocr : .tagging)
 
         if photo.type != .document {   // Box/Folder marker → finalize now
-            Task { [weak self] in await self?.finalizeSegment(groupId: photo.groupId) }
+            startFinalize(photo.groupId)
         }
     }
 
@@ -1086,7 +1085,14 @@ final class LiveCaptureProcessor: ObservableObject {
         // A box or folder marker was finalized on arrival; its card resolving is what a held Finish waits for
         // (W47.ct-processor-capture), so look again now rather than at the next watchdog tick.
         if finalizedGroups.contains(groupId) { proceedToFinishIfReady(); return }
-        Task { [weak self] in await self?.finalizeSegment(groupId: groupId) }
+        startFinalize(groupId)
+    }
+
+    /// Finalize one segment off the caller's turn. The one place a finalize is started, so a test driver that
+    /// arms `_testFinalizeTasks` sees every one.
+    private func startFinalize(_ groupId: String) {
+        let task = Task<Void, Never> { [weak self] in await self?.finalizeSegment(groupId: groupId) }
+        _testFinalizeTasks?.append(task)
     }
 
     /// Where a group is filed RIGHT NOW — the single reader of collection membership outside finalize
@@ -3061,6 +3067,20 @@ final class LiveCaptureProcessor: ObservableObject {
     /// a driver can inject one into the window between `finalize` snapshotting `plans` and the move
     /// finishing — the interleaving that produced the bug.
     func _recoveryTestAppendStaged(_ seg: StagedSegment) { staged.append(seg) }
+
+    /// Test-only (W40.fix-processor-date-route-live-flake): a driver sets this to `[]` and every finalize this
+    /// processor starts is kept here, so it awaits the staging itself rather than a deadline. A deadline raced the
+    /// first Apple Vision reading of the process (the text layer's), which waits for the Neural Engine to compile its
+    /// model again whenever macOS has evicted it: measured at 30 s in a run that staged nothing in its 10. Nil in
+    /// production, so nothing is kept.
+    var _testFinalizeTasks: [Task<Void, Never>]?
+    /// Test-only: awaits every finalize started since `_testFinalizeTasks` was armed, including any one of them starts.
+    func _testAwaitFinalizes() async {
+        while let task = _testFinalizeTasks?.first {
+            _testFinalizeTasks?.removeFirst()
+            await task.value
+        }
+    }
 
     /// Test-only ($0, W3.cap-r2): when set, `photoIngested` starts THIS canned result instead of a paid
     /// OCR call, and appends the page it started to `_recoveryTestOCRStarts`. The dedup guard's whole claim

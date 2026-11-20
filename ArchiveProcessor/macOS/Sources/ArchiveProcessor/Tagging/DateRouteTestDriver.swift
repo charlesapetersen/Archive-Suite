@@ -950,6 +950,9 @@ enum DateRouteTestDriver {
         let s = CaptureSession()
         s._recoveryTestBeginLive(config: cfg, stagingDir: staging)
         s.liveProcessor._entityTestSetSettings([:])
+        // The staging itself is awaited, not a deadline: this batch is the process's first Apple Vision reading (the
+        // text layer's), which can wait about 30 s for the Neural Engine to compile its model again.
+        s.liveProcessor._testFinalizeTasks = []
         for (i, d) in docs.enumerated() {
             let page = tmp.appendingPathComponent("page-\(d.gid).jpg")
             writeJPEG(page, width: d.width)
@@ -960,7 +963,8 @@ enum DateRouteTestDriver {
         }
         LiveCaptureProcessor._recoveryTestOCRStub = nil
         for d in docs { s.liveProcessor.segmentResolved(groupId: d.gid) }
-        let all = await settle { s.liveProcessor.staged.count == docs.count }
+        await s.liveProcessor._testAwaitFinalizes()
+        let all = s.liveProcessor.staged.count == docs.count
         check("6 Live: every document stages", all, "\(s.liveProcessor.staged.count)")
         func staged(_ gid: String) -> LiveCaptureProcessor.StagedSegment? { s.liveProcessor.staged.first { $0.groupId == gid } }
         func dating(_ gid: String) -> [String: Any]? { json(staged(gid)?.jsonURL)["dating"] as? [String: Any] }
@@ -1036,6 +1040,7 @@ enum DateRouteTestDriver {
         let f = CaptureSession()
         f._recoveryTestBeginLive(config: cfg, stagingDir: staging2)
         f.liveProcessor._entityTestSetSettings([:])
+        f.liveProcessor._testFinalizeTasks = []
         func fStaged(_ gid: String) -> LiveCaptureProcessor.StagedSegment? { f.liveProcessor.staged.first { $0.groupId == gid } }
         func fTags(_ gid: String) -> [String] { fStaged(gid)?.pdfURLs.first.flatMap { try? MacOSTagger.readTags(from: $0) } ?? [] }
         func fDating(_ gid: String) -> [String: Any]? { json(fStaged(gid)?.jsonURL)["dating"] as? [String: Any] }
@@ -1053,7 +1058,8 @@ enum DateRouteTestDriver {
             _ = f.ingest(jpeg: (try? Data(contentsOf: page)) ?? Data(), groupId: gid, seq: seq, type: type,
                          quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             if type == .document { f.liveProcessor.segmentResolved(groupId: gid) }
-            let done = await settle { fStaged(gid) != nil }
+            await f.liveProcessor._testAwaitFinalizes()
+            let done = fStaged(gid) != nil
             LiveCaptureProcessor._recoveryTestOCRStub = nil
             return done
         }
