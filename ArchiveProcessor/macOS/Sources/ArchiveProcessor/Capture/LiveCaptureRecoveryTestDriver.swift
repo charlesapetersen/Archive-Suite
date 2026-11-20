@@ -2035,12 +2035,19 @@ enum LiveCaptureRecoveryTestDriver {
             let bwJPEG = bwBitmap?.representation(using: .jpeg, properties: [:]) ?? Data()
 
             // 1. PREMISE. A two-page document stages CLEANLY — the success label this section watches decay.
+            //    The staging itself is awaited, not a deadline (W49.recov-fu6-flake): these are the run's first
+            //    decodable pages through live staging, so this write is its first Apple Vision reading (the text
+            //    layer's), which can wait about 30 s for the Neural Engine to compile its model again after a
+            //    rebuild (W40.fix-processor-date-route-live-flake). A hang still fails: the script times out.
+            bwProc._testFinalizeTasks = []
             for seq in [1, 2] {
                 bwSession.ingest(jpeg: bwJPEG, groupId: "B1", seq: seq,
                                  type: .document, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
             }
             bwProc.segmentResolved(groupId: "B1")
-            let bwStagedOK = await bwSettle { bwProc.statuses.first { $0.id == "B1" }?.phase == .staged }
+            await bwProc._testAwaitFinalizes()
+            bwProc._testFinalizeTasks = nil
+            let bwStagedOK = bwProc.statuses.first { $0.id == "B1" }?.phase == .staged
             let bwFirst = bwProc.staged.first { $0.groupId == "B1" }
             check("a two-page document stages cleanly as ONE merged PDF, in no failed set",
                   bwStagedOK && bwProc.failedGroupIds.isEmpty
