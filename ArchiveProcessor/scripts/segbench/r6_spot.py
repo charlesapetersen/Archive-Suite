@@ -5,10 +5,12 @@
   r6_spot.py report            # scores beside the panel's routes on the same 25 -> stdout (markdown)
   r6_spot.py transkribus-pack  # copy the 25 images and an instruction sheet for the owner's hand upload
                                # (report also scores its PAGE XML export, in the export's own reading order)
+  R6_SET=rest r6_spot.py select|run|transkribus-pack  # W47.wh-readers-lost-vendors-read: the other 71 of the 96
+  R6_SET=all r6_spot.py report  # all 96 (Transkribus only once both packs' exports are in)
 
 Azure: prebuilt-layout (text in reading order, paragraphs, per-span handwriting style), F0 free tier, $0.
 Textract: AnalyzeDocument LAYOUT + one QUERY ("the document's date"), $4 + $15 per 1,000 pages at list, so
-25 pages are about $0.48; CAP below is the item's whole Textract allowance. Keys come from Keychain
+25 pages are about $0.48; CAPS below are each set's whole Textract allowance. Keys come from Keychain
 (service com.archiveprocessor.app) and are never printed or written. Raw replies stay in CACHE, outside git.
 """
 import datetime
@@ -33,7 +35,10 @@ from ocr_panel_score import score, paired
 CACHE = Path(os.environ.get('R6_SPOT_CACHE', Path.home() / 'Library/Caches/ArchiveSuiteRehearsal/r6-spot'))
 IMAGES = F.CACHE / 'images'
 N, SEED = 25, 4625
-CAP = 1.50                      # dollars, Textract; Azure F0 bills nothing
+SET = os.environ.get('R6_SET', 'spot')  # spot: the 25 (W46.r6-spot); rest: the other 71; all: the 96 (report only)
+CAPS = {'spot': 1.50, 'rest': 1.40}     # dollars, Textract, each set's whole allowance; Azure F0 bills nothing
+SELECTION = {'spot': 'selection.json', 'rest': 'selection-rest.json'}
+PACK = {'spot': 'transkribus-pack', 'rest': 'transkribus-pack-rest'}
 TEXTRACT_PAGE = 0.004 + 0.015   # LAYOUT + QUERIES, per page, list
 REGION = 'us-east-2'
 DATE_QUERY = 'What is the date of this document?'
@@ -48,23 +53,33 @@ def key(account):
     return r.stdout.strip()
 
 
+def sets():
+    return ['spot', 'rest'] if SET == 'all' else [SET]
+
+
 def selection():
-    return json.loads((CACHE / 'selection.json').read_text())
+    jobs = [j for k in sets() for j in json.loads((CACHE / SELECTION[k]).read_text())['jobs']]
+    return {'jobs': sorted(jobs, key=lambda j: j['page'])}
 
 
 def cmd_select():
     CACHE.mkdir(parents=True, exist_ok=True)
-    out = CACHE / 'selection.json'
+    out = CACHE / SELECTION[SET]
     if out.exists():
         print('already frozen:', out); return
     jobs = [j for j in F.manifest()['jobs'] if j['page'] not in P.AGREEMENT]
     assert len(jobs) == 96, len(jobs)
-    pick = sorted(random.Random(SEED).sample(jobs, N), key=lambda j: j['page'])
+    if SET == 'rest':
+        spot = {j['id'] for j in json.loads((CACHE / SELECTION['spot']).read_text())['jobs']}
+        pick = [j for j in jobs if j['id'] not in spot]
+        assert len(pick) == 96 - N, len(pick)
+    else:
+        pick = sorted(random.Random(SEED).sample(jobs, N), key=lambda j: j['page'])
     for j in pick:
         data = (IMAGES / (j['id'] + '.jpg')).read_bytes()
         assert hashlib.sha256(data).hexdigest() == j['sha256'], j['id']
-    out.write_text(json.dumps({'seed': SEED, 'n': N, 'jobs': pick}, indent=1))
-    print('froze', N, 'pages:', ' '.join(j['page'] for j in pick))
+    out.write_text(json.dumps({'seed': SEED, 'n': len(pick), 'jobs': pick}, indent=1))
+    print('froze', len(pick), 'pages:', ' '.join(j['page'] for j in pick))
 
 
 def ledger():
@@ -138,17 +153,19 @@ def textract(data):
 
 def cmd_run(route):
     call = {'azure': azure, 'textract': textract}[route]
+    assert SET in CAPS, 'run one set at a time'
     root = CACHE / route; root.mkdir(parents=True, exist_ok=True)
-    for j in selection()['jobs']:
+    jobs = selection()['jobs']; ids = {j['id'] for j in jobs}
+    for j in jobs:
         dest, pending = root / (j['id'] + '.json'), root / (j['id'] + '.pending')
         if dest.exists():
             continue
         if pending.exists():
             raise SystemExit(f'uncertain call for {j["id"]}: reconcile by hand, never retry')
         cost = TEXTRACT_PAGE if route == 'textract' else 0.
-        spent = sum(e['cost'] for e in ledger())
-        if spent + cost > CAP:
-            raise SystemExit(f'cap: ${spent:.3f} spent, ${cost:.3f} more would pass ${CAP}')
+        spent = sum(e['cost'] for e in ledger() if e['job'] in ids)
+        if spent + cost > CAPS[SET]:
+            raise SystemExit(f'cap: ${spent:.3f} spent, ${cost:.3f} more would pass ${CAPS[SET]}')
         pending.write_text(str(time.time()))
         charge({'route': route, 'job': j['id'], 'cost': cost, 'at': time.time()})
         got = call((IMAGES / (j['id'] + '.jpg')).read_bytes())
@@ -210,7 +227,7 @@ def transkribus_pages():
     """{page id: PAGE XML path} from the owner's export, keyed by the image the pack uploaded (0001_p005.jpg)."""
     import xml.etree.ElementTree as ET
     out = {}
-    for f in sorted((CACHE / 'transkribus-pack' / 'export').glob('*/*/page/*.xml')):
+    for f in sorted(f for k in sets() for f in (CACHE / PACK[k] / 'export').glob('*/*/page/*.xml')):
         img = ET.parse(f).getroot().find('p:Page', PAGE_NS).get('imageFilename')
         m = re.fullmatch(r'(?:\d+_)?(p\d+)\.jpg', img)
         assert m and m.group(1) not in out, (f, img)
@@ -246,12 +263,14 @@ def decades(tags):
 
 def cmd_report():
     import ocr_cloud_full_report as R
-    sel = selection()['jobs']; ids = {j['id'] for j in sel}
+    sel = selection()['jobs']; ids = {j['id'] for j in sel}; N = len(sel)
     by_page = {r['page']: r for r in P.rows()}
     rows = {}
     tk = transkribus_pages()
-    if tk:
-        assert set(tk) == {j['page'] for j in sel}, sorted(set(tk) ^ {j['page'] for j in sel})
+    if tk and set(tk) != {j['page'] for j in sel}:
+        assert set(tk) < {j['page'] for j in sel}, sorted(set(tk) - {j['page'] for j in sel})
+        print(f'(Transkribus export covers {len(tk)} of the {N}: not scored until every pack is back)\n')
+        tk = {}
     for j in sel:
         truth = (P.TRUTH / 'truth' / (j['page'] + '.txt')).read_text()
         a = json.loads((CACHE / 'azure' / (j['id'] + '.json')).read_text())
@@ -317,28 +336,34 @@ def cmd_report():
     print(f"\nTextract date query: answered {tally['answered']} of {N}, a four-digit year in {tally['year']}; "
           f"year matches a tagged year or decade on {tally['tag_hit']} of {tally['tag_pages']}; "
           f"inside the page's date bin on {tally['bin_hit']} of {tally['bin_pages']}")
-    print(f"ledger: ${sum(e['cost'] for e in ledger()):.3f} accounted")
+    print(f"ledger: ${sum(e['cost'] for e in ledger() if e['job'] in ids):.3f} accounted on these {N}")
 
 
-SHEET = """# Transkribus hand upload — W46.r6-spot
+SHEET = """# Transkribus hand upload — {item}
 
-The 25 images in `images/` are the same pages the Azure and Textract arms read. Free credits only; buy nothing.
+The {n} images in `images/` are the same pages the Azure and Textract arms read. Free credits only; buy nothing.
 
 1. Sign in at https://app.transkribus.org with the Stanford account.
-2. Create a collection named `W46.r6-spot` and upload all 25 images from `images/` as one document.
-3. Run text recognition with **Text Titan II**, with its layout analysis switched on, on all pages
-   (about 25 credits of the 50 free a month).
+2. Create a collection named `{item}` and upload all {n} images from `images/` as one document.
+3. Run text recognition with **{model}**, with its layout analysis switched on, on all pages
+   (about {n} credits; {credits}).
 4. When it finishes, export the document as **PAGE XML** and unzip it into `export/` beside this file.
 5. Tell a session the export is there; it scores the PAGE XML text against the truth.
 """
 
 
 def cmd_transkribus_pack():
-    pack = CACHE / 'transkribus-pack'
+    assert SET in PACK, 'pack one set at a time'
+    pack = CACHE / PACK[SET]
     (pack / 'images').mkdir(parents=True, exist_ok=True); (pack / 'export').mkdir(exist_ok=True)
-    for j in selection()['jobs']:
+    jobs = selection()['jobs']
+    for j in jobs:
         shutil.copy2(IMAGES / (j['id'] + '.jpg'), pack / 'images' / (j['page'] + '.jpg'))
-    (pack / 'README.md').write_text(SHEET)
+    (pack / 'README.md').write_text(SHEET.format(**(
+        {'item': 'W46.r6-spot', 'model': 'Text Titan II', 'credits': 'the 50 free a month'} if SET == 'spot' else
+        {'item': 'W47.wh-readers-lost-vendors-read', 'credits': 'more than the 50 free a month, so two months or '
+         'a split upload; buy nothing without asking',
+         'model': 'Text Titan I (the model the 25 were read with; not Text Titan II)'}), n=len(jobs)))
     print(pack)
 
 
