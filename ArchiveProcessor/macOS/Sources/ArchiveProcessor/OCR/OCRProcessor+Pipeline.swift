@@ -3305,6 +3305,7 @@ extension OCRProcessor {
         activeRunHistory?.dateImageEveryDocument = frozen.values[SettingsKey.dateImageEveryDocument.rawValue]?
             .value.bool ?? false
         activeRunHistory?.sidecars = enableSegmentJSON
+        activeRunHistory?.setNamesEstimate(taggingMode: taggingMode) { frozen.values[$0.rawValue]?.value }
         activeRunHistory?.outputDirectory = outputDirectory
         activeRunToRecord = resumingMixedPDF == nil
             ? PendingCollectionRecord(snapshot: frozen, outputDirectory: outputDirectory, fileCount: files.count) : nil

@@ -1083,7 +1083,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a run with names ranked on a box with letters, its calls by kind against the estimate's
   terms (the item-fields driver's part 6 counts them the same way).
 - **Would clear it:** names are never ranked in a run the estimate prices, or the call is free on every route.
-- **Status:** `reproduced` — independently confirmed by `W49.proc-s044-check`; fix queued as `W49.proc-fix-s044`; [independent evidence](evidence/processor/W49.proc-s044-check.md); [`evidence/processor/W49.proc-s044-reproduce.md`](evidence/processor/W49.proc-s044-reproduce.md), `ArchiveProcessor/scripts/repro-s044-names.sh`
+- **Status:** `cleared` — fixed by `W49.proc-fix-s044`; regression `NamesEstimateJourneyUITests`; [independent evidence](evidence/processor/W49.proc-s044-check.md); [`evidence/processor/W49.proc-s044-reproduce.md`](evidence/processor/W49.proc-s044-reproduce.md), `ArchiveProcessor/scripts/repro-s044-names.sh`
 - **History:**
   - 2026-11-20 W49.proc-fix-s041 — raised.
   - 2026-11-20 owner walkthrough of 13:42 (call 29) — queued as `W49.proc-s044-reproduce` under phase rule 5a.
@@ -1098,6 +1098,9 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     With gateway prices entered in Settings ($2/$10 per million), the estimate stays $0.0310. Real Start → review →
     Complete makes 5 requests, including one names request on the run's model; one sidecar holds entities.
     `W49.proc-fix-s044` queued; no estimator fix in this check.
+  - 2026-11-21 W49.proc-fix-s044 — ranked Names adds a $0.0015 row and raises the VM journey's total from
+    $0.0310 to $0.0325 at the stand-in gateway's $2/$10 prices. Start makes one names call and writes its
+    sidecar on the same journey.
 
 ### S-045 · A failed tagging call in Live Capture is filed silently
 

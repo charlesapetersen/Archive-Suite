@@ -21,7 +21,7 @@ final class NamesEstimateJourneyUITests: XCTestCase {
 
     override func tearDown() async throws { app?.terminate(); app = nil }
 
-    func testNamesRankedByInterviewAddsUnestimatedCall() throws {
+    func testNamesRankedByInterviewAddsEstimatedCall() throws {
         let initialCalls = try gatewayCalls()
         let input = scratch.appendingPathComponent("in"), output = scratch.appendingPathComponent("out")
         for dir in [input, output] { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
@@ -70,6 +70,8 @@ final class NamesEstimateJourneyUITests: XCTestCase {
         let before = estimateText()
         print("[s044] estimate before names: \(before)")
         XCTAssertTrue(before.contains("$0.0213"), "OCR uses the entered $2/$10 gateway prices")
+        XCTAssertFalse(before.contains("Names:"), "unranked Names adds no estimate row")
+        XCTAssertTrue(before.contains("$0.0310"))
         shot("s044-before-names")
         app.showSettingsWindow()
         XCTAssertTrue(app.showSettingsPanel("Collection"))
@@ -103,7 +105,12 @@ final class NamesEstimateJourneyUITests: XCTestCase {
         app.settingsWindow.typeKey("w", modifierFlags: .command)
         let after = estimateText()
         print("[s044] estimate after names: \(after)")
-        XCTAssertEqual(before, after, "S-044 reproduction: ranking names leaves the estimate unchanged")
+        let names = try XCTUnwrap(after.firstIndex(of: "Names:"))
+        XCTAssertEqual(after.dropFirst(names + 1).first, "$0.0015",
+                       "one estimated document × 157/299 × (925 input at $2 and 100 output at $10 per million)")
+        XCTAssertTrue(after.contains("$0.0325"), "the standard total includes the names call")
+        XCTAssertEqual(after.filter { !["Names:", "$0.0015", "$0.0325"].contains($0) },
+                       before.filter { $0 != "$0.0310" }, "ranking Names changes just its row and the total")
         shot("s044-after-names")
         let start = app.descendants(matching: .any)["ap.ocr.start"]
         XCTAssertTrue(start.waitForExistence(timeout: 10) && start.isEnabled, "real Start is enabled")
@@ -132,7 +139,7 @@ final class NamesEstimateJourneyUITests: XCTestCase {
         XCTAssertEqual(kinds["names"], 1, "one real gateway names request for the letter")
         XCTAssertEqual(entities, 1, "the names reply reached a sidecar")
         XCTAssertTrue(calls.filter { $0["kind"] == "names" }.allSatisfy { $0["model"] == "s044-priced" })
-        print("[s044] CONFIRMED: collection interview → real Start → one names request; estimate unchanged")
+        print("[s044] CONFIRMED: collection interview → real Start → one names request; estimate includes Names")
     }
 
     private func gatewayCalls() throws -> [[String: String]] {

@@ -81,13 +81,19 @@ enum ProcessingHistoryTestDriver {
         var mixed = snapshot(fileCount: 6, batch: true, reOCR: true)
         mixed.pdfFileCount = 2
         mixed.pdfPageCount = 7
+        mixed.sidecars = true
+        mixed.setNamesEstimate(taggingMode: .automatic) { key in
+            key == .priorities ? .strings([SettingsPriority.names.rawValue]) : nil
+        }
         let mixedImages = CostEstimator.estimate(
             fileCount: 4, model: model, enableTagging: true,
-            sendPreviousImage: false, contextCharCount: 0)
+            sendPreviousImage: false, contextCharCount: 0,
+            sidecars: true, namesCallShare: 157.0 / 299)
         let mixedPages = CostEstimator.estimateDirectPDFPages(pageCount: 7, model: model)
         let mixedExpected = mixedImages.totalBatch + mixedPages.totalStandard
-        check("mixed batch prices images at batch and PDF pages at standard",
-              mixedPages.totalStandard > 0 && mixedPages.taggingCost == 0
+        check("mixed batch adds names on the image route only",
+              mixedImages.namesCost > 0 && mixedPages.namesCost == 0
+                  && mixedPages.totalStandard > 0 && mixedPages.taggingCost == 0
                   && abs(mixed.makeRun(succeeded: 6).cost - mixedExpected) < 1e-9
                   && abs(CostEstimator.runTotal(images: mixedImages, directPDFPages: mixedPages, batch: true)
                          - mixedExpected) < 1e-9)

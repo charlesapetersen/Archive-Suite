@@ -428,6 +428,13 @@ final class SettingsLayerStore: ObservableObject {
         SettingsResolver(general: file.general, project: project(doc?.projectID), collection: doc?.collection)
     }
 
+    func resolver(at outputDirectory: URL?) -> SettingsResolver {
+        if let outputDirectory, case .document(let doc) = CollectionSettingsFile.read(in: outputDirectory) {
+            return resolver(for: doc)
+        }
+        return resolver(for: nil)
+    }
+
     /// Change a collection's layer in its folder, creating the document if there is none.
     @discardableResult
     func updateCollection(in outputDirectory: URL,

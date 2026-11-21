@@ -17428,3 +17428,13 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Debug build and key-free `ArchiveProcessor/scripts/test-collection-organize.sh` passed, including nested
   and top-level-only scratch reads. The prompt and entry points were checked in source. $0 spent.
   <!-- /W49.proc-s049-verify -->
+
+- [x] **W49.proc-fix-s044 — count the correspondence names call in the Cost Estimate [S]** · §Known limits are queued, accepted or asked
+  (lane: processor) (uses: build) (blocked-on: W49.proc-s044-check) — S-044 independently confirmed at baseline `f1adc8af`: `performTaggingPhase` → `EntityExtractor.extract` makes a separate text call for ranked names on correspondence with sidecars on, while `CostEstimator.estimate` and `OCRView` omit it. The real collection interview in the VM changes Names from weight 0 to ranked, with $2/$10 gateway prices entered in Settings; the estimate stays $0.0310 and Start makes one names request among five for one letter. Add and carry the names term through the estimate's callers, using the run's names policy, correspondence share and text-route prices as W49.proc-fix-s041 did for dating/item fields. Keep `NamesEstimateJourneyUITests` and its independent stand-in as the regression run; change its unchanged-estimate assertion to require the added term, and check unranked/sidecars-off/free routes. Evidence: `verification/evidence/processor/W49.proc-s044-check.md`. Nothing is fixed by the check.
+  SHIPPED 2026-11-21 (this commit). Prices the Names call on the run's text route, using the collection's
+  Names settings and the mixed benchmark's correspondence share (157 of 299 documents). The cost is included
+  in both totals, Settings, history and Live Capture's spend estimate. The independent VM journey showed
+  $0.0015 for Names, a $0.0325 total and one names request with an output sidecar. Debug build, OCR prompt,
+  entity and Live Capture, processing history, and item-field contracts passed with scratch data. They cover
+  unranked Names, sidecars off, overrides, free routes and mixed batch totals. $0 spent. No bench cache used.
+  <!-- /W49.proc-fix-s044 -->

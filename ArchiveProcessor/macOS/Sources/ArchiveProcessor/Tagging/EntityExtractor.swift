@@ -349,6 +349,29 @@ enum EntityRunPolicy {
 }
 
 extension EntityRunPolicy {
+    private static func namesRanked(_ setting: (SettingsKey) -> SettingsValue?) -> Bool {
+        setting(.priorities)?.strings?.contains(SettingsPriority.names.rawValue) == true
+    }
+
+    private static func routeDisabled(handwritten: Bool, setting: (SettingsKey) -> SettingsValue?) -> Bool {
+        let part = handwritten ? "correspondence-handwritten" : "correspondence-typed"
+        return setting(SettingsSheetModel.overrideKey("entities"))?.string == "none"
+            || setting(.override(stage: "entities", part: part))?.string == "none"
+    }
+
+    /// Before tagging tells us the format, use the mixed item-field bench as a proxy for the correspondence mix:
+    /// 141 letters, memos or telegrams in its base and clippings strata and 16 in its handwritten stratum, out
+    /// of 299 documents (`segbench-results/item-fields-retruth.md`). The Vision OCR backend does not provide a
+    /// page kind, so its text cannot pass the policy's known-typed-page check.
+    static func estimatedCallShare(taggingMode: TaggingMode, gateway: GatewayConfig?, usesLocalAgent: Bool,
+                                   usesVision: Bool, setting: (SettingsKey) -> SettingsValue?) -> Double {
+        guard taggingMode == .automatic, !usesLocalAgent, !usesVision, gateway?.isLocalModel != true,
+              namesRanked(setting) else { return 0 }
+        let typed = routeDisabled(handwritten: false, setting: setting) ? 0.0 : 141.0
+        let handwritten = routeDisabled(handwritten: true, setting: setting) ? 0.0 : 16.0
+        return (typed + handwritten) / 299.0
+    }
+
     /// The policy's inputs for one document before the tagging reply gives its `format`: the route's family, who read
     /// each page (Apple Vision or a model), each page's kind, whether the collection ranks names and whether the user
     /// chose no names for the stage. `results` holds each page's OCR result (nil when the run has none for it);
@@ -375,17 +398,14 @@ extension EntityRunPolicy {
         } else {
             source = .reader
         }
-        let ranked = values[SettingsKey.priorities.rawValue]?.value.strings?
-            .contains(SettingsPriority.names.rawValue) ?? false
+        let setting = { (key: SettingsKey) in values[key.rawValue]?.value }
         // "No names" on the Names card is stored for the whole stage (`SettingsSheetModel.overrideKey`); a per-part key
         // is read too. Any other route chosen there is not read: the names call takes the run's text route.
-        let part = kinds.contains(.handwritten) ? "correspondence-handwritten" : "correspondence-typed"
-        let routeNone = [SettingsSheetModel.overrideKey("entities"), SettingsKey.override(stage: "entities", part: part)]
-            .contains { values[$0.rawValue]?.value.string == "none" }
+        let routeNone = routeDisabled(handwritten: kinds.contains(.handwritten), setting: setting)
         // With a gateway set, LLMTextClient calls the gateway's model, whatever the provider and model say.
         let modelName = gateway?.displayName ?? model.displayName
         let route = (family == .mac ? "this Mac" : (gateway != nil ? "Gateway" : provider.rawValue)) + " · " + modelName
-        return Inputs(family: family, namesRanked: ranked, routeNone: routeNone, format: nil,
+        return Inputs(family: family, namesRanked: namesRanked(setting), routeNone: routeNone, format: nil,
                       textSource: source, pageKinds: kinds, route: route)
     }
 }

@@ -37,6 +37,7 @@ run_case() {   # name env...
     local kv vars=(ARCHIVEPROC_HEADLESS=1 "ARCHIVEPROC_TEST_BACKUP_ROOT=$WORK/backup"
         PROCESSFILES_TESTMODE=1 PROCESSFILES_TESTKEY=stand-in-key
         "PROCESSFILES_GATEWAY_URL=http://127.0.0.1:$PORT/v1" PROCESSFILES_GATEWAY_MODEL=stand-in
+        PROCESSFILES_GATEWAY_IN_PER_1M=2 PROCESSFILES_GATEWAY_OUT_PER_1M=10
         PROCESSFILES_METER=1 PROCESSFILES_CAP_USD=100 PROCESSFILES_TAGGING=automatic
         "PROCESSFILES_TESTIN=$WORK/in" "PROCESSFILES_TESTOUT=$out" "PROCESSFILES_TESTDONE=$out/DONE.txt"
         PROCESSFILES_MAXIMAGES=6 "$@")
@@ -66,7 +67,7 @@ for line in open(log, encoding='utf-8'):
     kinds[kind] += 1
 print('  calls by kind: ' + ', '.join(f'{k} {n}' for k, n in sorted(kinds.items())))
 est = dict(p.split('=', 1) for p in open(os.path.join(rd, 'estimate.txt')).read().strip().split('\t'))
-terms = [k for k in ('ocr', 'classification', 'tagging', 'dating', 'itemFields') if k in est]
+terms = [k for k in ('ocr', 'classification', 'tagging', 'dating', 'itemFields', 'names') if k in est]
 named = 0
 for p in glob.glob(os.path.join(rd, '**', '*.json'), recursive=True):
     try:

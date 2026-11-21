@@ -234,6 +234,11 @@ enum ProcessFilesTestDriver {
 
         // State the cost first, with the app's own estimator and the same inputs the Cost Estimate box uses, and
         // refuse a run whose estimate is over the spend cap. A metered run (PROCESSFILES_METER=1) must name its cap.
+        let settings = SettingsLayerStore.shared.resolver(at: runDir)
+        let namesCallShare = EntityRunPolicy.estimatedCallShare(
+            taggingMode: mode, gateway: gateway, usesLocalAgent: localAgent != nil,
+            usesVision: provider == .appleVision,
+            setting: { settings.resolve($0).value })
         let estimate = CostEstimator.estimate(
             fileCount: inputs.count, model: model, enableTagging: mode.llmTags,
             sendPreviousImage: false, contextCharCount: 0, imageScale: 1.0, rotationMode: .off,
@@ -241,13 +246,15 @@ enum ProcessFilesTestDriver {
             imageTokenProvider: gateway != nil ? (LLMProvider(rawValue: env["PROCESSFILES_GATEWAY_UPSTREAM"] ?? "") ?? .gemini) : nil,
             measuredRoute: DateRoute.measuredRoute(gateway: gateway, usesLocalAgent: false),
             dateImageEveryDocument: DateRoute.imageEveryDocument(SettingsLayerStore.shared.resolver(for: nil)),
-            sidecars: true)
+            sidecars: true, namesCallShare: namesCallShare)
         let metered = env[Self.meterEnvKey] == "1"
         let capUSD = env["PROCESSFILES_CAP_USD"].flatMap(Double.init)
         writeMarker(runDir.appendingPathComponent("estimate.txt").path,
                     "files=\(inputs.count)\tmodel=\(model.id)\tocr=\(estimate.ocrFormatted)\tclassification=\(estimate.classificationFormatted)"
                     + "\ttagging=\(estimate.taggingFormatted)\tdating=\(estimate.datingFormatted)"
-                    + "\titemFields=\(estimate.itemFieldFormatted)\ttotal=\(estimate.totalStandardFormatted)"
+                    + "\titemFields=\(estimate.itemFieldFormatted)"
+                    + (estimate.namesCost > 0 ? "\tnames=\(estimate.namesFormatted)" : "")
+                    + "\ttotal=\(estimate.totalStandardFormatted)"
                     + (batch || storedBatchFlag ? "\tbatch=\(CostEstimate.money(estimate.totalBatch))" : "")
                     + "\tcap=\(capUSD.map(CostEstimate.money) ?? "none")\n")
         if gateway != nil && !metered {

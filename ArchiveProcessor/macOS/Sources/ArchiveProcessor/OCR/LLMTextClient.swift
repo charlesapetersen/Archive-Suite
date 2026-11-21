@@ -93,7 +93,11 @@ enum LLMTextClient {
         return parts.compactMap { $0["text"] as? String }.joined()
     }
 
-    // The tagging/segmentation model is intentionally fixed to mistral-small-latest (cheaper), so no model param.
+    // Text completion uses Mistral Small 4 (mistral-small-latest), including for a run read by Mistral OCR.
+    // Standard prices per million tokens, checked 2026-11-21 at https://docs.mistral.ai/inference/pricing.
+    static let mistralTextRates = (input: 0.15, output: 0.60)
+
+    // The model is fixed to mistral-small-latest, so there is no model parameter.
     private static func callMistralChat(prompt: String, apiKey: String, maxTokens: Int, timeout: TimeInterval) async throws -> String {
         let endpoint = URL(string: "https://api.mistral.ai/v1/chat/completions")!
         let body: [String: Any] = [

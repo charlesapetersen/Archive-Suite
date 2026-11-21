@@ -166,6 +166,7 @@ struct OCRView: View {
     /// this store's custom models — so adding or deleting one has to re-render this view too.
     @ObservedObject private var customModelStore = CustomModelStore.shared
     @ObservedObject private var modelStore = ModelSelectionStore.shared
+    @ObservedObject private var settingsStore = SettingsLayerStore.shared
 
     init(processor: OCRProcessor) {
         _processor = ObservedObject(wrappedValue: processor)
@@ -262,6 +263,10 @@ struct OCRView: View {
             ? pageReaderPlan.ocrCostDelta(runModel: effectiveModel, imageScale: imageScale / 100.0,
                                           sendPreviousImage: sendPreviousImage && segmentationPlan.usesPerPageClassifier,
                                           contextCharCount: Int(contextCharCount)) : 0
+        let settings = settingsStore.resolver(at: outputDirectory)
+        let namesCallShare = EntityRunPolicy.estimatedCallShare(
+            taggingMode: taggingMode, gateway: currentGatewayConfig, usesLocalAgent: useLocalAgent,
+            usesVision: useAppleVision, setting: { settings.resolve($0).value })
         return CostEstimator.estimate(
             fileCount: imageFileCount,
             model: model,
@@ -278,13 +283,14 @@ struct OCRView: View {
             gatewayRotation: gatewayRotation,
             measuredRoute: DateRoute.measuredRoute(gateway: useGateway ? currentGatewayConfig : nil,
                                                    usesLocalAgent: useLocalAgent),
-            dateImageEveryDocument: dateImageEveryDocument,
-            sidecars: enableSegmentJSON
+            dateImageEveryDocument: DateRoute.imageEveryDocument(settings),
+            sidecars: enableSegmentJSON,
+            namesCallShare: namesCallShare
         ).addingOCR(readersDelta)
     }
 
-    /// The dating route's and the item fields' lines of the Cost Estimate box (W49.proc-fix-s041), each where it costs.
-    @ViewBuilder private func datingRows(_ est: CostEstimate) -> some View {
+    /// The separate tagging-related calls shown in the Cost Estimate when they have a price.
+    @ViewBuilder private func taggingCallRows(_ est: CostEstimate) -> some View {
         if est.datingCost > 0 {
             HStack {
                 Text("Dating:").foregroundStyle(.primary)
@@ -299,13 +305,13 @@ struct OCRView: View {
                 Text(est.itemFieldFormatted)
             }
         }
-    }
-
-    /// The Dates card's switch for this run's output folder: its collection, its project and the general layer.
-    private var dateImageEveryDocument: Bool {
-        var doc: CollectionSettingsDocument?
-        if let outDir = outputDirectory, case .document(let d) = CollectionSettingsFile.read(in: outDir) { doc = d }
-        return DateRoute.imageEveryDocument(SettingsLayerStore.shared.resolver(for: doc))
+        if est.namesCost > 0 {
+            HStack {
+                Text("Names:").foregroundStyle(.primary)
+                Spacer()
+                Text(est.namesFormatted)
+            }
+        }
     }
 
     /// Direct per-page calls for the dropped multi-page PDFs, priced with the model that OCRs them.
@@ -763,7 +769,7 @@ struct OCRView: View {
                                         Text(est.taggingFormatted)
                                     }
                                 }
-                                datingRows(est)
+                                taggingCallRows(est)
                                 if enableCollectionSegmentation {
                                     HStack {
                                         Text("Collection ID:").foregroundStyle(.primary)
@@ -868,7 +874,7 @@ struct OCRView: View {
                                         Text(est.taggingFormatted)
                                     }
                                 }
-                                datingRows(est)
+                                taggingCallRows(est)
                                 if enableCollectionSegmentation {
                                     HStack {
                                         Text("Collection ID:").foregroundStyle(.primary)

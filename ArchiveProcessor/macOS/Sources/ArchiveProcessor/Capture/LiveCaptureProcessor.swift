@@ -2372,7 +2372,7 @@ final class LiveCaptureProcessor: ObservableObject {
             // run of them. Filed pages only, so a finalize retried after a failure counts each page once.
             // The markers' label calls are added to the folder's pages (W47.ct-label-cost).
             if let config, let filedPages = pages[folder.standardizedFileURL.path] {
-                store.recordSpend(usd: Self.estimatedSpend(config, pages: filedPages)
+                store.recordSpend(usd: Self.estimatedSpend(config, pages: filedPages, namesSettings: liveSettings(config))
                                       + (labels[folder.standardizedFileURL.path] ?? 0),
                                   runID: snapshot.runID, outputDirectory: folder, files: count)
             }
@@ -2398,7 +2398,8 @@ final class LiveCaptureProcessor: ObservableObject {
 
     /// The list-price estimate for `pages` pages read with the session's settings, by the same math as the
     /// processing history (a Local Agent session costs nothing; Apple Vision alone costs nothing).
-    static func estimatedSpend(_ config: SessionProcessingConfig, pages: Int) -> Double {
+    private static func estimatedSpend(_ config: SessionProcessingConfig, pages: Int,
+                                       namesSettings: [String: ResolvedSetting]) -> Double {
         guard pages > 0 else { return 0 }
         var snapshot = RunHistorySnapshot(
             startedAt: Date(), provider: config.provider, gatewayConfig: config.gateway, localAgent: config.localAgent,
@@ -2411,9 +2412,9 @@ final class LiveCaptureProcessor: ObservableObject {
         )
         // The dating and item-field terms (W49.proc-fix-s041), with the switches `liveDating` and `liveItemFields` read.
         snapshot.sidecars = config.enableSegmentJSON
-        var doc: CollectionSettingsDocument?
-        if case .document(let d) = CollectionSettingsFile.read(in: config.outputDirectory) { doc = d }
-        snapshot.dateImageEveryDocument = DateRoute.imageEveryDocument(SettingsLayerStore.shared.resolver(for: doc))
+        let settings = SettingsLayerStore.shared.resolver(at: config.outputDirectory)
+        snapshot.dateImageEveryDocument = DateRoute.imageEveryDocument(settings)
+        snapshot.setNamesEstimate(taggingMode: config.taggingMode) { namesSettings[$0.rawValue]?.value }
         return snapshot.estimatedCost
     }
 

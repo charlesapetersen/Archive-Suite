@@ -50,6 +50,7 @@ enum EntityFeatureTestDriver {
         evidenceCases()
         parsing()
         policy()
+        namesEstimate()
         sidecar()
         await endToEnd()
         await liveCapture()
@@ -159,6 +160,51 @@ enum EntityFeatureTestDriver {
               P.withholdsTaggingSender(inputs(ranked: false, source: .vision))
               && P.withholdsTaggingSender(inputs(.plan, source: .unknown))
               && !P.withholdsTaggingSender(inputs(ranked: false, source: .reader)))
+    }
+
+    private static func namesEstimate() {
+        var gateway = GatewayConfig(baseURL: "http://127.0.0.1/v1", modelID: "priced", displayName: "Priced",
+                                    inputCostPer1M: 2, outputCostPer1M: 10)
+        var settings: [SettingsKey: SettingsValue] = [.priorities: .strings([SettingsPriority.names.rawValue])]
+        func share(mode: TaggingMode = .automatic, plan: Bool = false, vision: Bool = false) -> Double {
+            EntityRunPolicy.estimatedCallShare(taggingMode: mode, gateway: gateway, usesLocalAgent: plan,
+                                               usesVision: vision, setting: { settings[$0] })
+        }
+        func estimate(share: Double, sidecars: Bool = true, model: LLMModel? = nil) -> CostEstimate {
+            CostEstimator.estimate(fileCount: 300, model: model ?? gateway.asLLMModel(), enableTagging: true,
+                                   sendPreviousImage: false, contextCharCount: 0,
+                                   sidecars: sidecars, namesCallShare: share)
+        }
+        let base = estimate(share: 0)
+        let expected = 100 * (157.0 / 299) * 0.00285
+        let ranked = estimate(share: share())
+        check("3 names estimate: one priced text call per expected correspondence document",
+              abs(ranked.namesCost - expected) < 1e-9)
+        check("3 names estimate: the same addition to standard and batch totals and retained after OCR adjustments",
+              abs(ranked.totalStandard - base.totalStandard - expected) < 1e-9
+              && abs(ranked.totalBatch - base.totalBatch - expected) < 1e-9
+              && ranked.addingOCR(1).namesCost == ranked.namesCost)
+        check("3 names estimate: sidecars off is zero", estimate(share: share(), sidecars: false).namesCost == 0)
+        check("3 names estimate: Auto date and subscription are zero", share(mode: .autoDate) == 0 && share(plan: true) == 0)
+        check("3 names estimate: Vision supplies no page kind for the names policy", share(vision: true) == 0)
+        let mistral = LLMModel.mistralModels[0]
+        let mistralText = 100 * (157.0 / 299) * (925 * 0.15 + 100 * 0.60) / 1_000_000
+        check("3 names estimate: Mistral Small text prices are separate from Mistral OCR",
+              abs(estimate(share: share(), model: mistral).namesCost - mistralText) < 1e-9)
+        let vision = LLMProvider.appleVision.models.first!
+        check("3 names estimate: transcription-only Vision is free", estimate(share: share(), model: vision).namesCost == 0)
+        gateway.localModel = true
+        check("3 names estimate: this Mac is free even with stored token prices", share() == 0)
+        gateway.localModel = false
+        gateway.inputCostPer1M = 0
+        gateway.outputCostPer1M = 0
+        check("3 names estimate: zero-price text routes are free", estimate(share: share()).namesCost == 0)
+        settings[.override(stage: "entities", part: "correspondence-handwritten")] = .string("none")
+        check("3 names estimate: a per-part override excludes that part", share() == 141.0 / 299)
+        settings[SettingsSheetModel.overrideKey("entities")] = .string("none")
+        check("3 names estimate: No names excludes all correspondence", share() == 0)
+        settings = [.priorities: .strings([SettingsPriority.dates.rawValue])]
+        check("3 names estimate: unranked is zero", share() == 0)
     }
 
     // MARK: 4. The sidecar

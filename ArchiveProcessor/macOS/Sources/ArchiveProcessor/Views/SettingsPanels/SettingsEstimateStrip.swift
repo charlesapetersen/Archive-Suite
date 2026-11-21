@@ -27,7 +27,9 @@ struct SettingsEstimateStrip: View {
     @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
     @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = true
     @AppStorage(DefaultsKeys.contextCharCount) private var contextCharCount: Double = 0   // context slider removed; kept 0 (parallel OCR)
+    @AppStorage(DefaultsKeys.outputDirectory) private var outputPath: String = ""
     @ObservedObject private var modelStore = ModelSelectionStore.shared
+    @ObservedObject private var settingsStore = SettingsLayerStore.shared
     @State private var openRouterPricesRead = 0
 
     private var models: [LLMModel] {
@@ -87,6 +89,14 @@ struct SettingsEstimateStrip: View {
                              inputCostPer1M: gatewayInputCost, outputCostPer1M: gatewayOutputCost).asLLMModel()
     }
 
+    private var outputFolder: URL? {
+        _ = outputPath
+        #if DEBUG
+        if let folder = ProcessorUITestConfiguration.outputDirectory { return folder }
+        #endif
+        return ModelSelectionStore.savedOutputDirectory()
+    }
+
     var body: some View {
         costPane
             .onAppear { segmentationRoutes = SegmentationRoutes.currentPreselecting() }
@@ -119,6 +129,11 @@ struct SettingsEstimateStrip: View {
                 Text("OpenRouter's listing gives no price for this model, so there is no cost estimate and no price ceiling.")
                     .font(.caption).foregroundStyle(.primary)
             } else if let model = useGateway ? gatewayModel : selectedModel {
+                let gateway = GatewayConfig.fromDefaults()
+                let settings = settingsStore.resolver(at: outputFolder)
+                let namesCallShare = EntityRunPolicy.estimatedCallShare(
+                    taggingMode: taggingMode, gateway: gateway, usesLocalAgent: false, usesVision: false,
+                    setting: { settings.resolve($0).value })
                 let est = CostEstimator.estimate(
                     fileCount: 1000, model: model, enableTagging: tagging,
                     enableCollectionSegmentation: enableCollectionSegmentation,
@@ -126,10 +141,9 @@ struct SettingsEstimateStrip: View {
                     contextCharCount: Int(contextCharCount), imageScale: imageScale / 100.0,
                     rotationMode: rotationMode, useGateway: useGateway,
                     imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil, gatewayRotation: gatewayRotation,
-                    measuredRoute: DateRoute.measuredRoute(gateway: useGateway ? GatewayConfig.fromDefaults() : nil,
-                                                           usesLocalAgent: useLocalAgent),
-                    dateImageEveryDocument: DateRoute.imageEveryDocument(SettingsLayerStore.shared.resolver(for: nil)),
-                    sidecars: enableSegmentJSON)
+                    measuredRoute: DateRoute.measuredRoute(gateway: gateway, usesLocalAgent: false),
+                    dateImageEveryDocument: DateRoute.imageEveryDocument(settingsStore.resolver(for: nil)),
+                    sidecars: enableSegmentJSON, namesCallShare: namesCallShare)
                 let time = TimeEstimator.estimate(
                     fileCount: 1000, model: model, rotationMode: rotationMode,
                     sequentialOCR: contextCharCount > 0, enableTagging: tagging,
@@ -151,6 +165,7 @@ struct SettingsEstimateStrip: View {
                 if tagging { costRow("· Tagging", est.taggingFormatted) }
                 if est.datingCost > 0 { costRow("· Dating", est.datingFormatted) }
                 if est.itemFieldCost > 0 { costRow("· Item fields", est.itemFieldFormatted) }
+                if est.namesCost > 0 { costRow("· Names", est.namesFormatted) }
                 if enableCollectionSegmentation { costRow("· Collection", est.collectionFormatted) }
                 if let row = segmentationRow { costRow("· Segmentation", row.costSummary) }
 

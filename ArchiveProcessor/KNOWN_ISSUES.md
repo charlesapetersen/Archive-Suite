@@ -8,13 +8,11 @@ The README now describes the **Read the folders inside?** prompt for a folder wi
 Verified at baseline `37dbe229` in `OCRView.admit`, `OCRView.answer`, and `ProcessFilesTree.collect`
 (W49.proc-s049-verify).
 
-## ⚠️ LIMITATION (S-044, independently checked 2026-11-21): the Cost Estimate omits correspondence names
+## FIXED (S-044, 2026-11-21) — the Cost Estimate includes correspondence names
 
-- With names ranked in the collection interview, Automatic tagging and sidecars on, `performTaggingPhase`
-  calls `EntityExtractor.extract` separately for correspondence. `CostEstimator.estimate` has no names term.
-  `W49.proc-s044-check` independently reproduced the user path in the offscreen VM: a nonzero $0.0310 estimate
-  before and after ranking names, then one names request among five for a single letter, with entities in its
-  sidecar. Evidence: `verification/evidence/processor/W49.proc-s044-check.md`. (queued: W49.proc-fix-s044)
+With Automatic tagging, ranked Names and JSON sidecars, the estimate prices the expected names calls on the
+run's text route. The Names row contributes to both the standard and batch totals. The same term is included
+in run history and Live Capture's spend estimate (W49.proc-fix-s044).
 
 ## ⚠️ LIMITATION (W49.proc-resume-standard-runs, 2026-11-20): what an interrupted standard run can still lose
 

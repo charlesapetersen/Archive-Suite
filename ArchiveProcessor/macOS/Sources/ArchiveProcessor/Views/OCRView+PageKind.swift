@@ -151,7 +151,8 @@ extension CostEstimate {
     func addingOCR(_ delta: Double) -> CostEstimate {
         CostEstimate(ocrCost: max(0, ocrCost + delta), classificationCost: classificationCost, taggingCost: taggingCost,
                      collectionCost: collectionCost, rotationCost: rotationCost, batchOcrCost: batchOcrCost,
-                     fileCount: fileCount, model: model, datingCost: datingCost, itemFieldCost: itemFieldCost)
+                     fileCount: fileCount, model: model, datingCost: datingCost, itemFieldCost: itemFieldCost,
+                     namesCost: namesCost)
     }
 }
 

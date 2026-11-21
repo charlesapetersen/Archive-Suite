@@ -13,9 +13,10 @@ struct CostEstimate {
     /// (`ItemFieldExtractor.extract`), which go out after tagging and are never batched.
     var datingCost: Double = 0
     var itemFieldCost: Double = 0
+    var namesCost: Double = 0
 
     private var afterOCR: Double {
-        classificationCost + taggingCost + collectionCost + rotationCost + datingCost + itemFieldCost
+        classificationCost + taggingCost + collectionCost + rotationCost + datingCost + itemFieldCost + namesCost
     }
     var totalStandard: Double { ocrCost + afterOCR }
     var totalBatch: Double { batchOcrCost + afterOCR }
@@ -29,6 +30,7 @@ struct CostEstimate {
     var rotationFormatted: String { Self.money(rotationCost) }
     var datingFormatted: String { Self.money(datingCost) }
     var itemFieldFormatted: String { Self.money(itemFieldCost) }
+    var namesFormatted: String { Self.money(namesCost) }
     var totalStandardFormatted: String { Self.money(totalStandard) }
 }
 
@@ -107,6 +109,11 @@ struct CostEstimator {
     /// documents of 627 pages (`segbench-results/item-fields-retruth.md`, "Spend"), so it is priced by the page.
     static let gatewayItemFieldPageCost = 1.00 / 627
 
+    // One names call on the run's text route. W46's 3,000-character prompt averaged 924 input tokens on
+    // Gemini 3.8 Flash, whose reasoning averaged 820 tokens (ent-8k-paired.md). Allow 100 for the JSON reply.
+    static let estimatedNamesInputTokens = 925.0
+    static let estimatedNamesOutputTokens = 100.0
+
     // Collection segmentation: text-only calls (~500 input + 50 output per box, plus one clustering call)
     static let estimatedCollectionInputTokens: Double = 500
     static let estimatedCollectionOutputTokens: Double = 50
@@ -174,8 +181,10 @@ struct CostEstimator {
         measuredRoute: Bool = false,
         /// The Dates card's "image on every document" switch (`SettingsKey.dateImageEveryDocument`).
         dateImageEveryDocument: Bool = false,
-        /// The run writes JSON sidecars, the item fields' only output (`ItemFieldPolicy.skipReason`).
-        sidecars: Bool = false
+        /// The run writes JSON sidecars, which hold the item fields and correspondence names.
+        sidecars: Bool = false,
+        /// Fraction of tagged documents expected to make the names call (`EntityRunPolicy.estimatedCallShare`).
+        namesCallShare: Double = 0
     ) -> CostEstimate {
         // Apple Vision is an in-process macOS framework. It never calls a provider and the V1 backend
         // exposes only transcription / source-tag copying, so every estimated dollar component is $0.
@@ -216,12 +225,21 @@ struct CostEstimator {
         var taggingCost: Double = 0
         var datingCost: Double = 0
         var itemFieldCost: Double = 0
+        var namesCost: Double = 0
         if enableTagging {
             let estimatedSegments = estimatedDocuments(fileCount)
             let tagInput = estimatedSegments * estimatedTaggingInputTokens
             let tagOutput = estimatedSegments * estimatedTaggingOutputTokens
             taggingCost = (tagInput / 1_000_000) * model.inputCostPer1M
                         + (tagOutput / 1_000_000) * model.outputCostPer1M
+            if sidecars, namesCallShare > 0 {
+                let namesCalls = estimatedSegments * namesCallShare
+                let reasoning = model.measuredModel.id == "gemini-3.8-flash" ? 820.0 : 0
+                let rates = model.provider == .mistral
+                    ? LLMTextClient.mistralTextRates : (input: model.inputCostPer1M, output: model.outputCostPer1M)
+                namesCost = namesCalls * (estimatedNamesInputTokens * rates.input
+                    + (estimatedNamesOutputTokens + reasoning) * rates.output) / 1_000_000
+            }
             // Each tagged document's date, then its item fields (`performTaggingPhase`).
             if measuredRoute {
                 let imageShare = dateImageEveryDocument ? 1.0 : dateImageShare
@@ -268,7 +286,8 @@ struct CostEstimator {
             fileCount: fileCount,
             model: model,
             datingCost: datingCost,
-            itemFieldCost: itemFieldCost
+            itemFieldCost: itemFieldCost,
+            namesCost: namesCost
         )
     }
 

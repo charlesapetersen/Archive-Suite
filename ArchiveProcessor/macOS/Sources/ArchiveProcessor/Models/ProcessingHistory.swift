@@ -83,6 +83,7 @@ struct RunHistorySnapshot {
     /// The dating route's image switch and the JSON sidecars, for the dating and item-field terms (W49.proc-fix-s041).
     var dateImageEveryDocument = false
     var sidecars = false
+    var namesCallShare = 0.0
     /// Multi-page PDFs among `fileCount` and their total pages. Those pages go to `model` directly, one
     /// call each, so they are priced apart from the image subset (never at batch rates).
     var pdfFileCount: Int = 0
@@ -105,6 +106,12 @@ struct RunHistorySnapshot {
     /// the ledger's share of `makeRun` leave them out.
     var labelCalls = 0
     var labelDollars: Double = 0
+
+    mutating func setNamesEstimate(taggingMode: TaggingMode, setting: (SettingsKey) -> SettingsValue?) {
+        namesCallShare = EntityRunPolicy.estimatedCallShare(
+            taggingMode: taggingMode, gateway: gatewayConfig, usesLocalAgent: localAgent != nil,
+            usesVision: provider == .appleVision, setting: setting)
+    }
 
     /// Reserve all expanded batch requests beyond the original request the base estimate already counts.
     /// Each crop keeps its original page's previous-image context; batch discounts apply to these requests only.
@@ -151,7 +158,8 @@ struct RunHistorySnapshot {
             measuredRoute: visionTextModel == nil
                 && DateRoute.measuredRoute(gateway: gatewayConfig, usesLocalAgent: localAgent != nil),
             dateImageEveryDocument: dateImageEveryDocument,
-            sidecars: sidecars
+            sidecars: sidecars,
+            namesCallShare: namesCallShare
         )
         return CostEstimator.runTotal(images: est, directPDFPages: pdfPages, batch: batchMode) + newspaperBatchExtraCost
     }
@@ -286,6 +294,7 @@ extension RunHistorySnapshot {
         dateImageEveryDocument = run.resolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
             .value.bool ?? false
         sidecars = run.enableSegmentJSON
+        setNamesEstimate(taggingMode: taggingMode) { run.resolvedSettings?.values[$0.rawValue]?.value }
     }
 
     /// Build a history snapshot for a RESUMED batch run from its persisted manifest plus the live
@@ -319,6 +328,8 @@ extension RunHistorySnapshot {
             pdfSources: batch.mixedPDFOutcomes?.map(\.sourceURL) ?? [],
             pdfHalfRead: batch.mixedPDFOutcomes != nil
         )
+        sidecars = batch.enableSegmentJSON
+        setNamesEstimate(taggingMode: batch.taggingMode) { batch.resolvedSettings?.values[$0.rawValue]?.value }
         reserveNewspaperBatch(batch.newspaperManifest)
     }
 }

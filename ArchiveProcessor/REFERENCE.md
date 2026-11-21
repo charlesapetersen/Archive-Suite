@@ -89,6 +89,11 @@ For models that support low/high thinking, include a dropdown: Low / High.
   image switch on), and the item fields by the page, at the bench's measured gateway figures. Neither is batched.
   Process Files' Cost Estimate box shows them as "Dating" and "Item fields", Settings as "· Dating" and "· Item fields";
   the run history and Live Capture's ledger entry count them the same way
+- **Names** adds one interactive text call per expected eligible correspondence document when Automatic tagging
+  and JSON sidecars are on and the collection ranks Names. It uses the text route's prices and estimates the
+  correspondence share from the mixed item-field bench (157 of 299 documents). Overrides for either type of
+  correspondence remove its share. Standard and batch totals, run history and Live Capture's ledger include it
+  (W49.proc-fix-s044).
 
 ### Batch Processing
 - Toggle button to enable batch mode
