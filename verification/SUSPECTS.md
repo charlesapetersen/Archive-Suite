@@ -1102,6 +1102,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-fix-s042 — raised.
+  - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s045-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+
 
 ### S-046 · "Review document segmentation" changes nothing on a fresh Process Files run
 
@@ -1120,6 +1122,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
+  - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s046-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+
 
 ### S-047 · Windows that split a letter the OCR read as one document drop its enclosure's `Sent With`
 
@@ -1137,6 +1141,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
+  - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s047-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+
 
 ### S-048 · Adding a file Process Files already lists adds it again
 
@@ -1151,6 +1157,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
+  - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s048-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+
 
 ### S-049 · The Processor README says a chosen folder is read only at its top level
 
@@ -1164,6 +1172,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
+  - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s049-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+
 
 ### S-050 · Resuming an interrupted (non-batch) run also skips the per-page review and the box/folder confirmation
 
@@ -1178,6 +1188,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
+  - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s050-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+
 
 ### S-051 · A batch create refused outright is reported as an uncertain submission
 
@@ -1192,6 +1204,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-suspects-money — raised.
+  - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s051-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+
 
 ### S-052 · Label reads that fail are counted as read
 
@@ -1205,6 +1219,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-suspects-messages — raised.
+  - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s052-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+
 
 ### S-053 · The label reader asks any gateway for GPT 5.6 Luna
 
@@ -1218,3 +1234,4 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open`
 - **History:**
   - 2026-11-20 W49.proc-suspects-messages — raised.
+  - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s053-verify`; standing authorization for all bug suspects, phase rule 5a retained.

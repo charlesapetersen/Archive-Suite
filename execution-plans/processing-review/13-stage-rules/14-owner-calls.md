@@ -242,6 +242,24 @@ calls are section 1.
     reproduced under phase rule 5a (W49.notes-s043-reproduce, W49.proc-s044-reproduce). Sherlock family-coverage batch
     still pending on priority (11 GPU jobs, fair-share 0.32; 11 public nodes have 48 or 80 GB cards), nothing failed.
 
+30. **The walkthrough of 2026-11-21, begun 08:46.** Reader cloud-only PDFs: match Notes, showing "This PDF is in
+    the cloud" with **Download and Show** before materializing an explicitly opened PDF. Selection, thumbnails and
+    neighbor prefetch do not download. S-002's independent check still precedes the fix. Resume (S-035 and S-050):
+    **skip only reviews the user already explicitly skipped; otherwise show the applicable reviews**, for paid
+    batch and ordinary interrupted runs. Resume alone is not permission to omit reviews. Collection ID (S-034):
+    keep Box/Folder label markers under No tagging and Copy source tags, **preserve every copied source tag**, and
+    explain the exception in the SPEC with the fix. S-034/S-035 fixes still await W49.proc-suspects-filing-check.
+    Backlog S-045 through S-053: queue verification; **all future bug suspects are automatically queued for
+    verification without individual owner review**. Phase rule 5a and owner questions about intended behavior
+    remain. New verification tags: W49.proc-s045-verify through W49.proc-s053-verify. No feature wish was approved
+    by this blanket instruction. The new storage analysis f1adc8af arrived after this walkthrough's digest;
+    W49.storage-one-home-owner-ok remains unanswered. Sherlock checked at about 09:03: setup 52765234 completed
+    successfully in 10:10; all eleven GPU jobs still pending, six on priority/resources and five on dependencies;
+    no failed job and no scheduler start estimate. Nothing resubmitted.
+    Disk cleanup: 11 MB of rebuildable uv downloads moved to Trash; available space including purgeable
+    measured 100.1 GiB before and after. Both retired worktrees remain for unfinished items; rehearsal,
+    model and dewarp inputs remain for open work. No backup handoff prepared.
+
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
 Each is a table default or a filed item, reversible without app work; the figures and files are in the note named.

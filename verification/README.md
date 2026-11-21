@@ -119,6 +119,10 @@ journey. Suspects never become queue items directly. A reproduce attempt follows
 (`execution-plans/verification-phase/01-daemon-plan.md`, owner 2026-11-20): user's path, an independent check of
 any reproduction before a fix, one attempt, nothing new fixed directly.
 
+Owner, 2026-11-21 (call 30): queue verification for every new bug suspect automatically; no
+individual walkthrough approval is needed. Phase rule 5a still applies, including a different-model
+independent check where required and an owner question for genuinely intended behavior.
+
 One `###` section per suspect, newest at the bottom:
 
 ```markdown

@@ -156,6 +156,16 @@ else
   fails=$((fails+1))
 fi
 
+# Owner call 30 (2026-11-21): bug suspects go straight to verification, with phase rule 5a retained.
+if grep -qF 'without asking the owner to review them individually' CLAUDE.md \
+   && grep -qF 'queue verification for every new bug suspect' verification/README.md \
+   && grep -qF 'without an individual walkthrough question' execution-plans/verification-phase/01-daemon-plan.md; then
+  printf '  %s bug-suspect-verification-authorized\n' "$(green '✓')"
+else
+  printf '  %s bug-suspect-verification-authorized — restore owner call 30 in the guides\n' "$(red '✗')"
+  fails=$((fails+1))
+fi
+
 printf '\n'
 if [ "$fails" -gt 0 ]; then
   printf '%s — %d rule(s) violated. Fix the prose, or change the rule here IN THE SAME COMMIT and say why.\n' \

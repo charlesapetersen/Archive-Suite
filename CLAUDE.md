@@ -325,7 +325,10 @@ Three tiers, so nothing sprawls or goes stale:
   2026-11-19):** the walkthrough digest's "Backlog entries" shows each new entry once (Agent Manager `backlogs.json`,
   which also registers `verification/SUSPECTS.md`, `FUTURE_FEATURES.md` and `execution-plans/paid-runs-deferred.md`);
   a new file of this kind is registered there in the same change. An entry that would change what users get today
-  is an item or an owner question, not a wish.
+  is an item or an owner question, not a wish. **Bug suspects (owner, 2026-11-21, call 30): automatically queue
+  verification for all new suspects, without asking the owner to review them individually. Phase rule 5a still
+  governs reproduction, independent checks and fixes; ask only a genuine intended-behavior question or another
+  owner-only choice. Feature wishes retain the walkthrough review.**
 - **In-flight progress notes → `execution-plans/items/<TAG>.md`** — checkpoint notes, session notes and saved-draft branches for one open item, written by its claimant; the `SUITE_TODO.md` entry carries only a pointer line, never the notes (they made that shared file a rebase-conflict hotspot). Deleted when the item ships, useful lines folded into its `SUITE_TODO_DONE.md` entry. Detail: `ops/autonomous/README.md` §L2.
 - **Short-term execution plans → `execution-plans/`** (root) — one detailed plan per in-flight feature, tracked from `SUITE_TODO.md`; **delete a plan once its feature ships** (git keeps the history). Don't let shipped plans linger.
 

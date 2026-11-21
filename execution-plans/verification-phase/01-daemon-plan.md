@@ -58,6 +58,9 @@ mirrored by the `W40` section of `SUITE_TODO.md`, tags byte-identical. `next-que
    (5) one attempt: if it does not reproduce, clear it in SUSPECTS.md with the evidence, and anything new noticed on
    the way is written down as a suspect, never fixed directly; (6) a fix follows the usual review, with the reproducing
    run kept as its test. A suspect seen in a real run already has its reproduction and skips (1)-(4).
+   **Standing authorization (owner, 2026-11-21, call 30):** queue verification for every new bug suspect
+   without an individual walkthrough question. This changes who authorizes the attempt, not steps (1)-(6):
+   intended-behavior questions still go to the owner and confirmed fixes keep their normal checks.
 6. **Builder is not verifier.** The session that fixes a bug or wires a feature may move its ledger row only to
    `fixed-pending-recheck`. A later, separate item (`W40.h2`, or the next journey re-run) moves it to `works`.
 7. **Feature freeze, per area (owner, 2026-10-07: "Start the independent parts now").** No new features in this
