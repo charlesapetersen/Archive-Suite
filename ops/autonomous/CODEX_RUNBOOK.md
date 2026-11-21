@@ -72,7 +72,8 @@ After that, "Continue" is enough to resume after an interruption.
      that is how the next session finds prior work on an item. Add a body saying what was verified and a
      trailer naming the agent and model, for example `Agent: Codex (<model>)`.
 
-   Then `git pull --rebase origin main` and `git push origin HEAD:main`.
+   Then publish using the [approved helper](../../CLAUDE.md#worktree-first--mandatory-before-any-edit-every-agent--instance).
+   Use the same helper for checkpoint commits.
 7. **Record.** Immediately after the push, and not before it, tick the item in the primary checkout's
    `.maintenance/AUTONOMOUS_PLAN.md` (`[x]`, the sha and a one-line result) and append a line to its
    Session Log. The plan is gitignored, so this edit is invisible to git and the easiest step to forget. The

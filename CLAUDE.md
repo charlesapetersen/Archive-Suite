@@ -128,8 +128,12 @@ else
 fi
 ```
 Then do **all** edits, builds, and commits from that worktree (use its absolute paths for Read/Edit/Write),
-and run `xcodegen generate` there before building (the `.xcodeproj` is gitignored). Push as normal — every
-worktree shares one `origin/main`. **When your task is pushed, remove your own worktree** so they don't pile
+and run `xcodegen generate` there before building (the `.xcodeproj` is gitignored). Every worktree shares one
+`origin/main`. **Publish verified Archive Suite commits from the root of your clean linked worktree** by
+running `/Users/cp1/.local/libexec/agent-workflow publish-main` as a standalone command. The owner's standing
+approval covers this helper, which checks the repository and destination, scans the outgoing commits for
+secrets, and pushes to `main` without force. If `main` has advanced, reconcile and verify your changes before
+rerunning the helper. **When your task is pushed, remove your own worktree** so they don't pile
 up for the owner: from the primary checkout, `git worktree remove "/absolute/path/to/your/worktree"` (`./build` is gitignored,
 so it won't block); `git worktree list` / `git worktree prune` clear strays.
 

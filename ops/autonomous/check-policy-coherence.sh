@@ -147,6 +147,11 @@ must_exist "tier2-still-mandatory" 'Tier-2' 8
 # Owner, 2026-10-25: comparable gateway benchmark uploads must not acquire a new per-run permission gate.
 must_exist "benchmark-upload-standing-approval" 'Benchmark uploads are authorized \(owner, 2026-10-25\)' 1
 
+rule "no-mandatory-full-vm-suite" \
+  "run a full lane once, at the end|The full lane is the|item.s final proof, run once when the targeted runs pass" \
+  "focused VM tests are sufficient for a small fix; full app suites need a specific reason"
+must_exist "focused-vm-is-sufficient" 'Focused VM tests are sufficient for small fixes' 1
+
 # W40.root-marker(-auto): the Core Directive must disclose the owner's one root-file exception.
 # Pin its presence in the authoritative guide (another file mentioning it cannot substitute).
 if grep -qF 'One named exception: choosing a folder' ArchiveReader/CLAUDE.md \
