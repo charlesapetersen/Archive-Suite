@@ -991,7 +991,11 @@ struct GatewayConfig: Codable, Equatable {
     /// The gateway key from the Keychain. A local model always gets the placeholder: a saved key belongs to a remote
     /// gateway, and is never sent in plain http to whatever listens on this Mac's port.
     static func storedKey(localModel: Bool) -> String {
-        localModel ? LocalModelRoute.placeholderKey : (KeychainHelper.load(account: "Gateway") ?? "")
+#if DEBUG
+        // The offscreen UI journey uses only this public dummy key; never reads the owner's Keychain.
+        if !localModel, ProcessorUITestConfiguration.usesStandInGateway { return "s044-stand-in" }
+#endif
+        return localModel ? LocalModelRoute.placeholderKey : (KeychainHelper.load(account: "Gateway") ?? "")
     }
 
     static func storedKey(_ d: UserDefaults = .standard) -> String {

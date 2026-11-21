@@ -1075,7 +1075,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a run with names ranked on a box with letters, its calls by kind against the estimate's
   terms (the item-fields driver's part 6 counts them the same way).
 - **Would clear it:** names are never ranked in a run the estimate prices, or the call is free on every route.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-s044-check`); [`evidence/processor/W49.proc-s044-reproduce.md`](evidence/processor/W49.proc-s044-reproduce.md), `ArchiveProcessor/scripts/repro-s044-names.sh`
+- **Status:** `reproduced` — independently confirmed by `W49.proc-s044-check`; fix queued as `W49.proc-fix-s044`; [independent evidence](evidence/processor/W49.proc-s044-check.md); [`evidence/processor/W49.proc-s044-reproduce.md`](evidence/processor/W49.proc-s044-reproduce.md), `ArchiveProcessor/scripts/repro-s044-names.sh`
 - **History:**
   - 2026-11-20 W49.proc-fix-s041 — raised.
   - 2026-11-20 owner walkthrough of 13:42 (call 29) — queued as `W49.proc-s044-reproduce` under phase rule 5a.
@@ -1085,6 +1085,11 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     settings, 3 names calls of 23 (one per document, 3 sidecars with `entities`), without, 0 of 24; both runs' estimates
     were the same, $0.0158, with no names term. Nothing calls the omission deliberate (`EntityRunPolicy.decide` says the
     call "costs money on a cloud route"), so no owner question.
+  - 2026-11-21 W49.proc-s044-check — independently confirmed on Codex through the VM's real collection interview:
+    Names starts at weight 0, is given a positive weight and moved first while the other priorities stay ranked.
+    With gateway prices entered in Settings ($2/$10 per million), the estimate stays $0.0310. Real Start → review →
+    Complete makes 5 requests, including one names request on the run's model; one sidecar holds entities.
+    `W49.proc-fix-s044` queued; no estimator fix in this check.
 
 ### S-045 · A failed tagging call in Live Capture is filed silently
 

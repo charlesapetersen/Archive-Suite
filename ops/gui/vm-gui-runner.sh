@@ -29,6 +29,8 @@
 #                PROCESSOR_JOURNEY=reviews (W40.d2: the review dialogs answered by hand in the real Process Files
 #                  window, on six photos of a rehearsal box, read by the stand-in CLI scripts/fake_local_agent.py;
 #                  run it through ArchiveProcessor/scripts/journey-review-dialogs.sh).
+#                PROCESSOR_JOURNEY=namesestimate (W49.proc-s044-check: rank names in the collection interview,
+#                  compare the Cost Estimate and count the independent loopback stand-in gateway requests; $0).
 #                VISUAL_REVIEW=1 (W40.e10/e11 screenshot tour; pair with ONLY_TESTING=<App>UITests/VisualReviewUITests).
 #                TRANSIENT_VIDEO=1 (W40.e13: record the guest screen across the run; scan with transient-frames.py).
 #                VM_KEEP=1 (W40.vm-macos27-runtime (4)): leave the guest booted for the next call, for a run of
@@ -101,6 +103,9 @@ cleanup() {
   tart_sampler_stop
   # W40.d1: the key file never outlives the run, whatever ended it.
   [ "$VM_BOOTED" = 1 ] && [ "${PROCESSOR_BULKOCR:-0}" = 1 ] && tart exec "$VM" rm -f "$BULK_GDIR/key" >/dev/null 2>&1
+  if [ -n "${S044_GW_PID:-}" ]; then
+    tart exec "$VM" pkill -f s044_user_gateway.py >/dev/null 2>&1; kill "$S044_GW_PID" 2>/dev/null
+  fi
   if [ -n "${FAKE_GW_PID:-}" ]; then
     tart exec "$VM" pkill -f fake_gateway.py >/dev/null 2>&1; kill "$FAKE_GW_PID" 2>/dev/null
   fi
@@ -261,8 +266,15 @@ elif [ "${PROCESSOR_JOURNEY:-}" = "reviews" ]; then
   fi
   REVIEWS_SET="$REHEARSAL/processor-set/${W40D2_COLLECTION:-RG 165 — War Department}"
   [ -d "$REVIEWS_SET" ] || die "no rehearsal box at $REVIEWS_SET (python3 ArchiveProcessor/scripts/make-processor-rehearsal.py)"
+elif [ "${PROCESSOR_JOURNEY:-}" = "namesestimate" ]; then
+  [ "$APP" = processor ] && [ "$LANE" = xcuitest ] || die "namesestimate needs processor xcuitest."
+  [ -z "$CORRUPT_TEST_SELECTOR" ] || die "namesestimate cannot use a corrupt fixture."
+  CORRUPT_TEST_SELECTOR="ArchiveProcessorUITests/NamesEstimateJourneyUITests"
+  if [ -n "${ONLY_TESTING:-}" ] && [ "$ONLY_TESTING" != "$CORRUPT_TEST_SELECTOR" ]; then
+    die "namesestimate runs only $CORRUPT_TEST_SELECTOR"
+  fi
 elif [ -n "${PROCESSOR_JOURNEY:-}" ]; then
-  die "unknown PROCESSOR_JOURNEY '$PROCESSOR_JOURNEY' (use: livecapture, bulkocr, reviews)"
+  die "unknown PROCESSOR_JOURNEY '$PROCESSOR_JOURNEY' (use: livecapture, bulkocr, reviews, namesestimate)"
 fi
 ONLY_TESTING="${ONLY_TESTING:-${CORRUPT_TEST_SELECTOR:-$(archive_app_field "$APP" tests)}}"
 TEST_ARGS="$(archive_xcode_test_args "$ONLY_TESTING")" \
@@ -635,6 +647,12 @@ run_xcuitest() {
   if [ "$PROCESSOR_LIVECAPTURE" = 1 ]; then start_phone_leg; TEST_ENV="TEST_RUNNER_W40D5_DIR='$LIVE_GDIR'"; fi
   [ "$PROCESSOR_BULKOCR" = 1 ] && prepare_bulk_ocr
   [ "$PROCESSOR_REVIEWS" = 1 ] && prepare_review_dialogs
+  if [ "${PROCESSOR_JOURNEY:-}" = namesestimate ]; then
+    tart exec "$VM" bash -lc "exec python3 '$GUEST_REPO/ArchiveProcessor/scripts/s044_user_gateway.py' 18472" \
+      > "$APP_ART/s044-gateway.log" 2>&1 &
+    S044_GW_PID=$!
+    TEST_ENV="TEST_RUNNER_S044_GATEWAY=1"
+  fi
   rm -f "$APP_ART"/sampler-*.tsv "$APP_ART"/chunk*.log
   if [ "$VM_SPLIT" -gt 0 ]; then
     run_split

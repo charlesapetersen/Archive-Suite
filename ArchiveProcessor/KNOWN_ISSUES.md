@@ -2,6 +2,14 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## ⚠️ LIMITATION (S-044, independently checked 2026-11-21): the Cost Estimate omits correspondence names
+
+- With names ranked in the collection interview, Automatic tagging and sidecars on, `performTaggingPhase`
+  calls `EntityExtractor.extract` separately for correspondence. `CostEstimator.estimate` has no names term.
+  `W49.proc-s044-check` independently reproduced the user path in the offscreen VM: a nonzero $0.0310 estimate
+  before and after ranking names, then one names request among five for a single letter, with entities in its
+  sidecar. Evidence: `verification/evidence/processor/W49.proc-s044-check.md`. (queued: W49.proc-fix-s044)
+
 ## ⚠️ LIMITATION (W49.proc-resume-standard-runs, 2026-11-20): what an interrupted standard run can still lose
 
 `ProcessorAppDelegate.applicationShouldTerminate`, `OCRProcessor.requestStop` / `finishPageDrainIfAsked`,

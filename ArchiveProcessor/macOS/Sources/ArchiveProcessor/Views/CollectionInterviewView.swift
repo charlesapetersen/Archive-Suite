@@ -292,6 +292,7 @@ struct CollectionInterviewView: View {
                                                        set: { answers.weights[p] = max(0, $0); answers.touch(.priorities) }),
                               format: .number.precision(.fractionLength(0)))
                         .labelsHidden().multilineTextAlignment(.trailing).frame(width: 50)
+                        .accessibilityIdentifier("ap.collectionInterview.weight.\(p.rawValue)")
                     Button { answers.move(p, by: -1) } label: { Image(systemName: "chevron.up") }
                         .buttonStyle(.borderless).disabled(i == 0).accessibilityLabel("Move \(CollectionInterviewAnswers.priorityLabel(p)) up")
                     Button { answers.move(p, by: 1) } label: { Image(systemName: "chevron.down") }
