@@ -1,5 +1,7 @@
 # Archive Suite — Umbrella Project Guide
 
+@AGENTS.md
+
 Three native macOS apps in one monorepo: **Archive Processor** (capture · OCR · tag),
 **Archive Reader** (find · read · triage), and **Archive Notes** (provenance‑first note‑taking from
 archival sources). This file is the *umbrella* guide — repo‑wide conventions, the shared contract, and

@@ -113,11 +113,10 @@ Phase rule 1: **evidence or it did not happen.** A `works` or `broken` status ci
 
 ## SUSPECTS.md
 
-Rule 5: a bug enters the work queue only with a reproduction. Anything weaker lands in `SUSPECTS.md` — an
-AI finder's report, an owner note that could not be reproduced yet, a doc claim that looks wrong, a hunch from a
-journey. Suspects never become queue items directly. A reproduce attempt follows phase rule 5a
-(`execution-plans/verification-phase/01-daemon-plan.md`, owner 2026-11-20): user's path, an independent check of
-any reproduction before a fix, one attempt, nothing new fixed directly.
+Rule 5: a fix item needs a reproduction. Record weaker evidence in `SUSPECTS.md`, such as an AI review
+finding, an owner note we could not reproduce yet, or a hunch from a journey. Follow
+[phase rule 5a](../execution-plans/verification-phase/01-daemon-plan.md#phase-rules--these-bind-every-w40-item-and-every-item-it-files)
+for the reproduction attempt and [AGENTS.md](../AGENTS.md#independent-verification) for the shared independent check.
 
 Owner, 2026-11-21 (call 30): queue verification for every new bug suspect automatically; no
 individual walkthrough approval is needed. Phase rule 5a still applies, including a different-model

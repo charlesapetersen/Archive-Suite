@@ -1,6 +1,6 @@
 ARCHIVE SUITE UNDER CODEX. The Agent Manager's engine runs this project (its old daemon was retired on 8 Oct 2026)
 and started this session with `codex exec`. These notes add to the engine's Codex notes above and win where they
-are more specific; the prompt that follows was written for Claude Code and binds you with these differences.
+are more specific. Follow the shared project rules in AGENTS.md and the project procedures it links to.
 
 1. ONE ITEM, THEN STOP. Do the item the engine's assignment names (a gate fix or doc fix when it names one) and end
    the session. `ops/autonomous/CODEX_RUNBOOK.md` is the right reference for HOW to work an item under Codex: its
@@ -45,15 +45,13 @@ are more specific; the prompt that follows was written for Claude Code and binds
 5. CLAUDE-ONLY TOOLS. Where the prompt names the Agent or Task tool, `Workflow`, a skill such as `lean-review`,
    or a per-subagent model or effort, use codex's own equivalent if you have one, or do the work yourself. The
    Tier-2 rule still holds: an adversarial review of your own diff, done as a separate pass from writing it,
-   plus a functional test on scratch copies.
+   plus a functional test on scratch copies. For an independent check required by AGENTS.md, use a separate
+   reviewer and follow the model rule for the task. The Tier-2 self-review serves a different purpose.
 
 6. COMMIT TRAILER. End commit messages with `Agent: Codex (<your model>)`, as `CODEX_RUNBOOK.md` says, not with
    the Claude `Co-Authored-By` line the prompt shows.
 
-7. THE USAGE WINDOW. `ops/autonomous/usage-window.sh` (no arguments) reads Codex's own five-hour window from
-   codex's rollout files when the engine's `$AUTONOMOUS_WORKER_STATE/agent` file says codex, which the engine
-   writes at each launch; the owner's interactive Codex sessions share that window. Its thresholds in the
-   prompt's USAGE WINDOW block apply to how you hand out work within the session. The engine paces the week and
-   waits out a limit for you; keep your work checkpointed, since a limit ends the session where it stands.
+7. THE USAGE WINDOW. `ops/autonomous/usage-window.sh` reads Codex rollouts when the worker's agent file says
+   codex. Follow the shared prompt's USAGE WINDOW block for the window it reports, including weekly-only plans.
 
 The repository is "__REPO__". The prompt begins after these notes.

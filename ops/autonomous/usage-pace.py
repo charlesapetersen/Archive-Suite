@@ -47,6 +47,9 @@ sibling reading never lowers a current one.
 """
 import math
 import json
+import os
+import sys
+import time
 from pathlib import Path
 
 FIVE_HOUR = 5 * 3600
@@ -124,15 +127,19 @@ def codex_windows(lines):
         except ValueError:
             continue
         for value in limits:
-            for key, kind in (("primary", "five_hour"), ("secondary", "weekly")):
+            windows = {}
+            for key in ("primary", "secondary"):
                 window = value.get(key)
                 try:
                     reading = (float(window["used_percent"]) / 100, int(window["resets_at"]),
                                int(window["window_minutes"]) * 60)
                 except (KeyError, TypeError, ValueError, OverflowError):
                     continue
-                if reading[2] > 0 and math.isfinite(reading[0]):
-                    found[kind] = reading
+                kind = {FIVE_HOUR: "five_hour", WEEK: "weekly"}.get(reading[2])
+                if kind and math.isfinite(reading[0]):
+                    windows[kind] = reading
+            if windows:
+                found = windows
     return found
 
 
@@ -157,6 +164,21 @@ def codex_sources(codex_home, now, keep=30):
         if now - mtime < 6 * 3600:
             found.append((mtime, path))
     return [path for _, path in sorted(found, reverse=True)[:keep]]
+
+
+def codex_usage(paths, now):
+    """Select the current window for usage-window.sh, or its last expired reading."""
+    expired = None
+    for path in paths:
+        windows = codex_windows(tail_lines(path))
+        current = {kind: reading for kind, reading in windows.items() if reading[1] > now}
+        if current:
+            week = current.get("weekly")
+            kind = "weekly" if (week and week[0] >= 1) or "five_hour" not in current else "five_hour"
+            return kind, current[kind]
+        if expired is None and windows:
+            expired = max(windows.items(), key=lambda pair: pair[1][1])
+    return expired
 
 
 def band(used, reset, length, now):
@@ -194,3 +216,13 @@ def next_cap(previous, name, limit):
     if name == "steady":
         return min(limit, max(1, previous), 2)
     return 1
+
+
+if __name__ == "__main__":
+    now = time.time()
+    paths = [sys.argv[1]] if len(sys.argv) > 1 else codex_sources(
+        os.environ.get("CODEX_HOME") or Path.home() / ".codex", now, keep=None)
+    usage = codex_usage(paths, now)
+    if usage is not None:
+        kind, (used, reset, _) = usage
+        print(int(used * 100 + 0.5), reset, kind)

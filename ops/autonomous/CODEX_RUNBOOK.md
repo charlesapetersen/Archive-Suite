@@ -2,13 +2,13 @@
 
 This is the loop for an external agent that drains the daemon's work queue while the daemon is stopped. It
 uses the same queue, the same trackers and the same rules as the daemon, so either one can pick up where the
-other stopped. The rules themselves live in [`AGENTS.md`](../../AGENTS.md) and [`CLAUDE.md`](../../CLAUDE.md);
-this file only puts them in order.
+other stopped. Read [`AGENTS.md`](../../AGENTS.md) for shared rules, including independent verification, and
+follow the linked project procedures. This file puts the work in order.
 
 ## Unattended instead: the daemon can run Codex (2026-10-04)
 
 `./ops/autonomous/daemon.sh start --agent codex` runs this same queue with Codex, one fresh `codex exec` session
-per item, and waits out the five-hour window by itself, so nobody has to type "Continue". It gives each session
+per item, and waits out usage limits, so nobody has to type "Continue". It gives each session
 `codex-preamble.txt` ahead of the daemon's resume prompt; the preamble points back here for how to work an item.
 Only the owner starts the daemon. Do not run this interactive loop while the daemon is running: two workers on
 one queue take the same item. Details: `README.md` §*Choosing the agent*.
@@ -43,9 +43,9 @@ After that, "Continue" is enough to resume after an interruption.
 
 ## The loop, once per item
 
-1. **Pick.** Run `./ops/autonomous/next-queue-item.sh` and take the first line that starts with `ok`. Do not
-   choose by interest or size; the order is the priority. Items in the plan's `## HOLD QUEUE` never appear here
-   and are not yours.
+1. **Pick.** Run `./ops/autonomous/next-queue-item.sh` and take the first `ok` item whose `(agent: …)` or
+   `(agents: …)` marker permits Codex. Items without an agent marker are open to either agent. Queue order
+   sets the priority. Items in the plan's `## HOLD QUEUE` are reserved for the owner.
 2. **Read.** `grep -n '<TAG>' SUITE_TODO.md` and read the item's whole entry. Then read the touched app's
    `CLAUDE.md` and `AGENTS.md`. If the tag appears in `OWNER_AUTHORIZATIONS.md`, its ⛔ constraints bind you.
    Run `git log --oneline --grep='<TAG>'`: if a final commit already exists, the item is done and only the

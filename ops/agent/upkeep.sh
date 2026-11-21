@@ -26,8 +26,7 @@ echo "--- cluster login request (warn-only)"
 echo "--- token pass (warn-only)"
 AGENT_REPO="$REPO" AGENT_STATE="$STATE" AUTONOMOUS_PLAN="$PLAN" /usr/bin/python3 "$AGENT_DIR/token-audit.py" upkeep \
   || echo "upkeep: the token pass failed; it runs again at the next upkeep"
-# W46.measure-review: once 8 result commits have landed since the last measurement review, or a week and at least
-# one, open the standing review (Fable, max effort) by ticking W46.measure-review-due. Never fails upkeep.
+# W46.measure-review: the cadence helper ticks W46.measure-review-due when new results warrant a pass.
 echo "--- measurement review cadence (warn-only)"
 AGENT_REPO="$REPO" AGENT_STATE="$STATE" AUTONOMOUS_PLAN="$PLAN" /usr/bin/python3 "$AGENT_DIR/measure-review.py" upkeep \
   || echo "upkeep: the measurement review cadence failed; it runs again at the next upkeep"

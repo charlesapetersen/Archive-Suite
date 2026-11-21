@@ -52,9 +52,8 @@ mirrored by the `W40` section of `SUITE_TODO.md`, tags byte-identical. `next-que
    says what the suspect says; (2) reproduce it the way a user meets it, through the app or its real pipeline on
    scratch data, not with a test written around the suspicion; (3) if the behaviour could be intended (a comment calls
    it deliberate, or a document promises it), ask the owner in the Daemon Report instead of fixing; (4) a claimed
-   reproduction is checked by a second, independent session on a different model before any fix item is filed
-   (the check item's queue line carries `(agent: codex)` when Opus made the reproduction, so the engine gives it
-   only to Codex: owner, 2026-11-20 walkthrough);
+   reproduction follows the [shared independent verification rule](../../AGENTS.md#independent-verification)
+   before any fix item is filed (owner, 2026-11-20 walkthrough);
    (5) one attempt: if it does not reproduce, clear it in SUSPECTS.md with the evidence, and anything new noticed on
    the way is written down as a suspect, never fixed directly; (6) a fix follows the usual review, with the reproducing
    run kept as its test. A suspect seen in a real run already has its reproduction and skips (1)-(4).

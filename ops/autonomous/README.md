@@ -361,15 +361,12 @@ mode without touching anything. The manual steps below are what it automates.
 `start` or `start --agent claude` goes back to Claude. The choice is written to `$STATE/agent`, which is what a
 launchd KeepAlive relaunch reads, and `daemon.sh status` shows which one is running. Everything else is the
 same loop: one item per fresh session, the same plan, queue, resume prompt, health gate, watchdogs, park rules
-and housekeeping. The owner asked for this so Codex resumes by itself after its five-hour window instead of
-waiting for someone to type "Continue".
+and housekeeping. Codex can resume by itself after its usage window resets.
 
 What differs under codex, and why:
 
-- **Model and effort, set apart from Claude's.** `gpt-6.1-sol` at `high` effort (owner, 2026-10-05), pinned in the
-  daemon rather than read from `~/.codex/config.toml`, so changing the model for interactive Codex use does not change
-  the daemon. `AUTONOMOUS_CODEX_MODEL` and `AUTONOMOUS_CODEX_EFFORT` override them; Claude sessions keep
-  `AUTONOMOUS_EFFORT` (medium).
+- **Model and effort.** Agent Manager starts unmarked Codex work on GPT-6.2 Sol Medium and applies its Codex
+  escalation policy and per-item overrides. Agent Manager's registry and policy are the routing authority.
 - **The CLI.** The ChatGPT app ships it at `/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/
   Contents/MacOS/codex`; a `~/.local/bin/codex` symlink, or `AUTONOMOUS_CODEX`, wins.
 - **The prompt.** `codex-preamble.txt` goes in front of the same `resume-prompt.txt`. It says: one item, then
@@ -386,11 +383,10 @@ What differs under codex, and why:
   preamble, backed by the sandbox and the reviewer.
 - **No `--max-budget-usd`.** Codex bills against the subscription window. `MAXRUN` and the health watchdog
   still bound a session. Codex reports tokens, not dollars, so the cost column in `usage-window.tsv` is `-`.
-- **The usage window.** Codex writes its readings into the session's rollout file under `~/.codex/sessions`, not
-  into the `--json` stream. `usage-window.sh` reads that format, and before each launch the daemon reads the
-  newest rollout of ANY session (`--codex-latest`), because the owner's interactive Codex use spends the same
-  window. At 95% or over, or after a cut-off session, it waits for the reset exactly as it does for claude. A
-  codex limit error, or a 100% reading, is logged as a usage limit, never as an empty queue.
+- **The usage window.** `usage-window.sh` reads account-wide Codex rollout readings by duration. It reports
+  the active five-hour window when available and the weekly window when it is the only one or is exhausted.
+  The shared resume prompt applies its checkpoint and delegation thresholds to the reported window. Agent
+  Manager handles admission and usage-limit waits for the queue.
 - **The heartbeat.** `--json` emits one event per item but no token deltas, and codex runs its subagents inside
   its own process, so neither the stream nor a child process shows a codex session that is thinking or
   delegating. Its rollout files do grow meanwhile, so the watchdog also spares a session while any rollout born
@@ -1397,7 +1393,8 @@ An item that must run on one agent says so with `(agent: codex)` (or `(agents: c
 sends it to the Agent Manager as the item's `agents`, and the engine offers the item only to those agents, waiting
 while none of them has room and giving the other agents the next item meanwhile (Agent Manager CONTRACT.md, section
 2; owner, 2026-11-20). A name other than claude or codex blocks the item with the reason. It names an agent, not a
-model: a Claude model is the engine's `item_start` in the registry.
+model: the engine's `item_start` and `codex_item_start` in the registry set model overrides. See
+[`AGENTS.md`](../../AGENTS.md#independent-verification) for cross-model verification.
 
 An item that needs a cluster says so with a `(cluster: NAME)` marker. It is not a `(uses: …)` value, because
 `worker-state.py` and the Agent Manager refuse unknown ones. The queue hook (`ops/agent/hooks.py`) offers such an
@@ -1534,8 +1531,9 @@ do not count. They are read from the pass's note: **each item a pass files is na
 note**, as every pass since the third has done; a DONE entry whose first line opens its description with "Measurement
 review <date> pass N, P<N>-<k>" counts as review-filed too. A pass's remark appended to an owner's item does not. Neither time nor the number
 of commits opens a review (until 2026-11-04 it was 8 result commits or a week with one, which ran it almost daily).
-The standing item `W46.measure-review` carries `(effort: xhigh)`, which the Agent Manager's policy runs on Opus at
-xhigh (owner, 2026-11-04; it ran on Fable at max before). `status` shows what landed and whether a review is due;
+Agent Manager starts `W46.measure-review` on Fable High with Claude or GPT-6.2 Astra High with Codex.
+Either can escalate to XHigh. The per-item settings in its registry set the starting model and effort.
+`status` shows what landed and whether a review is due;
 `cards` lists result reports since the last review with no measurement card; `deps` lists open items waiting on a
 tag that exists nowhere, and dependency cycles (W42.int-s1..s7 and AM-restructure-R3 are expected there: Phase 4
 and the Agent Manager file them).
@@ -1543,11 +1541,12 @@ and the Agent Manager file them).
 **The review session, in order.**
 
 1. Read `measure-review.py status` and `cards`; read each listed result report, its item's DONE entry and commit body.
-   Code, aggregates and plans only: no Claude session or subagent reads corpus pages or texts (owner, 2026-10-30).
+   All agents use code, aggregates and plans only (owner, 2026-10-30).
 2. Judge each result against the six classes: truth weaker than or circular with what it judges; selection by a
    tested route, by ABBYY text or by convenience; noise read as a result; unequal comparisons or one OCR set only;
    a verdict that sets a default, a route or closes work on too little; stale or cyclic dependencies (`deps`).
-3. Have one independent subagent try to refute each finding against the cited files before anything changes.
+3. Follow the [independent reviewer rule](../../AGENTS.md#independent-verification) for every finding. Record the
+   reviewer's model and which findings stood, changed or were withdrawn.
 4. Write `execution-plans/processing-review/measure-reviews/<date>.md` (findings, severity, fix, what stands).
 5. Rework the queue with `plan-edit.sh` only (`add`, `depend`, `undepend`, `block` for an owner sheet) and keep
    `SUITE_TODO.md` in step: re-measure or rebuild a truth a conclusion depends on, add scoring conditions, re-rank,

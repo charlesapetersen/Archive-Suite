@@ -1,7 +1,8 @@
-# Archive Suite — Agent / Concurrent-Development Guide
+# Archive Suite — Shared Agent Guide
 
-Umbrella conventions for working in this monorepo (solo or with multiple agents in parallel). Each app
-also has its own `AGENTS.md` with app‑specific lanes — read it before working inside a subdir:
+This is the home for standing rules shared by Claude, Codex and other agents. Put new shared rules here and link
+to them from agent-specific prompts or runbooks. Read the root [project guide](CLAUDE.md) for existing suite
+procedures and the touched app's `AGENTS.md` and `CLAUDE.md` for app-specific instructions:
 [`ArchiveProcessor/AGENTS.md`](ArchiveProcessor/AGENTS.md) · [`ArchiveReader/AGENTS.md`](ArchiveReader/AGENTS.md) · [`ArchiveNotes/AGENTS.md`](ArchiveNotes/AGENTS.md).
 
 > 🛑 **If the owner asks for the "daemon report" (or "the report", or the old name "morning review"), that
@@ -30,6 +31,22 @@ also has its own `AGENTS.md` with app‑specific lanes — read it before workin
   `SUITE_TODO.md` is the tracker of record — an unattended run reconciles it *before ending*, never leaning
   on a private plan file. The owner shouldn't have to catch a stale tracker. (Full rule:
   [`CLAUDE.md`](CLAUDE.md) → "Docs & backlog convention.")
+
+## Independent verification
+
+- **Bug suspects.** Queue verification as soon as a new suspect is recorded. For a code-reading suspect, first
+  reproduce the user-visible failure on scratch data, then have a separate session on a different model verify
+  the reproduction before filing a fix. Route Claude reproductions to `(agent: codex)` and Codex reproductions
+  to `(agent: claude)` to get a different provider. Record both models with the evidence. Follow
+  [phase rule 5a](execution-plans/verification-phase/01-daemon-plan.md#phase-rules--these-bind-every-w40-item-and-every-item-it-files)
+  for reproduction, real-run
+  reports and intended-behavior questions.
+- **Measurement review (`W46.measure-review`).** A separate reviewer challenges each finding against the
+  cited evidence before it can change the queue or a verdict. The lead may use a read-only subagent or a separate
+  review session. Give the reviewer the claims, sources and baseline, and keep both agents to code, aggregates
+  and plans. If no independent reviewer is available, save the findings as a draft and leave the review pending.
+  Follow the [measurement review runbook](ops/autonomous/README.md#the-measurement-review--w46measure-review-opsagentmeasure-reviewpy-owner-2026-10-30)
+  for the rest of the pass.
 
 ## Working the to-do list as an external agent (Codex et al.) — finish the handoff
 

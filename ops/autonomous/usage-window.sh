@@ -11,10 +11,9 @@
 #
 # CODEX (2026-10-04). Codex writes its readings into the session's ROLLOUT file under ~/.codex/sessions, not
 # into the `codex exec --json` stream, as `"rate_limits":{…"primary":{"used_percent":91.0,"window_minutes":300,
-# "resets_at":<epoch>},"secondary":{…weekly…}}`. A LOG holding such lines is read the same way: the primary
-# (five-hour) window, unless the weekly one is exhausted, which then reads as 100% until ITS reset. With
-# --codex-latest (or with no LOG when AUTONOMOUS_AGENT=codex) it reads the newest rollout of ANY session that
-# has a reading, because the window is the account's and the owner's own Codex sessions spend it too.
+# "resets_at":<epoch>},"secondary":{…weekly…}}`. usage-pace.py identifies each window by its duration.
+# Report the active five-hour window when available, the weekly window when it is the only one or is exhausted.
+# With --codex-latest or a Codex worker's no-argument call, consider rollouts across the account.
 #
 # USAGE:  usage-window.sh [--raw] [--codex-latest | LOG]    LOG defaults to $STATE/last-session.log
 # OUTPUT: "five-hour window 73% used, resets 18:10 (in 67 min)"; with --raw, "73 1790555400".
@@ -33,31 +32,11 @@ agent_file="$STATE/agent"
 [ -r "${AUTONOMOUS_WORKER_STATE:-$STATE}/agent" ] && agent_file="${AUTONOMOUS_WORKER_STATE:-$STATE}/agent"
 [ -z "${1:-}" ] && [ "$( { tr -d '[:space:]' < "$agent_file"; } 2>/dev/null)" = codex ] && latest=1
 
-# Codex readings (see the header): the account-wide "codex" limit only. Other limit_ids occur in real rollouts
-# ("premium", with primary null) and say nothing about the codex window.
-codex_ev() {
-  grep -o '"rate_limits":{"limit_id":"codex"[^}]*}[^}]*}[^}]*}' "$1" 2>/dev/null | awk '
-    { pp = ""; pr = ""; sp = ""; sr = ""
-      if (match($0, /"primary":\{"used_percent":[0-9.]+,"window_minutes":[0-9]+,"resets_at":[0-9]+/)) {
-        x = substr($0, RSTART, RLENGTH); split(x, a, /[:,]/); pp = a[3]; pr = a[7] }
-      if (match($0, /"secondary":\{"used_percent":[0-9.]+,"window_minutes":[0-9]+,"resets_at":[0-9]+/)) {
-        x = substr($0, RSTART, RLENGTH); split(x, a, /[:,]/); sp = a[3]; sr = a[7] }
-      if (sp != "" && sp + 0 >= 100) { printf "100 %s weekly\n", sr; next }
-      if (pp != "") printf "%d %s five_hour\n", pp + 0.5, pr
-    }' | tail -1
-}
-
+codex_reader="$(dirname "${BASH_SOURCE[0]}")/usage-pace.py"
 ev=""
 if [ "$latest" = 1 ]; then
-  # Newest rollout first (by mtime), modified within the last six hours: an older reading cannot describe the
-  # current five-hour window. The first file that yields a CODEX reading wins — not merely the first with any
-  # "rate_limits", which can be a premium-only file (the 2026-10-04 review's case: exit 3 at 97%).
-  LOG="codex rollouts"
-  while IFS= read -r f; do
-    ev="$(codex_ev "$f")"; [ -n "$ev" ] && { LOG="$f"; break; }
-  done < <(find "${CODEX_HOME:-$HOME/.codex}/sessions" -name 'rollout-*.jsonl' -mmin -360 2>/dev/null \
-           | while IFS= read -r x; do printf '%s\t%s\n' "$(stat -f %m "$x")" "$x"; done | sort -rn | cut -f2-)
-  [ -n "$ev" ] || { [ "$raw" = 1 ] || echo "five-hour window: unknown (no recent codex session has a reading)"; exit 3; }
+  ev="$(/usr/bin/python3 "$codex_reader")"
+  [ -n "$ev" ] || { [ "$raw" = 1 ] || echo "Codex usage: unknown (no recent usage reading)"; exit 3; }
 else
   LOG="${1:-${AUTONOMOUS_WORKER_STATE:-$STATE}/last-session.log}"
   # One "<pct> <resetsAt> <type>" per rate_limit_event, in log order; the last one wins.
@@ -71,7 +50,7 @@ else
       s = substr($0, RSTART, RLENGTH); sub(/.*"utilization":/, "", s); split(s, a, /,"resetsAt":/)
       printf "%d %s five_hour\n", a[1] * 100 + 0.5, a[2]
     }' | tail -1)"
-  [ -n "$ev" ] || ev="$(codex_ev "$LOG")"
+  [ -n "$ev" ] || ev="$(/usr/bin/python3 "$codex_reader" "$LOG")"
 fi
 [ -n "$ev" ] || { [ "$raw" = 1 ] || echo "five-hour window: unknown (no rate_limit_event in $LOG yet)"; exit 3; }
 read -r pct reset kind <<< "$ev"
@@ -80,9 +59,14 @@ if [ "$raw" = 1 ]; then
   echo "$pct $reset"
 else
   label="five-hour window"; [ "$kind" = five_hour ] || label="$kind limit"
+  reset_format='+%H:%M'
+  if [ "$kind" = weekly ]; then
+    label="weekly window"
+    reset_format='+%a %b %d at %H:%M'
+  fi
   secs=$(( reset - $(date +%s) )); mins=$(( secs / 60 ))
   if [ "$secs" -gt 0 ]; then
-    echo "$label ${pct}% used, resets $(date -r "$reset" '+%H:%M') (in ${mins} min)"
+    echo "$label ${pct}% used, resets $(date -r "$reset" "$reset_format") (in ${mins} min)"
   else
     # A reading from a window that has since reset says nothing about the current one. Run outside a daemon
     # session on 2026-09-28, this printed a six-week-old "100% used", which the resume prompt would read as

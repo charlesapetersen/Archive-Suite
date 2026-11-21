@@ -14,6 +14,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -171,6 +172,33 @@ class Sources(unittest.TestCase):
         path.write_text("\n".join(lines) + "\n")
         os.utime(path, (mtime, mtime))
         return path
+
+    def test_usage_window_reports_weekly_only_and_preserves_raw_format(self):
+        now = int(time.time())
+        state = self.root / "worker"
+        state.mkdir()
+        (state / "agent").write_text("codex\n")
+        event = json.loads(codex_line(60, now + H, 87, now + 168 * H))
+        limits = event["payload"]["rate_limits"]
+        both = json.dumps(event)
+        limits["primary"], limits["secondary"] = limits["secondary"], None
+        path = self.write("sessions/rollout-test.jsonl", [both, json.dumps(event)], now)
+        env = dict(os.environ, CODEX_HOME=str(self.root), AUTONOMOUS_WORKER_STATE=str(state))
+        command = ["bash", str(SOURCE / "usage-window.sh")]
+        out = subprocess.check_output(command, env=env, text=True)
+        self.assertTrue(out.startswith("weekly window 87% used"), out)
+        self.assertEqual(subprocess.check_output(command + ["--raw"], env=env, text=True),
+                         "87 %d\n" % (now + 168 * H))
+
+        limits["secondary"] = {"used_percent": 60, "window_minutes": 300, "resets_at": now + H}
+        path.write_text(json.dumps(event) + "\n")
+        out = subprocess.check_output(command + ["--codex-latest"], env=env, text=True)
+        self.assertTrue(out.startswith("five-hour window 60% used"), out)
+
+        limits["primary"]["used_percent"] = 100
+        path.write_text(json.dumps(event) + "\n")
+        out = subprocess.check_output(command + [str(path)], env=env, text=True)
+        self.assertTrue(out.startswith("weekly window 100% used"), out)
 
     def test_highest_current_reading_wins_whatever_the_mtimes(self):
         # The most recently touched file holds the LOWER, older reading: a log is

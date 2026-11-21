@@ -166,6 +166,17 @@ else
   fails=$((fails+1))
 fi
 
+if grep -qxF '@AGENTS.md' CLAUDE.md \
+   && grep -qxF '## Independent verification' AGENTS.md \
+   && grep -qF 'separate session on a different model' AGENTS.md \
+   && grep -qF 'Follow root AGENTS.md for shared rules' ops/autonomous/resume-prompt.txt \
+   && grep -qF 'For an independent check required by AGENTS.md' ops/autonomous/codex-preamble.txt; then
+  printf '  %s shared-independent-verification\n' "$(green '✓')"
+else
+  printf '  %s shared-independent-verification — both agents need the independent-check rule in AGENTS.md\n' "$(red '✗')"
+  fails=$((fails+1))
+fi
+
 printf '\n'
 if [ "$fails" -gt 0 ]; then
   printf '%s — %d rule(s) violated. Fix the prose, or change the rule here IN THE SAME COMMIT and say why.\n' \
