@@ -154,12 +154,20 @@ def validate(paths):
     if not verification.stdout.startswith(b'<?xml'):
         print(verification.stdout[:1200], verification.stderr[:1200])
     xml = ET.fromstring(verification.stdout)
+    summary = xml.find('.//batchSummary')
+    assert int(summary.get('totalJobs')) == len(paths)
+    assert all(int(summary.get(key)) == 0 for key in ('failedToParse', 'encrypted', 'outOfMemory', 'veraExceptions'))
+    reports = summary.find('validationReports')
+    assert int(reports.get('failedJobs')) == 0
+    verdicts = {}
     for job in xml.findall('.//jobs/job'):
         item = Path(job.findtext('item/name')).name
         report = job.find('validationReport')
+        verdicts[item] = report.get('isCompliant') == 'true'
         print(item, '2b', report.get('isCompliant'), [(r.get('clause'), r.get('testNumber'))
               for r in report.findall('.//rule') if r.get('status') == 'failed'])
-    print(xml.find('.//batchSummary').attrib)
+    print(summary.attrib)
+    return [verdicts[path.name] for path in paths]
 
 
 def main(folder):
@@ -182,11 +190,14 @@ def main(folder):
             assert result[0] == json.loads(NEW) and result[1:] == baseline[1:]
             checked = subprocess.run(['qpdf', '--check', out], capture_output=True)
             print('qpdf', checked.returncode, checked.stderr.decode().strip())
+            if checked.returncode:
+                assert mode == 'incremental' and checked.returncode == 3
+                assert b'xref entry for the xref stream itself is missing' in checked.stderr
             print(mode, len(data), 'prefix', data.startswith(original), 'old literal', OLD in data,
                   'ms', [round(s, 2) for s in samples], 'median', round(statistics.median(samples), 2))
             paths.append(out)
         if archival:
-            validate(paths)
+            assert all(validate(paths))
         assert base.read_bytes() == original
 
 
