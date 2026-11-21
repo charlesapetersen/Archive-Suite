@@ -5,35 +5,31 @@ uses the same queue, the same trackers and the same rules as the daemon, so eith
 other stopped. Read [`AGENTS.md`](../../AGENTS.md) for shared rules, including independent verification, and
 follow the linked project procedures. This file puts the work in order.
 
-## Unattended instead: the daemon can run Codex (2026-10-04)
+## Unattended work through Agent Manager
 
-`./ops/autonomous/daemon.sh start --agent codex` runs this same queue with Codex, one fresh `codex exec` session
-per item, and waits out usage limits, so nobody has to type "Continue". It gives each session
-`codex-preamble.txt` ahead of the daemon's resume prompt; the preamble points back here for how to work an item.
-Only the owner starts the daemon. Do not run this interactive loop while the daemon is running: two workers on
-one queue take the same item. Details: `README.md` §*Choosing the agent*.
+Agent Manager runs the queue on the subscriptions in its registry. For a Codex assignment, it sends
+`codex-preamble.txt` ahead of the shared resume prompt and handles usage waits. The owner starts or stops the
+project in Agent Manager. While it is running, work from the engine's assignments. See [Install / run](README.md#install--run).
 
 ## Starting prompt for the owner
 
 Paste this into Codex, opened on `~/Claude/Archive Suite`:
 
-> Work the Archive Suite queue by following `ops/autonomous/CODEX_RUNBOOK.md` exactly. The daemon is stopped.
+> Work the Archive Suite queue by following `ops/autonomous/CODEX_RUNBOOK.md` exactly. I stopped Archive Suite in Agent Manager.
 > Keep going item after item without checking in; stop only for the reasons the runbook lists.
 
 After that, "Continue" is enough to resume after an interruption.
 
 ## Before the first item
 
-1. Confirm the daemon is stopped: `./ops/autonomous/daemon.sh status` must say "Not running". If it is
-   running, stop here and tell the owner. Two workers on one queue take the same item. Only the owner starts
-   the daemon; do not start or stop it yourself.
-2. Run `./ops/autonomous/tidy.sh` from the primary checkout. It does the daemon's between-cycle upkeep, which
-   does not happen while the daemon is stopped: it compacts the plan (every session reads it whole) and removes
-   worktrees whose branch is merged and whose tree is clean. From 2026-08-13 to 2026-09-28 nobody ran it; the
-   plan passed its budget and nine finished worktrees (3.7 GB) piled up in `~/Claude`.
-3. Run `./ops/autonomous/check-handoff.sh` from the primary checkout. It must end `HANDOFF: CLEAN`. If it does
+1. Confirm the owner stopped Archive Suite in Agent Manager. Run
+   `/usr/bin/python3 "/Users/cp1/Claude/Agent Manager/manager.py" status` and check for an owner stop under
+   Archive Suite. Confirm the `com.agentmanager.run.archive-suite` job is unloaded and that no Archive Suite
+   engine session or live claim remains. A pause, a park, or the retired daemon's status is insufficient.
+   If any check is uncertain, leave queue selection with Agent Manager and tell the owner.
+2. Run `./ops/autonomous/check-handoff.sh` from the primary checkout. It must end `HANDOFF: CLEAN`. If it does
    not, fix what it names before taking new work; a leftover from the last session comes first.
-4. Set up the shell the way the daemon does, so nothing you run can draw on the owner's screen. Claude's hooks
+3. Set up the shell the way the daemon does, so nothing you run can draw on the owner's screen. Claude's hooks
    do not run under Codex, so these two lines are the only guard you have:
    ```bash
    export ARCHIVE_UNATTENDED=1
@@ -88,7 +84,6 @@ After that, "Continue" is enough to resume after an interruption.
    "$primary/ops/autonomous/check-handoff.sh"
    git -C "$primary" worktree remove "$worktree_path"
    git -C "$primary" branch -d "codex/<slug>-$stamp"
-   "$primary/ops/autonomous/tidy.sh"
    ```
 9. **Gate when due.** The daemon runs the full health gate once 30 commits have landed since the last green
    one, and nothing else does; while it is stopped, you are the cadence. Use its state files, so the count

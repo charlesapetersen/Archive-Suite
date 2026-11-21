@@ -48,7 +48,8 @@ TARGETS=(
   ArchiveProcessor/CLAUDE.md ArchiveProcessor/AGENTS.md ArchiveProcessor/KNOWN_ISSUES.md
   ArchiveReader/CLAUDE.md ArchiveReader/AGENTS.md ArchiveReader/KNOWN_ISSUES.md
   ArchiveNotes/CLAUDE.md ArchiveNotes/AGENTS.md ArchiveNotes/KNOWN_ISSUES.md
-  ops/autonomous/README.md ops/autonomous/resume-prompt.txt ops/autonomous/CODEX_RUNBOOK.md
+  ops/autonomous/README.md ops/autonomous/resume-prompt.txt ops/autonomous/CODEX_RUNBOOK.md ops/autonomous/codex-preamble.txt
+  verification/README.md execution-plans/verification-phase/01-daemon-plan.md
   ArchiveProcessor/scripts/E2E-PHONE-MAC.md
   REFERENCE.md ArchiveProcessor/REFERENCE.md ArchiveReader/REFERENCE.md ArchiveNotes/REFERENCE.md
 )

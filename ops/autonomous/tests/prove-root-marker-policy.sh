@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# W40.root-marker(-auto): the real prose checker must reject a missing choosing-a-folder disclosure.
+# Prove the real prose checker catches missing safety disclosures and shared-guide links.
 # All mutations are in a temporary git repo (including a space in its path); no app/engine/network.
 set -euo pipefail
 python3 - "$(cd "$(dirname "$0")/../../.." && pwd)" <<'PY'
@@ -29,12 +29,12 @@ with tempfile.TemporaryDirectory(prefix='root-marker-policy-') as tmp:
     guide = repo / 'ArchiveReader/CLAUDE.md'
     original = guide.read_text()
 
-    def run(expect, label):
+    def run(expect, label, check='reader-root-marker-disclosed'):
         result = subprocess.run(['bash', str(script)], cwd=repo, text=True, capture_output=True)
         assert result.returncode == expect, label + '\n' + result.stdout + result.stderr
-        assert ('reader-root-marker-disclosed' in result.stdout), result.stdout
+        assert check in result.stdout, result.stdout
         if expect:
-            assert re.search(r'✗.*reader-root-marker-disclosed', result.stdout), result.stdout
+            assert re.search(r'✗.*' + re.escape(check), result.stdout), result.stdout
         print('PASS ' + label)
 
     run(0, 'current policy passes from a spaced scratch path')
@@ -44,4 +44,14 @@ with tempfile.TemporaryDirectory(prefix='root-marker-policy-') as tmp:
     run(1, 'removing the exact identity filename fails')
     guide.write_text(original)
     run(0, 'restoring the directive restores green')
+
+    guide.write_text(original.replace('@AGENTS.md\n', '', 1))
+    run(1, 'missing app guide import fails', 'ArchiveReader shared guides')
+    guide.write_text(original)
+    preamble = repo / 'ops/autonomous/codex-preamble.txt'
+    original = preamble.read_text()
+    preamble.write_text(original.replace('For an independent check required by AGENTS.md', 'For an optional check'))
+    run(1, 'missing Codex independent check instruction fails', 'shared-independent-verification')
+    preamble.write_text(original)
+    run(0, 'restoring shared-guide links restores green')
 PY

@@ -43,12 +43,12 @@ and the GUI verification rules below. Hooks and launch methods vary by agent. Th
   the reproduction before filing a fix. Route Claude reproductions to `(agent: codex)` and Codex reproductions
   to `(agent: claude)` to get a different provider. Record both models with the evidence. Follow
   [phase rule 5a](execution-plans/verification-phase/01-daemon-plan.md#phase-rules--these-bind-every-w40-item-and-every-item-it-files)
-  for reproduction, real-run
-  reports and intended-behavior questions.
+  for reproduction, real-run reports and intended-behavior questions.
 - **Measurement review (`W46.measure-review`).** A separate reviewer challenges each finding against the
-  cited evidence before it can change the queue or a verdict. The lead may use a read-only subagent or a separate
-  review session. Give the reviewer the claims, sources and baseline, and keep both agents to code, aggregates
-  and plans. If no independent reviewer is available, save the findings as a draft and leave the review pending.
+  cited evidence before it can change the queue or a verdict. Use a read-only subagent or separate session,
+  limited to code, aggregates and plans. If neither is available, checkpoint the baseline, claims, evidence
+  and remaining checks in `execution-plans/items/W46.measure-review.md`. Unattended sessions record the reason
+  in `$AGENT_WORKER_STATE/blocked`. Resume from the draft and obtain the separate review before filing changes.
   Follow the [measurement review runbook](ops/autonomous/README.md#the-measurement-review--w46measure-review-opsagentmeasure-reviewpy-owner-2026-10-30)
   for the rest of the pass.
 

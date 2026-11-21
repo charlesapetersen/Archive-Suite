@@ -26,15 +26,11 @@ read that section.
   single source of truth: PRIME DIRECTIVES + RESUME PROTOCOL + a checkboxed WORK QUEUE + Session Log +
   Daemon Report. Every increment is committed+pushed, so any fresh session recovers full state from the
   plan + `git log` + `SUITE_TODO.md`. **This is what makes the run resilient to losing context/usage.**
-- **L1 — self-resume daemon (`archive-suite-autonomous.sh`).** A loop that every ~90 s fires ONE fresh
-  headless `claude -p` to advance the plan by one bounded item, then the session commits+pushes+stops. A
-  usage-exhausted window just fails fast; the next cycle retries when the cap resets (~5h). Safety:
-  `--permission-mode default` (**never** bypass), a scoped `--allowedTools` + a destructive
-  `--disallowedTools` denylist, `--max-budget-usd`, a **health watchdog** that kills a wedged/runaway session
-  early (see "Health watchdog" below) behind a 3 h wall-clock backstop, and a stale-lock guard so cycles never
-  overlap. The script lives in `~/.local/bin` (outside the TCC-protected `~/Desktop`).
+- **L1 — Agent Manager engine.** It claims one bounded item per session, selects Claude or Codex, and
+  controls session capacity, usage waits and watchdogs. The previous `archive-suite-autonomous.sh`
+  runner remains for the legacy regression fixtures.
 - **L2 — the resume prompt (`resume-prompt.txt`).** The exact instructions each fresh session follows
-  (recover state → pick the first `[ ]` item → own worktree → verify → **checkpoint-commit+push as it goes** →
+  (recover state → check the assigned item → own worktree → verify → **checkpoint-commit+push as it goes** →
   finish+tick → stop). **Checkpointing bounds redo:** an interrupted session (usage cutoff / watchdog) loses
   only the work since its last push, and the next session **continues** from the committed checkpoints
   (detected via `git log` + the plan's Session Log) rather than restarting the whole item. Only the *final*
@@ -346,29 +342,22 @@ are what sessions read, so use after a window's last reading is unseen and the u
 > **`daemon.sh`** with **`start`**. A bare `./ops/autonomous/daemon.sh` still means `start`, but the old
 > `arm` verb is rejected rather than silently aliased — two spellings for one command is how docs drift.
 
-**One command (preferred): `./ops/autonomous/daemon.sh start`** — checks every prerequisite (claude CLI outside
-`~/Desktop`, daemon + resume prompt present, an L0 plan whose `RUN STATUS` is `IN_PROGRESS` with unchecked
-`[ ]` items), installs the latest committed copies to the runtime location, refuses to double-launch, warns
-with the exact fix if the plan is stale-`COMPLETE`, launches, and confirms the first cycle started. By
-**default (2026-07-17)** it launches under **launchd KeepAlive** (crash-restart — see below), the right
-posture for a long unattended run. `daemon.sh nohup` is the opt-in detached mode; `daemon.sh status` (read-only)
-and `daemon.sh stop` round it out. `./ops/autonomous/daemon.sh --dry-run [nohup]` previews the resolved launch
-mode without touching anything. The manual steps below are what it automates.
+The owner manages Archive Suite in Agent Manager. Its CLI provides `manager.py status`,
+`manager.py start "Archive Suite"` and `manager.py stop "Archive Suite"`. The engine runs as
+`com.agentmanager.run.archive-suite`. The `daemon.sh` wrapper described in the older sections below
+controls the retired runner only. Use the [manual queue runbook](CODEX_RUNBOOK.md) for an owner-approved handoff.
 
-### Choosing the agent: `--agent claude` (default), `--agent codex` or `--agent both` (owner, 2026-10-04)
+### Choosing the agent
 
-`./ops/autonomous/daemon.sh start --agent codex` runs every session with Codex (`codex exec`) instead of Claude;
-`start` or `start --agent claude` goes back to Claude. The choice is written to `$STATE/agent`, which is what a
-launchd KeepAlive relaunch reads, and `daemon.sh status` shows which one is running. Everything else is the
-same loop: one item per fresh session, the same plan, queue, resume prompt, health gate, watchdogs, park rules
-and housekeeping. Codex can resume by itself after its usage window resets.
+Agent Manager's registry lists both Claude and Codex. The engine uses queue eligibility, available capacity
+and grant policy to select the agent for each item. Both agents use the same plan, queue and resume prompt.
 
 What differs under codex, and why:
 
 - **Model and effort.** Agent Manager starts unmarked Codex work on GPT-6.2 Sol Medium and applies its Codex
   escalation policy and per-item overrides. Agent Manager's registry and policy are the routing authority.
 - **The CLI.** The ChatGPT app ships it at `/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/
-  Contents/MacOS/codex`; a `~/.local/bin/codex` symlink, or `AUTONOMOUS_CODEX`, wins.
+  Contents/MacOS/codex`. Agent Manager checks `AGENT_ENGINE_CODEX` and `~/.local/bin/codex` before the bundled CLI.
 - **The prompt.** `codex-preamble.txt` goes in front of the same `resume-prompt.txt`. It says: one item, then
   stop (the runbook's keep-going loop is the daemon's job here); hooks do not run, so the screen rule and the
   same-commit docs rule are the session's own; the claude deny list as a list of commands never to run; the
@@ -381,8 +370,7 @@ What differs under codex, and why:
   `.rules` files can forbid commands, but they load from `~/.codex/rules` or the project, so they would also bind
   the owner's interactive Codex sessions; that was not done unasked. Under codex the deny list is a rule in the
   preamble, backed by the sandbox and the reviewer.
-- **No `--max-budget-usd`.** Codex bills against the subscription window. `MAXRUN` and the health watchdog
-  still bound a session. Codex reports tokens, not dollars, so the cost column in `usage-window.tsv` is `-`.
+- **Session bounds.** Codex uses its subscription allowance. Agent Manager enforces the wall and quiet limits.
 - **The usage window.** `usage-window.sh` reads account-wide Codex rollout readings by duration. It reports
   the active five-hour window when available and the weekly window when it is the only one or is exhausted.
   The shared resume prompt applies its checkpoint and delegation thresholds to the reported window. Agent
@@ -390,16 +378,12 @@ What differs under codex, and why:
 - **The heartbeat.** `--json` emits one event per item but no token deltas, and codex runs its subagents inside
   its own process, so neither the stream nor a child process shows a codex session that is thinking or
   delegating. Its rollout files do grow meanwhile, so the watchdog also spares a session while any rollout born
-  after the session started was written within `HB_STALL` (`_codex_alive`). If a codex session is still killed
-  while working, raise `AUTONOMOUS_HB_STALL`.
-- **No environment variable for the agent.** The daemon unsets `AUTONOMOUS_AGENT` once it has read it, and
-  `usage-window.sh` finds the agent in the worker's agent file, falling back to `$STATE/agent`. An exported variable leaked into the health gate's
-  harnesses and turned the gate RED under either agent (found in review, 2026-10-04).
+  after the session started was written within the watchdog's quiet limit.
+- **Agent detection.** `usage-window.sh` reads the worker's agent file, with the project state file as a legacy
+  fallback. Agent Manager writes each worker's agent assignment.
 
-Proof: `tests/prove-codex-agent.sh` (a gate step) runs the real daemon against a stub codex; the dispatch is in
-`tests/prove-daemon-dispatch.sh`. Not proven by either, because both use stubs: how the real `codex exec` reports
-a usage limit (no rollout on this machine recorded one), and how its reviewer treats `git push` and builds.
-Watch the first real codex run's `daemon.log` and `last-session.log` for both.
+`tests/prove-codex-agent.sh` covers the retired runner with a stub CLI. Agent Manager's engine tests cover the
+current dispatch and watchdog.
 
 ### A red health gate goes to a fix session first (owner, 2026-10-05)
 
@@ -1532,7 +1516,7 @@ note**, as every pass since the third has done; a DONE entry whose first line op
 review <date> pass N, P<N>-<k>" counts as review-filed too. A pass's remark appended to an owner's item does not. Neither time nor the number
 of commits opens a review (until 2026-11-04 it was 8 result commits or a week with one, which ran it almost daily).
 Agent Manager starts `W46.measure-review` on Fable High with Claude or GPT-6.2 Astra High with Codex.
-Either can escalate to XHigh. The per-item settings in its registry set the starting model and effort.
+Either can escalate to XHigh. In a running session, `AGENT_MODEL` and `AGENT_EFFORT` give the assigned rung.
 `status` shows what landed and whether a review is due;
 `cards` lists result reports since the last review with no measurement card; `deps` lists open items waiting on a
 tag that exists nowhere, and dependency cycles (W42.int-s1..s7 and AM-restructure-R3 are expected there: Phase 4
@@ -1554,7 +1538,9 @@ and the Agent Manager file them).
    carry its condition in the item that consumes its result. Ask first, in the Daemon Report as a decision, before
    retiring an item, moving one behind `W46.nice-to-have`, or any spend past $7 for one piece of work.
 6. `check-tracker-sync.sh`, commit and push, then `measure-review.py done <the commit reviewed up to>` and
-   `plan-edit.sh PLAN rearm W46.measure-review-due '<date>: reviewed up to <sha>'`. The item is never ticked.
+   `plan-edit.sh PLAN rearm W46.measure-review-due '<date>: reviewed up to <sha>'` after the independent check
+   and final review are complete. A draft awaiting a reviewer leaves the last-reviewed baseline and due gate in place.
+   Remove the draft after completing the pass. The standing item stays open.
 
 **When a truth needs the owner** (the canonical rule; the audit's §2 has the per-set table). His reading is needed
 when only he knows the answer (his collections' conventions, what counts as a document, his own tags, what a page
