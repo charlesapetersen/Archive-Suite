@@ -141,7 +141,9 @@ final class NotesNavigationModel: ObservableObject {
     /// A pending single-item **delete-last-instance** confirmation (§3.6, W6-S5). Non-nil ⟹ the view
     /// MUST present the mandatory modal before anything is deleted; `nil` = nothing pending. (The
     /// batched folder-delete variant lives on the shared tree, since folder structure is shared.)
-    @Published var pendingDeletion: PendingDeletion?
+    @Published private(set) var pendingDeletion: PendingDeletion?
+    private var queuedDeletions: ArraySlice<PendingDeletion> = []
+    private var isConfirmingDeletion = false
 
     /// Whether an Undo's Put Back brought the note home, read by the Redo that follows it.
     final class DeleteHistoryStep { var happened = false }
@@ -560,46 +562,67 @@ final class NotesNavigationModel: ObservableObject {
         model.organization.folders.first { $0.id == folderId }?.kind == .normal
     }
 
-    /// Remove `itemId` from `folderId`, guarding the delete-last-instance case (§3.6). A replicant
-    /// (≥2 memberships) is removed quietly; the LAST membership sets `pendingDeletion` (**no mutation
-    /// yet**) so the view shows the mandatory confirmation. `OrganizationStore.removeMembership` verifies
-    /// the `(item, folder)` pair still exists and reads the count FRESH, so neither a concurrent
-    /// replicate nor a concurrent move in the other window can cause a false "last instance."
     func removeMembership(_ itemId: UUID, from folderId: UUID) async {
-        do {
-            switch try await model.organization.removeMembership(item: itemId, folder: folderId) {
-            case .removed:
-                model.rebuild(); recompute(); model.adoptMirrorFailure()
-            case .notPresent:
-                // The other window already moved or removed this membership. Nothing to remove — resync
-                // this window's view. NEVER a last instance: some *other* folder may hold the note
-                // (W23.h3).
-                model.rebuild(); recompute(); model.adoptMirrorFailure()
-            case .wasLastInstance:
-                let title = model.allItems.first { $0.id == itemId }?.title ?? ""
-                pendingDeletion = PendingDeletion(itemId: itemId, folderId: folderId,
-                                                  title: title.isEmpty ? "Untitled" : title)
+        await removeMemberships([itemId], from: folderId)
+    }
+
+    /// Unlink replicants quietly and ask about each last instance (§3.6). The organization store
+    /// checks the specific pair and leaves a sole membership intact until confirmed.
+    func removeMemberships(_ itemIds: [UUID], from folderId: UUID) async {
+        var soleInstances: [UUID] = []
+        for itemId in itemIds {
+            do {
+                switch try await model.organization.removeMembership(item: itemId, folder: folderId) {
+                case .removed, .notPresent:
+                    model.rebuild(); recompute(); model.adoptMirrorFailure()
+                case .wasLastInstance:
+                    soleInstances.append(itemId)
+                }
+            } catch {
+                model.statusMessage = "Couldn't remove the note from the folder."
             }
-        } catch { model.statusMessage = "Couldn't remove the note from the folder." }
+        }
+        guard !soleInstances.isEmpty else { return }
+        let titles = model.titles(for: soleInstances)
+        enqueueDeletions(zip(soleInstances, titles).map { itemId, title in
+            PendingDeletion(itemId: itemId, folderId: folderId, title: title)
+        })
     }
 
     /// Stage a whole-item delete from the row context menu. Nothing is changed until the user confirms.
     func requestDeleteItem(_ itemId: UUID) {
         let title = model.allItems.first { $0.id == itemId }?.title ?? ""
-        pendingDeletion = PendingDeletion(itemId: itemId, folderId: nil,
-                                          title: title.isEmpty ? "Untitled" : title,
-                                          allInstances: true)
+        enqueueDeletions([PendingDeletion(itemId: itemId, folderId: nil,
+                                          title: title.isEmpty ? "Untitled" : title, allInstances: true)])
     }
 
-    /// Confirm the currently-pending delete-last-instance (test/programmatic entry point). Reads
-    /// `pendingDeletion`, clears it, and performs the delete. The VIEW instead calls
-    /// `confirmDeletion(_:)` with the value captured when the alert was shown, because SwiftUI clears
-    /// `pendingDeletion` (via the presentation binding) the instant the button is tapped — before this
-    /// async work runs — so reading it back here would see `nil`.
+    private func enqueueDeletions(_ requests: [PendingDeletion]) {
+        queuedDeletions.append(contentsOf: requests)
+        if pendingDeletion == nil { advanceDeletionQueue() }
+    }
+
+    private func advanceDeletionQueue() {
+        pendingDeletion = queuedDeletions.popFirst()
+        if queuedDeletions.isEmpty { queuedDeletions = [] }
+    }
+
+    /// Confirm the currently presented note (test/programmatic entry point).
     func confirmPendingDeletion() async {
         guard let pending = pendingDeletion else { return }
-        pendingDeletion = nil
-        await confirmDeletion(pending)
+        await confirmPendingDeletion(pending)
+    }
+
+    /// Only the current prompt can be answered. Keep it current until the fresh membership check
+    /// and any Trash move finish, so the next prompt gets its own decision.
+    @discardableResult
+    func confirmPendingDeletion(_ pending: PendingDeletion) async -> Bool {
+        guard pendingDeletion?.id == pending.id, !isConfirmingDeletion else { return false }
+        isConfirmingDeletion = true
+        defer {
+            isConfirmingDeletion = false
+            advanceDeletionQueue()
+        }
+        return await confirmDeletion(pending)
     }
 
     /// Perform a confirmed delete-last-instance for a specific pending item. The alert may be **stale**
@@ -667,8 +690,12 @@ final class NotesNavigationModel: ObservableObject {
         return survived.isEmpty
     }
 
-    /// Dismiss the confirmation without deleting anything (the default / Cancel path).
-    func cancelPendingDeletion() { pendingDeletion = nil }
+    /// Skip just this note and offer the next queued confirmation.
+    func cancelPendingDeletion(_ pending: PendingDeletion? = nil) {
+        guard let current = pendingDeletion, pending == nil || pending?.id == current.id,
+              !isConfirmingDeletion else { return }
+        advanceDeletionQueue()
+    }
 
     /// The note Edit ▸ Delete… (⌘⌫) asks to delete: the one selected row of the note list, or nil when the
     /// list is not showing or holds no single selection (W40.fix-notes-delete-redo, notes-2 row 16).

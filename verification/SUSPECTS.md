@@ -279,7 +279,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would clear it:** the loop produces a confirmation for each sole-instance item, one after another, or one
   batched confirmation naming both. After confirming, neither A nor B is still filed in F without having been
   asked about.
-- **Status:** `reproduced` — independently confirmed, queued as `W49.fix-notes-multi-remove`; [evidence](evidence/notes/W49.notes-suspects-small-check.md); test `ArchiveNotesTests/NotesSmallSuspectTests` `s010MultiRemove`
+- **Status:** `cleared` — W49.fix-notes-multi-remove. Scratch regressions: `NotesSmallSuspectTests.s010MultiRemove` and `NotesE2NoteLifecycleTests.testS010_MultiRemoveAsksAboutBothNotes`. [Original reproduction](evidence/notes/W49.notes-suspects-small-check.md).
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
@@ -291,6 +291,9 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     F with no alert. Nothing was deleted beyond what was confirmed. The menu comment says "confirms one at a time",
     which promises more than happens, so this is not intended behaviour.
   - 2026-11-21 W49.notes-suspects-small-check (Codex, gpt-6.2-sol, `b0539267`) — The VM alert named one of two selected sole-instance notes. Confirming moved precisely that note into the fixture Trash. The other stayed in Reading with no second prompt.
+  - 2026-11-21 W49.fix-notes-multi-remove — The VM row menu produced two named prompts. Confirming the first
+    moved its note to the library Trash. Escape on the second kept its note in Reading. The scratch unit
+    regression also checks that confirming a newly replicated note only unlinks it from the source folder.
 
 ### S-011 · Row-menu "New from Template" skips the template-body flush and failed-save guard
 

@@ -5,14 +5,21 @@ Running log of quirks, risks, and things verified/unverified for the Notes app. 
 
 ## ⚠️ OPEN — Notes list actions verified on scratch data (2026-11-21)
 
-- **Removing several sole-instance notes from one folder** asks about only one. Confirming moves the
-  named note to Trash and leaves the other in the folder without a second prompt. (queued: W49.fix-notes-multi-remove)
 - **Clicking a sortable column header** changes the arrow and leaves the notes in their prior order.
   Two clicks on Title flipped the arrow in the scratch library. (queued: W49.fix-notes-header-sort)
 - **A full lowercase tag filter** can omit the notes that carry the same tag with its stored capitals.
   The VM reproduced this with the complete lowercase token pasted into the filter. (queued: W49.fix-notes-tag-filter-case)
 - **Creating from a template through a row menu** can use the last saved body while an edit is pending
   or after a save has failed. Standard New flushes the editor and checks for a failed save. (queued: W49.fix-notes-template-create)
+
+## ✅ FIXED (W49.fix-notes-multi-remove, 2026-11-21) — each sole-instance note gets a confirmation
+
+Removing several notes from a folder used to replace each confirmation with the next. The row menu now
+unlinks replicants and queues a separate prompt for each sole-instance note. Cancel keeps the named
+note and advances the queue. Confirm rechecks the named note's source membership under the existing
+delete guard. If another folder now holds the note, the command only unlinks it from the source.
+If the source membership has already gone, the command leaves the note where it is. Only notes that
+reach the library Trash receive an Undo action. The scratch regression remains `s010MultiRemove`.
 
 ## ✅ FIXED (W49.notes-undo-across-toggle, 2026-11-20) — undo survives the ⌘/ switch between styled and raw
 

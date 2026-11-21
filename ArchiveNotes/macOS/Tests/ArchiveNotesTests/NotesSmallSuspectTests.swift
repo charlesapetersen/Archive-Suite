@@ -144,8 +144,8 @@ struct NotesSmallSuspectTests {
 
     // MARK: - S-010
 
-    /// S-010: row menu ▸ "Remove 3 Items from “F”" over two notes filed only in F and one also filed in G.
-    @Test("S-010: removing two sole-instance notes and a replicant from a folder asks about both sole notes")
+    /// S-010: the actual row menu, with sole instances and a note already replicated in G.
+    @Test("S-010: the row menu asks about every sole instance and rechecks each confirmed membership")
     func s010MultiRemove() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
         let f = try await env.org.createFolder(name: "F").id
@@ -153,29 +153,41 @@ struct NotesSmallSuspectTests {
         let a = try #require(await env.model.newItem(kind: .note, in: f, from: nil))
         let b = try #require(await env.model.newItem(kind: .note, in: f, from: nil))
         let c = try #require(await env.model.newItem(kind: .note, in: f, from: nil))
+        let d = try #require(await env.model.newItem(kind: .note, in: f, from: nil))
+        let titles = [a: "Survey A", b: "Survey B", d: "Survey D"]
+        for (id, title) in titles { try #require(await env.model.setTitle(title, to: id)) }
         try await env.org.addMembership(item: c, folder: g)
         env.model.setFolderScope(f)
 
-        let menu = try #require(NotesItemContextMenu.make(nav: env.nav, selection: [a, b, c]))
-        let remove = try #require(menu.items.first { $0.title == "Remove 3 Items from “F”" })
+        let menu = try #require(NotesItemContextMenu.make(nav: env.nav, selection: [a, b, c, d]))
+        let remove = try #require(menu.items.first { $0.title == "Remove 4 Items from “F”" })
         try click(remove)
 
-        #expect(await eventually { !env.org.foldersContaining(item: c).contains(f) && env.nav.pendingDeletion != nil },
-                "the replicant leaves F quietly and a sole-instance note is put to the user")
-        try? await Task.sleep(for: .milliseconds(500))   // let the loop finish
-        let asked = try #require(env.nav.pendingDeletion)
-        #expect([a, b].contains(asked.itemId))
-        let other = asked.itemId == a ? b : a
-
-        // The user confirms the one alert shown.
-        await env.nav.confirmPendingDeletion()
-        #expect(!itemDirExists(env, asked.itemId), "the note the alert named is the one trashed")
+        try #require(await eventually { env.nav.pendingDeletion != nil })
         #expect(itemDirExists(env, c) && env.org.foldersContaining(item: c) == [g], "the replicant stays in G")
-        withKnownIssue("S-010: each sole-instance prompt overwrites the last, so only one is asked about") {
-            #expect(env.nav.pendingDeletion != nil || !env.org.foldersContaining(item: other).contains(f),
-                    "the other sole-instance note is asked about too, or out of F")
+        for id in titles.keys {
+            #expect(itemDirExists(env, id) && env.org.foldersContaining(item: id) == [f])
         }
-        #expect(itemDirExists(env, other), "nothing more is deleted than was confirmed")
+
+        let first = try #require(env.nav.pendingDeletion)
+        #expect(first.title == titles[first.itemId])
+        try #require(await env.nav.confirmPendingDeletion(first))
+        #expect(await env.store.isTrashed(first.itemId))
+        #expect(!itemDirExists(env, first.itemId) && env.org.foldersContaining(item: first.itemId).isEmpty)
+
+        let second = try #require(env.nav.pendingDeletion)
+        #expect(second.title == titles[second.itemId])
+        env.nav.cancelPendingDeletion(second)
+        #expect(itemDirExists(env, second.itemId) && env.org.foldersContaining(item: second.itemId) == [f])
+
+        let third = try #require(env.nav.pendingDeletion)
+        #expect(third.title == titles[third.itemId])
+        #expect(Set([first.itemId, second.itemId, third.itemId]) == Set(titles.keys))
+        // Another window added a placement after the batch was staged. Confirm only unlinks F.
+        try await env.org.addMembership(item: third.itemId, folder: g)
+        #expect(await !env.nav.confirmPendingDeletion(third))
+        #expect(itemDirExists(env, third.itemId) && env.org.foldersContaining(item: third.itemId) == [g])
+        #expect(env.nav.pendingDeletion == nil)
     }
 
     // MARK: - S-011

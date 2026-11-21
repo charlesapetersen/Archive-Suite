@@ -50,6 +50,67 @@ final class NotesE2NoteLifecycleTests: NotesFixtureUITestCase {
         }
     }
 
+    /// S-010. Drive the real multi-row menu and answer two consecutive window-modal prompts.
+    func testS010_MultiRemoveAsksAboutBothNotes() throws {
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let reading = mainWindow.descendants(matching: .any).matching(identifier: "an.sidebar.folder")
+                .matching(NSPredicate(format: "value == %@ OR label == %@", "Reading", "Reading")).firstMatch
+            XCTAssertTrue(reading.waitForExistence(timeout: 10))
+            reading.click()
+
+            let before = itemDirs()
+            app.typeKey("n", modifierFlags: .command)
+            XCTAssertTrue(pollUntil(timeout: 10) { self.itemDirs().subtracting(before).count == 1 })
+            let created = try XCTUnwrap(itemDirs().subtracting(before).first)
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                (self.organizationMemberships() ?? []).contains([Self.folderReading, created])
+            })
+            let titlesByID = [Self.idPlain: "My First Note", created: "Untitled"]
+            let memberships = try XCTUnwrap(organizationMemberships())
+            for id in titlesByID.keys {
+                XCTAssertEqual(memberships.filter { $0[1] == id }, [[Self.folderReading, id]])
+            }
+
+            let plainRow = selectItem(uuid: Self.idPlain)
+            let createdRow = mainWindow.descendants(matching: .any)["an.cell.title.\(created.uppercased())"]
+            XCTAssertTrue(createdRow.waitForExistence(timeout: 10))
+            XCUIElement.perform(withKeyModifiers: .command) { createdRow.click() }
+            plainRow.rightClick()
+            let remove = app.menuItems["Remove 2 Items from “Reading”"]
+            XCTAssertTrue(remove.waitForExistence(timeout: 5))
+            remove.click()
+
+            let confirm = app.buttons["an.dialog.deleteLastInstance.confirm"]
+            XCTAssertTrue(confirm.waitForExistence(timeout: 10))
+            let firstID = try XCTUnwrap(titlesByID.first {
+                app.staticTexts["Delete “\($0.value)”?"].exists
+            }?.key)
+            let secondID = try XCTUnwrap(titlesByID.keys.first { $0 != firstID })
+            let secondTitle = try XCTUnwrap(titlesByID[secondID])
+            let firstTrash = Self.fixturePath + "/Trash/" + firstID
+            let secondTrash = Self.fixturePath + "/Trash/" + secondID
+            XCTAssertTrue(itemDirs().isSuperset(of: titlesByID.keys))
+            confirm.click()
+
+            let nextPrompt = app.staticTexts["Delete “\(secondTitle)”?"]
+            XCTAssertTrue(nextPrompt.waitForExistence(timeout: 10), "the other note must get its own prompt")
+            let shot = FileManager.default.temporaryDirectory.appendingPathComponent("s010-second-prompt.png")
+            try app.screenshot().pngRepresentation.write(to: shot)
+            print("[shot] s010-second-prompt: wrote \(shot.path)")
+            XCTAssertTrue(FileManager.default.fileExists(atPath: firstTrash))
+            XCTAssertFalse(itemDirs().contains(firstID))
+
+            let cancel = app.buttons["an.dialog.deleteLastInstance.cancel"]
+            XCTAssertTrue(cancel.exists)
+            app.typeKey(XCUIKeyboardKey.escape.rawValue, modifierFlags: [])
+            XCTAssertTrue(pollUntil(timeout: 5) { !cancel.exists })
+            XCTAssertTrue(itemDirs().contains(secondID))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: secondTrash))
+            XCTAssertTrue((organizationMemberships() ?? []).contains([Self.folderReading, secondID]))
+        }
+    }
+
     // MARK: - Helpers
 
     /// Which of the three fixture notes the note window's list currently shows.

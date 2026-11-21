@@ -1001,7 +1001,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   alert is at `Views/NotesBrowserView.swift:82-101`. Delete Note → `confirmDeletion` (`:353`), which re-checks
   via `removeConfirmedLastMembership` under a hard-delete window, then `NotesModel.trashItems`
   (`Core/NotesModel.swift:1585`) → `NoteStore.delete` → `deleteEntry` (`Store/NoteStore.swift:415`), a
-  coordinated `trashItem` of the whole `<uuid>/` dir. Cancel only clears `pendingDeletion`.
+  coordinated move of the whole `<uuid>/` dir into the library Trash. Cancel keeps the current note and
+  advances to the next queued prompt.
 - **Real-path test:** `ArchiveNotesUITests/NotesGUITests.testG8_DeleteLastInstanceGuardCancelKeepsThenConfirmTrashes`;
   `.testG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation`;
   `.testG22_CommandDeleteAndRedo` (⌘⌫, Undo, Redo, Undo; W40.fix-notes-delete-redo);
@@ -1015,8 +1016,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Notes:** the W9.e2 result is `W9.e2-notes`: note delete and the delete-last-instance guard,
   `NotesGUITests.testG8_…` and `.testG19_…` (already on main). On the source conflict, the code moves the whole
   `<uuid>/` folder to the Trash (`NoteStore.swift:415-430`, never `removeItem`), so §3.6/§16.1 ("deletes the
-  item's folder") and SMOKE M ("→ Trash") are each half right. The multi-select row-menu remove is suspect
-  `S-010`.
+  item's folder") and SMOKE M ("→ Trash") are each half right. W49.fix-notes-multi-remove fixed S-010.
+  The multi-select row menu now prompts for each sole instance in turn.
 
 ### N-29 · Templates
 
@@ -1069,7 +1070,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   Remove from “folder” when the list is scoped to a normal folder (`:129-143`).
 - **Real-path test:** `ArchiveNotesUITests/NotesE2NoteLifecycleTests.testE2_ContextMenuOpenSelectsAndLoadsTheRow`;
   `ArchiveNotesUITests/NotesE2LinkTests.testE2_ContextMenuCopyLinkNamesTheClickedRow`;
-  `ArchiveNotesUITests/NotesGUITests.testG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation`.
+  `ArchiveNotesUITests/NotesGUITests.testG19_ContextMenuDeleteRemovesAllPlacementsAfterConfirmation`;
+  `ArchiveNotesUITests/NotesE2NoteLifecycleTests.testS010_MultiRemoveAsksAboutBothNotes`.
 - **Runtime evidence:** none
 - **Status:** `unproven`
 - **History:**
@@ -1079,8 +1081,8 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   `nav.select(id)`, and the right-click has already selected the row (`NotesTableView.swift:554-556`). So the
   Open test would pass with Open as a no-op, and it does not meet the README's reverted-implementation bar for
   Open itself. Open, Reveal, Copy Link, New from Template, Set Quality and Delete… appear only for a single
-  selection. Rename… is in the menu but not in the promise. Reveal in Finder has no test. The multi-select
-  Remove is suspect `S-010`.
+  selection. Rename… is in the menu but not in the promise. Reveal in Finder has no test. For multi-select
+  Remove, `s010MultiRemove` checks the membership and Trash outcomes on a scratch library.
 
 ## Search and smart folders
 

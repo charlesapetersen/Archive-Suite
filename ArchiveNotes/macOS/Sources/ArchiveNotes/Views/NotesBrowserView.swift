@@ -68,6 +68,7 @@ struct NotesBrowserView: View {
     }
 
     var body: some View {
+        let pendingDeletion = nav.pendingDeletion
         HStack(spacing: 0) {
             if showingTree {
                 NotesFolderTreeView(model: model, nav: nav)
@@ -160,32 +161,37 @@ struct NotesBrowserView: View {
                 )
             }
         }
-        // The mandatory delete confirmation (§3.6, W6-S5). Set by a guarded membership removal or
-        // the whole-item context action; no note is deleted until the user confirms.
-        .alert("Delete “\(nav.pendingDeletion?.title ?? "")”?",
-               isPresented: Binding(get: { nav.pendingDeletion != nil },
-                                    set: { if !$0 { nav.pendingDeletion = nil } }),
-               presenting: nav.pendingDeletion) { pending in
-            // Capture `pending` from the presentation value: SwiftUI clears the binding (→
-            // pendingDeletion = nil) the instant a button is tapped, before this async Task runs.
-            Button("Delete Note", role: .destructive) {
-                Task {
-                    // Edit ▸ Undo puts the note back, only once it is really in the Trash, and Redo deletes
-                    // it again (W40.fix-notes-delete-undo, -redo). The window's manager, which the note
-                    // table answers to.
-                    guard await nav.confirmDeletion(pending), let undo = window?.undoManager ?? undoManager else { return }
-                    nav.registerUndoOfDelete(pending.itemId, title: pending.title, with: undo)
-                }
-            }
-                .accessibilityIdentifier("an.dialog.deleteLastInstance.confirm")
-            Button("Cancel", role: .cancel) { }
-                .accessibilityIdentifier("an.dialog.deleteLastInstance.cancel")
-        } message: { pending in
-            if pending.allInstances {
-                Text("This removes every folder placement for “\(pending.title)” and moves the note to the Trash.")
-            } else {
-                Text("This is the only remaining instance of “\(pending.title)” — deleting it moves the note to the Trash.")
-            }
+        .task(id: window == nil ? nil : pendingDeletion?.id) {
+            guard let window, let pending = pendingDeletion,
+                  nav.pendingDeletion?.id == pending.id, !Task.isCancelled else { return }
+            await presentDeletion(pending, in: window)
+        }
+    }
+
+    /// AppKit's sheet completion lets each prompt finish before the queue advances.
+    private func presentDeletion(_ pending: NotesNavigationModel.PendingDeletion, in window: NSWindow) async {
+        let alert = NSAlert()
+        alert.messageText = "Delete “\(pending.title)”?"
+        alert.informativeText = pending.allInstances
+            ? "This removes every folder placement for “\(pending.title)” and moves the note to the Trash."
+            : "This is the only remaining instance of “\(pending.title)” — deleting it moves the note to the Trash."
+        let delete = alert.addButton(withTitle: "Delete Note")
+        delete.hasDestructiveAction = true
+        delete.keyEquivalent = ""
+        delete.setAccessibilityIdentifier("an.dialog.deleteLastInstance.confirm")
+        let cancel = alert.addButton(withTitle: "Cancel")
+        cancel.keyEquivalent = "\u{1b}"
+        cancel.setAccessibilityIdentifier("an.dialog.deleteLastInstance.cancel")
+
+        let response = await alert.beginSheetModal(for: window)
+        guard !Task.isCancelled else { return }
+        guard response == .alertFirstButtonReturn else {
+            nav.cancelPendingDeletion(pending)
+            return
+        }
+        // Offer Undo only once the confirmed note actually reached the Trash.
+        if await nav.confirmPendingDeletion(pending), let undo = window.undoManager ?? undoManager {
+            nav.registerUndoOfDelete(pending.itemId, title: pending.title, with: undo)
         }
     }
 

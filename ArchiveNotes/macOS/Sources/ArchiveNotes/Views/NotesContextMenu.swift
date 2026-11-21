@@ -135,9 +135,7 @@ enum NotesItemContextMenu {
                 : "Remove from “\(folder.name)”"
             let remove = NSMenuItem(title: title, action: #selector(NotesMenuAction.fire), keyEquivalent: "")
             let trampoline = NotesMenuAction {
-                // Guarded per item: replicants are removed quietly; a sole-instance surfaces the §3.6
-                // confirmation. (Multi-select where several are sole-instances confirms one at a time.)
-                Task { for id in ids { await nav.removeMembership(id, from: source) } }
+                Task { await nav.removeMemberships(ids, from: source) }
             }
             remove.target = trampoline
             remove.representedObject = trampoline
