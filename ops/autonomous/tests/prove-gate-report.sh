@@ -34,12 +34,14 @@ T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 # --- extract the real text, and PROVE we extracted it -------------------------------------------
 step_def="$(sed -n '/^step() {/,/^}/p'            "$GATE")"
 skip_def="$(sed -n '/^step_skippable() {/,/^}/p'  "$GATE")"
+fixture_defs="$(sed -n '/^cleanup_gate() {/,/^}/p; /^start_fixture_checks() {/,/^}/p; /^collect_fixture_checks() {/,/^}/p' "$GATE")"
 red_def="$(sed  -n '/^if \[ -n "\$fails" \]; then/,/^fi/p' "$GATE")"
 # The gate reads its retry list once, into a shell variable its steps do not inherit (may be absent; 3c checks it).
 only_def="$(grep -E '^_gate_only=' "$GATE")"
 
 [ -n "$step_def" ] || { echo "FATAL: could not extract step() from $GATE"; exit 1; }
 [ -n "$skip_def" ] || { echo "FATAL: could not extract step_skippable() from $GATE"; exit 1; }
+[ "$(printf '%s\n' "$fixture_defs" | grep -c '() {')" -eq 3 ] || { echo "FATAL: could not extract fixture jobs from $GATE"; exit 1; }
 [ -n "$red_def"  ] || { echo "FATAL: could not extract the RED verdict block from $GATE"; exit 1; }
 case "$step_def" in *'>>"$LOG"'*) ;; *) echo "FATAL: extracted step() never appends to \$LOG — extraction is stale"; exit 1 ;; esac
 case "$red_def"  in *'$LOG'*)     ;; *) echo "FATAL: extracted RED block never reads \$LOG — extraction is stale"; exit 1 ;; esac
@@ -48,10 +50,12 @@ ok "extracted the real step(), step_skippable() and RED verdict block from healt
 # drive <scenario-file> -> the harness's stdout
 drive() {
   { echo 'set -uo pipefail'
-    echo 'LOG="$(mktemp)"; fails=""; skips=""; warns=""'
+    echo 'gate_tmp="$(mktemp -d)"; LOG="$gate_tmp/failures"; : > "$LOG"; agent_fixture_pid=""; script_fixture_pid=""; fails=""; skips=""; warns=""'
     printf '%s\n' "$only_def"
     printf '%s\n' "$step_def"
     printf '%s\n' "$skip_def"
+    printf '%s\n' "$fixture_defs"
+    echo 'trap cleanup_gate EXIT'
     cat "$1"
     printf '%s\n' "$red_def"
     echo 'exit 0'
@@ -125,6 +129,92 @@ step_skippable vm-lane-proof bash -c '[ -z "${AUTONOMOUS_GATE_ONLY+set}" ] || { 
 EOS
 out="$(AUTONOMOUS_GATE_ONLY="gate-report vm-lane-proof" drive "$T/s3c.sh")"
 case "$out" in *"✓ gate-report"*"✓ vm-lane-proof"*) ok "a retried step's child does not inherit AUTONOMOUS_GATE_ONLY" ;; *) no "the retry list leaked into a step's environment (got: $out)" ;; esac
+
+# The fixture job and the foreground both have to make progress before collection. A fixture
+# failure must contribute its original step name and diagnostic to the parent verdict.
+cat > "$T/fixture-overlap.sh" <<'EOS'
+await_marker() {
+  local attempt
+  for attempt in {1..100}; do
+    [ ! -e "$1" ] || return 0
+    sleep 0.05
+  done
+  return 1
+}
+fixture_check() {
+  touch "$gate_tmp/started"
+  await_marker "$gate_tmp/foreground-ran" || return 8
+  echo FIXTURE-FAILURE
+  return 9
+}
+foreground_check() {
+  await_marker "$gate_tmp/started" && touch "$gate_tmp/foreground-ran"
+}
+run_checks() { step running-in-fixture fixture_check; }
+start_fixture_checks agent agent_fixture_pid run_checks
+other_checks() { step other-fixture true; }
+start_fixture_checks script script_fixture_pid other_checks
+step running-in-foreground foreground_check
+collect_fixture_checks agent agent_fixture_pid || exit 2
+collect_fixture_checks script script_fixture_pid || exit 2
+EOS
+out="$(drive "$T/fixture-overlap.sh")"; rep="$(printf '%s' "$out" | report)"
+case "$out" in *"✓ running-in-foreground"*"✓ other-fixture"*"HEALTH GATE: RED — running-in-fixture"*) ok "foreground and fixture checks overlap and the fixture failure REDs the gate" ;; *) no "overlap or verdict was lost (got: $out)" ;; esac
+case "$rep" in *"running-in-fixture (rc=9)"*FIXTURE-FAILURE*) ok "the fixture's exit status and diagnostic survive collection" ;; *) no "fixture diagnostics were lost (got: $rep)" ;; esac
+
+cat > "$T/fixture-retry.sh" <<'EOS'
+run_checks() {
+  step untouched-fixture false
+  step selected-fixture true
+}
+start_fixture_checks agent agent_fixture_pid run_checks
+step untouched-foreground false
+collect_fixture_checks agent agent_fixture_pid || exit 2
+EOS
+out="$(AUTONOMOUS_GATE_ONLY="selected-fixture" drive "$T/fixture-retry.sh")"
+case "$out" in *untouched*|*RED*) no "fixture retry ran an unselected step (got: $out)" ;; *"✓ selected-fixture"*) ok "a fixture retry runs just the selected step" ;; *) no "the selected fixture did not run (got: $out)" ;; esac
+
+cat > "$T/fixture-abort.sh" <<'EOS'
+run_checks() { exit 7; }
+start_fixture_checks agent agent_fixture_pid run_checks
+collect_fixture_checks agent agent_fixture_pid || exit 2
+EOS
+out="$(drive "$T/fixture-abort.sh" 2>&1)"; rc=$?
+if [ "$rc" -eq 2 ] && [[ "$out" == *"did not produce a verdict (exit 7)"* ]]; then
+  ok "a fixture job without results fails closed"
+else
+  no "an interrupted fixture job can pass (rc=$rc, got: $out)"
+fi
+
+cat > "$T/fixture-cleanup.sh" <<'EOS'
+wait_for() {
+  local attempt
+  for attempt in {1..100}; do
+    [ ! -e "$1" ] || return 0
+    sleep 0.05
+  done
+  return 1
+}
+run_checks() {
+  step pending-fixture bash -c '
+    trap '"'"'touch "$1/stopped"; exit 0'"'"' TERM
+    touch "$1/started"
+    while :; do sleep 1; done
+  ' bash "$CANCEL_DIR"
+}
+start_fixture_checks agent agent_fixture_pid run_checks
+wait_for "$CANCEL_DIR/started" || exit 2
+old_tmp="$gate_tmp"
+cleanup_gate
+agent_fixture_pid=""
+wait_for "$CANCEL_DIR/stopped" && [ ! -e "$old_tmp" ] && echo FIXTURE-CLEANED || exit 2
+EOS
+out="$(CANCEL_DIR="$T" drive "$T/fixture-cleanup.sh" 2>&1)"; rc=$?
+if [ "$rc" -eq 0 ] && [[ "$out" == *FIXTURE-CLEANED* ]]; then
+  ok "gate cleanup signals the running fixture command and removes its output"
+else
+  no "fixture cleanup left a job or its output (rc=$rc, got: $out)"
+fi
 
 # --- 4. all green: no verdict, no report ----------------------------------------------------------------
 cat > "$T/s4.sh" <<'EOS'

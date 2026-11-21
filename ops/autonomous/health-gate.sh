@@ -35,8 +35,23 @@ export PATH="$ROOT/ops/autonomous/bin:$PATH"
 # step's children, and a harness that drives the real step() on its own fixture steps (prove-gate-report.sh,
 # prove-vm-lane.sh) skipped them all and failed on the retry meant to cure a flake.
 _gate_only="${AUTONOMOUS_GATE_ONLY:-}"; unset AUTONOMOUS_GATE_ONLY; export -n _gate_only 2>/dev/null
-LOG="$(mktemp)"; fails=""
-trap 'rm -f "$LOG"' EXIT
+gate_tmp="$(mktemp -d)" || exit 2
+LOG="$gate_tmp/failures"; fails=""
+agent_fixture_pid=""; script_fixture_pid=""
+cleanup_gate() {
+  local pid
+  for pid in "$agent_fixture_pid" "$script_fixture_pid"; do
+    [ -n "$pid" ] || continue
+    kill -TERM -- "-$pid" 2>/dev/null || true
+  done
+  for pid in "$agent_fixture_pid" "$script_fixture_pid"; do
+    [ -n "$pid" ] && wait "$pid" 2>/dev/null || true
+  done
+  rm -rf -- "$gate_tmp"
+}
+trap cleanup_gate EXIT
+trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
+: > "$LOG" || exit 2
 
 # Run a named check; record a failure without aborting (no set -e); on failure, append THAT STEP'S OWN tail
 # to $LOG.
@@ -56,7 +71,7 @@ step() {
   # A retry names only the steps that failed (AUTONOMOUS_GATE_ONLY); the rest already passed at this tip.
   case " ${_gate_only:-} " in "  "|*" $name "*) ;; *) return 0 ;; esac
   printf '── %s ──\n' "$name"
-  local out _t=$SECONDS; out="$(mktemp)"
+  local out _t=$SECONDS; out="$(mktemp "${LOG%/*}/step.XXXXXX")" || exit 2
   if "$@" >"$out" 2>&1; then
     echo "  ✓ $name"
   else
@@ -86,7 +101,7 @@ step_skippable() {
   # anywhere in the file — including one left by an earlier step — as this step's reason. ($LOG is now
   # failures-only for the same class of reason; see step() above. Only the `*)` arm contributes to it —
   # a skip and a known-failure are both reported inline, and neither is what RED is asking about.)
-  local out _t=$SECONDS; out="$(mktemp)"
+  local out _t=$SECONDS; out="$(mktemp "${LOG%/*}/step.XXXXXX")" || exit 2
   "$@" >"$out" 2>&1; local rc=$?
   case "$rc" in
     0) echo "  ✓ $name" ;;
@@ -106,7 +121,56 @@ step_skippable() {
   rm -f "$out"
 }
 
+# These proofs use separate scratch trees, do not acquire the live heavy lock, and do not
+# build or launch real apps. Their Git operations still run with the normal Git configuration.
+agent_fixture_checks() {
+  step agent-hooks-proof /usr/bin/python3 -m unittest discover -s "$ROOT/ops/agent/tests"
+}
 
+script_fixture_checks() {
+  step write-surface-lint-proof bash "$ROOT/ArchiveReader/scripts/test-lint-write-surface.sh"
+  step processor-write-surface-lint-proof bash "$ROOT/ArchiveProcessor/scripts/test-lint-write-surface.sh"
+  # Verify the legacy daemon's Codex flags, usage handling and refusals with a stub CLI.
+  step codex-agent-proof bash "$ROOT/ops/autonomous/tests/prove-codex-agent.sh"
+  step docsync-packages-proof bash "$ROOT/ops/autonomous/tests/prove-docsync-packages.sh"
+  step gui-vm-proof bash "$ROOT/ops/autonomous/tests/prove-gui-vm.sh"
+  step worker-supervisor-proof bash "$ROOT/ops/autonomous/tests/prove-worker-supervisor.sh"
+  step done-union-proof bash "$ROOT/ops/autonomous/tests/prove-done-union.sh"
+  step housekeeping-proof bash "$ROOT/ops/autonomous/tests/prove-housekeeping.sh"
+  step review-cadence-proof bash "$ROOT/ops/autonomous/tests/prove-review-cadence.sh"
+}
+
+start_fixture_checks() {
+  local job="$1" pid_var="$2"; shift 2
+  # Give this job its own process group so a gate timeout also stops its descendants.
+  set -m
+  (
+    set +m
+    trap - EXIT HUP INT TERM
+    LOG="$gate_tmp/$job.failures"; fails=""
+    : > "$LOG" || exit 2
+    "$@"
+    printf '%s\n' "$fails" > "$gate_tmp/$job.result"
+  ) </dev/null > "$gate_tmp/$job.output" 2>&1 &
+  printf -v "$pid_var" '%s' "$!"
+  set +m
+}
+
+collect_fixture_checks() {
+  local job="$1" pid_var="$2" rc=0 fixture_fails
+  wait "${!pid_var}" || rc=$?
+  printf -v "$pid_var" '%s' ""
+  cat "$gate_tmp/$job.output" || return 2
+  if [ "$rc" -ne 0 ] || ! IFS= read -r fixture_fails < "$gate_tmp/$job.result"; then
+    echo "The $job fixture checks did not produce a verdict (exit $rc)." >&2
+    return 2
+  fi
+  cat "$gate_tmp/$job.failures" >> "$LOG" || return 2
+  fails="$fails$fixture_fails"
+}
+
+start_fixture_checks agent agent_fixture_pid agent_fixture_checks
+start_fixture_checks script script_fixture_pid script_fixture_checks
 # ── Tier-2 script gates that nothing was running (W26.lint-fu, 2026-08-07) ────────────────────────
 # Five harnesses shipped across Wave 26, each the mechanism proof for a Core-Directive or
 # de-Spotlight guarantee — and every one of them had NO CALLER anywhere in the repo. The
@@ -124,9 +188,7 @@ step_skippable() {
 # wired (the item's "the gate must not start RED"), and each failure mode is a fact about the source,
 # never inconclusive.
 step write-surface-lint       bash "$ROOT/ArchiveReader/scripts/lint-write-surface.sh"
-step write-surface-lint-proof bash "$ROOT/ArchiveReader/scripts/test-lint-write-surface.sh"
 step processor-write-surface-lint       bash "$ROOT/ArchiveProcessor/scripts/lint-write-surface.sh"
-step processor-write-surface-lint-proof bash "$ROOT/ArchiveProcessor/scripts/test-lint-write-surface.sh"
 # W40.a5: every Processor test driver / headless contract is `#if DEBUG`, so none ships in Release.
 step processor-release-drivers-lint       bash "$ROOT/ArchiveProcessor/scripts/lint-release-drivers.sh"
 step processor-release-drivers-lint-proof bash "$ROOT/ArchiveProcessor/scripts/lint-release-drivers.sh" --self-test
@@ -245,9 +307,6 @@ step compact-proof bash "$ROOT/ops/autonomous/tests/prove-compact.sh"
 #     retry and fail-open outcomes, and per-app artifact isolation without starting a VM, Xcode, or GUI.
 step status-proof   bash "$ROOT/ops/autonomous/tests/prove-status.sh"
 step dispatch-proof bash "$ROOT/ops/autonomous/tests/prove-daemon-dispatch.sh"
-# prove-codex-agent.sh (~35 s) — the `--agent codex` lane: the flags codex exec runs with, the closed stdin
-# and scrubbed env, the rollout-file usage window and its wait, and the refusals. A stub codex; no network.
-step codex-agent-proof bash "$ROOT/ops/autonomous/tests/prove-codex-agent.sh"
 # prove-gate-fix.sh (~75 s) — a red gate goes to a fix session before it may park (owner, 2026-10-05).
 step gate-fix-proof bash "$ROOT/ops/autonomous/tests/prove-gate-fix.sh"
 # prove-source-restart.sh (~20 s) — restart-on-source-change installs only committed, parseable daemon code,
@@ -256,11 +315,9 @@ step source-restart-proof bash "$ROOT/ops/autonomous/tests/prove-source-restart.
 # step_skippable, not step: this harness greps with `rg`, which is a brew prereq rather than a repo file,
 # so a machine without ripgrep must report ⊘ NOT VERIFIED — not park the run. See the harness header.
 step_skippable keychain-partition-proof bash "$ROOT/ops/autonomous/tests/prove-keychain-partition.sh"
-step docsync-packages-proof  bash "$ROOT/ops/autonomous/tests/prove-docsync-packages.sh"
 step gate-report    bash "$ROOT/ops/autonomous/tests/prove-gate-report.sh"
 step handoff-proof  bash "$ROOT/ops/autonomous/tests/prove-handoff.sh"
 step vm-lane-proof  bash "$ROOT/ops/autonomous/tests/prove-vm-lane.sh"
-step gui-vm-proof   bash "$ROOT/ops/autonomous/tests/prove-gui-vm.sh"
 
 # W26.fixwarn-fu1 (2026-08-10) — the SIX remaining hermetic harnesses. Wiring them one at a time is how this
 # list came to be wrong five times: `f64649b` swept four in, W26.fixwarn found a fifth, and counting them to
@@ -296,20 +353,12 @@ step heavy-work-proof     bash "$ROOT/ops/autonomous/tests/prove-heavy.sh"
 #   path: two projects never overlap, a dead holder is reclaimed, a wait is watchdog work and not gate time,
 #   and a heavy-run.py mutant without the take turns it red.
 step mac-heavy-lock-proof bash "$ROOT/ops/autonomous/tests/prove-mac-heavy-lock.sh"
-step worker-supervisor-proof bash "$ROOT/ops/autonomous/tests/prove-worker-supervisor.sh"
 step usage-pace-proof     bash "$ROOT/ops/autonomous/tests/prove-usage-pace.sh"
 step measure-workers-proof bash "$ROOT/ops/autonomous/tests/prove-measure-workers.sh"
 step worker-claims-proof  bash "$ROOT/ops/autonomous/tests/prove-worker-claims.sh"
 step dep-gating-proof     bash "$ROOT/ops/autonomous/tests/prove-dep-gating.sh"
 step tracker-sync-proof   bash "$ROOT/ops/autonomous/tests/prove-tracker-sync.sh"
 step todo-stubs-proof     bash "$ROOT/ops/autonomous/tests/prove-todo-stubs.sh"
-# prove-done-union.sh (~9 s) — W35.done-union: SUITE_TODO_DONE.md's append-only + merge=union rule, in scratch
-#   repos with the real .gitattributes. Shipped unwired, which turned gate-report red (gate-fix 2026-10-08).
-step done-union-proof     bash "$ROOT/ops/autonomous/tests/prove-done-union.sh"
-# ops/agent/tests (~25 s) — the Agent Manager hooks (queue, holds, status, gate, upkeep) against scratch fixture
-#   repos. Unwired until 2026-10-13, so Status.test_counts_and_health failed for a day with nothing to notice it.
-step agent-hooks-proof    /usr/bin/python3 -m unittest discover -s "$ROOT/ops/agent/tests"
-step housekeeping-proof   bash "$ROOT/ops/autonomous/tests/prove-housekeeping.sh"
 step host-gui-proof       bash "$ROOT/ops/autonomous/tests/prove-no-host-gui.sh"
 # prove-heavy-unlocked.sh (~3 s, 35/0) — the hook that refuses a kraken, ketos, layout-order or mlx_vlm run
 #   outside the heavy lock (the 2026-10-31 panic).
@@ -319,9 +368,10 @@ step heavy-unlocked-proof bash "$ROOT/ops/autonomous/tests/prove-heavy-unlocked.
 step pyguard-proof        bash "$ROOT/ops/autonomous/tests/prove-pyguard.sh"
 step exit-log-proof       bash "$ROOT/ops/autonomous/tests/prove-exit-logging.sh"
 step harness-lifecycle-proof python3 "$ROOT/ops/autonomous/tests/prove-harness-lifecycle.py"
-step review-cadence-proof bash "$ROOT/ops/autonomous/tests/prove-review-cadence.sh"
 # W40.root-marker's hermetic disclosure proof must run with the rest of the watched harnesses.
 step root-marker-policy-proof bash "$ROOT/ops/autonomous/tests/prove-root-marker-policy.sh"
+collect_fixture_checks agent agent_fixture_pid || exit 2
+collect_fixture_checks script script_fixture_pid || exit 2
 
 # ── HEAVY STEPS, after every light one (efficiency plan round 2, 2026-10-07) ─────────────────────────────
 # Everything above is hermetic and lock-free, so it runs first and a RED there lands in the first minutes
