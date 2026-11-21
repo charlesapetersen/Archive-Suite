@@ -279,7 +279,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would clear it:** the loop produces a confirmation for each sole-instance item, one after another, or one
   batched confirmation naming both. After confirming, neither A nor B is still filed in F without having been
   asked about.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.notes-suspects-small-check`); test `ArchiveNotesTests/NotesSmallSuspectTests` `s010MultiRemove`
+- **Status:** `reproduced` — independently confirmed, queued as `W49.fix-notes-multi-remove`; [evidence](evidence/notes/W49.notes-suspects-small-check.md); test `ArchiveNotesTests/NotesSmallSuspectTests` `s010MultiRemove`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
@@ -290,6 +290,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     set, so which one varies). Confirming it trashed the note it named, and only that one; the other stayed filed in
     F with no alert. Nothing was deleted beyond what was confirmed. The menu comment says "confirms one at a time",
     which promises more than happens, so this is not intended behaviour.
+  - 2026-11-21 W49.notes-suspects-small-check (Codex, gpt-6.2-sol, `b0539267`) — The VM alert named one of two selected sole-instance notes. Confirming moved precisely that note into the fixture Trash. The other stayed in Reading with no second prompt.
 
 ### S-011 · Row-menu "New from Template" skips the template-body flush and failed-save guard
 
@@ -311,7 +312,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   call the row-menu closure's `model.newItem`, and assert that a note is created.
 - **Would clear it:** the row-menu path flushes and refuses the same way the toolbar path does, or the new note
   holds the marker.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.notes-suspects-small-check`); tests `ArchiveNotesTests/NotesSmallSuspectTests` `s011RowMenuSkipsFlush`, `s011RowMenuSkipsFailedSaveGuard`
+- **Status:** `reproduced` — independently confirmed, queued as `W49.fix-notes-template-create`; [evidence](evidence/notes/W49.notes-suspects-small-check.md); tests `ArchiveNotesTests/NotesSmallSuspectTests` `s011RowMenuSkipsFlush`, `s011RowMenuSkipsFailedSaveGuard`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
@@ -322,6 +323,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     typed and still waiting to save is missing from the note the row menu's New from Template ▸ T makes, and
     present in one `NewItemFlow` makes. With T's last body save refused (read-only template folder),
     `NewItemFlow` makes nothing and the row menu makes a note from the stale body.
+  - 2026-11-21 W49.notes-suspects-small-check (Codex, gpt-6.2-sol, `b0539267`) — Dispatching the AppKit row command created from the prior saved body both with a flush pending and after a real failed scratch save. Standard New flushed the first draft and refused creation after the failed save.
 
 ### S-012 · The tag filter may miss every tag entered in the app unless it is typed with the stored capitals
 
@@ -341,7 +343,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   assert that `nav.displayed` contains the note. Confirmed if it is empty.
 - **Would clear it:** the note is displayed, i.e. the filter or the stored tag is normalised somewhere this
   reading missed.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.notes-suspects-small-check`); test `ArchiveNotesTests/NotesSmallSuspectTests` `s012TagFilterCase`
+- **Status:** `reproduced` — independently confirmed for the full lowercase token, queued as `W49.fix-notes-tag-filter-case`; [evidence](evidence/notes/W49.notes-suspects-small-check.md); test `ArchiveNotesTests/NotesSmallSuspectTests` `s012TagFilterCase`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
@@ -354,6 +356,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     "intel" through `NotesModel.addTag` is stored "Intel" and the list filtered by "intel" is empty. The comment
     there says "the filter bar supplies canonical tokens", which it does not for this case. Advanced Search
     lower-cases both sides (`NotesAdvancedSearch.swift:242`), so it finds the note.
+  - 2026-11-21 W49.notes-suspects-small-check (Codex, gpt-6.2-sol, `b0539267`) — The VM confirmed the exact-input path. The filter chip `fieldwork` hid the note tagged `Fieldwork` on disk. After clearing, the chip `Fieldwork` found it. The complete token was pasted and submitted with Return.
 
 ### S-013 · An `archivenotes://` link may be dropped when the Notes window is closed
 
@@ -396,7 +399,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   tracking.
 - **Would clear it:** the in-session case yields `.needsRootGrant` or `.searchIncomplete`, or the owner rules that
   "not found" is correct for a vanished root and `W40.b5` corrects the promise.
-- **Status:** `reproduced` — the code calls it the W8-S9 rule, so the owner is asked first (rule 5a(3), Daemon Report 2026-11-20); then the independent check, `W49.notes-suspects-small-check`; test `ArchiveNotesTests/NotesSmallSuspectTests` `s014MovedRoot`
+- **Status:** `reproduced` — independently confirmed, queued as `W49.fix-notes-moved-root`; [evidence](evidence/notes/W49.notes-suspects-small-check.md); test `ArchiveNotesTests/NotesSmallSuspectTests` `s014MovedRoot`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
@@ -411,6 +414,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   - 2026-11-20 owner walkthrough of 13:42 (call 29) — option (a): when the root was moved or renamed in session,
     Notes asks for the folder (Choose Archive Folder) or says the search could not finish; it never says the file is
     gone. The fix follows the independent check `W49.notes-suspects-small-check`.
+  - 2026-11-21 W49.notes-suspects-small-check (Codex, gpt-6.2-sol, `b0539267`) — The production chooser and resolver with isolated scratch bookmarks returned `.notFound` after an in-session rename, even with the old preview scope released. A fresh root store located the original file at the new path. Reopening the same source preview in the VM displayed “Source file not found in the archive.”
 
 ### S-015 · The list's `[`, `]` and `\` keys may fire inside the inline tag editor, and `\` would mark a file Read
 
@@ -446,7 +450,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   unit test that sets `tableView.sortDescriptors` on the live table and checks `NotesNavigationModel`'s sort.
   Confirmed if the order does not change.
 - **Would clear it:** the rows reorder by title.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.notes-suspects-small-check`); test `ArchiveNotesTests/NotesSmallSuspectTests` `s016HeaderSort`
+- **Status:** `reproduced` — independently confirmed, queued as `W49.fix-notes-header-sort`; [evidence](evidence/notes/W49.notes-suspects-small-check.md); test `ArchiveNotesTests/NotesSmallSuspectTests` `s016HeaderSort`
 - **History:**
   - 2026-10-16 W40.e5 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
@@ -456,6 +460,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     set as the table's sort descriptors (what a header click does): the header takes the Title sort, the model's
     sort and the row order stay by date, and the data source does not respond to
     `tableView(_:sortDescriptorsDidChange:)`. Called by hand, the coordinator's handler sorts by title.
+  - 2026-11-21 W49.notes-suspects-small-check (Codex, gpt-6.2-sol, `b0539267`) — Two actual Title header clicks flipped the sort arrow in the VM. The three fixture notes kept the same row order.
 
 ### S-017 · A pre-OCRed Processor run drops the operator's per-document segmentation review
 

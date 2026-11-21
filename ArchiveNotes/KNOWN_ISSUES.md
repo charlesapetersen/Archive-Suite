@@ -3,6 +3,17 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ⚠️ OPEN — Notes list actions verified on scratch data (2026-11-21)
+
+- **Removing several sole-instance notes from one folder** asks about only one. Confirming moves the
+  named note to Trash and leaves the other in the folder without a second prompt. (queued: W49.fix-notes-multi-remove)
+- **Clicking a sortable column header** changes the arrow and leaves the notes in their prior order.
+  Two clicks on Title flipped the arrow in the scratch library. (queued: W49.fix-notes-header-sort)
+- **A full lowercase tag filter** can omit the notes that carry the same tag with its stored capitals.
+  The VM reproduced this with the complete lowercase token pasted into the filter. (queued: W49.fix-notes-tag-filter-case)
+- **Creating from a template through a row menu** can use the last saved body while an edit is pending
+  or after a save has failed. Standard New flushes the editor and checks for a failed save. (queued: W49.fix-notes-template-create)
+
 ## ✅ FIXED (W49.notes-undo-across-toggle, 2026-11-20) — undo survives the ⌘/ switch between styled and raw
 
 Switching views used to clear undo (`switchMode`'s `removeAllActions`), so an edit made before ⌘/ could not be undone
@@ -938,19 +949,18 @@ entries and yielding periodically.
 slow — it was that the resolver *offered* a main-actor walk over the archive. `resolve` is async-only now, so
 the freeze cannot be reintroduced by a future caller doing the obvious thing.
 
-**A search that did not finish is never reported as absence.** The new `.searchIncomplete(scanned:)` covers
-cancellation, the entry bound and an unwalkable root; the popover says the file "may still be there" rather
-than "not found in the archive". Two boundaries worth not re-litigating:
+**An incomplete search has a distinct result.** The `.searchIncomplete(scanned:)` outcome covers
+cancellation, the entry bound and an unwalkable root. The popover says the file may still be there. A completed search of an available archive can still report an absent source.
+
 - The bound is `1_000_000` entries — an order of magnitude clear of the real corpus (~102k PDFs plus JPEG
   partners plus folders). It exists to stop a pathological mount from searching forever, **not** to cap a
   legitimate archive, so it must stay far above any plausible corpus. Shrinking it to something "reasonable"
   would silently turn real fallback hits into `.searchIncomplete`. (accepted: by design, W23.m14; a bound against a pathological mount, kept far above any real archive).
-- A root directory that **does not exist** still reports `.notFound`, because nothing can be under a
-  directory that isn't there. That keeps the shipped W8-S9 computer-move contract (a stale root reports the
-  file missing, never a wrong file) — `DurableLinkE2ETests` caught the first attempt, which reported the
-  vanished root as an incomplete search. **W23.m14-fu re-confirmed the narrower unplugged-volume case is
-  already handled:** `ReaderRootStore.root(for:)` returns `nil` when its scope cannot start, before any
-  basename scan, and the resolver returns `.needsRootGrant` rather than `.notFound`. (queued: W49.notes-suspects-small-check, whose fix follows the owner's call 29 of 2026-11-20: a root moved or renamed while Notes runs asks for the folder or says the search could not finish, never "not found"; a root that is truly gone still reports the file missing).
+- **An archive folder moved or renamed in session** can return `.notFound` from a search of the old
+  path even though the source still exists. A fresh root store can follow the bookmark. When the scope
+  itself fails to start, `ReaderRootStore.root(for:)` already returns nil and the resolver asks for access.
+  The owner asked Notes to offer the chooser or say the search could not finish in the moved-root case
+  (call 29, 2026-11-20). (queued: W49.fix-notes-moved-root)
 
 Pinned by 10 scratch tests (`ReaderLinkScanTests`). The off-actor proof is structural rather than
 timing-based: the raw progress callback runs on the scanning thread, so `Thread.isMainThread` inside it
