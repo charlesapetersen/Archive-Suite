@@ -262,7 +262,7 @@ it REDs only on a reproducible `** TEST FAILED **` (retry-once). The daemon's ga
 per invocation (W40.vm-gate-unpause, 2026-11-13), rotating over app × chunk via its gitignored
 `.maintenance/gui-vm-next-app` state (`<app> <chunk> <chunks>`, or `AUTONOMOUS_GUI_VM_STATE`); `AUTONOMOUS_GUI_VM_APPS`
 can narrow the pool while diagnosing. On the macOS 27.2 guest no whole lane fits (Notes ~6,250 s of tests, Reader
-~3,000 s) and the rest of the gate takes ~1,400 s of the engine's 3,000 s, so the gate builds once
+~3,000 s) in the VM step's budget, so the gate builds once
 (`build-for-testing`), enumerates, and runs one chunk of at most `AUTONOMOUS_GUI_VM_CHUNK` (600) estimated seconds
 with `test-without-building`; every guest xcodebuild is capped to what is left of the step's
 `AUTONOMOUS_GUI_VM_BUDGET` (1,400 s), and an attempt with no time left SKIPs. A cycle's chunk plan

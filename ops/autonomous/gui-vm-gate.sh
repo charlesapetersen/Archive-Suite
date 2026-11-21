@@ -5,8 +5,8 @@
 #
 # Covers EVERY app that ships a UITest bundle — Reader, Notes, and Processor. ONE CHUNK of one app runs per
 # health-gate invocation, rotating over app × chunk (W40.vm-gate-unpause, 2026-11-13). On the macOS 27.2 guest a
-# whole lane is far over the gate's budget (Notes ~6,250 s of tests in fresh guests, Reader ~3,000 s) while the
-# rest of the gate takes ~1,400 s of the engine's 3,000 s, so each invocation builds the app once
+# whole lane exceeds the VM step's budget (Notes ~6,250 s of tests in fresh guests, Reader ~3,000 s), so each
+# invocation builds the app once
 # (`build-for-testing`), enumerates its selection (tart_enumerate_tests, shared with the runner's VM_SPLIT) and
 # runs one chunk with `test-without-building`. Chunks are planned by ops/gui/vm-chunks.py from measured per-test
 # times (the committed seed ops/gui/vm-test-times.tsv, overridden by what this gate learns from its own passed
@@ -39,7 +39,7 @@
 #
 # Knobs: AUTONOMOUS_GUI_VM_NAME (default archive-gui-runner), AUTONOMOUS_GUI_VM_MAXRUN (cap on one guest
 #        xcodebuild, 1000 s), AUTONOMOUS_GUI_VM_BUDGET (the whole step, 1400 s: every guest xcodebuild is capped
-#        to what is left of it, so the step cannot push the gate past the engine's 3,000 s), AUTONOMOUS_GUI_VM_CHUNK
+#        to what is left of it), AUTONOMOUS_GUI_VM_CHUNK
 #        (estimated test seconds per chunk, 600), AUTONOMOUS_GUI_VM_APPS (default "reader notes processor"),
 #        AUTONOMOUS_GUI_VM_AGENTWAIT (default 240s), AUTONOMOUS_GUI_VM_STATE (rotation state, `app chunk chunks`;
 #        default $ROOT/.maintenance/gui-vm-next-app; the chunk plans and learned times sit beside it).

@@ -1,7 +1,6 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import AppKit
 import Foundation
-import PDFKit
 
 /// W49.proc-suspects-filing (S-035): which review gates a resumed paid batch raises. A finished Gemini batch journal
 /// (every chunk consumed, every page's result and output PDF on disk) is saved into a scratch state directory, and the
@@ -61,7 +60,7 @@ enum ResumeReviewGatesProbe {
         for (i, cls) in classes.enumerated() {
             let photo = input.appendingPathComponent(String(format: "p%02d.jpg", i + 1))
             let pdf = output.appendingPathComponent(String(format: "p%02d.pdf", i + 1))
-            guard writeJPEG(photo, shade: 0.15 * Double(i + 1)), writePDF(pdf) else {
+            guard writeJPEG(photo, shade: 0.15 * Double(i + 1)), writeFixturePDF(pdf) else {
                 finish(["FAIL: fixture files could not be written"])
                 return
             }
@@ -148,13 +147,16 @@ enum ResumeReviewGatesProbe {
         return (try? data.write(to: url)) != nil
     }
 
-    private static func writePDF(_ url: URL) -> Bool {
-        let doc = PDFDocument()
-        let image = NSImage(size: NSSize(width: 100, height: 140), flipped: false, drawingHandler: { rect in
-            NSColor.white.setFill(); rect.fill(); return true })
-        guard let page = PDFPage(image: image) else { return false }
-        doc.insert(page, at: 0)
-        return doc.write(to: url)
+    private static func writeFixturePDF(_ url: URL) -> Bool {
+        var mediaBox = CGRect(x: 0, y: 0, width: 100, height: 140)
+        guard let consumer = CGDataConsumer(url: url as CFURL),
+              let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else { return false }
+        context.beginPDFPage(nil)
+        context.setFillColor(gray: 1, alpha: 1)
+        context.fill(mediaBox)
+        context.endPDFPage()
+        context.closePDF()
+        return FileManager.default.fileExists(atPath: url.path)
     }
 
     private static func finish(_ lines: [String]) {

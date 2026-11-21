@@ -408,7 +408,7 @@ step archivecore-cache        bash "$ROOT/ArchiveProcessor/scripts/test-archivec
 # set AUTONOMOUS_GUI_VM=0 to disable). Fail-open: a missing VM / boot failure / guest-agent timeout SKIPs
 # (so it's inert where no VM is built); only a reproducible UITest failure REDs (park). Runs via
 # step_skippable, NOT step — a lane that ran zero tests must never print ✓ (see its comment).
-# The VM step adds ~15-20 min, which is why the daemon's GATE_MAXRUN is 50 min.
+# The engine's overall gate limit must leave room for the VM step's separate 1,400 s budget after the host checks.
 # See ops/autonomous/gui-vm-gate.sh + ops/gui/README.md §3.
 [ "${AUTONOMOUS_GUI_VM:-1}" = 1 ] && step_skippable gui-vm bash "$ROOT/ops/autonomous/gui-vm-gate.sh"
 
