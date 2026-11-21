@@ -201,13 +201,16 @@ asking the owner for anything:
 | It **renders / behaves** (layout, interaction, a bug repro) | **Off-screen in the Tart VM** (macOS 27.2 with Xcode 27.2, matching the host) — `ops/gui/vm-gui-runner.sh reader\|notes\|processor xcuitest\|sighted\|both` (XCUITest + a VNC pixel grab; artifacts in `~/.tart-mirror/vm-artifacts/<app>/` → **read the shot**). See `ops/gui/README.md` §3. The host loop (`./launch.sh` + `cliclick` + `ops/gui/capture-window.sh`) does the same job but **takes over the physical screen** — interactive sessions only, with the owner's agreement. |
 | **Subjective taste** (does this look right?), an **API key**, or an **account/device** action | Genuinely owner-only — ask. |
 
-**Iterate on single tests in the VM; run a full lane once, at the end (owner, 2026-11-12).** A full app lane on the
-macOS 27.2 guest takes hours (one guest also slows as it runs: run a full lane as `VM_SPLIT=4`, fresh guest per
-chunk, balanced by measured test time; W40.vm-macos27-runtime; the health gate runs one such chunk per invocation), so a session that debugs against full lanes spends most of its wall time waiting. While fixing or checking a test, run only it, or its class, with
-`VM_KEEP=1 ONLY_TESTING=<App>UITests/<Class>[/<test>] ops/gui/vm-gui-runner.sh <app> xcuitest` (`VM_KEEP=1` keeps the
-guest booted between calls; `ops/gui/README.md` §3). A test that fails in a lane but passes
-alone is a lane effect: rerun the lane split before chasing it in the test. The full lane is the
-item's final proof, run once when the targeted runs pass; a second full lane needs a reason in the item's notes.
+**Focused VM tests are sufficient for small fixes (owner, 2026-11-21).** Run the regression and any focused
+tests needed to cover the affected behavior. Use
+`VM_KEEP=1 ONLY_TESTING=<App>UITests/<Class>[/<test>] ops/gui/vm-gui-runner.sh <app> xcuitest`
+to keep the guest booted between calls (see [VM runner guide](ops/gui/README.md)). Once those tests pass,
+the VM verification for a small fix is complete. The health gate supplies broader coverage by rotating
+through one app's test chunk per invocation.
+
+Run a full app suite for an individual fix only when there is a specific reason, such as a change to shared
+GUI behavior that focused tests cannot cover or a failure that appears only across test classes. Record the
+reason in the item's notes, then run the suite with `VM_SPLIT=4` so each chunk gets a fresh guest.
 
 **Reader passes over rendered screens stop early (owner, 2026-11-12).** A wording or layout item that has fresh
 readers judge its offscreen renders (a non-technical reader's pass, a plain-words pass) runs at most three passes,
