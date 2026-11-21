@@ -499,9 +499,10 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
-- **Notes:** **Drift.** README says a chosen folder is searched recursively; the code reads one level
-  (`contentsOfDirectory`, `Views/OCRView.swift:1211`, `:1231`). Suspect `S-028`. `CLAUDE.md` §File Input lists no
-  PDF; the code accepts PDFs in every mode.
+- **Notes:** **Drift at the original trace.** The README described a recursive search while folder intake read one
+  level (S-028). Since W47.ct-processor-intake, the picker and drag-and-drop both call `OCRView.admit`, which asks
+  whether to read subfolders. W49.proc-s049-verify updated the README to describe that choice (S-049). The code
+  accepts PDFs in every mode.
 
 ## Output
 

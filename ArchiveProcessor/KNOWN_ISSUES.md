@@ -2,6 +2,12 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (S-049, 2026-11-21) — the README describes the folder intake prompt
+
+The README now describes the **Read the folders inside?** prompt for a folder with subfolders.
+Verified at baseline `37dbe229` in `OCRView.admit`, `OCRView.answer`, and `ProcessFilesTree.collect`
+(W49.proc-s049-verify).
+
 ## ⚠️ LIMITATION (S-044, independently checked 2026-11-21): the Cost Estimate omits correspondence names
 
 - With names ranked in the collection interview, Automatic tagging and sidecars on, `performTaggingPhase`

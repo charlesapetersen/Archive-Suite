@@ -1179,10 +1179,13 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** ledger `P-22`.
 - **Would confirm it:** the README line beside `Views/OCRView.swift:1505-1543`.
 - **Would clear it:** the README describes the question.
-- **Status:** `open`
+- **Status:** `cleared` — corrected in `ArchiveProcessor/README.md` (W49.proc-s049-verify).
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
   - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s049-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+  - 2026-11-21 W49.proc-s049-verify — confirmed the old README wording against baseline `37dbe229`.
+    `OCRView.admit` asks the question for a folder with subfolders, and `OCRView.answer` passes the choice to
+    `ProcessFilesTree.collect`. The README now describes both choices.
 
 
 ### S-050 · Resuming an interrupted (non-batch) run also skips the per-page review and the box/folder confirmation

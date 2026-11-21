@@ -279,7 +279,9 @@ Process PDFs that already contain OCR text (e.g., from a previous run):
 
 - **Drag and drop** images onto the app window
 - **File selection** via standard macOS open panel
-- **Directory selection** — adds the images in the selected folder (for now only its top level: images in sub-folders are not picked up)
+- **Directory selection** — if you choose or drop a folder with subfolders, Process Files asks **Read the folders inside?**
+  Choose **Read Folders Inside** to include supported files in the folder and its subfolders, or **Only Its Own Files**
+  to add just the supported files directly in the selected folder.
 - Supported formats: JPEG, PNG, TIFF, HEIC, plus PDF (a multi-page PDF is read again page by page; with pre-OCRed input, PDFs only)
 
 ### Other Features
