@@ -1,9 +1,13 @@
 # Archive Suite — Shared Agent Guide
 
-This is the home for standing rules shared by Claude, Codex and other agents. Put new shared rules here and link
-to them from agent-specific prompts or runbooks. Read the root [project guide](CLAUDE.md) for existing suite
-procedures and the touched app's `AGENTS.md` and `CLAUDE.md` for app-specific instructions:
+This is the entry point for Claude, Codex and other agents. Keep each shared rule in its authoritative
+suite, app or workflow guide and link to it from agent-specific instructions. Read the root [project guide](CLAUDE.md)
+for suite procedures and the touched app's `AGENTS.md` and `CLAUDE.md` for app-specific instructions:
 [`ArchiveProcessor/AGENTS.md`](ArchiveProcessor/AGENTS.md) · [`ArchiveReader/AGENTS.md`](ArchiveReader/AGENTS.md) · [`ArchiveNotes/AGENTS.md`](ArchiveNotes/AGENTS.md).
+
+For unattended work, follow the [heavy-work rules](ops/autonomous/README.md#heavy-work-across-workers-w35heavy),
+the [cluster rules](ops/autonomous/README.md#cluster-items--cluster-farmsharesherlock-cluster-reachpy-w46engine-cluster)
+and the GUI verification rules below. Hooks and launch methods vary by agent. The rules apply to every agent.
 
 > 🛑 **If the owner asks for the "daemon report" (or "the report", or the old name "morning review"), that
 > is a WALKTHROUGH — one decision at a time, waiting for each answer, writing nothing.** It is not a summary

@@ -176,6 +176,14 @@ else
   printf '  %s shared-independent-verification — both agents need the independent-check rule in AGENTS.md\n' "$(red '✗')"
   fails=$((fails+1))
 fi
+for app in ArchiveProcessor ArchiveReader ArchiveNotes; do
+  if grep -qxF '@AGENTS.md' "$app/CLAUDE.md" && grep -qF '](CLAUDE.md)' "$app/AGENTS.md"; then
+    printf '  %s %s shared guides\n' "$(green '✓')" "$app"
+  else
+    printf '  %s %s shared guides — restore the links between CLAUDE.md and AGENTS.md\n' "$(red '✗')" "$app"
+    fails=$((fails+1))
+  fi
+done
 
 printf '\n'
 if [ "$fails" -gt 0 ]; then

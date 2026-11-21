@@ -1,9 +1,11 @@
 # Archive Notes — App Guide
 
+@AGENTS.md
+
 Provenance‑first note‑taking from archival PDFs (via Reader) and Zotero references, at
 100k‑note / 2M‑word scale. Third app in the Archive Suite monorepo. Umbrella conventions,
 the shared contract, and the release process live in the root [`CLAUDE.md`](../CLAUDE.md);
-this file is authoritative for Notes‑specific work. It holds the rules and the commands; the file map,
+this guide holds the Notes rules and commands for every agent. The file map,
 per-file descriptions and backstory are in [`REFERENCE.md`](REFERENCE.md), read on demand.
 
 ## Core Directive — file safety

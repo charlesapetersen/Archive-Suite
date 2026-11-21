@@ -4,9 +4,8 @@
 
 Three native macOS apps in one monorepo: **Archive Processor** (capture · OCR · tag),
 **Archive Reader** (find · read · triage), and **Archive Notes** (provenance‑first note‑taking from
-archival sources). This file is the *umbrella* guide — repo‑wide conventions, the shared contract, and
-the release process. **Each app's own `CLAUDE.md` stays authoritative for that app**; read it before
-working inside a subdirectory:
+archival sources). This umbrella guide covers repo-wide conventions, the shared contract and releases
+for every agent. **Each app's own `CLAUDE.md` and `AGENTS.md` apply to work in that app.** Start here:
 
 - [`ArchiveProcessor/CLAUDE.md`](ArchiveProcessor/CLAUDE.md) — the Processor + its iOS/Android capture companions.
 - [`ArchiveReader/CLAUDE.md`](ArchiveReader/CLAUDE.md) — the Reader (incl. its bulletproof file‑safety Core Directive).

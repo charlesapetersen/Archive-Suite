@@ -1,9 +1,11 @@
 # Archive Processor — Project Guide
 
+@AGENTS.md
+
 ## Overview
 A native macOS app for processing collections of historical archive photographs: (1) OCR via LLM models, (2) macOS filesystem tagging, (3) Live Capture from the phone companions, which this guide also covers.
 
-This file holds the rules and commands; reference detail (model lists, per-function descriptions, the
+This guide holds the rules and commands for every agent. Reference detail (model lists, per-function descriptions, the
 **Implementation map**) is in [`REFERENCE.md`](REFERENCE.md), read on demand; it never relaxes a rule here.
 
 ## ⛑️ Recovery Core Directive (data safety) — bulletproof AND always recoverable

@@ -1,10 +1,12 @@
 # Archive Reader — Project Guide
 
+@AGENTS.md
+
 A native macOS app that lets a **historian read through PDFs of historical documents** tagged by the sibling
 app **Archive Processor**: find tagged PDFs, list them chronologically, filter by subject / quality /
 read-state, read them two-up (image + OCR text), copy text and file links, and mark them Read.
 
-This file holds the rules and commands; it is the durable record for the Reader. **Core Directive**,
+This guide holds the Reader's rules and commands for every agent. **Core Directive**,
 **Verified Facts** and **Safety Protocol** are settled and non-negotiable. Reference detail (facts tables,
 architecture, implementation map, keyboard map, options, history) is in [`REFERENCE.md`](REFERENCE.md) — read
 it on demand. It adds mechanism and history; it never relaxes a rule here, and a rule stated more strictly there still binds.
