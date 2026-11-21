@@ -1,6 +1,6 @@
 # Where item facts should live — decision analysis
 
-W49.storage-model-analysis · 2026-11-21 · source baseline `4bffed3d`.
+W49.storage-model-analysis and W49.storage-metadata-review · 2026-11-21. The original source survey used `4bffed3d`. The new scratch measurements are in §12.
 
 **Recommendation: one authoritative JSON companion per PDF, Reader fields for viewing and changing its facts,
 and optional Finder-tag and Spotlight projections.** Keep transcription and the record of how it was made in the
@@ -9,7 +9,7 @@ other apps need not mean immediately understood by them. It has one substantial 
 or Finder move does not carry its companion. If that must always work, choose embedded structured PDF metadata,
 or a document package, instead. No filename, watcher or UUID in the JSON alone removes that price.
 
-This is a read-only design analysis, **not an approved format or permission to convert anything**. No app, SPEC,
+This is a proposal with synthetic scratch evidence, **not an approved format or permission to convert anything**. No app, SPEC,
 setting or archive has changed. It replaces the options and recommendation in the 2026-11-20
 W49.storage-simplify-audit version of this file (history: `8d8d16e1`). The existing gate
 `W49.storage-one-home-owner-ok` remains unanswered. The decision is in §9; refactor sizes and verification are
@@ -471,8 +471,7 @@ corpus migration; it should use the eventual chosen facts contract.
 ## 11. Evidence and verification boundary
 
 Read-only source surveys, followed by manual checks of the surprising findings, were made against `4bffed3d`.
-No corpus pages/text were read, no benchmark/model arm was run, no money spent, no applications launched, and no
-functional storage claim was tested. Platform links support documented constraints, not a claim that an integration
+That first survey used source inspection only. The later scratch-PDF study starts in §12. Platform links support documented constraints, not a claim that an integration
 has passed. Implementation must verify the proposed guarantees; source inspection alone cannot prove them.
 
 Source map (repository-relative, stable symbols):
@@ -503,3 +502,21 @@ concurrent edits and Undo; Notes source dates and Zotero with all four projectio
 and projection failures; exported container context; and actual PDF bytes/images/text/conformance for S’s new identity XMP as well as E’s fact writes, with crash
 recovery. Run on scratch copies only. The writer, SPEC, discovery/index, capture/finalize and concurrency changes
 need Tier-2 adversarial review and functional tests; builds alone cannot establish these properties.
+
+## 12. What a metadata edit actually did on scratch PDFs
+
+W49.storage-metadata-review, 2026-11-21. Source baseline `709603ee`. We changed the same catalog XMP property from year 1958, revision 1, to year 1957, revision 2. Both generated fixtures had two image-and-text pages, an embedded font, a Dublin Core description, and the Suite's ordered `pageHeaders` property. The smaller file also had an ICC output intent and a PDF/A-2b declaration. The larger ordinary PDF had a rotated page, URI link, filled form, outline and text attachment. These sizes exercise different write costs. Neither represents a sample of the owner's archive.
+
+| Writer on a new local copy | 89,395-byte PDF/A input → output bytes / median ms | 9,630,492-byte ordinary input → output bytes / median ms | What changed |
+|---|---:|---:|---|
+| Fixed-length packet edit | 89,395 / 0.14 | 9,630,492 / 5.96 | Two byte positions changed in an uncompressed, unique, equal-length test value. No historical revision was appended. |
+| ExifTool incremental XMP | 91,963 / 114.68 | 9,632,996 / 126.60 | Original bytes remained an exact prefix, including the old year. The active catalog read the new year. qpdf reported clean structure. |
+| pypdf incremental XMP | 91,974 / 1.38 | 9,633,005 / 8.91 | Same prefix and historical value. qpdf reported a missing cross-reference entry for the cross-reference stream itself on **both** outputs. Reject this candidate as tested. |
+| pypdf full document save | 89,398 / 4.01 | 9,630,529 / 10.81 | Re-serialized the file. The original prefix and old JSON literal were absent. Finding no literal is insufficient to establish erasure. |
+
+**Preservation measured.** All eight outputs reopened with the new active value. At 72 dpi, both pages' Poppler pixel hashes were identical to their own baseline, as were extracted text, decoded page-content streams, extracted images, page boxes/rotation and parsed XMP outside the two changed values. Where present, form field values, annotation subtypes, outline titles and attachment bytes matched. veraPDF explicitly validated the small baseline and all four small outputs as PDF/A-2b, five completed jobs with zero failed rules. The pypdf warning survived that green conformance result. The large fixture makes no PDF/A claim. We did not certify every reference in the object graph, every PDF/A profile, tagged accessibility structure, signature validity or third-party re-saves with these observations.
+
+**Timing boundary.** Five staged saves of each input, same machine, median wall time, macOS 27.2.1 arm64, local filesystem. Includes reading the source and writing the candidate, plus process startup and the staging copy for the Perl CLI. Excludes independent verification, transaction journal, file coordination, durable flush, indexing, network and Undo. An append to the PDF format does not mean the library or a cloud provider wrote or transferred only the appended bytes. The fixed-size experiment materialized the whole candidate. An edited value can grow, an XMP stream can be compressed or absent, and packets can have multiple historical copies. Searching an arbitrary PDF for bytes and patching it would be unsafe. A fast save on either fixture is insufficient evidence for enabling Reader writes.
+
+**Reproduce.** The [scratch probe](storage-evidence/metadata_probe.py) creates its own temporary directory and PDFs, accepts no archive path, and prints sizes, all five timings, prefix checks, qpdf diagnostics and veraPDF verdicts. Run `python3 ops/autonomous/heavy-run.py run -- python3 execution-plans/storage-evidence/metadata_probe.py` on a Mac with pypdf 6.7.5, ReportLab 4.4.10, Pillow 12.1.1, ExifTool 13.50, qpdf 12.3.2, Poppler 26.07.0 and veraPDF CLI 1.30.0. Inspect the per-file verdicts. PDF file IDs may vary by run. The private facts property is declared as XMP Text in a distinct test namespace with its PDF/A extension schema, alongside the existing Suite header schema. PDF/A-1/2/3 custom properties require a suitable declaration. A successful XML parse or a `pdfaid` label alone cannot establish conformance. [PDF Association extension schemas](https://pdfa.org/resource/xmp-extension-schema-templates/) · [veraPDF validation profiles and reports](https://docs.verapdf.org/cli/validation/)
+
