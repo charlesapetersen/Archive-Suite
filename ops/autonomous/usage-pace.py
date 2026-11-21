@@ -50,6 +50,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 FIVE_HOUR = 5 * 3600
@@ -117,16 +118,15 @@ def _limits(node):
             yield from _limits(child)
 
 
-def codex_windows(lines):
-    found = {}
+def codex_events(lines):
     for line in lines:
         if '"rate_limits"' not in line:
             continue
         try:
-            limits = list(_limits(json.loads(line)))
+            event = json.loads(line)
         except ValueError:
             continue
-        for value in limits:
+        for value in _limits(event):
             windows = {}
             for key in ("primary", "secondary"):
                 window = value.get(key)
@@ -139,7 +139,18 @@ def codex_windows(lines):
                 if kind and math.isfinite(reading[0]):
                     windows[kind] = reading
             if windows:
-                found = windows
+                stamp = event.get("timestamp") if isinstance(event, dict) else None
+                try:
+                    read_at = datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp() if stamp else None
+                except (AttributeError, ValueError, OverflowError, OSError):
+                    read_at = None
+                yield windows, read_at
+
+
+def codex_windows(lines):
+    found = {}
+    for windows, _ in codex_events(lines):
+        found = windows
     return found
 
 
@@ -168,17 +179,32 @@ def codex_sources(codex_home, now, keep=30):
 
 def codex_usage(paths, now):
     """Select the current window for usage-window.sh, or its last expired reading."""
-    expired = None
+    best = expired = None
     for path in paths:
-        windows = codex_windows(tail_lines(path))
+        try:
+            mtime = Path(path).stat().st_mtime
+            event = next(codex_events(reversed(tail_lines(path))), None)
+            if event is None:
+                # A large tool response can push the last reading out of the tail.
+                with open(path, encoding="utf-8", errors="replace") as source:
+                    for event in codex_events(source):
+                        pass
+        except OSError:
+            continue
+        if event is None:
+            continue
+        windows, stamp = event
+        read_at = stamp if stamp is not None else mtime
         current = {kind: reading for kind, reading in windows.items() if reading[1] > now}
         if current:
             week = current.get("weekly")
             kind = "weekly" if (week and week[0] >= 1) or "five_hour" not in current else "five_hour"
-            return kind, current[kind]
-        if expired is None and windows:
-            expired = max(windows.items(), key=lambda pair: pair[1][1])
-    return expired
+            if best is None or read_at > best[0]:
+                best = (read_at, (kind, current[kind]))
+        elif expired is None or read_at > expired[0]:
+            expired = (read_at, max(windows.items(), key=lambda pair: pair[1][1]))
+    selected = best or expired
+    return selected[1] if selected else None
 
 
 def band(used, reset, length, now):

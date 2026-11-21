@@ -7,6 +7,7 @@ or real ~/.codex is read: every source path is a scratch file.
 Run --source-dir /path/to/ops/autonomous to inspect another worktree's sources.
 """
 import argparse
+from datetime import datetime, timezone
 import importlib.util
 import json
 import os
@@ -198,6 +199,22 @@ class Sources(unittest.TestCase):
         limits["primary"]["used_percent"] = 100
         path.write_text(json.dumps(event) + "\n")
         out = subprocess.check_output(command + [str(path)], env=env, text=True)
+        self.assertTrue(out.startswith("weekly window 100% used"), out)
+
+    def test_usage_window_uses_newest_event_even_when_buried_in_an_older_file(self):
+        now = int(time.time())
+        reset = now + H
+
+        def event(used, recorded):
+            line = json.loads(codex_line(10, reset, used, reset))
+            line["timestamp"] = datetime.fromtimestamp(recorded, timezone.utc).isoformat()
+            line["payload"]["rate_limits"]["primary"] = None
+            return json.dumps(line)
+
+        self.write("sessions/rollout-stale.jsonl", [event(12, now - 60)], now)
+        self.write("sessions/rollout-current.jsonl", [event(100, now - 20), "x" * (2 * pace.TAIL)], now - 10)
+        out = subprocess.check_output(["bash", str(SOURCE / "usage-window.sh"), "--codex-latest"],
+                                      env=dict(os.environ, CODEX_HOME=str(self.root)), text=True)
         self.assertTrue(out.startswith("weekly window 100% used"), out)
 
     def test_highest_current_reading_wins_whatever_the_mtimes(self):

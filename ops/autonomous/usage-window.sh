@@ -13,7 +13,7 @@
 # into the `codex exec --json` stream, as `"rate_limits":{…"primary":{"used_percent":91.0,"window_minutes":300,
 # "resets_at":<epoch>},"secondary":{…weekly…}}`. usage-pace.py identifies each window by its duration.
 # Report the active five-hour window when available, the weekly window when it is the only one or is exhausted.
-# With --codex-latest or a Codex worker's no-argument call, consider rollouts across the account.
+# With --codex-latest or a Codex worker's no-argument call, use the newest reading across the account.
 #
 # USAGE:  usage-window.sh [--raw] [--codex-latest | LOG]    LOG defaults to $STATE/last-session.log
 # OUTPUT: "five-hour window 73% used, resets 18:10 (in 67 min)"; with --raw, "73 1790555400".
