@@ -17624,3 +17624,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 - [x] **W49.reader-s003-reproduce-check — check the S-003 reproduction in an independent session [S]** · §Known limits are queued, accepted or asked (lane: reader) (uses: build,vm) — SHIPPED 2026-11-21 (this commit). Phase rule 5a(4), owner call 28. Codex gpt-6.2-sol independently confirmed the Claude Opus 5.5 model reproduction by typing “California” in Reader's real window in the headless VM. The corrupt-index fixture went from 12 rows to zero, showing “No matches” over a list whose status bar said “Search index unavailable”. After the scratch cache was rebuilt, the same query found 10 rows and displayed OCR snippets.
   [Reproduction and screenshot](verification/evidence/reader/W49.reader-s003-reproduce-check.md). Filed W49.fix-reader-dead-index-overlay. The original model check remains available for the fix. The independent UI probe was temporary. No bench cache used.
   <!-- /W49.reader-s003-reproduce-check -->
+- [x] **W49.storage-one-home — one home for each fact the user corrects, as the owner chose** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-21 (this commit)
+  Owner call 32 selected one authoritative adjacent JSON record per PDF. Converted the approved design into
+  bounded implementation items starting with W49.storage-contract and ending with W49.storage-pilot.
+  Reconciled the existing field mapping, Finder rename, Improve OCR, redundant dates, movable-root and
+  scratch adoption items with that sequence. The optional segment JSON remains distinct. Finder and
+  Spotlight choices and any real-corpus change still require separate decisions. Implementation is tracked
+  by the stages in [execution-plans/storage-simplify.md](execution-plans/storage-simplify.md#15-delivery-sequence-dependencies-and-exit-tests).
+  <!-- /W49.storage-one-home -->

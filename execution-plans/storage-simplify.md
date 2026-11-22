@@ -627,8 +627,19 @@ Implement the S stages in scratch roots. Enable real writes only after the write
 - **E → S.** Extract the latest *active* packet and identity into new companions in a distinct root. Use a known original PDF if its content generation still matches, or preserve the newer verified content revision. An embedded packet in a retained historical PDF is a snapshot under S. Ensure the new root and consumer contract select the companion explicitly. Verify receipts, links, fields and byte preservation before switching. Never truncate an incremental tail or restore a stale whole-file backup as a general Undo.
 - **Stop conditions.** A lost explicit clear/check, altered page or unexpected XMP, changed signature coverage, failed conformance, ambiguous duplicate, older app writing the pilot, or missing source/record during recovery stops rollout. Keep both roots and affected candidates for reconciliation. Archive-wide cutover is distinct from testing this plan. Any real-corpus write requires separate owner authorization.
 
-**Dependency handoff.** Call 32 answers `W49.storage-one-home-owner-ok` with S. Start
-`W49.storage-one-home` by filing bounded items from the S stages. Reconcile `W49.item-fields-home`,
-`W49.storage-drop-dead-copies`, `W49.proc-item-fields-rerun`, `W49.reader-item-fields-rename`, and
-`W49.reader-root-movable` with the companion contract and their own open decisions. Cloud editing stays
-with `W49.reader-cloud-drives` at its existing priority. Adoption of the real archive requires separate approval.
+**Queued implementation.** Call 32 selects S. W49.storage-one-home is the planning handoff.
+The items below carry implementation and acceptance. Every stage starts on scratch roots.
+
+| Stage | Queue items |
+|---|---|
+| 1 · Contract | `W49.storage-contract` (schema and association fixtures), then `W49.item-fields-home` (field mapping) |
+| 2 · Shared reads | `W49.storage-reads` |
+| 3S · Coordinated writer and local pairing | `W49.storage-writer` for edits and `W49.storage-pair-recovery` for paired filing, with Finder rename/reassociation in `W49.reader-item-fields-rename` |
+| 4 · Processor | `W49.storage-processor`, followed by `W49.proc-item-fields-rerun` for Improve OCR and restore |
+| 5 · Reader | `W49.storage-reader`, followed by `W49.reader-root-movable` for moved-root behavior and cache reuse |
+| 6 · Consumer parity and transfer | `W49.storage-notes-zotero` and `W49.storage-export`, followed by `W49.storage-drop-dead-copies` |
+| 7 · Optional projections | `W49.storage-finder` and `W49.storage-spotlight` keep the decisions separate. |
+| 8 · Adoption, pilot and rollback | `W49.corpus-adoption-tool` implements scratch conversion after Processor filing. `W49.storage-pilot` verifies the integrated flow and rollback after the remaining stages. |
+
+Cloud editing stays with `W49.reader-cloud-drives` at its existing priority. Real archive writes require
+separate approval.
