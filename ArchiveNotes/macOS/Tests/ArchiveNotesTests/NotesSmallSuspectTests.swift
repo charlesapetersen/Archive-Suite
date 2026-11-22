@@ -114,7 +114,7 @@ struct NotesSmallSuspectTests {
     // MARK: - S-016
 
     /// S-016: a click on a list column header sets the table's sort descriptors from the column's prototype.
-    @Test("S-016: setting the Title sort on the list's own table re-sorts the notes")
+    @Test("S-016: the list's table re-sorts by Title in both directions")
     func s016HeaderSort() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
         let stamp = Date(timeIntervalSince1970: 0)
@@ -137,19 +137,15 @@ struct NotesSmallSuspectTests {
         let title = try #require(table.tableColumns.first { $0.identifier.rawValue == NotesTableView.titleColumnID })
         let prototype = try #require(title.sortDescriptorPrototype, "the Title header is sortable")
 
-        // What NSTableHeaderView does on a click on a sortable column.
+        // The same descriptor changes AppKit makes for the first click and the direction toggle.
         table.sortDescriptors = [prototype]
-        #expect(table.sortDescriptors.first?.key == prototype.key, "the header shows the Title sort")
-        withKnownIssue("S-016: the sort callback is on the delegate, so NSTableView never calls it") {
-            #expect(env.nav.sort.first?.field.rawValue == prototype.key)
-            #expect(env.nav.displayed.map(\.title) == ["Alpha", "Beta"])
-        }
-        // The cause: the table asks its data source, which does not answer; the handler itself works.
-        let selector = #selector(NSTableViewDataSource.tableView(_:sortDescriptorsDidChange:))
-        #expect(table.dataSource?.responds(to: selector) != true)
-        let coordinator = try #require(table.delegate as? NotesTableView.Coordinator)
-        coordinator.tableView(table, sortDescriptorsDidChange: [])
-        #expect(env.nav.displayed.map(\.title) == ["Alpha", "Beta"], "called by hand, the handler sorts")
+        #expect(env.nav.sort.first == NoteSortDescriptor(field: .title, ascending: true))
+        #expect(env.nav.displayed.map(\.title) == ["Alpha", "Beta"])
+
+        let reversed = try #require(prototype.reversedSortDescriptor as? NSSortDescriptor)
+        table.sortDescriptors = [reversed]
+        #expect(env.nav.sort.first == NoteSortDescriptor(field: .title, ascending: false))
+        #expect(env.nav.displayed.map(\.title) == ["Beta", "Alpha"])
     }
 
     // MARK: - S-010

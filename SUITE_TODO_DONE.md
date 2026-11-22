@@ -17507,3 +17507,9 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   preview test on a generated VM archive cover the original grant, the PDF preview and the in-session rename.
   The scratch unit regression also checks bookmark recovery with a fresh root store. No bench cache used.
   <!-- /W49.fix-notes-moved-root -->
+
+- [x] **W49.fix-notes-header-sort — Sort notes when a column header is clicked [S]** · §Known limits are queued, accepted or asked (lane: notes) (uses: build,vm) — S-016 (S3). Dispatch primary header sorting through the table data source and verify both directions. Keep s016HeaderSort as the regression.
+  SHIPPED 2026-11-21 (this commit). The table's data-source callback updates the list sort. Notes smoke
+  passed, including the retained regression. Two Title clicks in the focused off-screen test sorted
+  three scratch notes ascending and then descending. No bench cache used.
+  <!-- /W49.fix-notes-header-sort -->

@@ -140,6 +140,9 @@ struct NotesTableView: NSViewRepresentable {
         // Rows are draggable onto folder-tree rows: MOVE (plain) / REPLICATE (⌥) — W6-S5.
         tableView.setDraggingSourceOperationMask([.move, .copy], forLocal: true)
         tableView.sortDescriptors = sortDescriptorsFromModel()
+        dataSource.onSortDescriptorsChanged = { [weak coordinator] descriptors in
+            coordinator?.applyHeaderSort(descriptors)
+        }
 
         coordinator.applySnapshot(model.displayed.map(\.id), animated: false)
         coordinator.syncSelection(selection)
@@ -528,9 +531,9 @@ struct NotesTableView: NSViewRepresentable {
             parent.selection = newSel
         }
 
-        func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
+        func applyHeaderSort(_ sortDescriptors: [NSSortDescriptor]) {
             guard !isSortingFromModel else { return }
-            let descriptors = tableView.sortDescriptors.compactMap { sd -> NoteSortDescriptor? in
+            let descriptors = sortDescriptors.compactMap { sd -> NoteSortDescriptor? in
                 guard let key = sd.key, let field = NoteSortField(rawValue: key) else { return nil }
                 return NoteSortDescriptor(field: field, ascending: sd.ascending)
             }
@@ -789,7 +792,7 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
     @objc private func resetSort(_ sender: NSMenuItem) { onResetSort?() }
 }
 
-// MARK: - Drag-source data source
+// MARK: - Diffable data source
 
 /// `NSTableViewDiffableDataSource` subclass that makes rows draggable, carrying the row's item id
 /// (06-viewers §5, W6-S5). The payload is **ids only** — the custom `com.archivenotes.item-ids` type
@@ -797,8 +800,13 @@ final class ColumnPickerHeaderView: NSTableHeaderView {
 /// No file bytes ever cross the pasteboard.
 @MainActor
 final class NotesTableDataSource: NSTableViewDiffableDataSource<Int, UUID> {
-    // Optional NSTableViewDataSource method (not declared on the diffable superclass, so no `override`);
-    // @objc-exposed via the inherited NSTableViewDataSource conformance so NSTableView calls it.
+    var onSortDescriptorsChanged: (([NSSortDescriptor]) -> Void)?
+
+    // Expose the optional NSTableViewDataSource callbacks through the inherited conformance.
+    @objc func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
+        onSortDescriptorsChanged?(tableView.sortDescriptors)
+    }
+
     @objc func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
         let ids = snapshot().itemIdentifiers(inSection: 0)
         guard row >= 0, row < ids.count else { return nil }

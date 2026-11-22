@@ -340,22 +340,25 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Promised in:** `SMOKE_TEST.md` step D; `CLAUDE.md` Impl Map `NotesSort`, `ItemSummaryDisplay`;
   `00-overview.md` §7, §16.5.
 - **Reached by:**
-  - **Primary sort:** a header click calls `sortDescriptorsDidChange` (`Views/NotesTableView.swift:389-396`). That
-    runs `NotesNavigationModel.setSort` (`Core/NotesNavigationModel.swift:247`), which recomputes the list with
-    `NotesSort.sorted` (`Core/NotesSort.swift:30`). Missing values sort last in either direction (`:47-70`).
+  - **Primary sort:** a header click calls `NotesTableDataSource.tableView(_:sortDescriptorsDidChange:)` in
+    `Views/NotesTableView.swift`. The coordinator forwards the new descriptors to `NotesNavigationModel.setSort`,
+    which recomputes the list with `NotesSort.sorted`. Missing values sort last in either direction.
   - **Secondary sort:** header right-click ▸ "Set as Secondary Sort" (`Views/NotesTableView.swift:466-478`).
   - **Uncertain dates:** the date cell is italic when the date is uncertain (`:306-309`).
 - **Real-path test:** `ArchiveNotesTests/NotesSortTests.dateAscendingUndatedLast` and `.multiLevelDateThenTitle`;
   `ArchiveNotesTests/ItemSortDateTests.testItemSortDateMatchesArchiveCoreSharedFormula` (with `.testMedieval`,
-  `.testDecadeStart1970s`, `.testUncertainDateStillSorts`). No UITest clicks a header.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+  `.testDecadeStart1970s`, `.testUncertainDateStillSorts`); `NotesSmallSuspectTests.s016HeaderSort` and
+  `NotesHeaderSortUITests.testTitleHeaderSortsRowsInBothDirections`.
+- **Runtime evidence:** W49.fix-notes-header-sort verified the Title header on three VM fixture rows. Date order
+  began with Moore, Lovelace, My First Note. Two clicks produced Lovelace, Moore, My First Note, then My First
+  Note, Moore, Lovelace.
+- **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
+  - 2026-11-21 W49.fix-notes-header-sort — primary header sorting fixed, with both directions tested for Title.
 - **Notes:** a non-empty search swaps the sort to relevance and swaps it back on clear
   (`Core/NotesNavigationModel.swift:474-477`). The promise draft records no W9.e2 result.
-  2026-10-16 `W40.e5`: Periphery reports `sortDescriptorsDidChange` unused, and the code reads that way (it sits
-  on the delegate, not the data source), so the header-click path above may be dead: suspect `S-016`.
+  W40.e5 raised `S-016` after finding the unused delegate callback.
 
 ### N-10 · Empty-list guidance
 

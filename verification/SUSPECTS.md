@@ -460,7 +460,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   unit test that sets `tableView.sortDescriptors` on the live table and checks `NotesNavigationModel`'s sort.
   Confirmed if the order does not change.
 - **Would clear it:** the rows reorder by title.
-- **Status:** `reproduced` — independently confirmed, queued as `W49.fix-notes-header-sort`; [evidence](evidence/notes/W49.notes-suspects-small-check.md); test `ArchiveNotesTests/NotesSmallSuspectTests` `s016HeaderSort`
+- **Status:** `cleared` — fixed by W49.fix-notes-header-sort. Regression `NotesSmallSuspectTests.s016HeaderSort`. [Original reproduction](evidence/notes/W49.notes-suspects-small-check.md#s-016--title-column-clicks-change-the-arrow-and-leave-the-rows-in-place).
 - **History:**
   - 2026-10-16 W40.e5 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
@@ -471,6 +471,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     sort and the row order stay by date, and the data source does not respond to
     `tableView(_:sortDescriptorsDidChange:)`. Called by hand, the coordinator's handler sorts by title.
   - 2026-11-21 W49.notes-suspects-small-check (Codex, gpt-6.2-sol, `b0539267`) — Two actual Title header clicks flipped the sort arrow in the VM. The three fixture notes kept the same row order.
+  - 2026-11-21 W49.fix-notes-header-sort — After wiring the data-source callback, the two clicks reordered the
+    three fixture notes by Title ascending and then descending in the focused VM regression.
 
 ### S-017 · A pre-OCRed Processor run drops the operator's per-document segmentation review
 

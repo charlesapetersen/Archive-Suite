@@ -3,6 +3,11 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W49.fix-notes-header-sort, 2026-11-21) — sortable column headers reorder notes
+
+Clicking a sortable header now reorders the rows with the arrow. Clicking the same header again reverses the
+order. `NotesSmallSuspectTests.s016HeaderSort` covers both directions through the table's data source.
+
 ## ✅ FIXED (W49.fix-notes-tag-filter-case, 2026-11-21) — tag filters match across letter case
 
 The filter bar and saved smart folders match whole tags regardless of capitalization.
@@ -25,8 +30,6 @@ regression is `NotesTextLossSuspectTests.s019TypedCloserAfterUnclosedHeader`.
 
 ## ⚠️ OPEN — Notes list actions verified on scratch data (2026-11-21)
 
-- **Clicking a sortable column header** changes the arrow and leaves the notes in their prior order.
-  Two clicks on Title flipped the arrow in the scratch library. (queued: W49.fix-notes-header-sort)
 - **Creating from a template through a row menu** can use the last saved body while an edit is pending
   or after a save has failed. Standard New flushes the editor and checks for a failed save. (queued: W49.fix-notes-template-create)
 
