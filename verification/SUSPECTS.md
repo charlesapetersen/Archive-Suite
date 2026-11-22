@@ -709,7 +709,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `P-17`, `P-19`.
 - **Would confirm it:** encode one oversized JPEG through both paths at 100% and compare the bytes sent.
 - **Would clear it:** both paths send the same size.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-money-check`); [`evidence/processor/W49.proc-suspects-money.md`](evidence/processor/W49.proc-suspects-money.md), `ArchiveProcessor/scripts/repro-suspects-money.sh`
+- **Status:** `reproduced` — independently confirmed; fix queued as `W49.proc-fix-s026`. [VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
@@ -718,6 +718,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     then batch, redirected to the stand-in: a 2000×1500, 8.8 MB scan went up at 1169×877 (0.9 MB) direct and as the file
     itself in batch; a 6000×4000 scan at 1606×1071 direct and 2048×1365 in batch. Both paths cap at 2,048 px, so a scan
     goes up whole only when it is already within the cap. Nothing calls it deliberate.
+  - 2026-11-21 W49.proc-suspects-money-check (Codex gpt-6.2-sol at `f2b51e98`, original Claude Opus 5.5 in `325a3455`) — At 100% and the 3 MB standard size, direct Gemini sent 602,467 B at 985×739. Batch sent the original 12,349,513 B at 2000×1500. Both routes retain the 2,048-pixel cap.
 
 ### S-027 · Batch mode is offered for providers with no batch, and still changes the run
 
@@ -730,7 +731,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** OpenAI selected, Batch on, page kinds on: check the estimate and whether the run read pages
   with the per-kind reader.
 - **Would clear it:** the toggle is disabled there, or those sites test `provider.supportsBatch`.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-money-check`); [`evidence/processor/W49.proc-suspects-money.md`](evidence/processor/W49.proc-suspects-money.md), `ArchiveProcessor/scripts/repro-suspects-money.sh`
+- **Status:** `reproduced` — independently confirmed; fix queued as `W49.proc-fix-s027`. [VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
@@ -740,6 +741,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     read by GPT-5.4 mini instead, and the estimate's batch figure was $0.0105 against $0.0210; off, all four went to
     GPT-5 nano. The pane's batch line tests the raw flag (code; not drawn). Nothing intends a run with no batch to lose
     its readers.
+  - 2026-11-21 W49.proc-suspects-money-check (Codex gpt-6.2-sol at `f2b51e98`, original Claude Opus 5.5 in `325a3455`) — Settings disables Batch for OpenAI. A stored on value still displays a $0.0052 batch estimate against $0.0105 standard and suppresses page-reader choices. Both standard requests used GPT-5.4 mini, where both with Batch off used the chosen GPT-5 nano.
 
 ### S-028 · A chosen folder is read one level deep; nested photos are silently left out
 
@@ -833,7 +835,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** choose Gemini only with no Gemini key, three pages on a cheap OCR model; watch when the prompt
   appears.
 - **Would clear it:** Start is disabled, or the run stops before OCR.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-money-check`); [`evidence/processor/W49.proc-suspects-money.md`](evidence/processor/W49.proc-suspects-money.md), `ArchiveProcessor/scripts/repro-suspects-money.sh`
+- **Status:** `reproduced` — independently confirmed; fix queued as `W49.proc-fix-s032`. [VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
@@ -841,6 +843,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     the chooser with no Gemini key, three photos, Automatic: all three pages were OCRed, then the window stage asked
     "Gemini needs an API key." (pages read 3/3). The run is resumable, so the reads are kept if the user adds the key and
     resumes. The chooser's comment promises the start gate, so it is not intended.
+  - 2026-11-21 W49.proc-suspects-money-check (Codex gpt-6.2-sol at `f2b51e98`, original Claude Opus 5.5 in `325a3455`) — With Automatic tagging and Gemini-only segmentation, Start made three OCR requests before the missing-key alert. The interrupted run offered Stop and resume later.
 
 ### S-033 · A tag reply with no year and `date_uncertain: false` gets no date tags at all
 
@@ -993,7 +996,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `P-50`.
 - **Would confirm it:** in a driver, hand off twice and count the files Process Files receives.
 - **Would clear it:** the second hand-off is empty or refused.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-money-check`); [`evidence/processor/W49.proc-suspects-money.md`](evidence/processor/W49.proc-suspects-money.md), `ArchiveProcessor/scripts/repro-suspects-money.sh`
+- **Status:** `reproduced` — independently confirmed; fix queued as `W49.proc-fix-s039`. [VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
@@ -1001,6 +1004,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     the run the pane hands the same six over again, and a relaunched app restores them and its run OCRs all six again (12
     OCR calls for six photos). Each hand-off still needs Start pressed. Keeping the photos is deliberate (the backup is
     the only copy); nothing calls the repeat hand-off deliberate.
+  - 2026-11-21 W49.proc-suspects-money-check (Codex gpt-6.2-sol at `f2b51e98`, original Claude Opus 5.5 in `325a3455`) — Live Capture handed off the same two photos after a successful Process Files run and again after relaunch. A second Start read both photos again. The handoff itself sent zero requests.
 
 ### S-040 · A year typed on the phone keeps the day the OCR read from another date
 

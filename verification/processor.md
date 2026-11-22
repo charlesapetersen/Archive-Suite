@@ -88,13 +88,14 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   §2.2.
 - **Reached by:** drop files on the drop zone (`Views/OCRView.swift:901`) → `costEstimate` (`:197`) →
   `GroupBox("Cost Estimate")` (`:631`): "Total (standard)" (`:694`), "Total (batch)" (`:703`, `ap.ocr.batchTotal`).
-- **Real-path test:** none for the image path. `ProcessorUITests.testMultiPageScratchPDFDisablesTaggingAndExplainsAutoReOCR`
-  asserts only `ap.ocr.pdfPageCost`; the Local Agent UITest asserts `ap.ocr.localAgentCost`. Nothing checks
-  standard and batch together or the update on add, remove or model change.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Real-path test:** `MoneyJourneyUITests.testStoredBatchFlagOnOpenAIStillSuppressesPageReaders`
+  compares standard and batch estimates in Process Files and inspects the requests sent on Start.
+  `ProcessorUITests.testMultiPageScratchPDFDisablesTaggingAndExplainsAutoReOCR` checks `ap.ocr.pdfPageCost`.
+- **Runtime evidence:** OpenAI showed a $0.0052 batch estimate alongside a $0.0105 standard estimate with the stored Batch flag on. Both reads took the standard path. [Independent VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
+- **Status:** `broken` — W49.proc-fix-s027 (S2) for unsupported batch estimates.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-21 W49.proc-suspects-money-check — `broken` on the tested path.
 - **Notes:** **Drift.** Batch is shown only with batch mode on, no gateway and no pre-OCRed input (`:701`).
   Vision, Local Agent and an unpriced gateway replace the dollar figure (`:554`, `:603`, `:621`). The Gemini
   refusal reader's cost is excluded from the totals (`:713-718`). See also S-027.
@@ -337,10 +338,11 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** `scripts/test-ocr-page-kind.sh` (`OCRPAGEKIND_TEST=1`, `OCR/OCRPageKindTestDriver.swift`):
   classifier weights, routing, the plan, the estimate, the real `performOCRCall`, history and a row render. Not
   covered: the Settings toggle, the Start freeze, drag and drop.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** With Batch off, two OpenAI pages followed the GPT-5 nano selection. With Batch stored on, the menu disappeared and both standard requests used GPT-5.4 mini. [Independent VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
+- **Status:** `broken` — W49.proc-fix-s027 (S2) when Batch is stored on for OpenAI.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-21 W49.proc-suspects-money-check — `broken` on the tested path.
 - **Notes:** limits are in Processor `KNOWN_ISSUES.md` (PDFs are not classified; the 0.8 floor is unmeasured). The
   feature is dropped whenever the raw batch toggle is on, even for a provider with no batch (S-027).
 
@@ -388,12 +390,13 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   `OCR/OCRProcessor.swift:117`).
 - **Real-path test:** `scripts/test-manifest-persistence.sh` check B8 calls `targetDimensionScale` directly. Not
   covered: the encode itself, the batch path.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** at 100% and a 3 MB target, direct Gemini submitted 602,467 B at 985×739. Gemini batch submitted the original 12,349,513 B at 2000×1500. [Independent VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
+- **Status:** `broken` — W49.proc-fix-s026 (S2) for batch sizing.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-21 W49.proc-suspects-money-check — `broken` for a dense JPEG in Gemini batch.
 - **Notes:** **Drift.** The batch path is not size-based: it passes the raw slider fraction to
-  `ImageEncoding.loadImageAsJPEG(scale:)` (`OCR/OCRProcessor+OCR.swift:787-801`). Suspect `S-026`.
+  `ImageEncoding.loadImageAsJPEG(scale:)` (`OCR/OCRProcessor+OCR.swift:787-801`). The shared cap remains 2,048 px (S-026).
 
 ### P-18 · Parallel OCR workers and previous-page image context
 
@@ -440,8 +443,7 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-18 W40.d4 — real batch submit, poll, collect and a cancel: `works` for Anthropic and Mistral.
-- **Notes:** the toggle is not disabled for OpenAI or OpenRouter, which have no batch
-  (`Models/ProviderModels.swift:36-40`), nor for the Local Agent. Suspect `S-027`.
+- **Notes:** Settings disables Batch for unsupported providers. A stored Batch flag still affects standard OpenAI runs and their estimates (S-027). [Independent VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
 
 ### P-20 · Automatic retry and the retry dialog
 
@@ -671,11 +673,13 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** `ArchiveProcessorUITests/ProcessorUITests.testSegmentationChooserShowsEachApproachWithFiguresAndCost`
   drives the real picker; `scripts/test-segmentation-chooser.sh` checks the figures. Not covered: the `glm` and
   `local` rows, plan-versus-key cost lines, the Gemini preselect.
-- **Runtime evidence:** none in `verification/evidence/`. The `W36.seg-opt-proof` record in `SUITE_TODO_DONE.md` ran
+- **Runtime evidence:** Start let three pages run through OpenAI OCR before reporting the missing Gemini segmentation key. [Independent VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
+  The `W36.seg-opt-proof` record in `SUITE_TODO_DONE.md` ran
   the approaches end to end; it predates this ledger and is not in the evidence form.
-- **Status:** `unproven`
+- **Status:** `broken` — W49.proc-fix-s032 (S2) for the missing-key Start check.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-21 W49.proc-suspects-money-check — `broken` on the tested path.
 - **Notes:** **Drift.** ChatGPT gets tokens and an approximate dollar figure, not a plan share
   (`Segmentation/SegmentationChooser.swift:253-257`); only Claude has a meter. Suspect `S-032`.
 
@@ -1143,11 +1147,13 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   `Capture/LiveCaptureRecoveryTestDriver.swift:3927`, `:4015` check the filtering in `orderedFilesAndGroups`.
 - **Runtime evidence:** 2026-10-21 · W40.d5 · [`evidence/processor/W40.d5-live-capture.md`](evidence/processor/W40.d5-live-capture.md): two photos from the phone, "Process 2 →", Process Files listed both
   with the session's tagging mode and the cost line.
-- **Status:** `works`
+  Two scratch photos were offered again after processing and after relaunch. Each produced two OCR requests. [Independent VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
+- **Status:** `broken` — W49.proc-fix-s039 (S2) for repeat handoff after completing processing.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-10-21 W40.d5 — `works`.
-- **Notes:** suspect `S-039` (the same photos can be handed off twice).
+  - 2026-11-21 W49.proc-suspects-money-check — `broken` on the tested path.
+- **Notes:** handing off the files itself sends zero OCR requests. Repeating Start reads the same originals again.
 
 ### P-51 · Process live
 

@@ -786,6 +786,7 @@ extension OCRProcessor {
     nonisolated static var pendingStateDirectoryFromEnvironment: URL {
 #if DEBUG
         if PaidBatchUITestFixture.isActive { return PaidBatchUITestFixture.stateDirectory }
+        if MoneyJourneyFixture.isActive { return MoneyJourneyFixture.directory.appendingPathComponent("state") }
 #endif
         let env = ProcessInfo.processInfo.environment
         return pendingStateDirectory(testFlag: env[batchResumeTestEnvKey],

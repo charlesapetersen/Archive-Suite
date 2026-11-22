@@ -149,6 +149,7 @@ enum NetworkSession {
     nonisolated static var activeTestTransport: (@Sendable (URLRequest) async throws -> (Data, URLResponse))? {
 #if DEBUG
         if PaidBatchUITestFixture.isActive { return PaidBatchUITestFixture.transport }
+        if MoneyJourneyFixture.isActive { return MoneyJourneyFixture.transport }
         guard let stub = testTransport,
               (testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[OCRProcessor.batchResumeTestEnvKey])

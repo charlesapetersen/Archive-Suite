@@ -2,6 +2,22 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## Stage for later offers already-processed photos (S-039)
+
+- Live Capture handed off the same two photos after a successful Process Files run and again after relaunch. A second Start read both photos again. The handoff itself sent zero requests. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s039)
+
+## Gemini segmentation reports its missing key after OCR (S-032)
+
+- With Automatic tagging and Gemini-only segmentation, Start made three OCR requests before the missing-key alert. The interrupted run offered Stop and resume later. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s032)
+
+## Gemini batch OCR bypasses the file-size target (S-026)
+
+- At 100% and the 3 MB standard size, direct Gemini sent 602,467 B at 985×739. Batch sent the original 12,349,513 B at 2000×1500. Both routes retain the 2,048-pixel cap. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s026)
+
+## A stored Batch flag affects standard OpenAI runs (S-027)
+
+- Settings disables Batch for OpenAI. A stored on value still displays a $0.0052 batch estimate against $0.0105 standard and suppresses page-reader choices. Both standard requests used GPT-5.4 mini, where both with Batch off used the chosen GPT-5 nano. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s027)
+
 ## FIXED (S-052, 2026-11-21) — Process Files reports failed gateway label requests
 
 The run summary counts labels with usable gateway fields and reports failed attempts separately.

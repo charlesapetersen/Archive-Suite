@@ -246,6 +246,10 @@ struct OCRView: View {
 
     private func reloadAPIKey() {
 #if DEBUG
+        if MoneyJourneyFixture.isActive {
+            apiKey = MoneyJourneyFixture.dummyKey
+            return
+        }
         if PaidBatchUITestFixture.isActive {
             apiKey = PaidBatchUITestFixture.dummyKey
             return

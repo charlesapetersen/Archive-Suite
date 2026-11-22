@@ -49,6 +49,7 @@ struct ContentView: View {
             // The UI test needs the exact no-sheet regeneration window, but manufacturing it through a
             // real finalize would write files. This explicit launch switch changes only the observed model
             // flag: no receiver, OCR, Keychain, network, source, or output directory is touched.
+            MoneyJourneyFixture.receiveScratchPhotosIfRequested(in: capture)
             if ProcessorUITestConfiguration.showsLiveCaptureFinishingScrim {
                 capture.liveProcessor._uiTestShowFinishingScrim()
             }

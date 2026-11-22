@@ -1,0 +1,268 @@
+import AppKit
+import CryptoKit
+import XCTest
+
+/// Off-screen scratch journeys for the four spending suspects. The fixture intercepts requests after
+/// encoding and before the wire. The tests enter through the app's actual Process and Start buttons.
+@MainActor
+final class MoneyJourneyUITests: XCTestCase {
+    private var app: XCUIApplication!
+    private var root: URL!
+
+    override func setUp() async throws {
+        continueAfterFailure = false
+        app = .archiveProcessorUITestApp()
+    }
+
+    override func tearDown() async throws { app?.terminate() }
+
+    func testStageForLaterOffersTheSamePhotosAfterProcessingAndRelaunch() throws {
+        try preparePhotos(count: 2)
+        launch(extra: ["-APUITestReceiveScratchPhotos"], staged: true)
+        try handOff()
+        start()
+        waitForDone(count: 2)
+        let first = try requestRecords()
+        XCTAssertEqual(first.count, 2)
+        XCTAssertEqual(Set(first.map(\.digest)).count, 2)
+
+        try handOff()
+        XCTAssertEqual(try requestRecords(), first, "the handoff alone sends no provider requests")
+        shot("s039-second-handoff")
+        app.terminate()
+        launch(staged: true)
+        try handOff()
+        shot("s039-relaunch-handoff")
+        start()
+        waitForDone(count: 2)
+        let repeated = try requestRecords()
+        XCTAssertEqual(repeated.count, 4)
+        for call in first { XCTAssertEqual(repeated.filter { $0 == call }.count, 2) }
+        print("[s039] two distinct photos handed off again after completion and after relaunch: \(repeated)")
+    }
+
+    func testStartReadsPagesBeforeMissingGeminiSegmentationKey() throws {
+        try preparePhotos(count: 3)
+        launch(tagging: "automatic", extra: ["-segmentationApproach", "gemini"])
+        XCTAssertTrue(try requestRecords().isEmpty)
+        start()
+        let missing = text(containing: "Gemini needs an API key.")
+        let confirm = app.sheets.containing(.staticText, identifier: "Confirm Box & Folder Labels").firstMatch
+        let deadline = Date().addingTimeInterval(35)
+        while !missing.exists && Date() < deadline {
+            if confirm.exists { confirm.buttons["Confirm"].click() }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        XCTAssertTrue(missing.exists, app.debugDescription)
+        let calls = try requestRecords()
+        XCTAssertEqual(calls.map(\.route), ["openai", "openai", "openai"])
+        XCTAssertEqual(Set(calls.map(\.digest)).count, 3)
+        shot("s032-missing-key-after-three-reads")
+        print("[s032] the real Start made \(calls.count) page reads before the Gemini key alert")
+        app.buttons["Stop and resume later"].firstMatch.click()
+    }
+
+    func testGeminiDirectAndBatchSendDifferentImageSizes() throws {
+        let directInput = try preparePhotos(count: 1, width: 2000, height: 1500)
+        launch(provider: "Gemini")
+        start()
+        waitForDone(count: 1)
+        let direct = try XCTUnwrap(try requestRecords().only)
+        XCTAssertEqual(direct.route, "gemini-direct")
+        app.terminate()
+
+        let batchInput = try preparePhotos(count: 1, width: 2000, height: 1500)
+        XCTAssertEqual(batchInput, directInput, "both runs start from the same JPEG bytes")
+        launch(provider: "Gemini", batch: true)
+        start()
+        let deadline = Date().addingTimeInterval(35)
+        while try requestRecords().isEmpty && Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        let batch = try XCTUnwrap(try requestRecords().only)
+        XCTAssertEqual(batch.route, "gemini-batch")
+        XCTAssertEqual(batch.model, direct.model)
+        XCTAssertEqual(batch.pixels, "2000x1500")
+        XCTAssertEqual(batch.bytes, directInput.count)
+        XCTAssertEqual(batch.digest, SHA256.hash(data: directInput).map { String(format: "%02x", $0) }.joined())
+        XCTAssertLessThan(direct.bytes, batch.bytes)
+        let directWidth = try XCTUnwrap(direct.pixels.split(separator: "x").first.flatMap { Int($0) })
+        XCTAssertLessThan(directWidth, 2000)
+        print("[s026] source \(directInput.count) B, direct \(direct), batch \(batch)")
+    }
+
+    func testStoredBatchFlagOnOpenAIStillSuppressesPageReaders() throws {
+        try preparePhotos(count: 2)
+        let routing = ["-APUITestScratchPageKinds", "-ocrPageKindRouting", "YES"]
+        launch(extra: routing)
+        let readers = element("ap.ocr.pageKindBatch")
+        XCTAssertTrue(readers.waitForExistence(timeout: 15))
+        revealInCostPanel(readers)
+        readers.click()
+        let nano = app.menuItems["OpenAI · GPT-5 nano for every page"].firstMatch
+        XCTAssertTrue(nano.waitForExistence(timeout: 5), app.debugDescription)
+        nano.click()
+        XCTAssertFalse(element("ap.ocr.batchTotal").exists)
+        XCTAssertTrue(element("ap.ocr.institutionalComputeChoose").exists)
+        start()
+        waitForDone(count: 2)
+        let standard = try requestRecords()
+        XCTAssertEqual(standard.map(\.model), ["gpt-5-nano", "gpt-5-nano"])
+        app.terminate()
+
+        try preparePhotos(count: 2)
+        launch(batch: true, extra: routing)
+        let total = element("ap.ocr.batchTotal")
+        XCTAssertTrue(total.waitForExistence(timeout: 10))
+        XCTAssertFalse(readers.exists, "the same reader setting no longer offers page readers")
+        XCTAssertFalse(element("ap.ocr.institutionalComputeChoose").exists)
+        revealInCostPanel(total)
+        print("[s027] displayed batch total \(renderedText(total))")
+        shot("s027-openai-shows-batch-estimate")
+        let settings = app.showSettingsWindow()
+        XCTAssertTrue(app.showSettingsPanel("Pages and output"))
+        let toggle = settings.descendants(matching: .any)["ap.settings.batchMode"].firstMatch
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+        reveal(toggle, in: settings.scrollViews.firstMatch)
+        XCTAssertFalse(toggle.isEnabled)
+        XCTAssertTrue(text(containing: "OpenAI has no batch API here.").exists)
+        shot("s027-openai-batch-disabled")
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(settings.waitForNonExistence(timeout: 5))
+        start()
+        waitForDone(count: 2)
+        let flagged = try requestRecords()
+        XCTAssertEqual(flagged.map(\.route), ["openai", "openai"])
+        XCTAssertEqual(flagged.map(\.model), ["gpt-5.4-mini", "gpt-5.4-mini"])
+        print("[s027] batch off \(standard); stored batch on \(flagged)")
+    }
+
+    private func launch(provider: String = "OpenAI", batch: Bool = false, tagging: String = "none",
+                        extra: [String] = [], staged: Bool = false) {
+        let out = root.appendingPathComponent("out").path
+        app.launchArguments = UITestLaunch.arguments([
+            "-APUITestMode", "-APUITestMoneyJourney", "-APUITestOutputDirectory", out, "-outputDirectory", out,
+            "-selectedProvider", provider, "-selectedModelId_OpenAI", "gpt-5.4-mini",
+            "-selectedModelId_Gemini", "gemini-3.8-flash", "-batchMode", batch ? "YES" : "NO",
+            "-taggingModeRaw", tagging, "-enableCollectionSegmentation", "NO",
+            "-rotationModeRaw", "off", "-reviewRotation", "NO", "-reviewDocumentSegmentation", "NO",
+            "-outputImageFile", "NO", "-mergeDocuments", "NO", "-sendPreviousImage", "NO",
+            "-useInstitutionalComputeImport", "NO", "-skipAlreadyProcessed", "NO", "-preOCRedInput", "NO",
+            "-useAppleVision", "NO", "-useLocalAgent", "NO", "-useGateway", "NO",
+            "-ocrHandwritingOnTyped", "NO", "-imageResolutionPercent", "100", "-standardImageSizeMB", "3",
+            "-liveProcessingMode", "stageForLater"
+        ] + (staged ? [] : ["-APUITestInputImages", root.appendingPathComponent("in").path]) + extra)
+        app.launchEnvironment = [
+            "ARCHIVEPROC_HEADLESS": "1",
+            "ARCHIVEPROC_TEST_BACKUP_ROOT": root.appendingPathComponent("backup").path
+        ]
+        app.launch()
+        XCTAssertTrue(element("ap.mode.picker").waitForExistence(timeout: 15))
+    }
+
+    private func handOff() throws {
+        let main = app.windows.containing(.any, identifier: "ap.mode.picker").firstMatch
+        let live = [main.radioButtons["Live Capture"], main.buttons["Live Capture"]].first { $0.exists }
+        try XCTUnwrap(live).click()
+        let process = main.buttons["Process 2 →"]
+        XCTAssertTrue(process.waitForExistence(timeout: 10) && process.isEnabled)
+        process.click()
+        for index in 1...2 {
+            XCTAssertTrue(text(containing: String(format: "%06d-doc.jpg", index)).waitForExistence(timeout: 10))
+        }
+    }
+
+    private func start() {
+        let button = element("ap.ocr.start")
+        XCTAssertTrue(button.waitForExistence(timeout: 10) && button.isEnabled, app.debugDescription)
+        revealInCostPanel(button)
+        button.click()
+    }
+
+    private func revealInCostPanel(_ control: XCUIElement) {
+        reveal(control, in: app.scrollViews.firstMatch)
+        XCTAssertTrue(control.isHittable, control.debugDescription)
+    }
+
+    private func reveal(_ control: XCUIElement, in scroll: XCUIElement) {
+        func centerIsVisible() -> Bool {
+            let frame = control.frame
+            return scroll.frame.insetBy(dx: 0, dy: 4).contains(CGPoint(x: frame.midX, y: frame.midY))
+        }
+        // Accessibility reports a partially clipped Start as hittable. Its click is delivered to
+        // the center, so scroll far enough for that exact point to be inside the viewport.
+        for _ in 0..<12 where !centerIsVisible() { scroll.scroll(byDeltaX: 0, deltaY: -140) }
+        XCTAssertTrue(centerIsVisible(), control.debugDescription)
+    }
+
+    private func waitForDone(count: Int) {
+        let done = text(containing: "Done. \(count) succeeded, 0 failed.")
+        XCTAssertTrue(done.waitForExistence(timeout: 45), app.debugDescription)
+    }
+
+    @discardableResult
+    private func preparePhotos(count: Int, width: Int = 240, height: Int = 320) throws -> Data {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        for child in ["in", "out", "backup", "calls", "state"] {
+            try FileManager.default.createDirectory(at: root.appendingPathComponent(child), withIntermediateDirectories: true)
+        }
+        var jpeg = Data()
+        for index in 1...count {
+            let bitmap = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+                                                        bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false,
+                                                        isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+            let pixels = try XCTUnwrap(bitmap.bitmapData)
+            var value = UInt32(index)
+            for offset in 0..<(bitmap.bytesPerRow * height) {
+                value = value &* 1_664_525 &+ 1_013_904_223
+                pixels[offset] = UInt8(value >> 24)
+            }
+            jpeg = try XCTUnwrap(bitmap.representation(using: .jpeg, properties: [.compressionFactor: 1.0]))
+            try jpeg.write(to: root.appendingPathComponent("in/photo-\(index).jpg"))
+        }
+        return jpeg
+    }
+
+    private struct RequestRecord: Equatable {
+        let route: String
+        let model: String
+        let pixels: String
+        let bytes: Int
+        let digest: String
+    }
+
+    private func requestRecords() throws -> [RequestRecord] {
+        let files = try FileManager.default.contentsOfDirectory(at: root.appendingPathComponent("calls"),
+                                                               includingPropertiesForKeys: nil, options: .skipsHiddenFiles)
+        return try files.map {
+            let values = try String(contentsOf: $0, encoding: .utf8).components(separatedBy: "\t")
+            XCTAssertEqual(values.count, 5)
+            return RequestRecord(route: values[0], model: values[1], pixels: values[2],
+                                 bytes: try XCTUnwrap(Int(values[3])), digest: values[4])
+        }.sorted { $0.digest < $1.digest }
+    }
+
+    private func element(_ id: String) -> XCUIElement { app.descendants(matching: .any)[id].firstMatch }
+
+    private func text(containing fragment: String) -> XCUIElement {
+        app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", fragment, fragment)).firstMatch
+    }
+
+    private func renderedText(_ item: XCUIElement) -> String { (item.value as? String) ?? item.label }
+
+    private func shot(_ name: String) {
+        let screenshot = app.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        let path = root.appendingPathComponent("\(name).png")
+        if (try? screenshot.pngRepresentation.write(to: path)) != nil {
+            print("[shot] \(name): wrote \(path.path)")
+        }
+    }
+}
+
+private extension Array {
+    var only: Element? { count == 1 ? first : nil }
+}

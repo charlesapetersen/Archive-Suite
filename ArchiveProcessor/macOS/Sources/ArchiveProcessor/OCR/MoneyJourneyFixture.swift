@@ -1,0 +1,128 @@
+#if DEBUG
+import CryptoKit
+import Foundation
+import ImageIO
+
+/// Scratch inputs and a no-wire reply for the off-screen spending journeys. Capture uses the normal
+/// persistence path, and the request recorder observes the already-encoded payload at the transport seam.
+enum MoneyJourneyFixture {
+    static let isActive = ProcessInfo.processInfo.environment["ARCHIVEPROC_HEADLESS"] == "1"
+        && ProcessorUITestConfiguration.isActive
+        && ProcessInfo.processInfo.arguments.contains("-APUITestMoneyJourney")
+    static let dummyKey = "scratch-money-no-wire"
+
+    static var directory: URL {
+        guard isActive, let output = ProcessorUITestConfiguration.outputDirectory else {
+            preconditionFailure("Spending journey requires a scratch output directory")
+        }
+        let root = output.deletingLastPathComponent().resolvingSymlinksInPath()
+        guard root.deletingLastPathComponent().path.hasSuffix("/Library/Containers/com.archiveprocessor.uitests.xctrunner/Data/tmp"),
+              UUID(uuidString: root.lastPathComponent) != nil,
+              output.lastPathComponent == "out",
+              output.resolvingSymlinksInPath().path == root.appendingPathComponent("out").path,
+              ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"].map({
+                  URL(fileURLWithPath: $0).resolvingSymlinksInPath().path
+              }) == root.appendingPathComponent("backup").path else {
+            preconditionFailure("Spending journey must use its own temporary output and backup")
+        }
+        for child in ["state", "calls", "in"] {
+            let url = root.appendingPathComponent(child)
+            precondition(url.resolvingSymlinksInPath().path == url.path)
+        }
+        return root
+    }
+
+    @MainActor static func configureIfRequested() {
+        guard isActive else { return }
+        _ = directory
+        if ProcessInfo.processInfo.arguments.contains("-APUITestScratchPageKinds") {
+            PageKindStore.classifyOverride = { _ in PageKind(kind: .typewritten, confidence: 1) }
+            PageKindStore.availableOverride = [.init(provider: .openai, modelID: "gpt-5-nano")]
+        }
+    }
+
+    @MainActor static func receiveScratchPhotosIfRequested(in session: CaptureSession) {
+        guard isActive, ProcessInfo.processInfo.arguments.contains("-APUITestReceiveScratchPhotos"),
+              session.photos.isEmpty else { return }
+        session.beginStageSessionForTest()
+        for index in 1...2 {
+            let photo = directory.appendingPathComponent("in/photo-\(index).jpg")
+            guard let data = try? Data(contentsOf: photo),
+                  session.ingest(jpeg: data, groupId: "doc", seq: index, type: .document,
+                                 quality: nil, year: nil, month: nil, deviceName: "Scratch phone") != nil else {
+                preconditionFailure("Could not receive scratch photo \(index)")
+            }
+        }
+    }
+
+    static let transport: @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
+        guard request.httpMethod == "POST", let url = request.url, let body = request.httpBody,
+              let json = try JSONSerialization.jsonObject(with: body) as? [String: Any] else {
+            throw URLError(.unsupportedURL)
+        }
+        let reading = "[document_start]\nDear friend, this is a synthetic letter dated 12 March 1978."
+        let reply: [String: Any]
+        let images: [Data]
+        let model: String
+        let route: String
+        let status: Int
+        switch (url.host, url.path) {
+        case ("api.openai.com", "/v1/chat/completions"):
+            let messages = json["messages"] as? [[String: Any]] ?? []
+            images = messages.flatMap { $0["content"] as? [[String: Any]] ?? [] }.compactMap { part in
+                guard let field = part["image_url"] as? [String: Any], let dataURL = field["url"] as? String,
+                      let comma = dataURL.firstIndex(of: ",") else { return nil }
+                return Data(base64Encoded: String(dataURL[dataURL.index(after: comma)...]))
+            }
+            model = json["model"] as? String ?? ""
+            route = "openai"
+            status = 200
+            reply = ["choices": [["message": ["content": reading], "finish_reason": "stop"]]]
+        case ("generativelanguage.googleapis.com", let path) where path.hasSuffix(":generateContent"):
+            images = geminiImages(in: json)
+            model = String(url.lastPathComponent.prefix { $0 != ":" })
+            route = "gemini-direct"
+            status = 200
+            reply = ["candidates": [["content": ["parts": [["text": reading]]], "finishReason": "STOP"]]]
+        case ("generativelanguage.googleapis.com", let path) where path.hasSuffix(":batchGenerateContent"):
+            let batch = json["batch"] as? [String: Any]
+            let config = batch?["inputConfig"] as? [String: Any]
+            let requests = config?["requests"] as? [String: Any]
+            images = (requests?["requests"] as? [[String: Any]] ?? []).flatMap {
+                geminiImages(in: $0["request"] as? [String: Any] ?? [:])
+            }
+            model = String(url.lastPathComponent.prefix { $0 != ":" })
+            route = "gemini-batch"
+            status = 400
+            reply = ["error": ["status": "INVALID_ARGUMENT", "message": "Scratch recorder stops after submission."]]
+        default:
+            preconditionFailure("Unexpected provider request in the spending journey")
+        }
+        guard !images.isEmpty, !model.isEmpty else { throw URLError(.cannotDecodeContentData) }
+        for image in images {
+            guard let source = CGImageSourceCreateWithData(image as CFData, nil),
+                  let info = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+                  let width = info[kCGImagePropertyPixelWidth] as? Int,
+                  let height = info[kCGImagePropertyPixelHeight] as? Int else {
+                throw URLError(.cannotDecodeContentData)
+            }
+            let digest = SHA256.hash(data: image).map { String(format: "%02x", $0) }.joined()
+            let record = "\(route)\t\(model)\t\(width)x\(height)\t\(image.count)\t\(digest)"
+            let file = directory.appendingPathComponent("calls").appendingPathComponent(UUID().uuidString)
+            try Data(record.utf8).write(to: file, options: .atomic)
+        }
+        guard let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil) else {
+            throw URLError(.badServerResponse)
+        }
+        return (try JSONSerialization.data(withJSONObject: reply), response)
+    }
+
+    private static func geminiImages(in body: [String: Any]) -> [Data] {
+        let contents = body["contents"] as? [[String: Any]] ?? []
+        return contents.flatMap { $0["parts"] as? [[String: Any]] ?? [] }.compactMap { part in
+            guard let inline = part["inlineData"] as? [String: Any], let data = inline["data"] as? String else { return nil }
+            return Data(base64Encoded: data)
+        }
+    }
+}
+#endif
