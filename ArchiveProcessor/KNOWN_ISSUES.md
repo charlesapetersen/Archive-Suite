@@ -178,7 +178,7 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   editor (the Inspector's Container section, W47.ct-reader-edit). The pre-OCRed PDF route (re-tagging existing PDFs, a new run or a resumed one) reads
   no labels: its outputs are its inputs, and nothing is written beside a source. An output outside the run's output
   folder, missing, or merged into another label's PDF is not recorded, and the summary counts it; so is one whose
-  collection organisation stopped partway (its moves are not reported then). (queued: W49.corpus-specific-audit).
+  collection organisation stopped partway (its moves are not reported then). (asked: W49.corpus-migration-scope-owner-ok).
 - **Process Files reads its labels one at a time before the run's summary.** One Vision pass, and with the gateway one
   call of up to 60 s, per label photo, after organisation ("Reading N box and folder labels…"); Stop ends it with
   nothing written. (accepted: labels are known only after organisation; the read is shown and Stop ends it cleanly).
