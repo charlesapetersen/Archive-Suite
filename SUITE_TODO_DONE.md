@@ -17452,3 +17452,12 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   <!-- /W49.notes-suspects-text-check -->
 - [x] **W49.proc-s045-verify — Live Capture reports failed tagging calls [S]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build) — Owner call 30 (2026-11-21). SHIPPED 2026-11-21 (this commit). Codex gpt-6.2-sol reproduced S-045 through the real headless Live Capture pipeline on scratch data at `7252c39b`. The document whose gateway tagging call got HTTP 500 filed with OCR text and its phone date but no model subjects. The Processing row showed success and Finish reported two files moved with no warning. `computeTags` drops the failure reason. Debug build succeeded, with 24 tagging and 300 Live Capture recovery smoke checks passing. Debug probe and [runtime evidence](verification/evidence/processor/W49.proc-s045-verify.md) retained. Independent Claude confirmation queued as W49.proc-s045-check before filing a fix. $0 and no bench cache used.
   <!-- /W49.proc-s045-verify -->
+
+- [x] **W49.preservation-copies — how the suite keeps a preservation copy when lossy compression is used [M]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-21 (this commit)
+  (lane: suite) (uses: light) — Owner, 2026-11-19 (call 21, the accepted-issues sheet; `execution-plans/processing-review/17-accepted-review.json` entry `p-pair-size`, answers in `answers/17-accepted-review-answers-20261119.json`): owner's note: "we need to queue work to figure out how we want to provide for keeping preservation copies when lossy compression is used." A design note: where the camera original or a lossless copy lives (beside, inside the PDF, a sidecar folder), its size, how the Reader shows it, and the options for the owner's call (needs you). No build.
+  The [design](execution-plans/preservation-copies.md) compares a visible Preservation folder, loose originals,
+  and PDF/A-3 attachments. It recommends preserving the exact intake bytes in the folder and exposing the
+  matching source page in Reader. Existing PDF sizes and illustrative storage estimates are labelled.
+  Implementation waits on W49.preservation-copies-owner-ok. Source and standards review only.
+  No application build, corpus access, uploads, spend or bench cache.
+  <!-- /W49.preservation-copies -->
