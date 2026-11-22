@@ -443,6 +443,17 @@ enum ProcessFilesTestDriver {
         }
         await run.value
 
+        if batch {
+            // Record recovery before the driver's deferred cleanup dismisses the scratch journal.
+            let journal = OCRProcessor.paidBatchJournalState()
+            let recovery = [
+                "journal_on_disk=\(journal.onDisk)",
+                "acknowledged_ids=\(journal.acknowledgedChunkCount)",
+                "banner=\(processor.pendingBatchInfo ?? "")"
+            ]
+            writeMarker(runDir.appendingPathComponent("batch-recovery.tsv").path,
+                        recovery.joined(separator: "\n") + "\n")
+        }
         autopilot.cancel()
         if metered {
             writeMarker(runDir.appendingPathComponent("spend.tsv").path, meter.summary + "\n")

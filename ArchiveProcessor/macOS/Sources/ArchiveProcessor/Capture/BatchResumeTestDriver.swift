@@ -145,7 +145,9 @@ enum BatchResumeTestDriver {
     private static var didRun = false
 
     static func runIfRequested() {
-        guard !didRun, ProcessInfo.processInfo.environment["BATCHRESUME_TEST"] == "1" else { return }
+        let env = ProcessInfo.processInfo.environment
+        // Process Files can borrow the scratch journal location without running this suite alongside it.
+        guard !didRun, env["BATCHRESUME_TEST"] == "1", env["PROCESSFILES_TESTMODE"] != "1" else { return }
         didRun = true
         Task { await run() }
     }

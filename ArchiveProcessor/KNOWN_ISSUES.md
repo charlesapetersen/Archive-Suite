@@ -2,6 +2,13 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## A refused batch create is offered for recovery (S-051)
+
+- **Reproduced 2026-11-21 (Codex gpt-6.2-sol, `eaa9e556`).** Process Files reports uncertainty after a complete
+  Gemini batch-create HTTP 401, keeps a journal with zero acknowledged IDs, and offers Resume. A cut-off
+  reply before an ID arrives warrants the uncertainty warning and journal retention. The provider's refusal reason
+  appears in the log only. [Scratch evidence](../verification/evidence/processor/W49.proc-s051-verify.md). (queued: W49.proc-fix-s051)
+
 ## FIXED (S-052, 2026-11-21) — Process Files reports failed gateway label requests
 
 The run summary counts labels with usable gateway fields and reports failed attempts separately.
