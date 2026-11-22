@@ -198,6 +198,12 @@ supplies the initial companion record, and holds the root's grant. The identifyi
 even at the pending name. The caller keeps the original input and is responsible for its own retirement
 ledger and all other retirement checks.
 
+A producer with a prepared working PDF can supply its URL and the physical destination proof saved
+with the request. The filer exclusively stages a copy under the granted directory lock and verifies
+its identity and bytes before claiming the reserved pending name. It compares resumed pending bytes
+with the working copy if a journal has yet to be written. A replaced root or directory with the same
+path fails the saved proof. The working PDF remains available until the producer acts on a receipt.
+
 Under the catalogue parent lock, the filer verifies and flushes the staged files and writes a hidden
 journal containing their pending and final names, physical identities and SHA-256 digests. The journal
 also binds the operation to the granted instance and the physical root and parent directory.
@@ -219,4 +225,6 @@ protocol coordinates same-directory local writes through ArchiveCore. A receipt 
 at verification time. External writers can race a rename of a reserved staging name. The filer then
 withholds a receipt if the resulting files differ from the journal and leaves the available artifacts
 in place. Cloud synchronization and multi-device transactions need their own verification.
-Processor integration will connect this receipt to each output path's existing source-retirement checks.
+Live Capture uses the receipt in its existing filed-group ledger and source-retirement checks. It keeps
+the destination and operation IDs in the staging manifest so a repeated Finish can resume the same
+numbered filing. Optional image and segment JSON exports stay separate.

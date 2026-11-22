@@ -211,6 +211,9 @@ ALLOW=(
 
   # New Processor output pair only (SPEC/catalogue.md). File the exact staged siblings and then
   # the journal under the same guarded parent lock. Each rename exclusively claims an empty name.
+  # The copy reads a stable working PDF descriptor and writes only a newly created exclusive sibling.
+  # Both the copy identity and digest must match the staged name before a journal is created.
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CataloguePairFiler.swift${SEP}guard fcopyfile(input, output, nil, copyfile_flags_t(COPYFILE_ALL)) == 0 else {"
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CataloguePairFiler.swift${SEP}guard renameatx_np(parent, source, parent, target, UInt32(RENAME_EXCL)) == 0 else {"
 
   # ── rule 3 (errorHandler:-less enumerator) ──────────────────────────────────────────────────

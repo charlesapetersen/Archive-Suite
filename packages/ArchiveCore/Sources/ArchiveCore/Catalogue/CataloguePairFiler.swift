@@ -10,6 +10,12 @@ public struct CataloguePairFiler: Sendable {
         public let companionRelativePath: String
     }
 
+    /// Local proof captured by the producer before it saves its filing request.
+    public struct Destination: Codable, Equatable, Sendable {
+        fileprivate let root: CatalogueReadDirectory.Identity
+        fileprivate let parent: CatalogueReadDirectory.Identity
+    }
+
     public enum Failure: Error, Equatable, Sendable {
         case journalMissing
         case journalInvalid
@@ -42,17 +48,43 @@ public struct CataloguePairFiler: Sendable {
         prefix(operationID) + ".pdf.pending"
     }
 
+    public func destination(at occurrence: CatalogueAssociation.Occurrence) throws -> Destination {
+        try reader.withOccurrence(occurrence) { root, parent, _ in
+            Destination(root: .init(root.info), parent: .init(parent.info))
+        }
+    }
+
+    /// Encloses a secondary producer operation in the same pinned directory and lock as the pair.
+    /// The closure borrows the descriptor synchronously and leaves its lifetime with this boundary.
+    public func withDestinationDirectory<T>(at occurrence: CatalogueAssociation.Occurrence,
+                                            matching saved: Destination, _ operation: (Int32) throws -> T) throws -> T {
+        try reader.withOccurrence(occurrence) { root, parent, _ in
+            try writer.withLock(on: parent) {
+                try reader.validateScope(root: root, parent: parent)
+                guard saved == Destination(root: .init(root.info), parent: .init(parent.info)) else {
+                    throw Failure.operationMismatch
+                }
+                let value = try operation(parent.descriptor)
+                try reader.validateScope(root: root, parent: parent)
+                return value
+            }
+        }
+    }
+
     /// Start or retry initial filing. An existing journal takes precedence over new staging.
     /// For interruption before the journal exists, retry with the same record and staged PDF.
+    /// If provided and staging is absent, copy the prepared working PDF under the destination lock.
     public func filePair(operationID: UUID, at occurrence: CatalogueAssociation.Occurrence,
-                         record: CatalogueRecord) throws -> Receipt {
-        try run(operationID: operationID, at: occurrence, initialRecord: record)
+                         record: CatalogueRecord, preparedPDF: URL? = nil,
+                         destination: Destination? = nil) throws -> Receipt {
+        try run(operationID: operationID, at: occurrence, initialRecord: record,
+                preparedPDF: preparedPDF, destination: destination)
     }
 
     /// Resume a journaled operation, or reverify its completed receipt after relaunch. Missing,
     /// changed or obstructed files withhold a receipt and keep every available artifact in place.
     public func recoverPair(operationID: UUID, at occurrence: CatalogueAssociation.Occurrence) throws -> Receipt {
-        try run(operationID: operationID, at: occurrence, initialRecord: nil)
+        try run(operationID: operationID, at: occurrence, initialRecord: nil, preparedPDF: nil, destination: nil)
     }
 
     private typealias Directory = CatalogueReadDirectory
@@ -121,7 +153,7 @@ public struct CataloguePairFiler: Sendable {
     }
 
     private func run(operationID: UUID, at occurrence: CatalogueAssociation.Occurrence,
-                     initialRecord: CatalogueRecord?) throws -> Receipt {
+                     initialRecord: CatalogueRecord?, preparedPDF: URL?, destination: Destination?) throws -> Receipt {
         try reader.withOccurrence(occurrence) { root, parent, filename in
             let paths = Paths(operationID: operationID, occurrence: occurrence, filename: filename)
             guard paths.finalCompanion.utf8.count <= NAME_MAX,
@@ -131,6 +163,11 @@ public struct CataloguePairFiler: Sendable {
             let scope = Scope(root: root, parent: parent, occurrence: occurrence, paths: paths, operationID: operationID)
             return try writer.withLock(on: parent) {
                 try reader.validateScope(root: root, parent: parent)
+                if let destination {
+                    guard destination.root == .init(root.info), destination.parent == .init(parent.info) else {
+                        throw Failure.operationMismatch
+                    }
+                }
                 let pending = try version(scope.pendingJournal, in: scope)
                 let completed = try version(scope.completedJournal, in: scope)
                 guard pending == nil || completed == nil else { throw Failure.journalInvalid }
@@ -141,7 +178,7 @@ public struct CataloguePairFiler: Sendable {
                     journalName = scope.pendingJournal
                     if pending == nil {
                         guard let initialRecord else { throw Failure.journalMissing }
-                        try prepare(initialRecord, in: scope)
+                        try prepare(initialRecord, preparedPDF: preparedPDF, in: scope)
                     }
                 }
                 let (journal, stamp) = try readJournal(journalName, in: scope)
@@ -155,12 +192,21 @@ public struct CataloguePairFiler: Sendable {
         }
     }
 
-    private func prepare(_ record: CatalogueRecord, in scope: Scope) throws {
+    private func prepare(_ record: CatalogueRecord, preparedPDF: URL?, in scope: Scope) throws {
         let paths = scope.paths
         for name in [paths.finalPDF, paths.finalCompanion] {
             guard try version(name, in: scope) == nil else { throw Failure.occupied(name) }
         }
+        let copied = try preparedPDF.flatMap { source in
+            try version(paths.pendingPDF, in: scope) == nil ? copyPreparedPDF(source, record: record, in: scope) : nil
+        }
         let pdf = try verifiedPDF(paths.pendingPDF, record: record, flush: true, in: scope).member
+        if let copied {
+            guard pdf == copied else { throw Failure.changed(paths.pendingPDF) }
+        } else if let preparedPDF {
+            let sourceDigest = try withPreparedPDF(preparedPDF) { input, _ in try Self.pdfDigest(input) }
+            guard sourceDigest == pdf.digest else { throw Failure.changed(paths.pendingPDF) }
+        }
         if try version(paths.pendingCompanion, in: scope) == nil {
             try create(record.originalJSON, as: paths.pendingCompanion, in: scope)
         }
@@ -179,6 +225,47 @@ public struct CataloguePairFiler: Sendable {
         try create(JSONEncoder().encode(journal), as: scope.pendingJournal, in: scope)
         try writer.sync(scope.parent.descriptor, operation: "flush filing journal")
         try boundary(.journalFlushed)
+    }
+
+    /// Populate the reserved PDF name from a read-only working copy under the destination directory lock.
+    /// A crash during the copy leaves a unique incomplete file, before any reserved or final name is claimed.
+    private func copyPreparedPDF(_ source: URL, record: CatalogueRecord, in scope: Scope) throws -> Member {
+        let name = ".archivesuite-pdf-copy-" + UUID().uuidString.lowercased()
+        let parent = scope.parent.descriptor
+        let output = try writer.createExclusive(name, in: scope.parent)
+        defer { close(output) }
+        let size = try withPreparedPDF(source) { input, before in
+            guard fcopyfile(input, output, nil, copyfile_flags_t(COPYFILE_ALL)) == 0 else {
+                throw CatalogueWriter.Failure.io(operation: "copy working PDF", code: errno)
+            }
+            return before.st_size
+        }
+        var made = stat()
+        guard fstat(output, &made) == 0, made.st_size == size else { throw Failure.changed(name) }
+        let verified = try verifiedPDF(name, record: record, flush: true, in: scope)
+        try reader.validateScope(root: scope.root, parent: scope.parent)
+        guard verified.version == Directory.FileVersion(made), try version(name, in: scope) == verified.version else {
+            throw Failure.changed(name)
+        }
+        try claimName(name, to: scope.paths.pendingPDF, in: scope)
+        try writer.sync(parent, operation: "flush prepared PDF name")
+        return verified.member
+    }
+
+    private func withPreparedPDF<T>(_ source: URL, run: (Int32, stat) throws -> T) throws -> T {
+        let input = open(source.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK)
+        guard input >= 0 else { throw CatalogueWriter.Failure.io(operation: "open working PDF", code: errno) }
+        defer { close(input) }
+        var before = stat()
+        guard fstat(input, &before) == 0, (before.st_mode & S_IFMT) == S_IFREG else {
+            throw Failure.changed(source.lastPathComponent)
+        }
+        let result = try run(input, before)
+        var after = stat()
+        guard fstat(input, &after) == 0, Directory.FileVersion(before) == Directory.FileVersion(after) else {
+            throw Failure.changed(source.lastPathComponent)
+        }
+        return result
     }
 
     private func finish(_ journal: Journal, stamp: Directory.FileVersion, journalName: String,
@@ -251,15 +338,20 @@ public struct CataloguePairFiler: Sendable {
         try reader.withProvenPDF(name, in: scope.parent, at: scope.occurrence) { entry, proof in
             _ = try CatalogueAssociation.pair(record, at: scope.occurrence, verifiedBy: proof)
             // The PDF proof callback may have consumed the descriptor.
-            let file = FileHandle(fileDescriptor: entry.descriptor, closeOnDealloc: false)
-            try file.seek(toOffset: 0)
-            var digest = SHA256()
-            while let bytes = try file.read(upToCount: 1024 * 1024), !bytes.isEmpty {
-                digest.update(data: bytes)
-            }
+            let digest = try Self.pdfDigest(entry.descriptor)
             if flush { try writer.sync(entry.descriptor, operation: "flush pending PDF") }
-            return (Member(identity: .init(entry.info), digest: Data(digest.finalize())), .init(entry.info))
+            return (Member(identity: .init(entry.info), digest: digest), .init(entry.info))
         }
+    }
+
+    private static func pdfDigest(_ descriptor: Int32) throws -> Data {
+        let file = FileHandle(fileDescriptor: descriptor, closeOnDealloc: false)
+        try file.seek(toOffset: 0)
+        var digest = SHA256()
+        while let bytes = try file.read(upToCount: 1024 * 1024), !bytes.isEmpty {
+            digest.update(data: bytes)
+        }
+        return Data(digest.finalize())
     }
 
     private func validate(_ pair: [Located], journal: String, stamp: Directory.FileVersion, in scope: Scope) throws {

@@ -73,6 +73,21 @@ final class LiveCaptureProcessor: ObservableObject {
         var pdfLayerLogNotes: [String]? = nil
         /// Pages whose original scans were embedded after Gemini failed with no second reader available.
         var unreadImageOnlyPageCount: Int? = nil
+        /// Validated initial records, in PDF order, frozen before the initial filing attempt.
+        var catalogueRecords: [Data]? = nil
+        var catalogueDestination: CatalogueDestination? = nil
+
+        var numberedSlots: Int {
+            pdfURLs.count == 1 && imageURLs.count > 1 ? imageURLs.count : pdfURLs.count
+        }
+    }
+
+    struct CatalogueDestination: Codable, Sendable {
+        let root: URL
+        let folder: URL
+        let name: String
+        let firstNumber: Int
+        let pdfs: [ProcessorCatalogueFiling]
     }
 
     @Published private(set) var statuses: [SegmentStatus] = []
@@ -946,7 +961,12 @@ final class LiveCaptureProcessor: ObservableObject {
         // staged for a retry to race.)
         guard !isFinalizing else { return }
         session.refreshProvisionalSnapshotIfUnused()   // a resumed session's first Retry reads Settings now
-        let targets = groupIds ?? failedGroupIds
+        let pendingFiling = Set(staged.filter { $0.catalogueDestination != nil }.map(\.groupId))
+        let requested = groupIds ?? failedGroupIds
+        let targets = requested.subtracting(pendingFiling)
+        if targets.count != requested.count {
+            session.statusMessage = "Click Finish again to recover the pending PDF and catalogue pairs."
+        }
         if let config, targets.contains(where: { id in session.photos.contains { $0.groupId == id } }),
            !canProcessUnderTrainingPolicy(config) {
             workAfterTrainingApproval = { [weak self] in self?.retryFailed(groupIds: targets, rotation: rotation) }
@@ -959,6 +979,11 @@ final class LiveCaptureProcessor: ObservableObject {
             // Delete the old staged output + retained state first, so we don't orphan files
             // on disk or re-review stale rotation for a segment we're about to regenerate.
             if let old = staged.first(where: { $0.groupId == gid }) {
+                if old.catalogueRecords == nil, !old.pdfURLs.isEmpty,
+                   !group.photos.allSatisfy({ fm.fileExists(atPath: $0.url.path) }) {
+                    session.statusMessage = "Some original photos are missing. The staged PDFs remain in the Backup Folder for recovery."
+                    continue
+                }
                 for u in old.pdfURLs { try? fm.removeItem(at: u) }
                 for u in old.imageURLs { try? fm.removeItem(at: u) }
                 if let j = old.jsonURL { try? fm.removeItem(at: j) }
@@ -1266,7 +1291,8 @@ final class LiveCaptureProcessor: ObservableObject {
 
         // Fix already-staged segments whose collectionKey was pinned before their box arrived
         var didFixStaged = false
-        for i in staged.indices where staged[i].type != CaptureGroupType.box.rawValue {
+        for i in staged.indices where staged[i].type != CaptureGroupType.box.rawValue
+            && staged[i].catalogueDestination == nil {
             if let box = correctBox(forOrder: staged[i].order), staged[i].collectionKey != box.id {
                 staged[i].collectionKey = box.id
                 groupCollectionKey[staged[i].groupId] = box.id
@@ -1396,8 +1422,10 @@ final class LiveCaptureProcessor: ObservableObject {
         // W46.ent-feature-owner-calls: where the page text is Apple Vision's, the sidecar carries no tagging-call sender.
         // Kept in `jsonTags`, so a rotation-review regeneration writes the same sidecar.
         let jsonTags = EntityRunPolicy.sidecarTags(
-            tags, withholdingSender: writeJSON && tags.authorName != nil
+            tags, withholdingSender: tags.authorName != nil
                 && EntityRunPolicy.withholdsTaggingSender(liveEntityInputs(results: results, config: config)))
+        let dateIsUserSet = (mac?.year ?? group.year) != nil || (mac?.month ?? group.month) != nil
+        let subjectsAreUserSet = !(mac?.subjects.isEmpty ?? true)
         let outputImageFile = config.outputImageFile, pdfImageMB = config.pdfImageMB, exportedImageMB = config.exportedImageMB, textColumns = config.textColumns
         let textLayer = PDFGenerator.TextLayerOptions.from(liveSettings(config))
         let taggingMode = config.taggingMode
@@ -1423,12 +1451,13 @@ final class LiveCaptureProcessor: ObservableObject {
                                    gatewayName: gatewayName, localAgentDisplayName: localAgentDisplayName,
                                    localAgentModelName: localAgentModelName, stagingDir: stagingDir, writeJSON: writeJSON,
                                    jsonTags: jsonTags, entities: entities, dating: dating,
-                                   preDatingTags: preDatingTags, itemFields: itemFields, texts: texts,
+                                   itemFields: itemFields, texts: texts,
                                    boxLabelText: gType == .box ? texts.first : nil,
                                    outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
                                    exportedImageMB: exportedImageMB, textColumns: textColumns,
                                    taggingMode: taggingMode,
-                                   stampUnread: stampUnread, textLayer: textLayer)
+                                   stampUnread: stampUnread, textLayer: textLayer,
+                                   dateIsUserSet: dateIsUserSet, subjectsAreUserSet: subjectsAreUserSet)
         }.value
 
         // B8: the off-main write itself can straddle a Clear. If the session was cleared while it ran, do NOT
@@ -1462,7 +1491,8 @@ final class LiveCaptureProcessor: ObservableObject {
             exportedImageMB: exportedImageMB, textColumns: textColumns,
             taggingMode: taggingMode,
             stampUnread: stampUnread, textLayer: textLayer,
-            routeDating: routeDating, preDatingTags: routeDating == nil ? nil : preDatingTags)
+            routeDating: routeDating, preDatingTags: routeDating == nil ? nil : preDatingTags,
+            dateIsUserSet: dateIsUserSet, subjectsAreUserSet: subjectsAreUserSet)
         persistManifest()
         if let containerRead {
             session.setContainerRead(groupId: groupId, read: containerRead.fields, fallback: containerRead.fallback)
@@ -1508,7 +1538,7 @@ final class LiveCaptureProcessor: ObservableObject {
         } else if !producedOutput {
             // No PDF at all (incl. a true document OCR-empty with no usable PDF). Retryable; sources kept.
             markFailed(groupId, .noOutput, firstError)
-        } else if !pagesComplete {
+        } else if !pagesComplete || outcome.catalogueRecords?.count != outcome.pdfURLs.count {
             // Some page produced no PDF → incomplete; finalize won't file it, so it never partially deletes
             // a multi-page segment's sources. Retryable.
             markFailed(groupId, .incompleteOutput, firstError)
@@ -1590,13 +1620,13 @@ final class LiveCaptureProcessor: ObservableObject {
 
     /// W46.ent-feature-live — the document's names for its sidecar's `entities` object, on the policy Process Files
     /// follows (`EntityRunPolicy`, `OCRProcessor.performTaggingPhase`): only a document the tagging call tagged here
-    /// (automatic mode, not Mac-tagged, not a box or folder), only with sidecars on (they are the names' only output),
+    /// (automatic mode, not Mac-tagged, not a box or folder),
     /// and only when the policy runs the feature on it. No nearby documents are sent, as in Process Files. A page whose
     /// OCR failed counts as a page of unknown reader. nil = no `entities` object, and the sidecar is as before.
     private func liveEntities(group: CaptureGroup, segment: DocumentSegment, results: [OCRResult],
                               tags: GeneratedTags, mac: MacSegmentTags?,
                               config: SessionProcessingConfig) async -> EntityResult? {
-        guard group.type == .document, config.enableSegmentJSON else { return nil }
+        guard group.type == .document else { return nil }
         var inputs = liveEntityInputs(results: results, config: config)
         if config.taggingMode == .none || config.taggingMode == .copySource {
             return await EntityRunPolicy.localMentions(text: segment.combinedText, inputs: inputs)
@@ -1679,8 +1709,9 @@ final class LiveCaptureProcessor: ObservableObject {
     /// disk (as the rotation review's regeneration requires), and whose group is still in the session. No call is made.
     private func redateFromFolders(into changed: inout Set<String>) {
         let fm = FileManager.default
+        let pendingFiling = Set(staged.filter { $0.catalogueDestination != nil }.map(\.groupId))
         for gid in Array(retained.keys) {
-            guard var seg = retained[gid], let routeDating = seg.routeDating,
+            guard !pendingFiling.contains(gid), var seg = retained[gid], let routeDating = seg.routeDating,
                   seg.pages.allSatisfy({ fm.fileExists(atPath: $0.sourceURL.path) }),
                   updateRetainedDate(&seg, from: routeDating) else { continue }
             retained[gid] = seg
@@ -1699,7 +1730,9 @@ final class LiveCaptureProcessor: ObservableObject {
         if seg.dating?.evidenceClass == .folder,
            want.evidenceClass != .folder, want.evidenceClass != .image, want.evidenceClass != .text { return false }
         guard want != seg.dating else { return false }
-        let tags = Self.datedTags(preDating, dating: want, mac: session.macTags[seg.groupId], group: group)
+        let mac = session.macTags[seg.groupId]
+        let tags = Self.datedTags(preDating, dating: want, mac: mac, group: group)
+        seg.dateIsUserSet = (mac?.year ?? group.year) != nil || (mac?.month ?? group.month) != nil
         seg.dating = want
         seg.baseTags = tags.allTags
         seg.jsonTags.year = tags.year
@@ -1726,7 +1759,7 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     /// W47.item-fields-build — the item-field call for a document the tagging call read here (automatic mode, not
-    /// Mac-tagged, a reply that is not a failure), with sidecars on. As in Process Files, page images use the
+    /// Mac-tagged, a reply that is not a failure). As in Process Files, page images use the
     /// run's rotation. The Mac models also get a fresh Vision reading. nil = no `item_fields` object.
     private func liveItemFields(group: CaptureGroup, segment: DocumentSegment, results: [OCRResult],
                                 tags: GeneratedTags, mac: MacSegmentTags?,
@@ -1735,7 +1768,7 @@ final class LiveCaptureProcessor: ObservableObject {
               !tags.ocrFailed, !segment.combinedText.isEmpty,
               !Task.isCancelled,
               let route = ItemFieldPolicy.route(gateway: config.textGateway, localAgent: config.textLocalAgent,
-                                                sidecars: config.enableSegmentJSON,
+                                                sidecars: true,
                                                 macEnabled: config.macItemFields) else { return nil }
         let pages = zip(segment.pdfURLs, results).map { (url: $0, rotation: $1.rotationDegrees) }
         let input = ItemFieldExtractor.Input(texts: segment.texts, pages: pages)
@@ -1809,6 +1842,8 @@ final class LiveCaptureProcessor: ObservableObject {
         /// (`redateFromFolders`). nil where the route did not run, and in a manifest written before them.
         var routeDating: DateRoute.Decision?
         var preDatingTags: GeneratedTags?
+        var dateIsUserSet: Bool?
+        let subjectsAreUserSet: Bool?
 
         // Memberwise init (matches the synthesized one the callers already use).
         init(groupId: String, type: CaptureGroupType, order: Int,
@@ -1820,7 +1855,8 @@ final class LiveCaptureProcessor: ObservableObject {
              outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
              taggingMode: TaggingMode,
              stampUnread: Bool, textLayer: PDFGenerator.TextLayerOptions? = nil,
-             routeDating: DateRoute.Decision? = nil, preDatingTags: GeneratedTags? = nil) {
+             routeDating: DateRoute.Decision? = nil, preDatingTags: GeneratedTags? = nil,
+             dateIsUserSet: Bool? = nil, subjectsAreUserSet: Bool? = nil) {
             self.groupId = groupId; self.type = type; self.order = order
             self.pages = pages; self.baseTags = baseTags; self.doMerge = doMerge; self.model = model
             self.gatewayName = gatewayName
@@ -1833,6 +1869,8 @@ final class LiveCaptureProcessor: ObservableObject {
             self.stampUnread = stampUnread
             self.textLayer = textLayer
             self.routeDating = routeDating; self.preDatingTags = preDatingTags
+            self.dateIsUserSet = dateIsUserSet
+            self.subjectsAreUserSet = subjectsAreUserSet
         }
     }
 
@@ -1841,13 +1879,15 @@ final class LiveCaptureProcessor: ObservableObject {
         pages: [PageWork], baseTags: [String], doMerge: Bool, model: LLMModel, gatewayName: String?,
         localAgentDisplayName: String?, localAgentModelName: String?,
         stagingDir: URL, writeJSON: Bool, jsonTags: GeneratedTags, entities: EntityResult? = nil,
-        dating: DateRoute.Decision? = nil, preDatingTags: GeneratedTags? = nil, itemFields: ItemFieldResult? = nil,
+        dating: DateRoute.Decision? = nil, itemFields: ItemFieldResult? = nil,
         texts: [String],
         boxLabelText: String?,
         outputImageFile: Bool, pdfImageMB: Double, exportedImageMB: Double, textColumns: Int,
         taggingMode: TaggingMode,
         stampUnread: Bool,
-        textLayer: PDFGenerator.TextLayerOptions = .standard
+        textLayer: PDFGenerator.TextLayerOptions = .standard,
+        dateIsUserSet: Bool = false, subjectsAreUserSet: Bool = false,
+        tagWriter: @Sendable ([String], URL, String?, Bool) -> Bool = tagStagedArtifact
     ) -> StagedSegment {
         let fm = FileManager.default
         let pdfGen = PDFGenerator()
@@ -1857,31 +1897,12 @@ final class LiveCaptureProcessor: ObservableObject {
         var untaggedOutputs: [URL] = []
         var layerNotes: [String] = []
         var unreadImageOnlyPages = 0
+        var cataloguePages: [(CataloguePDFIdentity, ProcessorCatalogueRecord.SourcePage, Bool, String?)] = []
         // W3.cap-r1 — the app's OWN colour for this segment (the user's colour for a box/folder, if any;
         // nil for a document or no colour chosen — W40.suite-item-types),
         // passed to every tag write below so a *subject* string is never mistaken for one. See
         // `tagStagedArtifact`.
         let appColor = jsonTags.colorTag
-        // W37.dual-date — Live Capture computes the tags BEFORE rendering, so its documents' text pages
-        // can carry the source-date header lines (repeated on every page of the unit). Documents in
-        // real-tagging modes only: a no-tagging / copy-source run writes no generated date anywhere.
-        var sourceDates: PDFSourceDates? = (type == .document && taggingMode.stampsUnread)
-            ? EnclosureDates.pdfSourceDates(for: jsonTags) : nil
-        // W46.date-route-header — the evidence of a non-explicit year, on the same pages as the dates (a year implies
-        // the document-date line, so there is a header to carry it).
-        // W49.reader-finder-month-stands: the line names the date the route gave (on the tagging call's tags), not a
-        // month the phone or the Mac card set over it, so the Reader leaves that month alone as the user's.
-        if sourceDates != nil, let dating {
-            var given = preDatingTags ?? jsonTags
-            if preDatingTags != nil { dating.apply(to: &given) }
-            if let evidence = dating.headerEvidence(giving: given) { sourceDates?.dateEvidence = evidence }
-        }
-        // W47.item-fields-build — the filled item fields, on the same documents' pages.
-        if type == .document, taggingMode.stampsUnread, let fields = itemFields?.headerFields, !fields.isEmpty {
-            sourceDates = sourceDates ?? PDFSourceDates()
-            sourceDates?.itemFields = fields
-        }
-
         for page in pages {
             // W40.fix-processor-failed-ocr-filed-image-only — a document page whose OCR FAILED (`ocrFailed`:
             // the request got no reading) produces no output, exactly like a page whose PDF did not write. Its
@@ -1893,28 +1914,20 @@ final class LiveCaptureProcessor: ObservableObject {
             if type == .document, holdsForOCR(page.result) { continue }
             let base = page.sourceURL.deletingPathExtension().lastPathComponent
             let stagedPDF = stagingDir.appendingPathComponent(base + ".pdf")
-            let output = try? pdfGen.generateOutput(
+            let identity = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+            guard let output = try? pdfGen.generateOutput(
                 imageURL: page.sourceURL, result: page.result, model: model, outputURL: stagedPDF,
                 originalFileName: page.sourceURL.lastPathComponent, gatewayDisplayName: gatewayName,
                 localAgentDisplayName: localAgentDisplayName, localAgentModelName: localAgentModelName,
-                pdfImageMB: pdfImageMB, textColumns: textColumns, sourceDates: sourceDates, textLayer: textLayer,
+                pdfImageMB: pdfImageMB, textColumns: textColumns, textLayer: textLayer,
                 // W42.stroke-weight-processor: a live capture is the phone's photo.
-                photographed: true)
-            // Only record a PDF we can PROVE is on disk. `generate` is `try?`, so a swallowed failure would
-            // otherwise append a phantom URL — and finalize keys "safe to delete the source photo" off the
-            // PDF actually reaching the destination. A phantom would let a never-written output masquerade as
-            // filed, and the irreplaceable source would be deleted (the original data-loss bug). So skip a
-            // page whose PDF didn't write: its source stays in the backup folder and the segment is surfaced
-            // as failed (retryable) because it produced no output.
-            guard fm.fileExists(atPath: stagedPDF.path) else { continue }
+                photographed: true, catalogueIdentity: identity),
+                fm.fileExists(atPath: stagedPDF.path) else { continue }
             // W23.h5 — the PDF exists, but does it hold the SCAN? `.placeholder` means it doesn't, so this
-            // page's source photo is the only copy of the image and finalize must keep it. A nil outcome
-            // (generate threw yet still left a file on disk) is UNKNOWN, and unknown resolves the safe way:
-            // withhold the deletion. Erring here keeps a photo we could have deleted; erring the other way
-            // destroys an irreplaceable page.
-            if output?.imagePage != .embedded { placeholderSources.append(page.sourceURL) }
-            var notes = output?.layerLogNotes ?? []
-            if type == .document, output?.imagePage == .embedded, filesUnreadPageAsImage(page.result) {
+            // page's source photo is the only copy of the image and finalize must keep it.
+            if output.imagePage != .embedded { placeholderSources.append(page.sourceURL) }
+            var notes = output.layerLogNotes
+            if type == .document, output.imagePage == .embedded, filesUnreadPageAsImage(page.result) {
                 unreadImageOnlyPages += 1
                 notes.insert("filed image-only: the first reader failed and no second reader was available", at: 0)
             }
@@ -1923,17 +1936,20 @@ final class LiveCaptureProcessor: ObservableObject {
             }
             let tagList = tagsByApplyingPhoneQuality(baseTags, quality: page.quality)
             if writesFinderTags(taggingMode, tagList),
-               !tagStagedArtifact(tagList, at: stagedPDF, appColor: appColor, stampUnread: stampUnread) {
+               !tagWriter(tagList, stagedPDF, appColor, stampUnread) {
                 untaggedOutputs.append(stagedPDF)
             }
             pdfURLs.append(stagedPDF)
+            let sourcePage = ProcessorCatalogueRecord.SourcePage(
+                roles: output.form == .searchable ? ["searchable"] : ["image", "text"])
+            cataloguePages.append((identity, sourcePage, ocrFailed(page.result), page.quality))
 
             // Two-file output: a .jpg next to its PDF, sized to the exported-image target + identical tags.
             if outputImageFile {
                 let stagedImg = stagingDir.appendingPathComponent(base + ".jpg")
                 if ImageEncoding.writeSizedJPEG(from: page.sourceURL, to: stagedImg, targetMB: exportedImageMB, rotationDegrees: page.result.rotationDegrees) {
                     if writesFinderTags(taggingMode, tagList),
-                       !tagStagedArtifact(tagList, at: stagedImg, appColor: appColor, stampUnread: stampUnread) {
+                       !tagWriter(tagList, stagedImg, appColor, stampUnread) {
                         untaggedOutputs.append(stagedImg)
                     }
                     imageURLs.append(stagedImg)
@@ -1956,11 +1972,14 @@ final class LiveCaptureProcessor: ObservableObject {
             if fm.fileExists(atPath: jurl.path) { jsonURL = jurl }   // only record it if it actually wrote
         }
 
+        let mergedIdentity = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+        var merged = false
         if doMerge, pdfURLs.count > 1 {
             let base = pdfURLs[0].deletingPathExtension().lastPathComponent
             let mergedURL = stagingDir.appendingPathComponent(base + "_merged.pdf")
             do {
-                try pdfGen.mergeDocumentPDFs(sourcePDFs: pdfURLs, outputURL: mergedURL)
+                try pdfGen.mergeDocumentPDFs(sourcePDFs: pdfURLs, outputURL: mergedURL,
+                                             catalogueIdentity: mergedIdentity)
                 // The per-page PDFs are about to be deleted, so a tag failure recorded against one of them is
                 // moot — the merged file replaces them and carries its own verdict. Drop them BEFORE tagging
                 // the merged output so the warning only ever names artifacts that still exist.
@@ -1972,20 +1991,49 @@ final class LiveCaptureProcessor: ObservableObject {
                 let mergedQuality = pages.first(where: { $0.quality == "Q3" })?.quality ?? pages.first?.quality
                 let tagList = tagsByApplyingPhoneQuality(baseTags, quality: mergedQuality)
                 if writesFinderTags(taggingMode, tagList),
-                   !tagStagedArtifact(tagList, at: mergedURL, appColor: appColor, stampUnread: stampUnread) {
+                   !tagWriter(tagList, mergedURL, appColor, stampUnread) {
                     untaggedOutputs.append(mergedURL)
                 }
                 for u in pdfURLs { try? fm.removeItem(at: u) }
                 pdfURLs = [mergedURL]
+                merged = true
             } catch { /* keep the individual PDFs if merge fails */ }
         }
 
+        var catalogueRecords: [Data]? = nil
+        if let first = cataloguePages.first {
+            let logicalID = UUID()
+            let owner = merged ? mergedIdentity.fileID : first.0.fileID
+            let facts = ProcessorCatalogueRecord.documentFields(
+                tags: jsonTags, type: type.itemType, dateIsUserSet: dateIsUserSet, subjectsAreUserSet: subjectsAreUserSet,
+                dating: dating, itemFields: itemFields, entities: entities)
+            func record(_ identity: CataloguePDFIdentity, _ sourcePages: [ProcessorCatalogueRecord.SourcePage],
+                        failed: Bool, quality: String?) throws -> Data {
+                let document = ProcessorCatalogueRecord.Document(id: logicalID, ownerFileID: owner,
+                                                                fields: identity.fileID == owner ? facts : nil)
+                let fileFields = ProcessorCatalogueRecord.fileFields(tags: jsonTags, quality: quality,
+                                                                     unread: stampUnread, failed: failed)
+                return try ProcessorCatalogueRecord(identity: identity, sourcePages: sourcePages,
+                                                    document: document, fileFields: fileFields).encoded()
+            }
+            if merged {
+                let quality = pages.first(where: { $0.quality == "Q3" })?.quality ?? pages.first?.quality
+                catalogueRecords = try? [record(mergedIdentity, cataloguePages.map(\.1),
+                                                failed: cataloguePages.contains { $0.2 }, quality: quality)]
+            } else {
+                catalogueRecords = try? cataloguePages.map {
+                    try record($0.0, [$0.1], failed: $0.2, quality: $0.3)
+                }
+            }
+        }
         return StagedSegment(groupId: groupId, type: type.rawValue, collectionKey: collectionKey, order: order,
                              pdfURLs: pdfURLs, imageURLs: imageURLs, jsonURL: jsonURL, boxLabelText: boxLabelText,
-                             pagesComplete: pagesComplete, placeholderSources: placeholderSources,
+                             pagesComplete: pagesComplete && catalogueRecords?.count == pdfURLs.count,
+                             placeholderSources: placeholderSources,
                              untaggedOutputs: untaggedOutputs,
                              pdfLayerLogNotes: layerNotes.isEmpty ? nil : layerNotes,
-                             unreadImageOnlyPageCount: unreadImageOnlyPages > 0 ? unreadImageOnlyPages : nil)
+                             unreadImageOnlyPageCount: unreadImageOnlyPages > 0 ? unreadImageOnlyPages : nil,
+                             catalogueRecords: catalogueRecords)
     }
 
     /// A page's Quality input: a saved card's decision, else the phone's. The card's 0 becomes the internal
@@ -2138,7 +2186,8 @@ final class LiveCaptureProcessor: ObservableObject {
     private func persistManifest(
         staged stagedOverride: [StagedSegment]? = nil,
         retained retainedOverride: [String: RetainedSegment]? = nil,
-        clearToken: String? = nil
+        clearToken: String? = nil,
+        synchronize: Bool = false
     ) -> Bool {
         guard !stagingManifestBlocked else { return false }
         let records = stagedOverride ?? staged
@@ -2157,6 +2206,14 @@ final class LiveCaptureProcessor: ObservableObject {
             if !records.isEmpty || !retainedRecords.isEmpty { ensureStagingDirectory(stagingDir) }
             let data = try JSONEncoder().encode(manifest)
             try data.write(to: url, options: .atomic)
+            if synchronize {
+                let file = try FileHandle(forUpdating: url)
+                defer { try? file.close() }
+                let directory = open(stagingDir.path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)
+                guard directory >= 0 else { return false }
+                defer { close(directory) }
+                guard fcntl(file.fileDescriptor, F_FULLFSYNC) == 0, fsync(directory) == 0 else { return false }
+            }
             return true
         } catch {
             return false
@@ -2358,7 +2415,8 @@ final class LiveCaptureProcessor: ObservableObject {
         // W47.ct-folder-date-live: with no review, still through the regeneration pass, for a folder's re-date.
         guard wantReview else { applyRotationReviewAndFinalize(); return }
         var pages: [RotationReviewPage] = []
-        for seg in retained.values {
+        let pendingFiling = Set(staged.filter { $0.catalogueDestination != nil }.map(\.groupId))
+        for seg in retained.values where !pendingFiling.contains(seg.groupId) {
             for (i, p) in seg.pages.enumerated() {
                 pages.append(RotationReviewPage(groupId: seg.groupId, pageIndex: i, order: seg.order,
                                                 sourceURL: p.sourceURL,
@@ -2400,6 +2458,10 @@ final class LiveCaptureProcessor: ObservableObject {
         }
         showRotationReview = false
         var changedGroups: Set<String> = []
+        for record in staged where record.catalogueRecords == nil && record.pagesComplete != false {
+            // Recreate an older staged derivative from the held reading without buying another OCR call.
+            changedGroups.insert(record.groupId)
+        }
         var changedDatingImages: Set<String> = []
         for page in rotationReviewPages {
             guard var seg = retained[page.groupId], page.pageIndex < seg.pages.count else { continue }
@@ -2469,12 +2531,14 @@ final class LiveCaptureProcessor: ObservableObject {
                                            localAgentModelName: seg.localAgentModelName,
                                            stagingDir: stagingDir, writeJSON: seg.writeJSON, jsonTags: seg.jsonTags,
                                            entities: seg.entities, dating: seg.dating,
-                                           preDatingTags: seg.preDatingTags, itemFields: seg.itemFields,
+                                           itemFields: seg.itemFields,
                                            texts: seg.texts, boxLabelText: seg.boxLabelText,
                                            outputImageFile: seg.outputImageFile, pdfImageMB: seg.pdfImageMB,
                                            exportedImageMB: seg.exportedImageMB, textColumns: seg.textColumns,
                                            taggingMode: seg.taggingMode,
-                                           stampUnread: seg.stampUnread, textLayer: seg.textLayer ?? .standard)
+                                           stampUnread: seg.stampUnread, textLayer: seg.textLayer ?? .standard,
+                                           dateIsUserSet: seg.dateIsUserSet ?? false,
+                                           subjectsAreUserSet: seg.subjectsAreUserSet ?? false)
                 }
             }.value
             for outcome in regenerated {
@@ -2644,7 +2708,7 @@ final class LiveCaptureProcessor: ObservableObject {
             imageScale: config.imageScale, rotationMode: config.rotationMode, fileCount: pages
         )
         // The dating and item-field terms (W49.proc-fix-s041), with the switches `liveDating` and `liveItemFields` read.
-        snapshot.sidecars = config.enableSegmentJSON
+        snapshot.sidecars = true   // document fields and eligible names also feed the catalogue
         let settings = SettingsLayerStore.shared.resolver(at: config.outputDirectory)
         snapshot.dateImageEveryDocument = DateRoute.imageEveryDocument(settings)
         snapshot.setNamesEstimate(taggingMode: config.taggingMode) { namesSettings[$0.rawValue]?.value }
@@ -2660,6 +2724,12 @@ final class LiveCaptureProcessor: ObservableObject {
         }
         drafts = orderedKeys.map { key in
             let segs = byKey[key] ?? []
+            if let pinned = segs.compactMap(\.catalogueDestination).first {
+                let folder = pinned.folder
+                return CollectionDraft(id: key, finalName: pinned.name, existingFolders: existing,
+                                       suggestedFolders: [folder], chosenExisting: folder,
+                                       segmentCount: segs.count, photoCount: segs.reduce(0) { $0 + $1.imageURLs.count })
+            }
             let candidate = Self.candidateName(segments: segs)
             return CollectionDraft(id: key, finalName: candidate, existingFolders: existing,
                                    suggestedFolders: Self.fuzzyMatches(candidate, in: existing, limit: 3),
@@ -2675,11 +2745,29 @@ final class LiveCaptureProcessor: ObservableObject {
         isFinalizing = true
         let outputDir = currentOutputDirectory   // live output folder (matches the "Add to" list built above)
         let byKey = Dictionary(grouping: staged, by: { $0.collectionKey })
-        let plans: [MovePlan] = decided.map { d in
+        let requestedPlans: [MovePlan] = decided.map { d in
             let segs = (byKey[d.id] ?? []).sorted { $0.order < $1.order }
             let name = d.chosenExisting?.lastPathComponent ?? Self.sanitize(d.finalName)
             let folder = d.chosenExisting ?? outputDir.appendingPathComponent(name, isDirectory: true)
             return MovePlan(folder: folder, name: name, appending: d.chosenExisting != nil, segments: segs)
+        }
+        let plans: [MovePlan]
+        do {
+            plans = try Self.pinCatalogueDestinations(requestedPlans, alreadyStaged: staged, outputRoot: outputDir)
+        } catch {
+            isFinalizing = false
+            showFinalizeSheet = false
+            finalizeSummary = "The catalogue filing destination could not be saved. Choose the original output folder to resume filing. Staged files and original photos are in the Backup Folder."
+            return
+        }
+        let pinned = Dictionary(plans.flatMap(\.segments).map { ($0.groupId, $0) },
+                                uniquingKeysWith: { first, _ in first })
+        staged = staged.map { pinned[$0.groupId] ?? $0 }
+        guard persistManifest(synchronize: true) else {
+            isFinalizing = false
+            showFinalizeSheet = false
+            finalizeSummary = "The filing plan could not be saved. Check disk space or permissions and click Finish again. Staged files and original photos are in the Backup Folder."
+            return
         }
         // W47.ct-processor-capture — each read marker's fields, snapshotted here so the container write runs inside
         // the same off-main task as the move, right after it: the tail below keeps its one suspension point.
@@ -2753,6 +2841,12 @@ final class LiveCaptureProcessor: ObservableObject {
                 .filter { filedGroups.contains($0.groupId) }
                 .reduce(0) { $0 + ($1.untaggedOutputs?.count ?? 0) }
 
+            // Pair filing copies out of staging. Keep those copies until the destination receipt and
+            // duplicate-rejection ledger both exist, then retire only the verified groups' working PDFs.
+            for segment in self.staged where filedGroups.contains(segment.groupId) {
+                for pdf in segment.pdfURLs { CaptureSession.trashOrRemove(pdf) }
+            }
+            for export in outcome.filedExports { CaptureSession.trashOrRemove(export) }
             // Drop bookkeeping for the fully-filed segments only; keep any unfiled segment staged for retry.
             self.staged.removeAll { filedGroups.contains($0.groupId) }
             self.statuses.removeAll { filedGroups.contains($0.id) }
@@ -3036,6 +3130,49 @@ final class LiveCaptureProcessor: ObservableObject {
         let folder: URL; let name: String; let appending: Bool; let segments: [StagedSegment]
     }
 
+    nonisolated private static func pinCatalogueDestinations(
+        _ plans: [MovePlan], alreadyStaged: [StagedSegment], outputRoot: URL
+    ) throws -> [MovePlan] {
+        let root = outputRoot.standardizedFileURL
+        let rootInstance = UUID()
+        var reserved: [String: Int] = [:]
+        for segment in alreadyStaged {
+            guard let destination = segment.catalogueDestination else { continue }
+            let path = destination.folder.standardizedFileURL.path
+            reserved[path] = max(reserved[path, default: 0], destination.firstNumber + segment.numberedSlots - 1)
+        }
+        return try plans.map { plan in
+            let folder = plan.folder.standardizedFileURL
+            var last = max(reserved[folder.path, default: 0], CollectionNumbering.highestLeadingNumber(in: folder))
+            let segments = try plan.segments.map { segment -> StagedSegment in
+                if let saved = segment.catalogueDestination {
+                    guard saved.root == root, saved.folder == folder, saved.name == plan.name else {
+                        throw ItemFacts.Unavailable.invalid(.root)
+                    }
+                    return segment
+                }
+                guard segment.pagesComplete != false, !segment.pdfURLs.isEmpty,
+                      let records = segment.catalogueRecords, records.count == segment.pdfURLs.count else {
+                    return segment
+                }
+                let first = last + 1
+                last += segment.numberedSlots
+                let pdfs = try records.enumerated().map { index, data in
+                    let record = try CatalogueRecord(json: data)
+                    let filename = "\(CollectionNumbering.format(first + index)) \(plan.name).pdf"
+                    return try ProcessorCatalogueFiling(operationID: record.fileID, root: root, rootInstanceID: rootInstance,
+                                                        destination: folder.appendingPathComponent(filename))
+                }
+                var pinned = segment
+                pinned.catalogueDestination = CatalogueDestination(root: root, folder: folder, name: plan.name,
+                                                                  firstNumber: first, pdfs: pdfs)
+                return pinned
+            }
+            reserved[folder.path] = last
+            return MovePlan(folder: folder, name: plan.name, appending: plan.appending, segments: segments)
+        }
+    }
+
     /// Outcome of moving staged files into their collection folders. `filedGroupIds` is the set of segments
     /// whose *every* PDF output actually reached its destination collection — the ONLY segments whose source
     /// photos are safe to delete. `failedMoves > 0` (a real move error) or a segment absent from
@@ -3052,6 +3189,7 @@ final class LiveCaptureProcessor: ObservableObject {
         var firstPDFs: [String: FiledPDF] = [:]
         /// Every file name that landed, by its folder's path: what a container run started now may cover.
         var filedNames: [String: Set<String>] = [:]
+        var filedExports: Set<URL> = []
     }
 
     struct FiledPDF: Sendable {
@@ -3061,18 +3199,25 @@ final class LiveCaptureProcessor: ObservableObject {
 
     private enum MoveResult { case moved, absent, failed }
 
-    nonisolated private static func executePlans(_ plans: [MovePlan], fm: FileManager = .default) -> FinalizeOutcome {
+    nonisolated private static func executePlans(_ plans: [MovePlan], fm: FileManager = .default,
+                                                requireCatalogue: Bool = true) -> FinalizeOutcome {
         var movedFiles = 0
         var failedMoves = 0
         var filedGroupIds = Set<String>()
         var firstPDFs: [String: FiledPDF] = [:]
         var filedNames: [String: Set<String>] = [:]
+        var filedExports = Set<URL>()
         var totalSegments = 0
         var unreadImageOnlyPages = 0
         // Move one file; returns true iff it actually LANDED at the destination — so a segment can tell
         // whether ALL of its authoritative PDF outputs were filed (the gate for deleting its source photo).
         func doMove(_ src: URL, to dest: URL) -> Bool {
-            switch move(src, to: dest, fm: fm) {
+            if requireCatalogue, fm.fileExists(atPath: src.path),
+               fm.fileExists(atPath: dest.path) || (try? fm.destinationOfSymbolicLink(atPath: dest.path)) != nil {
+                failedMoves += 1
+                return false
+            }
+            switch move(src, to: dest, fm: fm, replaceExisting: !requireCatalogue) {
             case .moved:
                 movedFiles += 1
                 filedNames[dest.deletingLastPathComponent().standardizedFileURL.path, default: []].insert(dest.lastPathComponent)
@@ -3082,7 +3227,7 @@ final class LiveCaptureProcessor: ObservableObject {
             }
         }
         for plan in plans {
-            try? fm.createDirectory(at: plan.folder, withIntermediateDirectories: true)
+            if !requireCatalogue { try? fm.createDirectory(at: plan.folder, withIntermediateDirectories: true) }
             // ALWAYS continue numbering from the folder's existing max (not only when appending). A "new
             // collection" whose folder already holds numbered files — e.g. a Finish-again retry after a
             // partial finalize, or the operator reusing a name — must NOT restart at 000001 and collide with
@@ -3095,21 +3240,56 @@ final class LiveCaptureProcessor: ObservableObject {
                 // partial output scatters to the destination and none of its source pages are deleted. Its
                 // staged files stay in `_processed` and it's marked failed (retryable) in finalizeSegment.
                 if seg.pagesComplete == false { continue }
+                let catalogue = seg.catalogueDestination
+                if requireCatalogue {
+                    guard let catalogue, catalogue.pdfs.count == seg.pdfURLs.count,
+                          seg.catalogueRecords?.count == seg.pdfURLs.count else {
+                        if !seg.pdfURLs.isEmpty { failedMoves += 1 }
+                        continue
+                    }
+                    seq = catalogue.firstNumber - 1
+                }
                 // PDFs are the authoritative output. A segment counts as "filed" (its source photos safe to
                 // delete) ONLY if it staged at least one PDF and EVERY one reached the destination. Exported
                 // images / JSON are secondary and do NOT gate deletion.
                 var pdfExpected = 0, pdfLanded = 0
                 var landed: [String] = []
                 var firstNum: Int?
+                var optionalMoves: [(URL, URL)] = []
+                func filePDF(_ source: URL, to destination: URL) {
+                    defer { pdfExpected += 1 }
+                    if requireCatalogue {
+                        guard let operation = catalogue?.pdfs[pdfExpected],
+                              let record = seg.catalogueRecords?[pdfExpected] else { return }
+                        do {
+                            let receipt = try operation.file(preparedPDF: source, record: record)
+                            let filename = operation.root.appendingPathComponent(receipt.pdfRelativePath).lastPathComponent
+                            movedFiles += 1
+                            filedNames[plan.folder.standardizedFileURL.path, default: []].insert(filename)
+                            pdfLanded += 1
+                            landed.append(filename)
+                        } catch {
+                            failedMoves += 1
+                            NSLog("Live Capture catalogue filing did not verify %@: %@", destination.lastPathComponent,
+                                  String(describing: error))
+                        }
+                    } else if doMove(source, to: destination) {
+                        pdfLanded += 1
+                        landed.append(destination.lastPathComponent)
+                    }
+                }
+                func fileOptional(_ source: URL, to destination: URL) {
+                    if requireCatalogue { optionalMoves.append((source, destination)) }
+                    else { _ = doMove(source, to: destination) }
+                }
                 if seg.imageURLs.isEmpty {
                     // One-file output (PDF only): number by PDF (a merged doc is already a single PDF).
                     for pdf in seg.pdfURLs {
                         seq += 1
                         if firstNum == nil { firstNum = seq }
                         let numStr = CollectionNumbering.format(seq)
-                        pdfExpected += 1
                         let dest = plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf")
-                        if doMove(pdf, to: dest) { pdfLanded += 1; landed.append(dest.lastPathComponent) }
+                        filePDF(pdf, to: dest)
                     }
                 } else if seg.pdfURLs.count == 1 && seg.imageURLs.count > 1 {
                     // Merged multi-page document: one PDF for many page images. Number each image, then the
@@ -3119,12 +3299,11 @@ final class LiveCaptureProcessor: ObservableObject {
                         if firstNum == nil { firstNum = seq }
                         let numStr = CollectionNumbering.format(seq)
                         let ext = img.pathExtension.isEmpty ? "jpg" : img.pathExtension
-                        _ = doMove(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"))
+                        fileOptional(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"))
                     }
                     if let fn = firstNum, let pdf = seg.pdfURLs.first {
-                        pdfExpected += 1
                         let dest = plan.folder.appendingPathComponent("\(CollectionNumbering.format(fn)) \(plan.name).pdf")
-                        if doMove(pdf, to: dest) { pdfLanded += 1; landed.append(dest.lastPathComponent) }
+                        filePDF(pdf, to: dest)
                     }
                 } else {
                     // Two-file output, one PDF per page. The PDF list is authoritative (always page-complete);
@@ -3139,20 +3318,34 @@ final class LiveCaptureProcessor: ObservableObject {
                         let numStr = CollectionNumbering.format(seq)
                         if let img = imgByBase[pdf.deletingPathExtension().lastPathComponent] {
                             let ext = img.pathExtension.isEmpty ? "jpg" : img.pathExtension
-                            _ = doMove(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"))
+                            fileOptional(img, to: plan.folder.appendingPathComponent("\(numStr) \(plan.name).\(ext)"))
                         }
-                        pdfExpected += 1
                         let dest = plan.folder.appendingPathComponent("\(numStr) \(plan.name).pdf")
-                        if doMove(pdf, to: dest) { pdfLanded += 1; landed.append(dest.lastPathComponent) }
+                        filePDF(pdf, to: dest)
                     }
                 }
                 if let json = seg.jsonURL, let fn = firstNum {
                     let jf = plan.folder.appendingPathComponent("JSON Output", isDirectory: true)
-                    try? fm.createDirectory(at: jf, withIntermediateDirectories: true)
-                    _ = doMove(json, to: jf.appendingPathComponent("\(CollectionNumbering.format(fn)) \(plan.name).json"))
+                    if !requireCatalogue { try? fm.createDirectory(at: jf, withIntermediateDirectories: true) }
+                    fileOptional(json, to: jf.appendingPathComponent("\(CollectionNumbering.format(fn)) \(plan.name).json"))
                 }
                 // Filed iff it produced ≥1 PDF and ALL of them landed. (No PDF → never filed → source kept.)
                 if pdfExpected > 0 && pdfLanded == pdfExpected {
+                    if let operation = catalogue?.pdfs.first {
+                        for (source, destination) in optionalMoves where fm.fileExists(atPath: source.path) {
+                            do {
+                                try operation.fileExport(source, to: destination)
+                                movedFiles += 1
+                                filedExports.insert(source)
+                                filedNames[destination.deletingLastPathComponent().standardizedFileURL.path,
+                                           default: []].insert(destination.lastPathComponent)
+                            } catch {
+                                failedMoves += 1
+                                NSLog("Live Capture export could not be filed %@: %@",
+                                      destination.lastPathComponent, String(describing: error))
+                            }
+                        }
+                    }
                     filedGroupIds.insert(seg.groupId)
                     unreadImageOnlyPages += seg.unreadImageOnlyPageCount ?? 0
                     if let first = landed.first { firstPDFs[seg.groupId] = FiledPDF(folder: plan.folder, fileName: first) }
@@ -3167,7 +3360,7 @@ final class LiveCaptureProcessor: ObservableObject {
         }
         return FinalizeOutcome(summary: summary, failedMoves: failedMoves, movedFiles: movedFiles,
                                filedGroupIds: filedGroupIds, allFiled: allFiled, firstPDFs: firstPDFs,
-                               filedNames: filedNames)
+                               filedNames: filedNames, filedExports: filedExports)
     }
 
     nonisolated private static func imageOnlyFilingNote(pageCount: Int) -> String {
@@ -3243,7 +3436,8 @@ final class LiveCaptureProcessor: ObservableObject {
         type: CaptureGroupType = .document, baseTags: [String] = [],
         pageQuality: String? = nil, jsonTags: GeneratedTags = GeneratedTags(),
         stampUnread: Bool = false, taggingMode: TaggingMode? = nil, doMerge: Bool = false,
-        outputImageFile: Bool = false, pageQualities: [String?]? = nil
+        outputImageFile: Bool = false, pageQualities: [String?]? = nil,
+        tagWriter: @Sendable ([String], URL, String?, Bool) -> Bool = tagStagedArtifact
     ) -> (pdfCount: Int, pagesComplete: Bool?, placeholderSources: [URL],
           untaggedOutputs: [URL], pdfURLs: [URL], imageURLs: [URL]) {
         let pages = sources.enumerated().map { index, source in
@@ -3265,7 +3459,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                     jsonTags: jsonTags, texts: [], boxLabelText: nil,
                                     outputImageFile: outputImageFile, pdfImageMB: 0, exportedImageMB: 0,
                                     textColumns: 1, taggingMode: effectiveTaggingMode,
-                                    stampUnread: stampUnread)
+                                    stampUnread: stampUnread, tagWriter: tagWriter)
         return (seg.pdfURLs.count, seg.pagesComplete, seg.placeholderSources ?? [],
                 seg.untaggedOutputs ?? [], seg.pdfURLs, seg.imageURLs)
     }
@@ -3431,7 +3625,7 @@ final class LiveCaptureProcessor: ObservableObject {
                                        imageURLs: s.imageURLs, jsonURL: s.jsonURL, boxLabelText: nil,
                                        pagesComplete: s.complete) })
         }
-        let o = executePlans(mapped, fm: fm)
+        let o = executePlans(mapped, fm: fm, requireCatalogue: false)
         return (o.movedFiles, o.failedMoves, o.filedGroupIds, o.allFiled)
     }
 
@@ -3468,12 +3662,13 @@ final class LiveCaptureProcessor: ObservableObject {
 
     /// Move `src` to `dest`, reporting the outcome so the caller can tell a real failure (output stuck in
     /// staging) apart from a nothing-to-move slot. A missing source is `.absent`, not `.failed`.
-    nonisolated private static func move(_ src: URL, to dest: URL, fm: FileManager) -> MoveResult {
+    nonisolated private static func move(_ src: URL, to dest: URL, fm: FileManager,
+                                         replaceExisting: Bool) -> MoveResult {
         guard fm.fileExists(atPath: src.path) else { return .absent }
         // Overwriting an existing destination is now collision-proof (numbering continues from the folder's
         // max), so this should be unreachable in practice — but if a name ever does collide, send the old
         // file to the Trash (recoverable), never a hard delete.
-        if fm.fileExists(atPath: dest.path) { CaptureSession.trashOrRemove(dest, fm) }
+        if replaceExisting, fm.fileExists(atPath: dest.path) { CaptureSession.trashOrRemove(dest, fm) }
         do { try fm.moveItem(at: src, to: dest); return .moved } catch { return .failed }
     }
 

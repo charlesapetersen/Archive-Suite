@@ -1,4 +1,5 @@
 import CoreGraphics
+import Darwin
 import Foundation
 import Testing
 @testable import ArchiveCore
@@ -206,6 +207,54 @@ struct CataloguePairFilerTests {
         async let first = fixture.recover()
         async let second = fixture.file()
         #expect(try await first == second)
+        #expect(try Data(contentsOf: fixture.input) == fixture.pdfBytes)
+    }
+
+    @Test func copiesPreparedPDFWithoutConsumingTheWorkingFile() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        try FileManager.default.removeItem(at: fixture.pendingPDF)
+        let filer = CataloguePairFiler(reader: try fixture.reader())
+        let metadata = Data("scratch projection".utf8)
+        let attribute = "org.archivesuite.test-projection"
+        let wrote = metadata.withUnsafeBytes {
+            setxattr(fixture.input.path, attribute, $0.baseAddress, $0.count, 0, XATTR_NOFOLLOW)
+        }
+        try #require(wrote == 0)
+        let receipt = try filer.filePair(operationID: fixture.id, at: fixture.occurrence,
+                                         record: fixture.record, preparedPDF: fixture.input)
+        #expect(try Data(contentsOf: fixture.input) == fixture.pdfBytes)
+        #expect(try Data(contentsOf: fixture.finalPDF) == fixture.pdfBytes)
+        var copiedMetadata = Data(count: metadata.count)
+        let read = copiedMetadata.withUnsafeMutableBytes {
+            getxattr(fixture.finalPDF.path, attribute, $0.baseAddress, $0.count, 0, XATTR_NOFOLLOW)
+        }
+        #expect(read == metadata.count)
+        #expect(copiedMetadata == metadata)
+        #expect(try fixture.recover() == receipt)
+        #expect(try filer.filePair(operationID: fixture.id, at: fixture.occurrence,
+                                   record: fixture.record, preparedPDF: fixture.input) == receipt)
+    }
+
+    @Test func preparedFilingRefusesAChangedPendingCopyOrReplacedDestination() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let filer = CataloguePairFiler(reader: try fixture.reader())
+        let destination = try filer.destination(at: fixture.occurrence)
+        try (fixture.pdfBytes + Data([10])).write(to: fixture.pendingPDF)
+        #expect(throws: CataloguePairFiler.Failure.changed(fixture.pendingPDF.lastPathComponent)) {
+            try filer.filePair(operationID: fixture.id, at: fixture.occurrence, record: fixture.record,
+                               preparedPDF: fixture.input, destination: destination)
+        }
+        #expect(!FileManager.default.fileExists(atPath: fixture.finalPDF.path))
+
+        try FileManager.default.moveItem(at: fixture.parent, to: fixture.root.appendingPathComponent("Previous Box"))
+        try FileManager.default.createDirectory(at: fixture.parent, withIntermediateDirectories: false)
+        #expect(throws: CataloguePairFiler.Failure.operationMismatch) {
+            try filer.filePair(operationID: fixture.id, at: fixture.occurrence, record: fixture.record,
+                               preparedPDF: fixture.input, destination: destination)
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.parent.path).isEmpty)
         #expect(try Data(contentsOf: fixture.input) == fixture.pdfBytes)
     }
 

@@ -183,7 +183,10 @@ enum LiveCaptureRecoveryTestDriver {
             NSLog("RECOVERYTEST \(ok ? "PASS" : "FAIL"): \(name)")
         }
 
-        let tmp = fm.temporaryDirectory.appendingPathComponent("APRecoveryTest-\(UUID().uuidString)", isDirectory: true)
+        let outputRoot = ProcessInfo.processInfo.environment["LIVECAPTURE_TESTOUT"].map {
+            URL(fileURLWithPath: $0, isDirectory: true)
+        } ?? fm.temporaryDirectory
+        let tmp = outputRoot.appendingPathComponent("APRecoveryTest-\(UUID().uuidString)", isDirectory: true)
         let staging = tmp.appendingPathComponent("_staging", isDirectory: true)
         try? fm.createDirectory(at: staging, withIntermediateDirectories: true)
 
@@ -775,20 +778,27 @@ enum LiveCaptureRecoveryTestDriver {
         check("...and the refusal was real — the file carries no tags", tagsOf(locked).isEmpty)
         try? fm.setAttributes([.immutable: false], ofItemAtPath: locked.path)   // so `tmp` can be removed
 
-        // (e) The WIRING: that verdict has to reach the manifest, or finalize still can't warn. Pre-placing
-        // an immutable file at the staged PDF's path fails every write against it — realistic (a locked
-        // output fails as a unit) and enough to prove the verdict is threaded onto the segment.
+        // (e) The WIRING: that verdict has to reach the manifest. Lock a newly generated PDF only for
+        // its real tag write, so the fixture can distinguish that warning from a failed generation.
         let wireTagDir = tmp.appendingPathComponent("tagwire", isDirectory: true)
         try? fm.createDirectory(at: wireTagDir, withIntermediateDirectories: true)
         let lockedSrc = makeJPEG("held.jpg", in: wireTagDir)
         let lockedOut = wireTagDir.appendingPathComponent("held.pdf")
-        try? Data("pre-existing".utf8).write(to: lockedOut)
-        try? fm.setAttributes([.immutable: true], ofItemAtPath: lockedOut.path)
         let lockedSeg = LiveCaptureProcessor._recoveryTestStageSegment(
             sources: [lockedSrc], stagingDir: wireTagDir, model: stubModel,
-            type: .document, baseTags: ["1948"], jsonTags: GeneratedTags(), stampUnread: true)
+            type: .document, baseTags: ["1948"], jsonTags: GeneratedTags(), stampUnread: true
+        ) { tags, url, colour, unread in
+            try? FileManager.default.setAttributes([.immutable: true], ofItemAtPath: url.path)
+            defer { try? FileManager.default.setAttributes([.immutable: false], ofItemAtPath: url.path) }
+            return LiveCaptureProcessor._recoveryTestTagArtifact(tags, at: url, appColor: colour, stampUnread: unread)
+        }
         check("an un-taggable staged artifact is recorded on the segment (the wiring)",
-              lockedSeg.untaggedOutputs == [lockedOut])
+              lockedSeg.pdfCount == 1 && lockedSeg.untaggedOutputs == [lockedOut])
+
+        try? fm.setAttributes([.immutable: true], ofItemAtPath: lockedOut.path)
+        let blockedGeneration = LiveCaptureProcessor._recoveryTestStageSegment(
+            sources: [lockedSrc], stagingDir: wireTagDir, model: stubModel)
+        check("a refused write cannot reuse a stale staged PDF", blockedGeneration.pdfCount == 0)
         try? fm.setAttributes([.immutable: false], ofItemAtPath: lockedOut.path)
 
         // (f) The merge path tags the MERGED file and reports nothing spurious — the constituents it deletes
@@ -839,9 +849,17 @@ enum LiveCaptureRecoveryTestDriver {
                     textColumns: 1)
             }
             func stagedSeg(_ gid: String, pdf: URL) -> LiveCaptureProcessor.StagedSegment {
-                LiveCaptureProcessor.StagedSegment(
+                let document = PDFDocument()
+                document.insert(PDFPage(), at: 0)
+                let identity = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+                let catalogue = ProcessorCatalogueRecord(
+                    identity: identity, sourcePages: [.init(roles: ["image"])],
+                    document: .init(id: UUID(), ownerFileID: identity.fileID, fields: .init()), fileFields: .init())
+                try? PDFGenerator.writeArchival(document, to: pdf, catalogueIdentity: identity)
+                return LiveCaptureProcessor.StagedSegment(
                     groupId: gid, type: CaptureGroupType.document.rawValue, collectionKey: gid, order: 0,
-                    pdfURLs: [pdf], imageURLs: [], jsonURL: nil, boxLabelText: nil, pagesComplete: true)
+                    pdfURLs: [pdf], imageURLs: [], jsonURL: nil, boxLabelText: nil, pagesComplete: true,
+                    catalogueRecords: (try? catalogue.encoded()).map { [$0] })
             }
             // `chosenExisting` is set on purpose: it makes the destination an explicit scratch folder, so
             // `currentOutputDirectory` (which would otherwise fall back to the operator's real Settings
@@ -874,7 +892,6 @@ enum LiveCaptureRecoveryTestDriver {
             let keepDir = tmp.appendingPathComponent("APStaging-keep-\(tok)", isDirectory: true)
             try? fm.createDirectory(at: keepDir, withIntermediateDirectories: true)
             let plannedPDF = keepDir.appendingPathComponent("planned.pdf")
-            try? Data("planned".utf8).write(to: plannedPDF)
             let keepOut = tmp.appendingPathComponent("r6keep", isDirectory: true)
             let keepProc = LiveCaptureProcessor(session: r6Session)
             keepProc._recoveryTestArm(stagingDir: keepDir, config: makeConfig(keepOut),
@@ -884,7 +901,6 @@ enum LiveCaptureRecoveryTestDriver {
             // Task, but that Task cannot have run. Writing output into the staging dir and appending to
             // `staged` here reproduces the straggler's interleaving exactly, and deterministically.
             let stragglerPDF = keepDir.appendingPathComponent("straggler.pdf")
-            try? Data("straggler".utf8).write(to: stragglerPDF)
             keepProc._recoveryTestAppendStaged(stagedSeg("straggler", pdf: stragglerPDF))
             await settle(keepProc)
             check("a straggler that finalized during the move KEEPS the staging directory",
@@ -897,7 +913,8 @@ enum LiveCaptureRecoveryTestDriver {
                   manifestGroupIds(keepDir) == ["straggler"])
             check("...while the PLANNED segment really did file (the fix costs nothing)",
                   !fm.fileExists(atPath: plannedPDF.path)
-                      && fm.fileExists(atPath: keepOut.appendingPathComponent("000001 r6keep.pdf").path))
+                      && fm.fileExists(atPath: keepOut.appendingPathComponent("000001 r6keep.pdf").path)
+                      && fm.fileExists(atPath: keepOut.appendingPathComponent("000001 r6keep.pdf.archivesuite.json").path))
             check("...and the operator is TOLD, instead of seeing a clean \"Finalized\"",
                   keepProc.finalizeSummary?.contains("finished processing while this batch was being filed") == true)
 
@@ -906,7 +923,6 @@ enum LiveCaptureRecoveryTestDriver {
             let goneDir = tmp.appendingPathComponent("APStaging-reclaim-\(tok)", isDirectory: true)
             try? fm.createDirectory(at: goneDir, withIntermediateDirectories: true)
             let onlyPDF = goneDir.appendingPathComponent("only.pdf")
-            try? Data("only".utf8).write(to: onlyPDF)
             let goneOut = tmp.appendingPathComponent("r6gone", isDirectory: true)
             let goneProc = LiveCaptureProcessor(session: r6Session)
             goneProc._recoveryTestArm(stagingDir: goneDir, config: makeConfig(goneOut),
@@ -917,6 +933,46 @@ enum LiveCaptureRecoveryTestDriver {
                   !fm.fileExists(atPath: goneDir.path) && goneProc.staged.isEmpty)
             check("...and the summary carries no straggler warning",
                   goneProc.finalizeSummary?.contains("finished processing while") != true)
+
+            let retryDir = tmp.appendingPathComponent("APStaging-pair-retry-\(tok)", isDirectory: true)
+            let retryOut = tmp.appendingPathComponent("r6pair", isDirectory: true)
+            try? fm.createDirectory(at: retryDir, withIntermediateDirectories: true)
+            try? fm.createDirectory(at: retryOut, withIntermediateDirectories: true)
+            let workingPDF = retryDir.appendingPathComponent("retry.pdf")
+            let finalPDF = retryOut.appendingPathComponent("000001 r6pair.pdf")
+            let finalCompanion = finalPDF.appendingPathExtension("archivesuite.json")
+            let retryProc = LiveCaptureProcessor(session: r6Session)
+            let optionalJSON = retryDir.appendingPathComponent("retry.json")
+            try? Data("optional export".utf8).write(to: optionalJSON)
+            var pendingSegment = stagedSeg("retry-pair", pdf: workingPDF)
+            pendingSegment.jsonURL = optionalJSON
+            retryProc._recoveryTestArm(stagingDir: retryDir, config: makeConfig(retryOut),
+                                       staged: [pendingSegment])
+            let before = try? Data(contentsOf: workingPDF)
+            retryProc.finalize([draft("retry-pair", into: retryOut)])
+            let foreign = Data("outside file must survive".utf8)
+            try? foreign.write(to: finalCompanion)
+            await settle(retryProc)
+            check("a companion-only collision keeps the staged PDF, its manifest and the occupying bytes",
+                  before != nil && (try? Data(contentsOf: workingPDF)) == before
+                      && !fm.fileExists(atPath: finalPDF.path)
+                      && (try? Data(contentsOf: finalCompanion)) == foreign
+                      && manifestGroupIds(retryDir) == ["retry-pair"])
+            try? fm.removeItem(at: finalCompanion)
+            try? Data().write(to: retryOut.appendingPathComponent("000042 another.pdf"))
+            let wrongJSONFolder = tmp.appendingPathComponent("not-an-export-destination", isDirectory: true)
+            try? fm.createDirectory(at: wrongJSONFolder, withIntermediateDirectories: true)
+            try? fm.createSymbolicLink(at: retryOut.appendingPathComponent("JSON Output"), withDestinationURL: wrongJSONFolder)
+            retryProc.finalize([draft("retry-pair", into: retryOut)])
+            await settle(retryProc)
+            check("Finish retries the pinned number despite a newer PDF and publishes both members",
+                  before != nil && (try? Data(contentsOf: finalPDF)) == before
+                      && (try? Data(contentsOf: finalCompanion)).flatMap { try? CatalogueRecord(json: $0) } != nil
+                      && retryProc.staged.isEmpty)
+            check("an aliased optional export folder leaves the staged JSON and does not touch that folder",
+                  (try? fm.contentsOfDirectory(atPath: wrongJSONFolder.path))?.isEmpty == true
+                      && fm.fileExists(atPath: optionalJSON.path))
+
             // The reclaim above went to the Trash (recoverable, by design). Take our own probe folder back
             // out so a Tier-2 run doesn't leave one behind each time — best-effort, since the physical
             // Trash location varies with the app's launch context. The assertion is about the ORIGINAL
