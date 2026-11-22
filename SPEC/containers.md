@@ -67,8 +67,8 @@ until the user confirms it; confirming makes it `user` and keeps `reader`. The r
 2026-11-13): box and folder numbers from Vision + parser; repository, collection title, collection number and date
 from GPT 5.6 Luna on the gateway, else Gemma 3 12B, proposed and confirmed once per run; accession from Luna, else
 Vision + parser; collection subtitle, box title, folder title and other marks from the user. The Processor asks Gemma
-only on a server on the same Mac that lists it (`W47.ct-capture-gemma`); with none, it proposes the parser's values
-for those fields.
+on a server on the same Mac that lists it, or uses the local reader downloaded with the operator's consent
+(W49.proc-gemma-offer-download). If no model supplies values, the label card says which text the parser used.
 
 `path` values are worked out from the tree and the level map each time they are read and are **never stored**, so
 renaming a folder renames its value. A stored `path` value from another writer is read as `path`.

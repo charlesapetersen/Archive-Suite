@@ -17853,3 +17853,16 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 - [x] **W49.proc-batch-resume-approach — a resumed paid batch keeps the segmenter the user chose [S]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build) — Owner, 2026-11-19 (call 21, the accepted-issues sheet; `execution-plans/processing-review/17-accepted-review.json` entry `p-resume-manual`, answers in `answers/17-accepted-review-answers-20261119.json`): change it. Record the approach (and windows/answers) in `PendingBatch` as `PendingRun` does, so a resumed batch segments as chosen and a usage limit offers Stop.
   SHIPPED 2026-11-22 (this commit). The batch keeps its chosen approach and local-model partner, saves each completed window and confirmed gap answers, and offers Stop on a usage limit. Resume reuses fully collected OCR, including outputs in their tree folders. Older journals retain Manual.
   <!-- /W49.proc-batch-resume-approach -->
+
+- [x] **W49.proc-gemma-offer-download — the app offers to download and run the Gemma label reader [M]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit) — Owner, 2026-11-19 (call 21, the accepted-issues sheet; `execution-plans/processing-review/17-accepted-review.json` entry `p-gemma-server`, answers in `answers/17-accepted-review-answers-20261119.json`): change it. When label reading is on and no local server lists Gemma 3 12B, offer once to download the model (size and memory shown) and run it in-process or under a managed mlx-vlm child the app starts and stops; say on the card when the weaker Vision-plus-parser route was used.
+  On Apple silicon with at least 16 GB of memory, the first local label read without an existing Gemma server
+  offers the download. The app shows the 8 GB model, about 10 GB of total disk space and 8 GB of memory.
+  Settings → Capture can start, pause or retry setup. The app starts its offline mlx-vlm worker when needed
+  and stops it on idle, disable or quit. Live Capture explains the fallback on the label card and keeps it
+  across recovery. Process Files and backfill report labels where a model supplied no suggestions.
+  Verified actual local inference through the app with the pinned cached weights on a synthetic label, the runtime
+  installer and anonymous model revision access, the scratch Capture manifest and recovery contracts, the key-free
+  two-image Process Files smoke, and the off-screen offer, fallback card and backfill review.
+  The Android-to-Mac round trip verified all three synthetic captures through OCR, Finder tags and finalized PDFs.
+  Its Gemini API spend was estimated below $0.03. The real archive was outside the test inputs.
+  <!-- /W49.proc-gemma-offer-download -->

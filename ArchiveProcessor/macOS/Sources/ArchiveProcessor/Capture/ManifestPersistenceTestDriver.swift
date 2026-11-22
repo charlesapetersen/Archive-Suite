@@ -753,11 +753,24 @@ enum ManifestPersistenceTestDriver {
         check("W47: a box marker ingests with no card until its label is read",
               boxPhoto != nil && session.pendingTagGroup == nil)
         let boxRead = ContainerLabelReader.proposals(lines: ["HOOVER INSTITUTION ARCHIVES", "BOX NO. 17"], type: .box)
-        session.setContainerRead(groupId: "gBox", read: boxRead)
+        session.setContainerRead(groupId: "gBox", read: ContainerFieldSet(), fallback: .unread)
+        let restoredUnread = CaptureSession()
+        check("W49: an empty fallback read and its explanation survive a restart",
+              restoredUnread.pendingTagGroup?.id == "gBox" && restoredUnread.containerFallbacks["gBox"] == .unread)
+        session.setContainerRead(groupId: "gBox", read: boxRead, fallback: .vision)
+        check("W49: an updated label read replaces the prior fallback",
+              CaptureSession().containerFallbacks["gBox"] == .vision)
         check("W47: the read brings up the marker's card with the parser's proposals",
               session.pendingTagGroup?.id == "gBox"
               && session.containerFields["gBox"]?[.container]?.value == "Box 17"
               && session.containerFields["gBox"]?[.container]?.source == .label)
+        let futureManifest = CaptureSession.SessionManifest(photos: [], completedDocGroups: [],
+                                                           containerFields: ["gBox": boxRead],
+                                                           containerFallbacks: ["gBox": "futureReader"])
+        let decodedFuture = (try? JSONEncoder().encode(futureManifest)).flatMap(CaptureSession.decodeManifest)
+        check("W49: an unknown fallback value preserves the manifest and proposals",
+              decodedFuture?.containerFields["gBox"]?[.container]?.value == "Box 17"
+              && decodedFuture?.containerFallbacks.isEmpty == true)
         let cardFields = ContainerLabelCard.fields(for: .box)
         let edited = ContainerLabelCard.confirmed(
             texts: [.repository: "Hoover Institution Archives", .container: "Box 18", .collectionTitle: "Glotzer papers",
@@ -788,6 +801,7 @@ enum ManifestPersistenceTestDriver {
               && session.containerFields["gBox"]?[.container]?.value == "Box 18"
               && afterBox.containerFields["gBox"]?[.container]?.value == "Box 18"
               && afterBox.containerFields["gBox"]?[.container]?.source == .user
+              && afterBox.containerFallbacks["gBox"] == .vision
               && afterBox.pendingTagGroup == nil)
 
         let collection = tmp.appendingPathComponent("00 Collection", isDirectory: true)

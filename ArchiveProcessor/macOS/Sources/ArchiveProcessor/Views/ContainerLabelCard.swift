@@ -33,6 +33,13 @@ struct ContainerLabelCard: View {
                 .font(.caption).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            if let fallback = session.containerFallbacks[group.id] {
+                Label(fallback.cardNote, systemImage: "info.circle")
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("ap.container.fallback")
+            }
+
             HStack(alignment: .top, spacing: 14) {
                 if let photo = group.photos.first {
                     ArchiveThumbnail(url: photo.url, maxSize: 480)

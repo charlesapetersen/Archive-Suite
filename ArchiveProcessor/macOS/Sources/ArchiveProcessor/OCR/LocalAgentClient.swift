@@ -647,7 +647,7 @@ struct LocalAgentClient: Sendable {
     /// stops the child (SIGTERM, then SIGKILL) and returns a run marked `cancelled`.
     static func runAsync(binaryPath: String, args: [String], stdinText: String,
                          timeout: TimeInterval, currentDirectory: URL? = nil,
-                         unsetEnvironment: [String] = []) async -> CLIRun {
+                         unsetEnvironment: [String] = [], environment: [String: String]? = nil) async -> CLIRun {
         let canceller = ProcessCanceller()
         return await withTaskCancellationHandler {
             await withCheckedContinuation { cont in
@@ -655,7 +655,7 @@ struct LocalAgentClient: Sendable {
                     cont.resume(returning: runProcess(binaryPath: binaryPath, args: args,
                                                       stdinText: stdinText, timeout: timeout,
                                                       currentDirectory: currentDirectory, canceller: canceller,
-                                                      unsetEnvironment: unsetEnvironment))
+                                                      unsetEnvironment: unsetEnvironment, environment: environment))
                 }
             }
         } onCancel: {
@@ -672,7 +672,8 @@ struct LocalAgentClient: Sendable {
     /// that copy; `SegmentationPlanTestDriver` tests them against the same fake CLI.
     static func runProcess(binaryPath: String, args: [String], stdinText: String,
                            timeout: TimeInterval, currentDirectory: URL? = nil,
-                           canceller: ProcessCanceller? = nil, unsetEnvironment: [String] = []) -> CLIRun {
+                           canceller: ProcessCanceller? = nil, unsetEnvironment: [String] = [],
+                           environment: [String: String]? = nil) -> CLIRun {
         if canceller?.isCancelled == true {
             return CLIRun(exitCode: -1, stdout: "", stderr: "", timedOut: false, spawnFailed: false, cancelled: true)
         }
@@ -684,7 +685,7 @@ struct LocalAgentClient: Sendable {
         if let currentDirectory { proc.currentDirectoryURL = currentDirectory }
         // Inherit the environment but strip the Claude Code nested-session guard so a dev/test run
         // from inside a Claude Code session can still spawn `claude` (prod is unaffected — unset).
-        var env = ProcessInfo.processInfo.environment
+        var env = environment ?? ProcessInfo.processInfo.environment
         env.removeValue(forKey: "CLAUDECODE")
         for key in unsetEnvironment { env.removeValue(forKey: key) }
         proc.environment = env

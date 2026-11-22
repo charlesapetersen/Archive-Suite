@@ -158,8 +158,8 @@ struct ContainerBackfillSheet: View {
                 + "\(dollars(model.estimatedDollars)) for \(n) photos not read yet (\(dollars(ContainerLabelCapture.gatewayDollarsPerLabel)) each)."
         case .gemma, .vision:
             let minutes = Int((Double(n) * ContainerLabelGemma.secondsPerLabel / 60).rounded(.up))
-            return "Gemma 3 12B on this Mac, when a local model server lists it: free, about \(minutes) min for \(n) photos. "
-                + "With no server, Vision's reading alone is proposed."
+            return "Gemma 3 12B on this Mac, when installed or served locally: free, about \(minutes) min for \(n) photos. "
+                + "If Gemma is unavailable, the app proposes fields from Apple Vision’s text."
         }
     }
 
@@ -191,6 +191,10 @@ struct ContainerBackfillSheet: View {
                 if !proposal.warnings.isEmpty {
                     Text(warningLine(proposal.warnings)).font(.caption).foregroundStyle(.orange)
                 }
+            }
+            if row.fallbackCount > 0 {
+                Text("No model supplied suggestions for \(row.fallbackCount) label photo\(row.fallbackCount == 1 ? "" : "s"). Check the proposals carefully.")
+                    .font(.caption)
             }
             if let note = row.note { Text(note).font(.caption).foregroundStyle(.orange) }
         }

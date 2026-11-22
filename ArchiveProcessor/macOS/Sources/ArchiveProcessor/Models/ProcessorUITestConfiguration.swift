@@ -41,6 +41,19 @@ enum ProcessorUITestConfiguration {
         isActive && KeychainHelper.isHeadlessTestMode && arguments.contains("-APUITestLiveCaptureTrainingWarning")
     }
 
+    static var showsGemmaOffer: Bool { isActive && arguments.contains("-APUITestGemmaOffer") }
+    static var showsLabelFallback: Bool { isActive && arguments.contains("-APUITestLabelFallback") }
+
+    @MainActor static func receiveLabelFallback(in session: CaptureSession) {
+        guard showsLabelFallback, KeychainHelper.isHeadlessTestMode, session.photos.isEmpty else { return }
+        let fields = ContainerLabelReader.proposals(lines: ["BOX NO. 17"], type: .box)
+        let photo = session.ingest(jpeg: Data(), groupId: "scratch-label", seq: 1, type: .box,
+                                   quality: nil, year: nil, month: nil, deviceName: "Scratch phone")
+        if photo != nil {
+            session.setContainerRead(groupId: "scratch-label", read: fields, fallback: .vision)
+        }
+    }
+
     /// Start the actual warning on the normal ingest path, with a disposable collection and an OCR stub.
     @MainActor static func receiveTrainingWarningPhotos(in session: CaptureSession) {
         guard showsLiveCaptureTrainingWarning, session.config == nil, let backupDirectory else { return }

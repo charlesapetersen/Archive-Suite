@@ -31,6 +31,7 @@ final class ContainerBackfillModel: ObservableObject {
         var id: String { directory.relativePath }
         let directory: ContainerBackfill.Directory
         var proposal: ContainerBackfill.Proposal?
+        var fallbackCount = 0
         var status: RowStatus = .waiting
         /// Shown when the folder changed after its proposal and the proposal was made again.
         var note: String?
@@ -74,7 +75,7 @@ final class ContainerBackfillModel: ObservableObject {
 
     var gateway: GatewayConfig? { GatewayConfig.fromDefaults() }
 
-    /// What "use a model" would read with: the gateway's Luna (money), else Gemma on this Mac when a server lists it.
+    /// What "use a model" would read with: the gateway's Luna (money), else Gemma on this Mac.
     var modelRoute: ContainerBackfillCache.Route {
         if let g = gateway, !g.isLocalModel { return .luna }
         return .gemma
@@ -205,24 +206,32 @@ final class ContainerBackfillModel: ObservableObject {
             var done = 0
             var next = 0
             var finished: [String] = []
+            var fallbacks: [String: Int] = [:]
             // Reads that land after the window closed, saved straight into the cache below: they were paid for.
             var orphans: [String: ContainerBackfillCache.Entry] = [:]
             var paid = (calls: 0, dollars: 0.0)
             typealias Keys = (vision: String, model: String)
             typealias Result = (dir: String, keys: Keys, entry: ContainerBackfillCache.Entry?, visionAnswered: Bool,
-                                called: Bool, dollars: Double, modelAnswered: Bool)
+                                called: Bool, dollars: Double, modelAnswered: Bool, usedFallback: Bool)
             await withTaskGroup(of: Result.self) { group in
                 func add() {
                     guard next < work.count else { return }
                     let (dir, marker, keys, hit) = work[next]
                     next += 1
                     group.addTask {
-                        if let hit { return (dir, keys, hit, false, false, 0, false) }
-                        if Task.isCancelled { return (dir, keys, nil, false, false, 0, false) }
-                        if let override { return (dir, keys, await override(marker), true, false, 0, route != .vision) }
+                        if let hit {
+                            let reader = route == .luna ? ContainerLabelCapture.gatewayReader
+                                : ContainerLabelReader.localModelReader
+                            let fallback = route != .vision && !hit.fields.values.values.contains { $0.reader == reader }
+                            return (dir, keys, hit, false, false, 0, false, fallback)
+                        }
+                        if Task.isCancelled { return (dir, keys, nil, false, false, 0, false, false) }
+                        if let override {
+                            return (dir, keys, await override(marker), true, false, 0, route != .vision, false)
+                        }
                         let r = await Self.read(marker, gateway: gateway, route: route)
                         return (dir, keys, r?.entry, r?.visionAnswered ?? false, r?.gatewayCalled ?? false,
-                                r?.dollars ?? 0, r?.modelAnswered ?? false)
+                                r?.dollars ?? 0, r?.modelAnswered ?? false, r?.usedFallback ?? false)
                     }
                 }
                 for _ in 0..<Self.concurrentReads { add() }
@@ -243,6 +252,7 @@ final class ContainerBackfillModel: ObservableObject {
                     for (k, entry) in keep where k == r.keys.model || self.reads[k] == nil { self.reads[k] = entry }
                     let dir = r.dir
                     guard gen == self.generation, !Task.isCancelled else { group.cancelAll(); continue }
+                    if r.usedFallback { fallbacks[dir, default: 0] += 1 }
                     done += 1
                     left[dir, default: 1] -= 1
                     if left[dir] == 0 { finished.append(dir) }
@@ -250,7 +260,7 @@ final class ContainerBackfillModel: ObservableObject {
                     if done % 25 == 0 { self.saveCache() }
                     add()
                     // Proposals are made between reads, never while a result is half recorded.
-                    for d in finished { await self.propose(d, generation: gen) }
+                    for d in finished { await self.propose(d, generation: gen, fallbackCount: fallbacks[d, default: 0]) }
                     finished = []
                 }
             }
@@ -271,13 +281,13 @@ final class ContainerBackfillModel: ObservableObject {
     nonisolated private static func read(_ marker: ContainerBackfill.Marker, gateway: GatewayConfig?,
                                          route: ContainerBackfillCache.Route)
         async -> (entry: ContainerBackfillCache.Entry, visionAnswered: Bool, gatewayCalled: Bool, dollars: Double,
-                  modelAnswered: Bool)? {
+                  modelAnswered: Bool, usedFallback: Bool)? {
         let photo = await Task.detached { PDFToImageConverter.imageURL(for: marker.url) }.value
         defer { if photo != marker.url { try? FileManager.default.removeItem(at: photo) } }
         let r = await ContainerLabelCapture.readLabel(type: marker.type, text: "", photo: photo, rotation: 0,
                                                       gateway: gateway, useModel: route != .vision)
         return (ContainerBackfillCache.Entry(fields: r.fields, text: r.visionText), r.visionAnswered, r.gatewayCalled,
-                r.dollars, r.modelAnswered)
+                r.dollars, r.modelAnswered, r.fallback != nil)
     }
 
     private func containerMarkers(_ d: ContainerBackfill.Directory, route: ContainerBackfillCache.Route) -> [ContainerMarker] {
@@ -288,7 +298,7 @@ final class ContainerBackfillModel: ObservableObject {
         }
     }
 
-    private func propose(_ relativePath: String, generation gen: Int) async {
+    private func propose(_ relativePath: String, generation gen: Int, fallbackCount: Int? = nil) async {
         guard let i = rows.firstIndex(where: { $0.id == relativePath }) else { return }
         let d = rows[i].directory
         let markers = containerMarkers(d, route: readRoute)
@@ -296,6 +306,7 @@ final class ContainerBackfillModel: ObservableObject {
         guard gen == generation, let j = rows.firstIndex(where: { $0.id == relativePath }),
               rows[j].status != .written, rows[j].status != .accepting else { return }
         rows[j].proposal = proposal
+        if let fallbackCount { rows[j].fallbackCount = fallbackCount }
         switch proposal.state {
         case .ready: rows[j].status = .proposed
         case .unchanged: rows[j].status = .unchanged

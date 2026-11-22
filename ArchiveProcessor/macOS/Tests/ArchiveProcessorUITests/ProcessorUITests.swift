@@ -850,6 +850,32 @@ final class ProcessorUITests: XCTestCase {
         sheet.buttons["Cancel"].click()
     }
 
+    func testGemmaOfferDisclosesSizeAndCanBeDismissed() {
+        relaunch(extra: ["-APUITestGemmaOffer"])
+
+        XCTAssertTrue(app.buttons["ap.gemma.download"].waitForExistence(timeout: 10))
+        attachScreenshot("processor-gemma-offer")
+        let size = element("ap.gemma.requirements")
+        XCTAssertTrue(size.exists)
+        let requirements = renderedText(of: size)
+        XCTAssertTrue(requirements.contains("8 GB to download"), requirements)
+        XCTAssertTrue(requirements.contains("8 GB of memory"), requirements)
+        app.buttons["ap.gemma.dismiss"].click()
+        XCTAssertFalse(app.buttons["ap.gemma.download"].exists)
+    }
+
+    func testLiveLabelCardExplainsAppleVisionFallback() {
+        relaunch(extra: ["-APUITestLabelFallback"])
+
+        let fallback = element("ap.container.fallback")
+        XCTAssertTrue(fallback.waitForExistence(timeout: 10))
+        XCTAssertTrue(renderedText(of: fallback).contains("Apple Vision"))
+        XCTAssertTrue(app.sheets.firstMatch.buttons["Skip"].exists)
+        attachScreenshot("processor-label-fallback")
+        app.sheets.firstMatch.buttons["Skip"].click()
+        XCTAssertFalse(fallback.exists)
+    }
+
     func testLiveCaptureTrainingWarningKeepsPhotosPausedUntilApproved() {
         relaunch(extra: ["-APUITestLiveCaptureTrainingWarning"])
 

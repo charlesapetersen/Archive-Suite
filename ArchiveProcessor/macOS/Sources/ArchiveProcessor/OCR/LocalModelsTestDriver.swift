@@ -90,6 +90,18 @@ enum LocalModelsTestDriver {
         replyGuardChecks()
         settingsChecks()
 
+        if let path = ProcessInfo.processInfo.environment["LOCALMODELS_SCRATCH_GEMMA_ROOT"] {
+            let scratch = URL(fileURLWithPath: path, isDirectory: true)
+            let photo = scratch.appending(path: "synthetic-label.jpg")
+            if let jpeg = try? Data(contentsOf: photo), let answer = await ManagedGemma.testRead(jpeg: jpeg, scratch: scratch) {
+                let fields = ContainerLabelReader.localModelFields(fromReply: answer)
+                check("W49 managed worker returns the expected fields through the app",
+                      fields[.collectionTitle] == "Doe Papers" && fields[.date] == "1968", answer)
+            } else {
+                check("W49 managed worker starts and answers through the app", false)
+            }
+        }
+
         check("0 seam dormant before install", !NetworkSession.testTransportIsActive)
         let wire = Wire()
         NetworkSession.testTransport = { request in
@@ -444,6 +456,13 @@ enum LocalModelsTestDriver {
         check("10 unreadable photo uses the run's text", !fallback.visionAnswered
               && fallback.fields[.container]?.value == "Box 99"
               && fallback.fields[.container]?.reader == ContainerLabelCapture.ocrTextReader)
+        check("10 intentional Vision-only reading is not a model fallback", fallback.fallback == nil)
+        let noModel = await ContainerLabelCapture.readLabel(type: .box, text: "BOX NO. 99", photo: unreadable,
+                                                            rotation: 90, gateway: nil)
+        check("10 a missing photo with saved OCR text discloses the text fallback", noModel.fallback == .ocrText)
+        let noText = await ContainerLabelCapture.readLabel(type: .box, text: "", photo: unreadable,
+                                                           rotation: 90, gateway: nil)
+        check("10 a missing photo with no text discloses an unread label", noText.fallback == .unread)
     }
 
     /// 9. W47.ct-label-cost: what a label's gateway call is counted at, and where it goes.

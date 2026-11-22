@@ -10,8 +10,8 @@ import ArchiveCore
 /// 8.04 GB at its peak; through mlx-vlm's server with this request, a median 13.04 s and a tie with that reading
 /// (`segbench-results/ct-gemma-route.md`). It is used only when a server on this Mac lists it (`find`): the gateway's own address when it
 /// is a local model, else the three presets' (`LocalModelRoute.Server`): only addresses on this Mac, though a server
-/// there that forwards to the cloud (a proxy) cannot be told apart. With no server answering the card proposes the
-/// parser's values, as before.
+/// there that forwards to the cloud (a proxy) cannot be told apart. If no external server answers, the app can
+/// use the reader downloaded with the operator's consent.
 enum ContainerLabelGemma {
     /// The name each server lists it under: the measured MLX build, and the other servers' usual names for the same model.
     static let ids: [LocalModelRoute.Server: String] = [
@@ -113,24 +113,42 @@ enum ContainerLabelGemma {
         return request
     }
 
-    /// Gemma's fields for the photo (its four only, `ContainerLabelReader.localModelFields`), or nil when no server
-    /// lists it or the call fails, is cut at its cap, or gives none of them.
-    /// A server whose call fails (an error status, a text-only build refusing the image) counts as none for the rest of
-    /// `rememberFor`, so a run of labels does not fail one call each.
+    /// Check the external servers first, then the reader the operator downloaded in this app.
+    @MainActor
+    static func prepare(gateway: GatewayConfig?) async -> Bool {
+        if await find(gateway: gateway) != nil { return true }
+        ManagedGemma.shared.offerIfNeeded()
+        return ManagedGemma.shared.installed
+    }
+
+    /// A failed external request suppresses that address for the rest of the lookup window.
     static func read(photo: URL, rotation: Int, gateway: GatewayConfig?) async -> [ContainerField: String]? {
-        guard let server = await find(gateway: gateway),
-              let jpeg = ImageEncoding.uprightJPEG(url: photo, rotationDegrees: rotation, longEdge: imageLongSide),
-              let request = request(jpeg: jpeg, server: server) else { return nil }
+        guard let jpeg = ImageEncoding.uprightJPEG(url: photo, rotationDegrees: rotation, longEdge: imageLongSide) else {
+            return nil
+        }
+        if let server = await find(gateway: gateway) {
+            if let answer = await readExternal(jpeg: jpeg, server: server, gateway: gateway) {
+                let fields = ContainerLabelReader.localModelFields(fromReply: answer)
+                if !fields.isEmpty { return fields }
+            }
+        } else {
+            await ManagedGemma.shared.offerIfNeeded()
+        }
+        guard !Task.isCancelled, let answer = await ManagedGemma.shared.read(jpeg: jpeg) else { return nil }
+        let fields = ContainerLabelReader.localModelFields(fromReply: answer)
+        return fields.isEmpty ? nil : fields
+    }
+
+    private static func readExternal(jpeg: Data, server: Server, gateway: GatewayConfig?) async -> String? {
+        guard let request = request(jpeg: jpeg, server: server) else { return nil }
         guard let (data, response) = try? await NetworkSession.data(for: request, policy: .nonIdempotent, maxRetries: 0),
               (response as? HTTPURLResponse)?.statusCode == 200 else {
             if !Task.isCancelled { await memory.failed(candidates(gateway: gateway), now: Date()) }
             return nil
         }
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choice = (json["choices"] as? [[String: Any]])?.first,
-              let answer = LocalModelRoute.textAnswer((choice["message"] as? [String: Any])?["content"] as? String,
-                                                      finish: choice["finish_reason"] as? String) else { return nil }
-        let fields = ContainerLabelReader.localModelFields(fromReply: answer)
-        return fields.isEmpty ? nil : fields
+              let choice = (json["choices"] as? [[String: Any]])?.first else { return nil }
+        return LocalModelRoute.textAnswer((choice["message"] as? [String: Any])?["content"] as? String,
+                                          finish: choice["finish_reason"] as? String)
     }
 }

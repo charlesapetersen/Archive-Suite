@@ -170,6 +170,8 @@ final class CaptureSession: ObservableObject {
     /// An entry, even an empty one, means the read is in, which is what lets the marker's card appear. Written into
     /// the marker's directory's `.archivesuite/containers.json` at finalize (`SPEC/containers.md`).
     @Published private(set) var containerFields: [String: ContainerFieldSet] = [:]
+    /// Why the label card has parser suggestions only. This is independent of the filing decisions.
+    @Published private(set) var containerFallbacks: [String: ContainerLabelCapture.Fallback] = [:]
     /// Document groups the phone has signalled complete (via `POST /segment/complete` at End segment).
     /// Photos now stream to the Mac page-by-page as they are shot, so a document group exists mid-segment;
     /// its tag card must appear only once the segment is complete — this gates `pendingTagGroup`.
@@ -582,6 +584,7 @@ final class CaptureSession: ObservableObject {
             resolvedGroupIds = restored.resolved     // B9: don't re-surface an already-resolved tag card
             macTags = restored.macTags               // B9: keep the Mac-entered tags across the restart
             containerFields = restored.containerFields
+            containerFallbacks = restored.containerFallbacks
         } else {
             sessionId = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
             incomingFolder = root.appendingPathComponent(sessionId, isDirectory: true)
@@ -872,7 +875,7 @@ final class CaptureSession: ObservableObject {
     @discardableResult
     func commitPreparedClear(token: String) -> Bool {
         guard clearPhase == "prepared", clearToken == token else { return false }
-        let didWrite = writeManifest(completed: [], resolved: [], macTags: [:], containerFields: [:],
+        let didWrite = writeManifest(completed: [], resolved: [], macTags: [:], containerFields: [:], containerFallbacks: [:],
                                      clearPhase: "committed", clearToken: token)
         if didWrite { clearPhase = "committed" }
         return didWrite
@@ -883,7 +886,7 @@ final class CaptureSession: ObservableObject {
         for p in photos { Self.trashOrRemove(p.url) }   // to Trash, not a hard delete — recoverable
         photos = []
         completedDocGroups.removeAll()
-        resolvedGroupIds.removeAll(); macTags.removeAll(); containerFields.removeAll()   // B9: keep the persisted resolve state in sync
+        resolvedGroupIds.removeAll(); macTags.removeAll(); containerFields.removeAll(); containerFallbacks.removeAll()   // B9: keep the persisted resolve state in sync
         if writeManifest(preserveClearMarker: false) { clearPhase = nil; clearToken = nil }
         statusMessage = serverRunning ? "Listening on port \(listenPort)." : "Idle"
     }
@@ -929,7 +932,7 @@ final class CaptureSession: ObservableObject {
         for p in removed { Self.trashOrRemove(p.url) }   // to Trash, not a hard delete — recoverable
         photos = photos.filter { !filed.contains($0.url) }
         if photos.isEmpty {
-            completedDocGroups.removeAll(); resolvedGroupIds.removeAll(); macTags.removeAll(); containerFields.removeAll()
+            completedDocGroups.removeAll(); resolvedGroupIds.removeAll(); macTags.removeAll(); containerFields.removeAll(); containerFallbacks.removeAll()
         }
         let refreshed = writeManifest()
         statusMessage = serverRunning ? "Listening on port \(listenPort)." : "Idle"
@@ -988,11 +991,12 @@ final class CaptureSession: ObservableObject {
     /// The label read of a marker is in (W47.ct-processor-capture): its proposals replace earlier label values and keep
     /// every value the operator set. Persisted best-effort: a lost write costs only the proposals, which the next
     /// read gives again, and the card still appears from memory.
-    func setContainerRead(groupId: String, read: ContainerFieldSet) {
+    func setContainerRead(groupId: String, read: ContainerFieldSet, fallback: ContainerLabelCapture.Fallback? = nil) {
         guard !filedGroupIds.contains(groupId), !resolvedGroupIds.contains(groupId) else { return }
         var merged = containerFields[groupId] ?? ContainerFieldSet()
         merged.values = merged.values.filter { $0.value.source == .user }
         for (field, value) in read.values where merged[field] == nil { merged[field] = value }
+        containerFallbacks[groupId] = fallback
         containerFields[groupId] = merged
         _ = writeManifest()
         headlessResolvePendingTags()   // headless E2E only (env-gated): a marker's card resolves like a tag card
@@ -1190,6 +1194,7 @@ final class CaptureSession: ObservableObject {
         var macTags: [String: MacSegmentTags]? = nil
         /// W47.ct-processor-capture — the markers' container fields; optional so older manifests decode.
         var containerFields: [String: ContainerFieldSet]? = nil
+        var containerFallbacks: [String: String]? = nil
         // W3.cap-r3-fu4: a filed group stays remembered after its source photos leave the Backup Folder.
         // Optional so pre-fu4 manifests continue to decode.
         var filedGroupIds: [String]? = nil
@@ -1208,6 +1213,7 @@ final class CaptureSession: ObservableObject {
                                resolved resolvedOverride: Set<String>? = nil,
                                macTags macTagsOverride: [String: MacSegmentTags]? = nil,
                                containerFields containerFieldsOverride: [String: ContainerFieldSet]? = nil,
+                               containerFallbacks containerFallbacksOverride: [String: ContainerLabelCapture.Fallback]? = nil,
                                clearPhase: String? = nil,
                                clearToken: String? = nil,
                                preserveClearMarker: Bool = true) -> Bool {
@@ -1221,6 +1227,7 @@ final class CaptureSession: ObservableObject {
                                        resolvedGroupIds: Array(resolvedOverride ?? resolvedGroupIds),
                                        macTags: macTagsOverride ?? macTags,
                                        containerFields: containerFieldsOverride ?? containerFields,
+                                       containerFallbacks: (containerFallbacksOverride ?? containerFallbacks).mapValues(\.rawValue),
                                        filedGroupIds: filedGroupIds.sorted(), clearPhase: markerPhase,
                                        clearToken: markerToken)
         guard let data = try? JSONEncoder().encode(manifest) else { return false }
@@ -1240,18 +1247,20 @@ final class CaptureSession: ObservableObject {
     nonisolated static func decodeManifest(_ data: Data) -> (entries: [ManifestEntry], completed: Set<String>,
                                                              resolved: Set<String>, macTags: [String: MacSegmentTags],
                                                              filed: Set<String>, clearPhase: String?, clearToken: String?,
-                                                             containerFields: [String: ContainerFieldSet])? {
+                                                             containerFields: [String: ContainerFieldSet], containerFallbacks: [String: ContainerLabelCapture.Fallback])? {
         let d = JSONDecoder()
         if let m = try? d.decode(SessionManifest.self, from: data) {
+            // A fallback label from a newer version must never block recovery of its photos and proposals.
+            let fallbacks = m.containerFallbacks?.compactMapValues(ContainerLabelCapture.Fallback.init(rawValue:)) ?? [:]
             return (m.photos, Set(m.completedDocGroups), Set(m.resolvedGroupIds ?? []), m.macTags ?? [:],
-                    Set(m.filedGroupIds ?? []), m.clearPhase, m.clearToken, m.containerFields ?? [:])
+                    Set(m.filedGroupIds ?? []), m.clearPhase, m.clearToken, m.containerFields ?? [:], fallbacks)
         }
-        if let legacy = try? d.decode([ManifestEntry].self, from: data) { return (legacy, [], [], [:], [], nil, nil, [:]) }
+        if let legacy = try? d.decode([ManifestEntry].self, from: data) { return (legacy, [], [], [:], [], nil, nil, [:], [:]) }
         return nil
     }
 
     /// Newest session folder that still has photos + a manifest (received but not yet cleared).
-    static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto], completed: Set<String>, resolved: Set<String>, macTags: [String: MacSegmentTags], filed: Set<String>, clearPhase: String?, clearToken: String?, containerFields: [String: ContainerFieldSet])? {
+    static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto], completed: Set<String>, resolved: Set<String>, macTags: [String: MacSegmentTags], filed: Set<String>, clearPhase: String?, clearToken: String?, containerFields: [String: ContainerFieldSet], containerFallbacks: [String: ContainerLabelCapture.Fallback])? {
         let fm = FileManager.default
         guard let subdirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return nil }
         // ISO-8601 folder names sort lexically = chronologically; check newest first.
@@ -1277,7 +1286,7 @@ final class CaptureSession: ObservableObject {
                 || decoded.clearPhase == "prepared" || decoded.clearPhase == "committed" {
                 restored.sort { $0.seq < $1.seq }
                 return (folder, restored, decoded.completed, decoded.resolved, decoded.macTags,
-                        decoded.filed, decoded.clearPhase, decoded.clearToken, decoded.containerFields)
+                        decoded.filed, decoded.clearPhase, decoded.clearToken, decoded.containerFields, decoded.containerFallbacks)
             }
         }
         return nil

@@ -275,15 +275,13 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   views follow the Reader's levels sheet, which the VM checked (W47.ct-reader-view). (queued: W49.proc-tree-sheet-vm).
 
 ## ⚠️ LIMITATION (W47.ct-processor-capture, 2026-11-19): what reading box and folder labels does not do
-- **Gemma needs a server already running on this Mac** (W47.ct-capture-gemma). With the gateway off or a local model on
-  it, repository, collection title and number and date come from Gemma 3 12B only when LM Studio, Ollama or mlx-vlm
-  on this Mac lists it (`ContainerLabelGemma`); otherwise the card proposes the Vision + parser values, a weaker
-  route (`segbench-results/ct-read.md`). The app starts no server and downloads no model. A server is looked for
-  once every two minutes, so one started mid-run is used from the next window; one whose call fails is skipped for
-  the window. With mlx-vlm, start it with the model (`mlx_vlm.server --model mlx-community/gemma-3-12b-it-4bit`): its
-  0.7.4 cache listing skips that build, whose index names five shards where the repo has two, so a server that has
-  not loaded it does not list it. Settings has no switch for it apart from the label-reading toggle. The reader is recorded as
-  `gemma-3-12b` whichever build the server lists. (queued: W49.proc-gemma-offer-download).
+When label reading needs Gemma, the Processor checks the existing local servers first. If none lists it,
+  the app offers its own Gemma 3 12B download once on a supported Mac (W49.proc-gemma-offer-download). Settings
+  → Capture can start or retry the download. The app-managed reader uses about 10 GB of disk space including its
+  software, and about 8 GB of memory while reading. It handles one label at a time and stops after 20 seconds
+  idle, when label reading is turned off, or when the app quits. The label card describes the parser fallback
+  when no model supplied fields. The field provenance stays `gemma-3-12b` for either local route.
+
 - **Gemma beside a local OCR model swaps models.** With a local model as the gateway, Gemma (about 8 GB) is asked on
   that same server first; LM Studio and Ollama may unload the OCR model to load it, and load it again for the next
   page, tens of seconds each way on an 18 GB Mac, inside Live Capture's segment work (Finish waits). Not measured

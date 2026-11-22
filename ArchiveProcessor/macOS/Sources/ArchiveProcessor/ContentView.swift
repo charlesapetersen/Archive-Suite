@@ -4,12 +4,15 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var processor = OCRProcessor()
     @StateObject private var capture = CaptureSession()
+    @ObservedObject private var gemma = ManagedGemma.shared
+    @AppStorage(DefaultsKeys.readContainerLabels) private var readContainerLabels = true
 #if DEBUG
     @State private var mode: Mode = (
         ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1"
         || ProcessorUITestConfiguration.showsLiveCaptureFinishingScrim
         || ProcessorUITestConfiguration.showsLiveCaptureEmptyPaneClear
         || ProcessorUITestConfiguration.showsLiveCaptureTrainingWarning
+        || ProcessorUITestConfiguration.showsLabelFallback
     ) ? .live : .files
 #else
     @State private var mode: Mode =
@@ -60,6 +63,8 @@ struct ContentView: View {
             // flag: no receiver, OCR, Keychain, network, source, or output directory is touched.
             MoneyJourneyFixture.receiveScratchPhotosIfRequested(in: capture)
             ProcessorUITestConfiguration.receiveTrainingWarningPhotos(in: capture)
+            ProcessorUITestConfiguration.receiveLabelFallback(in: capture)
+            if ProcessorUITestConfiguration.showsGemmaOffer { gemma.showOfferForUITest() }
             if ProcessorUITestConfiguration.showsLiveCaptureFinishingScrim {
                 capture.liveProcessor._uiTestShowFinishingScrim()
             }
@@ -157,6 +162,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task { await ClaudeCLIUsage.shared.refresh(binary: claudeBinary, force: true) }
         }
+        .onChange(of: readContainerLabels) { _, enabled in
+            if !enabled { gemma.stop() }
+        }
         .onOpenURL { url in
             // W44: a hand-off from the Reader only opens the Improve OCR dialog, on the Process Files tab.
             guard url.scheme == ImproveOCRRequest.scheme else { return }
@@ -193,6 +201,9 @@ struct ContentView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
 
+            if gemma.offerVisible || gemma.installStatus != nil && readContainerLabels {
+                ManagedGemmaBanner(reader: gemma)
+            }
             Divider()
 
             switch mode {

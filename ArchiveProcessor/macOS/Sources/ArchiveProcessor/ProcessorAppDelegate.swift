@@ -8,6 +8,10 @@ final class ProcessorAppDelegate: NSObject, NSApplicationDelegate {
         OCRProcessor.quitApp = { NSApp.terminate(nil) }
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        ManagedGemma.shared.stop()
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         if OCRProcessor.quitApproved { return .terminateNow }
         let running = OCRProcessor.processorsStillRunning

@@ -1327,7 +1327,7 @@ final class LiveCaptureProcessor: ObservableObject {
 
         // W47.ct-processor-capture — a box or folder label read into container fields, for its card. Awaited here,
         // inside the segment's own processing, so a Finish waits for it like any other segment work.
-        var containerRead: ContainerFieldSet?
+        var containerRead: (fields: ContainerFieldSet, fallback: ContainerLabelCapture.Fallback?)?
         if let itemType = group.type.itemType, ContainerLabelCapture.enabled, let photo = group.photos.first {
             let r = await ContainerLabelCapture.readLabel(type: itemType, text: texts.first ?? "", photo: photo.url,
                                                           rotation: results.first?.rotationDegrees ?? 0,
@@ -1339,7 +1339,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 else { recordUnfiledLabelSpend(r.dollars, calls: 1) }
             }
             guard clearGeneration == startedGeneration else { return }
-            containerRead = r.fields
+            containerRead = (r.fields, r.fallback)
         }
 
         // Tags: Mac subjects skip the LLM; automatic mode calls the LLM; box/folder → color tag.
@@ -1462,7 +1462,9 @@ final class LiveCaptureProcessor: ObservableObject {
             stampUnread: stampUnread, textLayer: textLayer,
             routeDating: routeDating, preDatingTags: routeDating == nil ? nil : preDatingTags)
         persistManifest()
-        if let containerRead { session.setContainerRead(groupId: groupId, read: containerRead) }
+        if let containerRead {
+            session.setContainerRead(groupId: groupId, read: containerRead.fields, fallback: containerRead.fallback)
+        }
         for p in group.photos { pageTasks[PageKey(p)] = nil }   // free memory
         labelStagedRecord(groupId, type: gType, outcome: outcome, results: results)
         proceedToFinishIfReady()   // if the operator hit Finish mid-processing, this staged segment may be the last

@@ -22,11 +22,23 @@ enum ContainerLabelCapture {
     /// the bench has not scored (an LLM transcript may join or reflow the label's lines).
     static let ocrTextReader = "ocr-text+parser"
 
+    enum Fallback: String, Codable, Sendable {
+        case vision, ocrText, unread
+
+        var cardNote: String {
+            switch self {
+            case .vision: "No model supplied suggestions for this label. Apple Vision read the text and the app extracted fields from it. Check the suggestions carefully."
+            case .ocrText: "Apple Vision returned no text for this label. Suggestions came from the page’s OCR text. Check them carefully."
+            case .unread: "The app could not read this label. Enter any details you can see in the photo."
+            }
+        }
+    }
+
     /// One label photo's proposals: Vision + parser on the photo's own Apple Vision lines (accurate, as `ct-read.md`
     /// scored it; the run's OCR text if Vision reads nothing), and a model's reading of the image: GPT 5.6 Luna when
     /// the session reads text through the gateway, else (no gateway, or a local model on it, which cannot serve Luna)
-    /// Gemma 3 12B when a server on this Mac lists it (`ContainerLabelGemma`, W47.ct-capture-gemma). A failed call, no
-    /// such server, or a photo that is not an image, leaves the parser's values.
+    /// Gemma 3 12B on this Mac (an existing server or the app-managed reader). When no model supplies fields,
+    /// the card describes the text available to the parser.
     static func read(type: ItemType, text: String, photo: URL, rotation: Int,
                      gateway: GatewayConfig?) async -> ContainerFieldSet {
         await readLabel(type: type, text: text, photo: photo, rotation: rotation, gateway: gateway).fields
@@ -63,7 +75,7 @@ enum ContainerLabelCapture {
     static func readLabel(type: ItemType, text: String, photo: URL, rotation: Int, gateway: GatewayConfig?,
                           useModel: Bool = true)
         async -> (fields: ContainerFieldSet, visionText: String, visionAnswered: Bool, gatewayCalled: Bool,
-                  dollars: Double, modelAnswered: Bool, modelUnavailable: Bool) {
+                  dollars: Double, modelAnswered: Bool, modelUnavailable: Bool, fallback: Fallback?) {
         let visionReader = PageReaders.visionReader(rotationDegrees: rotation)
         let vision = try? await visionReader.read(.init(imageURL: photo)).detail
         let visionText = vision?.text ?? ""
@@ -96,8 +108,13 @@ enum ContainerLabelCapture {
         let fields = ContainerLabelReader.proposals(lines: lines, type: type, model: model,
                                                     modelReader: model == nil ? nil : modelReader,
                                                     parserReader: parserReader, at: Date())
+        let fallback: Fallback? = if useModel, !fields.values.values.contains(where: { $0.reader == modelReader }) {
+            visionText.isEmpty ? (text.isEmpty ? .unread : .ocrText) : .vision
+        } else {
+            nil
+        }
         return (fields, visionText, vision != nil, gatewayCalled, dollars, !(model ?? [:]).isEmpty,
-                modelUnavailable)
+                modelUnavailable, fallback)
     }
 
     /// The up-front estimate's line for label reads (W47.ct-label-cost), nil when the run will make no gateway call
