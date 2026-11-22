@@ -12,6 +12,9 @@ import time
 # hooks.py's HOLD_MARK, and the markers a note must not smuggle into a queue line.
 HOLD = re.compile(r"\[hold\]|needs:\s*owner", re.I)
 MARKERS = re.compile(r"\((?:blocked-on|uses|cluster|lane|needs|effort|agents?)\s*:", re.I)
+PROCESSOR_PACK = "W40.g3"
+REGULAR_QUEUE = "### Regular queue — other work\n"
+OPEN_CHECKBOX = re.compile(r"\s*[-*]\s+\[ \]")
 
 
 def section(text, heading):
@@ -90,12 +93,81 @@ def entries(body):
     return out
 
 
+def processor_priority(text):
+    """Keep Tier P to the open pack and the queue items it needs, in existing queue order."""
+    if not re.search(r"^### TIER P\b", text, re.M):
+        return text
+    start, end = section(text, "## WORK QUEUE")
+    queue = text[start:end]
+    heading = re.search(r"^### TIER P\b[^\n]*\n", queue, re.M)
+    if not heading:
+        return text
+    priority_start = heading.end()
+    tail = re.search(r"^### ", queue[priority_start:], re.M)
+    priority_end = priority_start + tail.start() if tail else len(queue)
+    rows = entries(queue)
+    open_rows = {tag: queue[lo:hi] for tag, lo, hi in rows if OPEN_CHECKBOX.match(queue[lo:hi])}
+    required = set()
+    pending = [PROCESSOR_PACK]
+    while pending:
+        tag = pending.pop()
+        if tag in required or tag not in open_rows:
+            continue
+        required.add(tag)
+        for group in re.findall(r"\(blocked-on:([^)]*)\)", open_rows[tag]):
+            pending.extend(dep.strip().strip("`") for dep in group.split(","))
+
+    promoted, deferred, remove = [], [], []
+    for tag, lo, hi in rows:
+        in_priority = priority_start <= lo < priority_end
+        row = queue[lo:hi]
+        if tag in required and OPEN_CHECKBOX.match(row):
+            if tag != PROCESSOR_PACK:
+                promoted.append(row)
+            remove.append((lo, hi))
+        elif in_priority or (lo < priority_start and OPEN_CHECKBOX.match(row)):
+            deferred.append(row)
+            remove.append((lo, hi))
+    if PROCESSOR_PACK in required:
+        promoted.append(open_rows[PROCESSOR_PACK])
+
+    for lo, hi in reversed(remove):
+        queue = queue[:lo] + queue[hi:]
+        if lo < priority_end:
+            priority_end -= hi - lo
+        if lo < priority_start:
+            priority_start -= hi - lo
+    priority = queue[priority_start:priority_end].rstrip()
+    queue = (queue[:priority_start] + priority + "\n\n" +
+             "".join(promoted) + ("\n" if promoted else "") + queue[priority_end:])
+    if deferred:
+        regular = re.search(r"^" + re.escape(REGULAR_QUEUE), queue, re.M)
+        if regular:
+            next_section = re.search(r"^### ", queue[regular.end():], re.M)
+            offset = regular.end() + next_section.start() if next_section else len(queue)
+        else:
+            bookkeeping = re.search(r"^### BOOKKEEPING\b", queue, re.M)
+            offset = bookkeeping.start() if bookkeeping else len(queue)
+            queue = queue[:offset] + REGULAR_QUEUE + queue[offset:]
+            offset += len(REGULAR_QUEUE)
+        queue = queue[:offset].rstrip("\n") + "\n\n" + "".join(deferred) + "\n" + queue[offset:]
+    return text[:start] + queue + text[end:]
+
+
 def edit(plan, action, values):
     plan = plan.resolve()
     with plan.with_name(plan.name + ".lock").open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        text = plan.read_text()
-        if action == "archive-answered":
+        original = text = plan.read_text()
+        if action in ("prioritize-processor", "check-processor-priority"):
+            if values:
+                raise ValueError(action + " takes no arguments")
+            text = processor_priority(text)
+            if action == "check-processor-priority":
+                if text != original:
+                    raise ValueError("Tier P must contain only W40.g3 and its unfinished prerequisites")
+                return
+        elif action == "archive-answered":
             if values:
                 raise ValueError("archive-answered takes no arguments")
             start, end = section(text, "## HOLD QUEUE")
@@ -391,6 +463,11 @@ def edit(plan, action, values):
             pos, _ = section(text, heading)
             # Newest-first, so a report lands above the settled walkthrough anchor.
             text = text[:pos] + "\n" + content.rstrip() + "\n" + text[pos:]
+        if action in ("add", "block", "complete", "depend", "undepend") or (
+                action == "append" and values[0] == "## WORK QUEUE"):
+            text = processor_priority(text)
+        if text == original:
+            return
         fd, tmp = tempfile.mkstemp(prefix=plan.name + ".", dir=plan.parent)
         try:
             with os.fdopen(fd, "w") as out:

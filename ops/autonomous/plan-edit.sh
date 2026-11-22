@@ -10,5 +10,7 @@
 # or plan-edit.sh PLAN release TAG NOTE: lift that hold once the owner's part is done (removes `(needs: owner)`).
 # or plan-edit.sh PLAN due|rearm GATE NOTE: tick or untick a machine gate in `## RECURRING` (W40.token-pass's W40.token-fix-due).
 # or plan-edit.sh PLAN archive-answered: archive answered HOLD details, keeping completed tags and mandatory read pointers.
+# or plan-edit.sh PLAN prioritize-processor: reconcile Tier P against the current W40.g3 prerequisites.
+# or plan-edit.sh PLAN check-processor-priority: check that Tier P is already reconciled.
 set -euo pipefail
 exec python3 "$(dirname "$0")/plan-edit.py" "$@"

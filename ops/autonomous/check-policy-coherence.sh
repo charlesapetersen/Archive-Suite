@@ -152,6 +152,16 @@ rule "no-mandatory-full-vm-suite" \
   "focused VM tests are sufficient for a small fix; full app suites need a specific reason"
 must_exist "focused-vm-is-sufficient" 'Focused VM tests are sufficient for small fixes' 1
 
+# The live queue is gitignored. Check its actual membership as well as the written policy.
+if [ -f "$PRIMARY/.maintenance/AUTONOMOUS_PLAN.md" ]; then
+  if bash ops/autonomous/plan-edit.sh "$PRIMARY/.maintenance/AUTONOMOUS_PLAN.md" check-processor-priority; then
+    printf '  %s processor-walkthrough-priority\n' "$(green '✓')"
+  else
+    printf '  %s processor-walkthrough-priority — reconcile Tier P with plan-edit.sh prioritize-processor\n' "$(red '✗')"
+    fails=$((fails+1))
+  fi
+fi
+
 # W40.root-marker(-auto): the Core Directive must disclose the owner's one root-file exception.
 # Pin its presence in the authoritative guide (another file mentioning it cannot substitute).
 if grep -qF 'One named exception: choosing a folder' ArchiveReader/CLAUDE.md \

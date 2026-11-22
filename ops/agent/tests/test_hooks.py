@@ -361,6 +361,48 @@ class Cluster(Fixture):
         by = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
         self.assertFalse(by["S.held"]["permanent"], by["S.held"])
 
+    def test_processor_priority_tracks_dependencies_without_capturing_followups(self):
+        items = ("### TIER P — Processor guided session\n\n"
+                 "- [ ] **P.other — unrelated work** (lane: processor)\n"
+                 "- [x] **P.done — finished prerequisite**\n"
+                 "- [ ] **W40.g3 — prepare the pack** (lane: processor) (blocked-on: P.middle, P.done)\n\n"
+                 "### TIER 0\n\n"
+                 "- [ ] **P.middle — required** (lane: processor)\n"
+                 "  (blocked-on: P.first)\n"
+                 "- [ ] **P.first — second-level prerequisite** (lane: processor)\n"
+                 "- [ ] **P.regular — regular work** (lane: processor)\n\n")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace("- [ ] **A.four", items + "- [ ] **A.four"))
+        plan = os.path.join(self.repo, ".maintenance", "AUTONOMOUS_PLAN.md")
+        editor = os.path.join(self.repo, "ops/autonomous/plan-edit.sh")
+
+        def edit(*args, check=True):
+            return run(["/bin/bash", editor, plan, *args], env=self.env, check=check)
+
+        def priority():
+            with open(plan) as source:
+                return source.read().split("### TIER P", 1)[1].split("### TIER 0", 1)[0]
+
+        before = {tag: row["status"] for tag, row in self.queue().items()}
+        self.assertNotEqual(edit("check-processor-priority", check=False).returncode, 0)
+        edit("prioritize-processor")
+        edit("check-processor-priority")
+        after = self.queue()
+        self.assertEqual({tag: row["status"] for tag, row in after.items()}, before)
+        self.assertIn("P.first", priority())
+        self.assertNotIn("**P.done", priority())
+        self.assertLess(list(after).index("P.first"), list(after).index("W40.g3"))
+        self.assertLess(list(after).index("W40.g3"), list(after).index("P.other"))
+        edit("add", "P.followup", "P.first", "**P.followup — optional follow-up** (lane: processor)")
+        self.assertNotIn("P.followup", priority())
+        edit("append", "## WORK QUEUE", "- [ ] **P.early — unprioritized** (lane: processor)")
+        queue = list(self.queue())
+        self.assertLess(queue.index("W40.g3"), queue.index("P.early"))
+        edit("depend", "P.first", "P.followup", "The pack needs this through P.first")
+        self.assertIn("**P.followup", priority())
+        edit("undepend", "P.first", "P.followup", "The pack no longer needs this")
+        self.assertNotIn("**P.followup", priority())
+        edit("check-processor-priority")
+
     def test_hold_hands_an_item_to_the_owner(self):
         items = "- [ ] **S.prep — to prepare** (lane: segbench) (uses: light) (cluster: sherlock)\n"
         self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN.replace("- [ ] **A.four", items + "- [ ] **A.four"))

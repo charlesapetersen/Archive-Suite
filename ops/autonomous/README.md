@@ -230,6 +230,12 @@ rules. Register an isolated worktree with `worker-state.py --state "$STATE" --re
 "$PWD"` using the token supplied in the assignment. Codex escalates this process-inspecting helper outside
 the sandbox. All operations use scratch fixtures in `tests/prove-worker-claims.sh`, wired into the health gate.
 
+Tier P is reserved for the Processor guided-session pack and its unfinished prerequisites (owner, 2026-11-22).
+The locked plan editor derives membership from the pack's dependencies, including work those dependencies
+need. Filing a follow-up beside a Tier P item only gives it priority if the pack actually requires it.
+Add or remove the real prerequisite with the plan editor to change what the pack waits for. The policy
+check detects manual edits that leave Tier P out of sync.
+
 ## Several workers and subscription lanes (W35.workers)
 
 The default remains one worker on the chosen subscription. The owner can opt into both with
