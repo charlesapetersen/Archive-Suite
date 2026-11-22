@@ -1,5 +1,7 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import AppKit
+import CoreText
+import ImageIO
 import Foundation
 import ArchiveCore
 
@@ -382,6 +384,66 @@ enum LocalModelsTestDriver {
               && wire.hosts == ["remote-gateway.invalid"], "\(asked.asked) \(wire.hosts)")
         await ContainerLabelGemma.forget()
         await labelCostChecks(wire: wire, image: image, remote: remote, answer: answer)
+        await labelRotationChecks(in: image.deletingLastPathComponent())
+    }
+
+    /// A scratch label with both camera orientation and a separate clockwise correction from the run.
+    private static func labelRotationChecks(in directory: URL) async {
+        let photo = directory.appendingPathComponent("box-label.jpg")
+        let width = 800
+        let height = 500
+        guard let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+                                      bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else {
+            check("10 create label context", false)
+            return
+        }
+        context.setFillColor(gray: 1, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        let font = CTFontCreateWithName("Helvetica-Bold" as CFString, 42, nil)
+        func draw(_ line: String, at point: CGPoint) {
+            let text = NSAttributedString(string: line, attributes: [
+                NSAttributedString.Key(kCTFontAttributeName as String): font,
+                NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(gray: 0, alpha: 1),
+            ])
+            context.textPosition = point
+            CTLineDraw(CTLineCreateWithAttributedString(text), context)
+        }
+        draw("BOX", at: CGPoint(x: 50, y: 385))
+        draw("17", at: CGPoint(x: 275, y: 385))
+        draw("FOLDER", at: CGPoint(x: 470, y: 255))
+        draw("99", at: CGPoint(x: 50, y: 95))
+
+        guard let upright = context.makeImage() else { check("10 render label", false); return }
+        let cases: [(storedTurn: Int, correction: Int)] = [(180, 90), (90, 180), (0, 270), (270, 0)]
+        for (storedTurn, correction) in cases {
+            guard let stored = ImageEncoding.rotate(upright, byDegreesClockwise: storedTurn),
+                  let dest = CGImageDestinationCreateWithURL(photo as CFURL, "public.jpeg" as CFString, 1, nil) else {
+                check("10 create label photo", false)
+                return
+            }
+            // The camera always requests another 90° clockwise. EXIF + storedTurn + correction makes 360°.
+            CGImageDestinationAddImage(dest, stored, [
+                kCGImagePropertyOrientation: CGImagePropertyOrientation.right.rawValue,
+            ] as CFDictionary)
+            guard CGImageDestinationFinalize(dest) else { check("10 save label", false); return }
+
+            let result = await ContainerLabelCapture.readLabel(type: .box, text: "BOX NO. 99", photo: photo,
+                                                               rotation: correction, gateway: nil, useModel: false)
+            let box = result.fields[.container]
+            // Vision may read the same words from a turned image, but the layout can change their order.
+            check("10 label correction \(correction)° follows EXIF",
+                  result.visionText == "BOX\n17\nFOLDER\n99"
+                  && result.visionAnswered && box?.value == "Box 17" && box?.reader == ContainerLabelReader.visionReader,
+                  "Vision read ‘\(result.visionText)’, box field \(String(describing: box))")
+        }
+
+        let unreadable = directory.appendingPathComponent("missing-label.jpg")
+        let fallback = await ContainerLabelCapture.readLabel(type: .box, text: "BOX NO. 99", photo: unreadable,
+                                                             rotation: 90, gateway: nil, useModel: false)
+        check("10 unreadable photo uses the run's text", !fallback.visionAnswered
+              && fallback.fields[.container]?.value == "Box 99"
+              && fallback.fields[.container]?.reader == ContainerLabelCapture.ocrTextReader)
     }
 
     /// 9. W47.ct-label-cost: what a label's gateway call is counted at, and where it goes.

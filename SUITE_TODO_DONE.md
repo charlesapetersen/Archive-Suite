@@ -17741,3 +17741,13 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   and render checks, and four off-screen Settings tests. A two-page synthetic letter returned a quoted 1961
   date from the cached 8B model over loopback. Verification cost $0 and created no bench cache.
   <!-- /W47.wh-date-8b-image -->
+
+- [x] **W49.proc-label-read-turned — read a label photo at the run's rotation correction [S]** · §Known limits are queued, accepted or asked — SHIPPED 2026-11-22 (this commit).
+  Process Files and Live Capture now apply the run's clockwise correction after camera orientation before Apple
+  Vision reads a box or folder label. The run's OCR text is the fallback when Vision returns no usable text.
+  The backfill uses the photo's stored orientation, since it has no run correction. Filed by W49.ki-audit-processor.
+  The synthetic EXIF label produced the expected lines and box proposal at all four turns. Omitting the correction
+  changed the line order at 180° and failed the regression. The unreadable-photo fallback, page-reader smoke and
+  scratch Process Files label run passed. The standard Processor smoke produced two PDFs, and the headless
+  Android-to-Mac round trip produced three PDFs with all expected OCR tokens and years. No bench cache was created.
+  <!-- /W49.proc-label-read-turned -->

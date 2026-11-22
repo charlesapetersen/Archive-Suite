@@ -1,6 +1,5 @@
 import Foundation
 import ArchiveCore
-import VisionOCRKit
 
 /// W47.ct-processor-capture — Route A at capture: a box or folder label photo read into container fields, shown on
 /// the marker card for correction, and written into the collection folder's `.archivesuite/containers.json` at
@@ -65,10 +64,8 @@ enum ContainerLabelCapture {
                           useModel: Bool = true)
         async -> (fields: ContainerFieldSet, visionText: String, visionAnswered: Bool, gatewayCalled: Bool,
                   dollars: Double, modelAnswered: Bool, modelUnavailable: Bool) {
-        let visionReader = try? PageReaders.reader(provider: .appleVision, model: LLMModel.appleVisionModels[0],
-                                                   apiKey: "", thinkingLevel: nil, visionSettings: .default,
-                                                   newspaperLayout: false)
-        let vision = try? await visionReader?.read(PageReaderInput(imageURL: photo)).detail
+        let visionReader = PageReaders.visionReader(rotationDegrees: rotation)
+        let vision = try? await visionReader.read(.init(imageURL: photo)).detail
         let visionText = vision?.text ?? ""
         let lines = (visionText.isEmpty ? text : visionText).components(separatedBy: .newlines)
         let parserReader = visionText.isEmpty ? ocrTextReader : ContainerLabelReader.visionReader

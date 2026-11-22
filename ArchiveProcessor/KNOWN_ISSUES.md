@@ -303,8 +303,9 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   $0.00084), but which photos are labels is known only once the run has read them (accepted: no classification
   before the run). After a relaunch, a Live Capture marker filed later is counted at the $0.00084 estimate when its
   fields carry Luna's reading, since the measured charge is kept in memory (accepted: within a cent of the figure).
-- **Vision reads the photo as stored**, turned by its EXIF orientation only, not by the run's rotation correction; a
-  label shot sideways may read nothing there, and the run's OCR text stands in (`ocr-text+parser`). (queued: W49.proc-label-read-turned).
+- **Vision uses the run's rotation correction** for box and folder label photos after applying the camera's EXIF
+  orientation. The run's OCR text stands in (`ocr-text+parser`) when Vision returns no usable text.
+  (accepted: fixed, W49.proc-label-read-turned; the fallback still covers empty and unreadable photos).
 - **A marker whose card is still up when the collection sheet is confirmed** is filed with its read's proposals; its
   card goes with it. Skip leaves proposals too; both are confirmed later in the Reader. (accepted: proposals are confirmed in the Reader either way).
 - **A marker whose own PDF failed to move** and is filed by a later Finish gets the next number after the documents

@@ -59,8 +59,13 @@ enum PageReaders {
                             pricedModel: OpenRouterRoute.isUnpriced(model) ? nil : model)
         case .appleVision:
             if model.id == OnDeviceModelClient.modelID { return Measured(OnDeviceModelClient(), dollars: nil) }
-            return Measured(VisionClient(settings: visionSettings), dollars: nil)
+            return visionReader(settings: visionSettings)
         }
+    }
+
+    /// The local Vision reader, with a known clockwise correction for a box or folder label photo.
+    static func visionReader(settings: VisionOCRSettings = .default, rotationDegrees: Int = 0) -> some PageReader<OCRResult> {
+        Measured(VisionClient(settings: settings, rotationDegrees: rotationDegrees), dollars: nil)
     }
 
     /// The correction stage reuses the pinned image transport. Its reply is plain text, without OCR classification.

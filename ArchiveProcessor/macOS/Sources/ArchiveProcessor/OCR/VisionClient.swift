@@ -45,6 +45,7 @@ struct VisionOCRSettings: Codable, Equatable, Sendable {
 /// the separate Vision+LLM hybrid backend exists.
 struct VisionClient: Sendable {
     let settings: VisionOCRSettings
+    var rotationDegrees: Int = 0
 
     /// Vision work is CPU-bound rather than HTTP/rate limited. Apple Silicon exposes performance cores as
     /// perflevel0; Intel and unusual hosts fall back to the active logical processor count. Never return
@@ -68,9 +69,8 @@ struct VisionClient: Sendable {
         // The shared client shape deliberately accepts the LLM-only context/prompt/scale arguments. Vision
         // has no prompt or multi-image context channel and reads the original image to retain small text.
         _ = (previousText, previousImageURL, customPrompt, imageScale)
-        let settings = settings
         return try await Self.visionQueue.run {
-            try Self.transcribe(imageURL: imageURL, settings: settings)
+            try Self.transcribe(imageURL: imageURL, settings: settings, rotationDegrees: rotationDegrees)
         }
     }
 
@@ -78,14 +78,28 @@ struct VisionClient: Sendable {
     /// still runs there, and the cascade's second reader calls this inside page task groups sized by the worker count.
     private static let visionQueue = VisionQueue(name: "ArchiveProcessor.VisionClient.vision", width: recommendedConcurrency)
 
-    private static func transcribe(imageURL: URL, settings: VisionOCRSettings) throws -> OCRResult {
+    private static func transcribe(imageURL: URL, settings: VisionOCRSettings, rotationDegrees: Int) throws -> OCRResult {
         guard settings.isValid else {
             return OCRResult(text: nil, classification: nil,
                              errorMessage: "Apple Vision OCR settings are invalid.", errorCode: "vision_settings")
         }
-        guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
-            throw OCRError.imageLoadFailed
+        let image: CGImage
+        let orientation: CGImagePropertyOrientation
+        if rotationDegrees % 360 == 0 {
+            guard let source = CGImageSourceCreateWithURL(imageURL as CFURL, nil),
+                  let decoded = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+                throw OCRError.imageLoadFailed
+            }
+            image = decoded
+            orientation = storedOrientation(of: source)
+        } else {
+            // The run's clockwise correction is measured after EXIF, as for the label's model image.
+            guard let oriented = ImageEncoding.orientedCGImage(url: imageURL),
+                  let turned = ImageEncoding.rotate(oriented, byDegreesClockwise: rotationDegrees) else {
+                throw OCRError.imageLoadFailed
+            }
+            image = turned
+            orientation = .up
         }
 
         let request = VNRecognizeTextRequest()
@@ -96,9 +110,7 @@ struct VisionClient: Sendable {
         request.automaticallyDetectsLanguage = settings.languages.isEmpty
         request.customWords = settings.customWords
 
-        // The decoded image is the pixels as stored; a phone shot says in EXIF how to turn them upright
-        // (W40.fix-processor-vision-ignores-exif). Fast recognition reads a turned page as garbage without it.
-        let handler = VNImageRequestHandler(cgImage: image, orientation: storedOrientation(of: source), options: [:])
+        let handler = VNImageRequestHandler(cgImage: image, orientation: orientation, options: [:])
         do {
             try handler.perform([request])
         } catch {
