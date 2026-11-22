@@ -17,6 +17,80 @@ struct CatalogueJSON {
         guard scanner.peek == nil else { throw CatalogueRecord.Invalid.malformedJSON }
     }
 
+    /// Read one level of a validated record. Values stay in their original wire form, including
+    /// unknown numeric literals that Foundation cannot represent.
+    struct Object {
+        private let names: [String]
+        private var values: [String: Data]
+
+        init(_ data: Data) throws {
+            var scanner = CatalogueJSON(bytes: Array(data))
+            guard scanner.take(123) else { throw CatalogueRecord.Invalid.malformedJSON }
+            var names: [String] = []
+            var values: [String: Data] = [:]
+            if !scanner.take(125) {
+                repeat {
+                    let key = try scanner.string()
+                    let name = try scanner.decoder.decode(String.self, from: Data(scanner.bytes[key]))
+                    guard scanner.take(58) else { throw CatalogueRecord.Invalid.malformedJSON }
+                    names.append(name)
+                    values[name] = try scanner.rawValue()
+                } while scanner.take(44)
+                guard scanner.take(125) else { throw CatalogueRecord.Invalid.malformedJSON }
+            }
+            self.names = names
+            self.values = values
+        }
+
+        subscript(_ name: String) -> Data? {
+            get { values[name] }
+            set { values[name] = newValue }
+        }
+
+        var keys: Dictionary<String, Data>.Keys { values.keys }
+
+        func encoded() throws -> Data {
+            let encoder = JSONEncoder()
+            var data = Data([123])
+            for name in names + Set(values.keys).subtracting(names).sorted() {
+                guard let value = values[name] else { continue }
+                if data.count > 1 { data.append(44) }
+                data.append(try encoder.encode(name))
+                data.append(58)
+                data.append(value)
+            }
+            data.append(125)
+            return data
+        }
+    }
+
+    static func entries(in data: Data) throws -> [Data] {
+        var scanner = CatalogueJSON(bytes: Array(data))
+        guard scanner.take(91) else { throw CatalogueRecord.Invalid.malformedJSON }
+        if scanner.take(93) { return [] }
+        var entries: [Data] = []
+        repeat { entries.append(try scanner.rawValue()) } while scanner.take(44)
+        guard scanner.take(93) else { throw CatalogueRecord.Invalid.malformedJSON }
+        return entries
+    }
+
+    static func array(_ entries: [Data]) -> Data {
+        var result = Data([91])
+        for entry in entries {
+            if result.count > 1 { result.append(44) }
+            result.append(entry)
+        }
+        result.append(93)
+        return result
+    }
+
+    private mutating func rawValue() throws -> Data {
+        skipWhitespace()
+        let start = index
+        try value(depth: 0)
+        return Data(bytes[start..<index])
+    }
+
     private var peek: UInt8? { index < bytes.count ? bytes[index] : nil }
 
     private mutating func skipWhitespace() {
@@ -24,8 +98,12 @@ struct CatalogueJSON {
     }
 
     private mutating func take(_ byte: UInt8) -> Bool {
+        let start = index
         skipWhitespace()
-        guard peek == byte else { return false }
+        guard peek == byte else {
+            index = start
+            return false
+        }
         index += 1
         return true
     }

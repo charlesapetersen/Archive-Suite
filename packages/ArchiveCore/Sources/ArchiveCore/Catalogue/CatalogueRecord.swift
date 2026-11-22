@@ -13,9 +13,14 @@ public struct CatalogueRecord: Sendable {
         case inconsistentRecord
     }
 
-    public struct DateValue: Decodable, Sendable, Equatable {
+    public struct DateValue: Codable, Sendable, Equatable {
         public let date: ArchiveDate
         public let uncertain: Bool
+
+        public init(date: ArchiveDate, uncertain: Bool) {
+            self.date = date
+            self.uncertain = uncertain
+        }
     }
 
     public struct Evidence<Value: Decodable & Sendable>: Decodable, Sendable {
