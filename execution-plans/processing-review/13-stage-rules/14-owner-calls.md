@@ -284,6 +284,14 @@ calls are section 1.
     and Sent With unset. Never infer the cover from adjacency. File implementation after the
     independent reproduction in W49.proc-s047-check.
 
+34. **Walkthrough of 2026-11-22, begun 08:17 Pacific.** Drop the Improve OCR safeguard that
+    retains stale hidden search text to preserve the previous scan page's presentation. Queue the additional
+    coverage in W49.proc-reocr-searchable. When a matching full-resolution Preservation Copy exists, use it
+    as the OCR input for that document page. W49.proc-reocr-preservation follows the verified source map
+    from W49.preservation-copies-build. Queue improved tracking of paid requests as they happen, including
+    Live Capture, in W49.proc-ledger-track-paid. The owner opted in to recording, marking and publishing the
+    tracker update.
+
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
 Each is a table default or a filed item, reversible without app work; the figures and files are in the note named.

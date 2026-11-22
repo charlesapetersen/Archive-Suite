@@ -334,6 +334,7 @@ When label reading needs Gemma, the Processor checks the existing local servers 
 - **The early pause depends on the CLI's meter.** When the CLI streams a five-hour reading at 90% or higher,
   the page that reported it can finish. New reads wait for the reset and then resume on the plan. A CLI that
   supplies no five-hour meter can still reach the hard limit before the app knows to wait (W49.proc-plan-read-meter).
+  (accepted: an early pause needs the five-hour reading supplied by the CLI; a hard-limit reply still pauses until reset)
 - **Live Capture waits too.** A captured page at the limit waits inside its OCR task; the capture window shows the
   pause (`PlanPauseCaption`), and the segment is filed when its pages are read. (accepted: by design, as for any plan read at the limit).
 - **Throughput is from three synthetic pages** (`scripts/e2e-fixtures`, 2026-11-19): 5.7–8.5 s a page one at a time,
@@ -554,7 +555,7 @@ limits in their own section). Open:
   if an imported replacement picks up a turn that changes its appearance.
   Elsewhere the layer follows the new reading or is removed when the new reading has no image-page layer
   (`SPEC/improve-ocr.md` §5). Before Accept, the review names the image pages whose searchable layer will change
-  and those kept as they are (W49.proc-reocr-layer-review).
+  and those kept as they are (W49.proc-reocr-layer-review). (queued: W49.proc-reocr-searchable)
 - **The PDF/A writer holds the whole output in memory** (`PDFGenerator.archivalData`, then `ArchivalFinish`'s rewrite):
   about three to four times the file at the peak, so a 200-page merge of 2 MB pages passes 1 GB. It draws each page's
   media box only, without crop box or annotations; every caller passes the app's own new pages, which have neither (queued: W49.proc-pdfa-memory).
@@ -697,7 +698,7 @@ collection settings file leaves the General settings in effect.
   A paid reader with unknown pricing is unavailable under this limit. Resume reads the current month's ledger and
   limit. The check uses list-price estimates, which can differ from the provider's bill. Some stages are priced as a
   group, including segmentation windows, so the app can stop with money left. Optional box and folder label reads
-  that do not fit are reported in the completed run's summary.
+  that do not fit are reported in the completed run's summary. (queued: W49.proc-ledger-track-paid)
 - **The guarded writer checks, then writes.** A local process that swaps `.archivesuite` for a link between the
   check and the write could redirect one write (`SPEC/collection-settings.md`). Accepted: it needs a hostile local
   process. (accepted: needs a hostile local process)
