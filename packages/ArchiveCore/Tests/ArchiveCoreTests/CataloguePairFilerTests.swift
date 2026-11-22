@@ -1,5 +1,5 @@
+import CoreGraphics
 import Foundation
-import PDFKit
 import Testing
 @testable import ArchiveCore
 
@@ -239,31 +239,35 @@ struct CataloguePairFilerTests {
             let file = UUID()
             let content = UUID()
             let document = UUID()
-            let pdf = PDFDocument()
-            pdf.insert(PDFPage(), at: 0)
-            pdf.documentAttributes = [PDFDocumentAttribute.titleAttribute: file.uuidString, PDFDocumentAttribute.subjectAttribute: content.uuidString]
-            pdfBytes = try #require(pdf.dataRepresentation())
             record = try CatalogueRecord(json: Data("""
                 {"schema":1,"fileID":"\(file)","contentRevision":"\(content)","revision":"\(UUID())","parents":[],
                  "pages":[{"id":"\(UUID())","physicalIndex":0,"documentID":"\(document)","role":"searchable"}],
                  "documents":[{"id":"\(document)","ownerFileID":"\(file)","fields":{}}],"fileFields":{}}
                 """.utf8))
-            try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-            try pdfBytes.write(to: input)
+            try FileManager.default.createDirectory(at: root.appendingPathComponent("Box"),
+                                                    withIntermediateDirectories: true)
+            let source = root.appendingPathComponent("Source.pdf")
+            let packet = Data("""
+                <x:xmpmeta xmlns:x="adobe:ns:meta/">
+                <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+                </rdf:RDF></x:xmpmeta>
+                """.utf8)
+            let identity = CataloguePDFIdentity(fileID: file, contentRevision: content)
+            let metadata = try #require(identity.adding(to: packet))
+            var bounds = CGRect(x: 0, y: 0, width: 60, height: 60)
+            let pdf = try #require(CGContext(source as CFURL, mediaBox: &bounds, nil))
+            pdf.addDocumentMetadata(metadata as CFData)
+            pdf.beginPDFPage(nil)
+            pdf.fill(bounds.insetBy(dx: 10, dy: 10))
+            pdf.endPDFPage()
+            pdf.closePDF()
+            pdfBytes = try Data(contentsOf: source)
             try FileManager.default.copyItem(at: input, to: pendingPDF)
         }
 
         func reader(rootID: UUID? = nil) throws -> CatalogueReader {
-            try CatalogueReader(grantedRoot: root, rootInstanceID: rootID ?? occurrence.rootInstanceID, mode: .adopted) { fd, _ in
-                let handle = FileHandle(fileDescriptor: fd, closeOnDealloc: false)
-                guard let bytes = try handle.readToEnd(), let pdf = PDFDocument(data: bytes),
-                      let attributes = pdf.documentAttributes,
-                      let file = attributes[PDFDocumentAttribute.titleAttribute] as? String, let fileID = UUID(uuidString: file),
-                      let content = attributes[PDFDocumentAttribute.subjectAttribute] as? String, let contentID = UUID(uuidString: content) else {
-                    return nil
-                }
-                return .init(fileID: fileID, contentRevision: contentID, pageCount: pdf.pageCount)
-            }
+            try CatalogueReader(grantedRoot: root, rootInstanceID: rootID ?? occurrence.rootInstanceID,
+                                mode: .adopted, identifyPDF: CataloguePDFIdentity.identify)
         }
 
         func file(with filer: CataloguePairFiler? = nil) throws -> CataloguePairFiler.Receipt {

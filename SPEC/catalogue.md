@@ -18,6 +18,10 @@ current value for an adopted record.
 A companion's `fileID` is a stable UUID assigned to the Suite file lineage. `contentRevision` names
 one physical content generation. New Suite output will carry these two identifiers in the PDF and
 JSON. A pre-app scan may instead have an explicitly confirmed association under the root grant.
+The Suite identity property in PDF XMP is `identity` in
+`https://github.com/charlesapetersen/Archive-Suite/ns/catalogue/1.0/`. Its text is the file UUID,
+one space and the content generation UUID. The property belongs to the PDF's RDF subject. Its
+PDF/A extension schema shares the schema list with the page-header extension when both are present.
 `CatalogueAssociation.pair` accepts positive evidence obtained independently from the candidate
 JSON, scoped to the exact occurrence. It verifies the file ID, content generation and physical page
 count. A name, size, timestamp, PDF trailer ID or byte digest alone is insufficient. A companion
