@@ -17663,3 +17663,13 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Verified with a Debug build, four loopback cases, 394 batch-resume checks, 44 multi-page PDF
   checks and 314 OCR prompt checks. Independent Tier-2 review completed. Cost $0, no bench cache.
   <!-- /W49.proc-fix-s051 -->
+
+- [x] **W49.storage-contract — Define the catalogue fields and PDF association [M · Tier-2]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit)
+  Original scope: (lane: suite) (uses: build) (blocked-on: W49.storage-one-home) — Specify and fixture-test the shared ArchiveCore record, schema and per-PDF/document ownership. Preserve date precision, checks, clear values and unknown fields. Cover moved roots, copied PDFs, splits, merges and missing owners without writing PDFs. [Design](execution-plans/storage-simplify.md).
+  [Catalogue SPEC](SPEC/catalogue.md) and its JSON Schema define the adjacent companion, typed fields and ownership.
+  ArchiveCore validates UTF-8 JSON and binds records to an independently verified PDF occurrence and content generation.
+  Unknown optional data survives lossless unchanged export. Date roles retain their precision and uncertainty, and an
+  explicit clear and a revision-bound human check remain distinct from an observation. Scratch fixtures cover moved
+  roots, PDF-only and paired copies, same-name replacement, split ownership, merged membership and unavailable owners.
+  Tier-2 adversarial review, ArchiveCore smoke and the write-surface lint passed. No corpus or bench cache used.
+  <!-- /W49.storage-contract -->

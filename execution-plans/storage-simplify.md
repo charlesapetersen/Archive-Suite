@@ -60,7 +60,7 @@ The storage decision should separate four kinds of information:
 | Thumbnail, full-text index, derived chronology and resolved path cache | Local disposable cache | Rebuildable from content plus current facts. No unique user value lives only here. |
 | Preferences, device grants, pending operations and undo journal | Settings/local operational store | Not portable item facts. Pending projection work and undo are not a second answer to a field. |
 
-The exact JSON names are a later contract decision. The necessary semantics are already clear: a record identity;
+The adopted [catalogue contract](../SPEC/catalogue.md) defines the JSON names. The necessary semantics are a record identity;
 association with a specific PDF occurrence/revision; current field values; explicit “none”; provenance/checks;
 page/document relationships; and a record revision for concurrent edits. Unknown, empty and unreadable are different.
 Absent inferred information must not erase a user's explicit empty answer. Unknown structure must be preserved or
@@ -628,6 +628,7 @@ Implement the S stages in scratch roots. Enable real writes only after the write
 - **Stop conditions.** A lost explicit clear/check, altered page or unexpected XMP, changed signature coverage, failed conformance, ambiguous duplicate, older app writing the pilot, or missing source/record during recovery stops rollout. Keep both roots and affected candidates for reconciliation. Archive-wide cutover is distinct from testing this plan. Any real-corpus write requires separate owner authorization.
 
 **Queued implementation.** Call 32 selects S. W49.storage-one-home is the planning handoff.
+W49.storage-contract defines the adopted [catalogue contract](../SPEC/catalogue.md) and its ArchiveCore fixtures.
 The items below carry implementation and acceptance. Every stage starts on scratch roots.
 
 | Stage | Queue items |

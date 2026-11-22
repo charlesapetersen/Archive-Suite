@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Archive Suite catalogue companion",
+  "type": "object",
+  "required": ["schema", "fileID", "contentRevision", "revision", "parents", "pages", "documents", "fileFields"],
+  "properties": {
+    "schema": {"type": "integer", "const": 1},
+    "fileID": {"$ref": "#/$defs/uuid"},
+    "contentRevision": {"$ref": "#/$defs/uuid"},
+    "revision": {"$ref": "#/$defs/uuid"},
+    "parents": {"type": "array", "items": {"$ref": "#/$defs/uuid"}, "uniqueItems": true},
+    "pages": {"type": "array", "items": {"$ref": "#/$defs/page"}, "minItems": 1},
+    "documents": {"type": "array", "items": {"$ref": "#/$defs/document"}, "minItems": 1},
+    "fileFields": {"$ref": "#/$defs/fileFields"}
+  },
+  "$defs": {
+    "uuid": {"type": "string", "pattern": "^[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$"},
+    "date": {
+      "type": "object",
+      "required": ["date", "uncertain"],
+      "properties": {
+        "date": {
+          "type": "string",
+          "pattern": "^(?:[1-9][0-9]{1,2}0s|[1-9][0-9]{2,3}(?:-(?:0[1-9]|1[0-2])(?:-(?:0[1-9]|[12][0-9]|3[01]))?)?)$"
+        },
+        "uncertain": {"type": "boolean"}
+      }
+    },
+    "region": {
+      "type": "object",
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": {"type": "number", "minimum": 0, "maximum": 1},
+        "y": {"type": "number", "minimum": 0, "maximum": 1},
+        "width": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+        "height": {"type": "number", "exclusiveMinimum": 0, "maximum": 1}
+      }
+    },
+    "page": {
+      "type": "object",
+      "required": ["id", "physicalIndex", "documentID", "role"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"},
+        "physicalIndex": {"type": "integer", "minimum": 0},
+        "documentID": {"$ref": "#/$defs/uuid"},
+        "role": {"type": "string"},
+        "sourcePageID": {"anyOf": [{"$ref": "#/$defs/uuid"}, {"type": "null"}]},
+        "viewRotation": {"anyOf": [{"enum": [0, 90, 180, 270]}, {"type": "null"}]}
+      }
+    },
+    "reference": {
+      "type": "object",
+      "required": ["documentID", "ownerFileID"],
+      "properties": {"documentID": {"$ref": "#/$defs/uuid"}, "ownerFileID": {"$ref": "#/$defs/uuid"}}
+    },
+    "document": {
+      "type": "object",
+      "required": ["id", "ownerFileID"],
+      "properties": {
+        "id": {"$ref": "#/$defs/uuid"},
+        "ownerFileID": {"$ref": "#/$defs/uuid"},
+        "fields": {"anyOf": [{"$ref": "#/$defs/documentFields"}, {"type": "null"}]},
+        "enclosedWith": {"anyOf": [{"$ref": "#/$defs/reference"}, {"type": "null"}]}
+      }
+    },
+    "field": {
+      "type": "object",
+      "required": ["state", "fieldRevision", "origin"],
+      "properties": {
+        "state": {"enum": ["value", "cleared"]},
+        "fieldRevision": {"$ref": "#/$defs/uuid"},
+        "origin": {"type": "string"},
+        "checkedRevision": {"anyOf": [{"$ref": "#/$defs/uuid"}, {"type": "null"}]}
+      },
+      "if": {"properties": {"state": {"const": "value"}}},
+      "then": {"required": ["value"]},
+      "else": {"not": {"required": ["value"]}}
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["source"],
+      "properties": {
+        "source": {"type": "string"},
+        "route": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "measurementStatus": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+        "runID": {"anyOf": [{"$ref": "#/$defs/uuid"}, {"type": "null"}]},
+        "supportsRevision": {"anyOf": [{"$ref": "#/$defs/uuid"}, {"type": "null"}]},
+        "pageID": {"anyOf": [{"$ref": "#/$defs/uuid"}, {"type": "null"}]},
+        "region": {"anyOf": [{"$ref": "#/$defs/region"}, {"type": "null"}]},
+        "quote": {"anyOf": [{"type": "string"}, {"type": "null"}]}
+      }
+    },
+    "stringField": {
+      "$ref": "#/$defs/field",
+      "properties": {
+        "value": {"type": "string"},
+        "evidence": {
+          "anyOf": [{"type": "array", "items": {"$ref": "#/$defs/evidence", "properties": {"observedValue": {"anyOf": [{"type": "string"}, {"type": "null"}]}}}}, {"type": "null"}]
+        }
+      }
+    },
+    "booleanField": {
+      "$ref": "#/$defs/field",
+      "properties": {
+        "value": {"type": "boolean"},
+        "evidence": {
+          "anyOf": [{"type": "array", "items": {"$ref": "#/$defs/evidence", "properties": {"observedValue": {"anyOf": [{"type": "boolean"}, {"type": "null"}]}}}}, {"type": "null"}]
+        }
+      }
+    },
+    "integerField": {
+      "$ref": "#/$defs/field",
+      "properties": {
+        "value": {"type": "integer", "minimum": 1, "maximum": 3},
+        "evidence": {
+          "anyOf": [{"type": "array", "items": {"$ref": "#/$defs/evidence", "properties": {"observedValue": {"anyOf": [{"type": "integer", "minimum": 1, "maximum": 3}, {"type": "null"}]}}}}, {"type": "null"}]
+        }
+      }
+    },
+    "dateField": {
+      "$ref": "#/$defs/field",
+      "properties": {
+        "value": {"$ref": "#/$defs/date"},
+        "evidence": {
+          "anyOf": [{"type": "array", "items": {"$ref": "#/$defs/evidence", "properties": {"observedValue": {"anyOf": [{"$ref": "#/$defs/date"}, {"type": "null"}]}}}}, {"type": "null"}]
+        }
+      }
+    },
+    "stringsField": {
+      "$ref": "#/$defs/field",
+      "properties": {
+        "value": {"type": "array", "items": {"type": "string"}},
+        "evidence": {
+          "anyOf": [{"type": "array", "items": {"$ref": "#/$defs/evidence", "properties": {"observedValue": {"anyOf": [{"type": "array", "items": {"type": "string"}}, {"type": "null"}]}}}}, {"type": "null"}]
+        }
+      }
+    },
+    "fileFields": {
+      "type": "object",
+      "properties": {
+        "readState": {"anyOf": [{"$ref": "#/$defs/stringField"}, {"type": "null"}]},
+        "flagged": {"anyOf": [{"$ref": "#/$defs/booleanField"}, {"type": "null"}]},
+        "colour": {"anyOf": [{"$ref": "#/$defs/stringField"}, {"type": "null"}]},
+        "quality": {"anyOf": [{"$ref": "#/$defs/integerField"}, {"type": "null"}]},
+        "ocrPoor": {"anyOf": [{"$ref": "#/$defs/booleanField"}, {"type": "null"}]},
+        "ocrFailed": {"anyOf": [{"$ref": "#/$defs/booleanField"}, {"type": "null"}]}
+      }
+    },
+    "documentFields": {
+      "type": "object",
+      "properties": {
+        "documentDate": {"anyOf": [{"$ref": "#/$defs/dateField"}, {"type": "null"}]},
+        "sentWith": {"anyOf": [{"$ref": "#/$defs/dateField"}, {"type": "null"}]},
+        "publicationDate": {"anyOf": [{"$ref": "#/$defs/dateField"}, {"type": "null"}]},
+        "documentKind": {"anyOf": [{"$ref": "#/$defs/stringField"}, {"type": "null"}]},
+        "itemType": {"anyOf": [{"$ref": "#/$defs/stringField"}, {"type": "null"}]},
+        "title": {"anyOf": [{"$ref": "#/$defs/stringField"}, {"type": "null"}]},
+        "byline": {"anyOf": [{"$ref": "#/$defs/stringsField"}, {"type": "null"}]},
+        "publication": {"anyOf": [{"$ref": "#/$defs/stringField"}, {"type": "null"}]},
+        "senders": {"anyOf": [{"$ref": "#/$defs/stringsField"}, {"type": "null"}]},
+        "recipients": {"anyOf": [{"$ref": "#/$defs/stringsField"}, {"type": "null"}]},
+        "sendingPlaces": {"anyOf": [{"$ref": "#/$defs/stringsField"}, {"type": "null"}]},
+        "recipientPlaces": {"anyOf": [{"$ref": "#/$defs/stringsField"}, {"type": "null"}]},
+        "subjects": {"anyOf": [{"$ref": "#/$defs/stringsField"}, {"type": "null"}]}
+      }
+    }
+  }
+}
