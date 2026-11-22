@@ -156,7 +156,7 @@ def cents(v):
 
 def kind_cents(rid, kind, usd, ratio=None):
     """A route's price on one kind chart, standard and batch per 1,000 pages, in cents (W49.bench-kind-price)."""
-    if not cents(usd):
+    if usd != 0 and not cents(usd):
         sys.exit(f"{rid}: {kind} pages cost under half a cent per 1,000")
     return {"std": cents(usd), "batch": cents(usd * ratio) if ratio else None}
 
@@ -310,22 +310,26 @@ def farmshare_run(run, kinds, op, price=None):
     tp = summary["throughput"]
     preset = summary["env"]["FS_PRESET"]
 
-    # W49.bench-kind-price-rest: a kind's price is the run's mean tokens over that kind's answered pages, as the
-    # overall price is its mean over every answered page (all 99, the collectors' throughput figures), checked here.
-    def tokens(rr):
-        ok = [r for r in rr if r["ok"] == "True"]
-        return {k: sum(int(r[k.removeprefix("mean_")] or 0) for r in ok) / len(ok) if ok else None
-                for k in ("mean_prompt_tokens", "mean_completion_tokens")}
+    by_kind_pages = {k: [r for r in pages if r["kind"] == k] for k in kinds}
+    token_fields = ("prompt_tokens", "completion_tokens")
     usd = run_price(op, preset, tp, price)
     by_kind = {}
     if usd is not None:
-        if any(abs(v - (tp.get(k) or 0)) > 1e-6 for k, v in tokens(every).items()):
-            sys.exit(f"{run}: pages.csv's tokens over the answered pages give {tokens(every)}, summary.json says {tp}")
-        for k in kinds:
-            t = tokens([r for r in pages if r["kind"] == k])
-            if t["mean_prompt_tokens"] is not None:
-                by_kind[k] = run_price(op, preset, t, price)
-    return ({"overall": overall, **{k: sc([r for r in pages if r["kind"] == k]) for k in kinds}},
+        # Reproduce the collector's answered-only means over the full 99-page panel.
+        answered = [r for r in every if r["ok"] == "True"]
+        answered_means = {f"mean_{field}": sum(int(r[field] or 0) for r in answered) / len(answered)
+                          for field in token_fields}
+        if any(abs(v - (tp.get(k) or 0)) > 1e-6 for k, v in answered_means.items()):
+            sys.exit(f"{run}: pages.csv's tokens over the answered pages give {answered_means}, summary.json says {tp}")
+
+        # Price the same attempts as strict accuracy, including metered failures.
+        for kind, attempts in by_kind_pages.items():
+            missing = [f'{r["page"]} {field}' for r in attempts for field in token_fields if r.get(field) in (None, "")]
+            if missing:
+                sys.exit(f"{run}: missing token usage for {kind} attempts: {', '.join(missing)}")
+            means = {f"mean_{field}": sum(int(r[field]) for r in attempts) / len(attempts) for field in token_fields}
+            by_kind[kind] = run_price(op, preset, means, price)
+    return ({"overall": overall, **{k: sc(rr) for k, rr in by_kind_pages.items()}},
             {"photos_per_hour": tp["pages_per_hour_per_gpu"], "gpus": tp["gpus"],
              "gpu_hours_per_100k": 100000 / tp["pages_per_hour_per_gpu"],
              "usd_per_1000": usd, "usd_per_1000_by_kind": by_kind})

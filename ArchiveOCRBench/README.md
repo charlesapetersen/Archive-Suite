@@ -316,7 +316,7 @@ Python standard library.
   charts, part 4's Qwen tables and the 2,000-page pilot, the segmentation teacher and the dating runs. Models that
   fit on the Mac (CHURRO-3B, GLM-OCR, the 2B and 4B fine-tunes) stay free, except a FarmShare run of one OpenRouter
   sells (Qwen3-VL 8B, at $0.25/$0.75 read 2026-10-21), which the completeness rule below prices at that rate. Claude Sonnet 5.5 ran on the subscription, so its
-  price uses input tokens counted by Anthropic's free count_tokens call and the subscription run's output tokens
+  price uses input tokens counted by Anthropic's free count_tokens call on 99 panel images and the subscription run's output tokens
   (`data/inputs.json` → `sonnet_api_price`).
 - **Batch points** sit at half the measured cost, for routes whose batch price is half their standard price.
   A dotted line joins the two points.
@@ -325,9 +325,12 @@ Python standard library.
 - **The kind charts** price each route at what that kind's pages cost it (`charts[].prices` in `panel-data.json`,
   per 1,000): for the cloud and local panels, the gateway's Gemini 3.7 Flash and Gemini 4 Hydrogen, the `cost`
   column of their groups CSVs over the group's pages (the last two are list-price estimates from each page's
-  billed tokens); for a FarmShare or Sherlock run OpenRouter sells, OpenRouter's rate for the run's mean tokens over
-  that kind's answered pages in its `pages.csv`, as its overall price is over all its answered pages. Claude Sonnet
-  5.5 (a subscription, priced from counted tokens) keeps its price over all 96, and routes that are free stay free.
+  billed tokens). A whole-page FarmShare or Sherlock run OpenRouter sells uses the recorded tokens of that kind's
+  scored attempts in `pages.csv`, including capped and other unanswered metered replies. The build flags missing
+  usage for a priced kind by run, page and token field. An explicit zero counts as recorded usage. The overall
+  whole-page cluster estimate uses the collector's answered-only token means across the 99-image panel, including
+  any answered agreement-only images. Claude Sonnet 5.5 keeps its overall list-price estimate across kinds, and
+  routes that are free stay free.
   A chart whose cheapest paid point is under $0.25 moves its free column left with it.
 - **Segmentation's "no checking"** is the share of document pages that land in exactly the right document if
   nobody checks anything. Its "checks per 100 pages" counts every page photographed, box and folder photos

@@ -1574,7 +1574,7 @@
      "batch": null
     },
     "handwritten": {
-     "std": 1.6,
+     "std": 3.59,
      "batch": null
     }
    }
@@ -2986,7 +2986,7 @@
      "batch": null
     },
     "qwen3.5-9b-sherlock": {
-     "std": 0.48,
+     "std": 0.5,
      "batch": null
     },
     "qwen3.8-27b-sherlock": {
@@ -3842,7 +3842,7 @@
      "batch": null
     },
     "qwen3-vl-8b-farmshare": {
-     "std": 1.44,
+     "std": 1.65,
      "batch": null
     },
     "qwen3.5-9b-sherlock": {

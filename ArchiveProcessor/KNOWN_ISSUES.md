@@ -2,6 +2,12 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (2026-11-22) — Benchmark cluster pricing omitted capped attempts
+
+ArchiveOCRBench's per-kind whole-page cluster estimates now use the same attempted pages as strict accuracy,
+including metered failures. The overall estimate still uses answered pages from the 99-image panel, as does the
+collector's token summary. (W46.p18-kind-attempt-cost)
+
 ## FIXED (2026-11-22) — Improve OCR replaces hidden search text on the original scan
 
 Improve OCR supports single suite searchable PDFs and updates the hidden layer of eligible image-and-text pairs even

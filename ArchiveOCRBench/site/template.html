@@ -544,7 +544,7 @@ footer p { font-size: 13px; }
   </section>
 
   <footer>
-    <p><strong>OCR costs.</strong> Measured charges for the panel's pinned OpenRouter endpoint (Mistral's published rate for Mistral OCR), as dollars per 1,000 pages, averaged over all 96 pages; the same route cost is used on every chart, so the kind charts compare accuracy at a route's average price. Apple Vision runs on the device and costs nothing, and so do the three models read on our Mac (an M3 Pro with 18 GB): Qwen3-VL 8B (about 41 seconds a page), LightOnOCR-3-4B (about 24) and Qwen3.5-9B (about 38). Qwen3.6 27B ran on FarmShare, which bills nothing, but it does not fit on the Mac, so it is priced at OpenRouter's list rate for the same model ($0.25 and $2 per million input and output tokens, read 2026-10-20) applied to its own measured tokens; its GPU time is in the tables as GPU-hours per 100,000 photos. Claude Sonnet 5.5 ran through the subscription, so it was not billed; its price is its input tokens as counted by Anthropic's free count_tokens call on the same images (4,815 a page on average) and the subscription run's output tokens (816 a page), at $2 and $10 per million input and output tokens.</p>
+    <p><strong>OCR costs.</strong> Prices are per 1,000 pages. The hosted panels use recorded charges for their pinned endpoints (Mistral's published rate for Mistral OCR). Gemini 3.7 Flash on the Stanford gateway and Gemini 4 Hydrogen use list-price estimates from recorded usage. The overall hosted figures average over the 96 accuracy pages, and the kind charts use each kind's pages where usage is available. Apple Vision and the readers run on our Mac are free. Whole-page FarmShare and Sherlock estimates apply frozen OpenRouter rates to the cluster runs' token counts. Their overall figures average over the answered pages of the 99-image panel, including any answered agreement-only images. Their kind figures average over every attempt scored for that kind, including capped or otherwise unanswered readings with recorded usage. Cluster crop routes use the tokens from their own scored pages. Claude Sonnet 5.5 has one API list-price estimate across the charts. It uses 4,815 input tokens per page, counted by Anthropic on 99 panel images including the prompt, and 816 output tokens per page from the subscription run, at $2 and $10 per million input and output tokens.</p>
     <p id="vision-os" hidden><strong>Apple Vision's OS.</strong> <span id="vision-os-text"></span></p>
     <p id="vision-fail" hidden><strong>Apple Vision's failure rate.</strong> <span id="vision-fail-text"></span></p>
     <p><strong>Batch prices.</strong> Half the measured cost, where OpenRouter lists a batch version of the model at half its standard price (Gemini 3.8 Flash's batch price is half of what the run paid). Mistral OCR's batch price follows Mistral's published 50% batch discount. Routes with no batch point have no batch version in the catalogue.</p>
@@ -559,7 +559,7 @@ const FREE = 0.17;
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const money = v => v === 0 ? 'free' : '$' + v.toFixed(2);
 const OWN = { mac: 'on our Mac', farmshare: 'Stanford FarmShare' };
-const priceCell = (r, std) => r.free_cluster ? 'no hosted price (free on the cluster)' : money(std) + (r.id === 'claude-sonnet5.5' ? ' (est.)' : r.panel === 'farmshare' ? ' (OpenRouter rate)' : '');
+const priceCell = (r, std) => r.free_cluster ? 'no hosted price (free on the cluster)' : (r.panel === 'farmshare' && std === 0 ? '$0.00' : money(std)) + (r.id === 'claude-sonnet5.5' ? ' (est.)' : r.panel === 'farmshare' ? ' (OpenRouter rate)' : '');
 // A kind chart prices a route at what that kind's pages cost it, where the panel measured it (W49.bench-kind-price).
 const priceOf = (chart, r) => (chart.prices || {})[r.id] || r;
 const FREE_CLUSTER = 0.19;  // just right of the Mac routes in the free column, so the two kinds of free stay apart
@@ -605,10 +605,14 @@ DATA.charts.forEach((c, ci) => {
   sec.className = 'panel';
   sec.id = c.key;
   const meta = c.key === 'overall' ? '96 pages' : c.n + ' pages · ' + c.words.toLocaleString() + ' words';
+  const priceBasis = c.key === 'overall'
+    ? 'Whole-page cluster prices use the answered pages of the 99-image panel.'
+    : 'Whole-page cluster prices include all scored attempts for this kind, including capped replies.';
   const rows = tableOrder.map(r => { const s = r.extra ? r.scores[c.key] : c.scores[r.id], p = r.extra ? ((r.prices || {})[c.key] || r) : priceOf(c, r); return '<tr><td>' + r.num + '</td><td>' + r.name + (r.extra ? ' (table only)' : '') + '</td><td>' + s[0].toFixed(2) + '</td><td>' + s[1] + '/' + s[2] + '</td><td>' + priceCell(r, p.std) + '</td><td>' + (p.batch ? money(p.batch) : '—') + '</td><td>' + hwText(r) + '</td></tr>'; }).join('');
   sec.innerHTML = '<div class="head"><h2>' + c.title + '</h2><span class="meta">' + meta + '</span></div>' +
     '<p class="note">Highest: ' + best.r.name + ' at ' + best.y.toFixed(1) + '. Best-value points: ' +
     P.filter(p => p.front).sort((a, b) => a.x - b.x).map(p => p.r.name + (p.b ? ' (batch)' : '')).join(', ') + '.</p>' +
+    '<p class="note">' + priceBasis + '</p>' +
     '<div class="plot"><canvas role="img" aria-label="' + c.title + ': NES against dollars per 1,000 pages for ' + routes.length + ' routes"></canvas></div>' +
     '<details><summary>Show the numbers</summary><div class="tbl"><table><thead><tr><th>#</th><th>Route</th><th>NES %</th><th>Answered</th><th>Per 1,000</th><th>Batch</th><th>Own hardware</th></tr></thead><tbody>' + rows + '</tbody></table></div></details>';
   host.appendChild(sec);

@@ -17994,3 +17994,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   bytes, same-byte replacements, wrong grants, symlinks, torn staging, concurrent retries and exact filesystem
   path spelling. The write-surface proof passed 30 checks. No real corpus, bench cache or paid calls used.
   <!-- /W49.storage-pair-recovery -->
+
+- [x] **W46.p18-kind-attempt-cost — Include capped attempts in per-kind cluster price estimates [S]** · §Document processing review (lane: segbench) (uses: light) — Measurement review 2026-11-22 pass 18, P18-3, baseline dbb10584. In ArchiveOCRBench/build.py farmshare_run, price recorded input and generated tokens across the same attempts used for strict accuracy. Distinguish known zero, missing usage and an unanswered but metered read. Reproduce printed 8B $1.44 → $1.65 and typed 9B $0.48 → $0.50 per 1,000. Check other arms, retain the answered-only throughput validation, state the overall price denominator, rebuild the board and correct its OCR costs note including Sonnet’s 99-image input sample. $0, frozen rates. SHIPPED 2026-11-22 (this commit).
+  Per 1,000 pages at frozen rates, FarmShare 8B printed rose from $1.44 to $1.65, Sherlock 9B typewritten
+  from $0.48 to $0.50, and the table-only FarmShare Qwen3.6 27B fp8-at-load handwritten from $1.60 to $3.59.
+  The metered Sherlock 9B printed failure did not change its rounded price. All other published prices,
+  scores and throughput figures held. Verified with local fixtures and the rebuilt board. No paid calls
+  or bench cache used. The public copy awaits publication.
+  <!-- /W46.p18-kind-attempt-cost -->
