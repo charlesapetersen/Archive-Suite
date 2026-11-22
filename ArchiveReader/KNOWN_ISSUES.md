@@ -9,6 +9,12 @@ and Space preview offer **Download and Show**. Find reports when its results cov
 [Reproduction and regression](../verification/evidence/reader/W49.reader-s002-reproduce-check.md).
 (W49.fix-reader-dataless-prefetch)
 
+## OCR search with an unavailable index (S-003, 2026-11-21)
+
+- **OCR search shows “No matches” when the content index cannot open.** The empty-list message blames
+  the query, while the status bar says “Search index unavailable”. [Independent VM reproduction](../verification/evidence/reader/W49.reader-s003-reproduce-check.md).
+  (queued: W49.fix-reader-dead-index-overlay)
+
 ## Password-protected PDFs in the document viewer (S-005, fixed 2026-11-21)
 
 The document window and Space preview explain that the PDF is password-protected. Library health
