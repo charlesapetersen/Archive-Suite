@@ -9,11 +9,12 @@ and Space preview offer **Download and Show**. Find reports when its results cov
 [Reproduction and regression](../verification/evidence/reader/W49.reader-s002-reproduce-check.md).
 (W49.fix-reader-dataless-prefetch)
 
-## Password-protected PDFs in the document viewer (S-005, 2026-11-21)
+## Password-protected PDFs in the document viewer (S-005, fixed 2026-11-21)
 
-- **The viewer calls a locked text PDF image-only** and gives no password message. Library health marks
-  it unreadable. [Independent scratch run](../verification/evidence/reader/W49.reader-s005-reproduce-check.md).
-  (queued: W49.fix-reader-encrypted-pdf)
+The document window and Space preview explain that the PDF is password-protected. Library health
+still classifies the locked PDF as unreadable.
+[Independent scratch reproduction](../verification/evidence/reader/W49.reader-s005-reproduce-check.md).
+(W49.fix-reader-encrypted-pdf)
 
 ## Data keyed by absolute path — the limits (W49.storage-simplify-audit, 2026-11-20)
 

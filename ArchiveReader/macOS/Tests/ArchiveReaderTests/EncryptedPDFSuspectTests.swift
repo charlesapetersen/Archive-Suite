@@ -6,16 +6,8 @@ import AppKit
 import ArchiveCore
 @testable import ArchiveReader
 
-/// W49.reader-s005-reproduce — the reproduce attempt for suspect S-005 (phase rule 5a): a password-protected PDF,
-/// written on scratch with `kCGPDFContextUserPassword`, run through the content indexer's real pass and the
-/// document viewer's real `load`.
-///
-/// The indexer half holds: `PDFHeaderParser.extract` refuses a locked document, so the row is `.unreadable`. The
-/// viewer half reproduced on 2026-11-20: PDFKit opens the file locked with its real page count, so `loadError` stays
-/// nil and `formatNote` calls it image-only, never encrypted. That check is a known issue: the run stays green while
-/// the defect is there and fails once it is gone, when the fix removes the `XCTExpectFailure`. Phase rule 5a(4): a
-/// second session on another model checks the reproduction before a fix item is filed
-/// (`W49.reader-s005-reproduce-check`).
+/// S-005 regression: a PDF with an open password is unreadable to the indexer and gets a
+/// password message in the document viewer, including when opened ahead as a neighbour.
 @MainActor
 final class EncryptedPDFSuspectTests: XCTestCase {
     private var dir: URL!
@@ -68,25 +60,39 @@ final class EncryptedPDFSuspectTests: XCTestCase {
         XCTAssertEqual(statuses[url.path], .unreadable, "PDFFormatStatus counts an encrypted PDF as unreadable")
     }
 
-    func testTheViewerDoesNotSayTheDocumentIsEncrypted() throws {
+    func testTheViewerExplainsWhyALockedPDFCannotOpen() throws {
         let url = try lockedPDF()
         let viewer = DocumentViewerModel(persists: false, thumbnailer: nil)
         viewer.load(DocumentSelection(filePaths: [url.path]))
 
-        // What the viewer shows today: a document that opened, locked, with its two pages and no error.
-        let doc = try XCTUnwrap(viewer.current, "PDFKit opens a locked file")
-        XCTAssertTrue(doc.isLocked)
-        XCTAssertEqual(doc.pageCount, 2, "a locked file still reports its page count")
-        XCTAssertNil(viewer.textPage?.string, "no text can be read from a locked page")
+        assertPasswordError(viewer)
+    }
 
-        XCTExpectFailure("S-005: the viewer says nothing about encryption (W49.reader-s005-reproduce)") {
-            let shown = [viewer.loadError, viewer.formatNote].compactMap { $0 }
-            XCTAssertTrue(shown.contains { $0.localizedCaseInsensitiveContains("encrypt")
-                                           || $0.localizedCaseInsensitiveContains("password") },
-                          "shown instead: \(shown)")
+    func testSwitchingToAPreparedLockedPDFShowsTheErrorAndLeavingClearsIt() async throws {
+        let locked = try lockedPDF()
+        let readable = dir.appendingPathComponent("readable.pdf")
+        XCTAssertTrue(TestPDFBuilder.write(pages: ["scan", "OCR text"], to: readable))
+        let viewer = DocumentViewerModel(persists: false, thumbnailer: nil)
+        viewer.load(DocumentSelection(filePaths: [readable.path, locked.path]))
+
+        let deadline = Date().addingTimeInterval(10)
+        while !viewer.holdsPrepared(document: locked.path), Date() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
         }
-        XCTAssertNil(viewer.loadError, "today: no load error")
-        XCTAssertEqual(viewer.formatNote?.contains("image-only"), true,
-                       "today: the format note calls a locked text PDF image-only")
+        XCTAssertTrue(viewer.holdsPrepared(document: locked.path), "the locked PDF was opened ahead")
+        viewer.next()
+        XCTAssertEqual(viewer.currentFilePath, locked.path)
+        XCTAssertFalse(viewer.holdsPrepared(document: locked.path), "the switch took the prepared PDF")
+        assertPasswordError(viewer)
+
+        viewer.previous()
+        XCTAssertNil(viewer.loadError)
+        XCTAssertEqual(viewer.textPage?.string?.contains("OCR text"), true)
+    }
+
+    private func assertPasswordError(_ viewer: DocumentViewerModel, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(viewer.loadError, "“locked.pdf” is password-protected.", file: file, line: line)
+        XCTAssertNil(viewer.current, "the viewer must show the load error in place of the PDF", file: file, line: line)
+        XCTAssertNil(viewer.formatNote, "a locked PDF must not be described as image-only", file: file, line: line)
     }
 }

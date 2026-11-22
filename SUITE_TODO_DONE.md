@@ -17589,3 +17589,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Both viewers preserve linked pages across the download. The Checks inspector and multi-file Find use the same no-download policy.
   [OneDrive and off-screen VM regression](verification/evidence/reader/W49.reader-s002-reproduce-check.md).
   <!-- /W49.fix-reader-dataless-prefetch -->
+
+- [x] **W49.fix-reader-encrypted-pdf — Explain when a PDF requires a password [S]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-21 (this commit)
+  (lane: reader) (uses: build,vm) — S-005 (S4), reproduced by Claude Opus 5.5 and independently confirmed on Codex gpt-6.2-sol at baseline `ba39eeb4` ([scratch run](verification/evidence/reader/W49.reader-s005-reproduce-check.md)). In `DocumentViewerModel.loadDocument`, recognize a locked PDF through both the direct and prepared document paths. Show a load error that says it is password-protected and suppress the image-only banner for that PDF. Keep the indexer’s unreadable classification. Retain `EncryptedPDFSuspectTests`, replacing its viewer expected failure and current-bug assertions with assertions for the password message and absence of the image-only note.
+  Locked PDFs show “is password-protected” in the document window and Space preview. The regression covers a direct open, a prepared neighbour, recovery on switching files, and the indexer’s unreadable classification.
+  Reader smoke ran 1,084 tests with seven skips and no failures. All eight document render guards and all 29 write-surface lint self-checks passed.
+  Off-screen VM tests verified the password message in both viewers and the warning for a genuine image-only PDF. Both password-error screenshots were reviewed.
+  <!-- /W49.fix-reader-encrypted-pdf -->

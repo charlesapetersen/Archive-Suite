@@ -989,10 +989,15 @@ final class DocumentViewerModel: ObservableObject {
         let isDataless = loaded?.stamp?.isDataless == true
         // Guard the open and the page metadata read in current's didSet. The file can be evicted even
         // after the fresh stamp; check again on failure to distinguish that from a broken or missing file.
-        CorpusWalker.withDatalessMaterializationDisabled {
-            current = isDataless ? nil : neighbours.document(at: url.path) ?? Self.readDocument(url)
+        let isLocked = CorpusWalker.withDatalessMaterializationDisabled {
+            let document = isDataless ? nil : neighbours.document(at: url.path) ?? Self.readDocument(url)
+            let isLocked = document?.isLocked == true
+            current = isLocked ? nil : document
+            return isLocked
         }
-        if let current {
+        if isLocked {
+            loadError = "“\(url.lastPathComponent)” is password-protected."
+        } else if let current {
             loadError = current.pageCount == 0 ? "“\(url.lastPathComponent)” has no pages." : nil
         } else if isDataless || PreviewImagePrefetcher.FileStamp.of(url.path)?.isDataless == true {
             cloudState = .awaitingConsent
@@ -1067,7 +1072,9 @@ final class DocumentViewerModel: ObservableObject {
     nonisolated private static func openDocument(_ url: URL) -> PDFDocument? {
         CorpusWalker.withDatalessMaterializationDisabled {
             guard let doc = readDocument(url) else { return nil }
-            for i in 0..<min(doc.pageCount, 8) { _ = doc.page(at: i)?.string }
+            if !doc.isLocked {
+                for i in 0..<min(doc.pageCount, 8) { _ = doc.page(at: i)?.string }
+            }
             return doc
         }
     }
