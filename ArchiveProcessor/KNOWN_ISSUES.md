@@ -22,7 +22,8 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   same whole-run review before tagging. Neither adds a per-collection review. The help implies the switch
   controls the pre-tagging pause. Reproduced in the VM at `d1b38279` and traced to `startProcessing` and
   `performPreOCRedProcessing`. The [verification record](../verification/evidence/processor/W49.proc-s046-verify.md)
-  links the test and tracks the separate check and pending behavior choice. (queued: W49.proc-s046-check)
+  links the test and independent check. Owner call 31 sets fresh review on by default and lets the user
+  switch it off. The fix waits for independent reproduction. (queued: W49.proc-s046-review-toggle)
 
 ## Live Capture files a document silently after Automatic tagging gets HTTP 500 (S-045)
 
@@ -200,7 +201,7 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   editor (the Inspector's Container section, W47.ct-reader-edit). The pre-OCRed PDF route (re-tagging existing PDFs, a new run or a resumed one) reads
   no labels: its outputs are its inputs, and nothing is written beside a source. An output outside the run's output
   folder, missing, or merged into another label's PDF is not recorded, and the summary counts it; so is one whose
-  collection organisation stopped partway (its moves are not reported then). (asked: W49.corpus-migration-scope-owner-ok).
+  collection organisation stopped partway (its moves are not reported then). (queued: W49.corpus-adoption-tool).
 - **Process Files reads its labels one at a time before the run's summary.** One Vision pass, and with the gateway one
   call of up to 60 s, per label photo, after organisation ("Reading N box and folder labels…"); Stop ends it with
   nothing written. (accepted: labels are known only after organisation; the read is shown and Stop ends it cleanly).

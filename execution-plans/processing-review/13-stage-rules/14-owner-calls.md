@@ -260,6 +260,17 @@ calls are section 1.
     measured 100.1 GiB before and after. Both retired worktrees remain for unfinished items; rehearsal,
     model and dewarp inputs remain for open work. No backup handoff prepared.
 
+31. **Walkthrough follow-up, 2026-11-21.** Catalogue storage remains open. Compare filesystem metadata and
+    other external stores before choosing a durable home for corrections. Preservation (2A): keep the exact,
+    full-resolution intake original in a visible Preservation folder by default. Make this a prominent initial
+    Processor interview choice, with an explicit opt-out and an explanation of extra space and PDF-only sharing.
+    Adoption (3A): put the archive-specific colour rules, named PDF/JPEG pairing and old-label backfill in one
+    scratch-first adoption tool. Keep the classifier optional with a time and cost preview. Plan an LLM-assisted
+    migration kit for other users' existing personal repositories behind W46.nice-to-have. S-046 (4B): fresh
+    Process Files document review is on by default and the user can turn it off. Off skips the whole-run page
+    review before tagging. Independent confirmation still precedes the fix, and the separate Resume decision
+    remains in call 30.
+
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
 Each is a table default or a filed item, reversible without app work; the figures and files are in the note named.

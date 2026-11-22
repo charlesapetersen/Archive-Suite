@@ -1,9 +1,10 @@
 # Keep the source behind a compressed reading PDF
 
-**Decision for the owner (W49.preservation-copies-owner-ok).** Where should the suite keep the source when it
-creates a lossy reading copy? I recommend a visible **Preservation** folder beside the reading PDFs, organized
-into one subfolder per document. This keeps routine reading and PDF-only sharing lightweight and lets the owner
-recover the exact capture file with Finder. A preservation transfer must include both the PDF and its source folder.
+**Owner choice, 2026-11-21 (call 31).** Keep the exact, full-resolution intake file in a visible
+**Preservation** folder beside the reading PDFs, organized into one subfolder per document. Make this a
+prominent decision in Processor's initial interview. Default to keeping originals and offer an explicit
+opt-out. Tell the user that the originals take extra space, that Reader can show them, and that a PDF-only
+copy leaves them behind. Show actual source bytes before filing when they are known.
 
 ## What the suite keeps today
 
@@ -116,7 +117,3 @@ receiving unavailable or tampered source files and opening an original without a
 verification proves local filing only. Claim cloud behavior after a round-trip on an authorized scratch account.
 Existing documents with missing sources remain unverified. No recovery, migration or writes against the real
 corpus are part of this proposal.
-
-**Owner choice.** A keeps the reading PDF small and groups the originals visibly. B keeps everything loose next
-to the PDF. C makes every PDF a self-contained, larger transfer and changes its archival profile. Should A be
-the default for new lossy outputs, or is B or C the better fit for how you expect to copy and share documents?

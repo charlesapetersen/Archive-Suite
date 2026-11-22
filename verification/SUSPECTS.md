@@ -1141,7 +1141,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   and off, raised the same gates (whole-run review, box/folder confirmation, final review).
 - **Would confirm it:** observe the same review sequence on two fresh user-started runs with the Documents switch
   on and off. The owner chooses whether the whole-run review should remain required or be explicitly skippable.
-- **Would clear it:** the toggle is removed or wired, and its help says what it does.
+- **Would clear it:** fresh document review defaults on and an explicit off skips the before-tagging review.
+  Owner call 31 approved this behavior. The fix waits for independent verification.
 - **Status:** `reproduced` — [scratch VM evidence](evidence/processor/W49.proc-s046-verify.md). Independent Claude check `W49.proc-s046-check` queued.
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.

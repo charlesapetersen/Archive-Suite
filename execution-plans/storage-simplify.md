@@ -434,6 +434,27 @@ This replaces the old gate's A/B/C wording and its “no page 2” sub-question.
 needs. `W49.storage-one-home`, `W49.item-fields-home`, and movable-root work wait on the storage gate. Rename and rerun have their own owner gates and must be reconciled with the selected route. This analysis is complete when the question
 is delivered; implementing a choice is separate work.
 
+### Filesystem metadata and other external options
+
+The owner asked about filesystem metadata before deciding (call 31). A custom extended attribute is a named
+value stored against the file by the filesystem, outside the PDF bytes. It can hold a typed Suite record and
+follows an ordinary rename on the same volume. In a local scratch check, a custom attribute survived a rename
+and was absent after a byte-only copy and a plain ZIP round trip. The file contents were identical throughout.
+Treat cloud and backup retention as specific to the actual transfer method until each required route is
+measured, including Finder copies, original-file downloads, backup and restore, and PDF replacement on re-OCR.
+
+Finder tags can show a short set of searchable labels. They make a poor store for separate sender and recipient
+fields, uncertain dates, evidence, and revision history. Spotlight can index values that the Suite publishes,
+but its search index is a projection that can be rebuilt. A filesystem file identifier can help recognize a
+rename on the same volume, while copy and restore need their own association checks.
+
+A documented, archive-level database or catalogue gives fast lookup and one backup/export unit, while a PDF
+copied by itself has no corrected data. A companion supports per-document export and recovery, with pairing
+work. These choices can use Finder tags or custom attributes as optional conveniences without making them the
+only copy of a correction. A separate export can combine the PDF and its record for transfer. If the requirement
+is for the plain PDF byte stream to carry current data after a byte-only copy, storing the data inside that
+stream is necessary. No storage choice is approved yet.
+
 ## 10. Size and a reviewable implementation sequence
 
 No route is merely changing a JSON URL. Reader fields alone are **S–M**, because most controls exist. Canonical
