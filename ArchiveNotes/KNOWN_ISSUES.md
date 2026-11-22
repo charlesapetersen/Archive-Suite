@@ -3,6 +3,14 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ⚠️ OPEN — Notes editor save failures verified on scratch data (2026-11-21)
+
+- **Typing a comment closer after an unclosed block header** can erase prose on save. The styled
+  editor showed the new prose before save. The saved file and reopened editor lost the prose before
+  the closer. (queued: W49.fix-notes-unclosed-header)
+- **Pasting an image in raw Markdown mode** writes the image to the item's assets and saves a U+FFFC
+  character in the note. The note has no reference to the image. (queued: W49.fix-notes-raw-image-paste)
+
 ## ⚠️ OPEN — Notes list actions verified on scratch data (2026-11-21)
 
 - **Clicking a sortable column header** changes the arrow and leaves the notes in their prior order.

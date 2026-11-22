@@ -244,7 +244,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     `uiTestPasteImage()`, then inspect `string` and the scratch `assets/`.
 - **Would clear it:** the raw-mode paste is declined (no asset written), or it inserts the literal
   `![](assets/…)` text.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.notes-suspects-text-check`); test `ArchiveNotesTests/NotesTextLossSuspectTests` `s009RawModeImagePaste`
+- **Status:** `reproduced` — independently confirmed, queued as `W49.fix-notes-raw-image-paste`; [evidence](evidence/notes/W49.notes-suspects-text-check.md); test `ArchiveNotesTests/NotesTextLossSuspectTests` `s009RawModeImagePaste`
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-text` under phase rule 5a.
@@ -256,6 +256,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     (`currentSerialization` returns `textView.string`). No comment or document promises an image paste in raw mode;
     G4 switches to styled mode first. Not run in the VM: the second session may confirm it there with the G4 variant
     above.
+  - 2026-11-21 W49.notes-suspects-text-check (Codex, gpt-6.2-sol, `7252c39b`) — The off-screen VM raw-toggle and G4 paste path wrote a byte-identical PNG to the item. Its saved Markdown held one U+FFFC and no reference to the PNG. This check exercised paste.
 
 ### S-010 · Removing several sole-instance notes from a folder at once asks about only the last one
 
@@ -529,7 +530,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a unit test: decode a note whose body is `<!-- block: reader-doc\n link: x\nSome prose\nA --> B`,
   encode it, decode again, and look for "Some prose" in the blocks' markdown.
 - **Would clear it:** "Some prose" survives.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.notes-suspects-text-check`); test `ArchiveNotesTests/NotesTextLossSuspectTests` `s019TypedCloserAfterUnclosedHeader`
+- **Status:** `reproduced` — independently confirmed, queued as `W49.fix-notes-unclosed-header`; [evidence](evidence/notes/W49.notes-suspects-text-check.md); test `ArchiveNotesTests/NotesTextLossSuspectTests` `s019TypedCloserAfterUnclosedHeader`
 - **History:**
   - 2026-10-20 W40.e6 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-text` under phase rule 5a.
@@ -541,6 +542,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     `Some prose` is gone (`parseHeader` skips a line with no colon, `Store/BlockParser.swift:287`), and the next save
     writes it off disk. Without the first Return the prose is joined onto the link line (see S-043) and ends up inside
     the `link:` value. No comment calls the dropped lines deliberate.
+  - 2026-11-21 W49.notes-suspects-text-check (Codex, gpt-6.2-sol, `7252c39b`) — The styled editor showed the typed prose and the text after the closer. The prose was already missing from the first saved Markdown and remained absent when the note reopened.
 
 ### S-020 · An extract built from a degraded Notes block may detach its text from the passage
 
