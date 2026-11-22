@@ -62,6 +62,8 @@ struct ReOCRJob {
         let results: [PairResult]
         /// Present only when every selected pair was read and the candidate passed the preservation check.
         let candidate: Data?
+        /// Zero-based image page indexes replaced by the candidate. Nil when there is nothing to accept.
+        let replacedImagePages: Set<Int>?
         let candidateProblem: String?
     }
 
@@ -163,7 +165,10 @@ struct ReOCRJob {
         }
         func review(_ candidate: Data?, _ problem: String?) -> Review {
             Review(operation: op, key: key, reviewedGeneration: reviewed.generation, flaggedAtReview: flaggedAtReview,
-                   results: results, candidate: candidate, candidateProblem: problem)
+                   results: results, candidate: candidate,
+                   replacedImagePages: candidate.map { _ in
+                       Set(selected.map(\.imageIndex).filter { replacements[$0] != nil })
+                   }, candidateProblem: problem)
         }
         // Every selected text page replaced (an image page beside one is extra, W42.int-s5).
         guard Set(selected.map(\.textIndex)).isSubset(of: replacements.keys) else { return review(nil, nil) }

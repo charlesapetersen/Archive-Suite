@@ -552,10 +552,11 @@ limits in their own section). Open:
 - **Improve OCR keeps the old layer only where it cannot remake the image page** (`ReOCRJob.remadeImagePage`): when
   the page's own JPEG is not what it shows (a CMYK or turned image, a page Improve OCR renders) or the page is not the
   Processor's letter page, has its own crop box or annotations, or a remade page would not render exactly as it does.
-  Elsewhere the layer follows the new reading (`SPEC/improve-ocr.md` §5). A page kept this way is not named in the
-  review, and the review shows only the text diff: it does not say the image page's invisible layer changes too.
-  The remade page carries no `/Rotate` of its own (Quartz writes none), so under a page tree that passes a turn down
-  its revision is refused by the preservation check and the old layer stays (queued: W49.proc-reocr-layer-review).
+  A turn inherited from the PDF page tree can also keep a page as it is. The preservation check refuses a candidate
+  if an imported replacement picks up a turn that changes its appearance.
+  Elsewhere the layer follows the new reading or is removed when the new reading has no image-page layer
+  (`SPEC/improve-ocr.md` §5). Before Accept, the review names the image pages whose searchable layer will change
+  and those kept as they are (W49.proc-reocr-layer-review).
 - **The PDF/A writer holds the whole output in memory** (`PDFGenerator.archivalData`, then `ArchivalFinish`'s rewrite):
   about three to four times the file at the peak, so a 200-page merge of 2 MB pages passes 1 GB. It draws each page's
   media box only, without crop box or annotations; every caller passes the app's own new pages, which have neither (queued: W49.proc-pdfa-memory).

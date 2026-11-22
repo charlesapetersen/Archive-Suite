@@ -619,9 +619,19 @@ struct ImproveOCRView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(URL(fileURLWithPath: fileID).lastPathComponent).font(.headline)
                         ForEach(review.results, id: \.pair.textIndex) { r in
-                            HStack(alignment: .top, spacing: 12) {
-                                textColumn("Before", r.oldText)
-                                textColumn("After", (try? r.outcome.get()) ?? ((r.outcome.failureDescription) ?? ""))
+                            VStack(alignment: .leading, spacing: 6) {
+                                if let replaced = review.replacedImagePages {
+                                    let page = r.pair.imageIndex + 1
+                                    let message = replaced.contains(r.pair.imageIndex)
+                                        ? "The searchable text layer on image page \(page) will change."
+                                        : "Searchable text on image page \(page) will stay as it is."
+                                    Text(message)
+                                        .accessibilityIdentifier("ap.reocr.imageLayer.\(page)")
+                                }
+                                HStack(alignment: .top, spacing: 12) {
+                                    textColumn("Before", r.oldText)
+                                    textColumn("After", (try? r.outcome.get()) ?? ((r.outcome.failureDescription) ?? ""))
+                                }
                             }
                         }
                         HStack {

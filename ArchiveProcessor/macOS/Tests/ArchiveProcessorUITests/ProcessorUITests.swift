@@ -216,6 +216,14 @@ final class ProcessorUITests: XCTestCase {
         run.click()
         let accept = element("ap.reocr.accept")
         XCTAssertTrue(accept.waitForExistence(timeout: 60), "the page is read and the comparison shown")
+        let layer = element("ap.reocr.imageLayer.1")
+        XCTAssertTrue(layer.exists, "the review names the image page's searchable text before acceptance")
+        XCTAssertTrue(renderedText(of: layer).contains("image page 1"))
+        let reviewScroll = element("ap.reocr.dialog").scrollViews.firstMatch
+        for _ in 0..<8 where !reviewScroll.frame.contains(layer.frame) {
+            reviewScroll.scroll(byDeltaX: 0, deltaY: -250)
+        }
+        XCTAssertTrue(reviewScroll.frame.contains(layer.frame), "the layer message can be scrolled into view")
         attachScreenshot("processor-improve-ocr-compare")
         XCTAssertTrue(accept.isEnabled, "a full reading can be accepted")
         accept.click()

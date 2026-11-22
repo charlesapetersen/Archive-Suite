@@ -234,6 +234,7 @@ enum ReOCRJobTestDriver {
                 let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
                 check("3 every pair is still tried", reader.calls.map(\.imageIndex) == [0, 2, 4])
                 check("3 a failed pair means no candidate", review.candidate == nil)
+                check("3 no image page changes are offered without a candidate", review.replacedImagePages == nil)
                 check("3 the failure is shown for its page", { if case .failure = review.results[1].outcome { return true }; return false }())
                 do { _ = try j.accept(review); check("3 accept is refused", false) }
                 catch { check("3 accept is refused", (error as? ReOCRJob.Failure) == .noCandidate, "\(error)") }
@@ -550,7 +551,9 @@ enum ReOCRJobTestDriver {
                 let newText = (try? review.results.first?.outcome.get()) ?? ""
                 check("12 Vision reads the image page", newText.uppercased().contains("IMPROVED READING"), newText)
                 check("12 a candidate is made", review.candidate != nil, review.candidateProblem ?? "")
+                check("12 the review reports the image page's layer change", review.replacedImagePages == [0])
                 _ = try j.accept(review)
+                check("12 the image page's searchable text matches the review", text(pdf, 0).uppercased().contains("IMPROVED READING"))
                 let header = PDFDocument(url: pdf)?.page(at: 1).flatMap { PDFHeaderParser.parse($0).header }
                 check("12 the header names Vision as the reader", header?.provenance?.model == vision.displayName,
                       "\(String(describing: header?.provenance))")
@@ -781,13 +784,20 @@ enum ReOCRJobTestDriver {
                 }
                 let data = try Data(contentsOf: f)
                 check("7 a rotated page is not extracted", ReOCRJob.embeddedJPEG(data, pageIndex: 0) == nil)
-                let review = try await job(d).start(file: f, root: archive(d), model: model, read: reader.read)
+                let j = job(d)
+                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
                 let src = reader.calls.first.flatMap { CGImageSourceCreateWithData($0.image as CFData, nil) }
                 let props = src.flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
                 let w = props?[kCGImagePropertyPixelWidth] as? Int ?? 0, h = props?[kCGImagePropertyPixelHeight] as? Int ?? 0
                 check("7 it is rendered upright as a JPEG", src.map { CGImageSourceGetType($0) as String? } == "public.jpeg" && w > h,
                       "\(w)x\(h)")
                 check("7 its candidate is made", review.candidate != nil, review.candidateProblem ?? "")
+                check("7 the review reports that the image page is kept", review.replacedImagePages == [])
+                let oldLayer = text(f, 0)
+                _ = try j.accept(review)
+                check("7 accepting keeps the rotated image page and changes its text page",
+                      PDFDocument(url: f)?.page(at: 0)?.rotation == 90 && text(f, 0) == oldLayer
+                      && text(f, 1).contains("New reading of image page 1."))
             }
         } catch {
             check("no error is thrown", false, "\(error)")

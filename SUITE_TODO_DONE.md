@@ -17778,3 +17778,9 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   The settings suite still reports two catalogue parity failures for missing Reader and Notes labels for
   `dateLocalImage` and `lowConfidenceNames`. Both catalogues match the baseline.
   <!-- /W49.proc-runlog-all-paths -->
+
+- [x] **W49.proc-reocr-layer-review — Improve OCR's review says when the image page's layer changes, and names pages whose layer was kept [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit).
+  The review shows only the text diff: it does not say the invisible layer on the image page is replaced too, nor name the pages where `ReOCRJob.remadeImagePage` refused and the old layer stays (CMYK or turned images, crop boxes, annotations, an inherited `/Rotate`). Add one line for each. Tier-2 (in-place write surface). Covers §W42.int-s5 "Improve OCR keeps the old layer only where it cannot remake the image page…". Filed by W49.ki-audit-processor.
+  Each review names the affected PDF image page and says whether its searchable text layer will change
+  or stay as it is. The messages describe the candidate that passed preservation checks.
+  <!-- /W49.proc-reocr-layer-review -->
