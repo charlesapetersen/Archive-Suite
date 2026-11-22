@@ -167,7 +167,7 @@ struct SettingsAccountsPanel: View {
         }
     }
 
-    /// Small status chip: green "Validated" once the guided wizard's live check passed, else "Saved".
+    /// Small status chip: "Validated" once the guided wizard's live check passed, else "Saved".
     @ViewBuilder private func keyStatusChip(account: String, hasKey: Bool) -> some View {
         switch Self.keyChip(account: account, hasKey: hasKey) {
         case .saveFailed:
@@ -175,7 +175,7 @@ struct SettingsAccountsPanel: View {
                 .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.red)
         case .validated:
             Label("Validated", systemImage: "checkmark.seal.fill")
-                .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.green)
+                .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.primary)
         case .saved:
             Text("Saved").font(.caption).foregroundStyle(.primary)
         case .none:

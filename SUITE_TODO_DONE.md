@@ -17604,3 +17604,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Verified in the Debug build, key-free OCR smoke checks, and off-screen Settings interaction. Removed the generated benchmark images and raw readings from scratch and kept the aggregate results for the bench.
   The full off-screen Processor run reported 48 passes, 18 skips and two Accounts contrast failures. The badge failure reproduced on unchanged baseline `cb394d05` and is queued as W49.proc-validated-contrast.
   <!-- /W49.proc-vision-language-auto -->
+
+- [x] **W49.proc-validated-contrast — make the Accounts Validated badge readable in light mode [XS]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-21 (this commit)
+  Original item (lane: processor) (uses: build,vm) — Reproduced off-screen on baseline cb394d05 in `SettingsAccountsPanel.keyStatusChip`. The green label measured 2.07:1 in light mode. Use a foreground colour accessible in both appearances and rerun the Accounts accessibility audits.
+  The badge uses the system text color and keeps its checkmark seal. All four off-screen accessibility audits passed.
+  The badge measured 14.13:1 in light mode and 10.80:1 in dark mode against a 4.5:1 minimum.
+  The audit displays and measures the badge using a launch-only setting. Both badge screenshots were reviewed.
+  <!-- /W49.proc-validated-contrast -->

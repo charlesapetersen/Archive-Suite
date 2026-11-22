@@ -49,6 +49,7 @@ final class AccessibilityAuditUITests: XCTestCase {
             "-APUITestMode",
             "-APUITestInputDirectory", scratchRoot.appendingPathComponent("IN").path,
             "-APUITestOutputDirectory", scratchRoot.appendingPathComponent("OUT").path,
+            "-keyValidated_Gemini", "YES",  // show the badge without saving a key or contacting a provider
         ] + extra)
         app.launchEnvironment["ARCHIVEPROC_HEADLESS"] = "1"
         app.launch()
@@ -70,9 +71,25 @@ final class AccessibilityAuditUITests: XCTestCase {
         for panel in XCUIApplication.settingsPanels {
             XCTAssertTrue(app.showSettingsPanel(panel), "Settings should have a \(panel) panel")
             LayoutGuard.waitUntilSettled(settings)
+            if panel == "Accounts" { try checkValidatedBadge(in: settings, appearance: appearance) }
             sweep.audit(settings, screen: "settings, \(panel)", exempt: [AccessibilityAudit.groupedFormTextFieldOrphan])
         }
         sweep.finish()
+    }
+
+    private func checkValidatedBadge(in settings: XCUIElement, appearance: String) throws {
+        let badge = settings.staticTexts["Validated"].firstMatch
+        XCTAssertTrue(badge.exists, "The Accounts audit should include a Validated badge")
+        guard badge.exists else { return }
+
+        let pixels = try XCTUnwrap(ScreenPixels(XCUIScreen.main.screenshot()))
+        let ratio = try XCTUnwrap(pixels.contrast(under: badge.frame), "The badge must be visible")
+        XCTAssertGreaterThanOrEqual(ratio, 4.5, "Validated badge contrast in \(appearance) mode")
+        print("[a11y-audit] Validated badge in \(appearance) mode: \(String(format: "%.2f", ratio)):1")
+
+        let shot = scratchRoot.appendingPathComponent("uitest-validated-badge-\(appearance).png")
+        try badge.screenshot().pngRepresentation.write(to: shot)
+        print("[shot] validated-badge-\(appearance): wrote \(shot.path)")
     }
 
     // Filed 2026-10-16 from the first VM runs; each fix's session deletes its entry (the audit fails once it

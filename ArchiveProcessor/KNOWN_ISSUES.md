@@ -2,9 +2,11 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
-## Accounts Validated badge has low contrast in light mode
+## FIXED (2026-11-21) — Accounts Validated badge contrast
 
-- The off-screen accessibility audit measured 2.07:1 for the green “Validated” label in `SettingsAccountsPanel.keyStatusChip` on 2026-11-21. The same failure reproduced on unchanged baseline `cb394d05` using `AccessibilityAuditUITests`. (queued: W49.proc-validated-contrast)
+The green label measured 2.07:1 in light mode on baseline `cb394d05`. The badge now uses the system text
+color and keeps its checkmark seal. The off-screen accessibility audit measured 14.13:1 in light mode and
+10.80:1 in dark mode (W49.proc-validated-contrast).
 
 ## Stage for later offers already-processed photos (S-039)
 
