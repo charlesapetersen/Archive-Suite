@@ -1274,10 +1274,11 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `OCR/OCRProcessor+OCR.swift` batch submission (W49.proc-quit-waits-batch-submit's uncertain-outcome path).
 - **Would confirm it:** a submission answered 4xx with no batch ID, its status line and whether the journal is kept.
 - **Would clear it:** only a lost or cut-off reply is reported as uncertain.
-- **Status:** `open`
+- **Status:** `reproduced` — verified against a cut-off reply and queued as `W49.proc-fix-s051`. [Scratch evidence](evidence/processor/W49.proc-s051-verify.md).
 - **History:**
   - 2026-11-20 W49.proc-suspects-money — raised.
   - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s051-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+  - 2026-11-21 W49.proc-s051-verify — Codex gpt-6.2-sol reproduced the full 401 separately from the original Claude Opus 5.5 run. The 401 and the cut-off 200 both kept a journal with zero acknowledged IDs and showed the same warning and pending-batch banner.
 
 
 ### S-052 · Label reads that fail are counted as read

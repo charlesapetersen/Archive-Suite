@@ -17618,3 +17618,6 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Reader smoke ran 1,085 tests with seven skips and zero failures. Both focused off-screen app tests passed, both screenshots were reviewed, and all 30 write-surface lint checks passed. The shared warning is within the lint’s scope.
   A local scratch folder with cloud-like names stayed local. Scratch symlinks to mounted OneDrive, Keep It and MacDroid proved detection from live metadata. iCloud Drive, Google Drive and Dropbox had no safe live scratch fixture.
   <!-- /W49.cloud-drive-first-launch-warning -->
+- [x] **W49.proc-s051-verify — a refused batch submission is reported as refused** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-21 (this commit)
+  Owner call 30 verification reproduced S-051. The real Process Files batch path reported uncertainty for both a complete HTTP 401 and a cut-off HTTP 200 reply. Both runs kept an empty recovery journal and offered Resume. The loopback reproduction cost $0 and used no bench cache. Queued W49.proc-fix-s051. [Evidence](verification/evidence/processor/W49.proc-s051-verify.md).
+  <!-- /W49.proc-s051-verify -->
