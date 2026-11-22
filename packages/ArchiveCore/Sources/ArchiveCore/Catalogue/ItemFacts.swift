@@ -29,6 +29,7 @@ public struct ItemFacts: Sendable {
         public let revision: Revision
         let rootIdentity: CatalogueReadDirectory.Identity
         let pdfVersion: CatalogueReadDirectory.FileVersion
+        let companionVersion: CatalogueReadDirectory.FileVersion
     }
 
     public struct DocumentFacts: Sendable {

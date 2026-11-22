@@ -32,7 +32,7 @@ public struct CatalogueWriter: Sendable {
         case recoveryRequired(artifact: String, reason: String)
     }
 
-    enum Boundary { case staged, beforeExchange, exchanged }
+    enum Boundary { case staged, beforeExchange, exchanged, beforeReassociation, reassociated }
 
     let reader: CatalogueReader
     let boundary: @Sendable (Boundary) throws -> Void
@@ -158,7 +158,8 @@ public struct CatalogueWriter: Sendable {
             try reader.validateScope(root: scope.root, parent: scope.parent)
             return try reader.withProvenPDF(scope.filename, in: scope.parent, at: scope.occurrence, expectedBase: scope.base) { pdf, proof in
                 let live = try readRecord(scope.companion, in: scope.parent)
-                let facts = try reader.fileFacts(live.record, at: scope.occurrence, proof: proof, pdf: pdf)
+                let facts = try reader.fileFacts(live.record, at: scope.occurrence, proof: proof, pdf: pdf,
+                                                 companionVersion: live.version)
                 return (facts, live.version)
             }
         } catch {
@@ -186,9 +187,7 @@ public struct CatalogueWriter: Sendable {
                        in scope: Scope, created: () -> Void) throws -> CatalogueReadDirectory.FileVersion {
         let parent = scope.parent
         try reader.validateScope(root: scope.root, parent: parent)
-        guard faccessat(parent.descriptor, scope.companion, W_OK, AT_EACCESS | AT_SYMLINK_NOFOLLOW) == 0 else {
-            throw Failure.io(operation: "check companion write access", code: errno)
-        }
+        try requireWritableCompanion(scope.companion, in: parent)
         let fd = try createExclusive(name, in: parent)
         created()
         defer { close(fd) }
@@ -209,6 +208,12 @@ public struct CatalogueWriter: Sendable {
         var info = stat()
         guard fstat(fd, &info) == 0 else { throw Failure.io(operation: "inspect staged companion", code: errno) }
         return .init(info)
+    }
+
+    func requireWritableCompanion(_ name: String, in parent: CatalogueReadDirectory.Entry) throws {
+        guard faccessat(parent.descriptor, name, W_OK, AT_EACCESS | AT_SYMLINK_NOFOLLOW) == 0 else {
+            throw Failure.io(operation: "check companion write access", code: errno)
+        }
     }
 
     func createExclusive(_ name: String, in parent: CatalogueReadDirectory.Entry) throws -> Int32 {

@@ -163,6 +163,32 @@ are kept. Network mounts are refused. Provider synchronization and multi-device 
 own verification. Reader Undo is a separate implementation step.
 
 
+## Repair after a Finder rename
+
+A same-folder PDF rename leaves the current companion detached until a confirmed repair succeeds.
+`CatalogueWriter.reassociateCompanion` takes a verified pair from before the rename and the observed
+new path. It requires the same granted root instance, the same physical PDF and independent proof
+of the same file ID, content generation and page count. The former PDF name must be vacant or an
+alternate spelling of that physical file. The former companion must still be the exact file and
+record in the verified pair. An occupied destination or an indistinguishable PDF copy gives an
+ambiguity result. An absent companion still reads as missing. Discovery never attaches an orphan
+by filename, timestamp, digest or embedded identity alone.
+
+Under the same local parent lock used for saves, the writer exclusively renames the unchanged
+JSON and verifies both paths before returning a receipt. Case-only repairs work where the filesystem
+supports that exclusive rename. Undo verifies the PDF and the exact companion from the receipt,
+then returns the companion to its former name. The PDF stays at its Finder-chosen name. Later
+corrections, another occupant or a changed scope can refuse Undo. Discovery and repair leave
+historical edit artifacts at their original names. Those artifacts use the original PDF name in
+their lookup key. An outside writer that races the repair can leave an uncertain outcome, in which
+case the writer reports both companion names for inspection and never overwrites either one.
+
+A cold launch with no surviving verified pair and a PDF moved to another folder remain unresolved
+by this operation. An embedded identifier can be shared by copies that later received different
+corrections. Reader integration supplies the offer, availability wording and user-facing undo
+controls through the catalogue UI.
+
+
 ## Journaled initial pair filing
 
 `CataloguePairFiler` files a new derivative in an adopted local root. The producer persists one operation

@@ -205,6 +205,10 @@ ALLOW=(
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueWriter.swift${SEP}guard fcopyfile(source.descriptor, fd, nil, copyfile_flags_t(COPYFILE_METADATA)) == 0 else {"
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueWriter.swift${SEP}guard renameatx_np(parent.descriptor, artifact, parent.descriptor, companion, UInt32(RENAME_SWAP)) == 0 else {"
 
+  # Reassociate or undo the name of a verified catalogue companion under the guarded parent lock.
+  # Exclusive rename cannot replace another entry and never names a PDF.
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueReassociation.swift${SEP}guard renameatx_np(parent.descriptor, source, parent.descriptor, target, UInt32(RENAME_EXCL)) == 0 else {"
+
   # New Processor output pair only (SPEC/catalogue.md). File the exact staged siblings and then
   # the journal under the same guarded parent lock. Each rename exclusively claims an empty name.
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CataloguePairFiler.swift${SEP}guard renameatx_np(parent, source, parent, target, UInt32(RENAME_EXCL)) == 0 else {"

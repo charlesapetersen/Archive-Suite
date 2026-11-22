@@ -42,6 +42,13 @@ struct CatalogueReadDirectory {
             changedSeconds = info.st_ctimespec.tv_sec
             changedNanoseconds = info.st_ctimespec.tv_nsec
         }
+
+        // A rename may advance ctime while leaving the file and its modification time intact.
+        func matchesAcrossRename(_ other: Self) -> Bool {
+            identity == other.identity && size == other.size && mode == other.mode && links == other.links
+                && flags == other.flags && modifiedSeconds == other.modifiedSeconds
+                && modifiedNanoseconds == other.modifiedNanoseconds
+        }
     }
 
     struct Entry {

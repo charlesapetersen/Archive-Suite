@@ -18002,3 +18002,14 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   scores and throughput figures held. Verified with local fixtures and the rebuilt board. No paid calls
   or bench cache used. The public copy awaits publication.
   <!-- /W46.p18-kind-attempt-cost -->
+
+- [x] **W49.reader-item-fields-rename — Reassociate a detached catalogue companion after a Finder rename [M · Tier-2]** · §Known limits are queued, accepted or asked (lane: reader) (uses: build) (blocked-on: W49.reader-item-fields-rename-owner-ok, W49.item-fields-home, W49.storage-writer) — Owner calls 24 and 32. Use the shared identity and guarded writer. Surface missing companions and ambiguous matches, and prove a renamed PDF or same-name replacement cannot inherit another file’s corrections. Bring any unresolved reassociation choices to the owner. SHIPPED 2026-11-22 (this commit).
+  The guarded writer repairs a previously verified pair after a same-folder Finder rename and returns an Undo receipt.
+  It verifies the physical PDF and embedded identity, preserves the exact companion bytes, and refuses copied PDFs,
+  changed or read-only companions and occupied names. Discovery keeps detached facts unavailable. Undo preserves later
+  changes, and a racy repair preserves both names when the writer cannot safely reverse it. Reader controls are part of
+  W49.storage-reader. Cold recovery without prior occurrence proof remains a design choice. The Tier-2 review and scratch
+  tests covered ordinary and case-only renames, substitutes with the same or different embedded IDs, competing names,
+  read-only input, stale Undo and a racing replacement. ArchiveCore, Reader and Notes unit suites and the write-surface
+  proof passed. No real corpus, paid calls or bench cache used.
+  <!-- /W49.reader-item-fields-rename -->

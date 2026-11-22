@@ -149,8 +149,10 @@ What it does not do, deliberately or not yet:
   value goes to the folder's `.archivesuite/item-fields.json` and is shown checked, page 2's value in the tooltip. Page 2
   is never rewritten. Any file under the folder the Reader was given can be corrected, the boundary its tag writes keep.
   The entry is keyed by file name, so renaming a file in Finder leaves its corrections behind and a later file given
-  that name takes them (queued: W49.reader-item-fields-rename, owner call 24). Names are compared composed, so two files whose
-  names differ only in Unicode composition, possible on some network volumes, share them (accepted: a platform fact: APFS and
+  that name takes them. The adopted catalogue has a guarded same-folder repair for a verified pair
+  (W49.reader-item-fields-rename). Reader controls and the switch to the catalogue are queued in W49.storage-reader.
+  Legacy names are compared composed, so two files whose names differ only in Unicode composition, possible on some
+  network volumes, share corrections (accepted: a platform fact: APFS and
   HFS+ take such names as one name, and Finder shows the two alike). A
   `Checked <Field>` tag set before the correction stays and speaks for page 2's value again once the correction is
   removed (accepted: SPEC/tag-format.md §Field checks: a check names the field and never holds the value).

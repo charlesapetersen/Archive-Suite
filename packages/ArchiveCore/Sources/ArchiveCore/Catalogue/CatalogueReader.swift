@@ -145,7 +145,8 @@ public struct CatalogueReader: Sendable {
                                 CatalogueAssociation.VerifiedPDF(occurrence: occurrence, fileID: $0.fileID,
                                                                  contentRevision: $0.contentRevision, pageCount: $0.pageCount)
                             }
-                            return try fileFacts(record, at: occurrence, proof: proof, pdf: pdf)
+                            return try fileFacts(record, at: occurrence, proof: proof, pdf: pdf,
+                                                 companionVersion: .init(companion.info))
                         }
                         return (.success(facts), observed?.fileID)
                     } catch {
@@ -159,12 +160,13 @@ public struct CatalogueReader: Sendable {
     }
 
     func fileFacts(_ record: CatalogueRecord, at occurrence: CatalogueAssociation.Occurrence,
-                   proof: CatalogueAssociation.VerifiedPDF?, pdf: CatalogueReadDirectory.Entry) throws -> ItemFacts.FileFacts {
+                   proof: CatalogueAssociation.VerifiedPDF?, pdf: CatalogueReadDirectory.Entry,
+                   companionVersion: CatalogueReadDirectory.FileVersion) throws -> ItemFacts.FileFacts {
         let pair = try CatalogueAssociation.pair(record, at: occurrence, verifiedBy: proof)
         let revision = ItemFacts.Revision(occurrence: occurrence, fileID: record.fileID, content: record.contentRevision,
                                           facts: record.revision, companionSHA256: Data(SHA256.hash(data: record.originalJSON)))
         return ItemFacts.FileFacts(pair: pair, revision: revision, rootIdentity: rootIdentity,
-                                   pdfVersion: .init(pdf.info))
+                                   pdfVersion: .init(pdf.info), companionVersion: companionVersion)
     }
 
     static func companionStatus(_ error: any Error) -> ItemFacts.Unavailable {

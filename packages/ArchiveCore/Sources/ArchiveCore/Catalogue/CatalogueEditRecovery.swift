@@ -35,8 +35,9 @@ extension CatalogueWriter {
                     let live: Result<ItemFacts.FileFacts, ItemFacts.Unavailable>
                     do {
                         let name = CatalogueRecord.companionFilename(forPDFFilename: filename)
-                        let record = try readRecord(name, in: parent).record
-                        live = .success(try reader.fileFacts(record, at: occurrence, proof: proof, pdf: pdf))
+                        let companion = try readRecord(name, in: parent)
+                        live = .success(try reader.fileFacts(companion.record, at: occurrence, proof: proof, pdf: pdf,
+                                                            companionVersion: companion.version))
                     } catch {
                         live = .failure(CatalogueReader.companionStatus(error))
                     }
