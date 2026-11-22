@@ -33,17 +33,33 @@ struct ClaudeStreamOutput {
     /// The final `result` event: the envelope `--output-format json` prints (`subtype`, `is_error`, `result`,
     /// `total_cost_usd`).
     var envelope: [String: Any]?
-    /// The call's last `rate_limit_event`, nil when the CLI printed none (an older CLI, or an API-key login).
+    /// The latest reading of each window, nil when the CLI printed no meter (an older CLI, or an API-key login).
     var meter: PlanMeterReading?
+    /// Plain-text diagnostics, distinct from event fields that can contain incidental numbers like 429.
+    var diagnostics: [String] = []
 
     var notionalUSD: Double? { (envelope?["total_cost_usd"] as? NSNumber)?.doubleValue }
 
     static func parse(_ stdout: String) -> ClaudeStreamOutput {
         var out = ClaudeStreamOutput()
         for line in stdout.split(whereSeparator: \.isNewline) {
-            guard let ev = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any] else { continue }
+            guard let ev = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any] else {
+                out.diagnostics.append(String(line))
+                continue
+            }
             switch ev["type"] as? String {
-            case "rate_limit_event": if let m = meter(ev) { out.meter = m }
+            case "rate_limit_event":
+                if var reading = meter(ev) {
+                    if reading.fiveHour == nil {
+                        reading.fiveHour = out.meter?.fiveHour
+                        reading.fiveHourResetsAt = out.meter?.fiveHourResetsAt
+                    }
+                    if reading.sevenDay == nil {
+                        reading.sevenDay = out.meter?.sevenDay
+                        reading.sevenDayResetsAt = out.meter?.sevenDayResetsAt
+                    }
+                    out.meter = reading
+                }
             case "result": out.envelope = ev
             default: break
             }
@@ -51,7 +67,7 @@ struct ClaudeStreamOutput {
         // A CLI that printed one JSON envelope instead of the stream.
         if out.envelope == nil,
            let whole = (try? JSONSerialization.jsonObject(with: Data(stdout.utf8))) as? [String: Any],
-           whole["result"] != nil {
+           whole["type"] == nil, whole["result"] != nil {
             out.envelope = whole
         }
         return out
@@ -291,6 +307,34 @@ struct PlanCheckPrompt: Equatable, Sendable {
 /// (the user is asked whether to go on), and the five-hour meter at 90% (the run pauses and says when the window
 /// resets). Every `claude` window call passes through `beforeCall` and `record`.
 actor PlanRunGate {
+    /// Reading carries the pause across page clients and resumes at the reset. Segmentation ends its stage
+    /// at the same threshold, so it keeps its run-scoped stop and calibration below.
+    actor Reading {
+        private var pause: UsageWindowPause.Wait?
+
+        func pending() -> UsageWindowPause.Wait? {
+            if let pause, pause.until <= Date() { self.pause = nil }
+            return pause
+        }
+
+        func record(_ meter: PlanMeterReading?, pacing: UsageWindowPacing) {
+            guard let meter, let percent = PlanRunGate.pausePercent(for: meter) else { return }
+            let now = Date()
+            // A slow call can finish after the window it measured has already reset.
+            if let reset = meter.fiveHourResetsAt, reset <= now { return }
+            let until = pacing.resumeAt(reset: meter.fiveHourResetsAt, now: now)
+            // Calls finish out of order. A lower or earlier reading cannot reopen a paused window.
+            if let pause, pause.until >= until { return }
+            pause = UsageWindowPause.Wait(until: until, fiveHourPercent: percent)
+        }
+    }
+
+    private static func pausePercent(for meter: PlanMeterReading) -> Int? {
+        guard let fraction = meter.fiveHour, fraction.isFinite, (0...1).contains(fraction) else { return nil }
+        let percent = PlanCalibration.points(fraction)
+        return percent >= PlanCalibration.pausePercent ? percent : nil
+    }
+
     private let pagesPerCall: Int
     private let folderNotionalUSD: Double
     /// A ratio is stored, so the estimate was shown up front and there is no pause to measure.
@@ -337,10 +381,10 @@ actor PlanRunGate {
         }
         // The highest reading, not the latest: calls finish out of order, so the latest can be an older figure.
         if let m = records.compactMap(\.meter).filter({ $0.fiveHour != nil }).max(by: { $0.fiveHour! < $1.fiveHour! }),
-           let f = m.fiveHour, PlanCalibration.points(f) >= PlanCalibration.pausePercent {
+           let percent = Self.pausePercent(for: m) {
             let e = WindowTransportError.paused(
                 reset: m.fiveHourResetsAt,
-                message: "Your Claude plan's five-hour window is at \(PlanCalibration.points(f))%, so segmentation "
+                message: "Your Claude plan's five-hour window is at \(percent)%, so segmentation "
                     + "paused before it runs out.")
             stopped = e
             throw e

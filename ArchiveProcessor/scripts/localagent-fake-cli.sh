@@ -3,7 +3,7 @@
 # the LocalAgent tests (scripts/localagent-mechanism-test.swift and the in-app LocalAgentTestDriver).
 # Same spirit as the FileRelay stand-in: no network, no key, no cost, no real model.
 #
-# It IGNORES all args (the real CLI flags), DRAINS stdin (the prompt — so the caller's stdin write +
+# It drains stdin (the prompt — so the caller's stdin write +
 # close completes and the child sees EOF, exactly like a real CLI), and emits a canned response chosen
 # by $LOCALAGENT_FAKE_MODE:
 #   ok         (default) success JSON; .result is a valid OCRPrompt-format transcription        exit 0
@@ -22,6 +22,8 @@
 #   timeout    sleeps well past any test timeout (tests the client's SIGTERM/SIGKILL path)      exit 0
 #              (with $LOCALAGENT_FAKE_PID_DIR set, it writes its pid there and execs the sleep, so a test
 #              can check the child itself is gone after a cancel)
+#   readmeter  a streamed page result with 89%, then 90%, then 0%, using the reset set by the test.
+#              Requires the real stream flags. Each invocation creates a PID marker in the count dir.
 #   stream     `--output-format stream-json --verbose` for a segmentation window: a rate_limit_event, then a
 #              result event whose .result answers every page-NNNN.jpg in the working directory (W36)  exit 0
 #              The five-hour and weekly meters are whole percents kept in $LOCALAGENT_FAKE_METER_DIR
@@ -86,6 +88,26 @@ case "$mode" in
     fi
     sleep 30
     printf '%s\n' '{"result":"too late"}'
+    exit 0 ;;
+  readmeter)
+    case " $* " in
+      *" --output-format stream-json --verbose "*) ;;
+      *) echo "expected stream-json and verbose" >&2; exit 3 ;;
+    esac
+    dir="${LOCALAGENT_FAKE_COUNT_DIR:?}"
+    touch "$dir/$$"
+    n=$(find "$dir" -type f | wc -l)
+    case "$((n))" in
+      1) five=0.89 ;;
+      2) five=0.90 ;;
+      *) five=0 ;;
+    esac
+    printf '%s\n' '{"type":"system","subtype":"init"}'
+    printf '{"type":"rate_limit_event","rate_limit_info":{"status":"allowed","unifiedWindows":{"five_hour":{"utilization":%s,"resetsAt":%s}}}}\n' \
+        "$five" "${LOCALAGENT_FAKE_RESET:?}"
+    printf '%s\n' '{"type":"rate_limit_event","rate_limit_info":{"unifiedWindows":{"seven_day":{"utilization":0.5}}}}'
+    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"text","text":"not the final result"}]}}'
+    printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"result":"[document_start]\n[rotate_0]\nFAKE-CLI-OCR-TOKEN"}'
     exit 0 ;;
   stream|streamnometer)
     nums=$(ls page-*.jpg 2>/dev/null | sed -E 's/^page-0*([0-9]+)\.jpg$/\1/' | sort -n)

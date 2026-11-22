@@ -333,9 +333,9 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   message forms read are Claude Code's ("resets 3pm", "resets in 2h", "resets Nov 24, 9am", "usage limit reached|epoch");
   a new wording the CLI adopts is matched as a limit only if it says "usage limit", "hit your limit", "limit reached",
   "session limit", "rate limit" or 429 (`LocalAgentWindowTransport.isUsageLimit`), else the page fails as before. (accepted: the plan route is free by design and never falls back to a key; Stop ends the wait).
-- **Reading does not stop at 90% of the five-hour window.** The segmentation windows read the account's meter
-  (`stream-json`, `PlanRunGate`) and pause before the window runs out; the page reader uses `--output-format json`,
-  which prints no meter, so a batch reads until the limit itself and then waits. (queued: W49.proc-plan-read-meter).
+- **The early pause depends on the CLI's meter.** When the CLI streams a five-hour reading at 90% or higher,
+  the page that reported it can finish. New reads wait for the reset and then resume on the plan. A CLI that
+  supplies no five-hour meter can still reach the hard limit before the app knows to wait (W49.proc-plan-read-meter).
 - **Live Capture waits too.** A captured page at the limit waits inside its OCR task; the capture window shows the
   pause (`PlanPauseCaption`), and the segment is filed when its pages are read. (accepted: by design, as for any plan read at the limit).
 - **Throughput is from three synthetic pages** (`scripts/e2e-fixtures`, 2026-11-19): 5.7–8.5 s a page one at a time,

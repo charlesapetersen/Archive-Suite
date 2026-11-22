@@ -46,14 +46,10 @@ struct LocalAgentClient: Sendable {
     /// instance, so the two backends never share slots.
     private static let concurrencyLimiter = RequestLimiter(limit: 2)
 
-    /// When a CLI reports a usage-window limit with a parseable reset time, the moment it frees up — so a
-    /// bulk OCR run can pace to the subscription window instead of hammering it, and the UI can say when
-    /// it recovers. The CLI-side analog of `NetworkSession.lastRateLimitedAt` (subprocess calls bypass
-    /// that HTTP path's `Retry-After` handling). Write-mostly; the OCR loop consumes it in W13.cli-4.
-    /// `nil` ⇒ no reset time is currently known.
-    nonisolated(unsafe) static var lastUsageWindowResetAt: Date?
+    /// App-wide, like the CLI's signed-in plan. PageReader construction can happen separately for each page.
+    private static let readingGate = PlanRunGate.Reading()
 
-    /// How a page waits out the plan's usage limit (W41.app-claude-plan-reading).
+    /// How a page waits for the plan's usage window.
     let pacing: UsageWindowPacing
 
     /// The pages waiting for the plan's usage window, app-wide, for the status line (`UsageWindowPause`).
@@ -102,8 +98,8 @@ struct LocalAgentClient: Sendable {
                                          customPrompt: customPrompt)
         let prompt = Self.augmentWithImagePaths(basePrompt, pagePath: pageURL.path, previousPath: prevPath)
 
-        let run = await Self.invokePaced(binary: binary, tool: config.tool, modelOverride: config.modelOverride,
-                                         prompt: prompt, timeout: Self.ocrTimeout, pacing: pacing)
+        let run = await Self.invoke(binary: binary, tool: config.tool, modelOverride: config.modelOverride,
+                                    prompt: prompt, timeout: Self.ocrTimeout, pacing: pacing)
 
         switch run {
         case .failure(let code, let message):
@@ -125,8 +121,8 @@ struct LocalAgentClient: Sendable {
         guard let binary = Self.resolveBinaryPath(tool: config.tool, override: config.binaryPath) else {
             throw OCRError.networkError("The \(config.tool.displayName) CLI was not found. Install it and sign in.")
         }
-        let run = await Self.invokePaced(binary: binary, tool: config.tool, modelOverride: config.modelOverride,
-                                         prompt: prompt, timeout: Self.textTimeout, pacing: pacing)
+        let run = await Self.invoke(binary: binary, tool: config.tool, modelOverride: config.modelOverride,
+                                    prompt: prompt, timeout: Self.textTimeout, pacing: pacing)
         switch run {
         case .success(let text):
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -207,57 +203,55 @@ struct LocalAgentClient: Sendable {
         case usageLimited(reset: Date?, message: String)
     }
 
-    /// `invoke`, but a `claude` call that meets the plan's usage limit waits for the window to reset and tries the plan
-    /// again, as long as it takes (W41.app-claude-plan-reading): a long batch pauses and resumes by itself, and the
-    /// page is never sent anywhere else, so nothing is billed to a key behind the user's back. Cancelling the run
-    /// (Stop) ends the wait at once. `gemini`/`codex` are unverified adapters and keep failing the page, as before.
-    static func invokePaced(binary: String, tool: LocalAgentTool, modelOverride: String?, prompt: String,
-                            timeout: TimeInterval, pacing: UsageWindowPacing) async -> InvokeOutcome {
+    /// Reading waits for the five-hour meter or a hard plan limit, then retries on the plan. The probe
+    /// has no pacing so Settings can report login or CLI errors immediately.
+    private static func invoke(binary: String, tool: LocalAgentTool, modelOverride: String?,
+                               prompt: String, timeout: TimeInterval, pacing: UsageWindowPacing? = nil) async -> InvokeOutcome {
+        let cancelled = InvokeOutcome.failure(code: "cli_cancelled", message: "The \(tool.displayName) CLI request was cancelled.")
+        let planPacing = tool == .claude ? pacing : nil
         while true {
-            let run = await invoke(binary: binary, tool: tool, modelOverride: modelOverride, prompt: prompt,
-                                   timeout: timeout)
-            guard tool == .claude, case .usageLimited(let reset, _) = run else { return run }
-            let until = pacing.resumeAt(reset: reset, now: Date())
-            let id = UUID()
-            usageWindowPause.begin(id, until: until)
-            let waited = await pacing.wait(until: until)
-            usageWindowPause.end(id)
-            guard waited else {
-                return .failure(code: "cli_cancelled", message: "The \(tool.displayName) CLI request was cancelled.")
+            do {
+                try await concurrencyLimiter.acquire()
+            } catch {
+                return cancelled
             }
+            // Consult the meter after the limiter grants a slot so queued pages see the latest completed call.
+            let pause: UsageWindowPause.Wait? = if planPacing != nil { await readingGate.pending() } else { nil }
+            if Task.isCancelled {
+                await concurrencyLimiter.release()
+                return cancelled
+            }
+            if let pacing = planPacing, let pause {
+                await concurrencyLimiter.release()
+                guard await waitForPlan(pause, pacing: pacing) else { return cancelled }
+                continue
+            }
+            let run = await spawnAndClassify(binary: binary, tool: tool, modelOverride: modelOverride, prompt: prompt,
+                                             timeout: timeout, pacing: planPacing)
+            await concurrencyLimiter.release()
+
+            guard let pacing = planPacing, case .usageLimited(let reset, _) = run else { return run }
+            let until = pacing.resumeAt(reset: reset, now: Date())
+            guard await waitForPlan(.init(until: until), pacing: pacing) else { return cancelled }
         }
     }
 
-    private static func invoke(binary: String, tool: LocalAgentTool, modelOverride: String?,
-                               prompt: String, timeout: TimeInterval) async -> InvokeOutcome {
-        // Dedicated low ceiling — the subprocess path bypasses NetworkSession's HTTP limiter, so pace it
-        // here so a wide OCR task group never spawns a swarm of CLI children against a personal
-        // subscription. `spawnAndClassify` never throws, so a plain acquire → body → release is balanced
-        // (`acquire()` throws on cancellation, so a queued cancelled call never spawns a child process;
-        // `spawnAndClassify` itself never throws, keeping every granted slot balanced).
-        do {
-            try await concurrencyLimiter.acquire()
-        } catch {
-            return .failure(code: "cli_cancelled", message: "The \(tool.displayName) CLI request was cancelled.")
-        }
-        // Cancellation can race with the limiter granting this waiter. Return the granted slot before
-        // declining to spawn, matching NetworkSession's post-acquire cancellation check.
-        if Task.isCancelled {
-            await concurrencyLimiter.release()
-            return .failure(code: "cli_cancelled", message: "The \(tool.displayName) CLI request was cancelled.")
-        }
-        let outcome = await spawnAndClassify(binary: binary, tool: tool, modelOverride: modelOverride,
-                                             prompt: prompt, timeout: timeout)
-        await concurrencyLimiter.release()
-        return outcome
+    private static func waitForPlan(_ pause: UsageWindowPause.Wait, pacing: UsageWindowPacing) async -> Bool {
+        let id = UUID()
+        usageWindowPause.begin(id, wait: pause)
+        defer { usageWindowPause.end(id) }
+        return await pacing.wait(until: pause.until)
     }
 
     /// The actual spawn + classify, run while holding a `concurrencyLimiter` slot.
     private static func spawnAndClassify(binary: String, tool: LocalAgentTool, modelOverride: String?,
-                                         prompt: String, timeout: TimeInterval) async -> InvokeOutcome {
+                                         prompt: String, timeout: TimeInterval, pacing: UsageWindowPacing?) async -> InvokeOutcome {
         let args = cliArguments(tool: tool, modelOverride: modelOverride)
         let cli = await runAsync(binaryPath: binary, args: args, stdinText: prompt, timeout: timeout,
                                  unsetEnvironment: credentialVariables(for: tool))
+
+        let stream = tool == .claude ? ClaudeStreamOutput.parse(cli.stdout) : nil
+        if let pacing { await readingGate.record(stream?.meter, pacing: pacing) }
 
         if cli.cancelled {
             return .failure(code: "cli_cancelled", message: "The \(tool.displayName) CLI request was cancelled.")
@@ -268,47 +262,41 @@ struct LocalAgentClient: Sendable {
         if cli.spawnFailed {
             return .failure(code: "cli_spawn_failed", message: "Could not launch the \(tool.displayName) CLI.")
         }
-        if tool == .claude { return classifyClaude(cli, now: Date()) }
+        if let stream { return classifyClaude(cli, stream: stream, now: Date()) }
         if cli.exitCode != 0 {
             let code = exitErrorCode(stderr: cli.stderr, exitCode: cli.exitCode)
-            // Record a parseable usage-window reset so a bulk run can pace to it (W13.cli-4) and the
-            // message can say when the subscription frees up.
-            if code == "cli_rate_limited" {
-                lastUsageWindowResetAt = parseUsageWindowReset(fromStderr: cli.stderr, now: Date())
-            }
             return .failure(code: code,
                             message: friendlyExitMessage(tool: tool, stderr: cli.stderr, exitCode: cli.exitCode))
         }
-        guard let text = extractText(tool: tool, stdout: cli.stdout), !text.isEmpty else {
+        guard let text = extractText(stdout: cli.stdout), !text.isEmpty else {
             return .failure(code: "cli_bad_response",
                             message: "The \(tool.displayName) CLI returned an unreadable response.")
         }
         return .success(text)
     }
 
-    /// A finished `claude -p --output-format json` call. The CLI reports a usage limit in its JSON envelope on stdout
-    /// (`is_error`, and the reason in `result`), not only on stderr, and can do so with exit 0, so the envelope decides:
-    /// success only when it is not an error and has a result; otherwise its `result`, or all the output when there is
-    /// no envelope, says why (as the segmentation windows read it, `LocalAgentWindowTransport.classify`). A usage
-    /// limit is matched narrowly (`LocalAgentWindowTransport.isUsageLimit`), since the page then waits for it.
-    static func classifyClaude(_ cli: CLIRun, now: Date) -> InvokeOutcome {
-        let envelope = (try? JSONSerialization.jsonObject(with: Data(cli.stdout.utf8))) as? [String: Any]
+    /// The final event decides whether there is usable text. Usage-limit reasons can appear in the result
+    /// or in stderr, including when the CLI exits 0.
+    static func classifyClaude(_ cli: CLIRun, stream: ClaudeStreamOutput, now: Date) -> InvokeOutcome {
+        let envelope = stream.envelope
         let isError = envelope?["is_error"] as? Bool == true
         if cli.exitCode == 0, !isError, let text = envelope?["result"] as? String, !text.isEmpty {
             return .success(text)
         }
-        // When the envelope parsed, only its `result` (or stderr) says why: its other fields (a duration of 429 ms) must
-        // not read as a limit.
-        let reason = envelope != nil
-            ? ((envelope?["result"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? cli.stderr)
-            : (cli.stderr + "\n" + cli.stdout)
+        // Only diagnostic fields can describe an error. Other event fields can contain an incidental 429.
+        let reasons = [
+            envelope?["result"] as? String ?? "",
+            (envelope?["errors"] as? [String] ?? []).joined(separator: "\n"),
+            cli.stderr,
+        ] + (envelope == nil ? stream.diagnostics : [])
+        let reason = reasons.first { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? ""
         let tool = LocalAgentTool.claude
         if exitErrorCode(stderr: reason, exitCode: cli.exitCode) == "cli_not_logged_in" {
             return .failure(code: "cli_not_logged_in", message: friendlyExitMessage(tool: tool, stderr: reason, exitCode: 1))
         }
-        if LocalAgentWindowTransport.isUsageLimit(reason) {
-            let reset = pacingReset(reason, now: now)
-            lastUsageWindowResetAt = reset
+        let limitReasons = reasons.filter(LocalAgentWindowTransport.isUsageLimit)
+        if !limitReasons.isEmpty {
+            let reset = limitReasons.lazy.compactMap { pacingReset($0, now: now) }.first
             let when = reset.map { " It resets \(usageWindowHint(for: $0, now: now))." } ?? ""
             return .usageLimited(reset: reset, message: "Your Claude plan's usage limit is reached.\(when) Reading "
                                  + "waits for it and goes on with the plan; nothing is sent to a key.")
@@ -343,7 +331,7 @@ struct LocalAgentClient: Sendable {
     private static func cliArguments(tool: LocalAgentTool, modelOverride: String?) -> [String] {
         switch tool {
         case .claude:
-            var a = ["-p", "--output-format", "json", "--allowedTools", "Read",
+            var a = ["-p", "--output-format", "stream-json", "--verbose", "--allowedTools", "Read",
                      "--no-session-persistence", "--append-system-prompt", systemContract]
             if let m = modelOverride, !m.isEmpty { a += ["--model", m] }
             return a
@@ -360,25 +348,14 @@ struct LocalAgentClient: Sendable {
         }
     }
 
-    /// Pull the model's text out of the CLI's JSON envelope. `claude -p --output-format json` puts it
-    /// in `.result`; malformed/non-JSON Claude output must fail instead of being mistaken for OCR text.
-    /// The unverified Gemini/Codex adapters retain a plain-text compatibility fallback until their real
-    /// CLI envelope contracts are validated.
-    private static func extractText(tool: LocalAgentTool, stdout: String) -> String? {
-        guard let data = stdout.data(using: .utf8) else { return nil }
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            switch tool {
-            case .claude:
-                return json["result"] as? String
-            case .gemini, .codex:
-                // VERIFY: accept the common envelope shapes seen across CLIs.
-                return (json["result"] as? String)
-                    ?? (json["response"] as? String)
-                    ?? (json["text"] as? String)
-                    ?? (json["output"] as? String)
-            }
+    /// The unverified Gemini/Codex adapters retain a plain-text compatibility fallback.
+    private static func extractText(stdout: String) -> String? {
+        if let json = try? JSONSerialization.jsonObject(with: Data(stdout.utf8)) as? [String: Any] {
+            return (json["result"] as? String)
+                ?? (json["response"] as? String)
+                ?? (json["text"] as? String)
+                ?? (json["output"] as? String)
         }
-        if tool == .claude { return nil }
         // Gemini/Codex CLI contracts are still marked VERIFY. Preserve their compatibility with versions
         // that emit plain text despite the requested JSON flag, but never apply that fallback to Claude.
         let trimmed = stdout.trimmingCharacters(in: .whitespacesAndNewlines)

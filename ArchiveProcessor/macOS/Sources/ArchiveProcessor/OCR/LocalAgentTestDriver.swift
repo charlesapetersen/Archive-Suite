@@ -94,30 +94,33 @@ enum LocalAgentTestDriver {
             func run(_ out: String, _ err: String = "", exit: Int32 = 1) -> LocalAgentClient.CLIRun {
                 .init(exitCode: exit, stdout: out, stderr: err, timedOut: false, spawnFailed: false)
             }
-            if case .usageLimited(let reset, let message) = LocalAgentClient.classifyClaude(
-                run(#"{"type":"result","is_error":true,"result":"You've hit your limit · resets in 2s"}"#), now: now) {
+            func classify(_ cli: LocalAgentClient.CLIRun) -> LocalAgentClient.InvokeOutcome {
+                LocalAgentClient.classifyClaude(cli, stream: ClaudeStreamOutput.parse(cli.stdout), now: now)
+            }
+            if case .usageLimited(let reset, let message) = classify(
+                run(#"{"type":"result","is_error":true,"result":"You've hit your limit · resets in 2s"}"#)) {
                 check("classify: the envelope's limit is a usage limit, reset in 2 s",
                       reset.map { abs($0.timeIntervalSince(now) - 2) < 0.5 } == true)
                 check("classify: the limit message says nothing goes to a key", message.contains("nothing is sent to a key"))
             } else { check("classify: the envelope's limit is a usage limit", false) }
-            if case .usageLimited(let reset, _) = LocalAgentClient.classifyClaude(
-                run(#"{"is_error":true,"result":"Claude AI usage limit reached|1800000000"}"#), now: now) {
+            if case .usageLimited(let reset, _) = classify(
+                run(#"{"is_error":true,"result":"Claude AI usage limit reached|1800000000"}"#)) {
                 check("classify: the epoch reset is read", reset == Date(timeIntervalSince1970: 1_800_000_000))
             } else { check("classify: the epoch form is a usage limit", false) }
-            if case .usageLimited(let reset, _) = LocalAgentClient.classifyClaude(
-                run("", "Error: usage limit reached. Please try again later."), now: now) {
+            if case .usageLimited(let reset, _) = classify(
+                run("", "Error: usage limit reached. Please try again later.")) {
                 check("classify: a stderr limit with no reset has none", reset == nil)
             } else { check("classify: a stderr limit is a usage limit", false) }
             check("classify: an error envelope with exit 0 is no text",
-                  LocalAgentClient.classifyClaude(run(#"{"is_error":true,"result":"An internal error occurred while generating"}"#,
-                                                      exit: 0), now: now)
+                  classify(run(#"{"is_error":true,"result":"An internal error occurred while generating"}"#,
+                                                      exit: 0))
                   == .failure(code: "cli_error", message: "The Claude Code CLI reported an error: An internal error occurred while generating"))
-            if case .failure(let code, _) = LocalAgentClient.classifyClaude(run("", "could not separate the pages", exit: 2), now: now) {
+            if case .failure(let code, _) = classify(run("", "could not separate the pages", exit: 2)) {
                 check("classify: 'separate' is no usage limit for claude", code == "cli_exit_2")
             } else { check("classify: 'separate' is a failure", false) }
             // Review fixes: only the envelope's result says why; the reset forms a batch sleeps to.
-            if case .usageLimited = LocalAgentClient.classifyClaude(
-                run(#"{"type":"result","subtype":"error_max_turns","is_error":true,"duration_ms":429,"result":""}"#), now: now) {
+            if case .usageLimited = classify(
+                run(#"{"type":"result","subtype":"error_max_turns","is_error":true,"duration_ms":429,"result":""}"#)) {
                 check("classify: a 429 among the envelope's other fields is no limit", false)
             } else { check("classify: a 429 among the envelope's other fields is no limit", true) }
             var cal = Calendar(identifier: .gregorian)
@@ -137,7 +140,19 @@ enum LocalAgentTestDriver {
             check("pacing reset: relative", LocalAgentClient.pacingReset("resets in 2h", now: at301, calendar: cal)
                   == at301.addingTimeInterval(7200))
             check("classify: a good envelope is its result",
-                  LocalAgentClient.classifyClaude(run(#"{"is_error":false,"result":"text"}"#, exit: 0), now: now) == .success("text"))
+                  classify(run(#"{"is_error":false,"result":"text"}"#, exit: 0)) == .success("text"))
+
+            check("classify: an incomplete stream cannot pass model text or incidentally hit a rate limit",
+                  classify(run(#"{"type":"assistant","duration_ms":429,"result":"unfinished text"}"#, exit: 0))
+                  == .failure(code: "cli_bad_response", message: "The Claude Code CLI returned an unreadable response."))
+
+            if case .usageLimited(let reset, _) = classify(run("""
+                {"type":"system","subtype":"init"}
+                {"type":"result","is_error":true,"errors":["Claude AI usage limit reached|1800000000"]}
+                """, exit: 0)) {
+                check("classify: a terminal streamed error carries its limit and reset",
+                      reset == Date(timeIntervalSince1970: 1_800_000_000))
+            } else { check("classify: a terminal streamed error carries its limit and reset", false) }
 
             // 5d. A page that meets the limit waits for the reset and is read on the plan again; the pause is shown while
             // it waits and gone after.
@@ -194,7 +209,7 @@ enum LocalAgentTestDriver {
             let box = UsageWindowPause()
             check("pause: nothing to say when no page waits", box.message() == nil)
             let id = UUID()
-            box.begin(id, until: Date().addingTimeInterval(3 * 86_400))
+            box.begin(id, wait: .init(until: Date().addingTimeInterval(3 * 86_400)))
             let words = box.message() ?? ""
             check("pause: says paused, the day, and no key", words.hasPrefix("Paused:") && words.contains(" on ")
                   && words.contains("nothing is sent to a key"))
@@ -221,6 +236,41 @@ enum LocalAgentTestDriver {
             check("the fake CLI sees the variables when nothing strips them", codexKeys?.hasPrefix("ENV_KEYS=ANTHROPIC_API_KEY") == true)
             unsetenv("ANTHROPIC_API_KEY")
             unsetenv("ANTHROPIC_AUTH_TOKEN")
+
+            // At 89% a second page can start. At 90% its result is kept and the next page waits.
+            let meterDir = root.appendingPathComponent("meter-calls", isDirectory: true)
+            try? fm.createDirectory(at: meterDir, withIntermediateDirectories: true)
+            setenv("LOCALAGENT_FAKE_COUNT_DIR", meterDir.path, 1)
+            setenv("LOCALAGENT_FAKE_MODE", "readmeter", 1)
+            let reset = Date(timeIntervalSince1970: ceil(Date().timeIntervalSince1970) + 3)
+            setenv("LOCALAGENT_FAKE_RESET", String(Int(reset.timeIntervalSince1970)), 1)
+            func meteredClient() -> LocalAgentClient {
+                LocalAgentClient(config: LocalAgentConfig(tool: .claude, binaryPath: fakeCLI), pacing: fast)
+            }
+            func meterCalls() -> Int { (try? fm.contentsOfDirectory(atPath: meterDir.path).count) ?? 0 }
+            let below = try? await meteredClient().ocr(imageURL: imageURL)
+            let reached = try? await meteredClient().ocr(imageURL: imageURL)
+            check("meter: 89% admits the next page and the page that sees 90% keeps its final result",
+                  below?.text == "FAKE-CLI-OCR-TOKEN" && reached?.text == below?.text && meterCalls() == 2
+                    && LocalAgentClient.usageWindowPause.until == nil)
+            let cancelledRead = Task { try? await meteredClient().ocr(imageURL: imageURL) }
+            for _ in 0..<50 where LocalAgentClient.usageWindowPause.until == nil {
+                try? await Task.sleep(nanoseconds: 20_000_000)
+            }
+            let meterCaption = LocalAgentClient.usageWindowPause.message() ?? ""
+            check("meter: the next client shows the 90% pause and sends no call",
+                  meterCalls() == 2 && LocalAgentClient.usageWindowPause.until == reset && meterCaption.contains("at 90%")
+                    && !meterCaption.contains("limit is reached"))
+            cancelledRead.cancel()
+            let cancelledResult = await cancelledRead.value
+            check("meter: Stop ends the waiting page and clears the caption",
+                  cancelledResult?.errorCode == "cli_cancelled" && LocalAgentClient.usageWindowPause.until == nil)
+            let afterReset = try? await meteredClient().ocr(imageURL: imageURL)
+            check("meter: a new page still waits until the reset, then reads on the same plan",
+                  afterReset?.text == "FAKE-CLI-OCR-TOKEN" && Date() >= reset && meterCalls() == 3
+                    && LocalAgentClient.usageWindowPause.until == nil)
+            unsetenv("LOCALAGENT_FAKE_COUNT_DIR")
+            unsetenv("LOCALAGENT_FAKE_RESET")
 
             unsetenv("LOCALAGENT_FAKE_MODE")
 

@@ -1,11 +1,9 @@
 import Foundation
 
-// MARK: - Reading through the Claude plan: waiting out its usage limit (W41.app-claude-plan-reading)
+// MARK: - Reading through the Claude plan: waiting for its usage window (W49.proc-plan-read-meter)
 //
-// The plan's five-hour and weekly windows are a limit, not a price. When `claude -p` says the limit is reached, the
-// page waits for the reset the CLI printed and is read on the plan again (`LocalAgentClient.invokePaced`); a long
-// batch therefore pauses and resumes by itself, and nothing falls back to a billed key. The segmentation windows stop
-// the run instead (`PlanRunGate`), because a stage that has not started can be resumed later as a whole.
+// A page waits for the reset when the five-hour meter reaches 90% or the CLI reports a hard limit.
+// Reading resumes on the plan, using the same pause threshold as the segmentation windows (PlanRunGate).
 
 /// When a page waiting for the plan's window tries again.
 struct UsageWindowPacing: Sendable {
@@ -43,25 +41,33 @@ struct UsageWindowPacing: Sendable {
 /// The pages now waiting for the plan's window, app-wide, so the status line can say the run is paused and when it
 /// goes on. Each waiting call registers itself; the latest of their resume times is the one shown.
 final class UsageWindowPause: @unchecked Sendable {
-    private let lock = NSLock()
-    private var waits: [UUID: Date] = [:]
+    struct Wait: Sendable {
+        let until: Date
+        var fiveHourPercent: Int? = nil
+    }
 
-    func begin(_ id: UUID, until: Date) {
-        lock.lock(); waits[id] = until; lock.unlock()
+    private let lock = NSLock()
+    private var waits: [UUID: Wait] = [:]
+
+    func begin(_ id: UUID, wait: Wait) {
+        lock.lock(); waits[id] = wait; lock.unlock()
     }
 
     func end(_ id: UUID) {
         lock.lock(); waits[id] = nil; lock.unlock()
     }
 
-    var until: Date? {
+    var until: Date? { latest?.until }
+
+    private var latest: Wait? {
         lock.lock(); defer { lock.unlock() }
-        return waits.values.max()
+        return waits.values.max { $0.until < $1.until }
     }
 
     /// The status line while paused, nil when no page is waiting.
     func message(now: Date = Date(), calendar: Calendar = .current) -> String? {
-        guard let until else { return nil }
+        guard let wait = latest else { return nil }
+        let until = wait.until
         var when = LocalAgentClient.usageWindowHint(for: until, now: now, calendar: calendar)
         // The weekly window can reset days ahead: then say the day as well.
         if !calendar.isDate(until, inSameDayAs: now) {
@@ -72,7 +78,9 @@ final class UsageWindowPause: @unchecked Sendable {
             day.dateFormat = "EEE d MMM"
             when = "on \(day.string(from: until)) \(when)"
         }
-        return "Paused: your Claude plan's usage limit is reached. Reading goes on with the plan \(when); "
+        let reason = wait.fiveHourPercent.map { "your Claude plan's five-hour window is at \($0)%." }
+            ?? "your Claude plan's usage limit is reached."
+        return "Paused: \(reason) Reading goes on with the plan \(when); "
             + "nothing is sent to a key. Stop keeps the run, to resume later."
     }
 }

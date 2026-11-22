@@ -77,8 +77,8 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
   placeholders); `runAsync` signals exit via `terminationHandler` (`waitUntilExit()` on GCD missed exits) and kills
   its child on cancel. Precedence localAgent > gateway > direct; concurrency 1–2
   + usage-window pacing; the header/history keep the model override or `CLI default` and never price the
-  direct-provider fallback. At the plan's usage limit a
-  page waits and reads on the plan again, never a key (`invokePaced`). $0 harness: `scripts/test-localagent.sh`, `[3.5]` in `scripts/test-smoke.sh`.
+  direct-provider fallback. At 90% of the five-hour meter or at a hard usage limit, new Claude reads wait
+  for the reset and resume on the plan. $0 harness: `scripts/test-localagent.sh`.
 - **Requirements:** Low/High thinking where supported; a live cost estimate before processing, standard vs batch
   side by side, **reflecting the batch discount** (a batch total only with batch on, a direct provider, no pre-OCRed input; Vision / Local Agent / an unpriced gateway show a note, never a
   dollar figure); batch toggle; parallel workers. Input: drag-and-drop or open panel; JPEG, PNG, TIFF, HEIC, PDF (pre-OCRed: PDFs only). Model

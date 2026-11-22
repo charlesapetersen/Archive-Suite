@@ -17751,3 +17751,7 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   scratch Process Files label run passed. The standard Processor smoke produced two PDFs, and the headless
   Android-to-Mac round trip produced three PDFs with all expected OCR tokens and years. No bench cache was created.
   <!-- /W49.proc-label-read-turned -->
+
+- [x] **W49.proc-plan-read-meter — the Claude-plan page reader pauses before the five-hour window runs out [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit).
+  Page reading uses the CLI's streamed meter and the segmentation gate's 90% threshold. The page that reports the threshold keeps its transcription. New pages wait for the reset and resume on the plan. The pause caption shows the reported percentage and resume time. The key-free Local Agent smoke test covers 89%, 90%, Stop and resume.
+  <!-- /W49.proc-plan-read-meter -->
