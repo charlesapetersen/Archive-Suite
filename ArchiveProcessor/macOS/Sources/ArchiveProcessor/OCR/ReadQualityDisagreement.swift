@@ -9,11 +9,8 @@ import VisionOCRKit
 /// at 70 NES or above, on the sets named in `measuredOn`; a reader the bench has not read, or whose cut no set held
 /// the ceiling for, has no rule and is not flagged.
 ///
-/// Not checked, as none was measured: a page another route read in the reader's place (a refusal's second reader, the
-/// cascade's escalation), a page from an institutional-computing import, a newspaper page read in regions (its text is
-/// in region order), a page the app turned (Vision reads the stored image, and the fit's photographs were read as
-/// stored), a blank reading, and a page Vision failed on (as opposed to reading no text, which the fit counted as total
-/// disagreement). Batch runs do not come through `performOCRCall` and are not checked.
+/// Region-ordered newspaper text, blank readings, and Vision failures have no comparable reading. Vision
+/// returning no text is distinct from failure and counts as total disagreement, as in the fit.
 enum ReadQualityDisagreement {
     /// The route a page was read by, as far as a rule needs it.
     struct Route: Equatable, Sendable {
@@ -38,6 +35,7 @@ enum ReadQualityDisagreement {
 
     /// The rule for a route, or nil when the bench measured none for it.
     static func rule(for route: Route) -> Rule? {
+        guard route.provider != .appleVision else { return nil }
         let id = route.modelID.lowercased()
         if route.gateway {
             if !route.local { return id == LLMRotationDetector.gatewayModel ? gemini37Gateway : nil }
@@ -53,6 +51,21 @@ enum ReadQualityDisagreement {
             return direct[maker.provider]?[maker.id]
         }
         return direct[route.provider]?[id]
+    }
+
+    /// Select the route that wrote the retained text, even if the run's main reader has a different cut.
+    private static func rule(for result: OCRResult, primary: Route?) -> Rule? {
+        if let imported = result.imported {
+            // The cluster's official FP8 checkpoint and the hosted FP8 route read comparably on the 96
+            // (FARMSHARE_MEASUREMENTS.md). Use the hosted fit for that checkpoint. Other builds have no fit.
+            guard imported.readInRegions != true, imported.model.lowercased() == "qwen/qwen3.6-27b-fp8" else { return nil }
+            return direct[.openrouter]?["qwen/qwen3.6-27b"]
+        }
+        if let second = result.secondReader {
+            guard let provider = LLMProvider(rawValue: second.provider), let id = second.modelID else { return nil }
+            return rule(for: Route(provider: provider, modelID: id))
+        }
+        return primary.flatMap { rule(for: $0) }
     }
 
     // MARK: The fitted rules (post-read-flag.json `app_readers`)
@@ -113,29 +126,33 @@ enum ReadQualityDisagreement {
     }
 
     /// Test seam: Vision's reading of an image (headless tests draw no real page). nil in production.
-    nonisolated(unsafe) static var visionOverride: (@Sendable (URL) -> VisionReading)?
+    nonisolated(unsafe) static var visionOverride: (@Sendable (URL, Int) -> VisionReading)?
 
-    /// The flag for `result`, read by `route` from `imageURL`, or nil: no rule for the route, a reading the check does
+    static func addingFlag(to result: OCRResult, route: Route?, imageURL: URL) async -> OCRResult {
+        guard let flag = await check(result, route: route, imageURL: imageURL) else { return result }
+        var flagged = result
+        flagged.readPoorly = flag
+        return flagged
+    }
+
+    /// The flag for `result` from `imageURL`, or nil: no rule for its reader, a reading the check does
     /// not cover (see the type's note), a page already flagged, or a reading close enough to Vision's. Vision reads the
     /// image with the settings every cut was fitted with (`VisionOCRSettings.default`), whatever the run's own are.
     static func check(_ result: OCRResult, route: Route?, imageURL: URL) async -> ReadQualityFlag? {
-        guard let route, route.provider != .appleVision, let rule = rule(for: route), let text = result.text,
-              !normalized(text).isEmpty, result.errorMessage == nil, result.readPoorly == nil,
-              result.secondReader == nil, result.imported == nil, result.rotationDegrees == 0,
-              (result.newspaperLayout?.regions ?? 0) == 0, !Task.isCancelled else { return nil }
-        switch await visionReading(imageURL) {
+        guard !Task.isCancelled, result.errorMessage == nil, result.readPoorly == nil,
+              (result.newspaperLayout?.regions ?? 0) == 0, let rule = rule(for: result, primary: route),
+              let text = result.text, !normalized(text).isEmpty else { return nil }
+        switch await visionReading(imageURL, rotationDegrees: result.rotationDegrees) {
         case .text(let vision): return assess(readerText: text, visionText: vision, rule: rule)
         case .nothing: return assess(readerText: text, visionText: nil, rule: rule)
         case .failed: return nil
         }
     }
 
-    private static func visionReading(_ imageURL: URL) async -> VisionReading {
-        if let visionOverride { return visionOverride(imageURL) }
-        guard let reader = try? PageReaders.reader(provider: .appleVision, model: LLMModel.appleVisionModels[0],
-                                                   apiKey: "", thinkingLevel: nil, visionSettings: .default,
-                                                   newspaperLayout: false),
-              let read = try? await reader.read(PageReaderInput(imageURL: imageURL)).detail else { return .failed }
+    private static func visionReading(_ imageURL: URL, rotationDegrees: Int) async -> VisionReading {
+        if let visionOverride { return visionOverride(imageURL, rotationDegrees) }
+        let reader = PageReaders.visionReader(rotationDegrees: rotationDegrees)
+        guard let read = try? await reader.read(PageReaderInput(imageURL: imageURL)).detail else { return .failed }
         if let text = read.text, !text.isEmpty { return .text(text) }
         return read.errorCode == "vision_no_text" ? .nothing : .failed
     }

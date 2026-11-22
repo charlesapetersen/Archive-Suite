@@ -250,7 +250,10 @@ enum OCRCascadeTestDriver {
         // 6. Gemini first: the cascade's route comes first, then the refusal readers, never the same one twice.
         let toGPT = OCRCascade(routeID: OCRCascade.routeID(for: gpt))
         await script.set(["generativelanguage": (200, recitation), "openai": (200, gptText), "anthropic": (200, claudeText)])
+        ReadQualityDisagreement.visionOverride = { _, _ in .nothing }
         r = await ocr(.gemini, flash, cascade: toGPT)
+        ReadQualityDisagreement.visionOverride = nil
+        check("the cascade's measured reader owns the read-poorly flag", r.readPoorly?.reader == "GPT-5.4 mini")
         check("a Gemini refusal goes to the cascade's route first, recorded as a refusal",
               r.text?.contains("GPT-TEXT") == true && r.secondReader?.trigger == .refusal
               && r.secondReader?.firstCode == "Recitation")

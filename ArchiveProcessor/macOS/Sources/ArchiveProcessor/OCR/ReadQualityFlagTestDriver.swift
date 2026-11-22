@@ -177,7 +177,7 @@ enum ReadQualityFlagTestDriver {
               D.assess(readerText: base, visionText: nil, rule: rule)?.disagreement == 1)
 
         let page = root.appendingPathComponent("page.jpg")
-        D.visionOverride = { _ in .text(base) }
+        D.visionOverride = { _, _ in .text(base) }
         defer { D.visionOverride = nil }
         let lightOn = route(.gemini, "lightonocr-3", gateway: true, local: true)
         func result(_ t: String?, secondReader: SecondReader? = nil, readPoorly: ReadQualityFlag? = nil) -> OCRResult {
@@ -195,21 +195,43 @@ enum ReadQualityFlagTestDriver {
         let already = await D.check(result(far, readPoorly: flagged), route: lightOn, imageURL: page)
         check("5 nor a failed page or one already flagged", failed == nil && already == nil)
         let second = SecondReader(provider: "Anthropic", model: "m", firstCode: "length", trigger: .failure)
-        check("5 nor a page another route read", await D.check(result(far, secondReader: second), route: lightOn, imageURL: page) == nil)
+        check("5 a second reader without a rule does not inherit the primary cut",
+              await D.check(result(far, secondReader: second), route: lightOn, imageURL: page) == nil)
+        let gpt = SecondReader(provider: "OpenAI", model: "GPT-5.4 mini", firstCode: "length", modelID: "gpt-5.4-mini")
+        let gemini = route(.gemini, "gemini-3.8-flash")
+        // 0.68 is above GPT's cut (0.6721) and below Gemini's (0.6882).
+        let borderline = text(differingIn: 68)
+        check("5 the fallback uses the second reader's cut",
+              await D.check(result(borderline, secondReader: gpt), route: gemini, imageURL: page)?.reader == "GPT-5.4 mini")
+        check("5 the same reading by the primary model stays below its cut",
+              await D.check(result(borderline), route: gemini, imageURL: page) == nil)
+        func imported(_ model: String, inRegions: Bool? = nil) -> OCRResult {
+            OCRResult(text: far, classification: nil, errorMessage: nil, errorCode: nil,
+                      imported: ImportedReading(source: "FarmShare", model: model, preset: "qwen3.6-27b",
+                                                precision: nil, job: nil, kind: nil, readInRegions: inRegions))
+        }
+        check("5 an unmeasured cluster build does not inherit the preset or primary cut",
+              await D.check(imported("Qwen/Qwen3.6-27B"), route: gemini, imageURL: page) == nil)
+        check("5 a region-ordered import stays unflagged even with a measured model",
+              await D.check(imported("Qwen/Qwen3.6-27B-FP8", inRegions: true), route: gemini, imageURL: page) == nil)
         var regions = result(far)
         regions.newspaperLayout = NewspaperLayoutRecord(regions: 3, requests: 3, coverage: 0.9, filled: true, fallback: nil)
         check("5 nor a newspaper page read in regions", await D.check(regions, route: lightOn, imageURL: page) == nil)
         var whole = result(far)   // every page the layout stage passes whole carries a record with no regions
         whole.newspaperLayout = NewspaperLayoutRecord(regions: 0, requests: 1, coverage: nil, filled: false, fallback: nil)
         check("5 but a page read whole is checked", await D.check(whole, route: lightOn, imageURL: page) != nil)
-        let turned = result(far).with(classification: .documentStart, rotationDegrees: 90)
-        check("5 nor a page the app turned", await D.check(turned, route: lightOn, imageURL: page) == nil)
         check("5 nor a blank reading", await D.check(result(" \n "), route: lightOn, imageURL: page) == nil)
-        D.visionOverride = { _ in .nothing }
+        D.visionOverride = { _, _ in .nothing }
         check("5 Vision finding no text counts as total disagreement",
               await D.check(result(base), route: lightOn, imageURL: page)?.disagreement == 1)
-        D.visionOverride = { _ in .failed }
+        D.visionOverride = { _, _ in .failed }
         check("5 but Vision failing says nothing, so no flag", await D.check(result(far), route: lightOn, imageURL: page) == nil)
+        D.visionOverride = { _, rotation in rotation == 90 ? .text(base) : .nothing }
+        let turned = result(base).with(classification: .documentStart, rotationDegrees: 90)
+        check("5 the Vision pass receives the run's clockwise correction",
+              await D.check(turned, route: lightOn, imageURL: page) == nil)
+        check("5 with no correction the same page disagrees",
+              await D.check(result(base), route: lightOn, imageURL: page)?.disagreement == 1)
         D.visionOverride = nil
 
         // Real Vision on the clean page, against a reader that read it the same: not flagged.
@@ -220,6 +242,20 @@ enum ReadQualityFlagTestDriver {
             check("5 one that read something else is",
                   await D.check(result(String(repeating: "Lorem ipsum dolor sit amet. ", count: 60)), route: lightOn,
                                 imageURL: clean) != nil)
+            let turnedURL = root.appendingPathComponent("sideways.png")
+            if let image = ImageEncoding.orientedCGImage(url: clean),
+               let sideways = ImageEncoding.rotate(image, byDegreesClockwise: 270),
+               let png = NSBitmapImageRep(cgImage: sideways).representation(using: .png, properties: [:]),
+               (try? png.write(to: turnedURL)) != nil {
+                let corrected = result(same).with(classification: .documentStart, rotationDegrees: 90)
+                check("5 Vision compares the corrected orientation and agrees",
+                      await D.check(corrected, route: lightOn, imageURL: turnedURL) == nil)
+                let different = result(far).with(classification: .documentStart, rotationDegrees: 90)
+                check("5 a turned page still flags a truly different reading",
+                      await D.check(different, route: lightOn, imageURL: turnedURL)?.reader == rule.reader)
+            } else {
+                check("5 the sideways fixture was written", false)
+            }
         } else {
             check("5 Vision read the clean page", false)
         }

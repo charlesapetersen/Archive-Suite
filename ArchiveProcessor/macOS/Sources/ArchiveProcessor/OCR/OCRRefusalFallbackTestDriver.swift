@@ -174,7 +174,10 @@ enum OCRRefusalFallbackTestDriver {
         useRoutes([claude, qwen, gpt])
         await script.set(gemini: (200, recitation), anthropic: (401, #"{"error":{"message":"bad key"}}"#),
                          openai: (200, gptText), openrouter: (200, qwenText))
+        ReadQualityDisagreement.visionOverride = { _, _ in .nothing }
         r = await ocr()
+        ReadQualityDisagreement.visionOverride = nil
+        check("the refusal fallback's measured reader owns the read-poorly flag", r.readPoorly?.reader == "Qwen3.6 27B")
         calls = await script.calls()
         let pin = await script.openRouterPin()
         check("when Claude fails, Qwen3.6 27B on OpenRouter reads the page and OpenAI is never called",

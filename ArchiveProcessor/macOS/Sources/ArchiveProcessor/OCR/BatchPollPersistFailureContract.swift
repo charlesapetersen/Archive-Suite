@@ -185,7 +185,7 @@ enum BatchPollPersistFailureContract {
         /// One whole run of the poll. `jobCount` is the entire variable: at 1, the provider's result for
         /// index 1 arrives for a job that does not exist and the arm unwinds; at 2 it lands.
         func poll(jobCount: Int) async -> (interrupted: Bool, journalExistedBefore: Bool,
-                                           journalSurvived: Bool, requests: Int) {
+                                           journalSurvived: Bool, requests: Int, flag: ReadQualityFlag?) {
             let chunkId = "batches/w16bat7fu-\(provider.rawValue.lowercased())"
             let saved = OCRProcessor.savePendingBatch(
                 OCRProcessor.PendingBatch(
@@ -220,6 +220,7 @@ enum BatchPollPersistFailureContract {
 
             let transcript = Transcript()
             NetworkSession.testTransport = stub(for: provider, chunkId: chunkId, transcript: transcript)
+            ReadQualityDisagreement.visionOverride = { _, _ in .nothing }
             await processor.pollBatchUntilComplete(
                 batchId: chunkId, provider: provider, model: model(provider), thinkingLevel: .low,
                 apiKey: "poll-persist-not-a-key", fileURLs: sources, outputDirectory: outDir,
@@ -228,11 +229,14 @@ enum BatchPollPersistFailureContract {
             // Uninstalled only once the poll has fully RETURNED: its task group and the detached PDF write
             // are both awaited by then, so no request this run started can still be looking for a stub.
             NetworkSession.testTransport = nil
+            ReadQualityDisagreement.visionOverride = nil
 
+            let journal = OCRProcessor._testReadPendingBatch(from: OCRProcessor.pendingBatchURL)
+            let flag = journal?.completedResults["1"]?.readPoorly
             // The destructive half of the caller's decision, run for real against the file on disk.
             processor.retirePaidBatchJournalIfPollCompleted()
             return (processor.batchPollInterrupted, existed,
-                    fm.fileExists(atPath: OCRProcessor.pendingBatchURL.path), transcript.requests)
+                    fm.fileExists(atPath: OCRProcessor.pendingBatchURL.path), transcript.requests, flag)
         }
 
         let stopped = await poll(jobCount: 1)
@@ -245,6 +249,11 @@ enum BatchPollPersistFailureContract {
               + "poll uninterrupted and still retires the journal — one index apart is the whole difference",
               healthy.requests > 0 && healthy.journalExistedBefore
                   && !healthy.interrupted && !healthy.journalSurvived)
+        if provider == .gemini {
+            check("batch collection persists the measured Gemini reader's flag", healthy.flag?.reader == "Gemini 3.8 Flash")
+        } else {
+            check("batch collection leaves the unmeasured \(provider.rawValue) reader unflagged", healthy.flag == nil)
+        }
         check("poll persist (\(provider.rawValue) arm): the seam was dormant before this section and is "
               + "dormant again after it — no stub outlives the checks that installed it",
               dormantBefore && !NetworkSession.testTransportIsActive
@@ -300,7 +309,10 @@ enum BatchPollPersistFailureContract {
     private static func model() -> LLMModel { model(.gemini) }
 
     private static func model(_ provider: LLMProvider) -> LLMModel {
-        LLMModel(id: "poll-persist-\(provider.rawValue.lowercased())",
+        if provider == .gemini, let measured = LLMModel.geminiModels.first(where: { $0.id == "gemini-3.8-flash" }) {
+            return measured
+        }
+        return LLMModel(id: "poll-persist-\(provider.rawValue.lowercased())",
                  displayName: "Poll Persist \(provider.rawValue)",
                  provider: provider, supportsThinking: false, returnsMd: false,
                  inputCostPer1M: 0, outputCostPer1M: 0, batchDiscount: 0)

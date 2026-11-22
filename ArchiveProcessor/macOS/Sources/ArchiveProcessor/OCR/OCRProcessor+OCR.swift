@@ -1401,6 +1401,7 @@ extension OCRProcessor {
         // W41.app-ocr-cascade: a page the batch's model failed (or disagrees with Vision on) is escalated the same
         // way here, once. Off the direct route (gateway, Local Agent) neither runs.
         let direct = gateway == nil && localAgent == nil
+        let batchRoute = ReadQualityDisagreement.Route(provider: model.provider, modelID: model.id)
         let secondReaderFallback = model.provider == .gemini && direct
         let batchCascade = direct ? ocrRun.cascade : .off
         let fallbackPrompt = activePendingBatch?.customPrompt
@@ -1476,9 +1477,11 @@ extension OCRProcessor {
                             // persist that verdict; the kept journal brings the page back on resume. Since
                             // W40.fix-processor-cascade-edges a stopped escalation hands back the batch's own failure, so
                             // any page left without text under a Stop is held back, not only an exhausted one.
-                            let abandoned = Task.isCancelled && read.text == nil
-                            return (entry.index, entry.url, entry.jobID,
-                                    Self.mergeRotation(into: read, verdict: verdict), abandoned)
+                            let merged = Self.mergeRotation(into: read, verdict: verdict)
+                            let checked = await ReadQualityDisagreement.addingFlag(
+                                to: merged, route: batchRoute, imageURL: entry.url)
+                            let abandoned = Task.isCancelled && checked.text == nil
+                            return (entry.index, entry.url, entry.jobID, checked, abandoned)
                         }
                       }
                     }
@@ -2044,10 +2047,11 @@ extension OCRProcessor {
         // the import elsewhere); its classification comes from the run's model on the text alone.
         if let imported, localAgent == nil, gatewayConfig == nil, provider != .appleVision,
            let reading = imported.result(for: imageURL) {
-            return await applyingVisionTextClassification(
+            let classified = await applyingVisionTextClassification(
                 to: reading, previousText: previousText, customPrompt: customPrompt,
                 configuration: LLMTextConfiguration(provider: provider, model: model, thinkingLevel: thinkingLevel,
                                                     apiKey: apiKey))
+            return await ReadQualityDisagreement.addingFlag(to: classified, route: nil, imageURL: imageURL)
         }
         // Start rotation detection concurrently with the network OCR call. Both are async, so
         // the extra rotation work overlaps the OCR round-trip and adds little wall-clock time.
@@ -2134,10 +2138,7 @@ extension OCRProcessor {
             ? ReadQualityDisagreement.Route(provider: provider, modelID: gatewayConfig?.modelID ?? model.id,
                                             gateway: gatewayConfig != nil, local: gatewayConfig?.isLocalModel == true)
             : nil
-        if let flag = await ReadQualityDisagreement.check(merged, route: route, imageURL: imageURL) {
-            merged.readPoorly = flag
-        }
-        return merged
+        return await ReadQualityDisagreement.addingFlag(to: merged, route: route, imageURL: imageURL)
     }
     /// What rotation detection decided for a page: the clockwise correction (nil = keep the OCR model's own guess),
     /// and whether the agreement rule left the page as it is because its detectors did not settle it.

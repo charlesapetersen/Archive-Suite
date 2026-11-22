@@ -231,12 +231,16 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
 - Claude Sonnet 5.5 and Mistral OCR pages are never flagged: their cuts hold the 5% ceiling but caught none of their
   poor readings on the 96 (0 of 2, 0 of 7) (accepted: owner, 2026-11-19 walkthrough, call 17: a flag would only be
   false alarms; W47.wh-read-flag-cm declined).
-- A route the bench has not read (a typed gateway or OpenRouter model, Claude on the plan, the Local Agent, the older
-  Gemini, GPT and Claude models) is not flagged, nor is a page another route read in its place, an imported page, a
-  page the app turned, a page Vision failed on, or a batch run's pages (queued: W49.proc-read-flag-wiring).
-- A newspaper page read in regions is not flagged. Vision reads a whole newspaper scan at 21.8 NES, so comparing
-  with it says nothing; Vision reading the same region crops (84.8 NES) does, at one cut of 0.45 for every reader
-  (`segbench-results/post-read-flag-newspaper.md`, 15 scans from one collection) (queued: W49.proc-read-flag-newspaper-app).
+- Batch results and second reads use the cutoff for the model that supplied the text. Vision compares against the
+  corrected image when the app turns a page. Imports from the official Qwen3.6 27B FP8 checkpoint use the hosted FP8
+  cutoff, supported by similar readings on the 96 benchmark pages. Routes without an applicable cutoff and pages
+  where the Vision pass fails stay unflagged (accepted: owner, 2026-11-19, call 22, W49.proc-read-flag-wiring).
+- A newspaper page read in regions is not flagged. This includes the region-ordered cluster imports. Vision reads
+  a whole newspaper scan at 21.8 NES, compared with 84.8 NES on the same region crops. The region comparison was
+  fitted at one cut of 0.45 for every reader (`segbench-results/post-read-flag-newspaper.md`, 15 scans from one
+  collection) (queued: W49.proc-read-flag-newspaper-app).
+- A successful whole-page retry that still carries region counts from the earlier attempt is skipped by the
+  plain-photo check (queued: W49.proc-read-flag-newspaper-whole-app).
 - A newspaper scan read whole (always for Qwen3.6 27B since W47.wh-whole-page-large; otherwise when the layout model is not
   downloaded, the detector fails or the kind is uncertain) is checked against the poor whole-page Vision reading, so at
   the readers' cuts of about 0.70 a good reading is almost always flagged (46 of 53 good whole readings on L9; Gemini

@@ -239,7 +239,7 @@ struct OCRCascade: Codable, Equatable, Sendable {
                     let reader = SecondReader(
                         provider: route.provenanceProvider, model: route.provenanceModel, firstCode: firstCode,
                         estimatedCost: CostEstimator.secondReaderPageCost(model: target, imageScale: costScale),
-                        trigger: trigger, firstReader: firstLabel)
+                        trigger: trigger, firstReader: firstLabel, modelID: target.id)
                     NSLog("[OCR] \(imageURL.lastPathComponent): read by \(reader.summary)")
                     return OCRResult(text: read.text, classification: read.classification,
                                      rotationDegrees: read.rotationDegrees, errorMessage: nil, errorCode: nil,

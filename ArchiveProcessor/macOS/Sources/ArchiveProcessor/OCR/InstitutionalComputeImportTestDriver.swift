@@ -158,7 +158,11 @@ enum InstitutionalComputeImportTestDriver {
                 standardImageMB: 4, cascade: .off, imported: imported)
         }
         await script.set((200, #"{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"[document_start]\nMODEL-TEXT"}]}}]}"#))
+        ReadQualityDisagreement.visionOverride = { _, _ in .text(String(repeating: "z", count: 200)) }
         var r = await ocr(box2)
+        ReadQualityDisagreement.visionOverride = nil
+        check("a measured import uses the cluster model's cut instead of the classifier's",
+              r.readPoorly?.reader == "Qwen3.6 27B" && (r.readPoorly?.disagreement ?? 0) >= 0.7034)
         var calls = await script.calls()
         check("a matched page keeps the other institution's text and its reader",
               r.text == "BOX-TWO text from Example University" && r.imported?.job == "1849740"

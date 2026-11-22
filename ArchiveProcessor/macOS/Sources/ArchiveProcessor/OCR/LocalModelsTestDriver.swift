@@ -242,7 +242,7 @@ enum LocalModelsTestDriver {
 
         // 4b. (W47.wh-read-flag-readers) The page a local model read is checked against Vision's reading of it.
         let said = "The committee met on the fourth of March to consider the report."
-        ReadQualityDisagreement.visionOverride = { _ in .text(said) }
+        ReadQualityDisagreement.visionOverride = { _, _ in .text(said) }
         defer { ReadQualityDisagreement.visionOverride = nil }
         wire.reset(["local-mac": reply("[document_start]\n\(said)")])
         p = await ocr(stayLocal, .off)

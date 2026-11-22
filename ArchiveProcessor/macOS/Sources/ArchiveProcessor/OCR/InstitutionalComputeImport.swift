@@ -111,7 +111,8 @@ struct InstitutionalComputeImport: Sendable {
         return (sha, ImportedReading(
             source: cluster, model: model, preset: object["preset"] as? String,
             precision: ImportedReading.precision(model: model, vllmArgs: object["vllm_args"] as? String),
-            job: object["job"] as? String, kind: object["kind"] as? String))
+            job: object["job"] as? String, kind: object["kind"] as? String,
+            readInRegions: object["region_status"] != nil ? true : nil))
     }
 
     static func sha256(of url: URL) -> String? {
@@ -145,6 +146,8 @@ struct ImportedReading: Codable, Equatable, Sendable {
     let job: String?
     /// The model's own page-kind label (`typewritten`, `printed`, `mixed`, `handwritten`).
     let kind: String?
+    /// Present when the cluster ran the layout pipeline and assembled the text in region order.
+    var readInRegions: Bool? = nil
 
     var headerSource: String { Self.headerComponent(source) }
 

@@ -859,7 +859,7 @@ struct OCRResult: Codable {
     var newspaperLayout: NewspaperLayoutRecord? = nil
     /// W46.post-read-quality-flag — this page probably read poorly (`ReadQualityFlag`): Apple Vision read it with low
     /// confidence, or (W47.wh-read-flag-readers) another reader's text disagreed with Vision's past that reader's cut,
-    /// set by `performOCRCall` (`ReadQualityDisagreement`). Carried by the rebuilds that keep the text and feed the run
+    /// set after OCR and batch collection (`ReadQualityDisagreement`). Carried by the rebuilds that keep the text and feed the run
     /// summary (not Live Capture's group rotation, the newspaper region join or re-OCR pairs, which show none).
     /// `nil` = not flagged, or read by a route with no measured cut.
     var readPoorly: ReadQualityFlag?
@@ -952,6 +952,8 @@ struct SecondReader: Codable, Equatable {
     var trigger: Trigger? = nil
     /// The first reader, `"<provider> · <model>"`; nil = the run's Gemini model (a refusal second read).
     var firstReader: String? = nil
+    /// The API model ID for selecting a measured read-quality rule. Local agents have no measured route.
+    var modelID: String? = nil
 
     var summary: String {
         let first = firstReader ?? "Gemini"

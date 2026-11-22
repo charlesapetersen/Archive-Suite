@@ -155,7 +155,8 @@ enum OCRRefusalFallback {
                 let cost = route.localAgent == nil
                     ? CostEstimator.secondReaderPageCost(model: route.model, imageScale: costScale) : 0
                 let reader = SecondReader(provider: route.provenanceProvider, model: route.provenanceModel,
-                                          firstCode: refused.errorCode ?? "?", estimatedCost: cost)
+                                          firstCode: refused.errorCode ?? "?", estimatedCost: cost,
+                                          modelID: route.localAgent == nil ? route.model.id : nil)
                 NSLog("[OCR] Gemini refused \(imageURL.lastPathComponent); read by \(reader.summary)")
                 return OCRResult(text: result.text, classification: result.classification,
                                  rotationDegrees: result.rotationDegrees, errorMessage: nil, errorCode: nil,
