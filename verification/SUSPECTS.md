@@ -1277,13 +1277,15 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `Capture/ContainerLabelCapture.swift` `spendNote` (counts calls) and `warningNote`.
 - **Would confirm it:** a run whose label calls all fail; read the summary and the container file's markers.
 - **Would clear it:** the summary says the reads failed, or counts only answered calls.
-- **Status:** `reproduced` — `W49.proc-fix-s052`, [scratch evidence](evidence/processor/W49.proc-s052-verify.md)
+- **Status:** `cleared` — fixed by W49.proc-fix-s052. [Scratch evidence and regression](evidence/processor/W49.proc-s052-verify.md).
 - **History:**
   - 2026-11-20 W49.proc-suspects-messages — raised.
   - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s052-verify`; standing authorization for all bug suspects, phase rule 5a retained.
   - 2026-11-21 W49.proc-s052-verify (Codex gpt-6.2-sol, `43501730`) — independently repeated the
     HTTP 500 label replies seen by Claude Opus 5.5. The summary still counted two gateway reads.
     Vision supplied Box 17 and the blank folder produced an empty marker and a local warning.
+  - 2026-11-21 W49.proc-fix-s052 — Process Files counts only labels with a usable gateway field, reports
+    failed attempts separately, and charges each attempt as before.
 
 
 ### S-053 · The label reader asks any gateway for GPT 5.6 Luna
@@ -1291,7 +1293,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Raised:** 2026-11-20 · W49.proc-suspects-messages · seen in a run (the S-025 case).
 - **Suspected behaviour:** with the gateway set to OpenAI by "Fill in OpenAI preset", a box label read went to
   api.openai.com naming `gpt-5.6-luna` (`max_tokens: 1200`, `reasoning_effort: low`). A gateway that does not serve that
-  model fails every label read; with S-052 the run would still report them read.
+  model fails every label read. The S-052 fix reports these as failed attempts. This check covers whether
+  the reader can detect and explain the unavailable model.
 - **Where:** `Capture/ContainerLabelCapture.swift` (the label reader's gateway call).
 - **Would confirm it:** the label read against a gateway that does not list the model; read its reply and the summary.
 - **Would clear it:** the reader checks the gateway serves the model, or skips the call where it does not.

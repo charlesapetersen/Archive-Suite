@@ -49,7 +49,7 @@ struct ProcessingRun: Codable, Identifiable, Equatable {
     var newspaperPages: Int? = nil
     /// Image-reading requests made by those pages (regions, fills and fallbacks), across their recorded attempts.
     var newspaperRequests: Int? = nil
-    /// Box and folder label photos read through the gateway (W47.ct-label-cost); their charge is in `cost`.
+    /// Box and folder label requests through the gateway (including failed attempts); their charge is in `cost`.
     var labelReads: Int? = nil
 }
 
@@ -101,7 +101,7 @@ struct RunHistorySnapshot {
     var newspaperBatchExtraCost: Double = 0
     /// Runtime-only completed region charges, including reads whose result Stop discards.
     var newspaperSpend = NewspaperReadingSpend()
-    /// Box and folder label reads through the gateway (W47.ct-label-cost), each at `ContainerLabelCapture.charge`. In
+    /// Box and folder label requests through the gateway, each at `ContainerLabelCapture.charge`. In
     /// the history's cost; the ledger has them on a line of their own (`recordContainerLabels`), so `spentSoFar` and
     /// the ledger's share of `makeRun` leave them out.
     var labelCalls = 0

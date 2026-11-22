@@ -109,11 +109,19 @@ enum ContainerLabelCapture {
             + " a photo. Not in the totals above; the run's cost and history count each call."
     }
 
-    /// The run summary's line for its label reads through the gateway (W47.ct-label-cost); nil with none.
-    static func spendNote(calls: Int, dollars: Double) -> String? {
+    /// The summary's gateway label counts and charge. Live Capture carries a count of labels it tried, with their
+    /// combined charge for any rereads.
+    static func spendNote(calls: Int, successfulReads: Int? = nil, dollars: Double) -> String? {
         guard calls > 0 else { return nil }
-        return "\(calls) box or folder label\(calls == 1 ? "" : "s") read through the gateway (GPT 5.6 Luna), "
-            + String(format: "$%.4f", dollars) + "."
+        let cost = String(format: "$%.4f", dollars)
+        let route = "through the gateway (GPT 5.6 Luna)"
+        guard let successfulReads else {
+            return "Tried to read \(calls) box or folder label\(calls == 1 ? "" : "s") \(route), \(cost)."
+        }
+        let failed = calls - successfulReads
+        let reads = "\(successfulReads) box or folder label\(successfulReads == 1 ? "" : "s") read \(route)"
+        let failures = failed == 0 ? "" : ", \(failed) failed attempt\(failed == 1 ? "" : "s")"
+        return "\(reads)\(failures), \(cost)."
     }
 
     /// One filed marker, for the finalize write.

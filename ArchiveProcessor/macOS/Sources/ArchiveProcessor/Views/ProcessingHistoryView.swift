@@ -126,7 +126,7 @@ private struct ProcessingHistoryRow: View {
                 Text("· \(n) newspaper pages, \(run.newspaperRequests ?? n) reading requests")
             }
             if let n = run.labelReads, n > 0 {
-                Text("· \(n) box or folder \(n == 1 ? "label" : "labels") read through the gateway")
+                Text("· \(n) gateway label \(n == 1 ? "request" : "requests")")
             }
             if let n = run.rotationUnsurePages, n > 0 {
                 Text("· \(n) left unturned, rotation unsure")

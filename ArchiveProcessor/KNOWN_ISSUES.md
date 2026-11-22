@@ -2,11 +2,11 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
-## Process Files counts failed gateway label requests as reads (S-052)
+## FIXED (S-052, 2026-11-21) — Process Files reports failed gateway label requests
 
-- Two HTTP 500 replies still produce a summary saying two labels were read through the gateway.
-  In the scratch run, the pages were transcribed successfully, Vision recovered the box number,
-  and the blank folder photo produced an empty marker with a separate warning. [Scratch evidence](../verification/evidence/processor/W49.proc-s052-verify.md). (queued: W49.proc-fix-s052)
+The run summary counts labels with usable gateway fields and reports failed attempts separately.
+The charge covers every attempt. Vision proposals and warnings for empty markers still appear.
+[Scratch evidence and regression](../verification/evidence/processor/W49.proc-s052-verify.md) (W49.proc-fix-s052).
 
 ## Ordinary Resume bypasses two reviews before tagging (S-050)
 

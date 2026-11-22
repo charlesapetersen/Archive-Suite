@@ -451,8 +451,10 @@ enum LocalModelsTestDriver {
         eq("9 the history keeps the count", decoded?.labelReads, 2)
 
         // What the operator reads.
-        eq("9 the summary line", ContainerLabelCapture.spendNote(calls: 2, dollars: 0.0016),
+        eq("9 the summary with all reads usable", ContainerLabelCapture.spendNote(calls: 2, successfulReads: 2, dollars: 0.0016),
            "2 box or folder labels read through the gateway (GPT 5.6 Luna), $0.0016.")
+        eq("9 the summary with outcomes unknown", ContainerLabelCapture.spendNote(calls: 2, dollars: 0.0016),
+           "Tried to read 2 box or folder labels through the gateway (GPT 5.6 Luna), $0.0016.")
         eq("9 no call, no summary line", ContainerLabelCapture.spendNote(calls: 0, dollars: 0), nil)
         check("9 the estimate names the price a photo",
               ContainerLabelCapture.estimateNote(gateway: remote, preOCRedInput: false, enabled: true)?

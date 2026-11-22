@@ -13,7 +13,9 @@ hands over) gets a 401, so the run proves the key reached every call. The taggin
 prove a failed tagging call is reported rather than filed as tagged. A Pre-OCRed run's classification-only request takes
 its class from the same cycle, and FAKE_GATEWAY_TAGS_JSON replaces the tag JSON (W49.proc-suspects-filing).
 W49.proc-suspects-messages: FAKE_GATEWAY_FAIL_OCR (comma-separated OCR call numbers) answers those calls 400 with a
-message naming the call, and FAKE_GATEWAY_FAIL_OTHER=1 answers every other request (a rotation vote) 500. Each request is one line in the log, with the
+message naming the call, and FAKE_GATEWAY_FAIL_OTHER=1 answers every other request (a rotation vote) 500.
+FAKE_GATEWAY_LABEL_REPLIES is a JSON array of responses to container-label prompts in arrival order.
+Each request is one line in the log, with the
 start of its prompt. It runs in the VM guest, started by `ops/gui/vm-gui-runner.sh` when
 W40D1_FAKE_GATEWAY=1; it is never pointed at real material and sends nothing anywhere.
 """
@@ -25,7 +27,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 CYCLE = ['box_label', 'folder_label', 'document_start', 'document_continuation', 'document_start', 'document_start']
 lock = threading.Lock()
-count = {'ocr': 0, 'tags': 0, 'other': 0}
+count = {'ocr': 0, 'tags': 0, 'labels': 0, 'other': 0}
 
 
 def prompt_text(body):
@@ -71,6 +73,9 @@ class Handler(BaseHTTPRequestHandler):
         text = prompt_text(body)
         with lock:
             kind, reply = answer(text, CYCLE[count['ocr'] % len(CYCLE)], count['ocr'] + 1)
+            if LABEL_REPLIES and kind == 'other' and text.lstrip().startswith('This photo was taken in an archive reading room'):
+                kind = 'labels'
+                reply = json.dumps(LABEL_REPLIES[count[kind]]) if count[kind] < len(LABEL_REPLIES) else ''
             count[kind] += 1
             fail = (kind == 'tags' and count[kind] in FAIL_TAGS) or (kind == 'other' and FAIL_OTHER)
             refuse = kind == 'ocr' and count[kind] in FAIL_OCR
@@ -106,4 +111,5 @@ if __name__ == '__main__':
     FAIL_TAGS = {int(n) for n in sys.argv[5].split(',') if n} if len(sys.argv) > 5 else set()
     FAIL_OCR = {int(n) for n in os.environ.get('FAKE_GATEWAY_FAIL_OCR', '').split(',') if n}
     FAIL_OTHER = os.environ.get('FAKE_GATEWAY_FAIL_OTHER') == '1'
+    LABEL_REPLIES = json.loads(os.environ.get('FAKE_GATEWAY_LABEL_REPLIES', '[]'))
     ThreadingHTTPServer(('127.0.0.1', port), Handler).serve_forever()

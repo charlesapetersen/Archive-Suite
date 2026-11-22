@@ -51,11 +51,13 @@ extension OCRProcessor {
         statusMessage = "Reading \(labels.count) box and folder label\(labels.count == 1 ? "" : "s")\(pace)…"
         var markers: [ContainerLabelCapture.FiledMarker] = []
         var calls = 0
+        var successfulReads = 0
         var dollars = 0.0
         // The month's ledger gets the calls as a line of their own, Stop or not: a run's own line takes a top-up only
         // above a cent's fraction, which one label's charge may be under.
         defer {
-            containerLabelSpendNote = ContainerLabelCapture.spendNote(calls: calls, dollars: dollars)
+            containerLabelSpendNote = ContainerLabelCapture.spendNote(
+                calls: calls, successfulReads: successfulReads, dollars: dollars)
             SettingsLayerStore.shared.recordSpend(usd: dollars, runID: UUID(), outputDirectory: outputDirectory,
                                                   files: calls)
         }
@@ -66,6 +68,10 @@ extension OCRProcessor {
             // W47.ct-label-cost: the call is real money: the history's cost counts it, and the ledger (above).
             if r.gatewayCalled {
                 calls += 1
+                // A parsed reply can still leave all proposals to the local reader.
+                if r.fields.values.values.contains(where: { $0.reader == ContainerLabelCapture.gatewayReader }) {
+                    successfulReads += 1
+                }
                 dollars += r.dollars
                 activeRunHistory?.labelCalls += 1
                 activeRunHistory?.labelDollars += r.dollars

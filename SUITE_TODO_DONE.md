@@ -17535,3 +17535,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   reported both pages, no load error, and the image-only banner. The existing indexer test passed.
   [Scratch run](verification/evidence/reader/W49.reader-s005-reproduce-check.md). Follow-up W49.fix-reader-encrypted-pdf. No bench cache used.
   <!-- /W49.reader-s005-reproduce-check -->
+- [x] **W49.proc-fix-s052 — report failed gateway label reads [S]** · §Known limits are queued, accepted or asked
+  (lane: processor) (uses: build) — S-052 (S3). SHIPPED 2026-11-21 (this commit).
+  Process Files reports usable gateway label reads and failed attempts separately. The history counts requests,
+  and each attempt still contributes its charge. Local proposals and empty-marker warnings still appear.
+  The scratch regression covers two HTTP refusals and a mix of usable and empty replies with reported usage.
+  S-053 tracks gateway model availability. $0 spent. No bench cache used.
+  [Reproduction and regression](verification/evidence/processor/W49.proc-s052-verify.md).
+  <!-- /W49.proc-fix-s052 -->
