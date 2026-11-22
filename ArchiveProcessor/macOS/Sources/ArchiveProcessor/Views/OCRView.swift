@@ -36,6 +36,7 @@ struct OCRView: View {
     @AppStorage(OpenRouterListing.defaultsKey) private var openRouterListingData: Data?
     /// W46.training-optout-run: what Start says before it runs a way the collection's "must not train" switch hides.
     @State private var trainingWarning: String?
+    @State private var monthlyLimitWarning: String?
     @AppStorage(DefaultsKeys.rotationModeRaw) private var rotationModeRaw: String = RotationMode.standard.rawValue
     private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .standard }
     @AppStorage(DefaultsKeys.reviewRotation) private var reviewRotation: Bool = false
@@ -43,6 +44,7 @@ struct OCRView: View {
     /// Derived for compatibility with existing pipeline flags.
     private var enableTagging: Bool { taggingMode.enablesTagging }
     private var passSourceTags: Bool { taggingMode == .copySource }
+    private var classifyPreOCRedInput: Bool { (enableTagging && !passSourceTags) || enableCollectionSegmentation }
     /// Only a PDF-only drop disables tagging. A mixed drop also runs the standard image path,
     /// so the picker remains active for images while rebuilt PDFs stay untagged.
     private var hasMixedReOCR: Bool {
@@ -303,6 +305,7 @@ struct OCRView: View {
             useGateway: useGateway || useAppleVision,
             imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil,
             visionTextOnly: useAppleVision && visionUseLLMJudgment,
+            classifyPreOCRedInput: classifyPreOCRedInput,
             gatewayRotation: gatewayRotation,
             measuredRoute: DateRoute.measuredRoute(gateway: useGateway ? currentGatewayConfig : nil,
                                                    usesLocalAgent: useLocalAgent),
@@ -602,6 +605,9 @@ struct OCRView: View {
         }
         .modifier(SegmentationStagePresentations(processor: processor))
         .modifier(TrainingWarningPresentation(warning: $trainingWarning) { beginProcessing() })
+        .modifier(MonthlyLimitPresentation(warning: $monthlyLimitWarning) {
+            runProcessing(confirmedMonthlyLimit: true)
+        })
         .alert("Read the folders inside?", isPresented: Binding(get: { treeQuestion != nil },
                                                                  set: { if !$0 { treeQuestion = nil } }),
                presenting: treeQuestion) { question in
@@ -1845,8 +1851,8 @@ struct OCRView: View {
         runProcessing()
     }
 
-    private func runProcessing() {
-        guard let outDir = outputDirectory else { return }
+    private func runProcessing(confirmedMonthlyLimit: Bool = false) {
+        guard !processor.isProcessing, let outDir = outputDirectory else { return }
         let provider = effectiveProvider
         let model = effectiveModel
         if let warning = unavailableOpenRouterSelection {
@@ -1858,6 +1864,35 @@ struct OCRView: View {
            let id = modelStore.selectedModelIDs[provider.rawValue], !id.isEmpty, id != model.id {
             processor.statusMessage = OpenRouterRoute.unavailableMessage(id)
             return
+        }
+        if !confirmedMonthlyLimit, let limit = settingsStore.resolver(at: outDir).monthlyLimitUSD {
+            let pricedModel = useAppleVision && visionUseLLMJudgment && !isPDFOnlyReOCR ? selectedModel : model
+            let usesReader = !preOCRedInput || classifyPreOCRedInput
+            guard !usesReader || ProcessFilesMonthlySpend.hasPrice(model: pricedModel, gateway: currentGatewayConfig,
+                                                     localAgent: currentLocalAgentConfig) else {
+                processor.statusMessage = "This reader has no price estimate. Choose a priced or free reader to use the monthly spending limit."
+                return
+            }
+            let spent = settingsStore.spentThisMonthUSD()
+            let remaining = ProcessFilesMonthlySpend.remaining(limit: limit, spent: spent)
+            let useBatch = batchMode && provider.supportsBatch && !useGateway && !useLocalAgent && !useAppleVision && !preOCRedInput
+            let readingCost = useLocalAgent ? 0 : CostEstimator.runTotal(
+                images: costEstimate, directPDFPages: pdfPageEstimate, batch: useBatch)
+            let segmentationCost: Double
+            if case .windows = segmentationPlan, segmentationPageCount > 1 {
+                segmentationCost = segmentationRow?.apiDollars ?? 0
+            } else {
+                segmentationCost = 0
+            }
+            let estimate = readingCost + segmentationCost
+            if !ProcessFilesMonthlySpend.fits(estimate, remaining: remaining) {
+                let detail = useBatch
+                    ? "The app submits the provider batch only if all its requests fit within the remaining budget."
+                    : "The app stops before the next paid step that would exceed the limit and saves the results it can resume."
+                monthlyLimitWarning = "This run is estimated at \(CostEstimate.money(estimate)). About "
+                    + "\(CostEstimate.money(remaining)) remains of this month's \(CostEstimate.money(limit)) limit. \(detail)"
+                return
+            }
         }
         intakeGeneration += 1   // a tree still being read is not added to a started run
         readingTree = false
@@ -1924,6 +1959,24 @@ struct OCRView: View {
                 localAgent: currentLocalAgentConfig,
                 postCorrectionRequested: ocrPostCorrection && !useGateway && !useLocalAgent
             )
+        }
+    }
+}
+
+private struct MonthlyLimitPresentation: ViewModifier {
+    @Binding var warning: String?
+    let start: () -> Void
+
+    func body(content: Content) -> some View {
+        content.alert("This run may reach the monthly spending limit",
+                      isPresented: Binding(get: { warning != nil }, set: { if !$0 { warning = nil } })) {
+            Button("Start Within Limit") {
+                warning = nil
+                start()
+            }
+            Button("Cancel", role: .cancel) { warning = nil }
+        } message: {
+            Text(warning ?? "")
         }
     }
 }

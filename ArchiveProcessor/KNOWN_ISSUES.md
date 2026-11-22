@@ -694,8 +694,14 @@ collection settings file leaves the General settings in effect.
   when only part of it was submitted or a confirmed cancel left its journal for results still being saved; a Stop the provider confirmed counts nothing for its images, though a provider
   may bill requests it finished first. Live Capture counts the pages it files, at Finalize, without their second
   readers; pages read and then discarded are not counted. A run quit or crashed mid-way counts nothing unless it
-  is resumed. A headless test launch keeps the app's own ledger in memory and never writes its lines. The limit itself shapes only the settings sheet's choices:
-  Process Files does not yet stop a batch at it (it runs the app's processing settings, above). (queued: W49.proc-ledger-limit-stop)
+  is resumed. A headless test launch keeps the app's own ledger in memory and never writes its lines.
+  **Process Files applies the monthly limit** (W49.proc-ledger-limit-stop). Start warns when the estimate exceeds the
+  balance. The run stops before a paid step it estimates will cost more than remains, lets admitted page reads finish,
+  and keeps the recovery record where available. It prices whole PDFs and provider batches together before sending them.
+  A paid reader with unknown pricing is unavailable under this limit. Resume reads the current month's ledger and
+  limit. The check uses list-price estimates, which can differ from the provider's bill. Some stages are priced as a
+  group, including segmentation windows, so the app can stop with money left. Optional box and folder label reads
+  that do not fit are reported in the completed run's summary.
 - **The guarded writer checks, then writes.** A local process that swaps `.archivesuite` for a link between the
   check and the write could redirect one write (`SPEC/collection-settings.md`). Accepted: it needs a hostile local
   process. (accepted: needs a hostile local process)

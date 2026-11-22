@@ -173,6 +173,8 @@ struct CostEstimator {
         /// classification/tagging/collection calls. This is intentionally a separate flag rather than
         /// treating Vision as an image-token provider, which would make it easy to bill image OCR again.
         visionTextOnly: Bool = false,
+        /// In pre-OCRed runs, manual tagging still classifies text without existing classification.
+        classifyPreOCRedInput: Bool? = nil,
         /// The run's rotation calls go to a remote gateway's `LLMRotationDetector.gatewayModel` (not a model on this
         /// Mac, not Apple Vision): priced at the measured per-call figure (W46.rotation-default).
         gatewayRotation: Bool = false,
@@ -212,9 +214,9 @@ struct CostEstimator {
             batchOcrCost = ocrCost * model.batchDiscount
         }
 
-        // Text-only classification cost (only for pre-OCRed input when tagging or collection is enabled)
+        // Vision judgement reads each page's text. Pre-OCRed inputs classify only for tagging or Collection ID.
         var classificationCost: Double = 0
-        if (preOCRedInput || visionTextOnly) && (enableTagging || enableCollectionSegmentation) {
+        if visionTextOnly || (preOCRedInput && (classifyPreOCRedInput ?? (enableTagging || enableCollectionSegmentation))) {
             let classInput = Double(fileCount) * estimatedClassificationInputTokens
             let classOutput = Double(fileCount) * estimatedClassificationOutputTokens
             classificationCost = (classInput / 1_000_000) * model.inputCostPer1M

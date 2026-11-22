@@ -23,7 +23,17 @@ enum PageReaders {
                                    gateway: gateway, localAgent: localAgent, visionSettings: visionSettings)
         // A reader measured to tie the detector on newspapers reads them whole (W47.wh-whole-page-large).
         let whole = localAgent == nil && NewspaperPageReader.readsWhole(modelID: gateway?.modelID ?? model.id)
-        return newspaperLayout && !whole ? NewspaperPageReader(client: client) : client
+        guard newspaperLayout && !whole else { return client }
+        let price: (@Sendable (PageReaderInput) -> Double)?
+        if provider == .appleVision || localAgent != nil || gateway?.isLocalModel == true {
+            price = nil
+        } else {
+            price = { page in
+                PageKindRouting.pagePrice(model, imageScale: page.costScale ?? page.imageScale * page.imageScale,
+                    sendPreviousImage: page.previousImageURL != nil, contextCharCount: page.previousText?.count ?? 0)
+            }
+        }
+        return NewspaperPageReader(client: client, estimatedPrice: price)
     }
 
     private static func rawReader(

@@ -51,6 +51,7 @@ struct NewspaperPageReader: PageReader {
     /// settings (`NewspaperDetector.scans(_:)`). Photographed newspapers always use PP-DocLayoutV3.
     @TaskLocal static var scanDetector: NewspaperDetector = .ppDocLayoutV3
     let client: any PageReader<OCRResult>
+    var estimatedPrice: (@Sendable (PageReaderInput) -> Double)? = nil
     var route: String { client.route }
 
     static let queue = VisionQueue(name: "ArchiveProcessor.NewspaperLayout", width: 1)
@@ -72,6 +73,11 @@ struct NewspaperPageReader: PageReader {
             return try await client.read(page)
         }
         defer { plan.removeScratch() }
+        // Use the original whole-page allowance if the complete region plan cannot fit.
+        if let price = estimatedPrice, plan.images.count > 1,
+           await Self.spend?.allowsExtra(Double(plan.images.count - 1) * price(page)) == false {
+            return try await whole(page, reason: "the monthly spending limit did not allow the region reads")
+        }
         return try await readRegions(page, plan: plan)
     }
 
@@ -161,6 +167,9 @@ struct NewspaperPageReader: PageReader {
                        previous: [PageReading<OCRResult>] = [], attempts: Int = 0,
                        spendID: UUID = UUID()) async throws -> PageReading<OCRResult> {
         try Task.checkCancellation()
+        if attempts > 0, let price = estimatedPrice, await Self.spend?.allowsExtra(price(page)) == false {
+            throw ProcessFilesMonthlySpend.ReadingDeclined()
+        }
         var read = try await client.read(page)
         Self.spend?.add(read.dollars ?? 0, id: spendID, source: page.imageURL,
                        baseAllowance: Self.hasBasePageAllowance)
@@ -233,6 +242,13 @@ struct NewspaperLayoutRecord: Codable, Equatable, Sendable {
 final class NewspaperReadingSpend: @unchecked Sendable {
     /// Legacy runs without a persisted settings ID still need an idempotent identity during Stop's two updates.
     let parentLedgerID = UUID()
+    @MainActor var monthlyAdmission: (@MainActor (Double) -> Bool)?
+    @MainActor var hasMonthlyLimit: Bool { monthlyAdmission != nil }
+
+    @MainActor func allowsExtra(_ price: Double) -> Bool {
+        price == 0 || (monthlyAdmission?(price) ?? true)
+    }
+
     private struct Reading {
         let source: URL
         let first: Double?

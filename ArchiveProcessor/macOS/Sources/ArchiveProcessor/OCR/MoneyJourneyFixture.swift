@@ -32,9 +32,37 @@ enum MoneyJourneyFixture {
         return root
     }
 
+    private static var refusesGeminiReading: Bool {
+        isActive && ProcessInfo.processInfo.arguments.contains("-APUITestGeminiRefusal")
+    }
+
+    static var monthlyLimit: Double? {
+        let args = ProcessInfo.processInfo.arguments
+        guard isActive, let index = args.firstIndex(of: "-APUITestMonthlyLimit"),
+              args.indices.contains(index + 1) else { return nil }
+        return Double(args[index + 1])
+    }
+
     @MainActor static func configureIfRequested() {
         guard isActive else { return }
         _ = directory
+        if let monthlyLimit {
+            let store = SettingsLayerStore.shared
+            var general = store.general
+            let source = SettingsSource.setByUser(Date())
+            general.set(.moneyHabit, .string(MoneyHabit.perMonth.rawValue), source: source)
+            general.set(.monthCeilingUSD, .double(monthlyLimit), source: source)
+            precondition(store.replaceGeneral(general))
+            if store.file.ledger.isEmpty {
+                precondition(store.recordSpend(usd: 1, runID: nil, outputDirectory: nil, files: 1))
+            }
+        }
+        if refusesGeminiReading {
+            OCRRefusalFallback.routesOverride = {
+                guard let model = LLMModel.openaiModels.first(where: { $0.id == "gpt-5.4-mini" }) else { return [] }
+                return [.init(provider: .openai, model: model, apiKey: dummyKey, localAgent: nil)]
+            }
+        }
         if ProcessInfo.processInfo.arguments.contains("-APUITestScratchPageKinds") {
             PageKindStore.classifyOverride = { _ in PageKind(kind: .typewritten, confidence: 1) }
             PageKindStore.availableOverride = [.init(provider: .openai, modelID: "gpt-5-nano")]
@@ -83,7 +111,9 @@ enum MoneyJourneyFixture {
             model = String(url.lastPathComponent.prefix { $0 != ":" })
             route = "gemini-direct"
             status = 200
-            reply = ["candidates": [["content": ["parts": [["text": reading]]], "finishReason": "STOP"]]]
+            reply = refusesGeminiReading
+                ? ["candidates": [["finishReason": "SAFETY"]]]
+                : ["candidates": [["content": ["parts": [["text": reading]]], "finishReason": "STOP"]]]
         case ("generativelanguage.googleapis.com", let path) where path.hasSuffix(":batchGenerateContent"):
             let batch = json["batch"] as? [String: Any]
             let config = batch?["inputConfig"] as? [String: Any]

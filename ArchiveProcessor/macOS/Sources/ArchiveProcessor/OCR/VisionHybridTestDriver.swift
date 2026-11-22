@@ -86,6 +86,17 @@ enum VisionHybridTestDriver {
               estimate.ocrCost == 0 && estimate.batchOcrCost == 0 && estimate.rotationCost == 0
               && estimate.classificationCost > 0 && estimate.taggingCost > 0 && estimate.collectionCost > 0)
 
+        let judgementOnly = CostEstimator.estimate(
+            fileCount: 3, model: LLMModel.geminiModels[0], enableTagging: false,
+            sendPreviousImage: false, contextCharCount: 0, visionTextOnly: true)
+        check("Vision judgement uses the budget even with tagging and Collection ID off",
+              judgementOnly.totalStandard == judgementOnly.classificationCost && judgementOnly.classificationCost > 0)
+        let classifyOnly = CostEstimator.estimate(
+            fileCount: 3, model: LLMModel.geminiModels[0], enableTagging: false, preOCRedInput: true,
+            sendPreviousImage: false, contextCharCount: 0, classifyPreOCRedInput: true)
+        check("pre-OCRed manual tagging prices the model's classification separately",
+              classifyOnly.totalStandard == classifyOnly.classificationCost && classifyOnly.classificationCost > 0)
+
         NetworkSession.testTransport = nil
         check("test transport is dormant after teardown", !NetworkSession.testTransportIsActive)
         let passed = !results.contains { $0.hasPrefix("FAIL") }

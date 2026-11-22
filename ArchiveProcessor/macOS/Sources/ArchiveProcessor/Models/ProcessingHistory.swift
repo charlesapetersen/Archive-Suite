@@ -84,6 +84,7 @@ struct RunHistorySnapshot {
     var dateImageEveryDocument = false
     var sidecars = false
     var namesCallShare = 0.0
+    var classifyPreOCRedInput: Bool? = nil
     /// Multi-page PDFs among `fileCount` and their total pages. Those pages go to `model` directly, one
     /// call each, so they are priced apart from the image subset (never at batch rates).
     var pdfFileCount: Int = 0
@@ -132,17 +133,19 @@ struct RunHistorySnapshot {
     var estimatedCost: Double {
         // A Local Agent consumes the operator's CLI subscription, never this app's API budget.
         guard localAgent == nil else { return 0 }
-        let imageCount = max(0, fileCount - pdfFileCount)
         let pdfPages = pdfPageCount > 0 ? CostEstimator.estimateDirectPDFPages(
             pageCount: pdfPageCount, model: model, imageScale: imageScale, rotationMode: rotationMode,
             useGateway: gatewayConfig != nil, imageTokenProvider: imageTokenProvider,
             gatewayRotation: gatewayRotation) : nil
-        guard imageCount > 0 else {
-            return CostEstimator.runTotal(images: nil, directPDFPages: pdfPages, batch: batchMode) + newspaperBatchExtraCost
-        }
+        let images = imageEstimate(count: max(0, fileCount - pdfFileCount))
+        return CostEstimator.runTotal(images: images, directPDFPages: pdfPages, batch: batchMode) + newspaperBatchExtraCost
+    }
+
+    func imageEstimate(count: Int) -> CostEstimate? {
+        guard count > 0, localAgent == nil else { return nil }
         let costModel = visionTextModel ?? model
-        let est = CostEstimator.estimate(
-            fileCount: imageCount,
+        return CostEstimator.estimate(
+            fileCount: count,
             model: costModel,
             enableTagging: enableTagging,
             enableCollectionSegmentation: enableCollectionSegmentation,
@@ -154,6 +157,7 @@ struct RunHistorySnapshot {
             useGateway: gatewayConfig != nil,
             imageTokenProvider: imageTokenProvider,
             visionTextOnly: visionTextModel != nil,
+            classifyPreOCRedInput: classifyPreOCRedInput,
             gatewayRotation: gatewayRotation,
             measuredRoute: visionTextModel == nil
                 && DateRoute.measuredRoute(gateway: gatewayConfig, usesLocalAgent: localAgent != nil),
@@ -161,7 +165,6 @@ struct RunHistorySnapshot {
             sidecars: sidecars,
             namesCallShare: namesCallShare
         )
-        return CostEstimator.runTotal(images: est, directPDFPages: pdfPages, batch: batchMode) + newspaperBatchExtraCost
     }
 
     /// What a run that ends before its success tail has spent (W46.settings-ledger-more): the estimate for the pages
@@ -294,6 +297,7 @@ extension RunHistorySnapshot {
         dateImageEveryDocument = run.resolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
             .value.bool ?? false
         sidecars = run.enableSegmentJSON
+        classifyPreOCRedInput = (run.enableTagging && taggingMode != .copySource) || run.enableCollectionSegmentation
         setNamesEstimate(taggingMode: taggingMode) { run.resolvedSettings?.values[$0.rawValue]?.value }
     }
 

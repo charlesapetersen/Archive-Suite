@@ -295,7 +295,15 @@ enum CollectionSettingsFile {
 /// The layers as the app holds them: the general file in memory, collections read from their folders when needed.
 @MainActor
 final class SettingsLayerStore: ObservableObject {
-    static let shared = SettingsLayerStore(directory: SettingsLayerStore.realDirectory)
+    static let shared: SettingsLayerStore = {
+#if DEBUG
+        if MoneyJourneyFixture.monthlyLimit != nil {
+            return SettingsLayerStore(directory: MoneyJourneyFixture.directory.appendingPathComponent("state"))
+        }
+#endif
+        return SettingsLayerStore(directory: realDirectory)
+    }()
+
 
     @Published private(set) var file: GeneralSettingsFile
     /// The last thing that went wrong reading or writing, for the Settings window and the run log; cleared by the next

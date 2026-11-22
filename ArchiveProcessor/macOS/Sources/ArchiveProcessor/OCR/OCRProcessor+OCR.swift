@@ -329,7 +329,7 @@ extension OCRProcessor {
         defer { if let pass { endDrainablePass(pass) } }
 
         for (ordinal, input) in files.enumerated() {
-            guard !Task.isCancelled else { cleanupTempFiles(); return }
+            guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { cleanupTempFiles(); return }
             // The PDFs already rebuilt are in the record; the next one would start a new page.
             guard !drainingPages else { cleanupTempFiles(); return }
             let index = input.jobIndex
@@ -352,6 +352,21 @@ extension OCRProcessor {
                 }
                 progress = Double(ordinal + 1) / Double(total)
                 continue
+            }
+            if monthlySpend != nil, let history = activeRunHistory, history.localAgent == nil {
+                // A PDF is only usable once it is rebuilt. Reserve it together, including pages that this
+                // interrupted PDF has already read but has yet to put into the ledger.
+                let pages = RunHistorySnapshot.directPDFPageCount([pdfURL])
+                let price = CostEstimator.estimateDirectPDFPages(
+                    pageCount: pages, model: model, imageScale: history.imageScale,
+                    rotationMode: history.rotationMode, useGateway: gatewayConfig != nil,
+                    imageTokenProvider: history.imageTokenProvider,
+                    gatewayRotation: LLMRotationDetector.callsGateway(
+                        mode: history.rotationMode, gateway: gatewayConfig, usesLocalAgent: false))
+                guard reserveMonthlySpend(price.totalStandard, for: "the next PDF") else {
+                    cleanupTempFiles()
+                    return
+                }
             }
             jobs[index].status = .processing
             statusMessage = "Rendering \(pdfURL.lastPathComponent)…"
@@ -423,8 +438,8 @@ extension OCRProcessor {
                         imageURL: img, provider: provider, model: model,
                         thinkingLevel: thinkingLevel, apiKey: apiKey,
                         previousText: pageResults.last?.text, previousImageURL: nil,
-                        customPrompt: customPrompt, gatewayConfig: gatewayConfig, localAgent: localAgent,
-                        rotationMode: ocrRun.rotationMode,
+                        customPrompt: customPrompt, imageScale: runConfig?.imageScale ?? 1,
+                        gatewayConfig: gatewayConfig, localAgent: localAgent, rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB,
                         visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
                     )
@@ -785,7 +800,16 @@ extension OCRProcessor {
         defer { newspaper.removeScratch() }
         guard !Task.isCancelled, jobs.map(\.id) == preparationJobs else { return }
         let preparedRequests = newspaper.manifest.hasExpandedPages ? newspaper.requests : nil
-        activeRunHistory?.reserveNewspaperBatch(newspaper.manifest)
+        if var history = activeRunHistory {
+            history.reserveNewspaperBatch(newspaper.manifest)
+            let price = (history.imageEstimate(count: total)?.totalBatch ?? 0) + history.newspaperBatchExtraCost
+            guard reserveMonthlySpend(price, for: "the provider batch") else {
+                // Admission sent no requests. An earlier poll's flag does not describe this stop.
+                batchPollInterrupted = false
+                return
+            }
+            activeRunHistory = history
+        }
 
         // This submission's own money count and cause, cleared before the first create (W16.bat3-fu2).
         // `batchPollInterrupted` is the standing warning about what happens when paid-batch state is left
@@ -944,7 +968,7 @@ extension OCRProcessor {
         )
 
         // Keep the pending batch if polling was interrupted transiently, so it stays resumable.
-        retirePaidBatchJournalIfPollCompleted()
+        if monthlySpend == nil { retirePaidBatchJournalIfPollCompleted() }
         activeBatch = nil
         progress = 0.7
     }
@@ -1379,16 +1403,24 @@ extension OCRProcessor {
                         await NewspaperPageReader.$hasBasePageAllowance.withValue(false) {
                             var first = entry.result
                             if first.errorCode == NewspaperBatch.failedRegionCode {
+                                let standardCost = PageKindRouting.pagePrice(model, imageScale: fallbackScale,
+                                    sendPreviousImage: fallbackPreviousImage && entry.previousURL != nil, contextCharCount: 0)
                                 do {
                                     try Task.checkCancellation()
+                                    if await newspaperSpend?.allowsExtra(standardCost) == false {
+                                        throw ProcessFilesMonthlySpend.ReadingDeclined()
+                                    }
                                     let reader = try PageReaders.reader(provider: model.provider, model: model, apiKey: apiKey,
                                                                         thinkingLevel: batchThinking, newspaperLayout: false)
+                                    let spendID = UUID()
+                                    let countAttempt = await newspaperSpend?.hasMonthlyLimit == true
+                                    if countAttempt {
+                                        newspaperSpend?.add(standardCost, id: spendID, source: entry.url, baseAllowance: false)
+                                    }
                                     var whole = try await reader.read(PageReaderInput(
                                         imageURL: entry.url, previousImageURL: fallbackPreviousImage ? entry.previousURL : nil,
                                         customPrompt: fallbackPrompt, imageScale: fallbackScale)).detail
                                     var note = first.newspaperLayout
-                                    let standardCost = PageKindRouting.pagePrice(model, imageScale: fallbackScale,
-                                        sendPreviousImage: fallbackPreviousImage && entry.previousURL != nil, contextCharCount: 0)
                                     let extra = (note?.estimatedExtraCost ?? 0) + standardCost
                                     note?.estimatedExtraCost = extra
                                     if let n = note {
@@ -1396,12 +1428,15 @@ extension OCRProcessor {
                                             coverage: n.coverage, filled: n.filled, fallback: n.fallback,
                                             estimatedExtraCost: n.estimatedExtraCost, standardFallbackCost: standardCost)
                                     }
-                                    let spendID = UUID()
-                                    newspaperSpend?.add(standardCost, id: spendID, source: entry.url, baseAllowance: false)
+                                    if !countAttempt {
+                                        newspaperSpend?.add(standardCost, id: spendID, source: entry.url, baseAllowance: false)
+                                    }
                                     let spendIDs = (note?.spendIDs ?? []) + [spendID]
                                     note?.spendIDs = spendIDs
                                     whole.newspaperLayout = note
                                     first = whole
+                                } catch is ProcessFilesMonthlySpend.ReadingDeclined {
+                                    return (entry.index, entry.url, entry.jobID, first, true)
                                 } catch {
                                     if !Task.isCancelled {
                                         first = OCRResult(text: nil, classification: nil, errorMessage: error.localizedDescription,
@@ -1442,8 +1477,14 @@ extension OCRProcessor {
                 // not persisted either (W41.app-ocr-default-fu1).
                 guard let jobID, !abandoned else {
                     allPersisted = false
+                    if monthlyStopMessage != nil { continue }
                     group.cancelAll()
                     return
+                }
+                if monthlyStopMessage != nil, resolved.text == nil {
+                    // A declined fallback left this batch result unread. Collect it from the paid journal later.
+                    allPersisted = false
+                    continue
                 }
                 if expandedPages.contains(index) {
                     guard persistNewspaperFallback(resolved, index: index, address: materializationAddress) else {
@@ -1457,14 +1498,14 @@ extension OCRProcessor {
                     group.cancelAll()
                     return
                 }
-                _ = addNext()
+                if monthlyStopMessage == nil { _ = addNext() }
             }
         }
         // NOTE: do NOT sweep remaining `.processing` jobs to `.failed` here. For multi-chunk Gemini
         // batches this runs while OTHER chunks are still processing, so it would falsely fail files
         // whose chunk hasn't finished yet. The sweep is done once in pollBatchUntilComplete after the
         // whole batch is complete.
-        return allPersisted
+        return allPersisted && monthlyStopMessage == nil
     }
     func performOCRPhase(
         fileURLs: [URL],
@@ -1532,6 +1573,7 @@ extension OCRProcessor {
             guard !Task.isCancelled, !drainingPages,
                   !stopForUnavailableOpenRouterModel(provider: provider, model: model) else { return }
             let url = fileURLs[index]
+            guard reserveMonthlyImage(url, runConfig: runConfig) else { return }
             jobs[index].status = .processing
             // W16.bat10 — bound with the index, before the round-trip that gives Stop/Clear/Start its window.
             let jobID = jobs[index].id
@@ -1564,7 +1606,7 @@ extension OCRProcessor {
             )
 
             // If timed out, retry once without context
-            if Self.isTimeoutError(result) {
+            if Self.isTimeoutError(result), reserveMonthlyImage(url, runConfig: runConfig, retry: true) {
                 statusMessage = "OCR \(index + 1)/\(total)… retrying after timeout"
                 result = await Self.performOCRCall(
                     imageURL: url,
@@ -1643,6 +1685,7 @@ extension OCRProcessor {
             for _ in 0..<min(concurrency, total) {
                 let index = nextIndex
                 let url = fileURLs[index]
+                guard reserveMonthlyImage(url, runConfig: runConfig) else { break }
                 let jobID = jobIDs[index]
                 let prevImageURL = (sendPreviousImage && index > 0) ? fileURLs[index - 1] : nil
                 nextIndex += 1
@@ -1689,6 +1732,7 @@ extension OCRProcessor {
                 } else if nextIndex < total {
                     let idx = nextIndex
                     let nextURL = fileURLs[idx]
+                    guard reserveMonthlyImage(nextURL, runConfig: runConfig) else { continue }
                     let nextJobID = jobIDs[idx]
                     let prevImageURL = (sendPreviousImage && idx > 0) ? fileURLs[idx - 1] : nil
                     nextIndex += 1
@@ -2206,6 +2250,7 @@ extension OCRProcessor {
                   !stopForUnavailableOpenRouterModel(provider: provider, model: model) else { return }
             let index = slot.index
             let url = fileURLs[index]
+            guard reserveMonthlyImage(url, runConfig: runConfig, retry: true) else { return }
             jobs[index].status = .processing
             statusMessage = "Retrying \(attempt + 1)/\(retryIndices.count): \(url.lastPathComponent)…"
 

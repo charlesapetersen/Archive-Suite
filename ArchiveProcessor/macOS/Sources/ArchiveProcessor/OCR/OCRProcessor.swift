@@ -6,7 +6,13 @@ import ArchiveCore
 @MainActor
 class OCRProcessor: ObservableObject {
     @Published var jobs: [OCRJob] = []
-    @Published var isProcessing = false { didSet { updateOpenRouterPolicy(); updateRunActivity() } }
+    @Published var isProcessing = false {
+        didSet {
+            if !isProcessing { monthlySpend = nil }
+            updateOpenRouterPolicy()
+            updateRunActivity()
+        }
+    }
     /// W49.proc-resume-standard-runs: while a run works App Nap is held off, and in its main OCR pass idle sleep too, so
     /// a laptop left alone does not stall a long run mid-page. A run waiting on a review sheet lets the Mac idle-sleep.
     /// Closing the lid still sleeps; the run's saved pages then resume.
@@ -19,6 +25,8 @@ class OCRProcessor: ObservableObject {
     /// saved rather than read (and paid for) again on Resume Run; the run then stops and the app stays open.
     @Published var stopWhenPagesSaved = false
     var unavailableOpenRouterRunMessage: String?
+    var monthlySpend: ProcessFilesMonthlySpend?
+    var monthlyStopMessage: String?
     /// Either wait: the OCR loops start no new page while it holds.
     var drainingPages: Bool { quitWhenPagesSaved || stopWhenPagesSaved }
     /// Whether the run is in its main OCR pass, the one stage a quit or Stop can wait on (`performOCRPhase`, its resume

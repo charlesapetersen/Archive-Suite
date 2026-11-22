@@ -17813,3 +17813,13 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Verified the signed Debug build, scratch recovery, the off-screen interaction, the Processor smoke and
   three synthetic Android captures through OCR, Finder tags and finalized PDFs. No bench cache used.
   <!-- /W49.proc-training-warn-capture -->
+
+- [x] **W49.proc-ledger-limit-stop — Process Files warns, then stops, at the month's money limit [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit).
+  The money habit's limit (W46.settings-ledger) only shapes the settings sheet's choices; Process Files neither warns nor stops when a batch would pass what is left of it. Start warns when the estimate plus the month's ledger passes the limit, and the run stops at it. Covers §W46.settings-layers "The month's ledger is an estimate…". Filed by W49.ki-audit-processor.
+  Start shows the estimate and the month's remaining balance. Direct reads reserve the next page before dispatch
+  and let admitted pages finish when the limit stops the run. Provider batches must fit before submission.
+  Supplemental readers and paid segmentation check the same balance, and a resumed run uses the current ledger.
+  Off-screen tests verified cancellation at the warning, two reads on a five-page run with four workers,
+  resuming the other three without repeats, declining a provider batch before submission, and withholding an
+  unaffordable second reader. The Debug build and key-free recovery, OCR, history and output checks passed.
+  <!-- /W49.proc-ledger-limit-stop -->

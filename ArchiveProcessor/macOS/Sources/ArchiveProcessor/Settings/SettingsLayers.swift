@@ -573,6 +573,12 @@ struct SettingsResolver: Sendable {
         return a
     }
 
+    var monthlyLimitUSD: Double? {
+        guard resolve(.moneyHabit).value.string == MoneyHabit.perMonth.rawValue else { return nil }
+        let value = resolve(.monthCeilingUSD).value.double ?? 0
+        return value.isFinite ? max(0, value) : 0
+    }
+
     /// This batch's ceiling. Under the money habit "none" nothing is spent, whatever a collection says (§3.1: the
     /// cheapest safe answer where money is involved). Per batch, the nearest layer's batch ceiling. Per month, what
     /// is left of the month's ceiling, and no more than a batch ceiling a layer set. No ceiling is infinity, unless a
@@ -586,7 +592,7 @@ struct SettingsResolver: Sendable {
         case .noCeiling: return batch.layer == nil || batch.layer == .general ? .infinity : usable(batch.value.double)
         case .perBatch: return usable(batch.value.double)
         case .perMonth:
-            let left = max(0, usable(resolve(.monthCeilingUSD).value.double) - usable(spentThisMonthUSD))
+            let left = max(0, (monthlyLimitUSD ?? 0) - usable(spentThisMonthUSD))
             return batch.layer == nil ? left : min(left, usable(batch.value.double))
         }
     }

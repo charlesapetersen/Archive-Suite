@@ -57,6 +57,7 @@ struct OCRPostCorrection: Sendable {
               result.errorCode == nil, result.errorMessage == nil, result.imported == nil,
               result.newspaperLayout == nil, result.classification != .boxLabel, result.classification != .folderLabel,
               !Task.isCancelled, !apiKey.isEmpty else { return result }
+        guard await spend?.allowsExtra(Self.estimatedCost(model: model)) != false else { return result }
         do {
             guard let reply = try await PageReaders.correctPage(imageURL, prompt: Self.instruction + reading,
                                                               scale: scale, apiKey: apiKey, model: model) else {

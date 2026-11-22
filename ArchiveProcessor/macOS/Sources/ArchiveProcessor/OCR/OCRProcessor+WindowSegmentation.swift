@@ -205,6 +205,34 @@ extension OCRProcessor {
                                         message: "Could not read \(pages.urls[bad].lastPathComponent) for the model.")
         }
 
+        guard !Task.isCancelled else { return nil }
+        let estimatedSpend: Double
+        if monthlySpend != nil, pages.urls.count > 1, let options = SegmentationOptionsStore.shared {
+            let windows = WindowLayout.windows(pageCount: pages.urls.count, pages: spec.windowPages,
+                                               stride: spec.windowStride)
+            let needsRequests = spec.voters.contains { voter in
+                windows.contains { window in
+                    prior[WindowKey(voter: voter.name, pages: pages.urls.count,
+                                    start: window.lowerBound, end: window.upperBound)] == nil
+                }
+            }
+            var routes = SegmentationRoutes.current()
+            routes.localPartner = partner
+            let row = SegmentationRow.make(approach, options: options, pageCount: pages.urls.count, routes: routes)
+            estimatedSpend = needsRequests ? (row.apiDollars ?? 0) : 0
+        } else {
+            estimatedSpend = 0
+        }
+        guard reserveMonthlySpend(estimatedSpend, for: "document segmentation") else { return nil }
+        let ledgerOutputFolder = activeRunConfig?.outputDirectory
+        defer {
+            if estimatedSpend > 0 {
+                // A stage may have spent its estimate before an interruption. Keep that charge when a run resumes.
+                SettingsLayerStore.shared.recordSpend(usd: estimatedSpend, runID: nil,
+                                                      outputDirectory: ledgerOutputFolder, files: 0)
+                if !Task.isCancelled { monthlySpend?.reserved -= estimatedSpend }
+            }
+        }
         do {
             // A model on this Mac reads one window at a time (one model, one GPU), as the local OCR route reads pages.
             let onThisMac = spec.voters.allSatisfy { $0.provider == .local }

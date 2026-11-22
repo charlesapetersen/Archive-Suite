@@ -137,6 +137,68 @@ final class MoneyJourneyUITests: XCTestCase {
         print("[s027] batch off \(standard); stored batch on \(flagged)")
     }
 
+    func testMonthlyLimitWarnsStopsParallelReadsAndResumesWithoutRepeatingThem() throws {
+        try preparePhotos(count: 5)
+        // The fixture starts with $1 already in this month's ledger. About $0.0053 per image fits twice.
+        launch(extra: ["-APUITestMonthlyLimit", "1.013", "-ocrWorkerCount", "4"])
+        start()
+        let warning = text(containing: "This run may reach the monthly spending limit")
+        XCTAssertTrue(warning.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(text(containing: "$0.0130").exists)
+        shot("monthly-limit-warning")
+        app.buttons["Cancel"].firstMatch.click()
+        XCTAssertTrue(warning.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(try requestRecords().isEmpty)
+
+        start()
+        app.buttons["Start Within Limit"].firstMatch.click()
+        let stop = text(containing: "Stopped at the monthly spending limit")
+        XCTAssertTrue(stop.waitForExistence(timeout: 30), app.debugDescription)
+        let paid = try requestRecords()
+        XCTAssertEqual(paid.count, 2)
+        let resume = element("ap.ocr.resumeRun")
+        XCTAssertTrue(resume.exists)
+        shot("monthly-limit-stopped")
+        resume.click()
+        XCTAssertTrue(stop.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertEqual(try requestRecords(), paid)
+
+        app.terminate()
+        launch(extra: ["-APUITestMonthlyLimit", "1.03", "-ocrWorkerCount", "4"])
+        XCTAssertTrue(resume.waitForExistence(timeout: 10))
+        resume.click()
+        waitForDone(count: 5)
+        let final = try requestRecords()
+        XCTAssertEqual(final.count, 5)
+        XCTAssertEqual(Set(final.map(\.digest)).count, 5)
+    }
+
+    func testMonthlyLimitRefusesProviderBatchBeforeSubmission() throws {
+        try preparePhotos(count: 3)
+        launch(provider: "Gemini", batch: true, extra: ["-APUITestMonthlyLimit", "1"])
+        start()
+        let warning = text(containing: "This run may reach the monthly spending limit")
+        XCTAssertTrue(warning.waitForExistence(timeout: 10), app.debugDescription)
+        app.buttons["Start Within Limit"].firstMatch.click()
+        let stop = text(containing: "Stopped at the monthly spending limit")
+        XCTAssertTrue(stop.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertTrue(text(containing: "the provider batch").exists)
+        XCTAssertTrue(try requestRecords().isEmpty)
+        XCTAssertFalse(element("ap.ocr.resumeRun").exists)
+    }
+
+    func testMonthlyLimitStopsBeforeBuyingASecondReader() throws {
+        try preparePhotos(count: 1)
+        // The first Gemini read fits in $0.035. A second reader would take the estimate over the limit.
+        launch(provider: "Gemini", extra: ["-APUITestMonthlyLimit", "1.035", "-APUITestGeminiRefusal"])
+        start()
+        let stop = text(containing: "Stopped at the monthly spending limit")
+        XCTAssertTrue(stop.waitForExistence(timeout: 30), app.debugDescription)
+        XCTAssertTrue(text(containing: "an additional page reading").exists)
+        XCTAssertEqual(try requestRecords().map(\.route), ["gemini-direct"])
+        XCTAssertTrue(element("ap.ocr.resumeRun").exists)
+    }
+
     private func launch(provider: String = "OpenAI", batch: Bool = false, tagging: String = "none",
                         extra: [String] = [], staged: Bool = false) {
         let out = root.appendingPathComponent("out").path

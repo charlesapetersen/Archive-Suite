@@ -244,6 +244,8 @@ struct OCRCascade: Codable, Equatable, Sendable {
                 incurredLayout = NewspaperLayoutRecord.combining(read.newspaperLayout, after: incurredLayout)
                 why = "\(targetLabel): \(read.errorMessage ?? "no text")"
                 whyCode = read.errorCode ?? ""
+            } catch is ProcessFilesMonthlySpend.ReadingDeclined {
+                return first
             } catch {
                 why = "\(targetLabel): \(error.localizedDescription)"
             }

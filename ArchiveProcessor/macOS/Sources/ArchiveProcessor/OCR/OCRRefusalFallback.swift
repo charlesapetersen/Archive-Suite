@@ -144,6 +144,8 @@ enum OCRRefusalFallback {
                 result = try await read(route, imageURL: imageURL, previousText: previousText,
                                         previousImageURL: previousImageURL, customPrompt: customPrompt,
                                         imageScale: imageScale, costScale: costScale)
+            } catch is ProcessFilesMonthlySpend.ReadingDeclined {
+                return refused
             } catch {
                 reasons.append("\(route.label): \(error.localizedDescription)")
                 codes.append("")
@@ -179,13 +181,30 @@ enum OCRRefusalFallback {
         if route.localAgent == nil, route.provider == .appleVision {
             return OCRResult(text: nil, classification: nil, errorMessage: "not a second reader", errorCode: nil)
         }
+        let spending = NewspaperPageReader.spend
+        let price = route.localAgent == nil
+            ? CostEstimator.secondReaderPageCost(model: route.model, imageScale: costScale ?? imageScale) : 0
+        guard await spending?.allowsExtra(price) != false else {
+            throw ProcessFilesMonthlySpend.ReadingDeclined()
+        }
         // W42.int-s2: through the one page reader, with no thinking level as before. Gemini is never a refusal route
         // (`availableRoutes` builds none: Gemini is the refuser), but a cascade may escalate a cheaper reader's
         // failure to it.
         let reader = try PageReaders.reader(provider: route.provider, model: route.model, apiKey: route.apiKey,
                                             thinkingLevel: nil, localAgent: route.localAgent)
-        return try await reader.read(PageReaderInput(
+        let countFailure = await spending?.hasMonthlyLimit == true
+        var hasText = false
+        defer {
+            // Successful reads carry their price in SecondReader. The ledger still needs a line for
+            // an attempted read with no text, or a later Resume buys it again at the same balance.
+            if countFailure && !hasText && price > 0 {
+                spending?.add(price, id: UUID(), source: imageURL, baseAllowance: false)
+            }
+        }
+        let reading = try await reader.read(PageReaderInput(
             imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
             customPrompt: customPrompt, imageScale: imageScale, costScale: costScale)).detail
+        hasText = reading.text != nil
+        return reading
     }
 }

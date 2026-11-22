@@ -1618,6 +1618,10 @@ extension OCRProcessor {
         isProcessing = false
         cleanupTempFiles()
         checkForPendingBatch()
+        if let message = monthlyStopMessage {
+            monthlyStopMessage = nil
+            statusMessage = message + " The provider batch is saved. Resume when more money is available."
+        }
     }
     /// The first run's counterpart: retire a paid batch's recovery journal, and ONLY when the poll ran to
     /// completion (W16.bat3).
@@ -1762,6 +1766,13 @@ extension OCRProcessor {
         activeRunHistory = RunHistorySnapshot(
             resuming: pending, rotationMode: runConfig.rotationMode, imageScale: runConfig.imageScale)
 
+        beginMonthlySpend(outputDirectory: pending.outputDirectory)
+        if monthlySpend != nil, let history = activeRunHistory, history.ledgerRunID != nil {
+            // If the app crashed, reconcile what was already bought under the original run ID.
+            // The whole-batch ledger estimate already includes its expected rotation and tagging work.
+            Self.recordLedgerSpend(history, jobs: jobs, wholeRun: true)
+        }
+
         activeBatch = BatchContext(
             batchId: pending.batchId, apiKey: apiKey,
             model: pending.model, thinkingLevel: pending.thinkingLevel,
@@ -1784,11 +1795,11 @@ extension OCRProcessor {
             finishInterruptedBatchPoll()
             return
         }
-        Self.deletePendingBatch()
         activeBatch = nil
-        activePendingBatch = nil
-
         guard !Task.isCancelled else { return }
+        if monthlySpend == nil {
+            retirePaidBatchJournalIfPollCompleted()
+        }
 
         await retryHighUseFailures(
             fileURLs: imageURLs, provider: pending.provider,
@@ -1797,7 +1808,7 @@ extension OCRProcessor {
             runConfig: runConfig
         )
 
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { return }
 
         await retryLoopForFailedFiles(
             imageURLs: imageURLs,
@@ -1928,6 +1939,7 @@ extension OCRProcessor {
         restoreMixedPDFJobs(pending.mixedPDFOutcomes)
         restoredFullJobs = true
         progressRange = nil
+        if activePendingBatch != nil { retirePaidBatchJournalIfPollCompleted() }
         writeLogFile(outputDirectory: pending.outputDirectory)
         isProcessing = false
         progress = 1.0
@@ -2049,6 +2061,14 @@ extension OCRProcessor {
             imageScale: resumeImageScale,
             imageTokenProvider: resumeGatewayUpstream)
 
+        beginMonthlySpend(outputDirectory: pending.outputDirectory, pricedImages: pending.completedResults.count)
+        let pricedModel = activeRunHistory?.visionTextModel ?? pending.model
+        if monthlySpend != nil, !pending.preOCRedInput || activeRunHistory?.classifyPreOCRedInput == true,
+           !ProcessFilesMonthlySpend.hasPrice(model: pricedModel, gateway: pending.gatewayConfig,
+                                             localAgent: pending.localAgent) {
+            guard reserveMonthlySpend(nil, for: "this reader") else { return }
+        }
+
         let segmentationContext = SegmentationContext(
             previousTextCharCount: pending.previousTextCharCount,
             sendPreviousImage: pending.sendPreviousImage,
@@ -2155,6 +2175,11 @@ extension OCRProcessor {
             statusMessage = "Restored \(completedCount)/\(total). Resuming OCR…"
         }
 
+        if monthlySpend != nil, let history = activeRunHistory, history.ledgerRunID != nil {
+            // Journaled results survive a crash that happened before the normal Stop/finish ledger update.
+            Self.recordLedgerSpend(history, jobs: jobs, wholeRun: false)
+        }
+
         // Run OCR only on files that were NOT already completed — the anti-double-cost guarantee: a file
         // whose result is cached in the manifest is never re-OCR'd (Tier-2 rule a). Its output PDF is
         // regenerated above from the cached result only when missing on disk, never re-charged.
@@ -2163,6 +2188,7 @@ extension OCRProcessor {
 
         if !remainingIndices.isEmpty {
             if pending.preOCRedInput {
+                guard reserveMonthlySpend(activeRunHistory?.estimatedCost ?? 0, for: "processing these PDFs") else { return }
                 // For pre-OCRed, run the full pipeline (it's text extraction + classification, cheap)
                 await performPreOCRedProcessing(
                     files: pending.fileURLs,
@@ -2181,10 +2207,10 @@ extension OCRProcessor {
                     settings: pending.resolvedSettings
                 )
                 // Pre-OCRed path handles its own post-processing; skip to finalization
+                guard !Task.isCancelled, isProcessing else { return }
                 activePendingRun = nil
                 Self.deletePendingRun()
                 pendingRunInfo = nil
-                guard !Task.isCancelled else { return }
                 writeLogFile(outputDirectory: pending.outputDirectory)
                 isProcessing = false
                 progress = 1.0
@@ -2229,7 +2255,7 @@ extension OCRProcessor {
             runConfig: runConfig
         )
 
-        guard !Task.isCancelled, isProcessing else { cleanupTempFiles(); return }
+        guard !Task.isCancelled, isProcessing, !stopIfMonthlyReadDeclined() else { cleanupTempFiles(); return }
 
         // Interactive retry
         await retryLoopForFailedFiles(
@@ -2430,6 +2456,7 @@ extension OCRProcessor {
                 for _ in 0..<min(concurrency, remaining) {
                     let index = indices[nextSlot]
                     let url = fileURLs[index]
+                    guard reserveMonthlyImage(url, runConfig: runConfig) else { break }
                     let jobID = jobIDs[nextSlot]
                     let prevImageURL = (segmentationContext.sendPreviousImage && index > 0) ? fileURLs[index - 1] : nil
                     nextSlot += 1
@@ -2475,6 +2502,7 @@ extension OCRProcessor {
                     } else if nextSlot < remaining {
                         let idx = indices[nextSlot]
                         let url = fileURLs[idx]
+                        guard reserveMonthlyImage(url, runConfig: runConfig) else { continue }
                         let nextJobID = jobIDs[nextSlot]
                         let prevImageURL = (segmentationContext.sendPreviousImage && idx > 0) ? fileURLs[idx - 1] : nil
                         nextSlot += 1
@@ -2507,6 +2535,7 @@ extension OCRProcessor {
                 guard !Task.isCancelled, !drainingPages,
                       !stopForUnavailableOpenRouterModel(provider: provider, model: model) else { return }
                 let url = fileURLs[index]
+                guard reserveMonthlyImage(url, runConfig: runConfig) else { return }
                 jobs[index].status = .processing
                 // W16.bat10 — bound with the index, before this file's round-trip.
                 let jobID = jobs[index].id
@@ -2533,7 +2562,7 @@ extension OCRProcessor {
                     scanDetector: scanDetector, postCorrection: postCorrection
                 )
 
-                if Self.isTimeoutError(result) {
+                if Self.isTimeoutError(result), reserveMonthlyImage(url, runConfig: runConfig, retry: true) {
                     statusMessage = "OCR \(alreadyCompleted + attempt + 1)/\(totalFiles)… retrying after timeout"
                     result = await Self.performOCRCall(
                         imageURL: url, provider: provider, model: model,
@@ -2962,10 +2991,11 @@ extension OCRProcessor {
             activeBatch = nil
         }
         let modelBecameUnavailable = unavailableOpenRouterRunMessage != nil
+        let moneyLimitReached = monthlyStopMessage != nil
         cancel()
         let cancellation = batchCancellationTask
         guard quitting else {
-            if kind == .pages && !modelBecameUnavailable { statusMessage += " " + Self.stoppedAfterDrainNote }
+            if kind == .pages && !modelBecameUnavailable && !moneyLimitReached { statusMessage += " " + Self.stoppedAfterDrainNote }
             return
         }
         statusMessage = kind == .pages ? "The pages being read are saved. Quitting…"
@@ -2985,7 +3015,11 @@ extension OCRProcessor {
 
     func cancel() {
         let unavailableModel = unavailableOpenRouterRunMessage
-        let keepsRecovery = activePendingRun != nil || activePendingMixedPDF != nil
+        let spendingLimit = monthlyStopMessage
+        monthlyStopMessage = nil
+        let collectingPaidBatchLater = monthlySpend != nil && activeBatch == nil
+            && activePendingBatch?.effectiveChunkIds.isEmpty == false
+        let keepsRecovery = activePendingRun != nil || activePendingMixedPDF != nil || collectingPaidBatchLater
         unavailableOpenRouterRunMessage = nil
         // A Stop pressed while a quit waits for its pages takes the quit back: the run stops and the app stays open.
         // Pressed while a Stop waits, it is Stop Now.
@@ -3001,13 +3035,13 @@ extension OCRProcessor {
         // estimate is added below if the provider does not confirm its cancellation.
         let unfinishedRun = activeRunHistory
         let unfinishedJobs = jobs
-        recordUnfinishedRunSpend()
+        recordUnfinishedRunSpend(wholeRun: collectingPaidBatchLater)
         if let unfinishedRun, let interruptedRun {
             Task {
                 await interruptedRun.value
                 // The stopped run may finish an already-bought region while unwinding. Use only its captured
                 // snapshot and rows: Clear or a newer run cannot lend this update another run's identity.
-                Self.recordLedgerSpend(unfinishedRun, jobs: unfinishedJobs, wholeRun: false)
+                Self.recordLedgerSpend(unfinishedRun, jobs: unfinishedJobs, wholeRun: collectingPaidBatchLater)
             }
         }
         if activePendingMixedPDF != nil, interruptedRun != nil {
@@ -3117,23 +3151,26 @@ extension OCRProcessor {
             }
         }
 
-        // If a non-batch run was active, keep the pending run file for resume
-        if activePendingRun != nil {
+        // Keep the recovery record for direct reads or an already-collected batch.
+        if activePendingRun != nil || collectingPaidBatchLater {
             activePendingRun = nil
-            // Refresh the pending run info banner
+            if collectingPaidBatchLater { activePendingBatch = nil }
             checkForPendingBatch()
         }
 
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         let pending = jobs.filter { $0.status == .processing || $0.status == .pending }.count
-        if let unavailableModel {
+        if let spendingLimit {
+            statusMessage = spendingLimit
+            if keepsRecovery { statusMessage += " Your progress is saved. Resume when more money is available." }
+        } else if let unavailableModel {
             statusMessage = "Processing stopped. " + unavailableModel
             if keepsRecovery { statusMessage += Self.unavailableModelRecoveryNote }
         } else {
             statusMessage = "Cancelled. \(succeeded) succeeded, \(failedFiles.count) failed, \(pending) skipped."
         }
         for i in jobs.indices where jobs[i].status == .processing {
-            jobs[i].status = unavailableModel == nil ? .failed : .pending
+            jobs[i].status = unavailableModel == nil && spendingLimit == nil ? .failed : .pending
         }
     }
     func startProcessing(
@@ -3434,8 +3471,15 @@ extension OCRProcessor {
         activeRunHistory?.dateImageEveryDocument = frozen.values[SettingsKey.dateImageEveryDocument.rawValue]?
             .value.bool ?? false
         activeRunHistory?.sidecars = enableSegmentJSON
+        activeRunHistory?.classifyPreOCRedInput = (enableTagging && !passSourceTags) || enableCollectionSegmentation
         activeRunHistory?.setNamesEstimate(taggingMode: taggingMode) { frozen.values[$0.rawValue]?.value }
         activeRunHistory?.outputDirectory = outputDirectory
+        beginMonthlySpend(outputDirectory: outputDirectory)
+        let pricedModel = activeRunHistory?.visionTextModel ?? model
+        if monthlySpend != nil, !preOCRedInput || activeRunHistory?.classifyPreOCRedInput == true,
+           !ProcessFilesMonthlySpend.hasPrice(model: pricedModel, gateway: gatewayConfig, localAgent: localAgent) {
+            guard reserveMonthlySpend(nil, for: "this reader") else { return }
+        }
         activeRunToRecord = resumingMixedPDF == nil
             ? PendingCollectionRecord(snapshot: frozen, outputDirectory: outputDirectory, fileCount: files.count) : nil
 
@@ -3457,7 +3501,7 @@ extension OCRProcessor {
                 localAgent: localAgent,
                 runConfig: runConfig
             )
-            guard !Task.isCancelled else { cleanupTempFiles(); return }
+            guard !Task.isCancelled, isProcessing, !stopIfMonthlyReadDeclined() else { cleanupTempFiles(); return }
             guard pdfIndices.allSatisfy({ jobs[$0].status == .succeeded || jobs[$0].status == .failed }) else {
                 recordUnfinishedRunSpend()
                 isProcessing = false
@@ -3507,6 +3551,7 @@ extension OCRProcessor {
             // --- Pre-OCRed PDF path: extract text, classify, skip PDF generation ---
             // A Vision-hybrid selection has no image work on this route either. Reuse its text
             // judgement backend rather than presenting Apple Vision as a network text provider.
+            guard reserveMonthlySpend(activeRunHistory?.estimatedCost ?? 0, for: "processing these PDFs") else { return }
             // This route keeps no pending record, so the collection's run record is its only frozen settings.
             recordActiveRunInCollection(kind: "preOCRed")
             await performPreOCRedProcessing(
@@ -3525,6 +3570,7 @@ extension OCRProcessor {
                 runConfig: runConfig,
                 settings: activeResolvedSettings
             )
+            guard !Task.isCancelled, isProcessing else { return }
         } else if !autoReOCR || mixedReOCR {
             // --- Standard path: all inputs except the multi-page PDFs already rebuilt above. ---
             let files = mixedReOCR ? imageIndices.map { files[$0] } : files
@@ -3651,7 +3697,7 @@ extension OCRProcessor {
                 runConfig: runConfig
             )
 
-            guard !Task.isCancelled, isProcessing else { cleanupTempFiles(); return }
+            guard !Task.isCancelled, isProcessing, !stopIfMonthlyReadDeclined() else { cleanupTempFiles(); return }
 
             // Phase 1c: Prompt user to retry remaining failures with different provider/model
             await retryLoopForFailedFiles(
@@ -3830,6 +3876,7 @@ extension OCRProcessor {
         Self.deletePendingRun()
         pendingRunInfo = nil
 
+        if activePendingBatch != nil { retirePaidBatchJournalIfPollCompleted() }
         writeLogFile(outputDirectory: outputDirectory)
         isProcessing = false
         progress = 1.0   // fill the bar on completion (later phases don't drive the 0.7→1.0 band)
@@ -3914,7 +3961,7 @@ extension OCRProcessor {
                     guard !Task.isCancelled else { return }
                     _ = await retryOne(index: index, imageURL: imageURLs[index],
                                        outputDirectory: outputDirectory, runConfig: retryConfig)
-                    guard !Task.isCancelled, isProcessing else { return }
+                    guard !Task.isCancelled, isProcessing, !stopIfMonthlyReadDeclined() else { return }
                     progress = Double(attempt + 1) / Double(indicesToRetry.count)
                     statusMessage = "Retried \(attempt + 1)/\(indicesToRetry.count)"
                 }
@@ -3961,13 +4008,14 @@ extension OCRProcessor {
             }
             return false
         }
+        let ocrURL = imageURL ?? jobs[index].sourceURL
+        guard reserveMonthlyImage(ocrURL, runConfig: effectiveRunConfig, retry: true) else { return false }
         let previousStatus = jobs[index].status
         jobs[index].status = .processing
         // W16.bat10 — the row this retry is FOR. `ocrURL` cannot stand in for it: for a pre-OCRed PDF (or a
         // rotate-and-re-run) it is a temp JPEG that is deliberately NOT the job's source, which is exactly
         // why the identity threaded into `handleOCRResult` is the job's id rather than a URL comparison.
         let jobID = jobs[index].id
-        let ocrURL = imageURL ?? jobs[index].sourceURL
         let ocrRun = Self.ocrCallValues(for: effectiveRunConfig)
         let scanDetector = NewspaperDetector.scans(activeResolvedSettings?.values)
         let newspaperSpend = activeRunHistory?.newspaperSpend

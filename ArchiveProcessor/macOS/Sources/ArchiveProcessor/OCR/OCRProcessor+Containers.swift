@@ -42,6 +42,14 @@ extension OCRProcessor {
             : "\(skipped) box or folder label\(skipped == 1 ? " was" : "s were") not recorded: \(skipped == 1 ? "its PDF was" : "their PDFs were") not where the run left \(skipped == 1 ? "it" : "them"), or shared one with another label."
         guard !labels.isEmpty else { return skippedNote }
         let gateway = currentGateway
+        let estimate = gateway?.isLocalModel == false
+            ? Double(labels.count) * ContainerLabelCapture.gatewayDollarsPerLabel : 0
+        guard reserveMonthlySpend(estimate, for: "reading the box and folder labels", whileReading: true) else {
+            // The main outputs may already have been organised. Preserve the finished run and tell the
+            // operator the optional label proposals are missing, so a resume never recreates moved PDFs.
+            monthlyStopMessage = nil
+            return "The monthly spending limit left box and folder labels unread."
+        }
         // W47.ct-capture-gemma: with Gemma on this Mac the read takes about 13 s a label, so the line says how long.
         var pace = ""
         if gateway == nil || gateway?.isLocalModel == true, await ContainerLabelGemma.find(gateway: gateway) != nil {
@@ -57,6 +65,7 @@ extension OCRProcessor {
         // The month's ledger gets the calls as a line of their own, Stop or not: a run's own line takes a top-up only
         // above a cent's fraction, which one label's charge may be under.
         defer {
+            if !Task.isCancelled { monthlySpend?.reserved -= estimate }
             containerLabelSpendNote = ContainerLabelCapture.spendNote(
                 calls: calls, successfulReads: successfulReads, dollars: dollars)
             SettingsLayerStore.shared.recordSpend(usd: dollars, runID: UUID(), outputDirectory: outputDirectory,
@@ -66,6 +75,10 @@ extension OCRProcessor {
             guard !Task.isCancelled else { return nil }
             let r = await ContainerLabelCapture.readLabel(type: label.type, text: label.text, photo: label.source,
                                                           rotation: label.rotation, gateway: gateway)
+            guard !Task.isCancelled else {
+                if r.gatewayCalled { dollars += r.dollars; calls += 1 }
+                return nil
+            }
             // W47.ct-label-cost: the call is real money: the history's cost counts it, and the ledger (above).
             if r.gatewayCalled {
                 modelUnavailable = modelUnavailable || r.modelUnavailable
