@@ -38,6 +38,12 @@ Process scanned images through any of five cloud LLM providers or the free, loca
 - API keys stored securely in macOS Keychain
 - Cost estimation displayed before processing (standard pricing, and batch pricing too when batch mode is on)
 - Custom OCR prompts — append additional instructions to the default OCR prompt
+- **Image-grounded OCR correction** — in Advanced Settings › Reading, enable **Correct OCR against the page image**.
+  This adds one paid OpenRouter request per eligible page, sending its image and initial transcription to Qwen3.6 27B
+  on Chutes. The first reading is kept on a failed, blank, or cut-off reply. When the text changes, the PDF
+  credits the initial reader and the corrector. Standard Process Files runs with a direct API or Apple Vision can use
+  it. The output collection can block the call through its sharing settings. The switch starts off and shows both
+  benchmark comparisons. A forced stop can leave a provider charge for a request that has yet to return.
 - Image resolution scaling — **size-based** (target a fraction of a standard image size; see below) to lower API cost and time, downscaling large files more
 
 ### Guided API-Key Setup

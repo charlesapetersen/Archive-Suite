@@ -596,6 +596,7 @@ enum ProcessingSettingsCapture {
         .init(key: DefaultsKeys.gatewayLocalModel, def: .bool(false)),
         .init(key: DefaultsKeys.gatewayLocalEscalates, def: .bool(false)),
 
+        .init(key: DefaultsKeys.ocrPostCorrection, def: .bool(false)),
         .init(key: DefaultsKeys.batchMode, def: .bool(false)),
         .init(key: DefaultsKeys.preOCRedInput, def: .bool(false)),
         .init(key: DefaultsKeys.skipAlreadyProcessed, def: .bool(false)),

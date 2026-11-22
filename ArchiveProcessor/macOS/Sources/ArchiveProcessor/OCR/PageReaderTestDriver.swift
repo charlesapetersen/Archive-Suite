@@ -2,6 +2,7 @@
 import AppKit
 import CoreText
 import Foundation
+import PDFKit
 import VisionOCRKit
 
 /// Headless, $0 self-test of the one way to read a page (W42.int-s2), gated by `PAGEREADER_TEST=1` (does nothing in
@@ -77,11 +78,15 @@ enum PageReaderTestDriver {
         await journeys(dir: dir, current: current)
         await seamChecks(dir: dir, current: current)
         await priceChecks(current: current)
+        await correctionChecks(dir: dir, current: current)
     }
 
     /// The reply each provider's wire gives, for the page being read: the page's own text in that provider's shape.
     private final class Current: @unchecked Sendable {
         var text = ""
+        var correctionBody: [String: Any]?
+        var correctionReply = ""
+        var correctionCalls = 0
         /// The endpoints listing each model's GET gets, by model id.
         var listings: [String: String] = [:]
         func reply(for request: URLRequest) -> String {
@@ -91,6 +96,13 @@ enum PageReaderTestDriver {
                 let id = path.replacingOccurrences(of: "/api/v1/models/", with: "")
                     .replacingOccurrences(of: "/endpoints", with: "")
                 return listings[id] ?? #"{"data":{"id":"\#(id)","endpoints":[]}}"#
+            }
+            if host == "openrouter.ai", let data = request.httpBody,
+               let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               body["model"] as? String == OCRPostCorrection.model?.id {
+                correctionBody = body
+                correctionCalls += 1
+                return correctionReply
             }
             let tagged = "[document_start]\n" + text
             func json(_ object: Any) -> String {
@@ -196,6 +208,91 @@ enum PageReaderTestDriver {
         check("2 loop stop: a counting run is not caught (the cap stops it)",
               !OnDeviceModelClient.isLooping((700...800).map { "(\($0))" }.joined(separator: " ")))
         current.text = "failed"
+    }
+
+    private static func correctionChecks(dir: URL, current: Current) async {
+        let page = dir.appendingPathComponent("memo.png")
+        let correction = OCRPostCorrection(apiKey: "test-key")
+        let spend = NewspaperReadingSpend()
+        current.text = "A mernorandum.\nSecond line."
+        current.correctionReply = #"{"choices":[{"finish_reason":"stop","message":{"content":"A memorandum.\nSecond line."}}],"usage":{"prompt_tokens":4000,"completion_tokens":10}}"#
+        func read(_ stage: OCRPostCorrection?, customPrompt: String? = nil) async -> OCRResult {
+            await OCRProcessor.performOCRCall(
+                imageURL: page, provider: .gemini, model: LLMProvider.gemini.models[0], thinkingLevel: nil,
+                apiKey: "test-key", previousText: "A different page", previousImageURL: nil, customPrompt: customPrompt,
+                rotationMode: .off, standardImageMB: 2, cascade: .off, refusalFallback: false,
+                newspaperSpend: spend, postCorrection: stage)
+        }
+
+        let baseline = await read(nil)
+        check("4 correction off sends no extra request", baseline.text == current.text && current.correctionCalls == 0)
+        let corrected = await read(correction)
+        check("4 completed correction replaces only the OCR text",
+              corrected.text == "A memorandum.\nSecond line."
+                && corrected.classification == baseline.classification
+                && corrected.ocrClassification == baseline.ocrClassification
+                && corrected.rotationDegrees == baseline.rotationDegrees
+                && corrected.readPoorly == baseline.readPoorly
+                && corrected.imageCorrectionApplied == true)
+        let reopened = corrected.with(classification: corrected.classification, rotationDegrees: 0)
+        let output = dir.appendingPathComponent("corrected.pdf")
+        let saved = try? PDFGenerator().generateOutput(imageURL: page, result: reopened, model: LLMProvider.gemini.models[0],
+                                                      outputURL: output, textLayer: nil)
+        let pageText = PDFDocument(url: output)?.page(at: 1)?.string
+        check("4 scratch PDF records the original reader and corrector and keeps the corrected text",
+              saved != nil && pageText?.contains("Gemini ·") == true
+                && pageText?.contains("Qwen3.6 27B image correction (OpenRouter)") == true
+                && pageText?.contains("A memorandum.") == true)
+        let messages = current.correctionBody?["messages"] as? [[String: Any]]
+        let parts = messages?.first?["content"] as? [[String: Any]]
+        let photo = (parts?.first?["image_url"] as? [String: String])?["url"]
+        let provider = current.correctionBody?["provider"] as? [String: Any]
+        let reasoning = current.correctionBody?["reasoning"] as? [String: Any]
+        check("4 correction sends one page and its reading on the pinned non-thinking route",
+              current.correctionCalls == 1 && parts?.count == 2
+                && photo?.hasPrefix("data:image/jpeg;base64,") == true
+                && parts?.last?["text"] as? String == OCRPostCorrection.instruction + current.text
+                && current.correctionBody?["max_tokens"] as? Int == 8192
+                && current.correctionBody?["temperature"] as? Int == 0
+                && reasoning?["enabled"] as? Bool == false
+                && provider?["order"] as? [String] == ["chutes/fp8"]
+                && provider?["allow_fallbacks"] as? Bool == false)
+        check("4 the additional request has its own charge",
+              abs(spend.unreported(layouts: [], baseSources: [page]) - 0.00102) < 1e-10)
+
+        current.correctionReply = #"{"choices":[{"finish_reason":"length","message":{"content":"Cut off"}}],"usage":{"prompt_tokens":4000,"completion_tokens":8192}}"#
+        let cut = await read(correction)
+        check("4 a capped reply keeps the original text and still counts its cost",
+              cut.text == current.text && cut.errorCode == nil && current.correctionCalls == 2
+                && spend.unreported(layouts: [], baseSources: [page]) > 0.017)
+        current.correctionReply = #"{"choices":[{"finish_reason":"stop","message":{"content":"  "}}]}"#
+        let blank = await read(correction)
+        check("4 an empty correction keeps the original text", blank.text == current.text && current.correctionCalls == 3)
+        let custom = await read(correction, customPrompt: "Keep all marks.")
+        check("4 a custom OCR prompt skips correction", custom.text == current.text && current.correctionCalls == 3)
+
+        let policy = ResolvedSetting(value: .bool(true), layer: .collection, source: nil, layerName: nil)
+        let excludes = ResolvedSetting(value: .strings(["Qwen"]), layer: .collection, source: nil, layerName: nil)
+        check("4 each collection sharing restriction skips image correction",
+              OCRPostCorrection.policyReason([SettingsKey.staysOnMac.rawValue: policy]) != nil
+                && OCRPostCorrection.policyReason([SettingsKey.noTraining.rawValue: policy]) != nil
+                && OCRPostCorrection.policyReason([SettingsKey.excludedModelFamilies.rawValue: excludes]) != nil)
+
+        let processor = OCRProcessor()
+        let configOff = processor.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil)
+        processor.activePostCorrection = correction
+        let configOn = processor.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil)
+        let encoded = try? JSONEncoder().encode(configOn)
+        let decoded = encoded.flatMap { try? JSONDecoder().decode(OCRProcessor.PendingRunRuntimeConfig.self, from: $0) }
+        check("4 the standard and mixed resume snapshot stores only the effective switch",
+              configOff.postCorrection == nil && decoded?.postCorrection == true
+                && encoded.flatMap { String(data: $0, encoding: .utf8) }?.contains("test-key") == false)
+        // An abandoned newspaper's estimated first request still has a base allowance if a paid correction for
+        // the same input was recorded earlier (for example, before a subsequent rotation pass).
+        spend.add(0.003, id: UUID(), source: page)
+        check("4 correction does not consume the newspaper's base reading allowance",
+              spend.unreported(layouts: [], baseSources: []) - spend.unreported(layouts: [], baseSources: [page])
+                > 0.00299)
     }
 
     /// 3. OpenRouter's listed price for the pinned upstream, through the no-wire seam into a scratch defaults suite.

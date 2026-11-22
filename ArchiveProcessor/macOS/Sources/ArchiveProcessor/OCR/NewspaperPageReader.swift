@@ -235,7 +235,7 @@ final class NewspaperReadingSpend: @unchecked Sendable {
     let parentLedgerID = UUID()
     private struct Reading {
         let source: URL
-        let first: Double
+        let first: Double?
         let sequence: Int
         var total: Double
     }
@@ -246,7 +246,7 @@ final class NewspaperReadingSpend: @unchecked Sendable {
         guard dollars.isFinite, dollars >= 0 else { return }
         lock.withLock {
             if readings[id] == nil {
-                readings[id] = Reading(source: source, first: baseAllowance ? dollars : 0, sequence: readings.count, total: 0)
+                readings[id] = Reading(source: source, first: baseAllowance ? dollars : nil, sequence: readings.count, total: 0)
             }
             readings[id]?.total += dollars
         }
@@ -267,7 +267,12 @@ final class NewspaperReadingSpend: @unchecked Sendable {
             var charges: [UUID: Double] = [:]
             for (id, read) in readings.sorted(by: { $0.value.sequence < $1.value.sequence }) where !reported.contains(id) {
                 let hasBase = baseSources == nil || baseSources!.contains(read.source) || allPDFPagesRead
-                let subtract = hasBase && consumed.insert(read.source).inserted ? read.first : 0
+                let subtract: Double
+                if let first = read.first, hasBase, consumed.insert(read.source).inserted {
+                    subtract = first
+                } else {
+                    subtract = 0
+                }
                 charges[id] = max(0, read.total - subtract)
             }
             return charges

@@ -62,7 +62,7 @@ enum SettingsPanelOwnership {
             DefaultsKeys.gatewayLocalModel, DefaultsKeys.gatewayLocalEscalates,
             DefaultsKeys.visionUseLLMJudgment, DefaultsKeys.visionLanguages, DefaultsKeys.visionFastRecognition,
             DefaultsKeys.visionMinimumConfidence, DefaultsKeys.visionCustomVocabulary,
-            DefaultsKeys.ocrCascadeRoute, DefaultsKeys.ocrCascadeOnDisagreement,
+            DefaultsKeys.ocrCascadeRoute, DefaultsKeys.ocrCascadeOnDisagreement, DefaultsKeys.ocrPostCorrection,
             DefaultsKeys.ocrPageKindRouting, DefaultsKeys.ocrHandwritingOnTyped,
             SettingsSheetModel.overrideKey("reading").rawValue, SettingsKey.scanNewspapersDocLayoutYOLO.rawValue,
         ] + LLMProvider.allCases.map { ModelSelectionStore.modelKey(for: $0) })

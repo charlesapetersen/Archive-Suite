@@ -17673,3 +17673,18 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   roots, PDF-only and paired copies, same-name replacement, split ownership, merged membership and unavailable owners.
   Tier-2 adversarial review, ArchiveCore smoke and the write-surface lint passed. No corpus or bench cache used.
   <!-- /W49.storage-contract -->
+
+- [x] **W47.wh-post-correction — the image-grounded corrector as an optional stage, labelled [M]** · §The withheld features — the owner's calls of 2026-11-19 (W47.wh) — SHIPPED 2026-11-22 (this commit).
+  Owner call 15 (2026-11-19) asked to release the image-grounded pass after reading, off by default, at Advanced.
+  Against direct 27B re-reading, the 96-page set's tested band tied (−0.42, 95% interval −1.47 to +0.64) and
+  120 public band readings gained +1.47 (+0.55 to +2.63). Relative to the first reading, 4 of 57 and 10 of 120
+  got worse (`ocr-postcorrect.md`). Both results are shown in Reading settings. Text-only correction stays out.
+  The app uses pinned Qwen3.6 27B FP8 on OpenRouter/Chutes, a different host from Sherlock. The test band used
+  checked transcriptions, so the switch applies once per eligible page in standard Process Files with a direct API
+  or Apple Vision. Imports, layout runs, custom prompts, batch, gateway/CLI and multi-page PDF rebuilds skip it.
+  The stage respects sharing restrictions, keeps the first text if the extra request fails, and credits the
+  corrector in the PDF when the text changes. Standard and mixed-run recovery remember the effective switch
+  without saving the key. Verified with the Debug build, key-free page-reader and scratch PDF checks, run quit/resume,
+  settings ownership, newspaper accounting, the OCR prompt and route-table contracts, and four focused off-screen
+  Settings tests. Reviewed the Advanced and changed-at-Basic screenshots. Verification cost $0 and used no bench cache.
+  <!-- /W47.wh-post-correction -->

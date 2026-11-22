@@ -1087,7 +1087,7 @@
     },
     {
      "id": "no-post-correction",
-     "text": "No post-correction stage; a log-probability score is a check-this-reading flag, not a trigger.",
+     "text": "Image-grounded correction is off by default and available in Advanced Reading settings. A log-probability score only flags a reading for checking.",
      "source": "ocr-postcorrect.md",
      "switch": null
     },

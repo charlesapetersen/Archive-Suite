@@ -66,7 +66,7 @@ enum SettingsLevels {
         .overrides, .backend, .providerModel, .cascade, .pageKind, .handwritingOnTyped, .visionLanguages,
         .visionJudgement, .gatewayLocal, .cliAgent, .preOCRed, .batch, .outputSizes, .rotation, .vocabularyColours,
         .collectionID, .segmentationReview, .segmentationApproach, .dateImage, .scanNewspapers, .placeHand, .searchable, .downloads,
-        .driveRelay, .thinking, .cascadeDisagreement, .visionTuning, .gatewayFields, .cliFields, .customModels,
+        .driveRelay, .thinking, .cascadeDisagreement, .postCorrection, .visionTuning, .gatewayFields, .cliFields, .customModels,
         .imageSize, .workers, .logFile, .previousImage, .customPrompt, .localSegmenter,
     ]
 
@@ -105,7 +105,7 @@ enum SettingsLevels {
             return ""
         case DefaultsKeys.useGateway, DefaultsKeys.useLocalAgent, DefaultsKeys.useAppleVision, DefaultsKeys.gatewayLocalModel,
              DefaultsKeys.gatewayLocalEscalates, DefaultsKeys.visionUseLLMJudgment, DefaultsKeys.visionFastRecognition,
-             DefaultsKeys.ocrCascadeOnDisagreement, DefaultsKeys.ocrPageKindRouting,
+             DefaultsKeys.ocrCascadeOnDisagreement, DefaultsKeys.ocrPageKindRouting, DefaultsKeys.ocrPostCorrection,
              DefaultsKeys.preOCRedInput, DefaultsKeys.batchMode, DefaultsKeys.reviewRotation,
              DefaultsKeys.enableCollectionSegmentation, DefaultsKeys.confirmCollectionIDs,
              DefaultsKeys.reviewDocumentSegmentation, DefaultsKeys.mergeDocuments, DefaultsKeys.sendPreviousImage,
@@ -238,6 +238,8 @@ extension SettingsLevels.Row {
                                why: "no measured figure compares Low thinking with High")
     static let cascadeDisagreement = Self("cascade-disagreement", .advanced, [DefaultsKeys.ocrCascadeOnDisagreement],
                                           why: "opt-in, with no measured gain over escalating failed pages alone")
+    static let postCorrection = Self("post-correction", .advanced, [DefaultsKeys.ocrPostCorrection],
+                                     why: "an extra paid reading with mixed results")
     static let visionTuning = Self("vision-tuning", .advanced,
                                    [DefaultsKeys.visionFastRecognition, DefaultsKeys.visionMinimumConfidence, DefaultsKeys.visionCustomVocabulary],
                                    why: "none of these is measured on the bench")

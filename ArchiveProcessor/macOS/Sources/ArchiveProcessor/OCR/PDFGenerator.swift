@@ -765,7 +765,8 @@ struct PDFGenerator {
         } else {
             providerName = model.provider.rawValue; modelName = model.displayName
         }
-        let metaLine = "\(ImportedReading.headerComponent(providerName)) · \(ImportedReading.headerComponent(modelName)) · \(dateStr)"
+        let correction = result.imageCorrectionApplied == true ? " + Qwen3.6 27B image correction (OpenRouter)" : ""
+        let metaLine = "\(ImportedReading.headerComponent(providerName)) · \(ImportedReading.headerComponent(modelName))\(correction) · \(dateStr)"
         provenanceRange = NSRange(location: headerLine.utf16.count + 1, length: metaLine.utf16.count)
         headerLine += "\n\(metaLine)"
         if let classification = result.classification {

@@ -79,10 +79,14 @@ cascades) keep the floor alone and "pair not measured". A tie goes to the cheape
   a row with a `lower-scoring: …` condition naming what beats it. It sits at the Advanced level with its figures and is
   never a default, the solver's pick, a suggested alternative or the Improve OCR suggestion; chosen on the card, it is
   what the stage reads with (the solver keeps it only where `onlyRoutes` names it).
-- No post-correction stage for the owner's material: an image-grounded corrector is no better than reading the band
-  page again with the same 27B (-0.42, -1.47 to +0.64), and text-only correction is never used
-  (`ocr-postcorrect.md`). A log-probability score is a per-page "check this reading" flag, not a trigger
-  (`ocr-logprob.md`).
+- Image-grounded correction is off by default and optional in Advanced Reading settings (owner call 15,
+  W47.wh-post-correction). On middle-accuracy readings it tied re-reading with the 27B on the 96 (−0.42,
+  95% interval −1.47 to +0.64) and gained +1.47 (+0.55 to +2.63) on 120 public readings. It worsened
+  4 of 57 and 10 of 120 starting readings. The test ran on Sherlock FP8. The app uses the pinned
+  Qwen3.6 27B route at OpenRouter (Chutes) for eligible standard Process Files pages and keeps the
+  initial reading on failure or truncation. The benchmark band needed checked transcriptions, so it
+  does not select pages at runtime. There is no text-only correction. A log-probability score flags a
+  reading for checking (`ocr-postcorrect.md`, `ocr-logprob.md`).
 
 **Fallback when the chosen route fails on a page.** A reply at the token cap is a failure, stopped early. Shipped
 today: the cascade (`OCR/OCRCascade.swift`, off by default) re-reads a failed page (cut off at `length`,

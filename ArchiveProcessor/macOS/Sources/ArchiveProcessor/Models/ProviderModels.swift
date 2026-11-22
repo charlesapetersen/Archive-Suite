@@ -798,7 +798,7 @@ struct OCRJob: Identifiable {
 }
 
 struct OCRResult: Codable {
-    let text: String?
+    private(set) var text: String?
     let classification: DocumentClassification?
     /// Clockwise rotation in degrees needed to correct image orientation (0, 90, 180, 270).
     let rotationDegrees: Int
@@ -847,11 +847,15 @@ struct OCRResult: Codable {
     /// summary (not Live Capture's group rotation, the newspaper region join or re-OCR pairs, which show none).
     /// `nil` = not flagged, or read by a route with no measured cut.
     var readPoorly: ReadQualityFlag?
+    /// The image corrector changed this text. The first reader still owns classification and rotation.
+    private(set) var imageCorrectionApplied: Bool?
 
     init(text: String?, classification: DocumentClassification?, rotationDegrees: Int = 0, errorMessage: String?, errorCode: String?,
          enclosure: Bool? = nil, ocrClassification: DocumentClassification?? = nil, ocrEnclosure: Bool?? = nil,
          secondReader: SecondReader? = nil, pageReader: PageReaderRecord? = nil, imported: ImportedReading? = nil,
-         readingCodes: [String]? = nil, newspaperLayout: NewspaperLayoutRecord? = nil, readPoorly: ReadQualityFlag? = nil) {
+         readingCodes: [String]? = nil, newspaperLayout: NewspaperLayoutRecord? = nil, readPoorly: ReadQualityFlag? = nil,
+         imageCorrectionApplied: Bool? = nil) {
+        self.imageCorrectionApplied = imageCorrectionApplied
         self.readPoorly = text == nil ? nil : readPoorly
         self.readingCodes = readingCodes
         self.newspaperLayout = newspaperLayout
@@ -868,6 +872,14 @@ struct OCRResult: Codable {
         // A fresh result's model classification IS its classification; a rebuild passes the original.
         self.ocrClassification = ocrClassification ?? classification
         self.ocrEnclosure = ocrEnclosure ?? self.enclosure
+    }
+
+    func withImageCorrection(_ text: String) -> OCRResult {
+        guard text != self.text else { return self }
+        var copy = self
+        copy.text = text
+        copy.imageCorrectionApplied = true
+        return copy
     }
 
     /// A reply cut off at the token limit (W41.app-ocr-cascade): every client fails the page with this, never the
@@ -890,7 +902,7 @@ struct OCRResult: Codable {
                   enclosure: classification == self.classification ? enclosure : nil,
                   ocrClassification: .some(ocrClassification), ocrEnclosure: .some(ocrEnclosure),
                   secondReader: secondReader, pageReader: pageReader, imported: imported, readingCodes: readingCodes,
-                  readPoorly: readPoorly)
+                  readPoorly: readPoorly, imageCorrectionApplied: imageCorrectionApplied)
         copy.rotationUnsure = rotationUnsure
         copy.newspaperLayout = newspaperLayout
         return copy

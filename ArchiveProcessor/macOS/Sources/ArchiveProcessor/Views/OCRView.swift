@@ -12,6 +12,7 @@ struct OCRView: View {
     // Persisted via @AppStorage (UserDefaults)
     @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
     @AppStorage(DefaultsKeys.selectedThinking) private var selectedThinking: ThinkingLevel = .low
+    @AppStorage(DefaultsKeys.ocrPostCorrection) private var ocrPostCorrection = false
     @AppStorage(DefaultsKeys.batchMode) private var batchMode: Bool = false
     @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
     @AppStorage(DefaultsKeys.skipAlreadyProcessed) private var skipAlreadyProcessed: Bool = false
@@ -983,6 +984,7 @@ struct OCRView: View {
                 }
 
                 newspaperLayoutAllowance
+                postCorrectionEstimate
 
                 // Output directory
                 GroupBox("Output Folder") {
@@ -1020,6 +1022,27 @@ struct OCRView: View {
                         .frame(maxWidth: .infinity)
                 }
             }
+        }
+    }
+
+    @ViewBuilder private var postCorrectionEstimate: some View {
+        if ocrPostCorrection, !droppedFiles.isEmpty {
+            let notice: String = if let policy = OCRPostCorrection.policyReason(at: outputDirectory, store: settingsStore) {
+                "Image correction is skipped. \(policy)"
+            } else if preOCRedInput || isPDFOnlyReOCR || useGateway || useLocalAgent
+                        || (!useAppleVision && batchMode && effectiveProvider.supportsBatch)
+                        || !customOCRPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                "This run skips image correction."
+            } else if !segmentationRoutes.hasOpenRouterKey {
+                "Image correction needs an OpenRouter key in Settings › Accounts."
+            } else if let model = OCRPostCorrection.model {
+                "Image correction via OpenRouter adds about \(CostEstimate.money(OCRPostCorrection.estimatedCost(model: model))) per eligible page, outside the reading estimate."
+            } else {
+                "The image correction route is unavailable."
+            }
+            Text(notice)
+                .font(.caption2).foregroundStyle(.primary)
+                .accessibilityIdentifier("ap.ocr.postCorrectionCost")
         }
     }
 
@@ -1810,7 +1833,8 @@ struct OCRView: View {
                 skipAlreadyProcessed: skipAlreadyProcessed,
                 segmentationContext: context,
                 gatewayConfig: gateway,
-                localAgent: currentLocalAgentConfig
+                localAgent: currentLocalAgentConfig,
+                postCorrectionRequested: ocrPostCorrection && !useGateway && !useLocalAgent
             )
         }
     }

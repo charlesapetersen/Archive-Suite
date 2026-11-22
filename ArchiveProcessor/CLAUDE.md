@@ -49,8 +49,8 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
   Apple Vision model (`apple-fm-27`), chosen only on the reading card (lower-scoring, owner call 15); its loop stop
   fails a page whose reply starts repeating, as a page at the token cap fails on every client.
 - **Apple Vision** is additive, never the default. Its optional text-only judgement call goes to a **direct** LLM
-  with the extracted text only — no image bytes, image URL, gateway or Local Agent. With judgement off, Vision is
-  fully offline (No tagging / Copy source tags only).
+  with the extracted text only — no image bytes, image URL, gateway or Local Agent. With judgement and image correction
+  off, Vision is fully offline (No tagging / Copy source tags only).
 - **A failed reply is never a transcription:** an OpenRouter 200 with `finish_reason` error, or an in-body provider
   error, is a failed page (503, retried); every client fails a cut-off reply as `length`, never saving cut text.
 - **Cascade** (`OCR/OCRCascade.swift`, off by default) never escalates transport errors, timeouts, 429/503/529,

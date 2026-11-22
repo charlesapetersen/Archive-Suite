@@ -146,14 +146,14 @@ enum SettingsPanelsTestDriver {
         check("6 the level itself is Basic, in General", levelOf[DefaultsKeys.settingsLevel] == .basic
               && owned[DefaultsKeys.settingsLevel] == .general)
 
-        // 7. The design's placements (levels.md §4): the twelve groups the owner moved to Advanced, each with its reason.
+        // 7. The original Advanced groups and image correction, each with its reason (levels.md §4 and §5).
         let advanced = rows.filter { $0.level == .advanced }
-        check("7 twelve groups at Advanced", advanced.count == 12,
+        check("7 thirteen groups at Advanced", advanced.count == 13,
               "\(advanced.count): " + advanced.map(\.id).joined(separator: ", "))
         check("7 every Advanced row says why", advanced.allSatisfy { !($0.why ?? "").isEmpty })
         check("7 no row below Advanced carries a reason", rows.filter { $0.level != .advanced }.allSatisfy { $0.why == nil })
         let expected: [(String, SettingsLevel)] = [
-            (DefaultsKeys.selectedThinking, .advanced), (DefaultsKeys.ocrCascadeOnDisagreement, .advanced),
+            (DefaultsKeys.ocrPostCorrection, .advanced), (DefaultsKeys.selectedThinking, .advanced), (DefaultsKeys.ocrCascadeOnDisagreement, .advanced),
             (DefaultsKeys.visionMinimumConfidence, .advanced), (DefaultsKeys.gatewayBaseURL, .advanced),
             (DefaultsKeys.localAgentBinaryPath, .advanced), (DefaultsKeys.standardImageSizeMB, .advanced),
             (DefaultsKeys.ocrWorkerCount, .advanced), (DefaultsKeys.writeLogFile, .advanced),

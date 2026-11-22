@@ -63,6 +63,13 @@ enum PageReaders {
         }
     }
 
+    /// The correction stage reuses the pinned image transport. Its reply is plain text, without OCR classification.
+    static func correctPage(_ imageURL: URL, prompt: String, scale: Double, apiKey: String,
+                            model: LLMModel) async throws -> OCRPostCorrection.Reply? {
+        let client = try OpenAICompatibleClient.pinnedOpenRouter(model: model, apiKey: apiKey)
+        return try await client.correctPage(imageURL: imageURL, prompt: prompt, imageScale: scale)
+    }
+
     /// One page at the model's standard rate, as the refusal second readers are priced (image, prompt and output).
     static func pagePrice(_ model: LLMModel) -> Double {
         CostEstimator.secondReaderPageCost(model: model, imageScale: 1)

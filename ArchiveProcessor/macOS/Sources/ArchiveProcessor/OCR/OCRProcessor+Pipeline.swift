@@ -318,6 +318,7 @@ extension OCRProcessor {
             gatewayUpstreamProvider: gatewayConfig == nil ? nil : Self.gatewayUpstreamProviderFromDefaults(),
             segmentationApproach: runConfig?.segmentationApproach ?? SegmentationApproach.stored(),
             cascade: runConfig?.cascade ?? OCRCascade.fromDefaults(),
+            postCorrection: activePostCorrection == nil ? nil : true,
             pageReaders: runConfig.map { $0.pageReaders.isEmpty ? nil : $0.pageReaders } ?? nil,
             institutionalComputeFolder: runConfig?.institutionalComputeImport?.folder.path,
             outputSubfolders: outputSubfolders.isEmpty ? nil : outputSubfolders
@@ -1697,6 +1698,7 @@ extension OCRProcessor {
         // The run's own frozen settings, not the last started run's: the PDFs it still writes read them
         // (W42.int-s5 `textLayerOptions`, the dating route's switch). nil (a run recorded before them) is the defaults.
         activeResolvedSettings = pending.resolvedSettings
+        activePostCorrection = nil
         let runConfig = makePendingBatchResumeConfig(pending, apiKey: apiKey)
         applyResumeConfig(runConfig)
         activeRunConfig = runConfig
@@ -1978,6 +1980,10 @@ extension OCRProcessor {
         currentGateway = pending.gatewayConfig
         currentLocalAgent = pending.localAgent
         activeRunConfig = runConfig
+        activePostCorrection = Self.makePostCorrection(
+            requested: pending.runtimeConfig?.postCorrection == true,
+            gateway: pending.gatewayConfig, localAgent: pending.localAgent, outputDirectory: pending.outputDirectory,
+            frozen: pending.resolvedSettings?.values)
         let resumeGatewayUpstream: LLMProvider
         if let config = pending.runtimeConfig {
             // V2: replay the immutable start-time snapshot. Self-consistency above has already validated
@@ -2376,6 +2382,7 @@ extension OCRProcessor {
         let ocrRun = Self.ocrCallValues(for: runConfig)
         let scanDetector = NewspaperDetector.scans(activeResolvedSettings?.values)
         let newspaperSpend = activeRunHistory?.newspaperSpend
+        let postCorrection = newspaperSpend == nil ? nil : activePostCorrection
         let visionTextLLM = provider == .appleVision ? runConfig?.visionTextLLM : nil
 
         if segmentationContext.previousTextCharCount == 0 {
@@ -2411,7 +2418,8 @@ extension OCRProcessor {
                             gatewayConfig: gateway, localAgent: localAgent,
                             rotationMode: ocrRun.rotationMode,
                             standardImageMB: ocrRun.standardImageMB,
-                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
+                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend,
+                            scanDetector: scanDetector, postCorrection: postCorrection
                         )
                         let result = await Self.applyingVisionTextClassification(
                             to: ocrResult, previousText: nil,
@@ -2452,7 +2460,8 @@ extension OCRProcessor {
                                 gatewayConfig: gateway, localAgent: localAgent,
                                 rotationMode: ocrRun.rotationMode,
                                 standardImageMB: ocrRun.standardImageMB,
-                                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
+                                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend,
+                                scanDetector: scanDetector, postCorrection: postCorrection
                             )
                             let result = await Self.applyingVisionTextClassification(
                                 to: ocrResult, previousText: nil,
@@ -2490,7 +2499,8 @@ extension OCRProcessor {
                     gatewayConfig: gateway, localAgent: localAgent,
                     rotationMode: ocrRun.rotationMode,
                     standardImageMB: ocrRun.standardImageMB,
-                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
+                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend,
+                    scanDetector: scanDetector, postCorrection: postCorrection
                 )
 
                 if Self.isTimeoutError(result) {
@@ -2504,7 +2514,8 @@ extension OCRProcessor {
                         gatewayConfig: gateway, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB,
-                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
+                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend,
+                        scanDetector: scanDetector, postCorrection: postCorrection
                     )
                 }
 
@@ -3084,7 +3095,8 @@ extension OCRProcessor {
         segmentationContext: SegmentationContext,
         gatewayConfig: GatewayConfig? = nil,
         localAgent: LocalAgentConfig? = nil,
-        resumingMixedPDF: PendingMixedPDF? = nil
+        resumingMixedPDF: PendingMixedPDF? = nil,
+        postCorrectionRequested: Bool = false
     ) async {
         // W41.app-page-kind: taken and cleared before any early return, so a start that is refused cannot leave its
         // plan for a later run whose caller set none.
@@ -3262,6 +3274,18 @@ extension OCRProcessor {
         let mixedReOCR = autoReOCR && !imageIndices.isEmpty
         // One id for the run across a resume from its PDF recovery record (W46.settings-ledger-more).
         let runID = resumingMixedPDF?.ledgerRunID ?? UUID()
+        // W46.settings-layers: resolve the general, project and collection layers once and freeze them for this run's
+        // pending record. The run is recorded in the collection's folder only once it is committed to start
+        // (`recordActiveRunInCollection`), and a resumed mixed-PDF run was recorded when it first started.
+        let frozen = SettingsLayerStore.shared.snapshot(
+            outputDirectory: outputDirectory, runID: runID, processing: ProcessingSettingsCapture.capture())
+        activeResolvedSettings = frozen
+        let wantsCorrection = resumingMixedPDF.map { $0.runtimeConfig.postCorrection == true } ?? postCorrectionRequested
+        activePostCorrection = Self.makePostCorrection(
+            requested: wantsCorrection && !preOCRedInput && !(autoReOCR && !mixedReOCR)
+                && !(batchMode && provider.supportsBatch)
+                && segmentationContext.customPrompt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
+            gateway: gatewayConfig, localAgent: localAgent, outputDirectory: outputDirectory, frozen: frozen.values)
         if let resumingMixedPDF {
             guard mixedReOCR && pdfIndices == resumingMixedPDF.pdfIndices else {
                 isProcessing = false
@@ -3331,12 +3355,6 @@ extension OCRProcessor {
             pdfSources: pdfIndices.map { files[$0] }
         )
 
-        // W46.settings-layers: resolve the general, project and collection layers once and freeze them for this run's
-        // pending record. The run is recorded in the collection's folder only once it is committed to start
-        // (`recordActiveRunInCollection`), and a resumed mixed-PDF run was recorded when it first started.
-        let frozen = SettingsLayerStore.shared.snapshot(
-            outputDirectory: outputDirectory, runID: runID, processing: ProcessingSettingsCapture.capture())
-        activeResolvedSettings = frozen
         activeRunHistory?.ledgerRunID = frozen.runID
         activeRunHistory?.dateImageEveryDocument = frozen.values[SettingsKey.dateImageEveryDocument.rawValue]?
             .value.bool ?? false
@@ -3852,6 +3870,7 @@ extension OCRProcessor {
         let ocrRun = Self.ocrCallValues(for: effectiveRunConfig)
         let scanDetector = NewspaperDetector.scans(activeResolvedSettings?.values)
         let newspaperSpend = activeRunHistory?.newspaperSpend
+        let postCorrection = newspaperSpend == nil ? nil : activePostCorrection
         var result = await Self.performOCRCall(
             imageURL: ocrURL, provider: effectiveRunConfig.provider, model: effectiveRunConfig.model,
             thinkingLevel: effectiveRunConfig.thinkingLevel, apiKey: effectiveRunConfig.apiKey,
@@ -3861,7 +3880,7 @@ extension OCRProcessor {
             // W41.app-institutional-compute: no import here. A Retry (or Rotate & re-run) is the user asking for a fresh
             // read, and an imported page matches its institutional-computing text again by its bytes (Tier-2 review).
             visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: nil, newspaperSpend: newspaperSpend,
-            scanDetector: scanDetector)
+            scanDetector: scanDetector, postCorrection: postCorrection)
         if let rotation {
             result = OCRResult(text: result.text, classification: result.classification,
                                rotationDegrees: ((rotation % 360) + 360) % 360,
@@ -3869,7 +3888,7 @@ extension OCRProcessor {
                                enclosure: result.enclosure, ocrClassification: .some(result.ocrClassification), ocrEnclosure: .some(result.ocrEnclosure),
                                secondReader: result.secondReader, pageReader: result.pageReader, imported: result.imported,
                                readingCodes: result.readingCodes, newspaperLayout: result.newspaperLayout,
-                               readPoorly: result.readPoorly)
+                               readPoorly: result.readPoorly, imageCorrectionApplied: result.imageCorrectionApplied)
         }
         result = await Self.applyingVisionTextClassification(
             to: result, previousText: nil, customPrompt: effectiveRunConfig.customOCRPrompt,
@@ -3880,6 +3899,22 @@ extension OCRProcessor {
             outputDirectory: outputDirectory, runConfig: effectiveRunConfig)
         return persisted && result.text != nil
     }
+    /// Resolve the stage once for the run. A resume honours both the original policy and any tighter current policy.
+    private static func makePostCorrection(
+        requested: Bool, gateway: GatewayConfig?, localAgent: LocalAgentConfig?, outputDirectory: URL,
+        frozen: [String: ResolvedSetting]?
+    ) -> OCRPostCorrection? {
+        guard requested, gateway == nil, localAgent == nil,
+              OCRPostCorrection.policyReason(frozen) == nil else {
+            return nil
+        }
+        guard OCRPostCorrection.policyReason(at: outputDirectory, store: .shared) == nil,
+              let key = KeychainHelper.load(account: LLMProvider.openrouter.rawValue), !key.isEmpty else {
+            return nil
+        }
+        return OCRPostCorrection(apiKey: key)
+    }
+
     /// Request notification permission (call once at app launch).
     static func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }

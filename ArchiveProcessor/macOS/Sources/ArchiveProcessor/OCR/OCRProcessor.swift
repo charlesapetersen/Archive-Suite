@@ -63,6 +63,8 @@ class OCRProcessor: ObservableObject {
     /// before any work starts; W16.cfg5 will populate it from resume state. MainActor isolation keeps the
     /// snapshot and all retry consumers serialized.
     var activeRunConfig: SessionProcessingConfig?
+    /// The optional correction stage for this Process Files run; its credential never enters a journal.
+    var activePostCorrection: OCRPostCorrection?
 
     // MARK: Live Capture staging (set by LiveCaptureView, consumed by OCRView → startProcessing)
     /// Ordered captured photo URLs waiting to be loaded as the input file list.
@@ -666,6 +668,9 @@ class OCRProcessor: ObservableObject {
         /// The run's OCR cascade (W41.app-ocr-cascade), so a resumed run escalates to the route it began with.
         /// Nil reads as off.
         var cascade: OCRCascade? = nil
+
+        /// Only runs which actually enabled correction store this. Absence keeps older fingerprints valid.
+        var postCorrection: Bool? = nil
 
         /// The run's per-page readers (W41.app-page-kind), so a resumed run reads each page with the reader it was
         /// planned for. Nil reads as none.

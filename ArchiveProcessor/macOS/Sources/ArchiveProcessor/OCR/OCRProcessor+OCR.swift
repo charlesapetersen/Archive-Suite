@@ -1498,6 +1498,7 @@ extension OCRProcessor {
         let ocrRun = Self.ocrCallValues(for: runConfig)
         let scanDetector = NewspaperDetector.scans(activeResolvedSettings?.values)
         let newspaperSpend = activeRunHistory?.newspaperSpend
+        let postCorrection = newspaperSpend == nil ? nil : activePostCorrection
         let visionTextLLM = provider == .appleVision ? runConfig?.visionTextLLM : nil
         var previousText: String? = nil
         var previousImageURL: URL? = nil
@@ -1532,7 +1533,8 @@ extension OCRProcessor {
                 gatewayConfig: gateway, localAgent: localAgent,
                 rotationMode: ocrRun.rotationMode,
                 standardImageMB: ocrRun.standardImageMB,
-                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
+                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend,
+                scanDetector: scanDetector, postCorrection: postCorrection
             )
 
             // If timed out, retry once without context
@@ -1551,7 +1553,8 @@ extension OCRProcessor {
                     gatewayConfig: gateway, localAgent: localAgent,
                     rotationMode: ocrRun.rotationMode,
                     standardImageMB: ocrRun.standardImageMB,
-                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
+                    visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend,
+                    scanDetector: scanDetector, postCorrection: postCorrection
                 )
             }
 
@@ -1590,6 +1593,7 @@ extension OCRProcessor {
         let ocrRun = Self.ocrCallValues(for: runConfig)
         let scanDetector = NewspaperDetector.scans(activeResolvedSettings?.values)
         let newspaperSpend = activeRunHistory?.newspaperSpend
+        let postCorrection = newspaperSpend == nil ? nil : activePostCorrection
         let visionTextLLM = provider == .appleVision ? runConfig?.visionTextLLM : nil
         let concurrency = model.provider == .appleVision
             ? VisionClient.recommendedConcurrency
@@ -1623,7 +1627,8 @@ extension OCRProcessor {
                         gatewayConfig: gateway, localAgent: localAgent,
                         rotationMode: ocrRun.rotationMode,
                         standardImageMB: ocrRun.standardImageMB,
-                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
+                        visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend,
+                        scanDetector: scanDetector, postCorrection: postCorrection
                     )
                     let result = await Self.applyingVisionTextClassification(
                         to: ocrResult, previousText: nil, customPrompt: customPrompt,
@@ -1665,7 +1670,8 @@ extension OCRProcessor {
                             gatewayConfig: gateway, localAgent: localAgent,
                             rotationMode: ocrRun.rotationMode,
                             standardImageMB: ocrRun.standardImageMB,
-                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
+                            visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend,
+                            scanDetector: scanDetector, postCorrection: postCorrection
                         )
                         let result = await Self.applyingVisionTextClassification(
                             to: ocrResult, previousText: nil, customPrompt: customPrompt,
@@ -1882,16 +1888,24 @@ extension OCRProcessor {
         readers: PageReaderPlan = .empty,
         imported: InstitutionalComputeImport? = nil,
         newspaperSpend: NewspaperReadingSpend? = nil,
-        scanDetector: NewspaperDetector = .ppDocLayoutV3
+        scanDetector: NewspaperDetector = .ppDocLayoutV3,
+        postCorrection: OCRPostCorrection? = nil
     ) async -> OCRResult {
         await NewspaperPageReader.$spend.withValue(newspaperSpend) {
             await NewspaperPageReader.$scanDetector.withValue(scanDetector) {
-                await performOCRCallUntracked(
+                let reading = await performOCRCallUntracked(
                     imageURL: imageURL, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
                     previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt,
                     imageScale: imageScale, gatewayConfig: gatewayConfig, localAgent: localAgent,
                     rotationMode: rotationMode, standardImageMB: standardImageMB, visionSettings: visionSettings,
                     cascade: cascade, refusalFallback: refusalFallback, readers: readers, imported: imported)
+                guard let postCorrection, gatewayConfig == nil, localAgent == nil,
+                      customPrompt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false else {
+                    return reading
+                }
+                let scale = targetDimensionScale(forFileAt: imageURL, sizeFraction: imageScale,
+                                                 standardImageMB: standardImageMB)
+                return await postCorrection.apply(to: reading, imageURL: imageURL, scale: scale, spend: newspaperSpend)
             }
         }
     }
@@ -2133,6 +2147,7 @@ extension OCRProcessor {
         let ocrRun = Self.ocrCallValues(for: runConfig)
         let scanDetector = NewspaperDetector.scans(activeResolvedSettings?.values)
         let newspaperSpend = activeRunHistory?.newspaperSpend
+        let postCorrection = newspaperSpend == nil ? nil : activePostCorrection
 
         statusMessage = "Waiting to retry \(retryIndices.count) file\(retryIndices.count == 1 ? "" : "s") (model was busy)…"
         try? await Task.sleep(for: .seconds(10))
@@ -2156,7 +2171,8 @@ extension OCRProcessor {
                 gatewayConfig: gateway, localAgent: localAgent,
                 rotationMode: ocrRun.rotationMode,
                 standardImageMB: ocrRun.standardImageMB,
-                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
+                visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend,
+                scanDetector: scanDetector, postCorrection: postCorrection
             )
 
             // W16.bat11 — there is deliberately NO `jobs[index]` read here.

@@ -79,6 +79,27 @@ struct OpenAICompatibleClient: Sendable {
         return parseCompletion(data)
     }
 
+    /// Plain-text image correction uses its own prompt and requires a complete reply.
+    func correctPage(imageURL: URL, prompt: String, imageScale: Double) async throws -> OCRPostCorrection.Reply? {
+        try Task.checkCancellation()
+        guard let jpeg = ImageEncoding.loadImageAsJPEG(url: imageURL, scale: imageScale) else {
+            throw OCRError.imageLoadFailed
+        }
+        let content: [[String: Any]] = [
+            ["type": "image_url", "image_url": imageField(jpeg.base64EncodedString())],
+            ["type": "text", "text": prompt],
+        ]
+        var body: [String: Any] = [
+            "model": modelID, "max_tokens": OCRPostCorrection.tokenLimit,
+            "messages": [["role": "user", "content": content]],
+        ]
+        applyOpenRouterRoute(&body)
+        try Task.checkCancellation()
+        let (data, response) = try await sendRequest(body: body, timeoutInterval: requestTimeout)
+        guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+        return OCRPostCorrection.Reply(data: data)
+    }
+
     /// The `image_url` object: OpenAI's own endpoint through OpenRouter reads it at `detail: high`, as the bench sent it
     /// (`ocr_cloud.py`); every other caller's stays byte-identical.
     private func imageField(_ base64: String) -> [String: Any] {

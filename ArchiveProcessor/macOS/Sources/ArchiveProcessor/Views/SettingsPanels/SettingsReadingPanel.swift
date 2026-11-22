@@ -22,6 +22,7 @@ struct SettingsReadingPanel: View {
     @AppStorage(DefaultsKeys.visionFastRecognition) private var visionFastRecognition: Bool = false
     @AppStorage(DefaultsKeys.visionMinimumConfidence) private var visionMinimumConfidence: Double = 0
     @AppStorage(DefaultsKeys.visionCustomVocabulary) private var visionCustomVocabulary: String = ""
+    @AppStorage(DefaultsKeys.ocrPostCorrection) private var ocrPostCorrection = false
     @AppStorage(DefaultsKeys.ocrCascadeRoute) private var ocrCascadeRoute: String = ""
     @AppStorage(DefaultsKeys.ocrCascadeOnDisagreement) private var ocrCascadeOnDisagreement: Bool = false
     @AppStorage(DefaultsKeys.ocrPageKindRouting) private var ocrPageKindRouting: Bool = false
@@ -61,6 +62,21 @@ struct SettingsReadingPanel: View {
                 SettingsStageCards(cards: ["reading"])
             } header: { Text("The app's pick") }
             SettingsLevelSection(Self.providerRows) { providerSection }
+            SettingsLevelSection([.postCorrection]) {
+                Section("After reading") {
+                    SettingsLevelRows(.postCorrection) {
+                        Toggle("Correct OCR against the page image", isOn: $ocrPostCorrection)
+                            .accessibilityIdentifier("ap.settings.postCorrection")
+                        Text("Adds one paid request per eligible page. Sends the page image and its reading to Qwen3.6 27B via OpenRouter (Chutes), using your OpenRouter key. Available for standard Process Files runs with a direct API or Apple Vision. Batch jobs, gateway and CLI reads, imported text, multi-page PDF rebuilds, custom OCR prompts, and pages read in regions are excluded. The output collection’s sharing settings can block this step.")
+                        Text("In tests on middle-accuracy readings, correction tied re-reading with the same model on the 96-page set (−0.42 accuracy points, 95% interval −1.47 to +0.64). It gained 1.47 points on 120 public readings (95% interval +0.55 to +2.63). Compared with the starting text, correction worsened 4 of 57 and 10 of 120 readings. The tests used the Sherlock FP8 model.")
+                            .accessibilityIdentifier("ap.settings.postCorrection.results")
+                        if ocrPostCorrection && openrouterKey.isEmpty {
+                            Text("Save an OpenRouter key in Settings › Accounts to use this stage.")
+                        }
+                    }
+                    .font(.callout)
+                }
+            }
             Section {
                 SettingsStageCards(rules: ["ocr-input", "layout"])
             } header: { Text("The image read and the reading order") }

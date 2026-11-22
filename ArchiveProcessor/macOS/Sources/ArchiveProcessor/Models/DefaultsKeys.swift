@@ -47,6 +47,8 @@ enum DefaultsKeys {
     static let visionFastRecognition = "visionFastRecognition"
     static let visionMinimumConfidence = "visionMinimumConfidence" // 0...1
     static let visionCustomVocabulary = "visionCustomVocabulary"   // comma/newline-separated words
+    static let ocrPostCorrection = "ocrPostCorrection"
+
     // W41.app-ocr-cascade (`OCRCascade`)
     static let ocrCascadeRoute = "ocrCascadeRoute"                 // "<provider>|<model id>"; empty = off
     static let ocrCascadeOnDisagreement = "ocrCascadeOnDisagreement"
