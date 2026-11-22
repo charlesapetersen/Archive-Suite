@@ -1,0 +1,168 @@
+#if DEBUG
+import AppKit
+import ArchiveCore
+import Foundation
+
+/// Drives Live Capture from page receipt through Skip and Finish on synthetic pages.
+@MainActor
+enum LiveCaptureTaggingFailureTestDriver {
+    nonisolated static let envKey = "LIVECAPTURE_TAGGING_FAILURE_TEST"
+    private static var didRun = false
+
+    private actor Gateway {
+        private(set) var statuses: [Int] = []
+
+        func respond(to request: URLRequest) throws -> (Data, URLResponse) {
+            guard let url = request.url,
+                  let body = request.httpBody,
+                  let json = try JSONSerialization.jsonObject(with: body) as? [String: Any],
+                  let messages = json["messages"] as? [[String: Any]],
+                  let prompt = messages.first?["content"] as? String,
+                  prompt.contains("You are a metadata tagging assistant"),
+                  prompt.contains("CONTROL-MEMO") != prompt.contains("REFUSED-MEMO") else {
+                statuses.append(0)
+                throw URLError(.badServerResponse)
+            }
+            let status = prompt.contains("REFUSED-MEMO") ? 500 : 200
+            statuses.append(status)
+            let error = Data(#"{"error":{"message":"synthetic tagging refusal"}}"#.utf8)
+            let tags = #"{"year":"1918","subject_tags":["War Department","Military Intelligence"],"format":"memo"}"#
+            let bodyData = status == 500 ? error : try JSONSerialization.data(
+                withJSONObject: ["choices": [["message": ["content": tags]]]])
+            guard let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil) else {
+                throw URLError(.badServerResponse)
+            }
+            return (bodyData, response)
+        }
+    }
+
+    static func runIfRequested() {
+        let env = ProcessInfo.processInfo.environment
+        guard !didRun, env[envKey] == "1" else { return }
+        didRun = true
+        Task {
+            do {
+                let report = try await run(env: env)
+                print(report)
+                exit(0)
+            } catch {
+                print("S-045 probe failed: \(error)")
+                exit(1)
+            }
+        }
+    }
+
+    private static func run(env: [String: String]) async throws -> String {
+        let fm = FileManager.default
+        let temp = fm.temporaryDirectory.resolvingSymlinksInPath()
+        guard let backupPath = env["ARCHIVEPROC_TEST_BACKUP_ROOT"], let outputPath = env["LIVECAPTURE_TESTOUT"],
+              let scratch = env["LIVECAPTURE_TAGGING_FAILURE_SCRATCH"] else {
+            throw ProbeError("missing scratch paths")
+        }
+        let root = URL(fileURLWithPath: scratch).resolvingSymlinksInPath()
+        let backup = URL(fileURLWithPath: backupPath).resolvingSymlinksInPath()
+        let out = URL(fileURLWithPath: outputPath).resolvingSymlinksInPath()
+        guard root.path.hasPrefix(temp.path + "/"), backup.path == root.path + "/backup",
+              out.path == root.path + "/out" else { throw ProbeError("paths must be under one temporary root") }
+
+        let gateway = Gateway()
+        NetworkSession.testTransport = { try await gateway.respond(to: $0) }
+        defer {
+            NetworkSession.testTransport = nil
+            LiveCaptureProcessor._recoveryTestOCRStub = nil
+        }
+        guard NetworkSession.testTransportIsActive else { throw ProbeError("no injected transport") }
+
+        let staging = root.appendingPathComponent("stage", isDirectory: true)
+        try fm.createDirectory(at: staging, withIntermediateDirectories: true)
+        let model = LLMModel(id: "test-model", displayName: "Test Model", provider: .gemini,
+                             supportsThinking: false, returnsMd: false,
+                             inputCostPer1M: 0, outputCostPer1M: 0, batchDiscount: 0)
+        let config = SessionProcessingConfig(
+            provider: .gemini, model: model, thinkingLevel: .low, apiKey: "",
+            taggingMode: .automatic, rotationMode: .off, mergeDocuments: false, outputDirectory: out,
+            customOCRPrompt: "", imageScale: 1, enableSegmentJSON: false, tagVocabulary: [],
+            gateway: GatewayConfig(baseURL: "https://gateway.test/v1", modelID: "synthetic-tagger",
+                                   displayName: "Synthetic gateway"),
+            outputImageFile: false, pdfImageMB: 2, exportedImageMB: 3, textColumns: 1)
+        let session = CaptureSession()
+        let processor = session.liveProcessor
+        session._recoveryTestBeginLive(config: config, stagingDir: staging)
+        let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 64, pixelsHigh: 64,
+                                      bitsPerSample: 8, samplesPerPixel: 3, hasAlpha: false, isPlanar: false,
+                                      colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+        guard let jpeg = bitmap?.representation(using: .jpeg, properties: [:]) else {
+            throw ProbeError("could not make JPEG")
+        }
+
+        let documents = ["CONTROL-MEMO", "REFUSED-MEMO"]
+        var lines: [String] = []
+        for (index, id) in documents.enumerated() {
+            LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(
+                text: "\(id)\nMemorandum dated March 1918.", classification: .documentStart,
+                errorMessage: nil, errorCode: nil)
+            guard session.ingest(jpeg: jpeg, groupId: id, seq: index + 1, type: .document,
+                                 quality: nil, year: 1918, month: 3, deviceName: "TestPhone") != nil,
+                  session.markSegmentComplete(groupId: id, quality: nil, year: 1918, month: 3),
+                  session.pendingTagGroup?.id == id, session.skipMacTags(groupId: id) else {
+                throw ProbeError("could not receive and resolve \(id)")
+            }
+            try await wait(for: "staging \(id)") {
+                guard let phase = processor.statuses.first(where: { $0.id == id })?.phase else { return false }
+                return phase != .ocr && phase != .tagging
+            }
+            guard let status = processor.statuses.first(where: { $0.id == id }),
+                  let pdf = processor.stagedURLs(for: id).first else { throw ProbeError("no output for \(id)") }
+            let row = SegmentItem(status: status, ocrText: processor.retainedText(for: id),
+                                  providerModel: config.retryBackendDescription, expanded: true, finalizing: false)
+            lines.append("\(id) staged Finder tags: \(try MacOSTagger.readTags(from: pdf).sorted())")
+            lines.append("\(id) row: \(row.title), \(row.state), error=\(row.errorMessage ?? "nil"), code=\(row.errorCode ?? "nil"), actions=\(row.availableActions)")
+            lines.append("\(id) session status: \(session.statusMessage)")
+        }
+        let requests = await gateway.statuses
+        guard requests == [200, 500] else { throw ProbeError("unexpected gateway responses \(requests)") }
+        lines.append("Gateway responses, in order: \(requests)")
+
+        processor.requestFinish()
+        guard processor.showFinalizeSheet, processor.drafts.count == 1 else {
+            throw ProbeError("Finish did not reach collection naming")
+        }
+        var draft = processor.drafts[0]
+        draft.finalName = "S045"
+        processor.finalize([draft])
+        try await wait(for: "Finish") { processor.finalizeSummary != nil }
+        let summary = processor.finalizeSummary ?? ""
+        lines.append("Finish summary: \(summary)")
+        lines.append("Finish shows warning: \(LiveCaptureProcessor.summaryReportsProblem(summary))")
+        let folder = out.appendingPathComponent("S045", isDirectory: true)
+        let pdfs = try fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "pdf" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+        guard pdfs.count == 2 else { throw ProbeError("expected two filed PDFs, found \(pdfs.count)") }
+        let expectedSubjects: Set<String> = ["War Department", "Military Intelligence"]
+        for (pdf, id) in zip(pdfs, documents) {
+            let text = PDFTextExtractor.extract(from: pdf).text ?? ""
+            guard text.contains(id) else { throw ProbeError("filed PDF lost OCR text for \(id)") }
+            let tags = Set(try MacOSTagger.readTags(from: pdf))
+            guard tags.contains("1918"), tags.contains("Unread"),
+                  id != documents.first || expectedSubjects.isSubset(of: tags) else {
+                throw ProbeError("Finder tag fixture failed for \(id): \(tags.sorted())")
+            }
+            lines.append("\(pdf.lastPathComponent) (\(id)) Finder tags: \(tags.sorted())")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func wait(for operation: String, until ready: () -> Bool) async throws {
+        for _ in 0..<400 {
+            if ready() { return }
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        throw ProbeError("timed out waiting for \(operation)")
+    }
+
+    private struct ProbeError: Error, CustomStringConvertible {
+        let description: String
+        init(_ description: String) { self.description = description }
+    }
+}
+#endif

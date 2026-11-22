@@ -2,6 +2,13 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## Live Capture files a document silently after Automatic tagging gets HTTP 500 (S-045)
+
+- A refused tagging request leaves the filed PDF with its OCR text and phone-entered date but without model
+  subjects. The Processing row shows success, and Finish gives no warning. Reproduced on scratch PDFs at
+  `7252c39b` in `LiveCaptureProcessor.computeTags`; independent confirmation is queued before a fix.
+  [Evidence](../verification/evidence/processor/W49.proc-s045-verify.md). (queued: W49.proc-s045-check)
+
 ## FIXED (S-049, 2026-11-21) — the README describes the folder intake prompt
 
 The README now describes the **Read the folders inside?** prompt for a folder with subfolders.
