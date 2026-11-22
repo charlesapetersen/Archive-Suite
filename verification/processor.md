@@ -1094,19 +1094,17 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Promise:** Finish shows "phone still has N to send" and holds finalize until the phone's heartbeat reports
   nothing pending, so no segment finalizes partial.
 - **Promised in:** `CLAUDE.md` §On the Mac; `LIVE_CAPTURE_ANDROID_TEST.md` A6.
-- **Reached by:** heartbeat `POST /phone/status` (`Net/CaptureServer.swift:575`) → `updatePhonePending`
-  (`Capture/CaptureSession.swift:39`); Finish session (`Views/LiveCaptureView.swift:538`) → `requestFinish`
-  (`Capture/LiveCaptureProcessor.swift:1689`) → `proceedToFinishIfReady` (`:1778`, gate `:1806`) → `finishSession`
-  (`:1817`). Message `Views/LiveCaptureView.swift:415-416`.
+- **Reached by:** `CaptureServer` receives `POST /phone/status` and calls `CaptureSession.updatePhonePending`.
+  `LiveCaptureView` calls `LiveCaptureProcessor.requestFinish`, then `proceedToFinishIfReady` gates `finishSession`.
 - **Real-path test:** `scripts/test-recovery.sh` holds Finish while `updatePhonePending(1)` is fresh and releases it on
   0 (`Capture/LiveCaptureRecoveryTestDriver.swift:2652-2701`); direct calls, nothing rendered.
-- **Runtime evidence:** partial: the `W40.a3` E2E finished through `requestFinish`, but no held state was shown.
-- **Status:** `unproven`
+- **Runtime evidence:** the `W40.a3` E2E finished through `requestFinish`. The [independent relay run](evidence/processor/W49.relay-suspects-check.md) filed one of two photos and kept the late arrival in Backup.
+- **Status:** `broken` — W49.proc-fix-s038 (S2) for relay drain.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
-- **Notes:** a phone silent for 20 s stops blocking Finish (`Capture/CaptureSession.swift:33`; deliberate per
-  `Capture/LiveCaptureProcessor.swift:1796-1800`), so the guarantee is weaker than "no segment finalizes partial".
-  Suspect `S-038` (the Drive relay carries no heartbeat).
+  - 2026-11-21 W49.relay-suspects-check — independently confirmed S-038. Fix queued as `W49.proc-fix-s038`.
+- **Notes:** a phone silent for 20 s stops blocking Finish (`CaptureSession.phonePendingActive`).
+  The Drive relay carries no heartbeat, so its drain gate has no pending count from the start.
 
 ### P-49 · The backup folder and recovery
 

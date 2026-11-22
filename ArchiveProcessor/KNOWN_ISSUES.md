@@ -2,6 +2,14 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## Android drops a segment completion after a failed Drive write (S-021)
+
+- After the phone sends its photos, a Drive error on End segment can discard the completion signal and the tags it carries. Re-pairing leaves the signal missing, so the Mac can leave the segment open until Finish. [Independent scratch evidence](../verification/evidence/processor/W49.relay-suspects-check.md). (queued: W49.proc-fix-s021)
+
+## Finish can file a relay document before its last photo arrives (S-038)
+
+- The relay has no pending-photo status for Finish. In the scratch run, Finish filed the first photo and the second stayed in Backup after it arrived. [Independent scratch evidence](../verification/evidence/processor/W49.relay-suspects-check.md). (queued: W49.proc-fix-s038)
+
 ## Stage for later offers already-processed photos (S-039)
 
 - Live Capture handed off the same two photos after a successful Process Files run and again after relaunch. A second Start read both photos again. The handoff itself sent zero requests. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s039)

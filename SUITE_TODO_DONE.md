@@ -17589,3 +17589,8 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Both viewers preserve linked pages across the download. The Checks inspector and multi-file Find use the same no-download policy.
   [OneDrive and off-screen VM regression](verification/evidence/reader/W49.reader-s002-reproduce-check.md).
   <!-- /W49.fix-reader-dataless-prefetch -->
+
+- [x] **W49.relay-suspects-check — independently check the S-021 and S-038 reproductions [S]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-21 (this commit).
+  Codex gpt-6.2-sol independently confirmed both findings originally reproduced by Claude Opus 5.5. Android reported a segment sent after Drive refused its completion, cleared its pending signal, and sent nothing after re-pair. Headless Mac Finish filed one of two photos when the second was still pending, and the late photo stayed in Backup. The all-pages-first control filed both.
+  Filed W49.proc-fix-s021 and W49.proc-fix-s038 with [scratch evidence and regression runs](verification/evidence/processor/W49.relay-suspects-check.md). Provider spend was $0. No bench cache used.
+  <!-- /W49.relay-suspects-check -->
