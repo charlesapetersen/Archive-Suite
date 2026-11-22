@@ -33,15 +33,17 @@ enum SearchableArchival {
 
     /// `sources`' pages in order as one PDF/A-2b file at `url`, written atomically. `pageHeaders`: one entry per page
     /// of the result (`PDFHeaderCarrier`), nil for a pair's page.
-    static func write(_ sources: [URL], pageHeaders: [String?], to url: URL, budget: PDFChildBudget) throws {
-        let data = try data(sources, pageHeaders: pageHeaders, budget: budget)
+    static func write(_ sources: [URL], pageHeaders: [String?], to url: URL, budget: PDFChildBudget,
+                      catalogueIdentity: CataloguePDFIdentity? = nil) throws {
+        let data = try data(sources, pageHeaders: pageHeaders, budget: budget, catalogueIdentity: catalogueIdentity)
         try budget.check()
         do { try data.write(to: url, options: .atomic) } catch { throw PDFError.writeFailed }
     }
 
     /// `write` into memory. Read back before it is returned: every page of every source in order, each with the text
     /// it had, and the header list as given.
-    static func data(_ sources: [URL], pageHeaders: [String?], budget: PDFChildBudget? = nil) throws -> Data {
+    static func data(_ sources: [URL], pageHeaders: [String?], budget: PDFChildBudget? = nil,
+                     catalogueIdentity: CataloguePDFIdentity? = nil) throws -> Data {
         let budget = budget ?? PDFChildBudget(seconds: PDFChildBudget.secondsPerPage * Double(max(1, pageHeaders.count)))
         try budget.check()
         guard let qpdf = CompressedPage.qpdf else { throw Failure.noQPDF }
@@ -62,7 +64,7 @@ enum SearchableArchival {
 
         try run(qpdf, ["--empty", "--pages"] + sources.map(\.path) + ["--", merged.path], budget: budget)
         let shape = try jsonShape(qpdf, merged, budget: budget)
-        guard let xmp = metadata(pageHeaders: pageHeaders),
+        guard let xmp = metadata(pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity),
               let icc = CGColorSpace(name: CGColorSpace.sRGB)?.copyICCData() as Data? else {
             throw Failure.check("the metadata could not be made")
         }
@@ -87,14 +89,15 @@ enum SearchableArchival {
         try run(qpdf, [merged.path, "--update-from-json=" + patch.path, "--newline-before-endstream", out.path], budget: budget)
 
         let data = try Data(contentsOf: out)
-        try check(data, against: docs, pageHeaders: pageHeaders, xmp: xmp)
+        try check(data, against: docs, pageHeaders: pageHeaders, xmp: xmp, catalogueIdentity: catalogueIdentity)
         try budget.check()
         return data
     }
 
     /// The result opens with every page in order, each with its source's size, turn and text, its XMP as written
     /// (unfiltered, so PDFium's rewrite in an Improve OCR revision keeps it) and the header list as given.
-    private static func check(_ data: Data, against docs: [PDFDocument], pageHeaders: [String?], xmp: Data) throws {
+    private static func check(_ data: Data, against docs: [PDFDocument], pageHeaders: [String?], xmp: Data,
+                              catalogueIdentity: CataloguePDFIdentity?) throws {
         guard let made = PDFDocument(data: data), let ref = made.documentRef else { throw Failure.check("the file does not open") }
         let pages = docs.flatMap { doc in (0..<doc.pageCount).compactMap { doc.page(at: $0) } }
         guard made.pageCount == pages.count else { throw Failure.check("the file does not have every page") }
@@ -115,10 +118,14 @@ enum SearchableArchival {
         if wanted.contains(where: { $0 != nil }), PDFHeaderCarrier.pages(of: ref) != wanted {
             throw Failure.check("the headers do not read back")
         }
+        if let catalogueIdentity, CataloguePDFIdentity.identity(in: ref) != catalogueIdentity {
+            throw Failure.check("the catalogue identity does not read back")
+        }
     }
 
     /// The XMP packet: PDF/A-2b's identification, the tool and the time, and the header list when a page has one.
-    static func metadata(pageHeaders: [String?], date: Date = Date()) -> Data? {
+    static func metadata(pageHeaders: [String?], date: Date = Date(),
+                         catalogueIdentity: CataloguePDFIdentity? = nil) -> Data? {
         let stamp = ISO8601DateFormatter.string(from: date, timeZone: .current,
                                                 formatOptions: [.withInternetDateTime])
         let base = """
@@ -138,9 +145,13 @@ enum SearchableArchival {
             </x:xmpmeta>
             <?xpacket end="w"?>
             """
-        let packet = Data(base.utf8)
-        guard pageHeaders.contains(where: { $0?.isEmpty == false }) else { return packet }
-        return PDFHeaderCarrier.adding(pages: pageHeaders, to: packet)
+        var packet = Data(base.utf8)
+        if pageHeaders.contains(where: { $0?.isEmpty == false }) {
+            guard let withHeaders = PDFHeaderCarrier.adding(pages: pageHeaders, to: packet) else { return nil }
+            packet = withHeaders
+        }
+        if let catalogueIdentity { return catalogueIdentity.adding(to: packet) }
+        return packet
     }
 
     /// The catalog's object, its dictionary and the highest object number, from qpdf's own JSON.

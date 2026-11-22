@@ -23,9 +23,11 @@ enum ArchivalFinish {
 
     /// `pageHeaders` (one entry per page, `PDFHeaderCarrier`) must reach the XMP: when it cannot, the result is nil, never
     /// a searchable file whose headers are lost. Without it, the repairs are made where they can be and never fail.
-    static func finished(_ pdf: Data, pageHeaders: [String?]? = nil) -> Data? {
+    static func finished(_ pdf: Data, pageHeaders: [String?]? = nil,
+                         catalogueIdentity: CataloguePDFIdentity? = nil) -> Data? {
+        let requiresMetadata = pageHeaders != nil || catalogueIdentity != nil
         let pdf = Data(pdf)   // start index 0, so offsets index it directly
-        guard let table = xrefTable(pdf) else { return pageHeaders == nil ? pdf : nil }
+        guard let table = xrefTable(pdf) else { return requiresMetadata ? nil : pdf }
         var entries = table.entries
 
         // 1. The free list: entry 0 points at the first free object, each free one at the next, the last at 0.
@@ -39,14 +41,15 @@ enum ArchivalFinish {
         // 2. The XMP, unfiltered, in place of the compressed stream; every object after it moves by the difference.
         var body = pdf[..<table.start]
         var xmp: Data?
-        if let plain = unfilteredMetadata(pdf, entries: entries, pageHeaders: pageHeaders) {
+        if let plain = unfilteredMetadata(pdf, entries: entries, pageHeaders: pageHeaders,
+                                          catalogueIdentity: catalogueIdentity) {
             body = pdf[..<plain.range.lowerBound] + plain.object + pdf[plain.range.upperBound..<table.start]
             let delta = plain.object.count - plain.range.count
             for i in entries.indices where entries[i].inUse && entries[i].offset > plain.range.lowerBound {
                 entries[i].offset += delta
             }
             xmp = plain.xmp
-        } else if pageHeaders != nil { return nil }
+        } else if requiresMetadata { return nil }
         if unwritten.isEmpty && xmp == nil { return pdf }
 
         var out = Data(body)
@@ -64,10 +67,11 @@ enum ArchivalFinish {
         guard entries.indices.allSatisfy({ i in !entries[i].inUse
                   || (entries[i].offset < out.count && out[entries[i].offset...].starts(with: Data("\(i) 0 obj".utf8))) }),
               let before = document(pdf), let after = document(out), before.numberOfPages == after.numberOfPages,
-              xmp == nil || metadata(of: after) == xmp else { return pageHeaders == nil ? pdf : nil }
+              xmp == nil || metadata(of: after) == xmp else { return requiresMetadata ? nil : pdf }
         if let pageHeaders, PDFHeaderCarrier.pages(of: after) != pageHeaders.map({ $0.flatMap { $0.isEmpty ? nil : $0 } }) {
             return nil
         }
+        if let catalogueIdentity, CataloguePDFIdentity.identity(in: after) != catalogueIdentity { return nil }
         return out
     }
 
@@ -103,10 +107,12 @@ enum ArchivalFinish {
     }
 
     /// The catalog's metadata object rewritten unfiltered: the bytes it replaces, the new object and the XMP.
-    private static func unfilteredMetadata(_ pdf: Data, entries: [Entry],
-                                           pageHeaders: [String?]?) -> (range: Range<Int>, object: Data, xmp: Data)? {
+    private static func unfilteredMetadata(_ pdf: Data, entries: [Entry], pageHeaders: [String?]?,
+                                           catalogueIdentity: CataloguePDFIdentity?)
+        -> (range: Range<Int>, object: Data, xmp: Data)? {
         guard let doc = document(pdf), let quartz = metadata(of: doc), !quartz.isEmpty,
-              let xmp = pageHeaders == nil ? quartz : PDFHeaderCarrier.adding(pages: pageHeaders ?? [], to: quartz),
+              let headerPacket = pageHeaders == nil ? quartz : PDFHeaderCarrier.adding(pages: pageHeaders ?? [], to: quartz),
+              let xmp = catalogueIdentity == nil ? headerPacket : catalogueIdentity?.adding(to: headerPacket),
               let root = firstMatch(#"/Root (\d+) 0 R"#, in: xrefTable(pdf)?.trailer ?? Data()),
               root < entries.count, entries[root].inUse,
               let rootObject = object(root, at: entries[root].offset, in: pdf),

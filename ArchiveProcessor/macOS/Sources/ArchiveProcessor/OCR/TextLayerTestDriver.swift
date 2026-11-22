@@ -184,6 +184,58 @@ enum TextLayerTestDriver {
         check("3 unknown kind, aligned reading: placed", u?.layer.route == .visionLinesAligned, "\(String(describing: u?.layer))")
 
         await searchableChecks(dir: dir, jpeg: jpeg, reading: reading)
+        await catalogueChecks(dir: dir, jpeg: jpeg, reading: reading)
+    }
+
+    private static func catalogueChecks(dir: URL, jpeg: URL, reading: String) async {
+        let model = LLMModel.appleVisionModels[0]
+        let result = OCRResult(text: reading, classification: .documentStart, errorMessage: nil, errorCode: nil)
+        let options = PDFGenerator.TextLayerOptions(searchableFor: ["jpeg/typewritten"])
+        let pair = dir.appendingPathComponent("catalogue-pair.pdf")
+        let searchable = dir.appendingPathComponent("catalogue-searchable.pdf")
+        let merged = dir.appendingPathComponent("catalogue-merged.pdf")
+        func verify(_ url: URL, identity: CataloguePDFIdentity, roles: [PDFPageRole]) {
+            let pdf = PDFDocument(url: url)?.documentRef
+            let content = PDFHeaderParser.extract(url)
+            check("8 \(url.lastPathComponent) carries its own identity", pdf.flatMap(CataloguePDFIdentity.identity(in:)) == identity)
+            check("8 \(url.lastPathComponent) preserves roles and reading", content?.pageRoles == roles
+                  && content?.strippedBody.contains("MEMORANDUM") == true)
+            check("8 \(url.lastPathComponent) preserves actual provenance and omits current facts",
+                  content?.textPages.map(\.pageIndex) == roles.indices.filter { roles[$0] != .image }
+                      && content?.textPages.allSatisfy { $0.header?.provenance?.provider == "Apple Vision"
+                          && $0.header?.provenance?.model.isEmpty == false
+                          && $0.header?.provenance?.processingDate.isEmpty == false
+                          && $0.header?.originalFilename == jpeg.lastPathComponent
+                          && $0.header?.documentDate == nil } == true)
+            if roles.contains(.searchable), CompressedPage.missingTools.isEmpty {
+                check("8 \(url.lastPathComponent) keeps the compressed scan",
+                      (try? Data(contentsOf: url))?.range(of: Data("/JBIG2Decode".utf8)) != nil)
+            }
+            archivalChecks(url.lastPathComponent, url)
+            if let keep = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_KEEP"] {
+                try? FileManager.default.copyItem(at: url, to: URL(fileURLWithPath: keep).appendingPathComponent(url.lastPathComponent))
+            }
+        }
+        do {
+            for (url, layer, roles): (URL, PDFGenerator.TextLayerOptions?, [PDFPageRole]) in
+                [(pair, nil, [.image, .text]), (searchable, options, [.searchable])] {
+                let identity = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+                try await PDFGenerator.runWorker {
+                    _ = try PDFGenerator().generateOutput(
+                        imageURL: jpeg, result: result, model: model, outputURL: url,
+                        originalFileName: jpeg.lastPathComponent, sourceDates: PDFSourceDates(documentDate: "1958"),
+                        pageKind: .typewritten, textLayer: layer, catalogueIdentity: identity)
+                }
+                verify(url, identity: identity, roles: roles)
+            }
+            let identity = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+            try await PDFGenerator.runWorker {
+                try PDFGenerator().mergeDocumentPDFs(sourcePDFs: [pair, searchable], outputURL: merged, catalogueIdentity: identity)
+            }
+            verify(merged, identity: identity, roles: [.image, .text, .searchable])
+        } catch {
+            check("8 write PDF with catalogue identity", false, "\(error)")
+        }
     }
 
     private static func searchableChecks(dir: URL, jpeg: URL, reading: String) async {

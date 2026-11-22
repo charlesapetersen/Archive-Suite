@@ -133,7 +133,7 @@ struct PDFGenerator {
                         pdfImageMB: Double = 0, textColumns: Int = 1,
                         sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil,
                         textLayer: TextLayerOptions? = .standard, sourceFormat: String? = nil,
-                        photographed: Bool? = nil) throws -> Output {
+                        photographed: Bool? = nil, catalogueIdentity: CataloguePDFIdentity? = nil) throws -> Output {
         try Task.checkCancellation()
         let pdfDocument = PDFDocument()
         let outcome: ImagePageOutcome
@@ -145,7 +145,8 @@ struct PDFGenerator {
         var formFallback: String?
         let header = headerBlock(result: result, model: model, originalFileName: originalFileName,
                                  gatewayDisplayName: gatewayDisplayName, localAgentDisplayName: localAgentDisplayName,
-                                 localAgentModelName: localAgentModelName, sourceDates: sourceDates, pageKind: pageKind)
+                                 localAgentModelName: localAgentModelName,
+                                 sourceDates: catalogueIdentity == nil ? sourceDates : nil, pageKind: pageKind)
 
         var straightened: Double?
         // The searchable page's image and the lines its layer was written from, for its compression.
@@ -211,6 +212,7 @@ struct PDFGenerator {
                                                         unplaced: layer.route == .unplaced, reading: result.text ?? "",
                                                         header: header.carried,
                                                         photographed: photographed ?? CompressedPage.isCameraPhoto(imageURL),
+                                                        catalogueIdentity: catalogueIdentity,
                                                         to: outputURL)
                 compression = written.why
                 if written.why == nil {
@@ -223,7 +225,7 @@ struct PDFGenerator {
         }
 
         try Task.checkCancellation()
-        try Self.writeArchival(pdfDocument, to: outputURL, pageHeaders: pageHeaders)
+        try Self.writeArchival(pdfDocument, to: outputURL, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity)
         return Output(imagePage: outcome, layer: layer, straightenedDegrees: straightened, form: form,
                       formFallback: formFallback, compression: compression)
     }
@@ -237,6 +239,7 @@ struct PDFGenerator {
     /// engine's own camera route does. Off the main thread.
     private func writeCompressedSearchable(_ image: ImagePageData, lines: TextLayer.Lines?, unplaced: Bool,
                                            reading: String, header: String?, photographed: Bool,
+                                           catalogueIdentity: CataloguePDFIdentity?,
                                            to url: URL) -> (why: String?, note: String?) {
         let missing = CompressedPage.missingTools
         guard missing.isEmpty else { return (missing.joined(separator: " and ") + " not found", nil) }
@@ -265,7 +268,8 @@ struct PDFGenerator {
             return ("the compressed page is not the image's size", nil)
         }
         do {
-            try SearchableArchival.write([page], pageHeaders: [header], to: url, budget: budget)
+            try SearchableArchival.write([page], pageHeaders: [header], to: url, budget: budget,
+                                         catalogueIdentity: catalogueIdentity)
         } catch {
             return (error.localizedDescription, nil)
         }
@@ -282,19 +286,24 @@ struct PDFGenerator {
     /// Written atomically, as PDFKit's write replaced the file: a regenerated output never stands half-written, and it
     /// does not keep the old file's Finder tags (the regenerations re-apply them).
     /// `pageHeaders`: one entry per page for a file with searchable pages (`PDFHeaderCarrier`), nil for pairs only.
-    static func writeArchival(_ document: PDFDocument, to url: URL, pageHeaders: [String?]? = nil) throws {
-        guard let data = archivalData(document, pageHeaders: pageHeaders) else { throw PDFError.writeFailed }
+    static func writeArchival(_ document: PDFDocument, to url: URL, pageHeaders: [String?]? = nil,
+                              catalogueIdentity: CataloguePDFIdentity? = nil) throws {
+        guard let data = archivalData(document, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity) else {
+            throw PDFError.writeFailed
+        }
         do { try data.write(to: url, options: .atomic) } catch { throw PDFError.writeFailed }
     }
 
     /// `writeArchival` into memory. It
     /// is drawn as the output's own pages are, so it renders as they do.
-    static func archivalData(_ document: PDFDocument, pageHeaders: [String?]? = nil) -> Data? {
+    static func archivalData(_ document: PDFDocument, pageHeaders: [String?]? = nil,
+                             catalogueIdentity: CataloguePDFIdentity? = nil) -> Data? {
         if let pageHeaders, pageHeaders.count != document.pageCount { return nil }
         let data = NSMutableData()
         guard let consumer = CGDataConsumer(data: data as CFMutableData),
               let pages = try? drawArchival(document, into: consumer),
-              let out = ArchivalFinish.finished(data as Data, pageHeaders: pageHeaders) else { return nil }
+              let out = ArchivalFinish.finished(data as Data, pageHeaders: pageHeaders,
+                                                 catalogueIdentity: catalogueIdentity) else { return nil }
         guard let provider = CGDataProvider(data: out as CFData), CGPDFDocument(provider)?.numberOfPages == pages else {
             return nil
         }
@@ -1022,13 +1031,13 @@ struct PDFGenerator {
     /// merged file's XMP carries in its place (`PDFHeaderCarrier`), so a document may mix the two forms.
     /// Throws `PDFError.sourceUnreadable` if any source PDF cannot be loaded (fail-loud
     /// to prevent silent page-drop in this no-undo path).
-    func mergeDocumentPDFs(sourcePDFs: [URL], outputURL: URL) throws {
-        let data = try mergedDocumentData(sourcePDFs: sourcePDFs)
+    func mergeDocumentPDFs(sourcePDFs: [URL], outputURL: URL, catalogueIdentity: CataloguePDFIdentity? = nil) throws {
+        let data = try mergedDocumentData(sourcePDFs: sourcePDFs, catalogueIdentity: catalogueIdentity)
         try Task.checkCancellation()
         do { try data.write(to: outputURL, options: .atomic) } catch { throw PDFError.writeFailed }
     }
 
-    func mergedDocumentData(sourcePDFs: [URL]) throws -> Data {
+    func mergedDocumentData(sourcePDFs: [URL], catalogueIdentity: CataloguePDFIdentity? = nil) throws -> Data {
         try Task.checkCancellation()
         let merged = PDFDocument()
         var pageIndex = 0
@@ -1063,14 +1072,16 @@ struct PDFGenerator {
         // compressed page stays compressed; Quartz redraws them where qpdf is missing or fails.
         if let pageHeaders, SearchableArchival.isAvailable {
             do {
-                return try SearchableArchival.data(sourcePDFs, pageHeaders: pageHeaders)
+                return try SearchableArchival.data(sourcePDFs, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity)
             } catch {
                 try Task.checkCancellation()
                 NSLog("ArchiveProcessor: merge through qpdf failed (%@); merging through Quartz", "\(error)")
             }
         }
         try Task.checkCancellation()
-        guard let data = Self.archivalData(merged, pageHeaders: pageHeaders) else { throw PDFError.writeFailed }
+        guard let data = Self.archivalData(merged, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity) else {
+            throw PDFError.writeFailed
+        }
         return data
     }
 }
