@@ -347,7 +347,8 @@ extension OCRProcessor {
     }
 
     func dismissPendingMixedPDF() {
-        guard !isProcessing && !mixedPDFCancellationUnwinding else { return }
+        guard !isProcessing, !mixedPDFCancellationUnwinding,
+              !FileManager.default.fileExists(atPath: Self.pendingBatchURL.path) else { return }
         Self.deletePendingMixedPDF()
         activePendingMixedPDF = nil
         pendingMixedPDFInfo = nil

@@ -1,6 +1,6 @@
 #!/bin/bash
-# S-051: run the real Process Files batch submission twice with one synthetic image.
-# A loopback stand-in sends either an explicit 401 or an incomplete success reply.
+# S-051: run real Process Files batch submission with one synthetic image per case.
+# A loopback stand-in sends a refusal, two unusable success replies, or a server error.
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -22,14 +22,13 @@ outcome = sys.argv[1]
 class StandIn(BaseHTTPRequestHandler):
     def do_POST(self):
         self.rfile.read(int(self.headers["Content-Length"]))
-        if outcome == "refused":
-            status = 401
-            body = b'{"error":{"message":"Synthetic authorization refusal"}}'
-            length = len(body)
-        else:
-            status = 200
-            body = b'{"name":'
-            length = len(body) + 100
+        status, body = {
+            "refused": (401, b'{"error":{"message":"Synthetic authorization refusal"}}'),
+            "cut-off": (200, b'{"name":'),
+            "blank-id": (200, b'{"name":"   "}'),
+            "server-error": (503, b'{"error":{"message":"Synthetic server error"}}'),
+        }[outcome]
+        length = len(body) + (100 if outcome == "cut-off" else 0)
         print(f"POST {outcome} {status}")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
@@ -47,7 +46,7 @@ with HTTPServer(("127.0.0.1", 0), StandIn) as server:
     server.serve_forever()
 PY
 
-for outcome in refused cut-off; do
+for outcome in refused cut-off blank-id server-error; do
     out="$work/$outcome"
     mkdir -p "$out/state" "$out/backup" "$out/home"
     processor_test_start server python3 -u "$work/stand-in.py" "$outcome" >"$out/wire.log"
@@ -87,5 +86,16 @@ for outcome in refused cut-off; do
     [ -z "$(find "$run" -name '*.pdf' -print -quit)" ]
     tail -n +2 "$out/wire.log"
     cat "$run/status.txt" "$run/batch-recovery.tsv"
-    grep -F 'paid-batch submission interrupted:' "$out/app.log" || true
+    grep -Fxq 'acknowledged_ids=0' "$run/batch-recovery.tsv"
+    if [ "$outcome" = refused ]; then
+        grep -Fxq 'Batch submission refused (HTTP 401): Synthetic authorization refusal' "$run/status.txt"
+        grep -Fxq 'journal_on_disk=false' "$run/batch-recovery.tsv"
+        grep -Fxq 'banner=' "$run/batch-recovery.tsv"
+    else
+        grep -Fq 'Batch submission outcome is uncertain.' "$run/status.txt"
+        grep -Fq "Check the provider's batch console for a job." "$run/status.txt"
+        grep -Fxq 'journal_on_disk=true' "$run/batch-recovery.tsv"
+        grep -Fq 'banner=Pending batch from ' "$run/batch-recovery.tsv"
+    fi
 done
+echo "PASS: explicit refusal and ambiguous batch outcomes"

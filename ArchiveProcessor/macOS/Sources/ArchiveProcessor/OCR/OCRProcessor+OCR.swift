@@ -817,11 +817,6 @@ extension OCRProcessor {
         }
         activePendingBatch = persistedInitialBatch
         recordActiveRunInCollection(kind: "batch")
-        if activePendingMixedPDF != nil {
-            Self.deletePendingMixedPDF()
-            activePendingMixedPDF = nil
-            pendingMixedPDFInfo = nil
-        }
         // This submission owns the journal now, so no previous Stop's address may be consulted again
         // (W16.bat5-fu). The identity check would refuse a stale one anyway; clearing it here means the
         // property never outlives the batch it names.
@@ -889,17 +884,10 @@ extension OCRProcessor {
                 return
             }
         } catch {
-            // A non-idempotent create can be accepted server-side even when its response is lost. Keep
-            // the pre-submit journal in every failure case; acknowledged IDs remain resumable, while an
-            // empty ID list explicitly records an unknown outcome and prevents an automatic duplicate.
-            //
-            // What the operator is told is composed from measurements rather than from `activePendingBatch`
-            // (W16.bat3-fu2). This catch's commonest cause is a Stop pressed mid-submit — the chunk callback
-            // throws as soon as `recordSubmittedBatchChunk` finds the journal closed — and `cancel()` has
-            // nil'd that journal by then, so reading the count out of it said "no server ID was received"
-            // about a batch already billed for several, and "the journal was kept" without looking.
             NSLog("[ArchiveProcessor] paid-batch submission interrupted: %@", error.localizedDescription)
-            reportInterruptedBatchSubmission()
+            reportInterruptedBatchSubmission(
+                refusal: error as? BatchCreateRefusal,
+                address: ClosedPaidBatchJournalAddress(persistedInitialBatch))
             return
         }
 
@@ -910,6 +898,11 @@ extension OCRProcessor {
             batchPollInterrupted = true
             isProcessing = false
             return
+        }
+        if activePendingMixedPDF != nil {
+            Self.deletePendingMixedPDF()
+            activePendingMixedPDF = nil
+            pendingMixedPDFInfo = nil
         }
         // A quit or Stop that waited is carried out here: Stop cancels every journaled job, a quit leaves them for Resume.
         submitPassOpen = false

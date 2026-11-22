@@ -58,12 +58,12 @@ color and keeps its checkmark seal. The off-screen accessibility audit measured 
 
 - Settings disables Batch for OpenAI. A stored on value still displays a $0.0052 batch estimate against $0.0105 standard and suppresses page-reader choices. Both standard requests used GPT-5.4 mini, where both with Batch off used the chosen GPT-5 nano. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s027)
 
-## A refused batch create is offered for recovery (S-051)
+## FIXED (S-051, 2026-11-22) — A refused batch create shows the provider's reason
 
-- **Reproduced 2026-11-21 (Codex gpt-6.2-sol, `eaa9e556`).** Process Files reports uncertainty after a complete
-  Gemini batch-create HTTP 401, keeps a journal with zero acknowledged IDs, and offers Resume. A cut-off
-  reply before an ID arrives warrants the uncertainty warning and journal retention. The provider's refusal reason
-  appears in the log only. [Scratch evidence](../verification/evidence/processor/W49.proc-s051-verify.md). (queued: W49.proc-fix-s051)
+A confirmed first-create refusal clears its empty batch journal and shows the provider's reason.
+An incomplete reply, an unusable job ID, or a server error keeps the journal for review. Earlier
+acknowledged jobs stay resumable. Any completed PDF work in a mixed run stays recoverable.
+[Scratch evidence and regression](../verification/evidence/processor/W49.proc-s051-verify.md) (W49.proc-fix-s051).
 
 ## FIXED (S-052, 2026-11-21) — Process Files reports failed gateway label requests
 

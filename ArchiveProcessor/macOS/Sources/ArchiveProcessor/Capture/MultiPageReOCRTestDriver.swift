@@ -294,6 +294,35 @@ enum MultiPageReOCRTestDriver {
                     })
                 check("second relaunch reuses completed output without a paid call",
                       await repeatedCalls.count() == 0 && secondRelaunch.outputURLMap[recoveryPDF] == output)
+                if let completed {
+                    let fingerprint = OCRProcessor.runFingerprint(
+                        files: [recoveryImage], outputDirectory: recoveryOut, taggingMode: TaggingMode.none,
+                        enableTagging: false, batchMode: true, preserveInputOrder: true)
+                    let journal = OCRProcessor.PendingBatch(
+                        batchId: "", provider: .gemini, model: model, thinkingLevel: nil,
+                        fileURLs: [recoveryImage], outputDirectory: recoveryOut,
+                        enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
+                        taggingMode: TaggingMode.none, runFingerprint: fingerprint,
+                        lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
+                        submittedChunkIds: [], submissionComplete: false,
+                        mixedPDFOutcomes: completed.completedOutcomes)
+                    let savedBatch = OCRProcessor.savePendingBatch(journal)
+                    let secondWindow = OCRProcessor()
+                    secondWindow.checkForPendingBatch()
+                    check("an uncertain first batch create hides mixed Resume but keeps the completed PDF journal",
+                          secondWindow.pendingBatchInfo?.hasPrefix("Pending batch from ") == true
+                          && secondWindow.pendingMixedPDFInfo == nil
+                          && OCRProcessor.loadPendingMixedPDF()?.integrity == completed.integrity)
+
+                    relaunch.activePendingBatch = savedBatch
+                    relaunch.reportInterruptedBatchSubmission(
+                        refusal: BatchCreateRefusal(statusCode: 401, reason: "Synthetic authorization refusal"),
+                        address: OCRProcessor.ClosedPaidBatchJournalAddress(savedBatch))
+                    check("an explicit first-create refusal retires only the empty batch journal",
+                          relaunch.statusMessage.contains("Batch submission refused")
+                          && relaunch.pendingBatchInfo == nil && relaunch.pendingMixedPDFInfo != nil
+                          && OCRProcessor.loadPendingMixedPDF()?.integrity == completed.integrity)
+                }
                 if let output, let completed {
                     try? Data("replaced output".utf8).write(to: output)
                     check("replaced output fails recovery identity check",

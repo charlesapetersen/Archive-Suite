@@ -1171,11 +1171,15 @@ extension OCRProcessor {
 
         let unrecorded = max(0, createdJobCount - journal.acknowledgedChunkCount)
         if journal.onDisk {
-            parts.append(unrecorded == 0
-                ? "The recovery journal was kept, so Resume can pick the batch up."
-                : "The recovery journal was kept, but \(jobs(unrecorded)) "
-                  + "\(unrecorded == 1 ? "is" : "are") missing from it, so Resume will not reach "
-                  + "\(unrecorded == 1 ? "it" : "them").")
+            if unrecorded > 0 {
+                parts.append("The recovery journal was kept, but \(jobs(unrecorded)) "
+                             + "\(unrecorded == 1 ? "is" : "are") missing from it, so Resume will not reach "
+                             + "\(unrecorded == 1 ? "it" : "them").")
+            } else if journal.acknowledgedChunkCount > 0 {
+                parts.append("The recovery journal was kept, so Resume can pick the batch up.")
+            } else {
+                parts.append("The recovery journal was kept. Check the provider's batch console for a job.")
+            }
         } else {
             parts.append(createdJobCount == 0
                 ? "No recovery journal is on disk."
@@ -1191,14 +1195,40 @@ extension OCRProcessor {
     /// Same four statements the exit always made — say what happened, flag the interruption, end the run,
     /// refresh the Resume banner — with the message now composed from measurements. It does NOT cancel
     /// `processingTask`: this runs *on* that task, and the run is ending under its own power.
-    func reportInterruptedBatchSubmission() {
-        statusMessage = Self.interruptedSubmissionMessage(
-            createdJobCount: paidJobsCreatedThisSubmission.count,
-            journal: Self.paidBatchJournalState(),
-            priorReport: lastPaidBatchInterruptionReport)
+    func reportInterruptedBatchSubmission(
+        refusal: BatchCreateRefusal? = nil,
+        address: ClosedPaidBatchJournalAddress? = nil
+    ) {
+        if let refusal, let address, !Task.isCancelled, paidJobsCreatedThisSubmission.isEmpty,
+           let activePendingBatch, address.matches(activePendingBatch),
+           activePendingBatch.effectiveChunkIds.isEmpty,
+           let journal = Self.loadPendingBatch(), address.matches(journal),
+           Self.pendingBatchIsSelfConsistent(journal), journal.submissionComplete == false,
+           journal.effectiveChunkIds.isEmpty,
+           journal.lifecycleFingerprint == activePendingBatch.lifecycleFingerprint,
+           journal.mixedPDFOutcomes == nil || hasRetainedMixedPDFJournal() {
+            // A first-create refusal proves there is no batch work to recover or charge. The mixed PDF
+            // journal, if any, still holds the PDF work and remains available after this batch is retired.
+            Self.deletePendingBatch()
+            recordUnfinishedRunSpend()
+            statusMessage = refusal.localizedDescription
+            if Self.paidBatchJournalState().onDisk {
+                statusMessage += " The local batch journal could not be removed."
+            }
+        } else {
+            statusMessage = Self.interruptedSubmissionMessage(
+                createdJobCount: paidJobsCreatedThisSubmission.count,
+                journal: Self.paidBatchJournalState(),
+                priorReport: refusal?.localizedDescription ?? lastPaidBatchInterruptionReport)
+        }
         batchPollInterrupted = true
         isProcessing = false
         checkForPendingBatch()
+    }
+
+    private func hasRetainedMixedPDFJournal() -> Bool {
+        guard let activePendingMixedPDF, let saved = Self.loadPendingMixedPDF() else { return false }
+        return Self.pendingMixedPDFIsSelfConsistent(saved) && saved.integrity == activePendingMixedPDF.integrity
     }
 
     /// Atomically advance the in-memory + on-disk paid-batch journal. The old durable snapshot remains
@@ -1455,11 +1485,8 @@ extension OCRProcessor {
     }
     /// Check for persisted pending batch or run on launch.
     func checkForPendingBatch() {
-        // Check for pending batch. A manifest that fails to decode (corrupt JSON) already loads as nil;
-        // additionally ignore one that is self-inconsistent (torn/tampered — valid JSON but its stored
-        // fingerprint no longer matches its own fields) rather than offering a resume that could misapply
-        // it (Tier-2 rule e). The local file is NOT deleted for a batch — a paid server-side job may
-        // still exist, and dropping the manifest would strand it — it is simply not surfaced.
+        // Keep and surface malformed or self-inconsistent batch journals for review. The resume
+        // path verifies the journal again before using it for any provider request.
         if let pending = Self.loadPendingBatch() {
             if Self.pendingBatchIsSelfConsistent(pending) {
                 let formatter = DateFormatter()
@@ -1476,6 +1503,8 @@ extension OCRProcessor {
                 NSLog("[ArchiveProcessor] WARNING: pending BATCH manifest failed the self-consistency check but is being PRESERVED (a paid server-side batch may still exist and must not be stranded).")
                 pendingBatchInfo = "A pending batch was found but its manifest failed a self-consistency check (it may be torn or tampered). It has NOT been discarded — a paid server-side batch may still exist. The manifest was kept for recovery; review before resuming."
             }
+        } else if FileManager.default.fileExists(atPath: Self.pendingBatchURL.path) {
+            pendingBatchInfo = "A pending batch journal could not be read. It was kept for review. Automatic resume is unavailable."
         } else {
             pendingBatchInfo = nil
         }
@@ -1511,7 +1540,9 @@ extension OCRProcessor {
         }
         #endif
         // A crash between saving the image journal and retiring the PDF journal leaves both.
-        // Prefer the validated image journal once it contains this exact completed PDF set.
+        // Prefer the validated image journal once it contains this exact completed PDF set. An empty
+        // batch journal could still be waiting on its first create, so keep the mixed copy until a job
+        // ID is saved. The batch journal takes priority while the create outcome is unresolved.
         if let mixed = Self.loadPendingMixedPDF(), Self.pendingMixedPDFIsSelfConsistent(mixed),
            mixed.completedOutcomes.count == mixed.pdfIndices.count {
             let transferred: [MixedPDFOutcome]?
@@ -1522,7 +1553,7 @@ extension OCRProcessor {
                run.fileURLs == images {
                 transferred = run.mixedPDFOutcomes
             } else if let batch = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(batch),
-                      batch.fileURLs == images {
+                      !batch.effectiveChunkIds.isEmpty, batch.fileURLs == images {
                 transferred = batch.mixedPDFOutcomes
             } else {
                 transferred = nil
@@ -1534,7 +1565,8 @@ extension OCRProcessor {
                 activePendingMixedPDF = nil
             }
         }
-        if FileManager.default.fileExists(atPath: Self.pendingMixedPDFURL.path) {
+        if !FileManager.default.fileExists(atPath: Self.pendingBatchURL.path),
+           FileManager.default.fileExists(atPath: Self.pendingMixedPDFURL.path) {
             if let pending = Self.loadPendingMixedPDF(), Self.pendingMixedPDFIsSelfConsistent(pending) {
                 let completed = pending.completedOutcomes.count
                 let total = pending.pdfIndices.count
@@ -1599,7 +1631,7 @@ extension OCRProcessor {
                                                       imageScale: config.imageScale), jobs: [], wholeRun: true)
         }
         Self.deletePendingBatch()
-        pendingBatchInfo = nil
+        checkForPendingBatch()
     }
     /// W49.proc-resume-standard-runs: a resume reads the run's own file list, so a page moved, renamed or deleted since
     /// is not found. Said in the Interrupted Run box before Resume, rather than discovered as failures afterwards.
@@ -3071,7 +3103,7 @@ extension OCRProcessor {
         // Never overwrite recovery state from a different interrupted run. The UI surfaces explicit
         // Resume/Dismiss controls, but keep the invariant here as well for shortcuts and programmatic
         // callers. A paid batch may still exist even when its manifest is malformed or has no received ID.
-        if Self.loadPendingBatch() != nil || Self.loadPendingRun() != nil ||
+        if FileManager.default.fileExists(atPath: Self.pendingBatchURL.path) || Self.loadPendingRun() != nil ||
            (FileManager.default.fileExists(atPath: Self.pendingMixedPDFURL.path)
             && resumingMixedPDF == nil) {
             checkForPendingBatch()

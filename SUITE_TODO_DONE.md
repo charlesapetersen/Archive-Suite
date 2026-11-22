@@ -17654,3 +17654,12 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Verified with the Reader smoke suite, headless render guard, write-surface lint and its 30 self-checks,
   and the focused corrupt-index test in the off-screen Tart VM.
   <!-- /W49.fix-reader-dead-index-overlay -->
+- [x] **W49.proc-fix-s051 — Report an explicit batch refusal and preserve uncertain recovery [S · Tier-2]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit)
+  (lane: processor) (uses: build) — Distinguish an explicit first-create refusal from a missing or unusable reply. Surface the refusal reason without offering recovery for an empty refused journal. Preserve recovery for ambiguous outcomes and any earlier acknowledged jobs. Keep [the two scratch runs](verification/evidence/processor/W49.proc-s051-verify.md) as the regression.
+  Batch creation now reports recognized provider refusals with the HTTP code and reason. A verified
+  empty first-create journal is retired without booking the batch estimate. Ambiguous replies and
+  earlier acknowledged jobs retain recovery, and completed PDF work in a mixed run stays available.
+  The loopback regression uses synthetic images and includes cutoff, blank-ID and server-error replies.
+  Verified with a Debug build, four loopback cases, 394 batch-resume checks, 44 multi-page PDF
+  checks and 314 OCR prompt checks. Independent Tier-2 review completed. Cost $0, no bench cache.
+  <!-- /W49.proc-fix-s051 -->

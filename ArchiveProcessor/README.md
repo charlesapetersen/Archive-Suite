@@ -129,6 +129,10 @@ Anthropic, Gemini, and Mistral support batch processing for lower-cost, asynchro
 - Cancel running batches (server-side cancellation)
 - Cost estimator shows batch discount (50% for all providers)
 
+If the provider explicitly refuses the first batch request, the status shows the HTTP code and the
+provider's reason. Fix the cause before starting again. An earlier acknowledged job stays available
+for Resume if a later request is refused.
+
 #### If a batch submission reports an uncertain outcome
 
 Very rarely, the provider can accept a batch and its reply can be lost on the way back (a dropped
@@ -136,7 +140,8 @@ connection at exactly the wrong moment). The app never guesses in that situation
 recovery journal, and says
 
 > Batch submission outcome is uncertain. No server job was acknowledged, but a create whose reply was lost
-> may still have been accepted. The recovery journal was kept. Review before retrying.
+> may still have been accepted. The recovery journal was kept. Check the provider's batch console for a job.
+> Review before retrying.
 
 **Do not just press Resume — check the provider's own console first.** The app cannot list your batches
 on the provider side, so it cannot tell whether that batch exists there; retrying blind is the one way to

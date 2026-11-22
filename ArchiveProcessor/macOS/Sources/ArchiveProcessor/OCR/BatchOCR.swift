@@ -29,12 +29,34 @@ struct BatchOCRRequest: Sendable {
 /// Internal (not `private`) so the headless provider-contract driver can pin its shape — see
 /// `BatchParseContract`.
 func parseBatchErrorBody(data: Data, statusCode: Int) -> String {
-    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-        if let message = json["message"] as? String { return message }
-        if let error = json["error"] as? [String: Any],
-           let message = error["message"] as? String { return message }
+    batchErrorReason(data) ?? "API error (\(statusCode))"
+}
+
+private func batchErrorReason(_ data: Data) -> String? {
+    guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+    return json["message"] as? String ?? (json["error"] as? [String: Any])?["message"] as? String
+}
+
+struct BatchCreateRefusal: LocalizedError {
+    let statusCode: Int
+    let reason: String
+
+    var errorDescription: String? { "Batch submission refused (HTTP \(statusCode)): \(reason)" }
+}
+
+/// Only a complete, structured rejection of the create itself establishes that no job was made.
+/// Timeouts, conflicts, server errors and unusable replies leave the pre-submit journal in place.
+private func batchCreateError(data: Data, statusCode: Int, apiKey: String) -> any Error {
+    switch statusCode {
+    case 400, 401, 402, 403, 404, 413, 415, 422, 429:
+        if let reason = batchErrorReason(data)?.trimmingCharacters(in: .whitespacesAndNewlines), !reason.isEmpty {
+            let safeReason = apiKey.isEmpty ? reason : reason.replacingOccurrences(of: apiKey, with: "[redacted]")
+            return BatchCreateRefusal(statusCode: statusCode, reason: safeReason)
+        }
+    default:
+        break
     }
-    return "API error (\(statusCode))"
+    return OCRError.networkError(parseBatchErrorBody(data: data, statusCode: statusCode))
 }
 
 /// URL-encodes a value for safe interpolation into a URL query/path component (RFC 3986 unreserved).
@@ -172,12 +194,12 @@ struct AnthropicBatchClient: Sendable {
         }
 
         if http.statusCode != 200 {
-            let errorMsg = parseBatchErrorBody(data: data, statusCode: http.statusCode)
-            throw OCRError.networkError(errorMsg)
+            throw batchCreateError(data: data, statusCode: http.statusCode, apiKey: apiKey)
         }
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let batchId = json["id"] as? String else {
+              let batchId = json["id"] as? String,
+              !batchId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw OCRError.networkError("No batch ID in response")
         }
 
@@ -511,8 +533,7 @@ struct GeminiBatchClient: Sendable {
         }
 
         if http.statusCode != 200 {
-            let errorMsg = parseBatchErrorBody(data: data, statusCode: http.statusCode)
-            throw OCRError.networkError(errorMsg)
+            throw batchCreateError(data: data, statusCode: http.statusCode, apiKey: apiKey)
         }
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -521,7 +542,8 @@ struct GeminiBatchClient: Sendable {
 
         let metadata = json["metadata"] as? [String: Any]
         guard let batchName = json["name"] as? String
-                ?? metadata?["name"] as? String else {
+                ?? metadata?["name"] as? String,
+              !batchName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw OCRError.networkError("No batch name in response")
         }
 
@@ -909,12 +931,12 @@ struct MistralBatchClient: Sendable {
         }
 
         if http.statusCode != 200 {
-            let errorMsg = parseBatchErrorBody(data: data, statusCode: http.statusCode)
-            throw OCRError.networkError(errorMsg)
+            throw batchCreateError(data: data, statusCode: http.statusCode, apiKey: apiKey)
         }
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let batchId = json["id"] as? String else {
+              let batchId = json["id"] as? String,
+              !batchId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw OCRError.networkError("No batch ID in response")
         }
 

@@ -253,6 +253,19 @@ enum BatchSubmissionMessageContract {
               + "the server-side job keeps its only local record",
               bytesAfter == bytesBefore)
 
+        // A refusal of a later create does not authorize retirement of an earlier job.
+        let laterRefusal = OCRProcessor()
+        laterRefusal.activePendingBatch = written
+        laterRefusal.paidJobsCreatedThisSubmission = ["batches/paid-chunk-1"]
+        let refusal = BatchCreateRefusal(statusCode: 401, reason: "Synthetic authorization refusal")
+        laterRefusal.reportInterruptedBatchSubmission(
+            refusal: refusal, address: OCRProcessor.ClosedPaidBatchJournalAddress(written))
+        check("submission message: a later refusal gives its reason and keeps the earlier job resumable",
+              laterRefusal.statusMessage.hasPrefix(refusal.localizedDescription)
+              && laterRefusal.statusMessage.contains("1 server job had been created")
+              && laterRefusal.pendingBatchInfo != nil
+              && (try? Data(contentsOf: url)) == bytesBefore)
+
         // Now the other direction, with the file really gone. Nothing here may say it was kept.
         OCRProcessor.deletePendingBatch()
         let orphaned = OCRProcessor()
