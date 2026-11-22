@@ -3,7 +3,8 @@
 Owner call 32 selected one authoritative adjacent JSON companion per PDF. This contract is for the
 adopted catalogue. [The current tag and PDF format](tag-format.md) continues to describe the existing
 app paths during the rollout. [The rollout plan](../execution-plans/storage-simplify.md) covers discovery,
-writing, app integration, projections, adoption and recovery.
+writing, app integration, projections, adoption and recovery. See [field mapping and acceptance cases](catalogue-fields.md)
+for the Inspector, Processor output, Notes and Zotero.
 
 ## Location and identity
 

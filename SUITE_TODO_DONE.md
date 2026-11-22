@@ -17950,3 +17950,9 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   UI tests passed. The Android-to-Mac smoke filed all three synthetic pages and verified OCR text and tags using
   Gemini Flash-Lite at the usual few-cent smoke cost. OpenRouter verification used mocked requests.
   <!-- /W49.proc-openrouter-rotation -->
+
+- [x] **W49.item-fields-home — Map editable fields to the catalogue record [M]** · §Known limits are queued, accepted or asked (lane: suite) (uses: light) (blocked-on: W49.storage-simplify-audit, W49.storage-one-home-owner-ok, W49.storage-contract) — Map Inspector, generated page 2, Notes and Zotero fields to the shared contract. Separate current corrections, original evidence and historical output. Record the field mapping and consumer acceptance cases for implementation. SHIPPED 2026-11-22 (this commit).
+  [Field mapping and acceptance cases](SPEC/catalogue-fields.md) cover Inspector controls, Processor
+  history, Notes source dates and shared Zotero payloads. Checked against the schema and current
+  consumer paths. This closes the mapping stage. Implementation stays with the staged queue items.
+  <!-- /W49.item-fields-home -->

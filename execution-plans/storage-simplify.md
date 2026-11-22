@@ -629,11 +629,12 @@ Implement the S stages in scratch roots. Enable real writes only after the write
 
 **Queued implementation.** Call 32 selects S. W49.storage-one-home is the planning handoff.
 W49.storage-contract defines the adopted [catalogue contract](../SPEC/catalogue.md) and its ArchiveCore fixtures.
+W49.item-fields-home records the [field mapping and consumer acceptance cases](../SPEC/catalogue-fields.md).
 The items below carry implementation and acceptance. Every stage starts on scratch roots.
 
 | Stage | Queue items |
 |---|---|
-| 1 · Contract | `W49.storage-contract` (schema and association fixtures), then `W49.item-fields-home` (field mapping) |
+| 1 · Contract | `W49.storage-contract` (schema and association fixtures), then `W49.item-fields-home` ([field mapping](../SPEC/catalogue-fields.md)) |
 | 2 · Shared reads | `W49.storage-reads` |
 | 3S · Coordinated writer and local pairing | `W49.storage-writer` for edits and `W49.storage-pair-recovery` for paired filing, with Finder rename/reassociation in `W49.reader-item-fields-rename` |
 | 4 · Processor | `W49.storage-processor`, followed by `W49.proc-item-fields-rerun` for Improve OCR and restore |
