@@ -1,14 +1,14 @@
 # Where item facts should live — decision analysis
 
-**Owner decision · 2026-11-21 · W49.storage-one-home-owner-ok.** When someone sends just a PDF from Finder, must the recipient receive the catalogue corrections stored for that file?
+**Owner decision, 2026-11-21 (call 32).** Use one adjacent JSON companion per PDF (option 1A, called S
+in the study) as the authoritative catalogue record. Reader saves corrections in the companion, preserving
+the PDF's bytes and any existing signature. Transfer the pair or use a Suite export to carry current facts.
+The optional Processor segment JSON serves a separate purpose. The staged implementation starts with the
+shared record and association rules.
 
-**Recommend a JSON companion per PDF (S)** if sending a pair or a Suite export is acceptable. A correction can then be saved without changing the scan or its signature. The price is concrete: moving or sending only the PDF leaves its companion behind. Reader would show and edit typed fields in either design.
+[Compare all four choices](#4-which-vehicle-is-best) · [Read the decision and open choices](#9-storage-choice-and-remaining-decisions) · [Inspect scratch evidence](#12-what-a-metadata-edit-actually-did-on-scratch-pdfs) · [Check the provider limits](#13-what-travels-through-a-drive) · [Review the proposed contract](#14-proposed-record-and-write-contract-for-s-or-e) · [Review stages, tests and rollback](#15-delivery-sequence-dependencies-and-exit-tests)
 
-**Choose embedded XMP (E)** if single-PDF transfer is essential. The local experiment recovered the corrected year from the PDF alone. A targeted edit preserved the original bytes as a prefix, both rendered pages and PDF/A-2b on the tested archival fixture. On a signed copy, the new facts fell outside the signature. E therefore needs an audited writer, restricted eligibility and a derivative workflow for unsupported originals. Ordinary downloads on iCloud Drive and Google Drive remain unverified. With either choice, a split document's sibling-owned fields and its folder context require the whole set or a resolved export.
-
-[Compare all four choices](#4-which-vehicle-is-best) · [Read the decision and open choices](#9-revised-question-for-w49storage-one-home-owner-ok-needs-you) · [Inspect scratch evidence](#12-what-a-metadata-edit-actually-did-on-scratch-pdfs) · [Check the provider limits](#13-what-travels-through-a-drive) · [Review the proposed contract](#14-proposed-record-and-write-contract-for-s-or-e) · [Review stages, tests and rollback](#15-delivery-sequence-dependencies-and-exit-tests)
-
-The source survey in §§1–11 used `4bffed3d`. The scratch study and staged decision plan in §§12–15 use `709603ee`. The owner has deferred implementation until this decision.
+The source survey in §§1–11 used `4bffed3d`. The scratch study and staged decision plan in §§12–15 use `709603ee`. Call 32 selects the companion route. The alternative designs and measurements below document the comparison.
 
 ## 1. What changed in the question, and what exists today
 
@@ -400,11 +400,11 @@ adopted; a Finder toggle cannot move years out of tags safely on its own. Once a
 authority when either projection setting changes. The application may recognize unadopted input, but does not need
 perpetual backward-writing formats for test output that nobody keeps.
 
-## 9. Revised question for W49.storage-one-home-owner-ok (needs you)
+## 9. Storage choice and remaining decisions
 
-**When you send just a PDF, do you need its corrected catalogue facts to go with it?** Choose S if sending a pair or a Suite export is acceptable, or E if the ordinary PDF must carry the correction. Sections 12–13 supply the evidence and its limits. F and P remain alternatives if you normally move a whole folder or package.
+The owner chose S, one JSON companion per PDF. The options below explain the decision and its trade-offs. Sections 12–13 supply the evidence and its limits.
 
-- **S — a JSON companion per PDF, recommended:** Reader fields edit it; the PDF keeps transcription/processing
+- **S — a JSON companion per PDF, selected:** Reader fields edit it; the PDF keeps transcription/processing
   history. Transfer the pair, folder or suite export to keep current facts. Accept that a PDF-only Finder move or
   copy can detach/omit metadata, and that Finder changes to mirrored tags become a deliberate import rather than
   an automatic second source of truth. New suite PDFs carry an identity; old PDFs can be associated without rewriting.
@@ -429,10 +429,9 @@ whether “off in Spotlight” means no **suite-published fields**, or full fold
 Keeping existing tags, removing owned projections, and adopting a pre-app archive are separate deliberate operations.
 These are proposed defaults, not enacted policy. Today's behavior remains until the owner answers.
 
-This replaces the old gate's A/B/C wording and its “no page 2” sub-question. Do not execute the old
-`W49.storage-drop-dead-copies` recipe by deleting the very sidecar date/evidence fields a chosen canonical route now
-needs. `W49.storage-one-home`, `W49.item-fields-home`, and movable-root work wait on the storage gate. Rename and rerun have their own owner gates and must be reconciled with the selected route. This analysis is complete when the question
-is delivered; implementing a choice is separate work.
+Use the selected companion contract when rescoping redundant date copies, item-field edits, and movable-root
+work. Preserve sidecar date and evidence fields that have consumers. The rename and rerun questions have
+their own owner decisions and must be reconciled with this contract.
 
 ### Filesystem metadata and other external options
 
@@ -453,7 +452,7 @@ copied by itself has no corrected data. A companion supports per-document export
 work. These choices can use Finder tags or custom attributes as optional conveniences without making them the
 only copy of a correction. A separate export can combine the PDF and its record for transfer. If the requirement
 is for the plain PDF byte stream to carry current data after a byte-only copy, storing the data inside that
-stream is necessary. No storage choice is approved yet.
+stream is necessary. Call 32 selects the JSON companion.
 
 ## 10. Size and a reviewable implementation sequence
 
@@ -608,7 +607,7 @@ For both vehicles, record an opaque content-generation token and unique edit IDs
 
 ## 15. Delivery sequence, dependencies and exit tests
 
-Each stage below is proposed work **after** the existing owner gate. Use scratch roots throughout development, and keep the switch for real writes unavailable until the writer, all consumers and rollback have passed for that route. The sizes in §10 are planning estimates. S and E are alternative routes; the unselected writer need not ship.
+Implement the S stages in scratch roots. Enable real writes only after the writer, all consumers and rollback have passed. The sizes in §10 are planning estimates. The 3E row records the alternative evaluated in the decision.
 
 | Order and dependency | Implementation boundary | Pass condition before enabling the next stage |
 |---|---|---|
@@ -628,4 +627,8 @@ Each stage below is proposed work **after** the existing owner gate. Use scratch
 - **E → S.** Extract the latest *active* packet and identity into new companions in a distinct root. Use a known original PDF if its content generation still matches, or preserve the newer verified content revision. An embedded packet in a retained historical PDF is a snapshot under S. Ensure the new root and consumer contract select the companion explicitly. Verify receipts, links, fields and byte preservation before switching. Never truncate an incremental tail or restore a stale whole-file backup as a general Undo.
 - **Stop conditions.** A lost explicit clear/check, altered page or unexpected XMP, changed signature coverage, failed conformance, ambiguous duplicate, older app writing the pilot, or missing source/record during recovery stops rollout. Keep both roots and affected candidates for reconciliation. Archive-wide cutover is distinct from testing this plan. Any real-corpus write requires separate owner authorization.
 
-**Dependency handoff.** `W49.storage-one-home-owner-ok` remains the decision. After the answer, divide `W49.storage-one-home` using the selected stages. Reconcile `W49.item-fields-home`, `W49.storage-drop-dead-copies`, `W49.proc-item-fields-rerun`, `W49.reader-item-fields-rename` and `W49.reader-root-movable` with the chosen semantics and their own open decisions. Defer cloud editing to `W49.reader-cloud-drives` and its existing priority. No automatic conversion, implementation assignment, provider upload or release follows from this research.
+**Dependency handoff.** Call 32 answers `W49.storage-one-home-owner-ok` with S. Start
+`W49.storage-one-home` by filing bounded items from the S stages. Reconcile `W49.item-fields-home`,
+`W49.storage-drop-dead-copies`, `W49.proc-item-fields-rerun`, `W49.reader-item-fields-rename`, and
+`W49.reader-root-movable` with the companion contract and their own open decisions. Cloud editing stays
+with `W49.reader-cloud-drives` at its existing priority. Adoption of the real archive requires separate approval.

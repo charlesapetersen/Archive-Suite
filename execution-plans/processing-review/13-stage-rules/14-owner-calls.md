@@ -271,6 +271,12 @@ calls are section 1.
     review before tagging. Independent confirmation still precedes the fix, and the separate Resume decision
     remains in call 30.
 
+32. **Catalogue storage decision, 2026-11-21.** Choose 1A (S in the storage plan). One adjacent JSON
+    companion per PDF is the authoritative record for current catalogue fields, including Reader corrections.
+    Reader saves catalogue changes to the companion. A full transfer uses the PDF and its companion or a Suite
+    export. The existing optional Processor segment JSON remains a distinct output. Finder and Spotlight
+    defaults and any migration of the real archive remain separate decisions.
+
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
 Each is a table default or a filed item, reversible without app work; the figures and files are in the note named.
