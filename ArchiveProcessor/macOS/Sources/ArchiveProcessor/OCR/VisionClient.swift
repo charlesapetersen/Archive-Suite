@@ -6,6 +6,7 @@ import Darwin
 /// The operator-controlled, on-device Vision recognition settings. These are deliberately a value type:
 /// a run snapshots them at launch so changing Settings cannot alter an interrupted run when it resumes.
 struct VisionOCRSettings: Codable, Equatable, Sendable {
+    /// Empty when the user chose none: Vision then detects each page's language itself (W49.proc-vision-language-auto).
     var languages: [String]
     var usesFastRecognition: Bool
     var minimumConfidence: Float
@@ -14,26 +15,26 @@ struct VisionOCRSettings: Codable, Equatable, Sendable {
     static let `default` = VisionOCRSettings(
         languages: ["en-US"], usesFastRecognition: false, minimumConfidence: 0.0, customWords: [])
 
+    /// An unset key is the default, en-US; a field the user emptied is no language chosen, so detection.
     static func fromDefaults(_ defaults: UserDefaults = .standard) -> VisionOCRSettings {
         let languages = defaults.string(forKey: DefaultsKeys.visionLanguages)?
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty } ?? []
+            .filter { !$0.isEmpty } ?? Self.default.languages
         let words = defaults.string(forKey: DefaultsKeys.visionCustomVocabulary)?
             .split(whereSeparator: { $0 == "," || $0 == "\n" })
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty } ?? []
         let rawConfidence = defaults.object(forKey: DefaultsKeys.visionMinimumConfidence) as? Double
         return VisionOCRSettings(
-            languages: languages.isEmpty ? Self.default.languages : languages,
+            languages: languages,
             usesFastRecognition: defaults.bool(forKey: DefaultsKeys.visionFastRecognition),
             minimumConfidence: Float(min(1, max(0, rawConfidence ?? 0))),
             customWords: words)
     }
 
     var isValid: Bool {
-        !languages.isEmpty
-            && languages.allSatisfy { !$0.isEmpty && !$0.contains("\n") }
+        languages.allSatisfy { !$0.isEmpty && !$0.contains("\n") }
             && minimumConfidence.isFinite && (0...1).contains(minimumConfidence)
             && customWords.allSatisfy { !$0.isEmpty && !$0.contains("\n") }
     }
@@ -90,7 +91,9 @@ struct VisionClient: Sendable {
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = settings.usesFastRecognition ? .fast : .accurate
         request.usesLanguageCorrection = !settings.usesFastRecognition
-        request.recognitionLanguages = settings.languages
+        // Match VisionOCRKit's Recogniser: let Vision detect the language when the list is empty.
+        if !settings.languages.isEmpty { request.recognitionLanguages = settings.languages }
+        request.automaticallyDetectsLanguage = settings.languages.isEmpty
         request.customWords = settings.customWords
 
         // The decoded image is the pixels as stored; a phone shot says in EXIF how to turn them upright

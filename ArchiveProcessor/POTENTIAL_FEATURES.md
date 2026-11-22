@@ -24,7 +24,7 @@
 ### Document Processing
 - **Handwriting recognition mode** — shipped (owner, 2026-11-20, call 28): Handwritten pages go to the handwriting reader. — specialized prompts and processing for handwritten documents
 - **Table extraction** — queued: W49.proc-table-csv behind nice-to-have (owner, 2026-11-20, call 28) — detect and extract tabular data from documents into structured formats
-- **Language detection** — queued: W49.proc-vision-language-auto (owner, 2026-11-20, call 28) — identify document language and adjust OCR accordingly
+- **Language detection** — shipped in W49.proc-vision-language-auto (owner, 2026-11-20, call 28). Clear the Apple Vision language field to detect the language on each page.
 - **Newspaper/periodical layout analysis** — shipped (owner, 2026-11-20, call 28): region-by-region newspaper reading. — handle multi-column layouts, headlines, captions
 
 ### Collection Management

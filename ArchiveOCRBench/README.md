@@ -101,6 +101,11 @@ the 96 (16 handwritten, 2 mixed; the three agreement-only letters are left out, 
 they join part 7's stratum table as L1-L3 columns, but not the 895 table (no other stratum read), not the 96's four
 charts, the ranking table or part 5 (no typed or printed page read), so their owner figures stay in their own panel.
 
+The Apple Vision language-detection comparison in part 7 uses a paired table for the
+562 non-English public pages and the owner cohorts. The two settings were compared
+for this experiment, with the remaining English public strata outside its scope.
+See [the measurement card](../ArchiveProcessor/segbench-results/vision-language-auto.md).
+
 W46.r1-foundation's Apple on-device model (macOS 27, `segbench-results/r1-foundation.json`) is on the 96's four charts
 and the speed table as a free Mac route, with no app memory figure (the model runs in the OS). The speed table shows
 its median, 9.5 s a page; the mean is 32 s, because the third of pages that loop to the 4,096-token cap take about 80 s

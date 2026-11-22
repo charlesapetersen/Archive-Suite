@@ -566,6 +566,33 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-settings-drive-fields")
     }
 
+    func testClearingVisionLanguagesOffersAutoDetection() throws {
+        openSettings()
+        let settings = app.settingsWindow
+        XCTAssertTrue(settings.waitForExistence(timeout: 10))
+        chooseBackend("Apple Vision (on this Mac)", in: settings)
+        defer { chooseBackend("Direct API", in: settings) }
+
+        let languages = settings.textFields["ap.settings.visionLanguages"]
+        XCTAssertTrue(languages.waitForExistence(timeout: 5))
+        scrollUntilHittable(languages, in: settings)
+        languages.click()
+        languages.typeKey("a", modifierFlags: .command)
+        languages.typeText("fr-FR")
+        XCTAssertEqual(languages.value as? String, "fr-FR")
+        languages.typeKey("a", modifierFlags: .command)
+        languages.typeKey(.delete, modifierFlags: [])
+        languages.typeKey(.return, modifierFlags: [])
+
+        XCTAssertTrue(app.showSettingsPanel("General"))
+        XCTAssertTrue(app.showSettingsPanel("Reading"))
+        XCTAssertTrue(languages.waitForExistence(timeout: 5))
+        scrollUntilHittable(languages, in: settings)
+        XCTAssertEqual(languages.value as? String, "")
+        XCTAssertTrue(languages.placeholderValue?.hasPrefix("Auto-detect") == true)
+        attachScreenshot("processor-vision-language-auto")
+    }
+
     /// W40.fix-processor-settings-backend-mismatch: a backend that does not use batch mode or the worker stepper
     /// says so instead of offering them, and transcription-only Apple Vision names a Tagging mode it cannot run.
     func testSettingsShowOnlyWhatTheBackendUses() throws {

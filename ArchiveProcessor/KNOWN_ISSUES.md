@@ -2,6 +2,10 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## Accounts Validated badge has low contrast in light mode
+
+- The off-screen accessibility audit measured 2.07:1 for the green “Validated” label in `SettingsAccountsPanel.keyStatusChip` on 2026-11-21. The same failure reproduced on unchanged baseline `cb394d05` using `AccessibilityAuditUITests`. (queued: W49.proc-validated-contrast)
+
 ## Stage for later offers already-processed photos (S-039)
 
 - Live Capture handed off the same two photos after a successful Process Files run and again after relaunch. A second Start read both photos again. The handoff itself sent zero requests. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s039)

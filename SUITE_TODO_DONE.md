@@ -17596,3 +17596,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Reader smoke ran 1,084 tests with seven skips and no failures. All eight document render guards and all 29 write-surface lint self-checks passed.
   Off-screen VM tests verified the password message in both viewers and the warning for a genuine image-only PDF. Both password-error screenshots were reviewed.
   <!-- /W49.fix-reader-encrypted-pdf -->
+
+- [x] **W49.proc-vision-language-auto — the Apple Vision route detects the document's language when the user chose none [S]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-21 (this commit)
+  Original item (lane: processor) (uses: build) — Owner, 2026-11-20 (call 28, the Backlog review sheet). From ArchiveProcessor/POTENTIAL_FEATURES.md "Language detection". VisionOCRKit auto-detects when its language list is empty (`Recogniser.swift`); the Processor's `OCR/VisionClient.swift` always passes the user's list. Use detection when none is chosen, and measure on the bench's non-English pages (both OCR sets) before and after.
+  Clear **Languages** to let the app detect each page's language. An unset field setting uses the existing `en-US` default and named languages keep their priority order.
+  Measured 562 public non-English pages at 26.58 → 38.91 NES (+12.32 points, paired 95% interval +10.18 to +14.58). The two likely non-English owner pages tied at 91.64 NES. Across all 96 owner pages, the interval includes zero. See [the paired benchmark and measurement card](ArchiveProcessor/segbench-results/vision-language-auto.md).
+  Verified in the Debug build, key-free OCR smoke checks, and off-screen Settings interaction. Removed the generated benchmark images and raw readings from scratch and kept the aggregate results for the bench.
+  The full off-screen Processor run reported 48 passes, 18 skips and two Accounts contrast failures. The badge failure reproduced on unchanged baseline `cb394d05` and is queued as W49.proc-validated-contrast.
+  <!-- /W49.proc-vision-language-auto -->

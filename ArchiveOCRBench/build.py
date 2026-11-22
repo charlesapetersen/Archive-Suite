@@ -83,6 +83,7 @@ ENH_MARKS = RESULTS / "enh-ocr-marks.json"  # W46.enh-ocr-input-marks: the mark-
 POSTCORRECT = RESULTS / "ocr-postcorrect.json"  # W46.ocr-postcorrect: postcorrect.py score --results, the band corrector
 LOGPROB = RESULTS / "ocr-logprob.json"  # W46.ocr-logprob: ocr_logprob.py report, log-probabilities as an error flag
 POSTREAD = RESULTS / "post-read-flag.json"  # W46.post-read-quality-flag: post_read_flag.py report, the read-poorly flag
+VISION_LANGUAGE_AUTO = RESULTS / "vision-language-auto.json"
 POSTREAD_NEWS = RESULTS / "post-read-flag-newspaper.json"  # W49.proc-read-flag-newspaper: post_read_flag_newspaper.py
 POSTREAD_NEWS_WHOLE = RESULTS / "post-read-flag-newspaper-whole.json"  # W49.proc-read-flag-newspaper-whole
 LAYOUT_ORDER = RESULTS / "layout-order.json"  # W46.layout-order: layout_order.py run, ordering with detection fixed
@@ -1722,6 +1723,7 @@ def main():
              "seg_kit_gate_sherlock": seg_kit_gate_sherlock(), "seg_boxes_score": seg_boxes_score(),
              "seg_magazine_rule": seg_magazine_rule(),
              "public": pub, "ocr_scorers": ocr_scorers(),
+             "vision_language_auto": json.loads(VISION_LANGUAGE_AUTO.read_text()) if VISION_LANGUAGE_AUTO.exists() else None,
              "ppocrv6_hands": ppocrv6_hands(pub and pub["open_sweep"]),
              "hands_icl": {k: v for k, v in json.loads((RESULTS / "ocr-ppocrv6-hands-paid.json").read_text()).items()
                            if k in ("model", "groups", "comparisons", "cohorts", "charged", "complete", "verdict", "retained_allowance", "acknowledged_failures", "failure_reasons")}

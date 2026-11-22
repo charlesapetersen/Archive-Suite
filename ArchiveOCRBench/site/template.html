@@ -466,6 +466,12 @@ footer p { font-size: 13px; }
     <p class="note">Pages drawn with a fixed seed from published transcriptions (a quarter cap per collection, with thin-stratum exceptions marked in the manifest), checked against Apple Vision's reading for wrong truth, and frozen before any hosted model read them; the manifest is <code>ArchiveProcessor/segbench-results/bench-corpus/manifest.jsonl</code>. Same prompt, image size and scorer as the 96. Each source keeps its own transcription conventions, so a stratum's score is comparable across routes, not with the 96 or with another stratum. Second score: NES after mapping historical letter forms (long s, ligatures, abbreviation marks) for L5-L8; without diacritics for N1, N3 and N4. Apple Vision runs the app's settings (English, language correction on), so it reads only the Latin-script strata. N4 understates every route twice over: its truth is the main text only, while the prompt asks for everything on the sheet, so a reader that also transcribes the masorah in the margins loses points; and all but one of BiblIA's 132 pages are transcribed without vowel points, which Gemini writes, so for N4 the second score, without marks, is the fairer figure. Gemini's failures were provider errors (HTTP 500 mid-reply, not billed); Qwen's were replies that ran to the 8,192-token limit, mostly repeating a line. Scores only: the page images are not published, whatever their licence allows.</p>
   </section>
 
+  <section class="panel" id="vision-language-auto" hidden>
+    <div class="head"><h2>Apple Vision language detection</h2><span class="meta">Paired readings on the Mac · $0</span></div>
+    <div class="tbl"><table><thead><tr><th>Pages</th><th>n</th><th>English NES</th><th>Auto-detect NES</th><th>Δ NES points (95% interval)</th><th>Answered, English / Auto-detect</th></tr></thead><tbody id="vision-language-rows"></tbody></table></div>
+    <p class="note" id="vision-language-note"></p>
+  </section>
+
   <section class="panel" id="pub-open" hidden>
     <div class="head"><h2>Open models on all 895 pages</h2><span class="meta">FarmShare L40S cards (one each, Ling four) · a review baseline, nothing adopted</span></div>
     <div class="tbl"><table><thead><tr><th>Model</th><th>Route</th><th>Precision</th><th>Answered / 895</th><th>NES</th><th>NES, answered</th><th>chrF2</th><th>Words missed</th><th>Words added</th><th>NES, original 440</th><th>GPU minutes</th></tr></thead><tbody id="pub-open-rows"></tbody></table></div>
@@ -1564,6 +1570,18 @@ const STRATUM_NAMES = { L1: 'English letters and diaries', L2: 'English manuscri
   L4: 'Ledgers and forms', L5: 'Dutch and Romance archival hands', L6: 'German Kurrent', L7: 'Charters before 1600',
   L8: 'Early print, incl. Fraktur', L9: 'Newspapers', N1: 'Arabic manuscripts', N2: 'Cyrillic', N3: 'Greek minuscule',
   N4: 'Hebrew book hands', N5: 'Chinese print', N6: 'Devanagari print' };
+const VL = DATA.vision_language_auto;
+if (VL) {
+  const points = v => (100 * v).toFixed(1);
+  const name = group => group === 'L3' ? 'L3 · French typescripts' :
+    (STRATUM_NAMES[group] ? group + ' · ' + STRATUM_NAMES[group] : group);
+  document.getElementById('vision-language-rows').innerHTML = VL.rows.map(r =>
+    '<tr><td>' + name(r.group) + '</td><td>' + r.n + '</td><td>' + points(r.english) + '</td><td>' +
+    points(r.auto) + '</td><td>' + points(r.delta) + ' (' + points(r.lo) + ' to ' + points(r.hi) +
+    ')</td><td>' + r.answered_english + ' / ' + r.answered_auto + '</td></tr>').join('');
+  document.getElementById('vision-language-note').textContent = VL.summary;
+  document.getElementById('vision-language-auto').hidden = false;
+}
 if (PB) {
   const p1 = v => v == null ? '–' : (100 * v).toFixed(1);
   const rows = [...PB.rows, ...(PB.farmshare || []).filter(r => r.route.startsWith('qwen'))].filter(r => r.stratum !== 'all').sort((a, b) => a.stratum.localeCompare(b.stratum) || b.nes - a.nes);

@@ -1,6 +1,7 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import AppKit
 import Foundation
+import VisionOCRKit
 
 /// Key-free, no-network contract for W46.post-read-quality-flag: the weighted confidence and its cut, the flag riding
 /// on the result through a reclassification and a save, the run's summary and history naming the flagged pages, and
@@ -237,18 +238,48 @@ enum ReadQualityFlagTestDriver {
                   !pairs.isEmpty && off.allSatisfy { $0 < 1e-6 })
         }
 
+        // 7. W49.proc-vision-language-auto: no language chosen means Vision detects it.
+        let suite = "APVisionLanguages-\(UUID().uuidString)"
+        if let d = UserDefaults(suiteName: suite) {
+            defer { d.removePersistentDomain(forName: suite) }
+            check("7 an unset field is the default, en-US", VisionOCRSettings.fromDefaults(d).languages == ["en-US"])
+            d.set("fr-FR, de-DE", forKey: DefaultsKeys.visionLanguages)
+            check("7 named languages are kept in order", VisionOCRSettings.fromDefaults(d).languages == ["fr-FR", "de-DE"])
+            d.set(" , ", forKey: DefaultsKeys.visionLanguages)
+            check("7 separators without a language count as blank", VisionOCRSettings.fromDefaults(d).languages.isEmpty)
+            d.set("", forKey: DefaultsKeys.visionLanguages)
+            let none = VisionOCRSettings.fromDefaults(d)
+            check("7 an emptied field is no language", none.languages.isEmpty)
+            check("7 which is valid, and outside the read-poorly cut's fit", none.isValid && !F.applies(to: none))
+            if let page = makePage(at: root.appendingPathComponent("french.jpg"),
+                                   line: "Le comité s\u{2019}est réuni à Genève pour étudier le rapport, ligne") {
+                let reader = try? PageReaders.reader(
+                    provider: .appleVision, model: LLMModel.appleVisionModels[0],
+                    apiKey: "", thinkingLevel: nil, visionSettings: none, newspaperLayout: false)
+                let r = try? await reader?.read(PageReaderInput(imageURL: page))
+                check("7 Vision with no language reads a French page with its accents",
+                      (r?.text ?? "").contains("comité") && (r?.text ?? "").contains("Genève"))
+            } else {
+                check("7 the French page was drawn", false)
+            }
+        } else {
+            check("7 a scratch defaults suite", false)
+        }
+
         finish(results)
     }
 
     /// A page of dark text lines on white, upright.
-    private static func makePage(at url: URL) -> URL? {
+    private static func makePage(
+        at url: URL, line text: String = "The committee met on the fourth of March to consider the report, line"
+    ) -> URL? {
         let size = NSSize(width: 850, height: 1100)
         let image = NSImage(size: size)
         image.lockFocus()
         NSColor.white.setFill(); NSRect(origin: .zero, size: size).fill()
         let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 22), .foregroundColor: NSColor.black]
         for line in 0..<30 {
-            ("The committee met on the fourth of March to consider the report, line \(line)." as NSString)
+            ("\(text) \(line)." as NSString)
                 .draw(at: NSPoint(x: 60, y: 1040 - CGFloat(line) * 33), withAttributes: attrs)
         }
         image.unlockFocus()

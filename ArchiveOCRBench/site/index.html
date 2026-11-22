@@ -466,6 +466,12 @@ footer p { font-size: 13px; }
     <p class="note">Pages drawn with a fixed seed from published transcriptions (a quarter cap per collection, with thin-stratum exceptions marked in the manifest), checked against Apple Vision's reading for wrong truth, and frozen before any hosted model read them; the manifest is <code>ArchiveProcessor/segbench-results/bench-corpus/manifest.jsonl</code>. Same prompt, image size and scorer as the 96. Each source keeps its own transcription conventions, so a stratum's score is comparable across routes, not with the 96 or with another stratum. Second score: NES after mapping historical letter forms (long s, ligatures, abbreviation marks) for L5-L8; without diacritics for N1, N3 and N4. Apple Vision runs the app's settings (English, language correction on), so it reads only the Latin-script strata. N4 understates every route twice over: its truth is the main text only, while the prompt asks for everything on the sheet, so a reader that also transcribes the masorah in the margins loses points; and all but one of BiblIA's 132 pages are transcribed without vowel points, which Gemini writes, so for N4 the second score, without marks, is the fairer figure. Gemini's failures were provider errors (HTTP 500 mid-reply, not billed); Qwen's were replies that ran to the 8,192-token limit, mostly repeating a line. Scores only: the page images are not published, whatever their licence allows.</p>
   </section>
 
+  <section class="panel" id="vision-language-auto" hidden>
+    <div class="head"><h2>Apple Vision language detection</h2><span class="meta">Paired readings on the Mac · $0</span></div>
+    <div class="tbl"><table><thead><tr><th>Pages</th><th>n</th><th>English NES</th><th>Auto-detect NES</th><th>Δ NES points (95% interval)</th><th>Answered, English / Auto-detect</th></tr></thead><tbody id="vision-language-rows"></tbody></table></div>
+    <p class="note" id="vision-language-note"></p>
+  </section>
+
   <section class="panel" id="pub-open" hidden>
     <div class="head"><h2>Open models on all 895 pages</h2><span class="meta">FarmShare L40S cards (one each, Ling four) · a review baseline, nothing adopted</span></div>
     <div class="tbl"><table><thead><tr><th>Model</th><th>Route</th><th>Precision</th><th>Answered / 895</th><th>NES</th><th>NES, answered</th><th>chrF2</th><th>Words missed</th><th>Words added</th><th>NES, original 440</th><th>GPU minutes</th></tr></thead><tbody id="pub-open-rows"></tbody></table></div>
@@ -48584,6 +48590,208 @@ true,
 }
 }
 },
+"vision_language_auto":{
+"rows":[
+{
+"group":"Owner 96",
+"n":96,
+"english":0.813181610709082,
+"auto":0.8198575205179052,
+"answered_english":96,
+"answered_auto":96,
+"delta":0.006675909808823141,
+"lo":-0.00029761930965563343,
+"hi":0.019928416432139887,
+"median_seconds_english":0.17355045830481686,
+"median_seconds_auto":0.1861208541376982
+},
+{
+"group":"Public non-English",
+"n":562,
+"english":0.2658407387675579,
+"auto":0.3890874127780499,
+"answered_english":535,
+"answered_auto":540,
+"delta":0.123246674010492,
+"lo":0.10181935351930697,
+"hi":0.14583553851060155,
+"median_seconds_english":0.1372667083342094,
+"median_seconds_auto":0.15291835417156108
+},
+{
+"group":"Owner non-English",
+"n":2,
+"english":0.9163737776211687,
+"auto":0.9163737776211687,
+"answered_english":2,
+"answered_auto":2,
+"delta":0.0,
+"lo":0.0,
+"hi":0.0,
+"median_seconds_english":0.2878165208385326,
+"median_seconds_auto":0.29737689581816085
+},
+{
+"group":"L3",
+"n":2,
+"english":0.8870761710574288,
+"auto":0.8870761710574288,
+"answered_english":2,
+"answered_auto":2,
+"delta":0.0,
+"lo":0.0,
+"hi":0.0,
+"median_seconds_english":0.13378125001327135,
+"median_seconds_auto":0.13685310416622087
+},
+{
+"group":"L5",
+"n":80,
+"english":0.41074769898852886,
+"auto":0.4185771047482934,
+"answered_english":80,
+"answered_auto":80,
+"delta":0.007829405759764528,
+"lo":-0.004940596237934922,
+"hi":0.02810524347569713,
+"median_seconds_english":0.20393362498725764,
+"median_seconds_auto":0.23735900002066046
+},
+{
+"group":"L6",
+"n":80,
+"english":0.26510981121708266,
+"auto":0.25537529526107655,
+"answered_english":80,
+"answered_auto":80,
+"delta":-0.00973451595600612,
+"lo":-0.019184818682916015,
+"hi":-0.0022520904641864627,
+"median_seconds_english":0.14746418749564327,
+"median_seconds_auto":0.1604484583658632
+},
+{
+"group":"L7",
+"n":80,
+"english":0.14305918467472023,
+"auto":0.13775928923551692,
+"answered_english":65,
+"answered_auto":65,
+"delta":-0.005299895439203295,
+"lo":-0.01022872310792071,
+"hi":-0.0007454335235501875,
+"median_seconds_english":0.10119864583248273,
+"median_seconds_auto":0.11250620833016
+},
+{
+"group":"L8",
+"n":80,
+"english":0.7534167421844927,
+"auto":0.7527645410288419,
+"answered_english":80,
+"answered_auto":80,
+"delta":-0.0006522011556507861,
+"lo":-0.001428755567724846,
+"hi":6.326222771879526e-05,
+"median_seconds_english":0.13367027082131244,
+"median_seconds_auto":0.14429814586765133
+},
+{
+"group":"N1",
+"n":40,
+"english":0.08226125058276751,
+"auto":0.7161209755582834,
+"answered_english":40,
+"answered_auto":40,
+"delta":0.6338597249755159,
+"lo":0.578003683683342,
+"hi":0.6832948083356343,
+"median_seconds_english":0.13617966664605774,
+"median_seconds_auto":0.1561034583428409
+},
+{
+"group":"N2",
+"n":40,
+"english":0.20087776586687045,
+"auto":0.19144337240268539,
+"answered_english":40,
+"answered_auto":40,
+"delta":-0.009434393464185061,
+"lo":-0.015100161708650056,
+"hi":-0.00459020225547917,
+"median_seconds_english":0.1343108750297688,
+"median_seconds_auto":0.14862658330821432
+},
+{
+"group":"N3",
+"n":40,
+"english":0.11099548677461728,
+"auto":0.10672033806478749,
+"answered_english":37,
+"answered_auto":39,
+"delta":-0.004275148709829773,
+"lo":-0.02131513788968415,
+"hi":0.013651101660822363,
+"median_seconds_english":0.09058397912303917,
+"median_seconds_auto":0.10357447917340323
+},
+{
+"group":"N4",
+"n":40,
+"english":0.011767730170344687,
+"auto":0.014742719462576322,
+"answered_english":33,
+"answered_auto":35,
+"delta":0.0029749892922316364,
+"lo":0.0012358813005888675,
+"hi":0.004907083745518579,
+"median_seconds_english":0.15519202084396966,
+"median_seconds_auto":0.17203783334116451
+},
+{
+"group":"N5",
+"n":40,
+"english":0.0695462110526151,
+"auto":0.6124368242481777,
+"answered_english":38,
+"answered_auto":39,
+"delta":0.5428906131955626,
+"lo":0.44217179749067903,
+"hi":0.6399754673405115,
+"median_seconds_english":0.1397189166455064,
+"median_seconds_auto":0.4547184999973979
+},
+{
+"group":"N6",
+"n":40,
+"english":0.0705932525544533,
+"auto":0.6519076506947621,
+"answered_english":40,
+"answered_auto":40,
+"delta":0.5813143981403087,
+"lo":0.5467751124807539,
+"hi":0.613714560661905,
+"median_seconds_english":0.12790904165012762,
+"median_seconds_auto":0.1347203541372437
+}
+],
+"owner_language_counts":{
+"en":87,
+"de":1,
+"nl":1
+},
+"owner_language_uncertain":7,
+"rerun_pages":24,
+"max_rerun_shift":{
+"english":0.0,
+"auto":0.0
+},
+"mean_rerun_shift":{
+"english":0.0,
+"auto":0.0
+},
+"summary":"Language detection improved the public score by 12.32 NES points, driven by Arabic manuscripts, Chinese print and Devanagari print. The owner set's two likely non-English pages tied. NES measures similarity to the reference text, with empty readings scored zero. Both arms used accurate recognition and identical images. The owner language labels came from screening the reference text."
+},
 "ppocrv6_hands":{
 "public":[
 {
@@ -73531,6 +73739,18 @@ const STRATUM_NAMES = { L1: 'English letters and diaries', L2: 'English manuscri
   L4: 'Ledgers and forms', L5: 'Dutch and Romance archival hands', L6: 'German Kurrent', L7: 'Charters before 1600',
   L8: 'Early print, incl. Fraktur', L9: 'Newspapers', N1: 'Arabic manuscripts', N2: 'Cyrillic', N3: 'Greek minuscule',
   N4: 'Hebrew book hands', N5: 'Chinese print', N6: 'Devanagari print' };
+const VL = DATA.vision_language_auto;
+if (VL) {
+  const points = v => (100 * v).toFixed(1);
+  const name = group => group === 'L3' ? 'L3 · French typescripts' :
+    (STRATUM_NAMES[group] ? group + ' · ' + STRATUM_NAMES[group] : group);
+  document.getElementById('vision-language-rows').innerHTML = VL.rows.map(r =>
+    '<tr><td>' + name(r.group) + '</td><td>' + r.n + '</td><td>' + points(r.english) + '</td><td>' +
+    points(r.auto) + '</td><td>' + points(r.delta) + ' (' + points(r.lo) + ' to ' + points(r.hi) +
+    ')</td><td>' + r.answered_english + ' / ' + r.answered_auto + '</td></tr>').join('');
+  document.getElementById('vision-language-note').textContent = VL.summary;
+  document.getElementById('vision-language-auto').hidden = false;
+}
 if (PB) {
   const p1 = v => v == null ? '–' : (100 * v).toFixed(1);
   const rows = [...PB.rows, ...(PB.farmshare || []).filter(r => r.route.startsWith('qwen'))].filter(r => r.stratum !== 'all').sort((a, b) => a.stratum.localeCompare(b.stratum) || b.nes - a.nes);

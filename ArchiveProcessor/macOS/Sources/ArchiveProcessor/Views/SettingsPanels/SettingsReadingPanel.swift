@@ -331,7 +331,7 @@ struct SettingsReadingPanel: View {
         Text("Free on-device transcription with macOS Vision. It does not use an API key or send images over the network.")
             .font(.caption).foregroundStyle(.primary)
         SettingsField("Languages") {
-            TextField("Languages", text: $visionLanguages, prompt: Text("Comma-separated BCP-47 tags, e.g. en-US, fr-FR"))
+            TextField("Languages", text: $visionLanguages, prompt: Text("Auto-detect or enter en-US, fr-FR"))
                 .accessibilityIdentifier("ap.settings.visionLanguages")
         }
         .settingsLevel(.visionLanguages)
