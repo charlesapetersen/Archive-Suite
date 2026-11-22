@@ -17795,3 +17795,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   The Debug build, scratch dating, dual-date and Process Files output tests passed. Two off-screen UI tests passed
   on the manual date card and Live finishing controls. The tests used local fixtures and stub replies.
   <!-- /W49.proc-date-paths-rest -->
+
+- [x] **W49.proc-reocr-dialog — the Improve OCR dialog loads in the background, refreshes after Run, and picks Kind per page [M]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit).
+  Opening it on many files reads, validates and classifies on the main thread (up to 500 files); after Run its list is stale, so it offers Run once per opening; the Kind picker is per file and overwrites a mixed file's per-page Kinds. Load off the main thread with progress, re-read the accepted files after Run, and give mixed-Kind files a per-page picker. Covers three bullets under §W44.reocr-processor. Filed by W49.ki-audit-processor.
+  The dialog counts files as it checks them in the background. Each selected page has its own Kind and reader.
+  Accepted files reload from disk, and Run becomes available after the current reviews are decided.
+  The scratch Improve OCR smoke and both off-screen dialog tests passed. The tests exercised independent
+  Kind choices, acceptance, a second Run in the same dialog, rejection, and restoring from history.
+  <!-- /W49.proc-reocr-dialog -->

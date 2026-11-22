@@ -634,12 +634,6 @@ What remains: a box with many such pages has more gaps to check than the figures
   one-page originals and any file not in suite image/text pairs (queued: W49.proc-reocr-allow-more).
 - **Apple Vision fails inside the macOS 27.2 VM guest** ("Foundation._GenericObjCError 0") while it reads the same
   page on the host; the VM UI journey uses a DEBUG stand-in reader, the host self-test the real Vision (accepted: a VM guest platform limit; the host self-test uses the real Vision).
-- **The dialog offers Run once per opening:** after Run its file list is stale (an accepted file has a new reader);
-  reopening reads the files again (queued: W49.proc-reocr-dialog).
-- **Opening the dialog on many files is slow:** it reads and validates every file, and asks the classifier about
-  header-less pages, on the main thread (500 flagged files at most from the finder); load in the background later (queued: W49.proc-reocr-dialog).
-- **The Kind picker is per file:** it shows the first page's Kind and sets every page of the file, so a mixed-Kind
-  file's header Kinds are overwritten by a choice there; per-page pickers are open (queued: W49.proc-reocr-dialog).
 - **Opening the dialog reads the Keychain** for each provider (to know which readers are ready), which can bring back
   a Keychain prompt on an unseeded Mac (accepted: a one-time Keychain seed, kept by the stable signing certificate).
 - **Not re-flagged:** a restore whose publication launch recovery had to finish, and an acceptance whose clear

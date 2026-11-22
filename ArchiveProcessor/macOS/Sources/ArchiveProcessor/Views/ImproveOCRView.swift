@@ -15,6 +15,8 @@ enum ImproveOCRWork {
 
     /// Recovery once per shared folder per launch, through the queue.
     @MainActor private static var recovered: Set<URL> = []
+    // An interrupted publication requires today's candidate to stay in place for launch recovery.
+    @MainActor static var awaitingPublicationRecovery: Set<URL> = []
     @MainActor static func recoverOnce(support: URL, job: ReOCRJob, done: (@MainActor @Sendable ([ReOCRJob.Recovered]) -> Void)? = nil) {
         guard recovered.insert(support.standardizedFileURL).inserted else { return }
         Task {
@@ -41,9 +43,7 @@ final class ImproveOCRController: ObservableObject {
     @Published private(set) var root: ReOCRJob.Root?
     @Published private(set) var rootProblem: String?
     @Published private(set) var running = false
-    /// Run is offered once per opening: after it the file list is stale (an accepted file has a new reader); reopening
-    /// the dialog reads the files again.
-    @Published private(set) var hasRun = false
+    @Published private(set) var loadedFileCount: Int? = 0
     @Published private(set) var reviews: [String: ReOCRJob.Review] = [:]
     @Published private(set) var messages: [String: String] = [:]
     @Published private(set) var recoveryNote: String?
@@ -51,8 +51,10 @@ final class ImproveOCRController: ObservableObject {
     @Published private(set) var deciding: Set<String> = []
     private var runTask: Task<Void, Never>?
 
-    let model: ReOCRDialogModel?
-    let loadProblem: String?
+    private(set) var model: ReOCRDialogModel?
+    private var loadProblem: String?
+    let files: [URL]
+    private let selectedPairs: [URL: [Int]]
     private let connection: ReOCRSupportConnection
 
     /// `<Processor Application Support>/ImproveOCR`, where kept versions and journals live.
@@ -82,35 +84,55 @@ final class ImproveOCRController: ObservableObject {
     }
 
     init(files: [URL], pairs selectedPairs: [URL: [Int]] = [:]) {
+        var seen = Set<String>()
+        self.files = files.filter { seen.insert($0.standardizedFileURL.path).inserted }
+        self.selectedPairs = selectedPairs
         let conn = Self.connection()
         connection = conn
         support = Result { try conn.resolve() }.mapError { ($0 as? ReOCRSupportConnection.Problem) ?? .unavailable("\($0)") }
-        guard let table = SettingsRouteTable.bundled else {
-            model = nil
+    }
+
+    func load() async {
+        guard loadedFileCount != nil else { return }
+        loadedFileCount = 0
+        defer { if !Task.isCancelled { loadedFileCount = nil } }
+        if case .success(let s) = support { recover(s.url) }
+        let settings = SettingsLayerStore.shared.file
+        let prepared = await Self.prepare(files: files, settings: settings)
+        guard !Task.isCancelled else { return }
+        guard let prepared else {
             loadProblem = "the reading rule table is missing from this build"
             return
         }
-        var resources = SettingsResources(macMemoryGB: Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824)
-        resources.keys = Set(LLMProvider.allCases.filter { $0 != .appleVision && KeychainHelper.load(account: $0.rawValue) != nil }
-            .map { $0.rawValue.lowercased() })
-        // W46.training-optout-run: the files' collections' switches, the stricter where the files' folders differ,
-        // and the keys and plans the user says do not train.
-        let switches = Self.collectionSwitches(for: files)
-        resources.trainingOff = Set(SettingsLayerStore.shared.resolver(for: nil).resolve(.trainingOff).value.strings ?? [])
-        model = ReOCRDialogModel(files: files, selectedPairs: selectedPairs, table: table, pairs: OCRPairMatrix.bundled,
-                                 resources: resources, staysOnMac: switches.staysOnMac, noTraining: switches.noTraining,
-                                 scanDetectors: switches.scanDetectors)
-        loadProblem = nil
-        root = Self.findRoot(for: files)
+        root = prepared.root
         if root == nil { rootProblem = "these files are not inside one archive folder with a suite root marker" }
-        // Pages whose header names no Kind get the classifier's provisional call.
-        if let model {
-            Task { [weak self] in
-                await model.classifyUnknownPages()
-                self?.revision += 1
-            }
-        }
-        if case .success(let s) = support { recover(s.url) }
+        let model = ReOCRDialogModel(selectedPairs: selectedPairs, table: prepared.table, pairs: prepared.pairs,
+                                     resources: prepared.resources, staysOnMac: prepared.switches.staysOnMac,
+                                     noTraining: prepared.switches.noTraining, scanDetectors: prepared.switches.scanDetectors)
+        await model.loadFiles(files) { loadedFileCount = $0 }
+        guard !Task.isCancelled else { return }
+        self.model = model
+    }
+
+    struct CollectionSwitches: Sendable {
+        var staysOnMac = false
+        var noTraining = false
+        var scanDetectors: [URL: NewspaperDetector] = [:]
+    }
+
+    @concurrent
+    private static func prepare(files: [URL], settings: GeneralSettingsFile) async
+        -> (table: SettingsRouteTable, pairs: OCRPairMatrix?, resources: SettingsResources,
+            switches: CollectionSwitches, root: ReOCRJob.Root?)? {
+        guard let table = SettingsRouteTable.bundled, !Task.isCancelled else { return nil }
+        var resources = SettingsResources(macMemoryGB: Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824)
+        resources.keys = Set(LLMProvider.allCases.filter {
+            !Task.isCancelled && $0 != .appleVision && KeychainHelper.load(account: $0.rawValue) != nil
+        }.map { $0.rawValue.lowercased() })
+        resources.trainingOff = Set(SettingsResolver(general: settings.general, project: nil, collection: nil)
+            .resolve(.trainingOff).value.strings ?? [])
+        let switches = await collectionSwitches(for: files, settings: settings)
+        return (table, OCRPairMatrix.bundled, resources, switches, findRoot(for: files))
     }
 
     private func job(_ support: URL) -> ReOCRJob {
@@ -139,13 +161,12 @@ final class ImproveOCRController: ObservableObject {
     /// above it holding a collection's settings, resolved with its project and the general layer. Either is on when it
     /// is on for any file's collection. W47.wh-yolo-scans-reocr: `scanDetectors` is each file's own collection's choice
     /// for scanned newspapers, as Process Files and Live Capture take it from the output folder's layers.
-    static func collectionSwitches(for files: [URL])
-        -> (staysOnMac: Bool, noTraining: Bool, scanDetectors: [URL: NewspaperDetector]) {
-        var staysOnMac = false
-        var noTraining = false
-        var scanDetectors: [URL: NewspaperDetector] = [:]
+    @concurrent
+    static func collectionSwitches(for files: [URL], settings: GeneralSettingsFile) async -> CollectionSwitches {
+        var switches = CollectionSwitches()
         var byFolder: [String: NewspaperDetector] = [:]
         for url in files {
+            if Task.isCancelled { break }
             var dir = url.deletingLastPathComponent().standardizedFileURL
             var doc: CollectionSettingsDocument?
             while dir.pathComponents.count > 1 {
@@ -154,22 +175,23 @@ final class ImproveOCRController: ObservableObject {
                 if (try? RootMarker.read(at: dir)) != nil { break }
                 dir = dir.deletingLastPathComponent()
             }
-            if let known = byFolder[dir.path] { scanDetectors[url] = known; continue }
-            let r = SettingsLayerStore.shared.resolver(for: doc)
+            if let known = byFolder[dir.path] { switches.scanDetectors[url] = known; continue }
+            let project = settings.projects.first { $0.id == doc?.projectID }
+            let r = SettingsResolver(general: settings.general, project: project, collection: doc?.collection)
             let detector = NewspaperDetector.scans(r.resolveAll())
             byFolder[dir.path] = detector
-            scanDetectors[url] = detector
+            switches.scanDetectors[url] = detector
             // With no collection anywhere above, the general layer answers. "Stays on this Mac" counts only where a
             // layer set it: its built-in value is the skipped interview's, which would hide every online reader from
             // a user who never answered, where the dialog offered them before.
             let stays = r.resolve(.staysOnMac)
-            staysOnMac = staysOnMac || (stays.layer != nil && stays.value.bool == true)
-            noTraining = noTraining || (r.resolve(.noTraining).value.bool ?? false)
+            switches.staysOnMac = switches.staysOnMac || (stays.layer != nil && stays.value.bool == true)
+            switches.noTraining = switches.noTraining || (r.resolve(.noTraining).value.bool ?? false)
         }
-        return (staysOnMac, noTraining, scanDetectors)
+        return switches
     }
 
-    static func findRoot(for files: [URL]) -> ReOCRJob.Root? {
+    nonisolated private static func findRoot(for files: [URL]) -> ReOCRJob.Root? {
         guard var dir = files.first?.deletingLastPathComponent().standardizedFileURL else { return nil }
         while dir.pathComponents.count > 1 {
             let read: RootMarker?
@@ -199,8 +221,8 @@ final class ImproveOCRController: ObservableObject {
         if case .success(let s) = support { recover(s.url) }
     }
 
-    func setKind(_ kind: OCRPageKind?, file: String) {
-        model?.setKind(kind, file: file)
+    func setKind(_ kind: OCRPageKind?, file: String, pairIndex: Int) {
+        model?.setKind(kind, file: file, pairIndex: pairIndex)
         revision += 1
     }
 
@@ -210,6 +232,12 @@ final class ImproveOCRController: ObservableObject {
     }
 
     var runBlocker: String? {
+        if loadedFileCount != nil { return "Preparing files…" }
+        if !deciding.isEmpty { return "Finishing review decisions…" }
+        if !reviews.isEmpty { return "Accept or reject each reading before running again." }
+        if files.contains(where: { ImproveOCRWork.awaitingPublicationRecovery.contains($0.standardizedFileURL) }) {
+            return "Restart Archive Processor to recover an unfinished change before running again."
+        }
         if let loadProblem { return loadProblem }
         if case .failure(let p) = support { return p.description }
         if root == nil { return rootProblem }
@@ -217,9 +245,9 @@ final class ImproveOCRController: ObservableObject {
     }
 
     func run() {
-        guard runBlocker == nil, !hasRun, let model, let root, case .success(let s) = support else { return }
+        guard !running, runBlocker == nil, let model, let root, case .success(let s) = support else { return }
         running = true
-        hasRun = true
+        messages.removeAll()
         let job = job(s.url)
         var readerFor: (ReOCRRanking.Row) -> ReOCRJob.Reader? = { row in
             ReOCRJob.reader(for: row, apiKey: row.provider == .appleVision ? "" : (KeychainHelper.load(account: row.provider.rawValue) ?? ""))
@@ -265,8 +293,10 @@ final class ImproveOCRController: ObservableObject {
         let job = job(s.url)
         Task {
             var text: String
+            var accepted = false
             do {
                 let done = try await ImproveOCRWork.perform { try job.accept(review) }
+                accepted = true
                 switch done.flag {
                 case .cleared: text = "Accepted. The OCR Poor flag was cleared."
                 case .notFlagged: text = "Accepted."
@@ -276,7 +306,17 @@ final class ImproveOCRController: ObservableObject {
                 if done.receiptProblem != nil || done.recordProblem != nil {
                     text += " Its record for the Reader is not finished yet; it will be completed at the next launch."
                 }
-            } catch { text = "Not accepted: \(error)" }
+            } catch {
+                text = "Could not finish accepting: \(error)"
+                let id = review.operation.journal.operationID
+                let phase = try? await ImproveOCRWork.perform { try job.writer.read(id).phase }
+                if phase == nil || phase == .acceptReady {
+                    let url = URL(fileURLWithPath: fileID).standardizedFileURL
+                    ImproveOCRWork.awaitingPublicationRecovery.insert(url)
+                }
+            }
+            // An error can follow publication. Refresh from disk, keeping edits when the eligibility is unchanged.
+            await model?.refresh(fileID: fileID, keepKindsIfUnchanged: !accepted)
             messages[fileID] = text
             reviews[fileID] = nil
             deciding.remove(fileID)
@@ -511,11 +551,21 @@ struct ImproveOCRView: View {
             Text("Improve OCR").font(.title2.bold())
             connectionRow
             if let note = controller.recoveryNote { Text(note).foregroundStyle(.orange) }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    filesSection
-                    groupsSection
-                    reviewSection
+            if let count = controller.loadedFileCount {
+                ProgressView(value: Double(count), total: Double(max(1, controller.files.count))) {
+                    Text("Preparing files…")
+                } currentValueLabel: {
+                    Text("\(count) of \(controller.files.count) files checked")
+                }
+                .accessibilityIdentifier("ap.reocr.loading")
+                Spacer()
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        filesSection
+                        groupsSection
+                        reviewSection
+                    }
                 }
             }
             footer
@@ -525,6 +575,8 @@ struct ImproveOCRView: View {
         // A container, so the identifier names the dialog without overriding its controls' own.
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ap.reocr.dialog")
+        .interactiveDismissDisabled(!controller.deciding.isEmpty)
+        .task { await controller.load() }
         .onDisappear { controller.cancel() }
     }
 
@@ -536,43 +588,76 @@ struct ImproveOCRView: View {
             }
             Spacer()
             Button("Connect Shared Folder\u{2026}") { controller.connectSupport() }
+                .disabled(controller.running || !controller.reviews.isEmpty)
                 .accessibilityIdentifier("ap.reocr.connect")
         }
     }
 
     private var filesSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let pagesByFile = Dictionary(grouping: controller.model?.pages ?? [], by: \.fileID)
+        return VStack(alignment: .leading, spacing: 6) {
             Text("Files").font(.headline)
             if let p = controller.rootProblem { Text(p).foregroundStyle(.orange) }
             ForEach(controller.model?.files ?? []) { file in
-                HStack(alignment: .firstTextBaseline) {
-                    Text(file.url.lastPathComponent).bold()
-                    switch file.eligibility {
-                    case .success(let pairs):
-                        Text("\(pairs.count) page\(pairs.count == 1 ? "" : "s")").foregroundStyle(.secondary)
-                        if let r = file.currentReader { Text("now read by \(r.provider) · \(r.model)").foregroundStyle(.secondary) }
-                        Spacer()
-                        Picker("Kind", selection: Binding(
-                            get: { controller.model?.pages.first { $0.fileID == file.id }?.settledKind },
-                            set: { controller.setKind($0, file: file.id) })) {
-                            Text("Choose\u{2026}").tag(OCRPageKind?.none)
-                            ForEach(OCRPageKind.allCases, id: \.self) { Text($0.displayName).tag(Optional($0)) }
+                switch file.eligibility {
+                case .success(let pairs):
+                    let pages = pagesByFile[file.id] ?? []
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(file.url.lastPathComponent).bold()
+                        Text("\(pages.count) page\(pages.count == 1 ? "" : "s")").foregroundStyle(.secondary)
+                        if pairs.count == 1, let page = pages.first {
+                            pageControls(page, file: file, label: "Kind", idSuffix: "")
                         }
-                        .frame(width: 220)
-                        .accessibilityIdentifier("ap.reocr.kind.\(file.url.lastPathComponent)")
-                        if let p = controller.model?.provisional(file: file.id) {
-                            Text(p.confidence >= PageKindRouting.minimumConfidence
-                                 ? "suggested: \(p.kind.displayName), \(Int(p.confidence * 100))%"
-                                 : "unsure (\(p.kind.displayName)?, \(Int(p.confidence * 100))%): choose")
-                                .font(.caption).foregroundStyle(.secondary)
+                    }
+                    if pairs.count > 1 {
+                        ForEach(pages, id: \.pairIndex) { page in
+                            let pageNumber = page.pairIndex   // the one-based image page number in the PDF
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("Page \(pageNumber)").foregroundStyle(.secondary)
+                                pageControls(page, file: file, label: "Kind for page \(pageNumber)", idSuffix: ".\(pageNumber)")
+                            }
+                            .padding(.leading, 14)
                         }
-                    case .failure(let refusal):
+                    }
+                case .failure(let refusal):
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(file.url.lastPathComponent).bold()
                         Text(refusal.description).foregroundStyle(.secondary)
                     }
                 }
                 if let m = controller.messages[file.id] {
                     Text(m).font(.callout).accessibilityIdentifier("ap.reocr.message.\(file.url.lastPathComponent)")
                 }
+            }
+        }
+        .disabled(controller.running || !controller.reviews.isEmpty)
+    }
+
+    private func pageControls(_ page: ReOCRPageChoice, file: ReOCRDialogModel.FileEntry,
+                              label: String, idSuffix: String) -> some View {
+        HStack {
+            if let reader = file.pair(at: page.pairIndex)?.header.provenance {
+                Text("now read by \(reader.provider) · \(reader.model)")
+                    .lineLimit(1)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("ap.reocr.currentReader.\(file.url.lastPathComponent)\(idSuffix)")
+            }
+            Spacer()
+            Picker("Kind", selection: Binding(
+                get: { page.settledKind },
+                set: { controller.setKind($0, file: file.id, pairIndex: page.pairIndex) })) {
+                Text("Choose…").tag(OCRPageKind?.none)
+                ForEach(OCRPageKind.allCases, id: \.self) { Text($0.displayName).tag(Optional($0)) }
+            }
+            .frame(width: 220)
+            .accessibilityLabel(label)
+            .accessibilityIdentifier("ap.reocr.kind.\(file.url.lastPathComponent)\(idSuffix)")
+            if page.origin == .classifier, let kind = page.kind, let confidence = page.confidence {
+                let percent = Int(confidence * 100)
+                Text(page.settledKind != nil
+                     ? "suggested: \(kind.displayName), \(percent)%"
+                     : "unsure (\(kind.displayName)?, \(percent)%): choose")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
     }
@@ -591,6 +676,7 @@ struct ImproveOCRView: View {
                 }
             }
         }
+        .disabled(controller.running || !controller.reviews.isEmpty)
         .id(controller.revision)
     }
 
@@ -662,17 +748,21 @@ struct ImproveOCRView: View {
 
     private var footer: some View {
         HStack {
-            if let blocker = controller.runBlocker {
-                Text(blocker).foregroundStyle(.secondary).accessibilityIdentifier("ap.reocr.blocker")
-            } else if let e = controller.model?.estimate {
-                Text(e.unpricedPages > 0 ? String(format: "About $%.3f, plus %d page(s) at an unknown price", e.usd, e.unpricedPages)
-                                         : String(format: "About $%.3f", e.usd))
-                    .accessibilityIdentifier("ap.reocr.estimate")
+            if controller.loadedFileCount == nil {
+                if let blocker = controller.runBlocker {
+                    Text(blocker).foregroundStyle(.secondary).accessibilityIdentifier("ap.reocr.blocker")
+                } else if let e = controller.model?.estimate {
+                    Text(e.unpricedPages > 0 ? String(format: "About $%.3f, plus %d page(s) at an unknown price", e.usd, e.unpricedPages)
+                                             : String(format: "About $%.3f", e.usd))
+                        .accessibilityIdentifier("ap.reocr.estimate")
+                }
             }
             Spacer()
-            Button("Close") { dismiss() }.keyboardShortcut(.cancelAction)
+            Button("Close") { dismiss() }
+                .keyboardShortcut(.cancelAction)
+                .disabled(!controller.deciding.isEmpty)
             Button(controller.running ? "Reading\u{2026}" : "Run") { controller.run() }
-                .disabled(controller.runBlocker != nil || controller.running || controller.hasRun)
+                .disabled(controller.runBlocker != nil || controller.running)
                 .accessibilityIdentifier("ap.reocr.run")
         }
     }

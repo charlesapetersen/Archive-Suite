@@ -69,7 +69,9 @@ enum ProcessorUITestConfiguration {
 
     static var droppedPDF: URL? {
         if let path = urlValue(after: "-APUITestDroppedPDFPath") { return path }
-        if isActive, arguments.contains("-APUITestSyntheticSuitePair") { return syntheticSuitePair() }
+        if isActive, arguments.contains("-APUITestSyntheticSuitePair") {
+            return syntheticSuitePair(mixed: arguments.contains("-APUITestMixedKinds"))
+        }
         guard arguments.contains("-APUITestSyntheticMultiPagePDF") else { return nil }
         return syntheticMultiPagePDF()
     }
@@ -185,7 +187,7 @@ enum ProcessorUITestConfiguration {
 
     /// W44 Improve OCR: a scratch archive in this app's temporary directory (a Reader root marker and one Processor
     /// two-page file, image and text), so the dialog has a suite pair inside a root. Never a corpus file.
-    private static func syntheticSuitePair() -> URL? {
+    private static func syntheticSuitePair(mixed: Bool) -> URL? {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("archive-processor-uitest-archive-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
         let folder = root.appendingPathComponent("Box 1", isDirectory: true)
@@ -203,11 +205,21 @@ enum ProcessorUITestConfiguration {
         guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
               let jpeg = rep.representation(using: .jpeg, properties: [:]) else { return nil }
         let jpg = root.appendingPathComponent("scan.jpg"), pdf = folder.appendingPathComponent("Letter 1952.pdf")
-        guard (try? jpeg.write(to: jpg)) != nil,
-              (try? PDFGenerator().generate(imageURL: jpg, result: OCRResult(text: "A typcd lettcr, l952", classification: nil,
-                                            errorMessage: nil, errorCode: nil), model: LLMModel.appleVisionModels[0],
-                                            outputURL: pdf, originalFileName: "scan.jpg", pageKind: .typewritten)) != nil
-        else { return nil }
+        let generator = PDFGenerator()
+        let first = mixed ? root.appendingPathComponent("typed.pdf") : pdf
+        do {
+            try jpeg.write(to: jpg)
+            try generator.generate(imageURL: jpg, result: OCRResult(text: "A typcd lettcr, l952", classification: nil,
+                                   errorMessage: nil, errorCode: nil), model: LLMModel.appleVisionModels[0],
+                                   outputURL: first, originalFileName: "scan.jpg", pageKind: .typewritten)
+            if mixed {
+                let second = root.appendingPathComponent("printed.pdf")
+                try generator.generate(imageURL: jpg, result: OCRResult(text: "Second page", classification: nil,
+                                       errorMessage: nil, errorCode: nil), model: LLMModel.appleVisionModels[0],
+                                       outputURL: second, originalFileName: "scan.jpg", pageKind: .printed)
+                try generator.mergeDocumentPDFs(sourcePDFs: [first, second], outputURL: pdf)
+            }
+        } catch { return nil }
         return pdf
     }
 

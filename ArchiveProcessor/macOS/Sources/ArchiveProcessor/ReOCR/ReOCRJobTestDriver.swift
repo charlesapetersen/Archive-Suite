@@ -577,25 +577,27 @@ enum ReOCRJobTestDriver {
                 let one = PDFDocument(); one.insert(PDFPage(), at: 0); try one.dataRepresentation()?.write(to: raw)
                 var res = SettingsResources(macMemoryGB: 16)
                 res.keys = ["gemini", "openai", "anthropic", "mistral", "openrouter"]
-                let m = ReOCRDialogModel(files: [typed, unknown, raw], table: table, pairs: OCRPairMatrix.bundled,
+                let m = ReOCRDialogModel(table: table, pairs: OCRPairMatrix.bundled,
                                          resources: res, staysOnMac: false)
                 let three = try file(try folder("dialog-three"), pairs: 3)
-                let picked = ReOCRDialogModel(files: [three], selectedPairs: [three: [1, 7]], table: table, pairs: OCRPairMatrix.bundled,
+                let picked = ReOCRDialogModel(selectedPairs: [three: [1, 7]], table: table, pairs: OCRPairMatrix.bundled,
                                               resources: res, staysOnMac: false)
+                await picked.loadFiles([three])
                 check("13 the Reader's chosen pairs are the only pages offered (one past the end ignored)",
                       picked.pages.map(\.pairIndex) == [3], "\(picked.pages.map(\.pairIndex))")
+                var progress: [Int] = []
+                await m.loadFiles([typed, unknown, raw]) { progress.append($0) }
+                check("13 the load reports each checked file", progress == [1, 2, 3])
                 check("13 every file is listed, the raw one refused", m.files.count == 3
                       && { if case .failure = m.files[2].eligibility { return true }; return false }())
-                check("13 the header's Kind is used, the unknown page waits", m.groups.map(\.kind) == [.typewritten, nil], "\(m.groups.map(\.kind))")
-                await m.classifyUnknownPages()
                 let call = m.pages.first { $0.fileID == unknown.path }
                 check("13 the classifier gives the unknown page a provisional Kind", call?.origin == .classifier && call?.kind != nil
                       && m.pages.first { $0.fileID == typed.path }?.origin == .header, "\(String(describing: call))")
                 lines.append("INFO 13 classifier: \(String(describing: call?.kind)) at \(String(describing: call?.confidence))")
                 // Whatever it said, the test's next steps decide the Kind; start from "no Kind" again.
-                m.setKind(nil, file: unknown.path)
+                m.setKind(nil, file: unknown.path, pairIndex: 1)
                 check("13 Run waits for a Kind", m.runBlocker?.contains("Kind") == true, m.runBlocker ?? "")
-                m.setKind(.handwritten, file: unknown.path)
+                m.setKind(.handwritten, file: unknown.path, pairIndex: 1)
                 check("13 choosing a Kind re-groups", m.groups.map(\.kind) == [.handwritten, .typewritten] || m.groups.map(\.kind) == [.typewritten, .handwritten],
                       "\(m.groups.map(\.kind))")
                 let hand = m.groups.first { $0.kind == .handwritten }
@@ -603,7 +605,7 @@ enum ReOCRJobTestDriver {
                                                resources: res, staysOnMac: false)
                 check("13 and re-ranks for the new Kind", hand?.ranking?.kind == .handwritten
                       && hand?.ranking?.rows.map(\.id) == direct.rows.map(\.id) && !(direct.rows.isEmpty))
-                m.setKind(.forms, file: unknown.path)
+                m.setKind(.forms, file: unknown.path, pairIndex: 1)
                 let forms = ReOCRRanking.rank(kind: .forms, pages: 1, table: table, pairs: OCRPairMatrix.bundled,
                                               resources: res, staysOnMac: false)
                 check("13 a second change re-ranks again", m.groups.first { $0.kind == .forms }?.ranking?.rows.map(\.id) == forms.rows.map(\.id))
@@ -623,6 +625,11 @@ enum ReOCRJobTestDriver {
                         check("13 the new header names the chosen row's model and the Kind",
                               h?.kind == .forms && h?.provenance?.model == row.provider.models.first { $0.id == row.modelID }?.displayName,
                               "\(String(describing: h)) \(row.id)")
+                        await m.refresh(fileID: unknown.path)
+                        let refreshed = m.pages.first { $0.fileID == unknown.path }
+                        check("13 refresh reads the accepted Kind and reader back from disk",
+                              refreshed?.origin == .header && refreshed?.kind == .forms
+                              && m.files[1].pair(at: 1)?.header.provenance == h?.provenance)
                     }
                 } else {
                     check("13 with every key, a ready reader exists for each Kind", false, m.runBlocker ?? "")
@@ -642,13 +649,14 @@ enum ReOCRJobTestDriver {
                     return try file(d, pairs: 1)
                 }
                 let on = try collection("on", yolo: true), off = try collection("off", yolo: false)
-                let switches = ImproveOCRController.collectionSwitches(for: [on, off])
+                let switches = await ImproveOCRController.collectionSwitches(for: [on, off], settings: SettingsLayerStore.shared.file)
                 check("13b each file gets its collection's choice", switches.scanDetectors[on] == .docLayoutYOLO
                       && switches.scanDetectors[off] == .ppDocLayoutV3, "\(switches.scanDetectors)")
                 var res = SettingsResources(macMemoryGB: 16)
                 res.keys = ["gemini", "openai", "anthropic", "mistral", "openrouter"]
-                let m = ReOCRDialogModel(files: [on, off], table: table, pairs: OCRPairMatrix.bundled, resources: res,
+                let m = ReOCRDialogModel(table: table, pairs: OCRPairMatrix.bundled, resources: res,
                                          staysOnMac: false, scanDetectors: switches.scanDetectors)
+                await m.loadFiles([on, off])
                 final class Seen: @unchecked Sendable {
                     let lock = NSLock()
                     var detectors: [NewspaperDetector] = []

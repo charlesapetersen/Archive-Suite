@@ -178,25 +178,35 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(select.waitForNonExistence(timeout: 5), "Escape dismisses it")
     }
 
-    /// W44.reocr-processor: Processing ▸ Improve OCR… (⇧⌘I) opens the dialog for the dropped suite file: the file with
-    /// its page count and current reader, its header's Kind, the ranked readers for that Kind, and, with no shared
-    /// folder connected in this fresh VM, a Run that says why it is not offered. No OCR, no network, no write.
+    /// The Processing menu opens a mixed-Kind file, whose pages have independent choices and reader groups.
     func testImproveOCRDialogListsTheFileTheKindAndTheReaders() throws {
-        relaunch(extra: ["-APUITestSyntheticSuitePair"])
+        relaunch(extra: ["-APUITestSyntheticSuitePair", "-APUITestMixedKinds"])
         XCTAssertTrue(element("ap.ocr.start").waitForExistence(timeout: 10), "the Process Files window is up with the file")
         XCTAssertTrue(app.menuBars.menuItems["Improve OCR…"].exists, "the Processing menu lists Improve OCR…")
         XCTAssertTrue(app.menuBars.menuItems["Improve OCR on Flagged Files…"].exists, "and the flagged-files entry")
         app.typeKey("i", modifierFlags: [.command, .shift])
         let dialog = element("ap.reocr.dialog")
         XCTAssertTrue(dialog.waitForExistence(timeout: 10), "⇧⌘I opens the Improve OCR dialog")
-        XCTAssertTrue(app.staticTexts["Letter 1952.pdf"].exists, "the dropped file is listed")
-        XCTAssertTrue(element("ap.reocr.kind.Letter 1952.pdf").exists, "the file has a Kind picker")
+        XCTAssertTrue(app.staticTexts["Letter 1952.pdf"].waitForExistence(timeout: 10), "the dropped file is listed after loading")
+        let firstKind = element("ap.reocr.kind.Letter 1952.pdf.1")
+        let secondKind = element("ap.reocr.kind.Letter 1952.pdf.3")
+        XCTAssertTrue(firstKind.exists && secondKind.exists, "both image pages have a Kind picker")
+        func heading(_ kind: String) -> XCUIElement { app.staticTexts["\(kind): 1 page"] }
+        XCTAssertTrue(heading("Typewritten").exists && heading("Printed").exists, "both header Kinds have a group")
+        attachScreenshot("processor-improve-ocr-dialog")
+
+        secondKind.click()
+        let forms = app.menuItems["Form or table"]
+        XCTAssertTrue(forms.waitForExistence(timeout: 5))
+        forms.click()
+        XCTAssertTrue(heading("Form or table").waitForExistence(timeout: 5), "the chosen page joins its new group")
+        XCTAssertTrue(heading("Typewritten").exists, "the first page keeps its Kind")
+        XCTAssertFalse(heading("Printed").exists)
         let rows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'ap.reocr.row.typewritten.'"))
-        XCTAssertGreaterThan(rows.count, 0, "the header's Kind (typewritten) has ranked readers")
+        XCTAssertGreaterThan(rows.count, 0, "the first page's Kind still has ranked readers")
         let why = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'needs its shared folder' OR value CONTAINS 'needs its shared folder'"))
         XCTAssertTrue(why.firstMatch.waitForExistence(timeout: 5), "Run says why it is not offered: the shared folder is not connected")
         XCTAssertFalse(element("ap.reocr.run").isEnabled, "Run is not offered until the folder is connected")
-        attachScreenshot("processor-improve-ocr-dialog")
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(dialog.waitForNonExistence(timeout: 5), "Escape closes it")
     }
@@ -211,7 +221,8 @@ final class ProcessorUITests: XCTestCase {
         app.typeKey("i", modifierFlags: [.command, .shift])
         XCTAssertTrue(element("ap.reocr.dialog").waitForExistence(timeout: 10), "⇧⌘I opens the Improve OCR dialog")
         let run = element("ap.reocr.run")
-        XCTAssertTrue(run.waitForExistence(timeout: 5) && run.isEnabled, "with the folder connected and Vision ready, Run is offered")
+        XCTAssertTrue(element("ap.reocr.estimate").waitForExistence(timeout: 10) && run.isEnabled,
+                      "after loading, the folder is connected and Vision is ready")
         XCTAssertTrue(element("ap.reocr.estimate").exists, "the estimate is shown")
         run.click()
         let accept = element("ap.reocr.accept")
@@ -225,12 +236,26 @@ final class ProcessorUITests: XCTestCase {
         }
         XCTAssertTrue(reviewScroll.frame.contains(layer.frame), "the layer message can be scrolled into view")
         attachScreenshot("processor-improve-ocr-compare")
+        XCTAssertFalse(run.isEnabled, "the pending review must be decided before another run")
         XCTAssertTrue(accept.isEnabled, "a full reading can be accepted")
         accept.click()
         let done = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Accepted' OR value BEGINSWITH 'Accepted'"))
         XCTAssertTrue(done.firstMatch.waitForExistence(timeout: 30), "the dialog reports the acceptance")
-        XCTAssertFalse(run.isEnabled, "Run is not offered again over the now-stale file list")
+        XCTAssertTrue(run.isEnabled, "after accepting and refreshing, Run is offered again")
         attachScreenshot("processor-improve-ocr-accepted")
+        run.click()
+        let reject = element("ap.reocr.reject")
+        XCTAssertTrue(reject.waitForExistence(timeout: 60), "the refreshed file can be read again in the same dialog")
+        let updated = app.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@",
+                                                           "A TYPED LETTER OF 1952", "A TYPED LETTER OF 1952"))
+        XCTAssertGreaterThanOrEqual(updated.count, 2, "the next comparison uses the accepted text as Before")
+        let rejectScroll = element("ap.reocr.dialog").scrollViews.firstMatch
+        for _ in 0..<8 where !rejectScroll.frame.contains(reject.frame) {
+            rejectScroll.scroll(byDeltaX: 0, deltaY: -250)
+        }
+        reject.click()
+        XCTAssertTrue(app.staticTexts["Rejected. The file is unchanged."].waitForExistence(timeout: 30))
+        XCTAssertTrue(run.isEnabled, "rejecting also makes another Run available")
 
         // The history lists the acceptance and puts the old text back.
         app.typeKey(.escape, modifierFlags: [])
