@@ -473,8 +473,6 @@ written where the `searchableFor` setting names the input's format and the page'
 - **The compressed page is the engine's rebuild of the reading copy**, not the camera original: lossy MRC/JPEG
   layers at the engine's defaults (`Prefs.register`: balanced photo detail), so fine tone and colour in stamps and
   photographs are softer than in the pair's JPEG (accepted: lossy MRC layers are what compression is; the pair keeps the JPEG).
-- **The settings sheet chooses by kind only** (the rules tab, placement: "Every page" and one switch a kind, for any
-  input format). An entry naming one format (`jpeg/printed`) is set in the settings file and shown as such (queued: W49.proc-settings-rules-proper).
 - **Merges and date rewrites preserve compression where qpdf succeeds.** If qpdf is unavailable or refuses the
   file, they fall back to the Quartz PDF/A writer, which can expand compressed images. Merges and searchable header
   rewrites log a qpdf failure. The compression and PDF/A children have a shared 60-second budget per searchable page

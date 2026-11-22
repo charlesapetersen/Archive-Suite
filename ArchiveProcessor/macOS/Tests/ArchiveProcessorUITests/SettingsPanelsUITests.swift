@@ -85,6 +85,33 @@ final class SettingsPanelsUITests: XCTestCase {
         shoot(settings, "settings-panel-see-the-range")
     }
 
+    func testSearchablePlacementCanBeSetForOneInputFormat() throws {
+        let settings = app.showSettingsWindow()
+        XCTAssertTrue(app.showSettingsPanel("Pages and output"))
+        let picker = settings.descendants(matching: .any)["ap.sheet.forms.format"].firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        for _ in 0..<8 where !picker.isHittable { settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -180) }
+        picker.click()
+        app.menuItems["JPEG"].click()
+        let printed = settings.descendants(matching: .any)["ap.sheet.forms.printed"].firstMatch
+        guard printed.waitForExistence(timeout: 5) else { return XCTFail(settings.debugDescription) }
+        for _ in 0..<6 where !printed.isHittable { settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -120) }
+        XCTAssertEqual(printed.value.map { String(describing: $0) }, "0")
+        printed.click()
+        XCTAssertEqual(printed.value.map { String(describing: $0) }, "1")
+        shoot(settings, "settings-placement-jpeg")
+
+        picker.click()
+        app.menuItems["PNG"].click()
+        XCTAssertEqual(printed.value.map { String(describing: $0) }, "0")
+        picker.click()
+        app.menuItems["All formats"].click()
+        XCTAssertEqual(printed.value.map { String(describing: $0) }, "0")
+        picker.click()
+        app.menuItems["JPEG"].click()
+        XCTAssertEqual(printed.value.map { String(describing: $0) }, "1")
+    }
+
     private func shoot(_ element: XCUIElement, _ name: String) {
         let screenshot = element.screenshot()
         let attachment = XCTAttachment(screenshot: screenshot)

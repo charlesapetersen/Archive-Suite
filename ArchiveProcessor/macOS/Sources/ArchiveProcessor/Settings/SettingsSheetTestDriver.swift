@@ -89,12 +89,19 @@ enum SettingsSheetTestDriver {
         let forms = SettingsSheetModel.FormsRow(entries: ["jpeg/printed", "*/handwritten"], source: "")
         check("E forms: a kind switched on is added for any format, a format's own entry kept",
               forms.setting(.typewritten, true) == ["jpeg/printed", "*/typewritten"]
-              && forms.isOn(.handwritten) && !forms.isOn(.printed) && forms.others == ["jpeg/printed"])
+              && forms.isOn(.handwritten) && !forms.isOn(.printed) && forms.isOn(.printed, format: "jpeg")
+              && forms.others.isEmpty)
         check("E forms: every page, and one kind off under it keeps the rest",
               forms.settingAll(true) == ["jpeg/printed", "*/*"]
               && SettingsSheetModel.FormsRow(entries: ["*/*"], source: "").setting(.forms, false)
                   == SettingsSheetModel.FormsRow.kinds.filter { $0 != .forms }.map { "*/" + $0.rawValue }
               && SettingsSheetModel.FormsRow(entries: ["*/*"], source: "").settingAll(false).isEmpty)
+        let formats = SettingsSheetModel.FormsRow(entries: ["*/printed", "jpeg/*", "pdf/forms", "other/printed"], source: "")
+        check("E forms: a format inherits global selections, edits its own choices and preserves other entries",
+              formats.inherited(.printed, format: "jpeg") && !formats.inherited(.forms, format: "jpeg")
+              && formats.settingAll(false, format: "jpeg") == ["*/printed", "pdf/forms", "other/printed"]
+              && formats.setting(.typewritten, true, format: "pdf") == ["*/printed", "jpeg/*", "other/printed", "pdf/typewritten", "pdf/forms"]
+              && formats.others == ["other/printed"])
         let chosen = sheet("searchable-on", general: SettingsLayer(kind: .general, name: "General"),
                            collection: layer(.collection, [(.searchableFor, .strings(["*/printed"]))]))
         check("E forms: a collection's choice is read back with its source",

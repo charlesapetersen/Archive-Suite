@@ -457,8 +457,7 @@ struct RuleStageBox: View {
                 ForEach(stage.switches) { sw in SheetSwitchRow(row: sw, setSwitch: setSwitch) }
                 if stage.id == "layout" { NewspaperLayoutDownloadRow().settingsLevel(.downloads) }
                 if let forms = stage.forms {
-                    SettingsLevelRows(.searchable, changed: forms.all || !forms.others.isEmpty
-                                        || SettingsSheetModel.FormsRow.kinds.contains(where: forms.isOn),
+                    SettingsLevelRows(.searchable, changed: !forms.entries.isEmpty,
                                       reset: { setStrings(.searchableFor, []) }) { formsRow(forms) }
                 }
                 SheetDisclosure("The rules in detail") {
@@ -480,27 +479,49 @@ struct RuleStageBox: View {
         .accessibilityIdentifier("ap.sheet.rule.\(stage.id)")
     }
 
-    /// W42.int-s5-compress — the searchable form's switches: every page, or by kind.
     @ViewBuilder private func formsRow(_ forms: SettingsSheetModel.FormsRow) -> some View {
+        SearchableFormatControls(forms: forms, setEntries: { setStrings(.searchableFor, $0) })
+    }
+}
+
+private struct SearchableFormatControls: View {
+    let forms: SettingsSheetModel.FormsRow
+    let setEntries: ([String]) -> Void
+    @State private var format = "*"
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text("Write as one searchable page, with no text page").padding(.top, 4)
             Text("Search and select the reading on the page image. If the words cannot be placed, search still works "
-                 + "but selections may not line up. Unchecked kinds keep a separate page of text after each image, "
-                 + "and so do handwritten, mixed and register pages, always. "
+                 + "but selections may not line up. Handwritten, mixed and register pages keep their separate text page. "
                  + "Searchable images use less space when the compression tools are available.")
                 .font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
             Text(forms.source).font(.caption2).foregroundStyle(.primary)
-            Toggle("Every page, pages of no known kind too", isOn: Binding(get: { forms.all },
-                                               set: { setStrings(.searchableFor, forms.settingAll($0)) }))
+            Picker("Input format", selection: $format) {
+                ForEach(SettingsSheetModel.FormsRow.formats, id: \.self) { value in
+                    Text(value == "*" ? "All formats" : value.uppercased()).tag(value)
+                }
+            }
+            .accessibilityIdentifier("ap.sheet.forms.format")
+            if format != "*", forms.all || SettingsSheetModel.FormsRow.kinds.contains(where: { forms.inherited($0, format: format) }) {
+                Text("Choices checked and dimmed here come from All formats.")
+                    .font(.caption2).foregroundStyle(.primary)
+            }
+            Toggle("Every page, pages of no known kind too",
+                   isOn: Binding(get: { forms.isOn(format: format) || forms.inherited(format: format) },
+                                 set: { setEntries(forms.settingAll($0, format: format)) }))
+                .disabled(forms.inherited(format: format))
                 .accessibilityIdentifier("ap.sheet.forms.all")
             ForEach(SettingsSheetModel.FormsRow.kinds, id: \.self) { kind in
-                Toggle(kind.label, isOn: Binding(get: { forms.isOn(kind) },
-                                                 set: { setStrings(.searchableFor, forms.setting(kind, $0)) }))
+                Toggle(kind.label,
+                       isOn: Binding(get: { forms.isOn(kind, format: format) || forms.inherited(kind, format: format) },
+                                     set: { setEntries(forms.setting(kind, $0, format: format)) }))
+                    .disabled(forms.inherited(kind, format: format))
                     .padding(.leading, 16)
                     .accessibilityIdentifier("ap.sheet.forms.\(kind.rawValue)")
             }
             if !forms.others.isEmpty {
-                Text("Also set in the settings file: " + forms.others.joined(separator: ", "))
+                Text("Other settings file entries: " + forms.others.joined(separator: ", "))
                     .font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
             }
         }

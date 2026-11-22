@@ -163,32 +163,54 @@ struct SettingsSheetModel {
         var forms: FormsRow? = nil
     }
 
-    /// W42.int-s5-compress — which pages are written in the searchable form (`searchableFor`, `OutputForm.form`):
-    /// every page, or by kind, of any input format. An entry naming one format (`jpeg/printed`) is set in the settings
-    /// file only; it is kept as it is and listed.
+    /// Which source formats and page kinds request the one-page searchable form.
     struct FormsRow {
         let entries: [String]
         let source: String
-        /// Every page of every kind and format (`*/*`).
-        var all: Bool { entries.contains { Self.parts($0) == ["*", "*"] } }
-        /// The kinds the sheet offers: not the hand kinds, whose pages always keep their text page
-        /// (`OutputForm.searchableRefusal`).
+
+        static let formats = ["*", "jpeg", "png", "tiff", "heic", "pdf"]
         static let kinds = PageKindName.allCases.filter { !TextLayerRule.isHand($0) }
-        /// A kind's pages of any format (`*/<kind>`), or every page.
-        func isOn(_ kind: PageKindName) -> Bool { all || entries.contains { Self.parts($0) == ["*", kind.rawValue] } }
-        /// The entries the switches do not show.
+
+        var all: Bool { isOn(format: "*") }
+
+        func isOn(_ kind: PageKindName? = nil, format: String = "*") -> Bool {
+            entries.contains {
+                let parts = Self.parts($0)
+                return parts == [format, "*"] || parts == [format, kind?.rawValue ?? "*"]
+            }
+        }
+
+        func inherited(_ kind: PageKindName? = nil, format: String) -> Bool {
+            format != "*" && isOn(kind)
+        }
+
+        /// Entries the sheet cannot edit. Keep them when changing a supported format.
         var others: [String] {
-            entries.filter { let p = Self.parts($0); return p.count != 2 || p[0] != "*" || (p[1] != "*" && PageKindName(rawValue: p[1]) == nil) }
+            entries.filter { entry in
+                let parts = Self.parts(entry)
+                guard parts.count == 2, Self.formats.contains(parts[0]) else { return true }
+                return parts[1] != "*" && PageKindName(rawValue: parts[1]) == nil
+            }
         }
-        /// The list with every page switched `on` or off; the others kept.
-        func settingAll(_ on: Bool) -> [String] { others + (on ? ["*/*"] : []) }
-        /// The list with `kind` switched `on` or off. Switching one kind off under "every page" keeps the other kinds on
-        /// (and no longer pages of no known kind, which only "every page" takes); every kind on is not "every page". A
-        /// hand kind's entry does nothing (`kinds`), so it is not written, and one already there is dropped.
-        func setting(_ kind: PageKindName, _ on: Bool) -> [String] {
-            let kinds = Self.kinds.filter { $0 == kind ? on : isOn($0) }
-            return others + kinds.map { "*/" + $0.rawValue }
+
+        func settingAll(_ on: Bool, format: String = "*") -> [String] {
+            outside(format) + (on ? [format + "/*"] : [])
         }
+
+        /// Turning off a kind under Every page retains the other known kinds in this format.
+        func setting(_ kind: PageKindName, _ on: Bool, format: String = "*") -> [String] {
+            let kinds = Self.kinds.filter { $0 == kind ? on : isOn($0, format: format) }
+            return outside(format) + kinds.map { format + "/" + $0.rawValue }
+        }
+
+        private func outside(_ format: String) -> [String] {
+            entries.filter {
+                let parts = Self.parts($0)
+                return parts.count != 2 || parts[0] != format
+                    || (parts[1] != "*" && PageKindName(rawValue: parts[1]) == nil)
+            }
+        }
+
         static func parts(_ entry: String) -> [String] {
             entry.lowercased().split(separator: "/", omittingEmptySubsequences: false)
                 .map { $0.trimmingCharacters(in: .whitespaces) }
