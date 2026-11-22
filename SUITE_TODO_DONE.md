@@ -17555,3 +17555,7 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Vision still recovered Box 17. Queued W49.proc-fix-s053. [Scratch evidence and reproduction](verification/evidence/processor/W49.proc-s053-verify.md).
   $0 spent. No bench cache used.
   <!-- /W49.proc-s053-verify -->
+
+- [x] **W49.reader-s003-reproduce-check — check the S-003 reproduction in an independent session [S]** · §Known limits are queued, accepted or asked (lane: reader) (uses: build,vm) — SHIPPED 2026-11-21 (this commit). Phase rule 5a(4), owner call 28. Codex gpt-6.2-sol independently confirmed the Claude Opus 5.5 model reproduction by typing “California” in Reader's real window in the headless VM. The corrupt-index fixture went from 12 rows to zero, showing “No matches” over a list whose status bar said “Search index unavailable”. After the scratch cache was rebuilt, the same query found 10 rows and displayed OCR snippets.
+  [Reproduction and screenshot](verification/evidence/reader/W49.reader-s003-reproduce-check.md). Filed W49.fix-reader-dead-index-overlay. The original model check remains available for the fix. The independent UI probe was temporary. No bench cache used.
+  <!-- /W49.reader-s003-reproduce-check -->

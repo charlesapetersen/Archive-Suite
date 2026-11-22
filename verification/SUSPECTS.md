@@ -60,16 +60,17 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 
 - **Raised:** 2026-10-12 · W40.b1 · code reading while writing ledger row `R-12`.
 - **Suspected behaviour:** with the index unavailable, an OCR query empties the list and shows the generic
-  "No matches" overlay (`Views/NavigationWindowView.swift:255`). The amber status-bar line names the failure, but
+  "No matches" overlay. The amber status-bar line names the failure, but
   the main area still reads as an answer. `W23.m9` promised a dead index is never answered as "no matches".
-- **Where:** `NavigationWindowView.swift:255`, `:629-635`; ledger `R-12`.
+- **Where:** `NavigationWindowView.tableOverlay` and the `ar.status.indexFailure` status label; ledger `R-12`.
 - **Would confirm it:** the corrupt-index VM fixture (`ContentIndexFailureUITests`): type an OCR query and take a
   screenshot of the list area. Confirmed if it says "No matches" while the failure line shows.
 - **Would clear it:** the overlay says the index is unavailable, or no overlay is drawn while the failure line
   shows.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.reader-s003-reproduce-check`);
-  test `ArchiveReaderTests/DeadIndexEmptyListSuspectTests`, evidence
-  [`evidence/reader/W49.reader-s003-dead-index.md`](evidence/reader/W49.reader-s003-dead-index.md)
+- **Status:** `reproduced` — independently confirmed under phase rule 5a(4), fix queued as
+  `W49.fix-reader-dead-index-overlay` (S3).
+  [Opus 5.5 model reproduction](evidence/reader/W49.reader-s003-dead-index.md) and
+  [Codex gpt-6.2-sol VM reproduction](evidence/reader/W49.reader-s003-reproduce-check.md).
 - **History:**
   - 2026-10-12 W40.b1 — raised.
   - 2026-11-20 W49.reader-s003-reproduce (Opus 5.5) — reproduced on the model, scratch data. With the indexer on a
@@ -79,6 +80,9 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     Nothing on that path reads `indexFailure`. Not deliberate: `openForQuery`'s comment names exactly this outcome
     as what W23.m9 prevents; the overlay's sentence came later (`W40.fix-reader-filter-bar`). The check is an
     `XCTExpectFailure`. Pixels not captured; the view's switch has no other input.
+  - 2026-11-21 W49.reader-s003-reproduce-check (Codex gpt-6.2-sol) — typed “California” in the
+    real window on the generated VM fixture. The list went from 12 rows to zero and showed “No matches”
+    and “The OCR search ‘California’ hides every file.” while the status bar reported the failure.
 
 ### S-004 · Reader view state from another root may restore everything except the folder prefix
 

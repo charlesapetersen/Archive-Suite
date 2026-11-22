@@ -255,16 +255,16 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `SUITE_TODO_DONE.md` `W23.m9`, `W23.m9-fu3`.
 - **Reached by:** `ContentIndexer.failure` (`Search/ContentIndexer.swift:10-60`) is mirrored into
   `NavigationModel.indexFailure` (`Views/NavigationModel.swift:182`) and drawn as the orange `ar.status.indexFailure`
-  label (`Views/NavigationWindowView.swift:629-635`).
+  label (`Views/NavigationWindowView.swift`).
 - **Real-path test:** `ArchiveReaderUITests/ContentIndexFailureUITests.testCorruptIndexWarningRetractsAfterScratchRepairAndReindex`
   (needs the corrupt-index fixture); `ArchiveReaderTests/ContentIndexerFailureTests.testQueryOnUnopenableIndexReportsUnavailable`,
   `.testPassOnUnopenableIndexReportsUnavailable`.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Runtime evidence:** [S-003 independent Reader VM run](evidence/reader/W49.reader-s003-reproduce-check.md).
+  The list shows “No matches” alongside the unavailable-index status.
+- **Status:** `broken` · S3 · `W49.fix-reader-dead-index-overlay`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
-- **Notes:** the list area itself still shows the generic "No matches" overlay
-  (`NavigationWindowView.swift:255`) beside the status line (`S-003`).
+  - 2026-11-21 W49.reader-s003-reproduce-check — independently reproduced the misleading empty-list message.
 
 ### R-13 · The navigation table and its columns
 
