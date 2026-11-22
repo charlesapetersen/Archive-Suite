@@ -245,6 +245,12 @@ struct OCRView: View {
     }
 
     private func reloadAPIKey() {
+#if DEBUG
+        if PaidBatchUITestFixture.isActive {
+            apiKey = PaidBatchUITestFixture.dummyKey
+            return
+        }
+#endif
         apiKey = useAppleVision
             ? (visionUseLLMJudgment ? (KeychainHelper.load(account: selectedProvider.rawValue) ?? "") : "")
             : (useGateway ? GatewayConfig.storedKey() : (KeychainHelper.load(account: selectedProvider.rawValue) ?? ""))

@@ -722,11 +722,13 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   3, ↓, 2, X and Return changed nothing and did not confirm ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)).
   W40.fix-processor-review-keys, 2026-11-20: the window is now focusable and focused on open, and a click in a row
   gives the keys back; in the VM 1-4, X, ↑/↓, ←/→, [ ], Escape and Return all acted, the footer counting each change.
-- **Status:** `works`
+  Paid-batch Resume skipped the whole-run page review and showed only the later per-collection page review. [Independent VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
+- **Status:** `broken` — `W40.fix-processor-resume-reviews` (S2)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-19 W40.d2 — `unproven` → `broken`: the promised keys do nothing; the clicks work.
   - 2026-11-20 W40.fix-processor-review-keys — `broken` → `works`: the keys reach the review (focus fix), journey-tested.
+  - 2026-11-21 W49.proc-suspects-filing-check — `works` → `broken` on this path.
 - **Notes:** **Drift.** The rotation radios and `[`/`]` are not in this dialog: they appear only in the separate,
   opt-in Review rotation pass (`rotationOnly`, `:15-16`, `:201-213`; enabled by `reviewRotation` with rotation on,
   `OCR/OCRProcessor+Pipeline.swift:3084`). Keys 1 and 2 work only when document classes are shown (`:171-181`). The
@@ -797,17 +799,20 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   `processor.taggingMode`; copy-source sets `passSourceTags` (`Views/OCRView.swift:37`); `stampsUnread`
   (`Models/ProviderModels.swift:122`).
 - **Real-path test:** `scripts/test-tier2.sh` cases 01-02 (`none`, `copySource`; paid) with `tier2_assert.py:97-102`;
-  `scripts/test-tag-vocabulary.sh` (copy-source verbatim). Auto date and Human have no headless run
+  `scripts/test-tag-vocabulary.sh` (copy-source verbatim). The independent VM journey selects both modes and reads
+  the tags of the filed PDFs. Auto date and Human have no headless run
   (`Capture/ProcessFilesTestDriver.swift:124` refuses them); `ReviewDialogsJourneyUITests` runs Human (W40.d2, VM).
 - **Runtime evidence:** W40.d2, 2026-11-19: Human with the Manual approach writes only the typed tags and `Unread` ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)).
-  Automatic: W40.d1. Auto date, No tagging and Copy source not run here.
-- **Status:** `unproven`
+  Automatic: W40.d1. Auto date remains unproven.
+  With Collection ID on, No tagging wrote Box and Folder markers. Copy source file tags wrote those markers but removed both source Finder tags from the label PDFs. All four other PDFs kept both tags. [Independent VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
+- **Status:** `broken` — `W40.fix-processor-copy-label-tags` (S2)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-19 W40.d2 — stays `unproven`: Human and Automatic shown, the other three not.
+  - 2026-11-21 W49.proc-suspects-filing-check — `unproven` → `broken` on this path.
 - **Notes:** **Drift.** `TESTING.md` §2.5 still names "Auto date + manual seg", folded into Auto date by
-  `W36.seg-opt-review`. Suspect `S-034` (with collection segmentation on, No tagging and Copy source still write
-  `Box`/`Folder` and a colour).
+  `W36.seg-opt-review`. Owner call 30 keeps the Box/Folder markers in both modes and requires all copied
+  source tags to survive (S-034). Update the SPEC with the fix.
 
 ### P-36 · Controlled vocabulary
 
@@ -839,13 +844,15 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   gate with `confirmFinalReview` and draws nothing.
 - **Runtime evidence:** W40.d2, 2026-11-19: the review shows each file's class, rotation and tags and the segment list;
   Complete finishes the run ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)). Redo and the double-click edit sheet were not driven.
-- **Status:** `unproven`
+  Automatic paid-batch Resume filed tagged PDFs without displaying final tagging review. [Independent VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
+- **Status:** `broken` — `W40.fix-processor-resume-reviews` (S2)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-19 W40.d2 — stays `unproven`: Complete works; Redo and the edit sheet unproven.
+  - 2026-11-21 W49.proc-suspects-filing-check — `unproven` → `broken` on this path.
 - **Notes:** the button is "Redo Segmentation & Tagging"; it rebuilds segments from the edited classifications
-  (`OCR/OCRProcessor+Tagging.swift:493-497`). Only Automatic mode reaches this review; a resumed batch skips it on
-  purpose (`OCR/OCRProcessor+Pipeline.swift:1572`) — see S-035. Ordinary Resume still opens the final
+  (`OCR/OCRProcessor+Tagging.swift:493-497`). This review applies to Automatic. Call 30 requires it on paid-batch
+  Resume unless explicitly skipped (S-035). Ordinary Resume still opens the final
   tagging review ([S-050 VM evidence](evidence/processor/W49.proc-s050-verify.md)).
 
 ### P-38 · Manual per-segment tagging
@@ -882,14 +889,15 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   (`Views/OCRView.swift:380`) → `organizeOutput` (`Tagging/CollectionSegmenter.swift:298`) →
   `CollectionNumbering.highestLeadingNumber` (`Capture/CollectionNumbering.swift:11`).
 - **Real-path test:** `scripts/test-collection-organize.sh` (`Capture/CollectionOrganizeTestDriver.swift`) runs the real
-  `organizeOutput` on synthetic files: numbering, no overwrite, merged output. Name extraction, clustering and the
-  review sheet are untested.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+  `organizeOutput` on synthetic files: numbering, no overwrite, merged output. The independent VM journey
+  clicks Confirm and Organize after editing a live collection name. It uses stand-in names.
+- **Runtime evidence:** Confirm and Organize used the typed box name. A parent component placed six PDFs outside the selected output folder, a separator nested them, and a blank filed them loose. [Independent VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
+- **Status:** `broken` — `W40.fix-processor-collection-name-filing` (S1)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-21 W49.proc-suspects-filing-check — `unproven` → `broken` on this path.
 - **Notes:** the name review is opt-in (`confirmCollectionIDs` defaults to false, `Views/SettingsView.swift:82`),
-  though README calls it the final step. Suspect `S-036` (an edited name is used unnormalised on Confirm).
+  though README calls it the final step. S-036 reproduces when clicking the button without submitting the field.
 
 ### P-40 · Box and folder confirmation
 
@@ -903,11 +911,13 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   `scripts/test-segmentation-review.sh` covers it as the window stage's first step.
 - **Runtime evidence:** W40.d2, 2026-11-19: two photos marked Box in the review arrive as Box; the second, turned to
   Folder by its radio, carries `Folder` and no `Box` ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)). Page 2 does not follow (P-23).
-- **Status:** `works`
+  Paid-batch Resume omitted the label confirmation with both a box and a folder in the saved batch. [Independent VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
+- **Status:** `broken` — `W40.fix-processor-resume-reviews` (S2)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-18 W40.d1 — stays `unproven`: the headless driver answers the gate with no sheet drawn; `W40.d2` drives the dialogs.
   - 2026-11-19 W40.d2 — `unproven` → `works` on the per-page path (tags; page 2 is P-23's defect).
+  - 2026-11-21 W49.proc-suspects-filing-check — `works` → `broken` on this path.
 - **Notes:** it lists only pages already classed box or folder, so a box photo misread as a document is caught only
   by the per-page dialog. Skipped in the manual window, for Live Capture pre-grouped runs and in a resumed batch
   (S-035). A resumed ordinary Automatic + Full manual run also skips it, even with both label types

@@ -225,6 +225,177 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         }
     }
 
+    /// Drive both tagging choices through Start, then read each PDF's Finder tags.
+    func testCollectionMarkersWithSourceTags() throws {
+        let input = dir.appendingPathComponent("tagged-in")
+        let photos = try FileManager.default.contentsOfDirectory(at: input, includingPropertiesForKeys: nil)
+            .filter { ["jpg", "jpeg", "png", "tiff", "tif", "heic"].contains($0.pathExtension.lowercased()) }
+        XCTAssertEqual(photos.count, 6)
+        for photo in photos {
+            XCTAssertTrue(Set(finderTags(of: photo)).isSuperset(of: ["Scratch Subject", "1978"]))
+        }
+
+        for (mode, title) in [("none", "No tagging"), ("copySource", "Copy source file tags")] {
+            let out = try launch("s034-\(mode)", [
+                "-rotationModeRaw", "off", "-reviewRotation", "NO",
+                "-reviewDocumentSegmentation", "NO", "-outputImageFile", "NO"
+            ], collectionID: true, classificationCycle: true, input: input)
+            let picker = app.descendants(matching: .any)["ap.ocr.taggingPicker"]
+            XCTAssertTrue(picker.waitForExistence(timeout: 10))
+            picker.click()
+            let choice = app.menuItems[title]
+            XCTAssertTrue(choice.waitForExistence(timeout: 5))
+            choice.click()
+            clickStart()
+            confirmLabelReviews()
+            let organize = app.sheets.buttons["Confirm and Organize"]
+            XCTAssertTrue(organize.waitForExistence(timeout: 90))
+            organize.click()
+            waitForDone("s034-\(mode)")
+
+            let pdfs = filedPDFs(in: out)
+            XCTAssertEqual(pdfs.count, 6)
+            let tags = pdfs.map { finderTags(of: $0).sorted() }
+            print("[s034] \(mode): \(tags)")
+            XCTAssertEqual(tags.filter { $0 == ["Box"] }.count, 1)
+            XCTAssertEqual(tags.filter { $0 == ["Folder"] }.count, 1)
+            let documentTags = mode == "copySource" ? ["1978", "Scratch Subject"] : []
+            XCTAssertEqual(tags.filter { $0 == documentTags }.count, 4)
+        }
+    }
+
+    /// Type into the real box row and click the sheet's confirmation button without submitting the field.
+    func testCollectionNameConfirmedByClick() throws {
+        for (label, name) in [("separator", "a/b"), ("empty", ""), ("parent", "..")] {
+            let out = try launch("s036-\(label)", [
+                "-taggingModeRaw", "automatic", "-segmentationApproach", "manual",
+                "-rotationModeRaw", "off", "-reviewRotation", "NO",
+                "-reviewDocumentSegmentation", "NO", "-outputImageFile", "NO"
+            ], collectionID: true, classificationCycle: true)
+            clickStart()
+            confirmLabelReviews()
+            let complete = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Complete'")).firstMatch
+            XCTAssertTrue(complete.waitForExistence(timeout: 90))
+            complete.click()
+
+            let organize = app.sheets.buttons["Confirm and Organize"]
+            XCTAssertTrue(organize.waitForExistence(timeout: 60))
+            let field = app.sheets.textFields.firstMatch
+            XCTAssertEqual(app.sheets.textFields.count, 1, "one box name to edit")
+            field.click()
+            field.typeKey("a", modifierFlags: .command)
+            field.typeKey(.delete, modifierFlags: [])
+            if !name.isEmpty { field.typeText(name) }
+            XCTAssertEqual(field.value as? String ?? "", name)
+            shot("s036-\(label)-before-click")
+            organize.click()
+            waitForDone("s036-\(label)")
+
+            let filed = filedPDFs(in: out)
+            let loose = try FileManager.default.contentsOfDirectory(at: scratchRoot, includingPropertiesForKeys: nil)
+                .filter { $0.pathExtension == "pdf" }
+            print("[s036] \(label): output=\(filed.map { relativePath($0, under: out) }); parent=\(loose.map(\.lastPathComponent).sorted())")
+            switch label {
+            case "parent":
+                XCTAssertTrue(filed.isEmpty)
+                XCTAssertEqual(loose.count, 6)
+            case "separator":
+                XCTAssertTrue(loose.isEmpty)
+                XCTAssertEqual(filed.count, 6)
+                XCTAssertTrue(filed.allSatisfy { relativePath($0, under: out).hasPrefix("a/b/") })
+            default:
+                XCTAssertTrue(loose.isEmpty)
+                XCTAssertEqual(filed.count, 6)
+                XCTAssertTrue(filed.allSatisfy { !relativePath($0, under: out).contains("/") })
+            }
+        }
+    }
+
+    private func confirmLabelReviews() {
+        let review = reviewWindow("Document Segmentation Review", timeout: 90)
+        let counts = review.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS '1 box' OR value CONTAINS '1 box'")).firstMatch
+        XCTAssertTrue(text(of: counts).contains("1 folder"))
+        app.typeKey(.return, modifierFlags: [])
+        waitGone(review, "the page review has been confirmed")
+
+        let boxConfirmation = app.sheets.buttons["Confirm"]
+        XCTAssertTrue(boxConfirmation.waitForExistence(timeout: 60))
+        boxConfirmation.click()
+    }
+
+    /// Relaunch with a completed paid batch on disk and press the actual Resume Batch button.
+    func testPaidBatchResumeReviewGates() throws {
+        let args = [
+            "-APUITestPaidBatch", "-taggingModeRaw", "automatic", "-segmentationApproach", "manual",
+            "-rotationModeRaw", "off", "-reviewRotation", "NO", "-outputImageFile", "NO"
+        ]
+        let out = try launch("s035-paid", args + ["-APUITestSeedPaidBatch"], collectionID: true)
+        let resume = app.buttons["Resume Batch"]
+        XCTAssertTrue(resume.waitForExistence(timeout: 30), "the scratch journal was persisted")
+        _ = try launch("s035-paid", args, collectionID: true, preservePendingRun: true)
+        XCTAssertTrue(resume.waitForExistence(timeout: 30) && resume.isEnabled)
+        let pending = app.staticTexts.matching(NSPredicate(
+            format: "label CONTAINS '6 files via Gemini' OR value CONTAINS '6 files via Gemini'")).firstMatch
+        XCTAssertTrue(pending.exists, "the real pending-batch banner recognizes the saved journal")
+        shot("s035-paid-resume")
+        resume.click()
+
+        let page = app.windows.containing(.staticText, identifier: "Document Segmentation Review").firstMatch
+        let boxes = app.sheets.containing(.staticText, identifier: "Confirm Box & Folder Labels").firstMatch
+        let tags = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Complete'")).firstMatch
+        let names = app.sheets.buttons["Confirm and Organize"]
+        let done = app.staticTexts.matching(NSPredicate(
+            format: "label BEGINSWITH 'Done.' OR value BEGINSWITH 'Done.'")).firstMatch
+        let deadline = Date().addingTimeInterval(140)
+        var reviews: [String] = []
+        while !done.exists && Date() < deadline {
+            if page.exists {
+                let stage = reviews.contains("collection names") ? "per-collection pages" : "whole-run pages"
+                reviews.append(stage)
+                shot("s035-paid-\(slug(stage))")
+                app.typeKey(.return, modifierFlags: [])
+                waitGone(page, "page review confirms")
+            } else if names.exists {
+                reviews.append("collection names")
+                shot("s035-paid-collection-names")
+                names.click()
+                waitGone(names, "collection names confirm")
+            } else if boxes.exists {
+                reviews.append("box and folder labels")
+                boxes.buttons["Confirm"].click()
+                waitGone(boxes, "box and folder review confirms")
+            } else if tags.exists {
+                reviews.append("final tagging")
+                tags.click()
+                waitGone(tags, "final tagging review completes")
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+        }
+        print("[s035] paid Resume: \(reviews); \(text(of: done))")
+        if !done.exists { dump(app, "paid Resume did not finish") }
+        XCTAssertTrue(text(of: done).hasPrefix("Done. 6 succeeded, 0 failed."))
+        XCTAssertEqual(reviews, ["collection names", "per-collection pages"])
+        shot("s035-paid-done")
+        let pdfs = filedPDFs(in: out)
+        XCTAssertEqual(pdfs.count, 6)
+        XCTAssertTrue(pdfs.allSatisfy { $0.deletingLastPathComponent().lastPathComponent == "Scratch Papers" })
+        XCTAssertTrue(pdfs.allSatisfy { finderTags(of: $0).contains("Unread") })
+        XCTAssertEqual(pdfs.filter { finderTags(of: $0).contains("Resume Scratch Subject") }.count, 4)
+    }
+
+    private func filedPDFs(in root: URL) -> [URL] {
+        let files = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+        return (files?.allObjects.compactMap { $0 as? URL } ?? [])
+            .filter { $0.pathExtension.lowercased() == "pdf" }
+            .sorted { $0.path < $1.path }
+    }
+
+    private func relativePath(_ file: URL, under root: URL) -> String {
+        let rootParts = root.standardizedFileURL.pathComponents
+        return file.standardizedFileURL.pathComponents.dropFirst(rootParts.count).joined(separator: "/")
+    }
+
     private func documentReviewSetting() throws -> (XCUIElement, XCUIElement, XCUIElement) {
         let settings = app.showSettingsWindow()
         XCTAssertTrue(app.showSettingsPanel("Documents"))
@@ -442,16 +613,18 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
     // MARK: Launch and waiting
 
     private func launch(_ name: String, _ settings: [String], collectionID: Bool = false,
-                        classificationCycle: Bool = false, preservePendingRun: Bool = false) throws -> URL {
+                        classificationCycle: Bool = false, preservePendingRun: Bool = false,
+                        input: URL? = nil) throws -> URL {
         let out = scratchRoot.appendingPathComponent("\(name)-out", isDirectory: true)
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         app.terminate()
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode", "-APUITestLocalAgent",
-            "-APUITestInputImages", dir.appendingPathComponent("in").path,
+            "-APUITestInputImages", (input ?? dir.appendingPathComponent("in")).path,
             "-APUITestOutputDirectory", out.path, "-outputDirectory", out.path,
             "-localAgentBinaryPath", dir.appendingPathComponent("fake_local_agent.py").path,
             "-useAppleVision", "NO", "-useGateway", "NO", "-batchMode", "NO",
+            "-selectedProvider", "Gemini", "-preOCRedInput", "NO",
             "-mergeDocuments", "NO", "-enableCollectionSegmentation", collectionID ? "YES" : "NO",
             "-confirmCollectionIDs", collectionID ? "YES" : "NO", "-enableSegmentJSON", "YES",
             "-tagVocabulary", ""

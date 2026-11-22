@@ -148,6 +148,7 @@ enum NetworkSession {
     /// read first cannot weaken the gate: both must hold either way.
     nonisolated static var activeTestTransport: (@Sendable (URLRequest) async throws -> (Data, URLResponse))? {
 #if DEBUG
+        if PaidBatchUITestFixture.isActive { return PaidBatchUITestFixture.transport }
         guard let stub = testTransport,
               (testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[OCRProcessor.batchResumeTestEnvKey])

@@ -14,6 +14,18 @@ When the gateway returns `model_not_found` for a label request, the run summary 
 GPT 5.6 Luna was unavailable through the configured gateway. The app keeps the PDFs, Vision
 proposals, and separate gateway success and failure counts. [Scratch evidence and regression](../verification/evidence/processor/W49.proc-s053-verify.md) (W49.proc-fix-s053).
 
+## Copy source file tags drops Finder tags from collection labels (S-034)
+
+- In Process Files, No tagging wrote Box and Folder on the two label PDFs. Copy source file tags replaced both original Finder tags on those labels with the marker, while all four other PDFs kept both source tags. Owner call 30 keeps the label markers and requires preservation of every copied tag. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-filing-check.md). (queued: W40.fix-processor-copy-label-tags)
+
+## Paid-batch Resume bypasses three reviews (S-035)
+
+- After reopening a persisted, fully read Gemini scratch batch, Resume Batch opened neither pre-tagging review nor final tagging review. It opened collection names and the later per-collection page review, then filed all six tagged PDFs. Owner call 30 requires every applicable review except where the user already explicitly skipped it. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-filing-check.md). (queued: W40.fix-processor-resume-reviews)
+
+## Collection names can file PDFs outside the chosen folder (S-036)
+
+- In the box row of Review Collection Names, Confirm and Organize without Return used all three typed names as entered. Six PDFs went to the parent, six nested under the separator-containing name, and six landed loose for the empty name. The assigned output folder is the filing boundary. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-filing-check.md). (queued: W40.fix-processor-collection-name-filing)
+
 ## Ordinary Resume bypasses two reviews before tagging (S-050)
 
 - **Reproduced 2026-11-21 (Codex gpt-6.2-sol, `5cd1bd29`).** After relaunch, `OCRProcessor.resumeRun`

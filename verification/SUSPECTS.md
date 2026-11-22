@@ -873,7 +873,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   output's tags.
 - **Would clear it:** the source tags survive (or the owner rules that Red/Purple belongs in those modes, and the SPEC
   says so).
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-filing-check`) and the owner (Daemon Report, 2026-11-20: the code calls it deliberate); `ArchiveProcessor/scripts/repro-suspects-filing.sh` `s034-none`, `s034-copysource`
+- **Status:** `reproduced` — independently confirmed; fix queued as `W40.fix-processor-copy-label-tags`. [VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
@@ -885,6 +885,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     `Folder`. No colour was written (no colour is chosen by default, `Tagging/ItemTypeColourSetting.swift:4`). The
     function's comment calls this intended and `ProcessFilesTagWarningTestDriver` (`:178-192`) checks for it, while
     `SPEC/tag-format.md:538-546` promises the opposite, so it is asked rather than queued.
+  - 2026-11-21 W49.proc-suspects-filing-check (Codex gpt-6.2-sol at `bdfe3274`, original Claude Opus 5.5 in `d8fb1269`) — In Process Files, No tagging wrote Box and Folder on the two label PDFs. Copy source file tags replaced both original Finder tags on those labels with the marker, while all four other PDFs kept both source tags. Owner call 30 keeps the label markers and requires preservation of every copied tag.
 
 ### S-035 · Resuming a batch skips the per-page review and the box/folder confirmation
 
@@ -897,7 +898,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** `scripts/test-batch-resume.sh`-style resume of a finished batch under Automatic + Manual:
   record which review gates are raised.
 - **Would clear it:** the dialog and confirmation are raised, or the skip is a recorded decision.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-filing-check`) and the owner (Daemon Report, 2026-11-20); `ArchiveProcessor/scripts/repro-suspects-filing.sh` `s035-resume` (`ResumeReviewGatesProbe`)
+- **Status:** `reproduced` — independently confirmed; fix queued as `W40.fix-processor-resume-reviews`. [VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
@@ -910,6 +911,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     (`s033-noyear`). The comment at `:1786-1788` calls skipping the redo-review loop deliberate ("a resumed batch has no
     interactive session"); nothing records the other two, yet the same resume does raise the collection-name sheet and
     the per-collection review when they are on. Asked, as the comment's reason could be meant to cover them.
+  - 2026-11-21 W49.proc-suspects-filing-check (Codex gpt-6.2-sol at `bdfe3274`, original Claude Opus 5.5 in `d8fb1269`) — After reopening a persisted, fully read Gemini scratch batch, Resume Batch opened neither pre-tagging review nor final tagging review. It opened collection names and the later per-collection page review, then filed all six tagged PDFs. Owner call 30 requires every applicable review except where the user already explicitly skipped it.
 
 ### S-036 · An edited collection name is used as typed when the user clicks Confirm
 
@@ -923,7 +925,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** call `organizeOutput` (as `scripts/test-collection-organize.sh` does) with the names `a/b`,
   `..` and empty, in a scratch directory.
 - **Would clear it:** each is normalised or refused before anything is filed.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-filing-check`); `ArchiveProcessor/scripts/repro-suspects-filing.sh` `s036-dotdot`, `s036-slash`, `s036-empty`
+- **Status:** `reproduced` — independently confirmed; fix queued as `W40.fix-processor-collection-name-filing`. [VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
@@ -937,6 +939,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     loose in the output folder as `000001 .pdf`. Nothing says this is deliberate; README promises normalised names
     and Live Capture's own sanitiser refuses dot-only names (`Capture/LiveCaptureProcessor.swift:3241-3248`).
     `normalizeCollectionName`, which Return runs, would also pass `..` through.
+  - 2026-11-21 W49.proc-suspects-filing-check (Codex gpt-6.2-sol at `bdfe3274`, original Claude Opus 5.5 in `d8fb1269`) — In the box row of Review Collection Names, Confirm and Organize without Return used all three typed names as entered. Six PDFs went to the parent, six nested under the separator-containing name, and six landed loose for the empty name. The assigned output folder is the filing boundary.
 
 ### S-037 · No pairing QR at all when the Mac's address is not on en0 or en1
 

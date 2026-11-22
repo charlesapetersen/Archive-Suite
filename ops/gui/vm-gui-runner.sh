@@ -838,6 +838,16 @@ prepare_review_dialogs() {
            '$REVIEWS_GDIR/' && chmod 755 '$REVIEWS_GDIR/fake_local_agent.py' \
       && test \$(ls '$REVIEWS_GDIR/in' | wc -l) -eq 6" \
     || die "could not copy the photos and the stand-in CLI into $REVIEWS_GDIR in the guest"
+  if [[ "$ONLY_TESTING" == *ReviewDialogsJourneyUITests || "$ONLY_TESTING" == */testCollectionMarkersWithSourceTags ]]; then
+    # Give the guest copies two recognizable source tags for the copy-source journey.
+    # The rehearsal share remains read-only.
+    local source_tags
+    source_tags="$(python3 -c 'import plistlib; print(plistlib.dumps(["Scratch Subject", "1978"], fmt=plistlib.FMT_BINARY).hex())')"
+    tart exec "$VM" bash -lc "mkdir -p '$REVIEWS_GDIR/tagged-in' && ditto '$REVIEWS_GDIR/in' '$REVIEWS_GDIR/tagged-in' &&
+      for photo in '$REVIEWS_GDIR/tagged-in/'*; do
+        xattr -wx com.apple.metadata:_kMDItemUserTags '$source_tags' \"\$photo\" || exit 1
+      done" || die "could not tag the guest scratch copies"
+  fi
   TEST_ENV="TEST_RUNNER_W40D2_DIR='$REVIEWS_GDIR' TEST_RUNNER_W40D2_PHOTOS='$photos'"
   log "review dialogs: six photos of $name copied to $REVIEWS_GDIR/in in the guest"
 }
