@@ -40,7 +40,7 @@ public struct CatalogueReader: Sendable {
     private let mode: Mode
     private let rootIdentity: CatalogueReadDirectory.Identity
     private let identifyPDF: IdentifyPDF
-    private let directory: CatalogueReadDirectory
+    let directory: CatalogueReadDirectory
 
     public init(grantedRoot: URL, rootInstanceID: UUID, mode: Mode, identifyPDF: @escaping IdentifyPDF) throws {
         try self.init(grantedRoot: grantedRoot, rootInstanceID: rootInstanceID, mode: mode,
@@ -145,31 +145,92 @@ public struct CatalogueReader: Sendable {
                                 CatalogueAssociation.VerifiedPDF(occurrence: occurrence, fileID: $0.fileID,
                                                                  contentRevision: $0.contentRevision, pageCount: $0.pageCount)
                             }
-                            let pair = try CatalogueAssociation.pair(record, at: occurrence, verifiedBy: proof)
-                            let revision = ItemFacts.Revision(occurrence: occurrence, fileID: record.fileID,
-                                                              content: record.contentRevision, facts: record.revision,
-                                                              companionSHA256: Data(SHA256.hash(data: record.originalJSON)))
-                            return ItemFacts.FileFacts(pair: pair, revision: revision)
+                            return try fileFacts(record, at: occurrence, proof: proof, pdf: pdf)
                         }
                         return (.success(facts), observed?.fileID)
                     } catch {
-                        let status: ItemFacts.Unavailable
-                        switch error {
-                        case CatalogueRecord.Invalid.unsupportedSchema(let schema) where schema > CatalogueRecord.schema:
-                            status = .newer(schema: schema)
-                        case CatalogueAssociation.Unavailable.unverifiedPDF, CatalogueAssociation.Unavailable.mismatchedPDF:
-                            status = .invalid(.pdf)
-                        case let unavailable as ItemFacts.Unavailable:
-                            status = unavailable
-                        default:
-                            status = .invalid(.companion)
-                        }
-                        return (.failure(status), observed?.fileID)
+                        return (.failure(Self.companionStatus(error)), observed?.fileID)
                     }
                 }
             }
         } catch {
             return (.failure(error as? ItemFacts.Unavailable ?? .invalid(.pdf)), nil)
+        }
+    }
+
+    func fileFacts(_ record: CatalogueRecord, at occurrence: CatalogueAssociation.Occurrence,
+                   proof: CatalogueAssociation.VerifiedPDF?, pdf: CatalogueReadDirectory.Entry) throws -> ItemFacts.FileFacts {
+        let pair = try CatalogueAssociation.pair(record, at: occurrence, verifiedBy: proof)
+        let revision = ItemFacts.Revision(occurrence: occurrence, fileID: record.fileID, content: record.contentRevision,
+                                          facts: record.revision, companionSHA256: Data(SHA256.hash(data: record.originalJSON)))
+        return ItemFacts.FileFacts(pair: pair, revision: revision, rootIdentity: rootIdentity,
+                                   pdfVersion: .init(pdf.info))
+    }
+
+    static func companionStatus(_ error: any Error) -> ItemFacts.Unavailable {
+        switch error {
+        case CatalogueRecord.Invalid.unsupportedSchema(let schema) where schema > CatalogueRecord.schema:
+            .newer(schema: schema)
+        case CatalogueAssociation.Unavailable.unverifiedPDF, CatalogueAssociation.Unavailable.mismatchedPDF:
+            .invalid(.pdf)
+        case let unavailable as ItemFacts.Unavailable:
+            unavailable
+        default:
+            .invalid(.companion)
+        }
+    }
+
+    func withOccurrence<T>(_ occurrence: CatalogueAssociation.Occurrence,
+                           _ body: (CatalogueReadDirectory.Entry, CatalogueReadDirectory.Entry, String) throws -> T) throws -> T {
+        guard mode == .adopted else { throw ItemFacts.Unavailable.legacy }
+        guard occurrence.rootInstanceID == rootInstanceID else { throw ItemFacts.Unavailable.invalid(.root) }
+        guard let parts = Self.pathComponents(occurrence.relativePath), let filename = parts.last else {
+            throw ItemFacts.Unavailable.invalid(.pdf)
+        }
+        return try directory.withoutDownload {
+            try directory.withRoot(root, expected: rootIdentity) { root in
+                try directory.withParent(parts.dropLast(), in: root) { parent in
+                    try body(root, parent, filename)
+                }
+            }
+        }
+    }
+
+    func validateScope(root rootEntry: CatalogueReadDirectory.Entry, parent: CatalogueReadDirectory.Entry) throws {
+        try directory.validateRoot(root, identity: rootIdentity, entry: rootEntry)
+        guard CatalogueReadDirectory.hasPath(parent.descriptor, parent.path) else {
+            throw ItemFacts.Unavailable.invalid(.pdf)
+        }
+    }
+
+    func withProvenPDF<T>(_ filename: String, in parent: CatalogueReadDirectory.Entry,
+                          at occurrence: CatalogueAssociation.Occurrence, expectedBase: ItemFacts.FileFacts? = nil,
+                          _ body: (CatalogueReadDirectory.Entry, CatalogueAssociation.VerifiedPDF) throws -> T) throws -> T {
+        if let expectedBase, expectedBase.rootIdentity != rootIdentity {
+            throw ItemFacts.Unavailable.invalid(.root)
+        }
+        return try directory.withFile(filename, in: parent, artifact: .pdf) { entry in
+            if let expectedBase, CatalogueReadDirectory.FileVersion(entry.info) != expectedBase.pdfVersion {
+                throw ItemFacts.Unavailable.invalid(.pdf)
+            }
+            let observed: PDFIdentity
+            do {
+                guard let identity = try identifyPDF(entry.descriptor, occurrence) else {
+                    throw ItemFacts.Unavailable.invalid(.pdf)
+                }
+                observed = identity
+            } catch {
+                throw error as? ItemFacts.Unavailable ?? .invalid(.pdf)
+            }
+            let proof = CatalogueAssociation.VerifiedPDF(occurrence: occurrence, fileID: observed.fileID,
+                                                         contentRevision: observed.contentRevision, pageCount: observed.pageCount)
+            if let expectedBase,
+               observed.fileID != expectedBase.revision.fileID
+                || observed.contentRevision != expectedBase.revision.content
+                || observed.pageCount != expectedBase.pair.record.pages.count {
+                throw ItemFacts.Unavailable.invalid(.pdf)
+            }
+            return try body(entry, proof)
         }
     }
 
@@ -181,7 +242,7 @@ public struct CatalogueReader: Sendable {
         return parts.map(String.init)
     }
 
-    private static func record(in entry: CatalogueReadDirectory.Entry) throws -> CatalogueRecord {
+    static func record(in entry: CatalogueReadDirectory.Entry) throws -> CatalogueRecord {
         guard entry.info.st_size <= CatalogueRecord.maximumBytes else { throw CatalogueRecord.Invalid.inputLimit }
         let file = FileHandle(fileDescriptor: entry.descriptor, closeOnDealloc: false)
         let bytes = try file.read(upToCount: CatalogueRecord.maximumBytes + 1) ?? Data()

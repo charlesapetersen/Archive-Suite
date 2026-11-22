@@ -24,10 +24,9 @@ worktree."
 - **Only `ArchiveCore.CoordinatedTagWriter` may write tags**: the permitted surface is three exact lines in
   `ArchiveCore/Tags/TagWrite.swift`. Reader's `Core/TagWriter.swift` is the delta adapter every Reader tag edit
   goes through, and it calls no write API itself. No other file may import or call a tag-write API
-  (`setResourceValue(s)`, `setxattr`, …). **No file, not even `TagWriter`, may call a move / rename /
-  delete / trash / content-write API** (`FileManager.removeItem/moveItem/trashItem/…`,
-  `PDFDocument.write`, `Data.write`, `FileHandle` writes). A CI-style lint enforces this; the lint is
-  one layer — the real guarantee is the isolation.
+  (`setResourceValue(s)`, `setxattr`, …). The [Core Directive](CLAUDE.md#core-directive-bulletproof--this-overrides-everything) protects
+  source bytes and locations. The write-surface lint pins the exact allowed calls for the named JSON
+  exceptions, including the [adopted catalogue writer](../SPEC/catalogue.md#guarded-local-saves-and-recovery).
 - **Root-identity exception:** only choosing a folder (`RootFolderStore.setRoot`) or an archive-link copy
   (`prepareMarkerForLinkCopy`) may create `.archive-suite-root.json`, both via `RootFolderStore.ensureMarker`
   → ArchiveCore `RootMarker.ensure`; reopening at launch only reads (W40.root-marker-auto).

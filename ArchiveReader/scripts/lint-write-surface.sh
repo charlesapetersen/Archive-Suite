@@ -196,6 +196,15 @@ ALLOW=(
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}guard renameatx_np(sfd, parked, sfd, aside, UInt32(RENAME_EXCL)) == 0 else {"
   "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift${SEP}if renameatx_np(sfd, name, sfd, aside, UInt32(RENAME_EXCL)) == 0 {"
 
+  # W49.storage-writer / owner call 32: the adopted companion edit boundary (SPEC/catalogue.md).
+  # An exclusive hidden sibling is created under the locked, guarded parent descriptor. Only that
+  # sibling receives the existing companion's filesystem metadata. The atomic exchange uses the
+  # exact companion and its one staged sibling, including guarded restoration on a raced change.
+  # The displaced version stays in the recovery sibling. No PDF is written, moved or removed.
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueWriter.swift${SEP}let fd = openat(parent.descriptor, name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueWriter.swift${SEP}guard fcopyfile(source.descriptor, fd, nil, copyfile_flags_t(COPYFILE_METADATA)) == 0 else {"
+  "posixwrite${SEP}packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueWriter.swift${SEP}guard renameatx_np(parent.descriptor, artifact, parent.descriptor, companion, UInt32(RENAME_SWAP)) == 0 else {"
+
   # ── rule 3 (errorHandler:-less enumerator) ──────────────────────────────────────────────────
   # `ArchiveLibrary.swift`'s Spotlight-era fixture loader used to be allowed here. `W26.walk2`
   # deleted the call (discovery is `ArchiveCore.CorpusWalker` now, which passes an `errorHandler:`),

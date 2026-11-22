@@ -23,7 +23,7 @@ JSON, scoped to the exact occurrence. It verifies the file ID, content generatio
 count. A name, size, timestamp, PDF trailer ID or byte digest alone is insufficient. A companion
 must never be applied to a replacement at the same path on name evidence, even after a restart.
 A metadata edit changes `revision` and records its direct parent revision IDs. A content replacement
-also advances `contentRevision`. Writers and proof acquisition are later stages.
+also advances `contentRevision`. App-specific proof acquisition and pair creation are separate rollout stages.
 
 An occurrence is the granted root *instance* and canonical relative path. A move of the entire root
 retains the instance and relative paths after the grant is resolved. A simultaneously mounted copy
@@ -86,9 +86,9 @@ supporting revision, page, normalized region (source orientation, origin top lef
 or historical value.
 
 `CatalogueRecord` retains the original JSON bytes for lossless unchanged export, including optional
-unknown data at any depth. Its typed view is for reading. A future editor must patch a lossless
-representation and revalidate it, or refuse the operation if it cannot safely preserve unfamiliar data.
-Record decoding is pure. The shared reader below supplies read-only file access.
+unknown data at any depth. The writer patches individual fields, preserving untouched wire values and
+revalidating the resulting record. If a change would discard an unfamiliar value extension or overwrite a
+field with an unknown origin, it is refused. Record decoding is pure.
 
 ## Scoped reads and refresh
 
@@ -118,3 +118,42 @@ bytes, so a conflicting record claiming the same revision with the same timestam
 cached facts. The hash is an invalidation input and proves no PDF association. Rebuilding a cache
 starts with a fresh read. Consumers connect their file-event loops during app integration, where
 cold discovery cost and cloud-provider behavior still need verification at the target scale.
+
+
+## Guarded local saves and recovery
+
+Owner call 32 authorizes writing current catalogue fields to the adjacent companion. The local
+`CatalogueWriter` is the single boundary for editing an existing companion in a granted adopted root.
+It holds an exclusive lock on the already open parent directory for each operation. It checks the root,
+exact occurrence, physical PDF version and independent PDF identity again at save. Copies with the same
+embedded IDs, and identical bytes at a replaced path, cannot use the original selection as a write grant.
+The writer does not open the PDF for writing or alter its tags, content or location. It also refuses
+unsupported, stale, offline, read-only and invalid inputs without inventing a replacement record.
+
+Edits address file fields or fields of a locally owned document. An intentional clear gets its own
+field revision. A change to a value or its uncertainty drops the old check and retains historical
+evidence. Checking or unchecking keeps the field revision. A batch targets each field once. If the
+base is stale, the live record must be linked to the exact base bytes through retained local exchanges.
+The writer then compares the complete touched field envelopes, including checks, evidence and
+extensions. Disjoint edits can be saved from the same base through multiple revisions. An overlapping
+edit or an unverified branch returns the current record and the user's proposed record for explicit
+reconciliation. A record revision UUID alone does not establish ancestry.
+
+The writer creates a new, exclusively named sibling, copies the companion's filesystem metadata, flushes
+the new data and verifies it before atomically exchanging the two names. It verifies the published
+candidate, displaced before-image and the original PDF occurrence afterward. The hidden sibling name
+encodes SHA-256 digests of the PDF's local identity and filename, the old record and the candidate. This lets a later session
+distinguish a staged candidate from a completed exchange and identify divergent or incomplete operations.
+These artifacts are recovery history. The adjacent companion remains the sole source of current facts.
+A whole-folder copy that includes hidden files also carries those historical records. A pair transfer
+carries the PDF and active companion. A missing or invalid live companion is still unavailable. Recovery inspection can show a retained record
+when the PDF independently proves its identity. It never promotes an artifact automatically.
+
+Each successful exchange retains one exact before-image. Interrupted or uncertain exchanges retain the
+available bytes for reconciliation and report the artifact name. Retaining those files also permits
+verified disjoint edits from earlier bases. There is no automatic pruning during the rollout. A future
+retention policy would have to account for open edit bases and Undo. Coordination applies to local
+writers using this boundary. The writer attempts to restore a racing external version when it can still
+verify both exchange names. Changes outside the lock can leave an uncertain outcome, so both versions
+are kept. Network mounts are refused. Provider synchronization and multi-device writes require their
+own verification. Paired initial filing and the Reader Undo journal are separate implementation steps.

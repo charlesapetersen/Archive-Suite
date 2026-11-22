@@ -27,6 +27,8 @@ public struct ItemFacts: Sendable {
     public struct FileFacts: Sendable {
         public let pair: CatalogueAssociation.Pair
         public let revision: Revision
+        let rootIdentity: CatalogueReadDirectory.Identity
+        let pdfVersion: CatalogueReadDirectory.FileVersion
     }
 
     public struct DocumentFacts: Sendable {

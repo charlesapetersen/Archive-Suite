@@ -20,6 +20,30 @@ struct CatalogueReadDirectory {
         }
     }
 
+    struct FileVersion: Equatable, Sendable {
+        let identity: Identity
+        private let size: off_t
+        private let mode: mode_t
+        private let links: nlink_t
+        private let flags: UInt32
+        private let modifiedSeconds: Int
+        private let modifiedNanoseconds: Int
+        private let changedSeconds: Int
+        private let changedNanoseconds: Int
+
+        init(_ info: stat) {
+            identity = Identity(info)
+            size = info.st_size
+            mode = info.st_mode
+            links = info.st_nlink
+            flags = info.st_flags
+            modifiedSeconds = info.st_mtimespec.tv_sec
+            modifiedNanoseconds = info.st_mtimespec.tv_nsec
+            changedSeconds = info.st_ctimespec.tv_sec
+            changedNanoseconds = info.st_ctimespec.tv_nsec
+        }
+    }
+
     struct Entry {
         let descriptor: Int32
         let path: String
@@ -60,10 +84,17 @@ struct CatalogueReadDirectory {
 
             let result = try body(Entry(descriptor: fd, path: path, info: info))
             // A detached or replaced grant must never publish facts from its old directory.
-            var current = stat()
-            guard lstat(raw, &current) == 0, Identity(current) == identity,
-                  Self.hasPath(fd, path) else { throw Status.invalid(.root) }
+            try validateRoot(url, identity: identity, entry: Entry(descriptor: fd, path: path, info: info))
             return result
+        }
+    }
+
+    func validateRoot(_ url: URL, identity: Identity, entry: Entry) throws {
+        try url.withUnsafeFileSystemRepresentation { raw in
+            var current = stat()
+            guard let raw, lstat(raw, &current) == 0, Identity(current) == identity,
+                  Self.hasPath(entry.descriptor, entry.path) else { throw Status.invalid(.root) }
+            guard !isDataless(current) else { throw Status.offline(.root) }
         }
     }
 
@@ -110,16 +141,10 @@ struct CatalogueReadDirectory {
         }
         guard !isDataless(current) else { throw Status.offline(artifact) }
         // Check file changes during the read. Directory contents may change independently.
-        guard directory || Self.sameFileVersion(opened, current) else { throw Status.invalid(artifact) }
+        guard directory || (current.st_nlink == 1 && FileVersion(opened) == FileVersion(current)) else {
+            throw Status.invalid(artifact)
+        }
         return result
-    }
-
-    private static func sameFileVersion(_ lhs: stat, _ rhs: stat) -> Bool {
-        lhs.st_size == rhs.st_size && rhs.st_nlink == 1
-            && lhs.st_mtimespec.tv_sec == rhs.st_mtimespec.tv_sec
-            && lhs.st_mtimespec.tv_nsec == rhs.st_mtimespec.tv_nsec
-            && lhs.st_ctimespec.tv_sec == rhs.st_ctimespec.tv_sec
-            && lhs.st_ctimespec.tv_nsec == rhs.st_ctimespec.tv_nsec
     }
 
     private static func openError(_ code: Int32, for artifact: Artifact) -> Status {
@@ -136,7 +161,7 @@ struct CatalogueReadDirectory {
         return bytes.withUnsafeBufferPointer { String(validatingCString: $0.baseAddress!) }
     }
 
-    private static func hasPath(_ fd: Int32, _ expected: String) -> Bool {
+    static func hasPath(_ fd: Int32, _ expected: String) -> Bool {
         path(of: fd)?.utf8.elementsEqual(expected.utf8) == true
     }
 }

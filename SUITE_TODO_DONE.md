@@ -17968,3 +17968,18 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   updates and cold cache rebuilds. The production identity carrier and app integration remain in
   their queued rollout stages. No real corpus, bench cache or paid calls used.
   <!-- /W49.storage-reads -->
+
+- [x] **W49.storage-writer — Save catalogue companions with guarded edits and recovery [L · Tier-2]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit)
+  Original scope: (lane: suite) (uses: build) (blocked-on: W49.storage-reads) — Guard PDF identity and base revision, preserve disjoint edits and surface conflicts. Test stale revisions and concurrent edits on scratch copies. [Design](execution-plans/storage-simplify.md).
+  ArchiveCore now saves typed edits to an independently identified, physically unchanged PDF's
+  adjacent catalogue companion. A locked, atomic exchange verifies the old and new records,
+  rebases disjoint edits through exact local history, and returns both proposals on conflict.
+  Interrupted saves retain inspectable candidates or before-images. Recovery lookup is tied to
+  the local PDF occurrence and preserves unfamiliar JSON, evidence and recorded clears.
+  Tier-2 review and scratch tests covered concurrent writers, stale and repeated revisions,
+  same-byte PDF replacement, a newer companion racing publication, and interruption on both
+  sides of the exchange. ArchiveCore passed 671 tests with five skips, then passed the focused
+  writer suite with the post-exchange newer-companion case. Reader and Notes unit smokes,
+  Processor's Debug build and headless recovery test, and the 30-case write-surface proof passed.
+  No real corpus, bench cache or paid calls used.
+  <!-- /W49.storage-writer -->

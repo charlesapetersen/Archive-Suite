@@ -17,15 +17,15 @@ it on demand. It adds mechanism and history; it never relaxes a rule here, and a
 
 Archival image files are **irreplaceable** and their tagging was **extremely time-consuming**.
 
-- The app **MUST NOT** delete, move, rename, trash, re-save, or alter any file's **bytes/contents**
-  or **location** — ever.
+- The app **MUST NOT** delete, move, rename, trash, re-save, or alter any archival source file's
+  **bytes/contents** or **location**.
 - The app **MUST NOT** mangle, drop, or lose any tag *unintentionally*.
 - The app **MAY edit macOS Finder tags** — add / remove / change subject, date, quality, color,
   read-state and field-check (`Checked <Field>`) tags, for a single file **or a group** — but **only** as a *deliberate user
   action*, routed through one audited choke-point (`TagWriter`), applied as a precise **delta**
   (add-set / remove-set) to a **freshly-read** tag array, and **verified** afterward. Finder-tag
-  (extended-attribute) metadata is the only change to existing archive files; their **bytes and
-  location never change**. (Read/Unread triage is just the fast-path preset of this same editor.)
+  (extended-attribute) metadata is the only change to archival PDFs and images. Their **bytes and
+  location are protected**. (Read/Unread triage is just the fast-path preset of this same editor.)
 - **One named exception: choosing a folder** (in the Reader, or in Archive Notes' Choose Archive
   Folder…) creates `.archive-suite-root.json` if it is absent, a small identity file at the granted
   root, so links travel with the folder and Notes accepts the folder the Reader shows (owner,
@@ -42,12 +42,14 @@ Archival image files are **irreplaceable** and their tagging was **extremely tim
   dropping one is set aside (renamed in `.archivesuite`) only when the user accepts the Inspector's offer, and undo
   swaps it back (W49.reader-ct-set-aside, `NavigationModel+ContainerSetAside`). No archive file's
   bytes, tags or location change. Contract: `SPEC/containers.md` §File safety.
+- **Adopted catalogue companions** (owner call 32) use ArchiveCore's `CatalogueWriter` for deliberate
+  edits to the adjacent JSON. [Scope and recovery](../SPEC/catalogue.md#guarded-local-saves-and-recovery).
+  Reader wiring follows separately.
 - Everything else — discovery, filtering, viewing, ordinary copying — is strictly **read-only**.
 
 This is an architectural property, not a coding-discipline hope: **all tag writes route through the
-single audited `TagWriter`** (see Safety Protocol). No other code imports a file-mutating API, and
-even `TagWriter` never calls a move / rename / delete / content-write API — only the tag-array and
-(deliberately) the color-label metadata. The root-identity exception uses ArchiveCore's coordinated
+single audited `TagWriter`** (see Safety Protocol). It can change the tag array and color-label
+metadata. The named JSON writers each have their own scope and write-surface lint entries. The root-identity exception uses ArchiveCore's coordinated
 `RootMarker.ensure`, only from `RootFolderStore.prepareMarkerForLinkCopy`.
 
 ---
