@@ -121,7 +121,16 @@ enum KeyValidator {
         req.httpMethod = "GET"
         req.setValue("Bearer \(trimmed)", forHTTPHeaderField: "Authorization")
         do {
-            let (_, resp) = try await URLSession.shared.data(for: req)
+            let resp: URLResponse
+#if DEBUG
+            if MessageJourneyFixture.isActive {
+                resp = try MessageJourneyFixture.reply(to: req).1
+            } else {
+                resp = try await URLSession.shared.data(for: req).1
+            }
+#else
+            resp = try await URLSession.shared.data(for: req).1
+#endif
             guard let http = resp as? HTTPURLResponse else { return .providerBusy }
             switch http.statusCode {
             case 200: return .works

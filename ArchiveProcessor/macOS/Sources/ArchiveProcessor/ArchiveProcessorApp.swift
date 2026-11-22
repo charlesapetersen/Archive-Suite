@@ -21,6 +21,7 @@ struct ArchiveProcessorApp: App {
                 preconditionFailure("Could not seed the scratch paid batch: \(error)")
             }
             MoneyJourneyFixture.configureIfRequested()
+            MessageJourneyFixture.resetKeyWizardIfRequested()
             ProcessorUITestConfiguration.installScratchCollectionSettings()   // the range view's click check
         }
 #endif

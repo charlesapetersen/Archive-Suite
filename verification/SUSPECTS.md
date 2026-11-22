@@ -534,7 +534,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   with a reset time. Confirmed if the run does not wait for that time before retrying. Kept until then (a
   promised feature, so not deleted); the Processor ledger (`W40.b3`) should carry it as a row.
 - **Would clear it:** the run waits for the reset.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-messages-check`); [`evidence/processor/W49.proc-suspects-messages.md`](evidence/processor/W49.proc-suspects-messages.md), `ArchiveProcessor/scripts/repro-suspects-messages.sh`
+- **Status:** `reproduced` — independently confirmed and queued as W49.proc-fix-s018. [Independent VM evidence](evidence/processor/W49.proc-suspects-messages-check.md).
 - **History:**
   - 2026-10-16 W40.e5 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
@@ -543,6 +543,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     Codex CLI, same stub: one call, the page failed at once with "… The app paces to your subscription window and
     retries." No wait and no retry. The Gemini CLI takes the same branch (code). `lastUsageWindowResetAt` is still never
     read.
+  - 2026-11-21 W49.proc-suspects-messages-check (Codex gpt-6.2-sol, baseline `8e89c29b`) — Codex reported a known reset, but the app ended the page after one invocation and said it would pace and retry.
 
 ### S-019 · Typing `-->` after an unclosed Notes block header may drop the lines before it
 
@@ -675,13 +676,14 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** drive the wizard where `save` returns false (headless mode already makes it do so,
   `Models/KeychainHelper.swift:30`) and read the chip state.
 - **Would clear it:** the chip reads "Save failed" or not-set in that run.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-messages-check`); [`evidence/processor/W49.proc-suspects-messages.md`](evidence/processor/W49.proc-suspects-messages.md), `ArchiveProcessor/scripts/repro-suspects-messages.sh`
+- **Status:** `reproduced` — independently confirmed and queued as W49.proc-fix-s024. [Independent VM evidence](evidence/processor/W49.proc-suspects-messages-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
   - 2026-11-20 W49.proc-suspects-messages — reproduced. The code still says it. The wizard's step for a passed check,
     run with `save` refusing (headless), then the key row as it reloads: `save` returned false, the field reloaded empty,
     and the chip was "Validated" (Gemini and OpenAI). The button press itself was not driven. Nothing calls it deliberate.
+  - 2026-11-21 W49.proc-suspects-messages-check (Codex gpt-6.2-sol, baseline `8e89c29b`) — The OpenAI wizard passed the synthetic provider check. Returning to Accounts showed Validated beside an empty OpenAI key field.
 
 ### S-025 · The gateway's "Fill in OpenAI preset" picks a reasoning model the gateway request cannot drive
 
@@ -695,7 +697,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** apply the preset and read `gatewayModelID`, then send one page through the no-wire seam and
   check the body; a single live page against OpenAI (under a cent) would show the 400.
 - **Would clear it:** OpenAI accepts the request, or the preset picks a model that takes `max_tokens`.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-messages-check`); [`evidence/processor/W49.proc-suspects-messages.md`](evidence/processor/W49.proc-suspects-messages.md), `ArchiveProcessor/scripts/repro-suspects-messages.sh`
+- **Status:** `open` — preset and request mismatch confirmed and queued as W49.proc-fix-s025. Live OpenAI response remains open. [Independent VM evidence](evidence/processor/W49.proc-suspects-messages-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
@@ -704,6 +706,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     api.openai.com named `gpt-5.4-mini` with `max_tokens: 8192` and no `max_completion_tokens`. OpenAI's 400 was not
     observed (no OpenAI key here); it rests on the app's own statement. The preset's comment means a model the request
     works with, so not intended.
+  - 2026-11-21 W49.proc-suspects-messages-check (Codex gpt-6.2-sol, baseline `8e89c29b`) — The preset fills GPT-5.4 mini, which supports reasoning, while the help promises a non-reasoning model. Starting a run built a request with the deprecated max_tokens field. Live OpenAI acceptance remains open.
 
 ### S-026 · Batch OCR is not size-based: large images go up at full size
 
@@ -780,7 +783,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a run of rotated synthetic scans with LLM rotation set and the key removed: check page 1
   orientation and whether anything reports the fallback.
 - **Would clear it:** the fallback is reported, or the pages come out upright.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-messages-check`); [`evidence/processor/W49.proc-suspects-messages.md`](evidence/processor/W49.proc-suspects-messages.md), `ArchiveProcessor/scripts/repro-suspects-messages.sh`
+- **Status:** `reproduced` — independently confirmed and queued as W49.proc-fix-s029. [Independent VM evidence](evidence/processor/W49.proc-suspects-messages-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
@@ -789,6 +792,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     three synthetic pages correctly, so no sideways page came out. Since raised, the default (agreement) marks and counts
     a failed cloud call, the help measures Vision wrong on 3 of 119 (not about 60%), and README documents the fallback;
     the silence is undocumented. A fix keeps the fallback and reports it.
+  - 2026-11-21 W49.proc-suspects-messages-check (Codex gpt-6.2-sol, baseline `8e89c29b`) — A failed comparative vote left a sideways scan in the PDF. The app reported OCR success and gave no rotation warning. A successful vote on the same image turned it upright.
 
 ### S-030 · The run log can give one failed file another's reason
 
@@ -799,7 +803,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `P-26`.
 - **Would confirm it:** a run with two same-named failing files from two folders, logging on.
 - **Would clear it:** each line carries its own file's reason.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.proc-suspects-messages-check`); [`evidence/processor/W49.proc-suspects-messages.md`](evidence/processor/W49.proc-suspects-messages.md), `ArchiveProcessor/scripts/repro-suspects-messages.sh`
+- **Status:** `reproduced` — independently confirmed and queued as W49.proc-fix-s030. [Independent VM evidence](evidence/processor/W49.proc-suspects-messages-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
@@ -807,6 +811,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     refused: both failed (manifest), but the status line said "0 succeeded, 1 failed" and the log "Failed: 1" with one
     line and one reason. `failedFiles` is kept by name and skips a name it holds (`OCR/OCRProcessor+OCR.swift:1722`,
     `:1847`), so the second file is dropped, not given the first one's reason. The `try?` write was not tested.
+  - 2026-11-21 W49.proc-suspects-messages-check (Codex gpt-6.2-sol, baseline `8e89c29b`) — Both jobs failed and generated their own PDFs. The status and run log counted one failure and recorded a single reason.
 
 ### S-031 · Under a window segmentation approach, enclosures may get no `Sent With` date
 

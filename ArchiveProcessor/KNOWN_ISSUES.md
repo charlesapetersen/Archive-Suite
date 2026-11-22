@@ -8,6 +8,26 @@ The green label measured 2.07:1 in light mode on baseline `cb394d05`. The badge 
 color and keeps its checkmark seal. The off-screen accessibility audit measured 14.13:1 in light mode and
 10.80:1 in dark mode (W49.proc-validated-contrast).
 
+## The key wizard labels an empty key field Validated (S-024)
+
+- The OpenAI wizard passed the synthetic provider check. Returning to Accounts showed Validated beside an empty OpenAI key field. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md). (queued: W49.proc-fix-s024)
+
+## The OpenAI gateway preset contradicts its help (S-025)
+
+- The preset fills GPT-5.4 mini, which supports reasoning, while the help promises a non-reasoning model. Starting a run built a request with the deprecated max_tokens field. Live OpenAI acceptance remains open. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md). (queued: W49.proc-fix-s025)
+
+## Codex OCR stops before the usage window resets (S-018)
+
+- Codex reported a known reset, but the app ended the page after one invocation and said it would pace and retry. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md). (queued: W49.proc-fix-s018)
+
+## Comparative rotation can leave scans sideways without a warning (S-029)
+
+- A failed comparative vote left a sideways scan in the PDF. The app reported OCR success and gave no rotation warning. A successful vote on the same image turned it upright. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md). (queued: W49.proc-fix-s029)
+
+## Process Files counts two same-named failed files as one (S-030)
+
+- Both jobs failed and generated their own PDFs. The status and run log counted one failure and recorded a single reason. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md). (queued: W49.proc-fix-s030)
+
 ## Stage for later offers already-processed photos (S-039)
 
 - Live Capture handed off the same two photos after a successful Process Files run and again after relaunch. A second Start read both photos again. The handoff itself sent zero requests. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s039)

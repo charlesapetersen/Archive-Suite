@@ -17632,3 +17632,6 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Spotlight choices and any real-corpus change still require separate decisions. Implementation is tracked
   by the stages in [execution-plans/storage-simplify.md](execution-plans/storage-simplify.md#15-delivery-sequence-dependencies-and-exit-tests).
   <!-- /W49.storage-one-home -->
+- [x] **W49.proc-suspects-messages-check — check the S-024, S-025, S-018, S-029 and S-030 reproductions in an independent session [S]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-21 (this commit)
+  Codex gpt-6.2-sol independently exercised the Settings and Process Files paths after Claude Opus 5.5 reproduced them. The VM confirmed S-024, S-018, S-029 and S-030. S-025's preset and request mismatch is confirmed and queued, with the live OpenAI response still open. Each confirmed behavior has a fix item and a retained scratch reproducer. [VM evidence and scope](verification/evidence/processor/W49.proc-suspects-messages-check.md). Provider spend $0.
+  <!-- /W49.proc-suspects-messages-check -->
