@@ -9,17 +9,24 @@ dialogs show is the stand-in's and every change to it is the test's hand. Each c
 when set. The app passes its own environment on, which is how the UI test sets both. It runs in the VM guest only,
 reads nothing but stdin and sends nothing anywhere.
 """
+import fcntl
 import json
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
-from fake_gateway import answer  # noqa: E402
+from fake_gateway import CYCLE, answer  # noqa: E402
 
 text = sys.stdin.read()
 kind, reply = answer(text, os.environ.get('FAKE_AGENT_CLASS', 'document_start'), os.getpid())
 log = os.environ.get('FAKE_AGENT_LOG')
 if log:
-    with open(log, 'a', encoding='utf-8') as f:
+    with open(log, 'a+', encoding='utf-8') as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        # The resume journey needs both label candidates and documents in the saved OCR results.
+        if kind == 'ocr' and os.environ.get('FAKE_AGENT_CLASS_CYCLE') == '1':
+            f.seek(0)
+            pages_read = sum(line.startswith('ocr\t') for line in f)
+            _, reply = answer(text, CYCLE[pages_read % len(CYCLE)], pages_read + 1)
         f.write(f'{kind}\t{" ".join(text.split())[:90]}\n')
 print(json.dumps({'type': 'result', 'subtype': 'success', 'is_error': False, 'result': reply}))

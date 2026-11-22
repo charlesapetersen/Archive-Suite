@@ -261,8 +261,9 @@ elif [ "${PROCESSOR_JOURNEY:-}" = "reviews" ]; then
   [ -n "$CORRUPT_TEST_SELECTOR" ] && die "PROCESSOR_JOURNEY and CORRUPT_INDEX_FIXTURE cannot be combined."
   PROCESSOR_REVIEWS=1
   CORRUPT_TEST_SELECTOR="ArchiveProcessorUITests/ReviewDialogsJourneyUITests"
-  if [ -n "${ONLY_TESTING:-}" ] && [ "$ONLY_TESTING" != "$CORRUPT_TEST_SELECTOR" ]; then
-    die "PROCESSOR_JOURNEY=reviews runs only ONLY_TESTING=$CORRUPT_TEST_SELECTOR"
+  if [ -n "${ONLY_TESTING:-}" ] && [ "$ONLY_TESTING" != "$CORRUPT_TEST_SELECTOR" ] \
+     && [[ ! "$ONLY_TESTING" =~ ^$CORRUPT_TEST_SELECTOR/[[:alnum:]_]+$ ]]; then
+    die "PROCESSOR_JOURNEY=reviews needs $CORRUPT_TEST_SELECTOR or one of its tests"
   fi
   REVIEWS_SET="$REHEARSAL/processor-set/${W40D2_COLLECTION:-RG 165 — War Department}"
   [ -d "$REVIEWS_SET" ] || die "no rehearsal box at $REVIEWS_SET (python3 ArchiveProcessor/scripts/make-processor-rehearsal.py)"

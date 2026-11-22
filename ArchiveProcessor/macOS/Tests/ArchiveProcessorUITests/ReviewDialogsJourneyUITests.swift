@@ -75,25 +75,9 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
                 "-taggingModeRaw", "automatic", "-segmentationApproach", "manual",
                 "-rotationModeRaw", "off", "-reviewRotation", "NO"
             ], collectionID: true)
-            let settings = app.showSettingsWindow()
-            XCTAssertTrue(app.showSettingsPanel("Documents"))
-            let title = "Review document segmentation"
-            let label = settings.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", title, title))
-                .firstMatch
-            let scroll = settings.scrollViews.firstMatch
-            for _ in 0..<15 where !label.isHittable {
-                scroll.scroll(byDeltaX: 0, deltaY: -180)
-            }
-            XCTAssertTrue(label.isHittable)
-            // The grouped Form exposes the title, help button and switch as sibling AX elements.
-            let toggle = try XCTUnwrap(settings.switches.allElementsBoundByIndex.first {
-                abs($0.frame.midY - label.frame.midY) < 3
-            })
-            XCTAssertTrue(toggle.isHittable && toggle.isEnabled)
+            let (settings, label, toggle) = try documentReviewSetting()
+            setDocumentReview(toggle, enabled: enabled)
             let target = enabled ? "1" : "0"
-            let value = { String(describing: toggle.value ?? "") }
-            if value() != target { toggle.click() }
-            XCTAssertEqual(value(), target)
             print("[s046] \(name): switch value=\(target)")
             if enabled {
                 let help = try XCTUnwrap(settings.buttons.matching(NSPredicate(format: "label == 'Help'"))
@@ -152,6 +136,124 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
             print("[s046] \(name): whole-run per-page, box/folder, final tagging, collection names, per-collection=\(sawCollectionReview)")
             waitForDone(name)
         }
+    }
+
+    /// S-050: quit with real OCR results saved, relaunch, click Resume Run, and record the gates that open.
+    func testOrdinaryResumeReviewGates() throws {
+        for enabled in [true, false] {
+            let name = enabled ? "s050-review-on" : "s050-review-off"
+            let arguments = [
+                "-taggingModeRaw", "automatic", "-segmentationApproach", "manual",
+                "-rotationModeRaw", "off", "-reviewRotation", "NO", "-preOCRedInput", "NO"
+            ]
+            _ = try launch(name, arguments, collectionID: true, classificationCycle: true)
+            let (settings, _, toggle) = try documentReviewSetting()
+            // Exercise an actual settings change, including explicitly turning the review off.
+            setDocumentReview(toggle, enabled: !enabled)
+            setDocumentReview(toggle, enabled: enabled)
+            shot("\(name)-saved-setting")
+            settings.typeKey("w", modifierFlags: .command)
+            clickStart()
+
+            let firstReview = reviewWindow("Document Segmentation Review", timeout: 120)
+            let counts = firstReview.staticTexts.matching(NSPredicate(
+                format: "label CONTAINS '1 box' OR value CONTAINS '1 box'")).firstMatch
+            XCTAssertTrue(text(of: counts).contains("1 folder"), "the saved OCR must include both label candidates")
+            shot("\(name)-before-interruption")
+            XCTAssertEqual(try ocrCallCount(name), 6)
+
+            // Terminate while the first review is still open, without answering it. The second launch
+            // leaves the app's own recovery record in place and uses the regular Resume Run button.
+            _ = try launch(name, arguments, collectionID: true, classificationCycle: true, preservePendingRun: true)
+            let resume = app.descendants(matching: .any)["ap.ocr.resumeRun"]
+            XCTAssertTrue(resume.waitForExistence(timeout: 20) && resume.isEnabled)
+            let saved = app.staticTexts.matching(NSPredicate(
+                format: "label CONTAINS '6/6 files completed' OR value CONTAINS '6/6 files completed'")).firstMatch
+            XCTAssertTrue(saved.exists, "the interrupted-run box reports all six cached pages")
+            // Change the live setting after interruption. The late collection review should follow the
+            // original run's saved choice even when the setting now asks for the opposite.
+            let (relaunchSettings, _, relaunchToggle) = try documentReviewSetting()
+            setDocumentReview(relaunchToggle, enabled: !enabled)
+            relaunchSettings.typeKey("w", modifierFlags: .command)
+            shot("\(name)-interrupted")
+            resume.click()
+
+            let complete = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Complete'")).firstMatch
+            let boxSheet = app.sheets.containing(.staticText, identifier: "Confirm Box & Folder Labels").firstMatch
+            let deadline = Date().addingTimeInterval(90)
+            var sawPageReview = false
+            var sawBoxReview = false
+            while !complete.exists && Date() < deadline {
+                if !sawPageReview && firstReview.exists {
+                    sawPageReview = true
+                    shot("\(name)-resumed-page-review")
+                    app.typeKey(.return, modifierFlags: [])
+                }
+                if !sawBoxReview && boxSheet.exists {
+                    sawBoxReview = true
+                    shot("\(name)-resumed-label-review")
+                    boxSheet.buttons["Confirm"].click()
+                }
+                RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+            }
+            XCTAssertTrue(complete.exists, "the resumed run reaches final tagging review")
+            print("[s050] \(name): whole-run page review=\(sawPageReview), box/folder confirmation=\(sawBoxReview), final tagging review=\(complete.exists)")
+            shot("\(name)-final-tagging-review")
+            complete.click()
+
+            let organize = app.sheets.buttons["Confirm and Organize"]
+            XCTAssertTrue(organize.waitForExistence(timeout: 60))
+            organize.click()
+
+            let done = app.staticTexts.matching(NSPredicate(
+                format: "label BEGINSWITH 'Done.' OR value BEGINSWITH 'Done.'")).firstMatch
+            let completionDeadline = Date().addingTimeInterval(60)
+            var sawCollectionReview = false
+            while !done.exists && Date() < completionDeadline {
+                if firstReview.exists {
+                    if !sawCollectionReview { shot("\(name)-resumed-collection-review") }
+                    sawCollectionReview = true
+                    app.typeKey(.return, modifierFlags: [])
+                }
+                RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+            }
+            XCTAssertTrue(text(of: done).hasPrefix("Done. 6 succeeded, 0 failed."),
+                          "the resumed run finishes all six files after its remaining reviews")
+            XCTAssertEqual(sawCollectionReview, enabled, "the collection-stage review follows the saved setting")
+            XCTAssertEqual(try ocrCallCount(name), 6, "Resume reuses the original six saved readings")
+            print("[s050] \(name): per-collection page review=\(sawCollectionReview); \(text(of: done)); OCR calls=6")
+        }
+    }
+
+    private func documentReviewSetting() throws -> (XCUIElement, XCUIElement, XCUIElement) {
+        let settings = app.showSettingsWindow()
+        XCTAssertTrue(app.showSettingsPanel("Documents"))
+        let title = "Review document segmentation"
+        let label = settings.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", title, title))
+            .firstMatch
+        let scroll = settings.scrollViews.firstMatch
+        for _ in 0..<15 where !label.isHittable {
+            scroll.scroll(byDeltaX: 0, deltaY: -180)
+        }
+        XCTAssertTrue(label.isHittable)
+        // The grouped Form exposes the title, help button and switch as sibling AX elements.
+        let toggle = try XCTUnwrap(settings.switches.allElementsBoundByIndex.first {
+            abs($0.frame.midY - label.frame.midY) < 3
+        })
+        XCTAssertTrue(toggle.isHittable && toggle.isEnabled)
+        return (settings, label, toggle)
+    }
+
+    private func setDocumentReview(_ toggle: XCUIElement, enabled: Bool) {
+        let target = enabled ? "1" : "0"
+        if String(describing: toggle.value ?? "") != target { toggle.click() }
+        XCTAssertEqual(String(describing: toggle.value ?? ""), target)
+    }
+
+    private func ocrCallCount(_ name: String) throws -> Int {
+        let log = scratchRoot.appendingPathComponent("\(name)-agent.log")
+        return try String(contentsOf: log, encoding: .utf8).split(separator: "\n")
+            .filter { $0.hasPrefix("ocr\t") }.count
     }
 
     // MARK: Run A — rotation review, per-page segmentation review, box/folder confirmation, Complete
@@ -339,7 +441,8 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
 
     // MARK: Launch and waiting
 
-    private func launch(_ name: String, _ settings: [String], collectionID: Bool = false) throws -> URL {
+    private func launch(_ name: String, _ settings: [String], collectionID: Bool = false,
+                        classificationCycle: Bool = false, preservePendingRun: Bool = false) throws -> URL {
         let out = scratchRoot.appendingPathComponent("\(name)-out", isDirectory: true)
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         app.terminate()
@@ -355,13 +458,14 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         ] + settings)
         app.launchEnvironment = [
             "ARCHIVEPROC_HEADLESS": "1",   // keychain quiet; the window still draws
+            "FAKE_AGENT_CLASS_CYCLE": classificationCycle ? "1" : "0",
             "FAKE_AGENT_LOG": scratchRoot.appendingPathComponent("\(name)-agent.log").path
         ]
         app.launch()
         app.activate()
         XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 20), "the Processor window must appear")
         // An earlier run killed mid-way leaves an Interrupted Run box that holds Start; a user dismisses it.
-        if app.descendants(matching: .any)["ap.ocr.resumeRun"].waitForExistence(timeout: 3) {
+        if !preservePendingRun, app.descendants(matching: .any)["ap.ocr.resumeRun"].waitForExistence(timeout: 3) {
             shot("w40d2-\(name)-interrupted-run")
             app.buttons["Dismiss"].firstMatch.click()
         }

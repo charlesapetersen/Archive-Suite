@@ -733,6 +733,8 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   fresh pipeline chooses the whole-run review independently of the Documents switch and passes `false` to the
   later collection stage. S-046 reproduced this with the switch on and off in the VM
   ([W49.proc-s046-verify evidence](evidence/processor/W49.proc-s046-verify.md)).
+  Ordinary Resume bypasses the whole-run review with either saved setting. A saved On opens the per-collection
+  review after tagging ([S-050 VM evidence](evidence/processor/W49.proc-s050-verify.md)).
 
 ### P-33 · Generated tags
 
@@ -843,7 +845,8 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   - 2026-11-19 W40.d2 — stays `unproven`: Complete works; Redo and the edit sheet unproven.
 - **Notes:** the button is "Redo Segmentation & Tagging"; it rebuilds segments from the edited classifications
   (`OCR/OCRProcessor+Tagging.swift:493-497`). Only Automatic mode reaches this review; a resumed batch skips it on
-  purpose (`OCR/OCRProcessor+Pipeline.swift:1572`) — see S-035.
+  purpose (`OCR/OCRProcessor+Pipeline.swift:1572`) — see S-035. Ordinary Resume still opens the final
+  tagging review ([S-050 VM evidence](evidence/processor/W49.proc-s050-verify.md)).
 
 ### P-38 · Manual per-segment tagging
 
@@ -907,7 +910,8 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   - 2026-11-19 W40.d2 — `unproven` → `works` on the per-page path (tags; page 2 is P-23's defect).
 - **Notes:** it lists only pages already classed box or folder, so a box photo misread as a document is caught only
   by the per-page dialog. Skipped in the manual window, for Live Capture pre-grouped runs and in a resumed batch
-  (S-035).
+  (S-035). A resumed ordinary Automatic + Full manual run also skips it, even with both label types
+  saved ([S-050 VM evidence](evidence/processor/W49.proc-s050-verify.md)).
 
 ## Tools
 

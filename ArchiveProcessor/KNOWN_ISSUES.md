@@ -2,6 +2,14 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## Ordinary Resume bypasses two reviews before tagging (S-050)
+
+- **Reproduced 2026-11-21 (Codex gpt-6.2-sol, `5cd1bd29`).** After relaunch, `OCRProcessor.resumeRun`
+  goes straight from saved classifications to Automatic tagging review under the Full manual approach.
+  The whole-run page review and box/folder confirmation are omitted even with review enabled and no
+  review answered. The saved document review switch controls only the later per-collection review on this
+  path. [VM evidence](../verification/evidence/processor/W49.proc-s050-verify.md). (queued: W49.proc-s050-check)
+
 ## Adding the same photo twice can send two OCR requests (S-048)
 
 - **Reproduced 2026-11-21 (Codex gpt-6.2-sol, `1f5cc337`).** Process Files shows two rows and

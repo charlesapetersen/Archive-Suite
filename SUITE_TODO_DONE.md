@@ -17490,3 +17490,6 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   regression checks selection replacement and exact PNG bytes. The two focused G4 checks compare
   the note on disk with the new asset. [Verification](verification/evidence/notes/W49.notes-suspects-text-check.md#s-009-fix-verification). No bench cache used.
   <!-- /W49.fix-notes-raw-image-paste -->
+
+- [x] **W49.proc-s050-verify — ordinary Resume honors explicit review skips [S]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build,vm) — Owner call 30 (2026-11-21). SHIPPED 2026-11-21 (this commit). S-050 reproduced in the off-screen Processor VM at `5cd1bd29` (Codex gpt-6.2-sol, $0). After a real non-batch Automatic run was interrupted at the whole-run review, Resume omitted that review and the box/folder confirmation with the document review setting saved on or explicitly turned off. Final tagging review opened in both cases. Only the saved On brought back the later per-collection review, despite changing the live switch after relaunch. Both runs reused all six OCR results. [Evidence and replay](verification/evidence/processor/W49.proc-s050-verify.md). Filed `W49.proc-s050-check` for independent Claude verification before a fix and cross-linked the S-035 paid-batch check. Bench cache used read-only.
+  <!-- /W49.proc-s050-verify -->

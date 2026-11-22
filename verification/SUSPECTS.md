@@ -1218,17 +1218,21 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 ### S-050 · Resuming an interrupted (non-batch) run also skips the per-page review and the box/folder confirmation
 
 - **Raised:** 2026-11-20 · W49.proc-suspects-filing · code reading, beside S-035.
-- **Suspected behaviour:** `resumeRun` segments without the per-page dialog or the box/folder confirmation
-  (`OCR/OCRProcessor+Pipeline.swift:2189-2197`), though unlike a batch resume it then tags through the review loop
-  (`:2202`), so the user can still reclassify there.
-- **Where:** ledger `P-32`, `P-37`.
-- **Would confirm it:** a `RUN_QUIT_RESUME_TEST`-style resume under Automatic with an autopilot that records the gates,
-  as `ResumeReviewGatesProbe` does for a batch.
-- **Would clear it:** both are raised, or the owner's S-035 answer covers resumes in general.
-- **Status:** `open`
+- **Suspected behaviour:** `OCRProcessor.resumeRun` in `OCRProcessor+Pipeline.swift` segments without the
+  per-page dialog or the box/folder confirmation. It then calls `performAutomaticTaggingWithReview`, where
+  the user can still reclassify pages.
+- **Where:** ledger `P-32`, `P-37`, `P-40`.
+- **Would confirm it:** a real Process Files run under Automatic, interrupted at its first review and resumed
+  through the app after relaunch. Compare the visible stages with the document review setting saved on and off.
+- **Would clear it:** Resume presents each applicable review unless the user explicitly skipped it (owner call 30).
+- **Status:** `reproduced` — independent Claude check queued as `W49.proc-s050-check`.
+  [VM evidence](evidence/processor/W49.proc-s050-verify.md).
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
-  - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s050-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+  - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s050-verify`; Resume should omit only explicitly skipped reviews (also S-035).
+  - 2026-11-21 W49.proc-s050-verify — Codex gpt-6.2-sol reproduced at `5cd1bd29`. Both resumed runs bypassed
+    the whole-run page review and label confirmation, then opened final tagging review. Only a saved On opened
+    the later per-collection review, even when the live setting had been changed. Both reused all six OCR results.
 
 
 ### S-051 · A batch create refused outright is reported as an uncertain submission
