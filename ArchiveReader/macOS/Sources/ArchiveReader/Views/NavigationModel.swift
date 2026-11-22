@@ -207,8 +207,10 @@ final class NavigationModel: ObservableObject {
     @Published var containerCatalog: ContainerCatalog = .empty { didSet { containerCatalogRevision &+= 1 } }
     /// Bumped with each catalog published, so the table redraws its Container cells.
     private(set) var containerCatalogRevision = 0
-    /// The level map offered for the root, while the sheet is open (`NavigationModel+Containers`).
-    @Published var containerLevelsDraft: ContainerLevelsDraft?
+    /// The level map and the folder it governs, while the sheet is open (`NavigationModel+Containers`).
+    @Published var containerLevelsDraft: ReaderContainerLevelsEdit?
+    /// An explicit File ▸ Container Levels… command takes priority over the startup offer.
+    var containerLevelsOpenRequest: UUID?
     /// Why the last level-map save failed, shown in the sheet.
     @Published var containerLevelsError: String?
     /// Whether a level-map save is being written; the sheet's Save waits for it.
@@ -2385,6 +2387,7 @@ final class NavigationModel: ObservableObject {
             containerBuiltSignature = nil
             containerPrefilledDraft = nil
             containerLevelsDraft = nil     // a sheet for the old root must not save into this one
+            containerLevelsOpenRequest = nil
             containerLevelsError = nil
             containerEditError = nil       // the old root's refusal
             containerSetAsideOffer = nil   // and its offer

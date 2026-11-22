@@ -230,6 +230,7 @@ struct ContainerSelectionSection: View {
 /// Save; Not Now writes nothing.
 struct ContainerLevelsSheet: View {
     @State var draft: ContainerLevelsDraft
+    let mapDirectory: [String]
     let error: String?
     let saving: Bool
     let onSave: (ContainerLevelsDraft) -> Void
@@ -237,10 +238,12 @@ struct ContainerLevelsSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("What do this archive's folder levels name?").font(.headline)
-            Text("The Reader read these from the folder names. Check each level, then save: the Container column and "
-                 + "its filters show what the folders name. Saving writes one small file, "
-                 + "“.archivesuite/container-levels.json”, in the archive folder; no document is changed.")
+            Text("Container Levels").font(.headline)
+            Text(mapDirectory.isEmpty ? "Archive’s main folder" : mapDirectory.joined(separator: " / "))
+                .font(.callout.bold())
+                .accessibilityIdentifier("ar.containerLevels.location")
+            Text("Choose what each level of folders under this location represents. The Container column and filters "
+                 + "use these settings for documents governed by this folder.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
@@ -268,6 +271,7 @@ struct ContainerLevelsSheet: View {
                 Spacer()
                 Button("Not Now", action: onCancel)
                     .keyboardShortcut(.cancelAction)
+                    .disabled(saving)
                     .help("Close without saving. File ▸ Container Levels… opens this again.")
                     .accessibilityIdentifier("ar.containerLevels.cancel")
                 Button("Save Levels") { onSave(draft) }

@@ -52,7 +52,8 @@ struct AdvancedSearchSheet: View {
             }
             ScrollViewReader { proxy in
                 ScrollView {
-                    RuleListView(rules: $draft.search.rules, model: model, depth: 0, onAdded: { revealRule = $0 })
+                    RuleListView(rules: $draft.search.rules, model: model, combine: search.combine,
+                                 inheritedFacets: [], onAdded: { revealRule = $0 })
                         .padding(.vertical, 2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -160,13 +161,16 @@ enum SmartFolderReplace {
 private struct RuleListView: View {
     @Binding var rules: [SearchRule]
     @ObservedObject var model: NavigationModel
-    let depth: Int
+    let combine: RuleCombine
+    let inheritedFacets: Set<ContainerCatalog.FacetConstraint>
     let onAdded: (UUID) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach($rules) { $rule in
-                RuleRowView(rule: $rule, model: model, depth: depth,
+                let facets = inheritedFacets.union(
+                    SearchRule.requiredContainerFacets(in: rules, combine: combine, excluding: rule.id))
+                RuleRowView(rule: $rule, model: model, otherFacets: facets,
                             canRemove: rules.count > 1,
                             onAdd: { onAdded(rules.insertRule(after: rule.id, group: $0)) },
                             onRemove: { rules.removeAll { $0.id == rule.id } },
@@ -180,7 +184,7 @@ private struct RuleListView: View {
 private struct RuleRowView: View {
     @Binding var rule: SearchRule
     @ObservedObject var model: NavigationModel
-    let depth: Int
+    let otherFacets: Set<ContainerCatalog.FacetConstraint>
     let canRemove: Bool
     let onAdd: (_ group: Bool) -> Void
     let onRemove: () -> Void
@@ -200,7 +204,8 @@ private struct RuleRowView: View {
                     Spacer(minLength: 8)
                     rowButtons
                 }
-                RuleListView(rules: $rule.children, model: model, depth: depth + 1, onAdded: onAdded)
+                RuleListView(rules: $rule.children, model: model, combine: rule.combine,
+                             inheritedFacets: otherFacets, onAdded: onAdded)
                     .padding(.leading, 22)
             }
         } else {
@@ -215,7 +220,7 @@ private struct RuleRowView: View {
                 }
                 .labelsHidden().fixedSize()
                 .accessibilityIdentifier("ar.advanced.rule.op")
-                RuleValueView(rule: $rule, model: model)
+                RuleValueView(rule: $rule, model: model, otherFacets: otherFacets)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 rowButtons
             }
@@ -252,6 +257,8 @@ private struct RuleRowView: View {
 private struct RuleValueView: View {
     @Binding var rule: SearchRule
     @ObservedObject var model: NavigationModel
+    let otherFacets: Set<ContainerCatalog.FacetConstraint>
+    @State private var showingContainerValues = false
 
     var body: some View {
         switch rule.field {
@@ -330,16 +337,25 @@ private struct RuleValueView: View {
                     .frame(minWidth: 140, maxWidth: .infinity)
                     .help("Case, accents and punctuation are ignored: \u{201c}box 17\u{201d} matches \u{201c}Box 17.\u{201d}")
                     .accessibilityIdentifier("ar.advanced.rule.containerValue")
-                let values = model.containerCatalog.facetValues(rule.containerFacet)
-                Menu {
-                    ForEach(values.prefix(100), id: \.value) { v in
-                        Button("\(v.value) (\(v.count.formatted()))") { rule.text = v.value }
-                    }
-                } label: { Image(systemName: "chevron.down") }
-                .menuStyle(.borderlessButton).fixedSize()
-                .disabled(values.isEmpty)
-                .help("Choose one of the library's values")
+                Button { showingContainerValues.toggle() } label: {
+                    Image(systemName: "chevron.down")
+                }
+                .buttonStyle(.borderless)
+                .fixedSize()
+                .accessibilityLabel("Choose a container value")
+                .help("Search the library's values for this facet")
                 .accessibilityIdentifier("ar.advanced.rule.containerValues")
+                .popover(isPresented: $showingContainerValues) {
+                    ContainerFacetValuesView(scope: .init(facet: rule.containerFacet, constraints: otherFacets,
+                                                          revision: model.containerCatalogRevision),
+                                             catalog: model.containerCatalog,
+                                             selected: rule.text.isEmpty ? nil : rule.text) { value in
+                        rule.text = value
+                        showingContainerValues = false
+                    }
+                    .padding(12)
+                    .frame(width: 340)
+                }
             }
         case .needsAttention, .ambiguousDate, .flagged, .group:
             EmptyView()

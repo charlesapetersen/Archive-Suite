@@ -239,8 +239,8 @@ Writing (`ContainerFileStore.write`):
 ## The level map (Route B)
 
 `<root>/.archivesuite/container-levels.json`, in the folder a user chose as the root of a tree (a Reader archive
-root, the output folder of a Process Files run given a tree). It applies to the tree under that folder; the nearest map above a
-directory wins. Written only when the user confirms the pre-filled map, once per root; same writing rules as the
+root, the output folder of a Process Files run given a tree). It applies to the tree under that folder; the nearest map
+at or above a directory wins. The user confirms or edits the map explicitly, with the same writing rules as the
 container file. Reading is strict: a role this build does not know makes the map unreadable, so it is left alone.
 
 | key | meaning |
@@ -251,10 +251,11 @@ container file. Reading is strict: a role this build does not know makes the map
 | `updatedAt` | When the map was confirmed. |
 
 The Reader (`W47.ct-reader-view`) takes as the root of the tree the archive's main folder: the folder the user
-granted, or its "Archival Photos" folder when it holds one. It offers the pre-filled map once per root, after the
-root's scan has settled, and from File ▸ Container Levels…, and writes it only on Save, only into the tree the sheet
-was made for. The nearest map above a directory wins even when this build cannot read it: that subtree then has no
-path values, rather than an outer map's.
+granted, or its "Archival Photos" folder when it holds one. It offers the pre-filled map once per root after the
+root's scan has settled. File ▸ Container Levels… opens the nearest map governing the selected sidebar folder
+or, when there is no sidebar folder, the containing folder of one selected file. With no map for that branch, the
+sheet offers a pre-filled map for the main folder. Save writes only the settings file shown in the sheet. A nearer
+map this build cannot read still governs its branch. The branch gets no path values and the editor leaves the map alone.
 
 **Route B in Process Files** (`W47.ct-processor-intake`, `ContainerTree`). A folder given to Process Files (dropped
 or chosen) that holds accepted files in subfolders is read as a tree: its files depth-first, each folder's own files

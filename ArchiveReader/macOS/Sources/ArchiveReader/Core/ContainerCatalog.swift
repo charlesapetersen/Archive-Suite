@@ -206,6 +206,19 @@ struct ContainerCatalog: Sendable {
     struct FacetValue: Equatable, Sendable {
         let value: String
         let count: Int
+        let key: String
+    }
+
+    struct FacetConstraint: Hashable, Sendable {
+        let facet: ContainerFacet
+        let key: String
+        let isExcluded: Bool
+
+        init(_ facet: ContainerFacet, _ value: String, isExcluded: Bool = false) {
+            self.facet = facet
+            self.key = ContainerFacet.key(value)
+            self.isExcluded = isExcluded
+        }
     }
 
     static let empty = ContainerCatalog(rootPath: "", rows: [:], rootLevelMap: .missing, fileDirectories: [],
@@ -216,27 +229,50 @@ struct ContainerCatalog: Sendable {
     /// The shown values of `facet` across the listed files, with how many files carry each, most first.
     func facetValues(_ facet: ContainerFacet) -> [FacetValue] { facetLists[facet] ?? [] }
 
+    /// Count values among files matching all constraints on other facets. Include alternatives on this facet.
+    func facetValues(_ facet: ContainerFacet, narrowedBy chosen: Set<FacetConstraint>) -> [FacetValue] {
+        let others = chosen.filter { $0.facet != facet }
+        guard !others.isEmpty else { return facetValues(facet) }
+        let matching = rows.values.lazy.filter { row in
+            others.allSatisfy { (row.facetKeys[$0.facet] == $0.key) != $0.isExcluded }
+        }
+        return Self.values(of: facet, in: matching)
+    }
+
+    /// Match every search word using the same folding as the facet values.
+    static func filter(_ values: [FacetValue], matching query: String) -> [FacetValue] {
+        let words = ContainerFacet.key(query).split(separator: " ")
+        guard !words.isEmpty else { return values }
+        return values.filter { value in words.allSatisfy { value.key.contains($0) } }
+    }
+
     /// Values differing only in case or punctuation are one, shown in the spelling most files carry.
     static func facetLists(_ rows: [String: ContainerRow]) -> [ContainerFacet: [FacetValue]] {
         var lists: [ContainerFacet: [FacetValue]] = [:]
         for facet in ContainerFacet.allCases {
-            var spellings: [String: [String: Int]] = [:]
-            for row in rows.values {
-                guard let v = row.facets[facet] else { continue }
-                spellings[ContainerFacet.key(v), default: [:]][v, default: 0] += 1
-            }
-            let values = spellings.values.map { counts -> FacetValue in
-                let best = counts.max { $0.value != $1.value ? $0.value < $1.value : $0.key > $1.key }!
-                return FacetValue(value: best.key, count: counts.values.reduce(0, +))
-            }
-            if !values.isEmpty {
-                lists[facet] = values.sorted {
-                    $0.count != $1.count ? $0.count > $1.count
-                                         : $0.value.localizedStandardCompare($1.value) == .orderedAscending
-                }
-            }
+            let values = values(of: facet, in: rows.values)
+            if !values.isEmpty { lists[facet] = values }
         }
         return lists
+    }
+
+    /// `facet`'s values among `rows`, one per `ContainerFacet.key` in the spelling most rows carry, most first.
+    private static func values<S: Sequence>(of facet: ContainerFacet, in rows: S) -> [FacetValue]
+    where S.Element == ContainerRow {
+        var spellings: [String: [String: Int]] = [:]
+        for row in rows {
+            if Task.isCancelled { return [] }
+            guard let v = row.facets[facet], let key = row.facetKeys[facet] else { continue }
+            spellings[key, default: [:]][v, default: 0] += 1
+        }
+        return spellings.map { key, counts -> FacetValue in
+            let best = counts.max { $0.value != $1.value ? $0.value < $1.value : $0.key > $1.key }!
+            return FacetValue(value: best.key, count: counts.values.reduce(0, +), key: key)
+        }.sorted {
+            if $0.count != $1.count { return $0.count > $1.count }
+            let order = $0.value.localizedStandardCompare($1.value)
+            return order == .orderedSame ? $0.key < $1.key : order == .orderedAscending
+        }
     }
 
     /// The file's container in full, each value with its state (`FieldStatusPolicy.container`), and every
@@ -388,11 +424,15 @@ struct ContainerCatalog: Sendable {
     /// `path`'s directory below `rootPath` (top first) and its name; nil when it is not under the root. Byte-exact,
     /// as `ReaderArchiveLayout.isContained` compares.
     static func split(_ path: String, under rootPath: String) -> (directory: [String], name: String)? {
+        guard var parts = relativeComponents(path, under: rootPath), let name = parts.popLast() else { return nil }
+        return (parts, name)
+    }
+
+    /// A descendant path as components, keeping the last component for callers given a directory.
+    static func relativeComponents(_ path: String, under rootPath: String) -> [String]? {
         guard !rootPath.isEmpty, ReaderArchiveLayout.isContained(path: path, underRootPath: rootPath) else { return nil }
         let prefix = rootPath.hasSuffix("/") ? rootPath.utf8.count : rootPath.utf8.count + 1
         let relative = String(decoding: path.utf8.dropFirst(prefix), as: UTF8.self)
-        var parts = relative.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
-        guard let name = parts.popLast() else { return nil }
-        return (parts, name)
+        return relative.split(separator: "/").map(String.init)
     }
 }

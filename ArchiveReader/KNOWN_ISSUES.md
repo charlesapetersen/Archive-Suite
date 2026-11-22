@@ -101,11 +101,13 @@ What it does not do, deliberately or not yet:
 ## Containers in the list — the limits (W47.ct-reader-view, 2026-11-19)
 
 Shipped: a **Container** column (box, folder and folder title, else the collection; ⚠︎ where sources disagree;
-sortable; offered once a file has a value), a **Containers** menu in the filter bar (repository, collection,
-accession, series, container, each value with its file count; a chosen value is a chip), the Inspector's
+sortable; offered once a file has a value), a **Containers** list in the filter bar (repository, collection,
+accession, series and container, with type-to-filter and counts narrowed by the other selected facets), the Inspector's
 **Container** section (each value with its check state, every disagreement with its candidates), and the **folder
-levels** sheet, offered once per root after its scan settles and from File ▸ Container Levels…, which writes only
-`<main folder>/.archivesuite/container-levels.json` on Save. Contract: `SPEC/containers.md`.
+levels** sheet, offered once per root after its scan settles. File ▸ Container Levels… edits the map governing
+the selected folder. Save writes its `.archivesuite/container-levels.json`. Advanced Search offers the same
+searchable list, with counts scoped by the other container facets required by its rules (W49.reader-facet-list).
+Contract: `SPEC/containers.md`.
 What it does not do, deliberately or not yet:
 - **Editing is the section above** (W47.ct-reader-edit). The Reader works out no runs from marker photos itself:
   Route A needs label reads (`W47.ct-processor-capture`, `W47.ct-backfill`). It shows and edits the runs that
@@ -115,13 +117,9 @@ What it does not do, deliberately or not yet:
 - **A container rule is skipped until the catalog for the open root is built** (W47.ct-reader-facet-rules), like a
   text rule whose index answer has not come back: a smart folder with one lists and counts its other rules' files
   for that moment after launch or a root change. It compares the facet's shown value by `ContainerNames.key`, the
-  same value the Containers menu offers, so a collection matches by its title when it has one, else its number. (accepted: as a text rule waits for its index answer; the rule applies once the catalog is built).
-- **The facet menu lists each facet's 100 most common values**, counted over the whole library, not narrowed by the
-  other facets chosen. (queued: W49.reader-facet-list).
+  same value the Containers list offers, so a collection matches by its title when it has one, else its number. (accepted: as a text rule waits for its index answer; the rule applies once the catalog is built).
 - **The narrowest window scrolls sideways** once Container is shown, as with Capture marker: the default columns
   already take 656 of its 668 pt (`TableColumnFitter`). (accepted: the default columns already fill the narrowest window; a column can be hidden from the header menu).
-- **The sheet edits the tree root's map only**: a nested map (a level map in a subfolder) is read, not edited, and
-  one this build cannot read gives its subtree no folder levels rather than an outer map's. (queued: W49.reader-facet-list).
 - **The tree root is the archive's main folder**: the granted folder, or its "Archival Photos" folder when it holds
   one (`ReaderArchiveLayout`). Files outside it (the JPEG partner tree) have no container. (accepted: the main folder is the container tree by design, ReaderArchiveLayout; a JPEG original's partner PDF carries its container).
 

@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 import ArchiveCore
 @testable import ArchiveReader
 
@@ -82,6 +83,44 @@ final class ContainerViewTests: XCTestCase {
     }
 
     // MARK: The catalog
+
+    func testFacetListCountsAllValuesAndNarrowsByTheOtherFacets() throws {
+        try writeLevels([.collection, .box])
+        let paths = (1...110).map { "\(root.path)/Café papers/Box \($0)/page.pdf" }
+            + ["\(root.path)/Baker papers/Box 110/other.pdf", "\(root.path)/Baker papers/Box 212/other.pdf"]
+        let catalog = build([:], extra: paths)
+        let everyBox = catalog.facetValues(.container)
+        XCTAssertEqual(everyBox.count, 111)
+        XCTAssertEqual(ContainerCatalog.filter(everyBox, matching: "212 box").map(\.value), ["Box 212"])
+        XCTAssertEqual(ContainerCatalog.filter(everyBox, matching: "212—box").map(\.value), ["Box 212"])
+        let filtered = catalog.facetValues(.container, narrowedBy: [
+            .init(.collection, "cafe papers"), .init(.container, "Box 1"),
+        ])
+        XCTAssertEqual(filtered.count, 110, "the current box does not hide other boxes")
+        XCTAssertEqual(ContainerCatalog.filter(filtered, matching: "box 110").map(\.count), [1])
+        XCTAssertTrue(ContainerCatalog.filter(filtered, matching: "212").isEmpty)
+    }
+
+    func testAdvancedChoicesOnlyUseRequiredFacetsFromAllGroups() {
+        var collection = SearchRule(field: .container)
+        collection.containerFacet = .collection
+        collection.text = "Café papers"
+        var repository = SearchRule(field: .container, op: .isNot)
+        repository.containerFacet = .repository
+        repository.text = "Hoover"
+        let rules = [collection, .group(.all, [repository]), .group(.any, [collection, repository])]
+        XCTAssertEqual(SearchRule.requiredContainerFacets(in: rules, combine: .all, excluding: collection.id),
+                       [.init(.repository, "Hoover", isExcluded: true)])
+        XCTAssertEqual(SearchRule.requiredContainerFacets(in: rules, combine: .all),
+                       [.init(.collection, "Cafe papers"), .init(.repository, "Hoover", isExcluded: true)])
+        XCTAssertTrue(SearchRule.requiredContainerFacets(in: rules, combine: .any).isEmpty)
+        let singleActiveChild = SearchRule.group(.any, [collection, SearchRule(field: .container)])
+        XCTAssertEqual(SearchRule.requiredContainerFacets(in: [singleActiveChild], combine: .all),
+                       [.init(.collection, "Cafe papers")])
+        let commonFacet = SearchRule.group(.any, [collection, .group(.all, [collection, repository])])
+        XCTAssertEqual(SearchRule.requiredContainerFacets(in: [commonFacet], combine: .all),
+                       [.init(.collection, "Cafe papers")])
+    }
 
     func testTheCatalogResolvesFolderLevelsRunsAndFileNamesWithoutWriting() throws {
         let urls = try makeTree()
@@ -265,10 +304,105 @@ final class ContainerViewTests: XCTestCase {
         try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: other) }
         let draft = ContainerLevelsDraft.make(directories: [["A"]], tree: other, treePath: other.path)
-        model.saveContainerLevels(draft)
+        let edit = ReaderContainerLevelsEdit(archivePath: other.path, selectedDirectory: [],
+                                             mapDirectory: [], draft: draft)
+        model.containerLevelsDraft = edit
+        model.saveContainerLevels(edit, map: draft.map)
         XCTAssertEqual(model.containerLevelsError, "The archive folder changed since this sheet opened, so nothing was saved.")
         XCTAssertFalse(FileManager.default.fileExists(atPath: other.appendingPathComponent(ContainerFile.folderName).path))
         XCTAssertFalse(FileManager.default.fileExists(atPath: ContainerFileStore.levelMapURL(in: root).path))
+    }
+
+    func testNestedLevelsEditUsesTheNearestMapAndLeavesTheOuterMapAndPDFAlone() throws {
+        let urls = try makeTree()
+        try writeLevels([.repository, .collection, .box])
+        let inner = root.appendingPathComponent(repository).appendingPathComponent(collection)
+        try ContainerFileStore.writeLevelMap(ContainerLevelMap(levels: [.box]), root: inner, expecting: nil)
+        let pdf = try XCTUnwrap(urls["a"])
+        let outerBytes = try Data(contentsOf: ContainerFileStore.levelMapURL(in: root))
+        let pdfBytes = try Data(contentsOf: pdf)
+        let selected = [repository, collection, "Box 17"]
+        let deeper = [repository, collection, "Box 18"]
+        let deeperURL = inner.appendingPathComponent("Box 18")
+        try ContainerFileStore.writeLevelMap(ContainerLevelMap(levels: [.folder]), root: deeperURL, expecting: nil)
+        let edit = try XCTUnwrap(NavigationModel.prepareContainerLevels(
+            tree: root, treePath: root.path, selectedDirectory: selected, directories: [selected, deeper + ["Reports"]]))
+        XCTAssertEqual(edit.mapDirectory, [repository, collection])
+        XCTAssertEqual(edit.draft.examples, [["Box 17"]])
+        XCTAssertEqual(edit.draft.sampleDirectory, ["Box 17"])
+        try NavigationModel.writeContainerLevels(edit, map: ContainerLevelMap(levels: [.series]), archive: root)
+        XCTAssertEqual(ContainerFileStore.loadLevelMap(root: inner).document?.levels, [.series])
+        XCTAssertEqual(ContainerFileStore.loadLevelMap(root: deeperURL).document?.levels, [.folder])
+        XCTAssertEqual(try Data(contentsOf: ContainerFileStore.levelMapURL(in: root)), outerBytes)
+        XCTAssertEqual(try Data(contentsOf: pdf), pdfBytes)
+        XCTAssertThrowsError(try NavigationModel.writeContainerLevels(edit, map: edit.draft.map, archive: root),
+                             "a second save against the old stamp is refused")
+    }
+
+    func testLevelsEditRefusesAnUnreadableOrNewlyGoverningMap() throws {
+        try makeTree()
+        try writeLevels([.repository, .collection, .box])
+        let selected = [repository, collection, "Box 17"]
+        let edit = try XCTUnwrap(NavigationModel.prepareContainerLevels(
+            tree: root, treePath: root.path, selectedDirectory: selected, directories: [selected]))
+        XCTAssertTrue(edit.mapDirectory.isEmpty)
+        let outer = ContainerFileStore.levelMapURL(in: root)
+        let outerBytes = try Data(contentsOf: outer)
+        let inner = ContainerFileStore.levelMapURL(in: box17())
+        try FileManager.default.createDirectory(at: inner.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        let malformed = Data("not a level map".utf8)
+        try malformed.write(to: inner)
+        XCTAssertNil(NavigationModel.prepareContainerLevels(
+            tree: root, treePath: root.path, selectedDirectory: selected, directories: [selected]))
+        XCTAssertThrowsError(try NavigationModel.writeContainerLevels(edit, map: edit.draft.map, archive: root))
+        XCTAssertEqual(try Data(contentsOf: inner), malformed)
+        XCTAssertEqual(try Data(contentsOf: outer), outerBytes)
+    }
+
+    func testLevelsEditRefusesAnAncestorReplacedByALink() throws {
+        try makeTree()
+        let selected = [repository, collection, "Box 17"]
+        let inner = root.appendingPathComponent(repository).appendingPathComponent(collection)
+        try ContainerFileStore.writeLevelMap(ContainerLevelMap(levels: [.box]), root: inner, expecting: nil)
+        let edit = try XCTUnwrap(NavigationModel.prepareContainerLevels(
+            tree: root, treePath: root.path, selectedDirectory: selected, directories: [selected]))
+        let original = root.appendingPathComponent(repository)
+        let moved = root.appendingPathComponent("Moved")
+        try FileManager.default.moveItem(at: original, to: moved)
+        try FileManager.default.createSymbolicLink(at: original, withDestinationURL: moved)
+        XCTAssertThrowsError(try NavigationModel.writeContainerLevels(
+            edit, map: ContainerLevelMap(levels: [.series]), archive: root))
+        XCTAssertEqual(ContainerFileStore.loadLevelMap(root: moved.appendingPathComponent(collection)).document?.levels,
+                       [.box])
+    }
+
+    func testNestedLevelsSheetRendersAtItsWindowWidth() throws {
+        let folder = root.appendingPathComponent("Hoover Institution Archives")
+        let draft = ContainerLevelsDraft.make(directories: [["Glotzer papers", "Box 17"]],
+                                               existing: ContainerLevelMap(levels: [.collection, .box]),
+                                               tree: folder, treePath: folder.path)
+        for scheme in [ColorScheme.light, .dark] {
+            let sheet = ContainerLevelsSheet(draft: draft, mapDirectory: ["Hoover Institution Archives"],
+                                             error: nil, saving: false, onSave: { _ in }, onCancel: {})
+            let view = NSHostingView(rootView: sheet.background(.background).environment(\.colorScheme, scheme))
+            let png = try XCTUnwrap(RenderProbe.pngData(fromAppKitView: view, size: CGSize(width: 560, height: 440)))
+            writeRenderArtifact(png, named: "container-levels-nested-\(scheme).png")
+            assertRendersNonBlank(RenderProbe.cgImage(fromPNG: png), "nested container levels \(scheme)")
+        }
+    }
+
+    func testFacetValueListRendersAtItsPopoverWidth() throws {
+        let urls = try makeTree()
+        try writeLevels([.repository, .collection, .box])
+        let catalog = build(urls)
+        XCTAssertFalse(catalog.facetValues(.container).isEmpty)
+        let list = ContainerFacetValuesView(scope: .init(facet: .container, constraints: [], revision: 0),
+                                            catalog: catalog, selected: "Box 18", clear: {}, choose: { _ in })
+        let view = NSHostingView(rootView: list.padding(12).background(.background))
+        let png = try XCTUnwrap(RenderProbe.pngData(fromAppKitView: view, size: CGSize(width: 340, height: 330)))
+        writeRenderArtifact(png, named: "container-facet-value-list.png")
+        assertRendersNonBlank(RenderProbe.cgImage(fromPNG: png), "container facet values")
     }
 
     func testSplitIsByteExactUnderTheRoot() {

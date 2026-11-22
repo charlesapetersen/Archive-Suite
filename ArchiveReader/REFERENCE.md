@@ -568,8 +568,11 @@ Search/                       Discovery + disposable caches (never the corpus):
   SavedSearch.swift           Named filter+FTS query (smart folders), UserDefaults-persisted.
 Views/
   NavigationModel+Containers.swift  W47.ct-reader-view: one catalog build at a time off main, the level map offered
-                              once per root after the settled build, File ▸ Container Levels…, Save writing only
-                              `.archivesuite/container-levels.json` (ContainerFileStore.writeLevelMap) into its tree.
+                              once per root after the settled build. File ▸ Container Levels… edits the selected
+                              folder's governing map. Save rechecks the scope and writes the stamped map file
+                              (`ContainerFileStore.writeLevelMap`).
+  ContainerFacetValuesView.swift  W49.reader-facet-list: the searchable, counted values in the Containers popover
+                              and in Advanced Search, narrowed by the other facets.
   NavigationModel+Zotero.swift  W47.ct-zotero: Selection ▸ Export to Zotero… — one CSL-JSON file (ArchiveCore
                               ZoteroExport) from the Container column's values, the tags, the page-2 header and the
                               sidecar, read off main; saved where the user picks, never inside the archive folder.

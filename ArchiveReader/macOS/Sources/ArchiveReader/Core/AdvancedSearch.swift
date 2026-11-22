@@ -126,6 +126,30 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
         return r
     }
 
+    /// Facets that every match of this conjunction must satisfy. An Any group's alternatives do not constrain
+    /// each other, but an All group inside it can still constrain the choices within that branch.
+    static func requiredContainerFacets(in rules: [SearchRule], combine: RuleCombine, excluding id: UUID? = nil)
+        -> Set<ContainerCatalog.FacetConstraint> {
+        guard combine == .all else { return [] }
+        return rules.reduce(into: []) { constraints, rule in
+            if rule.id != id { constraints.formUnion(rule.requiredContainerFacets) }
+        }
+    }
+
+    private var requiredContainerFacets: Set<ContainerCatalog.FacetConstraint> {
+        if field == .container, isActive {
+            return [.init(containerFacet, text, isExcluded: op == .isNot)]
+        }
+        guard field == .group else { return [] }
+        if combine == .all { return Self.requiredContainerFacets(in: children, combine: .all) }
+        // When an Any group is itself required, only facets shared by every active branch are required.
+        let active = children.filter(\.isActive)
+        guard let first = active.first else { return [] }
+        return active.dropFirst().reduce(first.requiredContainerFacets) {
+            $0.intersection($1.requiredContainerFacets)
+        }
+    }
+
     /// Whether the row has a value to test. An inactive row is skipped (it neither passes nor fails).
     var isActive: Bool {
         switch field {

@@ -13,6 +13,7 @@ struct NavigationWindowView: View {
     @Environment(\.undoManager) private var undoManager
     @State private var showingHealth = false
     @State private var showingDateFilter = false      // W37: the year-range popover
+    @State private var showingContainerFacets = false
     @AppStorage("ar.showTagCloud") private var showingTagCloud = false
     @AppStorage("ar.showSidebar") private var showingSidebar = true
     @AppStorage("ar.sidebarWidth") private var sidebarWidth = 210.0
@@ -106,12 +107,12 @@ struct NavigationWindowView: View {
         .sheet(isPresented: $model.showingSaveDialog) { SaveSearchSheet(model: model) }
         .sheet(isPresented: Binding(get: { model.containerLevelsDraft != nil },
                                     set: { if !$0, model.containerLevelsDraft != nil { model.dismissContainerLevels() } })) {
-            if let draft = model.containerLevelsDraft {
-                ContainerLevelsSheet(draft: draft, error: model.containerLevelsError,
+            if let edit = model.containerLevelsDraft {
+                ContainerLevelsSheet(draft: edit.draft, mapDirectory: edit.mapDirectory, error: model.containerLevelsError,
                                      saving: model.containerLevelsSaving,
-                                     onSave: { model.saveContainerLevels($0) },
+                                     onSave: { model.saveContainerLevels(edit, map: $0.map) },
                                      onCancel: { model.dismissContainerLevels() })
-                    .id(draft.id)
+                    .id(edit.id)
             }
         }
         .sheet(item: $model.advancedSearchRequest) { request in AdvancedSearchSheet(model: model, request: request) }
@@ -604,38 +605,12 @@ struct NavigationWindowView: View {
         .accessibilityIdentifier("ar.filter.dates")
         .popover(isPresented: $showingDateFilter) { dateFilterPopover }
 
-        if !model.containerCatalog.isEmpty { containerFacetMenu }
+        if !model.containerCatalog.isEmpty || !model.filter.activeContainerFacets.isEmpty { containerFacetButton }
     }
 
-    /// The most values a container facet's menu lists; the rest are reached by narrowing with another facet first.
-    static let containerFacetMenuLimit = 100
-
-    /// W47.ct-reader-view: the container facets, one submenu each, every value with how many files carry it. A
-    /// chosen value shows as a chip under the bar.
-    private var containerFacetMenu: some View {
+    private var containerFacetButton: some View {
         let active = model.filter.activeContainerFacets
-        return Menu {
-            ForEach(ContainerFacet.allCases, id: \.self) { facet in
-                let values = model.containerCatalog.facetValues(facet)
-                if !values.isEmpty {
-                    let chosen = model.filter.containerFacet(facet).map(ContainerFacet.key)
-                    Menu(facet.label) {
-                        Button("Any \(facet.label.lowercased())") { model.filter.setContainerFacet(facet, nil) }
-                            .disabled(chosen == nil)
-                        Divider()
-                        ForEach(values.prefix(Self.containerFacetMenuLimit), id: \.value) { v in
-                            Toggle("\(v.value) (\(v.count))", isOn: Binding(
-                                get: { chosen == ContainerFacet.key(v.value) },
-                                set: { model.filter.setContainerFacet(facet, $0 ? v.value : nil) }))
-                        }
-                        if values.count > Self.containerFacetMenuLimit {
-                            Text("\(values.count - Self.containerFacetMenuLimit) more, the least common").disabled(true)
-                        }
-                    }
-                    .accessibilityIdentifier("ar.filter.containers.\(facet.rawValue)")
-                }
-            }
-        } label: {
+        return Button { showingContainerFacets.toggle() } label: {
             Label(active.isEmpty ? "Containers" : "Containers (\(active.count))", systemImage: "archivebox")
         }
         .controlSize(.small)
@@ -643,6 +618,9 @@ struct NavigationWindowView: View {
         .help("Filter by repository, collection, accession, series or container: from the folder levels "
               + "(File ▸ Container Levels…) and the container records the apps keep beside the files")
         .accessibilityIdentifier("ar.filter.containers")
+        .popover(isPresented: $showingContainerFacets) {
+            ContainerFacetFilterPopover(model: model)
+        }
     }
 
     /// File name and OCR text: finding documents by what they contain, on their own row (W40.fix-reader-filter-bar).

@@ -5,14 +5,37 @@ import ArchiveCore
 //
 // The Container column, its facets and the Inspector's Container section read `containerCatalog`. The level map
 // (Route B) is offered once per root, when its scan has settled, the catalog is built from the settled paths, and the
-// tree has folders but no map; it is written only when the user saves it, to
-// `<main folder>/.archivesuite/container-levels.json`, and only into the tree the sheet was made for.
+// tree has folders but no map. File ▸ Container Levels… edits the map governing the selected folder.
+// Only Save writes, into the sheet's original map folder through ContainerFileStore.
 
 /// The listed paths a catalog is built from: the tree, the count and an order-free hash of the paths.
 struct ContainerPathSignature: Equatable, Sendable {
     let root: String
     let count: Int
     let hash: Int
+}
+
+/// The archive and folder selected when this sheet opened, and the map that governed them at that point.
+struct ReaderContainerLevelsEdit: Identifiable, Sendable {
+    let archivePath: String
+    let selectedDirectory: [String]
+    let mapDirectory: [String]
+    let draft: ContainerLevelsDraft
+
+    var id: UUID { draft.id }
+
+    /// Match ContainerLookup.context: even an unreadable nearest map governs. A wholly unmapped branch uses
+    /// the archive root, where the Reader offers to create a map.
+    static func governingMap(in lookup: ContainerLookup, directory: [String])
+        -> (directory: [String], load: ContainerLoad<ContainerLevelMap>) {
+        for depth in (0...directory.count).reversed() {
+            let prefix = Array(directory.prefix(depth))
+            let load = lookup.levelMap(prefix)
+            if case .missing = load { continue }
+            return (prefix, load)
+        }
+        return ([], .missing)
+    }
 }
 
 extension NavigationModel {
@@ -65,7 +88,8 @@ extension NavigationModel {
                 let catalog = ContainerCatalog.build(treeRoot: tree.url, rootPath: tree.path, filePaths: paths)
                 // The pre-filled map weighs every file's folder, so it is made here and not on the main thread.
                 let draft = Self.shouldOfferContainerLevels(catalog: catalog, settled: true, asked: false)
-                    ? ContainerLevelsDraft.make(directories: catalog.fileDirectories, tree: tree.url, treePath: tree.path)
+                    ? Self.prepareContainerLevels(tree: tree.url, treePath: tree.path, selectedDirectory: [],
+                                                  directories: catalog.fileDirectories)?.draft
                     : nil
                 return (catalog, draft, LibraryChangeSignature.containers(catalog.rows))
             }.value
@@ -105,7 +129,9 @@ extension NavigationModel {
 
     /// Offers the pre-filled map once the published catalog was built from the settled library's current paths.
     func offerContainerLevelsIfNeeded() {
-        guard containerLevelsDraft == nil, let key = containerLevelsRootKey, let draft = containerPrefilledDraft,
+        guard containerLevelsDraft == nil, containerLevelsOpenRequest == nil,
+              let key = containerLevelsRootKey, let draft = containerPrefilledDraft,
+              draft.expecting == nil, draft.sampleDirectory != nil,
               draft.treePath == containerTree?.path, containerBuiltSignature != nil,
               containerBuiltSignature == containerSignature, !containerBuildInFlight else { return }
         // Nobody is there to answer under a test host or a fixture root, unless a UI test asks for the sheet.
@@ -117,7 +143,8 @@ extension NavigationModel {
                                               asked: asked) else { return }
         markContainerLevelsAsked()
         containerLevelsError = nil
-        containerLevelsDraft = draft
+        containerLevelsDraft = ReaderContainerLevelsEdit(archivePath: draft.treePath, selectedDirectory: [],
+                                                         mapDirectory: [], draft: draft)
     }
 
     private func markContainerLevelsAsked() {
@@ -127,52 +154,94 @@ extension NavigationModel {
         defaults.set(asked, forKey: Self.containerLevelsAskedKey)
     }
 
-    /// File ▸ Container Levels…: the stored map to edit, or a pre-filled one, made off the main thread. A map this
-    /// build cannot read, or one holding values it would drop, is left alone and the status line says so.
+    /// File ▸ Container Levels…: an explicit sidebar folder, else the containing folder of a single selected file,
+    /// else the archive root. Selection is captured before reading the map.
     func openContainerLevels() {
-        guard let tree = containerTree else { return }
+        guard containerLevelsDraft == nil, containerLevelsOpenRequest == nil,
+              !containerLevelsSaving, let tree = containerTree else { return }
+        let directory: [String]?
+        if case let .folder(path?) = currentPlace {
+            directory = path.utf8.elementsEqual(tree.path.utf8) ? []
+                : ContainerCatalog.relativeComponents(path, under: tree.path)
+        } else if selectedFiles.count == 1, let file = selectedFiles.first {
+            directory = ContainerCatalog.split(file.path, under: tree.path)?.directory
+        } else {
+            directory = []
+        }
+        guard let selectedDirectory = directory else {
+            statusMessage = "The selected folder is outside the archive’s main folder and has no container levels."
+            announce(statusMessage)
+            return
+        }
+        let request = UUID()
+        containerLevelsOpenRequest = request
         let directories = containerCatalog.rootPath == tree.path ? containerCatalog.fileDirectories : []
         Task { [weak self] in
-            let draft: ContainerLevelsDraft? = await Task.detached(priority: .userInitiated) {
-                switch ContainerFileStore.loadLevelMap(root: tree.url) {
-                case .missing:
-                    return ContainerLevelsDraft.make(directories: directories, tree: tree.url, treePath: tree.path)
-                case let .loaded(map, stamp) where !stamp.droppedOnReading:
-                    return ContainerLevelsDraft.make(directories: directories, existing: map, expecting: stamp,
-                                                     tree: tree.url, treePath: tree.path)
-                default:
-                    return nil
-                }
+            let edit = await Task.detached(priority: .userInitiated) {
+                Self.prepareContainerLevels(tree: tree.url, treePath: tree.path,
+                                            selectedDirectory: selectedDirectory, directories: directories)
             }.value
-            guard let self, tree.path == self.containerTree?.path else { return }
-            guard let draft else {
-                self.statusMessage = "The folder levels file in this archive could not be read by this version, "
-                    + "so it is left as it is."
+            guard let self, self.containerLevelsOpenRequest == request else { return }
+            self.containerLevelsOpenRequest = nil
+            guard tree.path == self.containerTree?.path, tree.url == self.containerTree?.url else { return }
+            guard let edit else {
+                self.statusMessage = "The folder levels for the selection couldn’t be opened. "
+                    + "The folder may be unavailable or this version may be unable to read its settings file."
                 self.announce(self.statusMessage)
                 return
             }
             self.containerLevelsError = nil
-            self.containerLevelsDraft = draft
+            self.containerLevelsDraft = edit
         }
     }
 
-    /// The user's Save: writes the map into the tree the sheet was made for, then rebuilds the catalog with it. Off
-    /// the main thread; the sheet stays open with the reason if the write is refused.
-    func saveContainerLevels(_ draft: ContainerLevelsDraft) {
+    nonisolated static func prepareContainerLevels(tree: URL, treePath: String, selectedDirectory: [String],
+                                                  directories: [[String]]) -> ReaderContainerLevelsEdit? {
+        guard (try? containerDirectoryURL(tree, selectedDirectory)) != nil else { return nil }
+        let lookup = ContainerLookup(treeRoot: tree.resolvingSymlinksInPath())
+        let target = ReaderContainerLevelsEdit.governingMap(in: lookup, directory: selectedDirectory)
+        let map: ContainerLevelMap?
+        let stamp: ContainerFileStamp?
+        switch target.load {
+        case .missing: (map, stamp) = (nil, nil)
+        case let .loaded(value, readStamp) where !readStamp.droppedOnReading: (map, stamp) = (value, readStamp)
+        default: return nil
+        }
+        // Examples and inferred depths come from folders that actually use this map.
+        var governed: [[String]: Bool] = [:]
+        let relative = directories.compactMap { directory -> [String]? in
+            guard directory.starts(with: target.directory, by: { $0.utf8.elementsEqual($1.utf8) }) else { return nil }
+            let usesMap = governed[directory] ?? {
+                let result = ReaderContainerLevelsEdit.governingMap(in: lookup, directory: directory)
+                    .directory.count == target.directory.count
+                governed[directory] = result
+                return result
+            }()
+            return usesMap ? Array(directory.dropFirst(target.directory.count)) : nil
+        }
+        let draft = ContainerLevelsDraft.make(directories: relative, existing: map, expecting: stamp,
+                                             tree: lookup.url(target.directory),
+                                             treePath: ContainerCatalog.directoryPath(target.directory, under: treePath))
+        return ReaderContainerLevelsEdit(archivePath: treePath, selectedDirectory: selectedDirectory,
+                                         mapDirectory: target.directory, draft: draft)
+    }
+
+    /// The user's Save rechecks the governing folder and writes against the stamp captured by the sheet.
+    func saveContainerLevels(_ edit: ReaderContainerLevelsEdit, map edited: ContainerLevelMap) {
         guard !containerLevelsSaving else { return }
-        guard draft.treePath == containerTree?.path else {
+        guard let tree = containerTree, edit.archivePath.utf8.elementsEqual(tree.path.utf8),
+              edit.id == containerLevelsDraft?.id else {
             containerLevelsError = "The archive folder changed since this sheet opened, so nothing was saved."
             return
         }
-        var edited = draft.map
-        edited.updatedAt = Date()
-        let map = edited, expecting = draft.expecting
-        let root = draft.tree.resolvingSymlinksInPath()
+        var dated = edited
+        dated.updatedAt = Date()
+        let map = dated
         containerLevelsSaving = true
         Task { [weak self] in
             let failure: String? = await Task.detached(priority: .userInitiated) {
                 do {
-                    try ContainerFileStore.writeLevelMap(map, root: root, expecting: expecting)
+                    try Self.writeContainerLevels(edit, map: map, archive: tree.url)
                     return nil
                 } catch {
                     return containerLevelsWriteMessage(error)
@@ -180,6 +249,7 @@ extension NavigationModel {
             }.value
             guard let self else { return }
             self.containerLevelsSaving = false
+            guard self.containerLevelsDraft?.id == edit.id else { return }
             if let failure {
                 self.containerLevelsError = failure
                 return
@@ -190,6 +260,22 @@ extension NavigationModel {
             self.announce(self.statusMessage)
             self.refreshContainers(force: true)
         }
+    }
+
+    nonisolated static func writeContainerLevels(_ edit: ReaderContainerLevelsEdit, map: ContainerLevelMap,
+                                                 archive: URL) throws {
+        let selected = try containerDirectoryURL(archive, edit.selectedDirectory)
+        let attributes = try FileManager.default.attributesOfItem(atPath: selected.path)
+        guard (attributes[.type] as? FileAttributeType) == .typeDirectory else {
+            throw ContainerWriteError.changedSinceRead
+        }
+        let lookup = ContainerLookup(treeRoot: archive.resolvingSymlinksInPath())
+        let target = ReaderContainerLevelsEdit.governingMap(in: lookup, directory: edit.selectedDirectory)
+        let folder = try containerDirectoryURL(archive, target.directory)
+        guard folder.path.utf8.elementsEqual(edit.draft.tree.path.utf8) else {
+            throw ContainerWriteError.changedSinceRead
+        }
+        try ContainerFileStore.writeLevelMap(map, root: folder, expecting: edit.draft.expecting)
     }
 
     /// Not Now: nothing is written, and the sheet is not offered again for this root (File ▸ Container Levels…
@@ -204,7 +290,7 @@ extension NavigationModel {
 /// Why a level-map save was refused, for the sheet.
 func containerLevelsWriteMessage(_ error: Error) -> String {
     switch error as? ContainerWriteError {
-    case .changedSinceRead?: return "The folder levels changed in another app since this sheet opened. Close it and open it again."
+    case .changedSinceRead?: return "The folder or its levels changed since this sheet opened. Close it and open it again."
     case .busy?: return "Another app is writing the folder levels. Try again in a moment."
     case .refusedExisting?: return "The folder levels file in this archive was written by a newer version, so it is left as it is."
     default: return "The folder levels could not be saved: \(error.localizedDescription)"

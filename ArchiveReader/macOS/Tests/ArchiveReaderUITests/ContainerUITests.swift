@@ -1,7 +1,7 @@
 import XCTest
 
 /// W47.ct-reader-view: the folder levels offered when a root is first added, the Container column, the Containers
-/// facet menu and the Inspector's Container section, on a scratch corpus built here. The only file the app writes is
+/// facet list and the Inspector's Container section, on a scratch corpus built here. The only level file the app writes is
 /// the level map, in the scratch corpus's `.archivesuite` folder, when the test presses Save, and (W47.ct-reader-edit)
 /// the box folders' container files, when the test edits a container, and (W40.reader-item-field-edit) a box folder's
 /// `.archivesuite/item-fields.json`, when the test corrects an item field.
@@ -53,6 +53,34 @@ final class ContainerUITests: XCTestCase {
         XCTAssertEqual(table.tableRows.count, count, "expected \(count) rows within \(timeout)s")
     }
 
+    private func chooseFacet(_ name: String, in app: XCUIApplication) {
+        let control = app.radioButtons[name].firstMatch
+        XCTAssertTrue(control.waitForExistence(timeout: 5))
+        control.click()
+    }
+
+    private func findValue(_ query: String, in app: XCUIApplication) {
+        let field = app.textFields["ar.containerFacet.search"].firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5))
+        field.click()
+        field.typeKey("a", modifierFlags: .command)
+        field.typeText(query)
+    }
+
+    private func writeLevels(_ json: String, in folder: URL) throws -> URL {
+        let suite = folder.appendingPathComponent(".archivesuite", isDirectory: true)
+        try FileManager.default.createDirectory(at: suite, withIntermediateDirectories: true)
+        let url = suite.appendingPathComponent("container-levels.json")
+        try Data(json.utf8).write(to: url)
+        return url
+    }
+
+    private func chooseValue(_ label: String, in app: XCUIApplication) {
+        let button = app.buttons[label].firstMatch
+        XCTAssertTrue(button.waitForExistence(timeout: 10), label)
+        button.click()
+    }
+
     func testTheFolderLevelsAreOfferedThenTheColumnFacetsAndInspectorShowTheContainer() throws {
         let app = launch(["-ARUITestOfferContainerLevels"])
         waitForRows(app, 5)
@@ -77,15 +105,13 @@ final class ContainerUITests: XCTestCase {
         _ = captureScreenshot("containers-column")
 
         // A facet narrows the list and shows as a chip.
-        let menu = app.descendants(matching: .any)["ar.filter.containers"].firstMatch
-        XCTAssertTrue(menu.waitForExistence(timeout: 10))
-        menu.click()
-        let containerItem = app.menuItems["Container"].firstMatch
-        XCTAssertTrue(containerItem.waitForExistence(timeout: 5))
-        containerItem.hover()
-        let box18 = app.menuItems["Box 18 (2)"].firstMatch
-        XCTAssertTrue(box18.waitForExistence(timeout: 5))
-        box18.click()
+        let containers = app.buttons["ar.filter.containers"]
+        XCTAssertTrue(containers.waitForExistence(timeout: 10))
+        containers.click()
+        chooseFacet("Container", in: app)
+        findValue("18", in: app)
+        chooseValue("Box 18 (2)", in: app)
+        app.buttons["ar.containerFacet.done"].click()
         waitForRows(app, 2)
         let chip = app.descendants(matching: .any)["ar.filter.chip.container.container"].firstMatch
         XCTAssertTrue(chip.waitForExistence(timeout: 5), "the facet is a removable chip")
@@ -108,6 +134,111 @@ final class ContainerUITests: XCTestCase {
         waitForRows(again, 5)
         RunLoop.current.run(until: Date().addingTimeInterval(3))
         XCTAssertFalse(again.buttons["ar.containerLevels.save"].exists, "a root with a map is not asked")
+    }
+
+    func testBothSearchesFindBoxesBeyond100AndCountThemWithinChosenFacets() throws {
+        _ = try writeLevels(#"{"levels":["repository","collection","box"],"overrides":{},"schemaVersion":1}"#, in: corpus)
+        let repository = corpus.appendingPathComponent("Hoover Institution Archives")
+        for i in Array(100...204) + [212] {
+            let collection = i == 212 ? "Baker papers" : "Glotzer papers, Mss 1036"
+            let folder = repository.appendingPathComponent(collection).appendingPathComponent("Box \(i)")
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let file = folder.appendingPathComponent("extra-\(i).pdf")
+            try Data("scratch fixture".utf8).write(to: file)
+            try (file as NSURL).setResourceValue(["Unread"], forKey: .tagNamesKey)
+        }
+        let additional = repository.appendingPathComponent("Baker papers/Box 18")
+        try FileManager.default.createDirectory(at: additional, withIntermediateDirectories: true)
+        let extra = additional.appendingPathComponent("same-box.pdf")
+        try Data("scratch fixture".utf8).write(to: extra)
+        try (extra as NSURL).setResourceValue(["Unread"], forKey: .tagNamesKey)
+
+        let app = launch()
+        let containers = app.buttons["ar.filter.containers"]
+        XCTAssertTrue(containers.waitForExistence(timeout: 40))
+        containers.click()
+        chooseFacet("Container", in: app)
+        findValue("212", in: app)
+        XCTAssertTrue(app.buttons["Box 212 (1)"].waitForExistence(timeout: 10))
+        _ = captureScreenshot("containers-search-beyond-100")
+        findValue("18", in: app)
+        XCTAssertTrue(app.buttons["Box 18 (3)"].waitForExistence(timeout: 10))
+        chooseFacet("Collection", in: app)
+        findValue("Glotzer", in: app)
+        chooseValue("Glotzer papers (110)", in: app)
+        chooseFacet("Container", in: app)
+        findValue("18", in: app)
+        XCTAssertTrue(app.buttons["Box 18 (2)"].waitForExistence(timeout: 10))
+        findValue("212", in: app)
+        XCTAssertTrue(app.staticTexts["No matching values"].waitForExistence(timeout: 10))
+        chooseFacet("Collection", in: app)
+        app.buttons["Any collection"].click()
+        app.buttons["ar.containerFacet.done"].click()
+
+        app.buttons["ar.filter.advanced"].click()
+        let fields = app.popUpButtons.matching(identifier: "ar.advanced.rule.field")
+        XCTAssertTrue(fields.firstMatch.waitForExistence(timeout: 10))
+        for row in 0...1 {
+            fields.element(boundBy: row).click()
+            app.menuItems["Container"].click()
+        }
+        let facets = app.popUpButtons.matching(identifier: "ar.advanced.rule.containerFacet")
+        facets.element(boundBy: 0).click()
+        app.menuItems["collection"].click()
+        let values = app.buttons.matching(identifier: "ar.advanced.rule.containerValues")
+        values.element(boundBy: 1).click()
+        findValue("212", in: app)
+        XCTAssertTrue(app.buttons["Box 212 (1)"].waitForExistence(timeout: 10))
+        app.typeKey(.escape, modifierFlags: [])
+        let collection = app.textFields.matching(identifier: "ar.advanced.rule.containerValue").element(boundBy: 0)
+        collection.click()
+        collection.typeText("Glotzer papers")
+        values.element(boundBy: 1).click()
+        findValue("212", in: app)
+        XCTAssertTrue(app.staticTexts["No matching values"].waitForExistence(timeout: 10))
+        findValue("18", in: app)
+        _ = captureScreenshot("advanced-search-narrowed-containers")
+        chooseValue("Box 18 (2)", in: app)
+        app.buttons["ar.advanced.search"].click()
+        waitForRows(app, 2)
+    }
+
+    func testContainerLevelsEditsTheMapGoverningTheSidebarFolder() throws {
+        let repository = corpus.appendingPathComponent("Hoover Institution Archives")
+        let outer = try writeLevels(#"{"levels":["repository","collection","box"],"overrides":{},"schemaVersion":1}"#,
+                                    in: corpus)
+        let inner = try writeLevels(#"{"levels":["collection","box"],"overrides":{},"schemaVersion":1}"#, in: repository)
+        let beforeOuter = try Data(contentsOf: outer)
+        let beforeInner = try Data(contentsOf: inner)
+        let outsideSelection = corpus.appendingPathComponent("outside-selection.pdf")
+        try Data("scratch fixture".utf8).write(to: outsideSelection)
+        try (outsideSelection as NSURL).setResourceValue(["Unread"], forKey: .tagNamesKey)
+        let app = launch()
+        waitForRows(app, 6)
+        let allFiles = app.staticTexts["ar.sidebar.allFiles"].firstMatch
+        if !allFiles.exists { app.buttons["ar.toolbar.sidebar"].firstMatch.click() }
+        let folder = app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@",
+                                                            "ar.sidebar.folder", "Hoover Institution Archives")).firstMatch
+        XCTAssertTrue(folder.waitForExistence(timeout: 20))
+        folder.click()
+        waitForRows(app, 5)
+        app.menuBars.menuBarItems["File"].click()
+        app.menuItems["Container Levels…"].firstMatch.click()
+        let location = app.staticTexts["ar.containerLevels.location"]
+        XCTAssertTrue(location.waitForExistence(timeout: 10))
+        XCTAssertEqual(location.accessibilityText, "Hoover Institution Archives")
+        let firstLevel = app.popUpButtons["ar.containerLevels.level1"]
+        XCTAssertTrue(firstLevel.waitForExistence(timeout: 10))
+        firstLevel.click()
+        app.menuItems["Series"].firstMatch.click()
+        _ = captureScreenshot("containers-nested-levels")
+        let save = app.buttons["ar.containerLevels.save"]
+        save.click()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 15))
+        let updated = try Data(contentsOf: inner)
+        XCTAssertNotEqual(updated, beforeInner)
+        XCTAssertTrue(String(decoding: updated, as: UTF8.self).contains("\"series\""))
+        XCTAssertEqual(try Data(contentsOf: outer), beforeOuter)
     }
 
     /// W47.ct-reader-edit: a value changed in the Inspector reaches every file of its run, and "set for selection"
