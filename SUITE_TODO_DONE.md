@@ -17755,3 +17755,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 - [x] **W49.proc-plan-read-meter — the Claude-plan page reader pauses before the five-hour window runs out [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit).
   Page reading uses the CLI's streamed meter and the segmentation gate's 90% threshold. The page that reports the threshold keeps its transcription. New pages wait for the reset and resume on the plan. The pause caption shows the reported percentage and resume time. The key-free Local Agent smoke test covers 89%, 90%, Stop and resume.
   <!-- /W49.proc-plan-read-meter -->
+
+- [x] **W49.proc-openrouter-gone-warn — warn when a picked OpenRouter model has left the listing [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit).
+  A listed model that leaves OpenRouter's listing silently falls back to the provider's first model, and a run already going has no client, so its pages fail one by one. Warn in the picker and estimate when the selection no longer resolves, and stop a running batch with one clear message. Covers §W41.app-openrouter-unmeasured "A listed model that leaves the listing leaves the picker". Filed by W49.ki-audit-processor.
+  Settings and Process Files name the unavailable model, hide replacement estimates and require a new
+  selection for Start. If a refresh removes the active model, Process Files saves readings already in
+  flight, stops scheduling pages and keeps the original model in any recovery record.
+  <!-- /W49.proc-openrouter-gone-warn -->

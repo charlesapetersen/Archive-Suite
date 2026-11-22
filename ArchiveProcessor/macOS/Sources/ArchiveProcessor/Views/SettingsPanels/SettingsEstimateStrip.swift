@@ -31,6 +31,7 @@ struct SettingsEstimateStrip: View {
     @ObservedObject private var modelStore = ModelSelectionStore.shared
     @ObservedObject private var settingsStore = SettingsLayerStore.shared
     @State private var openRouterPricesRead = 0
+    @AppStorage(OpenRouterListing.defaultsKey) private var openRouterListingData: Data?
 
     private var models: [LLMModel] {
         selectedProvider.models   // already includes this provider's custom models — don't concat (dupes)
@@ -44,6 +45,12 @@ struct SettingsEstimateStrip: View {
     private var selectedModel: LLMModel {
         get { modelStore.model(for: selectedProvider) }
         nonmutating set { modelStore.setModel(newValue, for: selectedProvider) }
+    }
+
+    private var unavailableOpenRouterSelection: String? {
+        _ = openRouterListingData
+        guard useAppleVision ? visionUseLLMJudgment : !useGateway && !useLocalAgent else { return nil }
+        return modelStore.unavailableOpenRouterSelection(for: selectedProvider)
     }
 
     private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
@@ -117,7 +124,10 @@ struct SettingsEstimateStrip: View {
             Text("~\(String(format: "%.2g", effectiveStandardImageMB)) MB each")
                 .font(.caption2).foregroundStyle(.primary)
 
-            if useAppleVision {
+            if let warning = unavailableOpenRouterSelection {
+                Text(warning)
+                    .font(.caption).foregroundStyle(.primary)
+            } else if useAppleVision {
                 segmentationCostBlock
                 appleVisionCostPane
             } else if useLocalAgent {

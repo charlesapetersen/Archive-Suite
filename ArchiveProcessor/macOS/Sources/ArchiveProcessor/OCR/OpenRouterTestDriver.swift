@@ -409,6 +409,80 @@ enum OpenRouterTestDriver {
            (body["max_tokens"] as? Int ?? 0) + OpenAICompatibleClient.openRouterReasoningAllowance)
         OpenRouterListing.testTyped = []
         check("9 a typed id removed gets no client", OpenAICompatibleClient.openRouter(model: fresh, apiKey: "k") == nil)
+        check("10 a listed id has no warning", OpenRouterRoute.unavailableSelection(claude.id) == nil)
+        check("10 a pinned id has no warning outside the listing",
+              OpenRouterRoute.unavailableSelection(OpenRouterRoute.catalog[0].model.id) == nil)
+        check("10 no explicit selection uses the provider default", OpenRouterRoute.unavailableSelection("") == nil)
+        let shorter = OpenRouterListing.Stored(entries: entries.filter { $0.id != claude.id }, fetched: Date())
+        OpenRouterListing.testListing = shorter
+        check("10 a removed listing id reports the original id",
+              OpenRouterRoute.unavailableSelection(claude.id)?.contains(claude.id) == true)
+        OpenRouterListing.testTyped = [typed(claude.id)]
+        check("10 a deliberately typed id remains available outside the listing",
+              OpenRouterRoute.unavailableSelection(claude.id) == nil)
+        OpenRouterListing.testTyped = []
+        await disappearanceDuringOCR(model: claude, image: image, listed: listing, shorter: shorter)
+    }
+
+    private static func disappearanceDuringOCR(
+        model: LLMModel, image: URL, listed: OpenRouterListing.Stored, shorter: OpenRouterListing.Stored
+    ) async {
+        let root = image.deletingLastPathComponent()
+        let second = root.appendingPathComponent("second.jpg")
+        do { try FileManager.default.copyItem(at: image, to: second) } catch {
+            check("10 second scratch page created", false, error.localizedDescription)
+            return
+        }
+        let files = [image, second]
+        var config = SessionProcessingConfig.fromDefaults()
+        config.provider = .openrouter
+        config.model = model
+        config.gateway = nil
+        config.localAgent = nil
+        config.rotationMode = .off
+        config.cascade = .off
+        config.ocrWorkerCount = 1
+        let runConfig = config
+        let savedTransport = NetworkSession.testTransport
+        defer { NetworkSession.testTransport = savedTransport }
+        for contextCount in [0, 50] {
+            let output = root.appendingPathComponent("disappeared-\(contextCount)")
+            do { try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true) } catch {
+                check("10 scratch output folder created", false, error.localizedDescription)
+                return
+            }
+            let wire = Wire()
+            OpenRouterListing.testListing = listed
+            NetworkSession.testTransport = { request in
+                wire.requests.append(request)  // one OCR worker, rotation and cascade off
+                await MainActor.run { OpenRouterListing.testListing = shorter }
+                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+                return (Data(wire.reply.utf8), response)
+            }
+            let processor = OCRProcessor()
+            processor.jobs = files.map { OCRJob(sourceURL: $0) }
+            processor.isProcessing = true
+            let task = Task {
+                await processor.performOCRPhase(
+                    fileURLs: files, provider: .openrouter, model: model, thinkingLevel: nil, apiKey: "test-key",
+                    outputDirectory: output,
+                    segmentationContext: .init(previousTextCharCount: contextCount, sendPreviousImage: false),
+                    runConfig: runConfig)
+            }
+            processor.processingTask = task
+            await task.value
+            let mode = contextCount == 0 ? "parallel scheduler" : "sequential scheduler"
+            eq("10 \(mode) sends only the first request", wire.requests.count, 1)
+            check("10 \(mode) saves the finished page and leaves the unread page pending",
+                  processor.jobs[0].status == .succeeded && processor.jobs[1].status == .pending
+                  && processor.failedFiles.isEmpty
+                  && FileManager.default.fileExists(atPath: output.appendingPathComponent(image.deletingPathExtension().lastPathComponent + ".pdf").path)
+                  && !FileManager.default.fileExists(atPath: output.appendingPathComponent("second.pdf").path),
+                  "\(processor.jobs.map(\.status)) \(processor.outputURLMap.values.map(\.lastPathComponent))")
+            check("10 \(mode) ends with one model warning",
+                  !processor.isProcessing && processor.statusMessage == "Processing stopped. "
+                  + OpenRouterRoute.unavailableMessage(model.id), processor.statusMessage)
+        }
     }
 
     /// 6. GLM-5.3 Flash as a segmentation voter: options.json's approach resolves to it, and its window request

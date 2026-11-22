@@ -682,6 +682,17 @@ struct OpenRouterRoute: Sendable, Equatable {
         return unpinned(model)
     }
 
+    static let unavailableModelCode = "openrouter_model_unavailable"
+
+    static func unavailableMessage(_ id: String) -> String {
+        "OpenRouter model “\(id)” is no longer available in the model list. Choose another model in Settings › Reading."
+    }
+
+    static func unavailableSelection(_ id: String) -> String? {
+        guard !id.isEmpty, forModel(id) == nil, !offered(id) else { return nil }
+        return unavailableMessage(id)
+    }
+
     /// Whether the app offers `id` unpinned: a priced image model in OpenRouter's listing, or an id the user typed.
     static func offered(_ id: String) -> Bool {
         OpenRouterListing.entry(id)?.priced == true
@@ -1077,7 +1088,7 @@ final class CustomModelStore: ObservableObject, @unchecked Sendable {
         // A provider still pointing at the deleted id would read as its fallback while the dead id stayed
         // on disk — and would spring back to life if that id were ever re-added, silently selecting a
         // model (and a price) the user had thrown away. Heal the stored selection now.
-        ModelSelectionStore.shared.healUnresolvableSelections()
+        ModelSelectionStore.shared.healUnresolvableSelections(afterRemoving: id)
     }
 
     func isCustom(_ model: LLMModel) -> Bool {

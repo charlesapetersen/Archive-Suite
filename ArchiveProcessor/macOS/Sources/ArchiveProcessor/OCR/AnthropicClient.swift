@@ -124,12 +124,14 @@ struct AnthropicClient: Sendable {
 
 enum OCRError: Error, LocalizedError {
     case imageLoadFailed
+    case openRouterModelUnavailable(String)
     case networkError(String)
     case apiError(String, String?)
 
     var errorDescription: String? {
         switch self {
         case .imageLoadFailed: return "Failed to load or convert image"
+        case .openRouterModelUnavailable(let id): return OpenRouterRoute.unavailableMessage(id)
         case .networkError(let msg): return "Network error: \(msg)"
         case .apiError(let msg, let code): return "API error [\(code ?? "?")]: \(msg)"
         }

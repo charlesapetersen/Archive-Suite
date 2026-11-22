@@ -406,6 +406,10 @@ extension OCRProcessor {
                 if let saved = activePendingMixedPDF?.pageResults[pageKey] {
                     result = saved
                 } else {
+                    if stopForUnavailableOpenRouterModel(provider: provider, model: model) {
+                        for u in pageImages { try? FileManager.default.removeItem(at: u) }
+                        cleanupTempFiles(); return
+                    }
                     if activePendingMixedPDF != nil &&
                        !persistMixedPDFMutation({ $0.inFlightPage = pageKey }) {
                         for u in pageImages { try? FileManager.default.removeItem(at: u) }
@@ -423,6 +427,16 @@ extension OCRProcessor {
                         standardImageMB: ocrRun.standardImageMB,
                         visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
                     )
+                    }
+                    if !Task.isCancelled, result.errorCode == OpenRouterRoute.unavailableModelCode {
+                        if activePendingMixedPDF != nil,
+                           !persistMixedPDFMutation({ $0.inFlightPage = nil }) {
+                            for u in pageImages { try? FileManager.default.removeItem(at: u) }
+                            cleanupTempFiles(); return
+                        }
+                        stopForUnavailableOpenRouterModel(provider: provider, model: model, knownUnavailable: true)
+                        for u in pageImages { try? FileManager.default.removeItem(at: u) }
+                        cleanupTempFiles(); return
                     }
                     if activePendingMixedPDF != nil &&
                        !persistMixedPDFMutation({ pending in
@@ -1455,6 +1469,7 @@ extension OCRProcessor {
     ) async {
         let pass = beginDrainablePass()
         defer { endDrainablePass(pass) }   // W49.proc-resume-standard-runs
+        guard !stopForUnavailableOpenRouterModel(provider: provider, model: model) else { return }
         if segmentationContext.previousTextCharCount == 0 {
             // No dependency on prior OCR text — can run in parallel
             await performOCRParallel(
@@ -1505,7 +1520,8 @@ extension OCRProcessor {
         var previousImageURL: URL? = nil
 
         for index in 0..<total {
-            guard !Task.isCancelled, !drainingPages else { return }
+            guard !Task.isCancelled, !drainingPages,
+                  !stopForUnavailableOpenRouterModel(provider: provider, model: model) else { return }
             let url = fileURLs[index]
             jobs[index].status = .processing
             // W16.bat10 — bound with the index, before the round-trip that gives Stop/Clear/Start its window.
@@ -1566,6 +1582,8 @@ extension OCRProcessor {
             // A page that Stop cut short (a call cancelled, or one waiting for the Claude plan's window) is not recorded, so
             // Resume reads it in its main pass instead of taking it as already tried (W41.app-claude-plan-reading).
             if Task.isCancelled && result.text == nil { return }
+            if result.errorCode == OpenRouterRoute.unavailableModelCode,
+               stopForUnavailableOpenRouterModel(provider: provider, model: model, knownUnavailable: true) { return }
             guard await handleOCRResult(
                 result, index: index, jobID: jobID, url: url, model: model,
                 outputDirectory: outputDirectory, runConfig: runConfig) else { return }
@@ -1641,6 +1659,8 @@ extension OCRProcessor {
             // Collect results and feed new tasks
             for await (index, jobID, result) in group {
                 guard !Task.isCancelled else { group.cancelAll(); return }
+                if result.errorCode == OpenRouterRoute.unavailableModelCode,
+                   stopForUnavailableOpenRouterModel(provider: provider, model: model, knownUnavailable: true) { continue }
                 let url = fileURLs[index]
                 guard await handleOCRResult(
                     result, index: index, jobID: jobID, url: url, model: model,
@@ -1654,6 +1674,7 @@ extension OCRProcessor {
                 statusMessage = "OCR \(completed)/\(total) complete (parallel)" + Self.rateLimitSuffix
 
                 // Add next task if available; a quit or Stop waiting for the pages in flight starts no new one.
+                if nextIndex < total { stopForUnavailableOpenRouterModel(provider: provider, model: model) }
                 if drainingPages {
                     statusMessage = pageDrainMessage
                 } else if nextIndex < total {
@@ -1931,6 +1952,7 @@ extension OCRProcessor {
         readers: PageReaderPlan = .empty,
         imported: InstitutionalComputeImport? = nil
     ) async -> OCRResult {
+        let runModelID = model.id
         // W49.proc-resume-standard-runs: a page moved or deleted since the run began (a resume reads the run's own list)
         // fails here, before any route is asked, so no reader or rotation call is made for a file that is not there.
         guard FileManager.default.fileExists(atPath: imageURL.path) else {
@@ -1988,8 +2010,14 @@ extension OCRProcessor {
                 imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
                 customPrompt: customPrompt, imageScale: scale, costScale: imageScale)).detail
         } catch {
-            _ = await rotationCorrection  // let the concurrent task finish
-            return OCRResult(text: nil, classification: nil, errorMessage: error.localizedDescription, errorCode: nil,
+            let code: String?
+            if case OCRError.openRouterModelUnavailable(let id) = error, id == runModelID {
+                code = OpenRouterRoute.unavailableModelCode
+            } else {
+                _ = await rotationCorrection
+                code = nil
+            }
+            return OCRResult(text: nil, classification: nil, errorMessage: error.localizedDescription, errorCode: code,
                              pageReader: routed?.record)
         }
 
@@ -2116,7 +2144,8 @@ extension OCRProcessor {
     private func isRetryableError(_ result: OCRResult?) -> Bool {
         guard let result = result, result.text == nil,
               result.errorCode != OCRRefusalFallback.exhaustedCode,
-              result.errorCode != OCRCascade.exhaustedCode else { return false }
+              result.errorCode != OCRCascade.exhaustedCode,
+              result.errorCode != OpenRouterRoute.unavailableModelCode else { return false }
         let code = result.errorCode ?? ""
         // No credit or billing: every retry would fail the same way (W40.fix-processor-gemini-402-message).
         if code == "402" { return false }
@@ -2155,7 +2184,8 @@ extension OCRProcessor {
         guard !Task.isCancelled else { return }
 
         for (attempt, slot) in retrySlots.enumerated() {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled,
+                  !stopForUnavailableOpenRouterModel(provider: provider, model: model) else { return }
             let index = slot.index
             let url = fileURLs[index]
             jobs[index].status = .processing
@@ -2175,6 +2205,13 @@ extension OCRProcessor {
                 visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend,
                 scanDetector: scanDetector, postCorrection: postCorrection
             )
+
+            if result.errorCode == OpenRouterRoute.unavailableModelCode, !Task.isCancelled,
+               jobs.indices.contains(index), jobs[index].id == slot.jobID {
+                jobs[index].status = .failed
+                stopForUnavailableOpenRouterModel(provider: provider, model: model, knownUnavailable: true)
+                return
+            }
 
             // W16.bat11 — there is deliberately NO `jobs[index]` read here.
             //

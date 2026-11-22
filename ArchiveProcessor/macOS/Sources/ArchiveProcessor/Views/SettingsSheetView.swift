@@ -143,6 +143,7 @@ struct SettingsSheetHost<Content: View>: View {
     @AppStorage(DefaultsKeys.localAgentModel) private var localAgentModel = ""
     @AppStorage(DefaultsKeys.batchMode) private var batchMode = false
     @ObservedObject private var modelStore = ModelSelectionStore.shared
+    @AppStorage(OpenRouterListing.defaultsKey) private var openRouterListingData: Data?
 
     @State private var doc: CollectionSettingsDocument?
     @State private var problem: String?
@@ -151,12 +152,18 @@ struct SettingsSheetHost<Content: View>: View {
 
     private var model: SettingsSheetModel? {
         guard let table = SettingsRouteTable.bundled, table.problems().isEmpty else { return nil }
-        let running = SettingsSheetView.running(
+        _ = openRouterListingData
+        var running = SettingsSheetView.running(
             segmentation: SegmentationApproach(rawValue: segmentationRaw) ?? .defaultApproach,
             useAppleVision: useAppleVision, useGateway: useGateway, useLocalAgent: useLocalAgent,
             provider: selectedProvider, model: modelStore.model(for: selectedProvider), table: table,
             localAgentTool: LocalAgentTool(rawValue: localAgentToolRaw) ?? .claude, localAgentModel: localAgentModel,
             appleVisionModelID: modelStore.model(for: .appleVision).id)
+        if !useAppleVision, !useGateway, !useLocalAgent,
+           let warning = modelStore.unavailableOpenRouterSelection(for: selectedProvider) {
+            running.readingRouteID = nil
+            running.unavailableModelWarning = warning
+        }
         return SettingsSheetModel(table: table, pairs: OCRPairMatrix.bundled, resolver: resolver,
                                   macMemoryGB: SettingsLayerStore.thisMacMemoryGB, pages: pages,
                                   month: store.monthSpend(), running: running)
@@ -607,6 +614,7 @@ struct StageCardView: View {
                 if let now = card.runsNow {
                     HStack(alignment: .firstTextBaseline) {
                         Text(now).font(.caption).fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("ap.sheet.current.\(card.id)")
                         if let a = card.apply {
                             Button(a.buttonTitle) { apply(a) }
                                 .controlSize(.small)

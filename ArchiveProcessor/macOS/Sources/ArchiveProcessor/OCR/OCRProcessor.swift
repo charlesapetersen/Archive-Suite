@@ -18,6 +18,7 @@ class OCRProcessor: ObservableObject {
     /// W49.proc-stop-saves-inflight: Stop asked in the main OCR pass waits the same way, so a reading already bought is
     /// saved rather than read (and paid for) again on Resume Run; the run then stops and the app stays open.
     @Published var stopWhenPagesSaved = false
+    var unavailableOpenRouterRunMessage: String?
     /// Either wait: the OCR loops start no new page while it holds.
     var drainingPages: Bool { quitWhenPagesSaved || stopWhenPagesSaved }
     /// Whether the run is in its main OCR pass, the one stage a quit or Stop can wait on (`performOCRPhase`, its resume

@@ -18,6 +18,7 @@ struct SettingsSheetModel {
         /// The reading runs on the user's Claude plan (the Local Agent's `claude`), not on a key. A row the plan reaches
         /// is priced at nothing, so the same row read on a key is not what the sheet's pick means (W41.app-claude-plan-reading).
         var onPlan = false
+        var unavailableModelWarning: String?
     }
 
     struct Limit: Identifiable {
@@ -696,6 +697,9 @@ struct SettingsSheetModel {
                 }
             }
         default: break
+        }
+        if stage.id == "reading", let warning = running.unavailableModelWarning {
+            runsNow = warning
         }
         // W46.training-optout: the reader Process Files uses now may itself train on the pages.
         if stage.id == "reading", a.noTraining, let id = running.readingRouteID, id != route?.id,

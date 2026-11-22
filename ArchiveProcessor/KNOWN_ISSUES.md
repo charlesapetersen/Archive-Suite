@@ -373,11 +373,16 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   1,024 tokens a page whatever the level (High may spend up to its 8,000-token budget more), and `max_price` caps
   the price per token, not the number of tokens. A model the listing gives a per-image or per-request charge is not
   listed (typed, it is unpriced), since neither the estimate nor `max_price` counts that charge. (queued: W49.proc-openrouter-list-image-priced).
-- **A listed model that leaves the listing leaves the picker.** A selection that no longer resolves falls back to
-  the provider's first model (Gemini 3.8 Flash through OpenRouter), as a deleted custom model's does; the picker
-  and the estimate show the change, nothing warns. A run already going has no client for it, so its pages fail. (queued: W49.proc-openrouter-gone-warn).
 - **No provider is pinned, so the precision and the upstream's terms are unknown**; `data_collection: "deny"` is
   sent on every request, so an upstream that may keep or train on pages is refused. (accepted: unmeasured models are unpinned by design; `data_collection: "deny"` guards the pages).
+
+## FIXED (W49.proc-openrouter-gone-warn, 2026-11-22): Process Files names a missing OpenRouter model
+
+When a refreshed listing no longer offers the saved model, the picker keeps the model ID visible and both
+estimates explain why no price is shown. Choose an available model to start. A direct OpenRouter OCR run
+stops scheduling pages when the app detects that its model is unavailable. Finished reads are saved through
+the existing recovery path. Resuming an interrupted run still requires its original model for unread pages.
+Pinned routes and explicitly typed IDs remain available through their existing routes.
 
 ## FIXED (W46.layout-partition-fix, 2026-11-17): the newspaper fill read like a whole page
 

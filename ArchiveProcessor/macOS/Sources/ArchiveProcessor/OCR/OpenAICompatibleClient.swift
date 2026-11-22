@@ -421,11 +421,11 @@ extension OpenAICompatibleClient {
         ["502", "503", "408"].contains(code ?? "") ? "503" : code
     }
 
-    /// `openRouter(model:apiKey:)`, throwing for a model with no pinned route (a stale saved selection).
+    /// `openRouter(model:apiKey:)`, throwing for a model the app can no longer route.
     static func pinnedOpenRouter(model: LLMModel, apiKey: String,
                                  thinkingLevel: ThinkingLevel? = nil) throws -> OpenAICompatibleClient {
         guard let client = openRouter(model: model, apiKey: apiKey, thinkingLevel: thinkingLevel) else {
-            throw OCRError.networkError("\(model.id) is not one of the OpenRouter models this app offers. Choose one of the listed OpenRouter models.")
+            throw OCRError.openRouterModelUnavailable(model.id)
         }
         return client
     }

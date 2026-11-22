@@ -164,6 +164,9 @@ enum OpenRouterListing {
 
     /// Both OpenRouter readings a run's estimate rests on: the pinned routes' endpoint prices and this listing.
     static func refreshAllIfStale() async {
+#if DEBUG
+        if ProcessorUITestConfiguration.isActive { return }
+#endif
         await OpenRouterPrices.refreshIfStale()
         await refreshIfStale()
     }

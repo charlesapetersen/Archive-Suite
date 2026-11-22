@@ -1957,6 +1957,13 @@ extension OCRProcessor {
         // stale manifest can never cross-contaminate a different job.
         guard let pending = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(pending) else { return }
         let runConfig = makePendingRunResumeConfig(pending, apiKey: apiKey)
+        if pending.provider == .openrouter, pending.gatewayConfig == nil, pending.localAgent == nil,
+           pending.completedResults.count < pending.fileURLs.count || pending.enableTagging
+               || pending.enableCollectionSegmentation,
+           let warning = OpenRouterRoute.unavailableSelection(pending.model.id) {
+            statusMessage = warning + Self.unavailableModelRecoveryNote
+            return
+        }
         // W40.fix-processor-instcompute-resume-silent: ask before any state changes, so stopping leaves the
         // interrupted run exactly as it was.
         if !readWithoutClusterText, let prompt = Self.institutionalComputeResumePrompt(
@@ -2201,7 +2208,7 @@ extension OCRProcessor {
             )
         }
 
-        guard !Task.isCancelled else { cleanupTempFiles(); return }
+        guard !Task.isCancelled, isProcessing else { cleanupTempFiles(); return }
 
         // Retry high-use failures
         await retryHighUseFailures(
@@ -2214,7 +2221,7 @@ extension OCRProcessor {
             runConfig: runConfig
         )
 
-        guard !Task.isCancelled else { cleanupTempFiles(); return }
+        guard !Task.isCancelled, isProcessing else { cleanupTempFiles(); return }
 
         // Interactive retry
         await retryLoopForFailedFiles(
@@ -2223,7 +2230,7 @@ extension OCRProcessor {
             runConfig: runConfig
         )
 
-        guard !Task.isCancelled else { cleanupTempFiles(); return }
+        guard !Task.isCancelled, isProcessing else { cleanupTempFiles(); return }
 
         // Tagging (mode-dependent), matching the main workflow — not always automatic.
         if pending.enableTagging && !passSourceTags {
@@ -2384,6 +2391,7 @@ extension OCRProcessor {
     ) async {
         let pass = beginDrainablePass()
         defer { endDrainablePass(pass) }   // W49.proc-resume-standard-runs
+        guard !stopForUnavailableOpenRouterModel(provider: provider, model: model) else { return }
         let remaining = indices.count
         let gateway = currentGateway
         let localAgent = currentLocalAgent
@@ -2439,6 +2447,8 @@ extension OCRProcessor {
 
                 for await (index, jobID, result) in group {
                     guard !Task.isCancelled else { group.cancelAll(); return }
+                    if result.errorCode == OpenRouterRoute.unavailableModelCode,
+                       stopForUnavailableOpenRouterModel(provider: provider, model: model, knownUnavailable: true) { continue }
                     guard await handleOCRResult(
                         result, index: index, jobID: jobID, url: fileURLs[index], model: model,
                         outputDirectory: outputDirectory, runConfig: runConfig) else {
@@ -2449,6 +2459,7 @@ extension OCRProcessor {
                     progress = Double(alreadyCompleted + completed) / Double(totalFiles) * 0.7
                     statusMessage = "OCR \(alreadyCompleted + completed)/\(totalFiles) complete (parallel)" + Self.rateLimitSuffix
 
+                    if nextSlot < remaining { stopForUnavailableOpenRouterModel(provider: provider, model: model) }
                     if drainingPages {
                         statusMessage = pageDrainMessage
                     } else if nextSlot < remaining {
@@ -2483,7 +2494,8 @@ extension OCRProcessor {
         } else {
             // Sequential: OCR remaining indices, using previous results for context
             for (attempt, index) in indices.enumerated() {
-                guard !Task.isCancelled, !drainingPages else { return }
+                guard !Task.isCancelled, !drainingPages,
+                      !stopForUnavailableOpenRouterModel(provider: provider, model: model) else { return }
                 let url = fileURLs[index]
                 jobs[index].status = .processing
                 // W16.bat10 — bound with the index, before this file's round-trip.
@@ -2534,6 +2546,8 @@ extension OCRProcessor {
                 // A page that Stop cut short (a call cancelled, or one waiting for the Claude plan's window) is not recorded, so
                 // Resume reads it in its main pass instead of taking it as already tried (W41.app-claude-plan-reading).
                 if Task.isCancelled && result.text == nil { return }
+                if result.errorCode == OpenRouterRoute.unavailableModelCode,
+                   stopForUnavailableOpenRouterModel(provider: provider, model: model, knownUnavailable: true) { return }
                 guard await handleOCRResult(
                     result, index: index, jobID: jobID, url: url, model: model,
                     outputDirectory: outputDirectory, runConfig: runConfig) else { return }
@@ -2847,6 +2861,8 @@ extension OCRProcessor {
         statusMessage = pageDrainMessage
     }
 
+    static let unavailableModelRecoveryNote = " To resume this run, the original model must be available again."
+        + " To start a new run, dismiss the interrupted run first."
     static let stoppedAfterDrainNote = "The pages being read were saved; Resume Run continues from the first page not read."
     static let stopWaitMessage = "Stopping once the pages being read now are saved… Stop Now stops at once."
     static let batchQuitWaitMessage = "Quitting once the provider's reply to the batch submission is in and recorded…"
@@ -2872,6 +2888,23 @@ extension OCRProcessor {
         guard isProcessing, ocrPhaseActive, !drainingPages else { cancel(); return }
         stopWhenPagesSaved = true
         statusMessage = pageDrainMessage
+    }
+
+    /// Stop scheduling pages if the frozen direct reader leaves the listing. Keep the recovery record and let
+    /// requests already in flight finish. A page refused before it had a client stays unread in the record.
+    @discardableResult
+    func stopForUnavailableOpenRouterModel(
+        provider: LLMProvider, model: LLMModel, knownUnavailable: Bool = false
+    ) -> Bool {
+        guard !Task.isCancelled, provider == .openrouter, currentGateway == nil, currentLocalAgent == nil,
+              knownUnavailable || OpenRouterRoute.unavailableSelection(model.id) != nil else { return false }
+        unavailableOpenRouterRunMessage = OpenRouterRoute.unavailableMessage(model.id)
+        if ocrPhaseActive {
+            stopWhenPagesSaved = true
+        } else {
+            cancel()
+        }
+        return true
     }
 
     /// Marks the start of a pass a quit or Stop can wait on. The token ties its end to this run: a run stopped at once
@@ -2918,10 +2951,11 @@ extension OCRProcessor {
             recordUnfinishedRunSpend(wholeRun: true)
             activeBatch = nil
         }
+        let modelBecameUnavailable = unavailableOpenRouterRunMessage != nil
         cancel()
         let cancellation = batchCancellationTask
         guard quitting else {
-            if kind == .pages { statusMessage += " " + Self.stoppedAfterDrainNote }
+            if kind == .pages && !modelBecameUnavailable { statusMessage += " " + Self.stoppedAfterDrainNote }
             return
         }
         statusMessage = kind == .pages ? "The pages being read are saved. Quitting…"
@@ -2940,6 +2974,9 @@ extension OCRProcessor {
     }
 
     func cancel() {
+        let unavailableModel = unavailableOpenRouterRunMessage
+        let keepsRecovery = activePendingRun != nil || activePendingMixedPDF != nil
+        unavailableOpenRouterRunMessage = nil
         // A Stop pressed while a quit waits for its pages takes the quit back: the run stops and the app stays open.
         // Pressed while a Stop waits, it is Stop Now.
         quitWhenPagesSaved = false
@@ -3079,10 +3116,14 @@ extension OCRProcessor {
 
         let succeeded = jobs.filter { $0.status == .succeeded }.count
         let pending = jobs.filter { $0.status == .processing || $0.status == .pending }.count
-        statusMessage = "Cancelled. \(succeeded) succeeded, \(failedFiles.count) failed, \(pending) skipped."
-        // Mark any still-processing jobs as failed
+        if let unavailableModel {
+            statusMessage = "Processing stopped. " + unavailableModel
+            if keepsRecovery { statusMessage += Self.unavailableModelRecoveryNote }
+        } else {
+            statusMessage = "Cancelled. \(succeeded) succeeded, \(failedFiles.count) failed, \(pending) skipped."
+        }
         for i in jobs.indices where jobs[i].status == .processing {
-            jobs[i].status = .failed
+            jobs[i].status = unavailableModel == nil ? .failed : .pending
         }
     }
     func startProcessing(
@@ -3115,6 +3156,11 @@ extension OCRProcessor {
         let plannedSubfolders = plannedOutputSubfolders   // W47.ct-processor-intake
         plannedOutputSubfolders = [:]
         guard !files.isEmpty else { return }
+        if provider == .openrouter, gatewayConfig == nil, localAgent == nil,
+           let warning = OpenRouterRoute.unavailableSelection(model.id) {
+            statusMessage = warning + (resumingMixedPDF == nil ? "" : Self.unavailableModelRecoveryNote)
+            return
+        }
         if resumingMixedPDF == nil, !preOCRedInput,
            let tree = ProcessFilesTree.treeHoldingOutput(subfolders: plannedSubfolders, outputDirectory: outputDirectory) {
             statusMessage = ProcessFilesTree.overlapMessage(tree)
@@ -3581,7 +3627,7 @@ extension OCRProcessor {
                 )
             }
 
-            guard !Task.isCancelled else { cleanupTempFiles(); return }
+            guard !Task.isCancelled, isProcessing else { cleanupTempFiles(); return }
 
             // Phase 1b: Retry files that failed due to high use
             await retryHighUseFailures(
@@ -3594,7 +3640,7 @@ extension OCRProcessor {
                 runConfig: runConfig
             )
 
-            guard !Task.isCancelled else { cleanupTempFiles(); return }
+            guard !Task.isCancelled, isProcessing else { cleanupTempFiles(); return }
 
             // Phase 1c: Prompt user to retry remaining failures with different provider/model
             await retryLoopForFailedFiles(
@@ -3603,7 +3649,7 @@ extension OCRProcessor {
                 runConfig: runConfig
             )
 
-            guard !Task.isCancelled else { cleanupTempFiles(); return }
+            guard !Task.isCancelled, isProcessing else { cleanupTempFiles(); return }
 
             // Dedicated rotation review (opt-in) — a fast, standalone pass, separate from and BEFORE
             // the segmentation/tagging review, and run in EVERY tagging mode. It bakes the corrected
@@ -3846,6 +3892,8 @@ extension OCRProcessor {
                     statusMessage = "Cannot retry: the original run configuration is unavailable."
                     return
                 }
+                guard !stopForUnavailableOpenRouterModel(provider: retryConfig.provider, model: retryConfig.model)
+                else { return }
                 let indicesToRetry = failedFileIndices
                 statusMessage = "Retrying \(indicesToRetry.count) files with \(retryConfig.retryBackendDescription)…"
 
@@ -3853,6 +3901,7 @@ extension OCRProcessor {
                     guard !Task.isCancelled else { return }
                     _ = await retryOne(index: index, imageURL: imageURLs[index],
                                        outputDirectory: outputDirectory, runConfig: retryConfig)
+                    guard !Task.isCancelled, isProcessing else { return }
                     progress = Double(attempt + 1) / Double(indicesToRetry.count)
                     statusMessage = "Retried \(attempt + 1)/\(indicesToRetry.count)"
                 }
@@ -3889,6 +3938,17 @@ extension OCRProcessor {
             statusMessage = "This rebuilt PDF must be re-OCR'd as a multi-page document in a new run."
             return false
         }
+        if effectiveRunConfig.provider == .openrouter, effectiveRunConfig.gateway == nil, effectiveRunConfig.localAgent == nil,
+           let warning = OpenRouterRoute.unavailableSelection(effectiveRunConfig.model.id) {
+            if isProcessing {
+                stopForUnavailableOpenRouterModel(provider: .openrouter, model: effectiveRunConfig.model,
+                                                  knownUnavailable: true)
+            } else {
+                statusMessage = warning
+            }
+            return false
+        }
+        let previousStatus = jobs[index].status
         jobs[index].status = .processing
         // W16.bat10 — the row this retry is FOR. `ocrURL` cannot stand in for it: for a pre-OCRed PDF (or a
         // rotate-and-re-run) it is a temp JPEG that is deliberately NOT the job's source, which is exactly
@@ -3909,6 +3969,17 @@ extension OCRProcessor {
             // read, and an imported page matches its institutional-computing text again by its bytes (Tier-2 review).
             visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: nil, newspaperSpend: newspaperSpend,
             scanDetector: scanDetector, postCorrection: postCorrection)
+        if result.errorCode == OpenRouterRoute.unavailableModelCode, !Task.isCancelled {
+            guard jobs.indices.contains(index), jobs[index].id == jobID else { return false }
+            jobs[index].status = previousStatus
+            if isProcessing {
+                stopForUnavailableOpenRouterModel(provider: .openrouter, model: effectiveRunConfig.model,
+                                                  knownUnavailable: true)
+            } else {
+                statusMessage = OpenRouterRoute.unavailableMessage(effectiveRunConfig.model.id)
+            }
+            return false
+        }
         if let rotation {
             result = OCRResult(text: result.text, classification: result.classification,
                                rotationDegrees: ((rotation % 360) + 360) % 360,

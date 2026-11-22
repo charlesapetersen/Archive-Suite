@@ -41,6 +41,7 @@ struct SettingsReadingPanel: View {
     @State private var openaiKey = ""
     @State private var openrouterKey = ""
     @State private var openRouterPricesRead = 0
+    @AppStorage(OpenRouterListing.defaultsKey) private var openRouterListingData: Data?
     @State private var showManageModels = false
 
     private var models: [LLMModel] {
@@ -55,6 +56,46 @@ struct SettingsReadingPanel: View {
     private var selectedModel: LLMModel {
         get { modelStore.model(for: selectedProvider) }
         nonmutating set { modelStore.setModel(newValue, for: selectedProvider) }
+    }
+
+    private var unavailableOpenRouterSelection: String? {
+        _ = openRouterListingData
+        return modelStore.unavailableOpenRouterSelection(for: selectedProvider)
+    }
+
+    private var modelPickerSelection: Binding<String> {
+        Binding(get: {
+            if unavailableOpenRouterSelection != nil,
+               let id = modelStore.selectedModelIDs[selectedProvider.rawValue] { return id }
+            return selectedModel.id
+        }, set: { id in
+            if let model = models.first(where: { $0.id == id }) { selectedModel = model }
+        })
+    }
+
+    @ViewBuilder private var modelChoices: some View {
+        if unavailableOpenRouterSelection != nil,
+           let id = modelStore.selectedModelIDs[selectedProvider.rawValue] {
+            Text("\(id) (unavailable)").tag(id)
+        }
+        ForEach(models) { model in
+            Text(customModelStore.isCustom(model) ? "\(model.displayName) (custom)" : model.displayName).tag(model.id)
+        }
+    }
+
+    private var openRouterModelNote: some View {
+        Text(unavailableOpenRouterSelection
+             ?? (openRouterPricesRead >= 0
+                 ? (OpenRouterRoute.forModel(selectedModel.id)?.settingsNote ?? OpenRouterRoute.unmeasuredNote(selectedModel))
+                 : ""))
+            .font(.caption).foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier(unavailableOpenRouterSelection == nil
+                                     ? "ap.settings.openRouterRoute" : "ap.settings.openRouterUnavailable")
+            .task {
+                await OpenRouterListing.refreshAllIfStale()
+                openRouterPricesRead += 1
+            }
     }
 
     private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
@@ -196,34 +237,20 @@ struct SettingsReadingPanel: View {
                         }
                     }
                     .accessibilityIdentifier("ap.settings.providerPicker")
-                    Picker(selection: Binding(get: { selectedModel }, set: { selectedModel = $0 })) {
-                        ForEach(models) { m in
-                            Text(customModelStore.isCustom(m) ? "\(m.displayName) (custom)" : m.displayName).tag(m)
-                        }
+                    Picker(selection: modelPickerSelection) {
+                        modelChoices
                     } label: {
                         HStack {
                             Text("Model")
                             HelpButton(text: "The model used for OCR and tagging. Fast, cheap models (e.g. Flash Lite) handle most archival documents well; larger models may read difficult handwriting or dense layouts better, at higher cost and time.")
                         }
                     }
-                    if selectedProvider == .openrouter {
-                        // `openRouterPricesRead` re-renders the note and the model list once OpenRouter's endpoint prices
-                        // (W42.int-s2) and its model listing (W41.app-openrouter-unmeasured) have been read.
-                        Text(openRouterPricesRead >= 0
-                             ? (OpenRouterRoute.forModel(selectedModel.id)?.settingsNote ?? OpenRouterRoute.unmeasuredNote(selectedModel))
-                             : "")
-                            .font(.caption).foregroundStyle(.primary)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("ap.settings.openRouterRoute")
-                            .task {
-                                await OpenRouterListing.refreshAllIfStale()
-                                openRouterPricesRead += 1
-                            }
-                    }
+                    .accessibilityIdentifier("ap.settings.modelPicker")
+                    if selectedProvider == .openrouter { openRouterModelNote }
                 }
                 // What reads which pages best is the reading card at the top of this panel (W47.settings-panels), in
                 // place of the guide that sat here (W41.app-ocr-hierarchy); its "Read with this" sets the model above.
-                if selectedModel.supportsThinking {
+                if unavailableOpenRouterSelection == nil, selectedModel.supportsThinking {
                     Picker(selection: $selectedThinking) {
                         ForEach(ThinkingLevel.allCases) { Text($0.rawValue).tag($0) }
                     } label: {
@@ -370,13 +397,10 @@ struct SettingsReadingPanel: View {
                     ForEach(LLMProvider.allCases.filter { $0 != .appleVision }) { Text($0.rawValue).tag($0) }
                 }
                 .accessibilityIdentifier("ap.settings.visionJudgmentProviderPicker")
-                Picker("Judgement model", selection: Binding(get: { selectedModel }, set: { selectedModel = $0 })) {
-                    ForEach(models) { model in
-                        Text(customModelStore.isCustom(model) ? "\(model.displayName) (custom)" : model.displayName).tag(model)
-                    }
-                }
-                .accessibilityIdentifier("ap.settings.visionJudgmentModelPicker")
-                if selectedModel.supportsThinking {
+                Picker("Judgement model", selection: modelPickerSelection) { modelChoices }
+                    .accessibilityIdentifier("ap.settings.visionJudgmentModelPicker")
+                if selectedProvider == .openrouter { openRouterModelNote }
+                if unavailableOpenRouterSelection == nil, selectedModel.supportsThinking {
                     Picker("Judgement thinking", selection: $selectedThinking) {
                         ForEach(ThinkingLevel.allCases) { Text($0.rawValue).tag($0) }
                     }

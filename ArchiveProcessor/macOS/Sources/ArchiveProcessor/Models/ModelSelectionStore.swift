@@ -50,6 +50,11 @@ final class ModelSelectionStore: ObservableObject {
         return provider.models.first { $0.id == id } ?? provider.models[0]
     }
 
+    func unavailableOpenRouterSelection(for provider: LLMProvider) -> String? {
+        guard provider == .openrouter else { return nil }
+        return OpenRouterRoute.unavailableSelection(selectedModelIDs[provider.rawValue] ?? "")
+    }
+
     /// Persist the selected model id for a provider and notify observers.
     func setModel(_ model: LLMModel, for provider: LLMProvider) {
         UserDefaults.standard.set(model.id, forKey: Self.modelKey(for: provider))
@@ -65,9 +70,10 @@ final class ModelSelectionStore: ObservableObject {
     /// fallback, and re-adding a custom model with the same id later (which `ManageModelsView` permits,
     /// since its duplicate check only sees models that currently exist) resurrects a selection the user
     /// deleted — the next run then bills at that model with no one having chosen it.
-    func healUnresolvableSelections() {
+    func healUnresolvableSelections(afterRemoving removedID: String) {
         for provider in LLMProvider.allCases {
             guard let id = selectedModelIDs[provider.rawValue], !id.isEmpty,
+                  provider != .openrouter || id == removedID,
                   !provider.models.contains(where: { $0.id == id }) else { continue }
             setModel(provider.models[0], for: provider)
         }

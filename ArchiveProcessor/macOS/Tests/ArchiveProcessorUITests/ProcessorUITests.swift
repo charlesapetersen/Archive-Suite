@@ -117,6 +117,44 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-start-blocked-reason")
     }
 
+    func testUnavailableOpenRouterModelStaysVisibleWithoutAReplacementEstimate() throws {
+        let removedID = "test/unavailable-vision-model"
+        relaunch(extra: ["-APUITestSyntheticMultiPagePDF", "-selectedProvider", "OpenRouter",
+                         "-selectedModelId_OpenRouter", removedID,
+                         "-useAppleVision", "NO", "-useGateway", "NO", "-useLocalAgent", "NO"])
+        let estimate = element("ap.ocr.openRouterEstimateUnavailable")
+        XCTAssertTrue(estimate.waitForExistence(timeout: 10))
+        XCTAssertTrue(renderedText(of: estimate).contains(removedID))
+        XCTAssertFalse(element("ap.ocr.pdfPageCost").exists)
+        XCTAssertFalse(element("ap.ocr.newspaperAllowance").exists)
+        XCTAssertFalse(element("ap.ocr.start").isEnabled)
+        attachScreenshot("processor-openrouter-unavailable-estimate")
+
+        openSettings("Collection")
+        let settingsEstimate = element("ap.settings.costPane")
+        XCTAssertTrue(settingsEstimate.waitForExistence(timeout: 10))
+        XCTAssertTrue(renderedText(of: settingsEstimate).contains(removedID))
+
+        XCTAssertTrue(app.showSettingsPanel("Reading"))
+        let currentReader = element("ap.sheet.current.reading")
+        XCTAssertTrue(currentReader.waitForExistence(timeout: 5))
+        XCTAssertTrue(renderedText(of: currentReader).contains(removedID), "the reading card names the unavailable model")
+        let warning = element("ap.settings.openRouterUnavailable")
+        XCTAssertTrue(warning.waitForExistence(timeout: 10))
+        XCTAssertTrue(renderedText(of: warning).contains(removedID))
+        let picker = element("ap.settings.modelPicker")
+        XCTAssertTrue(picker.exists)
+        XCTAssertTrue(renderedText(of: picker).contains(removedID), picker.debugDescription)
+        picker.click()
+        app.typeKey(.escape, modifierFlags: [])
+        attachScreenshot("processor-openrouter-unavailable-picker")
+        picker.click()
+        let replacement = app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", "Gemini 3.8 Flash")).firstMatch
+        XCTAssertTrue(replacement.waitForExistence(timeout: 5), "the picker offers a pinned replacement")
+        replacement.click()
+        XCTAssertTrue(waitUntil { !warning.exists }, "an explicit replacement clears the saved-model warning")
+    }
+
     /// W40.fix-suite-shortcuts: File ▸ Add Files… (⌘O) and Choose Output Folder… (⇧⌘O, the suite's "choose
     /// folder" key) open the panels their buttons open, and Processing ▸ Stop Processing is listed on ⌘.
     func testFileMenuShortcutsOpenTheirPanels() throws {

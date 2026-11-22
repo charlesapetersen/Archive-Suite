@@ -33,6 +33,7 @@ struct OCRView: View {
     @State private var segmentationRoutes = SegmentationRoutes.none
     /// Re-renders the estimate once OpenRouter's prices and listing have been read (W41.app-openrouter-unmeasured).
     @State private var openRouterListingRead = 0
+    @AppStorage(OpenRouterListing.defaultsKey) private var openRouterListingData: Data?
     /// W46.training-optout-run: what Start says before it runs a way the collection's "must not train" switch hides.
     @State private var trainingWarning: String?
     @AppStorage(DefaultsKeys.rotationModeRaw) private var rotationModeRaw: String = RotationMode.standard.rawValue
@@ -381,6 +382,12 @@ struct OCRView: View {
 
     private var gatewayHasCosts: Bool {
         gatewayInputCost >= 0 && gatewayOutputCost >= 0
+    }
+
+    private var unavailableOpenRouterSelection: String? {
+        _ = openRouterListingData
+        guard useAppleVision ? visionUseLLMJudgment : !useGateway && !useLocalAgent else { return nil }
+        return modelStore.unavailableOpenRouterSelection(for: selectedProvider)
     }
 
     /// W41.app-openrouter-unmeasured: the run's model is an OpenRouter model the listing gives no price for.
@@ -767,7 +774,14 @@ struct OCRView: View {
 
 
                 // Cost estimate
-                if useAppleVision && !droppedFiles.isEmpty {
+                if let warning = unavailableOpenRouterSelection, !droppedFiles.isEmpty {
+                    GroupBox("Cost Estimate") {
+                        Text(warning)
+                            .font(.caption)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("ap.ocr.openRouterEstimateUnavailable")
+                    }
+                } else if useAppleVision && !droppedFiles.isEmpty {
                     GroupBox("Cost Estimate") {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
@@ -996,8 +1010,10 @@ struct OCRView: View {
                     }
                 }
 
-                newspaperLayoutAllowance
-                postCorrectionEstimate
+                if unavailableOpenRouterSelection == nil {
+                    newspaperLayoutAllowance
+                    postCorrectionEstimate
+                }
 
                 // Output directory
                 GroupBox("Output Folder") {
@@ -1122,6 +1138,7 @@ struct OCRView: View {
     /// wouldn't allow: no files, no key, no output folder, already busy, or mid-review).
     private var canStartProcessing: Bool {
         !droppedFiles.isEmpty && !checkingInputLocation && !readingTree && (!runNeedsAPIKey || !apiKey.isEmpty) && visionWorkflowIsSupported && outputDirectory != nil
+            && unavailableOpenRouterSelection == nil
             && !processor.isProcessing && !isInReviewMode
             && processor.pendingBatchInfo == nil && processor.pendingRunInfo == nil
             && processor.pendingMixedPDFInfo == nil
@@ -1144,6 +1161,9 @@ struct OCRView: View {
             return "Set Tagging to No tagging or Copy source file tags. For Auto Date with Apple Vision, "
                 + "enable local image dating in Advanced Dates and names and process fresh images."
                 + (enableCollectionSegmentation ? " Turn off Collection ID as well." : "")
+        }
+        if unavailableOpenRouterSelection != nil {
+            return "Choose an available OpenRouter model in Settings › Reading before starting."
         }
         if runNeedsAPIKey && apiKey.isEmpty {
             if useGateway && !useAppleVision { return "No gateway key is saved. Add it in Settings (⌘,)." }
@@ -1830,6 +1850,18 @@ struct OCRView: View {
 
     private func runProcessing() {
         guard let outDir = outputDirectory else { return }
+        let provider = effectiveProvider
+        let model = effectiveModel
+        if let warning = unavailableOpenRouterSelection {
+            processor.statusMessage = warning
+            return
+        }
+        // The listing can refresh off the main actor between resolution and the availability check.
+        if provider == .openrouter, !useGateway, !useLocalAgent,
+           let id = modelStore.selectedModelIDs[provider.rawValue], !id.isEmpty, id != model.id {
+            processor.statusMessage = OpenRouterRoute.unavailableMessage(id)
+            return
+        }
         intakeGeneration += 1   // a tree still being read is not added to a started run
         readingTree = false
         let trimmedPrompt = customOCRPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1877,9 +1909,9 @@ struct OCRView: View {
         processor.processingTask = Task {
             await processor.startProcessing(
                 files: droppedFiles,
-                provider: effectiveProvider,
-                model: effectiveModel,
-                thinkingLevel: !useAppleVision && !useGateway && selectedModel.supportsThinking ? selectedThinking : nil,
+                provider: provider,
+                model: model,
+                thinkingLevel: !useAppleVision && !useGateway && model.supportsThinking ? selectedThinking : nil,
                 apiKey: useAppleVision ? "" : apiKey,
                 outputDirectory: outDir,
                 batchMode: (useGateway || useLocalAgent || useAppleVision) ? false : batchMode,
