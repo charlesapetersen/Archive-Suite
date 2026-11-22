@@ -80,6 +80,151 @@ enum SegmentationReviewTestDriver {
         }
     }
 
+    /// Uses the paid-batch harness's redirected journal and the normal Resume entry point.
+    static func checkPaidBatchResume(in directory: URL, check: (String, Bool) -> Void) async {
+        let urls = (0..<6).map { directory.appendingPathComponent("batch-page-\($0).jpg") }
+        let relative = "Box 17/Folder 8"
+        let treeFolder = directory.appendingPathComponent(relative, isDirectory: true)
+        var outputs = urls.map { $0.deletingPathExtension().appendingPathExtension("pdf") }
+        outputs[0] = treeFolder.appendingPathComponent(outputs[0].lastPathComponent)
+        let jpeg = syntheticJPEG()
+        let model = LLMModel.geminiModels[0]
+        let collector = makeProcessor(urls: urls)
+        var results: [String: OCRResult] = [:]
+        do {
+            try FileManager.default.createDirectory(at: treeFolder, withIntermediateDirectories: true)
+            for (index, url) in urls.enumerated() {
+                try jpeg.write(to: url)
+                guard let result = collector.jobs[index].result else {
+                    check("26 scratch OCR result is available", false)
+                    return
+                }
+                try PDFGenerator().generate(imageURL: url, result: result, model: model,
+                                            outputURL: outputs[index], textLayer: nil)
+                results[String(index)] = result
+            }
+        } catch {
+            check("26 batch segmentation scratch files created", false)
+            return
+        }
+        NetworkSession.testTransport = { _ in throw URLError(.unsupportedURL) }
+        defer {
+            NetworkSession.testTransport = nil
+            OCRProcessor.deletePendingBatch()
+        }
+        let id = "batches/segmentation-resume"
+        var batch = OCRProcessor.PendingBatch(
+            batchId: id, provider: .gemini, model: model,
+            thinkingLevel: nil, fileURLs: urls, outputDirectory: directory, enableTagging: true,
+            sendPreviousImage: false, submittedAt: Date(),
+            runFingerprint: OCRProcessor.runFingerprint(
+                files: urls, outputDirectory: directory, taggingMode: .automatic,
+                enableTagging: true, batchMode: true, preserveInputOrder: true),
+            lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
+            consumedChunkIds: [id], completedResults: results,
+            completedOutputPaths: Dictionary(uniqueKeysWithValues: outputs.enumerated().map {
+                (String($0.offset), $0.element.path)
+            }))
+        batch.segmentationApproach = .claude
+        batch.outputSubfolders = [urls[0].standardizedFileURL.path: relative]
+        collector.activePendingBatch = OCRProcessor.savePendingBatch(batch)
+        guard collector.activePendingBatch != nil else {
+            check("26 scratch batch journal saved", false)
+            return
+        }
+        await collector.pollBatchUntilComplete(batchId: id, provider: .gemini, model: model, thinkingLevel: nil,
+                                               apiKey: "batch-segmentation-fixture-not-a-key", fileURLs: urls,
+                                               outputDirectory: directory, pollInterval: .zero)
+        guard let collected = collector.activePendingBatch, collected.resultsCollected == true else {
+            check("26 the poll records that OCR collection is complete", false)
+            return
+        }
+        check("26 the poll records that OCR collection is complete", true)
+        batch = collected
+        guard let spec = try? SegmentationOptionsStore.shared?.spec(for: .claude),
+              let seeded = try? await WindowSegmenter(transport: FakeTransport(verdicts: [:]))
+                .segment(pages: urls.map { _ in PageInput(jpeg: jpeg, text: "text") },
+                         photoKinds: [.folder, nil, nil, nil, nil, nil], approach: spec)
+        else {
+            check("26 batch segmentation fixture prepared", false)
+            return
+        }
+        let firstWindow = [1, 2, 3, 4]
+        batch.segmentationWindows = seeded.answered.filter { $0.key.start == 0 && $0.key.end == 4 }
+        guard OCRProcessor.savePendingBatch(batch) != nil else {
+            check("26 batch segmentation fixture saved", false)
+            return
+        }
+
+        let limited = FakeTransport(verdicts: [:], failWith: .usageLimit(reset: nil, message: "fixture limit"))
+        let stopped = startBatchResume(transport: limited, staleGrouping: Array(repeating: true, count: urls.count))
+        if await waitFor({ stopped.processor.awaitingBoxFolderConfirmation }) {
+            stopped.processor.confirmBoxFolderReview()
+        }
+        let canStop = await waitFor { stopped.processor.windowStopPrompt?.canResumeLater == true }
+        check("26 a resumed paid batch opens its saved segmenter and offers Stop at a usage limit", canStop)
+        check("26 Resume reuses the recorded output in its tree folder",
+              stopped.processor.outputURLMap[urls[0]]?.path == outputs[0].path)
+        check("26 a saved window was reused", limited.calls.count == 2 && !limited.calls.contains(firstWindow))
+        if canStop { stopped.processor.answerWindowStop(.stop) } else { stopped.processor.cancel() }
+        await stopped.task.value
+        check("26 Stop keeps the on-disk journal and offers Resume",
+              stopped.processor.activePendingBatch == nil && stopped.processor.pendingBatchInfo != nil)
+        let retained = OCRProcessor._testReadPendingBatch(from: OCRProcessor.pendingBatchURL)
+        check("26 the paid batch retains its saved choice and windows",
+              retained?.segmentationApproach == .claude && retained?.segmentationWindows == batch.segmentationWindows)
+
+        let rest = FakeTransport(verdicts: [4: ("continue", 0.6)])
+        let resumed = startBatchResume(transport: rest)
+        if await waitFor({ resumed.processor.awaitingBoxFolderConfirmation }) {
+            resumed.processor.confirmBoxFolderReview()
+        }
+        let flagged = await waitFor { resumed.processor.awaitingFlaggedReview }
+        check("26 Resume finishes the remaining two windows",
+              flagged && rest.calls.count == 2 && !rest.calls.contains(firstWindow))
+        if flagged {
+            for index in resumed.processor.flaggedGapItems.indices {
+                resumed.processor.flaggedGapItems[index].answer = .split
+            }
+            resumed.processor.confirmFlaggedReview()
+            check("26 the batch reaches the skim", await waitFor { resumed.processor.awaitingDocumentReview })
+        }
+        resumed.processor.cancel()
+        await resumed.task.value
+        let reviewed = OCRProcessor._testReadPendingBatch(from: OCRProcessor.pendingBatchURL)
+        check("26 all windows and the flagged answers survive a journal round trip",
+              reviewed?.segmentationWindows?.count == 3 && reviewed?.segmentationAnswers?[urls[4].path] == .split)
+        if var reviewed {
+            reviewed.segmentationAnswers = nil
+            check("26 the journal rejects changed review answers", !OCRProcessor.pendingBatchIsSelfConsistent(reviewed))
+            reviewed = OCRProcessor.batchByReopeningMissingOutputs(reviewed, fileExists: { $0 != outputs[0].path })
+            check("26 a missing output reopens OCR collection without discarding segmentation windows",
+                  reviewed.resultsCollected == nil && reviewed.segmentationWindows?.count == 3)
+        }
+
+        let silent = FakeTransport(verdicts: [:], failWith: .fatal("saved windows should suffice"))
+        let reloaded = startBatchResume(transport: silent)
+        if await waitFor({ reloaded.processor.awaitingBoxFolderConfirmation }) {
+            reloaded.processor.confirmBoxFolderReview()
+        }
+        let reopened = await waitFor { reloaded.processor.awaitingFlaggedReview }
+        check("26 after relaunch the batch reuses all windows and pre-fills the flagged answer",
+              reopened && silent.calls.isEmpty
+              && reloaded.processor.flaggedGapItems.contains { $0.rightURL == urls[4] && $0.answer == .split })
+        reloaded.processor.cancel()
+        await reloaded.task.value
+    }
+
+    private static func startBatchResume(transport: FakeTransport, staleGrouping: [Bool] = [])
+        -> (processor: OCRProcessor, task: Task<Void, Never>) {
+        let processor = OCRProcessor()
+        processor.preGroupedBoundaries = staleGrouping
+        processor.windowTransportOverride = transport
+        let task = Task { await processor.resumeBatch(apiKey: "batch-segmentation-fixture-not-a-key") }
+        processor.processingTask = task
+        return (processor, task)
+    }
+
     // MARK: - Run
 
     static func run() async {

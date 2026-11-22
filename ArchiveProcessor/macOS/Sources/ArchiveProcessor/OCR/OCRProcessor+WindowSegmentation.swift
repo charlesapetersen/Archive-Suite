@@ -67,7 +67,14 @@ extension OCRProcessor {
 
         let pages = windowStagePages(files: files)
         // Read once for the whole stage, so the proposals, the review's heading and the skim agree.
-        let partner = approach == .local ? SegmentationApproach.storedLocalPartner() : nil
+        let partner: SegmentationApproach?
+        if approach != .local {
+            partner = nil
+        } else if let batch = activePendingBatch {
+            partner = batch.segmentationPartner
+        } else {
+            partner = SegmentationApproach.storedLocalPartner()
+        }
         let proposals: [GapProposal]
         switch await windowProposals(pages: pages, approach: approach, partner: partner) {
         case .some(let p): proposals = p
@@ -78,7 +85,7 @@ extension OCRProcessor {
         // The flagged pass.
         let rotations = pages.fileIndices.map { jobs[$0].result?.rotationDegrees ?? 0 }
         var items = FlaggedReview.items(proposals: proposals, pages: pages, rotations: rotations,
-                                        prior: activePendingRun?.segmentationAnswers ?? [:])
+                                        prior: activePendingRun?.segmentationAnswers ?? activePendingBatch?.segmentationAnswers ?? [:])
         if !items.isEmpty {
             flaggedGapItems = items
             flaggedGapFocus = items.firstIndex { $0.answer == nil } ?? 0
@@ -93,7 +100,9 @@ extension OCRProcessor {
             guard done, !Task.isCancelled else { return .stopped }
             items = flaggedGapItems
             flaggedGapItems = []
-            persistWindowSegmentationProgress(answers: FlaggedReview.answersByPage(items))
+            guard persistWindowSegmentationProgress(answers: FlaggedReview.answersByPage(items)) else {
+                return .stopped
+            }
         }
 
         // Apply every boundary, then the skim.
@@ -154,7 +163,7 @@ extension OCRProcessor {
             return await stopOrCheckAll(pages: pages, spec: nil, answered: [:],
                                         message: error.localizedDescription)
         }
-        let prior = activePendingRun?.segmentationWindows ?? [:]
+        let prior = activePendingRun?.segmentationWindows ?? activePendingBatch?.segmentationWindows ?? [:]
         // The Claude plan's meter and pauses (W36.seg-opt-subscription). Used only if Claude goes by the plan.
         let calibration = PlanCalibrationStore.load()
         let notional = SegmentationRow.planNotionalUSD(partner ?? approach, options: SegmentationOptionsStore.shared,
@@ -258,20 +267,20 @@ extension OCRProcessor {
                     guard !Task.isCancelled else { return }
                     await self?.persistWindowSegmentationProgress(windows: answered)
                 }
-            persistWindowSegmentationProgress(windows: result.answered)
+            guard persistWindowSegmentationProgress(windows: result.answered) else { return nil }
             return result.proposals
         } catch WindowSegmenterError.usageLimit(let reset, let message, let answered) {
-            persistWindowSegmentationProgress(windows: answered)
+            guard persistWindowSegmentationProgress(windows: answered) else { return nil }
             let when = reset.map { " It resets \(Self.windowResetFormatter.string(from: $0))." } ?? ""
             return await stopOrCheckAll(pages: pages, spec: spec, answered: answered,
                                         message: "The model's usage limit was reached.\(when) \(message.suffix(200))")
         } catch WindowSegmenterError.paused(let reset, let message, let answered) {
-            persistWindowSegmentationProgress(windows: answered)
+            guard persistWindowSegmentationProgress(windows: answered) else { return nil }
             let when = reset.map { " It resets \(Self.windowResetFormatter.string(from: $0))." } ?? ""
             return await stopOrCheckAll(pages: pages, spec: spec, answered: answered, message: message + when,
                                         title: "Segmentation paused")
         } catch WindowSegmenterError.fatal(let message, let answered) {
-            persistWindowSegmentationProgress(windows: answered)
+            guard persistWindowSegmentationProgress(windows: answered) else { return nil }
             return await stopOrCheckAll(pages: pages, spec: spec, answered: answered, message: message)
         } catch {
             if Task.isCancelled || error is CancellationError { return nil }
@@ -308,7 +317,7 @@ extension OCRProcessor {
         // A Stop pressed during the last suspension has already released the continuations: arming a new one
         // now would show a stale prompt and leak it.
         guard !Task.isCancelled else { return nil }
-        let canResume = activePendingRun != nil
+        let canResume = activePendingRun != nil || activePendingBatch?.usesWindowSegmentation == true
         windowStopPrompt = WindowStopPrompt(message: message, canResumeLater: canResume, title: title)
         let choice = await withCheckedContinuation { continuation in
             windowStopContinuation = continuation
@@ -423,6 +432,7 @@ extension OCRProcessor {
         // The OCR it stops after was paid for (W46.settings-ledger-more); a resume that finishes the run adds the rest.
         recordUnfinishedRunSpend()
         activePendingRun = nil
+        activePendingBatch = nil
         isProcessing = false
         cleanupTempFiles()
         checkForPendingBatch()

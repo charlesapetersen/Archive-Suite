@@ -1,6 +1,7 @@
 import Foundation
 import UserNotifications
 import CryptoKit
+import ArchiveCore
 
 extension OCRProcessor {
     // MARK: - Batch/run resume identity (crash-resume, Tier-2)
@@ -147,6 +148,17 @@ extension OCRProcessor {
         let newspaperParts: [String: OCRResult]?
         let outputSubfolders: [String: String]?
 
+        let segmentationApproach: SegmentationApproach?
+        let segmentationPartner: SegmentationApproach?
+        let segmentationWindows: [AnsweredWindow]?
+        let segmentationAnswers: [String: SavedGapAnswer]?
+        let resultsCollected: Bool?
+
+        struct AnsweredWindow: Encodable {
+            let key: WindowKey
+            let answer: WindowAnswer
+        }
+
         init(batch: PendingBatch) {
             batchId = batch.batchId
             provider = batch.provider
@@ -175,6 +187,14 @@ extension OCRProcessor {
             newspaperManifest = batch.newspaperManifest
             newspaperParts = batch.newspaperParts
             outputSubfolders = batch.outputSubfolders
+            segmentationApproach = batch.segmentationApproach
+            segmentationPartner = batch.segmentationPartner
+            // Codable encodes a dictionary with struct keys as an unordered array of key/value pairs.
+            segmentationWindows = batch.segmentationWindows?.map { AnsweredWindow(key: $0.key, answer: $0.value) }
+                .sorted { ($0.key.voter, $0.key.pages, $0.key.start, $0.key.end) <
+                          ($1.key.voter, $1.key.pages, $1.key.start, $1.key.end) }
+            segmentationAnswers = batch.segmentationAnswers
+            resultsCollected = batch.resultsCollected
         }
     }
 
@@ -221,6 +241,7 @@ extension OCRProcessor {
         // Chunk→file ranges are provider-owned and legacy Gemini IDs are string-only, so conservatively
         // re-fetch every consumed chunk. processBatchResults skips still-present per-file keys.
         repaired.consumedChunkIds = []
+        repaired.resultsCollected = nil
         repaired.lifecycleFingerprint = nil
         return repaired
     }
@@ -404,9 +425,7 @@ extension OCRProcessor {
         runConfig.enableSegmentJSON = pending.enableSegmentJSON
         runConfig.gateway = nil
         runConfig.localAgent = nil
-        // The batch journal records no Segmentation approach, so a resumed batch never runs the window
-        // segmenter on whatever Settings holds now (W36.seg-opt-review): it segments as Manual does.
-        runConfig.segmentationApproach = .manual
+        runConfig.segmentationApproach = pending.segmentationApproach ?? .manual
         // The cascade the batch was submitted with (W41.app-ocr-cascade); a journal without one escalates nothing.
         runConfig.cascade = pending.cascade ?? .off
         if let exportOriginals = pending.exportOriginals {
@@ -658,7 +677,11 @@ extension OCRProcessor {
 
         // A nil lifecycle version is the old submit-once manifest. Preserve its paid job exactly as the
         // compatibility path above did; only v1 journals are held to the stronger evolving-state contract.
-        guard let lifecycleVersion = batch.lifecycleVersion else { return batch.mixedPDFOutcomes == nil }
+        guard let lifecycleVersion = batch.lifecycleVersion else {
+            return batch.mixedPDFOutcomes == nil && batch.segmentationApproach == nil
+                && batch.segmentationPartner == nil && batch.segmentationWindows == nil
+                && batch.segmentationAnswers == nil && batch.resultsCollected == nil
+        }
         guard lifecycleVersion == PendingBatch.currentLifecycleVersion,
               !batch.fileURLs.isEmpty,
               batch.batchId == batch.submittedChunkIds.joined(separator: ","),
@@ -673,18 +696,32 @@ extension OCRProcessor {
             guard let index = Int(key) else { return false }
             return key == String(index) && index >= 0 && index < batch.fileURLs.count
         }
+        guard resultKeysAreValid else { return false }
         let outputPaths = batch.completedOutputPaths ?? [:]
+        let outputRoot = batch.outputDirectory.standardizedFileURL
         let outputPathsAreValid = Set(outputPaths.keys) == Set(batch.completedResults.keys)
             && outputPaths.allSatisfy { key, path in
-                guard batch.completedResults[key] != nil else { return false }
+                guard let index = Int(key), NSString(string: path).isAbsolutePath else { return false }
                 let url = URL(fileURLWithPath: path).standardizedFileURL
-                return NSString(string: path).isAbsolutePath
-                    && url.pathExtension.lowercased() == "pdf"
-                    && url.deletingLastPathComponent().path
-                        == batch.outputDirectory.standardizedFileURL.path
+                guard url.pathExtension.lowercased() == "pdf" else { return false }
+                let parent = url.deletingLastPathComponent()
+                // The tree writer may fall back to the output root. Otherwise the parent must be
+                // this source's exact assigned tree folder, with no link redirecting it elsewhere.
+                if parent.path == outputRoot.path { return true }
+                let sourcePath = batch.fileURLs[index].standardizedFileURL.path
+                guard let relative = batch.outputSubfolders?[sourcePath],
+                      let parts = ContainerTree.components(ofRelativePath: relative) else { return false }
+                func treeFolder(under root: URL) -> URL {
+                    parts.reduce(root) { $0.appendingPathComponent($1, isDirectory: true) }
+                }
+                return parent.path == treeFolder(under: outputRoot).path
+                    && parent.resolvingSymlinksInPath().path
+                        == treeFolder(under: outputRoot.resolvingSymlinksInPath()).path
             }
         guard NewspaperBatch.valid(batch.newspaperManifest, parts: batch.newspaperParts, files: batch.fileURLs.count),
-              resultKeysAreValid, outputPathsAreValid,
+              outputPathsAreValid,
+              batch.resultsCollected != true || (batch.submissionComplete && batch.usesWindowSegmentation
+                  && batch.completedResults.count == batch.fileURLs.count),
               mixedPDFOutcomesAreValid(batch.mixedPDFOutcomes, images: batch.fileURLs,
                                        outputDirectory: batch.outputDirectory,
                                        imageOutputPaths: Array(outputPaths.values)),
@@ -1005,21 +1042,35 @@ extension OCRProcessor {
         return " \(names.count) \(names.count == 1 ? "page" : "pages") may have read poorly (\(why)); "
             + "check \(shown)\(more). " + measured.joined(separator: "; ") + "."
     }
+    /// Save window and flagged-gap answers so a resume can reuse them after OCR.
+    @discardableResult
+    func persistWindowSegmentationProgress(windows: [WindowKey: WindowAnswer]? = nil,
+                                           answers: [String: SavedGapAnswer]? = nil) -> Bool {
+        guard !Task.isCancelled else { return false }
+        if var run = activePendingRun {
+            if let windows { run.segmentationWindows = windows }
+            if let answers { run.segmentationAnswers = (run.segmentationAnswers ?? [:]).merging(answers) { $1 } }
+            activePendingRun = run
+            if let save = pendingRunSaveOverride { save(run) } else { Self.savePendingRun(run) }
+        } else if let batch = activePendingBatch, batch.usesWindowSegmentation {
+            let saved = persistPendingBatchMutation(
+                failureMessage: "Could not save segmentation progress. The paid batch was kept for Resume."
+            ) { batch in
+                if let windows { batch.segmentationWindows = windows }
+                if let answers { batch.segmentationAnswers = (batch.segmentationAnswers ?? [:]).merging(answers) { $1 } }
+            }
+            guard saved else {
+                finishInterruptedBatchPoll()
+                return false
+            }
+        }
+        return true
+    }
+
     /// Save a completed OCR result to the pending run on disk, along with the EXACT output-PDF path that
     /// was assigned to this index in the original pass. Persisting the assigned path (not just the result)
     /// is what lets resume reuse the same source→output association verbatim instead of re-deriving it in
     /// index order, which would swap outputs for two sources that share a base filename (B7).
-    /// W36.seg-opt-review: keep the window answers and the flagged-gap answers in the run's manifest, so a
-    /// resume asks neither the model nor the user again. A no-op outside a non-batch run (a batch's journal is
-    /// retired before segmentation, and a pre-OCRed run has none).
-    func persistWindowSegmentationProgress(windows: [WindowKey: WindowAnswer]? = nil,
-                                           answers: [String: SavedGapAnswer]? = nil) {
-        guard var run = activePendingRun else { return }
-        if let windows { run.segmentationWindows = windows }
-        if let answers { run.segmentationAnswers = (run.segmentationAnswers ?? [:]).merging(answers) { $1 } }
-        activePendingRun = run
-        if let save = pendingRunSaveOverride { save(run) } else { Self.savePendingRun(run) }
-    }
     @discardableResult
     func saveResultToPendingRun(index: Int, result: OCRResult, outputURL: URL? = nil) -> Bool {
         // Paid batches have their own lifecycle journal. Persist every materialized result before a
@@ -1797,7 +1848,7 @@ extension OCRProcessor {
         }
         activeBatch = nil
         guard !Task.isCancelled else { return }
-        if monthlySpend == nil {
+        if monthlySpend == nil, !pending.usesWindowSegmentation {
             retirePaidBatchJournalIfPollCompleted()
         }
 
@@ -1826,7 +1877,8 @@ extension OCRProcessor {
             // W36.seg-opt-review: a window approach runs its stage (and its review) here too, reusing the
             // answers the manifest kept; otherwise the stored per-page classifications segment, as before.
             let plan = segmentationPlan(tagging: runOutputSettings.taggingMode, runConfig: runConfig)
-            let preGrouped = preGroupedBoundaries.count == pending.fileURLs.count && !pending.fileURLs.isEmpty
+            let preGrouped = !pending.usesWindowSegmentation
+                && preGroupedBoundaries.count == pending.fileURLs.count && !pending.fileURLs.isEmpty
             if case .windows(let approach) = plan, !preGrouped {
                 guard await runWindowSegmentationStage(files: pending.fileURLs, approach: approach,
                                                        runConfig: runConfig, outputDirectory: pending.outputDirectory,
@@ -1836,6 +1888,9 @@ extension OCRProcessor {
             } else {
                 statusMessage = "Segmenting documents…"
                 rebuildSegments(files: pending.fileURLs)
+            }
+            if monthlySpend == nil, activePendingBatch?.usesWindowSegmentation == true {
+                retirePaidBatchJournalIfPollCompleted()
             }
             statusMessage = "Found \(segments.count) segments. Generating tags…"
 
@@ -3025,8 +3080,8 @@ extension OCRProcessor {
         let unavailableModel = unavailableOpenRouterRunMessage
         let spendingLimit = monthlyStopMessage
         monthlyStopMessage = nil
-        let collectingPaidBatchLater = monthlySpend != nil && activeBatch == nil
-            && activePendingBatch?.effectiveChunkIds.isEmpty == false
+        let collectingPaidBatchLater = activeBatch == nil && activePendingBatch?.effectiveChunkIds.isEmpty == false
+            && (monthlySpend != nil || activePendingBatch?.usesWindowSegmentation == true)
         let keepsRecovery = activePendingRun != nil || activePendingMixedPDF != nil || collectingPaidBatchLater
         unavailableOpenRouterRunMessage = nil
         // A Stop pressed while a quit waits for its pages takes the quit back: the run stops and the app stays open.
@@ -3763,6 +3818,10 @@ extension OCRProcessor {
             }
 
             guard !Task.isCancelled else { cleanupTempFiles(); return }
+
+            if monthlySpend == nil, activePendingBatch?.usesWindowSegmentation == true {
+                retirePaidBatchJournalIfPollCompleted()
+            }
 
             // Phase 2: Tagging (mode-dependent)
             if enableTagging && !passSourceTags {

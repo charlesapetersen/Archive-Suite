@@ -514,6 +514,23 @@ class OCRProcessor: ObservableObject {
         /// The batch's tree (W47.ct-processor-intake, `OCRProcessor.outputSubfolders`); nil reads as none.
         var outputSubfolders: [String: String]? = nil
 
+        /// The run's segmenter and optional local-model partner, captured before submission.
+        /// Older batches have no recorded choice and resume with Manual.
+        var segmentationApproach: SegmentationApproach? = nil
+        var segmentationPartner: SegmentationApproach? = nil
+        var segmentationWindows: [WindowKey: WindowAnswer]? = nil
+        var segmentationAnswers: [String: SavedGapAnswer]? = nil
+        /// True after the poll ended and every OCR result and output path was recorded.
+        var resultsCollected: Bool? = nil
+
+        var usesWindowSegmentation: Bool {
+            guard enableTagging,
+                  case .windows = SegmentationPlan.resolve(tagging: taggingMode,
+                                                          approach: segmentationApproach ?? .manual)
+            else { return false }
+            return true
+        }
+
         init(batchId: String, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
              fileURLs: [URL], outputDirectory: URL, enableTagging: Bool,
              enableCollectionSegmentation: Bool = false, sendPreviousImage: Bool, submittedAt: Date,
@@ -582,6 +599,12 @@ class OCRProcessor: ObservableObject {
             completedOutputPaths = try c.decodeIfPresent([String: String].self, forKey: .completedOutputPaths)
             lifecycleFingerprint = try c.decodeIfPresent(String.self, forKey: .lifecycleFingerprint)
             mixedPDFOutcomes = try c.decodeIfPresent([MixedPDFOutcome].self, forKey: .mixedPDFOutcomes)
+            outputSubfolders = try c.decodeIfPresent([String: String].self, forKey: .outputSubfolders)
+            segmentationApproach = try c.decodeIfPresent(SegmentationApproach.self, forKey: .segmentationApproach)
+            segmentationPartner = try c.decodeIfPresent(SegmentationApproach.self, forKey: .segmentationPartner)
+            segmentationWindows = try c.decodeIfPresent([WindowKey: WindowAnswer].self, forKey: .segmentationWindows)
+            segmentationAnswers = try c.decodeIfPresent([String: SavedGapAnswer].self, forKey: .segmentationAnswers)
+            resultsCollected = try c.decodeIfPresent(Bool.self, forKey: .resultsCollected)
             newspaperManifest = try c.decodeIfPresent(NewspaperBatch.Manifest.self, forKey: .newspaperManifest)
             newspaperParts = try c.decodeIfPresent([String: OCRResult].self, forKey: .newspaperParts)
             cascade = try c.decodeIfPresent(OCRCascade.self, forKey: .cascade)

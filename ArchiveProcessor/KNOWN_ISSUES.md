@@ -1156,11 +1156,10 @@ Runtime evidence and the final unattended rerun are under `verification/evidence
 
 ## ⚠️ LIMITATION (W36.seg-opt-review, 2026-10-11): where the window segmenter's run state is and is not kept
 
-- **A paid batch resumed after a relaunch segments as Manual does.** `PendingBatch` records no approach, so rather
-  than run the window segmenter on whatever Settings holds now, the resume pins `manual`. Its journal is also
-  retired before segmentation, so a batch run that hits a usage limit offers only "check the rest myself", not
-  Stop. A non-batch run keeps its approach and its answers (`PendingRunRuntimeConfig.segmentationApproach`,
-  `PendingRun.segmentationWindows`/`segmentationAnswers`) and can stop and resume. (queued: W49.proc-batch-resume-approach)
+- **Fixed in W49.proc-batch-resume-approach.** A paid batch journal keeps the chosen segmenter, its optional
+  local-model partner, completed windows and confirmed flagged-gap answers. A usage limit offers Stop and
+  the batch can resume from its saved progress. Older journals without a recorded segmenter still use Manual.
+  (accepted: fixed history; older journals never recorded the choice)
 - **A window approach sends page images to its model even in an Apple Vision run** that has a judgment LLM. The
   approach is an explicit opt-in with its cost shown, so this is by design, but it is not text-only. (accepted: the window approach is an explicit opt-in with its cost shown, by design)
 - **Every page's window image is held in memory for the run** (about 1,600 px JPEGs, so roughly 150 MB for 500

@@ -896,6 +896,10 @@ enum BatchResumeTestDriver {
         // are real files only under the redirected scratch state root.
         BatchDismissedRunContract.run(check: check, redirected: journalsAreRedirected)
 
+        if journalsAreRedirected {
+            await SegmentationReviewTestDriver.checkPaidBatchResume(in: outDir, check: check)
+        }
+
         let passed = results.allSatisfy { $0.hasPrefix("PASS") }
         let report = (passed ? "ALL PASS\n" : "SOME FAILED\n") + results.joined(separator: "\n") + "\n"
         let outPath = ProcessInfo.processInfo.environment["BATCHRESUME_TEST_OUT"]

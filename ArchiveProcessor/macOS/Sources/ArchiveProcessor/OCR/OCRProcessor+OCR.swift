@@ -854,6 +854,13 @@ extension OCRProcessor {
             initialPendingBatch.newspaperManifest = newspaper.manifest
             initialPendingBatch.newspaperParts = [:]
         }
+        // Live Capture already supplies the boundaries, so its batch must not start a window segmenter.
+        let preGrouped = preGroupedBoundaries.count == originalFiles.count && !originalFiles.isEmpty
+        initialPendingBatch.segmentationApproach = preGrouped
+            ? .manual : (runConfig?.segmentationApproach ?? SegmentationApproach.stored())
+        if initialPendingBatch.segmentationApproach == .local {
+            initialPendingBatch.segmentationPartner = SegmentationApproach.storedLocalPartner()
+        }
         initialPendingBatch.cascade = Self.ocrCallValues(for: runConfig).cascade
         initialPendingBatch.outputSubfolders = outputSubfolders.isEmpty ? nil : outputSubfolders   // W47.ct-processor-intake
         initialPendingBatch.resolvedSettings = activeResolvedSettings
@@ -968,7 +975,9 @@ extension OCRProcessor {
         )
 
         // Keep the pending batch if polling was interrupted transiently, so it stays resumable.
-        if monthlySpend == nil { retirePaidBatchJournalIfPollCompleted() }
+        if monthlySpend == nil, activePendingBatch?.usesWindowSegmentation != true {
+            retirePaidBatchJournalIfPollCompleted()
+        }
         activeBatch = nil
         progress = 0.7
     }
@@ -998,6 +1007,8 @@ extension OCRProcessor {
         // NOT persist (W16.bat7) — they now all set it, marked `// W16.bat7` at each site. The fourth sits
         // in `sweepJobsWithNoBatchResult`, extracted below so that one can be driven rather than read.
         batchPollInterrupted = false
+        // Segmentation can resume from materialized OCR even after the provider's results expire.
+        if activePendingBatch?.resultsCollected == true { return }
         var consumedChunkIds = Set(activePendingBatch?.consumedChunkIds ?? [])
         // How many times a chunk has come back terminal-but-empty, and the chunks already given up on
         // (W16.bat1-fu). Poll-session state, deliberately not journaled: the give-up is terminal within
@@ -1231,6 +1242,12 @@ extension OCRProcessor {
         guard !batchPollInterrupted else { return }
         guard await sweepJobsWithNoBatchResult(
             model: model, outputDirectory: outputDirectory, runConfig: runConfig) else { return }
+        if let batch = activePendingBatch, batch.usesWindowSegmentation, batch.submissionComplete,
+           batch.completedResults.count == batch.fileURLs.count, !Task.isCancelled {
+            persistPendingBatchMutation(
+                failureMessage: "Could not record that batch OCR finished. The paid batch was kept for Resume."
+            ) { $0.resultsCollected = true }
+        }
     }
     /// The completion sweep. The whole batch reached a terminal state, so any job still `.processing` got no
     /// result: give each a proper failure output with a specific reason — in particular, distinguish a
