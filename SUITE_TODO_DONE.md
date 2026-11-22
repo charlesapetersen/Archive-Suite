@@ -17940,3 +17940,13 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   fill. The Reader labels the complete-value estimates and their ranges from retained in-process replies.
   No new bench cache or paid work. Retained replies and answer sheets remain as the evidence.
   <!-- /W46.p18-mac-field-precision -->
+- [x] **W49.proc-openrouter-rotation — OpenRouter as a rotation route, using the measured Gemini model [S]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build) — Owner, 2026-11-19 (call 22, the accepted-issues sheet's second round; `execution-plans/processing-review/17b-accepted-review-round2.json` entry `p-openrouter-rotation`, answers in `answers/17b-accepted-review-round2-answers-20261119.json`): change it. An OpenRouter case in LLMRotationDetector's ask, hasRoute and hasMeasuredRoute pinned to the measured model, its calls in the cost estimate, the Settings wording, a test. Batch through OpenRouter stays unavailable (it has none).
+  SHIPPED 2026-11-22 (this commit). The OpenRouter backend uses `google/gemini-3.7-flash` for rotation with a fixed request,
+  a standard-rate price ceiling and data collection disabled. The recommended mode calls it only when the local
+  checks cannot settle the page. The estimates use the gateway benchmark's $0.0037 and 5.79 s per call, with the
+  benchmark's observed call share in the recommended mode. Settings names the route and includes the cost.
+  Incomplete gateway settings cannot send the gateway credential on the rotation route. The scratch rotation,
+  OpenRouter, manifest persistence and Process Files checks passed with 1,028 assertions. Two focused off-screen
+  UI tests passed. The Android-to-Mac smoke filed all three synthetic pages and verified OCR text and tags using
+  Gemini Flash-Lite at the usual few-cent smoke cost. OpenRouter verification used mocked requests.
+  <!-- /W49.proc-openrouter-rotation -->

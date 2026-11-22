@@ -265,7 +265,7 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
 - **The estimate counts the maker's thinking tokens at Low only.** At High, a maker's thinking model gets the direct
   clients' 8,000-token budget on top of the bench's 8,192, but the estimate still counts 117 thinking tokens a page for
   Gemini 3.8 Flash and none for the others, as the direct routes' estimates do. (accepted: no High thinking figure is measured; the estimate follows the direct routes').
-- **No batch, no LLM rotation** through OpenRouter: the standard price only, and rotation stays on this Mac. (queued: W49.proc-openrouter-rotation).
+- **Processor sends OpenRouter requests at standard rates.** Batch mode is unavailable in the app.
 - **The unmeasured Claude models (Sonnet 4.6, Opus 4.6, Opus 5.5, Haiku 4.5) and the unmeasured Gemini and GPT
   built-ins come through OpenRouter only as unmeasured listing models** (W41.app-openrouter-unmeasured): by the listing's
   ids, unpinned, without their makers' handling (Gemini's refusals and second reader, image-token counts) and not as a

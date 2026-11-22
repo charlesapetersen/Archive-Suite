@@ -954,11 +954,13 @@ enum OpenRouterTestDriver {
               String(format: "$%.2f", q.ocrCost))
         eq("5 no batch discount offered", e.batchOcrCost, e.ocrCost)
         eq("5 GLM's minimal reasoning is priced as output", CostEstimator.estimatedThinkingTokens(for: OpenRouterRoute.catalog[2].model), 153)
-        eq("5 the time estimate does not count LLM rotation", TimeEstimator.estimate(
-            fileCount: 10, model: m, rotationMode: .llmMajority, enableTagging: false).rotationSeconds, 0)
-        eq("5 rotation by LLM is not priced (local Vision instead)",
-           CostEstimator.estimate(fileCount: 10, model: m, enableTagging: false, sendPreviousImage: false,
-                                  contextCharCount: 0, rotationMode: .llmMajority).rotationCost, 0)
+        let rotation = TimeEstimator.estimate(
+            fileCount: 10, model: m, rotationMode: .llmMajority, enableTagging: false, ocrWorkers: 4)
+        check("5 the time estimate counts three Gemini comparisons per page across four workers",
+              abs(rotation.rotationSeconds - 9 * 5.79) < 1e-9)
+        let majority = CostEstimator.estimate(fileCount: 10, model: m, enableTagging: false, sendPreviousImage: false,
+                                               contextCharCount: 0, rotationMode: .llmMajority)
+        check("5 the estimate prices three Gemini comparisons per page", abs(majority.rotationCost - 30 * 0.0037) < 1e-9)
     }
 
     /// W46.rotation-majority-fix: llmMajority's vote is deterministic. A tie goes to the earliest vote (the first

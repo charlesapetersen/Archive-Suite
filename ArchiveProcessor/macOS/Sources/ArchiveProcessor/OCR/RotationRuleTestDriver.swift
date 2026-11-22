@@ -24,10 +24,16 @@ enum RotationRuleTestDriver {
         var requests: [URLRequest] = []
         var status = 200
         var letter = "C"
-        func set(status: Int, letter: String) { self.status = status; self.letter = letter; requests = [] }
+        var finish = "stop"
+        func set(status: Int, letter: String, finish: String = "stop") {
+            self.status = status
+            self.letter = letter
+            self.finish = finish
+            requests = []
+        }
         func answer(_ request: URLRequest) -> (Int, String) {
             requests.append(request)
-            return (status, #"{"choices":[{"message":{"content":"\#(letter)"}}]}"#)
+            return (status, #"{"choices":[{"finish_reason":"\#(finish)","message":{"content":"\#(letter)"}}]}"#)
         }
         func seen() -> [URLRequest] { requests }
     }
@@ -76,7 +82,15 @@ enum RotationRuleTestDriver {
               !LLMRotationDetector.hasRoute(provider: .gemini, usesGateway: false, usesLocalAgent: true))
         check("2 a direct Gemini key has a route but not a measured one",
               LLMRotationDetector.hasRoute(provider: .gemini, usesGateway: false, usesLocalAgent: false)
-                && !LLMRotationDetector.hasMeasuredRoute(usesGateway: false, usesLocalAgent: false, gatewayIsLocal: false))
+                && !LLMRotationDetector.hasMeasuredRoute(provider: .gemini, usesGateway: false, usesLocalAgent: false, gatewayIsLocal: false))
+        check("2 OpenRouter offers the measured model outside the gateway and Local Agent routes",
+              LLMRotationDetector.hasRoute(provider: .openrouter, usesGateway: false, usesLocalAgent: false)
+                && LLMRotationDetector.hasMeasuredRoute(provider: .openrouter, usesGateway: false,
+                                                        usesLocalAgent: false, gatewayIsLocal: false)
+                && !LLMRotationDetector.hasMeasuredRoute(provider: .openrouter, usesGateway: true,
+                                                         usesLocalAgent: false, gatewayIsLocal: true)
+                && !LLMRotationDetector.hasMeasuredRoute(provider: .openrouter, usesGateway: false,
+                                                         usesLocalAgent: true, gatewayIsLocal: false))
         check("2 the estimates price gateway calls only where the run makes them",
               LLMRotationDetector.callsGateway(mode: .agreement, gateway: remote, usesLocalAgent: false)
                 && LLMRotationDetector.callsGateway(mode: .llmSingle, gateway: remote, usesLocalAgent: false)
@@ -100,11 +114,11 @@ enum RotationRuleTestDriver {
 
         await wire.set(status: 200, letter: "C")
         let asked = await LLMRotationDetector.detectCorrection(
-            imageURL: page, provider: .anthropic, apiKey: "unused", orderings: 1, gatewayConfig: remote)
+            imageURL: page, provider: .openrouter, apiKey: "unused", orderings: 1, gatewayConfig: remote)
         let sent = await wire.seen()
         let body = sent.first?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         let content = ((body?["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]) ?? []
-        check("3 one call to the gateway's chat completions",
+        check("3 the active gateway takes precedence over a stored OpenRouter provider",
               sent.count == 1 && sent.first?.url?.absoluteString == "https://gateway.invalid/v1/chat/completions")
         check("3 it asks the measured model with the measured settings, whatever the OCR model",
               body?["model"] as? String == "gemini-3.7-flash" && (body?["temperature"] as? Int) == 0
@@ -134,6 +148,66 @@ enum RotationRuleTestDriver {
                                               gatewayConfig: remote)
         let escalated = await wire.seen().count
         check("3 on a remote gateway the rule calls at most once a page", escalated <= 1)
+
+        // Use an image without text so Vision abstains and the real agreement path has to ask OpenRouter.
+        guard let blankPage = makePage(at: root.appendingPathComponent("blank.jpg"), withText: false) else {
+            finish(results + ["FAIL: blank fixture could not be created"]); return
+        }
+        await wire.set(status: 200, letter: "D")
+        let openRouterVerdict = await OpenRouterDataPolicy.$denyDataCollection.withValue(true) {
+            await OCRProcessor.detectRotation(imageURL: blankPage, provider: .openrouter, apiKey: "rotation-test",
+                                              mode: .agreement, gatewayConfig: nil)
+        }
+        let openRouterRequests = await wire.seen()
+        let request = openRouterRequests.first
+        let openRouterBody = request?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        let routing = openRouterBody?["provider"] as? [String: Any]
+        let reasoning = openRouterBody?["reasoning"] as? [String: Any]
+        let parts = (openRouterBody?["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]
+        check("3 disagreement sends one authenticated OpenRouter call and uses its correction",
+              openRouterRequests.count == 1 && openRouterVerdict == V(correction: 270)
+                && request?.url?.absoluteString == "https://openrouter.ai/api/v1/chat/completions"
+                && request?.value(forHTTPHeaderField: "Authorization") == "Bearer rotation-test")
+        check("3 OpenRouter sends four candidates to the same Gemini model at the benchmark settings",
+              openRouterBody?["model"] as? String == "google/gemini-3.7-flash"
+                && openRouterBody?["temperature"] as? Int == 0 && openRouterBody?["max_tokens"] as? Int == 2048
+                && reasoning?["effort"] as? String == "minimal"
+                && parts?.filter { $0["type"] as? String == "image_url" }.count == 4)
+        check("3 OpenRouter denies data collection and caps the model's price",
+              routing?["data_collection"] as? String == "deny" && routing?["require_parameters"] as? Bool == true
+                && routing?["max_price"] as? [String: Double] == ["prompt": 0.75, "completion": 3.75])
+        await wire.set(status: 200, letter: "D")
+        let majority = await OCRProcessor.detectRotation(imageURL: page, provider: .openrouter, apiKey: "rotation-test",
+                                                          mode: .llmMajority, gatewayConfig: nil)
+        let majorityRequests = await wire.seen()
+        let majorityBody = majorityRequests.first?.httpBody.flatMap {
+            try? JSONSerialization.jsonObject(with: $0) as? [String: Any]
+        }
+        check("3 OpenRouter majority sends three orderings and also denies data collection",
+              majorityRequests.count == 3 && majority == V(correction: 270)
+                && (majorityBody?["provider"] as? [String: Any])?["data_collection"] as? String == "deny")
+        await wire.set(status: 404, letter: "D")
+        let fallback = await OCRProcessor.detectRotation(imageURL: blankPage, provider: .openrouter, apiKey: "rotation-test",
+                                                         mode: .agreement, gatewayConfig: nil)
+        check("3 an unavailable OpenRouter model leaves a Vision abstention unturned and marked unsure",
+              fallback == V(correction: 0, unsure: true))
+
+        await wire.set(status: 200, letter: "D", finish: "error")
+        let providerError = await OCRProcessor.detectRotation(
+            imageURL: blankPage, provider: .openrouter, apiKey: "rotation-test", mode: .agreement, gatewayConfig: nil)
+        check("3 a failed OpenRouter choice cannot vote even if it contains a letter",
+              providerError == V(correction: 0, unsure: true))
+
+        let incompleteGateway = UserDefaults(suiteName: "APRotationGateway-\(UUID().uuidString)")!
+        incompleteGateway.set(true, forKey: DefaultsKeys.useGateway)
+        incompleteGateway.set(true, forKey: DefaultsKeys.gatewayLocalModel)
+        incompleteGateway.set(LLMProvider.openrouter.rawValue, forKey: DefaultsKeys.selectedProvider)
+        let live = SessionProcessingConfig.fromDefaults(incompleteGateway)
+        await wire.set(status: 200, letter: "D")
+        _ = await OCRProcessor.detectRotation(imageURL: blankPage, provider: live.provider, apiKey: live.apiKey,
+                                              mode: .agreement, gatewayConfig: live.gateway)
+        check("3 incomplete gateway settings cannot send a gateway credential via Live Capture's rotation",
+              await wire.seen().isEmpty && live.apiKey.isEmpty)
 
         // 4. The bundled model.
         check("4 the bundled PP-LCNet loads", RotationLCNet.isAvailable)
@@ -180,19 +254,42 @@ enum RotationRuleTestDriver {
                                           useGateway: true, gatewayRotation: true)
         check("6 the time estimate counts the gateway's calls", time.rotationSeconds > 0)
 
+        let routerModel = OpenRouterRoute.catalog[0].model
+        func openRouterCost(_ mode: RotationMode, preOCRed: Bool = false, useGateway: Bool = false) -> Double {
+            CostEstimator.estimate(fileCount: 1000, model: routerModel, enableTagging: false, preOCRedInput: preOCRed,
+                                   sendPreviousImage: false, contextCharCount: 0, rotationMode: mode,
+                                   useGateway: useGateway).rotationCost
+        }
+        check("6 OpenRouter prices the estimated agreement calls and one or three comparisons per page",
+              abs(openRouterCost(.agreement) - 3.7 * 45.0 / 476.0) < 1e-9
+                && abs(openRouterCost(.llmSingle) - 3.7) < 1e-9
+                && abs(openRouterCost(.llmMajority) - 11.1) < 1e-9)
+        check("6 local, off, pre-OCRed and local gateway paths incur no OpenRouter rotation cost",
+              openRouterCost(.localVision) == 0 && openRouterCost(.off) == 0
+                && openRouterCost(.agreement, preOCRed: true) == 0 && openRouterCost(.agreement, useGateway: true) == 0)
+        let pdfEstimate = CostEstimator.estimateDirectPDFPages(pageCount: 1000, model: routerModel,
+                                                               rotationMode: .llmSingle)
+        check("6 directly read PDF pages also include OpenRouter rotation", abs(pdfEstimate.rotationCost - 3.7) < 1e-9)
+        let routerTime = TimeEstimator.estimate(fileCount: 100, model: routerModel, rotationMode: .llmSingle,
+                                                enableTagging: false)
+        check("6 the time estimate counts the OpenRouter calls", routerTime.rotationSeconds == time.rotationSeconds)
+        check("6 OpenRouter still does not use the app's Batch mode", !routerModel.provider.supportsBatch)
+
         finish(results)
     }
 
-    /// A page of dark text lines on white, upright, big enough for both local detectors to read.
-    private static func makePage(at url: URL) -> URL? {
+    /// A blank page or one with upright dark text, big enough for both local detectors to read.
+    private static func makePage(at url: URL, withText: Bool = true) -> URL? {
         let size = NSSize(width: 850, height: 1100)
         let image = NSImage(size: size)
         image.lockFocus()
         NSColor.white.setFill(); NSRect(origin: .zero, size: size).fill()
-        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 22), .foregroundColor: NSColor.black]
-        for line in 0..<30 {
-            ("The committee met on the fourth of March to consider the report, line \(line)." as NSString)
-                .draw(at: NSPoint(x: 60, y: 1040 - CGFloat(line) * 33), withAttributes: attrs)
+        if withText {
+            let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 22), .foregroundColor: NSColor.black]
+            for line in 0..<30 {
+                ("The committee met on the fourth of March to consider the report, line \(line)." as NSString)
+                    .draw(at: NSPoint(x: 60, y: 1040 - CGFloat(line) * 33), withAttributes: attrs)
+            }
         }
         image.unlockFocus()
         guard let tiff = image.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),

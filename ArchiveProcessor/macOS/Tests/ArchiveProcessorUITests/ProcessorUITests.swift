@@ -117,6 +117,16 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-start-blocked-reason")
     }
 
+    func testIncompleteGatewayBlocksStartWithOpenRouterSelected() {
+        relaunch(extra: ["-APUITestSyntheticMultiPagePDF", "-APUITestStandInGateway",
+                         "-selectedProvider", "OpenRouter", "-useGateway", "YES", "-useAppleVision", "NO",
+                         "-useLocalAgent", "NO", "-gatewayBaseURL", "", "-gatewayModelID", ""])
+        let reason = element("ap.ocr.startBlockedReason")
+        XCTAssertTrue(reason.waitForExistence(timeout: 10))
+        XCTAssertTrue(renderedText(of: reason).contains("Set the gateway URL and model"))
+        XCTAssertFalse(element("ap.ocr.start").isEnabled)
+    }
+
     func testUnavailableOpenRouterModelStaysVisibleWithoutAReplacementEstimate() throws {
         let removedID = "test/unavailable-vision-model"
         relaunch(extra: ["-APUITestSyntheticMultiPagePDF", "-selectedProvider", "OpenRouter",

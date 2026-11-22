@@ -71,7 +71,7 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 - **A model on this Mac** always sends the stand-in bearer `local`, never a saved key; escalating its failed pages
   is off by default (pages may be meant to stay on the Mac). Its measured limits (4,096-token cap, streamed
   repetition check + one re-read with a repetition penalty, 600 s → `length`, temp 0, one page at a time) are required. Contract: `scripts/test-local-models.sh`.
-- **Gateway and Local Agent skip batch and LLM rotation.** Local Agent (`OCR/LocalAgentClient.swift`): no shell,
+- **Gateways and the Local Agent skip batch. Remote gateways support LLM rotation.** Local Agent (`OCR/LocalAgentClient.swift`): no shell,
   prompt on stdin not argv, absolute-path binary, per-call timeout, friendly errors (never raw stderr), **CLI-owned login**,
   with API charges reported for a key-backed Claude sign-in; only `claude` is validated (`gemini`/`codex` are `VERIFY`
   placeholders); `runAsync` signals exit via `terminationHandler` (`waitUntilExit()` on GCD missed exits) and kills

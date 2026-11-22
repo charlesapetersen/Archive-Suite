@@ -112,6 +112,28 @@ final class SettingsPanelsUITests: XCTestCase {
         XCTAssertEqual(printed.value.map { String(describing: $0) }, "1")
     }
 
+    func testOpenRouterRotationExplainsCloudCallsAndKeepsBatchUnavailable() {
+        app.terminate()
+        app.launchArguments += ["-selectedProvider", "OpenRouter", "-useAppleVision", "NO",
+                                "-useGateway", "NO", "-useLocalAgent", "NO", "-preOCRedInput", "NO",
+                                "-rotationModeRaw", "agreement"]
+        app.launch()
+        let settings = app.showSettingsWindow()
+        XCTAssertTrue(app.showSettingsPanel("Pages and output"))
+        let rotation = settings.staticTexts["ap.settings.openRouterRotation"]
+        XCTAssertTrue(rotation.waitForExistence(timeout: 5))
+        let wording = (rotation.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? rotation.label
+        XCTAssertTrue(wording.contains("Gemini 3.7 Flash through OpenRouter"), wording)
+        XCTAssertTrue(wording.contains("estimate includes these calls"), wording)
+        XCTAssertFalse(settings.staticTexts["ap.settings.rotationUnsure"].exists)
+        shoot(settings, "settings-openrouter-rotation")
+
+        let batch = settings.descendants(matching: .any)["ap.settings.batchMode"].firstMatch
+        for _ in 0..<12 where !batch.isHittable { settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -200) }
+        XCTAssertTrue(batch.exists)
+        XCTAssertFalse(batch.isEnabled)
+    }
+
     private func shoot(_ element: XCUIElement, _ name: String) {
         let screenshot = element.screenshot()
         let attachment = XCTAttachment(screenshot: screenshot)

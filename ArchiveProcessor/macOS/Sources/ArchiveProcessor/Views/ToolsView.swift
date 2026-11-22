@@ -81,7 +81,7 @@ struct ToolsView: View {
                     systemImage: "arrow.down.right.and.arrow.up.left",
                     detail: "OCR one image at 10–100% resolution to see how downscaling affects accuracy and cost. Uses the current provider/model.",
                     buttonTitle: "Test Resolution…",
-                    disabled: apiKey.isEmpty || isRunningResolutionTest
+                    disabled: apiKey.isEmpty || (useGateway && currentGatewayConfig == nil) || isRunningResolutionTest
                 ) { showResolutionDropSheet = true }
 
                 toolCard(
@@ -223,13 +223,14 @@ struct ToolsView: View {
     // MARK: Run logic (moved from OCRView; standalone OCR calls)
 
     private func runResolutionTest(imageURL: URL) {
+        let gateway = currentGatewayConfig
+        guard !useGateway || gateway != nil else { return }
         resolutionTask?.cancel()   // supersede any in-flight run so results can't interleave
         isRunningResolutionTest = true
         resolutionTestResults = []
         showResolutionTest = true
         let scales = [10, 20, 40, 60, 80, 100]
         let provider = selectedProvider
-        let gateway = currentGatewayConfig
         let localAgent = currentLocalAgentConfig
         let model = gateway?.asLLMModel() ?? selectedModel
         let thinking: ThinkingLevel? = (!useGateway && selectedModel.supportsThinking) ? selectedThinking : nil

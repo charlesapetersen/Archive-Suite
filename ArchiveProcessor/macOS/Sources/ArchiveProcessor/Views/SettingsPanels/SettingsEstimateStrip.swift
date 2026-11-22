@@ -173,7 +173,7 @@ struct SettingsEstimateStrip: View {
                 // each window interactively), so they add the same dollars to both totals.
                 let seg = segmentationRow?.apiDollars ?? 0
                 costRow("Total", CostEstimate.money(est.totalStandard + seg), bold: true)
-                if batchMode && !useGateway && !preOCRedInput {
+                if batchMode && !useGateway && !preOCRedInput && model.provider.supportsBatch {
                     costRow("Batch", CostEstimate.money(est.totalBatch + seg))
                 }
                 if !preOCRedInput { costRow("· OCR", est.ocrFormatted) }
@@ -195,7 +195,7 @@ struct SettingsEstimateStrip: View {
                 if time.rotationSeconds > 0 {
                     Text("*runs during OCR").font(.caption2).foregroundStyle(.primary)
                 }
-                if batchMode && !useGateway && !preOCRedInput {
+                if batchMode && !useGateway && !preOCRedInput && model.provider.supportsBatch {
                     Text("Batch mode returns asynchronously (minutes–hours); the time above is the equivalent interactive run.")
                         .font(.caption2).foregroundStyle(.orange)
                 }

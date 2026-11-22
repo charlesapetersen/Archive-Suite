@@ -142,7 +142,7 @@ enum TaggingMode: String, CaseIterable, Identifiable, Codable {
 enum RotationMode: String, CaseIterable, Identifiable, Codable {
     case off               // No rotation correction
     case localVision       // Free, local macOS Vision alone
-    case agreement         // Vision checked by PP-LCNet; a disagreement goes to the gateway's model, else is flagged
+    case agreement         // Vision checked by PP-LCNet; a disagreement goes to Gemini 3.7 Flash when available
     case llmSingle         // One LLM "which-of-4-is-upright" comparative call
     case llmMajority       // Three comparative calls, majority vote; a tie takes the first ordering's answer
 
@@ -165,7 +165,7 @@ enum RotationMode: String, CaseIterable, Identifiable, Codable {
         switch self {
         case .off: return "Do not correct rotation."
         case .localVision: return "On-device macOS Vision alone. Free and fast; wrong on 3 of 119 held-out pages, one of them a folder whose tab label reads upright as stored. Ambiguous text keeps the OCR model’s rotation guess."
-        case .agreement: return "Vision’s answer is checked by a second on-device model (PP-LCNet). When they agree the page is turned; when they disagree, or Vision finds no text, a remote API gateway asks Gemini 3.7 Flash once (about 1 page in 10), and otherwise the page is left as it is and counted as unsure; if that call fails, Vision’s turn is kept and the page is counted as unsure. On this Mac alone: wrong on 2 of 119 held-out pages (a near-blank cover and a folder whose tab label reads upright as stored), 14 left. With the gateway: wrong on 3 of 119, two near-blank covers and that folder. For charters, and Arabic, Hebrew or Chinese pages, choose LLM comparative: the local models leave most of those."
+        case .agreement: return "Vision’s answer is checked by a second on-device model (PP-LCNet). When they agree, the app uses their answer. If they disagree or Vision finds no text, a remote API gateway or OpenRouter asks Gemini 3.7 Flash once (about 1 page in 10). With another backend, the page is left as it is and counted as unsure. If the call fails, the app keeps Vision’s turn and counts the page as unsure. On this Mac alone: wrong on 2 of 119 held-out pages (a near-blank cover and a folder whose tab label reads upright as stored), 14 left. With the gateway: wrong on 3 of 119, two near-blank covers and that folder. For charters, and Arabic, Hebrew or Chinese pages, choose LLM comparative: the local models leave most of those."
         case .llmSingle: return "Shows the model all four rotations and asks which is upright — one extra cheap API call per image. The route for charters and non-Latin scripts."
         case .llmMajority: return "Repeats the comparison three times and takes the majority vote; three extra cheap API calls per image."
         }
@@ -181,7 +181,7 @@ enum RotationMode: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    /// The share of pages the agreement rule sends to the gateway's model: the held-out owner pages' 45 of 476 turns
+    /// The share of pages the agreement rule sends to Gemini 3.7 Flash: the held-out owner pages' 45 of 476 turns
     /// (W46.rotation-heldout). The estimators price and time that share of one call.
     static let agreementEscalationShare = 45.0 / 476.0
 }

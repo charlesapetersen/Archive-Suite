@@ -22,6 +22,10 @@ enum LLMRotationDetector {
     /// run's rotation is the measured route (W46.rotation-default, P9-3). A gateway without it answers an error,
     /// and the page falls back as on any failed call.
     static let gatewayModel = "gemini-3.7-flash"
+    /// OpenRouter's ID for the same model and its standard USD rates per million tokens.
+    /// https://openrouter.ai/google/gemini-3.7-flash
+    private static let openRouterModel = "google/\(gatewayModel)"
+    private static let openRouterMaxPrice = ["prompt": 0.75, "completion": 3.75]
     /// Long edge of the downscaled candidate images (orientation is obvious at low res).
     private static let candidatePixels = 800
 
@@ -38,30 +42,27 @@ enum LLMRotationDetector {
         [180, 0, 270, 90]
     ]
 
-    /// Whether an LLM rotation mode has a comparative call on this backend. A remote gateway asks `gatewayModel`
-    /// (W46.rotation-default); a model on this Mac behind the gateway field, the Local Agent CLI, Apple Vision,
-    /// Mistral and OpenRouter have no comparative call here, so their LLM modes fall back
-    /// (`OCRProcessor.detectRotation`); Settings says so (W40.fix-processor-rotation-deadlock).
+    /// Whether an LLM rotation mode has a comparative call on this backend. A local gateway, Local Agent,
+    /// Apple Vision and Mistral use the fallback in `OCRProcessor.detectRotation`.
     static func hasRoute(provider: LLMProvider, usesGateway: Bool, usesLocalAgent: Bool,
                          gatewayIsLocal: Bool = false) -> Bool {
-        if usesLocalAgent { return false }
-        if usesGateway { return !gatewayIsLocal }
-        return provider == .gemini || provider == .anthropic || provider == .openai
+        if hasMeasuredRoute(provider: provider, usesGateway: usesGateway, usesLocalAgent: usesLocalAgent,
+                            gatewayIsLocal: gatewayIsLocal) { return true }
+        return !usesLocalAgent && !usesGateway && [.gemini, .anthropic, .openai].contains(provider)
     }
 
-    /// Whether this backend's comparative call is a MEASURED route (`gatewayModel` on a remote gateway). The direct
-    /// keys ask models no bench measured on the rotation turns, so the agreement rule does not escalate to them
-    /// (W46.rotation-default, P9-3: a direct-key model is measured on the same turns first).
-    static func hasMeasuredRoute(usesGateway: Bool, usesLocalAgent: Bool, gatewayIsLocal: Bool) -> Bool {
-        usesGateway && !usesLocalAgent && !gatewayIsLocal
+    /// The agreement rule can ask the model W46.rotation-routes measured on the gateway.
+    /// OpenRouter uses that same model. The other direct keys use different rotation models.
+    static func hasMeasuredRoute(provider: LLMProvider, usesGateway: Bool, usesLocalAgent: Bool,
+                                 gatewayIsLocal: Bool) -> Bool {
+        guard !usesLocalAgent else { return false }
+        return usesGateway ? !gatewayIsLocal : provider == .openrouter
     }
 
     /// Whether a run in `mode` sends rotation calls to the gateway's model, as `OCRProcessor.detectRotation` decides:
     /// what the cost and time estimates price (W46.rotation-default).
     static func callsGateway(mode: RotationMode, gateway: GatewayConfig?, usesLocalAgent: Bool) -> Bool {
-        mode != .off && mode != .localVision
-            && hasMeasuredRoute(usesGateway: gateway != nil, usesLocalAgent: usesLocalAgent,
-                                gatewayIsLocal: gateway?.isLocalModel == true)
+        mode != .off && mode != .localVision && !usesLocalAgent && gateway?.isLocalModel == false
     }
 
     static func detectCorrection(
@@ -113,13 +114,13 @@ enum LLMRotationDetector {
         if let gateway {
             letter = await askGateway(images: images, gateway: gateway)
         } else {
-        switch provider {
-        case .gemini: letter = await askGemini(images: images, apiKey: apiKey)
-        case .anthropic: letter = await askAnthropic(images: images, apiKey: apiKey)
-        case .mistral: letter = nil
-        case .openai: letter = await askOpenAI(images: images, apiKey: apiKey)
-        case .appleVision, .openrouter: letter = nil   // OpenRouter: no rotation route measured
-        }
+            switch provider {
+            case .gemini: letter = await askGemini(images: images, apiKey: apiKey)
+            case .anthropic: letter = await askAnthropic(images: images, apiKey: apiKey)
+            case .openai: letter = await askOpenAI(images: images, apiKey: apiKey)
+            case .openrouter: letter = await askOpenRouter(images: images, apiKey: apiKey)
+            case .mistral, .appleVision: letter = nil
+            }
         }
         guard let label = letter.flatMap(parseLabel), let idx = labels.firstIndex(of: label) else { return nil }
         return order[idx]
@@ -201,6 +202,24 @@ enum LLMRotationDetector {
         return await chatLetter(url: url, body: body, apiKey: gateway.apiKey)
     }
 
+    private static func askOpenRouter(images: [(label: String, base64: String)], apiKey: String) async -> String? {
+        guard !apiKey.isEmpty else { return nil }
+        // As with unpinned OpenRouter OCR requests, exclude upstreams that collect data.
+        let routing: [String: Any] = [
+            "data_collection": "deny", "require_parameters": true, "max_price": openRouterMaxPrice
+        ]
+        let body: [String: Any] = [
+            "model": openRouterModel,
+            "temperature": 0,
+            "reasoning": ["effort": "minimal", "exclude": true],
+            "max_tokens": 2048,
+            "provider": routing,
+            "messages": [["role": "user", "content": chatContent(images)]]
+        ]
+        guard let url = URL(string: "\(OpenAICompatibleClient.openRouterBaseURL)/chat/completions") else { return nil }
+        return await chatLetter(url: url, body: body, apiKey: apiKey)
+    }
+
     /// The prompt and four labelled candidates as OpenAI-style content parts.
     private static func chatContent(_ images: [(label: String, base64: String)]) -> [[String: Any]] {
         var content: [[String: Any]] = [["type": "text", "text": prompt]]
@@ -223,8 +242,11 @@ enum LLMRotationDetector {
             for: request, policy: .nonIdempotent, maxRetries: 1),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: respData) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
-              let message = choices.first?["message"] as? [String: Any],
+              json["error"] as? [String: Any] == nil,
+              let choices = json["choices"] as? [[String: Any]], let choice = choices.first,
+              choice["error"] as? [String: Any] == nil,
+              !["error", "content_filter", "length"].contains(choice["finish_reason"] as? String ?? ""),
+              let message = choice["message"] as? [String: Any],
               let text = message["content"] as? String else { return nil }
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }

@@ -200,6 +200,10 @@ struct OCRView: View {
     private var currentGatewayConfig: GatewayConfig? {
         useAppleVision ? nil : GatewayConfig.fromDefaults()
     }
+    private var gatewaySetupIssue: String? {
+        guard !useAppleVision, !useLocalAgent, useGateway, currentGatewayConfig == nil else { return nil }
+        return "Set the gateway URL and model in Settings › Reading before starting."
+    }
     private var currentLocalAgentConfig: LocalAgentConfig? {
         useAppleVision ? nil : LocalAgentConfig.fromDefaults()
     }
@@ -958,7 +962,7 @@ struct OCRView: View {
                                     + (segmentationRow?.apiDollars ?? 0)))
                                     .fontWeight(.medium)
                             }
-                            if !useGateway && batchMode && !preOCRedInput && costEstimate != nil {
+                            if !useGateway && batchMode && effectiveProvider.supportsBatch && !preOCRedInput && costEstimate != nil {
                                 HStack {
                                     Text(pdfPageEstimate == nil ? "Whole-page estimate (batch):" : "Whole-page estimate (batch images + direct PDF pages):")
                                         .foregroundStyle(.primary)
@@ -1118,7 +1122,7 @@ struct OCRView: View {
                             Text(CostEstimate.money(standard * 130))
                                 .accessibilityIdentifier("ap.ocr.newspaperStandardAllowance")
                         }
-                        if !useGateway && batchMode && costEstimate != nil {
+                        if !useGateway && batchMode && effectiveProvider.supportsBatch && !preOCRedInput && costEstimate != nil {
                             let batch = CostEstimator.runTotal(images: costEstimate, directPDFPages: pdfPageEstimate, batch: true)
                                 + (segmentationRow?.apiDollars ?? 0)
                             HStack {
@@ -1152,7 +1156,7 @@ struct OCRView: View {
     /// wouldn't allow: no files, no key, no output folder, already busy, or mid-review).
     private var canStartProcessing: Bool {
         !droppedFiles.isEmpty && !checkingInputLocation && !readingTree && (!runNeedsAPIKey || !apiKey.isEmpty) && visionWorkflowIsSupported && outputDirectory != nil
-            && unavailableOpenRouterSelection == nil
+            && gatewaySetupIssue == nil && unavailableOpenRouterSelection == nil
             && !processor.isProcessing && !isInReviewMode
             && processor.pendingBatchInfo == nil && processor.pendingRunInfo == nil
             && processor.pendingMixedPDFInfo == nil
@@ -1179,6 +1183,7 @@ struct OCRView: View {
         if unavailableOpenRouterSelection != nil {
             return "Choose an available OpenRouter model in Settings › Reading before starting."
         }
+        if let gatewaySetupIssue { return gatewaySetupIssue }
         if runNeedsAPIKey && apiKey.isEmpty {
             if useGateway && !useAppleVision { return "No gateway key is saved. Add it in Settings (⌘,)." }
             return "No \(selectedProvider.rawValue) API key is saved. Add one in Settings (⌘,)."
@@ -1861,6 +1866,10 @@ struct OCRView: View {
 
     private func runProcessing(confirmedMonthlyLimit: Bool = false) {
         guard !processor.isProcessing, let outDir = outputDirectory else { return }
+        if let gatewaySetupIssue {
+            processor.statusMessage = gatewaySetupIssue
+            return
+        }
         let provider = effectiveProvider
         let model = effectiveModel
         if let warning = unavailableOpenRouterSelection {

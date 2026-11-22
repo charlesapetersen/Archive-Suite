@@ -74,7 +74,7 @@ When enabled, continuation pages are merged into a single PDF with their documen
 
 ### Image Orientation Correction
 
-The LLM detects if images are rotated sideways or upside down, and output PDFs show them upright. For folder photographs, orientation is based on the folder tab rather than document text. Mistral, an API Gateway and the Local Agent have no LLM rotation check, so with them the app uses the Mac's own detector, which is less accurate; it does the same if the LLM check fails. Detection can also be set to the Mac's detector only, or off.
+Archive Processor checks whether each page is upright. In the recommended mode, two models on this Mac check the page first. If they cannot settle it, a remote gateway or OpenRouter can ask Gemini 3.7 Flash. The run estimate includes those calls. For folder photographs, the app uses the folder tab to judge orientation. In Settings you can choose a comparative model check on every page, use only the Mac's Vision detector, or turn rotation checks off.
 
 To check rotation by hand, turn on **Review rotation** in Settings (it needs a detection mode). It is its own short pass, before the segmentation review: radio buttons for 0°, 90°, 180°, 270° with live thumbnail preview, and `[`/`]` rotate the focused image in 90° increments.
 

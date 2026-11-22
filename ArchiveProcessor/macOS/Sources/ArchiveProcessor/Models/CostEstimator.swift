@@ -127,13 +127,13 @@ struct CostEstimator {
     // Rotation (LLM comparative call): 4 downscaled (~800px) candidate images + a short prompt,
     // one letter of output. `.llmSingle` = 1 call/file, `.llmMajority` = 3 calls/file. Always runs
     // on a fixed cheap model (gemini-2.5-flash-lite for Gemini, claude-sonnet-4-6 for Anthropic,
-    // gpt-5.4-mini for OpenAI); Gateway/Mistral fall back to free local Vision.
+    // gpt-5.4-mini for OpenAI, Gemini 3.7 Flash for a remote gateway or OpenRouter).
     static let estimatedRotationPromptTokens: Double = 90
-    /// One comparative call to Gemini 3.7 Flash through the gateway, at list: W46.rotation-routes' llmSingle row,
-    /// $0.0037 a page (an estimate; the gateway returns no bill per call).
-    static let gatewayRotationCallCost = 0.0037
-    /// Gateway rotation calls a page: the orderings for the LLM modes, the escalated share for the agreement rule.
-    static func gatewayRotationCalls(_ mode: RotationMode) -> Double {
+    /// W46.rotation-routes' llmSingle average through the gateway, priced at OpenRouter's standard list rates.
+    /// Use the same token-usage estimate for Gemini 3.7 Flash via OpenRouter.
+    static let gemini37RotationCallCost = 0.0037
+    /// Gemini 3.7 Flash calls per page: the orderings for the LLM modes, the escalated share for the agreement rule.
+    static func gemini37RotationCalls(_ mode: RotationMode) -> Double {
         mode == .agreement ? RotationMode.agreementEscalationShare : Double(mode.orderings)
     }
     static let estimatedRotationOutputTokens: Double = 5
@@ -153,7 +153,7 @@ struct CostEstimator {
         case .mistral: return nil               // no LLM rotation path → local Vision (free)
         case .openai: return (0.75, 4.50)       // gpt-5.4-mini; verified 2026-09-26 against OpenAI's model page.
         case .appleVision: return nil
-        case .openrouter: return nil            // no LLM rotation route measured → local Vision (free)
+        case .openrouter: return nil            // priced per Gemini 3.7 Flash call below
         }
     }
 
@@ -265,11 +265,11 @@ struct CostEstimator {
                            + ((boxOutput + clusterOutput) / 1_000_000) * model.outputCostPer1M
         }
 
-        // Rotation cost (LLM modes only; free for Gateway/Mistral/local Vision/off; none for pre-OCRed).
+        // Comparative rotation costs apply to image reads on supported cloud backends.
         var rotationCost: Double = 0
         let rotCalls = rotationMode.orderings
-        if gatewayRotation, !preOCRedInput {
-            rotationCost = Double(fileCount) * gatewayRotationCalls(rotationMode) * gatewayRotationCallCost
+        if !preOCRedInput, !visionTextOnly, gatewayRotation || (!useGateway && model.provider == .openrouter) {
+            rotationCost = Double(fileCount) * gemini37RotationCalls(rotationMode) * gemini37RotationCallCost
         } else if rotCalls > 0, !preOCRedInput, !visionTextOnly, !useGateway,
            let (rIn, rOut) = rotationModelCost(for: model.provider) {
             let inputPerCall = 4 * estimatedRotationCandidateTokens(for: model.provider) + estimatedRotationPromptTokens

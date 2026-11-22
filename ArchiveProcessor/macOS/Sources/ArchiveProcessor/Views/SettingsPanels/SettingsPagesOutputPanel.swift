@@ -36,10 +36,11 @@ struct SettingsPagesOutputPanel: View {
         SessionProcessingConfig.normalizedImageMB(standardImageSizeMB, fallback: 3.0)
     }
 
-    /// The run's rotation calls go to the remote gateway's model (W46.rotation-default), as `detectRotation` decides.
-    private var gatewayRotation: Bool {
-        !useAppleVision && LLMRotationDetector.callsGateway(
-            mode: rotationMode, gateway: useGateway ? GatewayConfig.fromDefaults() : nil, usesLocalAgent: useLocalAgent)
+    private var hasMeasuredRotation: Bool {
+        guard !useAppleVision, !useGateway || GatewayConfig.fromDefaults() != nil else { return false }
+        return LLMRotationDetector.hasMeasuredRoute(
+            provider: selectedProvider, usesGateway: useGateway, usesLocalAgent: useLocalAgent,
+            gatewayIsLocal: gatewayLocalModel)
     }
 
     var body: some View {
@@ -212,7 +213,7 @@ struct SettingsPagesOutputPanel: View {
                 } label: {
                     HStack {
                         Text("Detect rotation")
-                        HelpButton(text: "\(rotationMode.detail)\n\nTime impact: Off, Local Vision and the two local checks add no LLM time; the recommended mode calls the gateway on about 1 page in 10. Single makes one extra call per page that overlaps OCR — usually free time-wise. Majority makes three calls per page and can exceed OCR time on large batches, becoming the bottleneck (see the Time estimate).")
+                        HelpButton(text: "\(rotationMode.detail)\n\nThe local checks make no API calls. In the recommended mode, a remote gateway or OpenRouter can make one call on about 1 page in 10. LLM comparative makes one call per page alongside OCR. LLM comparative ×3 makes three calls per page and can take longer than OCR.")
                     }
                 }
                 .disabled(preOCRedInput)
@@ -224,11 +225,16 @@ struct SettingsPagesOutputPanel: View {
                         .font(.caption).foregroundStyle(.primary)
                         .accessibilityIdentifier("ap.settings.rotationFallback")
                 }
-                if rotationMode == .agreement, !preOCRedInput, !gatewayRotation {
-                    // W46.rotation-default: the agreement rule asks a model only through the gateway (the one measured).
-                    Text("With no remote API gateway, a page the two local checks disagree on is left as it is and counted in the run’s summary.")
+                if rotationMode == .agreement, !preOCRedInput, !hasMeasuredRotation {
+                    Text("A page the two local checks disagree on is left as it is and counted in the run’s summary.")
                         .font(.caption).foregroundStyle(.primary)
                         .accessibilityIdentifier("ap.settings.rotationUnsure")
+                }
+                if !preOCRedInput, hasMeasuredRotation, !useGateway,
+                   rotationMode == .agreement || rotationMode.orderings > 0 {
+                    Text("Cloud rotation checks use Gemini 3.7 Flash through OpenRouter. The run estimate includes these calls.")
+                        .font(.caption).foregroundStyle(.primary)
+                        .accessibilityIdentifier("ap.settings.openRouterRotation")
                 }
                 Toggle(isOn: $reviewRotation) {
                     HStack {
