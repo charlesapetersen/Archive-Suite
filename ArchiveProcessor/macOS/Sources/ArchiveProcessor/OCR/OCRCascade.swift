@@ -174,12 +174,17 @@ struct OCRCascade: Codable, Equatable, Sendable {
         let family = provider == .openrouter ? model.measuredModel.provider : provider
         let refused = refusalFallback && family == .gemini && OCRRefusalFallback.isRefusal(first)
         guard cascade.applies(to: provider, model: model), let target = cascade.escalationModel else {
-            return refused
-                ? await OCRRefusalFallback.readRefusedPage(
-                    first, imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                    customPrompt: customPrompt, imageScale: imageScale, costScale: costScale,
-                    available: refusalRoutes)
-                : first
+            guard refused else { return first }
+            var result = await OCRRefusalFallback.readRefusedPage(
+                first, imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
+                customPrompt: customPrompt, imageScale: imageScale, costScale: costScale,
+                available: refusalRoutes)
+            // A lone 500 in the wrapped result means the refusal fallback found no routes.
+            // Set this only here: a cascade blocked by its circuit breaker can also return a lone 500.
+            if result.errorCode == OCRRefusalFallback.exhaustedCode, result.readingCodes == ["500"] {
+                result.noSecondReaderAvailable = true
+            }
+            return result
         }
         cascade.breaker.notePage(imageURL)
         let trigger: SecondReader.Trigger

@@ -147,7 +147,7 @@ struct ProcessableItemRow: View {
                     .padding(.leading, 22)
                     .fixedSize(horizontal: false, vertical: true)
             } else if case .succeededNoText = item.state {
-                Text("Filed as image-only — no OCR text.")
+                Text("Pages without OCR text will be filed image-only.")
                     .font(.caption2).foregroundStyle(.orange)
                     .padding(.leading, 22)
                     .fixedSize(horizontal: false, vertical: true)

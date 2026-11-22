@@ -850,6 +850,8 @@ struct OCRResult: Codable {
     /// page that was never read (a Gemini 500 then a 402 on the only second reader) from a real refusal
     /// (`OCRFailureCode.requestFailed`). `nil` on every other result.
     let readingCodes: [String]?
+    /// Gemini returned a server error and neither the cascade nor the refusal fallback had a second reader.
+    var noSecondReaderAvailable: Bool? = nil
     /// W46.rotation-default — the agreement rule left this page as it is: Vision and PP-LCNet disagreed, or Vision
     /// found no text, and no cloud route was set. `nil` = rotation was settled (or not checked).
     var rotationUnsure: Bool? = nil
@@ -917,6 +919,7 @@ struct OCRResult: Codable {
                   ocrClassification: .some(ocrClassification), ocrEnclosure: .some(ocrEnclosure),
                   secondReader: secondReader, pageReader: pageReader, imported: imported, readingCodes: readingCodes,
                   readPoorly: readPoorly, imageCorrectionApplied: imageCorrectionApplied)
+        copy.noSecondReaderAvailable = noSecondReaderAvailable
         copy.rotationUnsure = rotationUnsure
         copy.newspaperLayout = newspaperLayout
         return copy

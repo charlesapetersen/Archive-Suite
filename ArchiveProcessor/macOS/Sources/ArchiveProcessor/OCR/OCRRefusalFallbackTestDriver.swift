@@ -247,9 +247,9 @@ enum OCRRefusalFallbackTestDriver {
         useRoutes([])
         await script.set(gemini: (500, gemini500))
         r = await ocr()
-        check("a Gemini 500 with no second reader is GeminiRefused carrying the 500, and Live Capture fails it",
+        check("a Gemini 500 records the failed request and that no second reader was available",
               r.errorCode == OCRRefusalFallback.exhaustedCode && r.readingCodes == ["500"]
-              && LiveCaptureProcessor.ocrFailed(r))
+              && r.noSecondReaderAvailable == true && LiveCaptureProcessor.ocrFailed(r))
         useRoutes([claude])
         await script.set(gemini: (500, gemini500), anthropic: (402, anthropic402))
         r = await ocr()

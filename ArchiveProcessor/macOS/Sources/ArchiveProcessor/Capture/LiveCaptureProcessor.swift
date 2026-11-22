@@ -27,9 +27,8 @@ final class LiveCaptureProcessor: ObservableObject {
         var failureKind: FailureKind? = nil
         var errorMessage: String? = nil
         var errorCode: String? = nil
-        /// `succeededNoText`: a document that OCR'd to no text but WAS filed as a complete image-only PDF
-        /// (amber warning, not a hard failure). It is staged + filed exactly as before — only its label
-        /// differs, so bulk "Retry failed" stops over-counting a successfully-filed image-only doc.
+        /// `succeededNoText`: complete output with some or all pages image-only. The amber row offers
+        /// per-document Retry, while bulk "Retry failed" counts only documents that cannot be filed.
         enum Phase: String {
             case ocr = "OCR…", tagging = "Tagging…", staged = "Staged"
             case succeededNoText = "Filed (image-only)"
@@ -70,6 +69,8 @@ final class LiveCaptureProcessor: ObservableObject {
         var untaggedOutputs: [URL]?
         /// Layer notes for the captured pages, kept with the staged output through resume and regeneration.
         var pdfLayerLogNotes: [String]? = nil
+        /// Pages whose original scans were embedded after Gemini failed with no second reader available.
+        var unreadImageOnlyPageCount: Int? = nil
     }
 
     @Published private(set) var statuses: [SegmentStatus] = []
@@ -245,7 +246,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// an unsaved ledger) is appended as " ⚠️ …" — so the marker is the one signal all of them share.
     /// A new problem line must keep that marker, or this reads it as a clean finish.
     nonisolated static func summaryReportsProblem(_ summary: String) -> Bool { summary.contains("⚠️") }
-    /// Document segments whose OCR produced no text (filed as image-only PDFs; retryable).
+    /// Staged segments held for Retry because they cannot be filed.
     @Published private(set) var failedGroupIds: Set<String> = []
 
     // MARK: Per-item sheet targets (W3.cap-r3-fu9)
@@ -772,7 +773,7 @@ final class LiveCaptureProcessor: ObservableObject {
         let restored = manifest.staged.map { record in
             guard record.pagesComplete != false,
                   (CaptureGroupType(rawValue: record.type) ?? .document) == .document,
-                  retained[record.groupId]?.pages.contains(where: { Self.ocrFailed($0.result) }) == true
+                  retained[record.groupId]?.pages.contains(where: { Self.holdsForOCR($0.result) }) == true
             else { return record }
             // A prior build could stage image-only PDFs after a request failure. Preserve the staged PDFs
             // and source photos, and make Finish respect the same failure the Retry row will show.
@@ -1313,12 +1314,7 @@ final class LiveCaptureProcessor: ObservableObject {
             var r = await pageTasks[PageKey(photo)]?.value
                 ?? OCRResult(text: nil, classification: nil, errorMessage: "OCR not started", errorCode: nil)
             if let rot = rotationOverride {
-                r = OCRResult(text: r.text, classification: r.classification,
-                              rotationDegrees: ((rot % 360) + 360) % 360,
-                              errorMessage: r.errorMessage, errorCode: r.errorCode,
-                              enclosure: r.enclosure, ocrClassification: .some(r.ocrClassification), ocrEnclosure: .some(r.ocrEnclosure),
-                              secondReader: r.secondReader, pageReader: r.pageReader, imported: r.imported,
-                              readingCodes: r.readingCodes)
+                r = r.with(classification: r.classification, rotationDegrees: ((rot % 360) + 360) % 360)
             }
             results.append(r)
             texts.append(r.text ?? "")
@@ -1501,7 +1497,7 @@ final class LiveCaptureProcessor: ObservableObject {
         let pagesComplete = outcome.pagesComplete ?? true
         let anyText = results.contains { $0.text != nil }
         let firstError = results.first(where: { $0.errorMessage != nil })
-        if type == .document, let failedPage = results.first(where: Self.ocrFailed) {
+        if type == .document, let failedPage = results.first(where: Self.holdsForOCR) {
             // W40.fix-processor-failed-ocr-filed-image-only — a page's OCR failed, so `writeSegmentFiles` wrote
             // no PDF for it and finalize will not file the document. Ranked first so the row names the
             // provider's error rather than the missing output it caused. Retryable; sources kept.
@@ -1522,12 +1518,10 @@ final class LiveCaptureProcessor: ObservableObject {
             failedGroupIds.remove(groupId)
             setStatusDetail(groupId, kind: nil, error: firstError)
             setPhase(groupId, .succeededPlaceholderImage)
-        } else if type == .document && !anyText {
-            // Complete image-only PDF (every page produced a PDF, but no OCR text). It IS staged and WILL be
-            // filed by executePlans exactly as before — this is a WARNING, not a hard failure. Drop it from
-            // failedGroupIds so bulk "Retry failed" stops over-counting a successfully-filed doc.
+        } else if type == .document && (!anyText || (outcome.unreadImageOnlyPageCount ?? 0) > 0) {
+            // Complete output with missing text. Offer per-document Retry even when other pages have text.
             failedGroupIds.remove(groupId)
-            setStatusDetail(groupId, kind: nil, error: firstError)
+            setStatusDetail(groupId, kind: nil, error: results.first(where: Self.filesUnreadPageAsImage) ?? firstError)
             setPhase(groupId, .succeededNoText)
         } else {
             failedGroupIds.remove(groupId)
@@ -1538,7 +1532,7 @@ final class LiveCaptureProcessor: ObservableObject {
 
     /// A page whose OCR request got no reading at all: a rejected request (HTTP or a provider-specific code),
     /// a thrown transport error or a page never started (no code), or a Local Agent CLI that did not
-    /// answer. That is a failure, not an image-only page. An error that is the reader's verdict on the page
+    /// answer. This identifies a failed request even if Live Capture can file its scan. A reader's verdict
     /// (Vision's `vision_no_text` on a blank verso, a Gemini block or refusal, a cut-off or unreadable reply)
     /// comes back the same on every retry, so it still files image-only with its reason shown: failing it
     /// would hold the document back for good, since Live Capture has no "file as image-only" action.
@@ -1554,6 +1548,14 @@ final class LiveCaptureProcessor: ObservableObject {
             return codes.allSatisfy(OCRFailureCode.requestFailed)
         }
         return OCRFailureCode.requestFailed(result.errorCode)
+    }
+
+    nonisolated private static func filesUnreadPageAsImage(_ result: OCRResult) -> Bool {
+        result.noSecondReaderAvailable == true && ocrFailed(result)
+    }
+
+    nonisolated private static func holdsForOCR(_ result: OCRResult) -> Bool {
+        ocrFailed(result) && result.noSecondReaderAvailable != true
     }
 
     /// Compute the segment's subject/color tags (may hit the LLM). Date/quality are layered on later.
@@ -1842,6 +1844,7 @@ final class LiveCaptureProcessor: ObservableObject {
         var placeholderSources: [URL] = []
         var untaggedOutputs: [URL] = []
         var layerNotes: [String] = []
+        var unreadImageOnlyPages = 0
         // W3.cap-r1 — the app's OWN colour for this segment (the user's colour for a box/folder, if any;
         // nil for a document or no colour chosen — W40.suite-item-types),
         // passed to every tag write below so a *subject* string is never mistaken for one. See
@@ -1873,9 +1876,9 @@ final class LiveCaptureProcessor: ObservableObject {
             // PDF would hold the scan and no text, and a document of such pages was filed as "image-only" with
             // nothing to say the text was never read (owner session iphone-1: three pages that each failed with
             // a 402). Skipping it leaves the segment incomplete, so `executePlans` does not file it, its sources
-            // stay, and `labelStagedRecord` marks it failed and retryable. A page that was READ and has no text
-            // still writes its image-only PDF.
-            if type == .document, ocrFailed(page.result) { continue }
+            // stay, and `labelStagedRecord` marks it failed and retryable. A reader's no-text verdict, or a
+            // Gemini 500 with no second reader available, still writes an image-only page.
+            if type == .document, holdsForOCR(page.result) { continue }
             let base = page.sourceURL.deletingPathExtension().lastPathComponent
             let stagedPDF = stagingDir.appendingPathComponent(base + ".pdf")
             let output = try? pdfGen.generateOutput(
@@ -1898,7 +1901,12 @@ final class LiveCaptureProcessor: ObservableObject {
             // withhold the deletion. Erring here keeps a photo we could have deleted; erring the other way
             // destroys an irreplaceable page.
             if output?.imagePage != .embedded { placeholderSources.append(page.sourceURL) }
-            if let notes = output?.layerLogNotes, !notes.isEmpty {
+            var notes = output?.layerLogNotes ?? []
+            if type == .document, output?.imagePage == .embedded, filesUnreadPageAsImage(page.result) {
+                unreadImageOnlyPages += 1
+                notes.insert("filed image-only: the first reader failed and no second reader was available", at: 0)
+            }
+            if !notes.isEmpty {
                 layerNotes.append("\(page.sourceURL.lastPathComponent): \(notes.joined(separator: "; "))")
             }
             let tagList = tagsByApplyingPhoneQuality(baseTags, quality: page.quality)
@@ -1964,7 +1972,8 @@ final class LiveCaptureProcessor: ObservableObject {
                              pdfURLs: pdfURLs, imageURLs: imageURLs, jsonURL: jsonURL, boxLabelText: boxLabelText,
                              pagesComplete: pagesComplete, placeholderSources: placeholderSources,
                              untaggedOutputs: untaggedOutputs,
-                             pdfLayerLogNotes: layerNotes.isEmpty ? nil : layerNotes)
+                             pdfLayerLogNotes: layerNotes.isEmpty ? nil : layerNotes,
+                             unreadImageOnlyPageCount: unreadImageOnlyPages > 0 ? unreadImageOnlyPages : nil)
     }
 
     /// A page's Quality input: a saved card's decision, else the phone's. The card's 0 becomes the internal
@@ -2546,6 +2555,7 @@ final class LiveCaptureProcessor: ObservableObject {
         var counts: [String: Int] = [:]
         var pages: [String: Int] = [:]
         var layerNotes: [String: [String]] = [:]
+        var unreadImageOnlyPages: [String: Int] = [:]
         var labels: [String: Double] = [:]
         var labelCalls = 0
         var labelDollars = 0.0
@@ -2559,6 +2569,7 @@ final class LiveCaptureProcessor: ObservableObject {
             }
             for seg in filedSegments {
                 if let notes = seg.pdfLayerLogNotes { layerNotes[key, default: []].append(contentsOf: notes) }
+                unreadImageOnlyPages[key, default: 0] += seg.unreadImageOnlyPageCount ?? 0
                 guard let usd = labelCharge(seg.groupId) else { continue }
                 labels[key, default: 0] += usd
                 labelCalls += 1
@@ -2571,7 +2582,13 @@ final class LiveCaptureProcessor: ObservableObject {
             let key = folder.standardizedFileURL.path
             guard let count = counts[key], count > 0 else { continue }
             let snapshot = store.snapshot(outputDirectory: folder, runID: UUID(), processing: processing)
-            store.record(snapshot, kind: "liveCapture", fileCount: count, in: folder, pdfLayerLogNotes: layerNotes[key])
+            var notes = layerNotes[key] ?? []
+            if let unread = unreadImageOnlyPages[key], unread > 0 {
+                // Put the count first so it survives the run log's per-page detail limit.
+                notes.insert(Self.imageOnlyFilingNote(pageCount: unread), at: 0)
+            }
+            store.record(snapshot, kind: "liveCapture", fileCount: count, in: folder,
+                         pdfLayerLogNotes: notes.isEmpty ? nil : notes)
             // The month's ledger (W46.settings-ledger-more): the pages filed here, priced as Process Files prices a
             // run of them. Filed pages only, so a finalize retried after a failure counts each page once.
             // The markers' label calls are added to the folder's pages (W47.ct-label-cost).
@@ -3037,6 +3054,7 @@ final class LiveCaptureProcessor: ObservableObject {
         var firstPDFs: [String: FiledPDF] = [:]
         var filedNames: [String: Set<String>] = [:]
         var totalSegments = 0
+        var unreadImageOnlyPages = 0
         // Move one file; returns true iff it actually LANDED at the destination — so a segment can tell
         // whether ALL of its authoritative PDF outputs were filed (the gate for deleting its source photo).
         func doMove(_ src: URL, to dest: URL) -> Bool {
@@ -3122,15 +3140,25 @@ final class LiveCaptureProcessor: ObservableObject {
                 // Filed iff it produced ≥1 PDF and ALL of them landed. (No PDF → never filed → source kept.)
                 if pdfExpected > 0 && pdfLanded == pdfExpected {
                     filedGroupIds.insert(seg.groupId)
+                    unreadImageOnlyPages += seg.unreadImageOnlyPageCount ?? 0
                     if let first = landed.first { firstPDFs[seg.groupId] = FiledPDF(folder: plan.folder, fileName: first) }
                 }
             }
         }
         let allFiled = failedMoves == 0 && filedGroupIds.count == totalSegments
-        let summary = "Finalized \(plans.count) collection\(plans.count == 1 ? "" : "s") · \(movedFiles) files moved."
+        var summary = "Finalized \(plans.count) collection\(plans.count == 1 ? "" : "s") · \(movedFiles) files moved."
+        if unreadImageOnlyPages > 0 {
+            summary += " ⚠️ " + imageOnlyFilingNote(pageCount: unreadImageOnlyPages)
+                + " To try again, add the filed PDF in Process Files and choose Processing → Improve OCR."
+        }
         return FinalizeOutcome(summary: summary, failedMoves: failedMoves, movedFiles: movedFiles,
                                filedGroupIds: filedGroupIds, allFiled: allFiled, firstPDFs: firstPDFs,
                                filedNames: filedNames)
+    }
+
+    nonisolated private static func imageOnlyFilingNote(pageCount: Int) -> String {
+        let pages = pageCount == 1 ? "1 page was" : "\(pageCount) pages were"
+        return "\(pages) filed image-only because the first reader failed and no second reader was available."
     }
 
     /// THE source-retirement decision, as a pure function so it can be proven headlessly (W23.h5).

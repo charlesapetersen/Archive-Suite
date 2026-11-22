@@ -1,6 +1,7 @@
 #if DEBUG // W40.a5: a test driver/contract, compiled out of Release
 import Foundation
 import AppKit
+import PDFKit
 
 extension LiveCaptureRecoveryTestDriver {
     /// Tests 30-32 of `run()`, moved out whole (W46.rotation-majority-fix): with them inside, type-checking and
@@ -185,10 +186,10 @@ extension LiveCaptureRecoveryTestDriver {
                 for _ in 0..<400 { if cond() { return true }; try? await Task.sleep(nanoseconds: 25_000_000) }
                 return cond()
             }
-            // One three-page document through a fresh live session with `stub` as every page's OCR, then
-            // Finish. Returns the processor, the group's source photos and the output folder.
-            func foRun(_ name: String, stub: OCRResult, previousReading: OCRResult? = nil) async
-                -> (proc: LiveCaptureProcessor, sources: [URL], out: URL, staged: Bool, finished: Bool) {
+            // A three-page document through a fresh session, optionally reopened or retried before Finish.
+            func foRun(_ name: String, stub: OCRResult, previousReading: OCRResult? = nil,
+                       siblingReading: OCRResult? = nil, resume: Bool = false, retryWith: OCRResult? = nil) async
+                -> (proc: LiveCaptureProcessor, sources: [URL], out: URL, staged: Bool, finished: Bool, canRetry: Bool) {
                 let out = tmp.appendingPathComponent("failed-ocr-\(name)-out", isDirectory: true)
                 let staging = tmp.appendingPathComponent(
                     "APStaging-failedocr-\(name)-\(String(UUID().uuidString.prefix(8)))", isDirectory: true)
@@ -217,6 +218,7 @@ extension LiveCaptureRecoveryTestDriver {
                 session._recoveryTestBeginLive(config: config, stagingDir: staging)
                 var proc = session.liveProcessor
                 for seq in [1, 2, 3] {
+                    LiveCaptureProcessor._recoveryTestOCRStub = seq == 2 ? stub : (siblingReading ?? stub)
                     session.ingest(jpeg: foJPEG, groupId: "FO", seq: seq,
                                    type: .document, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
                 }
@@ -227,8 +229,18 @@ extension LiveCaptureRecoveryTestDriver {
                     staged = staged && proc.staged.first?.pagesComplete == true
                         && proc.staged.first?.pdfURLs.count == 3
                         && proc._recoveryTestPersistPreviousReading(previousReading, groupId: "FO")
+                }
+                if previousReading != nil || resume {
                     proc = LiveCaptureProcessor(session: session)
                     proc._recoveryTestResume(stagingDir: staging, config: config)
+                }
+                let canRetry = proc.statuses.first?.phase == .succeededNoText
+                    && SegmentItem.actions(for: .succeededNoText, finalizing: false).contains(.retry)
+                if let retryWith {
+                    LiveCaptureProcessor._recoveryTestOCRStub = retryWith
+                    proc.retryFailed(groupIds: ["FO"])
+                    staged = await foSettle { proc.staged.contains { $0.groupId == "FO" } }
+                        && staged && proc.statuses.first?.phase == .staged
                 }
                 let key = proc.staged.first { $0.groupId == "FO" }?.collectionKey ?? "__unfiled__"
                 proc.finalize([LiveCaptureProcessor.CollectionDraft(
@@ -241,7 +253,7 @@ extension LiveCaptureRecoveryTestDriver {
                 where item.hasPrefix(staging.lastPathComponent) {
                     try? fm.removeItem(at: trash.appendingPathComponent(item))
                 }
-                return (proc, sources, out, staged, finished)
+                return (proc, sources, out, staged, finished, canRetry)
             }
             func foOutPDFs(_ out: URL) -> Int {
                 ((try? fm.contentsOfDirectory(at: out, includingPropertiesForKeys: nil)) ?? [])
@@ -274,6 +286,36 @@ extension LiveCaptureRecoveryTestDriver {
                   wrapped.staged && wrappedStatus?.phase == .failed && wrappedStatus?.failureKind == .provider
                       && wrapped.proc.failedGroupIds == ["FO"] && wrapped.finished && foOutPDFs(wrapped.out) == 0
                       && wrapped.sources.allSatisfy { fm.fileExists(atPath: $0.path) })
+
+            let unread = await OCRCascade.resolve(
+                OCRResult(text: nil, classification: nil, errorMessage: "Gemini server error", errorCode: "500"),
+                cascade: .off, provider: .gemini, model: stubModel, refusalFallback: true,
+                imageURL: tmp, previousText: nil, previousImageURL: nil, customPrompt: nil, imageScale: 1,
+                visionSettings: .default, refusalRoutes: [])
+            let read = OCRResult(text: "Sibling page transcription", classification: nil, errorMessage: nil, errorCode: nil)
+            let imageOnly = await foRun("no-reader", stub: unread, siblingReading: read, resume: true)
+            let filedPDFs = ((try? fm.contentsOfDirectory(at: imageOnly.out, includingPropertiesForKeys: nil)) ?? [])
+                .filter { $0.pathExtension == "pdf" }
+            let transcripts = filedPDFs.compactMap { PDFDocument(url: $0)?.page(at: 1)?.string }
+            let runNotes = CollectionSettingsFile.runs(in: imageOnly.out).first { $0.kind == "liveCapture" }?.pdfLayerLogNotes
+            check("a mixed document still offers Retry after reopening and Finish files all three pages",
+                  imageOnly.staged && imageOnly.canRetry && imageOnly.finished && filedPDFs.count == 3
+                      && imageOnly.proc.failedGroupIds.isEmpty
+                      && LiveCaptureProcessor._recoveryTestOCRStarts.count == 3)
+            check("the filed PDFs preserve both transcriptions and identify the unread page",
+                  transcripts.filter { $0.contains("Sibling page transcription") }.count == 2
+                      && transcripts.filter { $0.contains("No text returned by model.") }.count == 1)
+            check("only the unread page is reported as image-only in the Finish summary and collection run log",
+                  imageOnly.proc.finalizeSummary?.contains("1 page was filed image-only") == true
+                      && imageOnly.proc.finalizeSummary?.contains("Improve OCR") == true
+                      && runNotes?.first?.contains("1 page was filed image-only") == true
+                      && runNotes?.filter { $0.contains(": filed image-only") }.count == 1)
+
+            let retried = await foRun("retried-unread", stub: unread, siblingReading: read, retryWith: read)
+            check("Retry before Finish can fill the missing text without filing twice or leaving a stale warning",
+                  retried.canRetry && retried.staged && retried.finished && foOutPDFs(retried.out) == 3
+                      && retried.proc.finalizeSummary?.contains("filed image-only") == false
+                      && LiveCaptureProcessor._recoveryTestOCRStarts.count == 6)
 
             // W49.proc-request-failure-codes: exercise the real Anthropic error parser. An invalid
             // request on its own and an oversized request from a second reader both got no reading.

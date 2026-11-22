@@ -17884,3 +17884,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   normal catalogue refresh. The key-free OpenRouter and synthetic PDF smoke tests passed. The off-screen
   UI test verified the picker, the Process Files estimate and the Settings estimate.
   <!-- /W49.proc-openrouter-list-image-priced -->
+
+- [x] **W49.proc-unread-page-files-image — a page no reader can read is filed image-only, not held [S]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build) — Owner, 2026-11-19 (call 21, the accepted-issues sheet; `execution-plans/processing-review/17-accepted-review.json` entry `p-unread-page-holds`, answers in `answers/17-accepted-review-answers-20261119.json`): change it. With no second reader, file the document with that page image-only, say so in the run log and summary, and keep Retry; with a second reader, behaviour stays.
+  SHIPPED 2026-11-22 (this commit). A Live Capture document with a Gemini 500 and no available second reader
+  files the original scan without OCR text, alongside any transcribed pages. Finish and the collection run log
+  count the image-only pages that actually filed. The Processing row offers Retry before Finish, and the
+  summary points to Improve OCR for the filed PDF. The scratch regression exercises mixed output, resuming the
+  staged document, explicit Retry, and the existing hold when a configured reader also fails.
+  <!-- /W49.proc-unread-page-files-image -->

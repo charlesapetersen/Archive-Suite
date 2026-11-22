@@ -482,6 +482,13 @@ enum OCRCascadeTestDriver {
         check("the breaker lets the first 20 escalations go, then stops a run where every page fails",
               escalatedPages == OCRCascade.Breaker.freeEscalations && calls.count == OCRCascade.Breaker.freeEscalations
               && last.errorCode == OCRFailureCode.cutOff && last.errorMessage?.contains("Not escalated: 20") == true)
+        let blockedRefusal = await OCRCascade.resolve(
+            firstFailure, cascade: runCascade, provider: .gemini, model: flash, refusalFallback: true,
+            imageURL: image, previousText: nil, previousImageURL: nil,
+            customPrompt: nil, imageScale: 1, visionSettings: .default, refusalRoutes: [])
+        check("a Gemini 500 blocked by the cascade breaker still holds even without a refusal fallback",
+              blockedRefusal.readingCodes == ["500"] && blockedRefusal.noSecondReaderAvailable != true
+              && LiveCaptureProcessor.ocrFailed(blockedRefusal))
         let copy = runCascade
         let more = await OCRCascade.resolve(OCRResult.cutOff, cascade: copy, provider: .openrouter, model: qwen,
                                             refusalFallback: true, imageURL: image, previousText: nil,
