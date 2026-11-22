@@ -16,7 +16,7 @@ final class NotesMenuAction: NSObject {
 enum NotesItemContextMenu {
 
     @MainActor
-    static func make(nav: NotesNavigationModel, selection: Set<UUID>) -> NSMenu? {
+    static func make(nav: NotesNavigationModel, selection: Set<UUID>, flushing registry: EditorFlushRegistry) -> NSMenu? {
         guard !selection.isEmpty else { return nil }
         let ids = Array(selection)
         let model = nav.model
@@ -53,12 +53,11 @@ enum NotesItemContextMenu {
                     let item = NSMenuItem(title: title, action: #selector(NotesMenuAction.fire), keyEquivalent: "")
                     let trampoline = NotesMenuAction {
                         Task {
-                            if let newID = await model.newItem(kind: summary.kind,
-                                                               in: model.selectedFolderId,
-                                                               from: templateId) {
-                                nav.showingTemplates = false
-                                nav.select(newID)
-                            }
+                            guard let newID = await NewItemFlow.create(kind: summary.kind, from: templateId,
+                                                                       model: model, flushing: registry)
+                            else { return }
+                            nav.showingTemplates = false
+                            nav.select(newID)
                         }
                     }
                     item.target = trampoline

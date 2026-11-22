@@ -28,10 +28,12 @@ and escapes the original opener. A candidate header with a nonblank line missing
 and colon also falls back to freeform text. Valid source headers still carry their provenance. The scratch
 regression is `NotesTextLossSuspectTests.s019TypedCloserAfterUnclosedHeader`.
 
-## ⚠️ OPEN — Notes list actions verified on scratch data (2026-11-21)
+## ✅ FIXED (W49.fix-notes-template-create, 2026-11-21) — row menus save template drafts before creating notes
 
-- **Creating from a template through a row menu** can use the last saved body while an edit is pending
-  or after a save has failed. Standard New flushes the editor and checks for a failed save. (queued: W49.fix-notes-template-create)
+New from Template on a row now uses the standard creation flow. It saves pending template edits
+before copying the body and stops creation while the chosen template's save still fails.
+Creation keeps the folder scope from the start of the command. Both S-011 scratch regressions
+exercise the row menu action.
 
 ## ✅ FIXED (W49.fix-notes-multi-remove, 2026-11-21) — each sole-instance note gets a confirmation
 

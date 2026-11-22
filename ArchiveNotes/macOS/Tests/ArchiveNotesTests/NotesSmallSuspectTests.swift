@@ -165,7 +165,8 @@ struct NotesSmallSuspectTests {
         try await env.org.addMembership(item: c, folder: g)
         env.model.setFolderScope(f)
 
-        let menu = try #require(NotesItemContextMenu.make(nav: env.nav, selection: [a, b, c, d]))
+        let registry = EditorFlushRegistry()
+        let menu = try #require(NotesItemContextMenu.make(nav: env.nav, selection: [a, b, c, d], flushing: registry))
         let remove = try #require(menu.items.first { $0.title == "Remove 4 Items from “F”" })
         try click(remove)
 
@@ -235,7 +236,7 @@ struct NotesSmallSuspectTests {
     /// Right-click the note ▸ New from Template ▸ Interview; returns the new note's id.
     private func newFromTemplateInRowMenu(_ t: TemplateEnv) async throws -> UUID? {
         let before = Set(t.env.model.allItems.map(\.id))
-        let menu = try #require(NotesItemContextMenu.make(nav: t.env.nav, selection: [t.noteID]))
+        let menu = try #require(NotesItemContextMenu.make(nav: t.env.nav, selection: [t.noteID], flushing: t.registry))
         let sub = try #require(menu.items.first { $0.title == "New from Template" }?.submenu)
         try click(try #require(sub.items.first { $0.title == "Interview" }))
         _ = await eventually(3) { Set(t.env.model.allItems.map(\.id)) != before }
@@ -245,43 +246,39 @@ struct NotesSmallSuspectTests {
     @Test("S-011: the row menu's New from Template includes a template edit still waiting to save")
     func s011RowMenuSkipsFlush() async throws {
         let t = try await makeTemplateEnv(); defer { Task { await cleanup(t.env) } }
+        let folder = try await t.env.org.createFolder(name: "Interviews").id
+        try await t.env.org.addMembership(item: t.noteID, folder: folder)
+        t.env.model.setFolderScope(folder)
         t.editor.markdown = "Questions MARKER-S011"   // typed, still inside the debounce
+        t.registry.register(UUID(), flush: { [model = t.env.model] in
+            model.setAllNotesScope()   // The scope can change while creation waits for a save.
+            return true
+        })
 
         let made = try #require(try await newFromTemplateInRowMenu(t), "the row menu makes a note")
-        let madeBody = try await body(of: made, in: t.env)
-        withKnownIssue("S-011: the row menu calls model.newItem without NewItemFlow's flush") {
-            #expect(madeBody.contains("MARKER-S011"))
-        }
-        // Every other New goes through NewItemFlow, which saves the edit first.
-        let viaFlow = try #require(await NewItemFlow.create(kind: .note, from: t.templateID, model: t.env.model,
-                                                            flushing: t.registry))
-        #expect(try await body(of: viaFlow, in: t.env).contains("MARKER-S011"))
+        #expect(try await body(of: made, in: t.env).contains("MARKER-S011"))
+        #expect(t.env.model.selectedFolderId == nil)
+        #expect(t.env.org.foldersContaining(item: made) == [folder])
+        #expect(await eventually { t.env.nav.selection == [made] })
     }
 
-    @Test("S-011: the row menu's New from Template refuses a template whose last body save failed")
+    @Test("S-011: the row menu's New from Template refuses a template whose body save still fails")
     func s011RowMenuSkipsFailedSaveGuard() async throws {
         let t = try await makeTemplateEnv(); defer { setWritable(t.templateDir, true); Task { await cleanup(t.env) } }
         setWritable(t.templateDir, false)
         t.editor.markdown = "Refused draft"
         await t.editor.flushPending()
+        try #require(t.env.model.hasFailedTemplateBodySave(t.templateID), "the store refused the body")
+        t.env.nav.select(t.noteID)
+
+        #expect(try await newFromTemplateInRowMenu(t) == nil, "no note is made from the stale template body")
+        #expect(t.env.nav.selection == [t.noteID])
+        #expect(t.env.model.hasFailedTemplateBodySave(t.templateID))
+
         setWritable(t.templateDir, true)
-        #expect(t.env.model.hasFailedTemplateBodySave(t.templateID), "the store refused the body")
-
-        // Every other New refuses.
-        #expect(await NewItemFlow.create(kind: .note, from: t.templateID, model: t.env.model,
-                                         flushing: SilentFlush.registry(t.env.root)) == nil)
-        let made = try await newFromTemplateInRowMenu(t)
-        withKnownIssue("S-011: the row menu has no hasFailedTemplateBodySave guard") {
-            #expect(made == nil, "no note is made from the stale template body")
-        }
-    }
-
-    /// A registry with nothing in it, so NewItemFlow's flush does not retry the refused save and clear the flag.
-    private enum SilentFlush {
-        @MainActor static func registry(_ root: URL) -> EditorFlushRegistry {
-            EditorFlushRegistry(vault: UnsavedDraftVault(
-                directory: root.appendingPathComponent("vault-empty", isDirectory: true)))
-        }
+        let made = try #require(try await newFromTemplateInRowMenu(t), "creation resumes once the draft can save")
+        #expect(try await body(of: made, in: t.env).contains("Refused draft"))
+        #expect(await eventually { t.env.nav.selection == [made] })
     }
 
     // MARK: - S-014

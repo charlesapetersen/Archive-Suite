@@ -17520,3 +17520,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   was warned about separately. Queued W49.proc-fix-s052. [Scratch run and regression](verification/evidence/processor/W49.proc-s052-verify.md).
   $0 spent. No bench cache used.
   <!-- /W49.proc-s052-verify -->
+
+- [x] **W49.fix-notes-template-create — Use the standard template creation flow from row menus [S]** · §Known limits are queued, accepted or asked (lane: notes) (uses: build) — S-011 (S4). Flush template drafts and honor failed saves through NewItemFlow. Keep s011RowMenuSkipsFlush and s011RowMenuSkipsFailedSaveGuard as regressions.
+  SHIPPED 2026-11-21 (this commit). The row menu uses NewItemFlow to save the pending body and
+  stop while the chosen template's save still fails. The scratch regressions also cover recovery
+  after a failed save and the destination folder when scope changes during the flush. Notes smoke
+  and both focused off-screen checks passed. The row and toolbar menus created the expected note
+  on disk. No bench cache used.
+  <!-- /W49.fix-notes-template-create -->

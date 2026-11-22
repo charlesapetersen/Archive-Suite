@@ -316,7 +316,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   call the row-menu closure's `model.newItem`, and assert that a note is created.
 - **Would clear it:** the row-menu path flushes and refuses the same way the toolbar path does, or the new note
   holds the marker.
-- **Status:** `reproduced` — independently confirmed, queued as `W49.fix-notes-template-create`; [evidence](evidence/notes/W49.notes-suspects-small-check.md); tests `ArchiveNotesTests/NotesSmallSuspectTests` `s011RowMenuSkipsFlush`, `s011RowMenuSkipsFailedSaveGuard`
+- **Status:** `cleared` — fixed by W49.fix-notes-template-create. Regressions `NotesSmallSuspectTests.s011RowMenuSkipsFlush` and `s011RowMenuSkipsFailedSaveGuard`. [Original reproduction](evidence/notes/W49.notes-suspects-small-check.md#s-011--the-row-command-creates-from-the-saved-template-body).
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
@@ -328,6 +328,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     present in one `NewItemFlow` makes. With T's last body save refused (read-only template folder),
     `NewItemFlow` makes nothing and the row menu makes a note from the stale body.
   - 2026-11-21 W49.notes-suspects-small-check (Codex, gpt-6.2-sol, `b0539267`) — Dispatching the AppKit row command created from the prior saved body both with a flush pending and after a real failed scratch save. Standard New flushed the first draft and refused creation after the failed save.
+  - 2026-11-21 W49.fix-notes-template-create — The row command flushes the draft before reading the
+    template. A scratch write refusal blocks creation, and restoring write access lets the command
+    create a note with the recovered body. The off-screen row submenu check creates a fresh note
+    with the named template's title, kind and body.
 
 ### S-012 · The tag filter may miss every tag entered in the app unless it is typed with the stored capitals
 

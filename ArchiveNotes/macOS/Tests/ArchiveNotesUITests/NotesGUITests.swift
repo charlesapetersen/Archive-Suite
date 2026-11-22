@@ -851,6 +851,15 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// disk carrying the template's title and body, and the note list shows it. The template is made
     /// through the Templates manager (production path); only its body goes in via the editor test seam.
     func testTemplateNewFromTemplateCreatesNoteWithTemplateBody() throws {
+        try createFromNamedTemplate(usingRowMenu: false)
+    }
+
+    /// W49.fix-notes-template-create — check the real row submenu and the note it creates on disk.
+    func testRowMenuNewFromTemplateCreatesNoteWithTemplateBody() throws {
+        try createFromNamedTemplate(usingRowMenu: true)
+    }
+
+    private func createFromNamedTemplate(usingRowMenu: Bool) throws {
         try withFixture {
             try requireCanonicalScratchFixtureForStoreWrites()
             let templates = mainWindow.staticTexts
@@ -894,13 +903,18 @@ final class NotesGUITests: NotesFixtureUITestCase {
 
             mainWindow.staticTexts.matching(identifier: "an.sidebar.allNotes").firstMatch.click()
             let baseline = itemDirs()
-            let newMenu = mainWindow.descendants(matching: .any)["an.toolbar.new"]
-            XCTAssertTrue(newMenu.waitForExistence(timeout: 10), "the toolbar New menu should exist")
-            newMenu.click()
+            if usingRowMenu {
+                selectItem(uuid: Self.idPlain).rightClick()
+            } else {
+                let newMenu = mainWindow.descendants(matching: .any)["an.toolbar.new"]
+                XCTAssertTrue(newMenu.waitForExistence(timeout: 10), "the toolbar New menu should exist")
+                newMenu.click()
+            }
             let fromTemplate = app.menuItems["New from Template"]
-            XCTAssertTrue(fromTemplate.waitForExistence(timeout: 5), "New ▸ New from Template should exist")
+            XCTAssertTrue(fromTemplate.waitForExistence(timeout: 5), "New from Template should exist")
             fromTemplate.hover()
-            let choice = app.menuItems["Interview Fixture"]
+            var choice = fromTemplate.menuItems["Interview Fixture"]
+            if !choice.waitForExistence(timeout: 3) { choice = app.menuItems["Interview Fixture"] }
             XCTAssertTrue(choice.waitForExistence(timeout: 5), "the note template should be offered by name")
             choice.click()
 

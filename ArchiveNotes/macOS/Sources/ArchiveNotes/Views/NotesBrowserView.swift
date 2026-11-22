@@ -485,6 +485,7 @@ struct StackedPanesLayout: Layout {
 private struct ItemListPane: View {
     @ObservedObject var model: NotesModel
     @ObservedObject var nav: NotesNavigationModel
+    @EnvironmentObject private var flushRegistry: EditorFlushRegistry
     @AppStorage(DisplayCalendarSettings.enabledKey) private var calendarsEnabled = false
     @AppStorage(NotesLayoutSettingsKey.showNoteHeader) private var showingHeader = true
     @AppStorage(NotesLayoutSettingsKey.showTagBar) private var showingTagBar = true
@@ -504,7 +505,9 @@ private struct ItemListPane: View {
                         model: nav,
                         selection: $nav.selection,
                         onDoubleClick: { /* focus/open in detail — dedicated editor window is a future step */ },
-                        buildContextMenu: { sel in NotesItemContextMenu.make(nav: nav, selection: sel) },  // W6-S5
+                        buildContextMenu: { selection in
+                            NotesItemContextMenu.make(nav: nav, selection: selection, flushing: flushRegistry)
+                        },
                         calendarsEnabled: calendarsEnabled
                     )
                     .accessibilityLabel("Notes")

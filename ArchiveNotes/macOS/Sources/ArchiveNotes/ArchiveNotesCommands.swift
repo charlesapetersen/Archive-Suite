@@ -181,11 +181,12 @@ extension FocusedValues {
 enum NewItemFlow {
     static func create(kind: Item.Kind, from templateId: UUID?, model: NotesModel,
                        flushing registry: EditorFlushRegistry) async -> UUID? {
+        let folderId = model.selectedFolderId
         if let templateId {
             await registry.flushAll()
             guard !model.hasFailedTemplateBodySave(templateId) else { return nil }
         }
-        return await model.newItem(kind: kind, in: model.selectedFolderId, from: templateId)
+        return await model.newItem(kind: kind, in: folderId, from: templateId)
     }
 }
 
