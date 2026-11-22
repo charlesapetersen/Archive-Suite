@@ -17513,3 +17513,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   passed, including the retained regression. Two Title clicks in the focused off-screen test sorted
   three scratch notes ascending and then descending. No bench cache used.
   <!-- /W49.fix-notes-header-sort -->
+- [x] **W49.proc-s052-verify — failed label reads are reported as failures [S]** · §Known limits are queued, accepted or asked
+  (lane: processor) (uses: build) — Owner call 30 (2026-11-21). SHIPPED 2026-11-21 (this commit).
+  Confirmed at `43501730`. Two successful page transcriptions and two HTTP 500 label replies gave
+  a summary claiming two gateway label reads. Vision supplied Box 17 and the empty folder marker
+  was warned about separately. Queued W49.proc-fix-s052. [Scratch run and regression](verification/evidence/processor/W49.proc-s052-verify.md).
+  $0 spent. No bench cache used.
+  <!-- /W49.proc-s052-verify -->

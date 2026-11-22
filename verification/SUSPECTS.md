@@ -1268,10 +1268,13 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `Capture/ContainerLabelCapture.swift` `spendNote` (counts calls) and `warningNote`.
 - **Would confirm it:** a run whose label calls all fail; read the summary and the container file's markers.
 - **Would clear it:** the summary says the reads failed, or counts only answered calls.
-- **Status:** `open`
+- **Status:** `reproduced` — `W49.proc-fix-s052`, [scratch evidence](evidence/processor/W49.proc-s052-verify.md)
 - **History:**
   - 2026-11-20 W49.proc-suspects-messages — raised.
   - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s052-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+  - 2026-11-21 W49.proc-s052-verify (Codex gpt-6.2-sol, `43501730`) — independently repeated the
+    HTTP 500 label replies seen by Claude Opus 5.5. The summary still counted two gateway reads.
+    Vision supplied Box 17 and the blank folder produced an empty marker and a local warning.
 
 
 ### S-053 · The label reader asks any gateway for GPT 5.6 Luna
