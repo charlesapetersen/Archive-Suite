@@ -806,9 +806,14 @@ enum DateRoute {
     /// One document's route. `traceRaw` is nil when the call failed; `image` nil when the pass was not sent.
     static func decide(text: String, near: [Neighbour], traceRaw: String?, image: ImageReading?,
                        imageNote: String, allowStampFallback: Bool = true) -> Decision {
+        decide(text: text, near: near, trace: parseTrace(traceRaw), image: image, imageNote: imageNote,
+               allowStampFallback: allowStampFallback)
+    }
+
+    static func decide(text: String, near: [Neighbour], trace tr: Trace, image: ImageReading?,
+                       imageNote: String, allowStampFallback: Bool = true) -> Decision {
         let cands = candidates(text)
         let own = Set(cands.map(\.year))
-        let tr = parseTrace(traceRaw)
         let check = tr.parsed ? evidenceCheck(year: tr.year, evidence: tr.evidence, context: context(text: text, near: near))
             : Check(verdict: "none", reason: "unparsed")
         let cited: String? = tr.evidence.map { $0["neighbour"] ?? "self" }

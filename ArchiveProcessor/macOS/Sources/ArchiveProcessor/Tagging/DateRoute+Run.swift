@@ -63,23 +63,36 @@ extension DateRoute {
             if !measured {
                 note = imageNoRoute
             } else {
-                let jpegs = input.pages.prefix(imagePages).compactMap {
-                    ImageEncoding.uprightJPEG(url: $0.url, rotationDegrees: $0.rotation, longEdge: imageLongSide)
-                }
-                if jpegs.isEmpty {
-                    note = imageNoPages
-                } else if let reply = await imagePass(jpegs, gateway: backend.gateway!) {
-                    image = readImage(reply)
-                    note = image?.ok == true ? imageSent : imageFailed
-                } else {
-                    note = imageFailed
-                }
+                (image, note) = await readPageImages(input.pages, gateway: backend.gateway!)
             }
         }
         var d = decide(text: input.text, near: input.near, traceRaw: raw, image: image, imageNote: note)
         d.route = measured ? backend.label : backend.ownLabel
         d.measured = measured
         return d
+    }
+
+    private static func readPageImages(_ pages: [(url: URL, rotation: Int)], gateway: GatewayConfig) async
+        -> (ImageReading?, String) {
+        let jpegs = pages.prefix(imagePages).compactMap {
+            ImageEncoding.uprightJPEG(url: $0.url, rotationDegrees: $0.rotation, longEdge: imageLongSide)
+        }
+        guard !jpegs.isEmpty else { return (nil, imageNoPages) }
+        guard let reply = await imagePass(jpegs, gateway: gateway) else { return (nil, imageFailed) }
+        let image = readImage(reply)
+        return (image, image.ok ? imageSent : imageFailed)
+    }
+
+    /// A Live rotation correction changes the image evidence alone. Keep the trace and keep the
+    /// previous decision if the refreshed image request fails.
+    static func refreshLiveImage(_ previous: Decision, input: Input, gateway: GatewayConfig) async -> Decision? {
+        guard previous.measured, [imageSent, imageFailed, imageNoPages].contains(previous.imageNote) else { return nil }
+        let (image, note) = await readPageImages(input.pages, gateway: gateway)
+        guard note == imageSent else { return nil }
+        var decision = decide(text: input.text, near: input.near, trace: previous.trace, image: image, imageNote: note)
+        decision.route = previous.route
+        decision.measured = previous.measured
+        return decision
     }
 
     /// The 4-bit MLX build used in date-8b-local.md, independent of the OCR backend.

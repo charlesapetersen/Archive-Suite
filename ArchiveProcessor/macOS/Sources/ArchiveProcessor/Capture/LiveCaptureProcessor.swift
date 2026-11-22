@@ -1545,22 +1545,49 @@ final class LiveCaptureProcessor: ObservableObject {
     private func redateFromFolders(into changed: inout Set<String>) {
         let fm = FileManager.default
         for gid in Array(retained.keys) {
-            guard var seg = retained[gid], let routeDating = seg.routeDating, let preDating = seg.preDatingTags,
-                  let group = session.groups.first(where: { $0.id == gid }) else { continue }
-            var want = routeDating
-            if let folder = liveFolderDate(for: gid) { want.inherit(fromFolder: folder) }
-            // Never take a folder date away: a marker filed by an earlier Finish, or its photo deleted, leaves the
-            // session's groups but not the run (SPEC §Runs: removing the label photo does not move the run).
-            guard want != seg.dating, want.evidenceClass == .folder || seg.dating?.evidenceClass != .folder,
-                  seg.pages.allSatisfy({ fm.fileExists(atPath: $0.sourceURL.path) }) else { continue }
-            let tags = Self.datedTags(preDating, dating: want, mac: session.macTags[gid], group: group)
-            seg.dating = want
-            seg.baseTags = tags.allTags
-            seg.jsonTags.year = tags.year; seg.jsonTags.month = tags.month; seg.jsonTags.day = tags.day
-            seg.jsonTags.dateUncertain = tags.dateUncertain
+            guard var seg = retained[gid], let routeDating = seg.routeDating,
+                  seg.pages.allSatisfy({ fm.fileExists(atPath: $0.sourceURL.path) }),
+                  updateRetainedDate(&seg, from: routeDating) else { continue }
             retained[gid] = seg
             changed.insert(gid)
         }
+    }
+
+    @discardableResult
+    private func updateRetainedDate(_ seg: inout RetainedSegment, from routeDating: DateRoute.Decision) -> Bool {
+        guard let preDating = seg.preDatingTags,
+              let group = session.groups.first(where: { $0.id == seg.groupId }) else { return false }
+        var want = routeDating
+        if let folder = liveFolderDate(for: seg.groupId) { want.inherit(fromFolder: folder) }
+        // A marker filed by an earlier Finish can leave the session without ending the folder run.
+        // Keep that date unless the corrected image now gives the document a date of its own.
+        if seg.dating?.evidenceClass == .folder,
+           want.evidenceClass != .folder, want.evidenceClass != .image, want.evidenceClass != .text { return false }
+        guard want != seg.dating else { return false }
+        let tags = Self.datedTags(preDating, dating: want, mac: session.macTags[seg.groupId], group: group)
+        seg.dating = want
+        seg.baseTags = tags.allTags
+        seg.jsonTags.year = tags.year
+        seg.jsonTags.month = tags.month
+        seg.jsonTags.day = tags.day
+        seg.jsonTags.dateUncertain = tags.dateUncertain
+        return true
+    }
+
+    private func refreshRotationDating(_ seg: RetainedSegment, gateway: GatewayConfig) async -> RetainedSegment {
+        guard let previous = seg.routeDating else { return seg }
+        let pages = seg.pages.prefix(DateRoute.imagePages).map {
+            (url: $0.sourceURL, rotation: $0.result.rotationDegrees)
+        }
+        let input = DateRoute.Input(text: seg.texts.prefix(DateRoute.docPages).joined(separator: "\n\n"),
+                                    near: [], pages: pages)
+        guard let refreshed = await DateRoute.refreshLiveImage(previous, input: input, gateway: gateway) else {
+            return seg
+        }
+        var updated = seg
+        updated.routeDating = refreshed
+        updateRetainedDate(&updated, from: refreshed)
+        return updated
     }
 
     /// W47.item-fields-build — the item-field call for a document the tagging call read here (automatic mode, not
@@ -2202,6 +2229,7 @@ final class LiveCaptureProcessor: ObservableObject {
         guard !stagingManifestBlocked else { return }
         showRotationReview = false
         var changedGroups: Set<String> = []
+        var changedDatingImages: Set<String> = []
         for page in rotationReviewPages {
             guard var seg = retained[page.groupId], page.pageIndex < seg.pages.count else { continue }
             let old = seg.pages[page.pageIndex].result.rotationDegrees
@@ -2218,6 +2246,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 quality: pw.quality)
             retained[page.groupId] = seg
             changedGroups.insert(page.groupId)
+            if page.pageIndex < DateRoute.imagePages { changedDatingImages.insert(page.groupId) }
         }
         rotationReviewPages = []
         if stagingDir != nil { redateFromFolders(into: &changedGroups) }   // recorded only where it is also written
@@ -2237,18 +2266,24 @@ final class LiveCaptureProcessor: ObservableObject {
         // `??` branch is unreachable (the map is built from this very array).
         let regenKeys: [String: String] = Dictionary(
             uniqueKeysWithValues: segsToRegen.map { ($0.groupId, liveCollectionKey(for: $0.groupId)) })
-        // W3.cap-r3-fu6 — the write INPUTS, keyed by group, so the label below is re-derived from exactly
-        // what the regeneration was handed rather than from `retained` re-read after the suspension. Same
-        // last-possible-moment discipline as `regenKeys`, inverted on purpose: the collection is live state
-        // and must be re-read late, whereas the OCR is an input to these very bytes and must NOT drift from
-        // them. (`retained[gid]` happens to be identical today — nothing on this path mutates it while the
-        // detached write runs — but that is a property of the surroundings, not of this line.)
-        let regenInputs: [String: RetainedSegment] = Dictionary(
-            uniqueKeysWithValues: segsToRegen.map { ($0.groupId, $0) })
         isFinalizing = true
         Task { [weak self] in
+            guard let self else { return }
+            var writeInputs = segsToRegen
+            if DateRoute.measuredRoute(gateway: self.config?.textGateway, usesLocalAgent: self.config?.textLocalAgent != nil),
+               let gateway = self.config?.textGateway {
+                for i in writeInputs.indices where changedDatingImages.contains(writeInputs[i].groupId) {
+                    writeInputs[i] = await self.refreshRotationDating(writeInputs[i], gateway: gateway)
+                }
+            }
+            // A request can take time. Recheck the sources before replacing existing staged output.
+            let segments = writeInputs.filter { seg in
+                seg.pages.allSatisfy { FileManager.default.fileExists(atPath: $0.sourceURL.path) }
+            }
+            // Use the exact inputs handed to the file writer again when labelling the regenerated record.
+            let regenInputs = Dictionary(uniqueKeysWithValues: segments.map { ($0.groupId, $0) })
             let regenerated: [StagedSegment] = await Task.detached { () -> [StagedSegment] in
-                segsToRegen.map { seg in
+                segments.map { seg in
                     Self.writeSegmentFiles(groupId: seg.groupId, type: seg.type,
                                            collectionKey: regenKeys[seg.groupId] ?? "__unfiled__",
                                            order: seg.order, pages: seg.pages, baseTags: seg.baseTags,
@@ -2265,7 +2300,6 @@ final class LiveCaptureProcessor: ObservableObject {
                                            stampUnread: seg.stampUnread, textLayer: seg.textLayer ?? .standard)
                 }
             }.value
-            guard let self else { return }
             for outcome in regenerated {
                 guard let idx = self.staged.firstIndex(where: { $0.groupId == outcome.groupId }) else { continue }
                 // W3.cap-r4 — regeneration replaces the staged RECORD, so it must not carry a stale
@@ -2303,6 +2337,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 // placement is the plain one: if the staged record is gone, this pass wrote nothing that
                 // needs describing.
                 if let input = regenInputs[outcome.groupId] {
+                    self.retained[outcome.groupId] = input
                     self.labelStagedRecord(outcome.groupId, type: input.type, outcome: fresh,
                                            results: input.pages.map(\.result))
                 }

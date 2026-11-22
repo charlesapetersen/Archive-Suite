@@ -590,9 +590,8 @@ What remains: a box with many such pages has more gaps to check than the figures
 
 - **Live Capture dates each document without neighbouring text.** Its tagging call has no neighbours, so a document
   with no checked year of its own or on its page image cannot take a neighbour's estimate. A Live document whose phone
-  or Mac card gives a month but no year keeps that month, while the evidence quotes the page's own date. A rotation-review
-  regeneration reuses the first decision, so a page first read sideways keeps an image pass that found nothing
-  (queued: W49.proc-date-paths-rest).
+  or Mac card gives a month but no year keeps that month, while the evidence quotes the page's own date
+  (accepted: Live tags the incoming segment before neighbouring text is available, and an operator-entered month takes precedence).
 - **The image pass runs only through a remote gateway** (Gemini 3.7 Flash, the measured route). On a direct key,
   OpenRouter, a Local Agent or a model on this Mac a document whose text has no year goes straight to the neighbour
   estimate, and its sidecar says `image_pass: not sent: no measured image route on this backend`.

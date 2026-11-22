@@ -1203,31 +1203,48 @@ enum DateRouteTestDriver {
               && fields("A")?["route"] as? String == "Gateway · " + ItemFieldExtractor.gatewayModel,
               "\(wire.itemFields) \(String(describing: fields("A")))")
 
-        // The staging manifest keeps the decision, so a relaunch's rotation review regenerates it without a call.
+        // The manifest retains the decision so rotation can keep its trace and refresh just the image pass.
         let kept = s.liveProcessor._datingTestRetained("B")
         let reloaded = CaptureSession()
         reloaded.liveProcessor._recoveryTestLoadManifest(stagingDir: staging, config: cfg)
         check("6 Live: the staging manifest round-trips the decision", kept?.evidenceClass == .image
               && reloaded.liveProcessor._datingTestRetained("B") == kept
               && reloaded.liveProcessor._datingTestRetained("D") == nil)
-        let calls = wire.lock.withLock { wire.trace.count + wire.images.count + wire.itemFields }
         let before = (dating("B") ?? [:]) as NSDictionary
-        let fieldsBefore = (fields("B") ?? [:]) as NSDictionary
-        if let src = s.photos.first(where: { $0.groupId == "B" })?.url {
-            s.liveProcessor.rotationReviewPages = [
-                LiveCaptureProcessor.RotationReviewPage(groupId: "B", pageIndex: 0, order: 2, sourceURL: src, rotationDegrees: 90)
-            ]
-            s.liveProcessor.applyRotationReviewAndFinalize()
-            let done = await settle { !s.liveProcessor.isFinalizing }
-            check("6 Live: the regenerated B keeps its dating object and header line, no second call",
-                  done && ((dating("B") ?? [:]) as NSDictionary) == before
-                  && evidence("B") == "image; page 1; dateline; \"March 30, 1961\"; gave 1961-03-30"
-                  && wire.lock.withLock { wire.trace.count + wire.images.count + wire.itemFields } == calls
-                  && !fieldsBefore.allKeys.isEmpty && ((fields("B") ?? [:]) as NSDictionary) == fieldsBefore,
-                  "\(String(describing: dating("B")))")
-        } else {
-            check("6 Live: B's source page is on disk", false)
+        let fieldsBefore = (fields("C") ?? [:]) as NSDictionary
+        wire.lock.withLock {
+            wire.imageReply[120] = "Unparsed image reply."
+            wire.imageReply[60] = #"{"dates":[{"quote":"April 10, 1962","page":1,"where":"dateline","kind":"typed","year":1962,"month":4}],"document_date":{"year":1962,"month":4,"quote":"April 10, 1962"}}"#
         }
+        let corrections = [("A", 90), ("B", 180), ("C", 90)]
+        s.liveProcessor.rotationReviewPages = corrections.enumerated().compactMap { index, correction in
+            let (gid, rotation) = correction
+            guard let src = s.photos.first(where: { $0.groupId == gid })?.url else { return nil }
+            return LiveCaptureProcessor.RotationReviewPage(groupId: gid, pageIndex: 0, order: index + 1,
+                                                            sourceURL: src, rotationDegrees: rotation)
+        }
+        s.liveProcessor.applyRotationReviewAndFinalize()
+        let done = await settle { !s.liveProcessor.isFinalizing }
+        check("6 Live: only B and C repeat the image pass on rotation; tagging, trace and item fields are reused",
+              done && wire.lock.withLock {
+                  wire.images.compactMap(\.first).sorted() == [60, 120, 120, 130]
+                      && wire.trace.count == 3 && wire.itemFields == 5 && wire.tagging == 5
+              }, "\(wire.images)")
+        check("6 Live: B keeps its date when the refreshed image reply cannot be read",
+              ((dating("B") ?? [:]) as NSDictionary) == before
+              && evidence("B") == "image; page 1; dateline; \"March 30, 1961\"; gave 1961-03-30")
+        let corrected = tags("C")
+        check("6 Live: the corrected image dates C in the Finder tags, sidecar and PDF header",
+              corrected.contains("1962") && corrected.contains("Day 10") && !corrected.contains("Date Uncertain")
+              && dating("C")?["class"] as? String == "image"
+              && json(staged("C")?.jsonURL)["date"] as? String == "1962-04-10"
+              && evidence("C") == "image; page 1; dateline; \"April 10, 1962\"; gave 1962-04-10"
+              && !fieldsBefore.allKeys.isEmpty && ((fields("C") ?? [:]) as NSDictionary) == fieldsBefore,
+              "\(corrected) \(String(describing: dating("C")))")
+        let refreshed = CaptureSession()
+        refreshed.liveProcessor._recoveryTestLoadManifest(stagingDir: staging, config: cfg)
+        check("6 Live: the refreshed decision survives manifest reload",
+              refreshed.liveProcessor._datingTestRetained("C")?.year == 1962)
 
         // W47.ct-folder-date-live: a folder whose card is saved before its documents · G, undated of its own · H, its
         // date in the text · a second folder whose card is saved only after K, undated, was tagged · a box (its card
