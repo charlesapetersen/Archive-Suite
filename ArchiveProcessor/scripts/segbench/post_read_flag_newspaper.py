@@ -3,7 +3,7 @@
 
   python3 ops/autonomous/heavy-run.py run -- python3 ArchiveProcessor/scripts/segbench/post_read_flag_newspaper.py vision
   uv run --offline --with rapidfuzz --with 'sacrebleu==2.5.1' --with regex --with numpy --with python-Levenshtein \
-      python ArchiveProcessor/scripts/segbench/post_read_flag_newspaper.py report
+      python ArchiveProcessor/scripts/segbench/post_read_flag_newspaper.py report --l9-only
   python3 ArchiveProcessor/scripts/segbench/post_read_flag_newspaper.py self-test
 
 THE QUESTION (owner, 2026-11-19, call 22). The flag (OCR/ReadQualityDisagreement.swift, post_read_flag.py) compares
@@ -11,7 +11,7 @@ a reader's page text with Apple Vision's reading of the same image, in reading o
 reader's own cut. A newspaper page read in regions comes out region by region, so its text is in another order than
 Vision's whole-page reading, and the check skips it. Which comparison would work there, and what cut?
 
-THE SIGNALS (risk, higher = more likely poor; a failed reading is always flagged, as in the fit):
+THE SIGNALS (risk, higher = more likely poor; failed requests are counted separately from flags):
   strict     1 - NES of the reading against Vision's whole-page text (what the app's check computes today).
   orderfree  1 - NewsBench's bag-of-words F1 against Vision's whole-page text (no order at all).
   regrouped  1 - NES against Vision's own lines put into the reading's regions: each line goes to the region holding
@@ -36,11 +36,13 @@ Regions for `regrouped`: the reader's own crop boxes where they are saved (Paddl
 app's PP-DocLayoutV3 boxes in PaddleOCR-VL's raw order, or DocLayout-YOLO's (layout-photo/regions/yolo.json) for a
 YOLO-routed system. A partition read uses its raw boxes: its own plan images went to the Trash.
 
-THE FITS. Pooled over the region readings of the L9 scans (per system each has 15 pages, too few for a 5% ceiling):
+THE FITS. Pooled over answered readings of the L9 scans (per system each has 15 pages, too few for a 5% ceiling):
 in-sample, cross-validated by page (5-fold, 20 seeds, a page's readings in one fold), and leave one system out (the
 cut fitted on the other systems, applied to the held-out one: a reader the cut was not fitted on). Every reader with
-an app rule also has its own whole-page cut applied to its region readings under each signal.
-Writes score-only files: segbench-results/post-read-flag-newspaper.{md,json}.
+a mapped app rule also has its own whole-page cut replayed on answered readings. The deployment baseline
+uses only mapped whole-page readings; the app skips region readings.
+Use report --l9-only to reproduce the newspaper results while retaining the published non-newspaper
+Gemini summaries when the old Vision cache is unavailable. Writes score-only files: segbench-results/post-read-flag-newspaper.{md,json}.
 """
 from __future__ import annotations
 
@@ -93,7 +95,8 @@ LAB_SYSTEMS = {
     'mistral-small-2603-wholepage': ('whole', None), 'qwen3-vl-8b-4bit-whole': ('whole', None),
     'qwen3.5-4b-4bit-whole': ('whole', None), 'qwen3.8-flash-wholepage': ('whole', None),
 }
-# Systems whose model has an app rule (ReadQualityDisagreement.swift), with that rule's cut (fitted on whole pages).
+# Frozen threshold replay from ReadQualityDisagreement.swift at the pass 18 review baseline.
+APP_BASELINE = "dbb10584"
 APP_CUTS = {
     'gemini-3.5-flash-lite': ('Gemini 3.5 Flash Lite', 0.6967), 'qwen3.8-flash': ('Qwen3.8 Flash', 0.7243),
     'qwen3-vl-8b-4bit': ('Qwen3-VL 8B', 0.7013), 'gemini-3.7-gw': ('Gemini 3.7 Flash', 0.9764),
@@ -281,7 +284,7 @@ def stitch(texts):
     return '\n\n'.join(t.strip() for t in texts if t.strip())
 
 
-def readings():
+def readings(l9_only=False):
     """One dict per reading: system, model, route, set, page, text, ok, truth, stratum, vision lines, regions."""
     out = []
     l9 = l9_pages()
@@ -304,11 +307,11 @@ def readings():
                         'text': text, 'ok': bool(text.strip()), 'truth': truth[p], 'stratum': 'L9', 'lines': lines[p],
                         'regions': boxes['pp'][p] if route == 'region' else None, 'source': 'bench',
                         'crops': crop_vision('pp', p) if route == 'region' else None})
-    out += gemini_readings()
+    out += gemini_readings(l9_only)
     return out
 
 
-def gemini_readings():
+def gemini_readings(l9_only):
     """Gemini 3.7 Flash's whole and PP-DocLayoutV3 readings, re-validated from their receipts (regions_orderfree)."""
     import regions as D
     import regions_gateway as G
@@ -317,6 +320,8 @@ def gemini_readings():
     ledger = {r['request_sha256']: r for r in G.effective() if r['event'] == 'settle'}
     out = []
     for p in m['pages']:
+        if l9_only and (p['set'] == 'owner99' or p['stratum'] != 'L9'):
+            continue
         ref = Path(p['truth']).read_text()
         if p['set'] == 'owner99':
             lines, set_, stratum = vision_lines(CACHE / 'enh-dewarp/lines/raw' / f'{p["id"]}.json'), 'the 96', None
@@ -395,50 +400,80 @@ def leave_one_out(rows, sig, label='poor'):
     return tot
 
 
+def reading_counts(rows):
+    answered = [r for r in rows if r['ok']]
+    return {'readings': len(rows), 'answered': len(answered), 'failed': len(rows) - len(answered),
+            'systems': len({r['system'] for r in rows}), 'poor': sum(r['poor'] for r in answered),
+            'poor_orderfree': sum(r['poor_orderfree'] for r in answered),
+            'mean_nes': st.mean(r['nes'] for r in answered) if answered else None}
+
+
+def app_baseline(rows, route, signal):
+    """Replay the plain-page thresholds after the reading, region and rule gates."""
+    coverage = {status: dict.fromkeys(('readings', 'good', 'poor'), 0)
+                for status in ('mapped', 'unmapped', 'ineligible')}
+    coverage['failed'] = {'readings': 0}
+    by_reader = {}
+    for r in rows:
+        if not r['ok']:
+            coverage['failed']['readings'] += 1
+            continue
+        if route == 'region':
+            status = 'ineligible'
+        else:
+            status = 'mapped' if r['model'] in APP_CUTS else 'unmapped'
+        coverage[status]['readings'] += 1
+        coverage[status]['poor' if r['poor'] else 'good'] += 1
+    if route == 'whole':
+        for model, (reader, cut) in APP_CUTS.items():
+            attempts = [r for r in rows if r['model'] == model]
+            answered = [r for r in attempts if r['ok']]
+            if attempts:
+                by_reader[reader] = {'cut': cut, 'failed': len(attempts) - len(answered),
+                                     **evaluate(answered, signal, cut=cut)['in_sample']}
+    return {'baseline': APP_BASELINE, 'route': route, 'coverage': coverage, 'by_reader': by_reader}
+
+
 def analyse(rows):
     l9 = [r for r in rows if r['set'] == 'L9']
-    res = {'counts': {}, 'systems': {}, 'pooled': {}, 'app_cuts': {}, 'gemini': {}}
+    res = {'counts': {}, 'systems': {}, 'pooled': {}, 'app_baseline': {}, 'app_cuts': {}, 'gemini': {}}
     for route in ('region', 'whole'):
-        sub = [r for r in l9 if r['route'] == route]
-        res['counts'][route] = {'readings': len(sub), 'systems': len({r['system'] for r in sub}),
-                                'poor': sum(r['poor'] for r in sub), 'failed': sum(not r['ok'] for r in sub),
-                                'mean_nes': st.mean(r['nes'] for r in sub)}
+        attempts = [r for r in l9 if r['route'] == route]
+        sub = [r for r in attempts if r['ok']]
+        res['counts'][route] = reading_counts(attempts)
+        res['app_baseline'][route] = app_baseline(attempts, route, 'strict')
         res['pooled'][route] = {s: evaluate(sub, s) for s in SIGNALS}
         res['pooled'][route + ' order-free label'] = {s: evaluate(sub, s, 'poor_orderfree') for s in SIGNALS}
-        # A single cut for every reader: the median of the app's whole-page cuts for its direct and OpenRouter routes.
-    res['pooled']['region, app-style cut 0.70'] = {s: evaluate([r for r in l9 if r['route'] == 'region'], s, cut=0.70)
-                                                  for s in SIGNALS}
-    reg = [r for r in l9 if r['route'] == 'region']
+    reg = [r for r in l9 if r['route'] == 'region' and r['ok']]
     res['recommended'] = {'cut': RECOMMENDED, 'strict label': evaluate(reg, 'crops', cut=RECOMMENDED),
                           'order-free label': evaluate(reg, 'crops', 'poor_orderfree', cut=RECOMMENDED),
                           'by system': {s: F.counts([r['risk']['crops'] for r in reg if r['system'] == s],
                                                     [r['poor'] for r in reg if r['system'] == s],
                                                     [r['nes'] for r in reg if r['system'] == s], RECOMMENDED)
                                         for s in sorted({r['system'] for r in reg})}}
-    res['pooled']['whole, app-style cut 0.70'] = {s: evaluate([r for r in l9 if r['route'] == 'whole'], s, cut=0.70)
-                                                 for s in SIGNALS}
     for s in sorted({r['system'] for r in l9}):
-        sub = [r for r in l9 if r['system'] == s]
-        res['systems'][s] = {'route': sub[0]['route'], 'n': len(sub), 'poor': sum(r['poor'] for r in sub),
-                             'failed': sum(not r['ok'] for r in sub), 'mean_nes': st.mean(r['nes'] for r in sub),
+        attempts = [r for r in l9 if r['system'] == s]
+        sub = [r for r in attempts if r['ok']]
+        res['systems'][s] = {'route': attempts[0]['route'], **reading_counts(attempts),
                              'auc': {g: F.auc([r['risk'][g] for r in sub], [r['poor'] for r in sub]) for g in SIGNALS},
-                             'median_risk_good': {g: med([r['risk'][g] for r in sub if not r['poor'] and r['ok']])
-                                                  for g in SIGNALS}}
+                             'median_risk_good': {g: med([r['risk'][g] for r in sub if not r['poor']]) for g in SIGNALS}}
     for model, (name, cut) in APP_CUTS.items():
         for route in ('region', 'whole'):
-            sub = [r for r in rows if r['model'] == model and r['route'] == route]
+            sub = [r for r in l9 if r['model'] == model and r['route'] == route and r['ok']]
             if sub:
                 res['app_cuts'][f'{name}, {route}'] = {'cut': cut, 'sets': sorted({r['set'] for r in sub}),
                                                        **{s: evaluate(sub, s, cut=cut) for s in SIGNALS}}
     gem = [r for r in rows if r['source'] == 'gateway']
     for set_ in ('the 96', 'public', 'L9'):
         for route in ('whole', 'region'):
-            sub = [r for r in gem if r['set'] == set_ and r['route'] == route]
-            res['gemini'][f'{set_}, {route}'] = {'n': len(sub), 'poor': sum(r['poor'] for r in sub),
-                                                'mean_nes': st.mean(r['nes'] for r in sub),
+            attempts = [r for r in gem if r['set'] == set_ and r['route'] == route]
+            if not attempts:
+                continue
+            sub = [r for r in attempts if r['ok']]
+            res['gemini'][f'{set_}, {route}'] = {**reading_counts(attempts),
                                                 **{s: {'auc': F.auc([r['risk'][s] for r in sub], [r['poor'] for r in sub]),
                                                        'median_risk_good': med([r['risk'][s] for r in sub
-                                                                                if not r['poor'] and r['ok']]),
+                                                                                if not r['poor']]),
                                                        'fitted_cut': F.fit_cut([r['risk'][s] for r in sub],
                                                                                [r['poor'] for r in sub])}
                                                    for s in SIGNALS}}
@@ -466,9 +501,13 @@ def vision_quality():
     return out
 
 
-def report():
-    rows = score_all(readings())
+def report(l9_only=False):
+    rows = score_all(readings(l9_only=l9_only))
     res = analyse(rows)
+    if l9_only:
+        prior = json.loads(OUT_JSON.read_text())
+        ancillary = {k: v for k, v in prior['gemini'].items() if not k.startswith('L9, ')}
+        res['gemini'] = ancillary | res['gemini']
     res['vision_quality'] = vision_quality()
     check_parity(rows)
     clean = json.loads(json.dumps(res, default=str).replace('Infinity', 'null'))
@@ -509,10 +548,41 @@ def _f(x, d=3):
     return '-' if x is None else f'{x:.{d}f}'
 
 
-NAMES = {'strict': "against Vision's whole page, in order (today's check)",
+NAMES = {'strict': "against Vision's whole page, in order",
          'orderfree': "against Vision's whole page, order-free (bag of words)",
          'regrouped': "against Vision's whole-page lines put into the reading's regions",
          'crops': 'against Vision reading the same region crops'}
+
+
+def render_baseline(baseline):
+    coverage = baseline['coverage']
+    lines = [
+        f"### {baseline['route'].capitalize()} readings at the app baseline",
+        '',
+        f"Replay of `ReadQualityDisagreement.swift` at `{baseline['baseline']}`. This applies the answer, "
+        "region and reader-rule gates to the cached readings, then compares mapped replies with Vision's "
+        "whole-page text in order. It cannot recreate all live eligibility checks or image preparation.",
+        '',
+        '| status | readings | strict poor | strict good |',
+        '|---|---:|---:|---:|',
+    ]
+    for status, label in (('mapped', 'Answered, mapped whole-reader rule'),
+                          ('unmapped', 'Answered, no mapped whole-reader rule'),
+                          ('ineligible', 'Answered, region-ordered and skipped'),
+                          ('failed', 'Failed request')):
+        e = coverage[status]
+        lines.append(f"| {label} | {e['readings']} | {e.get('poor', '—')} | {e.get('good', '—')} |")
+    readers = baseline['by_reader']
+    if readers:
+        lines += ['', '| reader | threshold | poor flagged | good flagged | failed requests |',
+                  '|---|---:|---:|---:|---:|']
+        for reader, e in readers.items():
+            lines.append(f"| {reader} | {e['cut']:.4f} | {e['hits']}/{e['poor']} | "
+                         f"{e['false_alarms']}/{e['good']} | {e['failed']} |")
+        lines.append(f"| Mapped total | — | {sum(e['hits'] for e in readers.values())}/{coverage['mapped']['poor']} | "
+                     f"{sum(e['false_alarms'] for e in readers.values())}/{coverage['mapped']['good']} | "
+                     f"{sum(e['failed'] for e in readers.values())} |")
+    return lines
 
 
 def render(res):
@@ -527,11 +597,12 @@ def render(res):
         bow = [v[k]['bowf1'] for v in vq.values()]
         L.append(f'| {k} | {100 * st.mean(nes):.1f} ({100 * min(nes):.1f}) | {100 * st.mean(bow):.1f} ({100 * min(bow):.1f}) |')
     L += ['', '## The four comparisons, every reader pooled', '',
-          f"Region readings: {c['region']['readings']} ({c['region']['systems']} systems x 15 pages, plus Gemini's 3), "
-          f"{c['region']['poor']} poor, mean NES {100 * c['region']['mean_nes']:.1f}. Whole-page readings, for contrast: "
-          f"{c['whole']['readings']} ({c['whole']['systems']} systems), {c['whole']['poor']} poor, {c['whole']['failed']} failed, "
-          f"mean NES {100 * c['whole']['mean_nes']:.1f} (most whole-page reads of a newspaper loop or stop short). "
-          'Cells: caught / poor, false alarms / good, Wilson 95% intervals.', '']
+          'The fits use answered readings. Cells give poor caught and good flagged with Wilson 95% intervals.', '']
+    for route, e in c.items():
+        L.append(f"- {route.capitalize()}: {e['answered']}/{e['readings']} answered across {e['systems']} systems, "
+                 f"{e['failed']} failed. Of the answers, {e['poor']} were strict poor and mean NES was "
+                 f"{100 * e['mean_nes']:.1f}.")
+    L.append('')
     for title, key in (('Region readings, poor = under 70 strict NES', 'region'),
                        ('Region readings, poor = under 70 bag-of-words F1 (content lost, not order)', 'region order-free label'),
                        ('Whole-page readings, poor = under 70 strict NES', 'whole')):
@@ -553,25 +624,33 @@ def render(res):
     L += ['', "### By system at that cut (strict label)", '', '| system | poor | caught | false alarms |', '|---|---:|---:|---:|']
     for s, e in r['by system'].items():
         L.append(f"| {s} | {e['poor']} | {e['hits']} | {e['false_alarms']} |")
-    L += ['', "## The app's whole-page cuts applied to region readings", '',
-          "Each reader with an app rule, its own cut (fitted on whole photographs) on its region and whole-page readings "
-          'here. Sets: L9 for the NewsBench systems; Gemini 3.7 Flash adds 9 public pages and the 96.', '',
-          '| reader, route | cut | today: caught | today: false alarms | same regions: caught | same regions: false alarms |',
+    L += ['', '## Which readings the app baseline can flag', '']
+    for baseline in res['app_baseline'].values():
+        L += render_baseline(baseline) + ['']
+    L += ['## Replaying the same thresholds on region answers', '',
+          "Thresholds fitted on whole photographs, replayed on answers from the mapped readers even on routes the app skips. "
+          "All readings in this table are from L9.", '',
+          '| reader, route | cut | whole Vision: caught | whole Vision: false alarms | same regions: caught | same regions: false alarms |',
           '|---|---:|---|---|---|---|']
     for k, e in res['app_cuts'].items():
-        L.append(f"| {k} | {e['cut']:.3f} | {_cell(e['strict']['in_sample'])} | {_cell(e['strict']['in_sample'], False)} | "
+        if k.endswith(', whole'):
+            continue
+        L.append(f"| {k} | {e['cut']:.4f} | {_cell(e['strict']['in_sample'])} | {_cell(e['strict']['in_sample'], False)} | "
                  f"{_cell(e['crops']['in_sample'])} | {_cell(e['crops']['in_sample'], False)} |")
     L += ['', '## Gemini 3.7 Flash on PP-DocLayoutV3 regions, by set', '',
-          'Median disagreement of its good readings, and AUC, under each comparison (the 96 are not newspapers).', '',
-          '| set, route | n | poor | mean NES | today: AUC, median | same regions: AUC, median |', '|---|---:|---:|---:|---|---|']
+          'Median disagreement of good readings and AUC. The original non-L9 summaries are retained for context. '
+          'Their attempt totals use the original scoring, which counted any failures as poor.', '',
+          '| set, route | attempts | failed | poor | mean NES | whole Vision: AUC, median | same regions: AUC, median |', '|---|---:|---:|---:|---:|---|---|']
     for k, e in res['gemini'].items():
-        L.append(f"| {k} | {e['n']} | {e['poor']} | {100 * e['mean_nes']:.1f} | {_f(e['strict']['auc'], 2)}, "
+        mean = e['mean_nes']
+        L.append(f"| {k} | {e.get('readings', e.get('n'))} | {e.get('failed', '—')} | {e['poor']} | "
+                 f"{_f(None if mean is None else 100 * mean, 1)} | {_f(e['strict']['auc'], 2)}, "
                  f"{_f(e['strict']['median_risk_good'], 2)} | {_f(e['crops']['auc'], 2)}, {_f(e['crops']['median_risk_good'], 2)} |")
     L += ['', '## Each system on the 15 scans', '',
-          'AUC and the median disagreement of its good readings, today\'s check and the same-region one.', '',
-          '| system | route | poor | mean NES | today: AUC, median | same regions: AUC, median |', '|---|---|---:|---:|---|---|']
+          'AUC and median disagreement of good answers against whole-page Vision and same-region Vision.', '',
+          '| system | route | answered | failed | poor | mean NES | whole Vision: AUC, median | same regions: AUC, median |', '|---|---|---:|---:|---:|---:|---|---|']
     for s, e in res['systems'].items():
-        L.append(f"| {s} | {e['route']} | {e['poor']} | {100 * e['mean_nes']:.1f} | {_f(e['auc']['strict'], 2)}, "
+        L.append(f"| {s} | {e['route']} | {e['answered']} | {e['failed']} | {e['poor']} | {_f(None if e['mean_nes'] is None else 100 * e['mean_nes'], 1)} | {_f(e['auc']['strict'], 2)}, "
                  f"{_f(e['median_risk_good']['strict'], 2)} | {_f(e['auc']['crops'], 2)}, {_f(e['median_risk_good']['crops'], 2)} |")
     return '\n'.join(L) + '\n\n' + CARD.strip() + '\n'
 
@@ -579,7 +658,7 @@ def render(res):
 HEAD = """
 # W49.proc-read-flag-newspaper: the read-poorly flag on newspaper pages read in regions
 
-Generated by `scripts/segbench/post_read_flag_newspaper.py report` (the method is its docstring); every figure is in
+Generated by `scripts/segbench/post_read_flag_newspaper.py report --l9-only` (the method is its docstring); every figure is in
 `post-read-flag-newspaper.json`. No money and no reader run: the readings are cached (the Vision OCR lab's NewsBench
 copy at its commit 2372b6b, W46.layout-partition-score's Mac reads, W46.ocr-regions-paid's gateway reads); Apple
 Vision read the 15 scans and their 3,124 region crops on this Mac (macOS 27.2, the guarded runner).
@@ -591,33 +670,29 @@ A reading is poor under 70 NES against the truth, as in `post-read-flag.md`; a f
 FINDINGS = """
 ## What this says
 
-- **Vision cannot read a whole newspaper scan, so today's check cannot work on one.** On the 15 L9 scans Vision's
+- **Whole-page Vision is a weak comparison on these scans.** On the 15 L9 scans Vision's
   whole-page reading scores 21.8 strict NES and 44.5 bag-of-words F1 against the truth (16.6 on its worst page); it
-  finds 84 to 544 lines on pages of 1,900 to 9,000 words. Every reader then disagrees with it: Gemini 3.7 Flash's
+  finds 84 to 544 lines on pages of 1,900 to 9,000 words. Even strong readings can disagree with it: Gemini 3.7 Flash's
   whole-page readings score 97.8 and still sit 0.70 from Vision. Against the whole page the comparison barely
   separates poor region readings from good ones (AUC 0.52 in order, 0.42 order-free, 0.47 with Vision's lines put
-  into the regions), and the app's own cuts (about 0.70) would flag 301 of 335 good region readings.
+  into the regions). The existing check skips all 393 region readings, including the 335 good ones.
 - **Vision reading the same region crops does.** Cropped, Vision reads the same scans at 84.8 strict NES and 90.8
   bag-of-words F1 (PP-DocLayoutV3 crops, worst page 82.6). Compared crop for crop, in the regions' order, the
   disagreement separates poor region readings (AUC 0.69) and almost perfectly separates the ones that lost content
-  rather than order (AUC 0.98). The fitted cut, 0.398, holds the ceiling in-sample (16 of 335 good readings, 4.8%,
-  catching 21 of 58 poor ones) and cross-validated by page (38% caught at 5.3%), and catches every one of the 12
-  that lost content; with each system left out in turn the held-out system sees 6.0% false alarms.
-- **A cut of 0.45 is the one to ship.** From 0.40 to 0.45 the false alarms fall from 16 to 5 of 335 (1.5%, 0.6-3.4%)
+  rather than order (AUC 0.98). The fitted cut, 0.398, holds the 5% ceiling in-sample (16 of 335 good readings,
+  4.8%, catching 21 of 58 poor ones and all 12 that lost content). On refitting, false alarms reach 5.3% by page
+  (38% caught) and 6.0% with each system held out in turn.
+- **Candidate threshold: 0.45.** From 0.40 to 0.45 the false alarms fall from 16 to 5 of 335 (1.5%, 0.6-3.4%)
   while 20 of the 21 poor readings and all 12 content-poor ones are still caught; above 0.45 hits drop fast (13 of 58
-  at 0.50). It was chosen from this grid, so its figures are in-sample. The poor readings it misses are poor in order
-  only: the strict label counts a region
+  at 0.50). It was chosen from this grid, so its figures are in-sample. Cross-validation refits the threshold in each fold.
+  The missed poor readings are poor in order only: the strict label counts a region
   reading whose words are right but whose columns are out of the truth's order as poor, and Vision's crops share the
   reading's order, so no comparison with them can see that.
-- **The whole-page cuts do not transfer.** On the same-region comparison every app cut (0.70 to 0.98) flags no good
-  region reading but also catches almost none; a newspaper page needs its own cut, one for every reader, since per
-  system 15 pages are too few to fit one and the pooled cut holds for systems left out of the fit.
-- **The shipped check misfires on a newspaper scan read whole.** The app reads a newspaper whole when the layout
-  model is not downloaded, the detector fails or the kind is uncertain, and the whole-page check then runs against
-  Vision's 22-NES reading: at the readers' cuts (about 0.70) it flags 46 of 53 good whole readings here (Gemini 3.5
-  Flash Lite 12 of 13, Qwen3-VL 8B 10 of 11; Gemini 3.7 Flash, at 0.976, none). Most whole readings of these scans are
-  poor (115 of 168), so most of those flags are right, but a good one is almost always flagged too
-  (W49.proc-read-flag-newspaper-whole measures a fix).
+- **The whole-page cuts do not transfer.** On the same-region comparison the mapped thresholds tested there flag no good
+  region reading and catch almost none of the poor ones. There are too few pages to fit a threshold per reader.
+- **Whole-page threshold replay.** On L9, 25 of the 32 good whole-page answers with a mapped rule crossed their
+  reader's actual threshold. Another 21 good answers had no mapped rule. See the coverage table and
+  `post-read-flag-newspaper-whole.md` for the nine-tile comparison.
 - **What the app would do.** For a page read in regions, read each region image the plan hands the reader (and its
   outside crops) with Vision, join them in the same order, compare with the reading's text by the bench's NES, and
   flag at 0.45 or more. The plan's crops already exist; Vision on them took about 0.15 s a crop here (some 10 s for
@@ -658,14 +733,28 @@ def self_test():
     lines = [{'text': 'right', 'box': (.6, .1, .9, .2)}, {'text': 'left', 'box': (.1, .2, .4, .3)},
              {'text': 'out', 'box': (2, 2, 3, 3)}]
     assert regroup(lines, boxes) == 'left\nright\nout'
+    good = {'ok': True, 'model': 'qwen3.8-flash', 'poor': False, 'poor_orderfree': False,
+            'nes': 0.9, 'risk': {'strict': 0.7243}, 'system': 'qwen'}
+    attempts = [good, {**good, 'model': None}, {**good, 'ok': False, 'poor': True, 'poor_orderfree': True}]
+    whole = app_baseline(attempts, 'whole', 'strict')
+    assert [whole['coverage'][k]['readings'] for k in ('mapped', 'unmapped', 'ineligible', 'failed')] == [1, 1, 0, 1]
+    assert whole['by_reader']['Qwen3.8 Flash']['false_alarms'] == 1
+    assert whole['by_reader']['Qwen3.8 Flash']['hits'] == 0
+    region = app_baseline(attempts, 'region', 'strict')
+    assert region['coverage']['ineligible']['good'] == 2 and not region['by_reader']
+    assert reading_counts(attempts)['poor'] == 0
     print('self-test ok')
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('cmd', choices=('vision', 'report', 'self-test'))
+    ap.add_argument('--l9-only', action='store_true', help='rescore the newspaper scans only')
     a = ap.parse_args()
-    {'vision': vision, 'report': report, 'self-test': self_test}[a.cmd]()
+    if a.cmd == 'report':
+        report(l9_only=a.l9_only)
+    else:
+        {'vision': vision, 'self-test': self_test}[a.cmd]()
 
 
 if __name__ == '__main__':

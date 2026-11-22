@@ -235,17 +235,21 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   corrected image when the app turns a page. Imports from the official Qwen3.6 27B FP8 checkpoint use the hosted FP8
   cutoff, supported by similar readings on the 96 benchmark pages. Routes without an applicable cutoff and pages
   where the Vision pass fails stay unflagged (accepted: owner, 2026-11-19, call 22, W49.proc-read-flag-wiring).
-- A newspaper page read in regions is not flagged. This includes the region-ordered cluster imports. Vision reads
-  a whole newspaper scan at 21.8 NES, compared with 84.8 NES on the same region crops. The region comparison was
-  fitted at one cut of 0.45 for every reader (`segbench-results/post-read-flag-newspaper.md`, 15 scans from one
-  collection) (queued: W49.proc-read-flag-newspaper-app).
+- The plain-photo check skips region-ordered newspaper replies, including region-ordered cluster imports, so
+  all 393 region answers on L9 were ineligible. The comparison using Vision on the same crops catches 20/58
+  strict-poor answers and flags 5/335 good answers at the candidate 0.45 threshold. The 15 scans (14 from one
+  collection) were used to select the method and threshold. The rate for photographs is unknown, and the
+  app's masked crops still need checking (`segbench-results/post-read-flag-newspaper.md`; queued:
+  W49.proc-read-flag-newspaper-app).
 - A successful whole-page retry that still carries region counts from the earlier attempt is skipped by the
   plain-photo check (queued: W49.proc-read-flag-newspaper-whole-app).
-- A newspaper scan read whole (always for Qwen3.6 27B since W47.wh-whole-page-large; otherwise when the layout model is not
-  downloaded, the detector fails or the kind is uncertain) is checked against the poor whole-page Vision reading, so at
-  the readers' cuts of about 0.70 a good reading is almost always flagged (46 of 53 good whole readings on L9; Gemini
-  3.7 Flash's 0.976 cut flags none). Vision on a 3 x 3 grid of tiles, compared order-free, flags none of the 53 at 0.20
-  and catches 110 of 115 poor ones (`segbench-results/post-read-flag-newspaper-whole.md`) (queued: W49.proc-read-flag-newspaper-whole-app).
+- On the L9 scans, replaying the four applicable reader thresholds from `dbb10584` against whole-page Vision
+  flags 25/32 mapped good whole answers. Another 21 good answers have no mapped rule. Six failed requests
+  contribute no warnings. Comparing with Vision on nine tiles at 0.20 catches 104/109 strict-poor and 92/92
+  content-poor answers, with 0/53 strict-good answers flagged on these scans (Wilson 0–7%). The candidate
+  was selected on these scans. The app's images and the designated whole-page Qwen3.6 27B reader still need
+  matched checks. The rate for photographs is unknown (`segbench-results/post-read-flag-newspaper-whole.md`;
+  queued: W49.proc-read-flag-newspaper-whole-app).
 - Each checked page costs one extra Apple Vision reading on this Mac (time not measured; no money) (accepted: the
   check needs Vision's text, and Vision is free and local).
 

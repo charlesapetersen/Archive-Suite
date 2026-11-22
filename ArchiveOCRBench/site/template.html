@@ -287,9 +287,10 @@ footer p { font-size: 13px; }
   </section>
   <section class="panel" id="dif-postread">
     <div class="head"><h2>A "this photo read poorly" flag with few false alarms</h2><span class="meta">poor reading = under 70 NES; ceiling 5% of good readings</span></div>
-    <p class="note">W46.post-read-quality-flag fitted each signal's cut so that it flags at most 5% of the readings at 70 NES or above, and scored it by repeated five-fold cross-validation (counts pooled over 20 splits). Own confidence is the mean token log-probability for the open readers and the character-weighted line confidence for Apple Vision; against Vision is this reading's disagreement with Vision's reading of the same image, with handwritten pages left out. The ladder rows are the capture ladder's 48 Gemini pages, the plain photograph and ten synthetic defects each. A failed reading is always flagged.</p>
+    <p class="note">W46.post-read-quality-flag fitted each signal's cut so that it flags at most 5% of the readings at 70 NES or above, and scored it by repeated five-fold cross-validation (counts pooled over 20 splits). Own confidence is the mean token log-probability for the open readers and the character-weighted line confidence for Apple Vision; against Vision is this reading's disagreement with Vision's reading of the same image, with handwritten pages left out. The ladder rows are the capture ladder's 48 Gemini pages, the plain photograph and ten synthetic defects each. The plain-photo benchmark counts failed reads as catches. The newspaper rows use answered readings only and refit the threshold in each fold.</p>
     <div class="tbl"><table><thead><tr><th>Reader</th><th>Images</th><th>Signal</th><th>AUC</th><th>Poor caught</th><th>Good flagged</th></tr></thead><tbody id="dif-postread-rows"></tbody></table></div>
     <p class="note" id="dif-postread-note"></p>
+    <p class="note" id="dif-postread-newspapers" hidden></p>
   </section>
   <section class="panel" id="dif-postcorrect">
     <div class="head"><h2>Correcting a cheap reading in the 70-90 band</h2><span class="meta">corrector: Qwen3.6-27B on Sherlock</span></div>
@@ -1051,7 +1052,21 @@ if (PRF) {
   const pc = v => v === null ? '—' : (100 * v).toFixed(0) + '%';
   document.getElementById('dif-postread-rows').innerHTML = PRF.rows.map(r => '<tr><td>' + r.reader + '</td><td>' + r.set + '</td><td>' + r.signal + '</td><td>' + f2(r.auc) + '</td><td>' + pc(r.hit_rate) + ' of ' + r.poor + '</td><td>' + pc(r.fa_rate) + '</td></tr>').join('');
   const a = PRF.app_rule;
-  document.getElementById('dif-postread-note').textContent = 'What it shows: Apple Vision\'s own confidence is the only flag that keeps false alarms near 5% on plain and damaged photographs alike. The app ships it for pages Vision reads: under ' + a.flag_below + ' it flags ' + a.hits_96 + ' of Vision\'s ' + a.poor_96 + ' poor readings of the 96 with ' + a.fa_96 + ' false alarms in ' + a.good_96 + ', and ' + a.hits_lad + ' of ' + a.poor_lad + ' on the ladder\'s defect images with ' + a.fa_lad + ' in ' + a.good_lad + '. Disagreement with Vision ranks the other readers\' errors well on plain photographs, but Vision loses far more to blur than they do, so a cut fitted there flags about a fifth of Gemini\'s good readings of damaged images. So each reader gets its own cut ("the app\'s cut" rows, every page): ' + (a.readers_shipped || 0) + ' of ' + (a.readers_fitted || 0) + ' readers ship one; Gemini 3.7 Flash\'s holds the ceiling on plain and damaged images each and catches about a third of its poor damaged readings, the others were measured on plain photographs only, and Claude Sonnet 5.5 and Mistral OCR caught none of their poor readings, so they wait for the owner. Full report: segbench-results/post-read-flag.md.';
+  document.getElementById('dif-postread-note').textContent = 'What it shows: Apple Vision\'s own confidence is the only flag that keeps false alarms near 5% on plain and damaged photographs alike. The app ships it for pages Vision reads: under ' + a.flag_below + ' it flags ' + a.hits_96 + ' of Vision\'s ' + a.poor_96 + ' poor readings of the 96 with ' + a.fa_96 + ' false alarms in ' + a.good_96 + ', and ' + a.hits_lad + ' of ' + a.poor_lad + ' on the ladder\'s defect images with ' + a.fa_lad + ' in ' + a.good_lad + '. Disagreement with Vision ranks the other readers\' errors well on plain photographs, but Vision loses far more to blur than they do, so a cut fitted there flags about a fifth of Gemini\'s good readings of damaged images. So each reader gets its own cut ("the app\'s cut" rows): ' + (a.readers_shipped || 0) + ' of ' + (a.readers_fitted || 0) + ' readers ship one; Gemini 3.7 Flash\'s holds the ceiling on plain and damaged images each and catches about a third of its poor damaged readings, the others were measured on plain photographs only, and Claude Sonnet 5.5 and Mistral OCR caught none of their poor readings, so they wait for the owner. Full report: segbench-results/post-read-flag.md.';
+  const newspapers = PRF.newspapers;
+  if(newspapers?.region && newspapers?.whole){
+    const {region, whole} = newspapers;
+    const mapped = whole.coverage.mapped.good;
+    const unmapped = whole.coverage.unmapped.good;
+    const w = whole.strict, c = whole.content, r = region.strict;
+    const note = document.getElementById('dif-postread-newspapers');
+    note.hidden = false;
+    note.textContent = `Newspaper scans. At the review baseline (${whole.baseline}), the app’s warning check skips all ${region.coverage.ineligible.readings} region answers. `
+      + `Replaying the reader thresholds flags ${whole.good_flagged} of ${mapped} mapped good whole-page answers. Another ${unmapped} good answers have no mapped rule, and ${whole.coverage.failed.readings} failed requests cannot issue a warning. `
+      + `The 3 × 3 tile comparison at ${whole.cut.toFixed(2)} catches ${w.hits}/${w.poor} strict-poor and ${c.hits}/${c.poor} content-poor answers, with ${w.false_alarms}/${w.good} strict-good answers flagged. `
+      + `The same-region comparison at ${region.cut.toFixed(2)} catches ${r.hits}/${r.poor} strict-poor answers and flags ${r.false_alarms}/${r.good} good answers. `
+      + 'Both methods and cutoffs were selected on these 15 scans, 14 from one collection. The photographed-newspaper false-alarm rate is unknown. The nine-tile test lacks matched answers from the app’s designated Qwen3.6 27B reader.';
+  }
 } else document.getElementById('dif-postread').hidden = true;
 const PCR = DATA.postcorrect;
 if (PCR) {

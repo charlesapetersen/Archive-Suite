@@ -1036,30 +1036,39 @@ def postread():
                      "set": "the 96 + ladder defects" if "damaged" in e["measured_on"] else "the 96, plain",
                      "signal": "against Vision, the app's cut" + ("" if e["ships"] else " (not shipped)"),
                      "auc": e["auc"], "poor": e["in_sample"]["poor"], "hit_rate": cv["hit_rate"], "fa_rate": cv["fa_rate"]})
+    newspapers = {}
     # W49.proc-read-flag-newspaper: newspaper pages read in regions, every region reader pooled
     if POSTREAD_NEWS.exists():
         n = json.loads(POSTREAD_NEWS.read_text())
         pooled = n["pooled"]["region"]
+        newspapers["region"] = {"coverage": n["app_baseline"]["region"]["coverage"],
+                                "cut": n["recommended"]["cut"],
+                                "strict": n["recommended"]["strict label"]["in_sample"]}
         for g, label in (("strict", "against Vision's whole page"), ("crops", "against Vision on the same regions")):
             e = pooled[g]
             rows.append({"reader": f"{n['counts']['region']['systems']} region readers, pooled",
-                         "set": "15 L9 newspaper scans, in regions", "signal": label, "auc": e["auc"],
+                         "set": "15 L9 scans, region answers", "signal": label + " (refitted)", "auc": e["auc"],
                          "poor": e["in_sample"]["poor"], "hit_rate": e["crossval"]["hit_rate"],
                          "fa_rate": e["crossval"]["fa_rate"]})
     # W49.proc-read-flag-newspaper-whole: newspaper scans read whole, every whole-page reader pooled
     if POSTREAD_NEWS_WHOLE.exists():
         n = json.loads(POSTREAD_NEWS_WHOLE.read_text())
+        baseline = n["app_baseline"]
+        newspapers["whole"] = {"baseline": baseline["baseline"], "coverage": baseline["coverage"],
+                               "good_flagged": sum(r["false_alarms"] for r in baseline["by_reader"].values()),
+                               "cut": n["recommended"]["cut"], "strict": n["recommended"]["poor"]["in_sample"],
+                               "content": n["recommended"]["poor_orderfree"]["in_sample"]}
         for g, label in (("whole nes", "against Vision's whole page"),
                          ("tiles 3x3 bow", "against Vision on 3 x 3 tiles, order-free")):
             e = n["pooled"]["poor"][g]
             rows.append({"reader": f"{n['counts']['systems']} whole-page readers, pooled",
-                         "set": "15 L9 newspaper scans, read whole", "signal": label, "auc": e["auc"],
+                         "set": "15 L9 scans, whole-page answers", "signal": label + " (refitted)", "auc": e["auc"],
                          "poor": e["in_sample"]["poor"], "hit_rate": e["crossval"]["hit_rate"],
                          "fa_rate": e["crossval"]["fa_rate"]})
     shipped = [e for e in (d.get("app_readers") or {}).values() if e["ships"]]
     rule["readers_shipped"] = len(shipped)
     rule["readers_fitted"] = len(d.get("app_readers") or {})
-    return {"rows": rows, "app_rule": rule}
+    return {"rows": rows, "app_rule": rule, "newspapers": newspapers}
 
 
 def ppocrv6_hands(sweep):
