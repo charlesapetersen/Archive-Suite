@@ -2,12 +2,12 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
-## Cloud-only PDFs download in Reader (S-002, 2026-11-21)
+## Cloud-only PDFs in Reader (S-002, fixed 2026-11-21)
 
-- **Selecting a cloud-only PDF can download the whole file for a thumbnail.** The document window and
-  Space preview also use an open path that downloads without asking. Owner call 30 requires an explicit
-  **Download and Show** action. [Independent Reader test](../verification/evidence/reader/W49.reader-s002-reproduce-check.md).
-  (queued: W49.fix-reader-dataless-prefetch)
+Selection, page thumbnails and neighbor prefetch leave cloud-only PDFs in the cloud. The document window
+and Space preview offer **Download and Show**. Find reports when its results cover downloaded files only.
+[Reproduction and regression](../verification/evidence/reader/W49.reader-s002-reproduce-check.md).
+(W49.fix-reader-dataless-prefetch)
 
 ## Password-protected PDFs in the document viewer (S-005, 2026-11-21)
 

@@ -39,6 +39,71 @@ final class PreviewImagePrefetchTests: XCTestCase {
 
     // MARK: The cache
 
+    /// S-002's original runtime probe, now using the shipped Reader prefetcher and viewer together.
+    /// Opt in with an already-evicted, disposable File Provider PDF outside the archive.
+    /// Set AR_S002_CLOUD_FIXTURE in the ArchiveReaderTests environment in the local .xctestrun.
+    /// Restore the fixture after the test host exits, when PDFKit releases its file handles.
+    func testCloudPlaceholderStaysRemoteUntilDownloadAndShow() async throws {
+        guard let path = ProcessInfo.processInfo.environment["AR_S002_CLOUD_FIXTURE"] else {
+            throw XCTSkip("set AR_S002_CLOUD_FIXTURE to run the real File Provider probe")
+        }
+        let url = URL(fileURLWithPath: path)
+        XCTAssertEqual(url.pathExtension.lowercased(), "pdf")
+        guard PreviewImagePrefetcher.FileStamp.of(path)?.isDataless == true else {
+            return XCTFail("the probe requires a file that is already cloud-only")
+        }
+        let prior = getiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS)
+        XCTAssertEqual(setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS,
+                                     IOPOL_MATERIALIZE_DATALESS_FILES_ON), 0)
+        defer {
+            _ = setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS,
+                               prior >= 0 ? prior : IOPOL_DEFAULT)
+        }
+
+        let local = try writeScanPDF(width: 200, height: 300, name: "local")
+        let prefetcher = PreviewImagePrefetcher(pixelBox: CGSize(width: 100, height: 100))
+        prefetcher.prefetch(paths: [path, local.path])
+        let prefetchDeadline = Date().addingTimeInterval(10)
+        while prefetcher.generation == 0, Date() < prefetchDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        XCTAssertNotNil(prefetcher.image(path: local.path, pageIndex: 0), "the local file should still prefetch")
+        XCTAssertEqual(prefetcher.generation, 1, "only the local file should produce a bitmap")
+        XCTAssertEqual(PreviewImagePrefetcher.FileStamp.of(path)?.isDataless, true)
+        XCTAssertNil(PreviewImagePrefetcher.render(path: path, pageIndex: 0, pixelBox: prefetcher.pixelBox),
+                     "a file evicted after its stamp was read must still be safe")
+        let pageCount = await PageThumbnails.pageCount(path: path)
+        let thumbnail = await PageThumbnails.image(path: path, pageIndex: 0, maxPixel: 100)
+        XCTAssertNil(pageCount)
+        XCTAssertNil(thumbnail)
+
+        let viewer = DocumentViewerModel(persists: false)
+        viewer.load(DocumentSelection(filePaths: [local.path, path]))
+        XCTAssertNotNil(viewer.current)
+        viewer.findQuery = "archive"
+        viewer.performFind()
+        XCTAssertTrue(viewer.findStatusText.hasSuffix(" in downloaded files"))
+        await viewer.pageCounts.request(path)
+        XCTAssertNil(viewer.pageCounts.count(path), "keep the placeholder tile available for selection")
+        XCTAssertEqual(PreviewImagePrefetcher.FileStamp.of(path)?.isDataless, true)
+        viewer.load(DocumentSelection(filePaths: [path]))
+        XCTAssertEqual(viewer.cloudState, .awaitingConsent)
+        XCTAssertNil(viewer.current)
+        XCTAssertEqual(PreviewImagePrefetcher.FileStamp.of(path)?.isDataless, true)
+
+        viewer.goToPDFPage(2)
+        viewer.downloadAndShow()
+        let deadline = Date().addingTimeInterval(30)
+        while viewer.cloudState == .downloading, Date() < deadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        XCTAssertNil(viewer.cloudState)
+        XCTAssertGreaterThanOrEqual(viewer.current?.pageCount ?? 0, 2)
+        XCTAssertEqual(viewer.focusedPageNumber, 2, "keep the page requested before the download")
+        XCTAssertEqual(PreviewImagePrefetcher.FileStamp.of(path)?.isDataless, false)
+        viewer.load(DocumentSelection(filePaths: []))
+    }
+
     func testPrefetchCachesAndForgetsAChangedFile() throws {
         let url = try writeScanPDF(width: 800, height: 1000, name: "cached")
         let prefetcher = PreviewImagePrefetcher(pixelBox: CGSize(width: 200, height: 250))

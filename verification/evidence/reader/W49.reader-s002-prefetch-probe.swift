@@ -1,9 +1,11 @@
 import AppKit
 import Foundation
 // W49.reader-s002-reproduce: the shipped PreviewImagePrefetcher, run on a cloud placeholder (SF_DATALESS).
-// Build: swiftc -parse-as-library -o /tmp/s002prefetch \
+// Historical build, from the pre-fix reproduction revision (92568b5f):
+// swiftc -parse-as-library -o /tmp/s002prefetch \
 //   ArchiveReader/macOS/Sources/ArchiveReader/Views/PreviewImagePrefetcher.swift verification/evidence/reader/W49.reader-s002-prefetch-probe.swift
 // Run: /tmp/s002prefetch <placeholder.pdf>
+// Current regression: PreviewImagePrefetchTests.testCloudPlaceholderStaysRemoteUntilDownloadAndShow.
 // The call is the one the browser list makes on every selection change
 // (PreviewImagePrefetchModifier: `PreviewImagePrefetcher.shared.prefetch(paths: model.previewPrefetchPaths(...))`),
 // with or without the preview sheet shown.

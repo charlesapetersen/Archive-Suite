@@ -173,7 +173,9 @@ struct PageThumbnailSidebar: View {
         return PageThumbnailCell(path: path, pageIndex: pageIndex,
                                  turns: model.pageTurns.turns(path: path, page: pageIndex), label: "\(pair + 1)",
                                  selected: file == model.index && pair == model.pair && !model.showingAllPages,
-                                 height: 150, maxPixel: 340, inverted: model.invertingImages, identifier: "\(idPrefix).thumb.\(file + 1).\(pair + 1)",
+                                 height: 150, maxPixel: 340, inverted: model.invertingImages,
+                                 awaitingDownload: file == model.index && model.cloudState != nil,
+                                 identifier: "\(idPrefix).thumb.\(file + 1).\(pair + 1)",
                                  accessibilityLabel: "Page \(pair + 1) of file \(file + 1)") {
             model.openThumbnail(file: file, pair: pair)
         }

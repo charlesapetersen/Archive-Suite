@@ -122,7 +122,11 @@ struct DocumentWindowView: View {
     }
 
     @ViewBuilder private var content: some View {
-        if model.current == nil {
+        if let state = model.cloudState {
+            CloudDocumentPlaceholder(title: model.cloudFileTitle, state: state,
+                                     idPrefix: "ar.doc", download: model.downloadAndShow)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if model.current == nil {
             ContentUnavailableView(model.loadError ?? "No document",
                                    systemImage: "doc.questionmark",
                                    description: Text(model.loadError == nil ? "Select files in the navigation window." : ""))

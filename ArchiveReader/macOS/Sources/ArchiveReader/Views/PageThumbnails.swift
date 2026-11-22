@@ -41,14 +41,16 @@ enum PageThumbnails {
 
     /// The file's page count, read without opening a `PDFDocument` and without downloading a cloud placeholder.
     nonisolated static func pageCount(path: String) async -> Int? {
-        CorpusWalker.withDatalessMaterializationDisabled {
+        guard PreviewImagePrefetcher.FileStamp.of(path)?.isDataless != true else { return nil }
+        return CorpusWalker.withDatalessMaterializationDisabled {
             CGPDFDocument(URL(fileURLWithPath: path) as CFURL).map { $0.numberOfPages }
         }
     }
 
     /// What each page of the file is (`PDFPageRole`, one per page); nil when it cannot be read.
     nonisolated static func pageRoles(path: String) async -> [PDFPageRole]? {
-        CorpusWalker.withDatalessMaterializationDisabled {
+        guard PreviewImagePrefetcher.FileStamp.of(path)?.isDataless != true else { return nil }
+        return CorpusWalker.withDatalessMaterializationDisabled {
             CGPDFDocument(URL(fileURLWithPath: path) as CFURL).map { PDFPageRole.roles(of: $0) }
         }
     }
@@ -56,7 +58,7 @@ enum PageThumbnails {
     /// `stat(2)`, not `URL.resourceValues`, which caches on a reused URL and would miss a re-OCR.
     nonisolated private static func modificationDate(_ path: String) -> Date? {
         var info = stat()
-        guard stat(path, &info) == 0 else { return nil }
+        guard stat(path, &info) == 0, !ViewerCloudFile.isDataless(path, flags: info.st_flags) else { return nil }
         return Date(timeIntervalSince1970: TimeInterval(info.st_mtimespec.tv_sec)
                     + TimeInterval(info.st_mtimespec.tv_nsec) / 1_000_000_000)
     }
@@ -129,9 +131,13 @@ final class OpenFilePageCounts: ObservableObject {
 
     /// Reads the count once; a file that cannot be opened counts 0 pages.
     func request(_ path: String) async {
-        guard counts[path] == nil, !asked.contains(path) else { return }
+        guard counts[path] == nil, !asked.contains(path),
+              PreviewImagePrefetcher.FileStamp.of(path)?.isDataless != true else { return }
         asked.insert(path)
         let roles = await PageThumbnails.pageRoles(path: path)
+        // Leave a cloud placeholder's count unknown so its tile can still select it. A viewer that
+        // downloads the file updates the count after opening it.
+        if roles == nil, PreviewImagePrefetcher.FileStamp.of(path)?.isDataless == true { return }
         // A file the viewer let go of while its count was read stays out.
         if counts[path] == nil, asked.contains(path) {
             counts[path] = roles?.count ?? 0
@@ -187,6 +193,7 @@ struct PageThumbnailCell: View {
     let height: CGFloat
     let maxPixel: CGFloat
     var inverted = false
+    var awaitingDownload = false
     let identifier: String
     let accessibilityLabel: String
     let open: () -> Void
@@ -203,10 +210,11 @@ struct PageThumbnailCell: View {
         .accessibilityValue(selected ? "current" : "")
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier(identifier)
-        .task(id: "\(path)#\(pageIndex)#\(turns)") {
+        .task(id: "\(path)#\(pageIndex)#\(turns)#\(awaitingDownload)") {
             // A cell is reused by position when the files change, so the last file's picture must not linger.
             image = nil
-            finished = false
+            finished = awaitingDownload
+            guard !awaitingDownload else { return }
             let fetched = await PageThumbnails.image(path: path, pageIndex: pageIndex, maxPixel: maxPixel, turns: turns)
             guard !Task.isCancelled else { return }
             image = fetched

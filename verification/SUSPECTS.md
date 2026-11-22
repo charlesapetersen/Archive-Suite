@@ -37,9 +37,9 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   prefetch or opening the PDF, before the user approves a download.
 - **Would clear it:** the file stays cloud-only through those paths and downloads when the user chooses
   **Download and Show**, as required by owner call 30 (2026-11-21).
-- **Status:** `reproduced` — independently confirmed and queued as `W49.fix-reader-dataless-prefetch`.
+- **Status:** `cleared` — fixed by `W49.fix-reader-dataless-prefetch`.
   [Original reproduction](evidence/reader/W49.reader-s002-dataless-viewer.md) ·
-  [Independent Reader test](evidence/reader/W49.reader-s002-reproduce-check.md)
+  [Independent reproduction and fix regression](evidence/reader/W49.reader-s002-reproduce-check.md)
 - **History:**
   - 2026-10-12 W40.b1 — raised.
   - 2026-11-20 W49.notes-s007-reproduce (no test of the Reader) — the route for this check exists now. The owner's OneDrive holds dataless PDFs, and a bare `PDFDocument(url:)` on one downloads it, while the thread guard keeps it dataless ([`evidence/notes/W49.notes-s007-dataless-preview.md`](evidence/notes/W49.notes-s007-dataless-preview.md)). An engine session must set the process materialization policy back to on first: it inherits off.

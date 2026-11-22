@@ -93,14 +93,17 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   `ArchiveFile.isDataless` (`Search/ArchiveLibrary.swift:1347`). Indexing skips dataless files
   (`Search/ContentIndexer.swift:169-179`) and wraps its reads in `withDatalessMaterializationDisabled`
   (`:265`, `Search/LibraryScan.swift:28`, `:49`). The link writer skips their thumbnail (`Core/ArchiveLinkWriter.swift:58`).
+  `PreviewImagePrefetcher` skips their stamps and guards the bitmap draw. `DocumentViewerModel` guards its opens,
+  including neighbors and Find, and `CloudDocumentPlaceholder` provides the download action in both views.
 - **Real-path test:** `ArchiveReaderTests/ContentIndexerDatalessTests.testDatalessFileIsNeverOpenedAndItsDisposableContentRowIsRemoved`;
   `.testRacePathPDFOpenRunsInsideNoMaterialisationPolicy`.
-- **Runtime evidence:** [S-002 independent Reader test](evidence/reader/W49.reader-s002-reproduce-check.md).
-  The selection prefetch and the viewer's load each downloaded the OneDrive placeholder.
-- **Status:** `broken` · S3 · `W49.fix-reader-dataless-prefetch`
+- **Runtime evidence:** [S-002 reproduction and regression](evidence/reader/W49.reader-s002-reproduce-check.md).
+- **Status:** `fixed-pending-recheck` · `W49.fix-reader-dataless-prefetch`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
   - 2026-11-21 W49.reader-s002-reproduce-check — independently reproduced and queued the fix.
+  - 2026-11-21 W49.fix-reader-dataless-prefetch — the app-hosted OneDrive probe and both viewer UI regression
+    tests cover the download boundary. The original prefetch probe is now an opt-in app-hosted test.
 
 ### R-05 · Chronological default sort
 

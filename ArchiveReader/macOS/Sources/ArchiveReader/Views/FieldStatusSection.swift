@@ -62,11 +62,15 @@ struct FieldStatusSection: View {
         static func read(_ url: URL, isDataless: Bool) -> HeaderFields? {
             guard url.pathExtension.lowercased() == "pdf" else { return nil }
             var fields = HeaderFields(headers: [])
-            if !isDataless, let doc = PDFDocument(url: url), !doc.isLocked {
-                fields = HeaderFields(headers: PDFHeaderParser.textPageHeaders(doc))
+            // The discovery flag can be stale. Keep the whole synchronous read under the policy.
+            if !isDataless, PreviewImagePrefetcher.FileStamp.of(url.path)?.isDataless != true {
+                CorpusWalker.withDatalessMaterializationDisabled {
+                    if let doc = PDFDocument(url: url), !doc.isLocked {
+                        fields = HeaderFields(headers: PDFHeaderParser.textPageHeaders(doc))
+                    }
+                    fields.sidecar = ZoteroSidecar.read(pdf: url)
+                }
             }
-            // A placeholder's sidecar is not read either, so selecting it never downloads anything.
-            if !isDataless { fields.sidecar = ZoteroSidecar.read(pdf: url) }
             let folder = url.deletingLastPathComponent().resolvingSymlinksInPath()
             switch ContainerFileStore.loadItemFields(directory: folder) {
             case .missing: break

@@ -1,4 +1,5 @@
 import AppKit
+import ArchiveCore
 import PDFKit
 import SwiftUI
 
@@ -53,7 +54,7 @@ final class PreviewImagePrefetcher: ObservableObject {
             guard stat(path, &st) == 0 else { return nil }
             return FileStamp(size: Int64(st.st_size), modifiedSeconds: st.st_mtimespec.tv_sec,
                              modifiedNanoseconds: st.st_mtimespec.tv_nsec, inode: UInt64(st.st_ino),
-                             isDataless: st.st_flags & 0x4000_0000 != 0)   // SF_DATALESS
+                             isDataless: ViewerCloudFile.isDataless(path, flags: st.st_flags))
         }
     }
 
@@ -99,7 +100,7 @@ final class PreviewImagePrefetcher: ObservableObject {
     func prefetch(paths: [String]) {
         var seen = Set<Key>()
         wanted = paths.compactMap { path in
-            guard let stamp = FileStamp.of(path) else { return nil }
+            guard let stamp = FileStamp.of(path), !stamp.isDataless else { return nil }
             let key = Key(path: path, pageIndex: 0, stamp: stamp)
             return seen.insert(key).inserted ? key : nil
         }
@@ -112,7 +113,7 @@ final class PreviewImagePrefetcher: ObservableObject {
 
     /// The bitmap of `path`'s page, if it has been drawn and the file is unchanged since.
     func image(path: String, pageIndex: Int) -> Rendered? {
-        guard let stamp = FileStamp.of(path) else { return nil }
+        guard let stamp = FileStamp.of(path), !stamp.isDataless else { return nil }
         let key = Key(path: path, pageIndex: pageIndex, stamp: stamp)
         guard let hit = cache[key] else { return nil }
         touch(key)
@@ -153,6 +154,13 @@ final class PreviewImagePrefetcher: ObservableObject {
     /// Open the file afresh and draw one page's crop box (the box a PDFView shows), unrotated, fitted into
     /// `pixelBox` by its longer side. nil for anything PDFKit cannot open or a page that is not there.
     nonisolated static func render(path: String, pageIndex: Int, pixelBox: CGSize) -> Rendered? {
+        // The file may have been evicted since the request's stamp was read.
+        CorpusWalker.withDatalessMaterializationDisabled {
+            drawLocalPage(path: path, pageIndex: pageIndex, pixelBox: pixelBox)
+        }
+    }
+
+    nonisolated private static func drawLocalPage(path: String, pageIndex: Int, pixelBox: CGSize) -> Rendered? {
         let start = CFAbsoluteTimeGetCurrent()
         guard let doc = PDFDocument(url: URL(fileURLWithPath: path)), pageIndex >= 0, pageIndex < doc.pageCount,
               let page = doc.page(at: pageIndex) else { return nil }

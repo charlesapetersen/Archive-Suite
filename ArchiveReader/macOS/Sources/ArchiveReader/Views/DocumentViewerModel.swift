@@ -29,6 +29,14 @@ final class DocumentViewerModel: ObservableObject {
     /// searchable pages (W42.int-s5-searchable), so a searchable page is never shown as another page's text.
     private(set) var pagePairs = DocumentPagePairs.empty
     @Published private(set) var loadError: String?
+
+    enum CloudState: Equatable { case awaitingConsent, downloading, downloadFailed }
+    @Published private(set) var cloudState: CloudState?
+    private var downloadTask: Task<Void, Never>?
+    private var pageAfterDownload: Int?
+    var cloudFileTitle: String {
+        currentURL?.pathExtension.lowercased() == "pdf" ? "This PDF is in the cloud" : "This file is in the cloud"
+    }
     @Published private(set) var jpegPartnerPage: PDFPage?
     @Published private(set) var jpegPartnerRelativePath: String?
     @Published private(set) var imageSource: DocumentImageSource = .pdf
@@ -47,6 +55,7 @@ final class DocumentViewerModel: ObservableObject {
     /// The query the navigator was last built for (avoids rescanning). Published because the extracted-text
     /// pane's highlight reads it (`extractedTextFind`), and a new search can leave the counts unchanged.
     @Published private var lastFoundQuery: String?
+    @Published private var findSkippedCloudFiles = false
 
     let leftController: PDFPaneController     // the current pair's image page (PDF page 2·pair)
     let rightController: PDFPaneController   // the current pair's OCR text page (PDF page 2·pair + 1)
@@ -286,9 +295,13 @@ final class DocumentViewerModel: ObservableObject {
         pageCounts.retain(selection.filePaths)
         pinsJPEGPartnerFromLink = selection.pinsJPEGPartner
         linkedJPEGRelativePath = selection.jpegRelativePath
-        index = path.flatMap { selection.filePaths.firstIndex(of: $0) } ?? 0
         focusedPane = .left
-        loadCurrent()
+        let selectedIndex = path.flatMap { selection.filePaths.firstIndex(of: $0) } ?? 0
+        if index == selectedIndex {
+            loadCurrent()
+        } else {
+            index = selectedIndex    // didSet → loadCurrent()
+        }
     }
 
     /// Step forward one page pair; past the current document's last pair, move to the next file.
@@ -714,14 +727,27 @@ final class DocumentViewerModel: ObservableObject {
             return
         }
         var perPair: [(doc: Int, pair: Int, hits: [PairHit])] = []
+        var skippedCloudFiles = false
         for i in urls.indices {
-            // Reuse the already-loaded document for the current index; open the rest read-only.
-            let doc = (i == index) ? current : PDFDocument(url: urls[i])
-            guard let doc else { continue }
-            for (p, hits) in DocumentFindScanner.pairHits(in: doc, query: query).enumerated() {
+            let hitsByPair: [[PairHit]] = CorpusWalker.withDatalessMaterializationDisabled {
+                let url = urls[i]
+                if PreviewImagePrefetcher.FileStamp.of(url.path)?.isDataless == true {
+                    skippedCloudFiles = true
+                    return []
+                }
+                if let doc = i == index ? current : PDFDocument(url: url) {
+                    return DocumentFindScanner.pairHits(in: doc, query: query)
+                }
+                if (i == index && cloudState != nil) || PreviewImagePrefetcher.FileStamp.of(url.path)?.isDataless == true {
+                    skippedCloudFiles = true
+                }
+                return []
+            }
+            for (p, hits) in hitsByPair.enumerated() {
                 perPair.append((doc: i, pair: p, hits: hits))
             }
         }
+        findSkippedCloudFiles = skippedCloudFiles
         findNavigator = FindNavigator(hits: perPair)
         refreshFindPublished()
         applyCurrentMatch()
@@ -771,7 +797,8 @@ final class DocumentViewerModel: ObservableObject {
     /// (blank while the user is still typing a new query, before submitting it).
     var findStatusText: String {
         guard !findQuery.isEmpty, findQuery == lastFoundQuery else { return "" }
-        return findTotal == 0 ? "No matches" : "\(findOrdinal ?? 1) of \(findTotal)"
+        let matches = findTotal == 0 ? "No matches" : "\(findOrdinal ?? 1) of \(findTotal)"
+        return findSkippedCloudFiles ? matches + " in downloaded files" : matches
     }
 
     private func refreshFindPublished() {
@@ -853,6 +880,10 @@ final class DocumentViewerModel: ObservableObject {
     /// pair's image page rather than focusing an empty pane.
     func goToPDFPage(_ page: Int) {
         showingAllPages = false
+        if cloudState != nil {
+            pageAfterDownload = page
+            return
+        }
         let pageIndex = max(0, page - 1)
         setPair(pagePairs.pair(ofPageIndex: pageIndex))
         // Set after `setPair` — which pulls focus off a text pane that doesn't exist — and re-check
@@ -919,6 +950,10 @@ final class DocumentViewerModel: ObservableObject {
     ]
 
     private func loadCurrent() {
+        downloadTask?.cancel()
+        downloadTask = nil
+        cloudState = nil
+        pageAfterDownload = nil
         showingAllPages = false
         pair = 0   // a newly loaded document always opens on its first page pair
         tagStatus = nil
@@ -951,22 +986,39 @@ final class DocumentViewerModel: ObservableObject {
 
     private func loadDocument(_ url: URL) {
         loaded = NeighbourCache.File(url.path)
-        if let prepared = neighbours.document(at: url.path) {
-            current = prepared
-            loadError = prepared.pageCount == 0 ? "“\(url.lastPathComponent)” has no pages." : nil
-        } else if let doc = PDFDocument(url: url) {
-            current = doc
-            loadError = doc.pageCount == 0 ? "“\(url.lastPathComponent)” has no pages." : nil
-        } else if Self.imageExtensions.contains(url.pathExtension.lowercased()),
-                  let image = NSImage(contentsOf: url),
-                  let page = PDFPage(image: image) {
-            let doc = PDFDocument()
-            doc.insert(page, at: 0)
-            current = doc
+        let isDataless = loaded?.stamp?.isDataless == true
+        // Guard the open and the page metadata read in current's didSet. The file can be evicted even
+        // after the fresh stamp; check again on failure to distinguish that from a broken or missing file.
+        CorpusWalker.withDatalessMaterializationDisabled {
+            current = isDataless ? nil : neighbours.document(at: url.path) ?? Self.readDocument(url)
+        }
+        if let current {
+            loadError = current.pageCount == 0 ? "“\(url.lastPathComponent)” has no pages." : nil
+        } else if isDataless || PreviewImagePrefetcher.FileStamp.of(url.path)?.isDataless == true {
+            cloudState = .awaitingConsent
             loadError = nil
         } else {
-            current = nil
             loadError = "Could not open “\(url.lastPathComponent)” (missing, corrupt, or unsupported format)."
+        }
+    }
+
+    /// The explicit action shared by both viewers. File Provider may take time, and moving to another
+    /// file while it works must never switch the viewer back when the download finishes.
+    func downloadAndShow() {
+        guard let url = currentURL, let cloudState, cloudState != .downloading else { return }
+        self.cloudState = .downloading
+        downloadTask = Task { [weak self] in
+            let downloaded = await Task.detached(priority: .userInitiated) { ViewerCloudFile.download(url) }.value
+            guard let self, !Task.isCancelled else { return }
+            self.downloadTask = nil
+            guard downloaded else {
+                self.cloudState = .downloadFailed
+                return
+            }
+            let page = self.pageAfterDownload
+            if self.findSkippedCloudFiles { self.lastFoundQuery = nil }
+            self.loadCurrent()
+            if let page { self.goToPDFPage(page) }
         }
     }
 
@@ -1013,17 +1065,20 @@ final class DocumentViewerModel: ObservableObject {
     /// Open a file the way `loadDocument` does, off the main actor, and read its pages' text there (the
     /// text pane and the format banner read it on the main actor as the file is shown). Read-only.
     nonisolated private static func openDocument(_ url: URL) -> PDFDocument? {
-        let doc: PDFDocument
-        if let pdf = PDFDocument(url: url) {
-            doc = pdf
-        } else if imageExtensions.contains(url.pathExtension.lowercased()),
-                  let image = NSImage(contentsOf: url), let page = PDFPage(image: image) {
-            doc = PDFDocument()
-            doc.insert(page, at: 0)
-        } else {
-            return nil
+        CorpusWalker.withDatalessMaterializationDisabled {
+            guard let doc = readDocument(url) else { return nil }
+            for i in 0..<min(doc.pageCount, 8) { _ = doc.page(at: i)?.string }
+            return doc
         }
-        for i in 0..<min(doc.pageCount, 8) { _ = doc.page(at: i)?.string }
+    }
+
+    /// Caller owns the no-materialisation policy through the open and synchronous reads.
+    nonisolated private static func readDocument(_ url: URL) -> PDFDocument? {
+        if let pdf = PDFDocument(url: url) { return pdf }
+        guard imageExtensions.contains(url.pathExtension.lowercased()),
+              let image = NSImage(contentsOf: url), let page = PDFPage(image: image) else { return nil }
+        let doc = PDFDocument()
+        doc.insert(page, at: 0)
         return doc
     }
 
@@ -1034,8 +1089,10 @@ final class DocumentViewerModel: ObservableObject {
     #endif
 
     nonisolated private static func openJPEGPage(_ url: URL) -> PDFPage? {
-        guard let image = NSImage(contentsOf: url) else { return nil }
-        return PDFPage(image: image)
+        CorpusWalker.withDatalessMaterializationDisabled {
+            guard let image = NSImage(contentsOf: url) else { return nil }
+            return PDFPage(image: image)
+        }
     }
 
     /// A file's JPEG original, by the same checks `refreshJPEGPartner` makes, or nil. Cheap: the index
@@ -1094,6 +1151,10 @@ final class DocumentViewerModel: ObservableObject {
             return
         }
         let partnerFile = NeighbourCache.File(partnerURL.path)
+        guard partnerFile.stamp?.isDataless != true else {
+            jpegUnavailableReason = "The JPEG original is not downloaded to this Mac."
+            return
+        }
         guard let page = neighbours.jpeg(at: partnerURL.path) ?? Self.openJPEGPage(partnerURL) else {
             jpegUnavailableReason = "The JPEG original “\(partnerURL.lastPathComponent)” could not be opened."
             return

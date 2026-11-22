@@ -156,7 +156,11 @@ struct PreviewSheet: View {
                 PageThumbnailSidebar(model: model, pages: model.pageCounts, idPrefix: "ar.preview")
                 Divider()
             }
-            if model.current == nil {
+            if let state = model.cloudState {
+                CloudDocumentPlaceholder(title: model.cloudFileTitle, state: state,
+                                         idPrefix: "ar.preview", download: model.downloadAndShow)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if model.current == nil {
                 ContentUnavailableView(model.loadError ?? "No document", systemImage: "doc.questionmark")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if model.showingAllPages {
