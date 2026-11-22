@@ -117,6 +117,7 @@ enum EntityExtractor {
         var senders: [Name] = []
         var recipients: [Name] = []
         var sendingPlaces: [Name] = []
+        var mentions: [Name]?
     }
 
     private static let unknownWords: Set<String> = ["", "null", "none", "unknown", "n/a"]
@@ -169,6 +170,10 @@ enum EntityExtractor {
     /// names: there is no fallback to another route (09-entities.md §3, Fallback).
     static func extract(text: String, decision: EntityRunPolicy.Run, provider: LLMProvider, model: LLMModel,
                         apiKey: String, gatewayConfig: GatewayConfig?) async -> EntityResult {
+        if let mode = decision.localMode {
+            let fields = LocalNameFinder.extract(text, mode: mode)
+            return EntityResult(decision: decision, outcome: .extracted(fields))
+        }
         let raw: String
         do {
             raw = try await LLMTextClient.complete(prompt: prompt(text: text), provider: provider, model: model,
@@ -207,21 +212,27 @@ struct EntityResult: Equatable, Sendable, Codable {
             o["reason"] = why
         case .extracted(let f):
             o["status"] = "extracted"
+            let lowConfidence = decision.localMode != nil
+            if let mentions = f.mentions {
+                o["mentions"] = Self.list(mentions, lowConfidence: true)
+                if let withheld = decision.senderWithheld { o["sender_withheld"] = withheld }
+                return o
+            }
             if let withheld = decision.senderWithheld {
                 o["sender_withheld"] = withheld
             } else {
-                o["sender"] = Self.list(f.senders)
+                o["sender"] = Self.list(f.senders, lowConfidence: lowConfidence)
             }
-            o["recipient"] = Self.list(f.recipients)
-            o["sending_place"] = Self.list(f.sendingPlaces)
+            o["recipient"] = Self.list(f.recipients, lowConfidence: lowConfidence)
+            o["sending_place"] = Self.list(f.sendingPlaces, lowConfidence: lowConfidence)
         }
         return o
     }
 
-    static func list(_ names: [EntityExtractor.Name]) -> [[String: Any]] {
-        guard !names.isEmpty else { return [["name": "Unknown", "evidence": "unknown"]] }
+    static func list(_ names: [EntityExtractor.Name], lowConfidence: Bool) -> [[String: Any]] {
+        guard !names.isEmpty || lowConfidence else { return [["name": "Unknown", "evidence": "unknown"]] }
         return names.map { n in
-            var e: [String: Any] = ["name": n.name, "confidence": n.confidence]
+            var e: [String: Any] = ["name": n.name, "confidence": lowConfidence ? "low" : n.confidence]
             switch n.evidence {
             case .quoted(let d):
                 e["evidence"] = "quoted"
@@ -282,6 +293,7 @@ enum EntityRunPolicy {
         var namesRanked: Bool
         /// The user chose "No names" for the stage (`override.entities.<part>` = `none`).
         var routeNone: Bool = false
+        var lowConfidenceNames: Bool = false
         /// The tagging call's `format`.
         var format: String?
         var textSource: TextSource
@@ -289,11 +301,16 @@ enum EntityRunPolicy {
         var route: String
     }
 
+    enum LocalMode: String, Equatable, Sendable, Codable {
+        case correspondence, mentions
+    }
+
     struct Run: Equatable, Sendable, Codable {
         let route: String
         let textSource: TextSource
         /// Why the sender is not written, when it is not: never from Apple Vision text (rule ent-vision-hands).
         let senderWithheld: String?
+        var localMode: LocalMode?
     }
 
     enum Decision: Equatable, Sendable {
@@ -303,12 +320,17 @@ enum EntityRunPolicy {
 
     static func decide(_ i: Inputs) -> Decision {
         if i.routeNone { return .skip("the user chose no names") }
-        if i.family == .plan { return .skip("a Local Agent plan has no measured names route") }
+        if i.family == .plan && !i.lowConfidenceNames {
+            return .skip("a Local Agent plan has no measured names route")
+        }
         // On every route, as on this Mac: the call costs money on a cloud route and nothing reads unshown names
         // (owner, walkthrough 2026-11-13).
         if !i.namesRanked { return .skip("names are not ranked, and they are read only when they are") }
-        guard let f = i.format?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
-              correspondenceFormats.contains(f) else {
+        let correspondence = i.format.map {
+            correspondenceFormats.contains($0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        } ?? false
+        if i.lowConfidenceNames { return .run(localRun(i, correspondence: correspondence)) }
+        guard correspondence else {
             return .skip("not correspondence")
         }
         if i.family == .mac, !(i.textSource == .vision || i.textSource == .reader) {
@@ -329,6 +351,23 @@ enum EntityRunPolicy {
         }
         let withheld: String? = i.textSource == .reader ? nil : "never from Apple Vision text"
         return .run(Run(route: i.route, textSource: i.textSource, senderWithheld: withheld))
+    }
+
+    private static func localRun(_ i: Inputs, correspondence: Bool) -> Run {
+        let mode: LocalMode = correspondence && i.textSource == .reader ? .correspondence : .mentions
+        return Run(route: "This Mac · Apple NLTagger", textSource: i.textSource,
+                   senderWithheld: i.textSource == .reader ? nil : "the reader cannot supply a sender",
+                   localMode: mode)
+    }
+
+    /// The local route can use successful OCR when automatic tagging is off. With no known correspondence
+    /// format for the output, only quoted mentions are recorded.
+    static func localMentions(text: String, inputs: Inputs) async -> EntityResult? {
+        guard inputs.lowConfidenceNames, inputs.namesRanked, !inputs.routeNone,
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        let run = localRun(inputs, correspondence: false)
+        let fields = LocalNameFinder.extract(text, mode: .mentions)
+        return EntityResult(decision: run, outcome: .extracted(fields))
     }
 
     /// Whether the sidecar leaves out the tagging call's `author_name` on a document the feature did not run on. The
@@ -353,6 +392,11 @@ extension EntityRunPolicy {
         setting(.priorities)?.strings?.contains(SettingsPriority.names.rawValue) == true
     }
 
+    static func usesLocalNames(_ setting: (SettingsKey) -> SettingsValue?) -> Bool {
+        namesRanked(setting) && setting(.lowConfidenceNames)?.bool == true
+            && setting(SettingsSheetModel.overrideKey("entities"))?.string != "none"
+    }
+
     private static func routeDisabled(handwritten: Bool, setting: (SettingsKey) -> SettingsValue?) -> Bool {
         let part = handwritten ? "correspondence-handwritten" : "correspondence-typed"
         return setting(SettingsSheetModel.overrideKey("entities"))?.string == "none"
@@ -366,7 +410,7 @@ extension EntityRunPolicy {
     static func estimatedCallShare(taggingMode: TaggingMode, gateway: GatewayConfig?, usesLocalAgent: Bool,
                                    usesVision: Bool, setting: (SettingsKey) -> SettingsValue?) -> Double {
         guard taggingMode == .automatic, !usesLocalAgent, !usesVision, gateway?.isLocalModel != true,
-              namesRanked(setting) else { return 0 }
+              namesRanked(setting), setting(.lowConfidenceNames)?.bool != true else { return 0 }
         let typed = routeDisabled(handwritten: false, setting: setting) ? 0.0 : 141.0
         let handwritten = routeDisabled(handwritten: true, setting: setting) ? 0.0 : 16.0
         return (typed + handwritten) / 299.0
@@ -405,7 +449,8 @@ extension EntityRunPolicy {
         // With a gateway set, LLMTextClient calls the gateway's model, whatever the provider and model say.
         let modelName = gateway?.displayName ?? model.displayName
         let route = (family == .mac ? "this Mac" : (gateway != nil ? "Gateway" : provider.rawValue)) + " · " + modelName
-        return Inputs(family: family, namesRanked: namesRanked(setting), routeNone: routeNone, format: nil,
+        return Inputs(family: family, namesRanked: namesRanked(setting), routeNone: routeNone,
+                      lowConfidenceNames: setting(.lowConfidenceNames)?.bool == true, format: nil,
                       textSource: source, pageKinds: kinds, route: route)
     }
 }

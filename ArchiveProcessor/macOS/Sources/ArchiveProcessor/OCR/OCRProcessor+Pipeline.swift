@@ -1880,6 +1880,10 @@ extension OCRProcessor {
         // unless exportOriginals is set (restored above), so the non-dual-output path is unchanged.
         await exportOriginalImages(runConfig: runConfig)
 
+        await recordLocalNameMentions(runConfig: runConfig, mode: runOutputSettings.taggingMode,
+                                      merging: runOutputSettings.mergeDocuments ? pending.fileURLs : nil)
+        guard !Task.isCancelled else { return }
+
         if runOutputSettings.mergeDocuments {
             performDocumentMerging(
                 files: pending.fileURLs, outputDirectory: pending.outputDirectory,
@@ -2295,6 +2299,10 @@ extension OCRProcessor {
         // before organization moves files — exactly as startProcessing does. No-op unless exportOriginals
         // is set (restored above), so the non-dual-output path is unchanged.
         await exportOriginalImages(runConfig: runConfig)
+
+        await recordLocalNameMentions(runConfig: runConfig, mode: runOutputSettings.taggingMode,
+                                      merging: runOutputSettings.mergeDocuments ? pending.fileURLs : nil)
+        guard !Task.isCancelled else { return }
 
         if runOutputSettings.mergeDocuments {
             performDocumentMerging(
@@ -3406,6 +3414,12 @@ extension OCRProcessor {
                 }
                 mixedPDFOutcomes = outcomes
                 activeRunHistory?.pdfHalfRead = true
+            }
+            // Rebuilt PDFs have OCR text but bypass tagging. Use their own output instead of the later image subset.
+            await recordLocalNameMentions(runConfig: runConfig, mode: runOutputSettings.taggingMode,
+                                          rebuiltPDFs: Set(pdfIndices.map { files[$0] }))
+            guard !Task.isCancelled else { cleanupTempFiles(); return }
+            if mixedReOCR {
                 fullJobsAfterPDF = jobs
                 jobs = imageIndices.map { jobs[$0] }
                 editingImageSubset = true
@@ -3695,6 +3709,10 @@ extension OCRProcessor {
             // Live Capture dual output: write each original image next to its PDF (same base + tags),
             // before merge repoints outputURLMap and before organization moves files.
             await exportOriginalImages(runConfig: runConfig)
+
+            await recordLocalNameMentions(runConfig: runConfig, mode: runOutputSettings.taggingMode,
+                                          merging: runOutputSettings.mergeDocuments ? files : nil)
+            guard !Task.isCancelled else { cleanupTempFiles(); return }
 
             // Phase 4: Merge multi-page documents (before collection organization moves files)
             if runOutputSettings.mergeDocuments {

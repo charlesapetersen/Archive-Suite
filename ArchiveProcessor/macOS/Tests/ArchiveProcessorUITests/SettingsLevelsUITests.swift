@@ -76,7 +76,8 @@ final class SettingsLevelsUITests: XCTestCase {
                hidden: ["ap.segmentation.picker", "ap.sheet.override.segmentation"], level: "Basic")
         shoot(settings, "settings-level-basic-documents")
         expect(settings, panel: "Dates and names", shown: ["ap.sheet.card.dating", "ap.sheet.card.entities"],
-               hidden: ["ap.sheet.switch.dating.image_every_document"], level: "Basic")
+               hidden: ["ap.sheet.switch.dating.image_every_document", "ap.sheet.switch.entities.low_confidence_on_mac"],
+               level: "Basic")
         expect(settings, panel: "Pages and output", shown: ["ap.sheet.rule.reading-copy"],
                hidden: ["ap.settings.batchMode"], level: "Basic")
         shoot(settings, "settings-level-basic-pages")
@@ -92,7 +93,7 @@ final class SettingsLevelsUITests: XCTestCase {
         expect(settings, panel: "Documents", shown: ["ap.segmentation.picker", "ap.sheet.override.segmentation"],
                hidden: ["ap.settings.level.why.custom-prompt"], level: "Standard")
         expect(settings, panel: "Dates and names", shown: ["ap.sheet.switch.dating.image_every_document"],
-               hidden: [], level: "Standard")
+               hidden: ["ap.sheet.switch.entities.low_confidence_on_mac"], level: "Standard")
         expect(settings, panel: "Pages and output", shown: ["ap.settings.batchMode"],
                hidden: ["ap.settings.level.why.workers", "ap.settings.level.why.log-file", "ap.settings.level.why.image-size"],
                level: "Standard")
@@ -108,6 +109,18 @@ final class SettingsLevelsUITests: XCTestCase {
                hidden: [], level: "Advanced")
         shootCorrection(settings, "settings-level-advanced-reading")
         expect(settings, panel: "Documents", shown: ["ap.settings.level.why.custom-prompt"], hidden: [], level: "Advanced")
+        let localNamesID = "ap.sheet.switch.entities.low_confidence_on_mac"
+        expect(settings, panel: "Dates and names", shown: [localNamesID, "ap.settings.level.why.low-confidence-names"],
+               hidden: [], level: "Advanced")
+        let form = settings.scrollViews.firstMatch
+        let localNames = element(settings, localNamesID)
+        let localNamesReason = element(settings, "ap.settings.level.why.low-confidence-names")
+        for _ in 0..<15 where !form.frame.contains(localNamesReason.frame) {
+            form.scroll(byDeltaX: 0, deltaY: -110)
+        }
+        XCTAssertTrue(form.frame.contains(localNames.frame))
+        XCTAssertTrue(form.frame.contains(localNamesReason.frame))
+        shoot(settings, "settings-level-advanced-low-confidence-names")
         expect(settings, panel: "Pages and output",
                shown: ["ap.settings.level.why.workers", "ap.settings.level.why.log-file", "ap.settings.level.why.image-size"],
                hidden: [], level: "Advanced")

@@ -107,14 +107,14 @@ struct SettingsDocumentsPanel: View {
                 .settingsLevel(.segmentationReview)
                 }
             }
-            if taggingMode.enablesTagging && taggingMode != .copySource {
-                Toggle(isOn: $enableSegmentJSON) {
-                    HStack {
-                        Text("Export segment JSON metadata")
-                        HelpButton(text: "Write a .json sidecar per document with structured metadata (date, subjects, author/recipient, body text) next to the PDF.")
-                    }
+            Toggle(isOn: $enableSegmentJSON) {
+                HStack {
+                    Text("Export segment JSON metadata")
+                    HelpButton(text: "Write a .json file beside the PDF when the run collects metadata. This also controls whether low-confidence name mentions are saved during OCR-only runs.")
                 }
-                .settingsLevel(.segmentationReview)
+            }
+            .settingsLevel(.segmentationReview)
+            if taggingMode.enablesTagging && taggingMode != .copySource {
                 Toggle(isOn: $sendPreviousImage) {
                     HStack {
                         Text("Send previous page image")

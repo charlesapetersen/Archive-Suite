@@ -69,6 +69,7 @@ struct SettingsAnswers: Sendable {
     var hours: Double = 8
     var preference: SettingsPreference = .bestMeasured
     var priorities: [SettingsPriority] = SettingsPriority.allCases
+    var lowConfidenceNames = false
     /// The collection interview's weights by stage, for the ranked priorities; empty is 45, 30, 15, 10 by position.
     var weights: [String: Double] = [:]
     /// The per-batch "stays on the Mac" switch (owner call 2): no page leaves this Mac.
@@ -818,6 +819,15 @@ struct SettingsSolver {
     func solveEntities(_ stage: SettingsRouteTable.Stage, _ state: inout SolveState) -> [SettingsPick] {
         let docs = Double(answers.documentCount)
         let ranked = answers.priorities.contains(.names)
+        // The Advanced switch is an explicit choice. The measured floor row stays out of ordinary rankings.
+        if ranked, answers.lowConfidenceNames, answers.onlyRoutes[stage.id]?.contains("none") != true,
+           let local = stage.route("nltagger") {
+            let pick = cand(local, stage: stage.id, value: 0, units: docs)
+            state.add(pick)
+            return [SettingsPick(stage: stage.id, part: "correspondence-typed", route: local, figure: nil,
+                                 flag: nil, reason: "You chose Apple’s built-in name finder (nltagger). Every result is marked low confidence.",
+                                 gap: nil, better: [], fallbackRouteID: nil, shown: true, usd: pick.usd, hours: pick.hours)]
+        }
         // Names run only when they are ranked, on every route (rule ent-run; owner, walkthrough 2026-11-13: the cloud
         // call costs money and nothing reads unshown names), so unranked only `none` is a candidate.
         // `none` is always there, at 0, so a batch whose limits leave no time for names runs without them.

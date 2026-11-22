@@ -643,6 +643,16 @@ enum SettingsSolverTestDriver {
         eq("G6 chosen on its card, a lower-scoring cluster reader reads", pick(solve("G6 chosen cluster", cluster, chosenCluster), "reading"),
            "glm-ocr-farmshare")
 
+        var localNames = SettingsAnswers()
+        localNames.lowConfidenceNames = true
+        let b3Local = solve("B3-local-names", mac(8), localNames)
+        eq("B3 Advanced opt-in: names run on this Mac", pick(b3Local, "entities", "correspondence-typed"), "nltagger")
+        check("B3 Advanced opt-in: names cost zero and carry no projected accuracy",
+              b3Local.pick("entities", "correspondence-typed").map { $0.usd == 0 && $0.figure == nil } == true)
+        localNames.onlyRoutes["entities"] = ["none"]
+        eq("B3 Advanced opt-in: No names still wins",
+           pick(solve("B3-local-none", mac(8), localNames), "entities", "correspondence-typed"), "none")
+
         // Every pick explains itself in one sentence naming its evidence row.
         var unexplained: [String] = []
         for (name, s) in solved {

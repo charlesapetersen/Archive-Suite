@@ -1233,8 +1233,7 @@ final class LiveCaptureProcessor: ObservableObject {
         guard clearGeneration == startedGeneration else { return }
         // W46.ent-feature-live — the names call after the tagging call, on the tagging reply's `format`. The B8 guard
         // below covers this await too: nothing between here and it touches session state.
-        let entities = humanOnly ? nil
-            : await liveEntities(group: group, segment: segment, results: results, tags: tags, mac: mac, config: config)
+        let entities = await liveEntities(group: group, segment: segment, results: results, tags: tags, mac: mac, config: config)
         guard clearGeneration == startedGeneration else { return }
         // W46.date-route-other-paths — the dating route replaces the tagging call's date, as in Process Files, on a
         // document the tagging call dated here and whose phone (or Mac card) gives no year. Same B8 cover as above.
@@ -1460,11 +1459,17 @@ final class LiveCaptureProcessor: ObservableObject {
     private func liveEntities(group: CaptureGroup, segment: DocumentSegment, results: [OCRResult],
                               tags: GeneratedTags, mac: MacSegmentTags?,
                               config: SessionProcessingConfig) async -> EntityResult? {
-        guard group.type == .document, config.enableSegmentJSON, config.taggingMode == .automatic,
-              (mac?.subjects ?? []).isEmpty, tags.format != nil else { return nil }
+        guard group.type == .document, config.enableSegmentJSON else { return nil }
         var inputs = liveEntityInputs(results: results, config: config)
+        if config.taggingMode == .none || config.taggingMode == .copySource {
+            return await EntityRunPolicy.localMentions(text: segment.combinedText, inputs: inputs)
+        }
+        guard config.taggingMode == .automatic, (mac?.subjects ?? []).isEmpty,
+              tags.format != nil || inputs.lowConfidenceNames else { return nil }
         inputs.format = tags.format
-        guard case .run(let run) = EntityRunPolicy.decide(inputs) else { return nil }
+        guard case .run(let run) = EntityRunPolicy.decide(inputs),
+              run.localMode == nil || !segment.combinedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
         return await EntityExtractor.extract(text: segment.combinedText, decision: run, provider: config.textProvider,
                                              model: config.textModel, apiKey: config.textAPIKey,
                                              gatewayConfig: config.textGateway)

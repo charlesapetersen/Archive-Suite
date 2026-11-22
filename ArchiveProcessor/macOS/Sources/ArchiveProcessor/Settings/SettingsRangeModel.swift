@@ -184,7 +184,12 @@ extension SettingsSheetModel {
                 blockers = ["on this Mac names are looked for only when you put names among what matters most (in "
                             + "“Questions about this material” in Settings)"]
             }
-            if !r.offered && blockers.isEmpty, let cond = r.conditions.first { blockers = [cond] }
+            if stage.id == "entities", r.id == "nltagger", picked.contains(r.id) {
+                // This measured floor is available only through the explicit Advanced switch.
+                blockers = []
+            } else if !r.offered && blockers.isEmpty, let cond = r.conditions.first {
+                blockers = [cond]
+            }
             let state: SettingsRangeChart.State
             var why: String?
             // A route breaks a limit by what it adds: its own cost against the room left, or hours that push the

@@ -124,6 +124,7 @@ enum OutputFileSafety {
         preferred: URL,
         allowedExisting: URL? = nil,
         reservedPaths: inout Set<String>,
+        companionExtension: String? = nil,
         fileManager: FileManager = .default
     ) -> URL {
         let directory = preferred.deletingLastPathComponent()
@@ -135,7 +136,13 @@ enum OutputFileSafety {
         while true {
             let key = pathKey(candidate)
             let allowed = allowedExisting.map { isSameFile(candidate, $0) } ?? false
-            if !reservedPaths.contains(key) && (!fileManager.fileExists(atPath: candidate.path) || allowed) {
+            let companionTaken = companionExtension.map {
+                let companion = candidate.deletingPathExtension().appendingPathExtension($0)
+                return fileManager.fileExists(atPath: companion.path)
+                    || (try? fileManager.destinationOfSymbolicLink(atPath: companion.path)) != nil
+            } ?? false
+            if !companionTaken && !reservedPaths.contains(key)
+                && (!fileManager.fileExists(atPath: candidate.path) || allowed) {
                 reservedPaths.insert(key)
                 return candidate
             }

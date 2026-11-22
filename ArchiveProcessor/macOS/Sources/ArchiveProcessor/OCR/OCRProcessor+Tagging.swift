@@ -1168,6 +1168,14 @@ extension OCRProcessor {
         }
         // W46.ent-feature-owner-calls: where the page text is Apple Vision's, no sidecar carries the tagging call's sender.
         let senderWithheld = entityBase.map(EntityRunPolicy.withholdsTaggingSender)
+        // The new finder works on this run's generated output, including PDFs rebuilt from new OCR. Skip it on
+        // an in-place input PDF whose existing text layer could be ABBYY.
+        let localNameEligible = snapshot.indices.map { i in
+            let segment = snapshot[i]
+            guard enableSegmentJSON, entityBase[i].lowConfidenceNames, !segment.isBox, !segment.isFolder,
+                  let source = segment.pdfURLs.first, let output = outputURLMap[source] else { return false }
+            return !OutputFileSafety.isSameFile(output, source) && FileManager.default.fileExists(atPath: output.path)
+        }
 
         // W46.date-route: each document's own text, neighbours and first page images, gathered here; nil for a label,
         // a document with no text, and one whose phone date (Live Capture) wins anyway, so no dating call is made.
@@ -1238,7 +1246,9 @@ extension OCRProcessor {
             var inputs = entityBase[i]
             inputs.format = tags.format
             // The sidecar is the names' only output, so with sidecars off the call would be spent for nothing.
-            guard enableSegmentJSON, !Task.isCancelled, case .run(let run) = EntityRunPolicy.decide(inputs) else {
+            guard enableSegmentJSON, !Task.isCancelled, case .run(let run) = EntityRunPolicy.decide(inputs),
+                  run.localMode == nil || (localNameEligible[i]
+                      && !snapshot[i].combinedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) else {
                 return (i, tags, nil, dating, fields)
             }
             let names = await EntityExtractor.extract(text: snapshot[i].combinedText, decision: run,
@@ -1624,40 +1634,92 @@ extension OCRProcessor {
         else { return }
         try? out.write(to: url, options: .atomic)
     }
+    var exportsLocalNames: Bool {
+        guard activeRunConfig?.enableSegmentJSON != false, let settings = activeResolvedSettings?.values else {
+            return false
+        }
+        return EntityRunPolicy.usesLocalNames { settings[$0.rawValue]?.value }
+    }
+
+    /// Name mentions are independent of Finder tagging. An OCR-only run has no reliable correspondence format,
+    /// so collect them from the generated output's pages. Planned merges carry the first PDF's sidecar along
+    /// through the existing merge transaction. An in-place input has no generated destination.
+    func recordLocalNameMentions(runConfig: SessionProcessingConfig, mode: TaggingMode,
+                                 merging: [URL]? = nil, rebuiltPDFs: Set<URL>? = nil) async {
+        guard runConfig.enableSegmentJSON, exportsLocalNames,
+              rebuiltPDFs != nil || mode == .none || mode == .copySource,
+              let settings = activeResolvedSettings?.values else { return }
+
+        let generated = jobs.compactMap { job -> (pdf: URL, job: OCRJob)? in
+            guard rebuiltPDFs?.contains(job.sourceURL) ?? true,
+                  job.classification != .boxLabel, job.classification != .folderLabel,
+                  let pdf = outputURLMap[job.sourceURL], !OutputFileSafety.isSameFile(pdf, job.sourceURL),
+                  FileManager.default.fileExists(atPath: pdf.path) else { return nil }
+            return (pdf, job)
+        }
+        let bySource = Dictionary(generated.map { ($0.job.sourceURL, $0) }, uniquingKeysWith: { first, _ in first })
+        let mergedGroups = merging.map { multiPageSegmentsForMerge(files: $0) } ?? []
+        let groupedPages = mergedGroups.map { $0.pdfURLs.compactMap { bySource[$0] } }
+        let groupedSources = Set(groupedPages.flatMap { $0.map { $0.job.sourceURL } })
+        let standalone = Dictionary(grouping: generated.filter {
+            $0.job.status == .succeeded && !groupedSources.contains($0.job.sourceURL)
+        }, by: \.pdf)
+        for pages in groupedPages + Array(standalone.values) {
+            guard !Task.isCancelled else { return }
+            guard let pdf = pages.first?.pdf else { continue }
+            let json = pdf.deletingPathExtension().appendingPathExtension("json")
+            guard !FileManager.default.fileExists(atPath: json.path) else { continue }
+            let jobs = pages.map(\.job)
+            let results = jobs.map { $0.status == .succeeded ? $0.result : nil }
+            let segment = DocumentSegment(pdfURLs: jobs.map(\.sourceURL), isBox: false, isFolder: false,
+                                          texts: results.map { $0?.text ?? "" })
+            let inputs = EntityRunPolicy.inputs(results: results, runProvider: runConfig.provider.rawValue,
+                                                settings: settings, provider: runConfig.textProvider,
+                                                model: runConfig.textModel, gateway: runConfig.textGateway,
+                                                localAgent: runConfig.textLocalAgent)
+            guard let names = await EntityRunPolicy.localMentions(text: segment.combinedText, inputs: inputs),
+                  !Task.isCancelled else { continue }
+            writeSegmentJSON(segment: segment, tags: GeneratedTags(), outputDirectory: runConfig.outputDirectory,
+                             entities: names.sidecarObject, newOutputOnly: true)
+        }
+    }
+
     private func writeSegmentJSON(segment: DocumentSegment, tags: GeneratedTags, outputDirectory: URL,
                                   enclosureOf: String? = nil, entities: [String: Any]? = nil,
-                                  dating: [String: Any]? = nil, itemFields: [String: Any]? = nil) {
+                                  dating: [String: Any]? = nil, itemFields: [String: Any]? = nil,
+                                  newOutputOnly: Bool = false) {
         guard let firstFile = segment.pdfURLs.first else { return }
         // Write JSON next to the output PDF, using its base name so they match
         let jsonURL: URL
         if let outputPDF = outputURLMap[firstFile] {
+            if newOutputOnly {
+                guard !OutputFileSafety.isSameFile(outputPDF, firstFile),
+                      FileManager.default.fileExists(atPath: outputPDF.path) else { return }
+            }
             jsonURL = outputPDF.deletingPathExtension().appendingPathExtension("json")
         } else {
+            guard !newOutputOnly else { return }
             let baseName = firstFile.deletingPathExtension().lastPathComponent
             jsonURL = outputDirectory.appendingPathComponent(baseName + ".json")
         }
 
         // Body + fields come from the shared SegmentJSONBuilder; this path adds the box/folder label
-        // format override. The sidecar-URL computation above and the atomic write below are unchanged.
+        // format override. A new OCR-only sidecar must never replace a file that already shares the basename.
         let formatOverride = SegmentJSONBuilder.labelFormatOverride(isBox: segment.isBox, isFolder: segment.isFolder)
         guard let data = SegmentJSONBuilder.buildData(fileURLs: segment.pdfURLs, texts: segment.texts,
                                                       tags: tags, formatOverride: formatOverride,
                                                       enclosureOf: enclosureOf, entities: entities,
                                                       dating: dating, itemFields: itemFields) else { return }
-        try? data.write(to: jsonURL, options: .atomic)
+        do {
+            try data.write(to: jsonURL, options: newOutputOnly ? .withoutOverwriting : .atomic)
+        } catch {
+            if newOutputOnly {
+                os_log(.error, "Name sidecar could not be saved for %{public}@: %{public}@",
+                       firstFile.lastPathComponent, error.localizedDescription)
+            }
+        }
     }
-    /// Merge multi-page document segments into single PDFs.
-    /// Each segment with >1 page gets combined. Single-page segments are left as-is.
-    typealias MergedTagWriter = (_ tags: [String], _ url: URL,
-                                 _ appColor: String?, _ colorIsAuthoritative: Bool) throws -> Void
-
-    func performDocumentMerging(
-        files: [URL],
-        outputDirectory: URL,
-        runConfig: SessionProcessingConfig? = nil,
-        tagWriter: MergedTagWriter? = nil
-    ) {
-        // Build segments from current classifications if not already built
+    private func multiPageSegmentsForMerge(files: [URL]) -> [DocumentSegment] {
         let segs: [DocumentSegment]
         if segments.isEmpty {
             let segmenter = DocumentSegmenter()
@@ -1669,10 +1731,23 @@ extension OCRProcessor {
         } else {
             segs = segments
         }
-
         // W47.ct-processor-intake: a document never spans two of a tree's folders, so it is merged within each.
-        let multiPageSegments = segs.filter { !$0.isBox && !$0.isFolder }.flatMap(splitAtOutputFolders)
+        return segs.filter { !$0.isBox && !$0.isFolder }.flatMap(splitAtOutputFolders)
             .filter { $0.pdfURLs.count > 1 }
+    }
+
+    /// Merge multi-page document segments into single PDFs.
+    /// Each segment with >1 page gets combined. Single-page segments are left as-is.
+    typealias MergedTagWriter = (_ tags: [String], _ url: URL,
+                                 _ appColor: String?, _ colorIsAuthoritative: Bool) throws -> Void
+
+    func performDocumentMerging(
+        files: [URL],
+        outputDirectory: URL,
+        runConfig: SessionProcessingConfig? = nil,
+        tagWriter: MergedTagWriter? = nil
+    ) {
+        let multiPageSegments = multiPageSegmentsForMerge(files: files)
         guard !multiPageSegments.isEmpty else { return }
 
         statusMessage = "Merging \(multiPageSegments.count) multi-page documents…"
@@ -1693,22 +1768,13 @@ extension OCRProcessor {
 
             // Reserve the merged PDF and its optional JSON sidecar as one basename. A JSON-only prior-run
             // collision must advance the PDF too, or downstream organization cannot keep the pair aligned.
-            var mergedBaseName = baseName + "_merged"
             // In the output folder, or for a tree's pages beside them, in its folder (W47.ct-processor-intake).
             let mergeDirectory = outputSubfolders[segment.pdfURLs[0].standardizedFileURL.path] == nil
                 ? outputDirectory : firstOutputPDF.deletingLastPathComponent()
-            var mergedURL = mergeDirectory.appendingPathComponent(mergedBaseName + ".pdf")
-            var mergedJSONURL = mergeDirectory.appendingPathComponent(mergedBaseName + ".json")
-            var mergeN = 2
-            while _takenOutputPaths.contains(OutputFileSafety.pathKey(mergedURL))
-                  || FileManager.default.fileExists(atPath: mergedURL.path)
-                  || (hasJSON && FileManager.default.fileExists(atPath: mergedJSONURL.path)) {
-                mergedBaseName = "\(baseName)_merged (\(mergeN))"
-                mergedURL = mergeDirectory.appendingPathComponent(mergedBaseName + ".pdf")
-                mergedJSONURL = mergeDirectory.appendingPathComponent(mergedBaseName + ".json")
-                mergeN += 1
-            }
-            _takenOutputPaths.insert(OutputFileSafety.pathKey(mergedURL))
+            let mergedURL = OutputFileSafety.reserveUniqueDestination(
+                preferred: mergeDirectory.appendingPathComponent(baseName + "_merged.pdf"),
+                reservedPaths: &_takenOutputPaths, companionExtension: hasJSON || exportsLocalNames ? "json" : nil)
+            let mergedJSONURL = mergedURL.deletingPathExtension().appendingPathExtension("json")
 
             do {
                 try pdfGen.mergeDocumentPDFs(sourcePDFs: sourcePDFs, outputURL: mergedURL)

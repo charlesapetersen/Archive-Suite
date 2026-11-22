@@ -1,6 +1,6 @@
 {
  "version": 1,
- "built": "2026-11-20",
+ "built": "2026-11-22",
  "item": "W46.settings-routes-table",
  "method": "ArchiveProcessor/scripts/segbench/settings_routes.py",
  "schema": "execution-plans/processing-review/13-stage-rules/00-index.md §The table schema",
@@ -14630,13 +14630,13 @@
    "rules": [
     {
      "id": "ent-correspondence-only",
-     "text": "Runs on correspondence only; non-correspondence output is unmeasured.",
+     "text": "The regular names route runs on correspondence only; the Advanced finder can record mentions without assigning roles.",
      "source": "ent-prompt-app.md §Measurement card",
      "switch": null
     },
     {
      "id": "ent-vision-hands",
-     "text": "No names from Apple Vision text on handwritten pages; never the sender from Vision text, the tagging call's included.",
+     "text": "The regular route skips Apple Vision text on handwritten pages; no route assigns a sender from Vision text, the tagging call's included.",
      "source": "ent-robust.md §Reading",
      "switch": null
     },
@@ -14653,6 +14653,16 @@
      "switch": {
       "id": "entities.enabled",
       "label": "Find senders, recipients and places",
+      "default": false
+     }
+    },
+    {
+     "id": "ent-low-confidence-on-mac",
+     "text": "Apple’s built-in finder can be chosen explicitly for smaller Macs or early material. Every result is marked low confidence.",
+     "source": "14-owner-calls.md §1. The owner's calls; ent-score.md; ent-robust.md",
+     "switch": {
+      "id": "entities.low_confidence_on_mac",
+      "label": "Find names on this Mac (low confidence)",
       "default": false
      }
     }
@@ -15394,7 +15404,8 @@
      "kind_rules": [],
      "fallback": "none",
      "conditions": [
-      "never offered for the fields; kept as the measured floor"
+      "not offered automatically; choose the low-confidence finder in Advanced settings",
+      "lower-scoring: sender F1 0.14 on 138 correspondence documents; offered at the Advanced level only"
      ]
     },
     {

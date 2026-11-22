@@ -230,6 +230,7 @@ struct SettingsSheetModel {
         for stage in Self.cardStages {
             guard let id = resolver.resolve(Self.overrideKey(stage)).value.string, !id.isEmpty else { continue }
             held.insert(stage)   // even a route the table no longer has, so the way back can clear it
+            if stage == "entities", answers.lowConfidenceNames, id != "none" { continue }
             if table.stage(stage)?.route(id) != nil {
                 answers.onlyRoutes[stage] = [id]
                 custom[stage] = id
@@ -525,6 +526,7 @@ struct SettingsSheetModel {
                               + "against\"): it keeps its own boundaries and you check only the places where the two disagree.")
             }
         }
+        let localNames = stage.id == "entities" && route?.id == "nltagger"
         if stage.id == "entities", let p = lead, !p.shown {
             labels.append("Names are not among what matters most for this collection, so they are not looked for.")
         }
@@ -608,7 +610,10 @@ struct SettingsSheetModel {
             }
         // Names run only when names are ranked, on every route (rule ent-run), which the solver applies by leaving them out.
         let namesUnranked = stage.id == "entities" && !a.priorities.contains(.names)
-        let options = stage.routes.filter { !$0.afterTraining && $0.offered && words.mainFigure(stage, $0, solver: solver) != nil }
+        let options = stage.routes.filter {
+            (!localNames || $0.id == "none") && !$0.afterTraining && $0.offered
+                && words.mainFigure(stage, $0, solver: solver) != nil
+        }
             .map { r in
                 Option(id: r.id, name: words.display(stage.id, r),
                        blocked: appBlocked[r.id]?.first.map(words.reason)
@@ -958,6 +963,11 @@ struct SettingsSheetModel {
             }
             return rows
         case "entities":
+            if picks.first?.route?.id == "nltagger" {
+                return [PartRow(id: "local-names", label: "Names found in OCR text", routeName: nil,
+                                figure: "Every result is marked low confidence",
+                                sample: nil, label2: "Records mentions when the sender and recipient cannot be assigned", warning: true)]
+            }
             var extra: [PartRow] = []
             if let p = picks.first(where: { $0.part == "correspondence-typed" }), p.flag == nil, let r = p.route {
                 for (key, label) in [("recipient", "the recipient"), ("place_city", "the sending place (its city)")] {
@@ -1014,7 +1024,8 @@ struct SettingsSheetModel {
                              source: Self.sourceWords(resolved),
                              note: Self.switchPending.contains(key) ? Self.pendingNote
                                  : key == .placeHandOnImage && !HandPlacer.isInstalled() ? Self.handDownloadNote
-                                 : key == .scanNewspapersDocLayoutYOLO ? Self.scanLayoutNote : nil,
+                                 : key == .scanNewspapersDocLayoutYOLO ? Self.scanLayoutNote
+                                 : key == .lowConfidenceNames ? Self.lowConfidenceNamesNote : nil,
                              offersHandDownload: key == .placeHandOnImage && !HandPlacer.isInstalled(),
                              offersScanLayoutDownload: key == .scanNewspapersDocLayoutYOLO && !ScanNewspaperLayout.isInstalled())
         }
@@ -1056,12 +1067,17 @@ struct SettingsSheetModel {
                     + "\(ScanNewspaperLayout.licence); until it is downloaded, scanned newspapers use the default helper.")
     }
 
+    static let lowConfidenceNamesNote = """
+        Use Apple’s built-in English name finder on smaller Macs or for early handwriting and print. It replaces the regular names route for this selection. Rank Names for the collection and turn on Export segment JSON metadata in Documents. For Process Files, choose Automatic, No tagging or Copy source file tags. On 138 correspondence documents, the finder scored 0.14 out of 1 for sender F1, which penalizes wrong guesses and missed names. GLiNER scored 0.24 in the same benchmark. On early handwriting, extractors found different names in the OCR and reference text, with agreement scores of 0.02 to 0.37 out of 1.
+        """
+
     static func switchLabel(_ key: SettingsKey) -> String? {
         switch key {
         case .straightenReadingCopy: return "Straighten sloping pages"
         case .placeHandOnImage:
             return "Also put handwritten text on the page image, where it fits closely (every handwritten page gets a "
                 + "separate text page either way)"
+        case .lowConfidenceNames: return key.label
         case .dateImageEveryDocument:
             return "Search the page image on every document, not only those whose text has no year: finds stamp dates "
                 + "(kept beside the document's own date); about $1.93 more per 1,000 documents"
@@ -1077,6 +1093,7 @@ struct SettingsSheetModel {
         switch id {
         case "reading_copy.straighten": return .straightenReadingCopy
         case "place.hand_on_image": return .placeHandOnImage
+        case "entities.low_confidence_on_mac": return .lowConfidenceNames
         case "dating.image_every_document": return .dateImageEveryDocument
         case "layout.scan_newspapers_yolo": return .scanNewspapersDocLayoutYOLO
         default: return nil

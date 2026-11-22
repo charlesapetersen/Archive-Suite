@@ -35,25 +35,32 @@ a letter; on this Mac it needs a local model and typed pages."
   ENT-1 rules the 27B's 0.60 against the 8B's 0.56 on senders (n 82) a tie [M, audit ruling]. Ties go to the cheaper
   route, then to the route already running for another stage. The order of the three fields is this note's
   proposal [I]; the owner may weigh recipients first.
-- **Kind rules.** (a) The stage runs on correspondence only: every figure here is on 138 correspondence documents, and
+- **Kind rules for the regular route.** (a) The stage runs on correspondence only: the role figures are on 138
+  correspondence documents, and
   non-correspondence output is unmeasured (`ent-prompt-app.md` Scope: author_name is now null there). (b) Typed or
   printed pages: every route that clears the bar may show names. (c) Handwritten pages: show names only from the API or
   27B readings, or from the 8B reading with the quote check; never from Apple Vision text (W46.ent-robust's switch-off
   rule, `ent-robust.md` Reading). (d) The sender field is never shown from Apple Vision text on any kind (same rule),
   and where the feature does not run, the sidecar leaves out the tagging call's `author_name` on Vision text too
   (owner, walkthrough 2026-11-13; `recipient_name` and `author_location` stay).
-  (e) Public pre-modern Latin hands and early print: no route (`ent-robust.md`: 0.02 to 0.37 on L5 and L7).
+  (e) Pre-modern material is available through the low-confidence opt-in below.
 - **Evidence rule.** A name whose quote is in the document's own OCR text (spacing-tolerant, edit distance 2) is shown
   as read; a name with no quote is shown marked inferred; a name found nowhere is never shown as read
   (`ent-score.md` Reading, G-entities §5). The check is against the document's own text, not the whole prompt, which
   carries neighbours' snippets (2 to 10 names a model lifted from them, `ent-score.md`).
 - **Fallback.** When the chosen route fails on a document (unparsed or length-capped reply), no names, and the sidecar
   says so (`ent-robust.md`: the 8B failed 4 of 96 readings). No silent fallback to another route [I].
-- **Must not run.** On a document the kind stage calls non-correspondence (rule a), on handwritten pages through Vision
-  text (rule c), and with the `none` route. When it runs: on every route only when the collection interview ranks
-  names (owner, walkthrough 2026-11-13, replacing owner call 11's "extract always on a cloud route": the separate call
-  costs $2.37 per 1,000 correspondence documents and nothing reads unshown names yet); on the Mac on typed and printed
-  correspondence only.
+- **Run conditions.** Every route requires Names among the collection priorities (owner, walkthrough 2026-11-13) and
+  respects the `none` override. The regular route follows rules (a)–(d). Its separate cloud call costs $2.37 per
+  1,000 correspondence documents.
+- **Advanced opt-in (owner call 15, W47.wh-names-small-mac).** Apple NLTagger reads the first 3,000 characters of
+  OCR text on this Mac, with no download or API request. The built-in finder uses the measured English settings and
+  the letter-position rule where automatic tagging identifies correspondence and the text comes from a known model
+  reader. Vision text, other documents and OCR-only runs can record exact quoted mentions with no assigned roles.
+  Every entry produced by this route has low confidence. The opt-in is off by default and can be set for a collection
+  without inferring the period of individual documents. Enable JSON metadata export to get the results alongside newly
+  generated PDFs. GLiNER’s 0.24 sender F1 and NLTagger’s 0.14 are benchmark scores on 138 correspondence documents.
+  The 0.02–0.37 on L5 and L7 is agreement across OCR and reference text, measured across readers and extractors.
 - **The local picks on Vision text.** Both are scored on the shipped prompt over Vision text, n 138
   (`ent-local-shipped.md`, W46.ent-local-shipped-prompt): the Mac pick (`qwen3-vl-8b-mac`) at sender 0.60, recipient
   0.61, place 0.54; the cluster pick (`qwen3.6-27b`) at 0.66, 0.68, 0.56, ahead of the 8B on recipients (+0.073,
@@ -80,10 +87,11 @@ come from `build_figures.py`'s hand-entered rows with no measuring file behind t
  "metric": {"id": "sender_ed2_f1", "label": "sender found (ed2 F1), then recipient, then place by city", "higher_is_better": true},
  "kinds": ["correspondence-typed", "correspondence-handwritten", "non-correspondence"],
  "rules": [
-  {"id": "ent-correspondence-only", "text": "Runs on correspondence only; non-correspondence output is unmeasured.", "source": "ent-prompt-app.md §Measurement card", "switch": null},
-  {"id": "ent-vision-hands", "text": "No names from Apple Vision text on handwritten pages; never the sender from Vision text, the tagging call's included.", "source": "ent-robust.md §Reading", "switch": null},
+  {"id": "ent-correspondence-only", "text": "The regular names route runs on correspondence only; the Advanced finder can record mentions without assigning roles.", "source": "ent-prompt-app.md §Measurement card", "switch": null},
+  {"id": "ent-vision-hands", "text": "The regular route skips Apple Vision text on handwritten pages; no route assigns a sender from Vision text, the tagging call's included.", "source": "ent-robust.md §Reading", "switch": null},
   {"id": "ent-evidence", "text": "Quoted in the document's own text: shown as read; unquoted: written and shown marked inferred; never shown as read without a quote.", "source": "ent-score.md §Reading; G-entities.md §5; 14-owner-calls.md §1. The owner's calls", "switch": null},
-  {"id": "ent-run", "text": "Names are extracted only when the collection interview ranks names, on every route; on the Mac on typed and printed correspondence only.", "source": "14-owner-calls.md §1. The owner's calls", "switch": {"id": "entities.enabled", "label": "Find senders, recipients and places", "default": false}}
+  {"id": "ent-run", "text": "Names are extracted only when the collection interview ranks names, on every route; on the Mac on typed and printed correspondence only.", "source": "14-owner-calls.md §1. The owner's calls", "switch": {"id": "entities.enabled", "label": "Find senders, recipients and places", "default": false}},
+  {"id": "ent-low-confidence-on-mac", "text": "Apple’s built-in finder can be chosen explicitly for smaller Macs or early material. Every result is marked low confidence.", "source": "14-owner-calls.md §1. The owner's calls; ent-score.md; ent-robust.md", "switch": {"id": "entities.low_confidence_on_mac", "label": "Find names on this Mac (low confidence)", "default": false}}
  ],
  "fallback": "none"}
 ```
@@ -211,7 +219,7 @@ The stage header above is kept apart from the route rows, which follow as a list
   "time": {"per_unit_s": 0.008, "measured": true, "measured_on": "M3 Pro CPU, background QoS: read the ratio", "source": {"file": "ent-score.md", "route": "nltagger", "attribute": "s/doc", "value": "0.008"}},
   "memory": null,
   "caveats": ["cannot replace the LLM: a perfect position rule over its spans finds at most 35 of 138 named senders (ent-score.md)"],
-  "kind_rules": [], "fallback": "none", "conditions": ["never offered for the fields; kept as the measured floor"]},
+  "kind_rules": [], "fallback": "none", "conditions": ["not offered automatically; choose the low-confidence finder in Advanced settings", "lower-scoring: sender F1 0.14 on 138 correspondence documents; offered at the Advanced level only"]},
  {"id": "gliner2.5-base-spans-rule", "name": "GLiNER2.5 base, spans with the letter position rule", "family": "mac",
   "app_route": null, "status": "measured",
   "needs": {"key": [], "plan": [], "cluster": false, "mac_gb": 0, "gpus": 0},

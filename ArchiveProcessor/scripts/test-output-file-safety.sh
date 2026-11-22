@@ -55,6 +55,18 @@ check("existing destination receives a numbered name", uniquePDF == occupiedPDF2
 let nextPDF = OutputFileSafety.reserveUniqueDestination(preferred: occupiedPDF, reservedPaths: &reserved)
 check("reserved destination is not reused", nextPDF.lastPathComponent == "report (3).pdf")
 
+let orphan = root.appendingPathComponent("orphan.json")
+let orphanPDF = root.appendingPathComponent("orphan.pdf")
+try Data("unrelated metadata".utf8).write(to: orphan)
+try FileManager.default.createSymbolicLink(at: root.appendingPathComponent("orphan (2).json"),
+                                           withDestinationURL: root.appendingPathComponent("missing.json"))
+var pairReservations = Set<String>()
+let paired = OutputFileSafety.reserveUniqueDestination(preferred: orphanPDF, reservedPaths: &pairReservations,
+                                                        companionExtension: "json")
+check("paired output skips existing JSON and dangling JSON links", paired.lastPathComponent == "orphan (3).pdf")
+let preservedOrphan = try Data(contentsOf: orphan)
+check("paired reservation preserves older metadata", preservedOrphan == Data("unrelated metadata".utf8))
+
 var imageReservations = Set<String>()
 let reusedSource = OutputFileSafety.reserveUniqueDestination(
     preferred: original, allowedExisting: original, reservedPaths: &imageReservations)

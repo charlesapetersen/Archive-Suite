@@ -1,5 +1,6 @@
 #if DEBUG // a test driver, compiled out of Release
 import Foundation
+import NaturalLanguage
 import ArchiveCore
 
 /// Headless, key-free ($0) self-test of the entity feature (W46.ent-feature), gated by `ENTITY_FEATURE_TEST=1`
@@ -52,6 +53,7 @@ enum EntityFeatureTestDriver {
         policy()
         namesEstimate()
         sidecar()
+        localRoles()
         await endToEnd()
         await liveCapture()
         lines.append(failures == 0 ? "ALL PASS" : "FAILURES \(failures)")
@@ -262,6 +264,22 @@ enum EntityFeatureTestDriver {
               && withheld.allTags == tags.allTags)
     }
 
+    private static func localRoles() {
+        let text = "Boston, Massachusetts\r\nDear Jane Smith,\r\nHere is the news.\r\nSincerely,\r\nJohn K. Brown"
+        let spans: [(NLTag, String)] = [(.placeName, "Boston"), (.placeName, "Massachusetts"),
+                                        (.personalName, "Jane Smith"), (.personalName, "John"), (.personalName, "Brown")]
+        let found = spans.compactMap { tag, quote in text.range(of: quote).map { LocalNameFinder.Span(tag: tag, range: $0) } }
+        let fields = LocalNameFinder.fields(in: text, spans: found, mode: .correspondence)
+        let run = EntityRunPolicy.Run(route: "local", textSource: .reader, senderWithheld: nil, localMode: .correspondence)
+        let out = EntityResult(decision: run, outcome: .extracted(fields)).sidecarObject
+        let roles = ["sender": "John K. Brown", "recipient": "Jane Smith", "sending_place": "Boston, Massachusetts"]
+        check("4 local: each position rule keeps the exact OCR quote and marks the role low confidence", roles.allSatisfy {
+            let field = (out[$0.key] as? [[String: Any]])?.first
+            return field?["name"] as? String == $0.value && field?["quote"] as? String == $0.value
+                && field?["confidence"] as? String == "low" && field?["evidence"] as? String == "quoted"
+        })
+    }
+
     /// Every request answered by `wire`: the tagging and the names prompt told apart by their first words, the
     /// document by the marker word nearest the start of the prompt (its own text comes first in both).
     private static func install(_ wire: Wire) {
@@ -316,7 +334,7 @@ enum EntityFeatureTestDriver {
                                                 ("V", "typewritten", "Apple Vision"), ("H", "handwritten", "Apple Vision"),
                                                 ("F", "typewritten", "Gemini")]
         func processor(gateway: GatewayConfig?, ranked: Bool, out: String,
-                       noNames: Bool = false) -> (OCRProcessor, [String: URL]) {
+                       noNames: Bool = false, lowConfidence: Bool = false) -> (OCRProcessor, [String: URL]) {
             let outDir = tmp.appendingPathComponent(out, isDirectory: true)
             try? fm.createDirectory(at: outDir, withIntermediateDirectories: true)
             let p = OCRProcessor()
@@ -325,11 +343,12 @@ enum EntityFeatureTestDriver {
             let files = docs.map { tmp.appendingPathComponent("\(out)-\($0.0).jpg") }
             p.jobs = docs.enumerated().map { i, d in
                 var job = OCRJob(sourceURL: files[i])
-                job.result = OCRResult(text: "DOC\(d.0) Dear Dr. Brown,\nThank you.\nYours, Alice Green",
+                job.result = OCRResult(text: "DOC\(d.0) Dear Dr. Brown,\nAlice Green met John Smith in New York City.\nYours, Alice Green.",
                                        classification: .documentStart, errorMessage: nil, errorCode: nil,
                                        pageReader: PageReaderRecord(kind: d.1, confidence: 0.9, reason: .kind,
                                                                     provider: d.2, model: "m"))
                 job.classification = .documentStart
+                job.status = .succeeded
                 return job
             }
             var outputs: [String: URL] = [:]
@@ -346,6 +365,7 @@ enum EntityFeatureTestDriver {
                 runID: UUID(), resolvedAt: Date(), collectionID: nil, projectID: nil, projectName: nil, macMemoryGB: 16,
                 values: [SettingsKey.priorities.rawValue: ResolvedSetting(
                             value: .strings(ranked ? ["reading", "names"] : ["reading", "dates"])),
+                         SettingsKey.lowConfidenceNames.rawValue: ResolvedSetting(value: .bool(lowConfidence)),
                          SettingsSheetModel.overrideKey("entities").rawValue: ResolvedSetting(
                             value: .string(noNames ? "none" : ""))],
                 processing: [:])
@@ -438,6 +458,41 @@ enum EntityFeatureTestDriver {
         check("5 \"No names\": tagged, no entity call, the sidecar as before",
               wire.tagging == 5 && wire.entity.isEmpty && json(noNamesOut["L"])["entities"] == nil,
               "\(wire.tagging) \(wire.entity)")
+
+        wire.lock.withLock { wire.tagging = 0; wire.entity = [] }
+        let (low, lowOut) = processor(gateway: nil, ranked: true, out: "low", lowConfidence: true)
+        await low.performTaggingPhase(provider: .openrouter, model: route.model, apiKey: "test-key",
+                                       outputDirectory: tmp, enableSegmentJSON: true)
+        let lowHand = json(lowOut["H"])["entities"] as? [String: Any]
+        let lowMentions = lowHand?["mentions"] as? [[String: Any]] ?? []
+        check("5 local opt-in replaces the paid names call and labels real Vision names without roles",
+              wire.tagging == 5 && wire.entity.isEmpty && lowHand?["sender"] == nil
+              && lowMentions.contains { $0["quote"] as? String == "John Smith" }
+              && lowMentions.allSatisfy { $0["confidence"] as? String == "low" }, "\(lowMentions)")
+        let (offline, offlineOut) = processor(gateway: nil, ranked: true, out: "offline", lowConfidence: true)
+        var cfg = SessionProcessingConfig(
+            provider: .appleVision, model: route.model, thinkingLevel: .low, apiKey: "",
+            taggingMode: .none, rotationMode: .off, mergeDocuments: false, outputDirectory: tmp,
+            customOCRPrompt: "", imageScale: 1, enableSegmentJSON: false, tagVocabulary: [], gateway: nil,
+            outputImageFile: false, pdfImageMB: 2, exportedImageMB: 3, textColumns: 1)
+        await offline.recordLocalNameMentions(runConfig: cfg, mode: .none)
+        check("5 offline: sidecars off writes nothing", json(offlineOut["H"]).isEmpty)
+        let existing = offlineOut["L"]!
+        let kept = Data("existing metadata".utf8)
+        try? kept.write(to: existing)
+        let inPlace = offline.jobs[1].sourceURL
+        offline.outputURLMap[inPlace] = inPlace
+        _ = fm.createFile(atPath: inPlace.path, contents: Data())
+        cfg.enableSegmentJSON = true
+        await offline.recordLocalNameMentions(runConfig: cfg, mode: .none)
+        let offlineHand = json(offlineOut["H"])["entities"] as? [String: Any]
+        check("5 offline: writes local mentions beside a generated PDF without tagging or sending a request",
+              offlineHand?["mentions"] != nil && offlineHand?["sender"] == nil
+              && offline.jobs.allSatisfy { $0.appliedTags.isEmpty } && wire.tagging == 5 && wire.entity.isEmpty)
+        check("5 offline: existing metadata and in-place sources stay untouched",
+              (try? Data(contentsOf: existing)) == kept
+              && !fm.fileExists(atPath: inPlace.deletingPathExtension().appendingPathExtension("json").path)
+              && json(offlineOut["R"]).isEmpty)
     }
 
     // MARK: 6. Live Capture
@@ -478,26 +533,27 @@ enum EntityFeatureTestDriver {
                   let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return [:] }
             return o
         }
-        func config(_ out: String, sidecars: Bool = true) -> SessionProcessingConfig {
+        func config(_ out: String, sidecars: Bool = true, mode: TaggingMode = .automatic) -> SessionProcessingConfig {
             SessionProcessingConfig(
                 provider: .openrouter, model: route.model, thinkingLevel: .low, apiKey: "test-key",
-                taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
+                taggingMode: mode, rotationMode: .off, mergeDocuments: false,
                 outputDirectory: tmp.appendingPathComponent(out, isDirectory: true),
                 customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: sidecars, tagVocabulary: [], gateway: nil,
                 outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0, textColumns: 1)
         }
         /// One live session: each document's one page ingested with its stand-in OCR result, resolved, and staged.
         func session(_ name: String, sidecars: Bool = true,
-                     settings: [String: ResolvedSetting] = [:]) async -> (CaptureSession, URL, SessionProcessingConfig) {
+                     settings: [String: ResolvedSetting] = [:], mode: TaggingMode = .automatic)
+            async -> (CaptureSession, URL, SessionProcessingConfig) {
             let staging = tmp.appendingPathComponent("APStaging-\(name)", isDirectory: true)
             try? fm.createDirectory(at: staging, withIntermediateDirectories: true)
-            let cfg = config(name, sidecars: sidecars)
+            let cfg = config(name, sidecars: sidecars, mode: mode)
             let s = CaptureSession()
             s._recoveryTestBeginLive(config: cfg, stagingDir: staging)
             s.liveProcessor._entityTestSetSettings(settings)
             for (i, d) in docs.enumerated() {
                 LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(
-                    text: "DOC\(d.0) Dear Dr. Brown,\nThank you.\nYours, Alice Green", classification: nil,
+                    text: "DOC\(d.0) Dear Dr. Brown,\nAlice Green met John Smith in New York City.\nYours, Alice Green.", classification: nil,
                     errorMessage: nil, errorCode: nil,
                     pageReader: PageReaderRecord(kind: d.1, confidence: 0.9, reason: .kind, provider: d.2, model: "m"))
                 _ = s.ingest(jpeg: Data("synthetic page bytes".utf8), groupId: d.0, seq: i + 1, type: .document,
@@ -602,6 +658,20 @@ enum EntityFeatureTestDriver {
         check("6 Live, \"No names\": tagged, no entity call, the sidecar as before",
               wire.tagging == 5 && wire.entity.isEmpty && sidecar(none, "L")["entities"] == nil
               && sidecar(none, "L")["author_name"] as? String == "Tagging Sender", "\(wire.tagging) \(wire.entity)")
+
+        let low = ranked.merging([SettingsKey.lowConfidenceNames.rawValue: ResolvedSetting(value: .bool(true))]) { a, _ in a }
+        wire.lock.withLock { wire.tagging = 0; wire.entity = [] }
+        let (offline, staging, cfg) = await session("offline", settings: low, mode: .none)
+        let offlineNames = sidecar(offline, "H")["entities"] as? [String: Any]
+        let mentions = offlineNames?["mentions"] as? [[String: Any]] ?? []
+        check("6 Live: offline mentions are quoted and low confidence, with no sender or network call",
+              mentions.contains { $0["quote"] as? String == "John Smith" && $0["confidence"] as? String == "low" }
+              && offlineNames?["sender"] == nil && wire.tagging == 0 && wire.entity.isEmpty, "\(mentions)")
+        let retained = offline.liveProcessor._entityTestRetainedEntities("H")
+        let reloadedOffline = CaptureSession()
+        reloadedOffline.liveProcessor._recoveryTestLoadManifest(stagingDir: staging, config: cfg)
+        check("6 Live: the manifest retains the local route's confidence on reload",
+              retained?.decision.localMode == .mentions && reloadedOffline.liveProcessor._entityTestRetainedEntities("H") == retained)
     }
 }
 

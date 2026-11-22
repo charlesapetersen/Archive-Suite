@@ -17688,3 +17688,20 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   settings ownership, newspaper accounting, the OCR prompt and route-table contracts, and four focused off-screen
   Settings tests. Reviewed the Advanced and changed-at-Basic screenshots. Verification cost $0 and used no bench cache.
   <!-- /W47.wh-post-correction -->
+
+- [x] **W47.wh-names-small-mac — low-confidence names on small Macs and on pre-modern material [M]** · §The withheld features — the owner's calls of 2026-11-19 (W47.wh) — SHIPPED 2026-11-22 (this commit).
+  Owner call 15 released these results with a low-confidence label at Advanced. Dates and names offers
+  Apple's built-in English name finder as an explicit choice per collection, off by default. It needs
+  Names in the collection priorities and JSON metadata export. Each result carries the exact OCR quote
+  and low confidence. With confirmed correspondence and a known model reading it may fill roles.
+  Apple Vision, OCR-only and unclassified material get mentions without assigned roles. The finder accepts
+  new OCR on rebuilt PDFs and takes no API key. Process Files reserves generated PDF and JSON names together,
+  keeps existing JSON and in-place PDFs, and uses the existing segment metadata and merge paths.
+  Live Capture keeps the confidence and mentions across staging reload. The option applies to the selected
+  collection without guessing a document's period. The UI gives the sender F1 comparison on 138 documents
+  (0.14 for NLTagger, 0.24 for GLiNER) and the 0.02–0.37 name agreement across OCR and reference text on early
+  handwriting. GLiNER is a comparison from the benchmark.
+  Verified with the Debug build, key-free entity, Vision, settings, file-safety, merge and PDF rebuild
+  regressions, route-table source check and off-screen Settings tests at all three levels. Verification
+  cost $0 and used synthetic inputs. No bench cache was created.
+  <!-- /W47.wh-names-small-mac -->

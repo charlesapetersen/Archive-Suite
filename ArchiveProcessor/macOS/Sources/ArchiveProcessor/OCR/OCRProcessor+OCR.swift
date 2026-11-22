@@ -580,7 +580,8 @@ extension OCRProcessor {
         let preferred = outputFolder(for: sourceURL, in: dir).appendingPathComponent(baseName + "." + ext)
         return OutputFileSafety.reserveUniqueDestination(
             preferred: preferred,
-            reservedPaths: &_takenOutputPaths
+            reservedPaths: &_takenOutputPaths,
+            companionExtension: ext.lowercased() == "pdf" && exportsLocalNames ? "json" : nil
         )
     }
 
