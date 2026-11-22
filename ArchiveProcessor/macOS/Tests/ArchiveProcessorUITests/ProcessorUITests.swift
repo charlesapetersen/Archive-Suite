@@ -989,8 +989,17 @@ final class ProcessorUITests: XCTestCase {
         let save = element("ap.collectionInterview.save")
         if !save.waitForExistence(timeout: 10) { attachScreenshot("processor-collection-interview-missing") }
         XCTAssertTrue(save.exists, "the collection interview must open")
-        XCTAssertTrue(app.buttons["Measure from photos…"].exists, "it must offer to measure the kinds of document")
+        XCTAssertTrue(app.buttons["Measure from files…"].exists, "it must offer to measure the kinds of document")
         attachScreenshot("processor-collection-interview")
+        let limit = element("ap.collectionInterview.batchLimit")
+        scrollUntilHittable(limit, in: app.sheets.firstMatch)
+        XCTAssertTrue(limit.isHittable)
+        limit.click()
+        let unlimited = app.menuItems["No limit"]
+        XCTAssertTrue(unlimited.waitForExistence(timeout: 5))
+        unlimited.click()
+        XCTAssertEqual(limit.value as? String, "No limit")
+        attachScreenshot("processor-collection-interview-no-limit")
         app.buttons["Skip"].click()
         let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: save)
         XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Skip must close the interview")

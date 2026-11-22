@@ -557,7 +557,7 @@ struct OCRView: View {
             }
         }
         .sheet(item: $collectionInterview) { target in
-            CollectionInterviewView(target: target, photos: droppedFiles) { collectionInterview = nil }
+            CollectionInterviewView(target: target, files: droppedFiles) { collectionInterview = nil }
         }
         .sheet(isPresented: $showKeychainSheet) {
             keychainExplanationSheet

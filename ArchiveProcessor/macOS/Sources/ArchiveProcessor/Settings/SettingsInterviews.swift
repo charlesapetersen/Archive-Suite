@@ -1,11 +1,12 @@
 import Foundation
+import PDFKit
 
 // MARK: - The two interviews (W46.settings-interviews)
 //
 // `12-settings-design.md` §3.1-3.2 and the owner's calls of 2026-11-04 and 2026-11-06 (`13-stage-rules/14-owner-calls.md`).
 // The general interview runs once, at the app's first start: it reads the Mac and the Keychain, shows what it found,
 // and asks the few things it cannot read. The collection interview runs when a collection or a project is created: it
-// measures the document mix on a sample of the photographs and asks what a classifier cannot see. Both write ordinary
+// measures the document mix on a sample of photos and PDF pages and asks what a classifier cannot see. Both write ordinary
 // layer values (`SettingsLayers.swift`) with their source; nothing depends on which starting point was pressed. A
 // skipped interview writes nothing but what was found on the Mac, which is "Free, on this Mac" (owner call 3).
 //
@@ -229,15 +230,15 @@ struct GeneralInterviewAnswers: Equatable, Sendable {
 
 // MARK: The collection interview
 
-/// The document mix measured by the on-device kind classifier on a sample of the photographs.
+/// The document mix measured by the on-device kind classifier on a sample of photos and PDF pages.
 struct KindMeasurement: Equatable, Sendable {
-    /// Photographs the classifier was given.
+    /// Pages the classifier was given.
     var sample: Int
     /// Pages by the kind it called.
     var counts: [String: Int]
     /// Pages it called with less than `PageKindRouting.minimumConfidence`, still counted under their kind.
     var unsure: Int
-    /// Pages it could not tell (an unreadable image, an older macOS).
+    /// Pages it could not tell (an unreadable page, an older macOS).
     var unknown: Int
     var date: Date
 
@@ -260,18 +261,66 @@ struct KindMeasurement: Equatable, Sendable {
         return KindMeasurement(sample: kinds.count, counts: counts, unsure: unsure, unknown: unknown, date: date)
     }
 
-    /// The photographs to classify: at most `limit`, spread evenly through the batch in name order, so a box that
-    /// changes kind halfway is sampled on both sides.
-    static func sample(_ urls: [URL], limit: Int = KindMeasurement.sampleLimit) -> [URL] {
-        let sorted = urls.filter { imageExtensions.contains($0.pathExtension.lowercased()) }
-            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
-        guard sorted.count > limit, limit > 0 else { return sorted }
-        return (0..<limit).map { sorted[$0 * sorted.count / limit] }
+    struct Page: Equatable, Sendable {
+        let url: URL
+        /// Zero-based for a PDF page, nil for an image file.
+        let pdfIndex: Int?
+
+        func renderedPDFImage() -> CGImage? {
+            guard let pdfIndex else { return nil }
+            return autoreleasepool {
+                PDFDocument(url: url)?.page(at: pdfIndex).flatMap(PDFToImageConverter.renderPageImage)
+            }
+        }
+
+        func classify() async -> PageKind? {
+            if pdfIndex == nil { return await PageKindClassifier.classify(url: url) }
+            guard let image = renderedPDFImage() else { return nil }
+            return await PageKindClassifier.classify(image)
+        }
     }
 
-    /// About 0.6 s a page (`kind-classifier.md` §6), so 40 photographs take under half a minute.
+    /// Spread the sample over pages in filename order, including the interior of multi-page PDFs.
+    /// Count pages first so only the selected pages need to be rendered or held in memory.
+    static func sample(_ urls: [URL], limit: Int = KindMeasurement.sampleLimit) -> [Page] {
+        let sorted = urls.sorted {
+            let order = $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent)
+            return order == .orderedSame ? $0.path < $1.path : order == .orderedAscending
+        }
+        var files: [(url: URL, first: Int, count: Int, isPDF: Bool)] = []
+        var totalPages = 0
+        for url in sorted {
+            if Task.isCancelled { return [] }
+            let ext = url.pathExtension.lowercased()
+            let isPDF = ext == "pdf"
+            guard isPDF || imageExtensions.contains(ext) else { continue }
+            let count: Int
+            if isPDF {
+                count = autoreleasepool {
+                    guard let document = PDFDocument(url: url), !document.isLocked else { return 0 }
+                    return document.pageCount
+                }
+            } else {
+                count = 1
+            }
+            guard count > 0 else { continue }
+            files.append((url, totalPages, count, isPDF))
+            totalPages += count
+        }
+
+        let sampleCount = min(totalPages, max(0, limit))
+        var fileIndex = 0
+        return (0..<sampleCount).map { index in
+            let ordinal = index * totalPages / sampleCount
+            while ordinal >= files[fileIndex].first + files[fileIndex].count { fileIndex += 1 }
+            let file = files[fileIndex]
+            return Page(url: file.url, pdfIndex: file.isPDF ? ordinal - file.first : nil)
+        }
+    }
+
+    /// The classifier takes about 0.6 s a page on photographs (`kind-classifier.md` §6).
     static let sampleLimit = 40
-    static let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "heic", "heif", "tif", "tiff"]
+    private static let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "heic", "heif", "tif", "tiff"]
     /// The classifier on the owner's pages after the mixed-cut rework (`kind-atrium.md`).
     static let ownerRight = 137, ownerPages = 141
 }
@@ -369,6 +418,7 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
     var latinForms: Set<CollectionScript> = []
     var scriptShares: [CollectionScript: Double] = [:]
     var batchCeilingUSD: Double = 0
+    var noBatchCeiling = false
     var hours: Double = 8
     var checkingMinutes: Double = 0
     /// What matters most, in order, and each one's weight (0 is not ranked).
@@ -389,7 +439,10 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
     /// project's), whose values count as already answered.
     init(resolver: SettingsResolver? = nil, own: SettingsLayer? = nil) {
         guard let r = resolver else { return }
-        batchCeilingUSD = r.resolve(.batchCeilingUSD).value.double ?? batchCeilingUSD
+        let batch = r.resolve(.batchCeilingUSD)
+        noBatchCeiling = batch.hasUnlimitedBatchSpending
+        let inherited = SettingsResolver(general: r.general, project: own?.kind == .project ? nil : r.project)
+        batchCeilingUSD = noBatchCeiling ? inherited.batchSpendingCapUSD ?? 0 : batch.value.double ?? 0
         hours = r.resolve(.hours).value.double ?? hours
         checkingMinutes = r.resolve(.checkingMinutes).value.double ?? checkingMinutes
         preference = r.resolve(.preference).value.string.flatMap(SettingsPreference.init(rawValue:)) ?? preference
@@ -446,6 +499,7 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
 
     mutating func take(_ m: KindMeasurement) {
         measurement = m
+        mixInheritedFrom = nil
         measuredShares = m.shares
         correctedMix = false
         touch(.mix)
@@ -466,13 +520,16 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
         touch(.priorities)
     }
 
-    /// A starting point fills only the limits it means: its ceiling only when it spends ("A few dollars, overnight"),
-    /// so the others keep the ceiling the layers give; and from a collection it can keep pages on the Mac but never
-    /// silently let them leave (that switch is the user's own).
+    /// The paid starting points fill the batch ceiling. A starting point can keep pages on the Mac, and only
+    /// the user can change the switch to let pages leave.
     mutating func fill(_ point: SettingsStartingPoint) {
         var keys: [SettingsKey] = [.hours, .preference]
         if point.moneyHabit == .perBatch {
             batchCeilingUSD = point.batchCeilingUSD
+            noBatchCeiling = false
+            keys.append(.batchCeilingUSD)
+        } else if point.moneyHabit == .noCeiling {
+            noBatchCeiling = true
             keys.append(.batchCeilingUSD)
         }
         if point.staysOnMac {
@@ -494,6 +551,11 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
 
     func isAnswered(_ key: SettingsKey) -> Bool { answered.contains(key.rawValue) }
 
+    mutating func inheritBatchCeiling() {
+        answered.remove(SettingsKey.batchCeilingUSD.rawValue)
+        filled.remove(SettingsKey.batchCeilingUSD.rawValue)
+    }
+
     static func unmeasuredLabel(_ kind: String) -> String {
         PageKindName(rawValue: kind)?.shareLabel ?? kind
     }
@@ -514,8 +576,10 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
         switch (point.moneyHabit, habit) {
         case (.perBatch, .none):
             return "Your general settings spend nothing, so this collection's $\(Int(point.batchCeilingUSD)) limit has no effect until Spending is changed there."
-        case (.noCeiling, .none), (.noCeiling, .perBatch), (.noCeiling, .perMonth):
-            return "“No limit” is a general setting: this collection keeps the spending limit your general settings give."
+        case (.noCeiling, .none):
+            return "Your general settings still spend nothing."
+        case (.noCeiling, .perMonth):
+            return "This batch can spend what is left of the monthly limit in your general settings."
         default:
             return nil
         }
@@ -606,7 +670,7 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
     }
 
     /// Write what this interview answered into a project's or a collection's layer, and remove the rest, so it is
-    /// read live from above. The mix is "measured from N photos" while it is the classifier's, and the user's once a
+    /// read live from above. The mix is "measured from N pages" while it is the classifier's, and the user's once a
     /// share was corrected, an unmeasured kind given, or a script's share set.
     func apply(to layer: inout SettingsLayer, now: Date = Date()) {
         func source(_ key: SettingsKey) -> SettingsSource {
@@ -637,7 +701,7 @@ struct CollectionInterviewAnswers: Equatable, Sendable {
         } else {
             for key in Self.mixGroup { layer.reset(key) }
         }
-        put(.batchCeilingUSD, .double(max(0, batchCeilingUSD)))
+        put(.batchCeilingUSD, .double(noBatchCeiling ? SettingsKey.unlimitedBatchCeiling : max(0, batchCeilingUSD)))
         put(.hours, .double(max(1, hours)))
         put(.checkingMinutes, .double(max(0, checkingMinutes)))
         if isAnswered(.priorities) {

@@ -17904,3 +17904,9 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   stay with the file. Cross-reference streams use a full save with the same object, rendering and searchable
   text checks. A verified copy remains available for Restore.
   <!-- /W49.proc-reocr-allow-more -->
+
+- [x] **W49.proc-kind-sample-pdf — the settings interview samples PDF pages too [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked — Owner, 2026-11-19 (call 21, the accepted-issues sheet; `execution-plans/processing-review/17-accepted-review.json` entry `p-kind-sample`, answers in `answers/17-accepted-review-answers-20261119.json`): change it (against the recommendation to keep). Render PDF pages for the kind sample; "No limit" also selectable in the interview.
+  SHIPPED 2026-11-22 (this commit). The interview measures up to 40 pages across photos and PDFs on the Mac.
+  Only sampled PDF pages are rendered, in memory. Projects and collections can inherit the batch limit,
+  enter an amount, or set No limit. The general no-spending rule and monthly cap still apply.
+  <!-- /W49.proc-kind-sample-pdf -->

@@ -669,11 +669,11 @@ collection settings file leaves the General settings in effect.
 
 ## ⚠️ LIMITATION (W46.settings-layers, 2026-11-11): what the settings layers do not yet cover
 
-- **The interviews' known gaps (W46.settings-interviews).** The kind sample reads photographs only (JPEG, PNG,
-  HEIC, TIFF), not PDF pages, and needs macOS 26 for the classifier. A Claude plan counts only after "Check the
-  sign-in" passes (one short message on the plan). The period, language and script rules that pick a public test set
-  are the bench's strata read by the period's middle year; they are a reading, not a measurement. The money habit
-  "No limit" can be chosen only in the general settings. (queued: W49.proc-kind-sample-pdf)
+- **The interviews' known gaps (W46.settings-interviews).** Measuring document kinds on photos and PDF pages
+  needs macOS 26 for the classifier. A Claude plan counts only after "Check the sign-in" passes (one short message
+  on the plan). The period, language and script rules that pick a public test set use the period's middle year
+  to choose the bench's strata, based on interpretation of the answers. (accepted: the classifier requires macOS 26,
+  plan access requires a sign-in check, and the test sets are chosen from the interview answers)
 - **The run still reads the app's processing settings, not the solver's picks.** The frozen record carries both: the
   resolved layers and the `UserDefaults` processing settings the run actually used. Running a batch from the
   solver's picks is the sheet's job. (accepted: the run reads the processing settings by design; the settings sheet's apply button carries a pick into them, W46.settings-sheet)

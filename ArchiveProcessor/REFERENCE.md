@@ -412,7 +412,7 @@ Settings/                      W46.settings-solver: the settings layer's solver;
                                never the secret; `claude` a plan only once its sign-in check passes; a ChatGPT
                                sign-in), the four starting points as fills, `GeneralInterviewAnswers` (skipping
                                writes only what was found: "Free, on this Mac"), `KindMeasurement` (the kind
-                               classifier on up to 40 photographs spread through the batch), and
+                               classifier on up to 40 pages spread through a batch of photos and PDFs), and
                                `CollectionInterviewAnswers.mixAndStrata` (period, languages and scripts → the public
                                test sets; `SPEC/collection-settings.md`). Views: `Views/GeneralInterviewView.swift`
                                (first start, Settings), `Views/CollectionInterviewView.swift` (a new output folder,

@@ -58,7 +58,7 @@ import Testing
         // The unknown value kind is dropped, and so is a value only the general layer holds; the rest survive.
         #expect(r.ownSettings.map(\.key) == ["hours", "mix"])
         #expect(r.ownSettings.last?.value == "typewritten 60%, handwritten 40%")
-        #expect(r.ownSettings.last?.source == "set for this collection, measured on 2026-11-04 from 40 photos")
+        #expect(r.ownSettings.last?.source == "set for this collection, measured on 2026-11-04 from 40 pages")
         #expect(r.runFileCount == 3 && r.unreadableRunCount == 1)
         #expect(r.runs.map(\.id) == ["B", "A"])
         let latest = try #require(r.latestRun)

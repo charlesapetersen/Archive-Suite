@@ -68,7 +68,8 @@ above), so a collection's mix is never read beside a project's `strata`.
 | `scripts` | `strings` | `kurrent` and `fraktur` as plain names; another script as `"<name>:<percent>"` (`greek`, `hebrew`, `arabic`, `cyrillic`, `chinese`, `devanagari`). The Latin alphabet is the rest. |
 | `priorities` | `strings` | The ranked priorities, most important first: `reading`, `findingDocuments`, `dates`, `names`. One not listed is not ranked. |
 | `weights` | `numbers` | Each ranked priority's weight by the same names. Absent means 45, 30, 15, 10 by position. |
-| `batchCeilingUSD`, `hours`, `checkingMinutes` | `double` | This collection's batch limits. A ceiling has effect only when the general spending habit allows money. |
+| `batchCeilingUSD` | `double` | The batch spending cap in dollars. Omit to inherit. A project or collection stores `-1` for No limit on the batch. The general no-spending rule and monthly cap still apply. |
+| `hours`, `checkingMinutes` | `double` | This collection's time limits. |
 | `preference` | `string` | `bestMeasured`, `cheapestWithinPoint` or `fastestWithinPoint`. |
 | `staysOnMac`, `straightenReadingCopy`, `placeHandOnImage`, `dateImageEveryDocument` | `bool` | The switches: pages stay on this Mac, straighten the copy you read (note 01), place handwritten text on the page image (note 05; the settings sheet's rules tab), search the page image for dates on every document, not only those whose text has no year (note 08; off by default, owner 2026-11-12). |
 | `scanNewspapersDocLayoutYOLO` | `bool` | Scanned newspapers' regions from DocLayout-YOLO through newspaper-ocr's route instead of PP-DocLayoutV3 (note 03; owner's call 15, 2026-11-19; W47.wh-yolo-scans). Off by default; photographed newspapers keep PP-DocLayoutV3 either way, and a scan falls back to it (or, without that helper either, to the whole page) while the detector is not downloaded. Resumed runs, retries and second readers follow the run's frozen value; Re-OCR of existing PDFs uses the default. |
@@ -79,7 +80,7 @@ above), so a collection's mix is never read beside a project's `strata`.
 (a name → number map, such as the document mix in percent).
 
 `S` is how the layer came to hold the value. It is Swift's synthesized enum coding, one key naming the case:
-`setByUser` (`_0`: the date), `measured` (`_0`: the date, `sample`: the number of photographs), `startingPoint`
+`setByUser` (`_0`: the date), `measured` (`_0`: the date, `sample`: the number of pages), `startingPoint`
 (`_0`: the starting point's name, `_1`: the date), `detected` (`_0`: the date) or `follows` (`_0`: the label of the
 answer it follows, `_1`: the date; the general layer's `staysOnMac` follows "Spending" until the user sets it).
 

@@ -296,10 +296,15 @@ struct SettingsSheetModel {
         // is shown beside it.
         let monthCeiling = r.resolve(.monthCeilingUSD)
         let batchCap = r.resolve(.batchCeilingUSD)
-        let ceilingWords = perMonth
-            ? "what is left of the month's limit" + (batchCap.layer == nil ? "" : ", and no more than "
-                + String(format: "$%.2f", max(0, batchCap.value.double ?? 0)) + " a batch (" + Self.sourceWords(batchCap) + ")")
-            : Self.sourceWords(ceilingSource)
+        let ceilingWords: String
+        if perMonth {
+            let batchWords = r.batchSpendingCapUSD.map {
+                ", and no more than " + String(format: "$%.2f", $0) + " a batch (" + Self.sourceWords(batchCap) + ")"
+            } ?? ""
+            ceilingWords = "what is left of the month's limit" + batchWords
+        } else {
+            ceilingWords = Self.sourceWords(ceilingSource)
+        }
         var out = [
             Limit(id: "ceiling", label: "Most to spend on this batch", value: ceiling, source: ceilingWords),
         ]

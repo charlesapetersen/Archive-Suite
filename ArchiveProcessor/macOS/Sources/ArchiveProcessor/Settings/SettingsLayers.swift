@@ -1,3 +1,4 @@
+import ArchiveCore
 import Foundation
 
 // MARK: - The three settings layers (W46.settings-layers)
@@ -97,12 +98,12 @@ enum SettingsSource: Codable, Equatable, Sendable {
         }
     }
 
-    /// "you set this on 2026-11-04", "measured on 2026-11-04 from 200 photos".
+    /// "you set this on 2026-11-04", "measured on 2026-11-04 from 200 pages".
     var phrase: String {
         let day = Self.day.string(from: date)
         switch self {
         case .setByUser: return "you set this on \(day)"
-        case .measured(_, let n): return "measured on \(day) from \(n) photo\(n == 1 ? "" : "s")"
+        case .measured(_, let n): return "measured on \(day) from \(n) page\(n == 1 ? "" : "s")"
         case .startingPoint(let name, _): return "filled by “\(name)” on \(day)"
         case .detected: return "found on this Mac on \(day)"
         case .follows(let answer, _): return "follows your answer to “\(answer)”, \(day)"
@@ -203,6 +204,8 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
 
     // Any layer: the habits a collection may answer for itself, and the collection interview (§3.2).
     static let batchCeilingUSD = SettingsKey(rawValue: "batchCeilingUSD")
+    /// Explicit project or collection override. A missing entry inherits, and $0 permits only free choices.
+    static let unlimitedBatchCeiling = CollectionSettingsVocabulary.unlimitedBatchCeilingUSD
     static let hours = SettingsKey(rawValue: "hours")
     static let excludedModelFamilies = SettingsKey(rawValue: "excludedModelFamilies")
     static let mix = SettingsKey(rawValue: "mix")
@@ -349,7 +352,8 @@ extension SettingsKey {
         case .int(let i): return "\(i)"
         case .double(let d):
             switch self {
-            case .batchCeilingUSD, .monthCeilingUSD: return String(format: "$%.2f", d)
+            case .batchCeilingUSD: return CollectionSettingsVocabulary.describe(rawValue, .double(d))
+            case .monthCeilingUSD: return String(format: "$%.2f", d)
             case .hours: return d == 1 ? "1 hour" : String(format: "%g hours", d)
             case .checkingMinutes: return String(format: "%g minutes", d)
             default: return String(format: "%g", d)
@@ -488,6 +492,10 @@ struct ResolvedSetting: Codable, Equatable, Sendable {
     /// The project's name when the project answered.
     var layerName: String?
 
+    var hasUnlimitedBatchSpending: Bool {
+        (layer == .project || layer == .collection) && value.double == SettingsKey.unlimitedBatchCeiling
+    }
+
     /// "from your general settings", "from the project “Letters”, you set this on 2026-11-04", "built in".
     var sourceText: String {
         switch layer {
@@ -579,22 +587,23 @@ struct SettingsResolver: Sendable {
         return value.isFinite ? max(0, value) : 0
     }
 
-    /// This batch's ceiling. Under the money habit "none" nothing is spent, whatever a collection says (§3.1: the
-    /// cheapest safe answer where money is involved). Per batch, the nearest layer's batch ceiling. Per month, what
-    /// is left of the month's ceiling, and no more than a batch ceiling a layer set. No ceiling is infinity, unless a
-    /// project or collection set its own batch ceiling, which then holds.
-    func ceilingUSD(spentThisMonthUSD: Double = 0) -> Double {
-        func usable(_ v: Double?) -> Double { (v ?? 0).isFinite ? max(0, v ?? 0) : 0 }
-        let habit = resolve(.moneyHabit).value.string.flatMap(MoneyHabit.init(rawValue:)) ?? MoneyHabit.none
+    /// The per-batch cap that applies before considering how much money remains this month.
+    var batchSpendingCapUSD: Double? {
+        let habit = resolve(.moneyHabit).value.string.flatMap(MoneyHabit.init(rawValue:)) ?? .none
+        if habit == .none { return 0 }
         let batch = resolve(.batchCeilingUSD)
-        switch habit {
-        case .none: return 0
-        case .noCeiling: return batch.layer == nil || batch.layer == .general ? .infinity : usable(batch.value.double)
-        case .perBatch: return usable(batch.value.double)
-        case .perMonth:
-            let left = max(0, (monthlyLimitUSD ?? 0) - usable(spentThisMonthUSD))
-            return batch.layer == nil ? left : min(left, usable(batch.value.double))
-        }
+        if batch.hasUnlimitedBatchSpending { return nil }
+        if habit == .noCeiling, batch.layer == nil || batch.layer == .general { return nil }
+        if habit == .perMonth, batch.layer == nil { return nil }
+        let value = batch.value.double ?? 0
+        return value.isFinite ? max(0, value) : 0
+    }
+
+    func ceilingUSD(spentThisMonthUSD: Double = 0) -> Double {
+        let cap = batchSpendingCapUSD ?? .infinity
+        guard let monthlyLimitUSD else { return cap }
+        let spent = spentThisMonthUSD.isFinite ? max(0, spentThisMonthUSD) : 0
+        return min(cap, max(0, monthlyLimitUSD - spent))
     }
 }
 

@@ -1,5 +1,6 @@
 #if DEBUG // a test driver, compiled out of Release
 import Foundation
+import CoreGraphics
 
 /// Headless, $0 self-test of the two interviews (W46.settings-interviews), gated by `SETTINGS_INTERVIEWS_TEST=1` (does
 /// nothing in normal use). The Mac's keys come from a fake probe, the kind classifier's answers are given, and every
@@ -48,6 +49,7 @@ enum SettingsInterviewsTestDriver {
         skipped()
         general()
         startingPoints()
+        batchSpending()
         measurement(root)
         mixAndStrata()
         collection()
@@ -229,7 +231,7 @@ enum SettingsInterviewsTestDriver {
         best.fill(.best)
         var bl = SettingsLayer(kind: .collection, name: "c")
         best.apply(to: &bl, now: day)
-        check("a fill that does not spend leaves the inherited ceiling alone", bl.entry(.batchCeilingUSD) == nil)
+        eq("Best measured fills No limit", bl.entry(.batchCeilingUSD)?.value, .double(SettingsKey.unlimitedBatchCeiling))
         check("a collection's fill never lets pages leave by itself", bl.entry(.staysOnMac) == nil)
         var free = CollectionInterviewAnswers()
         free.staysOnMac = false
@@ -242,9 +244,54 @@ enum SettingsInterviewsTestDriver {
               CollectionInterviewAnswers.moneyNote(point: .fewDollars, habit: .none) != nil)
         check("a collection's money fill under a per-batch habit needs no note",
               CollectionInterviewAnswers.moneyNote(point: .fewDollars, habit: .perBatch) == nil)
-        check("“no limit” from a collection says it is a general setting",
-              CollectionInterviewAnswers.moneyNote(point: .best, habit: .perBatch) != nil)
+        check("a No limit batch under a monthly habit explains that the monthly limit remains",
+              CollectionInterviewAnswers.moneyNote(point: .best, habit: .perMonth) != nil)
         check("a free fill needs no note", CollectionInterviewAnswers.moneyNote(point: .free, habit: .none) == nil)
+    }
+
+    private static func batchSpending() {
+        var general = SettingsLayer(kind: .general, name: "G")
+        general.set(.moneyHabit, .string(MoneyHabit.perBatch.rawValue), source: .setByUser(day))
+        general.set(.batchCeilingUSD, .double(20), source: .setByUser(day))
+        var project = SettingsLayer(kind: .project, name: "P")
+        project.set(.batchCeilingUSD, .double(5), source: .setByUser(day))
+        var collection = SettingsLayer(kind: .collection, name: "C")
+        var r = SettingsResolver(general: general, project: project, collection: collection)
+        var answers = CollectionInterviewAnswers(resolver: r, own: collection)
+        eq("the unanswered batch limit comes from the project", answers.batchCeilingUSD, 5)
+
+        answers.noBatchCeiling = true
+        answers.touch(.batchCeilingUSD)
+        answers.apply(to: &collection, now: day)
+        guard let encoded = try? JSONEncoder().encode(collection),
+              let decoded = try? JSONDecoder().decode(SettingsLayer.self, from: encoded) else {
+            check("No limit survives storage in JSON", false)
+            return
+        }
+        r.collection = decoded
+        eq("No limit cancels the inherited batch amount after saving", r.ceilingUSD(), .infinity)
+        check("No limit is selected when the interview reopens",
+              CollectionInterviewAnswers(resolver: r, own: decoded).noBatchCeiling)
+        eq("the stored limit is described in words", SettingsKey.batchCeilingUSD.describe(r.resolve(.batchCeilingUSD).value),
+           "No limit")
+
+        r.general.set(.moneyHabit, .string(MoneyHabit.perMonth.rawValue), source: .setByUser(day))
+        r.general.set(.monthCeilingUSD, .double(30), source: .setByUser(day))
+        eq("No limit still respects what is left this month", r.ceilingUSD(spentThisMonthUSD: 18), 12)
+        r.general.set(.moneyHabit, .string(MoneyHabit.none.rawValue), source: .setByUser(day))
+        eq("No limit still respects Spend nothing", r.ceilingUSD(), 0)
+
+        r.general = general
+        answers.inheritBatchCeiling()
+        answers.apply(to: &collection, now: day)
+        r.collection = collection
+        eq("returning to inherited removes the override", r.ceilingUSD(), 5)
+        answers.noBatchCeiling = false
+        answers.batchCeilingUSD = 0
+        answers.touch(.batchCeilingUSD)
+        answers.apply(to: &collection, now: day)
+        r.collection = collection
+        eq("an explicit zero still allows no spending", r.ceilingUSD(), 0)
     }
 
     // MARK: Collection interview
@@ -256,7 +303,7 @@ enum SettingsInterviewsTestDriver {
             PageKind(kind: .printed, confidence: 0.85),
         ]
         let m = KindMeasurement.tally(kinds, date: day)
-        eq("the sample counts every photograph given", m.sample, 5)
+        eq("the sample counts every page given", m.sample, 5)
         eq("pages under the 0.8 floor are counted as unsure", m.unsure, 1)
         eq("a page it could not tell is unknown", m.unknown, 1)
         near("shares are over the pages it could tell", m.shares["typewritten"], 50)
@@ -266,16 +313,51 @@ enum SettingsInterviewsTestDriver {
         let urls = names.map { root.appendingPathComponent($0) }
         let s = KindMeasurement.sample(urls, limit: 10)
         eq("the sample is capped", s.count, 10)
-        eq("the sample starts at the first photograph in name order", s.first?.lastPathComponent, "IMG_1.jpg")
-        eq("the sample is spread through the batch", s.last?.lastPathComponent, "IMG_91.jpg")
-        check("only photographs are sampled", s.allSatisfy { $0.pathExtension == "jpg" })
+        eq("the sample starts at the first photograph in name order", s.first?.url.lastPathComponent, "IMG_1.jpg")
+        eq("the sample is spread through the batch", s.last?.url.lastPathComponent, "IMG_91.jpg")
+        check("non-images and unreadable PDFs are skipped", s.allSatisfy { $0.url.pathExtension == "jpg" })
         eq("a small batch is sampled whole", KindMeasurement.sample(Array(urls.prefix(3)), limit: 10).count, 3)
 
         let folder = root.appendingPathComponent("box", isDirectory: true)
         try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
-        for n in ["a.jpg", "b.png", ".hidden.jpg"] { fm.createFile(atPath: folder.appendingPathComponent(n).path, contents: Data()) }
-        eq("a chosen folder gives its own photographs", Set(CollectionInterviewView.imageFiles(in: [folder]).map(\.lastPathComponent)),
-           ["a.jpg", "b.png"])
+        for n in ["a.jpg", "c.png", ".hidden.jpg"] { fm.createFile(atPath: folder.appendingPathComponent(n).path, contents: Data()) }
+        let pdf = folder.appendingPathComponent("b.PDF")
+        var box = CGRect(x: 0, y: 0, width: 100, height: 80)
+        guard let context = CGContext(pdf as CFURL, mediaBox: &box, nil) else {
+            check("create a scratch PDF", false)
+            return
+        }
+        for page in 0..<4 {
+            context.beginPDFPage(nil)
+            context.setFillColor(gray: page == 1 ? 0 : 1, alpha: 1)
+            context.fill(box)
+            context.endPDFPage()
+        }
+        context.closePDF()
+        let selected = CollectionInterviewView.inputFiles(in: [folder])
+        eq("a chosen folder gives its own photos and PDFs", Set(selected.map(\.lastPathComponent)), ["a.jpg", "b.PDF", "c.png"])
+        let mixed = KindMeasurement.sample(selected, limit: 4)
+        eq("photos and PDF pages share one sample limit", mixed.map { $0.url.lastPathComponent },
+           ["a.jpg", "b.PDF", "b.PDF", "b.PDF"])
+        eq("the sample includes PDF pages beyond the first", mixed.map(\.pdfIndex), [nil, 0, 2, 3])
+        let all = KindMeasurement.sample(selected)
+        eq("a small mixed batch measures all pages", all.map(\.pdfIndex), [nil, 0, 1, 2, 3, nil])
+        eq("PDF-only input samples its pages", KindMeasurement.sample([pdf], limit: 2).map(\.pdfIndex), [0, 2])
+
+        // Render to a one-pixel bitmap to verify the selected interior page's content.
+        guard let white = all.first(where: { $0.pdfIndex == 0 })?.renderedPDFImage(),
+              let black = all.first(where: { $0.pdfIndex == 1 })?.renderedPDFImage(),
+              let pixel = CGContext(data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 1,
+                                    space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue),
+              let byte = pixel.data?.assumingMemoryBound(to: UInt8.self) else {
+            check("render both scratch PDF pages into pixels", false)
+            return
+        }
+        let bounds = CGRect(x: 0, y: 0, width: 1, height: 1)
+        pixel.draw(white, in: bounds)
+        check("the first page renders white", byte.pointee > 240)
+        pixel.draw(black, in: bounds)
+        check("the selected interior page renders its black content", byte.pointee < 15)
     }
 
     private static func base() -> CollectionInterviewAnswers {
@@ -383,7 +465,7 @@ enum SettingsInterviewsTestDriver {
         for key in [SettingsKey.languages, .period, .batchCeilingUSD, .hours, .checkingMinutes, .staysOnMac] { a.touch(key) }
         var layer = SettingsLayer(kind: .collection, name: "Box 1")
         a.apply(to: &layer, now: day)
-        eq("an uncorrected mix is 'measured from 40 photos'", layer.entry(.mix)?.source, .measured(day, sample: 40))
+        eq("an uncorrected mix is 'measured from 40 pages'", layer.entry(.mix)?.source, .measured(day, sample: 40))
         eq("the period is kept as a span", layer.entry(.period)?.value, .string("1950-1980"))
         eq("the languages are kept", layer.entry(.languages)?.value, .strings(["en"]))
         eq("the scripts go with the mix, empty when none", layer.entry(.scripts)?.value, .strings([]))

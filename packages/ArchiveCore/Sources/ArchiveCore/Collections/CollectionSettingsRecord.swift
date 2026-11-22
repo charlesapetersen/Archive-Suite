@@ -272,7 +272,7 @@ public enum CollectionSettingSource: Equatable, Sendable, Decodable {
         f.dateFormat = "yyyy-MM-dd"
         switch self {
         case .setByUser(let d): return "you set this on \(f.string(from: d))"
-        case .measured(let d, let n): return "measured on \(f.string(from: d)) from \(n) photo\(n == 1 ? "" : "s")"
+        case .measured(let d, let n): return "measured on \(f.string(from: d)) from \(n) page\(n == 1 ? "" : "s")"
         case .startingPoint(let name, let d): return "filled by “\(name)” on \(f.string(from: d))"
         case .detected(let d): return "found on this Mac on \(f.string(from: d))"
         case .follows(let answer, let d): return "follows your answer to “\(answer)”, \(f.string(from: d))"
@@ -426,6 +426,9 @@ private struct RunDTO: Decodable {
 /// with it by the Processor's settings-layers test driver, which checks every catalog key and every answer's words
 /// against this table.
 public enum CollectionSettingsVocabulary {
+    /// The explicit No limit override for a project or collection's batch spending.
+    public static let unlimitedBatchCeilingUSD = -1.0
+
     public static let labels: [String: String] = [
         "keys": "API keys found",
         "plans": "Signed-in plans",
@@ -488,6 +491,7 @@ public enum CollectionSettingsVocabulary {
         case .int(let i): return "\(i)"
         case .double(let d):
             switch key {
+            case "batchCeilingUSD" where d == unlimitedBatchCeilingUSD: return "No limit"
             case "batchCeilingUSD", "monthCeilingUSD": return String(format: "$%.2f", d)
             case "hours": return d == 1 ? "1 hour" : String(format: "%g hours", d)
             case "checkingMinutes": return String(format: "%g minutes", d)

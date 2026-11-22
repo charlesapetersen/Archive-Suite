@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// The collection interview (W46.settings-interviews, `12-settings-design.md` §3.2): asked when a collection or a
-/// project is created, and again from Settings. It measures the kinds of document on a sample of the photographs, asks
+/// project is created, and again from Settings. It measures the kinds of document on a sample of photos and PDF pages, asks
 /// what the classifier cannot see, and writes the answers into the collection's own layer (its document in the output
 /// folder) or a project's. Skipping writes nothing, so the collection keeps reading its project and general settings.
 struct CollectionInterviewView: View {
@@ -12,8 +12,8 @@ struct CollectionInterviewView: View {
     }
 
     let target: Target
-    /// Photographs already chosen for the batch, measured without asking for them again.
-    var photos: [URL] = []
+    /// Files already chosen for the batch, measured without asking for them again.
+    var files: [URL] = []
     var onDone: () -> Void
 
     @ObservedObject private var store = SettingsLayerStore.shared
@@ -22,7 +22,7 @@ struct CollectionInterviewView: View {
     @State private var measuring = false
     @State private var measuredCount = 0
     @State private var measureTotal = 0
-    @State private var pickedPhotos: [URL]?
+    @State private var pickedFiles: [URL]?
     @State private var measureTask: Task<Void, Never>?
     @State private var problem: String?
     /// The collection's document, read once when the sheet opens rather than on every redraw.
@@ -40,6 +40,13 @@ struct CollectionInterviewView: View {
         switch target {
         case .collection: return doc?.collection
         case .project(let id): return store.project(id)
+        }
+    }
+
+    private var inheritedResolver: SettingsResolver {
+        switch target {
+        case .collection: return SettingsResolver(general: store.general, project: resolver.project)
+        case .project: return SettingsResolver(general: store.general)
         }
     }
 
@@ -81,7 +88,7 @@ struct CollectionInterviewView: View {
                 Spacer()
                 Button("Save") { save() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(measuring || pickedPhotos != nil)
+                    .disabled(measuring || pickedFiles != nil)
                     .accessibilityIdentifier("ap.collectionInterview.save")
             }
             .padding(16)
@@ -92,16 +99,16 @@ struct CollectionInterviewView: View {
             loaded = true
             if case .collection(let folder) = target, case .document(let d) = CollectionSettingsFile.read(in: folder) { doc = d }
             answers = CollectionInterviewAnswers(resolver: resolver, own: own)
-            if answers.measuredShares.isEmpty, !photos.isEmpty { measure(photos) }
+            if answers.measuredShares.isEmpty, !files.isEmpty { measure(files) }
         }
-        .task(id: pickedPhotos) {
-            guard let urls = pickedPhotos else { return }
-            defer { pickedPhotos = nil }
+        .task(id: pickedFiles) {
+            guard let urls = pickedFiles else { return }
+            defer { pickedFiles = nil }
             guard await CloudDriveWarning.confirmUse(of: urls) else { return }
-            measure(Self.imageFiles(in: urls))
+            measure(urls, expandFolders: true)
         }
         .onDisappear {
-            pickedPhotos = nil
+            pickedFiles = nil
             measureTask?.cancel()
         }
     }
@@ -118,7 +125,8 @@ struct CollectionInterviewView: View {
             if let point = answers.startingPoint {
                 Text(point.summary).font(.caption).foregroundStyle(.secondary)
             }
-            if let note = CollectionInterviewAnswers.moneyNote(point: answers.startingPoint, habit: habit) {
+            if answers.filled.contains(SettingsKey.batchCeilingUSD.rawValue),
+               let note = CollectionInterviewAnswers.moneyNote(point: answers.startingPoint, habit: habit) {
                 Text(note).font(.caption).foregroundStyle(.orange)
             }
         } footer: {
@@ -133,16 +141,21 @@ struct CollectionInterviewView: View {
         Section {
             HStack {
                 if measuring {
-                    ProgressView(value: Double(measuredCount), total: Double(max(1, measureTotal)))
-                    Text("Looking at \(measuredCount) of \(measureTotal)…").font(.caption).monospacedDigit()
+                    if measureTotal == 0 {
+                        ProgressView().controlSize(.small)
+                        Text("Finding pages…").font(.caption)
+                    } else {
+                        ProgressView(value: Double(measuredCount), total: Double(measureTotal))
+                        Text("Looking at \(measuredCount) of \(measureTotal)…").font(.caption).monospacedDigit()
+                    }
                     Button("Stop") { measureTask?.cancel() }
                 } else {
                     Text(measurementText).font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
-                    Button(answers.measurement == nil ? "Measure from photos…" : "Measure again…") { choosePhotos() }
-                        .disabled(pickedPhotos != nil)
-                        .help("Looks at up to \(KindMeasurement.sampleLimit) of the photographs on this Mac to tell typed, printed, handwritten and form pages apart. Nothing is sent anywhere.")
+                    Button(answers.measurement == nil ? "Measure from files…" : "Measure again…") { chooseFiles() }
+                        .disabled(pickedFiles != nil)
+                        .help("Looks at up to \(KindMeasurement.sampleLimit) photos and PDF pages on this Mac to tell typed, printed, handwritten and form pages apart. Nothing is sent anywhere.")
                 }
             }
             ForEach(CollectionInterviewAnswers.measuredKinds, id: \.self) { kind in
@@ -158,21 +171,21 @@ struct CollectionInterviewView: View {
         } header: {
             Text("Kinds of document")
         } footer: {
-            Text("Percent of the pages. The kinds marked “not measured” cannot be told from a photograph by the app, so give your own estimate; registers are judged with forms and tables.")
+            Text("Percent of the pages. The kinds marked “not measured” cannot be told by the app, so give your own estimate; registers are judged with forms and tables.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
 
     private var measurementText: String {
         if let from = answers.mixInheritedFrom {
-            return "These shares come from \(from). Measure this collection's own photographs to replace them."
+            return "These shares come from \(from). Measure this material to replace them."
         }
         guard let m = answers.measurement else {
             return answers.measuredShares.isEmpty
-                ? "Not measured yet. Measuring tells the kinds apart on a sample of the photographs."
+                ? "Not measured yet. Measuring tells the kinds apart on a sample of photos and PDF pages."
                 : "You gave these shares."
         }
-        var s = "Measured on \(m.sample) photo\(m.sample == 1 ? "" : "s")"
+        var s = "Measured on \(m.sample) page\(m.sample == 1 ? "" : "s")"
         if m.unsure > 0 { s += "; \(m.unsure) of them unsure" }
         if m.unknown > 0 { s += "; \(m.unknown) could not be read" }
         s += ". On the app's test pages it named the kind rightly on \(KindMeasurement.ownerRight) of \(KindMeasurement.ownerPages)."
@@ -238,7 +251,7 @@ struct CollectionInterviewView: View {
         } header: {
             Text("Period, languages and writing")
         } footer: {
-            Text("A photograph cannot show these, and they decide which of the app's public test pages its figures for your material come from.")
+            Text("These answers decide which of the app's public test pages its figures for your material come from.")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
@@ -265,18 +278,49 @@ struct CollectionInterviewView: View {
 
     // MARK: Limits
 
+    private enum BatchLimit: Hashable {
+        case inherited, unlimited, amount
+    }
+
+    private var batchLimit: Binding<BatchLimit> {
+        Binding {
+            guard answers.isAnswered(.batchCeilingUSD) else { return .inherited }
+            return answers.noBatchCeiling ? .unlimited : .amount
+        } set: { limit in
+            answers.noBatchCeiling = limit == .unlimited
+            if limit == .inherited {
+                answers.inheritBatchCeiling()
+                answers.batchCeilingUSD = inheritedResolver.batchSpendingCapUSD ?? 0
+            } else {
+                answers.touch(.batchCeilingUSD)
+            }
+        }
+    }
+
     private var limitsSection: some View {
         Section("This batch") {
-            LabeledContent("Most to spend") {
-                TextField("Most to spend", value: bind(\.batchCeilingUSD, .batchCeilingUSD), format: .currency(code: "USD"))
-                    .labelsHidden().multilineTextAlignment(.trailing).frame(width: 110)
+            Picker("Batch spending limit", selection: batchLimit) {
+                Text("Use inherited limit").tag(BatchLimit.inherited)
+                Text("No limit").tag(BatchLimit.unlimited)
+                Text("Set an amount").tag(BatchLimit.amount)
+            }
+            .accessibilityIdentifier("ap.collectionInterview.batchLimit")
+            if batchLimit.wrappedValue == .amount {
+                LabeledContent("Most to spend") {
+                    TextField("Most to spend", value: bind(\.batchCeilingUSD, .batchCeilingUSD), format: .currency(code: "USD"))
+                        .labelsHidden().multilineTextAlignment(.trailing).frame(width: 110)
+                }
             }
             if habit == .none {
-                Text("Your general settings spend nothing, so this limit has no effect until Spending is changed there.")
+                Text("Your general settings spend nothing, so this choice has no effect until Spending is changed there.")
                     .font(.caption).foregroundStyle(.secondary)
-            } else if !answers.isAnswered(.batchCeilingUSD) {
-                Text(habit == .noCeiling ? "No limit, from your general settings, unless you type one here."
-                                         : "From your general settings unless you type one here.")
+            } else if batchLimit.wrappedValue == .inherited {
+                let cap = inheritedResolver.batchSpendingCapUSD
+                Text(cap.map { "Inherited batch limit: " + $0.formatted(.currency(code: "USD")) } ?? "No inherited batch limit.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if habit == .perMonth {
+                Text("Your monthly spending limit still applies.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Stepper(value: bind(\.hours, .hours), in: 1...168) {
@@ -350,55 +394,67 @@ struct CollectionInterviewView: View {
 
     // MARK: Measuring
 
-    private func choosePhotos() {
+    private func chooseFiles() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
-        panel.allowedContentTypes = [.image, .folder]
+        panel.allowedContentTypes = [.image, .pdf, .folder]
         panel.prompt = "Measure"
-        panel.message = "Choose photographs from this material, or a folder of them."
+        panel.message = "Choose photos, PDFs or a folder of files to measure."
         guard panel.runModal() == .OK else { return }
-        pickedPhotos = panel.urls
+        pickedFiles = panel.urls
     }
 
-    /// The image files chosen, a folder's own files included (one level: a box's folder of photographs).
-    static func imageFiles(in urls: [URL]) -> [URL] {
+    /// The chosen files and the immediate contents of any chosen folder.
+    nonisolated static func inputFiles(in urls: [URL]) -> [URL] {
         let fm = FileManager.default
         return urls.flatMap { url -> [URL] in
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: url.path, isDirectory: &isDir) else { return [] }
             guard isDir.boolValue else { return [url] }
-            return (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil,
-                                                options: [.skipsHiddenFiles])) ?? []
+            let children = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey],
+                                                        options: [.skipsHiddenFiles])) ?? []
+            return children.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == false }
         }
     }
 
-    private func measure(_ urls: [URL]) {
-        let sample = KindMeasurement.sample(urls)
-        guard !sample.isEmpty else {
-            problem = "No photographs were found there (JPEG, PNG, HEIC or TIFF)."
-            return
-        }
+    private func measure(_ urls: [URL], expandFolders: Bool = false) {
         problem = nil
         measuring = true
         measuredCount = 0
-        measureTotal = sample.count
+        measureTotal = 0
         measureTask = Task {
+            defer { measuring = false }
+            let sampling = Task.detached(priority: .utility) {
+                KindMeasurement.sample(expandFolders ? Self.inputFiles(in: urls) : urls)
+            }
+            let sample = await withTaskCancellationHandler {
+                await sampling.value
+            } onCancel: {
+                sampling.cancel()
+            }
+            guard !Task.isCancelled else { return }
+            guard !sample.isEmpty else {
+                problem = "No readable PDF pages or supported photos (JPEG, PNG, HEIC or TIFF) were found."
+                return
+            }
+            measureTotal = sample.count
             var kinds: [PageKind?] = []
-            for url in sample {
-                if Task.isCancelled { break }
-                let kind = await Task.detached(priority: .utility) { () -> PageKind? in
-                    await PageKindClassifier.classify(url: url)
-                }.value
+            for page in sample {
+                if Task.isCancelled { return }
+                let kind = await Task.detached(priority: .utility) { await page.classify() }.value
                 kinds.append(kind)
                 measuredCount = kinds.count
             }
-            measuring = false
-            guard !Task.isCancelled, !kinds.isEmpty else { return }
+            guard !Task.isCancelled else { return }
             let m = KindMeasurement.tally(kinds)
             if m.counts.isEmpty {
-                problem = "The kinds could not be told on this Mac (it needs macOS 26 or later)."
+                if #available(macOS 26, *) {
+                    problem = "The app could not tell the kind of document on any of the sampled pages."
+                } else {
+                    problem = "Measuring kinds of document requires macOS 26 or later."
+                }
             } else {
                 answers.take(m)
             }

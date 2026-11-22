@@ -93,7 +93,7 @@ enum SettingsLayersTestDriver {
         r.collection = collection
         eq("the collection's own value wins", r.resolve(.hours).value, .double(2))
         eq("a measured value says so, with its sample", r.resolve(.mix).sourceText,
-           "set for this collection, measured on 2026-11-04 from 200 photos")
+           "set for this collection, measured on 2026-11-04 from 200 pages")
 
         collection.reset(.hours)
         r.collection = collection
@@ -435,6 +435,7 @@ enum SettingsLayersTestDriver {
         var samples: [(SettingsKey, SettingsValue)] = [
             (.priorities, .strings(SettingsPriority.allCases.map(\.rawValue))),
             (.hours, .double(1)), (.hours, .double(8)), (.batchCeilingUSD, .double(2.5)),
+            (.batchCeilingUSD, .double(SettingsKey.unlimitedBatchCeiling)),
             (.checkingMinutes, .double(20)), (.mix, .numbers(["a": 10, "b": 90])), (.weights, .numbers([:])),
             (override, .string("")), (.period, .string("")),
         ]
