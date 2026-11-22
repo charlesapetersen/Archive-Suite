@@ -8,6 +8,13 @@ The run summary counts labels with usable gateway fields and reports failed atte
 The charge covers every attempt. Vision proposals and warnings for empty markers still appear.
 [Scratch evidence and regression](../verification/evidence/processor/W49.proc-s052-verify.md) (W49.proc-fix-s052).
 
+## A gateway may lack the model used for box and folder labels (S-053)
+
+- **Reproduced 2026-11-21 (Codex gpt-6.2-sol, `85f7a7a8`).** A gateway can transcribe the pages
+  while refusing both supplemental label reads because it does not serve GPT 5.6 Luna. Process
+  Files keeps the PDFs and Vision proposals and counts the failed attempts, but gives no reason
+  for the refusals. [Scratch evidence](../verification/evidence/processor/W49.proc-s053-verify.md). (queued: W49.proc-fix-s053)
+
 ## Ordinary Resume bypasses two reviews before tagging (S-050)
 
 - **Reproduced 2026-11-21 (Codex gpt-6.2-sol, `5cd1bd29`).** After relaunch, `OCRProcessor.resumeRun`

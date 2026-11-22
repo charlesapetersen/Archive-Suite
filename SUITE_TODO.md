@@ -750,7 +750,7 @@ because the owner asked. "It's important to not just let problems like this accu
 - [ ] **W49.proc-s048-check — Independently reproduce S-048 [S]** (lane: processor) (uses: build,vm) (agent: claude) (blocked-on: W49.proc-s048-verify) — [Evidence and check](verification/evidence/processor/W49.proc-s048-verify.md).
 - [ ] **W49.proc-s050-check — Independently reproduce S-050 [S]** (lane: processor) (uses: build,vm) (agent: claude) (blocked-on: W49.proc-s050-verify) — [Evidence and check](verification/evidence/processor/W49.proc-s050-verify.md).
 - [ ] **`W49.proc-s051-verify` — a refused batch submission is reported as refused [S]** (lane: processor) (uses: build) — Owner call 30 (2026-11-21): verify S-051; detail in `execution-plans/verification-phase/suspects-20261121.md`.
-- [ ] **`W49.proc-s053-verify` — the label reader checks gateway model availability [S]** (lane: processor) (uses: build) — Owner call 30 (2026-11-21): verify S-053; detail in `execution-plans/verification-phase/suspects-20261121.md`.
+- [ ] **W49.proc-fix-s053 — explain an unavailable gateway label model [S]** (lane: processor) (uses: build) — S-053 (S3). Detect a label model unavailable on the configured gateway and explain the reason while keeping Vision proposals and S-052’s separate success and failure counts. Preserve the working Luna route. Keep the [scratch reproduction](verification/evidence/processor/W49.proc-s053-verify.md) as the regression.
 
 ## Archive Processor — automatic segmentation (owner, 2026-10-05; before the W40 freeze)
 

@@ -15,8 +15,9 @@ its class from the same cycle, and FAKE_GATEWAY_TAGS_JSON replaces the tag JSON 
 W49.proc-suspects-messages: FAKE_GATEWAY_FAIL_OCR (comma-separated OCR call numbers) answers those calls 400 with a
 message naming the call, and FAKE_GATEWAY_FAIL_OTHER=1 answers every other request (a rotation vote) 500.
 FAKE_GATEWAY_LABEL_REPLIES is a JSON array of responses to container-label prompts in arrival order.
-Each request is one line in the log, with the
-start of its prompt. It runs in the VM guest, started by `ops/gui/vm-gui-runner.sh` when
+FAKE_GATEWAY_MODELS is a comma-separated model catalog. When set, GET /v1/models lists it and a completion
+request naming a model outside it receives a 404 model_not_found.
+Each completion request is one line in the log, with the start of its prompt. It runs in the VM guest, started by `ops/gui/vm-gui-runner.sh` when
 W40D1_FAKE_GATEWAY=1; it is never pointed at real material and sends nothing anywhere.
 """
 import json
@@ -61,6 +62,25 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+    def send_json(self, status, body):
+        payload = json.dumps(body).encode()
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def do_GET(self):
+        if MODELS is None or self.path != '/v1/models':
+            self.send_error(404)
+            return
+        if self.headers.get('Authorization') != f'Bearer {KEY}':
+            self.send_error(401)
+            return
+        self.send_json(200, {'object': 'list', 'data': [
+            {'id': model, 'object': 'model'} for model in MODELS
+        ]})
+
     def do_POST(self):
         body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
         if self.headers.get('Authorization') != f'Bearer {KEY}':
@@ -71,6 +91,15 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         text = prompt_text(body)
+        model = body.get('model')
+        if MODELS is not None and model not in MODELS:
+            with lock, open(LOG, 'a', encoding='utf-8') as f:
+                head = ' '.join(text.split())[:90]
+                f.write(f'model_not_found-404\t{model}\t0\t{head}\n')
+            self.send_json(404, {'error': {
+                'code': 'model_not_found', 'message': f'The model {model} is unavailable on this gateway.'
+            }})
+            return
         with lock:
             kind, reply = answer(text, CYCLE[count['ocr'] % len(CYCLE)], count['ocr'] + 1)
             if LABEL_REPLIES and kind == 'other' and text.lstrip().startswith('This photo was taken in an archive reading room'):
@@ -84,24 +113,15 @@ class Handler(BaseHTTPRequestHandler):
                 head = ' '.join(text.split())[:90].replace('\t', ' ')
                 f.write(f'{kind}{"-500" if fail else "-400" if refuse else ""}\t{body.get("model")}\t{n}\t{head}\n')
         if fail or refuse:
-            err = json.dumps({'error': {'message': f'stand-in refusal of OCR call {n}' if refuse
-                                        else 'stand-in upstream error', 'code': 400 if refuse else 500}}).encode()
-            self.send_response(400 if refuse else 500)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Content-Length', str(len(err)))
-            self.end_headers()
-            self.wfile.write(err)
+            status = 400 if refuse else 500
+            message = f'stand-in refusal of OCR call {n}' if refuse else 'stand-in upstream error'
+            self.send_json(status, {'error': {'message': message, 'code': status}})
             return
-        out = json.dumps({'id': 'fake', 'object': 'chat.completion', 'model': body.get('model'),
-                          'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': reply},
-                                       'finish_reason': 'stop'}],
-                          'usage': {'prompt_tokens': 1000, 'completion_tokens': COMPLETION,
-                                    'total_tokens': 1000 + COMPLETION}}).encode()
-        self.send_response(200)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Content-Length', str(len(out)))
-        self.end_headers()
-        self.wfile.write(out)
+        self.send_json(200, {
+            'id': 'fake', 'object': 'chat.completion', 'model': model,
+            'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': reply}, 'finish_reason': 'stop'}],
+            'usage': {'prompt_tokens': 1000, 'completion_tokens': COMPLETION, 'total_tokens': 1000 + COMPLETION},
+        })
 
 
 if __name__ == '__main__':
@@ -112,4 +132,6 @@ if __name__ == '__main__':
     FAIL_OCR = {int(n) for n in os.environ.get('FAKE_GATEWAY_FAIL_OCR', '').split(',') if n}
     FAIL_OTHER = os.environ.get('FAKE_GATEWAY_FAIL_OTHER') == '1'
     LABEL_REPLIES = json.loads(os.environ.get('FAKE_GATEWAY_LABEL_REPLIES', '[]'))
+    catalog = os.environ.get('FAKE_GATEWAY_MODELS')
+    MODELS = catalog.split(',') if catalog else None
     ThreadingHTTPServer(('127.0.0.1', port), Handler).serve_forever()

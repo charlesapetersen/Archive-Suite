@@ -2,16 +2,28 @@
 # S-052: run Process Files through the normal pipeline on two synthetic label photos.
 # The local gateway accepts both transcriptions. Its label requests both fail with HTTP 500
 # by default. In the mixed case, both replies include usage and only one supplies a usable field.
-# Usage after a Debug build: bash ArchiveProcessor/scripts/repro-s052-label-failures.sh [mixed]
+# S-053: missing-model uses the OpenAI preset with a stand-in that lists only the preset's page reader.
+# Usage after a Debug build: bash ArchiveProcessor/scripts/repro-s052-label-failures.sh [mixed|missing-model]
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 scenario="${1:-refused}"
+gateway_preset=
+gateway_upstream=Gemini
+gateway_models=
+page_model=stand-in
 case "$scenario" in
     refused) label_replies='[]' ;;
     mixed) label_replies='[{"collection_title":"Test Papers"}, {}]' ;;
-    *) echo "Expected refused or mixed." >&2; exit 2 ;;
+    missing-model)
+        label_replies='[]'
+        page_model=gpt-5.4-mini
+        gateway_preset=openai
+        gateway_upstream=OpenAI
+        gateway_models="$page_model"
+        ;;
+    *) echo "Expected refused, mixed or missing-model." >&2; exit 2 ;;
 esac
 
 built_app="$PWD/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app"
@@ -40,18 +52,34 @@ magick -size 1200x800 xc:white -font '/System/Library/Fonts/Supplemental/Arial.t
     -pointsize 120 -gravity center -fill black -annotate +0+0 'Box 17' "$work/in/01-box.jpg"
 magick -size 1200x800 xc:white "$work/in/02-folder.jpg"
 
-FAKE_GATEWAY_FAIL_OTHER=1 FAKE_GATEWAY_LABEL_REPLIES="$label_replies" \
+FAKE_GATEWAY_FAIL_OTHER=1 FAKE_GATEWAY_LABEL_REPLIES="$label_replies" FAKE_GATEWAY_MODELS="$gateway_models" \
     processor_test_start gateway_pid python3 scripts/fake_gateway.py \
     "$port" "$work/gateway.tsv" 500 stand-in-key >"$work/gateway.log" 2>&1
 sleep 1
 [ "$(processor_test_child_state "$gateway_pid")" = running ] || { cat "$work/gateway.log" >&2; exit 1; }
 
+if [ "$scenario" = missing-model ]; then
+    python3 - "$gateway/models" "$page_model" <<'PY_CATALOG'
+import json
+import sys
+from urllib.request import Request, urlopen
+
+url, page_model = sys.argv[1:]
+with urlopen(Request(url, headers={"Authorization": "Bearer stand-in-key"}), timeout=5) as response:
+    models = [entry["id"] for entry in json.load(response)["data"]]
+if models != [page_model]:
+    sys.exit(f"Unexpected stand-in model catalog: {models!r}")
+print(f"Stand-in model catalog: {models[0]}")
+PY_CATALOG
+fi
+
 # Keep the recovery journal and other Application Support files under scratch as well.
 CFFIXED_USER_HOME="$work/home" ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     PROCESSFILES_TESTMODE=1 PROCESSFILES_TESTKEY=stand-in-key PROCESSFILES_TESTIN="$work/in" \
     PROCESSFILES_TESTOUT="$work/out" PROCESSFILES_MAXIMAGES=2 PROCESSFILES_TAGGING=none \
-    PROCESSFILES_GATEWAY_URL="$gateway" PROCESSFILES_GATEWAY_MODEL=stand-in \
+    PROCESSFILES_GATEWAY_URL="$gateway" PROCESSFILES_GATEWAY_MODEL="$page_model" \
     PROCESSFILES_METER=1 PROCESSFILES_CAP_USD=1 PROCESSFILES_REDIRECT_URL="$gateway/chat/completions" \
+    PROCESSFILES_GATEWAY_PRESET="$gateway_preset" PROCESSFILES_GATEWAY_UPSTREAM="$gateway_upstream" \
     processor_test_start app_pid "$bin" -readContainerLabels YES -ocrWorkerCount 1 >"$work/app.log" 2>&1
 
 # The manifest comes after the summary and the stand-in request log, so wait for it to be written.
@@ -64,22 +92,32 @@ done
 processor_test_stop "$app_pid"
 processor_test_stop "$gateway_pid"
 
-python3 - "$work" "${manifests[0]}" "$scenario" <<'PY'
+python3 - "$work" "${manifests[0]}" "$scenario" "$page_model" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 work, manifest = map(Path, sys.argv[1:3])
-mixed = sys.argv[3] == "mixed"
+scenario, page_model = sys.argv[3:5]
+mixed = scenario == "mixed"
 run = manifest.parent
 requests = (work / "gateway.tsv").read_text().splitlines()
 labels = [line for line in requests if "This photo was taken in an archive reading room" in line]
-page_reads = [line for line in requests if line.startswith("ocr\tstand-in\t")]
-expected_kind = "labels" if mixed else "other-500"
+page_reads = [line for line in requests if line.startswith(f"ocr\t{page_model}\t")]
+expected_kind = {"mixed": "labels", "refused": "other-500", "missing-model": "model_not_found-404"}[scenario]
 if len(requests) != 4 or len(page_reads) != 2 or len(labels) != 2 or any(
     line.split("\t")[:2] != [expected_kind, "gpt-5.6-luna"] for line in labels
 ):
     sys.exit(f"Expected two page reads and two label replies for {sys.argv[3]}. Got {requests!r}")
+if scenario == "missing-model":
+    wire = [line for line in (run / "requests.tsv").read_text().splitlines() if not line.startswith("#")]
+    if len(wire) != 4 or any(not line.startswith("api.openai.com/v1/chat/completions\t") for line in wire):
+        sys.exit(f"Expected only the four OpenAI-preset completions, with no model lookup. Got {wire!r}")
+    label_wire = [line for line in wire if "\tmodel=gpt-5.6-luna\t" in line]
+    if len(label_wire) != 2 or any(not line.endswith("params=max_tokens:1200,reasoning_effort:low") for line in label_wire):
+        sys.exit(f"Unexpected label requests: {label_wire!r}")
+    for line in wire:
+        print(f"Original request: {line}")
 rows = [line.split("\t") for line in manifest.read_text().splitlines() if not line.startswith("#")]
 expected = [
     ["01-box.pdf", "box_label", "succeeded"],
