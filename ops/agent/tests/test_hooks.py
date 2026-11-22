@@ -1,16 +1,16 @@
 #!/usr/bin/python3
 """Tests for the Agent Manager hooks in ops/agent/ (CONTRACT.md section 2 in the manager's repo).
 
-Each test builds a small fixture: a scratch git repo with a plan, SUITE_TODO.md and SUITE_TODO_DONE.md, and a
-copy of ops/agent/ beside an ops/autonomous/ that holds the real next-queue-item.sh and worker-state.py from
-this checkout plus fakes for the heavy scripts (health-gate.sh, context-budget.sh, compact-plan.sh). Nothing
-outside the scratch folder is read or written, and the real gate never runs.
+Each test gets a private copy of a prepared scratch Git repository with a plan, trackers and the hook
+sources. Tests can edit their copy or add fake heavy scripts without affecting any other test. The real
+gate never runs.
 
 Run: /usr/bin/python3 -m unittest discover -s ops/agent/tests   (from the repo root)
 """
 import hashlib
 import json
 import os
+from pathlib import Path
 import shlex
 import shutil
 import subprocess
@@ -74,30 +74,41 @@ def run(cmd, cwd=None, env=None, check=True):
     return p
 
 
+def setUpModule():
+    global _repo_seed
+    seed = tempfile.TemporaryDirectory(prefix="agent-hooks-seed-")
+    unittest.addModuleCleanup(seed.cleanup)
+    repo = Path(seed.name) / "repo"
+    (repo / ".maintenance").mkdir(parents=True)
+    shutil.copytree(AGENT, repo / "ops" / "agent",
+                    ignore=shutil.ignore_patterns("tests", "__pycache__"))
+    auto = repo / "ops" / "autonomous"
+    auto.mkdir()
+    for name in ("next-queue-item.sh", "worker-state.py", "keychain-provider-accounts.sh", "cluster-reach.py",
+                 "plan-edit.sh", "plan-edit.py"):
+        shutil.copy2(os.path.join(AUTONOMOUS, name), auto)
+    (auto / "resume-prompt.txt").write_text("work __REPO__\n")
+    (repo / ".maintenance" / "AUTONOMOUS_PLAN.md").write_text(PLAN, encoding="utf-8")
+    (repo / "SUITE_TODO.md").write_text("- [ ] **T.1 — todo**\n- [x] **T.0 — done**\n", encoding="utf-8")
+    (repo / "SUITE_TODO_DONE.md").write_text("- [x] **T.old — archived**\n", encoding="utf-8")
+    (repo / ".gitignore").write_text(".maintenance/\n")
+    git = ["git", "-C", str(repo)]
+    identity = ["-c", "user.email=t@example.invalid", "-c", "user.name=t"]
+    run(git + ["init", "-q", "-b", "main"])
+    run(git + identity + ["add", "-A"])
+    run(git + identity + ["commit", "-q", "-m", "fixture"])
+    _repo_seed = repo
+
+
 class Fixture(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="agent-hooks-")
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.repo = os.path.join(self.tmp, "repo")
         self.state = os.path.join(self.tmp, "state")
-        os.makedirs(os.path.join(self.repo, ".maintenance"))
+        # Copy .git as well so refs, index, config and hooks belong to each test.
+        shutil.copytree(_repo_seed, self.repo, symlinks=True)
         os.makedirs(self.state)
-        shutil.copytree(AGENT, os.path.join(self.repo, "ops", "agent"),
-                        ignore=shutil.ignore_patterns("tests", "__pycache__"))
-        auto = os.path.join(self.repo, "ops", "autonomous")
-        os.makedirs(auto)
-        for f in ("next-queue-item.sh", "worker-state.py", "keychain-provider-accounts.sh", "cluster-reach.py",
-                  "plan-edit.sh", "plan-edit.py"):
-            shutil.copy2(os.path.join(AUTONOMOUS, f), auto)
-        self.write("ops/autonomous/resume-prompt.txt", "work __REPO__\n")
-        self.write(".maintenance/AUTONOMOUS_PLAN.md", PLAN)
-        self.write("SUITE_TODO.md", "- [ ] **T.1 — todo**\n- [x] **T.0 — done**\n")
-        self.write("SUITE_TODO_DONE.md", "- [x] **T.old — archived**\n")
-        self.write(".gitignore", ".maintenance/\n")
-        g = ["git", "-C", self.repo]
-        run(g + ["init", "-q", "-b", "main"])
-        run(g + ["-c", "user.email=t@example.invalid", "-c", "user.name=t", "add", "-A"])
-        run(g + ["-c", "user.email=t@example.invalid", "-c", "user.name=t", "commit", "-q", "-m", "fixture"])
         self.env = dict(os.environ, AGENT_REPO=self.repo, AGENT_STATE=self.state, AGENT_PROJECT="fixture",
                         HOME=self.tmp)
         self.env.pop("AUTONOMOUS_PLAN", None)
