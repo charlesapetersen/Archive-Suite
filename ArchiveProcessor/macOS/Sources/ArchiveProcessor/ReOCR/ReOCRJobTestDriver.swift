@@ -901,7 +901,7 @@ enum ReOCRJobTestDriver {
         let original = handPDF(content: "q 200 0 0 250 0 0 cm /Im0 Do Q",
                                jpeg: try Data(contentsOf: image), imageExtra: "", resources: "")
         let encrypted = d.appendingPathComponent("encrypted.pdf")
-        let enc = PDFDocument(data: original)?.dataRepresentation(options: [
+        let enc: Data? = PDFDocument(data: original)?.dataRepresentation(options: [
             PDFDocumentWriteOption.userPasswordOption: "test", PDFDocumentWriteOption.ownerPasswordOption: "owner",
         ])
         if let enc {

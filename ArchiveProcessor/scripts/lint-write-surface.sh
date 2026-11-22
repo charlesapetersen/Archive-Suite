@@ -3,11 +3,8 @@
 #
 # Processor's `MacOSTagger` is deliberately only a fresh-write adapter over ArchiveCore's audited
 # `CoordinatedTagWriter`; a direct setResourceValue/setxattr call here would bypass its coordinated
-# read/verify path. PDF output is likewise centralised in PDFGenerator: its two exact output sites are
-# reviewed because later callers decide whether a source may be retired. This lint makes both boundaries loud.
-# Since W42.int-s5 those sites call `PDFGenerator.writeArchival` (the PDF/A-2b writer), so no `PDFDocument.write`
-# is allowed anywhere, and a `writeArchival` call is allowed only on the two audited lines. W42.int-s5-compress
-# adds SearchableArchival.write for stream-preserving PDF/A output, also only at its two audited call sites.
+# read/verify path. Direct calls to the PDF/A-2b writers are pinned to the audited PDFGenerator lines
+# because later callers decide whether a source may be retired. PDFDocument.write is forbidden.
 #
 # Run before Processor commits. It and its scratch-only mutation proof are health-gate steps, so this is a
 # backstop rather than a promise someone has to remember. `PROCESSOR_LINT_ROOT` is test-only and must point at
@@ -22,12 +19,10 @@ SEP=$'\x1f'
 # rule<SEP>relative path<SEP>exact trimmed source line. Never allow a whole file: an added PDF write in
 # PDFGenerator must be re-audited just as surely as one in a new source file.
 ALLOW=(
-  # W42.int-s5: the processed output and the merged document, both through the PDF/A-2b writer (W42.int-s5-searchable:
-  # with the searchable form's headers for the XMP, nil for pairs).
+  # W42.int-s5: generated pages use the Quartz PDF/A writer or the stream-preserving writer for a compressed
+  # searchable page. Merges assemble PDF/A bytes in memory through archivalData or SearchableArchival.data.
   "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try Self.writeArchival(pdfDocument, to: outputURL, pageHeaders: pageHeaders)"
-  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try Self.writeArchival(merged, to: outputURL, pageHeaders: pageHeaders)"
-  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try SearchableArchival.write([page], pageHeaders: [header], to: url)"
-  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try SearchableArchival.write(sourcePDFs, pageHeaders: pageHeaders, to: outputURL)"
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try SearchableArchival.write([page], pageHeaders: [header], to: url, budget: budget)"
   # W44.reocr-processor: the Improve OCR publication test (DEBUG only) puts a custom attribute and a resource fork on
   # its scratch fixtures, so it can prove publication keeps them. Tags and label go through CoordinatedTagWriter.
   "tagwrite${SEP}macOS/Sources/ArchiveProcessor/ReOCR/ReOCRFileWriterTestDriver.swift${SEP}let rc = value.withUnsafeBytes { setxattr(url.path, name, \$0.baseAddress, \$0.count, 0, XATTR_NOFOLLOW) }"
@@ -140,7 +135,7 @@ pdf_document_write_hits() {
 }
 
 # Every call of the PDF/A output writer, its definition and comment lines aside. A new caller is a new PDF
-# output site and must be audited (and allowed by its exact line) like the two above.
+# output site and must be audited (and allowed by its exact line).
 archival_write_hits() {
   grep -rnE '\bwriteArchival[[:space:]]*\(' "$SRC" --include='*.swift' 2>/dev/null \
     | /usr/bin/perl -ne 'next if /^[^:]+:\d+:\s*(?:\/\/|\/\*|\*)/; next if /\bfunc\s+writeArchival\b/; print' || true
@@ -162,7 +157,7 @@ scan_stream pdfwrite \
   'SearchableArchival.write outside its audited output sites:' \
   < <(searchable_write_hits)
 scan_stream pdfwrite \
-  'PDFGenerator.writeArchival outside the two audited PDFGenerator output sites (or an allowed line changed):' \
+  'PDFGenerator.writeArchival outside its audited PDFGenerator output site (or an allowed line changed):' \
   < <(archival_write_hits)
 
 if [ "$FAIL" -eq 0 ]; then

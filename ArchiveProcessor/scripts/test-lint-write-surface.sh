@@ -140,7 +140,7 @@ extension PDFGenerator {
     }
 }
 SWIFT
-expect 1 'a third writeArchival call inside PDFGenerator fails (W42.int-s5)' 'PDFGenerator.writeArchival outside'
+expect 1 'an extra writeArchival call inside PDFGenerator fails (W42.int-s5)' 'PDFGenerator.writeArchival outside'
 
 fresh_tree
 mkdir -p "$SCRATCH/$SRC/OCR"
@@ -154,7 +154,7 @@ SWIFT
 expect 1 'a writeArchival call in a new source file fails (W42.int-s5)' 'PlantedArchivalWrite.swift:3:'
 
 fresh_tree
-/usr/bin/perl -0pi -e 's/try Self\.writeArchival\(merged, to: outputURL,/try Self.writeArchival(merged, to: mergedURL,/' \
+/usr/bin/perl -0pi -e 's/try Self\.writeArchival\(pdfDocument, to: outputURL,/try Self.writeArchival(pdfDocument, to: changedURL,/' \
   "$SCRATCH/$SRC/OCR/PDFGenerator.swift"
 expect 2 'a changed audited writeArchival line is stale and flagged as a new site' 'STALE write allowance'
 
@@ -177,7 +177,7 @@ SWIFT
 expect 1 'a stream-preserving write in a new file fails' 'PlantedSearchableWrite.swift:2:'
 
 fresh_tree
-/usr/bin/perl -0pi -e 's/try SearchableArchival\.write\(\[page\], pageHeaders: \[header\], to: url\)/try SearchableArchival.write([page], pageHeaders: [header], to: changedURL)/' \
+/usr/bin/perl -0pi -e 's/try SearchableArchival\.write\(\[page\], pageHeaders: \[header\], to: url, budget: budget\)/try SearchableArchival.write([page], pageHeaders: [header], to: changedURL, budget: budget)/' \
   "$SCRATCH/$SRC/OCR/PDFGenerator.swift"
 expect 2 'a changed audited stream-preserving write is stale' 'STALE write allowance'
 

@@ -239,8 +239,8 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   all 393 region answers on L9 were ineligible. The comparison using Vision on the same crops catches 20/58
   strict-poor answers and flags 5/335 good answers at the candidate 0.45 threshold. The 15 scans (14 from one
   collection) were used to select the method and threshold. The rate for photographs is unknown, and the
-  app's masked crops still need checking (`segbench-results/post-read-flag-newspaper.md`; queued:
-  W49.proc-read-flag-newspaper-app).
+  app's masked crops still need checking (`segbench-results/post-read-flag-newspaper.md`)
+  (queued: W49.proc-read-flag-newspaper-app).
 - A successful whole-page retry that still carries region counts from the earlier attempt is skipped by the
   plain-photo check (queued: W49.proc-read-flag-newspaper-whole-app).
 - On the L9 scans, replaying the four applicable reader thresholds from `dbb10584` against whole-page Vision
@@ -248,8 +248,8 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   contribute no warnings. Comparing with Vision on nine tiles at 0.20 catches 104/109 strict-poor and 92/92
   content-poor answers, with 0/53 strict-good answers flagged on these scans (Wilson 0–7%). The candidate
   was selected on these scans. The app's images and the designated whole-page Qwen3.6 27B reader still need
-  matched checks. The rate for photographs is unknown (`segbench-results/post-read-flag-newspaper-whole.md`;
-  queued: W49.proc-read-flag-newspaper-whole-app).
+  matched checks. The rate for photographs is unknown (`segbench-results/post-read-flag-newspaper-whole.md`)
+  (queued: W49.proc-read-flag-newspaper-whole-app).
 - Each checked page costs one extra Apple Vision reading on this Mac (time not measured; no money) (accepted: the
   check needs Vision's text, and Vision is free and local).
 
@@ -265,7 +265,8 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
 - **The estimate counts the maker's thinking tokens at Low only.** At High, a maker's thinking model gets the direct
   clients' 8,000-token budget on top of the bench's 8,192, but the estimate still counts 117 thinking tokens a page for
   Gemini 3.8 Flash and none for the others, as the direct routes' estimates do. (accepted: no High thinking figure is measured; the estimate follows the direct routes').
-- **Processor sends OpenRouter requests at standard rates.** Batch mode is unavailable in the app.
+- **Processor sends OpenRouter requests at standard rates.** Batch mode is unavailable
+  (accepted: the OpenRouter route has no batch interface, recorded in the 2026-11-19 rotation decision).
 - **The unmeasured Claude models (Sonnet 4.6, Opus 4.6, Opus 5.5, Haiku 4.5) and the unmeasured Gemini and GPT
   built-ins come through OpenRouter only as unmeasured listing models** (W41.app-openrouter-unmeasured): by the listing's
   ids, unpinned, without their makers' handling (Gemini's refusals and second reader, image-token counts) and not as a
@@ -387,7 +388,8 @@ When label reading needs Gemma, the Processor checks the existing local servers 
   1,024 tokens a page whatever the level (High may spend up to its 8,000-token budget more), and `max_price` caps
   the price per token, not the number of tokens. OpenRouter models with a per-image or per-request charge appear
   as “price not estimated” in the picker and estimate. The app sends those requests without a price ceiling
-  (W49.proc-openrouter-list-image-priced).
+  (accepted: the 2026-11-19 walkthrough, call 21, approved offering these models marked “price not estimated”.
+  The token price ceiling cannot account for their charges. See W49.proc-openrouter-list-image-priced).
 - **No provider is pinned, so the precision and the upstream's terms are unknown**; `data_collection: "deny"` is
   sent on every request, so an upstream that may keep or train on pages is refused. (accepted: unmeasured models are unpinned by design; `data_collection: "deny"` guards the pages).
 
