@@ -81,8 +81,8 @@ final class NotesE2PasteTests: NotesFixtureUITestCase {
         }
     }
 
-    /// B7 — with the archive moved and no grant held, the preview popover asks for the folder, and choosing
-    /// it from the popover re-resolves the link there: the popover then shows the PDF.
+    /// B7 — the preview asks for a grant and shows the PDF once the folder is chosen.
+    /// S-014 — moving that folder again with Notes open leaves the preview search incomplete.
     func testE2_MovedArchiveReGrantsFromThePreviewPopover() throws {
         try withFixture {
             try moveCorpus()
@@ -108,6 +108,21 @@ final class NotesE2PasteTests: NotesFixtureUITestCase {
                           "after choosing the moved folder the popover should show the linked PDF")
             attachScreenshot(named: "W9.e2-paste resolved preview after re-grant")
             app.typeKey(.escape, modifierFlags: [])
+            XCTAssertTrue(pollUntil(timeout: 5) { !fileName.exists })
+
+            // The same app session now holds a grant to the path the fixture is leaving.
+            let renamedPath = Self.fixturePath + "/reader-corpus"
+            try FileManager.default.moveItem(atPath: Self.movedCorpusPath, toPath: renamedPath)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: renamedPath + "/sample.pdf"))
+            XCTAssertTrue(clickStripButton("an.editor.test.preview", timeout: 10))
+            let incomplete = app.popovers.staticTexts.containing(
+                NSPredicate(format: "value CONTAINS %@ OR label CONTAINS %@",
+                            "The search of the archive did not finish", "The search of the archive did not finish")
+            ).firstMatch
+            XCTAssertTrue(incomplete.waitForExistence(timeout: 10),
+                          "reopening the source should report an incomplete search after the folder moves again")
+            XCTAssertFalse(app.popovers.staticTexts["Source file not found in the archive."].exists)
+            attachScreenshot(named: "S-014 archive search incomplete")
         }
     }
 

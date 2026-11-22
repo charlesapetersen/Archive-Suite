@@ -21,7 +21,7 @@ enum LinkResolution: Sendable, Equatable {
     /// The file doesn't exist under the granted root, and the whole root was searched.
     case notFound
     /// The exact path was missing and the basename search did **not** finish — it was
-    /// cancelled, or it hit its entry bound. Absence was never established, so this must
+    /// cancelled, hit its entry bound, or could not read the archive. This must
     /// never be reported as `.notFound` (W23.m14).
     case searchIncomplete(scanned: Int)
     /// The folder the user chose could not be granted at all — `refusal.message` says why.
@@ -124,29 +124,6 @@ enum ReaderRootContainment {
         let urlComponents = canonical(url).pathComponents
         guard urlComponents.count >= rootComponents.count else { return false }
         return Array(urlComponents.prefix(rootComponents.count)) == rootComponents
-    }
-}
-
-/// Is there *nothing* at `url` — as distinct from something we are not allowed to look at?
-///
-/// This is the sole gate on the one branch of the basename search that still establishes absence,
-/// so it must be far pickier than the `FileManager.fileExists` it replaced. `fileExists` answers
-/// `false` for a path denied by a `0o000` ancestor exactly as readily as for one that was never
-/// there, which is this wave's defect in miniature: a permission error read as an empty archive.
-///
-/// `lstat(2)` and not `stat(2)`: a **dangling** symlink root is a root we cannot reach — the target
-/// may be an unmounted volume — not a root that is provably empty, so it must fall through to
-/// `.unreadableRoot`. This is the one behaviour the fix deliberately changes for a path that
-/// previously reported `.exhausted`.
-///
-/// `ENOTDIR` counts as absent alongside `ENOENT`: it means a component of the path is a plain file,
-/// so nothing can exist at the path either.
-private func rootIsWhollyAbsent(_ url: URL) -> Bool {
-    url.withUnsafeFileSystemRepresentation { rawPath -> Bool in
-        guard let rawPath else { return false }
-        var linkInfo = stat()
-        guard lstat(rawPath, &linkInfo) != 0 else { return false }
-        return errno == ENOENT || errno == ENOTDIR
     }
 }
 
@@ -349,15 +326,9 @@ final class ReaderLinkResolver {
         // the shared probe for exactly this (`opendir(3)`, plus `realpath(3)` for a symlinked
         // final component so the target is walked); it is what that function was made public for.
         guard let walkRoot = CorpusWalker.canonicalRoot(root) else {
-            guard rootIsWhollyAbsent(root) else {
-                // The root is *there* and we cannot read it — a denial, an unmounted volume, a
-                // plain file, a dangling link. Absence is NOT established.
-                return BasenameScan(match: nil, scanned: 0, stop: .unreadableRoot)
-            }
-            // The root itself is gone: nothing can be under a directory that isn't there,
-            // so absence IS established. (This is the shipped W8-S9 computer-move
-            // contract — a stale root reports the file missing, never a wrong file.)
-            return BasenameScan(match: nil, scanned: 0, stop: .exhausted)
+            // The archive may have moved or its volume may have been ejected. An old path
+            // that cannot be opened tells us nothing about the source file.
+            return BasenameScan(match: nil, scanned: 0, stop: .unreadableRoot)
         }
 
         // WITHOUT this handler the enumerator silently skips a directory it cannot descend into
@@ -427,10 +398,10 @@ final class ReaderLinkResolver {
             return BasenameScan(match: nil, scanned: scanned, stop: .cancelled)
         }
         onProgress?(scanned)
-        // The walk reached the end — but "the end of what it was allowed to see" is not absence.
-        // One skipped directory is enough: the file may be in it. `CorpusScanResult.isClean`
-        // encodes the same rule for the Reader's discovery walk.
-        return BasenameScan(match: nil, scanned: scanned,
-                            stop: errorSink.sawError ? .unreadableRoot : .exhausted)
+        // A skipped directory or a root that disappeared during the walk makes this result incomplete.
+        guard !errorSink.sawError, CorpusWalker.canonicalRoot(root) == walkRoot else {
+            return BasenameScan(match: nil, scanned: scanned, stop: .unreadableRoot)
+        }
+        return BasenameScan(match: nil, scanned: scanned, stop: .exhausted)
     }
 }

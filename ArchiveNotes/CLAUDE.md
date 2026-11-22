@@ -107,7 +107,8 @@ Rules for anyone changing this code. The file map is in REFERENCE.md §Implement
 - **Reader links.** There is NO synchronous full-walk API; `resolve` stays async-only so a main-actor archive
   walk cannot be reintroduced, and the basename walk runs off the main actor, cancellable and bounded. A search
   that did not finish is `.searchIncomplete`, NEVER `.notFound`; an unknown GUID / wrong folder needs a re-grant,
-  never a silent result; an unavailable saved root requests access before any basename scan. Containment for both
+  never a silent result. A saved scope that cannot start requests access. If a saved path cannot be opened for
+  the basename scan, the preview reports an incomplete search. Containment for both
   stages compares canonical (`resolvingSymlinksInPath`) paths component-wise, so a symlink cannot leave the granted
   root. `RoundupYearSuggestion` and `SourceBlockThumbnailRenderer` read only exact, already-granted roots: no
   prompt, no scan, no root mutation, no automatic writes. The Notes PDF pane is read-only, no-persist.

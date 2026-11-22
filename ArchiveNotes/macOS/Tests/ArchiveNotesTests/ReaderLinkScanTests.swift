@@ -482,17 +482,13 @@ struct ReaderLinkScanTests {
         #expect(scan.stop == .exhausted)
     }
 
-    @Test("A root that is GONE still establishes absence — the W8-S9 computer-move contract")
-    func missingRootStillEstablishesAbsence() async throws {
+    @Test("A missing archive path leaves the search incomplete")
+    func missingRootLeavesSearchIncomplete() async {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("ArchiveNotes-notesabsence-gone-\(UUID().uuidString)",
                                     isDirectory: true)
-        // Never created. `canonicalRoot` returns nil here exactly as it does for a denial, so
-        // this is the assertion that keeps the two apart.
         let scan = await ReaderLinkResolver.scanForBasename("doc.pdf", under: root)
-        #expect(scan.match == nil)
-        #expect(scan.stop == .exhausted,
-                "a stale root reports the file missing (shipped W8-S9), it does not stall")
+        #expect(scan == BasenameScan(match: nil, scanned: 0, stop: .unreadableRoot))
     }
 
     @Test("A root behind a denied ANCESTOR is unreachable, not absent")
@@ -506,10 +502,6 @@ struct ReaderLinkScanTests {
         try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: parent.path)
         defer { removeFixture(parent, unlocking: [parent]) }
 
-        // The reason the absence probe is `lstat`-and-errno rather than `fileExists`: `fileExists`
-        // answers `false` here, indistinguishably from a path that was never there, and the old
-        // code read that as the W8-S9 "root is gone" case. `lstat` fails with EACCES, which is a
-        // denial and not an absence.
         let scan = await ReaderLinkResolver.scanForBasename("doc.pdf", under: root)
         #expect(scan.stop == .unreadableRoot,
                 "a root we are not permitted to reach is not a root that is missing")

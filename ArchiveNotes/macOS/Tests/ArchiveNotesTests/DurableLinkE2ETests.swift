@@ -109,10 +109,9 @@ struct DurableLinkE2ETests {
             try FileManager.default.removeItem(at: corpusA)
             deletedA = true
 
-            // The stale path no longer resolves — a missing file, NOT a silent
-            // wrong file (the granting machine's scope now points at nothing).
+            // The old grant still points at the original path, which can no longer be searched.
             let rStale = await resolver.resolve(rootGUID: guid, relativePath: "sample.pdf")
-            #expect(rStale == .notFound)
+            #expect(rStale == .searchIncomplete(scanned: 0))
 
             // (c) Re-grant the SAME GUID at the NEW path → resolves again
             // (00-overview §8.3 new-machine path: one re-grant, keyed by GUID).

@@ -981,11 +981,11 @@ cancellation, the entry bound and an unwalkable root. The popover says the file 
   partners plus folders). It exists to stop a pathological mount from searching forever, **not** to cap a
   legitimate archive, so it must stay far above any plausible corpus. Shrinking it to something "reasonable"
   would silently turn real fallback hits into `.searchIncomplete`. (accepted: by design, W23.m14; a bound against a pathological mount, kept far above any real archive).
-- **An archive folder moved or renamed in session** can return `.notFound` from a search of the old
-  path even though the source still exists. A fresh root store can follow the bookmark. When the scope
-  itself fails to start, `ReaderRootStore.root(for:)` already returns nil and the resolver asks for access.
-  The owner asked Notes to offer the chooser or say the search could not finish in the moved-root case
-  (call 29, 2026-11-20). (queued: W49.fix-notes-moved-root)
+- **An archive folder moved or renamed in session** previously produced “Source file not found”
+  when Notes searched its old path. The preview now reports that the search could not finish when
+  the folder is unavailable. If Notes cannot start access to the saved folder, it offers **Choose Archive
+  Folder…**. The scratch regression `s014MovedRoot` also checks that a fresh root store follows the
+  bookmark to the renamed archive. (accepted: fixed in W49.fix-notes-moved-root, owner call 29)
 
 Pinned by 10 scratch tests (`ReaderLinkScanTests`). The off-actor proof is structural rather than
 timing-based: the raw progress callback runs on the scanning thread, so `Thread.isMainThread` inside it

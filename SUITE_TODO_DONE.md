@@ -17500,3 +17500,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   `Intelligence`, and reopens the saved filter. Notes smoke and the focused off-screen smart-folder
   test cover the live and saved list. No bench cache used.
   <!-- /W49.fix-notes-tag-filter-case -->
+
+- [x] **W49.fix-notes-moved-root — Report an unavailable archive folder in source previews [S]** · §Known limits are queued, accepted or asked (lane: notes) (uses: build,vm) — S-014 (S3, owner call 29). When an archive moves during a session, offer Choose Archive Folder or say the search could not finish. Keep s014MovedRoot as the regression.
+  SHIPPED 2026-11-21 (this commit). Notes reports an incomplete search when the saved archive path cannot
+  be opened. A readable archive can still return a missing source. The Notes smoke suite and the focused
+  preview test on a generated VM archive cover the original grant, the PDF preview and the in-session rename.
+  The scratch unit regression also checks bookmark recovery with a fresh root store. No bench cache used.
+  <!-- /W49.fix-notes-moved-root -->

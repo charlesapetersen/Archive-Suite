@@ -406,7 +406,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   tracking.
 - **Would clear it:** the in-session case yields `.needsRootGrant` or `.searchIncomplete`, or the owner rules that
   "not found" is correct for a vanished root and `W40.b5` corrects the promise.
-- **Status:** `reproduced` — independently confirmed, queued as `W49.fix-notes-moved-root`; [evidence](evidence/notes/W49.notes-suspects-small-check.md); test `ArchiveNotesTests/NotesSmallSuspectTests` `s014MovedRoot`
+- **Status:** `cleared` — fixed by W49.fix-notes-moved-root. Regression `NotesSmallSuspectTests.s014MovedRoot`. [Original reproduction](evidence/notes/W49.notes-suspects-small-check.md#s-014--the-source-still-exists-after-an-archive-folder-rename).
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
@@ -422,6 +422,9 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     Notes asks for the folder (Choose Archive Folder) or says the search could not finish; it never says the file is
     gone. The fix follows the independent check `W49.notes-suspects-small-check`.
   - 2026-11-21 W49.notes-suspects-small-check (Codex, gpt-6.2-sol, `b0539267`) — The production chooser and resolver with isolated scratch bookmarks returned `.notFound` after an in-session rename, even with the old preview scope released. A fresh root store located the original file at the new path. Reopening the same source preview in the VM displayed “Source file not found in the archive.”
+  - 2026-11-21 W49.fix-notes-moved-root — The focused VM test granted a scratch archive, previewed
+    `sample.pdf`, renamed the archive and reopened the same source. The preview said the search did not
+    finish. The unit regression also resolved the PDF through the bookmark with a fresh root store.
 
 ### S-015 · The list's `[`, `]` and `\` keys may fire inside the inline tag editor, and `\` would mark a file Read
 

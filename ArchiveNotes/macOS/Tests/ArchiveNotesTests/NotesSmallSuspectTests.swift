@@ -291,13 +291,11 @@ struct NotesSmallSuspectTests {
     // MARK: - S-014
 
     /// S-014: the archive folder is renamed while Notes runs, after a link in it has been opened once.
-    @Test("S-014: a link into a root renamed while Notes runs asks for the folder, not \"not found\"")
+    @Test("S-014: renaming the archive during a session leaves the search incomplete")
     func s014MovedRoot() async throws {
-        let key = "readerRootBookmarks"
-        let saved = UserDefaults.standard.dictionary(forKey: key)
-        defer {
-            if let saved { UserDefaults.standard.set(saved, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) }
-        }
+        let suiteName = "NotesSmallSuspectTests-S014-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
         let fm = FileManager.default
         let parent = fm.temporaryDirectory.appendingPathComponent("NotesSmallSuspectTests-S014-\(UUID().uuidString)",
                                                                   isDirectory: true)
@@ -311,7 +309,7 @@ struct NotesSmallSuspectTests {
             .write(to: root.appendingPathComponent(RootMarker.filename), options: .atomic)
         try Data("%PDF-1.4 scratch\n".utf8).write(to: root.appendingPathComponent("Box 1/doc.pdf"), options: .atomic)
 
-        let store = ReaderRootStore()
+        let store = ReaderRootStore(defaults: defaults)
         store.grantRoot(root)
         let resolver = ReaderLinkResolver(rootStore: store)
         let first = await resolver.resolve(rootGUID: guid, relativePath: "Box 1/doc.pdf")
@@ -319,16 +317,11 @@ struct NotesSmallSuspectTests {
 
         try fm.moveItem(at: root, to: moved)
         let after = await resolver.resolve(rootGUID: guid, relativePath: "Box 1/doc.pdf")
-        withKnownIssue("S-014: the vanished root is searched and reported as not found (W8-S9 rule)") {
-            switch after {
-            case .needsRootGrant, .searchIncomplete: break
-            default: Issue.record("in-session after the move: \(after)")
-            }
-        }
-        #expect(after == .notFound, "today's answer: \"Source file not found in the archive.\"")
+        #expect(after == .searchIncomplete(scanned: 0))
+        #expect(fm.fileExists(atPath: moved.appendingPathComponent("Box 1/doc.pdf").path))
 
         // A relaunch: a fresh store reads the bookmark, which follows the folder.
-        let relaunched = await ReaderLinkResolver(rootStore: ReaderRootStore())
+        let relaunched = await ReaderLinkResolver(rootStore: ReaderRootStore(defaults: defaults))
             .resolve(rootGUID: guid, relativePath: "Box 1/doc.pdf")
         guard case .resolved(let url) = relaunched else { Issue.record("after a relaunch: \(relaunched)"); return }
         #expect(url.path.contains("Archive (moved)"))

@@ -13,9 +13,9 @@ Format and statuses: [`README.md`](README.md). Written by `W40.b2`, 2026-10-12.
   `W23.m9`/`-fu3`, `W23.m14`/`-fu`, `W37.dual-date`, `W24.cal1`, `W24.cal1-toggle`, `W24.cal1-validator`,
   and the W0–W8 records under §*Archive Notes — NEW APP*.
 - **Sources and code read at:** `9e8959ef`.
-- **Count:** `unproven 28 · works 22 · broken 0 · unreachable 0 · fixed-pending-recheck 2` (works: N-04, N-07, N-11, N-12, N-14, N-16, N-17, N-20, N-21, N-29, N-32, N-34, N-35, N-36, N-41, N-43, N-44, N-45, N-49, N-50, N-51, N-52; fixed-pending-recheck: N-19, N-26). Updated by `W40.g2-notes-2-ledger` from the owner's Notes session 2, 2026-11-06 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)) and what it left on disk ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)): of the nine rows waiting for that recheck, seven to `works`, N-26 to `broken`, and N-22 back to `unproven`; N-04, N-17, N-20, N-21, N-29, N-32, N-36 and N-43 to `works`; N-19 to `broken`. N-26 back to `fixed-pending-recheck` by W40.fix-notes-folder-drag-again (2026-11-08), N-19 by W40.fix-notes-date-cell-erase (2026-11-08, reconciled 2026-11-10).
+- **Count:** `unproven 27 · works 22 · broken 0 · unreachable 0 · fixed-pending-recheck 3` (works: N-04, N-07, N-11, N-12, N-14, N-16, N-17, N-20, N-21, N-29, N-32, N-34, N-35, N-36, N-41, N-43, N-44, N-45, N-49, N-50, N-51, N-52; fixed-pending-recheck: N-19, N-26, N-37). Updated by `W40.g2-notes-2-ledger` from the owner's Notes session 2, 2026-11-06 ([`sessions/notes-2-returned.md`](sessions/notes-2-returned.md)) and what it left on disk ([`evidence/notes/W40.g2-notes-2-ledger-on-disk.md`](evidence/notes/W40.g2-notes-2-ledger-on-disk.md)): of the nine rows waiting for that recheck, seven to `works`, N-26 to `broken`, and N-22 back to `unproven`; N-04, N-17, N-20, N-21, N-29, N-32, N-36 and N-43 to `works`; N-19 to `broken`. N-26 back to `fixed-pending-recheck` by W40.fix-notes-folder-drag-again (2026-11-08), N-19 by W40.fix-notes-date-cell-erase (2026-11-08, reconciled 2026-11-10).
 
-**Runtime evidence, for every row below: none yet.** The W40.a3 full VM suite
+**Runtime evidence at the initial ledger pass.** The W40.a3 full VM suite
 ([`evidence/notes/W40.a3-full-ui.md`](evidence/notes/W40.a3-full-ui.md)) and the `W9.e2` runtime sweep passed
 the UITests named under *Real-path test* here. A green suite is not runtime evidence for a feature (README
 §Statuses), so no row moves to `works` on it. The journeys (`W40.d9`, `W40.d10`, …) provide the evidence. The
@@ -1250,9 +1250,9 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 
 ### N-37 · A moved archive is re-granted in Notes
 
-- **Promise:** links name the archive by its identity, not its path, so after moving the archive (or the
-  computer) the preview offers "Choose Archive Folder…"; picking the right folder resolves the link, a wrong
-  folder is refused, and an unavailable root asks for access rather than calling the source missing.
+- **Promise:** links identify the archive by its GUID. The preview offers **Choose Archive Folder…** when access
+  is needed. Picking the matching folder resolves the link, and picking a different archive explains the mismatch.
+  If Notes still holds a saved path that has become unavailable, the preview reports an incomplete search.
 - **Promised in:** `00-overview.md` D5, §8.1–§8.3; `SMOKE_TEST.md` step K; `CLAUDE.md` Stack (W8-S9),
   Impl Map `ReaderRootStore`, `ReaderLinkResolver`, `ReaderPreviewPopover`; `09-gap-closure.md` B7;
   `SUITE_TODO_DONE.md` `W9.b7`, `W23.m14-fu`.
@@ -1267,16 +1267,17 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **Real-path test:** `ArchiveNotesUITests/NotesE2PasteTests.testE2_MovedArchiveReGrantsFromThePreviewPopover`;
   `ArchiveNotesTests/ReaderRootChooserTests.pickingTheRightRootResolvesTheLink` and
   `.pickingTheWrongRootReportsMismatch`; `ArchiveNotesTests/DurableLinkE2ETests.linkResolvesThenSurvivesComputerMove`.
-- **Runtime evidence:** none
-- **Status:** `unproven`
+- **Runtime evidence:** W49.fix-notes-moved-root, focused off-screen VM preview test with a generated archive.
+- **Status:** `fixed-pending-recheck`
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
-- **Notes:** `W9.e2-paste` covered this with `NotesE2PasteTests.testE2_MovedArchiveReGrantsFromThePreviewPopover`.
-  The grant button appears only when the GUID has no stored root. A root that is still recorded but whose folder
-  is no longer at its path (moved while Notes runs, or a volume ejected) goes to the basename search instead.
-  When the root path is wholly absent, `scanForBasename` counts that as proof of absence
-  (`Links/ReaderLinkResolver.swift:351-361`, the "W8-S9 computer-move contract"), and the popover says "Source
-  file not found in the archive." with no grant button. See suspect `S-014`.
+  - 2026-11-21 W49.fix-notes-moved-root — `fixed-pending-recheck`. The off-screen VM preview offered a
+    grant initially and opened the PDF after it was granted. After the folder moved during the session,
+    the same preview said the search did not finish.
+- **Notes:** `W9.e2-paste` covered the grant step with `NotesE2PasteTests.testE2_MovedArchiveReGrantsFromThePreviewPopover`.
+  W49.fix-notes-moved-root extended that test to reopen the same source after the granted folder moves during
+  the session. The preview reports an incomplete search when Notes still holds the old path (S-014, owner call 29).
+  When the root is unknown or its security scope cannot start, the preview offers **Choose Archive Folder…**.
 
 ### N-38 · A renamed or moved file is searched for, without freezing
 
