@@ -39,22 +39,22 @@ final class ReOCRDialogModel {
     let pairs: OCRPairMatrix?
     let resources: SettingsResources
     let staysOnMac: Bool
-    /// W46.training-optout-run: the files' collections say their pages must not train a provider's models.
-    let noTraining: Bool
+    /// Reader selection covers the whole dialog. Each file's requests use its own collection's switch.
+    private let trainingProtectedFiles: Set<URL>
     private let selectedPairs: [URL: [Int]]
     private let scanDetectors: [URL: NewspaperDetector]
 
     /// `selectedPairs` keeps, for a file the Reader named pairs for, only those pairs (0-based); a pair past the end of
     /// the file is ignored.
     init(selectedPairs: [URL: [Int]] = [:], table: SettingsRouteTable, pairs: OCRPairMatrix?,
-         resources: SettingsResources, staysOnMac: Bool, noTraining: Bool = false,
+         resources: SettingsResources, staysOnMac: Bool, trainingProtectedFiles: Set<URL> = [],
          scanDetectors: [URL: NewspaperDetector] = [:]) {
         self.selectedPairs = selectedPairs
         self.table = table
         self.pairs = pairs
         self.resources = resources
         self.staysOnMac = staysOnMac
-        self.noTraining = noTraining
+        self.trainingProtectedFiles = trainingProtectedFiles
         self.scanDetectors = scanDetectors
     }
 
@@ -139,7 +139,7 @@ final class ReOCRDialogModel {
             files.first { $0.id == page.fileID }?.pair(at: page.pairIndex)?.header.provenance
         }
         return ReOCRRanking.rank(kind: kind, pages: count, table: table, pairs: pairs, resources: resources,
-                                 staysOnMac: staysOnMac, noTraining: noTraining, current: current)
+                                 staysOnMac: staysOnMac, noTraining: !trainingProtectedFiles.isEmpty, current: current)
     }
 
     // MARK: Choice and estimate
@@ -215,10 +215,12 @@ final class ReOCRDialogModel {
                 pageModels[p.pairIndex] = models[k]
             }
             do {
-                // The file's collection's detector reaches the reader as the run's task-local (`ReOCRJob.reader`).
-                let review = try await NewspaperPageReader.$scanDetector.withValue(file.scanDetector) {
-                    try await job.start(file: file.url, root: root, textPages: Set(mine.map(\.pairIndex)),
-                                        kinds: kinds, model: model, pageModels: pageModels, read: routed)
+                let denyDataCollection = trainingProtectedFiles.contains(file.url)
+                let review = try await OpenRouterDataPolicy.$denyDataCollection.withValue(denyDataCollection) {
+                    try await NewspaperPageReader.$scanDetector.withValue(file.scanDetector) {
+                        try await job.start(file: file.url, root: root, textPages: Set(mine.map(\.pairIndex)),
+                                            kinds: kinds, model: model, pageModels: pageModels, read: routed)
+                    }
                 }
                 out.append(FileRun(fileID: file.id, outcome: .success(review), error: nil))
             } catch let f as ReOCRJob.Failure {

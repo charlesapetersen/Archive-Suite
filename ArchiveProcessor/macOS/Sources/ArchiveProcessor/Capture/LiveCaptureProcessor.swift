@@ -358,7 +358,6 @@ final class LiveCaptureProcessor: ObservableObject {
             let resolver = config.map { SettingsLayerStore.shared.resolver(at: $0.outputDirectory) }
             noTraining = resolver?.resolve(.noTraining).value.bool == true
             trainingOff = Set(resolver?.resolve(.trainingOff).value.strings ?? [])
-            OpenRouterDataPolicy.set(noTraining, for: openRouterPolicyToken)
         }
     }
     @Published private(set) var trainingWarning: String?
@@ -462,9 +461,6 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     func releaseSettingsSnapshot() { config = nil }
-    private let openRouterPolicyToken = "live-capture-" + UUID().uuidString
-    // A session's entry ends with its processor; while the processor lives, it lasts as long as its config.
-    deinit { OpenRouterDataPolicy.set(false, for: openRouterPolicyToken) }
     /// W46.ent-feature-live — the layered settings the names policy reads (names ranked, "No names"), resolved for the
     /// session's output folder at its first finalize and kept for the session, as a Process Files run freezes them.
     /// Reset with the config and on Clear.
@@ -1153,7 +1149,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 rotationMode: config.rotationMode, standardImageMB: config.standardImageMB,
                 visionSettings: config.visionSettings, cascade: config.cascade,
                 refusalRoutes: approvedRefusalRoutes, visionTextLLM: config.visionTextLLM,
-                scanDetector: NewspaperDetector.scans(liveSettings(config)))
+                scanDetector: NewspaperDetector.scans(liveSettings(config)), denyDataCollection: noTraining)
         }
 
         let pageCount = session.groups.first(where: { $0.id == photo.groupId })?.photos.count ?? 1
@@ -1287,6 +1283,13 @@ final class LiveCaptureProcessor: ObservableObject {
               !finalizedGroups.contains(groupId),
               let group = session.groups.first(where: { $0.id == groupId }),
               canProcessUnderTrainingPolicy(config) else { return }
+        await OpenRouterDataPolicy.$denyDataCollection.withValue(noTraining) {
+            await finalizeSegment(groupId: groupId, config: config, stagingDir: stagingDir, group: group)
+        }
+    }
+
+    private func finalizeSegment(groupId: String, config: SessionProcessingConfig, stagingDir: URL,
+                                 group: CaptureGroup) async {
         finalizedGroups.insert(groupId)
         session.lockSettings()   // first finalize locks the session's settings
         // B8: snapshot the clear-generation BEFORE any await. Every await below (box-label OCR, LLM tagging,
@@ -2042,18 +2045,20 @@ final class LiveCaptureProcessor: ObservableObject {
         localAgent: LocalAgentConfig?, rotationMode: RotationMode, standardImageMB: Double,
         visionSettings: VisionOCRSettings, cascade: OCRCascade, refusalRoutes: [OCRRefusalFallback.Route]?,
         visionTextLLM: LLMTextConfiguration?,
-        scanDetector: NewspaperDetector
+        scanDetector: NewspaperDetector, denyDataCollection: Bool
     ) -> Task<OCRResult, Never> {
         Task.detached(priority: .userInitiated) {
-            let ocrResult = await OCRProcessor.performOCRCall(
-                imageURL: imageURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
-                apiKey: apiKey, previousText: nil, previousImageURL: nil,
-                customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway,
-                localAgent: localAgent, rotationMode: rotationMode, standardImageMB: standardImageMB,
-                visionSettings: visionSettings, cascade: cascade, refusalRoutes: refusalRoutes, scanDetector: scanDetector)
-            return await OCRProcessor.applyingVisionTextClassification(
-                to: ocrResult, previousText: nil, customPrompt: customPrompt,
-                configuration: provider == .appleVision ? visionTextLLM : nil)
+            await OpenRouterDataPolicy.$denyDataCollection.withValue(denyDataCollection) {
+                let ocrResult = await OCRProcessor.performOCRCall(
+                    imageURL: imageURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
+                    apiKey: apiKey, previousText: nil, previousImageURL: nil,
+                    customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway,
+                    localAgent: localAgent, rotationMode: rotationMode, standardImageMB: standardImageMB,
+                    visionSettings: visionSettings, cascade: cascade, refusalRoutes: refusalRoutes, scanDetector: scanDetector)
+                return await OCRProcessor.applyingVisionTextClassification(
+                    to: ocrResult, previousText: nil, customPrompt: customPrompt,
+                    configuration: provider == .appleVision ? visionTextLLM : nil)
+            }
         }
     }
 

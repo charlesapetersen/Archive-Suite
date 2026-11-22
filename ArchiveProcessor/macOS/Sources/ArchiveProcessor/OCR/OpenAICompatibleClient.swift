@@ -455,11 +455,10 @@ extension OpenAICompatibleClient {
         }
     }
 
-    /// W46.training-optout-run: while a run whose collection says its pages must not train is going, every request
-    /// also carries `data_collection: "deny"`, so OpenRouter refuses an upstream that may keep or train on them; with
-    /// the provider pinned and fallbacks off, such a call fails instead of reading.
+    /// A request from a job whose collection says its pages must not train carries `data_collection: "deny"`.
+    /// With a pinned provider and fallbacks off, OpenRouter refuses the call if that provider collects data.
     static func openRouterProviderField(_ route: OpenRouterRoute,
-                                        denyDataCollection: Bool = OpenRouterDataPolicy.denies) -> [String: Any] {
+                                        denyDataCollection: Bool = OpenRouterDataPolicy.denyDataCollection) -> [String: Any] {
         // W41.app-openrouter-unmeasured: no provider pinned, so OpenRouter chooses and may fall back; it is always told
         // not to use an upstream that may keep or train on the pages, and never to bill above the estimate's price.
         guard route.pinned else {
@@ -485,26 +484,10 @@ extension OpenAICompatibleClient {
     }
 }
 
-/// W46.training-optout-run: which running jobs need OpenRouter to refuse upstreams that may train. Each job (a Process
-/// Files run, a Live Capture session, an Improve OCR job) holds its own entry under its own token, so one job ending
-/// never lifts another's. The clients are built deep in the pipeline, some on detached tasks, so the switch is read
-/// here when a request is made rather than passed down. A job that never clears its entry only keeps the stricter
-/// setting.
+/// A job binds its collection's switch for its requests and their child tasks. A detached reader
+/// must bind the value it captured from the job when it was created.
 enum OpenRouterDataPolicy {
-    private static let lock = NSLock()
-    nonisolated(unsafe) private static var holders: Set<String> = []
-
-    /// Whether any running job's collection says its pages must not train.
-    static var denies: Bool {
-        lock.lock(); defer { lock.unlock() }
-        return !holders.isEmpty
-    }
-
-    /// Set (or clear) `token`'s need.
-    static func set(_ deny: Bool, for token: String) {
-        lock.lock(); defer { lock.unlock() }
-        if deny { holders.insert(token) } else { holders.remove(token) }
-    }
+    @TaskLocal static var denyDataCollection = false
 
     /// The switch as a frozen settings snapshot holds it.
     static func deny(_ values: [String: ResolvedSetting]?) -> Bool {

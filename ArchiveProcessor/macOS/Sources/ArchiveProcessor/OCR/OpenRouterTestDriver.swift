@@ -150,6 +150,83 @@ enum OpenRouterTestDriver {
         await unmeasuredChecks(wire: wire, image: image)
         wire.reply = #"{"choices":[{"message":{"content":"[document_start]\nHello archive"}}]}"#
         await claudeChecks(wire: wire, image: image)
+        await concurrentTrainingChecks(image: image)
+    }
+
+    private nonisolated static func dataCollection(_ request: URLRequest) -> String? {
+        guard let bytes = request.httpBody,
+              let body = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any],
+              let provider = body["provider"] as? [String: Any] else { return nil }
+        return provider["data_collection"] as? String
+    }
+
+    private actor TrainingRequests {
+        private var firstRequest: CheckedContinuation<Void, Never>?
+        private(set) var requests: [URLRequest] = []
+
+        func record(_ request: URLRequest) async {
+            requests.append(request)
+            // Hold the first request open until the other job reaches the transport.
+            if requests.count == 1 {
+                await withCheckedContinuation { firstRequest = $0 }
+            } else {
+                firstRequest?.resume()
+                firstRequest = nil
+            }
+        }
+    }
+
+    private static func concurrentTrainingChecks(image: URL) async {
+        let wire = TrainingRequests()
+        NetworkSession.testTransport = { request in
+            await wire.record(request)
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (Data(#"{"choices":[{"message":{"content":"[document_start]\nHello archive"}}]}"#.utf8), response)
+        }
+        let model = OpenRouterRoute.catalog[0].model
+        await withTaskGroup(of: Void.self) { jobs in
+            for protected in [true, false] {
+                jobs.addTask {
+                    let settings = [SettingsKey.noTraining.rawValue: ResolvedSetting(
+                        value: .bool(protected), layer: .collection, source: nil, layerName: nil)]
+                    await OpenRouterDataPolicy.$denyDataCollection.withValue(OpenRouterDataPolicy.deny(settings)) {
+                        let key = protected ? "protected-job" : "other-job"
+                        _ = await OCRProcessor.performOCRCall(
+                            imageURL: image, provider: .openrouter, model: model, thinkingLevel: nil, apiKey: key,
+                            previousText: nil, previousImageURL: nil, rotationMode: .off, standardImageMB: 4,
+                            cascade: .off, refusalFallback: false)
+                        _ = try? await LLMTextClient.complete(
+                            prompt: "Read this scratch page", provider: .openrouter, model: model, thinkingLevel: nil,
+                            apiKey: key, gatewayConfig: nil, maxTokens: 64, timeout: 10)
+                    }
+                }
+            }
+        }
+        let byJob = Dictionary(grouping: await wire.requests) { $0.value(forHTTPHeaderField: "Authorization") ?? "" }
+        eq("11 concurrent protected job sends deny on OCR and text", byJob["Bearer protected-job"]?.map(dataCollection),
+           ["deny", "deny"])
+        eq("11 concurrent unprotected job omits deny on OCR and text", byJob["Bearer other-job"]?.map(dataCollection),
+           [nil, nil])
+        check("11 outside both jobs the default stands", !OpenRouterDataPolicy.denyDataCollection)
+
+        // The manual card makes a separate request while the run is waiting for a review response.
+        let processor = OCRProcessor()
+        processor.activeResolvedSettings = ResolvedSettingsSnapshot(
+            runID: UUID(), resolvedAt: Date(), collectionID: nil, projectID: nil, projectName: nil, macMemoryGB: 16,
+            values: [SettingsKey.noTraining.rawValue: ResolvedSetting(
+                value: .bool(true), layer: .collection, source: nil, layerName: nil)],
+            processing: [:])
+        var job = OCRJob(sourceURL: image)
+        job.result = OCRResult(text: "March 3, 1947", classification: nil, errorMessage: nil, errorCode: nil)
+        processor.jobs = [job]
+        processor.manualSegImages = [ManualSegImage(fileIndex: 0, url: image, rotationDegrees: 0, kind: .document)]
+        processor.manualSegAutoDate = true
+        processor.manualSegModel = model
+        processor.manualSegProvider = .openrouter
+        processor.manualSegApiKey = "manual-card"
+        await Task { await processor.fetchManualSegDate(forIndices: [0]) }.value
+        let cardRequests = await wire.requests.filter { $0.value(forHTTPHeaderField: "Authorization") == "Bearer manual-card" }
+        eq("11 a standalone manual date card uses the run's saved switch", cardRequests.map(dataCollection), ["deny"])
     }
 
     /// 10. W41.app-openrouter-claude — Claude Sonnet 5.5, the Claude model the bench measured, through OpenRouter on
@@ -523,18 +600,11 @@ enum OpenRouterTestDriver {
         eq("6 window provider pinned", provider?["order"] as? [String], ["z-ai"])
         eq("6 window precision", provider?["quantizations"] as? [String], ["fp8"])
         check("6 window fallbacks off", raw.contains(#""allow_fallbacks":false"#))
-        check("6 window: no data_collection while no job holds the switch", provider?["data_collection"] == nil, raw)
-        // W46.training-optout-run: a job whose collection says its pages must not train adds deny to every request,
-        // a window's included, until that job's own entry is cleared; another job's clearing leaves it.
-        OpenRouterDataPolicy.set(true, for: "test-a")
-        OpenRouterDataPolicy.set(false, for: "test-b")
-        let denied = (try? APIWindowTransport.request(r, key: "test-key")).flatMap(\.httpBody)
-            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
-        eq("6 window under the switch: data_collection deny",
-           (denied?["provider"] as? [String: Any])?["data_collection"] as? String, "deny")
-        check("6 another job's clearing keeps the deny", OpenRouterDataPolicy.denies)
-        OpenRouterDataPolicy.set(false, for: "test-a")
-        check("6 the job's own clearing lifts it", !OpenRouterDataPolicy.denies)
+        check("6 window: no data_collection with the switch off", provider?["data_collection"] == nil, raw)
+        let denied = OpenRouterDataPolicy.$denyDataCollection.withValue(true) {
+            try? APIWindowTransport.request(r, key: "test-key")
+        }
+        eq("6 window under the switch: data_collection deny", denied.flatMap(dataCollection), "deny")
         let route0 = OpenRouterRoute.catalog[0]
         eq("6 the provider field with deny", OpenAICompatibleClient.openRouterProviderField(route0, denyDataCollection: true)["data_collection"] as? String, "deny")
         check("6 the provider field without", OpenAICompatibleClient.openRouterProviderField(route0, denyDataCollection: false)["data_collection"] == nil)

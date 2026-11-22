@@ -17866,3 +17866,13 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   The Android-to-Mac round trip verified all three synthetic captures through OCR, Finder tags and finalized PDFs.
   Its Gemini API spend was estimated below $0.03. The real archive was outside the test inputs.
   <!-- /W49.proc-gemma-offer-download -->
+
+- [x] **W49.proc-training-deny-per-job — the "must not train" refusal applies to its own job's requests only [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit) — Owner, 2026-11-19 (call 21, the accepted-issues sheet; `execution-plans/processing-review/17-accepted-review.json` entry `p-training-deny-wide`, answers in `answers/17-accepted-review-answers-20261119.json`): change it. Carry `data_collection: "deny"` per request from the job's collection setting instead of process-wide in `OpenRouterDataPolicy`; test two concurrent jobs, one with the switch.
+  Process Files, Live Capture and Improve OCR bind the collection policy to the work that sends requests.
+  Standard and batch resumes use their saved switch. Standalone retries use the run's snapshot. Improve OCR sends
+  each PDF with its own collection's policy, and retains shared reader selection for the dialog.
+  The manual date card also uses the run's setting while the main job is waiting. Verified overlapping OpenRouter
+  OCR and text requests, segmentation request bodies, the manual date card, and Improve OCR on two collections.
+  Batch resume, Retry, Live Capture recovery and dating contracts passed. The two-page Processor smoke and
+  three-page Android-to-Mac capture round trip passed on synthetic images, with estimated API spend below $0.06.
+  <!-- /W49.proc-training-deny-per-job -->

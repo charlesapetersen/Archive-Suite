@@ -9,7 +9,6 @@ class OCRProcessor: ObservableObject {
     @Published var isProcessing = false {
         didSet {
             if !isProcessing { monthlySpend = nil }
-            updateOpenRouterPolicy()
             updateRunActivity()
         }
     }
@@ -805,17 +804,7 @@ class OCRProcessor: ObservableObject {
     var containerLabelSpendNote: String?
 
     /// The settings layers frozen at this run's start (W46.settings-layers), copied into its pending run or batch.
-    var activeResolvedSettings: ResolvedSettingsSnapshot? { didSet { updateOpenRouterPolicy() } }
-    /// This processor's entry in `OpenRouterDataPolicy`.
-    nonisolated let openRouterPolicyToken = "process-files-" + UUID().uuidString
-
-    /// W46.training-optout-run: while this processor works (a run, its tagging, a retry), its OpenRouter calls refuse
-    /// an upstream that may train when the run's collection says its pages must not train. Idle, it holds nothing, so
-    /// another job's calls are not refused for this collection's sake.
-    func updateOpenRouterPolicy() {
-        OpenRouterDataPolicy.set(isProcessing && OpenRouterDataPolicy.deny(activeResolvedSettings?.values),
-                                 for: openRouterPolicyToken)
-    }
+    var activeResolvedSettings: ResolvedSettingsSnapshot?
     /// This start's collection record, until the run is committed and it is written; nil once written or on a resume.
     var activeRunToRecord: PendingCollectionRecord?
 

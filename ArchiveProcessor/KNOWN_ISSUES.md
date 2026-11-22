@@ -653,12 +653,11 @@ Process Files shows the training warning on Start. An interrupted run resumes wi
 Live Capture checks before the first read under its output folder's settings. A missing or unreadable
 collection settings file leaves the General settings in effect.
 
-- **OpenRouter is told to refuse, so a training upstream fails.** While a job works with the switch on (a Process
-  Files run, its tagging or retry; an open Live Capture session; an Improve OCR run), every OpenRouter request carries
-  `provider.data_collection: "deny"` (`OpenRouterDataPolicy`); with the provider pinned and no fallbacks, a
-  Chutes-pinned model's calls then fail instead of reading. The deny is process-wide, so another job working at the
-  same time is refused the same way; Live Capture holds it while its session's settings are loaded, not only while
-  it reads. (queued: W49.proc-training-deny-per-job)
+- **OpenRouter refuses upstreams that may collect data for a protected job.** Process Files and its retries, Live
+  Capture and Improve OCR send `provider.data_collection: "deny"` on the protected collection's requests. A pinned
+  Chutes route fails for that job. Other jobs follow their own collection settings, and unpinned routes always send
+  the deny. (accepted: provider refusal is the intended behavior for protected pages, owner 2026-11-19 call 21;
+  the process-wide interference was fixed in W49.proc-training-deny-per-job)
 - **The default segmenter reads the general layer only.** `SegmentationApproach.preferredDefault` is saved once for
   the app, before any collection is known, so it takes the general layer's switch, not a collection's. (accepted: the default is saved for the whole app before any collection is known)
 - **The billed and opted-out answers are the user's word.** The general interview asks, for each key and plan found

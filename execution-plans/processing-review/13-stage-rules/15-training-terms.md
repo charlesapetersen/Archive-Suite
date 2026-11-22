@@ -61,8 +61,9 @@ https://openrouter.ai/docs/guides/privacy/provider-logging). The app pins each O
 
 OpenRouter also takes `provider.data_collection: "deny"` on a request, which routes only to providers that do not
 collect data; with a pinned provider and no fallbacks, a request to one that does would fail rather than go elsewhere.
-Since W46.training-optout-run the app sends it on every OpenRouter request while a job whose collection has the switch
-on is working (`OpenRouterDataPolicy`), so a Chutes-pinned call fails instead of reading.
+The app sends it on the requests for a job whose collection has the switch on (`OpenRouterDataPolicy`). A call
+pinned to Chutes fails for that job. Concurrent jobs use their own collection settings. Unpinned routes always send
+the deny (W49.proc-training-deny-per-job).
 
 ## The user's answers and the run (W46.training-optout-run)
 

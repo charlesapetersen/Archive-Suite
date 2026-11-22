@@ -1160,7 +1160,11 @@ extension OCRProcessor {
                                                 gateway: currentGateway, localAgent: currentLocalAgent)
                 let imageEveryDocument = activeResolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
                     .value.bool ?? false
-                decision = await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument)
+                // The card starts this in a SwiftUI task, outside the suspended Process Files task.
+                let denyDataCollection = OpenRouterDataPolicy.deny(activeResolvedSettings?.values)
+                decision = await OpenRouterDataPolicy.$denyDataCollection.withValue(denyDataCollection) {
+                    await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument)
+                }
             }
             guard !Task.isCancelled else { return }
             manualSegDateFetching = false

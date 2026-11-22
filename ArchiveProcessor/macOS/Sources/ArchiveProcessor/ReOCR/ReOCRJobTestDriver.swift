@@ -645,6 +645,7 @@ enum ReOCRJobTestDriver {
                     try FileManager.default.createDirectory(at: d, withIntermediateDirectories: true)
                     var doc = CollectionSettingsDocument(name: name, createdAt: Date())
                     doc.collection.set(.scanNewspapersDocLayoutYOLO, .bool(yolo), source: .setByUser(Date()))
+                    doc.collection.set(.noTraining, .bool(yolo), source: .setByUser(Date()))
                     try CollectionSettingsFile.write(doc, in: d)
                     return try file(d, pairs: 1)
                 }
@@ -655,21 +656,28 @@ enum ReOCRJobTestDriver {
                 var res = SettingsResources(macMemoryGB: 16)
                 res.keys = ["gemini", "openai", "anthropic", "mistral", "openrouter"]
                 let m = ReOCRDialogModel(table: table, pairs: OCRPairMatrix.bundled, resources: res,
-                                         staysOnMac: false, scanDetectors: switches.scanDetectors)
+                                         staysOnMac: false, trainingProtectedFiles: switches.trainingProtectedFiles,
+                                         scanDetectors: switches.scanDetectors)
                 await m.loadFiles([on, off])
                 final class Seen: @unchecked Sendable {
                     let lock = NSLock()
                     var detectors: [NewspaperDetector] = []
+                    var trainingPolicies: [Bool] = []
                 }
                 let seen = Seen()
                 let runs = await m.run(job: job(a), root: archive(a), model: model, readerFor: { _ in { _, _, _ in
-                    seen.lock.withLock { seen.detectors.append(NewspaperPageReader.scanDetector) }
+                    seen.lock.withLock {
+                        seen.detectors.append(NewspaperPageReader.scanDetector)
+                        seen.trainingPolicies.append(OpenRouterDataPolicy.denyDataCollection)
+                    }
                     return OCRResult(text: "New reading.", classification: nil, errorMessage: nil, errorCode: nil)
                 } })
                 let order = seen.lock.withLock { seen.detectors }
                 check("13b the reader sees each file's detector, in file order",
                       runs.count == 2 && order == [.docLayoutYOLO, .ppDocLayoutV3],
                       "\(order) \(m.runBlocker ?? "") \(runs.map { $0.error ?? "\($0.outcome)" })")
+                check("13b only the protected file's reader gets the deny",
+                      seen.lock.withLock { seen.trainingPolicies } == [true, false])
                 check("13b outside the run the default stands", NewspaperPageReader.scanDetector == .ppDocLayoutV3)
             }
 

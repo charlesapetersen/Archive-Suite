@@ -108,7 +108,8 @@ final class ImproveOCRController: ObservableObject {
         if root == nil { rootProblem = "these files are not inside one archive folder with a suite root marker" }
         let model = ReOCRDialogModel(selectedPairs: selectedPairs, table: prepared.table, pairs: prepared.pairs,
                                      resources: prepared.resources, staysOnMac: prepared.switches.staysOnMac,
-                                     noTraining: prepared.switches.noTraining, scanDetectors: prepared.switches.scanDetectors)
+                                     trainingProtectedFiles: prepared.switches.trainingProtectedFiles,
+                                     scanDetectors: prepared.switches.scanDetectors)
         await model.loadFiles(files) { loadedFileCount = $0 }
         guard !Task.isCancelled else { return }
         self.model = model
@@ -116,7 +117,7 @@ final class ImproveOCRController: ObservableObject {
 
     struct CollectionSwitches: Sendable {
         var staysOnMac = false
-        var noTraining = false
+        var trainingProtectedFiles: Set<URL> = []
         var scanDetectors: [URL: NewspaperDetector] = [:]
     }
 
@@ -164,7 +165,7 @@ final class ImproveOCRController: ObservableObject {
     @concurrent
     static func collectionSwitches(for files: [URL], settings: GeneralSettingsFile) async -> CollectionSwitches {
         var switches = CollectionSwitches()
-        var byFolder: [String: NewspaperDetector] = [:]
+        var byFolder: [String: (detector: NewspaperDetector, noTraining: Bool)] = [:]
         for url in files {
             if Task.isCancelled { break }
             var dir = url.deletingLastPathComponent().standardizedFileURL
@@ -175,18 +176,23 @@ final class ImproveOCRController: ObservableObject {
                 if (try? RootMarker.read(at: dir)) != nil { break }
                 dir = dir.deletingLastPathComponent()
             }
-            if let known = byFolder[dir.path] { switches.scanDetectors[url] = known; continue }
+            if let known = byFolder[dir.path] {
+                switches.scanDetectors[url] = known.detector
+                if known.noTraining { switches.trainingProtectedFiles.insert(url) }
+                continue
+            }
             let project = settings.projects.first { $0.id == doc?.projectID }
             let r = SettingsResolver(general: settings.general, project: project, collection: doc?.collection)
             let detector = NewspaperDetector.scans(r.resolveAll())
-            byFolder[dir.path] = detector
+            let noTraining = r.resolve(.noTraining).value.bool == true
+            byFolder[dir.path] = (detector, noTraining)
             switches.scanDetectors[url] = detector
+            if noTraining { switches.trainingProtectedFiles.insert(url) }
             // With no collection anywhere above, the general layer answers. "Stays on this Mac" counts only where a
             // layer set it: its built-in value is the skipped interview's, which would hide every online reader from
             // a user who never answered, where the dialog offered them before.
             let stays = r.resolve(.staysOnMac)
             switches.staysOnMac = switches.staysOnMac || (stays.layer != nil && stays.value.bool == true)
-            switches.noTraining = switches.noTraining || (r.resolve(.noTraining).value.bool ?? false)
         }
         return switches
     }
@@ -258,8 +264,6 @@ final class ImproveOCRController: ObservableObject {
         }
         #endif
         let chooseReader = readerFor
-        // W46.training-optout-run: the job's OpenRouter calls refuse an upstream that may train.
-        OpenRouterDataPolicy.set(model.noTraining, for: openRouterPolicyToken)
         runTask = Task {
             let runs = await model.run(job: job, root: root, model: LLMModel.appleVisionModels[0], readerFor: chooseReader)
             for r in runs {
@@ -274,11 +278,9 @@ final class ImproveOCRController: ObservableObject {
             }
             running = false
             runTask = nil
-            OpenRouterDataPolicy.set(false, for: openRouterPolicyToken)
             revision += 1
         }
     }
-    private let openRouterPolicyToken = "improve-ocr-" + UUID().uuidString
 
     /// Stops a run when the dialog closes: no further page is read or paid for. A file already read stays "not
     /// decided" in the history, its original untouched.
