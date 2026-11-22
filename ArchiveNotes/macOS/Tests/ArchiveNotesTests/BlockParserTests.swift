@@ -92,6 +92,21 @@ final class BlockParserTests: XCTestCase {
         XCTAssertEqual(blocks[0].unknownHeaderFields[0].1, "future_value")
     }
 
+    func testMalformedHeaderKeepsProseBeforeCloserAndFollowingSource() throws {
+        let malformed = "<!-- block: reader-doc\n     link: x\nSome prose\nA --> B\n"
+        let valid = "<!-- block: reader-doc\n     link: y -->\nNext source.\n"
+        let (leading, blocks) = BlockParser.parse(malformed + valid)
+        let first = try XCTUnwrap(blocks.first)
+        XCTAssertTrue(first.headerless)
+        XCTAssertEqual(first.markdown, malformed)
+        let saved = BlockParser.serialize(leadingText: leading, blocks: blocks)
+        let reopened = BlockParser.parse(saved)
+        XCTAssertEqual(reopened.blocks.map(\.markdown), [malformed, "Next source.\n"])
+        XCTAssertNil(reopened.blocks.first?.source)
+        XCTAssertEqual(reopened.blocks.last?.source?.link, "y")
+        XCTAssertEqual(BlockParser.serialize(leadingText: reopened.leadingText, blocks: reopened.blocks), saved)
+    }
+
     func testAllBlockKinds() {
         let kinds: [(String, Block.Kind)] = [
             ("freeform", .freeform),

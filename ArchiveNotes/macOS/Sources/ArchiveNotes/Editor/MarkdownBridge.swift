@@ -468,12 +468,15 @@ enum MarkdownBridge {
 
             // Serialize this body segment
             let bodyRange = NSRange(location: i, length: end - i)
-            let bodyStr = serializeBodySegment(attributed, range: bodyRange)
+            let bodyStr = serializeBodySegment(attributed, range: bodyRange, afterHeaderlessChip: afterHeaderlessChip)
             // W40.fix-notes-block-marker-in-text — a typed line that reads as a header is text, so it is
             // written escaped, as `BlockParser.serialize` writes it, or the save would split the block there.
-            // A headerless chip's text begins with its own unclosed opener, which must stay one.
-            let midLine = !result.isEmpty && !BlockParser.endsWithLineTerminator(result)
-            result += BlockParser.escapingHeaderLines(bodyStr, skippingFirstLine: afterHeaderlessChip || midLine)
+            if afterHeaderlessChip {
+                result += BlockParser.serializeHeaderlessBody(bodyStr)
+            } else {
+                let midLine = !result.isEmpty && !BlockParser.endsWithLineTerminator(result)
+                result += BlockParser.escapingHeaderLines(bodyStr, skippingFirstLine: midLine)
+            }
             afterHeaderlessChip = false
             i = end
         }
@@ -492,9 +495,8 @@ enum MarkdownBridge {
     /// on by `serializeBodySegment`. Deleting the image in the editor now sticks, too; it used to
     /// reappear on the next save.
     private static func serializeBlockHeader(_ box: SourceAnchorBox) -> String {
-        // A block degraded from an unclosed header (`Block.headerless`) keeps its chip, so its text stays a
-        // block of its own in the editor, but writes no header: its text already begins with the opener, and
-        // a header here came back as one more `<!-- block: freeform -->` on every save (W40.e6).
+        // The degraded block's body supplies its own opener. Serialize them together once we have
+        // the body, since a typed closer can make that visible opener look like a source header.
         if box.headerless { return "" }
         let block = Block(
             kind: box.kind,
@@ -508,10 +510,11 @@ enum MarkdownBridge {
     }
 
     /// Serialize a body segment (no chips) using the existing paragraph/inline logic.
-    private static func serializeBodySegment(_ attributed: NSAttributedString,
-                                              range: NSRange) -> String {
-        let sub = attributed.attributedSubstring(from: range)
-        if sub.length == 0 { return "" }
+    private static func serializeBodySegment(_ attributed: NSAttributedString, range: NSRange,
+                                             afterHeaderlessChip: Bool) -> String {
+        let body = attributed.attributedSubstring(from: range)
+        if body.length == 0 { return "" }
+        let sub = afterHeaderlessChip ? preservingClosedHeaderlessComment(in: body) : body
 
         var paragraphs = collectParagraphs(sub)
         // W49.notes-keep-blank-lines — an empty list item on the last line, kept on the newline before it, is one
@@ -560,6 +563,19 @@ enum MarkdownBridge {
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    /// A typed closer makes the preceding lines part of a visible Markdown HTML comment on reopen.
+    /// Serialize those lines as raw text now so paragraph escapes do not appear as extra characters.
+    private static func preservingClosedHeaderlessComment(in body: NSAttributedString) -> NSAttributedString {
+        let text = body.string
+        guard let closer = BlockParser.headerlessCloser(in: text) else { return body }
+        let lineEnd = text[closer.upperBound...].firstIndex(where: BlockParser.isLineBreak) ?? text.endIndex
+        let comment = NSRange(text.startIndex..<lineEnd, in: text)
+        let raw = NSMutableAttributedString(attributedString: body)
+        raw.addAttributes([.noteRawHTML: true, .noteBlockHTML: true, .noteBlockKind: BlockKind.plain], range: comment)
+        raw.removeAttribute(.noteHardLineBreak, range: comment)
+        return raw
     }
 
     /// Whether a blank line goes between a block of kind `a` and the next, of kind `b`: always, except between

@@ -241,7 +241,7 @@ regenerable from front-matter and never the source of truth.
 
 ## 6. Block source header format (self-describing Markdown)
 
-Each block begins with a one-line HTML-comment header the app parses, followed (for sourced blocks) by a
+Each block begins with an HTML-comment header the app parses, followed (for sourced blocks) by a
 rendered thumbnail image line. Grammar (stable, versioned with `schema`):
 
 ```
@@ -261,9 +261,12 @@ degradation — matches the SPEC's "consumers must degrade, never assume structu
 Escape rule (W40.fix-notes-block-marker-in-text): a header is recognized only where `<!-- block:` begins a
 line. A line of block TEXT that begins with `<!-- block:` after any number of backslashes is written with one
 more backslash (`\<!-- block: freeform -->`), and the reader takes one away, so such a line stays text and the
-block stays whole. Applies to the leading prose and every block's text, not to the opener a headerless block
-(an unclosed header read back as text) begins with. One backslash before `<` is also CommonMark's own escape,
-so a rendered view shows the line as the operator typed it.
+block stays whole. One backslash before `<` is also CommonMark's own escape.
+
+An unclosed header or a candidate header with a nonblank line that lacks a field name and colon is read
+as freeform text. While the opener has no closer, it is written back as-is. Once a closer appears in the
+visible text, the block is saved with a freeform header and the visible opener is escaped. This keeps
+the prose visible on reopen, including prose typed in the shape of a source field.
 
 ---
 

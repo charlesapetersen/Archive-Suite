@@ -13,7 +13,7 @@ final class SourceAnchorBox: @unchecked Sendable {
     let anchor: SourceAnchor
     let kind: Block.Kind
     let unknownHeaderFields: [(String, String)]
-    /// `Block.headerless`: the chip of a block read from an unclosed header, serialized as no header at all.
+    /// `Block.headerless`: the chip of a block whose incomplete or malformed header is visible in its body.
     let headerless: Bool
 
     init(anchor: SourceAnchor, kind: Block.Kind = .freeform,

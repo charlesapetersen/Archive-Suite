@@ -530,7 +530,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a unit test: decode a note whose body is `<!-- block: reader-doc\n link: x\nSome prose\nA --> B`,
   encode it, decode again, and look for "Some prose" in the blocks' markdown.
 - **Would clear it:** "Some prose" survives.
-- **Status:** `reproduced` — independently confirmed, queued as `W49.fix-notes-unclosed-header`; [evidence](evidence/notes/W49.notes-suspects-text-check.md); test `ArchiveNotesTests/NotesTextLossSuspectTests` `s019TypedCloserAfterUnclosedHeader`
+- **Status:** `cleared` — fixed by W49.fix-notes-unclosed-header. [Save and reopen evidence](evidence/notes/W49.notes-suspects-text-check.md#s-019-fix-verification). Regression `NotesTextLossSuspectTests.s019TypedCloserAfterUnclosedHeader`.
 - **History:**
   - 2026-10-20 W40.e6 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-text` under phase rule 5a.

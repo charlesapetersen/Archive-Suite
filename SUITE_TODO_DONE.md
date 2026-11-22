@@ -17475,3 +17475,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 
 - [x] **W49.proc-s047-verify — an enclosure relation after the window stage splits its cover letter [S]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build) — Owner call 30 (2026-11-21). SHIPPED 2026-11-21 (this commit). Codex gpt-6.2-sol verified S-047 at `d1ec616d` through the real window stage on scratch images. The enclosure keeps its relation when the window agrees with OCR. A split leaves the enclosure separate and drops the relation. The independent Claude check is queued and the behavior choice is in Daemon Report. [Evidence](verification/evidence/processor/W49.proc-s047-verify.md).
   <!-- /W49.proc-s047-verify -->
+
+- [x] **W49.fix-notes-unclosed-header — Preserve prose typed after an unclosed block header [S · Tier-2]** · §Known limits are queued, accepted or asked (lane: notes) (uses: build,vm) — S-019. At `7252c39b`, `BlockParser.parseSegment` and `parseHeader` interpret typed prose as header text on `NoteStore.saveBody`. Preserve the prose across save and reopen, and keep valid source blocks working. Keep `NotesTextLossSuspectTests.s019TypedCloserAfterUnclosedHeader` as the regression and remove its `withKnownIssue` with the fix. [Evidence](verification/evidence/notes/W49.notes-suspects-text-check.md).
+  SHIPPED 2026-11-21 (this commit). Save the malformed opener as freeform text when a closer appears.
+  The retained scratch regression checks four exact-text save and reopen cases. Full Notes smoke and
+  two focused VM checks passed, including reveal from a valid Reader source.
+  [Verification](verification/evidence/notes/W49.notes-suspects-text-check.md#s-019-fix-verification). No bench cache used.
+  <!-- /W49.fix-notes-unclosed-header -->

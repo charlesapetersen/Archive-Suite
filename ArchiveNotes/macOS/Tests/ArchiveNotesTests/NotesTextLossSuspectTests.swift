@@ -8,9 +8,8 @@ import AppKit
 /// or hand-edited file arrives, loaded, rendered into a real `EditorTextView` as the editor renders it, edited
 /// through the text view's own editing calls, saved with `saveBody` and loaded again.
 ///
-/// S-019 and S-009 reproduced on 2026-11-20, so their checks are known issues: the run stays green while the defect is
-/// there and fails once it is gone, when the fix removes the `withKnownIssue`. Phase rule 5a(4): a second session on
-/// another model checks each reproduction before a fix item is filed (`W49.notes-suspects-text-check`).
+/// S-019 and S-009 reproduced on 2026-11-20 and were independently confirmed by
+/// `W49.notes-suspects-text-check`. S-019 now guards the fix. S-009 remains an expected issue.
 @Suite("Notes text-loss suspects — reproduce attempts (W49.notes-suspects-text)")
 @MainActor
 struct NotesTextLossSuspectTests {
@@ -59,25 +58,32 @@ struct NotesTextLossSuspectTests {
     /// S-019: typing prose and then a line holding `-->` after an unclosed header, saving and reopening.
     /// `returnFirst`: the user presses Return before typing, so the prose has a line of its own.
     @Test("S-019: typed prose after an unclosed header survives a typed --> and a reopen",
-          arguments: [false, true])
-    func s019TypedCloserAfterUnclosedHeader(returnFirst: Bool) async throws {
+          arguments: [false, true], [false, true])
+    func s019TypedCloserAfterUnclosedHeader(returnFirst: Bool, fieldShaped: Bool) async throws {
         let (store, tmp) = try scratchStore(); defer { try? FileManager.default.removeItem(at: tmp) }
         let id = try await writeNote(Self.degradedBody, in: store)
         let before = try await loadedBody(id, in: store)
         let (tv, storage) = try editor(showing: before)
         if returnFirst { tv.insertNewline(nil) }
-        tv.insertText("Some prose", replacementRange: tv.selectedRange())
+        let prose = fieldShaped ? "display: Some prose" : "Some prose"
+        tv.insertText(prose, replacementRange: tv.selectedRange())
         tv.insertNewline(nil)
-        tv.insertText("A --> B", replacementRange: tv.selectedRange())
+        let closer = fieldShaped ? "--> B" : "A --> B"
+        tv.insertText(closer, replacementRange: tv.selectedRange())
+        let shown = storage.string
         let saved = MarkdownBridge.serialize(storage)
         _ = try await store.saveBody(saved, basedOn: before, for: id)
 
-        let reopened = try await store.load(id)
-        let text = ([reopened.trailingBodyRaw ?? ""] + reopened.blocks.map(\.markdown)).joined()
         let onDisk = try String(contentsOf: await store.mdURL(for: id), encoding: .utf8)
-        withKnownIssue("S-019: the typed --> closes the unclosed header, and the prose before it leaves the text") {
-            #expect(text.contains("Some prose"), "the typed line is gone after the reopen; the file holds:\n\(onDisk)")
-        }
+        #expect(onDisk.hasSuffix(saved), "the first save changed the serialized body:\n\(onDisk)")
+        let reopened = try await store.load(id)
+        let block = try #require(reopened.blocks.first)
+        #expect(reopened.blocks.count == 1)
+        #expect(block.kind == .freeform)
+        #expect(block.source == nil)
+        let reopenedBody = BlockParser.serialize(leadingText: reopened.trailingBodyRaw, blocks: reopened.blocks)
+        let (_, again) = try editor(showing: reopenedBody)
+        #expect(again.string == shown, "the text changed after reopening: \(again.string.debugDescription)")
     }
 
     // MARK: - S-043

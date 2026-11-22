@@ -25,10 +25,7 @@ struct Block: Sendable {
     var source: SourceAnchor?
     var markdown: String
     var unknownHeaderFields: [(String, String)]
-    /// The block was read from a header that never closes (a file cut off mid-header, or a hand edit): §6
-    /// degrades it to `freeform` with the raw text as its markdown, and that text already begins with the
-    /// opener, so it is written back with no header of its own. Writing one made every save prepend a new
-    /// empty `<!-- block: freeform -->`, growing the file by a block per save (W40.e6).
+    /// The block was read from an incomplete or malformed header. Its markdown includes the raw opener.
     var headerless = false
 }
 
@@ -47,18 +44,18 @@ extension Block: Equatable {
 // MARK: - Parser & serializer
 
 enum BlockParser {
+    private static let headerMarker = "<!-- block:"
 
     /// Parse the body text (everything after the front-matter closing `---`) into
     /// optional leading text + an ordered list of blocks per §6.
     static func parse(_ body: String) -> (leadingText: String?, blocks: [Block]) {
         if body.isEmpty { return (nil, []) }
 
-        let marker = "<!-- block:"
         var positions: [String.Index] = []
         var search = body.startIndex
 
         while search < body.endIndex,
-              let range = body.range(of: marker, range: search..<body.endIndex) {
+              let range = body.range(of: headerMarker, range: search..<body.endIndex) {
             if isAtLineStart(range.lowerBound, in: body) { positions.append(range.lowerBound) }
             search = range.upperBound
         }
@@ -100,13 +97,33 @@ enum BlockParser {
         var out = escapingHeaderLines(leadingText ?? "")
         if !blocks.isEmpty, !out.isEmpty, !endsWithLineTerminator(out) { out += "\n" }
         for (i, block) in blocks.enumerated() {
-            if !block.headerless { out += serializeHeader(block) }
-            out += escapingHeaderLines(block.markdown, skippingFirstLine: block.headerless)
+            if block.headerless {
+                out += serializeHeaderlessBody(block.markdown)
+            } else {
+                out += serializeHeader(block)
+                out += escapingHeaderLines(block.markdown)
+            }
             if i + 1 < blocks.count, !block.markdown.isEmpty, !endsWithLineTerminator(block.markdown) {
                 out += "\n"
             }
         }
         return out
+    }
+
+    /// An open header can round-trip as-is (W40.e6). Once its visible text contains a closer, put
+    /// that text in an explicit freeform block and escape the opener so even field-shaped prose
+    /// stays visible. Reuse the same serialization for the editor's headerless chip and the store.
+    static func serializeHeaderlessBody(_ markdown: String) -> String {
+        if headerlessCloser(in: markdown) != nil {
+            let block = Block(kind: .freeform, source: nil, markdown: markdown, unknownHeaderFields: [])
+            return serializeHeader(block) + escapingHeaderLines(markdown)
+        }
+        return escapingHeaderLines(markdown, skippingFirstLine: true)
+    }
+
+    static func headerlessCloser(in markdown: String) -> Range<String.Index>? {
+        guard markdown.range(of: headerMarker, options: .anchored) != nil else { return nil }
+        return markdown.range(of: "-->")
     }
 
     // MARK: - Line terminators (W3.notes-cr-line-start)
@@ -133,7 +150,7 @@ enum BlockParser {
 
     /// True for the `Character`s that are exactly one line break: `"\n"`, `"\r"`, and the merged
     /// `"\r\n"` grapheme.
-    private static func isLineBreak(_ character: Character) -> Bool {
+    static func isLineBreak(_ character: Character) -> Bool {
         character.unicodeScalars.allSatisfy(isLineTerminator)
     }
 
@@ -220,8 +237,8 @@ enum BlockParser {
         rewritingHeaderLines(text, skippingFirstLine: false, escape: false)
     }
 
-    private static let headerMarkerScalars = Array("<!-- block:".unicodeScalars)
-    private static let headerMarkerUTF8 = Array("<!-- block:".utf8)
+    private static let headerMarkerScalars = Array(headerMarker.unicodeScalars)
+    private static let headerMarkerUTF8 = Array(headerMarker.utf8)
 
     private static func rewritingHeaderLines(_ text: String, skippingFirstLine: Bool, escape: Bool) -> String {
         // Bytes, not `Character`s: `"<!-- block:\u{301}"` holds the marker for `parse`, but its last
@@ -250,13 +267,13 @@ enum BlockParser {
     // MARK: - Internal
 
     private static func parseSegment(_ text: String) -> Block {
-        guard let closeRange = text.range(of: "-->") else {
+        guard let closeRange = text.range(of: "-->"),
+              let (kind, source, unknownFields) = parseHeader(text[..<closeRange.lowerBound]) else {
             // The opener on the first line has no backslash, so unescaping leaves it alone.
             return Block(kind: .freeform, source: nil, markdown: unescapingHeaderLines(text),
                          unknownHeaderFields: [], headerless: true)
         }
 
-        let headerRaw = String(text[text.startIndex..<closeRange.upperBound])
         var mdStart = closeRange.upperBound
         // Consume exactly ONE terminator, whichever form it takes — `index(after:)` steps over the
         // whole `"\r\n"` grapheme, which is one line break, not two.
@@ -265,17 +282,11 @@ enum BlockParser {
         }
         let markdown = mdStart < text.endIndex ? unescapingHeaderLines(String(text[mdStart...])) : ""
 
-        let (kind, source, unknownFields) = parseHeader(headerRaw)
         return Block(kind: kind, source: source, markdown: markdown, unknownHeaderFields: unknownFields)
     }
 
-    private static func parseHeader(_ raw: String) -> (Block.Kind, SourceAnchor?, [(String, String)]) {
-        var text = raw
-        if let r = text.range(of: "<!--") { text = String(text[r.upperBound...]) }
-        if let r = text.range(of: "-->", options: .backwards) { text = String(text[..<r.lowerBound]) }
-
-        let fieldLines = text.split(omittingEmptySubsequences: false, whereSeparator: { isLineBreak($0) })
-            .map { $0.trimmingCharacters(in: .whitespaces) }
+    private static func parseHeader(_ raw: Substring) -> (Block.Kind, SourceAnchor?, [(String, String)])? {
+        let fieldLines = raw.dropFirst("<!--".count).split(whereSeparator: isLineBreak)
 
         var kind: Block.Kind = .freeform
         var link: String?, display: String?, thumbRef: String?, zoteroSel: String?, noteRef: String?
@@ -283,8 +294,11 @@ enum BlockParser {
         var unknownFields: [(String, String)] = []
         let knownBlockFields: Set<String> = ["link", "display", "page", "thumb", "zotero", "note"]
 
-        for fieldLine in fieldLines where !fieldLine.isEmpty {
-            guard let colonIdx = fieldLine.firstIndex(of: ":") else { continue }
+        for line in fieldLines {
+            let fieldLine = line.trimmingCharacters(in: .whitespaces)
+            if fieldLine.isEmpty { continue }
+            // A prose line before a later closer invalidates the header. Keep the entire segment as text.
+            guard let colonIdx = fieldLine.firstIndex(of: ":"), colonIdx != fieldLine.startIndex else { return nil }
             let key = fieldLine[..<colonIdx].trimmingCharacters(in: .whitespaces)
             let val = fieldLine[fieldLine.index(after: colonIdx)...].trimmingCharacters(in: .whitespaces)
 

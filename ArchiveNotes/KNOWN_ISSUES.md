@@ -5,11 +5,16 @@ Running log of quirks, risks, and things verified/unverified for the Notes app. 
 
 ## ⚠️ OPEN — Notes editor save failures verified on scratch data (2026-11-21)
 
-- **Typing a comment closer after an unclosed block header** can erase prose on save. The styled
-  editor showed the new prose before save. The saved file and reopened editor lost the prose before
-  the closer. (queued: W49.fix-notes-unclosed-header)
 - **Pasting an image in raw Markdown mode** writes the image to the item's assets and saves a U+FFFC
   character in the note. The note has no reference to the image. (queued: W49.fix-notes-raw-image-paste)
+
+## ✅ FIXED (W49.fix-notes-unclosed-header, 2026-11-21) — prose survives a typed comment closer
+
+Typing `-->` after an unclosed block header could make Notes consume the intervening prose as source
+metadata on save. The styled editor now saves the text and its line breaks inside a freeform block
+and escapes the original opener. A candidate header with a nonblank line missing its field name
+and colon also falls back to freeform text. Valid source headers still carry their provenance. The scratch
+regression is `NotesTextLossSuspectTests.s019TypedCloserAfterUnclosedHeader`.
 
 ## ⚠️ OPEN — Notes list actions verified on scratch data (2026-11-21)
 
