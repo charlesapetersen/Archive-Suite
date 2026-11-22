@@ -277,6 +277,13 @@ calls are section 1.
     export. The existing optional Processor segment JSON remains a distinct output. Finder and Spotlight
     defaults and any migration of the real archive remain separate decisions.
 
+33. **Enclosure cover selection (S-047), 2026-11-21.** When window segmentation splits the
+    covering letter proposed by OCR and drops the enclosure relation, offer an optional choice in
+    document review to identify the actual covering document. Use that document's final date as
+    Sent With and preserve the enclosure's own date. Leaving the choice blank keeps the relation
+    and Sent With unset. Never infer the cover from adjacency. File implementation after the
+    independent reproduction in W49.proc-s047-check.
+
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
 Each is a table default or a filed item, reversible without app work; the figures and files are in the note named.
