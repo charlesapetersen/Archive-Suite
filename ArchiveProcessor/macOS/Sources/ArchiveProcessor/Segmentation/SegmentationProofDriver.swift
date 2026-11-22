@@ -221,7 +221,7 @@ enum SegmentationProofDriver {
         p.windowTransportFactory = { spec, gate in
             gateBox.value = gate
             let env = ProcessInfo.processInfo.environment
-            let base = WindowStageTransport.make(spec, keys: keys, claudeBinary: planBinary, route: route, gate: gate,
+            let base = WindowStageTransport.make(spec, keys: keys, claudeBinary: planBinary, route: route, claudeBilling: .subscription, gate: gate,
                                              http: meter.http,
                                              local: (env["SEGMENTATION_PROOF_LOCAL_URL"] ?? LocalSegmenter.defaultBaseURL,
                                                      env["SEGMENTATION_PROOF_LOCAL_MODEL"] ?? LocalSegmenter.defaultModelID))

@@ -75,6 +75,12 @@ struct OCRView: View {
     // Local Agent CLI backend (persisted; mutually exclusive with the gateway)
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent: Bool = false
     @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
+    @AppStorage(DefaultsKeys.localAgentBinaryPath) private var localAgentBinaryPath = ""
+    @ObservedObject private var claudeUsage = ClaudeCLIUsage.shared
+
+    private var claudeBinary: String? {
+        ClaudeCLIBilling.binaryPath(tool: localAgentTool, override: localAgentBinaryPath)
+    }
     // Apple Vision is the no-key, on-device backend selected in Settings.
     @AppStorage(DefaultsKeys.useAppleVision) private var useAppleVision: Bool = false
     @AppStorage(DefaultsKeys.visionUseLLMJudgment) private var visionUseLLMJudgment: Bool = false
@@ -252,7 +258,7 @@ struct OCRView: View {
     private var pendingRunResumeCaption: String {
         if let reason = pendingRunResumeBlockReason { return reason }
         switch processor.pendingRunBackend {
-        case .localAgent: return "Click Resume to continue with the Local Agent. No API key is needed."
+        case .localAgent: return "Click Resume to continue with the CLI configured for this run."
         case .gateway: return "Click Resume to continue through the gateway with its saved key."
         case .appleVision: return "Click Resume to continue with Apple Vision."
         case .direct, nil: return "Click Resume to continue processing remaining files."
@@ -360,7 +366,7 @@ struct OCRView: View {
               let options = SegmentationOptionsStore.shared else { return nil }
         let approach = SegmentationApproach(rawValue: segmentationApproachRaw) ?? .defaultApproach
         return SegmentationRow.make(approach, options: options, pageCount: segmentationPageCount,
-                                    routes: segmentationRoutes)
+                                    routes: segmentationRoutes.withClaudeBilling(claudeUsage.billing(for: claudeBinary)))
     }
 
     /// Processing-time estimate for the current batch (LLM/processing time only).
@@ -843,12 +849,12 @@ struct OCRView: View {
                     GroupBox("Cost Estimate") {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Image(systemName: "infinity.circle").foregroundStyle(.secondary)
-                                Text("Included in your subscription — usage limits apply.")
+                                Image(systemName: "terminal").foregroundStyle(.secondary)
+                                Text(claudeUsage.costHeadline(binary: claudeBinary, tool: localAgentTool))
                                     .accessibilityIdentifier("ap.ocr.localAgentCost")
                                 Spacer()
                             }
-                            Text("The \(localAgentTool.displayName) CLI uses your subscription login — no per-page charge. If you hit your plan's usage window, the app paces and resumes when it resets. It reads at most two pages at a time, so expect it to be slower than a metered API.")
+                            Text(claudeUsage.costDetail(binary: claudeBinary, tool: localAgentTool))
                                 .font(.caption2)
                                 .foregroundStyle(.primary)
                                 .padding(.top, 2)
@@ -1094,7 +1100,7 @@ struct OCRView: View {
                     Text("Confirmed newspaper pages use one reading request per region, with a possible fill and a whole-page fallback. Other kinds, handwriting, registers and uncertain pages keep whole-page reading.")
                     Text("Allow up to 130 requests per newspaper per attempt: 128 regions, one fill and one fallback. Retries and second readers can make additional attempts.")
                     if useLocalAgent {
-                        Text("These requests use your subscription allowance. No per-request dollar estimate is available.")
+                        Text("The CLI uses the billing method shown above. No per-request dollar estimate is available.")
                     } else if useAppleVision {
                         Text("Vision reads the regions locally, with no image-reading charge. Any optional text-only judgement is estimated separately above.")
                     } else if openRouterUnpriced {
@@ -1817,7 +1823,7 @@ struct OCRView: View {
         }
         if direct && !useAppleVision {
             ways += SettingsTraining.refusalFallbackWays(
-                claudeByPlan: segmentationRoutes.claudeByPlan,
+                claudeByPlan: segmentationRoutes.claudeUsesCLI,
                 openRouterKey: KeychainHelper.exists(account: LLMProvider.openrouter.rawValue),
                 mistralKey: KeychainHelper.exists(account: LLMProvider.mistral.rawValue))
                 .map { ($0, "reading a page the first reader refuses") }
@@ -1869,7 +1875,8 @@ struct OCRView: View {
             let pricedModel = useAppleVision && visionUseLLMJudgment && !isPDFOnlyReOCR ? selectedModel : model
             let usesReader = !preOCRedInput || classifyPreOCRedInput
             guard !usesReader || ProcessFilesMonthlySpend.hasPrice(model: pricedModel, gateway: currentGatewayConfig,
-                                                     localAgent: currentLocalAgentConfig) else {
+                                                     localAgent: currentLocalAgentConfig,
+                                                     claudeBilling: claudeUsage.billing(for: claudeBinary)) else {
                 processor.statusMessage = "This reader has no price estimate. Choose a priced or free reader to use the monthly spending limit."
                 return
             }

@@ -9,9 +9,8 @@ struct SegmentationRoutes: Equatable, Sendable {
     var hasGeminiKey = false
     var hasOpenAIKey = false
     var hasOpenRouterKey = false
-    /// The user's own `claude` is installed. Whether it is signed in is only known at the first call: the app
-    /// never reads the login (`segbench-results/usage.md`).
     var hasClaudeCLI = false
+    var claudeBilling: ClaudeCLIBilling = .unknown
     /// Which way Claude goes when both an Anthropic key and `claude` exist (W36.seg-opt-subscription).
     var claudeRoute: ClaudeRoute = .apiKey
     /// The signed-in ChatGPT account (Sign in with ChatGPT), or nil (W36.seg-opt-siwc).
@@ -33,8 +32,15 @@ struct SegmentationRoutes: Equatable, Sendable {
 
     static let none = SegmentationRoutes()
 
-    /// Claude's windows go by the user's own plan: `claude` is there, and either no key or the user chose the plan.
-    var claudeByPlan: Bool { hasClaudeCLI && (!hasAnthropicKey || claudeRoute == .plan) }
+    /// The CLI's sign-in is separate from the direct Anthropic key saved in Processor.
+    var claudeUsesCLI: Bool { hasClaudeCLI && (!hasAnthropicKey || claudeRoute == .plan) }
+
+    func withClaudeBilling(_ billing: ClaudeCLIBilling) -> Self {
+        var routes = self
+        routes.claudeBilling = billing
+        return routes
+    }
+
     /// W41.app-openrouter-claude: Claude's windows go through OpenRouter, on Anthropic's own endpoint: no Anthropic key
     /// and no `claude`, but an OpenRouter key. Not in the mix (`canRun(_:approach:)`): its ChatGPT half is GPT-6.1 Sol
     /// through Codex, not a measured OpenRouter route, so the mix stays on the keys and plans. Claude as the 2B's
@@ -50,14 +56,12 @@ struct SegmentationRoutes: Equatable, Sendable {
     /// Reads the Keychain and looks for `claude`. Never call it from a view body.
     static func current(_ defaults: UserDefaults = .standard) -> SegmentationRoutes {
         // The path override belongs to whichever CLI the OCR backend uses; it names `claude` only when that is it.
-        let tool = defaults.string(forKey: DefaultsKeys.localAgentTool).flatMap(LocalAgentTool.init(rawValue:))
-        let override = tool == .claude ? (defaults.string(forKey: DefaultsKeys.localAgentBinaryPath) ?? "") : ""
         return SegmentationRoutes(
             hasAnthropicKey: !(KeychainHelper.load(account: LLMProvider.anthropic.rawValue) ?? "").isEmpty,
             hasGeminiKey: !(KeychainHelper.load(account: LLMProvider.gemini.rawValue) ?? "").isEmpty,
             hasOpenAIKey: !(KeychainHelper.load(account: LLMProvider.openai.rawValue) ?? "").isEmpty,
             hasOpenRouterKey: !(KeychainHelper.load(account: LLMProvider.openrouter.rawValue) ?? "").isEmpty,
-            hasClaudeCLI: LocalAgentClient.resolveBinaryPath(tool: .claude, override: override) != nil,
+            hasClaudeCLI: ClaudeCLIBilling.binaryPath(defaults) != nil,
             claudeRoute: ClaudeRoute.stored(defaults),
             chatGPTAccount: ChatGPTAuth.shared.signedInAccount(),
             chatGPTStale: ChatGPTAuth.shared.hasStaleRegistration,
@@ -129,6 +133,7 @@ struct SegmentationRow: Equatable, Sendable {
     /// What else the user should read before choosing it: for the model on this Mac, its Mac figures, whether this
     /// Mac's memory suits it, and where it learned.
     var notes: [String] = []
+    var costUnconfirmed = false
 
     var canRun: Bool { unavailableReason == nil }
 
@@ -136,6 +141,7 @@ struct SegmentationRow: Equatable, Sendable {
     /// user's own `claude` can run it.
     var costSummary: String {
         if !approach.proposesBoundaries { return CostEstimate.money(0) }
+        if canRun && costUnconfirmed { return "billing unconfirmed" }
         if let d = apiDollars { return CostEstimate.money(d) }
         return canRun ? "your plan" : "—"
     }
@@ -179,9 +185,9 @@ struct SegmentationRow: Equatable, Sendable {
         let missingKeys = missing.filter { !routes.hasKey($0) }
         let reason: String? = missing.isEmpty ? nil : "Needs " + missing.map { needPhrase($0, approach: approach) }.joined(separator: " and ") + "."
 
-        let (lines, notes, dollars) = approach.proposesBoundaries
+        let (lines, notes, dollars, costUnconfirmed) = approach.proposesBoundaries
             ? costLines(entry, pageCount: n, routes: routes, today: today, approach: approach)
-            : (["No cost"], [], 0)
+            : (["No cost"], [], 0, false)
 
         // The 2B checked against an online model (W46.seg-review-rule): the 2B's boundaries, the partner's cost, and
         // only the gaps where the two disagree to check. No figure was measured for the pair on the test boxes.
@@ -204,7 +210,8 @@ struct SegmentationRow: Equatable, Sendable {
                 footnote: footnote,
                 unavailableReason: why.isEmpty ? nil : why.joined(separator: " "),
                 missingKeys: missingKeys + other.missingKeys,
-                notes: LocalSegmenter.notes(memoryGB: routes.memoryGB, mac: entry.mac, partner: other.label) + other.notes)
+                notes: LocalSegmenter.notes(memoryGB: routes.memoryGB, mac: entry.mac, partner: other.label) + other.notes,
+                costUnconfirmed: other.costUnconfirmed)
         }
 
         return SegmentationRow(
@@ -221,7 +228,8 @@ struct SegmentationRow: Equatable, Sendable {
                                                                      onlineReachable: SegmentationOptions.partnerApproaches.contains {
                                                                          let a = $0
                                                                          return SegmentationRow.providers(a, options: options).allSatisfy { routes.canRun($0, approach: a) }
-                                                                     }) : []))
+                                                                     }) : []),
+            costUnconfirmed: costUnconfirmed)
     }
 
     /// Why the text-only Gemini window is the pick when Gemini is the only key, and what the image window buys over it:
@@ -272,7 +280,7 @@ struct SegmentationRow: Equatable, Sendable {
     /// API price of the same calls, labelled approximate, with "Using ChatGPT plan".
     private static func costLines(_ entry: SegmentationOptions.Approach, pageCount n: Int,
                                   routes: SegmentationRoutes, today: Date,
-                                  approach: SegmentationApproach) -> ([String], [String], Double?) {
+                                  approach: SegmentationApproach) -> ([String], [String], Double?, Bool) {
         let models = (entry.cost?.perModel ?? [:]).sorted { $0.key < $1.key }
         let day = dayString(today)
         var apiList = 0.0, anyAPI = false
@@ -280,6 +288,7 @@ struct SegmentationRow: Equatable, Sendable {
         var planNotional = 0.0, anyPlan = false
         var chatGPTTokens = 0.0, chatGPTNotional = 0.0, anyChatGPTPlan = false
         var anyLocal = false
+        var claudeCLIUSD = 0.0, claudeCLIKey = false, costUnconfirmed = false
         for (key, cost) in models {
             let tokens = entry.tokensPer1000Pages?[key]
             // problems() refuses a model outside the catalog, so this never skips in a shipped file.
@@ -290,10 +299,18 @@ struct SegmentationRow: Equatable, Sendable {
                 anyLocal = true
                 continue
             }
-            if provider == .anthropic, routes.claudeByPlan,
-               let notional = tokens?.subscriptionRouteNotionalUSDPer1000Pages {
-                anyPlan = true
-                planNotional += notional * Double(n) / 1000
+            if provider == .anthropic, routes.claudeUsesCLI {
+                let notional = (tokens?.subscriptionRouteNotionalUSDPer1000Pages ?? 0) * Double(n) / 1000
+                switch routes.claudeBilling {
+                case .subscription:
+                    anyPlan = true
+                    planNotional += notional
+                case .apiKey:
+                    claudeCLIKey = true
+                    claudeCLIUSD += notional
+                case .unknown:
+                    costUnconfirmed = true
+                }
                 continue
             }
             if provider == .openai, routes.chatGPTByPlan {
@@ -324,6 +341,12 @@ struct SegmentationRow: Equatable, Sendable {
         var lines: [String] = []
         if anyLocal { lines.append("none: it runs on this Mac") }
         if anyAPI { lines.append("about \(dollars(apiList)) by API key at list price") }
+        if claudeCLIKey {
+            lines.append("Claude Code API key: about \(dollars(claudeCLIUSD)) at list price")
+        }
+        if costUnconfirmed {
+            lines.append("Claude Code billing could not be confirmed. Requests may incur charges.")
+        }
         if anyPlan {
             if let share = routes.planCalibration.estimate(notionalUSD: planNotional),
                let date = routes.planCalibration.lastMeasured {
@@ -338,7 +361,8 @@ struct SegmentationRow: Equatable, Sendable {
             lines.append("ChatGPT plan: \(tokenText)roughly \(dollars(chatGPTNotional)) "
                          + "of API calls at list price (approximate). Using ChatGPT plan")
         }
-        return (lines, notes, anyAPI ? apiList : anyLocal && !anyPlan && !anyChatGPTPlan ? 0 : nil)
+        let total = anyAPI || claudeCLIKey ? apiList + claudeCLIUSD : anyLocal && !anyPlan && !anyChatGPTPlan ? 0 : nil
+        return (lines, notes, total, costUnconfirmed)
     }
 
     // MARK: Formatting

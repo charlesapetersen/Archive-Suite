@@ -235,13 +235,15 @@ struct APIWindowTransport: WindowTransport {
 /// `call_claude`): the window's pages written as `page-NNNN.jpg` into a fresh temp dir that is the process's
 /// working directory, prompt w1 (here on stdin), the Read tool only, no session kept. The output is
 /// `--output-format stream-json --verbose` (W36.seg-opt-subscription), whose `rate_limit_event` carries the
-/// account's meter; the final `result` event is the envelope `json` printed. The app never reads the CLI's login.
+/// account's meter; the final `result` event is the envelope `json` printed. The CLI supplies the sign-in category and cost figure.
 struct LocalAgentWindowTransport: WindowTransport {
     let binaryPath: String
     /// Per window: the bench allowed 900 s for seven Read turns and the answer.
     var timeout: TimeInterval = 900
+    var billing: ClaudeCLIBilling = .subscription
     /// The run's meter and its two pauses (`PlanRunGate`); nil sends without them.
     var gate: PlanRunGate? = nil
+    var checkBilling = false
 
     /// Inherited from a shell that launched the app, these would make `claude -p` bill an API key, not the plan the
     /// user chose this route for (and the meter would then read as unreadable). The same list the OCR path strips.
@@ -261,13 +263,21 @@ struct LocalAgentWindowTransport: WindowTransport {
         for (n, img) in zip(r.pageNumbers, r.images) {
             try img.write(to: dir.appendingPathComponent(WindowPromptRenderer.fileName(n)))
         }
+        if checkBilling {
+            let current = await ClaudeCLIUsage.shared.refresh(binary: binaryPath, force: true)
+            guard current == billing else {
+                throw WindowTransportError.fatal("Claude Code billing changed. Check its sign-in before resuming segmentation.")
+            }
+        }
         let run = await LocalAgentClient.runAsync(binaryPath: binaryPath, args: Self.arguments(model: r.voter.modelID),
                                                   stdinText: r.prompt, timeout: timeout, currentDirectory: dir,
                                                   unsetEnvironment: Self.apiCredentialVariables)
         if run.cancelled { throw CancellationError() }
         let stream = ClaudeStreamOutput.parse(run.stdout)
         let result = Result { try Self.classify(run, stream: stream, now: Date()) }
-        if let gate {
+        if stream.billedByAPIKey(billing) {
+            await ClaudeCLIUsage.shared.reportAPIUsage(stream.notionalUSD, binary: binaryPath)
+        } else if let gate {
             // A call counts toward the pages measured only if its answer parses; a retry covers the same pages.
             let answered = (try? result.get()).flatMap { try? WindowAnswerParser.parse($0, pageNumbers: r.pageNumbers) } != nil
             await gate.record(meter: stream.meter, notionalUSD: stream.notionalUSD ?? 0, answered: answered,

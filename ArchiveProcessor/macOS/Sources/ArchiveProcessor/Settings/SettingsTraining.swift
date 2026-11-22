@@ -316,7 +316,7 @@ extension SettingsTraining {
             case .gemini: return .key("gemini")
             case .anthropic:
                 // W41.app-openrouter-claude: Claude outside the mix may go through OpenRouter (`WindowStageTransport.make`).
-                if routes.claudeByPlan { return .plan("claude") }
+                if routes.claudeUsesCLI { return .plan("claude") }
                 if approach != .mix, routes.claudeThroughOpenRouter, let id = OpenRouterRoute.through(
                     provider: .anthropic, modelID: v.modelID)?.model.id { return .openRouter(modelID: id) }
                 return .key("anthropic")

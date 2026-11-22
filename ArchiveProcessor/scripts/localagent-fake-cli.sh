@@ -33,12 +33,25 @@
 #   streamnometer  the same with no rate_limit_event (an older CLI, or an API-key login)          exit 0
 mode="${LOCALAGENT_FAKE_MODE:-ok}"
 
+if [ "${1:-}" = auth ] && [ "${2:-}" = status ]; then
+    case "${LOCALAGENT_FAKE_BILLING:-plan}" in
+        key) printf '%s\n' '{"loggedIn":true,"authMethod":"api_key","apiProvider":"firstParty","apiKeySource":"/login managed key"}' ;;
+        unknown) printf '%s\n' '{"loggedIn":false,"authMethod":"none","apiProvider":"firstParty"}'; exit 1 ;;
+        *) printf '%s\n' '{"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty"}' ;;
+    esac
+    exit 0
+fi
+
 # Always drain stdin first so the process exits cleanly on EOF and reports the prompt size.
 stdin_bytes=$(wc -c | tr -d ' ')
 
 case "$mode" in
   ok)
     printf '%s\n' '{"result":"[document_start]\n[rotate_0]\nFAKE-CLI-OCR-TOKEN transcribed body line one\nbody line two","total_cost_usd":0,"num_turns":3,"is_error":false}'
+    exit 0 ;;
+  paid)
+    printf '%s\n' '{"type":"system","subtype":"init","apiKeySource":"/login managed key"}' \
+        '{"type":"result","subtype":"success","result":"[document_start]\n[rotate_0]\nPAID FIXTURE","total_cost_usd":0.0425}'
     exit 0 ;;
   echostdin)
     printf '{"result":"STDIN_BYTES=%s"}\n' "$stdin_bytes"

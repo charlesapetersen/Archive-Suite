@@ -221,9 +221,10 @@ struct SettingsSheetModel {
     static let ruleStageIDs = ["reading-copy", "ocr-input", "layout", "placement", "marks", "capture"]
 
     init(table: SettingsRouteTable, pairs: OCRPairMatrix?, resolver: SettingsResolver, macMemoryGB: Double,
-         pages: Int, month: SettingsMonthSpend = .init(), running: Running) {
+         pages: Int, month: SettingsMonthSpend = .init(), running: Running, claudeBilling: ClaudeCLIBilling) {
         self.table = table
-        let resources = resolver.resources(macMemoryGB: macMemoryGB)
+        var resources = resolver.resources(macMemoryGB: macMemoryGB)
+        if claudeBilling != .subscription { resources.plans.remove("claude") }
         let base = resolver.answers(pages: pages, spentThisMonthUSD: month.usd)
         var answers = base
         var custom: [String: String] = [:]

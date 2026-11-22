@@ -1,7 +1,6 @@
 import Foundation
 
-/// OCR + text-completion backend that shells out to a locally installed, subscription-authenticated
-/// CLI (`claude` / `gemini` / `codex`) instead of a metered API key or gateway. Exposes the same two
+/// OCR + text-completion backend that runs a locally installed CLI (`claude` / `gemini` / `codex`). Exposes the same two
 /// operations as `OpenAICompatibleClient` (`ocr` → `OCRResult`, `textCompletion` → `String`) so it
 /// plugs into the same construction sites (wired in a later checkpoint).
 ///
@@ -14,7 +13,7 @@ import Foundation
 ///   explicit override), never from `$PATH` (no PATH injection).
 /// - Every call has a hard wall-clock **timeout** (SIGTERM→SIGKILL) and drains stdout/stderr
 ///   concurrently so a chatty child can't deadlock on a full pipe buffer.
-/// - Holds **no API key**. Auth is the CLI's own subscription login.
+/// - Holds **no API key**. The CLI handles its own sign-in.
 /// - Only `claude` is Phase-0-validated on a real machine; `gemini`/`codex` invocation details are
 ///   best-effort placeholders (marked VERIFY) pending their Phase-0 spike (keyed/owner tail).
 struct LocalAgentClient: Sendable {
@@ -24,6 +23,8 @@ struct LocalAgentClient: Sendable {
     /// generous ceiling; text completion is prompt-only and quicker.
     static let ocrTimeout: TimeInterval = 240
     static let textTimeout: TimeInterval = 120
+    /// Use the same settings context as the auth probe and as the parent of segmentation's scratch windows.
+    static var claudeWorkingDirectory: URL { FileManager.default.temporaryDirectory }
     /// A `probe()` verification round-trip is prompt-only, but still pays CLI cold-start + one turn, so
     /// it gets a middle ceiling — long enough for a slow first launch, short enough to feel responsive.
     static let probeTimeout: TimeInterval = 60
@@ -99,7 +100,8 @@ struct LocalAgentClient: Sendable {
         let prompt = Self.augmentWithImagePaths(basePrompt, pagePath: pageURL.path, previousPath: prevPath)
 
         let run = await Self.invoke(binary: binary, tool: config.tool, modelOverride: config.modelOverride,
-                                    prompt: prompt, timeout: Self.ocrTimeout, pacing: pacing)
+                                    prompt: prompt, timeout: Self.ocrTimeout, pacing: pacing,
+                                    requiresSubscription: config.requiresSubscription)
 
         switch run {
         case .failure(let code, let message):
@@ -122,7 +124,8 @@ struct LocalAgentClient: Sendable {
             throw OCRError.networkError("The \(config.tool.displayName) CLI was not found. Install it and sign in.")
         }
         let run = await Self.invoke(binary: binary, tool: config.tool, modelOverride: config.modelOverride,
-                                    prompt: prompt, timeout: Self.textTimeout, pacing: pacing)
+                                    prompt: prompt, timeout: Self.textTimeout, pacing: pacing,
+                                    requiresSubscription: config.requiresSubscription)
         switch run {
         case .success(let text):
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -206,15 +209,24 @@ struct LocalAgentClient: Sendable {
     /// Reading waits for the five-hour meter or a hard plan limit, then retries on the plan. The probe
     /// has no pacing so Settings can report login or CLI errors immediately.
     private static func invoke(binary: String, tool: LocalAgentTool, modelOverride: String?,
-                               prompt: String, timeout: TimeInterval, pacing: UsageWindowPacing? = nil) async -> InvokeOutcome {
+                               prompt: String, timeout: TimeInterval, pacing: UsageWindowPacing? = nil,
+                               requiresSubscription: Bool = false) async -> InvokeOutcome {
         let cancelled = InvokeOutcome.failure(code: "cli_cancelled", message: "The \(tool.displayName) CLI request was cancelled.")
-        let planPacing = tool == .claude ? pacing : nil
         while true {
             do {
                 try await concurrencyLimiter.acquire()
             } catch {
                 return cancelled
             }
+            let billing = tool == .claude
+                ? await ClaudeCLIUsage.shared.refresh(binary: binary, force: requiresSubscription) : .unknown
+            if tool == .claude, requiresSubscription, billing != .subscription {
+                await concurrencyLimiter.release()
+                _ = await NewspaperPageReader.spend?.allowsExtra(nil)
+                return .failure(code: "cli_billing_unconfirmed",
+                                message: "The monthly limit requires a confirmed Claude subscription for this read.")
+            }
+            let planPacing = tool == .claude && billing != .apiKey ? pacing : nil
             // Consult the meter after the limiter grants a slot so queued pages see the latest completed call.
             let pause: UsageWindowPause.Wait? = if planPacing != nil { await readingGate.pending() } else { nil }
             if Task.isCancelled {
@@ -227,7 +239,7 @@ struct LocalAgentClient: Sendable {
                 continue
             }
             let run = await spawnAndClassify(binary: binary, tool: tool, modelOverride: modelOverride, prompt: prompt,
-                                             timeout: timeout, pacing: planPacing)
+                                             timeout: timeout, pacing: planPacing, billing: billing)
             await concurrencyLimiter.release()
 
             guard let pacing = planPacing, case .usageLimited(let reset, _) = run else { return run }
@@ -245,13 +257,17 @@ struct LocalAgentClient: Sendable {
 
     /// The actual spawn + classify, run while holding a `concurrencyLimiter` slot.
     private static func spawnAndClassify(binary: String, tool: LocalAgentTool, modelOverride: String?,
-                                         prompt: String, timeout: TimeInterval, pacing: UsageWindowPacing?) async -> InvokeOutcome {
+                                         prompt: String, timeout: TimeInterval, pacing: UsageWindowPacing?,
+                                         billing: ClaudeCLIBilling) async -> InvokeOutcome {
         let args = cliArguments(tool: tool, modelOverride: modelOverride)
         let cli = await runAsync(binaryPath: binary, args: args, stdinText: prompt, timeout: timeout,
+                                 currentDirectory: tool == .claude ? claudeWorkingDirectory : nil,
                                  unsetEnvironment: credentialVariables(for: tool))
 
         let stream = tool == .claude ? ClaudeStreamOutput.parse(cli.stdout) : nil
-        if let pacing { await readingGate.record(stream?.meter, pacing: pacing) }
+        let byAPIKey = stream?.billedByAPIKey(billing) == true
+        if byAPIKey { await ClaudeCLIUsage.shared.reportAPIUsage(stream?.notionalUSD, binary: binary) }
+        if let pacing, !byAPIKey { await readingGate.record(stream?.meter, pacing: pacing) }
 
         if cli.cancelled {
             return .failure(code: "cli_cancelled", message: "The \(tool.displayName) CLI request was cancelled.")
@@ -262,7 +278,9 @@ struct LocalAgentClient: Sendable {
         if cli.spawnFailed {
             return .failure(code: "cli_spawn_failed", message: "Could not launch the \(tool.displayName) CLI.")
         }
-        if let stream { return classifyClaude(cli, stream: stream, now: Date()) }
+        if let stream {
+            return classifyClaude(cli, stream: stream, now: Date(), byPlan: !byAPIKey && (billing == .subscription || (billing == .unknown && stream.hasPlanEvidence)))
+        }
         if cli.exitCode != 0 {
             let code = exitErrorCode(stderr: cli.stderr, exitCode: cli.exitCode)
             return .failure(code: code,
@@ -277,7 +295,7 @@ struct LocalAgentClient: Sendable {
 
     /// The final event decides whether there is usable text. Usage-limit reasons can appear in the result
     /// or in stderr, including when the CLI exits 0.
-    static func classifyClaude(_ cli: CLIRun, stream: ClaudeStreamOutput, now: Date) -> InvokeOutcome {
+    static func classifyClaude(_ cli: CLIRun, stream: ClaudeStreamOutput, now: Date, byPlan: Bool = true) -> InvokeOutcome {
         let envelope = stream.envelope
         let isError = envelope?["is_error"] as? Bool == true
         if cli.exitCode == 0, !isError, let text = envelope?["result"] as? String, !text.isEmpty {
@@ -296,6 +314,9 @@ struct LocalAgentClient: Sendable {
         }
         let limitReasons = reasons.filter(LocalAgentWindowTransport.isUsageLimit)
         if !limitReasons.isEmpty {
+            guard byPlan else {
+                return .failure(code: "cli_rate_limited", message: "Claude Code reached a rate or usage limit. Check the CLI account and try again.")
+            }
             let reset = limitReasons.lazy.compactMap { pacingReset($0, now: now) }.first
             let when = reset.map { " It resets \(usageWindowHint(for: $0, now: now))." } ?? ""
             return .usageLimited(reset: reset, message: "Your Claude plan's usage limit is reached.\(when) Reading "
@@ -316,9 +337,8 @@ struct LocalAgentClient: Sendable {
         return .failure(code: "cli_bad_response", message: "The Claude Code CLI returned an unreadable response.")
     }
 
-    /// Inherited from a shell that launched the app, these make `claude -p` bill an API key instead of the
-    /// subscription this backend exists to use, while the cost pane says the plan covers it. Stripped from every
-    /// `claude` child: OCR, text completion, the probe and the segmentation windows (`LocalAgentWindowTransport`).
+    /// Keep the launching shell's API credentials out of every Claude subprocess. Claude Code may still
+    /// use the key from its own sign-in, which auth status and the result stream can identify.
     static let claudeAPICredentialVariables = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"]
 
     /// The variables removed from `tool`'s environment. `gemini`/`codex` are unverified adapters, left as they were.

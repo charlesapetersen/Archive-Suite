@@ -49,10 +49,11 @@ enum SettingsSheetTestDriver {
         let pairs = OCRPairMatrix.bundled
         func sheet(_ name: String, general: SettingsLayer, collection: SettingsLayer? = nil, gb: Double = 16,
                    pages: Int = 1000, month: SettingsMonthSpend = .init(),
-                   running: SettingsSheetModel.Running = running) -> SettingsSheetModel {
+                   running: SettingsSheetModel.Running = running,
+                   claudeBilling: ClaudeCLIBilling = .subscription) -> SettingsSheetModel {
             let m = SettingsSheetModel(table: table, pairs: pairs,
                                        resolver: SettingsResolver(general: general, project: nil, collection: collection),
-                                       macMemoryGB: gb, pages: pages, month: month, running: running)
+                                       macMemoryGB: gb, pages: pages, month: month, running: running, claudeBilling: claudeBilling)
             record(name, m)
             return m
         }
@@ -271,10 +272,21 @@ enum SettingsSheetTestDriver {
             check("3a \(name): the plan in use", planSheet.totals.contains { $0.id == "plan" && $0.value == "In use" },
                   planSheet.totals.map { "\($0.id)=\($0.value)" }.joined(separator: ", "))
         }
+        let onStoredKey = SettingsSheetView.running(
+            segmentation: .manual, useAppleVision: false, useGateway: false, useLocalAgent: true,
+            provider: .gemini, model: LLMProvider.gemini.models[0], table: table,
+            localAgentModel: "claude-sonnet-5-5", claudeBilling: .apiKey)
+        let storedKeySheet = sheet("claude-cli-key-running",
+                                   general: layer(.general, [(.plans, .strings(["claude"])), (.staysOnMac, .bool(false))]),
+                                   running: onStoredKey, claudeBilling: .apiKey)
+        check("3a a CLI-owned key cannot activate a recorded subscription",
+              !storedKeySheet.resources.plans.contains("claude") && !onStoredKey.onPlan
+              && onStoredKey.readingName.contains("API key"))
         // Reading through the plan already: the sheet finds the row and offers no switch.
         let onPlan = SettingsSheetView.running(segmentation: .manual, useAppleVision: false, useGateway: false, useLocalAgent: true,
                                                provider: .gemini, model: LLMProvider.gemini.models[0], table: table,
-                                               localAgentTool: .claude, localAgentModel: "claude-sonnet-5-5")
+                                               localAgentTool: .claude, localAgentModel: "claude-sonnet-5-5",
+                                               claudeBilling: .subscription)
         check("3a the plan's run is the Claude reading row", onPlan.readingRouteID == "claude-sonnet5.5", onPlan.readingRouteID ?? "nil")
         let onCLIDefault = SettingsSheetView.running(segmentation: .manual, useAppleVision: false, useGateway: false,
                                                      useLocalAgent: true, provider: .gemini, model: LLMProvider.gemini.models[0],
@@ -587,7 +599,7 @@ enum SettingsSheetTestDriver {
         let key = SettingsSheetModel.overrideKey("reading")
         func model(_ doc: CollectionSettingsDocument?) -> SettingsSheetModel {
             SettingsSheetModel(table: table, pairs: pairs, resolver: store.resolver(for: doc), macMemoryGB: 16,
-                               pages: 100, running: running)
+                               pages: 100, running: running, claudeBilling: .unknown)
         }
         let w = SettingsSheetWriter(store: store, folder: folder)
         var out = w.set(key, .string("xiaomi-ocr-0-bf16"), doc: nil)

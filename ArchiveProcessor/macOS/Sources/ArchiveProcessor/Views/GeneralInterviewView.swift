@@ -97,7 +97,7 @@ struct GeneralInterviewView: View {
                     if inventory.claudePath != nil && inventory.claudeSignedIn == nil {
                         Button(checkingClaude ? "Checking…" : "Check the sign-in") { checkClaude() }
                             .disabled(checkingClaude)
-                            .help("Sends one very short message through your Claude plan to see that it answers. It costs no money.")
+                            .help("Checks how the Claude Code app is signed in without sending a prompt.")
                     }
                 }
             }
@@ -112,7 +112,7 @@ struct GeneralInterviewView: View {
         guard inventory.claudePath != nil else { return "The Claude app for the command line is not installed" }
         switch inventory.claudeSignedIn {
         case true?: return "Installed and signed in"
-        case false?: return "Installed, but not signed in"
+        case false?: return "Installed, using an API key"
         case nil: return "Installed; sign-in not checked yet"
         }
     }
@@ -285,12 +285,16 @@ struct GeneralInterviewView: View {
         checkingClaude = true
         claudeMessage = nil
         Task {
-            let status = await LocalAgentValidator.detectAndVerify(config: LocalAgentConfig(tool: .claude, binaryPath: path))
+            let billing = await ClaudeCLIUsage.shared.refresh(binary: path, force: true)
             checkingClaude = false
-            switch status {
-            case .works: inventory.claudeSignedIn = true
-            case .cliNotLoggedIn, .cliEntitlementMissing, .cliNotFound: inventory.claudeSignedIn = false
-            default: claudeMessage = "The check could not finish just now; try again later. The plan is not used until it passes."
+            guard path == inventory.claudePath else { return }
+            switch billing {
+            case .subscription: inventory.claudeSignedIn = true
+            case .apiKey:
+                inventory.claudeSignedIn = false
+                claudeMessage = "Claude Code bills this key for the requests it makes."
+            case .unknown:
+                claudeMessage = "The subscription sign-in could not be confirmed. Check Claude Code's sign-in and try again."
             }
         }
     }

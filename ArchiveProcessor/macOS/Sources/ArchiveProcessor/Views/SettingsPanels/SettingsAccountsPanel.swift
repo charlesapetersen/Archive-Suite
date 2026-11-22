@@ -65,7 +65,7 @@ struct SettingsAccountsPanel: View {
             } label: {
                 HStack {
                     Text("CLI tool")
-                    HelpButton(text: "Which locally installed CLI performs OCR and tagging. Each authenticates with its own subscription login (Claude Code, Gemini CLI, or OpenAI Codex CLI) — no API key is used. Only Claude Code is verified on this machine so far; Gemini/Codex support is best-effort pending their setup check.")
+                    HelpButton(text: "Which locally installed CLI performs OCR and tagging. Each uses its own sign-in. Claude Code bills its API key if it is signed in with one. Only Claude Code is verified on this machine so far; Gemini/Codex support is best-effort pending their setup check.")
                 }
             }
             .accessibilityIdentifier("ap.settings.localAgentToolPicker")
@@ -86,7 +86,7 @@ struct SettingsAccountsPanel: View {
                     Label(localAgentChecking ? "Checking…" : "Detect & Verify", systemImage: "checkmark.seal")
                 }
                 .disabled(localAgentChecking)
-                HelpButton(text: "Checks that the selected CLI is installed and signed in by running one tiny prompt through it. No API key is used and no document is sent — the CLI authenticates with your subscription.")
+                HelpButton(text: "Checks that the selected CLI is installed and signed in by running one tiny prompt through it. The check sends no document. Claude Code can charge for the prompt if it is signed in with an API key.")
                 Button { showLocalAgentWizard = true } label: {
                     Label("Set up (guided)…", systemImage: "wand.and.stars")
                 }
@@ -96,7 +96,7 @@ struct SettingsAccountsPanel: View {
             if !localAgentStatus.isEmpty {
                 Text(localAgentStatus).font(.caption).foregroundStyle(.primary)
             }
-            Text("No API key needed — the CLI uses your existing subscription login. Personal use of your own subscription on your own archive is intended use.")
+            Text("The CLI uses its own sign-in. Archive Processor does not ask for its credentials.")
                 .font(.caption).foregroundStyle(.primary)
         }
     }

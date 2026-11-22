@@ -20,6 +20,14 @@ struct ContentView: View {
     @AppStorage(DefaultsKeys.hasSeenGeneralInterview) private var hasSeenGeneralInterview = false
     @State private var showGeneralInterview = false
 
+    @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
+    @AppStorage(DefaultsKeys.localAgentBinaryPath) private var localAgentBinaryPath = ""
+
+    private var claudeBinary: String? {
+        if KeychainHelper.isHeadlessTestMode && localAgentBinaryPath.isEmpty { return nil }
+        return ClaudeCLIBilling.binaryPath(tool: localAgentTool, override: localAgentBinaryPath)
+    }
+
     enum Mode: String, CaseIterable { case files = "Process Files", live = "Live Capture", tools = "Tools" }
 
     var body: some View {
@@ -143,6 +151,12 @@ struct ContentView: View {
             }
         }
 #endif
+        .task(id: claudeBinary) {
+            await ClaudeCLIUsage.shared.refresh(binary: claudeBinary, force: true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await ClaudeCLIUsage.shared.refresh(binary: claudeBinary, force: true) }
+        }
         .onOpenURL { url in
             // W44: a hand-off from the Reader only opens the Improve OCR dialog, on the Process Files tab.
             guard url.scheme == ImproveOCRRequest.scheme else { return }

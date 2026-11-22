@@ -26,7 +26,8 @@ struct SettingsSheetView: View {
     static func running(segmentation: SegmentationApproach, useAppleVision: Bool, useGateway: Bool,
                         useLocalAgent: Bool, provider: LLMProvider, model: LLMModel,
                         table: SettingsRouteTable?, localAgentTool: LocalAgentTool = .claude,
-                        localAgentModel: String = "", appleVisionModelID: String = "macos-vision") -> SettingsSheetModel.Running {
+                        localAgentModel: String = "", appleVisionModelID: String = "macos-vision",
+                        claudeBilling: ClaudeCLIBilling = .unknown) -> SettingsSheetModel.Running {
         if useAppleVision {
             // W47.wh-readers-lost-clients: the Mac's reader is Vision unless the reading card chose the on-device model.
             if appleVisionModelID == OnDeviceModelClient.modelID {
@@ -38,12 +39,14 @@ struct SettingsSheetView: View {
         if useLocalAgent {
             // `claude` at a measured Anthropic model is that row read by the plan (W41.app-claude-plan-reading).
             let model = localAgentModel.trimmingCharacters(in: .whitespacesAndNewlines)
-            if localAgentTool == .claude, !model.isEmpty,
+            if localAgentTool == .claude, claudeBilling == .subscription, !model.isEmpty,
                let r = table?.stage("reading")?.routes.first(where: { $0.appRoute == "anthropic|\(model)" && $0.needs.plan == ["claude"] }) {
                 return .init(readingRouteID: r.id, readingName: "your Claude plan (\(model))", segmentation: segmentation,
                              onPlan: true)
             }
-            return .init(readingRouteID: nil, readingName: "your signed-in command-line agent", segmentation: segmentation)
+            let name = localAgentTool == .claude && claudeBilling == .apiKey
+                ? "Claude Code on its API key" : "your signed-in command-line agent"
+            return .init(readingRouteID: nil, readingName: name, segmentation: segmentation)
         }
         if useGateway {
             return .init(readingRouteID: nil, readingName: "the model on your API gateway", segmentation: segmentation)
@@ -140,6 +143,8 @@ struct SettingsSheetHost<Content: View>: View {
     @AppStorage(DefaultsKeys.useGateway) private var useGateway = false
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent = false
     @AppStorage(DefaultsKeys.localAgentTool) private var localAgentToolRaw = LocalAgentTool.claude.rawValue
+    @AppStorage(DefaultsKeys.localAgentBinaryPath) private var localAgentBinaryPath = ""
+    @ObservedObject private var claudeUsage = ClaudeCLIUsage.shared
     @AppStorage(DefaultsKeys.localAgentModel) private var localAgentModel = ""
     @AppStorage(DefaultsKeys.batchMode) private var batchMode = false
     @ObservedObject private var modelStore = ModelSelectionStore.shared
@@ -150,6 +155,13 @@ struct SettingsSheetHost<Content: View>: View {
 
     private var resolver: SettingsResolver { store.resolver(for: doc) }
 
+    private var claudeBinary: String? {
+        ClaudeCLIBilling.binaryPath(tool: LocalAgentTool(rawValue: localAgentToolRaw) ?? .claude,
+                                    override: localAgentBinaryPath)
+    }
+
+    private var claudeBilling: ClaudeCLIBilling { claudeUsage.billing(for: claudeBinary) }
+
     private var model: SettingsSheetModel? {
         guard let table = SettingsRouteTable.bundled, table.problems().isEmpty else { return nil }
         _ = openRouterListingData
@@ -158,7 +170,7 @@ struct SettingsSheetHost<Content: View>: View {
             useAppleVision: useAppleVision, useGateway: useGateway, useLocalAgent: useLocalAgent,
             provider: selectedProvider, model: modelStore.model(for: selectedProvider), table: table,
             localAgentTool: LocalAgentTool(rawValue: localAgentToolRaw) ?? .claude, localAgentModel: localAgentModel,
-            appleVisionModelID: modelStore.model(for: .appleVision).id)
+            appleVisionModelID: modelStore.model(for: .appleVision).id, claudeBilling: claudeBilling)
         if !useAppleVision, !useGateway, !useLocalAgent,
            let warning = modelStore.unavailableOpenRouterSelection(for: selectedProvider) {
             running.readingRouteID = nil
@@ -166,7 +178,7 @@ struct SettingsSheetHost<Content: View>: View {
         }
         return SettingsSheetModel(table: table, pairs: OCRPairMatrix.bundled, resolver: resolver,
                                   macMemoryGB: SettingsLayerStore.thisMacMemoryGB, pages: pages,
-                                  month: store.monthSpend(), running: running)
+                                  month: store.monthSpend(), running: running, claudeBilling: claudeBilling)
     }
 
     var body: some View {
@@ -220,13 +232,21 @@ struct SettingsSheetHost<Content: View>: View {
             selectedProvider = provider
             modelStore.setModel(m, for: provider)
         case .readingByPlan(let model):
-            // The Local Agent backend with `claude`: the plan's login, never a key (`LocalAgentClient` strips the
-            // variables that would bill one). The batch switch is left as it is: the Local Agent run ignores it.
-            useGateway = false
-            useAppleVision = false
-            localAgentToolRaw = LocalAgentTool.claude.rawValue
-            localAgentModel = model
-            useLocalAgent = true
+            let binary = claudeBinary
+            Task {
+                let billing = await claudeUsage.refresh(binary: binary, force: true)
+                guard binary == claudeBinary, billing == .subscription else {
+                    problem = "Claude Code's subscription sign-in could not be confirmed. Check its sign-in before selecting the plan."
+                    return
+                }
+                problem = nil
+                useGateway = false
+                useAppleVision = false
+                if localAgentToolRaw != LocalAgentTool.claude.rawValue { localAgentBinaryPath = "" }
+                localAgentToolRaw = LocalAgentTool.claude.rawValue
+                localAgentModel = model
+                useLocalAgent = true
+            }
         }
     }
 

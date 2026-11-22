@@ -21,6 +21,14 @@ struct SegmentationChooserView: View {
     /// Where the setting lives, said under the picker when this is a shortcut to it (Process Files; W47.settings-panels).
     var shortcutNote: String? = nil
 
+    @ObservedObject private var claudeUsage = ClaudeCLIUsage.shared
+    @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
+    @AppStorage(DefaultsKeys.localAgentBinaryPath) private var localAgentBinaryPath = ""
+
+    private var claudeBilling: ClaudeCLIBilling {
+        claudeUsage.billing(for: ClaudeCLIBilling.binaryPath(tool: localAgentTool, override: localAgentBinaryPath))
+    }
+
     @State private var wizardSpecs: [ProviderKeySpec] = []
 
     private var approach: SegmentationApproach {
@@ -29,7 +37,7 @@ struct SegmentationChooserView: View {
 
     private var rows: [SegmentationRow] {
         guard let options else { return [] }
-        return SegmentationRow.all(options: options, pageCount: pageCount, routes: routes)
+        return SegmentationRow.all(options: options, pageCount: pageCount, routes: routes.withClaudeBilling(claudeBilling))
     }
 
     var body: some View {
@@ -69,7 +77,8 @@ struct SegmentationChooserView: View {
             if routes.offersClaudeRouteChoice, SegmentationRow.planNotionalUSD(approach, options: options, pageCount: 1) != nil {
                 Picker("Pay for Claude", selection: $claudeRouteRaw) {
                     Text("By API key").tag(ClaudeRoute.apiKey.rawValue)
-                    Text("By your Claude plan").tag(ClaudeRoute.plan.rawValue)
+                    Text(claudeBilling == .subscription ? "By your Claude plan" : "Through Claude Code")
+                        .tag(ClaudeRoute.plan.rawValue)
                 }
                 .pickerStyle(.segmented)
                 .controlSize(.small)

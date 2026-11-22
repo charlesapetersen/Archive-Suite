@@ -5,7 +5,7 @@ import Foundation
 // Spec: `ArchiveProcessor/segbench-results/usage.md` ("How the app shows it") and
 // execution-plans/segmentation/04-options-build.md Part 3 §4. The meter is the `rate_limit_event` that
 // `claude -p --output-format stream-json` prints on every call: the account's five-hour and weekly utilization, in
-// whole percent. The app never reads the CLI's login (usage.md, condition 2), so this stream is the only meter it has.
+// whole percent. The CLI stream supplies the plan meter and the reported cost of each call.
 // Because the meter is whole-percent, a share is measured as a ratio, meter points per notional dollar (each call's
 // `total_cost_usd`, what the same calls would cost at API list price), and a folder is scaled by its notional dollars.
 
@@ -38,7 +38,21 @@ struct ClaudeStreamOutput {
     /// Plain-text diagnostics, distinct from event fields that can contain incidental numbers like 429.
     var diagnostics: [String] = []
 
-    var notionalUSD: Double? { (envelope?["total_cost_usd"] as? NSNumber)?.doubleValue }
+    private var apiKeySource: String?
+    /// Explicit plan-only signals from a CLI whose auth status could not be read.
+    var hasPlanEvidence: Bool {
+        if meter != nil { return true }
+        let result = envelope?["result"] as? String ?? ""
+        return ([result] + diagnostics).contains { $0.contains("Claude AI usage limit reached|") }
+    }
+
+    var notionalUSD: Double? { envelope?["total_cost_usd"] as? Double }
+
+    func billedByAPIKey(_ billing: ClaudeCLIBilling) -> Bool {
+        if ClaudeCLIBilling.usesAPIKey(source: apiKeySource) { return true }
+        if apiKeySource == "none" || apiKeySource == "oauth" { return false }
+        return billing == .apiKey
+    }
 
     static func parse(_ stdout: String) -> ClaudeStreamOutput {
         var out = ClaudeStreamOutput()
@@ -60,6 +74,8 @@ struct ClaudeStreamOutput {
                     }
                     out.meter = reading
                 }
+            case "system" where ev["subtype"] as? String == "init":
+                out.apiKeySource = ev["apiKeySource"] as? String
             case "result": out.envelope = ev
             default: break
             }

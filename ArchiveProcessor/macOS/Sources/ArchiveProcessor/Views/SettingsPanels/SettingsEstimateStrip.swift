@@ -14,6 +14,12 @@ struct SettingsEstimateStrip: View {
     @AppStorage(DefaultsKeys.gatewayUpstreamProvider) private var gatewayUpstreamProvider: LLMProvider = .anthropic
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent: Bool = false
     @AppStorage(DefaultsKeys.localAgentTool) private var localAgentTool: LocalAgentTool = .claude
+    @AppStorage(DefaultsKeys.localAgentBinaryPath) private var localAgentBinaryPath = ""
+    @ObservedObject private var claudeUsage = ClaudeCLIUsage.shared
+
+    private var claudeBinary: String? {
+        ClaudeCLIBilling.binaryPath(tool: localAgentTool, override: localAgentBinaryPath)
+    }
     @AppStorage(DefaultsKeys.useAppleVision) private var useAppleVision: Bool = false
     @AppStorage(DefaultsKeys.visionUseLLMJudgment) private var visionUseLLMJudgment: Bool = false
     @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput: Bool = false
@@ -71,7 +77,8 @@ struct SettingsEstimateStrip: View {
     private var segmentationRow: SegmentationRow? {
         guard let options = SegmentationOptionsStore.shared else { return nil }
         let approach = SegmentationApproach(rawValue: segmentationApproachRaw) ?? .defaultApproach
-        return SegmentationRow.make(approach, options: options, pageCount: 1000, routes: segmentationRoutes)
+        return SegmentationRow.make(approach, options: options, pageCount: 1000,
+                                    routes: segmentationRoutes.withClaudeBilling(claudeUsage.billing(for: claudeBinary)))
     }
 
     private var rotationMode: RotationMode { RotationMode(rawValue: rotationModeRaw) ?? .standard }
@@ -207,31 +214,27 @@ struct SettingsEstimateStrip: View {
         .accessibilityIdentifier("ap.settings.costPane")
     }
 
-    /// Cost/pacing summary for the Local Agent CLI backend. There is no per-token dollar figure (the CLI
-    /// draws on the user's subscription), so surface that — the plan's "Included in your subscription —
-    /// usage limits apply" branch — plus the usage-window + low-concurrency pacing reality instead.
+    /// Billing detected for the selected CLI and the number of pages it reads at once.
     @ViewBuilder private var localAgentCostPane: some View {
         Divider().padding(.vertical, 2)
         Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)
         HStack(alignment: .top, spacing: 6) {
-            Image(systemName: "infinity.circle").foregroundStyle(.secondary)
-            Text("Included in your subscription — usage limits apply.")
+            Image(systemName: "terminal").foregroundStyle(.secondary)
+            Text(claudeUsage.costHeadline(binary: claudeBinary, tool: localAgentTool))
                 .font(.caption)
         }
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("ap.settings.localAgentCost")
-        Text("The \(localAgentTool.displayName) CLI uses your existing subscription login, so there's no per-page charge. Hit your plan's usage window and the app paces automatically, then resumes when it resets.")
+        Text(claudeUsage.costDetail(binary: claudeBinary, tool: localAgentTool))
             .font(.caption2).foregroundStyle(.primary)
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("ap.settings.localAgentPacing")
 
         Divider().padding(.vertical, 2)
         Text("PACING").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)
-        Text("Runs one CLI agent turn per page, at most two pages at a time, so it never hammers your subscription — expect it to be slower than a metered API.")
+        Text("Runs one CLI agent turn per page, at most two pages at a time.")
             .font(.caption2).foregroundStyle(.primary)
 
-        Text("No API cost; time varies with the CLI, content & your plan's limits.")
-            .font(.caption2).foregroundStyle(.primary)
     }
 
     /// Cost/pacing summary for the in-process Vision backend. Unlike the CLI path it neither consumes a

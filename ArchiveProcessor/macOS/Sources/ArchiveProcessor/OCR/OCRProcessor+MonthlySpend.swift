@@ -17,8 +17,10 @@ struct ProcessFilesMonthlySpend {
         cost.isFinite && cost <= remaining + 1e-12
     }
 
-    static func hasPrice(model: LLMModel, gateway: GatewayConfig?, localAgent: LocalAgentConfig?) -> Bool {
-        if localAgent != nil || gateway?.isLocalModel == true { return true }
+    static func hasPrice(model: LLMModel, gateway: GatewayConfig?, localAgent: LocalAgentConfig?,
+                         claudeBilling: ClaudeCLIBilling = .unknown) -> Bool {
+        if let localAgent { return localAgent.tool != .claude || claudeBilling == .subscription }
+        if gateway?.isLocalModel == true { return true }
         if let gateway {
             return [gateway.inputCostPer1M, gateway.outputCostPer1M].allSatisfy {
                 guard let price = $0 else { return false }

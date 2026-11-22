@@ -64,14 +64,14 @@ enum OCRRefusalFallback {
         var routes: [Route] = []
         let anthropicKey = KeychainHelper.load(account: LLMProvider.anthropic.rawValue) ?? ""
         let claudeModel = keyedModels[0]
-        if available.claudeByPlan {
+        if available.claudeUsesCLI {
             let tool = defaults.string(forKey: DefaultsKeys.localAgentTool).flatMap(LocalAgentTool.init(rawValue:))
             let path = tool == .claude ? (defaults.string(forKey: DefaultsKeys.localAgentBinaryPath) ?? "") : ""
             routes.append(Route(provider: .anthropic, model: claudeModel, apiKey: "",
                                 localAgent: LocalAgentConfig(tool: .claude, binaryPath: path)))
         }
         // A user who chose the plan over the key is not charged behind their back when the plan fails.
-        if !available.claudeByPlan, !anthropicKey.isEmpty {
+        if !available.claudeUsesCLI, !anthropicKey.isEmpty {
             routes.append(Route(provider: .anthropic, model: claudeModel, apiKey: anthropicKey, localAgent: nil))
         }
         if let key = KeychainHelper.load(account: LLMProvider.openrouter.rawValue), !key.isEmpty {
@@ -184,14 +184,17 @@ enum OCRRefusalFallback {
         let spending = NewspaperPageReader.spend
         let price = route.localAgent == nil
             ? CostEstimator.secondReaderPageCost(model: route.model, imageScale: costScale ?? imageScale) : 0
-        guard await spending?.allowsExtra(price) != false else {
+        var localAgent = route.localAgent
+        if await spending?.hasMonthlyLimit == true, localAgent?.tool == .claude {
+            localAgent?.requiresSubscription = true
+        } else if await spending?.allowsExtra(price) == false {
             throw ProcessFilesMonthlySpend.ReadingDeclined()
         }
         // W42.int-s2: through the one page reader, with no thinking level as before. Gemini is never a refusal route
         // (`availableRoutes` builds none: Gemini is the refuser), but a cascade may escalate a cheaper reader's
         // failure to it.
         let reader = try PageReaders.reader(provider: route.provider, model: route.model, apiKey: route.apiKey,
-                                            thinkingLevel: nil, localAgent: route.localAgent)
+                                            thinkingLevel: nil, localAgent: localAgent)
         let countFailure = await spending?.hasMonthlyLimit == true
         var hasText = false
         defer {

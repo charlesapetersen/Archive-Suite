@@ -112,7 +112,7 @@ private struct LocalAgentStep: View {
 
             if let status { statusView(status) }
 
-            Text("No API key needed — the CLI uses your existing subscription login.")
+            Text("Sign in to the CLI with your subscription. If Claude Code uses an API key, it bills that key.")
                 .font(.caption).foregroundStyle(.primary)
         }
         .onAppear {

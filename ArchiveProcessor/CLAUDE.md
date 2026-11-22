@@ -72,16 +72,17 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
   is off by default (pages may be meant to stay on the Mac). Its measured limits (4,096-token cap, streamed
   repetition check + one re-read with a repetition penalty, 600 s → `length`, temp 0, one page at a time) are required. Contract: `scripts/test-local-models.sh`.
 - **Gateway and Local Agent skip batch and LLM rotation.** Local Agent (`OCR/LocalAgentClient.swift`): no shell,
-  prompt on stdin not argv, absolute-path binary, per-call timeout, friendly errors (never raw stderr), **no key**,
-  $0 under the actual CLI's name; only `claude` is validated (`gemini`/`codex` are `VERIFY`
+  prompt on stdin not argv, absolute-path binary, per-call timeout, friendly errors (never raw stderr), **CLI-owned login**,
+  with API charges reported for a key-backed Claude sign-in; only `claude` is validated (`gemini`/`codex` are `VERIFY`
   placeholders); `runAsync` signals exit via `terminationHandler` (`waitUntilExit()` on GCD missed exits) and kills
   its child on cancel. Precedence localAgent > gateway > direct; concurrency 1–2
   + usage-window pacing; the header/history keep the model override or `CLI default` and never price the
-  direct-provider fallback. At 90% of the five-hour meter or at a hard usage limit, new Claude reads wait
+  direct-provider fallback. At 90% of the five-hour meter or at a hard usage limit, new Claude subscription reads wait
   for the reset and resume on the plan. $0 harness: `scripts/test-localagent.sh`.
 - **Requirements:** Low/High thinking where supported; a live cost estimate before processing, standard vs batch
-  side by side, **reflecting the batch discount** (a batch total only with batch on, a direct provider, no pre-OCRed input; Vision / Local Agent / an unpriced gateway show a note, never a
-  dollar figure); batch toggle; parallel workers. Input: drag-and-drop or open panel; JPEG, PNG, TIFF, HEIC, PDF (pre-OCRed: PDFs only). Model
+  side by side, **reflecting the batch discount** (batch totals require batch mode, a direct provider, and
+  fresh OCR). Vision, Local Agent and unpriced gateways show a billing note. Batch toggle; parallel workers.
+  Input: drag-and-drop or open panel; JPEG, PNG, TIFF, HEIC, PDF (pre-OCRed: PDFs only). Model
   defaults (REFERENCE.md) are item decisions: don't change them silently. A live-key OCR smoke is the final OpenAI model-ID check.
 - **Output: each input image → one PDF, same base filename.** Page 1 the image; page 2 the text under `Extracted
   text.` and `[Provider] · [Model] · [Day Month Year]`. **Critical: page 2 is arbitrarily tall — all text on one
@@ -205,7 +206,7 @@ files, including in `ArchiveCaptureiOS/`); keep commits small and rebase often; 
   private members, gate on a warnings delta (beware a cached "0 warnings"). `LiveCaptureTestDriver` does **not** exercise the batch GUI path.
 - `Tagging/` is Tier-2; `Segmentation/` is not (writes nothing). `WindowPrompts.swift` is verbatim from the bench
   (a test compares byte for byte). `enclosureOf` uses the OCR `[enclosure]` marker, never adjacency. `PlanUsage`
-  never reads the CLI's login; `PlanRunGate` pauses at a 90% five-hour meter; Claude/ChatGPT routes ask "key or
+  reads its meter from the CLI stream; `PlanRunGate` pauses at a 90% five-hour meter; Claude/ChatGPT routes ask "key or
   plan" only when both exist. A segmentation gap no window answer covered is flagged at 0 (contract:
   `execution-plans/segmentation/04-options-build.md` Part 3 §2). Segment `.json` sidecars come from
   `SegmentJSONBuilder`; callers write atomically. Single sources: `DefaultsKeys` (defaults keys),

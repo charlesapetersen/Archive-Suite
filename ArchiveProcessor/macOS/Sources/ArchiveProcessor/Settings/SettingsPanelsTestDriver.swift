@@ -66,7 +66,8 @@ enum SettingsPanelsTestDriver {
             let model = SettingsSheetModel(
                 table: table, pairs: OCRPairMatrix.bundled,
                 resolver: SettingsResolver(general: general, project: nil, collection: nil), macMemoryGB: 16, pages: 1000,
-                running: .init(readingRouteID: "apple-vision", readingName: "Apple Vision on this Mac", segmentation: .manual))
+                running: .init(readingRouteID: "apple-vision", readingName: "Apple Vision on this Mac", segmentation: .manual),
+                claudeBilling: .unknown)
             var drawn: [(String, String)] = model.ruleStages.flatMap { st in st.switches.map { (st.id, $0.key.rawValue) } }
             drawn += model.stageSwitches.flatMap { stage, rows in rows.map { (stage, $0.key.rawValue) } }
             if model.ruleStages.contains(where: { $0.forms != nil }) { drawn.append(("placement", SettingsKey.searchableFor.rawValue)) }
@@ -213,7 +214,8 @@ enum SettingsPanelsTestDriver {
             table: table, pairs: OCRPairMatrix.bundled,
             resolver: SettingsResolver(general: SettingsLayer(kind: .general, name: "General"), project: nil, collection: nil),
             macMemoryGB: 16, pages: 1000,
-            running: .init(readingRouteID: "apple-vision", readingName: "Apple Vision on this Mac", segmentation: .manual))
+            running: .init(readingRouteID: "apple-vision", readingName: "Apple Vision on this Mac", segmentation: .manual),
+                claudeBilling: .unknown)
         for card in model.cards {
             let stageRoutes = table.stage(card.id)?.routes ?? []
             let route = card.routeID.flatMap { id in stageRoutes.first { $0.id == id } }

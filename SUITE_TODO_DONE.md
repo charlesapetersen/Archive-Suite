@@ -17833,3 +17833,15 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Verified the Debug build, 427 headless recovery and OCR checks, the two-image Processor smoke, and
   three synthetic Android captures through OCR, Finder tags and finalized PDFs.
   <!-- /W49.proc-request-failure-codes -->
+
+- [x] **W49.proc-claude-stored-key-cost — a `claude` CLI signed in by API key shows the key's cost, not "the plan covers it" [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit).
+  A `claude` CLI logged in by API key stores the key at its own login, outside the environment the app scrubs, so the cost pane's "the plan covers it" is wrong for that account and the reads bill the key. Detect the login method (e.g. `claude auth status`) and show the key-billed cost instead. Covers §W36.seg-opt-subscription "A `claude` signed in by API key still bills that key". Filed by W49.ki-audit-processor.
+  Process Files and Settings show the CLI billing method and its reported API dollars after calls.
+  Segmentation prices the CLI windows from measured usage. A confirmed Claude plan keeps its usage
+  meter and pacing. If the app cannot confirm the sign-in, it says that charges may apply.
+  The settings sheet and setup interview offer a Claude plan only after a subscription sign-in is confirmed.
+  A monthly spending limit requires a confirmed subscription for CLI reads that lack an upfront estimate.
+  Verified the Debug build, two synthetic OCR inputs through tagging and PDF output, and key-free
+  billing, pacing, segmentation, settings and recovery contracts. Both off-screen billing UI checks
+  passed and their screenshots were reviewed. No bench cache used.
+  <!-- /W49.proc-claude-stored-key-cost -->

@@ -159,6 +159,31 @@ enum ProcessorUITestConfiguration {
         return images.isEmpty ? nil : images
     }
 
+    /// The app owns the temporary executable so the runner's container cannot hide it from Process.
+    private static func claudeAuthFixture() -> URL? {
+        let method: String
+        if arguments.contains("-APUITestClaudeKey") {
+            method = "api_key"
+        } else if arguments.contains("-APUITestClaudePlan") {
+            method = "claude.ai"
+        } else {
+            return nil
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("ap-fake-claude-\(UUID().uuidString)")
+        let script = """
+            #!/bin/sh
+            [ "$1" = auth ] && [ "$2" = status ] || exit 1
+            printf '%s\\n' '{"loggedIn":true,"authMethod":"\(method)","apiProvider":"firstParty"}'
+            """
+        do {
+            try script.write(to: url, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
+            return url
+        } catch {
+            preconditionFailure("Could not create the scratch Claude Code executable: \(error)")
+        }
+    }
+
     /// Apply deterministic, no-key defaults before SwiftUI creates any `@AppStorage` view. This is a
     /// launch argument rather than a scheme default so ordinary Debug launches remain unchanged.
     static func installScratchDefaults() {
@@ -170,7 +195,7 @@ enum ProcessorUITestConfiguration {
         defaults.set(false, forKey: DefaultsKeys.useGateway)
         defaults.set(arguments.contains("-APUITestLocalAgent"), forKey: DefaultsKeys.useLocalAgent)
         defaults.set(LocalAgentTool.claude.rawValue, forKey: DefaultsKeys.localAgentTool)
-        defaults.set("", forKey: DefaultsKeys.localAgentBinaryPath)
+        defaults.set(claudeAuthFixture()?.path ?? "", forKey: DefaultsKeys.localAgentBinaryPath)
         defaults.set("", forKey: DefaultsKeys.localAgentModel)
         // A test that picks Light or Dark must not leave the next test in that mode; the relaunch check keeps it.
         if !arguments.contains("-APUITestKeepAppearance") {

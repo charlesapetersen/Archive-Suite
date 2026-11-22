@@ -219,11 +219,11 @@ enum SegmentationPlanTestDriver {
         }
         let notional = "Claude plan: uses about as much of your plan as $50.29 of API calls at list price; "
             + "measured on your account after the first run"
-        let both = SegmentationRoutes(hasAnthropicKey: true, hasClaudeCLI: true)
+        let both = SegmentationRoutes(hasAnthropicKey: true, hasClaudeCLI: true, claudeBilling: .subscription)
         var bothPlan = both
         bothPlan.claudeRoute = .plan
         check("4 the route is offered only with both", both.offersClaudeRouteChoice
-              && !SegmentationRoutes(hasClaudeCLI: true).offersClaudeRouteChoice
+              && !SegmentationRoutes(hasClaudeCLI: true, claudeBilling: .subscription).offersClaudeRouteChoice
               && !SegmentationRoutes(hasAnthropicKey: true).offersClaudeRouteChoice)
         let byKey = SegmentationRow.make(.claude, options: options, pageCount: 1000, routes: both, today: day)
         check("4 both, API key chosen: priced by key", byKey.costLines.first?.contains("by API key") == true
@@ -232,7 +232,7 @@ enum SegmentationPlanTestDriver {
         eq("4 both, plan chosen: the plan line", byPlan.costLines, [notional])
         eq("4 both, plan chosen: no dollars", byPlan.apiDollars, nil)
 
-        var measured = SegmentationRoutes(hasClaudeCLI: true)
+        var measured = SegmentationRoutes(hasClaudeCLI: true, claudeBilling: .subscription)
         measured.planCalibration.add(PlanRunSample(fiveHourPointsPerUSD: 1, sevenDayPoints: 0, notionalUSD: 10,
                                                    pages: 100, measured: day))
         let row = SegmentationRow.make(.claude, options: options, pageCount: 1000, routes: measured, today: day)
@@ -247,9 +247,25 @@ enum SegmentationPlanTestDriver {
         check("4 plan notional per 1,000 pages",
               abs((SegmentationRow.planNotionalUSD(.claude, options: options, pageCount: 1000) ?? 0) - 50.29) < 0.01)
 
+        let paid = measured.withClaudeBilling(.apiKey)
+        let paidRow = SegmentationRow.make(.claude, options: options, pageCount: 1000, routes: paid, today: day)
+        check("4 CLI key pays the CLI list-price estimate", abs((paidRow.apiDollars ?? 0) - 50.29) < 0.01)
+        check("4 CLI key uses dollars even with a stored plan calibration",
+              paidRow.costLines == ["Claude Code API key: about $50.29 at list price"])
+        let unknownRow = SegmentationRow.make(.claude, options: options, pageCount: 1000,
+                                              routes: measured.withClaudeBilling(.unknown), today: day)
+        check("4 unrecognized login has an unconfirmed cost", unknownRow.costUnconfirmed && unknownRow.apiDollars == nil
+              && unknownRow.costSummary == "billing unconfirmed")
+
+        var localWithUnconfirmedPartner = measured.withClaudeBilling(.unknown)
+        localWithUnconfirmedPartner.localPartner = .claude
+        let localRow = SegmentationRow.make(.local, options: options, pageCount: 1000,
+                                            routes: localWithUnconfirmedPartner, today: day)
+        check("4 the local segmenter carries its online partner's unconfirmed cost", localRow.costUnconfirmed)
+
         guard let spec = try? options.spec(for: .claude) else { check("4 claude spec", false); return }
         func plan(_ keys: [WindowProvider: String], _ bin: String?, _ route: ClaudeRoute) -> Bool? {
-            guard case .success(let t) = WindowStageTransport.make(spec, keys: keys, claudeBinary: bin, route: route)
+            guard case .success(let t) = WindowStageTransport.make(spec, keys: keys, claudeBinary: bin, route: route, claudeBilling: .subscription)
             else { return nil }
             return OCRProcessor.usesPlan(t)
         }
@@ -258,6 +274,14 @@ enum SegmentationPlanTestDriver {
         eq("4 transport: claude only → plan", plan([:], "/bin/echo", .apiKey), true)
         eq("4 transport: key only, plan chosen → key", plan([.anthropic: "k"], nil, .plan), false)
         eq("4 transport: neither → missing", plan([:], nil, .plan), nil)
+        if case .success(let transport) = WindowStageTransport.make(spec, keys: [:], claudeBinary: "/bin/echo",
+                                                                     claudeBilling: .apiKey) {
+            check("4 transport: a CLI-owned key runs the CLI without plan metering",
+                  (transport as? RoutingWindowTransport)?.routes[.anthropic] is LocalAgentWindowTransport
+                  && !OCRProcessor.usesPlan(transport))
+        } else {
+            check("4 transport: the CLI-owned key can run without a key in Processor", false)
+        }
     }
 
     // MARK: 5. The gate

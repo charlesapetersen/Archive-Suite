@@ -49,7 +49,9 @@ Claude Code's headless mode is documented and, through the clause above, explici
    It reads the meter from the CLI's own stream instead.
 3. Offer no Claude login of its own. If `claude` is not signed in, tell the user to run `claude` and sign in, which
    uses Anthropic's own flow.
-4. Each user pays with their own plan. The app never supplies a login or a key for anyone else.
+4. Each user pays through their own CLI sign-in. Processor checks the billing category via `claude auth status`.
+   A Claude account uses its plan. A stored API key incurs API charges. The status command exposes metadata only,
+   and the app never supplies a login or a key.
 
 The Commercial Terms condition binds whoever distributes the app. That is the owner, who already holds an Anthropic
 API account.

@@ -188,7 +188,7 @@ struct SettingsReadingPanel: View {
             } label: {
                 HStack {
                     Text("OCR backend")
-                    HelpButton(text: "Direct API calls the provider directly. API Gateway routes OCR through a custom OpenAI-compatible endpoint. Local CLI Agent runs OCR through a signed-in CLI using your subscription. Apple Vision transcribes locally with macOS Vision: no API key, network request, or per-page charge. Exactly one backend is active at a time.")
+                    HelpButton(text: "Direct API calls the provider directly. API Gateway routes OCR through a custom OpenAI-compatible endpoint. Local CLI Agent runs OCR through the CLI's own sign-in, which can be a subscription or an API key for Claude Code. Apple Vision transcribes locally with macOS Vision: no API key, network request, or per-page charge. Exactly one backend is active at a time.")
                 }
             }
             .accessibilityIdentifier("ap.settings.backendPicker")

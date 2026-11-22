@@ -462,7 +462,7 @@ enum SegmentationChatGPTTestDriver {
         eq("7 neither → missing", route(spec, [:], nil, .plan),
            "missing:ChatGPT needs an OpenAI API key or Sign in with ChatGPT.")
         eq("7 the mix: Claude by its plan, ChatGPT by its plan", route(mixSpec, [:], auth, .apiKey, claude: "/bin/echo"), "plan")
-        if case .success(let t) = WindowStageTransport.make(mixSpec, keys: [:], claudeBinary: "/bin/echo", chatGPT: auth) {
+        if case .success(let t) = WindowStageTransport.make(mixSpec, keys: [:], claudeBinary: "/bin/echo", claudeBilling: .subscription, chatGPT: auth) {
             check("7 the run says Using ChatGPT plan", OCRProcessor.usesChatGPTPlan(t) && OCRProcessor.usesPlan(t))
         } else { check("7 the run says Using ChatGPT plan", false) }
         if case .success(let t) = WindowStageTransport.make(spec, keys: [.openai: "k"], claudeBinary: nil) {
@@ -485,7 +485,7 @@ enum SegmentationChatGPTTestDriver {
                                                                  routes: planChosen, today: day).costLines, row.costLines)
         check("7 the route is asked only with both", keyChosen.offersChatGPTRouteChoice && !signedIn.offersChatGPTRouteChoice)
         let both = SegmentationRow.make(.mix, options: options, pageCount: 1000,
-                                        routes: SegmentationRoutes(hasClaudeCLI: true, chatGPTAccount: "u"), today: day)
+                                        routes: SegmentationRoutes(hasClaudeCLI: true, claudeBilling: .subscription, chatGPTAccount: "u"), today: day)
         check("7 the mix on both plans: two plan lines, no dollars",
               both.canRun && both.apiDollars == nil && both.costLines.count == 2
               && both.costLines[0].hasPrefix("Claude plan:") && both.costLines[1].hasPrefix("ChatGPT plan:"), "\(both.costLines)")

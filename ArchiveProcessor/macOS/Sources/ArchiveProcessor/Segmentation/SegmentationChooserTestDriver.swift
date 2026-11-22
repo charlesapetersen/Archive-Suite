@@ -60,7 +60,7 @@ enum SegmentationChooserTestDriver {
         // 1. Fit to ship.
         eq("1 options.json has no problems", options.problems(), [])
 
-        let all = SegmentationRoutes(hasAnthropicKey: true, hasGeminiKey: true, hasOpenAIKey: true, hasClaudeCLI: true)
+        let all = SegmentationRoutes(hasAnthropicKey: true, hasGeminiKey: true, hasOpenAIKey: true, hasClaudeCLI: true, claudeBilling: .subscription)
         let keysOnly = SegmentationRoutes(hasAnthropicKey: true, hasGeminiKey: true, hasOpenAIKey: false,
                                           hasClaudeCLI: false)
         let today = day("2026-10-11")
@@ -160,7 +160,7 @@ enum SegmentationChooserTestDriver {
         eq("3 mix by keys", mix.costLines, ["about $31.44 by API key at list price"])
         eq("3 mix: both prices fresh, no note", mix.priceNotes, [])
 
-        let cliOnly = SegmentationRoutes(hasClaudeCLI: true)
+        let cliOnly = SegmentationRoutes(hasClaudeCLI: true, claudeBilling: .subscription)
         let claudePlan = row(.claude, 1000, cliOnly)
         eq("3 claude plan only runs", claudePlan.unavailableReason, nil)
         eq("3 claude plan line", claudePlan.costLines,
@@ -168,7 +168,7 @@ enum SegmentationChooserTestDriver {
             + "measured on your account after the first run"])
         eq("3 claude plan has no dollars", claudePlan.apiDollars, nil)
         eq("3 claude plan cost pane", claudePlan.costSummary, "your plan")
-        let mixPlan = row(.mix, 1000, SegmentationRoutes(hasOpenAIKey: true, hasClaudeCLI: true))
+        let mixPlan = row(.mix, 1000, SegmentationRoutes(hasOpenAIKey: true, hasClaudeCLI: true, claudeBilling: .subscription))
         eq("3 mix = Claude plan + ChatGPT dollars", mixPlan.costLines,
            ["about $14.51 by API key at list price",
             "Claude plan: uses about as much of your plan as $50.29 of API calls at list price; "
@@ -340,7 +340,7 @@ enum SegmentationChooserTestDriver {
         let key = DefaultsKeys.segmentationApproach
         let gemOnly = SegmentationRoutes(hasGeminiKey: true)
         let noGemini = SegmentationRoutes(hasAnthropicKey: true, hasOpenAIKey: true, hasOpenRouterKey: true,
-                                          hasClaudeCLI: true)
+                                          hasClaudeCLI: true, claudeBilling: .subscription)
         check("6 no key, nothing saved: saves nothing",
               !SegmentationApproach.preselect(.none, defaults: d) && d.object(forKey: key) == nil)
         eq("6 no key, nothing saved: manual", SegmentationApproach.stored(d), .manual)
@@ -370,7 +370,7 @@ enum SegmentationChooserTestDriver {
            SegmentationApproach.stored(d), .geminiText)
         d.removeObject(forKey: key)
         check("6 an installed claude alone: saves nothing",
-              !SegmentationApproach.preselect(SegmentationRoutes(hasClaudeCLI: true), defaults: d))
+              !SegmentationApproach.preselect(SegmentationRoutes(hasClaudeCLI: true, claudeBilling: .subscription), defaults: d))
         var gemChatGPT = gemOnly
         gemChatGPT.chatGPTAccount = "user@example.com"
         SegmentationApproach.preselect(gemChatGPT, defaults: d)

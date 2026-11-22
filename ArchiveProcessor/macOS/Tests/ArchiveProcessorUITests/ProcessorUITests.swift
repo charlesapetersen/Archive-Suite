@@ -540,14 +540,24 @@ final class ProcessorUITests: XCTestCase {
         return condition()
     }
 
+    func testLocalAgentSettingsAndFilesShowAPIKeyCost() throws {
+        relaunch(extra: ["-APUITestLocalAgent", "-APUITestSyntheticMultiPagePDF", "-APUITestClaudeKey"])
+        let filesCost = element("ap.ocr.localAgentCost")
+        XCTAssertTrue(waitUntil(10) { self.renderedText(of: filesCost).contains("Claude Code bills its API key") },
+                      "Process Files cost display: \(renderedText(of: filesCost))")
+        XCTAssertTrue(renderedText(of: element("ap.ocr.localAgentPacing")).contains("cost Claude Code reports"))
+        openSettings("Collection")
+        XCTAssertTrue(waitUntil(10) { self.renderedText(of: self.element("ap.settings.costPane"))
+            .contains("Claude Code bills its API key") })
+        attachScreenshot("processor-local-agent-key-cost")
+    }
+
     func testLocalAgentSettingsAndFilesShowSubscriptionCostAndGuidedSetup() throws {
-        relaunch(extra: ["-APUITestLocalAgent", "-APUITestSyntheticMultiPagePDF"])
+        relaunch(extra: ["-APUITestLocalAgent", "-APUITestSyntheticMultiPagePDF", "-APUITestClaudePlan"])
 
         let filesCost = element("ap.ocr.localAgentCost")
-        XCTAssertTrue(filesCost.waitForExistence(timeout: 10),
-                      "the OCR Files card must never imply a per-page API charge for Local Agent")
-        XCTAssertTrue(renderedText(of: filesCost).contains("Included in your subscription — usage limits apply."),
-                      "the OCR Files card must state the subscription cost model")
+        XCTAssertTrue(waitUntil(10) { self.renderedText(of: filesCost).contains("Included in your subscription") },
+                      "the OCR Files card must state the detected subscription cost model")
         XCTAssertTrue(renderedText(of: element("ap.ocr.localAgentPacing")).contains("paces and resumes"),
                       "the OCR Files card must explain subscription-window pacing")
         // W40.fix-processor-localagent-key: the UI test saves no key, and the Local Agent needs none, so with a
@@ -564,7 +574,7 @@ final class ProcessorUITests: XCTestCase {
                       "the Settings estimate needs a stable UI-test identity")
         XCTAssertTrue(renderedText(of: settingsCost).contains("Included in your subscription — usage limits apply."),
                       "the Settings estimate must use the same no-dollar cost message")
-        XCTAssertTrue(renderedText(of: settingsCost).contains("paces automatically, then resumes"),
+        XCTAssertTrue(renderedText(of: settingsCost).contains("paces and resumes"),
                       "the Settings estimate must describe its subscription pacing")
         XCTAssertTrue(app.showSettingsPanel("Accounts"), "Settings must have an Accounts panel")
         XCTAssertTrue(element("ap.settings.localAgentToolPicker").waitForExistence(timeout: 10),
@@ -1078,6 +1088,7 @@ final class ProcessorUITests: XCTestCase {
     /// SwiftUI's grouped accessibility elements expose their visible string as `value` on some macOS
     /// releases and as `label` on others. Both are read-only AX snapshots of the rendered control.
     private func renderedText(of element: XCUIElement) -> String {
+        guard element.exists else { return "" }
         if let value = element.value as? String, !value.isEmpty {
             return value
         }

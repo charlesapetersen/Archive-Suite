@@ -237,6 +237,40 @@ enum LocalAgentTestDriver {
             unsetenv("ANTHROPIC_API_KEY")
             unsetenv("ANTHROPIC_AUTH_TOKEN")
 
+            // The real client checks billing through the same executable, then reads its reported dollar cost.
+            let usage = ClaudeCLIUsage.shared
+            setenv("LOCALAGENT_FAKE_BILLING", "key", 1)
+            let paid = await usage.refresh(binary: fakeCLI, force: true)
+            check("auth status identifies a stored CLI key", paid == .apiKey)
+            check("paid CLI cost pane identifies billed usage before any calls",
+                  usage.costHeadline(binary: fakeCLI, tool: .claude).contains("bills its API key"))
+            let paidPage = try? await client(mode: "paid").ocr(imageURL: imageURL)
+            check("stored-key CLI reads the page", paidPage?.text?.contains("PAID FIXTURE") == true)
+            check("stored-key CLI shows the real result's dollar figure",
+                  usage.costDetail(binary: fakeCLI, tool: .claude).contains("$0.0425"))
+            let limitedPaid = try? await client(mode: "limitjson").ocr(imageURL: imageURL)
+            check("stored-key rate limit fails without waiting on a subscription", limitedPaid?.errorCode == "cli_rate_limited")
+            setenv("LOCALAGENT_FAKE_BILLING", "unknown", 1)
+            let unknown = await usage.refresh(binary: fakeCLI, force: true)
+            check("an unavailable sign-in status does not claim a free plan",
+                  unknown == .unknown && usage.costDetail(binary: fakeCLI, tool: .claude).contains("may incur charges"))
+            unsetenv("LOCALAGENT_FAKE_BILLING")
+            let plan = await usage.refresh(binary: fakeCLI, force: true)
+            usage.reportAPIUsage(0.01, binary: fakeCLI)
+            check("a completed paid request does not replace a newer sign-in", usage.billing(for: fakeCLI) == .subscription)
+            check("Claude account sign-in shows subscription coverage", plan == .subscription
+                  && usage.costHeadline(binary: fakeCLI, tool: .claude).contains("Included in your subscription"))
+            check("malformed status is unknown", ClaudeCLIBilling.parse(status: "unsupported command") == .unknown)
+
+            var cappedConfig = LocalAgentConfig(tool: .claude, binaryPath: fakeCLI)
+            cappedConfig.requiresSubscription = true
+            setenv("LOCALAGENT_FAKE_BILLING", "key", 1)
+            setenv("LOCALAGENT_FAKE_MODE", "paid", 1)
+            let capped = try? await LocalAgentClient(config: cappedConfig).ocr(imageURL: imageURL)
+            check("a monthly limit rejects a key-backed read before dispatch", capped?.errorCode == "cli_billing_unconfirmed")
+            unsetenv("LOCALAGENT_FAKE_BILLING")
+            _ = await usage.refresh(binary: fakeCLI, force: true)
+
             // At 89% a second page can start. At 90% its result is kept and the next page waits.
             let meterDir = root.appendingPathComponent("meter-calls", isDirectory: true)
             try? fm.createDirectory(at: meterDir, withIntermediateDirectories: true)

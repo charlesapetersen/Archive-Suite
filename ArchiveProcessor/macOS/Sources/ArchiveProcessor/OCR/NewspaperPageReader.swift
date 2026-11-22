@@ -242,10 +242,10 @@ struct NewspaperLayoutRecord: Codable, Equatable, Sendable {
 final class NewspaperReadingSpend: @unchecked Sendable {
     /// Legacy runs without a persisted settings ID still need an idempotent identity during Stop's two updates.
     let parentLedgerID = UUID()
-    @MainActor var monthlyAdmission: (@MainActor (Double) -> Bool)?
+    @MainActor var monthlyAdmission: (@MainActor (Double?) -> Bool)?
     @MainActor var hasMonthlyLimit: Bool { monthlyAdmission != nil }
 
-    @MainActor func allowsExtra(_ price: Double) -> Bool {
+    @MainActor func allowsExtra(_ price: Double?) -> Bool {
         price == 0 || (monthlyAdmission?(price) ?? true)
     }
 

@@ -165,9 +165,21 @@ extension OCRProcessor {
             pageVoter: spec.voters.first { $0.provider == .anthropic }?.name) { [weak self] prompt in
                 await self?.askPlanCheck(prompt) ?? false
             }
+        let claudeBinary = ClaudeCLIBilling.binaryPath()
+        var routes = SegmentationRoutes.current()
+        routes.localPartner = partner
         let transport: any WindowTransport
-        switch windowTransportOverride.map({ .success($0) }) ?? windowTransportFactory?(spec, gate)
-            ?? WindowStageTransport.current(spec, gate: gate) {
+        let injected = windowTransportOverride.map({ Result<any WindowTransport, WindowStageTransport.Missing>.success($0) })
+            ?? windowTransportFactory?(spec, gate)
+        if injected == nil, routes.claudeUsesCLI, spec.voters.contains(where: { $0.provider == .anthropic }) {
+            routes.claudeBilling = await ClaudeCLIUsage.shared.refresh(binary: claudeBinary, force: true)
+        }
+        guard !Task.isCancelled else { return nil }
+        switch injected ?? WindowStageTransport.current(
+            spec, claudeBinary: routes.claudeUsesCLI ? claudeBinary : nil,
+            claudeBilling: routes.claudeBilling, claudeRoute: routes.claudeUsesCLI ? .plan : .apiKey,
+            gate: gate, checkClaudeBilling: monthlySpend != nil
+        ) {
         case .success(let t): transport = t
         case .failure(let missing):
             return await stopOrCheckAll(pages: pages, spec: spec, answered: prior, message: missing.description)
@@ -206,7 +218,7 @@ extension OCRProcessor {
         }
 
         guard !Task.isCancelled else { return nil }
-        let estimatedSpend: Double
+        let estimatedSpend: Double?
         if monthlySpend != nil, pages.urls.count > 1, let options = SegmentationOptionsStore.shared {
             let windows = WindowLayout.windows(pageCount: pages.urls.count, pages: spec.windowPages,
                                                stride: spec.windowStride)
@@ -216,17 +228,19 @@ extension OCRProcessor {
                                     start: window.lowerBound, end: window.upperBound)] == nil
                 }
             }
-            var routes = SegmentationRoutes.current()
-            routes.localPartner = partner
             let row = SegmentationRow.make(approach, options: options, pageCount: pages.urls.count, routes: routes)
-            estimatedSpend = needsRequests ? (row.apiDollars ?? 0) : 0
+            if needsRequests {
+                estimatedSpend = row.costUnconfirmed ? nil : (row.apiDollars ?? 0)
+            } else {
+                estimatedSpend = 0
+            }
         } else {
             estimatedSpend = 0
         }
         guard reserveMonthlySpend(estimatedSpend, for: "document segmentation") else { return nil }
         let ledgerOutputFolder = activeRunConfig?.outputDirectory
         defer {
-            if estimatedSpend > 0 {
+            if let estimatedSpend, estimatedSpend > 0 {
                 // A stage may have spent its estimate before an interruption. Keep that charge when a run resumes.
                 SettingsLayerStore.shared.recordSpend(usd: estimatedSpend, runID: nil,
                                                       outputDirectory: ledgerOutputFolder, files: 0)
@@ -365,8 +379,10 @@ extension OCRProcessor {
 
     /// Whether any of a run's Claude windows go by the plan.
     nonisolated static func usesPlan(_ t: any WindowTransport) -> Bool {
-        if t is LocalAgentWindowTransport { return true }
-        return (t as? RoutingWindowTransport)?.routes.values.contains { $0 is LocalAgentWindowTransport } ?? false
+        if let claude = t as? LocalAgentWindowTransport { return claude.billing == .subscription }
+        return (t as? RoutingWindowTransport)?.routes.values.contains {
+            ($0 as? LocalAgentWindowTransport)?.billing == .subscription
+        } ?? false
     }
 
     /// Whether a run's ChatGPT windows go by the user's ChatGPT plan.

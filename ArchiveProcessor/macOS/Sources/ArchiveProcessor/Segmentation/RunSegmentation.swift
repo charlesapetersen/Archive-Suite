@@ -204,12 +204,13 @@ enum WindowStageTransport {
     }
 
     /// The transport for an approach's voters, from what the user has: by API key where there is one, else Claude
-    /// through the user's own `claude` and ChatGPT through the signed-in ChatGPT plan; with both, each goes the way
-    /// its route says (the chooser asks only then). `gate` meters and pauses the `claude` calls. `chatGPT` is the
+    /// through the user's own `claude` and ChatGPT through the signed-in ChatGPT plan. With both routes, use
+    /// the user's selection. `gate` meters and pauses the subscription Claude calls. `chatGPT` is the
     /// signed-in account, or nil.
     static func make(_ spec: ApproachSpec, keys: [WindowProvider: String], claudeBinary: String?,
-                     route: ClaudeRoute = .apiKey, chatGPT: ChatGPTAuth? = nil, chatGPTRoute: ChatGPTRoute = .apiKey,
-                     gate: PlanRunGate? = nil, http: APIWindowTransport.HTTP? = nil,
+                     route: ClaudeRoute = .apiKey, claudeBilling: ClaudeCLIBilling = .unknown,
+                     chatGPT: ChatGPTAuth? = nil, chatGPTRoute: ChatGPTRoute = .apiKey,
+                     gate: PlanRunGate? = nil, checkClaudeBilling: Bool = false, http: APIWindowTransport.HTTP? = nil,
                      local: (baseURL: String, modelID: String) = (LocalSegmenter.defaultBaseURL,
                                                                   LocalSegmenter.defaultModelID),
                      localProbe: (@Sendable (String) async throws -> [String])? = nil)
@@ -227,10 +228,12 @@ enum WindowStageTransport {
                 continue
             }
             let noKey = (keys[p] ?? "").isEmpty
-            let claudeByPlan = p == .anthropic && claudeBinary != nil && (route == .plan || noKey)
+            let claudeUsesCLI = p == .anthropic && claudeBinary != nil && (route == .plan || noKey)
             let chatGPTByPlan = p == .openai && chatGPT != nil && (chatGPTRoute == .plan || noKey)
-            if claudeByPlan, let claudeBinary {
-                routes[p] = LocalAgentWindowTransport(binaryPath: claudeBinary, gate: gate)
+            if claudeUsesCLI, let claudeBinary {
+                routes[p] = LocalAgentWindowTransport(binaryPath: claudeBinary, billing: claudeBilling,
+                                                      gate: claudeBilling == .subscription ? gate : nil,
+                                                      checkBilling: checkClaudeBilling)
             } else if chatGPTByPlan, let chatGPT {
                 var t = ChatGPTPlanWindowTransport(auth: chatGPT)
                 if let http { t.http = http }
@@ -260,7 +263,9 @@ enum WindowStageTransport {
     }
 
     /// Reads the Keychain (keys and the ChatGPT sign-in) and looks for `claude`. Never call it from a view body.
-    static func current(_ spec: ApproachSpec, defaults: UserDefaults = .standard, gate: PlanRunGate? = nil)
+    static func current(_ spec: ApproachSpec, defaults: UserDefaults = .standard,
+                        claudeBinary: String?, claudeBilling: ClaudeCLIBilling, claudeRoute: ClaudeRoute,
+                        gate: PlanRunGate? = nil, checkClaudeBilling: Bool = false)
         -> Result<any WindowTransport, Missing> {
         // The model on this Mac must be the shipped one or carry the training kit's manifest (W46.kit-gate).
         if spec.voters.contains(where: { $0.provider == .local }),
@@ -276,13 +281,10 @@ enum WindowStageTransport {
         if keys[.anthropic]?.isEmpty == true, keys[.openrouter] == nil {
             keys[.openrouter] = KeychainHelper.load(account: LLMProvider.openrouter.rawValue) ?? ""
         }
-        let tool = defaults.string(forKey: DefaultsKeys.localAgentTool).flatMap(LocalAgentTool.init(rawValue:))
-        let override = tool == .claude ? (defaults.string(forKey: DefaultsKeys.localAgentBinaryPath) ?? "") : ""
         return make(spec, keys: keys,
-                    claudeBinary: LocalAgentClient.resolveBinaryPath(tool: .claude, override: override),
-                    route: ClaudeRoute.stored(defaults),
+                    claudeBinary: claudeBinary, route: claudeRoute, claudeBilling: claudeBilling,
                     chatGPT: ChatGPTAuth.shared.isSignedIn ? ChatGPTAuth.shared : nil,
-                    chatGPTRoute: ChatGPTRoute.stored(defaults), gate: gate,
+                    chatGPTRoute: ChatGPTRoute.stored(defaults), gate: gate, checkClaudeBilling: checkClaudeBilling,
                     local: (LocalSegmenter.baseURL(defaults), LocalSegmenter.modelID(defaults)))
     }
 }

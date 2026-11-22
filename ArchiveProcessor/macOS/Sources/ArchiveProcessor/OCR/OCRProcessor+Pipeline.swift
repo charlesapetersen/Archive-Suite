@@ -1973,7 +1973,12 @@ extension OCRProcessor {
         // the manifest's OWN persisted input set + output dir (never the current UI selection), so a
         // stale manifest can never cross-contaminate a different job.
         guard let pending = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(pending) else { return }
-        let runConfig = makePendingRunResumeConfig(pending, apiKey: apiKey)
+        let runConfig = {
+            var config = makePendingRunResumeConfig(pending, apiKey: apiKey)
+            config.localAgent?.requiresSubscription = SettingsLayerStore.shared.resolver(at: pending.outputDirectory)
+                .monthlyLimitUSD != nil
+            return config
+        }()
         if pending.provider == .openrouter, pending.gatewayConfig == nil, pending.localAgent == nil,
            pending.completedResults.count < pending.fileURLs.count || pending.enableTagging
                || pending.enableCollectionSegmentation,
@@ -2012,7 +2017,7 @@ extension OCRProcessor {
         // (W42.int-s5 `textLayerOptions`, the dating route's switch). nil (a run recorded before them) is the defaults.
         activeResolvedSettings = pending.resolvedSettings
         currentGateway = pending.gatewayConfig
-        currentLocalAgent = pending.localAgent
+        currentLocalAgent = runConfig.localAgent
         activeRunConfig = runConfig
         activePostCorrection = Self.makePostCorrection(
             requested: pending.runtimeConfig?.postCorrection == true,
@@ -2063,10 +2068,13 @@ extension OCRProcessor {
 
         beginMonthlySpend(outputDirectory: pending.outputDirectory, pricedImages: pending.completedResults.count)
         let pricedModel = activeRunHistory?.visionTextModel ?? pending.model
-        if monthlySpend != nil, !pending.preOCRedInput || activeRunHistory?.classifyPreOCRedInput == true,
-           !ProcessFilesMonthlySpend.hasPrice(model: pricedModel, gateway: pending.gatewayConfig,
-                                             localAgent: pending.localAgent) {
-            guard reserveMonthlySpend(nil, for: "this reader") else { return }
+        if monthlySpend != nil, !pending.preOCRedInput || activeRunHistory?.classifyPreOCRedInput == true {
+            let billing = await ClaudeCLIUsage.shared.refresh(config: pending.localAgent)
+            guard !Task.isCancelled else { return }
+            if !ProcessFilesMonthlySpend.hasPrice(model: pricedModel, gateway: pending.gatewayConfig,
+                                                  localAgent: pending.localAgent, claudeBilling: billing) {
+                guard reserveMonthlySpend(nil, for: "this reader") else { return }
+            }
         }
 
         let segmentationContext = SegmentationContext(
@@ -3190,10 +3198,15 @@ extension OCRProcessor {
         skipAlreadyProcessed: Bool = false,
         segmentationContext: SegmentationContext,
         gatewayConfig: GatewayConfig? = nil,
-        localAgent: LocalAgentConfig? = nil,
+        localAgent requestedLocalAgent: LocalAgentConfig? = nil,
         resumingMixedPDF: PendingMixedPDF? = nil,
         postCorrectionRequested: Bool = false
     ) async {
+        let localAgent = requestedLocalAgent.map { config in
+            var config = config
+            config.requiresSubscription = SettingsLayerStore.shared.resolver(at: outputDirectory).monthlyLimitUSD != nil
+            return config
+        }
         // W41.app-page-kind: taken and cleared before any early return, so a start that is refused cannot leave its
         // plan for a later run whose caller set none.
         let plannedReaders = pageReaders
@@ -3476,9 +3489,13 @@ extension OCRProcessor {
         activeRunHistory?.outputDirectory = outputDirectory
         beginMonthlySpend(outputDirectory: outputDirectory)
         let pricedModel = activeRunHistory?.visionTextModel ?? model
-        if monthlySpend != nil, !preOCRedInput || activeRunHistory?.classifyPreOCRedInput == true,
-           !ProcessFilesMonthlySpend.hasPrice(model: pricedModel, gateway: gatewayConfig, localAgent: localAgent) {
-            guard reserveMonthlySpend(nil, for: "this reader") else { return }
+        if monthlySpend != nil, !preOCRedInput || activeRunHistory?.classifyPreOCRedInput == true {
+            let billing = await ClaudeCLIUsage.shared.refresh(config: localAgent)
+            guard !Task.isCancelled else { return }
+            if !ProcessFilesMonthlySpend.hasPrice(model: pricedModel, gateway: gatewayConfig,
+                                                  localAgent: localAgent, claudeBilling: billing) {
+                guard reserveMonthlySpend(nil, for: "this reader") else { return }
+            }
         }
         activeRunToRecord = resumingMixedPDF == nil
             ? PendingCollectionRecord(snapshot: frozen, outputDirectory: outputDirectory, fileCount: files.count) : nil

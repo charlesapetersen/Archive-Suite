@@ -1146,11 +1146,11 @@ Runtime evidence and the final unattended rerun are under `verification/evidence
 
 ## ⚠️ LIMITATION (W36.seg-opt-subscription, 2026-10-11): the Claude plan route, as built
 
-- **A `claude` signed in by API key still bills that key.** Every `claude` child the app spawns (OCR, text
-  completion, the probe and the segmentation windows) has `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` removed
-  (`LocalAgentClient.claudeAPICredentialVariables`; W40.fix-processor-localagent-api-key, 2026-11-01), so a key
-  exported by the shell that launched the app is never used. A key the CLI stored at its own login is outside the
-  environment and the app cannot see it: the cost pane's "the plan covers it" is then wrong. (queued: W49.proc-claude-stored-key-cost)
+- **Fixed in W49.proc-claude-stored-key-cost.** The cost panes report billing from `claude auth status`. With
+  a stored API key, they show the CLI's reported dollars since the app opened. Segmentation estimates the
+  charge for that key from its measured CLI usage at list price. Requests with unconfirmed billing may
+  incur charges. Processor drops inherited shell keys and handles only sign-in metadata and reported cost.
+  (accepted: fixed history; CLI figures can differ from the provider invoice)
 - **The meter is account-wide and whole-percent.** Other use of the account during a run inflates the measured
   share; rule 7 discards a run only when a step jumps by more than the calls explain, or when a window resets. (accepted: the meter is the account's whole-percent figure; rule 7 discards the runs it cannot explain)
 - **The ratio is stored unkeyed.** A change of plan shows as a ratio that moves; the median of the last five runs

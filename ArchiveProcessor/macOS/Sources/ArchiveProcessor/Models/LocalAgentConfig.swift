@@ -40,7 +40,7 @@ enum LocalAgentTool: String, Codable, Sendable, CaseIterable {
 /// this feature decodes byte-for-byte unchanged (the field is simply absent → `nil`) and crash-resume
 /// of an in-flight capture — the highest-consequence surface in this app — stays untouched.
 ///
-/// Holds **no API key**: auth lives entirely in the CLI's own subscription login. Mirrors
+/// Holds **no API key**: the CLI handles its own sign-in. Mirrors
 /// `GatewayConfig`'s plain synthesized `Codable` — back-compat is provided by the *optional at the
 /// `PendingRun` level*, not by a custom decoder here. SHARED HOTSPOT: append fields only, and append
 /// them as optional / defaulted so older manifests keep decoding.
@@ -56,6 +56,13 @@ struct LocalAgentConfig: Codable, Equatable, Sendable {
     /// in-flight limiter, so this path paces itself with a deliberately LOW cap so it never hammers a
     /// personal subscription. Use `effectiveConcurrencyCap` (clamped 1…2) at call sites.
     var concurrencyCap: Int
+    /// A run with a monthly spending limit only admits a confirmed Claude subscription for unpriced CLI reads.
+    /// Runtime only. Resuming a run checks the collection's current limit.
+    var requiresSubscription = false
+
+    private enum CodingKeys: String, CodingKey {
+        case tool, binaryPath, modelOverride, concurrencyCap
+    }
 
     init(tool: LocalAgentTool, binaryPath: String = "", modelOverride: String? = nil, concurrencyCap: Int = 1) {
         self.tool = tool
