@@ -588,15 +588,11 @@ What remains: a box with many such pages has more gaps to check than the figures
 
 ## ⚠️ LIMITATION (W46.date-route, 2026-11-13): what the dating route does not yet cover
 
-- **Live Capture and the manual auto-date take the route with less context (W46.date-route-other-paths).** Live Capture
-  and the manual segment card send no neighbours (Live's tagging call sends none, and the card's neighbours are not
-  drawn yet), so a document with no year of its own and none on its page image gets no year there rather than an
-  estimate. The tagging sheet's prefetch sends the neighbours, but an enclosure on it does not take its cover's year
-  (step 3a): its `Sent With` comes from the cover as before, and its sidecar may say `class: none`. A Live document whose
-  phone (or Mac card) gives a month but no year keeps that month over the route's, while the evidence quotes the page's
-  own date. A rotation-review regeneration in Live Capture reuses the first decision, with no second call, so a page
-  first read sideways keeps an image pass that found nothing. The sidecar's `dating` object and the header line are
-  written on a manual card only while it still holds the date the route filled; a date the user typed carries none (queued: W49.proc-date-paths-rest).
+- **Live Capture dates each document without neighbouring text.** Its tagging call has no neighbours, so a document
+  with no checked year of its own or on its page image cannot take a neighbour's estimate. A Live document whose phone
+  or Mac card gives a month but no year keeps that month, while the evidence quotes the page's own date. A rotation-review
+  regeneration reuses the first decision, so a page first read sideways keeps an image pass that found nothing
+  (queued: W49.proc-date-paths-rest).
 - **The image pass runs only through a remote gateway** (Gemini 3.7 Flash, the measured route). On a direct key,
   OpenRouter, a Local Agent or a model on this Mac a document whose text has no year goes straight to the neighbour
   estimate, and its sidecar says `image_pass: not sent: no measured image route on this backend`.

@@ -621,26 +621,18 @@ extension OCRProcessor {
         guard !Task.isCancelled else { return }
         isProcessing = true
 
-        // W37: every card's OWN tags first, so an enclosure can read its (owner-reviewed) cover's final
-        // date regardless of card order. The cover never receives the enclosure's date.
-        var ownTagsBySeg: [Int: GeneratedTags] = [:]
-        for m in manualTagSegments where m.segmentIndex < segments.count {
-            var own = GeneratedTags()
-            own.year = m.year.isEmpty ? nil : m.year
-            own.month = Self.normalizeMonth(m.month)
-            own.day = Self.normalizeDay(m.day)
-            own.dateUncertain = m.dateUncertain
-            ownTagsBySeg[m.segmentIndex] = own
+        let cardBySegment = Dictionary(uniqueKeysWithValues: manualTagSegments.indices.map {
+            (manualTagSegments[$0].segmentIndex, $0)
+        })
+        // Covers precede their enclosures, so refresh against the reviewed date before writing either.
+        for idx in manualTagSegments.indices {
+            refreshManualCardDate(at: idx, cardBySegment: cardBySegment)
         }
 
         // Apply the user's tags to each segment's output PDF(s) and write JSON.
         for m in manualTagSegments where m.segmentIndex < segments.count {
             let seg = segments[m.segmentIndex]
-            var tags = GeneratedTags()
-            tags.year = m.year.isEmpty ? nil : m.year
-            tags.month = Self.normalizeMonth(m.month)
-            tags.day = Self.normalizeDay(m.day)
-            tags.dateUncertain = m.dateUncertain
+            var tags = m.ownDateTags
             tags.subjectTags = m.subjectTags
             tags.quality = m.quality
             // W37: only a relation the owner left in place, and only to a valid preceding document cover.
@@ -648,7 +640,8 @@ extension OCRProcessor {
                 Self.validCoverIndex(of: m.segmentIndex, in: segments) == c ? c : nil
             }
             EnclosureDates.resolveManual(entry: m.sentWith, uncertain: m.sentWithUncertain,
-                                         cover: coverIndex.flatMap { ownTagsBySeg[$0] }, into: &tags)
+                                         cover: coverIndex.flatMap { cardBySegment[$0] }.map { manualTagSegments[$0].ownDateTags },
+                                         into: &tags)
             let enclosureOfName = coverIndex.flatMap { segments[$0].pdfURLs.first?.lastPathComponent }
             // The late Live-Capture boundary runs after this phase. Save the manual decision into
             // its aligned handoff array so it cannot re-apply the incoming phone P value afterwards.
@@ -709,6 +702,12 @@ extension OCRProcessor {
                                         localAgent: currentLocalAgent)
         let imageEveryDocument = activeResolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
             .value.bool ?? false
+        let cardBySegment = Dictionary(uniqueKeysWithValues: manualTagSegments.indices.map {
+            (manualTagSegments[$0].segmentIndex, $0)
+        })
+        let enclosuresByCover = Dictionary(grouping: manualTagSegments.indices.filter {
+            manualTagSegments[$0].enclosureOfSegmentIndex != nil
+        }, by: { manualTagSegments[$0].enclosureOfSegmentIndex! })
         let maxConcurrent = min(6, work.count)
         // A document with no text can still use the opt-in local image pass.
         let task: @Sendable ((idx: Int, input: DateRoute.Input?)) async -> (Int, DateRoute.Decision?) = { w in
@@ -733,9 +732,13 @@ extension OCRProcessor {
                     // been typed there — never a month or day beside a year the user typed meanwhile.
                     if manualTagSegments[idx].dateComponents == TypedDateTags.Components(),
                        !manualTagSegments[idx].dateTextUnreadable {
-                        if var decision {
-                            if let folder = folderDates[idx] { decision.inherit(fromFolder: folder) }
+                        if let decision {
+                            manualTagSegments[idx].dateInheritance = .init(base: decision, folder: folderDates[idx])
                             manualTagSegments[idx].setDate(fromRoute: decision)
+                            refreshManualCardDate(at: idx, cardBySegment: cardBySegment)
+                            for enclosure in enclosuresByCover[manualTagSegments[idx].segmentIndex] ?? [] {
+                                refreshManualCardDate(at: enclosure, cardBySegment: cardBySegment)
+                            }
                         } else {
                             manualTagSegments[idx].dateUncertain = true
                         }
@@ -750,6 +753,18 @@ extension OCRProcessor {
             }
         }
     }
+    private func refreshManualCardDate(at index: Int, cardBySegment: [Int: Int]? = nil) {
+        guard manualTagSegments.indices.contains(index), manualTagSegments[index].dateInheritance != nil else { return }
+        let segment = manualTagSegments[index].segmentIndex
+        var cover: GeneratedTags?
+        if let c = manualTagSegments[index].enclosureOfSegmentIndex,
+           Self.validCoverIndex(of: segment, in: segments) == c,
+           let coverIndex = cardBySegment?[c] ?? manualTagSegments.firstIndex(where: { $0.segmentIndex == c }),
+           !manualTagSegments[coverIndex].dateTextUnreadable {
+            cover = manualTagSegments[coverIndex].ownDateTags
+        }
+        manualTagSegments[index].refreshInheritedDate(from: cover)
+    }
     /// UI: advance to the next manual-tag segment, or finish if on the last one.
     /// W37: refuses while the current card's Sent-with text is not a valid date (the sheet shows why),
     /// so an invalid value can never be carried to the write.
@@ -758,13 +773,17 @@ extension OCRProcessor {
            !manualTagSegments[currentManualIndex].datesAreValid { return }
         if currentManualIndex < manualTagSegments.count - 1 {
             currentManualIndex += 1
+            refreshManualCardDate(at: currentManualIndex)
         } else {
             finishManualTagging()
         }
     }
     /// UI: go back to the previous manual-tag segment.
     func previousManualSegment() {
-        if currentManualIndex > 0 { currentManualIndex -= 1 }
+        if currentManualIndex > 0 {
+            currentManualIndex -= 1
+            refreshManualCardDate(at: currentManualIndex)
+        }
     }
     /// UI: finish manual tagging and resume the pipeline.
     func finishManualTagging() {
@@ -1097,7 +1116,7 @@ extension OCRProcessor {
         var pages: [(url: URL, rotation: Int)] = []
         let localImage = activeRunConfig?.dateLocalImage == true
         for i in indices where manualSegImages.indices.contains(i) && manualSegImages[i].kind == .document
-            && (!localImage || !manualSegRemoved.contains(i)) {
+            && !manualSegRemoved.contains(i) {
             let url = manualSegImages[i].url
             urls.append(url)
             texts.append(jobs.first { $0.sourceURL == url }?.result?.text ?? "")
@@ -1106,13 +1125,13 @@ extension OCRProcessor {
         guard !urls.isEmpty else { return }
 
         // W46.date-route-other-paths: the dating route on the card's pages (its own text and first page images, the
-        // rotation the user set). Only the local route uses already confirmed earlier documents.
+        // rotation the user set) and already confirmed earlier documents in the same folder.
         let segment = DocumentSegment(pdfURLs: urls, texts: texts)
         var decision: DateRoute.Decision? = nil
         if localImage || !segment.combinedText.isEmpty {
             manualSegDateFetching = true
             let input = DateRoute.Input(text: DateRoute.ownText(segment),
-                                        near: localImage ? priorManualDatingDocuments(before: indices.min()) : [],
+                                        near: priorManualDatingDocuments(before: indices.min()),
                                         pages: Array(pages.prefix(DateRoute.imagePages)))
             if localImage {
                 decision = await DateRoute.runLocal(input)
@@ -1158,7 +1177,9 @@ extension OCRProcessor {
         }.sorted { $0.indices[0] > $1.indices[0] }
         return prior.prefix(DateRoute.nearCount).enumerated().map { offset, document in
             let images = document.indices.sorted().prefix(DateRoute.nearPages).map { manualSegImages[$0] }
-            let text = images.map { jobs[$0.fileIndex].result?.text ?? "" }.joined(separator: "\n\n")
+            let text = images.map { image in
+                jobs.indices.contains(image.fileIndex) ? (jobs[image.fileIndex].result?.text ?? "") : ""
+            }.joined(separator: "\n\n")
             let distance = offset + 1
             return DateRoute.Neighbour(label: "P\(distance)", dist: distance, text: text,
                                        file: images.first?.url.lastPathComponent)
@@ -1939,7 +1960,7 @@ extension OCRProcessor {
     }
     /// Normalize a free-text month to the SPEC Month tag (e.g. "3" or "03" → "3 March").
     /// Returns nil for empty/blank input; passes through unrecognized values unchanged.
-    private static func normalizeMonth(_ raw: String) -> String? {
+    nonisolated static func normalizeMonth(_ raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
         if let n = GeneratedTags.monthNumber(from: trimmed) {
@@ -1949,7 +1970,7 @@ extension OCRProcessor {
     }
     /// Normalize a free-text day to SPEC "Day N" format (e.g. "15" → "Day 15").
     /// Returns nil for empty/blank input; passes through unrecognized values unchanged.
-    private static func normalizeDay(_ raw: String) -> String? {
+    nonisolated static func normalizeDay(_ raw: String) -> String? {
         let trimmed = raw.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
         if let n = GeneratedTags.dayNumber(from: trimmed) {

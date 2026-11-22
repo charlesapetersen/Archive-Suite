@@ -139,6 +139,7 @@ struct ManualTagSegment: Identifiable {
     var sentWithUncertain: Bool = false
     /// W46.date-route-other-paths — what the dating route filled the date with, for the sidecar and header.
     var datingFill: DateRoute.CardFill? = nil
+    var dateInheritance: DateRoute.Inheritance? = nil
 
     /// False while `sentWith` holds text that is not a valid date (the sheet refuses to advance).
     var sentWithIsValid: Bool { EnclosureDates.parseManual(sentWith) != .invalid }
@@ -150,8 +151,27 @@ struct ManualTagSegment: Identifiable {
     /// The own date the Year / Month / Day strings name, for the typed Date field; setting it rewrites all three.
     var ownDate: ArchiveDate? {
         get { TypedDateTags.date(year: year, month: month, day: day) }
-        set { (year, month, day) = TypedDateTags.components(newValue).tuple }
+        set {
+            let fields = TypedDateTags.components(newValue)
+            if fields != dateComponents { datingFill = nil }
+            (year, month, day) = fields.tuple
+        }
     }
+    var ownDateTags: GeneratedTags {
+        var tags = GeneratedTags()
+        tags.year = year.isEmpty ? nil : year
+        tags.month = OCRProcessor.normalizeMonth(month)
+        tags.day = OCRProcessor.normalizeDay(day)
+        tags.dateUncertain = dateUncertain
+        return tags
+    }
+
+    mutating func refreshInheritedDate(from cover: GeneratedTags?) {
+        guard !dateTextUnreadable, standingDating != nil, let dateInheritance else { return }
+        let source = cover.map { (tags: $0, file: enclosureCoverName) }
+        setDate(fromRoute: dateInheritance.resolve(cover: source))
+    }
+
     var dateComponents: TypedDateTags.Components { .init(year: year, month: month, day: day) }
     /// Take an auto-date reply: as the date it names when it names one, so what is written is what the field shows
     /// (no unseen Day beside a year), else verbatim, so the field shows the reply for fixing.

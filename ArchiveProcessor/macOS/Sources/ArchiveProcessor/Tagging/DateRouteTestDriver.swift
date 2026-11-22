@@ -946,6 +946,20 @@ enum DateRouteTestDriver {
             check("5 sheet A: its text year and its dated form's month and day, no flag",
                   cards[0].year == "1947" && cards[0].month == "3 March" && cards[0].day == "Day 3" && !cards[0].dateUncertain,
                   "\(cards[0].year) \(cards[0].month) \(cards[0].day)")
+            check("5 sheet E: its cover's year only, with inherited evidence",
+                  cards[1].year == "1947" && cards[1].month.isEmpty && cards[1].dateUncertain
+                  && cards[1].standingDating?.evidenceClass == .inherited)
+            // Revisiting a cover and changing its date changes the inherited suggestion on the next card.
+            sheet.manualTagSegments[0].ownDate = ArchiveDate.parse(wireValue: "1951-02-07")
+            sheet.advanceManualSegment()
+            check("5 sheet E: uses the reviewed cover's year", sheet.manualTagSegments[1].year == "1951")
+            var rejected = sheet.manualTagSegments[1]
+            rejected.enclosureOfSegmentIndex = nil
+            rejected.enclosureCoverName = nil
+            rejected.refreshInheritedDate(from: nil)
+            check("5 sheet E: rejecting the relation restores the standalone decision",
+                  rejected.year.isEmpty && rejected.standingDating?.evidenceClass == DateRoute.EvidenceClass.none)
+            sheet.manualTagSegments[0] = cards[0]
             check("5 sheet B: the page image's 1961, no flag", cards[2].year == "1961" && !cards[2].dateUncertain)
             check("5 sheet C: the neighbour's 1947, Date Uncertain, no month",
                   cards[3].year == "1947" && cards[3].month.isEmpty && cards[3].dateUncertain)
@@ -963,6 +977,14 @@ enum DateRouteTestDriver {
         check("5 sheet: the kept dates' sidecars carry the route's dating object (A text, B image, D none)",
               sa["class"] as? String == "text" && sb["class"] as? String == "image"
               && (json(sOut["DOCD"])["dating"] as? [String: Any])?["class"] as? String == "none", "\(sa) \(sb)")
+        let se = json(sOut["DOCE"])
+        let sheetEnclosure = applied(sheet, sFiles[1])
+        check("5 sheet E: Finder tags and sidecar use the final cover and record the inherited year",
+              sheetEnclosure.contains("1947") && sheetEnclosure.contains("Sent With 1947-03-03")
+              && sheetEnclosure.contains("Date Uncertain")
+              && (se["dating"] as? [String: Any])?["class"] as? String == "inherited"
+              && header(sOut, "DOCE")?.header?.dateEvidence?.hasPrefix("inherited;") == true,
+              "\(sheetEnclosure) \(se)")
         check("5 sheet B: the header line names the image evidence",
               header(sOut, "DOCB")?.header?.dateEvidence == "image; page 1; dateline; \"March 30, 1961\"; gave 1961-03-30",
               "\(String(describing: header(sOut, "DOCB")?.header?.dateEvidence))")
@@ -971,7 +993,7 @@ enum DateRouteTestDriver {
               sc.contains("1948") && !sc.contains("1947") && json(sOut["DOCC"])["dating"] == nil
               && header(sOut, "DOCC")?.header != nil && header(sOut, "DOCC")?.header?.dateEvidence == nil, "\(sc)")
 
-        // 5. The manual segment card's auto-date: the route on the card's pages, with no neighbours drawn yet.
+        // 5. The manual segment card's auto-date: the route on the card's pages and on confirmed earlier documents.
         wire.lock.withLock { wire.tagging = 0; wire.trace = []; wire.images = []; wire.models = [] }
         let (card, cardFiles, _) = processor(gateway: gw, out: "card")
         card.manualSegAutoDate = true
@@ -987,8 +1009,15 @@ enum DateRouteTestDriver {
               && card.manualSegDraftTags.standingDating?.evidenceClass == .image
               && wire.tagging == 0 && wire.trace == ["DOCB"] && wire.images.count == 1, "\(wire.trace) \(wire.images)")
         card.manualSegDraftTags = SegmentTagData()
+        card.manualSegCompleted = (0..<3).map { CompletedManualSegment(indices: [$0], tags: SegmentTagData()) }
         await card.fetchManualSegDate(forIndices: [3])
-        check("5 card C: an estimate with no neighbour to check it against writes no year, Date Uncertain",
+        check("5 card C: uses the checked quote from a confirmed earlier document",
+              card.manualSegDraftTags.year == "1947" && card.manualSegDraftTags.month.isEmpty
+              && card.manualSegDraftTags.dateUncertain && card.manualSegDraftTags.standingDating?.evidenceClass == .estimate)
+        card.manualSegImages[3].startsTreeFolder = true
+        card.manualSegDraftTags = SegmentTagData()
+        await card.fetchManualSegDate(forIndices: [3])
+        check("5 card C: a new folder stops the earlier documents from supplying a year",
               card.manualSegDraftTags.year.isEmpty && card.manualSegDraftTags.dateUncertain
               && card.manualSegDraftTags.standingDating?.evidenceClass == DateRoute.EvidenceClass.none)
         card.manualSegDraftTags.year = "1950"
@@ -1025,8 +1054,8 @@ enum DateRouteTestDriver {
                   msCards[2].year == "1966" && msCards[2].dateUncertain && msCards[3].year == "1966"
                   && msCards[3].dateUncertain && msCards[3].standingDating?.evidenceClass == .folder,
                   "\(msCards.map(\.year))")
-            check("5 sheet, in place: A's text year stands; E and D, in the run whose date nobody confirmed, take none",
-                  msCards[0].year == "1947" && msCards[1].year.isEmpty && msCards[4].year.isEmpty, "\(msCards.map(\.year))")
+            check("5 sheet, in place: A's text year stands; E takes its cover's, and D has no date",
+                  msCards[0].year == "1947" && msCards[1].year == "1947" && msCards[4].year.isEmpty, "\(msCards.map(\.year))")
         } else {
             check("5 sheet, in place: five cards dated", false, "\(msFilled) \(msCards.count)")
         }

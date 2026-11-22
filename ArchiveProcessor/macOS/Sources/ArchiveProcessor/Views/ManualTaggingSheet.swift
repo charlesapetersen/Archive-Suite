@@ -199,6 +199,7 @@ struct ManualTagSegmentView: View {
                                     Button("Not an enclosure") {
                                         segment.enclosureOfSegmentIndex = nil
                                         segment.enclosureCoverName = nil
+                                        segment.refreshInheritedDate(from: nil)
                                     }
                                     .controlSize(.small)
                                 }

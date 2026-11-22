@@ -191,6 +191,19 @@ extension DateRoute {
         }
     }
 
+    /// The route's own result before any cover or folder supplies the date.
+    struct Inheritance {
+        let base: Decision
+        let folder: ContainerFolderDate?
+
+        func resolve(cover: (tags: GeneratedTags, file: String?)?) -> Decision {
+            var decision = base
+            if let cover { decision.inherit(fromCover: cover.tags, coverFile: cover.file) }
+            if let folder { decision.inherit(fromFolder: folder) }
+            return decision
+        }
+    }
+
     /// The trace call and whether the measured route answered it. On a remote gateway, the measured request
     /// (`date_route_pipeline.trace_body`); a gateway that does not serve that model (or fails) is asked again on its
     /// own model, as every other backend is: the run's own text route, which no bench measured for this prompt.
