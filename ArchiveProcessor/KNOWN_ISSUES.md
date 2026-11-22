@@ -15,7 +15,7 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
   same whole-run review before tagging. Neither adds a per-collection review. The help implies the switch
   controls the pre-tagging pause. Reproduced in the VM at `d1b38279` and traced to `startProcessing` and
   `performPreOCRedProcessing`. The [verification record](../verification/evidence/processor/W49.proc-s046-verify.md)
-  links the test and tracks the separate check and pending behavior choice.
+  links the test and tracks the separate check and pending behavior choice. (queued: W49.proc-s046-check)
 
 ## Live Capture files a document silently after Automatic tagging gets HTTP 500 (S-045)
 
