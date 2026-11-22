@@ -749,7 +749,7 @@ because the owner asked. "It's important to not just let problems like this accu
 
 - [ ] **W49.proc-s045-check — Independently reproduce S-045 [S]** (lane: processor) (uses: build) (agent: claude) (blocked-on: W49.proc-s045-verify) — [Evidence and check](verification/evidence/processor/W49.proc-s045-verify.md).
 - [ ] **W49.proc-s046-check — Independently reproduce S-046 [S]** (lane: processor) (uses: build,vm) (agent: claude) (blocked-on: W49.proc-s046-verify) — [Evidence and check](verification/evidence/processor/W49.proc-s046-verify.md).
-- [ ] **`W49.proc-s047-verify` — an enclosure relation after the window stage splits its cover letter [S]** (lane: processor) (uses: build) — Owner call 30 (2026-11-21): verify S-047; detail in `execution-plans/verification-phase/suspects-20261121.md`.
+- [ ] **W49.proc-s047-check — Independently reproduce S-047 [S]** (lane: processor) (uses: build) (agent: claude) (blocked-on: W49.proc-s047-verify) — [Evidence and check](verification/evidence/processor/W49.proc-s047-verify.md).
 - [ ] **`W49.proc-s048-verify` — adding the same input twice does not process and pay twice [S]** (lane: processor) (uses: build,vm) — Owner call 30 (2026-11-21): verify S-048; detail in `execution-plans/verification-phase/suspects-20261121.md`.
 - [ ] **`W49.proc-s050-verify` — ordinary Resume honors explicit review skips [S]** (lane: processor) (uses: build,vm) — Owner call 30 (2026-11-21): verify S-050; detail in `execution-plans/verification-phase/suspects-20261121.md`.
 - [ ] **`W49.proc-s051-verify` — a refused batch submission is reported as refused [S]** (lane: processor) (uses: build) — Owner call 30 (2026-11-21): verify S-051; detail in `execution-plans/verification-phase/suspects-20261121.md`.

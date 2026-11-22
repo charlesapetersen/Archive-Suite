@@ -1163,12 +1163,18 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Seen:** `SegmentationReviewTestDriver` §9b (`repro-suspects-filing.sh s031-window`): folder, a two-page letter,
   its enclosure marked `[enclosure]`, a document; windows answering "new" between the letter's two pages; the
   enclosure's cover is none.
-- **Would confirm it:** the owner's call that the enclosure should keep its relation to the letter's first part.
+- **Would confirm it:** the owner's call that Processor should ask which segment is the actual cover when the
+  window splits it.
 - **Would clear it:** a ruling that a changed cover boundary drops the relation by design.
-- **Status:** `open`
+- **Status:** `reproduced` — behavior choice pending and independent check queued as `W49.proc-s047-check`.
+  [Scratch evidence](evidence/processor/W49.proc-s047-verify.md).
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
   - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s047-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+  - 2026-11-21 W49.proc-s047-verify — Codex gpt-6.2-sol reproduced at `d1ec616d`. The control
+    points to the two-page letter. The window split leaves the marked enclosure separate with no cover.
+    W37 deliberately drops proposals when cover pages change. The window vote gives only a boundary, so
+    keeping a relation after a split would need confirmation of the actual cover.
 
 
 ### S-048 · Adding a file Process Files already lists adds it again

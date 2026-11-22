@@ -619,13 +619,15 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   Capture (`Capture/LiveCaptureProcessor.swift:1387-1399`).
 - **Real-path test:** `scripts/test-dual-date.sh` (`DUAL_DATE_TEST=1`, `Capture/DualDateTestDriver.swift`): marker,
   relation, `Sent With`, JSON and resume round-trips, header lines. Not covered: a real OCR reply, the manual UI.
-- **Runtime evidence:** none.
+- **Runtime evidence:** 2026-11-21 · `d1ec616d` · [S-047 scratch run](evidence/processor/W49.proc-s047-verify.md).
+  Agreement between OCR and the window kept the relation. A split dropped it. The separate dual-date
+  driver verified the tag writer with a valid relation and with no relation.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
 - **Notes:** **Drift.** The source-date header lines are written only in Live Capture; Process Files renders the PDF
   before tagging and does not rewrite it (`OCR/OCRProcessor+OCR.swift:1604`), as `SPEC/tag-format.md` §W37 itself
-  says. Suspect `S-031`.
+  says. The split-cover case is S-047.
 
 ## Segmentation and tagging
 

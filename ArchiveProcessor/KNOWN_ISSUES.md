@@ -2,6 +2,13 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## A window split can drop the enclosure's covering-letter date (S-047)
+
+- When a window splits the OCR's two-page letter, the marked enclosure remains a separate document.
+  The exact-cover check drops the proposed relation, so Automatic tagging has no verified cover from
+  which to derive Sent With. The choice of whether to ask the user to confirm a disputed cover is in
+  Daemon Report. [Scratch evidence](../verification/evidence/processor/W49.proc-s047-verify.md). (queued: W49.proc-s047-check)
+
 ## Review document segmentation has no effect on fresh Process Files runs (S-046)
 
 - With Automatic tagging, the Manual segmentation approach and Collection ID, both switch values open the
