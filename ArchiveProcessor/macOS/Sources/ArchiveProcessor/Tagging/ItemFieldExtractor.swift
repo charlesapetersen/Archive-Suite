@@ -1,5 +1,6 @@
 import Foundation
 import ArchiveCore
+import VisionOCRKit
 
 /// W47.item-fields-build: the document's own catalogue fields (its kind, title, byline, publication, the printed issue
 /// date and where a letter's addressee is), read by one dedicated call per document after the tagging call. The
@@ -21,6 +22,15 @@ enum ItemFieldExtractor {
     /// The bench's cap: Gemini 3.7 Flash spends reasoning tokens before the reply.
     static let maxTokens = 8192
     static let timeout: TimeInterval = 180
+    static let macImageModel = LocalModelRoute.qwen3VL8B4.modelID(for: .mlxVLM)
+    static let macTextModel = "lmstudio-community/Qwen3.5-4B-MLX-4bit"
+    static let macRoute = "This Mac · Qwen3-VL 8B and Qwen3.5 4B"
+    static let macCost = "Item fields on this Mac: 8B images ~15.5 s/document, 9.0 GB peak; 4B text ~5.0 s/document, 4.8 GB peak"
+    static let macSetup = "Requires mlx-vlm on this Mac (port 8080) with Qwen3-VL 8B and Qwen3.5 4B, both 4-bit."
+    static let macTimingNote = "Times are for model inference. Vision reading and model loading add time."
+    static let macImageLongSide = 1280
+    static let macMaxTokens = 1024
+    private static let macLimiter = RequestLimiter(limit: 1)
 
     static let kinds: [String] = [
         "letter", "memo", "telegram", "newspaper article", "magazine article", "journal article", "newsletter",
@@ -43,15 +53,30 @@ enum ItemFieldExtractor {
     /// The sent pages' text, each under its page mark, as `item_fields_retruth.doc_text` writes it, cut at `textCap`
     /// Unicode scalars (the bench cuts a Python string).
     static func markedText(_ texts: [String]) -> String {
-        let n = texts.count
-        let marked = capped(Array(texts.enumerated())).map { i, t in
-            "[page \(i + 1) of \(n)]\n" + t.trimmingCharacters(in: .whitespacesAndNewlines)
+        markedText(capped(Array(texts.enumerated())), count: texts.count)
+    }
+
+    private static func markedText(_ pages: [(Int, String)], count: Int) -> String {
+        let marked = pages.map { i, text in
+            "[page \(i + 1) of \(count)]\n" + text.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         return String(String.UnicodeScalarView(marked.joined(separator: "\n\n").unicodeScalars.prefix(textCap)))
     }
 
     static func prompt(texts: [String]) -> String {
         template.replacingOccurrences(of: "{text}", with: markedText(texts))
+    }
+
+    static let imageOpening = "You get images of the pages of one document (all of them, or for a long "
+        + "document the first 8 and the last 2) and the text machine OCR read from them, with page marks "
+        + "(it may be noisy). Read the images as well as the text."
+    static let textOpening = "You get the text machine OCR read from the pages of one document (all of them, "
+        + "or for a long document the first 8 and the last 2), with page marks (it may be noisy). "
+        + "No images are given: read the text."
+
+    static func macPrompt(marked: String, images: Bool) -> String {
+        let tpl = images ? template : template.replacingOccurrences(of: imageOpening, with: textOpening)
+        return tpl.replacingOccurrences(of: "{text}", with: marked)
     }
 
     /// `item_fields_retruth.PROMPT`, byte for byte; `{text}` is the marked text.
@@ -213,6 +238,86 @@ enum ItemFieldExtractor {
         let pages: [(url: URL, rotation: Int)]
     }
 
+    static func extract(_ input: Input, via route: ItemFieldPolicy.Route) async -> ItemFieldResult? {
+        switch route {
+        case .gateway(let gateway):
+            return await extract(input, gateway: gateway, route: "Gateway · " + gatewayModel)
+        case .mac:
+            return await extractOnMac(input)
+        }
+    }
+
+    /// Each local call uses the same Vision read, independently of the run's OCR backend.
+    private static func extractOnMac(_ input: Input) async -> ItemFieldResult? {
+        guard !input.pages.isEmpty else { return nil }
+        do {
+            try await macLimiter.acquire()
+        } catch { return nil }
+        let result = await readOnMac(input)
+        await macLimiter.release()
+        return result
+    }
+
+    private static func readOnMac(_ input: Input) async -> ItemFieldResult? {
+        let pages = capped(Array(input.pages.enumerated()))
+        var textPages: [(Int, String)] = []
+        var images: [Data] = []
+        for (index, page) in pages {
+            guard !Task.isCancelled else { return nil }
+            let reader = PageReaders.visionReader(rotationDegrees: page.rotation)
+            let vision = try? await reader.read(PageReaderInput(imageURL: page.url))
+            textPages.append((index, vision?.text ?? ""))
+            if let jpeg = ImageEncoding.uprightJPEG(url: page.url, rotationDegrees: page.rotation,
+                                                    longEdge: macImageLongSide) {
+                images.append(jpeg)
+            }
+        }
+        let marked = markedText(textPages, count: input.pages.count)
+        var image: Reading?
+        if images.count == pages.count, !Task.isCancelled {
+            image = await macReply(model: macImageModel, prompt: macPrompt(marked: marked, images: true), images: images)
+        }
+        guard !Task.isCancelled else { return nil }
+        let text = await macReply(model: macTextModel, prompt: macPrompt(marked: marked, images: false), images: [])
+        guard !Task.isCancelled else { return nil }
+        return ItemFieldResult(route: macRoute, outcome: .mac(image: image, text: text))
+    }
+
+    private static func macReply(model: String, prompt: String, images: [Data]) async -> Reading? {
+        // Fixed loopback destination, no redirects or credentials from the run's backend.
+        guard let url = URL(string: LocalModelRoute.Server.mlxVLM.baseURL + "/chat/completions") else { return nil }
+        let content: Any = images.isEmpty ? prompt : imageContent(images, prompt: prompt)
+        var body: [String: Any] = [
+            "model": model, "temperature": 0, "max_tokens": macMaxTokens,
+            "messages": [["role": "user", "content": content]],
+        ]
+        LocalModelRoute.applyReasoningOff(&body)
+        var request = URLRequest(url: url, timeoutInterval: LocalModelRoute.requestTimeout)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer " + LocalModelRoute.placeholderKey, forHTTPHeaderField: "Authorization")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        guard request.httpBody != nil,
+              let (data, response) = try? await NetworkSession.data(for: request, policy: .nonIdempotent,
+                                                                    maxRetries: 0, followRedirects: false),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let choice = (json["choices"] as? [[String: Any]])?.first,
+              let message = choice["message"] as? [String: Any],
+              let finish = choice["finish_reason"] as? String, finish == "stop",
+              let answer = LocalModelRoute.textAnswer(message["content"] as? String, finish: finish),
+              !LocalModelRoute.isRepetitionLoop(answer) else { return nil }
+        return parse(answer)
+    }
+
+    private static func imageContent(_ jpegs: [Data], prompt: String) -> [[String: Any]] {
+        var content: [[String: Any]] = jpegs.map {
+            ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64," + $0.base64EncodedString()]]
+        }
+        content.append(["type": "text", "text": prompt])
+        return content
+    }
+
     /// One document through the measured route. A failed call or an unparsable reply gives a `.failed` result: there
     /// is no other route to fall back to.
     static func extract(_ input: Input, gateway: GatewayConfig, route: String) async -> ItemFieldResult {
@@ -220,10 +325,7 @@ enum ItemFieldExtractor {
             ImageEncoding.uprightJPEG(url: $0.url, rotationDegrees: $0.rotation, longEdge: imageLongSide)
         }
         guard !jpegs.isEmpty else { return ItemFieldResult(route: route, outcome: .failed("no page image")) }
-        var content: [[String: Any]] = jpegs.map {
-            ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64," + $0.base64EncodedString()]]
-        }
-        content.append(["type": "text", "text": prompt(texts: input.texts)])
+        let content = imageContent(jpegs, prompt: prompt(texts: input.texts))
         guard let raw = await DateRoute.gatewayChat(content: content, gateway: gateway, model: gatewayModel,
                                                     maxTokens: maxTokens, timeout: timeout) else {
             return ItemFieldResult(route: route, outcome: .failed("the call failed"))
@@ -264,13 +366,39 @@ enum ItemFieldPolicy {
         }
     }
 
-    /// Whether the call runs on a document: only on the measured route, a remote gateway (where the dating route's
-    /// image pass runs too), and only where its output is written.
-    static func skipReason(gateway: GatewayConfig?, localAgent: LocalAgentConfig?, sidecars: Bool) -> String? {
-        if !sidecars { return "no sidecar is written" }
-        if localAgent != nil { return "no measured item-fields route on a Local Agent plan" }
-        guard let gateway, !gateway.isLocalModel else { return "no measured item-fields route on this backend" }
+    enum Route: Sendable {
+        case gateway(GatewayConfig)
+        case mac
+
+        var isMac: Bool {
+            if case .mac = self { return true }
+            return false
+        }
+    }
+
+    /// The managed image call keeps its existing gateway precedence and sidecar requirement.
+    static func route(gateway: GatewayConfig?, localAgent: LocalAgentConfig?, sidecars: Bool,
+                      macEnabled: Bool) -> Route? {
+        guard sidecars else { return nil }
+        if localAgent == nil, let gateway, !gateway.isLocalModel { return .gateway(gateway) }
+        if macEnabled, localAgent != nil || gateway?.isLocalModel == true { return .mac }
         return nil
+    }
+
+    /// Two independent readings, each scoped by the kind that its own model read. The text model's
+    /// kind never fills the item; the image model's kind never gates the publication date.
+    static func macFields(image: ItemFieldExtractor.Reading?, text: ItemFieldExtractor.Reading?) -> ItemFieldExtractor.Reading {
+        var filled = ItemFieldExtractor.Reading(kind: image?.kind)
+        if filled.kind != nil { filled.quotes["kind"] = image?.quotes["kind"] }
+        if let image, withheld(.byline, kind: image.kind) == nil, !image.byline.isEmpty {
+            filled.byline = image.byline
+            filled.quotes["byline"] = image.quotes["byline"]
+        }
+        if let text, withheld(.publicationDate, kind: text.kind) == nil, let date = text.publicationDate {
+            filled.publicationDate = date
+            filled.quotes["publication_date"] = text.quotes["publication_date"]
+        }
+        return filled
     }
 }
 
@@ -278,6 +406,7 @@ enum ItemFieldPolicy {
 struct ItemFieldResult: Equatable, Sendable, Codable {
     enum Outcome: Equatable, Sendable, Codable {
         case read(ItemFieldExtractor.Reading)
+        case mac(image: ItemFieldExtractor.Reading?, text: ItemFieldExtractor.Reading?)
         case failed(String)
     }
 
@@ -286,6 +415,10 @@ struct ItemFieldResult: Equatable, Sendable, Codable {
 
     /// The filled fields, as the sidecar and the page-2 header give them (nil: not filled).
     var filled: ItemFieldExtractor.Reading? {
+        if case .mac(let image, let text) = outcome {
+            guard image != nil || text != nil else { return nil }
+            return ItemFieldPolicy.macFields(image: image, text: text)
+        }
         guard case .read(let r) = outcome else { return nil }
         var f = ItemFieldExtractor.Reading(kind: r.kind)
         let kind = r.kind
@@ -313,12 +446,16 @@ struct ItemFieldResult: Equatable, Sendable, Codable {
     var headerFields: PDFItemFields {
         guard let f = filled else { return PDFItemFields() }
         func joined(_ list: [String]) -> String? { list.isEmpty ? nil : list.joined(separator: "; ") }
-        return PDFItemFields(documentKind: PDFItemFields.lineValue(f.kind),
+        var fields = PDFItemFields(documentKind: PDFItemFields.lineValue(f.kind),
                              title: PDFItemFields.lineValue(f.title.map(Self.titleCased)),
                              byline: PDFItemFields.lineValue(joined(f.byline)),
                              publication: PDFItemFields.lineValue(f.publication),
                              publicationDate: PDFItemFields.lineValue(f.publicationDate),
                              recipientPlace: PDFItemFields.lineValue(joined(f.recipientPlace)))
+        if case .mac = outcome {
+            fields.lowerConfidence = Set(CheckableField.itemFields.filter { $0.value(in: fields) != nil })
+        }
+        return fields
     }
 
     /// Small words left lower case inside a title-cased title.
@@ -399,20 +536,47 @@ struct ItemFieldResult: Equatable, Sendable, Codable {
     /// issue date, apart from the document's own date (`date`), which it never replaces.
     var sidecarObject: [String: Any] {
         var o: [String: Any] = ["route": route]
-        switch outcome {
-        case .failed(let why):
+        if case .failed(let why) = outcome {
             o["status"] = "failed"
             o["reason"] = why
-        case .read(let r):
-            o["status"] = "read"
-            guard let f = filled else { return o }
-            if let v = f.kind { o["kind"] = v }
-            if let v = f.title { o["title"] = v }
-            if !f.byline.isEmpty { o["byline"] = f.byline }
-            if let v = f.publication { o["publication"] = v }
-            if let v = f.publicationDate { o["publication_date"] = v }
-            if !f.recipientPlace.isEmpty { o["recipient_place"] = f.recipientPlace }
-            if !f.quotes.isEmpty { o["quotes"] = f.quotes }
+            return o
+        }
+        if case .mac(image: nil, text: nil) = outcome {
+            o["status"] = "failed"
+            o["reason"] = "The local models did not return item fields. " + ItemFieldExtractor.macSetup
+            o["confidence"] = [String: String]()
+            return o
+        }
+        o["status"] = "read"
+        guard let f = filled else { return o }
+        if let v = f.kind { o["kind"] = v }
+        if let v = f.title { o["title"] = v }
+        if !f.byline.isEmpty { o["byline"] = f.byline }
+        if let v = f.publication { o["publication"] = v }
+        if let v = f.publicationDate { o["publication_date"] = v }
+        if !f.recipientPlace.isEmpty { o["recipient_place"] = f.recipientPlace }
+        if !f.quotes.isEmpty { o["quotes"] = f.quotes }
+        if case .mac(let image, let text) = outcome {
+            let fields = [f.kind == nil ? nil : "kind", f.byline.isEmpty ? nil : "byline",
+                          f.publicationDate == nil ? nil : "publication_date"].compactMap { $0 }
+            o["confidence"] = Dictionary(uniqueKeysWithValues: fields.map { ($0, "lower") })
+            var reasons: [String: String] = [
+                "title": "not offered on this route", "publication": "not offered on this route",
+                "recipient_place": "not offered on this route",
+            ]
+            if image == nil {
+                reasons["kind"] = "the image call failed"
+                reasons["byline"] = "the image call failed"
+            } else if let image, !image.byline.isEmpty, f.byline.isEmpty {
+                reasons["byline"] = ItemFieldPolicy.withheld(.byline, kind: image.kind)
+            }
+            if text == nil {
+                reasons["publication_date"] = "the text call failed"
+            } else if let text, text.publicationDate != nil, f.publicationDate == nil {
+                reasons["publication_date"] = ItemFieldPolicy.withheld(.publicationDate, kind: text.kind)
+            }
+            o["not_filled"] = reasons
+        } else if case .read(let r) = outcome {
             var notFilled: [String: String] = [:]
             let had: [ItemFieldPolicy.Field: Bool] = [
                 .title: r.title != nil, .byline: !r.byline.isEmpty, .publication: r.publication != nil,

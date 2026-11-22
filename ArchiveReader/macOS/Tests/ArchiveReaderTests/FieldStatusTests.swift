@@ -80,6 +80,24 @@ final class FieldStatusTests: XCTestCase {
         XCTAssertNil(FieldStatusSection.HeaderFields.read(jpeg, isDataless: false))
     }
 
+    func testMacFieldsReadFromPDFAndUseTheExistingChecks() throws {
+        let url = scratch.appendingPathComponent("mac.pdf")
+        let page = Self.page2.replacingOccurrences(of: "Document kind: letter", with: """
+            Document kind (lower confidence): report
+            Byline (lower confidence): Mary Jones
+            Publication date (lower confidence): 1967-03
+            """)
+        try TestPDFBuilder.textPDFData(pages: ["(the page image)", page]).write(to: url)
+        let read = try XCTUnwrap(FieldStatusSection.HeaderFields.read(url, isDataless: false))
+        let tags = DocumentTags.parse(raw: ["Checked Byline"], labelNumber: nil)
+        let rows = FieldStatusList.rows(tags: tags, header: read)
+        XCTAssertEqual(rows.map(\.field), [.documentKind, .byline, .publicationDate, .recipientPlace])
+        XCTAssertEqual(rows.map(\.value), ["report", "Mary Jones", "1967-03", "Boston, Massachusetts"])
+        XCTAssertEqual(rows.map(\.status.level), [.lowerConfidence, .checked, .lowerConfidence, .unchecked])
+        XCTAssertTrue(rows[0].status.detail.contains("76 owner-checked values"))
+        XCTAssertTrue(rows[2].status.detail.contains("Qwen3.5 4B"))
+    }
+
     func testADateEditAndMarkCheckedWriteOnlyTheCheckTags() throws {
         let root = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("FieldStatusTests-root-\(UUID().uuidString)", isDirectory: true)
@@ -115,8 +133,10 @@ final class FieldStatusTests: XCTestCase {
 
     func testTheChecksDrawAtTheInspectorWidth() throws {
         let tags = DocumentTags.parse(raw: ["1958", "Checked Date", "Sent With 1957-03"], labelNumber: nil)
+        var header = header()
+        header.itemFields.lowerConfidence = [.documentKind]
         for scheme in [ColorScheme.light, .dark] {
-            let view = NSHostingView(rootView: FieldStatusList(tags: tags, header: header(), apply: { _ in })
+            let view = NSHostingView(rootView: FieldStatusList(tags: tags, header: header, apply: { _ in })
                 .padding().frame(width: 340).background(.background).environment(\.colorScheme, scheme))
             let png = try XCTUnwrap(RenderProbe.pngData(fromAppKitView: view, size: CGSize(width: 340, height: 300)))
             writeRenderArtifact(png, named: "field-status-\(scheme).png")

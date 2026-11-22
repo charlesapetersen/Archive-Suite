@@ -30,7 +30,9 @@ final class LiveCaptureProcessor: ObservableObject {
         /// `succeededNoText`: complete output with some or all pages image-only. The amber row offers
         /// per-document Retry, while bulk "Retry failed" counts only documents that cannot be filed.
         enum Phase: String {
-            case ocr = "OCR…", tagging = "Tagging…", staged = "Staged"
+            case ocr = "OCR…", tagging = "Tagging…", itemFields = "Reading item fields…", staged = "Staged"
+
+            var isProcessing: Bool { self == .ocr || self == .tagging || self == .itemFields }
             case succeededNoText = "Filed (image-only)"
             /// W23.h5: filed, but at least one page's PDF holds the placeholder instead of the scan. Amber,
             /// not red — the document IS filed and its text is real; what's missing is the image, and the
@@ -132,7 +134,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// which is why the cheap set matters there too.)
     var processingCount: Int {
         let live = Set(session.groups.map(\.id))
-        return statuses.filter { ($0.phase == .ocr || $0.phase == .tagging) && live.contains($0.id) }.count
+        return statuses.filter { ($0.phase.isProcessing) && live.contains($0.id) }.count
     }
     /// `W3.cap-r3-fu12`'s adversarial pass — can **Finish** actually DO anything right now? Distinct from
     /// `hasUnfiledWork` below, and the two come apart in a state the first version of that item shipped a
@@ -488,6 +490,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// stale the way a duplicated fact does: three paths freed the Task and left the key armed. See the guard
     /// in `photoIngested` for what that cost and why presence-of-Task is the right question to ask.
     private var pageTasks: [PageKey: Task<OCRResult, Never>] = [:]
+    private var macItemFieldTasks: [String: Task<ItemFieldResult?, Never>] = [:]
     private var finalizedGroups: Set<String> = []
     /// Bumped by `clearSessionState()`. A `finalizeSegment` that SUSPENDED at an `await` before the operator
     /// hit Clear captures this at its start and re-checks it after each await; if it changed, the session was
@@ -1365,7 +1368,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // document the tagging call dated here and whose phone (or Mac card) gives no year. Same B8 cover as above.
         let routeDating = humanOnly ? nil
             : await liveDating(group: group, segment: segment, results: results, tags: tags, mac: mac, config: config)
-        // W47.item-fields-build — the item-field call, on the measured route only. Same B8 cover as above.
+        guard clearGeneration == startedGeneration else { return }
         let itemFields = humanOnly ? nil
             : await liveItemFields(group: group, segment: segment, results: results, tags: tags, mac: mac,
                                    config: config)
@@ -1723,19 +1726,28 @@ final class LiveCaptureProcessor: ObservableObject {
     }
 
     /// W47.item-fields-build — the item-field call for a document the tagging call read here (automatic mode, not
-    /// Mac-tagged, a reply that is not a failure), with sidecars on (its only output so far), on the measured route
-    /// only, as in Process Files: every page's text and image at its run rotation. nil = no `item_fields` object.
+    /// Mac-tagged, a reply that is not a failure), with sidecars on. As in Process Files, page images use the
+    /// run's rotation. The Mac models also get a fresh Vision reading. nil = no `item_fields` object.
     private func liveItemFields(group: CaptureGroup, segment: DocumentSegment, results: [OCRResult],
                                 tags: GeneratedTags, mac: MacSegmentTags?,
                                 config: SessionProcessingConfig) async -> ItemFieldResult? {
         guard group.type == .document, config.taggingMode == .automatic, (mac?.subjects ?? []).isEmpty,
               !tags.ocrFailed, !segment.combinedText.isEmpty,
-              ItemFieldPolicy.skipReason(gateway: config.textGateway, localAgent: config.textLocalAgent,
-                                         sidecars: config.enableSegmentJSON) == nil,
-              let gateway = config.textGateway else { return nil }
+              !Task.isCancelled,
+              let route = ItemFieldPolicy.route(gateway: config.textGateway, localAgent: config.textLocalAgent,
+                                                sidecars: config.enableSegmentJSON,
+                                                macEnabled: config.macItemFields) else { return nil }
         let pages = zip(segment.pdfURLs, results).map { (url: $0, rotation: $1.rotationDegrees) }
-        return await ItemFieldExtractor.extract(ItemFieldExtractor.Input(texts: segment.texts, pages: Array(pages)),
-                                                gateway: gateway, route: "Gateway · " + ItemFieldExtractor.gatewayModel)
+        let input = ItemFieldExtractor.Input(texts: segment.texts, pages: pages)
+        guard route.isMac else { return await ItemFieldExtractor.extract(input, via: route) }
+
+        setPhase(group.id, .itemFields)
+        let generation = clearGeneration
+        let task = Task { await ItemFieldExtractor.extract(input, via: route) }
+        macItemFieldTasks[group.id] = task
+        let fields = await withTaskCancellationHandler { await task.value } onCancel: { task.cancel() }
+        if clearGeneration == generation { macItemFieldTasks[group.id] = nil }
+        return fields
     }
 
     // MARK: - Off-main file writing (nonisolated static; only touches the filesystem)
@@ -2995,6 +3007,8 @@ final class LiveCaptureProcessor: ObservableObject {
         // than running to completion after the session was cleared (its result is discarded either way).
         clearGeneration &+= 1
         for task in pageTasks.values { task.cancel() }
+        for task in macItemFieldTasks.values { task.cancel() }
+        macItemFieldTasks.removeAll()
         statuses.removeAll()
         staged.removeAll()
         releaseAllFinalizedGroups()   // W3.cap-r3-fu5 — the pair, together; see the helper

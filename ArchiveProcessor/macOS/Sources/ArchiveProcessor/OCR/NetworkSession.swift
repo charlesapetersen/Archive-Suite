@@ -84,6 +84,34 @@ enum NetworkSession {
     /// Max concurrent LLM requests in flight. Kept modest so the OCR worker pool plus the
     /// per-image rotation calls don't collectively exceed provider limits and trigger 503s.
     private static let limiter = RequestLimiter(limit: 5)
+    /// mlx-vlm serves one chat model at a time. Switching models while another chat is still streaming
+    /// shuts down its generator, including when page OCR or tagging and item fields share the server.
+    private static let mlxChatLimiter = RequestLimiter(limit: 1)
+
+    static func withMLXChatSlot<T>(_ request: URLRequest, _ work: () async throws -> T) async throws -> T {
+        guard let url = request.url, url.port == 8080, url.path.hasSuffix("/chat/completions"),
+              let host = url.host?.lowercased(), ["127.0.0.1", "localhost", "[::1]", "::1"].contains(host)
+        else { return try await work() }
+        return try await withSlot(mlxChatLimiter, work)
+    }
+
+    private static func withSlot<T>(_ slot: RequestLimiter, _ work: () async throws -> T) async throws -> T {
+        try await slot.acquire()
+        do {
+            // Cancellation can race with a waiter being granted. Refuse to start, then release the slot.
+            try Task.checkCancellation()
+            let result = try await work()
+            await slot.release()
+            return result
+        } catch {
+            await slot.release()
+            throw error
+        }
+    }
+
+    private static func withRequestSlot<T>(_ request: URLRequest, _ work: () async throws -> T) async throws -> T {
+        try await withMLXChatSlot(request) { try await withSlot(limiter, work) }
+    }
 
     /// HTTP statuses that are safe to retry only when the request itself is idempotent.
     private static let idempotentRetryStatuses: Set<Int> = [429, 500, 502, 503, 529]
@@ -211,30 +239,17 @@ enum NetworkSession {
         maxRetries: Int = 4,
         followRedirects: Bool = true
     ) async throws -> (Data, URLResponse) {
-        try await limiter.acquire()
-        do {
-            // Cancellation can race with a waiter being granted. Refuse to start the request, then release
-            // the legitimately granted slot through the shared catch path.
-            try Task.checkCancellation()
+        try await withRequestSlot(request) {
             // W16.bat7-fu — the production call is the one with no `transport:` argument. The seam adds a
-            // BRANCH rather than changing a default, so a build that cannot reach `activeTestTransport`
-            // cannot reach a stub either, and the retry/backoff/limiter semantics below are identical on
-            // both sides (a stubbed transport is retried exactly like a real one).
-            let result: (Data, URLResponse)
+            // branch, so a build without `activeTestTransport` cannot reach a stub.
             if let stub = activeTestTransport {
-                result = try await performWithRetry(
-                    request, policy: policy, maxRetries: maxRetries, transport: stub)
-            } else if followRedirects {
-                result = try await performWithRetry(request, policy: policy, maxRetries: maxRetries)
-            } else {
-                result = try await performWithRetry(request, policy: policy, maxRetries: maxRetries,
-                                                    transport: { try await shared.data(for: $0, delegate: NoRedirects()) })
+                return try await performWithRetry(request, policy: policy, maxRetries: maxRetries, transport: stub)
             }
-            await limiter.release()
-            return result
-        } catch {
-            await limiter.release()
-            throw error
+            if followRedirects {
+                return try await performWithRetry(request, policy: policy, maxRetries: maxRetries)
+            }
+            return try await performWithRetry(request, policy: policy, maxRetries: maxRetries,
+                                              transport: { try await shared.data(for: $0, delegate: NoRedirects()) })
         }
     }
 
@@ -251,9 +266,7 @@ enum NetworkSession {
         for request: URLRequest,
         onLine: (String) -> Bool
     ) async throws -> (response: URLResponse, stopped: Bool) {
-        try await limiter.acquire()
-        do {
-            try Task.checkCancellation()
+        try await withRequestSlot(request) {
             var req = request
             req.setValue("close", forHTTPHeaderField: "Connection")
             var stopped = false
@@ -278,11 +291,7 @@ enum NetworkSession {
                     break
                 }
             }
-            await limiter.release()
             return (response, stopped)
-        } catch {
-            await limiter.release()
-            throw error
         }
     }
 

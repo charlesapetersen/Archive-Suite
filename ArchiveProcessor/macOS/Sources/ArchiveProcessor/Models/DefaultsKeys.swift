@@ -111,6 +111,7 @@ enum DefaultsKeys {
     static let readContainerLabels = "readContainerLabels"
     static let reviewDocumentSegmentation = "reviewDocumentSegmentation"
     static let enableSegmentJSON = "enableSegmentJSON"
+    static let macItemFields = "macItemFields"
     static let tagVocabulary = "tagVocabulary"
 
     // Output & logging

@@ -63,7 +63,28 @@ public enum FieldStatusPolicy {
     /// prompt), which fills a field only where it cleared the rule. The figures are the stratified precision the
     /// verdict rests on (`item-fields-score.md`, "Every route, field by field" and "The verdict"). Title cleared it
     /// on its last look (W47.item-fields-title). The date fields are not item fields and have no figure here.
-    public static func itemField(_ field: CheckableField, checked: Bool) -> FieldStatus {
+    public static func itemField(_ field: CheckableField, checked: Bool, lowerConfidence: Bool = false) -> FieldStatus {
+        if lowerConfidence {
+            let model: String
+            let figure: String
+            // Owner-stratified precision after each model's own kind gates its fields. See item-fields-score.md.
+            switch field {
+            case .documentKind:
+                model = "Qwen3-VL 8B reading page images and Vision text"
+                figure = "86%, 76 owner-checked values"
+            case .byline:
+                model = "Qwen3-VL 8B reading page images and Vision text"
+                figure = "88%, 41 owner-checked values"
+            case .publicationDate:
+                model = "Qwen3.5 4B reading Vision text"
+                figure = "89%, 31 owner-checked values"
+            default:
+                return FieldStatus(level: checked ? .checked : .lowerConfidence,
+                                   source: "Read on the Processor’s Mac", measured: "")
+            }
+            return FieldStatus(level: checked ? .checked : .lowerConfidence, source: "Read on the Processor’s Mac by " + model,
+                               measured: "Estimated precision on the bench: " + figure + ".")
+        }
         let source = "Read by the Processor’s item-field call"
         let figure: String?
         switch field {

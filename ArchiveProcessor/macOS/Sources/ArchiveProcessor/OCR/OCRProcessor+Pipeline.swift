@@ -345,6 +345,7 @@ extension OCRProcessor {
             cascade: runConfig?.cascade ?? OCRCascade.fromDefaults(),
             postCorrection: activePostCorrection == nil ? nil : true,
             dateLocalImage: runConfig?.dateLocalImage == true ? true : nil,
+            macItemFields: runConfig?.macItemFields,
             pageReaders: runConfig.map { $0.pageReaders.isEmpty ? nil : $0.pageReaders } ?? nil,
             institutionalComputeFolder: runConfig?.institutionalComputeImport?.folder.path,
             outputSubfolders: outputSubfolders.isEmpty ? nil : outputSubfolders
@@ -388,6 +389,7 @@ extension OCRProcessor {
             runConfig.institutionalComputeImport = runtime.institutionalComputeFolder.flatMap { Self.reloadInstitutionalComputeImport($0) }
             runConfig.segmentationApproach = runtime.segmentationApproach ?? .manual
             runConfig.dateLocalImage = runtime.dateLocalImage == true
+            runConfig.macItemFields = runtime.macItemFields ?? true
             if runConfig.dateLocalImage { runConfig.visionTextLLM = nil }
             if let provider = runtime.visionTextProvider, let model = runtime.visionTextModel {
                 runConfig.visionTextLLM = LLMTextConfiguration(

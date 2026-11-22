@@ -1498,6 +1498,7 @@ struct SegmentItem: ProcessableItem {
         switch s.phase {
         case .ocr: return .processing(label: "OCR…")
         case .tagging: return .processing(label: "Tagging…")
+        case .itemFields: return .processing(label: ItemFieldExtractor.macCost)
         case .staged: return .succeeded
         case .succeededNoText: return .succeededNoText
         case .succeededPlaceholderImage: return .succeededPlaceholderImage

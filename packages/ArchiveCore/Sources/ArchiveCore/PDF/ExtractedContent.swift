@@ -57,6 +57,7 @@ public struct PDFItemFields: Sendable, Equatable {
     public var publication: String?
     public var publicationDate: String?
     public var recipientPlace: String?
+    public var lowerConfidence: Set<CheckableField> = []
 
     public init(documentKind: String? = nil, title: String? = nil, byline: String? = nil, publication: String? = nil,
                 publicationDate: String? = nil, recipientPlace: String? = nil) {
@@ -72,11 +73,14 @@ public struct PDFItemFields: Sendable, Equatable {
 
     /// Each line's prefix, in SPEC order, with its value.
     public var lines: [(prefix: String, value: String)] {
-        [(PDFHeaderParser.documentKindPrefix, documentKind), (PDFHeaderParser.titlePrefix, title),
-         (PDFHeaderParser.bylinePrefix, byline), (PDFHeaderParser.publicationPrefix, publication),
-         (PDFHeaderParser.publicationDatePrefix, publicationDate),
-         (PDFHeaderParser.recipientPlacePrefix, recipientPlace)]
-            .compactMap { p, v in v.map { (p, $0) } }
+        let values = [documentKind, title, byline, publication, publicationDate, recipientPlace]
+        return values.enumerated().compactMap { index, value in
+            guard let value else { return nil }
+            let prefix = lowerConfidence.contains(CheckableField.itemFields[index])
+                ? PDFHeaderParser.lowerConfidenceItemFieldPrefixes[index] ?? PDFHeaderParser.itemFieldPrefixes[index]
+                : PDFHeaderParser.itemFieldPrefixes[index]
+            return (prefix, value)
+        }
     }
 
     /// The header lines, in SPEC order, each with Core's exact prefix.
@@ -201,6 +205,23 @@ public enum PDFHeaderParser {
     public static let recipientPlacePrefix = "Recipient place: "
     public static let itemFieldPrefixes = [documentKindPrefix, titlePrefix, bylinePrefix, publicationPrefix,
                                     publicationDatePrefix, recipientPlacePrefix]
+
+    static let lowerConfidenceItemFieldPrefixes: [String?] = [
+        "Document kind (lower confidence): ", nil, "Byline (lower confidence): ", nil,
+        "Publication date (lower confidence): ", nil,
+    ]
+
+    public static func isItemFieldLine(_ line: String) -> Bool { itemFieldLine(line) != nil }
+
+    private static func itemFieldLine(_ line: String) -> (index: Int, value: String, lowerConfidence: Bool)? {
+        for (index, prefix) in itemFieldPrefixes.enumerated() {
+            if line.hasPrefix(prefix) { return (index, String(line.dropFirst(prefix.count)), false) }
+            if let lower = lowerConfidenceItemFieldPrefixes[index], line.hasPrefix(lower) {
+                return (index, String(line.dropFirst(lower.count)), true)
+            }
+        }
+        return nil
+    }
 
     public static func extract(_ url: URL) -> ExtractedContent? {
         guard let doc = PDFDocument(url: url), !doc.isLocked else { return nil }
@@ -355,6 +376,7 @@ public enum PDFHeaderParser {
             if line.isEmpty { index += 1; break }
             let field: Int
             let value: String
+            var lowerConfidence = false
             if line.hasPrefix("Classification:") {
                 field = 0; value = String(line.dropFirst("Classification:".count)).trimmingCharacters(in: .whitespaces)
             } else if line.hasPrefix("Kind:") {
@@ -365,8 +387,10 @@ public enum PDFHeaderParser {
                 field = 3; value = String(line.dropFirst(sentWithPrefix.count))
             } else if line.hasPrefix(dateEvidencePrefix) {
                 field = 4; value = String(line.dropFirst(dateEvidencePrefix.count))
-            } else if let n = itemFieldPrefixes.firstIndex(where: { line.hasPrefix($0) }) {
-                field = 5 + n; value = String(line.dropFirst(itemFieldPrefixes[n].count))
+            } else if let item = itemFieldLine(line) {
+                field = 5 + item.index
+                value = item.value
+                lowerConfidence = item.lowerConfidence
             } else { break }
             // Repeated or late Kind is consumed, diagnosed and never trusted. Other out-of-order
             // fields start the body; this preserves an archival Classification: security marking.
@@ -386,6 +410,9 @@ public enum PDFHeaderParser {
             case 9: header.itemFields.publicationDate = value
             case 10: header.itemFields.recipientPlace = value
             default: break
+            }
+            if lowerConfidence {
+                header.itemFields.lowerConfidence.insert(CheckableField.itemFields[field - 5])
             }
             lastField = max(lastField, field)
             index += 1
@@ -459,8 +486,8 @@ public enum PDFHeaderParser {
     }
 
     private static func isField(_ line: String) -> Bool {
-        (["Classification:", "Kind:", documentDatePrefix, sentWithPrefix, dateEvidencePrefix] + itemFieldPrefixes)
-            .contains { line.hasPrefix($0) }
+        ["Classification:", "Kind:", documentDatePrefix, sentWithPrefix, dateEvidencePrefix]
+            .contains { line.hasPrefix($0) } || itemFieldLine(line) != nil
     }
 
     private static func endsWithYear(_ text: String) -> Bool {

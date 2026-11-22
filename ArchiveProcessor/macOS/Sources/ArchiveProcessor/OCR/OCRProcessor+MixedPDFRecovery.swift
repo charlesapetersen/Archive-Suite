@@ -237,6 +237,7 @@ extension OCRProcessor {
         config.textColumns = runtime.textColumns
         config.visionSettings = runtime.visionSettings
         config.dateLocalImage = runtime.dateLocalImage == true
+        config.macItemFields = runtime.macItemFields ?? true
         if config.dateLocalImage { config.visionTextLLM = nil }
         config.cascade = runtime.cascade ?? .off
         config.pageReaders = runtime.pageReaders ?? .empty

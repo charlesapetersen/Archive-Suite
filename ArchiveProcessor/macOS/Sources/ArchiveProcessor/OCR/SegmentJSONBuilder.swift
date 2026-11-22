@@ -83,7 +83,11 @@ enum SegmentJSONBuilder {
         }
         if let itemFields {
             dict["item_fields"] = itemFields
-            if itemFields["status"] as? String == "read" {
+            if itemFields["confidence"] != nil {
+                // Items on the Mac route leave these catalogue fields empty, including in consumers of legacy keys.
+                dict["publication_name"] = nil
+                dict["recipient_location"] = nil
+            } else if itemFields["status"] as? String == "read" {
                 dict["publication_name"] = nil
                 if let kind = itemFields["kind"] as? String, ItemFieldExtractor.correspondence.contains(kind) {
                     dict["recipient_location"] = nil

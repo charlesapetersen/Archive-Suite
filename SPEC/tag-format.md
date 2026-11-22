@@ -135,10 +135,10 @@ the container file (`SPEC/containers.md`).
   three states, each a label and a symbol of its own as well as a colour, so the state never rests on colour alone:
   **Checked** (green), **Unchecked** (yellow; from a route the bench measured clearing the fill rule: Wilson lower
   bound 0.85, point 0.90, 40 owner-checked pairs) and **Unchecked, lower confidence** (red; below the rule or not
-  measured). The cut is the rule the Processor writes item fields by, and every figure shown is a measured one:
-  the item fields written (kind, title, byline, publication, publication date, recipient place) clear it on the image
-  prompt's stratified precision, which the verdict rests on (`segbench-results/item-fields-score.md`; title 0.91
-  [0.86, 0.94] after its last look, W47.item-fields-title); no evidence
+  measured). The gateway item fields clear the rule on the image prompt's stratified precision
+  (`segbench-results/item-fields-score.md`; title 0.91 [0.86, 0.94] after its last look, W47.item-fields-title).
+  The Mac item fields are written with lower confidence by owner call 23 and keep that status until the user checks
+  or corrects them. No evidence
   class of the dating route clears it (text 139/158 exact, image 10/12, estimate 35/51;
   `segbench-results/date-route-pipeline.md`; stamp 1/1 where it fired, a stamp's year 25/25 on documents carrying
   one, most also dated in their text, `segbench-results/date-stamp-fallback.md`; a year written from a folder's
@@ -449,12 +449,13 @@ Recipient place: <place>; <place>
   an output of more than one pair or an output that fails verification keeps its existing bytes. Improve OCR
   keeps the line. No migration is written because there is nothing to migrate.
 - **Item fields (W47.item-fields-build, owner 2026-10-21).** The document's own catalogue fields, from the Processor's
-  item-field call (Gemini 3.7 Flash on the gateway, the bench's image prompt; `Tagging/ItemFieldExtractor.swift`).
+  item-field call (`Tagging/ItemFieldExtractor.swift`). Gemini 3.7 Flash on the gateway uses the bench's image prompt.
   Optional lines after the date-evidence line, in the order `Document kind: `, `Title: `, `Byline: `, `Publication: `,
   `Publication date: `, `Recipient place: ` (exact case-sensitive prefixes; a line before one it follows, or after a
   blank separator, starts the body; Core `PDFItemFields` on `PDFPageHeader.itemFields`). The separator ambiguity below
-  holds for them as for the other optional lines: a body that opens, with no separator, on `Title: …` is read as one. A field is written only where
-  the bench measured the call clearing the fill rule (`segbench-results/item-fields-score.md`, "The verdict"): the kind
+  holds for them as for the other optional lines: a body that opens, with no separator, on `Title: …` is read as one.
+  The gateway fills fields where the bench measured the call clearing the fill rule
+  (`segbench-results/item-fields-score.md`, "The verdict"): the kind
   (one of `letter`, `memo`, `telegram`, `newspaper article`, `magazine article`, `journal article`, `newsletter`,
   `clipping`, `report`, `speech`, `press release`, `photograph`, `other`), the title and the publication on every kind, the
   byline and publication date on the published kinds (the articles, newsletters, clippings and reports), the
@@ -470,6 +471,16 @@ Recipient place: <place>; <place>
   the lines in the date-evidence rewrite (one pass for both); Live Capture at render time, on the same documents'
   pages as the source dates; Improve OCR keeps them, and refuses a page that would lose them. No migration is written
   because there is nothing to migrate.
+  **Mac item fields (W47.wh-item-fields-mac-fill, owner 2026-11-19, call 23).** For automatic tagging with segment
+  JSON on, a Mac model or Local Agent run uses the two 4-bit MLX models on the Mac by default. Qwen3-VL 8B reads the
+  same prompt with upright images at up to 1,280 px and Vision text. Its kind can fill and its byline fills on its
+  own published kinds. Qwen3.5 4B reads Vision text with the text-only opening. Its publication date fills on its
+  own published kinds. Title, publication and recipient place stay empty on this route. The two calls run at
+  temperature 0 with thinking off. Per value, the corresponding header prefix is
+  `Document kind (lower confidence): `, `Byline (lower confidence): ` or `Publication date (lower confidence): `,
+  in the same slot as the ordinary prefix. The JSON `item_fields.confidence` object maps each written field's key to
+  `"lower"`. The Reader shows the field and its bench estimate as unchecked, lower confidence until the user checks
+  or corrects it through the existing Inspector controls. Improve OCR preserves the value and its confidence together.
 - **Per-page metadata and mixed summaries.** `ExtractedContent.textPages` records zero-based physical
   text slots 1, 3, 5… (in a file with searchable pages, each text page and searchable page by its `pageRoles`, §"The
   searchable form") with optional `PDFPageHeader`. Missing headers stay represented. Kind and full

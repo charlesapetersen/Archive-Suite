@@ -2,6 +2,7 @@
 import AppKit
 import ArchiveCore
 import Foundation
+import PDFKit
 
 /// Drives Live Capture from page receipt through Skip and Finish on synthetic pages.
 @MainActor
@@ -11,13 +12,26 @@ enum LiveCaptureTaggingFailureTestDriver {
 
     private actor Gateway {
         private(set) var statuses: [Int] = []
+        private(set) var macModels: [String] = []
 
         func respond(to request: URLRequest) throws -> (Data, URLResponse) {
             guard let url = request.url,
                   let body = request.httpBody,
                   let json = try JSONSerialization.jsonObject(with: body) as? [String: Any],
-                  let messages = json["messages"] as? [[String: Any]],
-                  let prompt = messages.first?["content"] as? String,
+                  let messages = json["messages"] as? [[String: Any]] else { throw URLError(.badServerResponse) }
+            if let model = json["model"] as? String,
+               url.host == "127.0.0.1", url.port == 8080,
+               model == ItemFieldExtractor.macImageModel || model == ItemFieldExtractor.macTextModel {
+                macModels.append(model)
+                let text = model == ItemFieldExtractor.macImageModel
+                    ? #"{"kind":"report","byline":["Mary Jones"]}"#
+                    : #"{"kind":"newsletter","publication_date":"1967-03"}"#
+                let body = try JSONSerialization.data(withJSONObject: [
+                    "choices": [["message": ["content": text], "finish_reason": "stop"]],
+                ])
+                return (body, HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+            }
+            guard let prompt = messages.first?["content"] as? String,
                   prompt.contains("You are a metadata tagging assistant"),
                   prompt.contains("CONTROL-MEMO") != prompt.contains("REFUSED-MEMO") else {
                 statuses.append(0)
@@ -78,12 +92,15 @@ enum LiveCaptureTaggingFailureTestDriver {
         let model = LLMModel(id: "test-model", displayName: "Test Model", provider: .gemini,
                              supportsThinking: false, returnsMd: false,
                              inputCostPer1M: 0, outputCostPer1M: 0, batchDiscount: 0)
+        let macFields = env["LIVECAPTURE_MAC_ITEM_FIELDS"] == "1"
+        let gatewayConfig = GatewayConfig(
+            baseURL: macFields ? "http://127.0.0.1:1234/v1" : "https://gateway.test/v1",
+            modelID: "synthetic-tagger", displayName: "Synthetic gateway", localModel: macFields)
         let config = SessionProcessingConfig(
             provider: .gemini, model: model, thinkingLevel: .low, apiKey: "",
             taggingMode: .automatic, rotationMode: .off, mergeDocuments: false, outputDirectory: out,
-            customOCRPrompt: "", imageScale: 1, enableSegmentJSON: false, tagVocabulary: [],
-            gateway: GatewayConfig(baseURL: "https://gateway.test/v1", modelID: "synthetic-tagger",
-                                   displayName: "Synthetic gateway"),
+            customOCRPrompt: "", imageScale: 1, enableSegmentJSON: macFields, tagVocabulary: [],
+            gateway: gatewayConfig,
             outputImageFile: false, pdfImageMB: 2, exportedImageMB: 3, textColumns: 1)
         let session = CaptureSession()
         let processor = session.liveProcessor
@@ -95,7 +112,7 @@ enum LiveCaptureTaggingFailureTestDriver {
             throw ProbeError("could not make JPEG")
         }
 
-        let documents = ["CONTROL-MEMO", "REFUSED-MEMO"]
+        let documents = macFields ? ["CONTROL-MEMO"] : ["CONTROL-MEMO", "REFUSED-MEMO"]
         var lines: [String] = []
         for (index, id) in documents.enumerated() {
             LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(
@@ -109,7 +126,7 @@ enum LiveCaptureTaggingFailureTestDriver {
             }
             try await wait(for: "staging \(id)") {
                 guard let phase = processor.statuses.first(where: { $0.id == id })?.phase else { return false }
-                return phase != .ocr && phase != .tagging
+                return !phase.isProcessing
             }
             guard let status = processor.statuses.first(where: { $0.id == id }),
                   let pdf = processor.stagedURLs(for: id).first else { throw ProbeError("no output for \(id)") }
@@ -120,7 +137,14 @@ enum LiveCaptureTaggingFailureTestDriver {
             lines.append("\(id) session status: \(session.statusMessage)")
         }
         let requests = await gateway.statuses
-        guard requests == [200, 500] else { throw ProbeError("unexpected gateway responses \(requests)") }
+        let expectedRequests = macFields ? [200] : [200, 500]
+        guard requests == expectedRequests else { throw ProbeError("unexpected gateway responses \(requests)") }
+        if macFields {
+            let localCalls = await gateway.macModels
+            guard localCalls == [ItemFieldExtractor.macImageModel, ItemFieldExtractor.macTextModel] else {
+                throw ProbeError("unexpected local calls \(localCalls)")
+            }
+        }
         lines.append("Gateway responses, in order: \(requests)")
 
         processor.requestFinish()
@@ -137,7 +161,7 @@ enum LiveCaptureTaggingFailureTestDriver {
         let folder = out.appendingPathComponent("S045", isDirectory: true)
         let pdfs = try fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "pdf" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
-        guard pdfs.count == 2 else { throw ProbeError("expected two filed PDFs, found \(pdfs.count)") }
+        guard pdfs.count == documents.count else { throw ProbeError("unexpected filed PDF count \(pdfs.count)") }
         let expectedSubjects: Set<String> = ["War Department", "Military Intelligence"]
         for (pdf, id) in zip(pdfs, documents) {
             let text = PDFTextExtractor.extract(from: pdf).text ?? ""
@@ -146,6 +170,16 @@ enum LiveCaptureTaggingFailureTestDriver {
             guard tags.contains("1918"), tags.contains("Unread"),
                   id != documents.first || expectedSubjects.isSubset(of: tags) else {
                 throw ProbeError("Finder tag fixture failed for \(id): \(tags.sorted())")
+            }
+            if macFields {
+                let fields = PDFDocument(url: pdf).flatMap { PDFHeaderParser.textPageHeaders($0).first.flatMap { $0 } }?.itemFields
+                guard fields?.documentKind == "report", fields?.byline == "Mary Jones",
+                      fields?.publicationDate == "1967-03",
+                      fields?.lowerConfidence == [.documentKind, .byline, .publicationDate],
+                      let sidecar = ZoteroSidecar.read(pdf: pdf), sidecar.itemFields.byline == "Mary Jones" else {
+                    throw ProbeError("filed PDF or sidecar lost the suggested item fields")
+                }
+                lines.append("Live Capture received, staged and filed the lower-confidence Mac item fields")
             }
             lines.append("\(pdf.lastPathComponent) (\(id)) Finder tags: \(tags.sorted())")
         }

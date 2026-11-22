@@ -222,7 +222,9 @@ struct LocalWindowTransport: WindowTransport {
     /// gone, the retry is refused and stops the run then.
     static func call(_ request: URLRequest, baseURL: String, http: APIWindowTransport.HTTP) async throws
         -> (Data, URLResponse) {
-        do { return try await http(request) } catch let e as URLError {
+        do {
+            return try await NetworkSession.withMLXChatSlot(request) { try await http(request) }
+        } catch let e as URLError {
             switch e.code {
             case .timedOut: throw WindowTransportError.failed("the local model did not answer in time")
             case .cancelled: throw CancellationError()

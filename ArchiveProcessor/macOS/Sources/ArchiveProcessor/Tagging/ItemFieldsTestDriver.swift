@@ -141,16 +141,33 @@ enum ItemFieldsTestDriver {
               P.withheld(.recipientPlace, kind: "telegram") == nil && P.withheld(.recipientPlace, kind: "report") != nil)
         let gw = GatewayConfig(baseURL: "https://gateway.test/v1", modelID: "m", displayName: "Gateway")
         let mac = GatewayConfig(baseURL: "http://127.0.0.1:1234/v1", modelID: "q", displayName: "Q", localModel: true)
-        check("2 runs on a remote gateway with sidecars on", P.skipReason(gateway: gw, localAgent: nil, sidecars: true) == nil)
-        check("2 not with sidecars off, on this Mac's model, nor with no gateway",
-              P.skipReason(gateway: gw, localAgent: nil, sidecars: false) != nil
-              && P.skipReason(gateway: mac, localAgent: nil, sidecars: true) != nil
-              && P.skipReason(gateway: nil, localAgent: nil, sidecars: true) != nil)
+        let agent = LocalAgentConfig(tool: .claude, binaryPath: "/test/claude")
+        check("2 remote gateway keeps precedence and its own fill rules",
+              P.route(gateway: gw, localAgent: nil, sidecars: true, macEnabled: true)?.isMac == false)
+        check("2 a Mac or Local Agent runs local item fields by default",
+              P.route(gateway: mac, localAgent: nil, sidecars: true, macEnabled: true)?.isMac == true
+              && P.route(gateway: gw, localAgent: agent, sidecars: true, macEnabled: true)?.isMac == true)
+        check("2 skip with sidecars off, Mac opt-out, or a direct provider",
+              P.route(gateway: gw, localAgent: nil, sidecars: false, macEnabled: true) == nil
+              && P.route(gateway: mac, localAgent: nil, sidecars: true, macEnabled: false) == nil
+              && P.route(gateway: nil, localAgent: nil, sidecars: true, macEnabled: true) == nil)
+        let image = ItemFieldExtractor.Reading(kind: "speech", title: "Other field", byline: ["Wrong"],
+                                               publicationDate: "1950", recipientPlace: ["Wrong"])
+        let text = ItemFieldExtractor.Reading(kind: "newsletter", byline: ["Wrong"], publicationDate: "1967")
+        let mixed = ItemFieldPolicy.macFields(image: image, text: text)
+        check("2 the text model's own kind can allow its date even when the image model's kind does not",
+              mixed.kind == "speech" && mixed.publicationDate == "1967" && mixed.byline.isEmpty
+              && mixed.title == nil && mixed.publication == nil && mixed.recipientPlace.isEmpty)
     }
 
     // MARK: 3. The sidecar
 
     private static func sidecar() {
+        let failedMac = ItemFieldResult(route: ItemFieldExtractor.macRoute, outcome: .mac(image: nil, text: nil))
+        let failedObject = failedMac.sidecarObject
+        check("3 a failed Mac route keeps its provenance without writing any field",
+              failedObject["status"] as? String == "failed" && failedObject["confidence"] as? [String: String] == [:]
+              && failedMac.headerFields.isEmpty)
         var r = ItemFieldExtractor.Reading(kind: "newspaper article", title: "A Headline", byline: ["John Smith"],
                                            publication: "The Times", publicationDate: "1967-05",
                                            recipientPlace: [], quotes: ["title": "A Headline", "byline": "John Smith"])
@@ -309,6 +326,9 @@ enum ItemFieldsTestDriver {
         var tagging = 0
         /// Per item-field request: the marker, the model, the image count.
         var fields: [(String, String, Int)] = []
+        var macRequests: [(model: String, images: Int, ok: Bool)] = []
+        var mlxInFlight = 0
+        var mlxPeak = 0
         /// The dating route's trace and image calls (`DateRoute.run`).
         var trace = 0
         var image = 0
@@ -317,6 +337,15 @@ enum ItemFieldsTestDriver {
 
     private static func install(_ wire: Wire) {
         NetworkSession.testTransport = { request in
+            let sharesMLX = request.url?.port == 8080
+            if sharesMLX {
+                wire.lock.withLock {
+                    wire.mlxInFlight += 1
+                    wire.mlxPeak = max(wire.mlxPeak, wire.mlxInFlight)
+                }
+            }
+            defer { if sharesMLX { wire.lock.withLock { wire.mlxInFlight -= 1 } } }
+            if sharesMLX { try await Task.sleep(for: .milliseconds(25)) }
             let body = request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
             let message = (body?["messages"] as? [[String: Any]])?.first?["content"]
             let parts = message as? [[String: Any]] ?? []
@@ -330,7 +359,22 @@ enum ItemFieldsTestDriver {
                         : #"{"year": "1958", "format": "letter", "recipient_location": "Tagging Place"}"#
                 }
                 if text.contains("You are labelling catalogue fields") {
-                    wire.fields.append((marker, body?["model"] as? String ?? "", images))
+                    let model = body?["model"] as? String ?? ""
+                    if model == ItemFieldExtractor.macImageModel || model == ItemFieldExtractor.macTextModel {
+                        let isImage = model == ItemFieldExtractor.macImageModel
+                        let expectedPrompt = ItemFieldExtractor.macPrompt(
+                            marked: ItemFieldExtractor.markedText(Array(repeating: "", count: isImage ? images
+                                : (text.contains("[page 2 of 2]") ? 2 : 1))), images: isImage)
+                        let ok = request.url?.absoluteString == "http://127.0.0.1:8080/v1/chat/completions"
+                            && request.value(forHTTPHeaderField: "Authorization") == "Bearer local"
+                            && body?["temperature"] as? Int == 0 && body?["max_tokens"] as? Int == 1024
+                            && body?["enable_thinking"] as? Bool == false && text == expectedPrompt
+                        wire.macRequests.append((model, images, ok))
+                        return isImage
+                            ? #"{"kind":"report","byline":["Mary Jones"],"title":"Unused","publication":"Unused","publication_date":"1900"}"#
+                            : #"{"kind":"newsletter","byline":["Unused"],"publication_date":"1967-03-02"}"#
+                    }
+                    wire.fields.append((marker, model, images))
                     return marker == "DOCA"
                         ? #"{"kind": "newspaper article", "title": "SENATE ACTS ON THE BUDGET", "byline": ["Mary Jones"], "publication": "The Sun", "publication_date": "1967-03-02", "recipient_place": []}"#
                         : #"{"kind": "letter", "title": null, "byline": [], "publication": null, "publication_date": null, "recipient_place": ["Boston, MA"]}"#
@@ -340,7 +384,8 @@ enum ItemFieldsTestDriver {
                 else { wire.other += 1 }
                 return "{}"
             }
-            let reply = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": content]]]])
+            let reply = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": content],
+                                                                                  "finish_reason": "stop"]]])
             return (reply, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
     }
@@ -499,6 +544,33 @@ enum ItemFieldsTestDriver {
         check("4 a key route: no item-field call, the tagging call's publication kept",
               wire.lock.withLock { wire.fields.isEmpty } && ka["item_fields"] == nil
               && ka["publication_name"] as? String == "Tagging Paper", "\(ka.keys.sorted())")
+
+        let macGateway = GatewayConfig(baseURL: "http://127.0.0.1:8080/v1", modelID: "tagging-model",
+                                       displayName: "Mac", localModel: true)
+        let (mac, macOut) = processor(gateway: macGateway, out: "mac")
+        await mac.performTaggingPhase(provider: .gemini, model: route.model, apiKey: "test-key",
+                                      outputDirectory: tmp, enableSegmentJSON: true)
+        let (macRequests, mlxPeak) = wire.lock.withLock { (wire.macRequests, wire.mlxPeak) }
+        check("4 the local tagger and item-field models share one server slot", mlxPeak == 1, "\(mlxPeak)")
+        check("4 Mac route: two exact loopback requests per document, Vision text only on 4B",
+              macRequests.map(\.model) == Array(repeating: [ItemFieldExtractor.macImageModel,
+                                                            ItemFieldExtractor.macTextModel], count: 2).flatMap { $0 }
+              && macRequests.map(\.images).sorted() == [0, 0, 1, 2] && macRequests.allSatisfy(\.ok),
+              "\(macRequests)")
+        let local = json(macOut["A"])["item_fields"] as? [String: Any] ?? [:]
+        check("4 Mac route: only the three permitted values and their confidence are written",
+              local["kind"] as? String == "report" && local["byline"] as? [String] == ["Mary Jones"]
+              && local["publication_date"] as? String == "1967-03-02"
+              && local["title"] == nil && local["publication"] == nil && local["recipient_place"] == nil
+              && local["confidence"] as? [String: String] == ["kind": "lower", "byline": "lower",
+                                                            "publication_date": "lower"], "\(local)")
+        let macHeader = PDFDocument(url: tmp.appendingPathComponent("mac/A0.pdf"))?.page(at: 1)
+            .flatMap { PDFHeaderParser.parse($0).header }
+        check("4 Mac route: the PDF keeps confidence apart from the field values",
+              macHeader?.itemFields.documentKind == "report" && macHeader?.itemFields.byline == "Mary Jones"
+              && macHeader?.itemFields.publicationDate == "1967-03-02"
+              && macHeader?.itemFields.lowerConfidence == [.documentKind, .byline, .publicationDate],
+              "\(String(describing: macHeader))")
     }
 
     // MARK: 6. The Cost Estimate's figures

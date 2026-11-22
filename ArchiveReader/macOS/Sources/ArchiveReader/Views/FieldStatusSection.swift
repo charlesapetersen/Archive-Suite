@@ -269,7 +269,9 @@ struct FieldStatusList: View {
                                 pageValue: page))
             } else if let page {
                 rows.append(Row(field: field, value: page,
-                                status: FieldStatusPolicy.itemField(field, checked: tags.checkedFields.contains(field)),
+                                status: FieldStatusPolicy.itemField(field, checked: tags.checkedFields.contains(field),
+                                                                    lowerConfidence: header?.itemFields.lowerConfidence
+                                                                        .contains(field) == true),
                                 pageValue: page))
             }
         }

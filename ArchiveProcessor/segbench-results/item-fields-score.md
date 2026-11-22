@@ -342,7 +342,19 @@ The handwritten part (20 documents), right / filled against the drafted truth, w
 | Qwen3.5 4B on mac | 14/19 | 3/4 | - | 0/0 | - | 1/12 |
 | Qwen3.5 4B on image | 19/19 | 3/4 | - | 0/1 | - | 2/12 |
 
-No Mac route fills any field by either verdict.
+No Mac route meets the ordinary fill rule on either truth.
+
+### What the Processor fills on this Mac (W47.wh-item-fields-mac-fill)
+
+Owner call 23 released kind and byline from the 8B image call and publication date from the 4B Vision-text call, marked lower confidence. The rescore applies each model's own kind to its fields and uses the app's strict JSON parsing. It reuses the 299 cached replies per model (no model calls, $0). The owner column estimates precision by weighting the sampled groups at their original sizes, and counts the filled values he checked. The drafted columns count right / filled.
+
+| Field | Drafted, truth kind | Drafted, model's kind | Owner precision estimate (interval) | Owner-checked fills |
+|---|---:|---:|---:|---:|
+| kind | 252/292 | 252/292 | 86.05% [74.21%, 91.58%] | 76 |
+| byline | 72/79 | 68/81 | 88.44% [67.97%, 95.79%] | 41 |
+| publication_date | 60/70 | 61/72 | 89.36% [68.32%, 95.24%] | 31 |
+
+Regenerate these aggregates with `python3 scripts/segbench/item_fields_score.py --mac-fill-rescore` from ArchiveProcessor. The reported times are model inference. Vision reading and model switching add time.
 
 ### Three fields off their measured kinds
 

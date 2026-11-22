@@ -14,6 +14,7 @@ struct SettingsDocumentsPanel: View {
     @AppStorage(DefaultsKeys.confirmCollectionIDs) private var confirmCollectionIDs: Bool = false
     @AppStorage(DefaultsKeys.reviewDocumentSegmentation) private var reviewDocumentSegmentation: Bool = false
     @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = true
+    @AppStorage(DefaultsKeys.macItemFields) private var macItemFields = true
     @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
     @AppStorage(DefaultsKeys.tagVocabulary) private var tagVocabulary: String = ""
     @AppStorage(DefaultsKeys.mergeDocuments) private var mergeDocuments: Bool = false
@@ -114,6 +115,18 @@ struct SettingsDocumentsPanel: View {
                 }
             }
             .settingsLevel(.segmentationReview)
+            if taggingMode == .automatic {
+                Toggle(isOn: $macItemFields) {
+                    HStack {
+                        Text("Fill item fields on this Mac")
+                        HelpButton(text: "With a Mac model or Local Agent and segment JSON on, suggest a kind, byline and "
+                                   + "publication date for the Reader to check. " + ItemFieldExtractor.macSetup
+                                   + "\n\n" + ItemFieldExtractor.macCost + ". " + ItemFieldExtractor.macTimingNote)
+                    }
+                }
+                .disabled(!enableSegmentJSON)
+                .settingsLevel(.segmentationReview)
+            }
             if taggingMode.enablesTagging && taggingMode != .copySource {
                 Toggle(isOn: $sendPreviousImage) {
                     HStack {

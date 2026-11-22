@@ -709,6 +709,7 @@ class OCRProcessor: ObservableObject {
 
         /// Vision Auto Date's optional local image pass. Absence means off.
         var dateLocalImage: Bool? = nil
+        var macItemFields: Bool? = nil
 
         /// The run's per-page readers (W41.app-page-kind), so a resumed run reads each page with the reader it was
         /// planned for. Nil reads as none.

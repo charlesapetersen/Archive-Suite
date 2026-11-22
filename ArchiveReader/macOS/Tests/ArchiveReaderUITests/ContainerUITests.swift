@@ -1,4 +1,5 @@
 import XCTest
+import AppKit
 
 /// W47.ct-reader-view: the folder levels offered when a root is first added, the Container column, the Containers
 /// facet list and the Inspector's Container section, on a scratch corpus built here. The only level file the app writes is
@@ -381,6 +382,46 @@ final class ContainerUITests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(
             atPath: corpus.appendingPathComponent(
                 "Hoover Institution Archives/Glotzer papers, Mss 1036/Box 18/.archivesuite").path))
+    }
+
+    func testTheChecksConfirmALowerConfidenceMacByline() throws {
+        let box = corpus.appendingPathComponent("Hoover Institution Archives/Glotzer papers, Mss 1036/Box 17")
+        let pdf = box.appendingPathComponent("doc-01.pdf")
+        var bounds = CGRect(x: 0, y: 0, width: 612, height: 792)
+        let context = try XCTUnwrap(CGContext(pdf as CFURL, mediaBox: &bounds, nil))
+        let lines = ["Extracted text.", "doc-01.jpg", "Gemini · gemini-3.7-flash · 7 November 2026",
+                     "Kind: printed", "Byline (lower confidence): Mary Jones", "", "The harbour report follows."]
+        for pageLines in [["Image page"], lines] {
+            context.beginPDFPage(nil)
+            NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
+            for (index, line) in pageLines.enumerated() {
+                NSAttributedString(string: line, attributes: [.font: NSFont.systemFont(ofSize: 15)])
+                    .draw(at: CGPoint(x: 52, y: 720 - 20 * index))
+            }
+            NSGraphicsContext.current = nil
+            context.endPDFPage()
+        }
+        context.closePDF()
+        let url = URL(fileURLWithPath: pdf.path)
+        try (url as NSURL).setResourceValue(["Unread", "1951"], forKey: .tagNamesKey)
+        let before = try Data(contentsOf: url)
+
+        let app = launch()
+        waitForRows(app, 5)
+        app.tables["ar.table"].tableRows.element(boundBy: 0).click()
+        if !app.buttons["ar.tagEditor.done"].exists { app.typeKey("i", modifierFlags: [.command, .option]) }
+        let status = app.descendants(matching: .any)["ar.fieldStatus.byline.status"].firstMatch
+        XCTAssertTrue(status.waitForExistence(timeout: 10))
+        XCTAssertEqual(status.label, "Unchecked, lower confidence")
+        XCTAssertEqual(app.staticTexts["ar.fieldStatus.byline.value"].firstMatch.accessibilityText, "Mary Jones")
+        _ = captureScreenshot("mac-byline-lower-confidence")
+
+        let check = app.buttons["ar.fieldStatus.byline.check"].firstMatch
+        XCTAssertTrue(check.waitForExistence(timeout: 5))
+        check.click()
+        wait(for: [expectation(for: NSPredicate(format: "label == %@", "Checked"), evaluatedWith: status)], timeout: 10)
+        XCTAssertTrue(try url.resourceValues(forKeys: [.tagNamesKey]).tagNames?.contains("Checked Byline") == true)
+        XCTAssertEqual(try Data(contentsOf: url), before)
     }
 
     /// W40.reader-item-field-edit: an item field added in the Inspector's Checks shows as the user's, checked; None

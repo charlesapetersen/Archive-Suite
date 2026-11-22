@@ -138,6 +138,9 @@ Unchecked (yellow) or Unchecked, lower confidence (red), with its own label and 
 source and the measured figure; "Mark checked" / "Uncheck" writes or removes a `Checked <Field>` tag through
 `TagWriter`, and typing a date checks it. Contract: `SPEC/tag-format.md` §Field checks.
 What it does not do, deliberately or not yet:
+- **The Processor's Mac item fields carry lower confidence** (W47.wh-item-fields-mac-fill). The Checks show the
+  Mac models' suggested kind, byline and publication date with their bench figures. Confirm each using Mark checked,
+  or enter a correction. (accepted: lower-confidence fill, owner call 23, 2026-11-19).
 - **Item fields are corrected beside the file, not in it** (W40.reader-item-field-edit, 2026-11-19). Each item field
   has an Edit menu (Change…, None, Remove Your Value) and Add Item Field gives one page 2 lacks; for several selected
   files one value, None or Remove is given to them all, all or nothing, one Undo (W49.reader-item-fields-follow). The

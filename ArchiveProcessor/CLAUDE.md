@@ -108,8 +108,8 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 - **A refused Finder-tag write or a placeholder image page is REPORTED**, never swallowed by `try?` (W23.m5/h5-fu;
   `PROCESSFILES_TAGWARN_TEST=1`).
 - **Quality** crosses the capture protocol as `Q1`–`Q3` (omitted = Unrated) and is written to Finder as that token.
-- **API efficiency:** batch OCR results before tagging and reuse OCR text. Image exceptions are gateway dating
-  and item fields (W47.item-fields-build), and Advanced local 8B dating (W47.wh-date-8b-image, off by default).
+- **API efficiency:** batch OCR results and reuse OCR text. Image passes are gateway dating and item fields, optional
+  local 8B dating, and the local 8B item-field call (owner call 23). The Mac item-field calls share a fresh Vision read.
 
 ## Live Capture rules (Primary Function 3)
 

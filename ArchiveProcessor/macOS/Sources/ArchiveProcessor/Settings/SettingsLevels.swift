@@ -111,7 +111,8 @@ enum SettingsLevels {
              DefaultsKeys.reviewDocumentSegmentation, DefaultsKeys.mergeDocuments, DefaultsKeys.sendPreviousImage,
              DefaultsKeys.writeLogFile:
             return false
-        case DefaultsKeys.outputImageFile, DefaultsKeys.enableSegmentJSON, DefaultsKeys.ocrHandwritingOnTyped: return true
+        case DefaultsKeys.outputImageFile, DefaultsKeys.enableSegmentJSON, DefaultsKeys.ocrHandwritingOnTyped,
+             DefaultsKeys.macItemFields: return true
         case DefaultsKeys.visionMinimumConfidence: return 0.0
         case DefaultsKeys.gatewayInputCost, DefaultsKeys.gatewayOutputCost: return -1.0
         case DefaultsKeys.imageResolutionPercent: return 100.0
@@ -222,7 +223,8 @@ extension SettingsLevels.Row {
     static let collectionID = Self("collection-id", .standard,
                                    [DefaultsKeys.enableCollectionSegmentation, DefaultsKeys.confirmCollectionIDs])
     static let segmentationReview = Self("segmentation-review", .standard,
-                                         [DefaultsKeys.reviewDocumentSegmentation, DefaultsKeys.mergeDocuments, DefaultsKeys.enableSegmentJSON])
+                                         [DefaultsKeys.reviewDocumentSegmentation, DefaultsKeys.mergeDocuments,
+                                          DefaultsKeys.enableSegmentJSON, DefaultsKeys.macItemFields])
     static let segmentationApproach = Self("segmentation-approach", .standard,
                                            [DefaultsKeys.segmentationApproach, DefaultsKeys.segmentationClaudeRoute])
     static let dateImage = Self("date-image", .standard, [SettingsKey.dateImageEveryDocument.rawValue])

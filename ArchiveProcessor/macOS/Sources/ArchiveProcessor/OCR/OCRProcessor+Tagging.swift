@@ -1273,13 +1273,17 @@ extension OCRProcessor {
         let folderDates: [ContainerFolderDate?] = (0..<total).map { i in
             datingInputs[i] == nil ? nil : confirmedFolderDate(for: snapshot[i], runsByFolder: &runsByFolder)
         }
-        // W47.item-fields-build: every page's text and image, for the item-field call where it runs on this backend.
-        let itemFieldGateway = ItemFieldPolicy.skipReason(gateway: gateway, localAgent: localAgent,
-                                                         sidecars: enableSegmentJSON) == nil ? gateway : nil
-        let itemFieldRoute = "Gateway · " + ItemFieldExtractor.gatewayModel
-        let itemFieldInputs: [ItemFieldExtractor.Input?] = (0..<total).map {
-            itemFieldGateway == nil ? nil : itemFieldInput(for: snapshot[$0], jobBySource: jobBySource)
+        let itemFieldRoute = ItemFieldPolicy.route(gateway: gateway, localAgent: localAgent,
+                                                   sidecars: enableSegmentJSON,
+                                                   macEnabled: runConfig?.macItemFields ?? true)
+        let itemFieldInputs = snapshot.map { segment in
+            itemFieldRoute.flatMap { route in
+                itemFieldInput(for: segment, jobBySource: jobBySource, useConvertedImage: route.isMac)
+            }
         }
+        let itemFieldStatus = itemFieldRoute?.isMac == true && itemFieldInputs.contains { $0 != nil }
+            ? "  " + ItemFieldExtractor.macCost : ""
+        if !itemFieldStatus.isEmpty { statusMessage += itemFieldStatus }
 
         // Precompute neighbor context per segment on the main actor, so the concurrent tasks capture
         // only immutable, Sendable inputs.
@@ -1304,7 +1308,7 @@ extension OCRProcessor {
 
         // One segment: its tags, then its date (W46.date-route), then its names when the policy runs the feature on it
         // (the reply's `format` says whether it is correspondence). Mac-tagged segments skip every call.
-        // Then its item fields (W47.item-fields-build), on the measured route only.
+        // Then its item fields, on the assigned gateway or Mac route.
         let work: @Sendable (Int) async -> (Int, GeneratedTags, EntityResult?, DateRoute.Decision?,
                                             ItemFieldResult?) = { i in
             if !macSubjectsBySeg[i].isEmpty {
@@ -1321,8 +1325,8 @@ extension OCRProcessor {
                 dating = await DateRoute.run(input, backend: datingBackend, imageEveryDocument: imageEveryDocument)
             }
             var fields: ItemFieldResult? = nil
-            if let input = itemFieldInputs[i], let g = itemFieldGateway, !tags.ocrFailed, !Task.isCancelled {
-                fields = await ItemFieldExtractor.extract(input, gateway: g, route: itemFieldRoute)
+            if let input = itemFieldInputs[i], let itemFieldRoute, !tags.ocrFailed, !Task.isCancelled {
+                fields = await ItemFieldExtractor.extract(input, via: itemFieldRoute)
             }
             var inputs = entityBase[i]
             inputs.format = tags.format
@@ -1366,7 +1370,7 @@ extension OCRProcessor {
                 guard !Task.isCancelled else { break }
                 completed += 1
                 progress = 0.7 + (Double(completed) / Double(total)) * 0.3
-                statusMessage = "Tagging \(completed)/\(total)…"
+                statusMessage = "Tagging \(completed)/\(total)…" + itemFieldStatus
                 if next < total {
                     let j = next
                     group.addTask { await work(j) }
@@ -1425,10 +1429,12 @@ extension OCRProcessor {
     }
     /// W47.item-fields-build — what the item-field call reads for one segment: every page's text and source image with
     /// the run's rotation correction, or nil for a label or a document with no text (no call is made).
-    func itemFieldInput(for seg: DocumentSegment, jobBySource: [URL: Int]) -> ItemFieldExtractor.Input? {
+    func itemFieldInput(for seg: DocumentSegment, jobBySource: [URL: Int],
+                        useConvertedImage: Bool) -> ItemFieldExtractor.Input? {
         guard !seg.isBox, !seg.isFolder, !seg.combinedText.isEmpty, !seg.pdfURLs.isEmpty else { return nil }
         let pages = seg.pdfURLs.map { url in
-            (url: url, rotation: jobBySource[url].flatMap { jobs[$0].result?.rotationDegrees } ?? 0)
+            let image = useConvertedImage ? pdfToImageMap[url] ?? url : url
+            return (url: image, rotation: jobBySource[url].flatMap { jobs[$0].result?.rotationDegrees } ?? 0)
         }
         return ItemFieldExtractor.Input(texts: seg.texts, pages: pages)
     }

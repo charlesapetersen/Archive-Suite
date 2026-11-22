@@ -24,7 +24,7 @@ struct PDFSourceDates: Sendable, Equatable {
     /// document, so they must never wrap into the body.
     static func isFitted(_ line: String) -> Bool {
         line.hasPrefix(PDFHeaderParser.dateEvidencePrefix)
-            || PDFHeaderParser.itemFieldPrefixes.contains { line.hasPrefix($0) }
+            || PDFHeaderParser.isItemFieldLine(line)
     }
 
     /// The header lines, in SPEC order, each with Core's exact prefix.

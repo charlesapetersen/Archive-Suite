@@ -1212,6 +1212,62 @@
   ]
  },
  "fourth_sheet_open": false,
+ "mac_fill_scores": {
+  "byline": {
+   "prediction": {
+    "drafted_filled": 81,
+    "drafted_right": 68,
+    "lower": 0.6796691138040297,
+    "owner_filled": 41,
+    "precision": 0.8844361602982292,
+    "upper": 0.957921511996671
+   },
+   "truth": {
+    "drafted_filled": 79,
+    "drafted_right": 72,
+    "lower": 0.7393682100846181,
+    "owner_filled": 42,
+    "precision": 0.8871794871794872,
+    "upper": 0.9556415718989373
+   }
+  },
+  "kind": {
+   "prediction": {
+    "drafted_filled": 292,
+    "drafted_right": 252,
+    "lower": 0.742149619012007,
+    "owner_filled": 76,
+    "precision": 0.8604902667627974,
+    "upper": 0.9157798559078866
+   },
+   "truth": {
+    "drafted_filled": 292,
+    "drafted_right": 252,
+    "lower": 0.742149619012007,
+    "owner_filled": 76,
+    "precision": 0.8604902667627974,
+    "upper": 0.9157798559078866
+   }
+  },
+  "publication_date": {
+   "prediction": {
+    "drafted_filled": 72,
+    "drafted_right": 61,
+    "lower": 0.683196131446174,
+    "owner_filled": 31,
+    "precision": 0.8935756002595717,
+    "upper": 0.9524084690412948
+   },
+   "truth": {
+    "drafted_filled": 70,
+    "drafted_right": 60,
+    "lower": 0.692258364387221,
+    "owner_filled": 31,
+    "precision": 0.8932806324110673,
+    "upper": 0.9513941323768637
+   }
+  }
+ },
  "mac_owner_verdicts": {
   "mac-qwen3-vl-8b-image|byline": "too close",
   "mac-qwen3-vl-8b-image|kind": "too close",

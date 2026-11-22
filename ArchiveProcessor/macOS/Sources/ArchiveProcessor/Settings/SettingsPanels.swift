@@ -70,6 +70,7 @@ enum SettingsPanelOwnership {
             DefaultsKeys.taggingModeRaw, DefaultsKeys.itemTypeColourBox, DefaultsKeys.itemTypeColourFolder,
             DefaultsKeys.tagVocabulary, DefaultsKeys.enableCollectionSegmentation, DefaultsKeys.confirmCollectionIDs,
             DefaultsKeys.reviewDocumentSegmentation, DefaultsKeys.enableSegmentJSON, DefaultsKeys.sendPreviousImage,
+            DefaultsKeys.macItemFields,
             DefaultsKeys.mergeDocuments, DefaultsKeys.customOCRPrompt,
             DefaultsKeys.segmentationApproach, DefaultsKeys.segmentationClaudeRoute,
             DefaultsKeys.localSegmenterPartner, DefaultsKeys.localSegmenterBaseURL, DefaultsKeys.localSegmenterModelID,

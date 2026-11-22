@@ -92,6 +92,7 @@ public struct UserItemFields: Equatable, Sendable {
             case .recipientPlace: f.recipientPlace = v
             case .date, .sentWith, .sender, .recipient, .sendingPlace: continue
             }
+            f.lowerConfidence.remove(field)
         }
         return f
     }

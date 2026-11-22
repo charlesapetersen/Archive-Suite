@@ -56,6 +56,7 @@ struct SessionProcessingConfig: Sendable {
     var segmentationApproach: SegmentationApproach = .manual
     /// Process Files only. Frozen for the manual date cards and interrupted runs.
     var dateLocalImage = false
+    var macItemFields = true
 
     /// The backend for all post-transcription text work. For ordinary runs this is the OCR backend;
     /// for the Vision hybrid it is the separately-selected direct LLM.
@@ -320,7 +321,8 @@ struct SessionProcessingConfig: Sendable {
             visionSettings: VisionOCRSettings.fromDefaults(d),
             cascade: OCRCascade.fromDefaults(d),
             visionTextLLM: visionTextLLM,
-            segmentationApproach: SegmentationApproach.stored(d)
+            segmentationApproach: SegmentationApproach.stored(d),
+            macItemFields: d.object(forKey: DefaultsKeys.macItemFields) as? Bool ?? true
         )
     }
 

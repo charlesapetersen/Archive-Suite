@@ -11,6 +11,7 @@ import unittest
 
 import item_fields as IF
 import item_fields_retruth as R
+import item_fields_mac as M
 
 SWIFT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "macOS", "Sources", "ArchiveProcessor",
                      "Tagging", "ItemFieldExtractor.swift")
@@ -52,6 +53,21 @@ class Prompt(unittest.TestCase):
         self.assertIn(f"static let maxTokens = {R.MAX_TOKENS}", src)
         self.assertIn("static let gatewayModel = DateRoute.gatewayModel", src)
         self.assertEqual(R.MODELS["gemini"], "gemini-3.7-flash")
+
+    def test_mac_prompt_changes_only_the_measured_text_opening(self):
+        src = swift_source()
+
+        def opening(name):
+            expr = src.split(f"static let {name} = ", 1)[1]
+            expr = re.split(r"\n    (?:static|private)", expr, maxsplit=1)[0]
+            return "".join(re.findall(r'"([^"]+)"', expr))
+
+        image, text = opening("imageOpening"), opening("textOpening")
+        self.assertEqual(image, M.IMAGE_OPENING)
+        self.assertEqual(text, M.TEXT_OPENING)
+        self.assertEqual(swift_template().replace(image, text), M.TEXT_PROMPT)
+        self.assertIn(f"static let macImageLongSide = {M.IMAGE_SIDE}", src)
+        self.assertIn(f"static let macMaxTokens = {M.MAX_TOKENS}", src)
 
     def test_kinds_and_scopes_match(self):
         self.assertEqual(swift_set("kinds"), set(IF.KINDS))
