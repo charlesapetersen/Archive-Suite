@@ -187,7 +187,7 @@ expect 1 'a missing source root fails instead of passing vacuously' 'source root
 
 lint_steps="$(grep -Ec '^step processor-write-surface-lint[[:space:]]+bash "\$ROOT/ArchiveProcessor/scripts/lint-write-surface.sh"$' "$GATE" || true)"
 [ "$lint_steps" = 1 ] && ok 'the lint is wired exactly once into the health gate' || no "expected one Processor lint gate step, found $lint_steps"
-proof_steps="$(grep -Ec '^step processor-write-surface-lint-proof[[:space:]]+bash "\$ROOT/ArchiveProcessor/scripts/test-lint-write-surface.sh"$' "$GATE" || true)"
+proof_steps="$(grep -Ec '^[[:space:]]*step processor-write-surface-lint-proof[[:space:]]+bash "\$ROOT/ArchiveProcessor/scripts/test-lint-write-surface.sh"$' "$GATE" || true)"
 [ "$proof_steps" = 1 ] && ok 'the mutation proof is wired exactly once into the health gate' || no "expected one Processor proof gate step, found $proof_steps"
 
 echo "=================== $PASS passed, $FAIL failed ==================="

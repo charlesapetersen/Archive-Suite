@@ -102,7 +102,7 @@ run_guard "$SESSION_HEAD" "{\"session_id\":\"x\",\"cwd\":\"$W/session\",\"hook_e
 run_guard "$SESSION_HEAD"
 [ "$RC" = 0 ] && ok 'the same commit is not counted without that cwd (it is read from stdin)' || no "without cwd the worktree commit is not this checkout's, got rc=$RC: $OUT"
 
-steps="$(grep -Ec '^step docsync-packages-proof[[:space:]]+bash "\$ROOT/ops/autonomous/tests/prove-docsync-packages.sh"$' "$GATE" || true)"
+steps="$(grep -Ec '^[[:space:]]*step docsync-packages-proof[[:space:]]+bash "\$ROOT/ops/autonomous/tests/prove-docsync-packages.sh"$' "$GATE" || true)"
 [ "$steps" = 1 ] && ok 'the proof is wired exactly once into the health gate' || no "expected one docsync-packages-proof gate step, found $steps"
 
 echo "=================== $PASS passed, $FAIL failed ==================="

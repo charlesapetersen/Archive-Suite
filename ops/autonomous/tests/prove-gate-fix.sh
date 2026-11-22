@@ -65,7 +65,7 @@ echo "HEALTH GATE: GREEN"; exit 0
 STUB
 chmod +x "$GATE"
 # The fake gate script also needs the `step` line the request quotes, at line start:
-printf 'step notes-ui bash ops/gui/vm-gui-runner.sh notes xcuitest\n' >> "$GATE"
+printf '  step notes-ui bash ops/gui/vm-gui-runner.sh notes xcuitest\n' >> "$GATE"
 
 # The stub claude: records whether the request was there, and commits when $SESSCTL says so.
 SESSCTL="$T/sessctl"; SEEN="$T/seen"

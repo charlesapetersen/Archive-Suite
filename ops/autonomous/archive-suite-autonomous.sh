@@ -1200,7 +1200,7 @@ _gatefix_handoff() {
     echo "ATTEMPT: $n of $GATEFIX_MAX (the run parks if a committed fix still leaves the gate red after the last)."
     echo "FAILED STEPS:${steps:- (unknown — read the log)}"
     for st in $steps; do
-      cmd="$(grep -E "^step(_skippable)? $st " "$GATE_CMD" 2>/dev/null | head -1)"
+      cmd="$(grep -E "^[[:space:]]*step(_skippable)? $st " "$GATE_CMD" 2>/dev/null | head -1 | sed 's/^[[:space:]]*//')"
       echo "  $st: ${cmd:-(command not found in $GATE_CMD)}"
     done
     echo "FULL LOG: $glog"
