@@ -95,11 +95,10 @@ struct NotesFilter: Codable, Equatable, Sendable {
         // its own — both bounds must hold for the SAME value, so own 1950 + sent 1970 never matches
         // 1960–1965. Undated items are excluded whenever any bound is set.
         if !dateRange.isUnbounded, matchingDateRoles(item).isEmpty { return false }
-        // Tags (managed tokens) — ALL (subset) or ANY (intersection). Exact-token match, mirroring
-        // Reader's subject set logic; the filter bar supplies canonical tokens.
+        // Match whole tags case-insensitively, as the saved Advanced Search rules do.
         if !tags.isEmpty {
-            let itemTags = Set(item.managedTags)
-            let wanted = Set(tags)
+            let itemTags = Set(item.managedTags.map { $0.lowercased() })
+            let wanted = Set(tags.map { $0.lowercased() })
             switch tagCombine {
             case .all: if !wanted.isSubset(of: itemTags)   { return false }
             case .any: if wanted.isDisjoint(with: itemTags) { return false }

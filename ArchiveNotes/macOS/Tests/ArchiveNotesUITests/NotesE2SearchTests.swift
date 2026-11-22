@@ -91,8 +91,15 @@ final class NotesE2SearchTests: NotesFixtureUITestCase {
             XCTAssertTrue(waitForIndexReady(timeout: 30), "the search index should be built")
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == self.allNotes })
 
-            // A facet-based smart folder: the intel tag (two of the three notes).
-            addTagFacet("intel")
+            // Start with a spare character so autocomplete cannot substitute the fixture's
+            // stored "intel" spelling as the tag is typed. Remove it before submitting "Intel".
+            let tagField = mainWindow.textFields["an.filter.tagInput"]
+            XCTAssertTrue(tagField.waitForExistence(timeout: 10))
+            tagField.click()
+            tagField.typeText("xIntel")
+            tagField.typeKey(.leftArrow, modifierFlags: .command)
+            tagField.typeKey(.forwardDelete, modifierFlags: [])
+            tagField.typeKey(.return, modifierFlags: [])
             XCTAssertTrue(pollUntil(timeout: 10) { self.visibleNotes() == [Self.idPlain, Self.idReader] })
             saveSmartFolder(named: "E2 Intel")
             clearFilters()
@@ -111,7 +118,7 @@ final class NotesE2SearchTests: NotesFixtureUITestCase {
 
             let intelQuery = try XCTUnwrap(smartQueryJSON(named: "E2 Intel"),
                                            "Save should persist E2 Intel as a smart folder")
-            XCTAssertTrue(intelQuery.contains("intel"), "the saved query should carry the tag: \(intelQuery)")
+            XCTAssertTrue(intelQuery.contains("\"Intel\""), "the saved query should carry the submitted spelling: \(intelQuery)")
             let keywordQuery = try XCTUnwrap(smartQueryJSON(named: "E2 Lovelace"),
                                              "Save should persist E2 Lovelace as a smart folder")
             XCTAssertTrue(keywordQuery.contains("Lovelace"),

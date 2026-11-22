@@ -17493,3 +17493,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 
 - [x] **W49.proc-s050-verify — ordinary Resume honors explicit review skips [S]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build,vm) — Owner call 30 (2026-11-21). SHIPPED 2026-11-21 (this commit). S-050 reproduced in the off-screen Processor VM at `5cd1bd29` (Codex gpt-6.2-sol, $0). After a real non-batch Automatic run was interrupted at the whole-run review, Resume omitted that review and the box/folder confirmation with the document review setting saved on or explicitly turned off. Final tagging review opened in both cases. Only the saved On brought back the later per-collection review, despite changing the live switch after relaunch. Both runs reused all six OCR results. [Evidence and replay](verification/evidence/processor/W49.proc-s050-verify.md). Filed `W49.proc-s050-check` for independent Claude verification before a fix and cross-linked the S-035 paid-batch check. Bench cache used read-only.
   <!-- /W49.proc-s050-verify -->
+
+- [x] **W49.fix-notes-tag-filter-case — Match complete tag filters across letter case [S]** · §Known limits are queued, accepted or asked (lane: notes) (uses: build,vm) — S-012 (S3). A full lowercase filter should find a canonically cased tag, including in saved filters. Keep s012TagFilterCase as the regression.
+  SHIPPED 2026-11-21 (this commit). Live filters use the same whole-tag comparison as saved smart folders.
+  The scratch regression checks a lowercase query against the stored capitals, excludes the longer tag
+  `Intelligence`, and reopens the saved filter. Notes smoke and the focused off-screen smart-folder
+  test cover the live and saved list. No bench cache used.
+  <!-- /W49.fix-notes-tag-filter-case -->

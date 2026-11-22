@@ -43,8 +43,7 @@ struct NoteTagChipsField: View {
         tags.append(tag)
     }
 
-    /// The tags on notes, each in every spelling a note has (a search matches the spelling exactly in the filter
-    /// bar), most used first, then by name.
+    /// The tags on notes in their stored spellings, most used first, then by name.
     static func suggestions(in items: [ItemSummary]) -> [String] {
         var counts: [String: Int] = [:]
         for item in items {

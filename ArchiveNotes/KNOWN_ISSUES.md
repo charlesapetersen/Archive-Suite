@@ -3,6 +3,12 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
+## ✅ FIXED (W49.fix-notes-tag-filter-case, 2026-11-21) — tag filters match across letter case
+
+The filter bar and saved smart folders match whole tags regardless of capitalization.
+For example, entering or pasting `intel` finds a note tagged `Intel`.
+The scratch regression is `NotesSmallSuspectTests.s012TagFilterCase`.
+
 ## ✅ FIXED (W49.fix-notes-raw-image-paste, 2026-11-21) — raw Markdown image pastes save a reference
 
 Raw mode now inserts a literal `![](assets/…)` reference to the saved image at the selection.
@@ -21,8 +27,6 @@ regression is `NotesTextLossSuspectTests.s019TypedCloserAfterUnclosedHeader`.
 
 - **Clicking a sortable column header** changes the arrow and leaves the notes in their prior order.
   Two clicks on Title flipped the arrow in the scratch library. (queued: W49.fix-notes-header-sort)
-- **A full lowercase tag filter** can omit the notes that carry the same tag with its stored capitals.
-  The VM reproduced this with the complete lowercase token pasted into the filter. (queued: W49.fix-notes-tag-filter-case)
 - **Creating from a template through a row menu** can use the last saved body while an edit is pending
   or after a save has failed. Standard New flushes the editor and checks for a failed save. (queued: W49.fix-notes-template-create)
 

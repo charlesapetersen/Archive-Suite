@@ -347,7 +347,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   assert that `nav.displayed` contains the note. Confirmed if it is empty.
 - **Would clear it:** the note is displayed, i.e. the filter or the stored tag is normalised somewhere this
   reading missed.
-- **Status:** `reproduced` — independently confirmed for the full lowercase token, queued as `W49.fix-notes-tag-filter-case`; [evidence](evidence/notes/W49.notes-suspects-small-check.md); test `ArchiveNotesTests/NotesSmallSuspectTests` `s012TagFilterCase`
+- **Status:** `cleared` — fixed by W49.fix-notes-tag-filter-case. Regression `NotesSmallSuspectTests.s012TagFilterCase`. [Original reproduction](evidence/notes/W49.notes-suspects-small-check.md#s-012--an-exact-lowercase-tag-can-hide-a-note-with-that-tag).
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-small` under phase rule 5a.
@@ -361,6 +361,9 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     there says "the filter bar supplies canonical tokens", which it does not for this case. Advanced Search
     lower-cases both sides (`NotesAdvancedSearch.swift:242`), so it finds the note.
   - 2026-11-21 W49.notes-suspects-small-check (Codex, gpt-6.2-sol, `b0539267`) — The VM confirmed the exact-input path. The filter chip `fieldwork` hid the note tagged `Fieldwork` on disk. After clearing, the chip `Fieldwork` found it. The complete token was pasted and submitted with Return.
+  - 2026-11-21 W49.fix-notes-tag-filter-case — The filter bar now compares full tags without regard to
+    capitalization, like the saved rules. The scratch regression submits `intel` against `Intel`,
+    excludes `Intelligence`, and applies the saved smart folder with the same result.
 
 ### S-013 · An `archivenotes://` link may be dropped when the Notes window is closed
 

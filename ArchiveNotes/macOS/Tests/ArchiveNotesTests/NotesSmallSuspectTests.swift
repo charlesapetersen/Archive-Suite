@@ -80,25 +80,35 @@ struct NotesSmallSuspectTests {
     func s012TagFilterCase() async throws {
         let env = try await makeEnv(); defer { Task { await cleanup(env) } }
         let id = try #require(await env.model.newItem(kind: .note, in: nil, from: nil))
+        let unrelatedID = try #require(await env.model.newItem(kind: .note, in: nil, from: nil))
         #expect(await env.model.addTag("intel", to: id))   // the tag bar's add
+        #expect(await env.model.addTag("intelligence", to: unrelatedID))
         let stored = try #require(env.model.allItems.first { $0.id == id })
         #expect(stored.managedTags == ["Intel"], "the app stores the tag title-cased")
         #expect(env.nav.displayed.contains { $0.id == id })
 
-        // The filter bar's field (`NoteTagChipsField` over `SubjectEntryField`, fillsInAnyCase): typed in full, the
-        // stored spelling is an exact match in another case, so nothing is suggested or filled in, and Return adds
-        // the text as typed (`TagEntry.pendingText`, then `NoteTagChipsField.add`, which only trims).
+        // The field skips the exact case-insensitive match in the completion list and fills in
+        // nothing for it, so Return submits the original spelling.
         let suggestions = NoteTagChipsField.suggestions(in: env.model.allItems)
         let completions = TagEntry.completions(for: "intel", in: suggestions)
-        #expect(completions.isEmpty)
+        #expect(completions == ["Intelligence"])
         #expect(TagEntry.filledInIndex(for: "intel", in: completions, among: suggestions, anyCase: true) == -1)
         env.nav.filter.tags.append("intel")
 
-        withKnownIssue("S-012: the filter compares tags exactly, so \"intel\" misses \"Intel\"") {
-            #expect(env.nav.displayed.contains { $0.id == id })
-        }
-        // A prefix is filled in with the stored spelling, so "inte" + Return does find it.
-        #expect(TagEntry.completions(for: "inte", in: suggestions) == ["Intel"])
+        #expect(env.nav.displayed.map(\.id) == [id])
+        #expect(TagEntry.completions(for: "inte", in: suggestions).contains("Intel"))
+
+        // Submitting just a prefix should produce an empty list.
+        env.nav.filter.tags = ["inte"]
+        #expect(env.nav.displayed.isEmpty)
+
+        env.nav.filter.tags = ["intel"]
+        await env.nav.saveAsSmartFolder(named: "Intel notes")
+        let saved = try #require(env.org.folders.first { $0.name == "Intel notes" })
+        env.nav.filter = NotesFilter()
+        env.model.applySmartScope(saved.id)
+        #expect(env.model.selectedSmartId == saved.id)
+        #expect(env.nav.displayed.map(\.id) == [id])
     }
 
     // MARK: - S-016
