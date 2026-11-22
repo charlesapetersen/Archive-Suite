@@ -1187,11 +1187,14 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** in the VM, add the same scratch photo twice through the real window and count the rows (or
   the run's outputs).
 - **Would clear it:** one row, or a de-duplication before the run starts.
-- **Status:** `open`
+- **Status:** `reproduced` — independent Claude check queued as `W49.proc-s048-check`.
+  [Scratch evidence](evidence/processor/W49.proc-s048-verify.md).
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
   - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s048-verify`; standing authorization for all bug suspects, phase rule 5a retained.
-
+  - 2026-11-21 W49.proc-s048-verify — Codex gpt-6.2-sol reproduced at `1f5cc337`. Choosing twice or choosing
+    then dropping the same photo produced two rows and two OCR requests. One add produced one request.
+    Each run left one PDF and used only the guest loopback gateway.
 
 ### S-049 · The Processor README says a chosen folder is read only at its top level
 

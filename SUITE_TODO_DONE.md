@@ -17482,3 +17482,6 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   two focused VM checks passed, including reveal from a valid Reader source.
   [Verification](verification/evidence/notes/W49.notes-suspects-text-check.md#s-019-fix-verification). No bench cache used.
   <!-- /W49.fix-notes-unclosed-header -->
+
+- [x] **W49.proc-s048-verify — adding the same input twice does not process and pay twice [S]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build,vm) — Owner call 30 (2026-11-21). SHIPPED 2026-11-21 (this commit). Codex gpt-6.2-sol verified on `1f5cc337` that selecting the same scratch PNG twice, or selecting then dropping it from Finder, shows two rows and sends two OCR requests. The single-add control sent one request. Each run left one PDF. Both focused Debug VM tests passed. Queued the independent Claude check W49.proc-s048-check. [W49.proc-s048-verify evidence](verification/evidence/processor/W49.proc-s048-verify.md). $0 and no bench cache used.
+  <!-- /W49.proc-s048-verify -->

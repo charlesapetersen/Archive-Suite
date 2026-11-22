@@ -2,6 +2,13 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## Adding the same photo twice can send two OCR requests (S-048)
+
+- **Reproduced 2026-11-21 (Codex gpt-6.2-sol, `1f5cc337`).** Process Files shows two rows and
+  requests OCR twice when the same photo is chosen twice or chosen and then dropped from Finder.
+  The scratch run showed two successes but only one PDF. Skip already processed was enabled.
+  [VM evidence](../verification/evidence/processor/W49.proc-s048-verify.md). (queued: W49.proc-s048-check)
+
 ## A window split can drop the enclosure's covering-letter date (S-047)
 
 - When a window splits the OCR's two-page letter, the marked enclosure remains a separate document.

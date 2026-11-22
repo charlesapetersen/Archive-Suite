@@ -25,14 +25,7 @@ final class NamesEstimateJourneyUITests: XCTestCase {
         let initialCalls = try gatewayCalls()
         let input = scratch.appendingPathComponent("in"), output = scratch.appendingPathComponent("out")
         for dir in [input, output] { try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true) }
-        let image = NSImage(size: NSSize(width: 600, height: 400))
-        image.lockFocus()
-        NSColor.white.setFill(); NSBezierPath(rect: NSRect(x: 0, y: 0, width: 600, height: 400)).fill()
-        "12 March 1918\nDear friend,\nAda Lovelace".draw(at: NSPoint(x: 40, y: 100),
-            withAttributes: [.font: NSFont.systemFont(ofSize: 24), .foregroundColor: NSColor.black])
-        image.unlockFocus()
-        let bitmap = try XCTUnwrap(image.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)))
-        try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: input.appendingPathComponent("letter.png"))
+        try makeLetter(at: input.appendingPathComponent("letter.png"))
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode", "-APUITestStandInGateway", "-APUITestInputImages", input.path,
             "-APUITestOutputDirectory", output.path, "-outputDirectory", output.path,
@@ -140,6 +133,127 @@ final class NamesEstimateJourneyUITests: XCTestCase {
         XCTAssertEqual(entities, 1, "the names reply reached a sidecar")
         XCTAssertTrue(calls.filter { $0["kind"] == "names" }.allSatisfy { $0["model"] == "s044-priced" })
         print("[s044] CONFIRMED: collection interview → real Start → one names request; estimate includes Names")
+    }
+
+    // S-048: a single-file control and two duplicate attempts through the real intake window.
+    // The loopback gateway counts OCR calls after the real Start. No provider can bill this test.
+    func testRepeatedFileIntakeRequestsOCRForEachRow() throws {
+        try checkInput(repeatBy: "once", expected: 1)
+        try checkInput(repeatBy: "picker", expected: 2)
+        try checkInput(repeatBy: "Finder drop", expected: 2)
+    }
+
+    private func checkInput(repeatBy method: String, expected: Int) throws {
+        let run = scratch.appendingPathComponent(UUID().uuidString)
+        let input = run.appendingPathComponent("in")
+        let output = run.appendingPathComponent("out")
+        for folder in [input, output] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        let photo = input.appendingPathComponent("scratch-letter.png")
+        try makeLetter(at: photo)
+        let initialCalls = try gatewayCalls()
+        app.launchArguments = UITestLaunch.arguments([
+            "-APUITestMode", "-APUITestStandInGateway",
+            "-APUITestOutputDirectory", output.path, "-outputDirectory", output.path,
+            "-useGateway", "YES", "-gatewayLocalModel", "NO", "-useAppleVision", "NO", "-useLocalAgent", "NO",
+            "-gatewayBaseURL", "http://127.0.0.1:18472/v1", "-gatewayModelID", "s048-ocr",
+            "-gatewayUpstreamProvider", "Anthropic", "-taggingModeRaw", "none",
+            "-enableCollectionSegmentation", "NO", "-rotationModeRaw", "off", "-reviewRotation", "NO",
+            "-outputImageFile", "NO", "-mergeDocuments", "NO", "-batchMode", "NO",
+            "-sendPreviousImage", "NO", "-useInstitutionalComputeImport", "NO",
+            "-skipAlreadyProcessed", "YES", "-preOCRedInput", "NO"
+        ])
+        app.launchEnvironment = ["ARCHIVEPROC_HEADLESS": "1"]
+        app.launch()
+        defer { app.terminate() }
+        let rows = app.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@",
+                                                       photo.lastPathComponent, photo.lastPathComponent))
+        XCTAssertTrue(app.descendants(matching: .any)["ap.ocr.dropZone"].waitForExistence(timeout: 15))
+        if app.descendants(matching: .any)["ap.ocr.resumeRun"].exists {
+            app.buttons["Dismiss"].firstMatch.click()
+        }
+        addThroughPicker(photo)
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 10))
+        XCTAssertEqual(rows.count, 1, "the fresh window must start with exactly one row")
+        switch method {
+        case "picker": addThroughPicker(photo)
+        case "Finder drop": dragFromFinder(photo, to: rows.firstMatch)
+        default: break
+        }
+        let rowCount = rows.count
+        print("[s048] \(method) rows before Start: \(rowCount)")
+        shot("s048-rows-\(expected)-\(method.replacingOccurrences(of: " ", with: "-"))")
+        XCTAssertEqual(rowCount, expected)
+        let start = app.descendants(matching: .any)["ap.ocr.start"]
+        XCTAssertTrue(start.exists && start.isEnabled)
+        start.click()
+        let done = "Done. \(expected) succeeded, 0 failed."
+        XCTAssertTrue(app.staticTexts[done].waitForExistence(timeout: 90), app.debugDescription)
+        let calls = try gatewayCalls()
+        XCTAssertEqual(Array(calls.prefix(initialCalls.count)), initialCalls)
+        let received = Array(calls.dropFirst(initialCalls.count))
+        let outputs = try FileManager.default.contentsOfDirectory(atPath: output.path).filter { $0.hasSuffix(".pdf") }
+        print("[s048] \(method): \(done) requests=\(received) PDFs=\(outputs)")
+        XCTAssertEqual(received, Array(repeating: ["kind": "ocr", "model": "s048-ocr"], count: expected))
+        XCTAssertFalse(outputs.isEmpty, "the run reached scratch PDF output")
+    }
+
+    private func addThroughPicker(_ photo: URL) {
+        app.buttons["Add Files…"].click()
+        let open = app.buttons["Open"].firstMatch
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        app.typeKey("g", modifierFlags: [.command, .shift])
+        app.typeText(photo.path)
+        app.typeKey(.return, modifierFlags: [])
+        XCTAssertTrue(open.waitForExistence(timeout: 5) && open.isEnabled, app.debugDescription)
+        open.click()
+        XCTAssertTrue(open.waitForNonExistence(timeout: 10))
+    }
+
+    private func dragFromFinder(_ photo: URL, to row: XCUIElement) {
+        let main = app.windows.firstMatch
+        let rowFrame = row.frame
+        let target = row.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
+        finder.activate()
+        finder.typeKey("n", modifierFlags: .command)
+        let window = finder.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 10))
+        defer {
+            finder.typeKey("w", modifierFlags: .command)
+            app.activate()
+        }
+        finder.typeKey("g", modifierFlags: [.command, .shift])
+        finder.typeText(photo.deletingLastPathComponent().path)
+        finder.typeKey(.return, modifierFlags: [])
+        finder.typeKey("2", modifierFlags: .command)
+        let file = window.descendants(matching: .any).matching(NSPredicate(
+            format: "label == %@ OR title == %@ OR value == %@",
+            photo.lastPathComponent, photo.lastPathComponent, photo.lastPathComponent
+        )).firstMatch
+        XCTAssertTrue(file.waitForExistence(timeout: 10), finder.debugDescription)
+        // Keep the filename in reach while exposing the Processor row to its left.
+        let title = window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0))
+            .withOffset(CGVector(dx: 0, dy: 12))
+        let distance = max(0, rowFrame.midX + 40 - window.frame.minX)
+        if distance > 0 {
+            title.click(forDuration: 0.2, thenDragTo: title.withOffset(CGVector(dx: distance, dy: 0)))
+        }
+        print("[s048] Finder file \(file.frame), Finder window \(window.frame), Processor \(main.frame), row \(rowFrame)")
+        file.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .click(forDuration: 0.2, thenDragTo: target)
+    }
+
+    private func makeLetter(at url: URL) throws {
+        let image = NSImage(size: NSSize(width: 600, height: 400))
+        image.lockFocus()
+        NSColor.white.setFill(); NSBezierPath(rect: NSRect(x: 0, y: 0, width: 600, height: 400)).fill()
+        "12 March 1918\nDear friend,\nAda Lovelace".draw(at: NSPoint(x: 40, y: 100),
+            withAttributes: [.font: NSFont.systemFont(ofSize: 24), .foregroundColor: NSColor.black])
+        image.unlockFocus()
+        let bitmap = try XCTUnwrap(image.tiffRepresentation.flatMap(NSBitmapImageRep.init(data:)))
+        try XCTUnwrap(bitmap.representation(using: .png, properties: [:])).write(to: url)
     }
 
     private func gatewayCalls() throws -> [[String: String]] {

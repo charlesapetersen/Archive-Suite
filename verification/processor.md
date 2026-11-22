@@ -489,13 +489,14 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Promise:** images can be dragged onto the window, chosen in an open panel, or found recursively in a chosen
   folder; JPEG, PNG, TIFF and HEIC are accepted (and PDF for pre-OCRed input), others ignored gracefully.
 - **Promised in:** `README.md` §File Input; `CLAUDE.md` §File Input; `TESTING.md` §2.3.
-- **Reached by:** drag onto `DropReceiver` (`Views/DropReceiver.swift:36-46`, used at `Views/OCRView.swift:920`) →
-  `handleDroppedURLs` (`:1207`); Add Files… (`:823`) → `selectFiles` (`:1221`). Both filter with `isImageFile`
-  (`:1251`) against `ImageEncoding.acceptedImageExtensions` (`OCR/ImageEncoding.swift:17`).
+- **Reached by:** the Files pane's `DropReceiver` calls `OCRView.handleDroppedURLs`. Add Files… calls
+  `OCRView.selectFiles`. Both reach `OCRView.admit` and filter with `ProcessFilesTree.isInput` against
+  `ImageEncoding.acceptedImageExtensions` and PDF.
 - **Real-path test:** the PDF UITests (`ProcessorUITests.testMultiPageScratchPDFDisablesTaggingAndExplainsAutoReOCR`,
   `.testInstitutionalComputingImportOffersNeutralFolderChooser`) feed a PDF through `handleDroppedURLs` by a UI-test
-  seam. Not covered: a real drag, the open panel, images, folders.
-- **Runtime evidence:** none.
+  seam. S-048 drove the actual Add Files panel and Finder drop with a synthetic PNG and ran Start.
+- **Runtime evidence:** 2026-11-21 · `1f5cc337` · [S-048 scratch run](evidence/processor/W49.proc-s048-verify.md).
+  Both intake routes accepted the PNG. Adding it twice created two rows and sent two OCR requests.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
