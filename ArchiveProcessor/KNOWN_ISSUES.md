@@ -469,8 +469,9 @@ written where the `searchableFor` setting names the input's format and the page'
 - **The settings sheet chooses by kind only** (the rules tab, placement: "Every page" and one switch a kind, for any
   input format). An entry naming one format (`jpeg/printed`) is set in the settings file and shown as such (queued: W49.proc-settings-rules-proper).
 - **Merges and date rewrites preserve compression where qpdf succeeds.** If qpdf is unavailable or refuses the
-  file, they fall back to the Quartz PDF/A writer, which can expand compressed images. A merge logs that fallback;
-  a date rewrite does not. Compression children also have no per-page timeout or connection to run cancellation (queued: W49.proc-child-cancel).
+  file, they fall back to the Quartz PDF/A writer, which can expand compressed images. Merges and searchable header
+  rewrites log a qpdf failure. The compression and PDF/A children have a shared 60-second budget per searchable page
+  and stop when the run is cancelled (accepted: the Quartz fallback keeps the page when compression fails, W49.proc-child-cancel).
 - **An unplaced layer selects in the wrong place.** Where the reading's words do not all land on Vision's lines
   (handwriting, a missed note, a reading that does not align), the layer is the reading's own lines spread down the
   image: searchable and selectable, but a selection's highlight is not on the words. The run log names those pages (accepted: the reading has no word positions to place by; the run log names the pages).
@@ -538,7 +539,6 @@ layer on 9 of 20 owner hand pages (`place-hands-lines.md`, Qwen3.6-27B). Open:
   searchable form, a page no classifier called and no tag named is not known to be handwritten, so it is written as
   one searchable page with its reading unplaced (W46.place-hands-textpage keeps the text page on every page whose
   kind, or whose reading's hand, is handwritten, mixed or registers) (queued: W49.proc-settings-rules-proper).
-- **Cancelling a run does not stop a page's placer**: it finishes its page (up to 600 s) or its wait for a slot (queued: W49.proc-child-cancel).
 - **The reflow rule is by name**: a reader whose model name holds Infinity-Parser, LightOnOCR, PaddleOCR-VL or
   Xiaomi-OCR gets the text page on hand pages; a renamed build of one is not caught (queued: W49.proc-settings-rules-proper).
 - **Accented readings align worse**: McCATMuS is an NFD model and the reading is not normalised to NFD (as on the

@@ -486,7 +486,7 @@ enum CollectionOrganizeTestDriver {
                   && tags(at: outputs[2]).contains("Apricot") && !tags(at: outputs[2]).contains("Cedar")
                   && tags(at: outputs[3]).contains("Cedar") && !tags(at: outputs[3]).contains("Apricot"))
 
-            processor.performDocumentMerging(files: documentFiles, outputDirectory: out)
+            await processor.performDocumentMerging(files: documentFiles, outputDirectory: out)
             let merged = tree.appendingPathComponent("Folder 8/0001_merged.pdf")
             let second = tree.appendingPathComponent("Folder 9/0001.pdf")
             check("tree: a document is merged within its folder, beside its pages, with its own tags",

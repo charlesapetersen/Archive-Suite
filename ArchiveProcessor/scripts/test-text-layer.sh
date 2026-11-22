@@ -23,7 +23,7 @@ report="$work/result.txt"
 log="$work/app.log"
 keep="${TEXTLAYER_TEST_KEEP:-$work/keep}"
 mkdir -p "$keep"
-ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
+TMPDIR="$work" ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
     TEXTLAYER_TEST=1 TEXTLAYER_TEST_OUT="$report" TEXTLAYER_TEST_KEEP="$keep" processor_test_start pid "$bin" >"$log" 2>&1
 
 for _ in $(seq 1 180); do

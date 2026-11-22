@@ -57,7 +57,7 @@ enum MergeSafetyTestDriver {
         let (failedProcessor, failedSource1, failedSource2, failedPDF1, failedPDF2) = configuredProcessor(in: failureDir)
         var failedWriterSawSources = false
         var failedMergedURL: URL?
-        failedProcessor.performDocumentMerging(files: [failedSource1, failedSource2], outputDirectory: failureDir) {
+        await failedProcessor.performDocumentMerging(files: [failedSource1, failedSource2], outputDirectory: failureDir) {
             _, mergedURL, _, _ in
             failedMergedURL = mergedURL
             failedWriterSawSources = fm.fileExists(atPath: failedPDF1.path)
@@ -79,7 +79,7 @@ enum MergeSafetyTestDriver {
         let successDir = root.appendingPathComponent("success", isDirectory: true)
         let (successProcessor, successSource1, successSource2, successPDF1, successPDF2) = configuredProcessor(in: successDir)
         var successWriterSawSources = false
-        successProcessor.performDocumentMerging(files: [successSource1, successSource2], outputDirectory: successDir) {
+        await successProcessor.performDocumentMerging(files: [successSource1, successSource2], outputDirectory: successDir) {
             _, _, _, _ in
             successWriterSawSources = fm.fileExists(atPath: successPDF1.path)
                 && fm.fileExists(atPath: successPDF2.path)
@@ -101,7 +101,7 @@ enum MergeSafetyTestDriver {
             configuredProcessor(in: stampedDir, tags: [])
         stampedProcessor.taggingMode = .automatic   // a real-tagging mode → stampsUnread == true
         var stampedWriterCalled = false
-        stampedProcessor.performDocumentMerging(files: [stampedSource1, stampedSource2], outputDirectory: stampedDir) {
+        await stampedProcessor.performDocumentMerging(files: [stampedSource1, stampedSource2], outputDirectory: stampedDir) {
             tags, _, _, _ in
             stampedWriterCalled = tags.isEmpty
                 && fm.fileExists(atPath: stampedPDF1.path)
@@ -120,7 +120,7 @@ enum MergeSafetyTestDriver {
             configuredProcessor(in: plainDir, tags: [])
         plainProcessor.taggingMode = .none          // not a real-tagging mode → stampsUnread == false
         var plainWriterCalled = false
-        plainProcessor.performDocumentMerging(files: [plainSource1, plainSource2], outputDirectory: plainDir) {
+        await plainProcessor.performDocumentMerging(files: [plainSource1, plainSource2], outputDirectory: plainDir) {
             _, _, _, _ in plainWriterCalled = true
         }
         check("empty non-stamping merge skips unnecessary tag writer", !plainWriterCalled)
@@ -134,7 +134,7 @@ enum MergeSafetyTestDriver {
         let sourceJSON = jsonDir.appendingPathComponent("page-1.json")
         try? Data("KEEP".utf8).write(to: existingJSON)
         try? Data("NEW".utf8).write(to: sourceJSON)
-        jsonProcessor.performDocumentMerging(files: [jsonSource1, jsonSource2], outputDirectory: jsonDir) {
+        await jsonProcessor.performDocumentMerging(files: [jsonSource1, jsonSource2], outputDirectory: jsonDir) {
             _, _, _, _ in
         }
         let collisionMerged = jsonProcessor.outputURLMap[jsonSource1]

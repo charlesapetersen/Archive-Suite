@@ -197,13 +197,17 @@ final class RunControl: @unchecked Sendable {
         lock.unlock()
     }
 
-    init() {
+    let pdfChildBudget: PDFChildBudget?
+
+    init(pdfChildBudget: PDFChildBudget? = nil) {
+        self.pdfChildBudget = pdfChildBudget
         Self.registryLock.lock()
         Self.live[ObjectIdentifier(self)] = WeakControl(self)
         Self.registryLock.unlock()
     }
 
     var isCancelled: Bool {
+        if let pdfChildBudget, (try? pdfChildBudget.check()) == nil { return true }
         lock.lock(); defer { lock.unlock() }
         return _cancelled
     }
@@ -1960,7 +1964,7 @@ final class OCRModel: ObservableObject {
         //    /JBIG2Decode streams alone. An older qpdf has no such option, and
         //    that is now the only case that takes the Flate route for its
         //    geometry — at 2.26x the bytes, measured.
-        let canCarryCrop = JBIG2.merger.map { JBIG2.canSetCropBoxes(using: $0) } ?? false
+        let canCarryCrop = JBIG2.merger.map { JBIG2.canSetCropBoxes(using: $0, budget: control.pdfChildBudget) } ?? false
         let wantJBIG2 = Self.wantsJBIG2(
             rebuild: rebuild, settings: settings, mode: rebuildMode,
             cropWouldBeLost: !canCarryCrop && Self.hasTrimmedPages(file, password: password))
@@ -2003,7 +2007,7 @@ final class OCRModel: ObservableObject {
             if sourceJBIG2 == nil {
                 sourceJBIG2 = control.adopting { register in
                     JBIG2.sourceImages(in: file, password: password, using: qpdf,
-                                       streamsInto: sourceStreams, register: register)
+                                       streamsInto: sourceStreams, budget: control.pdfChildBudget, register: register)
                 }
             }
             // A placed image is its own size, not the rebuild's.
@@ -2120,7 +2124,7 @@ final class OCRModel: ObservableObject {
                             // whole batch.
                             try control.adopting { register in
                                 try JBIG2.encode(png: png, to: out, using: jb,
-                                                 register: register)
+                                                 budget: control.pdfChildBudget, register: register)
                             }
                             // Encoded even so, because the kept stream has to be
                             // no larger than this: 35 of the corpus's 4,353 kept
@@ -2134,7 +2138,7 @@ final class OCRModel: ObservableObject {
                                     String(format: "o%05d.jbig2", encoded.count))
                                 if (try? control.adopting({ register in
                                     try JBIG2.encode(png: o.png, to: url, using: jb,
-                                                     register: register)
+                                                     budget: control.pdfChildBudget, register: register)
                                 })) != nil {
                                     overlay = (url, o.width, o.height, o.rect)
                                 }
@@ -2587,12 +2591,12 @@ final class OCRModel: ObservableObject {
                         do {
                             try control.adopting { register in
                                 try JBIG2.encode(png: layers.mask, to: stencil,
-                                                 using: jb, register: register)
+                                                 using: jb, budget: control.pdfChildBudget, register: register)
                             }
                             if let marks = layers.marks, let markStencil {
                                 try control.adopting { register in
                                     try JBIG2.encode(png: marks.mask, to: markStencil,
-                                                     using: jb, register: register)
+                                                     using: jb, budget: control.pdfChildBudget, register: register)
                                 }
                             }
                         } catch {
@@ -2661,7 +2665,7 @@ final class OCRModel: ObservableObject {
                         do {
                             try control.adopting { register in
                                 try JBIG2.encode(png: png, to: out, using: jb,
-                                                 register: register)
+                                                 budget: control.pdfChildBudget, register: register)
                             }
                         } catch { continue }
                         let colour = streams.reduce(0) { $0 + fileSize($1) }
@@ -2699,7 +2703,7 @@ final class OCRModel: ObservableObject {
                         }
                         let stripped = budgets.isEmpty ? [:] : ((try? control.adopting { register in
                             try JBIG2.textlessCopy(of: file, password: password, budgets: budgets,
-                                                   to: textless, using: qpdf, register: register)
+                                                   to: textless, using: qpdf, budget: control.pdfChildBudget, register: register)
                         }) ?? [:])
                         var kept = 0, keptSaving = 0
                         if !stripped.isEmpty, let copy = PDFDocument(url: textless) {
@@ -2843,7 +2847,7 @@ final class OCRModel: ObservableObject {
                                          into: assembled.isEmpty ? pagesFrom : imagesOnly,
                                          passthrough: fromSource,
                                          pageCount: expected, to: spliced,
-                                         using: qpdf, register: register)
+                                         using: qpdf, budget: control.pdfChildBudget, register: register)
                     }
                     // Invariant 1, and this is the one thing an interleave gets
                     // wrong silently: a page list that names the wrong ranges
@@ -2866,7 +2870,7 @@ final class OCRModel: ObservableObject {
                     do {
                         try control.adopting { register in
                             try JBIG2.setOutline(outline, in: spliced, using: qpdf,
-                                                 register: register)
+                                                 budget: control.pdfChildBudget, register: register)
                         }
                     } catch {
                         outlineNote = "the original's outline could not be carried "
@@ -2892,7 +2896,7 @@ final class OCRModel: ObservableObject {
                     try JBIG2.overlay(text: textLayer, onto: imagesForLayer,
                                       to: staged, using: qpdf,
                                       pages: carriedThrough.isEmpty ? nil : stampedPages,
-                                      register: register)
+                                      budget: control.pdfChildBudget, register: register)
                 }
                 // C23. Last, and it has to be last — see `setCropBoxes`. Empty
                 // for the overwhelming majority of documents, which is a `return`
@@ -2908,7 +2912,7 @@ final class OCRModel: ObservableObject {
                 try control.adopting { register in
                     try JBIG2.setCropBoxes(
                         sourceCropBoxes.filter { !fromSource.contains($0.key) },
-                        in: staged, using: qpdf, register: register)
+                        in: staged, using: qpdf, budget: control.pdfChildBudget, register: register)
                 }
                 try? FileManager.default.removeItem(at: imagesOnly)
                 try? FileManager.default.removeItem(at: spliced)
@@ -2932,12 +2936,12 @@ final class OCRModel: ObservableObject {
                 try control.adopting { register in
                     try JBIG2.splice(source: file, password: password, into: file,
                                      passthrough: passedThroughPages, pageCount: expected,
-                                     to: staged, using: qpdf, register: register)
+                                     to: staged, using: qpdf, budget: control.pdfChildBudget, register: register)
                 }
                 do {
                     try control.adopting { register in
                         try JBIG2.setOutline(outline, in: staged, using: qpdf,
-                                             register: register)
+                                             budget: control.pdfChildBudget, register: register)
                     }
                 } catch {
                     outlineNote = "the original's outline could not be carried "
@@ -3064,7 +3068,7 @@ final class OCRModel: ObservableObject {
                     try control.adopting { register in
                         try JBIG2.carryDocumentInfo(from: file, password: password,
                                                     into: finished, using: qpdf,
-                                                    register: register)
+                                                    budget: control.pdfChildBudget, register: register)
                     }
                 } catch {
                     if control.isCancelled { report(.cancelled, "Cancelled."); return }
@@ -3089,7 +3093,7 @@ final class OCRModel: ObservableObject {
                 }
                 // C47. Last, so no later rewrite unpacks it again.
                 control.adopting { register in
-                    JBIG2.packObjects(in: finished, using: qpdf, register: register)
+                    JBIG2.packObjects(in: finished, using: qpdf, budget: control.pdfChildBudget, register: register)
                 }
             }
             // A text page needs qpdf to put it in its place; without it the reading would be lost.

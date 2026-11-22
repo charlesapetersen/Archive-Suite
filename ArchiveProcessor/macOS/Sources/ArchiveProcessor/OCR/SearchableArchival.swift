@@ -33,14 +33,17 @@ enum SearchableArchival {
 
     /// `sources`' pages in order as one PDF/A-2b file at `url`, written atomically. `pageHeaders`: one entry per page
     /// of the result (`PDFHeaderCarrier`), nil for a pair's page.
-    static func write(_ sources: [URL], pageHeaders: [String?], to url: URL) throws {
-        let data = try data(sources, pageHeaders: pageHeaders)
+    static func write(_ sources: [URL], pageHeaders: [String?], to url: URL, budget: PDFChildBudget) throws {
+        let data = try data(sources, pageHeaders: pageHeaders, budget: budget)
+        try budget.check()
         do { try data.write(to: url, options: .atomic) } catch { throw PDFError.writeFailed }
     }
 
     /// `write` into memory. Read back before it is returned: every page of every source in order, each with the text
     /// it had, and the header list as given.
-    static func data(_ sources: [URL], pageHeaders: [String?]) throws -> Data {
+    static func data(_ sources: [URL], pageHeaders: [String?], budget: PDFChildBudget? = nil) throws -> Data {
+        let budget = budget ?? PDFChildBudget(seconds: PDFChildBudget.secondsPerPage * Double(max(1, pageHeaders.count)))
+        try budget.check()
         guard let qpdf = CompressedPage.qpdf else { throw Failure.noQPDF }
         guard !sources.isEmpty else { throw PDFError.writeFailed }
         let docs = try sources.map { url -> PDFDocument in
@@ -57,8 +60,8 @@ enum SearchableArchival {
         let merged = dir.appendingPathComponent("merged.pdf"), patch = dir.appendingPathComponent("patch.json")
         let out = dir.appendingPathComponent("out.pdf")
 
-        try run(qpdf, ["--empty", "--pages"] + sources.map(\.path) + ["--", merged.path])
-        let shape = try jsonShape(qpdf, merged)
+        try run(qpdf, ["--empty", "--pages"] + sources.map(\.path) + ["--", merged.path], budget: budget)
+        let shape = try jsonShape(qpdf, merged, budget: budget)
         guard let xmp = metadata(pageHeaders: pageHeaders),
               let icc = CGColorSpace(name: CGColorSpace.sRGB)?.copyICCData() as Data? else {
             throw Failure.check("the metadata could not be made")
@@ -81,10 +84,11 @@ enum SearchableArchival {
         ]]
         // Slashes unescaped: qpdf reads "\/" in a stream's base64 as invalid input.
         try JSONSerialization.data(withJSONObject: update, options: .withoutEscapingSlashes).write(to: patch)
-        try run(qpdf, [merged.path, "--update-from-json=" + patch.path, "--newline-before-endstream", out.path])
+        try run(qpdf, [merged.path, "--update-from-json=" + patch.path, "--newline-before-endstream", out.path], budget: budget)
 
         let data = try Data(contentsOf: out)
         try check(data, against: docs, pageHeaders: pageHeaders, xmp: xmp)
+        try budget.check()
         return data
     }
 
@@ -140,8 +144,8 @@ enum SearchableArchival {
     }
 
     /// The catalog's object, its dictionary and the highest object number, from qpdf's own JSON.
-    private static func jsonShape(_ qpdf: URL, _ pdf: URL) throws -> (root: String, catalog: [String: Any], maxObject: Int) {
-        let json = try run(qpdf, ["--json=2", "--json-key=qpdf", pdf.path])
+    private static func jsonShape(_ qpdf: URL, _ pdf: URL, budget: PDFChildBudget) throws -> (root: String, catalog: [String: Any], maxObject: Int) {
+        let json = try run(qpdf, ["--json=2", "--json-key=qpdf", pdf.path], budget: budget)
         guard let top = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
               let q = top["qpdf"] as? [Any], q.count == 2,
               let header = q[0] as? [String: Any], let maxObject = header["maxobjectid"] as? Int,
@@ -158,24 +162,11 @@ enum SearchableArchival {
 
     /// Runs qpdf; its output. Exit 3 is qpdf's "succeeded with warnings", which the read-back then judges.
     @discardableResult
-    private static func run(_ qpdf: URL, _ arguments: [String]) throws -> Data {
+    private static func run(_ qpdf: URL, _ arguments: [String], budget: PDFChildBudget) throws -> Data {
         let process = Process()
         process.executableURL = qpdf
         process.arguments = arguments
-        // Warnings to a file, not a second pipe: reading one pipe to its end while the other fills would block both.
-        let errURL = FileManager.default.temporaryDirectory.appendingPathComponent("ap-qpdf-" + UUID().uuidString + ".txt")
-        guard FileManager.default.createFile(atPath: errURL.path, contents: nil),
-              let err = try? FileHandle(forWritingTo: errURL) else { throw Failure.qpdf("no file for its messages") }
-        defer { try? err.close(); try? FileManager.default.removeItem(at: errURL) }
-        let out = Pipe()
-        process.standardOutput = out
-        process.standardError = err
-        process.standardInput = FileHandle.nullDevice
-        do { try process.run() } catch { throw Failure.qpdf(error.localizedDescription) }
-        // Read before waiting: a JSON larger than the pipe's buffer would block qpdf otherwise.
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        let message = (try? Data(contentsOf: errURL)) ?? Data()
+        let (data, message) = try budget.capture(process)
         guard process.terminationReason == .exit, process.terminationStatus == 0 || process.terminationStatus == 3 else {
             let text = String(decoding: message, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
             throw Failure.qpdf(text.isEmpty ? "exit \(process.terminationStatus)" : String(text.prefix(300)))

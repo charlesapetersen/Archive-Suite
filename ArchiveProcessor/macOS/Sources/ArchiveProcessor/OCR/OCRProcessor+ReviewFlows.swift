@@ -323,7 +323,8 @@ extension OCRProcessor {
     func updateClassification(
         at index: Int,
         to newClassification: DocumentClassification,
-        runConfig: SessionProcessingConfig? = nil
+        runConfig: SessionProcessingConfig? = nil,
+        rewriteHeader: Bool = true
     ) {
         guard jobs.indices.contains(index),
               !reOCRSourceURLs.contains(jobs[index].sourceURL) else { return }
@@ -336,7 +337,7 @@ extension OCRProcessor {
             )
         }
         // Page 2's Classification follows the edit (W40.fix-processor-review-classification-stale).
-        if oldClassification != newClassification {
+        if rewriteHeader, oldClassification != newClassification {
             writeClassificationHeader(forJobAt: index, runConfig: runConfig)
         }
         // Update tags on the output file (W23.m5-fu2 — see `applyReviewEdits`).
@@ -420,7 +421,7 @@ extension OCRProcessor {
                     let (fileName, gatewayName) = (source.lastPathComponent, currentGateway?.displayName)
                     let (agentName, agentModel) = (currentLocalAgent?.provenanceDisplayName, currentLocalAgent?.provenanceModelName)
                     let layerOptions = textLayerOptions
-                    let output = try await Task.detached(priority: .userInitiated) {
+                    let output = try await PDFGenerator.runWorker {
                         try pdfGen.generateOutput(
                             imageURL: imageURL,
                             result: result,
@@ -436,10 +437,12 @@ extension OCRProcessor {
                             sourceFormat: OutputForm.format(ofExtension: source.pathExtension),
                             photographed: CompressedPage.isCameraPhoto(source)   // W42.stroke-weight-processor
                         )
-                    }.value
+                    }
                     recordImagePage(output.imagePage, forSource: source)
                     recordTextLayer(output.layer, formFallback: output.formFallback, compression: output.compression,
                                     compressedNote: output.compressedNote, forSource: source)
+                } catch is CancellationError {
+                    return
                 } catch {
                     os_log(.error, "Rotation PDF regen failed for %{public}@: %{public}@",
                            source.lastPathComponent, error.localizedDescription)
@@ -452,6 +455,7 @@ extension OCRProcessor {
                     // Copy-source restore after rotation regen: verbatim, label untouched.
                     tagOutput(appliedTags, at: outputURL, source: source, stampUnread: false)
                 }
+                guard !Task.isCancelled else { return }
             }
         }
     }
@@ -552,10 +556,12 @@ extension OCRProcessor {
         guard !Task.isCancelled else { return }
 
         // Apply any reclassifications (updateClassification handles Red/Purple tag updates).
-        for item in boxFolderConfirmItems where item.fileIndex < jobs.count {
+        for item in boxFolderConfirmItems {
+            guard !Task.isCancelled else { return }
+            guard jobs.indices.contains(item.fileIndex) else { continue }
             let newCls = item.classification ?? .documentStart
             if jobs[item.fileIndex].classification != newCls {
-                updateClassification(at: item.fileIndex, to: newCls, runConfig: runConfig)
+                await updateReviewedClassification(at: item.fileIndex, to: newCls, runConfig: runConfig)
             }
         }
     }

@@ -69,8 +69,10 @@ public enum CompressedPage {
     /// writes nothing, when the tools are missing, a line cannot be placed or the page did not come out compressed.
     @discardableResult
     public static func write(image: CGImage, lines: TextLayer.Lines, ink: TextLayer.Lines? = nil, pageSize: CGSize,
-                             photographed: Bool = false, to destination: URL) throws -> [String] {
+                             photographed: Bool = false, to destination: URL,
+                             budget: PDFChildBudget = PDFChildBudget()) throws -> [String] {
         assert(!Thread.isMainThread, "CompressedPage.write on the main thread")
+        try budget.check()
         let missing = missingTools
         guard missing.isEmpty else { throw Failure.missingTools(missing) }
         guard image.width > 0, image.height > 0, pageSize.width > 0, pageSize.height > 0 else {
@@ -97,12 +99,13 @@ public enum CompressedPage {
         var compressed = false
         var notes: [String] = []
         OCRModel.makeSearchablePDF(file: png, output: out, rebuild: true, rebuildMode: .auto, password: nil,
-                                   settings: settings, control: RunControl(), lines: [1: lines.observations],
+                                   settings: settings, control: RunControl(pdfChildBudget: budget), lines: [1: lines.observations],
                                    inkBoxes: ink.flatMap { $0.isEmpty ? nil : [1: $0.observations.map(\.boundingBox)] },
                                    photographed: photographed,
                                    progress: { _, _ in }, tookJBIG2Route: { compressed = true },
                                    shrunkTextPageNote: { notes.append($0) },
                                    report: { outcome = $0; message = $1 })
+        try budget.check()
         guard outcome == .succeeded else { throw Failure.refused(message.isEmpty ? "the page was not written" : message) }
         guard compressed else { throw Failure.notCompressed }
         if fm.fileExists(atPath: destination.path) {

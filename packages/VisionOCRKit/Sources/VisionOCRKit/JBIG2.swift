@@ -187,6 +187,7 @@ enum JBIG2 {
     /// `/Pages` is not kept. That costs bytes, never content.
     static func sourceImages(in file: URL, password: String?, using qpdf: String,
                              streamsInto directory: URL,
+                             budget: PDFChildBudget? = nil,
                              register: (Process) -> Void = { _ in }) -> [Int: SourceImage] {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         // `--decode-level=none`: every stream exactly as stored. Decoding would
@@ -206,7 +207,7 @@ enum JBIG2 {
         }
         defer { try? FileManager.default.removeItem(at: directory.appendingPathComponent("pw")) }
         arguments.append(file.path)
-        guard let out = try? runQPDF(arguments, using: qpdf, register: register),
+        guard let out = try? runQPDF(arguments, using: qpdf, budget: budget, register: register),
               let top = (try? JSONSerialization.jsonObject(with: out)) as? [String: Any],
               let pages = top["pages"] as? [[String: Any]],
               let objects = (top["qpdf"] as? [Any])?.last as? [String: Any] else { return [:] }
@@ -297,26 +298,13 @@ enum JBIG2 {
 
     /// qpdf's stdout, or a throw. 3 is its warning exit and still an answer.
     private static func runQPDF(_ arguments: [String], using qpdf: String,
+                                budget: PDFChildBudget? = nil,
                                 register: (Process) -> Void = { _ in }) throws -> Data {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: qpdf)
         process.arguments = arguments
-        let outPipe = Pipe(), errPipe = Pipe()
-        process.standardOutput = outPipe
-        process.standardError = errPipe
-        try process.run()
-        register(process)
-        // Both pipes drained before the wait, and concurrently: a child that
-        // fills the one nobody is reading blocks forever.
-        var err = Data()
-        let group = DispatchGroup()
-        group.enter()
-        DispatchQueue.global().async {
-            err = errPipe.fileHandleForReading.readDataToEndOfFile(); group.leave()
-        }
-        let out = outPipe.fileHandleForReading.readDataToEndOfFile()
-        group.wait()
-        process.waitUntilExit()
+        let (out, err) = try PDFChildBudget.capture(process, stdout: true, stderr: true,
+                                                     budget: budget, register: register)
         guard process.terminationStatus == 0 || process.terminationStatus == 3 else {
             let message = String(decoding: err, as: UTF8.self)
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -408,6 +396,7 @@ enum JBIG2 {
 
     /// Compresses one 1-bit PNG. jbig2enc writes the PDF-ready stream to stdout.
     static func encode(png: URL, to stream: URL, using jbig2: String,
+                       budget: PDFChildBudget? = nil,
                        register: (Process) -> Void = { _ in }) throws {
         FileManager.default.createFile(atPath: stream.path, contents: nil)
         guard let sink = try? FileHandle(forWritingTo: stream) else {
@@ -421,13 +410,7 @@ enum JBIG2 {
         // region coding only, which is lossless.
         process.arguments = ["-p", png.path]
         process.standardOutput = sink
-        let errPipe = Pipe()
-        process.standardError = errPipe
-
-        try process.run()
-        register(process)
-        let err = errPipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
+        let err = try PDFChildBudget.capture(process, stderr: true, budget: budget, register: register).err
 
         guard process.terminationStatus == 0 else {
             let message = String(decoding: err, as: UTF8.self)
@@ -1051,6 +1034,7 @@ enum JBIG2 {
     static func splice(source: URL, password: String?, into assembled: URL,
                        passthrough: [Int], pageCount: Int, to destination: URL,
                        using qpdf: String,
+                       budget: PDFChildBudget? = nil,
                        register: (Process) -> Void = { _ in }) throws {
         // Arithmetic first, and as refusals rather than clamps. Each of these
         // would otherwise build a page list that qpdf accepts and a reader
@@ -1077,14 +1061,8 @@ enum JBIG2 {
             source: source, password: password, assembled: assembled,
             passthrough: passthrough, pageCount: pageCount,
             destination: destination)
-        let errPipe = Pipe()
-        process.standardError = errPipe
         process.standardOutput = FileHandle.nullDevice
-
-        try process.run()
-        register(process)
-        let err = errPipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
+        let err = try PDFChildBudget.capture(process, stderr: true, budget: budget, register: register).err
 
         // 3 is qpdf's warning exit, which still produces valid output — the
         // same reading `overlay` has always taken.
@@ -1254,6 +1232,7 @@ enum JBIG2 {
     /// reason.
     static func textlessCopy(of file: URL, password: String?, budgets: [Int: Int],
                              to destination: URL, using qpdf: String,
+                             budget: PDFChildBudget? = nil,
                              register: (Process) -> Void = { _ in }) throws -> [Int: Int] {
         guard !budgets.isEmpty else { return [:] }
         let work = destination.deletingLastPathComponent()
@@ -1273,24 +1252,10 @@ enum JBIG2 {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: qpdf)
             process.arguments = arguments
-            // Warnings to a file, not a pipe, for `carryDocumentInfo`'s reason: a
-            // child blocked on a full stderr never closes stdout.
-            let errURL = work.appendingPathComponent("qpdf-\(UUID().uuidString).err")
-            defer { try? FileManager.default.removeItem(at: errURL) }
-            FileManager.default.createFile(atPath: errURL.path, contents: nil)
-            let err = try FileHandle(forWritingTo: errURL)
-            defer { try? err.close() }
-            let out = Pipe()
-            process.standardOutput = out
-            process.standardError = err
-            try process.run()
-            register(process)
-            let data = out.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
+            let (data, err) = try PDFChildBudget.capture(process, stdout: true, stderr: true,
+                                                         budget: budget, register: register)
             guard process.terminationStatus == 0 || process.terminationStatus == 3 else {
-                let message = String(decoding: (try? Data(contentsOf: errURL)) ?? Data(),
-                                     as: UTF8.self)
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let message = String(decoding: err, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
                 throw Failure.textlessCopyFailed(message.isEmpty
                     ? "qpdf exited with code \(process.terminationStatus)" : message)
             }
@@ -1560,6 +1525,7 @@ enum JBIG2 {
     /// source's own crop box, so stamping it would move it.
     static func overlay(text: URL, onto images: URL, to destination: URL,
                         using qpdf: String, pages: [Int]? = nil,
+                        budget: PDFChildBudget? = nil,
                         register: (Process) -> Void = { _ in }) throws {
         var arguments = [images.path, "--overlay", text.path]
         if let pages {
@@ -1570,14 +1536,8 @@ enum JBIG2 {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: qpdf)
         process.arguments = arguments
-        let errPipe = Pipe()
-        process.standardError = errPipe
         process.standardOutput = FileHandle.nullDevice
-
-        try process.run()
-        register(process)
-        let err = errPipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
+        let err = try PDFChildBudget.capture(process, stderr: true, budget: budget, register: register).err
 
         // qpdf uses exit code 3 for warnings, which still produce valid output.
         guard process.terminationStatus == 0 || process.terminationStatus == 3,
@@ -1598,14 +1558,20 @@ enum JBIG2 {
     /// on the user's machine is a real possibility, and the answer decides the
     /// **route**, so it is asked before a route is chosen rather than discovered
     /// after the pages are compressed.
-    static func canSetCropBoxes(using qpdf: String) -> Bool {
+    static func canSetCropBoxes(using qpdf: String, budget: PDFChildBudget? = nil) -> Bool {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: qpdf)
         process.arguments = ["--help=--update-from-json"]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
-        do { try process.run() } catch { return false }
-        process.waitUntilExit()
+        do {
+            if let budget {
+                try budget.run(process)
+            } else {
+                try process.run()
+                process.waitUntilExit()
+            }
+        } catch { return false }
         return process.terminationStatus == 0
     }
 
@@ -1644,6 +1610,7 @@ enum JBIG2 {
     ///     must be what was asked for. `qpdf --check` does not answer either
     ///     question, as the 391-byte file demonstrates.
     static func setCropBoxes(_ boxes: [Int: CGRect], in file: URL, using qpdf: String,
+                             budget: PDFChildBudget? = nil,
                              register: (Process) -> Void = { _ in }) throws {
         guard !boxes.isEmpty else { return }
 
@@ -1654,16 +1621,8 @@ enum JBIG2 {
             process.executableURL = URL(fileURLWithPath: qpdf)
             process.arguments = [file.path, "--json=2", "--json-stream-data=none"]
                 + keys.map { "--json-key=\($0)" }
-            let out = Pipe(), err = Pipe()
-            process.standardOutput = out
-            process.standardError = err
-            try process.run()
-            register(process)
-            // Read before waiting: a large structure fills the pipe buffer and
-            // the child blocks writing while we block waiting (C6's shape).
-            let data = out.fileHandleForReading.readDataToEndOfFile()
-            _ = err.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
+            process.standardError = FileHandle.nullDevice
+            let data = try PDFChildBudget.capture(process, stdout: true, budget: budget, register: register).out
             guard process.terminationStatus == 0 || process.terminationStatus == 3,
                   let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             else { throw Failure.cropBoxFailed("qpdf could not describe the merged file") }
@@ -1743,13 +1702,8 @@ enum JBIG2 {
         let apply = Process()
         apply.executableURL = URL(fileURLWithPath: qpdf)
         apply.arguments = [file.path, "--update-from-json=\(patchURL.path)", patched.path]
-        let err = Pipe()
-        apply.standardError = err
         apply.standardOutput = FileHandle.nullDevice
-        try apply.run()
-        register(apply)
-        let errorText = err.fileHandleForReading.readDataToEndOfFile()
-        apply.waitUntilExit()
+        let errorText = try PDFChildBudget.capture(apply, stderr: true, budget: budget, register: register).err
         guard apply.terminationStatus == 0 || apply.terminationStatus == 3,
               FileManager.default.fileExists(atPath: patched.path) else {
             let message = String(decoding: errorText, as: UTF8.self)
@@ -1763,13 +1717,8 @@ enum JBIG2 {
         let check = Process()
         check.executableURL = URL(fileURLWithPath: qpdf)
         check.arguments = [patched.path, "--json=2", "--json-stream-data=none", "--json-key=pages"]
-        let checkOut = Pipe()
-        check.standardOutput = checkOut
         check.standardError = FileHandle.nullDevice
-        try check.run()
-        register(check)
-        let checkData = checkOut.fileHandleForReading.readDataToEndOfFile()
-        check.waitUntilExit()
+        let checkData = try PDFChildBudget.capture(check, stdout: true, budget: budget, register: register).out
         guard check.terminationStatus == 0 || check.terminationStatus == 3,
               let after = try? JSONSerialization.jsonObject(with: checkData) as? [String: Any],
               fingerprint(after) == fingerprint(before) else {
@@ -1802,6 +1751,7 @@ enum JBIG2 {
     /// page's content objects must be unchanged.
     static func setOutline(_ outline: [SearchableWriter.OutlineItem], in file: URL,
                            using qpdf: String,
+                           budget: PDFChildBudget? = nil,
                            register: (Process) -> Void = { _ in }) throws {
         guard !outline.isEmpty else { return }
 
@@ -1810,14 +1760,8 @@ enum JBIG2 {
             process.executableURL = URL(fileURLWithPath: qpdf)
             process.arguments = [url.path, "--json=2", "--json-stream-data=none"]
                 + keys.map { "--json-key=\($0)" }
-            let out = Pipe(), err = Pipe()
-            process.standardOutput = out
-            process.standardError = err
-            try process.run()
-            register(process)
-            let data = out.fileHandleForReading.readDataToEndOfFile()
-            _ = err.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
+            process.standardError = FileHandle.nullDevice
+            let data = try PDFChildBudget.capture(process, stdout: true, budget: budget, register: register).out
             guard process.terminationStatus == 0 || process.terminationStatus == 3,
                   let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             else { throw Failure.outlineFailed("qpdf could not describe the file") }
@@ -1902,13 +1846,8 @@ enum JBIG2 {
         let apply = Process()
         apply.executableURL = URL(fileURLWithPath: qpdf)
         apply.arguments = [file.path, "--update-from-json=\(patchURL.path)", patched.path]
-        let err = Pipe()
-        apply.standardError = err
         apply.standardOutput = FileHandle.nullDevice
-        try apply.run()
-        register(apply)
-        let errorText = err.fileHandleForReading.readDataToEndOfFile()
-        apply.waitUntilExit()
+        let errorText = try PDFChildBudget.capture(apply, stderr: true, budget: budget, register: register).err
         guard apply.terminationStatus == 0 || apply.terminationStatus == 3,
               FileManager.default.fileExists(atPath: patched.path) else {
             let message = String(decoding: errorText, as: UTF8.self)
@@ -1997,6 +1936,7 @@ enum JBIG2 {
     /// written, and every page's contents unchanged.
     static func carryDocumentInfo(from source: URL, password: String?, into file: URL,
                                   using qpdf: String,
+                                  budget: PDFChildBudget? = nil,
                                   register: (Process) -> Void = { _ in }) throws {
         func json(_ url: URL, password: String? = nil, _ keys: [String],
                   objects: [String] = []) throws -> [String: Any] {
@@ -2006,15 +1946,8 @@ enum JBIG2 {
             if let password, !password.isEmpty { arguments.append("--password=\(password)") }
             process.arguments = arguments + ["--json=2", "--json-stream-data=none"]
                 + keys.map { "--json-key=\($0)" } + objects.map { "--json-object=\($0)" }
-            // Not a pipe: this reads the user's file, whose warnings can fill one
-            // while stdout is being drained, and then both sides wait forever.
-            let out = Pipe()
-            process.standardOutput = out
             process.standardError = FileHandle.nullDevice
-            try process.run()
-            register(process)
-            let data = out.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit()
+            let data = try PDFChildBudget.capture(process, stdout: true, budget: budget, register: register).out
             guard process.terminationStatus == 0 || process.terminationStatus == 3,
                   let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             else { throw Failure.documentInfoFailed("qpdf could not describe the file") }
@@ -2150,13 +2083,8 @@ enum JBIG2 {
         let apply = Process()
         apply.executableURL = URL(fileURLWithPath: qpdf)
         apply.arguments = [file.path, "--update-from-json=\(patchURL.path)", patched.path]
-        let err = Pipe()
-        apply.standardError = err
         apply.standardOutput = FileHandle.nullDevice
-        try apply.run()
-        register(apply)
-        let errorText = err.fileHandleForReading.readDataToEndOfFile()
-        apply.waitUntilExit()
+        let errorText = try PDFChildBudget.capture(apply, stderr: true, budget: budget, register: register).err
         guard apply.terminationStatus == 0 || apply.terminationStatus == 3,
               FileManager.default.fileExists(atPath: patched.path) else {
             let message = String(decoding: errorText, as: UTF8.self)
@@ -2189,6 +2117,7 @@ enum JBIG2 {
     /// images read back the same, and the file is smaller;
     /// otherwise the file is left as it was, since nothing in it is lost either way.
     static func packObjects(in file: URL, using qpdf: String,
+                            budget: PDFChildBudget? = nil,
                             register: (Process) -> Void = { _ in }) {
         let packed = file.deletingLastPathComponent()
             .appendingPathComponent("packed-\(UUID().uuidString).pdf")
@@ -2198,9 +2127,15 @@ enum JBIG2 {
         process.arguments = ["--object-streams=generate", file.path, packed.path]
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
-        guard (try? process.run()) != nil else { return }
-        register(process)
-        process.waitUntilExit()
+        do {
+            if let budget {
+                try budget.run(process)
+            } else {
+                try process.run()
+                register(process)
+                process.waitUntilExit()
+            }
+        } catch { return }
         func size(_ url: URL) -> Int {
             ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int) ?? 0
         }
@@ -2208,7 +2143,7 @@ enum JBIG2 {
         // rewrite: a page count alone would pass a page qpdf had to repair.
         func fingerprint(_ url: URL) -> [String]? {
             guard let out = try? runQPDF([url.path, "--json=2", "--json-stream-data=none",
-                                          "--json-key=pages"], using: qpdf, register: register),
+                                          "--json-key=pages"], using: qpdf, budget: budget, register: register),
                   let described = (try? JSONSerialization.jsonObject(with: out)) as? [String: Any]
             else { return nil }
             return pageFingerprint(described)

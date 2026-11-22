@@ -57,6 +57,7 @@ enum TextLayerTestDriver {
             check("0 smoke pages drawn", false); return
         }
         let reading = memo.joined(separator: "\n")
+        await childProcessChecks(dir, jpeg: jpeg)
 
         // 2. Placed print, three ways onto the page.
         for (name, url, turn) in [("jpeg", jpeg, 0), ("png", png, 0), ("turned", png, 90)] {
@@ -397,6 +398,98 @@ enum TextLayerTestDriver {
             }
         }
         lines.append("SIZE searchable \(size(typed)) bytes, unplaced \(size(hand)) bytes")
+    }
+
+    private static func childProcessChecks(_ dir: URL, jpeg: URL) async {
+        let fm = FileManager.default
+        let timed = await PDFGenerator.runWorker {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/sh")
+            // Ignore TERM so the test exercises escalation. The regular files exercise the same capture as qpdf.
+            process.arguments = ["-c", "trap '' TERM; while :; do /bin/sleep 1; done"]
+            let start = DispatchTime.now()
+            do {
+                _ = try PDFChildBudget(seconds: 0.3).capture(process)
+                return false
+            } catch {
+                return error.localizedDescription.contains("limit") && !process.isRunning
+                    && process.terminationReason == .uncaughtSignal && process.terminationStatus == SIGKILL
+                    && DispatchTime.now() < start + 5
+            }
+        }
+        check("8 compression timeout kills and reaps a child ignoring TERM", timed)
+
+        // A tiny stand-in uses exactly the placer's real command, slot, cancellation and scratch paths.
+        let hands = dir.appendingPathComponent("Hands")
+        let interpreter = hands.appendingPathComponent("bin/python3")
+        let model = hands.appendingPathComponent("models/McCATMuS_nfd_nofix_V1.mlmodel")
+        let script = dir.appendingPathComponent("place.py"), started = dir.appendingPathComponent("place.py.started")
+        let fake = """
+            #!/bin/sh
+            trap '' TERM
+            printf '%s\\n%s\\n' "$$" "$3" > "$2.started"
+            while :; do /bin/sleep 1; done
+            """
+        do {
+            for url in [interpreter, model] {
+                try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            }
+            try Data(fake.utf8).write(to: interpreter)
+            try fm.setAttributes([.posixPermissions: 0o700], ofItemAtPath: interpreter.path)
+            try Data().write(to: model)
+            try Data().write(to: script)
+        } catch { check("8 test hand placer prepared", false, error.localizedDescription); return }
+        let environment = ["VISIONOCR_MODEL_HOME": dir.path, "VISIONOCR_HANDS_SCRIPT": script.path]
+
+        @Sendable func place() async -> Bool {
+            await PDFGenerator.runWorker {
+                guard let image = decode(jpeg) else { return false }
+                do {
+                    _ = try HandPlacer.place(image: image, reading: "ONE LINE", environment: environment,
+                                             isCancelled: { Task.isCancelled })
+                    return false
+                } catch { return error is CancellationError }
+            }
+        }
+        func ready(_ condition: () -> Bool) async -> Bool {
+            for _ in 0..<100 {
+                if condition() { return true }
+                try? await Task.sleep(for: .milliseconds(30))
+            }
+            return false
+        }
+
+        let active = Task { await place() }
+        let didStart = await ready { (try? String(contentsOf: started, encoding: .utf8).split(separator: "\n").count) == 2 }
+        let start = DispatchTime.now()
+        active.cancel()
+        let stopped = await active.value
+        let info = (try? String(contentsOf: started, encoding: .utf8))?.split(separator: "\n").map(String.init) ?? []
+        if didStart, info.count == 2, let pid = Int32(info[0]), pid > 0 {
+            check("8 Stop reaps a running hand placer and removes its scratch",
+                  stopped && kill(pid, 0) == -1 && errno == ESRCH
+                    && !fm.fileExists(atPath: URL(fileURLWithPath: info[1]).deletingLastPathComponent().path)
+                    && DispatchTime.now() < start + 5)
+        } else { check("8 test hand placer started", false) }
+
+        // test-text-layer.sh gives this driver its own temporary root, and hence its own reader lock.
+        let scratch = fm.temporaryDirectory
+        let fd = open(scratch.appendingPathComponent("visionocr-model-reader.lock").path, O_CREAT | O_RDWR, 0o600)
+        guard fd >= 0 else { check("8 test slot opened", false); return }
+        defer { close(fd) }
+        guard flock(fd, LOCK_EX | LOCK_NB) == 0 else { check("8 test slot held", false); return }
+        try? fm.removeItem(at: started)
+        let queue = scratch.appendingPathComponent("visionocr-model-reader.queue")
+        let waiting = Task { await place() }
+        let queued = await ready { ((try? fm.contentsOfDirectory(atPath: queue.path)) ?? []).count == 1 }
+        let stoppedWaitingAt = DispatchTime.now()
+        waiting.cancel()
+        let stoppedWaiting = await waiting.value
+        check("8 Stop withdraws a queued hand placer without starting it",
+              queued && stoppedWaiting && !fm.fileExists(atPath: started.path)
+                && ((try? fm.contentsOfDirectory(atPath: queue.path)) ?? []).isEmpty
+                && ((try? fm.contentsOfDirectory(atPath: scratch.path)) ?? []).allSatisfy { !$0.hasPrefix("visionocr-hands-") }
+                && DispatchTime.now() < stoppedWaitingAt + 3)
     }
 
     private static func improveChecks(dir: URL, jpeg: URL, reading: String) async {

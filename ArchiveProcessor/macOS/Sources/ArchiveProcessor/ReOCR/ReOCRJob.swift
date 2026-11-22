@@ -127,6 +127,7 @@ struct ReOCRJob {
             try Self.makePrivateDirectory(scratch)
             let oldDoc = PDFDocument(data: original)
             for pair in selected {
+                try Task.checkCancellation()
                 let kind = kinds[pair.textIndex] ?? pair.header.kind
                 let oldText = oldDoc?.page(at: pair.textIndex).map { PDFHeaderParser.parse($0).body } ?? ""
                 let image = scratch.appendingPathComponent("\(op.journal.operationID.uuidString)-p\(pair.imageIndex + 1).jpg")
@@ -135,6 +136,7 @@ struct ReOCRJob {
                 }
                 let reading = await read(image, pair, kind)
                 try? FileManager.default.removeItem(at: image)   // a page of the archive; not kept past its reading
+                try Task.checkCancellation()
                 do {
                     let page = try ReOCRPairs.replacementPage(for: pair, result: reading, model: pageModels[pair.textIndex] ?? model, kind: kind,
                                                               gatewayDisplayName: gatewayDisplayName,
@@ -146,6 +148,7 @@ struct ReOCRJob {
                                                               model: pageModels[pair.textIndex] ?? model) {
                         replacements[pair.imageIndex] = image
                     }
+                    try Task.checkCancellation()
                     // The Kind actually written, which falls back to the reader's own when none was chosen.
                     let written = PDFDocument(data: page)?.page(at: 0).flatMap { PDFHeaderParser.parse($0).header?.kind }
                     results.append(PairResult(pair: pair, oldText: oldText, kind: written, outcome: .success(reading.text ?? "")))
@@ -531,7 +534,7 @@ struct ReOCRJob {
     /// (`KNOWN_ISSUES.md`). Off the main actor: the layer reads the page with Vision.
     static func remadeImagePage(_ pdf: Data, pair: ReOCRPairs.Pair, reading: OCRResult, kind: OCRPageKind?,
                                 model: LLMModel? = nil) async -> Data? {
-        await Task.detached(priority: .userInitiated) { () -> Data? in
+        await PDFGenerator.runWorker { () -> Data? in
             guard let jpeg = embeddedJPEG(pdf, pageIndex: pair.imageIndex),
                   let doc = ReOCRPreservationCheck.document(pdf), let page = doc.page(at: pair.imageIndex + 1),
                   page.getBoxRect(.mediaBox).size == CGSize(width: 612, height: 792),
@@ -548,7 +551,7 @@ struct ReOCRJob {
                   let before = ReOCRPreservationCheck.render(page), let after = ReOCRPreservationCheck.render(madePage),
                   before == after else { return nil }
             return made.pdf
-        }.value
+        }
     }
 
     // MARK: Image input

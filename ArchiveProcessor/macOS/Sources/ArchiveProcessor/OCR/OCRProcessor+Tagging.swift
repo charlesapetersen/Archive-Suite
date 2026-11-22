@@ -663,8 +663,9 @@ extension OCRProcessor {
                 appliedGeneratedTags[sourceURL] = tags
                 if let outputPDF = outputURLMap[sourceURL] {
                     if let dating {
-                        writeDateEvidence(dating.headerEvidence(giving: tags), to: outputPDF, source: sourceURL,
+                        await writeDateEvidence(dating.headerEvidence(giving: tags), to: outputPDF, source: sourceURL,
                                           runConfig: runConfig)
+                        guard !Task.isCancelled, outputURLMap[sourceURL] == outputPDF else { return }
                     }
                     // Manual tagging modes are real-tagging modes; follow the run's mode.
                     tagOutput(tags, at: outputPDF, source: sourceURL, stampUnread: stampUnread)
@@ -883,7 +884,7 @@ extension OCRProcessor {
                         let (agentName, agentModel) = (currentLocalAgent?.provenanceDisplayName, currentLocalAgent?.provenanceModelName)
                         let (imageMB, columns) = (outputSettings.pdfImageMB, outputSettings.textColumns)
                         let layerOptions = textLayerOptions
-                        let output = try await Task.detached(priority: .userInitiated) {
+                        let output = try await PDFGenerator.runWorker {
                             try PDFGenerator().generateOutput(
                                 imageURL: imageURL, result: updated, model: model, outputURL: outputURL,
                                 originalFileName: fileName,
@@ -896,10 +897,13 @@ extension OCRProcessor {
                                 sourceFormat: OutputForm.format(ofExtension: source.pathExtension),
                                 photographed: CompressedPage.isCameraPhoto(source)   // W42.stroke-weight-processor
                             )
-                        }.value
+                        }
+                        guard !Task.isCancelled else { return }
                         recordImagePage(output.imagePage, forSource: source)
                         recordTextLayer(output.layer, formFallback: output.formFallback, compression: output.compression,
                                     compressedNote: output.compressedNote, forSource: source)
+                    } catch is CancellationError {
+                        return
                     } catch {
                         os_log(.error, "Manual-seg rotation PDF regen failed for %{public}@: %{public}@",
                                source.lastPathComponent, error.localizedDescription)
@@ -969,8 +973,9 @@ extension OCRProcessor {
                 appliedGeneratedTags[sourceURL] = gtags
                 if let outputPDF = outputURLMap[sourceURL] {
                     if let dating {
-                        writeDateEvidence(dating.headerEvidence(giving: gtags), to: outputPDF, source: sourceURL,
+                        await writeDateEvidence(dating.headerEvidence(giving: gtags), to: outputPDF, source: sourceURL,
                                           runConfig: runConfig)
+                        guard !Task.isCancelled, outputURLMap[sourceURL] == outputPDF else { return }
                     }
                     // Manual segment tagging is a real-tagging mode; follow the run's mode.
                     tagOutput(gtags, at: outputPDF, source: sourceURL, stampUnread: outputSettings.stampUnread)
@@ -1308,7 +1313,7 @@ extension OCRProcessor {
                 if Self.validCoverIndex(of: i, in: snapshot) != nil {
                     deferredEnclosures.append((i, rawTags, names, dating, fields))
                 } else {
-                    finalTagsBySeg[i] = applyGeneratedTags(rawTags, toSegmentAt: i, in: snapshot,
+                    finalTagsBySeg[i] = await applyGeneratedTags(rawTags, toSegmentAt: i, in: snapshot,
                                                            enableSegmentJSON: enableSegmentJSON,
                                                            outputDirectory: outputDirectory,
                                                            runConfig: runConfig, entities: names,
@@ -1316,6 +1321,7 @@ extension OCRProcessor {
                                                            itemFields: fields,
                                                            taggingSenderWithheld: senderWithheld[i])
                 }
+                guard !Task.isCancelled else { break }
                 completed += 1
                 progress = 0.7 + (Double(completed) / Double(total)) * 0.3
                 statusMessage = "Tagging \(completed)/\(total)…"
@@ -1329,10 +1335,11 @@ extension OCRProcessor {
         // Same cancellation contract as the pool: a cancelled run writes nothing further.
         guard !Task.isCancelled else { return }
         for (i, raw, names, dating, fields) in deferredEnclosures.sorted(by: { $0.index < $1.index }) {
+            guard !Task.isCancelled else { return }
             // A cover that was never applied (absent from `finalTagsBySeg`) yields NO sent-with date —
             // never a neighbour's.
             let cover = Self.validCoverIndex(of: i, in: snapshot).flatMap { finalTagsBySeg[$0] }
-            finalTagsBySeg[i] = applyGeneratedTags(raw, toSegmentAt: i, in: snapshot,
+            finalTagsBySeg[i] = await applyGeneratedTags(raw, toSegmentAt: i, in: snapshot,
                                                    enableSegmentJSON: enableSegmentJSON,
                                                    outputDirectory: outputDirectory,
                                                    runConfig: runConfig, coverTags: cover ?? GeneratedTags(),
@@ -1411,8 +1418,8 @@ extension OCRProcessor {
                                     coverTags: GeneratedTags? = nil, entities: EntityResult? = nil,
                                     dating: DateRoute.Decision? = nil, folderDate: ContainerFolderDate? = nil,
                                     itemFields: ItemFieldResult? = nil,
-                                    taggingSenderWithheld: Bool = false) -> GeneratedTags {
-        guard i < snapshot.count else { return rawTags }
+                                    taggingSenderWithheld: Bool = false) async -> GeneratedTags {
+        guard !Task.isCancelled, i < snapshot.count else { return rawTags }
         let segment = snapshot[i]
         var tags = rawTags
         // W46.date-route: the route's date replaces the tagging call's, then a cover's year where step 3a applies.
@@ -1448,8 +1455,9 @@ extension OCRProcessor {
             appliedGeneratedTags[sourceURL] = tags
             if let outputPDF = outputURLMap[sourceURL] {
                 if dating != nil || !headerFields.isEmpty {
-                    writeDateEvidence(headerEvidence, itemFields: headerFields, to: outputPDF, source: sourceURL,
+                    await writeDateEvidence(headerEvidence, itemFields: headerFields, to: outputPDF, source: sourceURL,
                                       runConfig: runConfig)
+                    guard !Task.isCancelled, outputURLMap[sourceURL] == outputPDF else { return tags }
                 }
                 tagOutput(tags, at: outputPDF, source: sourceURL,
                           stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
@@ -1474,7 +1482,7 @@ extension OCRProcessor {
     @discardableResult
     /// W47.item-fields-build: the item-field lines go in the same rewrite (`itemFields`; empty removes stale ones).
     func writeDateEvidence(_ evidence: String?, itemFields: PDFItemFields = PDFItemFields(), to outputPDF: URL,
-                           source: URL, runConfig: SessionProcessingConfig?) -> PDFGenerator.DateEvidenceRewrite {
+                           source: URL, runConfig: SessionProcessingConfig?) async -> PDFGenerator.DateEvidenceRewrite {
         guard let text = jobs.first(where: { $0.sourceURL == source })?.result?.text, !text.isEmpty else {
             return .skipped("no text")
         }
@@ -1488,11 +1496,18 @@ extension OCRProcessor {
             return .skipped("not a readable generated output")
         }
         let columns = Self.pdfGenerationSettings(for: runConfig).textColumns
-        let outcome = PDFGenerator().dateEvidenceRewrite(of: data, sourceName: source.lastPathComponent,
-                                                         evidence: evidence, itemFields: itemFields, body: text,
-                                                         textColumns: columns)
+        let outcome = await PDFGenerator.runWorker {
+            PDFGenerator().dateEvidenceRewrite(of: data, sourceName: source.lastPathComponent, evidence: evidence,
+                                               itemFields: itemFields, body: text, textColumns: columns)
+        }
+        guard !Task.isCancelled, outputURLMap[source] == outputPDF else { return .skipped("the run stopped") }
         switch outcome {
         case .rewrite(let new):
+            guard (try? Data(contentsOf: outputPDF)) == data else {
+                os_log(.info, "Date evidence left out of %{public}@: the output changed during the rewrite",
+                       outputPDF.lastPathComponent)
+                return .skipped("the output changed during the rewrite")
+            }
             do {
                 try OutputFileSafety.replaceGeneratedOutput(outputPDF, for: source, with: new)
             } catch {
@@ -1520,15 +1535,42 @@ extension OCRProcessor {
         return Self.rewriteClassificationHeader(work, textColumns: Self.pdfGenerationSettings(for: runConfig).textColumns)
     }
 
+    /// Prepare the reviewed header off the actor, then publish it and apply the classification together.
+    func updateReviewedClassification(at index: Int, to classification: DocumentClassification,
+                                      runConfig: SessionProcessingConfig?) async {
+        guard !Task.isCancelled, jobs.indices.contains(index) else { return }
+        let jobID = jobs[index].id
+        if let current = classificationHeaderWork(forJobAt: index),
+           !OutputFileSafety.isSameFile(current.outputPDF, current.source),
+           let original = try? Data(contentsOf: current.outputPDF) {
+            let columns = Self.pdfGenerationSettings(for: runConfig).textColumns
+            let proposed = ClassificationHeaderWork(outputPDF: current.outputPDF, source: current.source,
+                                                    classification: classification.displayName, text: current.text)
+            let outcome = await PDFGenerator.runWorker {
+                PDFGenerator().classificationRewrite(of: original, sourceName: proposed.source.lastPathComponent,
+                                                      classification: proposed.classification, body: proposed.text,
+                                                      textColumns: columns)
+            }
+            guard !Task.isCancelled, jobs.indices.contains(index), jobs[index].id == jobID,
+                  classificationHeaderWork(forJobAt: index) == current,
+                  (try? Data(contentsOf: current.outputPDF)) == original else { return }
+            _ = Self.applyClassificationHeaderRewrite(outcome, to: proposed)
+        }
+        updateClassification(at: index, to: classification, runConfig: runConfig, rewriteHeader: false)
+    }
+
     /// Every output's `Classification:` line brought to its job's class, once the reviews are done and before merge
     /// folds the pages into documents (`writeClassificationHeader`). The files are read off the main actor.
     func writeClassificationHeaders(runConfig: SessionProcessingConfig?) async {
         let work = jobs.indices.compactMap { classificationHeaderWork(forJobAt: $0) }
         guard !work.isEmpty else { return }
         let columns = Self.pdfGenerationSettings(for: runConfig).textColumns
-        await Task.detached(priority: .userInitiated) {
-            for w in work { _ = Self.rewriteClassificationHeader(w, textColumns: columns) }
-        }.value
+        await PDFGenerator.runWorker {
+            for w in work {
+                guard !Task.isCancelled else { return }
+                _ = Self.rewriteClassificationHeader(w, textColumns: columns)
+            }
+        }
     }
 
     /// What one job's header rewrite needs, taken on the main actor; nil when it has no output of its own text.
@@ -1541,7 +1583,7 @@ extension OCRProcessor {
                                         classification: result.classification?.displayName, text: text)
     }
 
-    struct ClassificationHeaderWork: Sendable {
+    struct ClassificationHeaderWork: Sendable, Equatable {
         let outputPDF: URL, source: URL, classification: String?, text: String
     }
 
@@ -1559,6 +1601,12 @@ extension OCRProcessor {
         let outcome = PDFGenerator().classificationRewrite(of: data, sourceName: w.source.lastPathComponent,
                                                            classification: w.classification, body: w.text,
                                                            textColumns: textColumns)
+        guard !Task.isCancelled else { return .skipped("the run stopped") }
+        return applyClassificationHeaderRewrite(outcome, to: w)
+    }
+
+    private nonisolated static func applyClassificationHeaderRewrite(_ outcome: PDFGenerator.DateEvidenceRewrite,
+                                                                     to w: ClassificationHeaderWork) -> PDFGenerator.DateEvidenceRewrite {
         switch outcome {
         case .rewrite(let new):
             do {
@@ -1781,15 +1829,15 @@ extension OCRProcessor {
         outputDirectory: URL,
         runConfig: SessionProcessingConfig? = nil,
         tagWriter: MergedTagWriter? = nil
-    ) {
+    ) async {
         let multiPageSegments = multiPageSegmentsForMerge(files: files)
         guard !multiPageSegments.isEmpty else { return }
 
         statusMessage = "Merging \(multiPageSegments.count) multi-page documents…"
-        let pdfGen = PDFGenerator()
         let stampUnread = lateRunOutputSettings(for: runConfig).stampUnread
 
         for (segIdx, segment) in multiPageSegments.enumerated() {
+            guard !Task.isCancelled else { return }
             // Collect the individual output PDFs for this segment
             let sourcePDFs = segment.pdfURLs.compactMap { outputURLMap[$0] }
             guard sourcePDFs.count > 1 else { continue }
@@ -1799,20 +1847,22 @@ extension OCRProcessor {
             let firstOutputPDF = sourcePDFs[0]
             let baseName = firstOutputPDF.deletingPathExtension().lastPathComponent
             let originalJSONURL = firstOutputPDF.deletingPathExtension().appendingPathExtension("json")
-            let hasJSON = FileManager.default.fileExists(atPath: originalJSONURL.path)
-
-            // Reserve the merged PDF and its optional JSON sidecar as one basename. A JSON-only prior-run
-            // collision must advance the PDF too, or downstream organization cannot keep the pair aligned.
-            // In the output folder, or for a tree's pages beside them, in its folder (W47.ct-processor-intake).
-            let mergeDirectory = outputSubfolders[segment.pdfURLs[0].standardizedFileURL.path] == nil
-                ? outputDirectory : firstOutputPDF.deletingLastPathComponent()
-            let mergedURL = OutputFileSafety.reserveUniqueDestination(
-                preferred: mergeDirectory.appendingPathComponent(baseName + "_merged.pdf"),
-                reservedPaths: &_takenOutputPaths, companionExtension: hasJSON || exportsLocalNames ? "json" : nil)
-            let mergedJSONURL = mergedURL.deletingPathExtension().appendingPathExtension("json")
-
             do {
-                try pdfGen.mergeDocumentPDFs(sourcePDFs: sourcePDFs, outputURL: mergedURL)
+                let merged = try await PDFGenerator.runWorker(priority: .utility) {
+                    try PDFGenerator().mergedDocumentData(sourcePDFs: sourcePDFs)
+                }
+                guard !Task.isCancelled, segment.pdfURLs.compactMap({ outputURLMap[$0] }) == sourcePDFs else { return }
+
+                // Reserve the PDF and its optional JSON sidecar after the suspension. A JSON-only prior-run
+                // collision advances the PDF too, keeping the pair aligned for downstream organization.
+                let hasJSON = FileManager.default.fileExists(atPath: originalJSONURL.path)
+                let mergeDirectory = outputSubfolders[segment.pdfURLs[0].standardizedFileURL.path] == nil
+                    ? outputDirectory : firstOutputPDF.deletingLastPathComponent()
+                let mergedURL = OutputFileSafety.reserveUniqueDestination(
+                    preferred: mergeDirectory.appendingPathComponent(baseName + "_merged.pdf"),
+                    reservedPaths: &_takenOutputPaths, companionExtension: hasJSON || exportsLocalNames ? "json" : nil)
+                let mergedJSONURL = mergedURL.deletingPathExtension().appendingPathExtension("json")
+                try merged.write(to: mergedURL, options: .atomic)
 
                 // Apply tags to the merged PDF. Prefer the first page's tags, but fall back to the
                 // first page in the segment that actually has tags, so the merged PDF isn't left
@@ -1883,6 +1933,8 @@ extension OCRProcessor {
                 }
 
                 statusMessage = "Merged document \(segIdx + 1)/\(multiPageSegments.count): \(baseName) (\(sourcePDFs.count) pages)"
+            } catch is CancellationError {
+                return
             } catch {
                 statusMessage = "Failed to merge \(baseName): \(error.localizedDescription)"
             }

@@ -38,6 +38,21 @@ struct PDFSourceDates: Sendable, Equatable {
 }
 
 struct PDFGenerator {
+    /// PDFKit and the external tools run off the main actor. Stop must reach that worker and await its cleanup.
+    static func runWorker<T: Sendable>(priority: TaskPriority = .userInitiated,
+                                       _ operation: @escaping @Sendable () -> T) async -> T {
+        let worker = Task.detached(priority: priority, operation: operation)
+        return await withTaskCancellationHandler {
+            await worker.value
+        } onCancel: {
+            worker.cancel()
+        }
+    }
+
+    static func runWorker<T: Sendable>(priority: TaskPriority = .userInitiated,
+                                       _ operation: @escaping @Sendable () throws -> T) async throws -> T {
+        try await runWorker(priority: priority) { Result { try operation() } }.get()
+    }
 
     /// W23.h5 — what the written PDF's **image page** actually contains. `generate` succeeds either way (the
     /// 2-page archival contract and `PDFTextExtractor`'s `pageCount >= 2` heuristic are preserved on purpose),
@@ -100,6 +115,7 @@ struct PDFGenerator {
                         sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil,
                         textLayer: TextLayerOptions? = .standard, sourceFormat: String? = nil,
                         photographed: Bool? = nil) throws -> Output {
+        try Task.checkCancellation()
         let pdfDocument = PDFDocument()
         let outcome: ImagePageOutcome
         var layer = TextLayerOutcome.textPage("no layer asked for")
@@ -178,6 +194,7 @@ struct PDFGenerator {
             pdfDocument.insert(textPage(header: header, result: result, textColumns: textColumns), at: pdfDocument.pageCount)
         }
 
+        try Task.checkCancellation()
         try Self.writeArchival(pdfDocument, to: outputURL, pageHeaders: pageHeaders)
         return Output(imagePage: outcome, layer: layer, straightenedDegrees: straightened, form: form,
                       formFallback: formFallback, compression: compression)
@@ -203,11 +220,12 @@ struct PDFGenerator {
         let dir = fm.temporaryDirectory.appendingPathComponent("ap-compressed-" + UUID().uuidString, isDirectory: true)
         defer { try? fm.removeItem(at: dir) }
         let page = dir.appendingPathComponent("page.pdf")
+        let budget = PDFChildBudget()
         var note: String?
         do {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
             note = try CompressedPage.write(image: cg, lines: lines, ink: unplaced ? TextLayer.visionLines(of: cg) : nil,
-                                            pageSize: size, photographed: photographed, to: page).first
+                                            pageSize: size, photographed: photographed, to: page, budget: budget).first
         } catch { return (error.localizedDescription, nil) }
         // The same test the uncompressed page passed: there is no text page, so the layer must lose nothing.
         guard let doc = PDFDocument(url: page), doc.pageCount == 1, let made = doc.page(at: 0),
@@ -219,7 +237,7 @@ struct PDFGenerator {
             return ("the compressed page is not the image's size", nil)
         }
         do {
-            try SearchableArchival.write([page], pageHeaders: [header], to: url)
+            try SearchableArchival.write([page], pageHeaders: [header], to: url, budget: budget)
         } catch {
             return (error.localizedDescription, nil)
         }
@@ -343,7 +361,7 @@ struct PDFGenerator {
         unstraightened.straighten = false
         let layered = layeredImagePage(image, result: result, pageKind: pageKind, options: unstraightened, runReader: runReader)
         // Through the output's own writer either way, so a page with no layer is drawn as new output is.
-        guard let page = layered.page ?? PDFDocument(data: image.pdf)?.page(at: 0) else { return nil }
+        guard !Task.isCancelled, let page = layered.page ?? PDFDocument(data: image.pdf)?.page(at: 0) else { return nil }
         let doc = PDFDocument()
         doc.insert(page, at: 0)
         guard let data = Self.archivalData(doc) else { return nil }
@@ -462,7 +480,7 @@ struct PDFGenerator {
         guard let cg = image.decoded(), cg.width > 0 else {
             return .failure(HandFailure(reason: "the image could not be decoded for the handwriting placer"))
         }
-        do { return .success(try HandPlacer.place(image: cg, reading: reading)) } catch {
+        do { return .success(try HandPlacer.place(image: cg, reading: reading, isCancelled: { Task.isCancelled })) } catch {
             return .failure(HandFailure(reason: "handwriting: \(error.localizedDescription)"))
         }
     }
@@ -1015,6 +1033,13 @@ struct PDFGenerator {
     /// Throws `PDFError.sourceUnreadable` if any source PDF cannot be loaded (fail-loud
     /// to prevent silent page-drop in this no-undo path).
     func mergeDocumentPDFs(sourcePDFs: [URL], outputURL: URL) throws {
+        let data = try mergedDocumentData(sourcePDFs: sourcePDFs)
+        try Task.checkCancellation()
+        do { try data.write(to: outputURL, options: .atomic) } catch { throw PDFError.writeFailed }
+    }
+
+    func mergedDocumentData(sourcePDFs: [URL]) throws -> Data {
+        try Task.checkCancellation()
         let merged = PDFDocument()
         var pageIndex = 0
         var headers: [String?] = []
@@ -1048,13 +1073,15 @@ struct PDFGenerator {
         // compressed page stays compressed; Quartz redraws them where qpdf is missing or fails.
         if let pageHeaders, SearchableArchival.isAvailable {
             do {
-                try SearchableArchival.write(sourcePDFs, pageHeaders: pageHeaders, to: outputURL)
-                return
+                return try SearchableArchival.data(sourcePDFs, pageHeaders: pageHeaders)
             } catch {
+                try Task.checkCancellation()
                 NSLog("ArchiveProcessor: merge through qpdf failed (%@); merging through Quartz", "\(error)")
             }
         }
-        try Self.writeArchival(merged, to: outputURL, pageHeaders: pageHeaders)
+        try Task.checkCancellation()
+        guard let data = Self.archivalData(merged, pageHeaders: pageHeaders) else { throw PDFError.writeFailed }
+        return data
     }
 }
 

@@ -131,6 +131,7 @@ public enum HandPlacer {
                              environment: [String: String] = ProcessInfo.processInfo.environment,
                              isCancelled: () -> Bool = { false }) throws -> Placement {
         assert(!Thread.isMainThread, "HandPlacer.place on the main thread")
+        if isCancelled() { throw CancellationError() }
         let fm = FileManager.default
         let dir = fm.temporaryDirectory.appendingPathComponent("visionocr-hands-\(UUID().uuidString)", isDirectory: true)
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -176,6 +177,7 @@ public enum HandPlacer {
     private static func run(_ command: Command, memoryGB: Double, isCancelled: () -> Bool) throws -> Int {
         let locks: [Int32]
         do { locks = try Recogniser.takeReaderSlot(1, isCancelled: isCancelled) } catch {
+            if isCancelled() { throw CancellationError() }
             throw Failure.failed("the handwriting placer could not start: \(error.localizedDescription)")
         }
         defer { locks.forEach { close($0) } }
@@ -191,20 +193,21 @@ public enum HandPlacer {
         process.standardError = FileHandle.nullDevice
         let capMB = Int(min(max(memoryGB.isFinite ? memoryGB : Prefs.defaultModelMemoryGB(), 0), 1024) * 1024)
         let swap0 = ModelGuard.swapUsedMB()
+        if isCancelled() { throw CancellationError() }
         do { try process.run() } catch {
             throw Failure.failed("the handwriting placer could not be started (\(error.localizedDescription))")
         }
         let group = Runner.processGroup(of: process)
-        let deadline = Date().addingTimeInterval(seconds)
+        let deadline = DispatchTime.now() + seconds
         var sampled = Date.distantPast
         var peak = 0
         while process.isRunning {
             if isCancelled() {
-                Runner.stop(process, knownGroup: group)
-                throw Failure.failed("cancelled")
+                Runner.stop(process, knownGroup: group, graceSeconds: 0.5)
+                throw CancellationError()
             }
-            if Date() > deadline {
-                Runner.stop(process, knownGroup: group)
+            if DispatchTime.now() >= deadline {
+                Runner.stop(process, knownGroup: group, graceSeconds: 0.5)
                 throw Failure.failed("the handwriting placer took longer than \(Int(seconds)) seconds")
             }
             if Date().timeIntervalSince(sampled) >= ModelGuard.every {
@@ -213,11 +216,15 @@ public enum HandPlacer {
                 peak = max(peak, footprint)
                 if let why = ModelGuard.verdict(footprintMB: footprint, capMB: capMB, pressure: ModelGuard.pressure(),
                                                 swapGrowthMB: ModelGuard.swapUsedMB() - swap0) {
-                    Runner.stop(process, knownGroup: group)
+                    Runner.stop(process, knownGroup: group, graceSeconds: 0.5)
                     throw Failure.failed("the handwriting placer \(why)")
                 }
             }
             usleep(50_000)
+        }
+        if isCancelled() {
+            Runner.stop(process, knownGroup: group, graceSeconds: 0.5)
+            throw CancellationError()
         }
         guard process.terminationReason == .exit, process.terminationStatus == 0 else {
             throw Failure.failed("the handwriting placer stopped with status \(process.terminationStatus)")

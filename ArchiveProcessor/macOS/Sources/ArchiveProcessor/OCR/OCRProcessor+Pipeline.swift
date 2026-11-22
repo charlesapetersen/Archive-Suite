@@ -1890,10 +1890,12 @@ extension OCRProcessor {
         guard !Task.isCancelled else { return }
 
         if runOutputSettings.mergeDocuments {
-            performDocumentMerging(
+            await performDocumentMerging(
                 files: pending.fileURLs, outputDirectory: pending.outputDirectory,
                 runConfig: runConfig)
         }
+
+        guard !Task.isCancelled else { return }
 
         // Organize into collection folders (after merge so merged PDFs get moved)
         var organizedMoves: [URL: URL] = [:]
@@ -2098,11 +2100,12 @@ extension OCRProcessor {
                 // W23.h5-fu — carry each regenerated PDF's image-page verdict back too, so a rebuilt
                 // output that could not embed its scan is reported instead of counting as a clean redo.
                 let layerOptions = textLayerOptions
-                let regen: (failed: Set<URL>, placeholders: Set<URL>) = await Task.detached(priority: .utility) {
+                let regen: (failed: Set<URL>, placeholders: Set<URL>) = await PDFGenerator.runWorker(priority: .utility) { [toGenerate] in
                     let gen = PDFGenerator()
                     var failed = Set<URL>()
                     var placeholders = Set<URL>()
                     for g in toGenerate {
+                        guard !Task.isCancelled else { break }
                         do {
                             let outcome = try gen.generate(imageURL: g.imageURL, result: g.result, model: model,
                                               outputURL: g.outputURL, originalFileName: g.fileName,
@@ -2117,7 +2120,8 @@ extension OCRProcessor {
                         }
                     }
                     return (failed, placeholders)
-                }.value
+                }
+                guard !Task.isCancelled else { return }
                 failedRegenURLs = regen.failed
                 for r in restores where regen.placeholders.contains(r.outputURL) {
                     recordImagePage(.placeholder, forSource: r.sourceURL)
@@ -2312,10 +2316,12 @@ extension OCRProcessor {
         guard !Task.isCancelled else { return }
 
         if runOutputSettings.mergeDocuments {
-            performDocumentMerging(
+            await performDocumentMerging(
                 files: pending.fileURLs, outputDirectory: pending.outputDirectory,
                 runConfig: runConfig)
         }
+
+        guard !Task.isCancelled else { return }
 
         // Organize into collection folders (after merge so merged PDFs get moved)
         var organizedMoves: [URL: URL] = [:]
@@ -3772,9 +3778,11 @@ extension OCRProcessor {
 
             // Phase 4: Merge multi-page documents (before collection organization moves files)
             if runOutputSettings.mergeDocuments {
-                performDocumentMerging(
+                await performDocumentMerging(
                     files: files, outputDirectory: outputDirectory, runConfig: runConfig)
             }
+
+            guard !Task.isCancelled else { return }
 
             // Phase 5: Organize into collection folders (after merge so merged PDFs get moved)
             if enableCollectionSegmentation && !collectionSegments.isEmpty {

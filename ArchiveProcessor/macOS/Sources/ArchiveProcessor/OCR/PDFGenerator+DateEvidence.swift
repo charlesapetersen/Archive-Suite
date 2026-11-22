@@ -157,13 +157,18 @@ extension PDFGenerator {
     /// (`SearchableArchival`), so a compressed page is not redrawn and re-encoded; through Quartz where qpdf is missing
     /// or fails.
     private static func searchableRewrite(_ doc: PDFDocument, original pdf: Data, pageHeaders: [String?]) -> Data? {
-        if SearchableArchival.isAvailable {
-            let fm = FileManager.default
-            let url = fm.temporaryDirectory.appendingPathComponent("ap-evidence-" + UUID().uuidString + ".pdf")
-            defer { try? fm.removeItem(at: url) }
-            if (try? pdf.write(to: url)) != nil, let data = try? SearchableArchival.data([url], pageHeaders: pageHeaders) {
-                return data
-            }
+        guard !Task.isCancelled else { return nil }
+        let fm = FileManager.default
+        let url = fm.temporaryDirectory.appendingPathComponent("ap-evidence-" + UUID().uuidString + ".pdf")
+        defer { try? fm.removeItem(at: url) }
+        do {
+            guard SearchableArchival.isAvailable else { throw SearchableArchival.Failure.noQPDF }
+            try pdf.write(to: url)
+            return try SearchableArchival.data([url], pageHeaders: pageHeaders)
+        } catch {
+            guard !Task.isCancelled else { return nil }
+            NSLog("ArchiveProcessor: searchable header rewrite through qpdf failed (%@); rewriting through Quartz",
+                  error.localizedDescription)
         }
         return archivalData(doc, pageHeaders: pageHeaders)
     }

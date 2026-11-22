@@ -17762,3 +17762,7 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   selection for Start. If a refresh removes the active model, Process Files saves readings already in
   flight, stops scheduling pages and keeps the original model in any recovery record.
   <!-- /W49.proc-openrouter-gone-warn -->
+
+- [x] **W49.proc-child-cancel — compression children and the hand placer stop with the run; a date rewrite's Quartz fallback is logged [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked — SHIPPED 2026-11-22 (this commit).
+  Filed by W49.ki-audit-processor. jbig2 and qpdf share a 60-second budget for a searchable page, including its PDF/A finish. Stop reaches the PDF worker, ends an active child with TERM then KILL when needed, and withdraws a hand placer waiting for a reader slot. Both paths clean their scratch. A stopped write keeps an already saved non-batch reading for Resume. Searchable header rewrites log the reason for falling back to Quartz.
+  <!-- /W49.proc-child-cancel -->

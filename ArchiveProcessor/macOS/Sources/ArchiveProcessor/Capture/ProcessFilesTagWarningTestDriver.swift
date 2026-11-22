@@ -238,7 +238,7 @@ enum ProcessFilesTagWarningTestDriver {
         merger.outputURLMap = [src1: page1, src2: page2]
         merger.recordTagWrite(succeeded: false, forSource: src1)
         merger.recordImagePage(.placeholder, forSource: src2)
-        merger.performDocumentMerging(files: [src1, src2], outputDirectory: mergeDir)
+        await merger.performDocumentMerging(files: [src1, src2], outputDirectory: mergeDir)
         let mergedURL = merger.outputURLMap[src1]
         check("merge produced one durable output",
               mergedURL != nil && mergedURL == merger.outputURLMap[src2]

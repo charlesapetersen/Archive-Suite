@@ -495,7 +495,7 @@ extension OCRProcessor {
             // merge copies those pages verbatim, so one undecodable page makes the merged output a
             // partially scan-less PDF and the operator has to be told.
             let layerOptions = textLayerOptions
-            let assembly: (ok: Bool, anyPlaceholder: Bool) = await Task.detached(priority: .utility) {
+            let assembly: (ok: Bool, anyPlaceholder: Bool) = await PDFGenerator.runWorker(priority: .utility) {
                 let gen = PDFGenerator()
                 let fm = FileManager.default
                 var perPagePDFs: [URL] = []
@@ -520,12 +520,13 @@ extension OCRProcessor {
                            originalName, error.localizedDescription)
                     return (false, false)
                 }
-            }.value
+            }
             let ok = assembly.ok
 
             // Page-image temps are consumed either way.
             for u in pageImages { try? FileManager.default.removeItem(at: u) }
 
+            if Task.isCancelled && !ok { return }
             if ok {
                 // Map by the original source URL so downstream consumers (log, view-text) find it. Only
                 // set on a confirmed write — never a phantom entry pointing at a nonexistent file.
@@ -1748,6 +1749,12 @@ extension OCRProcessor {
         // Use original source name for output PDF naming
         let baseName = sourceURL.deletingPathExtension().lastPathComponent
         let outputURL = uniqueOutputURL(baseName: baseName, ext: "pdf", in: outputDirectory, for: sourceURL)
+        // Resume regenerates a missing PDF from a saved non-batch reading. Save it before Stop can close
+        // the journal during the cancellable write, so stopping the compressor cannot cost a second read.
+        let readingSavedBeforeWrite = activePendingRun != nil
+        if readingSavedBeforeWrite, !saveResultToPendingRun(index: index, result: result, outputURL: outputURL) {
+            return false
+        }
         // Move heavy PDF generation + tag I/O off the main actor (M3 perf fix). The MainActor
         // suspends at the await but is free to service UI events while the work runs on .utility.
         let originalFileName = sourceURL.lastPathComponent
@@ -1781,7 +1788,7 @@ extension OCRProcessor {
         let pdfResult: (success: Bool, tags: [String]?, tagWriteOK: Bool?,
                         imagePage: PDFGenerator.ImagePageOutcome?, layer: TextLayerOutcome?, formFallback: String?,
                         compression: String?, compressedNote: String?)
-            = await Task.detached(priority: .utility) {
+            = await PDFGenerator.runWorker(priority: .utility) {
             let pdfGen = PDFGenerator()
             do {
                 let output = try pdfGen.generateOutput(imageURL: url, result: result, model: model,
@@ -1809,11 +1816,12 @@ extension OCRProcessor {
                 return (true, appliedTags, tagWriteOK, output.imagePage, output.layer, output.formFallback,
                         output.compression, output.compressedNote)
             } catch {
+                if error is CancellationError { return (false, nil, nil, nil, nil, nil, nil, nil) }
                 os_log(.error, "PDF write failed for %{public}@: %{public}@",
                        originalFileName, error.localizedDescription)
                 return (false, nil, nil, nil, nil, nil, nil, nil)
             }
-        }.value
+        }
         // W16.bat9 — the same window as the sweep's loop, one frame down. The detached write above is the
         // longest suspension in this function (seconds, for a real page), and `jobs` can be emptied or
         // replaced across it: Stop re-enables **Clear**, whose action is `jobs = []`. The entry guard was
@@ -1830,6 +1838,7 @@ extension OCRProcessor {
         // the job id is strictly stronger, because a list cleared and re-dropped with the SAME file at the
         // same index compares equal by source and unequal by id.
         let slotIsStillOurs = index < jobs.count && jobs[index].id == jobID
+        if Task.isCancelled && !pdfResult.success { return readingSavedBeforeWrite }
         if pdfResult.success {
             // Map by original source URL so tagging/collection segmentation can find it.
             // Only set when the PDF was actually written — a failed write must not leave a
@@ -1867,11 +1876,9 @@ extension OCRProcessor {
             let name = sourceURL.lastPathComponent
             if !failedFiles.contains(name) { failedFiles.append(name) }
         }
-        // Persist result AND its assigned output path for resume-after-restart. Records the intended
-        // output path even on failure so resume can attempt to regenerate the PDF (B7). NOTE: the ORIGINAL
-        // `result` is persisted deliberately — the pending-run snapshot records what the model returned, so
-        // a resume regenerates the PDF from the real OCR text rather than inheriting this write-failure note.
-        return saveResultToPendingRun(index: index, result: result, outputURL: outputURL)
+        // The paid-batch journal advances only after materialization. Non-batch recovery already has
+        // the reading and its assigned path, including when this write failed.
+        return readingSavedBeforeWrite || saveResultToPendingRun(index: index, result: result, outputURL: outputURL)
     }
     nonisolated static func isTimeoutError(_ result: OCRResult) -> Bool {
         // A refused page whose second readers failed: re-running would buy the refusal and every reader again.
