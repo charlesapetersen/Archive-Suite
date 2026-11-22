@@ -217,10 +217,11 @@ final class ContainerUITests: XCTestCase {
         waitForRows(app, 6)
         let allFiles = app.staticTexts["ar.sidebar.allFiles"].firstMatch
         if !allFiles.exists { app.buttons["ar.toolbar.sidebar"].firstMatch.click() }
-        let folder = app.staticTexts.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label BEGINSWITH %@",
-                                                            "ar.sidebar.folder", "Hoover Institution Archives")).firstMatch
-        XCTAssertTrue(folder.waitForExistence(timeout: 20))
-        folder.click()
+        // The fixture has one sidebar folder. Click its row beside the native disclosure triangle.
+        let disclosure = app.outlines["Sidebar"].disclosureTriangles["NSOutlineViewDisclosureButtonKey"].firstMatch
+        XCTAssertTrue(disclosure.waitForExistence(timeout: 10))
+        disclosure.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .withOffset(CGVector(dx: 55, dy: 0)).click()
         waitForRows(app, 5)
         app.menuBars.menuBarItems["File"].click()
         app.menuItems["Container Levels…"].firstMatch.click()
