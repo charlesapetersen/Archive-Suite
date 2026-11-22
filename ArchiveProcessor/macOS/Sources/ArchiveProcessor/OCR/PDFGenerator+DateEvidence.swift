@@ -33,6 +33,14 @@ extension PDFGenerator {
         }
     }
 
+    /// A reclassification can change enclosure inheritance independently of the item fields.
+    func reviewDateEvidenceRewrite(of pdf: Data, sourceName: String, evidence: String?, body: String,
+                                   textColumns: Int) -> DateEvidenceRewrite {
+        headerRewrite(of: pdf, sourceName: sourceName, body: body, textColumns: textColumns) {
+            $0.dateEvidence = evidence
+        }
+    }
+
     /// W40.fix-processor-review-classification-stale — the bytes `pdf` should have so its text page's
     /// `Classification:` line reads `classification` (a `DocumentClassification.displayName`; nil removes the line).
     /// Each page is rendered with the reader's proposal, and a review that changes the class afterwards must reach the

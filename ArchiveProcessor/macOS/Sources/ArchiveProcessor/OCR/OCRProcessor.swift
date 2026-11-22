@@ -290,6 +290,7 @@ class OCRProcessor: ObservableObject {
     /// segment), so a post-tagging reclassification can refresh an enclosure's `Sent With` from its
     /// cover's CURRENT own date. Reset with `segments` at each run start.
     var appliedGeneratedTags: [URL: GeneratedTags] = [:]
+    var enclosureDateReviews: [URL: EnclosureDateReview] = [:]
     /// Cached lowercased paths of all values in `outputURLMap`, maintained by `uniqueOutputURL`
     /// and cleared alongside `outputURLMap = [:]` resets. Avoids O(n) set-rebuild per call.
     var _takenOutputPaths = Set<String>()

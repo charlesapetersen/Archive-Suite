@@ -112,6 +112,15 @@ struct SegmentTagData {
     }
 }
 
+/// Dating inputs already read for this run, kept until post-tagging review finishes.
+struct EnclosureDateReview {
+    var inheritance: DateRoute.Inheritance?
+    var decision: DateRoute.Decision?
+    var phoneMonth: String? = nil
+    var pendingSidecarDecision: DateRoute.Decision? = nil
+    var manual: (sentWith: String, uncertain: Bool, rejectedCover: Bool)? = nil
+}
+
 /// One document segment presented for manual/human tagging (feature 6).
 struct ManualTagSegment: Identifiable {
     let id = UUID()
@@ -140,6 +149,7 @@ struct ManualTagSegment: Identifiable {
     /// W46.date-route-other-paths — what the dating route filled the date with, for the sidecar and header.
     var datingFill: DateRoute.CardFill? = nil
     var dateInheritance: DateRoute.Inheritance? = nil
+    var dateEdited = false
 
     /// False while `sentWith` holds text that is not a valid date (the sheet refuses to advance).
     var sentWithIsValid: Bool { EnclosureDates.parseManual(sentWith) != .invalid }
@@ -153,7 +163,7 @@ struct ManualTagSegment: Identifiable {
         get { TypedDateTags.date(year: year, month: month, day: day) }
         set {
             let fields = TypedDateTags.components(newValue)
-            if fields != dateComponents { datingFill = nil }
+            if fields != dateComponents { datingFill = nil; dateEdited = true }
             (year, month, day) = fields.tuple
         }
     }
@@ -176,7 +186,10 @@ struct ManualTagSegment: Identifiable {
     /// Take an auto-date reply: as the date it names when it names one, so what is written is what the field shows
     /// (no unseen Day beside a year), else verbatim, so the field shows the reply for fixing.
     mutating func setDate(fromReply reply: GeneratedTags) {
-        if let d = TypedDateTags.date(year: reply.year, month: reply.month, day: reply.day) { ownDate = d; return }
+        if let d = TypedDateTags.date(year: reply.year, month: reply.month, day: reply.day) {
+            (year, month, day) = TypedDateTags.components(d).tuple
+            return
+        }
         (year, month, day) = (reply.year ?? "", reply.month ?? "", reply.day ?? "")
     }
     /// Fill the date from the dating route's decision and remember what it filled.

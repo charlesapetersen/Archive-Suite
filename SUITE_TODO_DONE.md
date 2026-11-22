@@ -17784,3 +17784,14 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Each review names the affected PDF image page and says whether its searchable text layer will change
   or stay as it is. The messages describe the candidate that passed preservation checks.
   <!-- /W49.proc-reocr-layer-review -->
+
+- [x] **W49.proc-date-paths-rest — the dating route's remaining gaps on the manual card, the tagging sheet and reclassification [M]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit).
+  W46.date-route-other-paths left: the manual card's neighbours not drawn (no estimate there for a yearless document), an enclosure on the tagging sheet not taking its cover's year (step 3a), a rotation-review regeneration in Live reusing the first decision, and a reclassification after tagging that refreshes `Sent With` but not an enclosure's inherited year. Close what each path can reach; Live's lack of neighbours at tagging time is structural and stays documented. Tier-2 (tag output). Covers the two bullets under §W46.date-route. Filed by W49.ki-audit-processor.
+  Manual segmentation uses up to three confirmed earlier documents in the same folder. The auto-date tagging sheet
+  takes an established enclosure's year from the reviewed cover and recomputes it when that date or relation changes.
+  Live rotation refreshes the gateway image pass when one of its input pages turns. A failed refresh keeps the prior
+  evidence, and the existing text trace is reused. Post-tagging reclassification reapplies the cover relation to
+  Finder dates, evidence and sidecars using the original decisions. Dates the operator entered take precedence.
+  The Debug build, scratch dating, dual-date and Process Files output tests passed. Two off-screen UI tests passed
+  on the manual date card and Live finishing controls. The tests used local fixtures and stub replies.
+  <!-- /W49.proc-date-paths-rest -->

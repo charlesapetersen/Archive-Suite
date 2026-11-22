@@ -207,7 +207,7 @@ extension OCRProcessor {
             }
         }
         // W37: a reclassified label/document can invalidate (or move) an enclosure relation.
-        reconcileSentWithAfterReclassification(runConfig: runConfig)
+        reconcileEnclosureDatesAfterReclassification(runConfig: runConfig)
 
         // Find box labels in order (user may have reclassified some)
         let boxIndices = collectionReviewItems
@@ -353,7 +353,7 @@ extension OCRProcessor {
         }
         // W37: the edit can invalidate (or move) an enclosure relation.
         if oldClassification != newClassification {
-            reconcileSentWithAfterReclassification(runConfig: runConfig)
+            reconcileEnclosureDatesAfterReclassification(runConfig: runConfig)
         }
     }
     /// Dedicated, standalone rotation-review pass (separate from the tagging/segmentation review).
@@ -673,7 +673,7 @@ extension OCRProcessor {
         // Re-run document segmentation with updated classifications
         rebuildSegments(files: jobs.map(\.sourceURL))
         // W37: refresh/strip written Sent With tokens + sidecar relation against the new segmentation.
-        reconcileSentWithAfterReclassification(runConfig: runConfig)
+        reconcileEnclosureDatesAfterReclassification(runConfig: runConfig)
 
         return collectionChanged
     }

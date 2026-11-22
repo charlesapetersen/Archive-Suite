@@ -537,6 +537,7 @@ extension OCRProcessor {
                 shouldRedoTagging = false
             case .redoTagging:
                 rebuildSegments(files: files)
+                enclosureDateReviews = [:]
                 for i in jobs.indices { jobs[i].appliedTags = [] }
             }
         }
@@ -626,7 +627,7 @@ extension OCRProcessor {
         })
         // Covers precede their enclosures, so refresh against the reviewed date before writing either.
         for idx in manualTagSegments.indices {
-            refreshManualCardDate(at: idx, cardBySegment: cardBySegment)
+            refreshManualCardDate(at: idx, cardBySegment: cardBySegment, allowRuleFallback: mode == .autoDate)
         }
 
         // Apply the user's tags to each segment's output PDF(s) and write JSON.
@@ -648,9 +649,14 @@ extension OCRProcessor {
             recordManualQualityIntent(m.quality, for: seg.pdfURLs)
             // W46.date-route-other-paths: the route's evidence, while the card still holds the date it filled.
             let dating = m.standingDating
+            let review = EnclosureDateReview(inheritance: dating == nil ? nil : m.dateInheritance, decision: dating,
+                                             manual: (m.sentWith, m.sentWithUncertain,
+                                                      m.enclosureOfSegmentIndex == nil &&
+                                                        Self.validCoverIndex(of: m.segmentIndex, in: segments) != nil))
 
             for sourceURL in seg.pdfURLs {
                 appliedGeneratedTags[sourceURL] = tags
+                enclosureDateReviews[sourceURL] = review
                 if let outputPDF = outputURLMap[sourceURL] {
                     if let dating {
                         await writeDateEvidence(dating.headerEvidence(giving: tags), to: outputPDF, source: sourceURL,
@@ -731,19 +737,20 @@ extension OCRProcessor {
                     // W40.processor-date-field: one typed field, so the estimate fills it only while nothing has
                     // been typed there — never a month or day beside a year the user typed meanwhile.
                     if manualTagSegments[idx].dateComponents == TypedDateTags.Components(),
-                       !manualTagSegments[idx].dateTextUnreadable {
+                       !manualTagSegments[idx].dateTextUnreadable, !manualTagSegments[idx].dateEdited {
                         if let decision {
                             manualTagSegments[idx].dateInheritance = .init(base: decision, folder: folderDates[idx])
                             manualTagSegments[idx].setDate(fromRoute: decision)
-                            refreshManualCardDate(at: idx, cardBySegment: cardBySegment)
-                            for enclosure in enclosuresByCover[manualTagSegments[idx].segmentIndex] ?? [] {
-                                refreshManualCardDate(at: enclosure, cardBySegment: cardBySegment)
-                            }
                         } else {
                             manualTagSegments[idx].dateUncertain = true
                         }
                     }
                     manualTagSegments[idx].dateLoading = false
+                    refreshManualCardDate(at: idx, cardBySegment: cardBySegment, allowRuleFallback: true)
+                    for enclosure in enclosuresByCover[manualTagSegments[idx].segmentIndex] ?? []
+                    where !manualTagSegments[enclosure].dateLoading {
+                        refreshManualCardDate(at: enclosure, cardBySegment: cardBySegment, allowRuleFallback: true)
+                    }
                 }
                 if next < work.count {
                     let w = work[next]
@@ -753,8 +760,9 @@ extension OCRProcessor {
             }
         }
     }
-    private func refreshManualCardDate(at index: Int, cardBySegment: [Int: Int]? = nil) {
-        guard manualTagSegments.indices.contains(index), manualTagSegments[index].dateInheritance != nil else { return }
+    private func refreshManualCardDate(at index: Int, cardBySegment: [Int: Int]? = nil,
+                                       allowRuleFallback: Bool = false) {
+        guard manualTagSegments.indices.contains(index) else { return }
         let segment = manualTagSegments[index].segmentIndex
         var cover: GeneratedTags?
         if let c = manualTagSegments[index].enclosureOfSegmentIndex,
@@ -762,6 +770,20 @@ extension OCRProcessor {
            let coverIndex = cardBySegment?[c] ?? manualTagSegments.firstIndex(where: { $0.segmentIndex == c }),
            !manualTagSegments[coverIndex].dateTextUnreadable {
             cover = manualTagSegments[coverIndex].ownDateTags
+        }
+        if allowRuleFallback, manualTagSegments[index].dateInheritance == nil,
+           let coverYear = cover?.year.flatMap({ Int($0) }), DateRoute.yearRange.contains(coverYear),
+           manualTagSegments[index].dateComponents == TypedDateTags.Components(),
+           !manualTagSegments[index].dateEdited, !manualTagSegments[index].dateTextUnreadable {
+            // With no usable OCR, or when Finish arrives before prefetch, the cover is still evidence.
+            // Check the text rule for an own year first and make no further request.
+            var base = DateRoute.decide(text: DateRoute.ownText(segments[segment]), near: [], traceRaw: nil,
+                                       image: nil, imageNote: "not sent: no prefetched image reading")
+            base.route = "OCR text and covering letter"
+            var runsByFolder: [URL: [ContainerRun]] = [:]
+            manualTagSegments[index].dateInheritance = .init(
+                base: base, folder: confirmedFolderDate(for: segments[segment], runsByFolder: &runsByFolder))
+            manualTagSegments[index].setDate(fromRoute: base)
         }
         manualTagSegments[index].refreshInheritedDate(from: cover)
     }
@@ -987,6 +1009,8 @@ extension OCRProcessor {
 
             for sourceURL in seg.pdfURLs {
                 appliedGeneratedTags[sourceURL] = gtags
+                enclosureDateReviews[sourceURL] = .init(inheritance: nil, decision: dating,
+                                                        manual: (data.sentWith, data.sentWithUncertain, true))
                 if let outputPDF = outputURLMap[sourceURL] {
                     if let dating {
                         await writeDateEvidence(dating.headerEvidence(giving: gtags), to: outputPDF, source: sourceURL,
@@ -1127,11 +1151,11 @@ extension OCRProcessor {
         // W46.date-route-other-paths: the dating route on the card's pages (its own text and first page images, the
         // rotation the user set) and already confirmed earlier documents in the same folder.
         let segment = DocumentSegment(pdfURLs: urls, texts: texts)
+        let near = priorManualDatingDocuments(before: indices.min())
         var decision: DateRoute.Decision? = nil
-        if localImage || !segment.combinedText.isEmpty {
+        if localImage || !segment.combinedText.isEmpty || !near.isEmpty {
             manualSegDateFetching = true
-            let input = DateRoute.Input(text: DateRoute.ownText(segment),
-                                        near: priorManualDatingDocuments(before: indices.min()),
+            let input = DateRoute.Input(text: DateRoute.ownText(segment), near: near,
                                         pages: Array(pages.prefix(DateRoute.imagePages)))
             if localImage {
                 decision = await DateRoute.runLocal(input)
@@ -1440,25 +1464,28 @@ extension OCRProcessor {
         guard !Task.isCancelled, i < snapshot.count else { return rawTags }
         let segment = snapshot[i]
         var tags = rawTags
-        // W46.date-route: the route's date replaces the tagging call's, then a cover's year where step 3a applies.
-        var dating = dating
-        if dating != nil, let coverTags, let c = Self.validCoverIndex(of: i, in: snapshot) {
-            dating?.inherit(fromCover: coverTags, coverFile: snapshot[c].pdfURLs.first?.lastPathComponent)
+        let inheritance = dating.map { DateRoute.Inheritance(base: $0, folder: folderDate) }
+        let cover = coverTags.flatMap { tags in
+            Self.validCoverIndex(of: i, in: snapshot).map { c in
+                (tags: tags, file: snapshot[c].pdfURLs.first?.lastPathComponent)
+            }
         }
-        // W47.ct-folder-date: then, with no date of its own nor a cover's, the folder's confirmed date (step 3b).
-        if let folderDate { dating?.inherit(fromFolder: folderDate) }
+        let dating = inheritance?.resolve(cover: cover)
         dating?.apply(to: &tags)
-        // W46.date-route-header: the evidence of a non-explicit year, for the outputs' header line, naming the date the
-        // route gave, before the phone's: a phone month then no longer matches it, so the Reader leaves it as the user's
-        // (W49.reader-finder-month-stands).
+        // Name the date given by the route before a phone month overrides it.
         var headerEvidence = dating?.headerEvidence(giving: tags)
-        // Live Capture: the phone's in-the-room date wins over the LLM's inferred date.
+        var phoneMonth: String?
+        var phoneYear: String?
         if let firstURL = segment.pdfURLs.first,
            let fileIdx = jobs.firstIndex(where: { $0.sourceURL == firstURL }) {
-            if let y = phoneYearTag(at: fileIdx) { tags.year = y; tags.dateUncertain = false; headerEvidence = nil }
-            // A decade takes no month (SPEC/tag-format.md); only the folder rule writes one here (W47.ct-folder-date).
-            if let mo = phoneMonthTag(at: fileIdx), tags.year?.hasSuffix("s") != true { tags.month = mo }
+            phoneYear = phoneYearTag(at: fileIdx)
+            if let phoneYear { tags.year = phoneYear; tags.dateUncertain = false; headerEvidence = nil }
+            phoneMonth = phoneMonthTag(at: fileIdx)
+            if let phoneMonth, tags.year?.hasSuffix("s") != true { tags.month = phoneMonth }
         }
+        let review = phoneYear == nil && !tags.ocrFailed ? inheritance.map {
+            EnclosureDateReview(inheritance: $0, decision: dating, phoneMonth: phoneMonth)
+        } : nil
         // W47.item-fields-build: the filled item fields, for the outputs' header lines.
         let headerFields = itemFields?.headerFields ?? PDFItemFields()
         // W37: the tagger never proposes a sent-with date; only a relation does.
@@ -1471,6 +1498,7 @@ extension OCRProcessor {
         }
         for sourceURL in segment.pdfURLs {
             appliedGeneratedTags[sourceURL] = tags
+            enclosureDateReviews[sourceURL] = review
             if let outputPDF = outputURLMap[sourceURL] {
                 if dating != nil || !headerFields.isEmpty {
                     await writeDateEvidence(headerEvidence, itemFields: headerFields, to: outputPDF, source: sourceURL,
@@ -1572,7 +1600,7 @@ extension OCRProcessor {
             guard !Task.isCancelled, jobs.indices.contains(index), jobs[index].id == jobID,
                   classificationHeaderWork(forJobAt: index) == current,
                   (try? Data(contentsOf: current.outputPDF)) == original else { return }
-            _ = Self.applyClassificationHeaderRewrite(outcome, to: proposed)
+            _ = Self.applyReviewHeaderRewrite(outcome, to: proposed, field: "Classification")
         }
         updateClassification(at: index, to: classification, runConfig: runConfig, rewriteHeader: false)
     }
@@ -1620,76 +1648,118 @@ extension OCRProcessor {
                                                            classification: w.classification, body: w.text,
                                                            textColumns: textColumns)
         guard !Task.isCancelled else { return .skipped("the run stopped") }
-        return applyClassificationHeaderRewrite(outcome, to: w)
+        return applyReviewHeaderRewrite(outcome, to: w, field: "Classification")
     }
 
-    private nonisolated static func applyClassificationHeaderRewrite(_ outcome: PDFGenerator.DateEvidenceRewrite,
-                                                                     to w: ClassificationHeaderWork) -> PDFGenerator.DateEvidenceRewrite {
+    private nonisolated static func applyReviewHeaderRewrite(_ outcome: PDFGenerator.DateEvidenceRewrite,
+                                                             to w: ClassificationHeaderWork, field: String) -> PDFGenerator.DateEvidenceRewrite {
         switch outcome {
         case .rewrite(let new):
             do {
                 try OutputFileSafety.replaceGeneratedOutput(w.outputPDF, for: w.source, with: new)
             } catch {
-                os_log(.error, "Classification not written to %{public}@: %{public}@",
-                       w.outputPDF.lastPathComponent, String(describing: error))
+                os_log(.error, "%{public}@ not written to %{public}@: %{public}@",
+                       field, w.outputPDF.lastPathComponent, String(describing: error))
                 return .skipped(String(describing: error))
             }
         case .skipped(let why):
-            os_log(.info, "Classification left as it was in %{public}@: %{public}@", w.outputPDF.lastPathComponent, why)
+            os_log(.info, "%{public}@ left as it was in %{public}@: %{public}@", field, w.outputPDF.lastPathComponent, why)
         case .unchanged:
             break
         }
         return outcome
     }
 
-    /// W37.dual-date — after a POST-tagging reclassification, bring every written `Sent With` token (and
-    /// each sidecar's `sent_with` / `sent_with_uncertain` / `enclosure_of`) back in line with the
-    /// relation the CURRENT segmentation still supports: a relation that no longer holds (the enclosure
-    /// page became a continuation or a label, a label was inserted, the cover's boundary moved) is
-    /// stripped; one that still holds is refreshed to the cover's current own date. Only tokens that parse
-    /// as a valid sent-with token (or are exactly the uncertain flag) are touched — never a prose subject.
-    /// Only pages that were already tagged this run are rewritten; a pre-tagging review is a no-op.
-    func reconcileSentWithAfterReclassification(runConfig: SessionProcessingConfig?) {
-        // Cheap exit for the common case (no proposal, nothing written) — `updateClassification` runs
-        // this once per edited page.
+    /// Reapply enclosure dates against the current segmentation, using the decisions already read for this run.
+    /// A former enclosure returns to its standalone date. A typed date or a checked date from the page still stands.
+    func reconcileEnclosureDatesAfterReclassification(runConfig: SessionProcessingConfig?) {
         guard jobs.contains(where: { !$0.appliedTags.isEmpty }),
-              jobs.contains(where: { $0.result?.enclosure == true
-                                     || $0.appliedTags.contains(where: Self.isSentWithToken) })
-        else { return }
-        let files = jobs.map { $0.sourceURL }
-        let segs = currentSegments(files: files)
+              jobs.contains(where: { job in
+                  job.result?.enclosure == true || job.appliedTags.contains(where: Self.isSentWithToken)
+                      || enclosureDateReviews[job.sourceURL]?.decision?.evidenceClass == .inherited
+                      || enclosureDateReviews[job.sourceURL]?.pendingSidecarDecision != nil
+              }) else { return }
+        let segs = currentSegments(files: jobs.map(\.sourceURL))
         let jobIndexBySource = Dictionary(jobs.indices.map { (jobs[$0].sourceURL, $0) },
                                           uniquingKeysWith: { first, _ in first })
         let stampUnread = lateRunOutputSettings(for: runConfig).stampUnread
 
         for (i, seg) in segs.enumerated() {
-            var desired = GeneratedTags()
-            var coverName: String? = nil
-            if let c = Self.validCoverIndex(of: i, in: segs), let coverFirst = segs[c].pdfURLs.first,
-               let coverJob = jobIndexBySource[coverFirst], !jobs[coverJob].appliedTags.isEmpty {
-                EnclosureDates.applySentWith(fromCover: appliedGeneratedTags[coverFirst], to: &desired)
-                coverName = coverFirst.lastPathComponent
+            let coverSource = Self.validCoverIndex(of: i, in: segs).flatMap { c -> URL? in
+                guard let source = segs[c].pdfURLs.first, let job = jobIndexBySource[source],
+                      !jobs[job].appliedTags.isEmpty else { return nil }
+                return source
             }
-            let desiredTokens = Self.sentWithTokens(for: desired)
+            let coverTags = coverSource.flatMap { appliedGeneratedTags[$0] }
             for source in seg.pdfURLs {
-                guard let j = jobIndexBySource[source], !jobs[j].appliedTags.isEmpty else { continue }
-                if var applied = appliedGeneratedTags[source] {
-                    applied.sentWith = desired.sentWith
-                    applied.sentWithUncertain = desired.sentWithUncertain
-                    appliedGeneratedTags[source] = applied
+                guard let j = jobIndexBySource[source], !jobs[j].appliedTags.isEmpty,
+                      let outputURL = outputURLMap[source] else { continue }
+                var review = enclosureDateReviews[source]
+                let coverName = review?.manual?.rejectedCover == true ? nil : coverSource?.lastPathComponent
+                let cover = coverName == nil ? nil : coverTags
+                var tags = appliedGeneratedTags[source] ?? GeneratedTags()
+                if let manual = review?.manual {
+                    EnclosureDates.resolveManual(entry: manual.sentWith, uncertain: manual.uncertain,
+                                                 cover: cover, into: &tags)
+                } else {
+                    EnclosureDates.applySentWith(fromCover: cover, to: &tags)
                 }
-                guard let outputURL = outputURLMap[source] else { continue }
+
                 let current = jobs[j].appliedTags
-                let updated = Self.replacingSentWithTokens(in: current, with: desiredTokens)
+                var updated = current
+                var dateChange: (before: DateRoute.Decision, after: DateRoute.Decision)?
+                if let review, let inheritance = review.inheritance, let before = review.decision {
+                    let after = inheritance.resolve(cover: cover.map { (tags: $0, file: coverName) })
+                    if after != before, before.evidenceClass == .inherited || after.evidenceClass == .inherited {
+                        var date = after.dateTags
+                        if let month = review.phoneMonth, date.year?.hasSuffix("s") != true { date.month = month }
+                        let previous = GeneratedTags(year: tags.year, month: tags.month, day: tags.day,
+                                                     dateUncertain: tags.dateUncertain).allTags
+                        let structure = Self.structureTag(for: Self.taggedClassification(of: jobs[j]))
+                        let start = structure != nil && current.first == structure ? 1 : 0
+                        if current.dropFirst(start).prefix(previous.count).elementsEqual(previous) {
+                            updated.replaceSubrange(start..<(start + previous.count), with: date.allTags)
+                            (tags.year, tags.month, tags.day, tags.dateUncertain) =
+                                (date.year, date.month, date.day, date.dateUncertain)
+                            dateChange = (before, after)
+                        }
+                    }
+                }
+
+                updated = Self.replacingSentWithTokens(in: updated, with: Self.sentWithTokens(for: tags))
                 if updated != current {
-                    tagOutput(updated, at: outputURL, source: source,
-                              appColor: Self.authoritativeColor(forJob: jobs[j]),
-                              colorIsAuthoritative: true, stampUnread: stampUnread)
+                    guard tagOutput(updated, at: outputURL, source: source,
+                                    appColor: Self.authoritativeColor(forJob: jobs[j]),
+                                    colorIsAuthoritative: true, stampUnread: stampUnread) else { continue }
                     jobs[j].appliedTags = updated
                 }
+                if appliedGeneratedTags[source] != nil { appliedGeneratedTags[source] = tags }
+                if let dateChange {
+                    review?.decision = dateChange.after
+                    if review?.pendingSidecarDecision == nil { review?.pendingSidecarDecision = dateChange.before }
+                    let evidence = dateChange.after.headerEvidence(giving: dateChange.after.dateTags)
+                    if let work = classificationHeaderWork(forJobAt: j),
+                       !OutputFileSafety.isSameFile(work.outputPDF, work.source),
+                       let data = try? Data(contentsOf: work.outputPDF) {
+                        let outcome = PDFGenerator().reviewDateEvidenceRewrite(
+                            of: data, sourceName: source.lastPathComponent, evidence: evidence, body: work.text,
+                            textColumns: Self.pdfGenerationSettings(for: runConfig).textColumns)
+                        if (try? Data(contentsOf: work.outputPDF)) == data {
+                            _ = Self.applyReviewHeaderRewrite(outcome, to: work, field: "Date evidence")
+                        } else {
+                            os_log(.info, "Date evidence left as it was in %{public}@: the output changed during the rewrite",
+                                   work.outputPDF.lastPathComponent)
+                        }
+                    }
+                }
                 let sidecar = outputURL.deletingPathExtension().appendingPathExtension("json")
-                Self.patchSidecarSentWith(at: sidecar, tags: desired,
-                                          enclosureOf: seg.isBox || seg.isFolder ? nil : coverName)
+                let pendingSidecar = review?.pendingSidecarDecision.flatMap { before in
+                    review?.decision.map { (before: before, after: $0) }
+                }
+                if Self.patchSidecarEnclosureDates(at: sidecar, tags: tags, enclosureOf: coverName, dateChange: pendingSidecar) {
+                    review?.pendingSidecarDecision = nil
+                }
+                enclosureDateReviews[source] = review
             }
         }
     }
@@ -1727,12 +1797,14 @@ extension OCRProcessor {
         if (3...4).contains(digits.count), digits.allSatisfy({ ("0"..."9").contains($0) }) { return true }
         return DocumentTags.parseMonth(t) != nil
     }
-    /// Rewrite ONLY the W37 keys of an existing sidecar (absent file → nothing). Same serialization
-    /// options as `SegmentJSONBuilder`, atomic write; an unreadable sidecar is left alone.
-    nonisolated static func patchSidecarSentWith(at url: URL, tags: GeneratedTags, enclosureOf: String?) {
-        guard FileManager.default.fileExists(atPath: url.path),
-              let data = try? Data(contentsOf: url),
-              var dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+    /// Update the existing sidecar's enclosure relation and matching dating decision.
+    private nonisolated static func patchSidecarEnclosureDates(
+        at url: URL, tags: GeneratedTags, enclosureOf: String?,
+        dateChange: (before: DateRoute.Decision, after: DateRoute.Decision)?
+    ) -> Bool {
+        guard FileManager.default.fileExists(atPath: url.path) else { return true }
+        guard let data = try? Data(contentsOf: url),
+              var dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
         let before = dict
         dict["sent_with"] = nil
         dict["sent_with_uncertain"] = nil
@@ -1742,10 +1814,22 @@ extension OCRProcessor {
             dict["sent_with_uncertain"] = tags.sentWithUncertain
         }
         if let enclosureOf { dict["enclosure_of"] = enclosureOf }
-        guard !NSDictionary(dictionary: before).isEqual(to: dict),
-              let out = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys])
-        else { return }
-        try? out.write(to: url, options: .atomic)
+        if let dateChange, let previous = dict["dating"] as? [String: Any],
+           NSDictionary(dictionary: previous).isEqual(to: dateChange.before.sidecarObject()) {
+            dict["date"] = tags.machineDate
+            dict["date_uncertain"] = tags.dateUncertain
+            dict["dating"] = dateChange.after.sidecarObject()
+        }
+        guard !NSDictionary(dictionary: before).isEqual(to: dict) else { return true }
+        do {
+            let out = try JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys])
+            try out.write(to: url, options: .atomic)
+            return true
+        } catch {
+            os_log(.error, "Enclosure dates not written to %{public}@: %{public}@",
+                   url.lastPathComponent, String(describing: error))
+            return false
+        }
     }
     var exportsLocalNames: Bool {
         guard activeRunConfig?.enableSegmentJSON != false, let settings = activeResolvedSettings?.values else {

@@ -743,12 +743,16 @@ enum DateRoute {
         return "\(v)"
     }
 
-    static func readImage(_ raw: String?) -> ImageReading {
+    static func readImage(_ raw: String?, requireCompleteResponse: Bool = false) -> ImageReading {
         let s = replace(fence, in: raw ?? "", with: "")
         let dotAll = try? NSRegularExpression(pattern: #"\{.*\}"#, options: [.dotMatchesLineSeparators])
         guard let m = (dotAll ?? braces).firstMatch(in: s, range: NSRange(s.startIndex..., in: s)),
               let r = Range(m.range, in: s), let data = String(s[r]).data(using: .utf8),
               let d = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return ImageReading() }
+        if requireCompleteResponse {
+            guard d["dates"] is [[String: Any]], d["document_date"] is NSNull || d["document_date"] is [String: Any]
+            else { return ImageReading() }
+        }
         var out = ImageReading(ok: true)
         for x in (d["dates"] as? [Any]) ?? [] {
             guard let x = x as? [String: Any] else { continue }

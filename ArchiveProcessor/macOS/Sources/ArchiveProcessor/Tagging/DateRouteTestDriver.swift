@@ -821,6 +821,30 @@ enum DateRouteTestDriver {
               == "inherited" && (ed["dating"] as? [String: Any])?["source"] as? String == "gateway-DOCA.jpg"
               && ed["enclosure_of"] != nil)
 
+        let reclassificationCalls = wire.lock.withLock { wire.tagging + wire.trace.count + wire.images.count }
+        let enclosurePDF = gOut["DOCE"]!.deletingPathExtension().appendingPathExtension("pdf")
+        g.updateClassification(at: 0, to: .boxLabel)
+        let standalone = (try? MacOSTagger.readTags(from: enclosurePDF)) ?? []
+        let standaloneJSON = json(gOut["DOCE"])
+        check("3 reclassification: a cover made into a label removes inherited year and Sent With from disk",
+              !standalone.contains("1947") && standalone.contains("Date Uncertain")
+              && !standalone.contains("Sent With 1947-03-03") && standaloneJSON["date"] == nil
+              && standaloneJSON["enclosure_of"] == nil && standaloneJSON["sent_with"] == nil
+              && (standaloneJSON["dating"] as? [String: Any])?["class"] as? String == "none"
+              && header(gOut, "DOCE")?.header?.dateEvidence == nil,
+              "\(standalone) \(standaloneJSON)")
+        g.updateClassification(at: 0, to: .documentStart)
+        let restored = (try? MacOSTagger.readTags(from: enclosurePDF)) ?? []
+        let restoredJSON = json(gOut["DOCE"])
+        check("3 reclassification: restoring the cover restores inheritance, with no model calls",
+              restored.contains("1947") && restored.contains("Sent With 1947-03-03")
+              && restoredJSON["date"] as? String == "1947" && restoredJSON["date_uncertain"] as? Bool == true
+              && restoredJSON["sent_with"] as? String == "1947-03-03"
+              && NSDictionary(dictionary: restoredJSON).isEqual(to: ed)
+              && header(gOut, "DOCE")?.header?.dateEvidence == "inherited; from gateway-DOCA.jpg; gave 1947, Date Uncertain"
+              && wire.lock.withLock { wire.tagging + wire.trace.count + wire.images.count } == reclassificationCalls,
+              "\(restored) \(restoredJSON)")
+
         // W47.ct-folder-date: a folder's container file holds a folder run from just after A, dated 1965-1967 by the user,
         // then one from just after C whose date is a label read nobody confirmed. Read, never written. The PDFs are
         // tagged where they are (the pre-OCRed route, output = source), as the runs were set on their names.
@@ -1030,7 +1054,9 @@ enum DateRouteTestDriver {
         let msPDFs = markers.map { msDir.appendingPathComponent("\($0).pdf") }
         ms.jobs = ms.jobs.enumerated().map { i, job in
             var inPlace = OCRJob(sourceURL: msPDFs[i])
-            inPlace.result = job.result
+            inPlace.result = i == 1
+                ? OCRResult(text: "", classification: .documentStart, errorMessage: nil, errorCode: nil, enclosure: true)
+                : job.result
             inPlace.classification = job.classification
             return inPlace
         }
@@ -1054,13 +1080,25 @@ enum DateRouteTestDriver {
                   msCards[2].year == "1966" && msCards[2].dateUncertain && msCards[3].year == "1966"
                   && msCards[3].dateUncertain && msCards[3].standingDating?.evidenceClass == .folder,
                   "\(msCards.map(\.year))")
-            check("5 sheet, in place: A's text year stands; E takes its cover's, and D has no date",
+            check("5 sheet, in place: A's text year stands; E takes its cover's despite empty OCR, and D has no date",
                   msCards[0].year == "1947" && msCards[1].year == "1947" && msCards[4].year.isEmpty, "\(msCards.map(\.year))")
         } else {
             check("5 sheet, in place: five cards dated", false, "\(msFilled) \(msCards.count)")
         }
+        if msCards.count == 5 {
+            ms.manualTagSegments[1].enclosureOfSegmentIndex = nil
+            ms.manualTagSegments[1].enclosureCoverName = nil
+            ms.manualTagSegments[1].refreshInheritedDate(from: nil)
+            ms.manualTagSegments[1].sentWith = "1954"
+        }
         ms.finishManualTagging()
         await msRun.value
+        ms.updateClassification(at: 0, to: .boxLabel)
+        ms.updateClassification(at: 0, to: .documentStart)
+        let msE = (try? MacOSTagger.readTags(from: msPDFs[1])) ?? []
+        check("5 sheet: reclassification respects the rejected relation and the operator's typed Sent With",
+              msE.contains("Sent With 1954") && !msE.contains("1947") && !msE.contains("Sent With 1947-03-03"),
+              "\(msE)")
         let msC = applied(ms, msPDFs[3])
         check("5 sheet, in place: C written as 1966 with Date Uncertain", msC.contains("1966") && msC.contains("Date Uncertain")
               && ((try? MacOSTagger.readTags(from: msPDFs[3])) ?? []).contains("1966"), "\(msC)")
@@ -1213,7 +1251,7 @@ enum DateRouteTestDriver {
         let before = (dating("B") ?? [:]) as NSDictionary
         let fieldsBefore = (fields("C") ?? [:]) as NSDictionary
         wire.lock.withLock {
-            wire.imageReply[120] = "Unparsed image reply."
+            wire.imageReply[120] = "{}"
             wire.imageReply[60] = #"{"dates":[{"quote":"April 10, 1962","page":1,"where":"dateline","kind":"typed","year":1962,"month":4}],"document_date":{"year":1962,"month":4,"quote":"April 10, 1962"}}"#
         }
         let corrections = [("A", 90), ("B", 180), ("C", 90)]

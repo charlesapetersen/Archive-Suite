@@ -2266,13 +2266,20 @@ final class LiveCaptureProcessor: ObservableObject {
         // `??` branch is unreachable (the map is built from this very array).
         let regenKeys: [String: String] = Dictionary(
             uniqueKeysWithValues: segsToRegen.map { ($0.groupId, liveCollectionKey(for: $0.groupId)) })
+        let refreshGroups = Set(segsToRegen.compactMap { seg -> String? in
+            guard changedDatingImages.contains(seg.groupId), let decision = seg.routeDating,
+                  DateRoute.canRefreshLiveImage(decision) else { return nil }
+            return seg.groupId
+        })
+        if !refreshGroups.isEmpty { session.refreshProvisionalSnapshotIfUnused() }
+        let datingGateway = DateRoute.measuredRoute(gateway: config?.textGateway, usesLocalAgent: config?.textLocalAgent != nil)
+            ? config?.textGateway : nil
         isFinalizing = true
         Task { [weak self] in
             guard let self else { return }
             var writeInputs = segsToRegen
-            if DateRoute.measuredRoute(gateway: self.config?.textGateway, usesLocalAgent: self.config?.textLocalAgent != nil),
-               let gateway = self.config?.textGateway {
-                for i in writeInputs.indices where changedDatingImages.contains(writeInputs[i].groupId) {
+            if let gateway = datingGateway {
+                for i in writeInputs.indices where refreshGroups.contains(writeInputs[i].groupId) {
                     writeInputs[i] = await self.refreshRotationDating(writeInputs[i], gateway: gateway)
                 }
             }

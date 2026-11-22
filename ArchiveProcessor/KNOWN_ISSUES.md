@@ -607,9 +607,6 @@ What remains: a box with many such pages has more gaps to check than the figures
   It runs on the main actor, one text page per document with a non-explicit year. A later manual year edit in review
   leaves the line as it was (an output-time snapshot, like the source-date lines; the tags are authoritative), and a
   rotation or retry that regenerates a page drops it until the run is tagged again (accepted: the sidecar holds the evidence; the header line is an output-time snapshot and the tags are authoritative).
-- **A reclassification after tagging** refreshes `Sent With` (W37) but not an enclosure's inherited own year: an
-  enclosure that stops being one keeps its cover's year, still marked `Date Uncertain`, and a page newly marked an
-  enclosure does not inherit, until the run is tagged again (queued: W49.proc-date-paths-rest).
 - **A year the reply quotes from the document itself counts as explicit** even when no rule candidate carries it (a
   two-digit `'47`, an OCR-damaged `196L`), as the measured bench route does (`date_route_pipeline.route`); 08-dating.md
   §3 words step 1 by the rule candidate alone. The model's own flag can still add `Date Uncertain` there (accepted: as the measured bench route does).

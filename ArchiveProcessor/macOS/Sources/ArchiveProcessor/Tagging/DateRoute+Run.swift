@@ -72,22 +72,26 @@ extension DateRoute {
         return d
     }
 
-    private static func readPageImages(_ pages: [(url: URL, rotation: Int)], gateway: GatewayConfig) async
-        -> (ImageReading?, String) {
+    private static func readPageImages(_ pages: [(url: URL, rotation: Int)], gateway: GatewayConfig,
+                                       requireCompleteResponse: Bool = false) async -> (ImageReading?, String) {
         let jpegs = pages.prefix(imagePages).compactMap {
             ImageEncoding.uprightJPEG(url: $0.url, rotationDegrees: $0.rotation, longEdge: imageLongSide)
         }
         guard !jpegs.isEmpty else { return (nil, imageNoPages) }
         guard let reply = await imagePass(jpegs, gateway: gateway) else { return (nil, imageFailed) }
-        let image = readImage(reply)
+        let image = readImage(reply, requireCompleteResponse: requireCompleteResponse)
         return (image, image.ok ? imageSent : imageFailed)
+    }
+
+    static func canRefreshLiveImage(_ decision: Decision) -> Bool {
+        decision.measured && [imageSent, imageFailed, imageNoPages].contains(decision.imageNote)
     }
 
     /// A Live rotation correction changes the image evidence alone. Keep the trace and keep the
     /// previous decision if the refreshed image request fails.
     static func refreshLiveImage(_ previous: Decision, input: Input, gateway: GatewayConfig) async -> Decision? {
-        guard previous.measured, [imageSent, imageFailed, imageNoPages].contains(previous.imageNote) else { return nil }
-        let (image, note) = await readPageImages(input.pages, gateway: gateway)
+        guard canRefreshLiveImage(previous) else { return nil }
+        let (image, note) = await readPageImages(input.pages, gateway: gateway, requireCompleteResponse: true)
         guard note == imageSent else { return nil }
         var decision = decide(text: input.text, near: input.near, trace: previous.trace, image: image, imageNote: note)
         decision.route = previous.route

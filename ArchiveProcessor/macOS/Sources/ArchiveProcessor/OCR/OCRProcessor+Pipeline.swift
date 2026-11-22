@@ -1700,6 +1700,7 @@ extension OCRProcessor {
         clearOutputWarnings()
         segments = []
         appliedGeneratedTags = [:]
+        enclosureDateReviews = [:]
         collectionSegments = []
         outputURLMap = [:]
         _takenOutputPaths = []
@@ -1987,6 +1988,7 @@ extension OCRProcessor {
         clearOutputWarnings()
         segments = []
         appliedGeneratedTags = [:]
+        enclosureDateReviews = [:]
         collectionSegments = []
         outputURLMap = [:]
         _takenOutputPaths = []
@@ -3275,6 +3277,7 @@ extension OCRProcessor {
         clearOutputWarnings()
         segments = []
         appliedGeneratedTags = [:]
+        enclosureDateReviews = [:]
         collectionSegments = []
         outputURLMap = [:]
         _takenOutputPaths = []
