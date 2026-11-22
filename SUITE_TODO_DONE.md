@@ -17566,3 +17566,12 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   recovery checks passed. A focused off-screen Process Files journey confirmed the completion
   summary and empty-label warning render. No live gateway calls or provider spend.
   <!-- /W49.proc-fix-s053 -->
+
+- [x] **W49.storage-one-home — one home for each fact the user corrects, as the owner chose** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-21 (this commit)
+  Owner call 32 selected one authoritative adjacent JSON record per PDF. Converted the approved design into
+  bounded implementation items starting with W49.storage-contract and ending with W49.storage-pilot.
+  Reconciled the existing field mapping, Finder rename, Improve OCR, redundant dates, movable-root and
+  scratch adoption items with that sequence. The optional segment JSON remains distinct. Finder and
+  Spotlight choices and any real-corpus change still require separate decisions. Implementation is tracked
+  by the stages in [execution-plans/storage-simplify.md](execution-plans/storage-simplify.md#15-delivery-sequence-dependencies-and-exit-tests).
+  <!-- /W49.storage-one-home -->
