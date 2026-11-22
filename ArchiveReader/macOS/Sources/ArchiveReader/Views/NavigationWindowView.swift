@@ -352,9 +352,7 @@ struct NavigationWindowView: View {
             .padding(28)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
         } else {
-            switch LibraryEmptyState.forPhase(model.library.phase,
-                                              rowCount: model.library.files.count,
-                                              displayedCount: model.displayed.count) {
+            switch model.emptyListState {
             case .none:
                 EmptyView()
             case .noRoot:
@@ -390,6 +388,9 @@ struct NavigationWindowView: View {
                     chooseFolderButton
                 }
                 .emptyStateBackdrop()
+            case .ocrSearchUnavailable:
+                OCRSearchUnavailableView(rescan: model.rescan)
+                    .emptyStateBackdrop()
             // W40.fix-reader-filter-bar (reader-1 row 8): says which filter hid the rows and offers to clear it.
             case .filteredOut:
                 VStack(spacing: 0) {
@@ -1130,6 +1131,23 @@ struct TagCloudThresholdControl: View {
                 .help("Hide the tags used on fewer files than this")
                 .accessibilityLabel("Minimum files per tag")
                 .accessibilityValue("\(minimumCount)")
+        }
+    }
+}
+
+struct OCRSearchUnavailableView: View {
+    let rescan: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ContentUnavailableView(
+                "OCR search unavailable", systemImage: "exclamationmark.triangle",
+                description: Text("Reader couldn’t open the search index. Try rescanning the archive folder."))
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("ar.empty.ocrSearchUnavailable")
+            Button("Rescan", action: rescan)
+                .accessibilityIdentifier("ar.empty.rescan")
+                .padding(.bottom, 16)
         }
     }
 }

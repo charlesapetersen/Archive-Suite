@@ -17646,3 +17646,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   checks both equal and higher OpenRouter prices against the direct route, including the estimate for 250 pages.
   Improve OCR continues to scale the measured list cost using the selected route's rates.
   <!-- /W47.reocr-price-check -->
+
+- [x] **W49.fix-reader-dead-index-overlay — Explain when OCR search is unavailable [S]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit)
+  (lane: reader) (uses: build,vm) — S-003 (S3), reproduced by Claude Opus 5.5 and independently confirmed by Codex gpt-6.2-sol in the [Reader VM](verification/evidence/reader/W49.reader-s003-reproduce-check.md). When an OCR query empties the list while `indexFailure` is `.unavailable`, explain that the index is unavailable and offer Rescan using the existing archive rescan action. Keep the ordinary no-match message for a working index. Remove the expected failure from `DeadIndexEmptyListSuspectTests` and verify the corrupt-index OCR search and same-session recovery in the VM.
+  The empty list now explains the unavailable index and offers Rescan. The active search returns results
+  in the same session once the index is usable, and a working index still shows “No matches” for a miss.
+  Verified with the Reader smoke suite, headless render guard, write-surface lint and its 30 self-checks,
+  and the focused corrupt-index test in the off-screen Tart VM.
+  <!-- /W49.fix-reader-dead-index-overlay -->

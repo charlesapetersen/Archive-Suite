@@ -67,8 +67,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   screenshot of the list area. Confirmed if it says "No matches" while the failure line shows.
 - **Would clear it:** the overlay says the index is unavailable, or no overlay is drawn while the failure line
   shows.
-- **Status:** `reproduced` — independently confirmed under phase rule 5a(4), fix queued as
-  `W49.fix-reader-dead-index-overlay` (S3).
+- **Status:** `cleared` — fixed by `W49.fix-reader-dead-index-overlay` (S3). Regressions:
+  `DeadIndexEmptyListSuspectTests` and `ContentIndexFailureUITests`.
   [Opus 5.5 model reproduction](evidence/reader/W49.reader-s003-dead-index.md) and
   [Codex gpt-6.2-sol VM reproduction](evidence/reader/W49.reader-s003-reproduce-check.md).
 - **History:**

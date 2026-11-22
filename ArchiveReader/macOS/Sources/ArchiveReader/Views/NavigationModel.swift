@@ -1294,6 +1294,16 @@ final class NavigationModel: ObservableObject {
         return causes.isEmpty ? facets.filter { $0.isLocation && bringsRowsBack($0) } : causes
     }
 
+    var emptyListState: LibraryEmptyState? {
+        let state = LibraryEmptyState.forPhase(library.phase, rowCount: library.files.count,
+                                               displayedCount: displayed.count)
+        if state == .filteredOut, case .unavailable = indexFailure,
+           ftsPaths?.isEmpty == true, !fullTextQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+            return .ocrSearchUnavailable
+        }
+        return state
+    }
+
     /// The empty list's sentence, naming what hides the rows.
     var emptyListExplanation: String {
         ActiveFilterChip.emptyExplanation(chips: listConstraints, causes: emptyListCauses)

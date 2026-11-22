@@ -9,11 +9,12 @@ and Space preview offer **Download and Show**. Find reports when its results cov
 [Reproduction and regression](../verification/evidence/reader/W49.reader-s002-reproduce-check.md).
 (W49.fix-reader-dataless-prefetch)
 
-## OCR search with an unavailable index (S-003, 2026-11-21)
+## OCR search with an unavailable index (S-003, fixed 2026-11-22)
 
-- **OCR search shows “No matches” when the content index cannot open.** The empty-list message blames
-  the query, while the status bar says “Search index unavailable”. [Independent VM reproduction](../verification/evidence/reader/W49.reader-s003-reproduce-check.md).
-  (queued: W49.fix-reader-dead-index-overlay)
+When an OCR query empties the list and Reader cannot open the index, the list says “OCR search unavailable”
+and offers **Rescan**, which retries the existing archive scan. The active query runs again after indexing.
+[Independent VM reproduction](../verification/evidence/reader/W49.reader-s003-reproduce-check.md).
+(W49.fix-reader-dead-index-overlay)
 
 ## Password-protected PDFs in the document viewer (S-005, fixed 2026-11-21)
 

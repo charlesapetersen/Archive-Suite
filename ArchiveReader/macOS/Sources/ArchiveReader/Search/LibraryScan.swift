@@ -178,6 +178,8 @@ enum LibraryEmptyState: Equatable, Sendable {
     case folderIsEmpty
     /// Rows exist; the user's own filters hide them.
     case filteredOut
+    /// An active OCR query emptied the list while the search index was unavailable.
+    case ocrSearchUnavailable
 
     /// `nil` when rows are on screen and nothing needs saying.
     ///
