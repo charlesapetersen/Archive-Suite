@@ -605,7 +605,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a test in `DriveRelayTransportTest` whose `MockDrive` answers the segment create with a 500:
   `segmentComplete` returns `true` and no segment object exists.
 - **Would clear it:** `segmentComplete` returns `false` in that test.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.relay-suspects-check`); [`evidence/processor/W49.relay-suspects.md`](evidence/processor/W49.relay-suspects.md), `ArchiveCapture/app/src/test/java/com/archiveprocessor/capture/capture/DriveRelaySegmentSignalSuspectTest.kt`
+- **Status:** `reproduced` — independently confirmed. Fix queued as `W49.proc-fix-s021`. [Independent evidence](evidence/processor/W49.relay-suspects-check.md).
 - **History:**
   - 2026-10-21 W40.i2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.relay-suspects` under phase rule 5a.
@@ -613,6 +613,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     restored segment with its page on the Mac, cloud pairing, End segment, Skip; the real transport against the mock
     Drive answering the segment create with a 500. One create, refused, no retry; no segment object; the group left
     `endedSegments` on disk; a re-pair sent nothing. The comment it rests on is about photos; iOS returns `false`.
+  - 2026-11-21 W49.relay-suspects-check (Codex gpt-6.2-sol at `5fa81705`, original Claude Opus 5.5 in `ae75bd87`) — Fresh capture through the Android view model received a valid photo receipt. The first completion create got a 500, the manifest cleared the pending segment, and cloud re-pair made no second create. The success control published the completion.
 
 ### S-022 · iOS may write a HEIC photo, or a wrongly rotated one, into a `.jpg` the Mac reads as JPEG
 
@@ -987,7 +988,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** `scripts/test-filerelay.sh`-style session with an ended segment whose last page has not yet
   arrived: press Finish and count pages filed.
 - **Would clear it:** Finish holds until the page lands.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.relay-suspects-check`); [`evidence/processor/W49.relay-suspects.md`](evidence/processor/W49.relay-suspects.md), `ArchiveProcessor/scripts/repro-relay-suspects.sh`
+- **Status:** `reproduced` — independently confirmed. Fix queued as `W49.proc-fix-s038`. [Independent evidence](evidence/processor/W49.relay-suspects-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.relay-suspects` under phase rule 5a.
@@ -997,6 +998,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     Finish (the session-complete marker driving `requestFinish`): finalized about a second later, `g1` filed with one
     page. Page 2 then arrived, was receipted, and stayed in the backup folder as a page of an already-filed document.
     Nothing exempts the relay from `P-48`'s promise.
+  - 2026-11-21 W49.relay-suspects-check (Codex gpt-6.2-sol at `5fa81705`, original Claude Opus 5.5 in `ae75bd87`) — The headless Mac relay filed one of two photos when Finish ran before the second arrived. The late receipt covered a photo still in Backup and the filed PDF was byte-identical. With both photos delivered before Finish, the PDF contained both.
 
 ### S-039 · Stage for later can hand the same photos to Process Files twice
 
