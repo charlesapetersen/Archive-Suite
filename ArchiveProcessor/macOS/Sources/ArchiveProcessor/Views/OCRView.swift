@@ -429,6 +429,9 @@ struct OCRView: View {
             if droppedFiles.isEmpty, let volume = ProcessorUITestConfiguration.droppedVolume {
                 handleDroppedURLs(volume)
             }
+            if droppedFiles.isEmpty, let tree = MessageJourneyFixture.inputTree {
+                handleDroppedURLs([tree])
+            }
             if droppedFiles.isEmpty, let images = ProcessorUITestConfiguration.droppedImages {
                 handleDroppedURLs(images)
             }

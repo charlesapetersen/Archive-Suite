@@ -113,12 +113,16 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   → `validate()` (`:196`) → `KeyValidator` (`OCR/KeyValidator.swift:49`); optional sample OCR (`:155-159`) →
   `SampleOCRTester`. Status chips: `keyStatusChip` (`Views/SettingsView.swift:732`).
 - **Real-path test:** `ProcessorUITests.testAnthropicGuidedKeySetupShowsConsoleCostPrivacyAndKeyShape` opens the
-  wizard from Settings and checks the Anthropic page text. Not covered: the first-run presentation (the UITest
-  configuration sets `hasSeenKeyOnboarding`, `ProcessorUITestConfiguration.swift:52`), paste, validate, save, chips.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+  wizard from Settings and checks the Anthropic page text. The tests leave two paths open: the first-run
+  presentation and a successful save to a real Keychain.
+- **Runtime evidence:** [Independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md) via
+  `MessageJourneyUITests.testWizardShowsValidatedAboveAnEmptyKey`. Settings → Accounts → guided key setup →
+  OpenAI → Validate key. With the headless save refused, returning to Accounts shows Validated beside the
+  empty OpenAI field.
+- **Status:** `broken` — W49.proc-fix-s024 for S-024.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-21 W49.proc-suspects-messages-check — S-024, see runtime evidence.
 - **Notes:** **Drift.** The key is confirmed by a cheap model-list call (`OCR/KeyValidator.swift:48`), not a sample
   OCR, and saved straight after (`Views/ProviderKeyWizard.swift:206`); the sample OCR is a separate optional
   button. The format check only shows a caption (`:144-147`), it does not block Validate. The wizard covers
@@ -203,16 +207,18 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   (`startProcessing`) → `processor.startProcessing(gatewayConfig:)` (`:1363`) → `OpenAICompatibleClient.gateway`
   (`OCR/OpenAICompatibleClient.swift:23`, from `OCR/OCRProcessor+OCR.swift:1760`).
 - **Real-path test:** partial: `scripts/test-local-models.sh` (`LOCALMODELS_TEST=1`) runs `performOCRCall` with a
-  `GatewayConfig` over the no-wire seam (the local variant). Not covered: the Settings fields, the preset, the
-  Gateway key, user pricing in the estimates, a remote gateway's request.
-- **Runtime evidence:** none.
+  `GatewayConfig` over the no-wire seam (the local variant). The preset check below applies the public Settings
+  control. The real Gateway key, estimates and live response remain open.
+- **Runtime evidence:** [Independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md) via
+  `MessageJourneyUITests.testOpenAIPresetBuildsLegacyTokenLimit`. The Settings preset selected GPT-5.4 mini
+  and Start built a request with `max_tokens: 8192`. The VM verified the help and request mismatch. Live
+  OpenAI acceptance remains open.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
-- **Notes:** **Drift.** LLM rotation is not greyed out for the gateway: the rotation section is disabled only for
-  pre-OCRed input (`Views/SettingsView.swift:860`); at run time it silently falls back to local Vision
-  (`OCR/LLMRotationDetector.swift:44`). `TESTING.md` §2.1 and §2.10 say "greys out". Suspect `S-025` (the preset
-  fills a reasoning model the gateway's `max_tokens` request would be refused for).
+  - 2026-11-21 W49.proc-suspects-messages-check — S-025, see runtime evidence.
+- **Notes:** **Drift.** `TESTING.md` §2.1 and §2.10 say the gateway greys out the LLM rotation controls.
+  The gateway can request a comparative vote. See P-25 for what happens when that request fails.
 
 ### P-09 · A model on this Mac
 
@@ -250,13 +256,17 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** `ProcessorUITests.testLocalAgentSettingsAndFilesShowSubscriptionCostAndGuidedSetup` (cost
   text in both places, CLI picker, wizard). `scripts/test-localagent.sh` (`LOCALAGENT_TEST=1`, fake CLI) drives the
   real `LocalAgentClient` and resume. `scripts/test-processing-history.sh` checks the PDF header and history name
-  `Local CLI Agent (claude)` at $0. Not covered: a real signed-in CLI, Detect & Verify, Gemini or Codex.
-- **Runtime evidence:** none. 2026-11-18 W40.d3: an unattended session cannot run the app on the host, and the VM
-  lane carries no CLI login (`verification/evidence/processor/W40.d3-providers.md`).
+  `Local CLI Agent (claude)` at $0. A real signed-in CLI and Detect & Verify remain open.
+- **Runtime evidence:** [Independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md) via
+  `MessageJourneyUITests.testCodexEndsPageBeforeThePromisedRetry`. Process Files Start, with a Codex stub
+  reporting a future reset, made one invocation and ended before that reset with the log saying it would
+  pace and retry.
+  See also the [earlier VM provider check](evidence/processor/W40.d3-providers.md).
 - **Status:** `unverifiable-here` (needs a signed-in `claude` CLI beside a running app: the owner's guided session)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-18 W40.d3 — `unverifiable-here`.
+  - 2026-11-21 W49.proc-suspects-messages-check — S-018, see runtime evidence.
 - **Notes:** **Drift.** README says the guided wizard covers Claude Code, Gemini CLI and Codex; it offers Claude and
   Gemini only (`Models/LocalAgentSpec.swift:11`, `:63`). The Batch toggle stays enabled under the Local Agent
   (`Views/SettingsView.swift:758`) and is silently ignored at run time.
@@ -566,15 +576,17 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   (`OCR/OCRPrompt.swift:42`). The manual rotation pass: P-32.
 - **Real-path test:** the manual pass only: `ReviewDialogsJourneyUITests` (W40.d2, VM).
 - **Runtime evidence:** W40.d2, 2026-11-19: the Review rotation pass, 90° clicked on one photo, is baked into its
-  PDF's page 1 (the photo drawn landscape, portrait with rotation off) ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)). Detection itself is not shown: Local
-  Vision fails in the guest, so every photo was proposed 0°.
-- **Status:** `unproven`
+  PDF's page 1. In that run, all photos were proposed 0°. [Manual review evidence](evidence/processor/W40.d2-review-dialogs.md).
+  On 2026-11-21, `MessageJourneyUITests.testComparativeVoteFailureLeavesSidewaysPageWithoutWarning`
+  rendered a sideways image without a warning after a synthetic HTTP 500 in single-vote comparative mode.
+  A usable synthetic vote turned the same image upright. [Independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md).
+- **Status:** `broken` — W49.proc-fix-s029 for S-029.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-19 W40.d2 — stays `unproven`: the manual pass works by click; detection is unproven.
-- **Notes:** **Drift.** `TESTING.md` says the gateway greys rotation out; it is disabled only for pre-OCRed input,
-  and gateway, Local Agent and Mistral fall back to local Vision (`OCR/OCRProcessor+OCR.swift:1841-1851`), which the
-  app's own help calls about 60% accurate (`Models/ProviderModels.swift:155`). Suspect `S-029`.
+  - 2026-11-21 W49.proc-suspects-messages-check — S-029, see runtime evidence.
+- **Notes:** The default agreement mode reports a failed cloud check when it needs a vote. Both comparative modes
+  can fall back silently.
 
 ### P-26 · Run log and on-screen errors
 
@@ -584,11 +596,15 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Reached by:** ⌘, → Write a processing log file (`Views/SettingsView.swift:831`, off by default `:75`) →
   `writeLogFile` (`OCR/OCRProcessor+Pipeline.swift:3396`) → `ArchiveProcessor_Log_<timestamp>.txt` (`:3443`). Row
   errors `Views/Shared/ProcessableItemRow.swift:213-217`; View text sheet `Views/OCRView+FileRowView.swift:149-151`.
-- **Real-path test:** none.
-- **Runtime evidence:** none.
-- **Status:** `unproven`
+- **Real-path test:** the Process Files folder intake and Start, with the run log enabled.
+- **Runtime evidence:** [Independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md) via
+  `MessageJourneyUITests.testRunLogLosesOneOfTwoSameNamedFailures`. Folder intake and Start produced two
+  failed same.jpg outputs in different folders. The status and run log counted one failure and the log
+  showed one reason.
+- **Status:** `broken` — W49.proc-fix-s030 for S-030.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
+  - 2026-11-21 W49.proc-suspects-messages-check — S-030, see runtime evidence.
 - **Notes:** **Drift.** README, `CLAUDE.md` §Batch log file and `TESTING.md` §2.4 read as always-on; it is opt-in and
   off by default. Suspect `S-030`.
 

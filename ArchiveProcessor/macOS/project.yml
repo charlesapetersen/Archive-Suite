@@ -103,6 +103,8 @@ targets:
     platform: macOS
     sources:
       - Tests/ArchiveProcessorUITests
+      - path: ../scripts/fake_messages_codex.sh
+        buildPhase: resources
       - path: ../../packages/UITestSupport/Runner   # W40.e9 layout guard, shared by every UI suite
       - path: ../../packages/UITestSupport/Shared   # W40.e13 transient analysis, shared with the app
     dependencies:
