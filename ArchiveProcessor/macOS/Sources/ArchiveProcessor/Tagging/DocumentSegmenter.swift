@@ -36,12 +36,15 @@ struct DocumentSegmenter {
     ///   enclosure's start page; any boundary change, removal or insertion around the cover drops it
     ///   (dropping is the safe direction — the owner can still type the date). `nil` = no baseline check
     ///   (used to compute the baseline itself).
+    /// - Parameter folderStarts: Page indices at tree-folder boundaries. These end the preceding
+    ///   document and its enclosure context even when the next page is classified as a continuation.
     func segment(
         files: [URL],
         classifications: [DocumentClassification?],
         texts: [String],
         enclosureFlags: [Bool] = [],
-        expectedCoverPages: [URL: [URL]]? = nil
+        expectedCoverPages: [URL: [URL]]? = nil,
+        folderStarts: Set<Int> = []
     ) -> [DocumentSegment] {
         guard !files.isEmpty else { return [] }
 
@@ -49,6 +52,7 @@ struct DocumentSegmenter {
         var currentFiles: [URL] = []
         var currentTexts: [String] = []
         var currentEnclosureOf: Int? = nil
+        var firstSegmentInFolder = 0
 
         func flush() {
             guard !currentFiles.isEmpty else { return }
@@ -59,7 +63,11 @@ struct DocumentSegmenter {
             currentEnclosureOf = nil
         }
 
-        for index in 0..<files.count {
+        for index in files.indices {
+            if folderStarts.contains(index) {
+                flush()
+                firstSegmentInFolder = segments.count
+            }
             let file = files[index]
             let text = index < texts.count ? texts[index] : ""
             let classification = index < classifications.count ? classifications[index] : nil
@@ -86,7 +94,7 @@ struct DocumentSegmenter {
                 // (an unclassified `.none` page is a guessed boundary, not a confirmed one).
                 let flagged = classification == .documentStart
                     && index < enclosureFlags.count && enclosureFlags[index]
-                if flagged, let previous = segments.indices.last,
+                if flagged, let previous = segments.indices.last, previous >= firstSegmentInFolder,
                    !segments[previous].isBox, !segments[previous].isFolder {
                     // Chain consecutive enclosures to the ONE covering letter.
                     currentEnclosureOf = segments[previous].enclosureOf ?? previous

@@ -54,6 +54,7 @@ struct ManualSegImage: Identifiable {
     let url: URL
     var rotationDegrees: Int
     var kind: ManualPhotoKind
+    var startsTreeFolder: Bool = false
 }
 
 /// A document segment the user has identified and tagged. Its pages drop out of the viewer.

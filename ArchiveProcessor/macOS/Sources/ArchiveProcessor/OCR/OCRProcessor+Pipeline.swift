@@ -1694,6 +1694,7 @@ extension OCRProcessor {
         _takenOutputPaths = []
         exportedImageMap = [:]
         outputSubfolders = pending.outputSubfolders ?? [:]   // W47.ct-processor-intake
+        removedSourceURLs = []
         currentModel = pending.model
         // The run's own frozen settings, not the last started run's: the PDFs it still writes read them
         // (W42.int-s5 `textLayerOptions`, the dating route's switch). nil (a run recorded before them) is the defaults.
@@ -1811,12 +1812,7 @@ extension OCRProcessor {
                 }
             } else {
                 statusMessage = "Segmenting documents…"
-                let segmenter = DocumentSegmenter()
-                let classifications = jobs.map { $0.result?.classification }
-                let texts = jobs.map { $0.result?.text ?? "" }
-                segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts,
-                                             enclosureFlags: jobs.map { $0.result?.enclosure == true },
-                                             expectedCoverPages: enclosureBaseline(files: pending.fileURLs))
+                rebuildSegments(files: pending.fileURLs)
             }
             statusMessage = "Found \(segments.count) segments. Generating tags…"
 
@@ -2234,12 +2230,7 @@ extension OCRProcessor {
                 }
             } else {
                 statusMessage = "Segmenting documents…"
-                let segmenter = DocumentSegmenter()
-                let classifications = jobs.map { $0.result?.classification }
-                let texts = jobs.map { $0.result?.text ?? "" }
-                segments = segmenter.segment(files: pending.fileURLs, classifications: classifications, texts: texts,
-                                             enclosureFlags: jobs.map { $0.result?.enclosure == true },
-                                             expectedCoverPages: enclosureBaseline(files: pending.fileURLs))
+                rebuildSegments(files: pending.fileURLs)
             }
             statusMessage = "Found \(segments.count) segments. Tagging…"
 

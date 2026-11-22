@@ -56,27 +56,29 @@ extension OCRProcessor {
             : outputURLMap.filter { outputSubfolders[$0.key.standardizedFileURL.path] == nil }
     }
 
-    /// `segment` split where consecutive pages were filed in different folders.
-    func splitAtOutputFolders(_ segment: DocumentSegment) -> [DocumentSegment] {
-        guard !outputSubfolders.isEmpty, segment.pdfURLs.count > 1 else { return [segment] }
-        var pieces: [DocumentSegment] = []
-        var current: [URL] = []
-        var folder: String?
-        for url in segment.pdfURLs {
-            let here = outputSubfolders[url.standardizedFileURL.path] ?? ""
-            if let folder, folder != here, !current.isEmpty {
-                var piece = segment
-                piece.pdfURLs = current
-                pieces.append(piece)
-                current = []
+    /// Indices in the original order where a different tree folder begins. If its first page was
+    /// removed, carry the break to the next retained page, even if it returns to an earlier folder.
+    func treeFolderStarts(in files: [URL], excluding removed: Set<URL> = []) -> Set<Int> {
+        guard !outputSubfolders.isEmpty else { return [] }
+        var starts = Set<Int>()
+        var previousFolder: String?
+        var previousSourceFolder: URL?
+        var pendingBreak = false
+        for (i, file) in files.enumerated() {
+            let source = file.standardizedFileURL
+            let folder = outputSubfolders[source.path]
+            let sourceFolder = folder.map { _ in source.deletingLastPathComponent() }
+            if i > 0, folder != previousFolder || sourceFolder != previousSourceFolder {
+                pendingBreak = true
             }
-            folder = here
-            current.append(url)
+            if pendingBreak, !removed.contains(file) {
+                starts.insert(i)
+                pendingBreak = false
+            }
+            previousFolder = folder
+            previousSourceFolder = sourceFolder
         }
-        var last = segment
-        last.pdfURLs = current
-        pieces.append(last)
-        return pieces
+        return starts
     }
 
     /// The planned tree keyed as `outputSubfolders` keeps it, its folders checked (`ContainerTree.relativePath`).

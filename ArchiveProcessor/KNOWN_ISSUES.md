@@ -265,9 +265,6 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   Reader (File ▸ Container Levels… on that archive). A map above the output folder is not looked for: with the output
   inside a Reader archive, Save writes a map for the output folder's subtree, and Start Without Saving leaves the
   outer map reading the new folders from its own root. (accepted: the map is the archive's record and is edited in the Reader, not overwritten by a run).
-- **Documents are found across the whole run.** Segmentation and tagging see the run's pages in order and may treat
-  pages from two folders as one document; merging splits it at the folder change, but the pieces keep the tags the
-  whole document was given. (queued: W49.proc-tree-folder-docs).
 - **Depth.** Folders more than 12 below the given folder are not read, and nothing says so. A given folder whose own
   name starts with "." is read but filed flat. (queued: W49.proc-tree-depth-say).
 - **Collection organisation is skipped for a tree's outputs**, by design: the tree says where they go. Its status line

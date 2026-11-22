@@ -14,7 +14,8 @@ extension OCRProcessor {
         }
         let flags = files.indices.map { $0 < jobs.count && jobs[$0].result?.ocrEnclosure == true }
         let baseline = DocumentSegmenter().segment(files: files, classifications: modelClasses,
-                                                   texts: [], enclosureFlags: flags)
+                                                   texts: [], enclosureFlags: flags,
+                                                   folderStarts: treeFolderStarts(in: files))
         return DocumentSegmenter.coverPageSequences(baseline)
     }
     /// Rebuild `segments` from current job classifications, excluding user-removed files.
@@ -28,8 +29,11 @@ extension OCRProcessor {
         var classifications: [DocumentClassification?] = []
         var texts: [String] = []
         var enclosureFlags: [Bool] = []
+        let originalFolderStarts = treeFolderStarts(in: files, excluding: removedSourceURLs)
+        var activeFolderStarts = Set<Int>()
         for (i, url) in files.enumerated() {
             if removedSourceURLs.contains(url) { continue }
+            if originalFolderStarts.contains(i) { activeFolderStarts.insert(activeFiles.count) }
             activeFiles.append(url)
             classifications.append(i < jobs.count ? jobs[i].result?.classification : nil)
             texts.append(i < jobs.count ? (jobs[i].result?.text ?? "") : "")
@@ -41,7 +45,8 @@ extension OCRProcessor {
         }
         return segmenter.segment(files: activeFiles, classifications: classifications, texts: texts,
                                  enclosureFlags: enclosureFlags,
-                                 expectedCoverPages: enclosureBaseline(files: files))
+                                 expectedCoverPages: enclosureBaseline(files: files),
+                                 folderStarts: activeFolderStarts)
     }
     /// Apply Live-Capture group boundaries/types to job classifications, so segmentation uses
     /// the phone's grouping instead of the LLM. Boundaries → documentStart/continuation;
@@ -660,13 +665,7 @@ extension OCRProcessor {
         }
 
         // Re-run document segmentation with updated classifications
-        let allFiles = jobs.map { $0.sourceURL }
-        let updatedClassifications = jobs.map { $0.result?.classification }
-        let texts = jobs.map { $0.result?.text ?? "" }
-        let segmenter = DocumentSegmenter()
-        segments = segmenter.segment(files: allFiles, classifications: updatedClassifications, texts: texts,
-                                     enclosureFlags: jobs.map { $0.result?.enclosure == true },
-                                     expectedCoverPages: enclosureBaseline(files: allFiles))
+        rebuildSegments(files: jobs.map(\.sourceURL))
         // W37: refresh/strip written Sent With tokens + sidecar relation against the new segmentation.
         reconcileSentWithAfterReclassification(runConfig: runConfig)
 

@@ -799,6 +799,7 @@ extension OCRProcessor {
 
         // Build the ordered image list (excluding already-removed files). Kind + rotation seed from
         // the OCR classifications; both are user-editable in the UI.
+        let folderStarts = treeFolderStarts(in: files, excluding: removedSourceURLs)
         var images: [ManualSegImage] = []
         for (i, url) in files.enumerated() {
             guard !removedSourceURLs.contains(url), i < jobs.count else { continue }
@@ -808,7 +809,8 @@ extension OCRProcessor {
                 fileIndex: i,
                 url: url,
                 rotationDegrees: jobs[i].result?.rotationDegrees ?? 0,
-                kind: kind
+                kind: kind,
+                startsTreeFolder: folderStarts.contains(i)
             ))
         }
         guard !images.isEmpty else { return }
@@ -987,12 +989,13 @@ extension OCRProcessor {
             manualSegImages[$0].kind == .document && !manualSegConsumed.contains($0) && !manualSegRemoved.contains($0)
         }
     }
-    /// The last index of the contiguous document run beginning at `start` (stops at a box/folder or a
-    /// consumed image; removed images are skipped transparently).
+    /// The last index of the contiguous document run beginning at `start`. A label, consumed image
+    /// or change of tree folder ends the run, even when the first page of the new folder was removed.
     func manualSegRunEnd(from start: Int) -> Int {
         var end = start
         var k = start
         while k < manualSegImages.count {
+            if k > start, manualSegImages[k].startsTreeFolder { break }
             if manualSegConsumed.contains(k) { break }
             if manualSegImages[k].kind != .document { break }
             if !manualSegRemoved.contains(k) { end = k }
@@ -1720,20 +1723,8 @@ extension OCRProcessor {
         }
     }
     private func multiPageSegmentsForMerge(files: [URL]) -> [DocumentSegment] {
-        let segs: [DocumentSegment]
-        if segments.isEmpty {
-            let segmenter = DocumentSegmenter()
-            let classifications = jobs.map { $0.result?.classification }
-            let texts = jobs.map { $0.result?.text ?? "" }
-            segs = segmenter.segment(files: files, classifications: classifications, texts: texts,
-                                     enclosureFlags: jobs.map { $0.result?.enclosure == true },
-                                     expectedCoverPages: enclosureBaseline(files: files))
-        } else {
-            segs = segments
-        }
-        // W47.ct-processor-intake: a document never spans two of a tree's folders, so it is merged within each.
-        return segs.filter { !$0.isBox && !$0.isFolder }.flatMap(splitAtOutputFolders)
-            .filter { $0.pdfURLs.count > 1 }
+        let segs = segments.isEmpty ? currentSegments(files: files) : segments
+        return segs.filter { !$0.isBox && !$0.isFolder && $0.pdfURLs.count > 1 }
     }
 
     /// Merge multi-page document segments into single PDFs.

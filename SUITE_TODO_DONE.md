@@ -17705,3 +17705,15 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   regressions, route-table source check and off-screen Settings tests at all three levels. Verification
   cost $0 and used synthetic inputs. No bench cache was created.
   <!-- /W47.wh-names-small-mac -->
+
+- [x] **W49.proc-tree-folder-docs — a document found across two folders of a tree keeps the right tags on each piece [S]** · §Known limits are queued, accepted or asked — SHIPPED 2026-11-22 (this commit).
+  Process Files previously tagged pages from two folders together and split them only at merge time.
+  A change of tree folder now starts a separate document before tagging, including automatic tagging,
+  manual tag cards and resumed runs. Each document has its own pages, text, tags and optional JSON sidecar.
+  An enclosure can take its cover's date only within its own folder. Merging uses the same document
+  boundaries and writes beside the pages. Filed by W49.ki-audit-processor.
+  Verified with the Debug build, two-image Processor smoke, 53 collection and tree checks, the
+  dual-date and merge-safety regressions, and the off-screen manual review journey. The tree
+  regression reads real Finder tags and JSON from scratch PDFs before and after merging.
+  No bench cache was created.
+  <!-- /W49.proc-tree-folder-docs -->

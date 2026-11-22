@@ -442,17 +442,76 @@ enum CollectionOrganizeTestDriver {
                   && processor.collectionsOutsideTrees.map(\.collectionName) == ["Loose"]
                   && processor.treeFallbackSuffix.isEmpty)
             for pdf in outputs { writePDF(pdf) }
-            var job = OCRJob(sourceURL: a)
-            job.appliedTags = ["Subject"]
-            processor.jobs = [job, OCRJob(sourceURL: b), OCRJob(sourceURL: c)]
-            processor.segments = [DocumentSegment(pdfURLs: [a, b, c])]
-            processor.performDocumentMerging(files: [a, b, c], outputDirectory: out) { _, _, _, _ in }
+            let documentFiles = [a, b, c]
+            processor.jobs = documentFiles.enumerated().map { i, source in
+                let classification: DocumentClassification = i == 0 ? .documentStart : .documentContinuation
+                var job = OCRJob(sourceURL: source)
+                job.classification = classification
+                job.result = OCRResult(text: ["Apricot", "Blossom", "Cedar"][i], classification: classification,
+                                       errorMessage: nil, errorCode: nil)
+                return job
+            }
+            processor.rebuildSegments(files: documentFiles)
+            check("tree: a continuation in the next folder starts its own segment with only its own text",
+                  processor.segments.map(\.pdfURLs) == [[a, b], [c]]
+                  && processor.segments.map(\.texts) == [["Apricot", "Blossom"], ["Cedar"]])
+
+            let manualFiles = [a, c, b]
+            let starts = processor.treeFolderStarts(in: manualFiles)
+            processor.manualSegImages = manualFiles.enumerated().map { i, url in
+                ManualSegImage(fileIndex: i, url: url, rotationDegrees: 0, kind: .document,
+                               startsTreeFolder: starts.contains(i))
+            }
+            processor.manualSegRemoved = [1]
+            processor.manualSegFocus = 2
+            check("tree: the manual tag card stops at a folder break even when that folder's page is removed",
+                  processor.manualSegPendingRange == (0...0)
+                  && processor.treeFolderStarts(in: manualFiles, excluding: [c]) == [2])
+
+            // Even an explicit enclosure flag must find its cover in the same folder.
+            let enclosureResult = DocumentSegmenter().segment(
+                files: [a, b, c], classifications: [.documentStart, .documentStart, .documentStart],
+                texts: [], enclosureFlags: [false, true, true],
+                folderStarts: processor.treeFolderStarts(in: documentFiles))
+            check("tree: an enclosure can point to a cover in its folder only",
+                  enclosureResult.map(\.enclosureOf) == [nil, 0, nil])
+
+            // Seed distinct tag replies without calling a provider, then let the normal tagging path write them.
+            processor.preGroupedSubjects = [["Apricot"], [], ["Cedar"]]
+            let model = LLMModel.geminiModels[0]
+            await processor.performTaggingPhase(provider: .gemini, model: model, apiKey: "", outputDirectory: out)
+            func tags(at pdf: URL) -> [String] { (try? MacOSTagger.readTags(from: pdf)) ?? [] }
+            check("tree: separate PDFs carry only their folder's subject",
+                  tags(at: outputs[1]).contains("Apricot") && !tags(at: outputs[1]).contains("Cedar")
+                  && tags(at: outputs[2]).contains("Apricot") && !tags(at: outputs[2]).contains("Cedar")
+                  && tags(at: outputs[3]).contains("Cedar") && !tags(at: outputs[3]).contains("Apricot"))
+
+            processor.performDocumentMerging(files: documentFiles, outputDirectory: out)
             let merged = tree.appendingPathComponent("Folder 8/0001_merged.pdf")
-            check("tree: a document is merged within its folder, beside its pages",
+            let second = tree.appendingPathComponent("Folder 9/0001.pdf")
+            check("tree: a document is merged within its folder, beside its pages, with its own tags",
                   processor.outputURLMap[a] == merged && processor.outputURLMap[b] == merged
                   && PDFDocument(url: merged)?.pageCount == 2
-                  && processor.outputURLMap[c] == tree.appendingPathComponent("Folder 9/0001.pdf")
-                  && fm.fileExists(atPath: tree.appendingPathComponent("Folder 9/0001.pdf").path))
+                  && processor.outputURLMap[c] == second && fm.fileExists(atPath: second.path)
+                  && tags(at: merged).contains("Apricot") && !tags(at: merged).contains("Cedar")
+                  && tags(at: second).contains("Cedar") && !tags(at: second).contains("Apricot"))
+
+            func sidecar(for pdf: URL) -> [String: Any]? {
+                let url = pdf.deletingPathExtension().appendingPathExtension("json")
+                guard let data = try? Data(contentsOf: url) else { return nil }
+                return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            }
+            let firstSidecar = sidecar(for: merged)
+            let secondSidecar = sidecar(for: second)
+            check("tree: each sidecar carries only its own pages, text and subject",
+                  firstSidecar?["files"] as? [String] == [a.lastPathComponent, b.lastPathComponent]
+                  && firstSidecar?["subjects"] as? [String] == ["Apricot"]
+                  && (firstSidecar?["body"] as? String)?.contains("Blossom") == true
+                  && (firstSidecar?["body"] as? String)?.contains("Cedar") == false
+                  && secondSidecar?["files"] as? [String] == [c.lastPathComponent]
+                  && secondSidecar?["subjects"] as? [String] == ["Cedar"]
+                  && (secondSidecar?["body"] as? String)?.contains("Cedar") == true
+                  && (secondSidecar?["body"] as? String)?.contains("Apricot") == false)
 
             // Incremental skip looks in each source's own folder: Folder 9's 0001.pdf is there, Folder 8's is not
             // (merged), and the output folder's own 0001.pdf never stands in for either.
