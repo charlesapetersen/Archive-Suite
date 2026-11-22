@@ -4,10 +4,11 @@ import PDFKit
 
 // MARK: - Improve OCR: which pages may be read again, and their new text pages (W44.reocr-processor)
 
-/// The suite image/text pairs of a file, positively validated before any in-place work (`execution-plans/reocr/
+/// The suite image/text pairs or single searchable page of a file, positively validated before any in-place work (`execution-plans/reocr/
 /// 00-plan.md` §4), and the replacement text page for a pair (§2).
 ///
-/// A file qualifies only when it opens unlocked, has an even number of pages, at least two, every odd page (the
+/// A suite-marked searchable page qualifies on its own. For pairs, the file must open unlocked, have an even
+/// number of pages, at least two, and every odd page (the
 /// second of each pair) begins with the suite header and carries a provenance line, and no even page (an image page)
 /// reads as a suite header. An even page count alone proves nothing. A raw one-page or image-only original, an odd
 /// or mixed structure, an encrypted file and a header-like trap are refused with the reason; the separate-output
@@ -15,10 +16,12 @@ import PDFKit
 /// `ReOCRIncrementalWriter`, which also proves the candidate kept everything else.
 enum ReOCRPairs {
     struct Pair: Equatable, Sendable {
-        /// 0-based page indices: the image page and the text page after it.
+        /// 0-based page indices. For a searchable PDF the two refer to the same page.
         let imageIndex: Int
         let textIndex: Int
         let header: PDFPageHeader
+
+        var isSearchable: Bool { imageIndex == textIndex }
     }
 
     enum Refusal: Error, Equatable, CustomStringConvertible {
@@ -31,8 +34,9 @@ enum ReOCRPairs {
         case unknownClassification(page: Int, String)
         case noReading(page: Int, String)
         case pageNotMade(page: Int)
+        case layerNotMade(page: Int)
+        case unsupportedLayer(page: Int)
         case headerNotKept(page: Int, String)
-        /// W42.int-s5-searchable: Improve OCR replaces text pages, and a searchable page has none.
         case searchable(page: Int)
 
         var description: String {
@@ -47,9 +51,11 @@ enum ReOCRPairs {
             case .imagePageLooksLikeText(let p): "page \(p + 1) should be an image page but reads as a text page"
             case .unknownClassification(let p, let c): "page \(p + 1) has a classification this app does not write (“\(c)”)"
             case .noReading(let p, let why): "page \(p + 1) was not read: \(why)"
+            case .unsupportedLayer(let p): "the existing text on image page \(p + 1) is not a supported invisible layer"
+            case .layerNotMade(let p): "the new searchable text for page \(p + 1) could not be written and read back"
             case .pageNotMade(let p): "the new text page for page \(p + 1) could not be made"
             case .headerNotKept(let p, let what): "the new text page for page \(p + 1) would change its \(what)"
-            case .searchable(let p): "page \(p + 1) is a searchable page with no text page; use Reprocess to make a new file"
+            case .searchable(let p): "page \(p + 1) is searchable, but this file is not a supported single-page searchable PDF"
             }
         }
     }
@@ -58,7 +64,13 @@ enum ReOCRPairs {
         guard let doc = PDFDocument(data: data) else { return .failure(.unreadable) }
         if doc.isEncrypted || doc.isLocked { return .failure(.locked) }
         let count = doc.pageCount
-        if let p = PDFPageRole.roles(of: doc).firstIndex(of: .searchable) { return .failure(.searchable(page: p)) }
+        if let p = PDFPageRole.roles(of: doc).firstIndex(of: .searchable) {
+            guard count == 1, let quartz = doc.documentRef,
+                  let entries = PDFHeaderCarrier.pages(of: quartz), let carried = entries[0],
+                  let header = PDFHeaderParser.parse(carried).header else { return .failure(.searchable(page: p)) }
+            guard header.rawProvenance != nil else { return .failure(.textPageWithoutProvenance(page: p)) }
+            return .success([Pair(imageIndex: p, textIndex: p, header: header)])
+        }
         guard count >= 2, count % 2 == 0 else { return .failure(.notPaired(pages: count)) }
         var pairs: [Pair] = []
         for imageIndex in stride(from: 0, to: count, by: 2) {
@@ -84,6 +96,14 @@ enum ReOCRPairs {
             .first { $0.displayName == display }
     }
 
+    static func readingText(_ result: OCRResult, page: Int) throws -> String {
+        if let code = result.errorCode { throw Refusal.noReading(page: page, result.errorMessage ?? code) }
+        guard let text = result.text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw Refusal.noReading(page: page, "the reader returned no text")
+        }
+        return text
+    }
+
     /// The new text page for `pair`: the pair's original filename, classification and source-date lines as they
     /// were, the new reader's provenance (today's date) and `kind`, then the new transcription. `result` is the
     /// reading of this pair's image page; its own classification is not used, since the classification belongs to
@@ -92,10 +112,7 @@ enum ReOCRPairs {
     static func replacementPage(for pair: Pair, result: OCRResult, model: LLMModel, kind: OCRPageKind?,
                                 gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil,
                                 localAgentModelName: String? = nil) throws -> Data {
-        if let code = result.errorCode { throw Refusal.noReading(page: pair.textIndex, result.errorMessage ?? code) }
-        guard let text = result.text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            throw Refusal.noReading(page: pair.textIndex, "the reader returned no text")
-        }
+        let text = try readingText(result, page: pair.textIndex)
         let kept = OCRResult(text: text, classification: pair.header.classification.flatMap(classification),
                              rotationDegrees: result.rotationDegrees, errorMessage: result.errorMessage,
                              errorCode: result.errorCode, secondReader: result.secondReader,

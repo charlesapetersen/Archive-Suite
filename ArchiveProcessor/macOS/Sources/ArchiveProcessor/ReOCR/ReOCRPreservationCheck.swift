@@ -19,7 +19,7 @@ import Foundation
 /// The pages being replaced are checked by the caller against the new text. Empty `problems` means the candidate
 /// may go to review; any problem stops publication.
 enum ReOCRPreservationCheck {
-    static func problems(original: Data, candidate: Data, replacing: Set<Int>) -> [String] {
+    static func problems(original: Data, candidate: Data, replacing: Set<Int>, editingLayers: Set<Int> = []) -> [String] {
         var out: [String] = []
         guard candidate.count > original.count, candidate.prefix(original.count) == original else {
             return ["the candidate does not begin with the original file byte for byte"]
@@ -27,14 +27,22 @@ enum ReOCRPreservationCheck {
         guard let oldDoc = document(original), let newDoc = document(candidate) else {
             return ["the original or the candidate does not open as a PDF"]
         }
+        defer { withExtendedLifetime((oldDoc, newDoc)) {} }
         if oldDoc.isEncrypted || newDoc.isEncrypted { return ["an encrypted PDF cannot be checked"] }
         guard oldDoc.numberOfPages == newDoc.numberOfPages else {
             return ["the page count changed from \(oldDoc.numberOfPages) to \(newDoc.numberOfPages)"]
         }
+        // An outline, link or annotation can lead back to an edited page. Give the same narrow exception there,
+        // and only for the exact corresponding page dictionaries.
+        let layerPages = editingLayers.compactMap { i -> [Int]? in
+            guard let old = oldDoc.page(at: i + 1)?.dictionary, let new = newDoc.page(at: i + 1)?.dictionary else { return nil }
+            return [unsafeBitCast(old, to: Int.self), unsafeBitCast(new, to: Int.self)]
+        }
+        let layerDictionaries = Set(layerPages)
         // Only the page tree may change at document level: the catalog's other entries (actions, forms, optional
         // content, outlines, metadata) must be the same objects as before.
         if let ca = oldDoc.catalog, let cb = newDoc.catalog {
-            var compare = GraphCompare()
+            var compare = GraphCompare(layerPages: layerDictionaries)
             if let diff = compare.dictionaries(ca, cb, path: "catalog", skip: ["Pages"]) { out.append(diff) }
         } else {
             out.append("the catalog cannot be read")
@@ -45,7 +53,7 @@ enum ReOCRPreservationCheck {
         switch (oldDoc.info, newDoc.info) {
         case (nil, nil): break
         case let (ia?, ib?):
-            var compare = GraphCompare()
+            var compare = GraphCompare(layerPages: layerDictionaries)
             if let diff = compare.dictionaries(ia, ib, path: "document information", skip: ["Producer"]) {
                 out.append(diff)
             }
@@ -65,7 +73,7 @@ enum ReOCRPreservationCheck {
                 out.append("page \(i + 1) cannot be read")
                 continue
             }
-            var compare = GraphCompare()
+            var compare = GraphCompare(layerPages: layerDictionaries)
             if let diff = compare.dictionaries(da, db, path: "page \(i + 1)") {
                 out.append(diff)
                 continue
@@ -76,12 +84,23 @@ enum ReOCRPreservationCheck {
                 out.append(diff)
                 continue
             }
+            if editingLayers.contains(i), let diff = compare.layerResources(da, db, path: "page \(i + 1)") {
+                out.append(diff)
+            }
             for box in [CGPDFBox.mediaBox, .cropBox, .bleedBox, .trimBox, .artBox]
             where a.getBoxRect(box) != b.getBoxRect(box) {
                 out.append("page \(i + 1): its \(box) changed")
             }
             if a.rotationAngle != b.rotationAngle { out.append("page \(i + 1): its rotation changed") }
-            if render(a) != render(b) { out.append("page \(i + 1): it renders differently") }
+            if editingLayers.contains(i) {
+                let boxes: [CGPDFBox] = a.getBoxRect(.cropBox) == a.getBoxRect(.mediaBox) ? [.cropBox] : [.cropBox, .mediaBox]
+                for box in boxes {
+                    if let before = render(a, box: box), before == render(b, box: box) { continue }
+                    out.append("page \(i + 1): its \(box) could not be verified to render identically")
+                }
+            } else if render(a) != render(b) {
+                out.append("page \(i + 1): it renders differently")
+            }
         }
         return out
     }
@@ -118,18 +137,21 @@ enum ReOCRPreservationCheck {
     }
 
     /// The page drawn into an RGBA bitmap at up to 600 px on its long side; nil when it cannot be drawn.
-    static func render(_ page: CGPDFPage) -> Data? {
-        let box = page.getBoxRect(.cropBox)
-        guard box.width > 0, box.height > 0 else { return nil }
-        let scale = min(1, 600 / max(box.width, box.height))
-        let w = max(1, Int((box.width * scale).rounded())), h = max(1, Int((box.height * scale).rounded()))
+    static func render(_ page: CGPDFPage) -> Data? { render(page, box: .cropBox) }
+
+    static func render(_ page: CGPDFPage, box: CGPDFBox) -> Data? {
+        let rect = page.getBoxRect(box)
+        guard rect.width.isFinite, rect.height.isFinite, rect.width > 0, rect.height > 0 else { return nil }
+        let size = page.rotationAngle % 180 == 0 ? rect.size : CGSize(width: rect.height, height: rect.width)
+        let scale = min(1, 600 / max(size.width, size.height))
+        let w = max(1, Int((size.width * scale).rounded())), h = max(1, Int((size.height * scale).rounded()))
         guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
                                   space: CGColorSpaceCreateDeviceRGB(),
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
         ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
         ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
         ctx.scaleBy(x: scale, y: scale)
-        ctx.concatenate(page.getDrawingTransform(.cropBox, rect: CGRect(origin: .zero, size: box.size), rotate: 0,
+        ctx.concatenate(page.getDrawingTransform(box, rect: CGRect(origin: .zero, size: size), rotate: 0,
                                                  preserveAspectRatio: true))
         ctx.drawPDFPage(page)
         guard let bytes = ctx.data else { return nil }
@@ -143,14 +165,23 @@ enum ReOCRPreservationCheck {
     struct GraphCompare {
         static let maxDepth = 64
         static let pageTreeLink: Set<String> = ["Parent"]
+        let layerPages: Set<[Int]>
         private var seen = Set<[Int]>()
+
+        init(layerPages: Set<[Int]> = []) { self.layerPages = layerPages }
 
         mutating func dictionaries(_ a: CGPDFDictionaryRef, _ b: CGPDFDictionaryRef, path: String,
                                    skip: Set<String> = [], depth: Int = 0) -> String? {
             if depth > Self.maxDepth { return "\(path): too deep to check" }
-            guard seen.insert([unsafeBitCast(a, to: Int.self), unsafeBitCast(b, to: Int.self)]).inserted else { return nil }
-            let ka = keys(a).subtracting(skip).subtracting(Self.pageTreeLink)
-            let kb = keys(b).subtracting(skip).subtracting(Self.pageTreeLink)
+            let pair = [unsafeBitCast(a, to: Int.self), unsafeBitCast(b, to: Int.self)]
+            guard seen.insert(pair).inserted else { return nil }
+            // PDFium writes geometry numbers without trailing decimal zeroes. The page loop compares all of the
+            // effective boxes and the rotation independently of that storage representation.
+            let excluded = layerPages.contains(pair)
+                ? skip.union(["Contents", "Resources", "MediaBox", "CropBox", "BleedBox", "TrimBox", "ArtBox", "Rotate"])
+                : skip
+            let ka = keys(a).subtracting(excluded).subtracting(Self.pageTreeLink)
+            let kb = keys(b).subtracting(excluded).subtracting(Self.pageTreeLink)
             if ka != kb { return "\(path): its keys changed (\(ka.symmetricDifference(kb).sorted().joined(separator: ", ")))" }
             for key in ka.sorted() {
                 var oa: CGPDFObjectRef?, ob: CGPDFObjectRef?
@@ -229,6 +260,7 @@ enum ReOCRPreservationCheck {
 
         mutating func inherited(_ a: CGPDFDictionaryRef, _ b: CGPDFDictionaryRef, path: String) -> String? {
             for key in Self.inheritable where !keys(a).contains(key) {
+                if layerPages.contains([unsafeBitCast(a, to: Int.self), unsafeBitCast(b, to: Int.self)]) { continue }
                 let oa = ancestorValue(a, key), ob = ancestorValue(b, key)
                 switch (oa, ob) {
                 case (nil, nil): continue
@@ -255,6 +287,74 @@ enum ReOCRPreservationCheck {
                 }
             }
             return nil
+        }
+
+        /// Layer edits may change fonts and form entries. Verify that original image streams and other appearance
+        /// resources survive, independently of the bitmap comparison.
+        mutating func layerResources(_ a: CGPDFDictionaryRef, _ b: CGPDFDictionaryRef, path: String) -> String? {
+            func resources(_ d: CGPDFDictionaryRef) -> CGPDFDictionaryRef? {
+                var own: CGPDFDictionaryRef?
+                if CGPDFDictionaryGetDictionary(d, "Resources", &own) { return own }
+                guard let inherited = ancestorValue(d, "Resources"),
+                      CGPDFObjectGetValue(inherited, .dictionary, &own) else { return nil }
+                return own
+            }
+            guard let before = resources(a), let after = resources(b) else { return "\(path): its resources cannot be read" }
+            if let diff = dictionaries(before, after, path: "\(path)/Resources", skip: ["Font", "XObject", "ExtGState", "ProcSet"]) {
+                return diff
+            }
+            guard let oldObjects = resourcesForLayerCheck(before), let newObjects = resourcesForLayerCheck(after) else {
+                return "\(path): its image and font resources could not be checked"
+            }
+            if oldObjects.hasType3 {
+                return "\(path): a Type 3 font can paint even in an invisible text object"
+            }
+            guard oldObjects.images.count == newObjects.images.count else { return "\(path): its image resources changed" }
+            var remaining = newObjects.images
+            for old in oldObjects.images {
+                guard let index = remaining.firstIndex(where: { new in
+                    var check = GraphCompare()
+                    return check.objects(old, new, path: path, depth: 0) == nil
+                }) else { return "\(path): an original image stream or its dictionary changed" }
+                remaining.remove(at: index)
+            }
+            return nil
+        }
+
+        private func resourcesForLayerCheck(_ resources: CGPDFDictionaryRef, depth: Int = 0)
+            -> (images: [CGPDFObjectRef], hasType3: Bool)? {
+            guard depth < Self.maxDepth else { return nil }
+            var hasType3 = false
+            var fonts: CGPDFDictionaryRef?
+            if CGPDFDictionaryGetDictionary(resources, "Font", &fonts), let fonts {
+                for name in keys(fonts) {
+                    var font: CGPDFDictionaryRef?
+                    var subtype: UnsafePointer<CChar>?
+                    guard CGPDFDictionaryGetDictionary(fonts, name, &font), let font,
+                          CGPDFDictionaryGetName(font, "Subtype", &subtype), let subtype else { return nil }
+                    if String(cString: subtype) == "Type3" { hasType3 = true }
+                }
+            }
+            var xObjects: CGPDFDictionaryRef?
+            guard CGPDFDictionaryGetDictionary(resources, "XObject", &xObjects), let xObjects else { return ([], hasType3) }
+            var result: [CGPDFObjectRef] = []
+            for name in keys(xObjects) {
+                var object: CGPDFObjectRef?
+                var stream: CGPDFStreamRef?
+                var subtype: UnsafePointer<CChar>?
+                guard CGPDFDictionaryGetObject(xObjects, name, &object), let object,
+                      CGPDFObjectGetValue(object, .stream, &stream), let stream,
+                      let dictionary = CGPDFStreamGetDictionary(stream),
+                      CGPDFDictionaryGetName(dictionary, "Subtype", &subtype), let subtype else { return nil }
+                if String(cString: subtype) == "Image" { result.append(object) }
+                var nested: CGPDFDictionaryRef?
+                if CGPDFDictionaryGetDictionary(dictionary, "Resources", &nested), let nested {
+                    guard let found = resourcesForLayerCheck(nested, depth: depth + 1) else { return nil }
+                    result.append(contentsOf: found.images)
+                    hasType3 = hasType3 || found.hasType3
+                }
+            }
+            return (result, hasType3)
         }
 
         /// The nearest ancestor's `key`, following `/Parent` at most `maxDepth` times.

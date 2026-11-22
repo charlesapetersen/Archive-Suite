@@ -395,10 +395,25 @@ enum TextLayerTestDriver {
             } else { check("7 date evidence: the same line again is no change", false) }
         } else { check("7 date evidence: rewritten", false) }
 
-        // Improve OCR replaces text pages; a searchable page has none.
-        if let data = try? Data(contentsOf: typed), case .failure(.searchable(page: 0)) = ReOCRPairs.validate(data) {
-            check("7 Improve OCR refuses a searchable file", true)
-        } else { check("7 Improve OCR refuses a searchable file", false) }
+        // This fixture exercises the actual compressed form when the bundled tools are available.
+        if let data = try? Data(contentsOf: typed), case .success(let pages) = ReOCRPairs.validate(data),
+           let page = pages.first, pages.count == 1, page.isSearchable {
+            do {
+                let newReading = reading.replacingOccurrences(of: "MEMORANDUM", with: "MEMORANDA")
+                guard let layer = try await ReOCRLayer.make(from: data, pageIndex: 0, reading: newReading,
+                                                            required: true, scratch: dir) else {
+                    check("7 Improve OCR makes a searchable replacement layer", false); return
+                }
+                let updated = try ReOCRIncrementalWriter.candidate(original: data, replacements: [:], layers: [0: layer])
+                let doc = PDFDocument(data: updated.bytes)
+                let text = doc?.page(at: 0)?.string ?? ""
+                check("7 Improve OCR replaces the single searchable layer", updated.layerPages == [0]
+                      && doc?.pageCount == 1 && text.contains("MEMORANDA") && !text.contains("MEMORANDUM"))
+                if let keep = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_KEEP"] {
+                    try updated.bytes.write(to: URL(fileURLWithPath: keep).appendingPathComponent("searchable-revised.pdf"))
+                }
+            } catch { check("7 Improve OCR replaces the single searchable layer", false, "\(error)") }
+        } else { check("7 Improve OCR accepts a single suite searchable page", false) }
 
         if let keep = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_KEEP"] {
             for url in [typed, hand, mixed, dir.appendingPathComponent("searchable-dated.pdf")] {
@@ -505,47 +520,38 @@ enum TextLayerTestDriver {
               case .success(let pairs) = ReOCRPairs.validate(original), let pair = pairs.first else {
             check("5 the layered output is an Improve OCR pair", false); return
         }
-        let source = (try? Data(contentsOf: jpeg)) ?? Data()
         let model = LLMModel.appleVisionModels[0]
         let newText = reading.replacingOccurrences(of: "MEMORANDUM", with: "MEMORANDA")
         let newReading = OCRResult(text: newText, classification: nil, rotationDegrees: 0, errorMessage: nil, errorCode: nil)
-        guard let remade = await ReOCRJob.remadeImagePage(original, pair: pair, reading: newReading, kind: .typewritten) else {
-            check("5 the image page is remade beside a re-read", false); return
-        }
-        let layer = PDFDocument(data: remade)?.page(at: 0)?.string ?? ""
-        check("5 the remade layer holds the new reading", layer.contains("MEMORANDA") && !layer.contains("MEMORANDUM"),
-              String(layer.prefix(40)))
-        check("5 the remade page embeds the same JPEG bytes", ReOCRJob.embeddedJPEG(remade, pageIndex: 0) == source)
         do {
-            let text = try ReOCRPairs.replacementPage(for: pair, result: newReading, model: model, kind: .typewritten)
-            let candidate = try ReOCRIncrementalWriter.candidate(original: original,
-                                                                 replacements: [pair.imageIndex: remade, pair.textIndex: text])
-            let doc = PDFDocument(data: candidate)
-            // Kept for test-text-layer.sh's veraPDF run: a revision with both pages replaced is still PDF/A-2b.
-            if let keep = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_KEEP"] {
-                try? candidate.write(to: URL(fileURLWithPath: keep).appendingPathComponent("revised.pdf"))
+            guard let layer = try await ReOCRLayer.make(from: original, pageIndex: pair.imageIndex, reading: newText,
+                                                        required: true, scratch: dir) else {
+                check("5 a replacement layer is made", false); return
             }
-            check("5 the incremental revision takes both pages and keeps the original as its prefix",
-                  candidate.starts(with: original) && doc?.pageCount == 2
-                  && doc?.page(at: 0)?.string?.contains("MEMORANDA") == true)
-        } catch { check("5 the incremental revision takes both pages", false, "\(error)") }
-        let hand = await ReOCRJob.remadeImagePage(original, pair: pair, reading: newReading, kind: .handwritten)
-        let handText = hand.flatMap { PDFDocument(data: $0)?.page(at: 0)?.string ?? "" }?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        check("5 a re-read that gets no layer drops the old one", handText?.isEmpty == true, String(describing: handText))
-        if let doc = PDFDocument(data: original), let first = doc.page(at: 0) {
-            first.setBounds(CGRect(x: 20, y: 20, width: 500, height: 700), for: .cropBox)
-            if let cropped = doc.dataRepresentation(), case .success(let cp) = ReOCRPairs.validate(cropped), let c = cp.first {
-                let kept = await ReOCRJob.remadeImagePage(cropped, pair: c, reading: newReading, kind: .typewritten)
-                check("5 an image page with its own crop box is kept (a remade page would show more)", kept == nil)
-            } else { check("5 a cropped original for Improve OCR", false) }
-        }
+            let text = try ReOCRPairs.replacementPage(for: pair, result: newReading, model: model, kind: .typewritten)
+            let updated = try ReOCRIncrementalWriter.candidate(original: original, replacements: [pair.textIndex: text],
+                                                                layers: [pair.imageIndex: layer])
+            let doc = PDFDocument(data: updated.bytes)
+            let reading = doc?.page(at: 0)?.string ?? ""
+            check("5 the new layer replaces the old reading", reading.contains("MEMORANDA") && !reading.contains("MEMORANDUM"),
+                  String(reading.prefix(40)))
+            check("5 the incremental revision takes both readings and keeps the original as its prefix",
+                  updated.bytes.starts(with: original) && updated.layerPages == [0] && doc?.pageCount == 2
+                  && doc?.page(at: 1)?.string?.contains("MEMORANDA") == true)
+            // Kept for test-text-layer.sh's veraPDF run.
+            if let keep = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_KEEP"] {
+                try? updated.bytes.write(to: URL(fileURLWithPath: keep).appendingPathComponent("revised.pdf"))
+            }
+        } catch { check("5 the incremental revision takes both readings", false, "\(error)") }
         let plainURL = dir.appendingPathComponent("plain-improve.pdf")
         if await write(jpeg, reading: reading, kind: .typewritten, rotation: 0, to: plainURL, options: nil) != nil,
            let plain = try? Data(contentsOf: plainURL), case .success(let plainPairs) = ReOCRPairs.validate(plain),
            let p = plainPairs.first {
-            let left = await ReOCRJob.remadeImagePage(plain, pair: p, reading: newReading, kind: .handwritten)
-            check("5 a page with no layer that gets none is left as it is", left == nil)
+            do {
+                let layer = try await ReOCRLayer.make(from: plain, pageIndex: p.imageIndex, reading: "Unrelated reading",
+                                                      required: false, scratch: dir)
+                check("5 a scan with no layer and no aligned reading is kept", layer == nil)
+            } catch { check("5 a scan with no layer is kept", false, "\(error)") }
         } else { check("5 a plain output for Improve OCR", false) }
     }
 

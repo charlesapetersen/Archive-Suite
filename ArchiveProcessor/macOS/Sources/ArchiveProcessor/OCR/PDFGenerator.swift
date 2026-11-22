@@ -278,7 +278,7 @@ struct PDFGenerator {
         do { try data.write(to: url, options: .atomic) } catch { throw PDFError.writeFailed }
     }
 
-    /// `writeArchival` into memory, also for the image page Improve OCR puts into an output (`remadeImagePageData`): it
+    /// `writeArchival` into memory. It
     /// is drawn as the output's own pages are, so it renders as they do.
     static func archivalData(_ document: PDFDocument, pageHeaders: [String?]? = nil) -> Data? {
         if let pageHeaders, pageHeaders.count != document.pageCount { return nil }
@@ -362,29 +362,6 @@ struct PDFGenerator {
             return TextLayerOptions(placeHandOnImage: flag(.placeHandOnImage), straighten: flag(.straightenReadingCopy),
                                     searchableFor: searchable)
         }
-    }
-
-    /// W42.int-s5 — the image page remade from its own JPEG with a layer of `result`'s reading, as one PDF page: what
-    /// Improve OCR puts in place of an image page whose text it replaces (`ReOCRJob.remadeImagePage`). The JPEG is
-    /// embedded byte for byte (a JPEG that the fast path would re-encode gives nil), never straightened again. `layer`
-    /// says whether the page got one; a page that gets none is the plain image page. Off the main thread only.
-    func remadeImagePageData(jpeg: Data, result: OCRResult, pageKind: OCRPageKind?, options: TextLayerOptions,
-                             runReader: String? = nil) -> (pdf: Data, layer: TextLayerOutcome)? {
-        guard !Thread.isMainThread else { return nil }
-        let fm = FileManager.default
-        let url = fm.temporaryDirectory.appendingPathComponent("ap-remade-" + UUID().uuidString + ".jpg")
-        defer { try? fm.removeItem(at: url) }
-        guard (try? jpeg.write(to: url)) != nil,
-              let image = makeImagePageData(imageURL: url, straighten: false) else { return nil }
-        var unstraightened = options
-        unstraightened.straighten = false
-        let layered = layeredImagePage(image, result: result, pageKind: pageKind, options: unstraightened, runReader: runReader)
-        // Through the output's own writer either way, so a page with no layer is drawn as new output is.
-        guard !Task.isCancelled, let page = layered.page ?? PDFDocument(data: image.pdf)?.page(at: 0) else { return nil }
-        let doc = PDFDocument()
-        doc.insert(page, at: 0)
-        guard let data = Self.archivalData(doc) else { return nil }
-        return (data, layered.outcome)
     }
 
     /// The image page with its searchable layer, or nil (and why) when it gets none. Never worse than the plain page:

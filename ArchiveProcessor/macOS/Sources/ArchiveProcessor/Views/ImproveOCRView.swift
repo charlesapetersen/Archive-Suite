@@ -270,9 +270,13 @@ final class ImproveOCRController: ObservableObject {
                 switch r.outcome {
                 case .success(let review):
                     reviews[r.fileID] = review
-                    messages[r.fileID] = review.candidate == nil
-                        ? "Not every page was read: " + review.results.compactMap { if case .failure(let f) = $0.outcome { return f.description }; return nil }.joined(separator: "; ")
-                        : "Read. Compare and accept or reject."
+                    if let problem = review.candidateProblem {
+                        messages[r.fileID] = problem
+                    } else if review.candidate == nil {
+                        messages[r.fileID] = "The revised PDF could not be made. See the page results below."
+                    } else {
+                        messages[r.fileID] = "Read. Compare and accept or reject."
+                    }
                 case .failure(let f): messages[r.fileID] = r.error ?? f.description
                 }
             }
@@ -638,8 +642,9 @@ struct ImproveOCRView: View {
     private func pageControls(_ page: ReOCRPageChoice, file: ReOCRDialogModel.FileEntry,
                               label: String, idSuffix: String) -> some View {
         HStack {
-            if let reader = file.pair(at: page.pairIndex)?.header.provenance {
-                Text("now read by \(reader.provider) · \(reader.model)")
+            if let pair = file.pair(at: page.pairIndex), let reader = pair.header.provenance {
+                let label = pair.isSearchable ? "originally read by" : "now read by"
+                Text("\(label) \(reader.provider) · \(reader.model)")
                     .lineLimit(1)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("ap.reocr.currentReader.\(file.url.lastPathComponent)\(idSuffix)")

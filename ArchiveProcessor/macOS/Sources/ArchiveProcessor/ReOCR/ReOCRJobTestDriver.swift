@@ -791,29 +791,114 @@ enum ReOCRJobTestDriver {
                 check("16 finding changes nothing", tags(fc) == ["Q2"] && tags(fa).contains("OCR Poor"))
             }
 
-            // 7. A rotated image page.
+            // 7. A selected pair whose scan has a crop, rotation, annotation and existing invisible OCR.
             do {
-                let d = try folder("rotated"), f = try file(d, pairs: 1), reader = FakeReader()
-                if let doc = PDFDocument(url: f), let p = doc.page(at: 0) {
+                let d = try folder("rotated"), f = try file(d, pairs: 2), reader = FakeReader()
+                let jpeg = try Data(contentsOf: d.appendingPathComponent("IMG2.jpg"))
+                let scan = handPDF(
+                    content: "q 200 0 0 250 0 0 cm /Im0 Do Q BT /F1 12 Tf 3 Tr 30 120 Td (STALESCAN) Tj ET",
+                    jpeg: jpeg, imageExtra: "", resources: "/Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >>")
+                if let doc = PDFDocument(url: f), let p = PDFDocument(data: scan)?.page(at: 0) {
                     p.rotation = 90
-                    try doc.dataRepresentation()?.write(to: f)
+                    p.setBounds(CGRect(x: 12, y: 17, width: 170, height: 210), for: .cropBox)
+                    let annotation = PDFAnnotation(bounds: CGRect(x: 24, y: 26, width: 30, height: 28), forType: .square, withProperties: nil)
+                    annotation.contents = "Keep this annotation"
+                    p.addAnnotation(annotation)
+                    doc.removePage(at: 2)
+                    doc.insert(p, at: 2)
+                    // Normalize Quartz's output as the Processor's PDF/A writer does, including its XMP stream.
+                    if let edited = doc.dataRepresentation(), let compatible = ArchivalFinish.finished(edited) {
+                        try compatible.write(to: f)
+                    }
                 }
                 let data = try Data(contentsOf: f)
-                check("7 a rotated page is not extracted", ReOCRJob.embeddedJPEG(data, pageIndex: 0) == nil)
+                check("7 fixture has an old searchable layer", text(f, 2).contains("STALESCAN"))
+                check("7 a rotated page is not extracted", ReOCRJob.embeddedJPEG(data, pageIndex: 2) == nil)
                 let j = job(d)
-                let review = try await j.start(file: f, root: archive(d), model: model, read: reader.read)
+                let review = try await j.start(file: f, root: archive(d), textPages: [3], model: model, read: reader.read)
                 let src = reader.calls.first.flatMap { CGImageSourceCreateWithData($0.image as CFData, nil) }
                 let props = src.flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) as? [CFString: Any] }
                 let w = props?[kCGImagePropertyPixelWidth] as? Int ?? 0, h = props?[kCGImagePropertyPixelHeight] as? Int ?? 0
                 check("7 it is rendered upright as a JPEG", src.map { CGImageSourceGetType($0) as String? } == "public.jpeg" && w > h,
                       "\(w)x\(h)")
-                check("7 its candidate is made", review.candidate != nil, review.candidateProblem ?? "")
-                check("7 the review reports that the image page is kept", review.replacedImagePages == [])
-                let oldLayer = text(f, 0)
-                _ = try j.accept(review)
-                check("7 accepting keeps the rotated image page and changes its text page",
-                      PDFDocument(url: f)?.page(at: 0)?.rotation == 90 && text(f, 0) == oldLayer
-                      && text(f, 1).contains("New reading of image page 1."))
+                check("7 its candidate is made", review.candidate != nil,
+                      review.candidateProblem ?? "\(review.results.map(\.outcome))")
+                check("7 review reports the selected scan's layer change", review.replacedImagePages == [2])
+                if review.candidate != nil {
+                    _ = try j.accept(review)
+                    let doc = PDFDocument(url: f)
+                    let page = doc?.page(at: 2)
+                    check("7 rotation, crop and annotation survive publication", page?.rotation == 90
+                          && page?.bounds(for: .cropBox) == CGRect(x: 12, y: 17, width: 170, height: 210)
+                          && page?.annotations.first?.contents == "Keep this annotation")
+                    let removed = doc?.findString("STALESCAN", withOptions: []).isEmpty == true
+                    let hits = doc?.findString("New reading", withOptions: []) ?? []
+                    let hitPages = hits.compactMap { $0.pages.first }.compactMap { doc?.index(for: $0) }
+                    let selected = page?.selection(for: NSRange(location: 0, length: 3))?.string
+                    check("7 search and selection use the new reading on the selected scan",
+                          removed && hitPages.sorted() == [2, 3] && selected == "New")
+                    if let page, let hit = hits.first(where: { $0.pages.contains(page) }) {
+                        let bounds = hit.bounds(for: page)
+                        check("7 the selected text is inside the visible crop",
+                              !bounds.isEmpty && page.bounds(for: .cropBox).contains(bounds))
+                    } else { check("7 the selected text is inside the visible crop", false) }
+                    check("7 only the corresponding separate text page changes", text(f, 1).contains("Old reading of image 1.")
+                          && text(f, 3).contains("New reading of image page 3."))
+                    _ = try j.restore(review.operation.journal.operationID)
+                    check("7 Restore returns the exact original including the old layer", (try? Data(contentsOf: f)) == data)
+                }
+            }
+
+            // 17. A standalone searchable file produced by the normal output path, including its XMP header.
+            do {
+                let d = try folder("searchable"), j = job(d)
+                let img = d.appendingPathComponent("typed.jpg"), pdf = d.appendingPathComponent("Searchable.pdf")
+                try typedPage(img, "FORMER TRANSCRIPTION")
+                let fixtureModel = model
+                let output = try await PDFGenerator.runWorker {
+                    try PDFGenerator().generateOutput(
+                        imageURL: img, result: OCRResult(text: "FORMER TRANSCRIPTION", classification: nil,
+                                                        errorMessage: nil, errorCode: nil),
+                        model: fixtureModel, outputURL: pdf, originalFileName: "typed.jpg", pageKind: .typewritten,
+                        textLayer: .init(searchableFor: ["*/*"]))
+                }
+                let original = try Data(contentsOf: pdf)
+                check("17 normal output made a searchable fixture", output.form == .searchable && text(pdf, 0).contains("FORMER"),
+                      output.compression ?? output.compressedNote ?? "")
+                let compressed = original.range(of: Data("/JBIG2Decode".utf8)) != nil
+                lines.append("INFO 17 fixture: \(compressed ? "JBIG2" : output.compression ?? "other scan encoding")")
+                let reader = FakeReader()
+                let review = try await j.start(file: pdf, root: archive(d), textPages: [0], model: model, read: reader.read)
+                check("17 review shows the old text and does not write before acceptance", reader.calls.map(\.imageIndex) == [0]
+                      && review.results.first?.oldText.contains("FORMER") == true && (try? Data(contentsOf: pdf)) == original)
+                check("17 one searchable page can be improved", review.candidate != nil && review.replacedImagePages == [0],
+                      review.candidateProblem ?? "\(review.results.map(\.outcome))")
+                if review.candidate != nil {
+                    _ = try j.accept(review)
+                    let doc = PDFDocument(url: pdf)
+                    let roles = doc.map { PDFPageRole.roles(of: $0) }
+                    check("17 page count and role survive", doc?.pageCount == 1 && roles == [.searchable])
+                    let oldHits = doc?.findString("FORMER", withOptions: []).count
+                    let newHits = doc?.findString("New reading", withOptions: []).count
+                    let selected = doc?.page(at: 0)?.selection(for: NSRange(location: 0, length: 3))?.string
+                    check("17 search and selection use only the new reading", oldHits == 0 && newHits == 1 && selected == "New")
+                    _ = try j.restore(review.operation.journal.operationID)
+                    check("17 Restore puts back the original searchable PDF byte for byte", (try? Data(contentsOf: pdf)) == original)
+                    let first = try await j.start(file: pdf, root: archive(d), model: model, read: reader.read)
+                    _ = try j.accept(first)
+                    let accepted = try Data(contentsOf: pdf)
+                    let again = try await j.start(file: pdf, root: archive(d), model: model) { _, _, _ in
+                        OCRResult(text: "SECOND REVISION", classification: nil, errorMessage: nil, errorCode: nil)
+                    }
+                    check("17 a subsequent Improve OCR replaces the previous form", again.candidate != nil, again.candidateProblem ?? "")
+                    if again.candidate != nil {
+                        _ = try j.accept(again)
+                        check("17 only the second reading remains searchable", text(pdf, 0).contains("SECOND REVISION")
+                              && !text(pdf, 0).contains("New reading"))
+                        _ = try j.restore(again.operation.journal.operationID)
+                        check("17 Restore puts back the previous revision byte for byte", (try? Data(contentsOf: pdf)) == accepted)
+                    }
+                }
             }
         } catch {
             check("no error is thrown", false, "\(error)")

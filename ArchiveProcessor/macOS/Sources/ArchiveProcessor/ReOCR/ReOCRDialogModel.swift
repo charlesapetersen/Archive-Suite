@@ -110,7 +110,8 @@ final class ReOCRDialogModel {
             guard !Task.isCancelled else { break }
             let image = scratch.appendingPathComponent("\(i).jpg")
             defer { try? FileManager.default.removeItem(at: image) }
-            guard ReOCRJob.writeImageInput(data, pageIndex: choices[i].pairIndex - 1, to: image),
+            guard let pair = file.pair(at: choices[i].pairIndex),
+                  ReOCRJob.writeImageInput(data, pageIndex: pair.imageIndex, to: image),
                   let cg = PageKindClassifier.loadImage(image) else { continue }
             guard let call = await PageKindClassifier.classify(cg), let kind = call.headerKind else { continue }
             choices[i].kind = kind
@@ -135,8 +136,10 @@ final class ReOCRDialogModel {
     }
 
     private func ranking(for kind: OCRPageKind, pages count: Int) -> ReOCRRanking {
-        let current = pages.first { $0.settledKind == kind }.flatMap { page in
-            files.first { $0.id == page.fileID }?.pair(at: page.pairIndex)?.header.provenance
+        let current: PDFReaderProvenance? = pages.first { $0.settledKind == kind }.flatMap { page in
+            guard let pair = files.first(where: { $0.id == page.fileID })?.pair(at: page.pairIndex),
+                  !pair.isSearchable else { return nil }
+            return pair.header.provenance
         }
         return ReOCRRanking.rank(kind: kind, pages: count, table: table, pairs: pairs, resources: resources,
                                  staysOnMac: staysOnMac, noTraining: !trainingProtectedFiles.isEmpty, current: current)

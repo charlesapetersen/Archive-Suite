@@ -2,6 +2,13 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (2026-11-22) — Improve OCR replaces hidden search text on the original scan
+
+Improve OCR supports single suite searchable PDFs and updates the hidden layer of eligible image-and-text pairs even
+when the scan is rotated, cropped or annotated. When the new reading cannot align with the scan, it remains
+searchable and selectable at approximate positions. A standalone page keeps its original XMP header and provenance.
+The review reports unsupported layer formats and candidate verification failures before acceptance. (W49.proc-reocr-searchable)
+
 ## FIXED (2026-11-22) — Improve OCR ranking price check depended on the OpenRouter price cache
 
 Check 3 in the headless ranking test could fail when the cached Gemini 3.8 Flash endpoint matched the
@@ -475,7 +482,6 @@ written where the `searchableFor` setting names the input's format and the page'
 - **An unplaced layer selects in the wrong place.** Where the reading's words do not all land on Vision's lines
   (handwriting, a missed note, a reading that does not align), the layer is the reading's own lines spread down the
   image: searchable and selectable, but a selection's highlight is not on the words. The processing log and Live Capture session records name those pages (accepted: the reading has no word positions to place by).
-- **Improve OCR refuses a searchable file** (it replaces text pages, and there is none): reprocess it instead (queued: W49.proc-reocr-searchable).
 - **A file edited elsewhere can lose its headers.** A list whose count is not the page count is ignored (the file was
   edited, so which entry is which page is unknown), and the file is then read as pairs (accepted: the safe fallback for a file whose page order is unknown).
 - **The Reader's thumbnails read a file's pages as pairs until its roles are read** (a moment, on first showing) (accepted: a moment on first showing).
@@ -549,14 +555,6 @@ VisionOCRKit `TextLayer`), and turns a page whose lines slope by 1 degree or mor
 switch `straightenReadingCopy`), and writes every output as PDF/A-2b; the text page stays. W42.int-s5 shipped
 2026-11-13; the searchable (layer-only) form is `W42.int-s5-searchable` and the hand placer `W42.int-s5-hands` (its
 limits in their own section). Open:
-- **Improve OCR keeps the old layer only where it cannot remake the image page** (`ReOCRJob.remadeImagePage`): when
-  the page's own JPEG is not what it shows (a CMYK or turned image, a page Improve OCR renders) or the page is not the
-  Processor's letter page, has its own crop box or annotations, or a remade page would not render exactly as it does.
-  A turn inherited from the PDF page tree can also keep a page as it is. The preservation check refuses a candidate
-  if an imported replacement picks up a turn that changes its appearance.
-  Elsewhere the layer follows the new reading or is removed when the new reading has no image-page layer
-  (`SPEC/improve-ocr.md` §5). Before Accept, the review names the image pages whose searchable layer will change
-  and those kept as they are (W49.proc-reocr-layer-review). (queued: W49.proc-reocr-searchable)
 - **The PDF/A writer holds the whole output in memory** (`PDFGenerator.archivalData`, then `ArchivalFinish`'s rewrite):
   about three to four times the file at the peak, so a 200-page merge of 2 MB pages passes 1 GB. It draws each page's
   media box only, without crop box or annotations; every caller passes the app's own new pages, which have neither (queued: W49.proc-pdfa-memory).
@@ -629,7 +627,8 @@ What remains: a box with many such pages has more gaps to check than the figures
 
 - **Refused for in-place improvement:** encrypted or signed files, files ending in a cross-reference stream (the
   pinned PDFium 8046d writes a revision Quartz cannot open after one; the Processor's own output uses tables), raw
-  one-page originals and any file not in suite image/text pairs (queued: W49.proc-reocr-allow-more).
+  one-page originals and arrangements outside suite image/text pairs or a single suite searchable page
+  (queued: W49.proc-reocr-allow-more).
 - **Apple Vision fails inside the macOS 27.2 VM guest** ("Foundation._GenericObjCError 0") while it reads the same
   page on the host; the VM UI journey uses a DEBUG stand-in reader, the host self-test the real Vision (accepted: a VM guest platform limit; the host self-test uses the real Vision).
 - **Opening the dialog reads the Keychain** for each provider (to know which readers are ready), which can bring back

@@ -70,8 +70,8 @@ so callers re-read the actual tag inside coordination.
 
 ## 4. Receipts
 
-`ImproveOCRReceipt`: operation ID, root GUID, relative path, the replaced text-page indices, the SHA-256 before and
-after, `published` or `restored`, and a date. Written once per operation after the new bytes are in place and
+`ImproveOCRReceipt`: operation ID, root GUID, relative path, the improved text-page indices (the scan's own index
+for a single searchable page), the SHA-256 before and after, `published` or `restored`, and a date. Written once per operation after the new bytes are in place and
 verified, independently of the flag; a retried or rebuilt receipt for the same revision is the same receipt. It
 carries no OCR text and grants no access. The Reader (`ImproveOCRReceiptInbox`, on each library change, on activation
 and every 20 s while connected) finds the file among its own library's rows, inside its granted root, by the receipt's
@@ -87,18 +87,18 @@ The candidate is the original byte for byte followed by one incremental revision
 pages' active object graphs are unchanged (`ReOCRPreservationCheck`); publication keeps the path, the Finder tags as a
 multiset, label, other extended attributes, resource fork, ACL, mode, flags, and creation, modification and
 date-added times (the inode and change time do change), and keeps a verified copy of the replaced file until the
-person removes it in the Processor's history. Encrypted, signed, cross-reference-stream, raw one-page and
-non-suite-structured files are refused for in-place improvement.
+person removes it in the Processor's history. In-place improvement accepts positively identified suite image/text
+pairs and a single suite searchable page with its header in XMP. Encrypted files, signed files, files ending in a
+cross-reference stream and other page arrangements are refused.
 
-The revision replaces each improved text page and, beside it, its image page when that page's searchable layer
-(W42.int-s5; [`tag-format.md`](tag-format.md) §2-page PDF structure, page 1) would otherwise keep the earlier
-reading: the image page is remade from its own embedded JPEG with a layer placed as new output places it (the new
-reading aligned onto Vision's lines, Vision's own words where it does not align, or no layer), never straightened
-again. The preservation check does not compare a replaced page with the original, so the remade page is used only
-when it embeds the original's JPEG byte for byte and renders exactly as the original does; an image page that had no
-text and gets none, one whose JPEG is not what it shows, one that is not the Processor's letter page, or one with its
-own crop box or annotations is kept with its old layer. The receipt still lists the text pages only (the Reader
-re-extracts the whole file either way).
+For a pair, the revision replaces its separate text page. If the scan has an invisible OCR layer, the revision
+replaces that layer on the existing page. A standalone searchable page gets the same layer edit and keeps the header
+and provenance stored in its original XMP. The new reading follows the detected lines where placement holds the whole
+reading. Otherwise it remains searchable and selectable, with lines spread down the page. The candidate must keep the scan's
+boxes, rotation, annotations and original image streams and pass a render comparison. If the writer cannot remove the
+old layer safely or verify the new one, the review reports the failure and disables acceptance. The receipt lists
+the separate text pages for pairs and page zero for a standalone searchable page. The Reader re-extracts the whole
+file in both cases.
 
 ## 6. Why it is built this way (design record)
 
@@ -113,9 +113,9 @@ Folded from the design plan when the Reader side shipped (W44.reocr-plan, 2026-1
   whole-file save), proven by the original-as-prefix and active-object-graph check of §5; recoverable editing, not
   redaction (the old text stays in the file's history). A verified copy of the replaced file is kept until the person
   removes it, and Restore is its own guarded transaction.
-- **Pages, ranking, cost.** Only positively validated image/text pairs are improved, and only their image slots are
-  read; raw, odd, encrypted or signed files go to the separate-output route. Each page shows its current reader and
-  stored or provisional Kind; correcting a Kind re-ranks through the same solver the settings use. Missing evidence is
+- **Pages, ranking, cost.** Improve OCR reads only the scan slots of validated pairs and the scan of a
+  single suite searchable page. Other file arrangements go to the separate-output route. Each page shows its stored
+  provenance and stored or provisional Kind. Correcting a Kind re-ranks through the same solver the settings use. Missing evidence is
   "not measured", never zero; a run needs the person's explicit action after the estimate.
 - **Flag generations** (§3) exist so an acceptance can tell whether the flag it reviewed is still the flag on the file:
   a flag set again during a re-read must survive the acceptance. They cover cooperating suite actions only; a boolean

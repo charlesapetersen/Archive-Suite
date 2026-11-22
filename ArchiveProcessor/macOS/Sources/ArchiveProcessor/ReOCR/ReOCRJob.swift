@@ -6,19 +6,20 @@ import Foundation
 import ImageIO
 import PDFKit
 import UniformTypeIdentifiers
+import VisionOCRKit
 
 // MARK: - Improve OCR: one file's run, behind the dialog (W44.reocr-processor)
 
 /// One file through Improve OCR (`SPEC/improve-ocr.md` §5–6), without any UI:
 ///
-/// 1. `start` validates the pairs, then `ReOCRFileWriter.prepare` keeps a verified copy of the file and journals it
+/// 1. `start` validates the page arrangement, then `ReOCRFileWriter.prepare` keeps a verified copy of the file and journals it
 ///    before anything is read. Everything after works from that copy's bytes, so the candidate is built on exactly
 ///    the snapshot `accept` later checks the live file against.
 /// 2. Each selected pair's image page goes to the reader as a private JPEG in `scratch` (0700, files 0600, each removed
 ///    after its reading): the page's own JPEG bytes when that is exactly what the page shows (`embeddedJPEG`), else a
 ///    300 dpi rendering. The old text pages are never read. A failure after `prepare` records the operation rejected.
-/// 3. When every selected pair has a reading, the replacement pages go through `ReOCRIncrementalWriter`, which proves
-///    the candidate kept the rest. One failed pair means no candidate: a partial batch cannot be accepted.
+/// 3. The new text pages and invisible layers go through `ReOCRIncrementalWriter`, which proves the candidate
+///    kept the scan's presentation and the rest of the file. One failed replacement prevents acceptance.
 /// 4. `accept` publishes through `ReOCRFileWriter`, then writes the content receipt for the Reader and clears only
 ///    the `OCR Poor` flag generation the review saw (plan §5 step 5, §6): tag clearing and replacement are not one
 ///    atomic step, so a flag that cannot be cleared leaves the good text in place and is reported, and `clearFlag`
@@ -117,6 +118,7 @@ struct ReOCRJob {
                             flaggedAtReview: flaggedAtReview, textPages: selected.map(\.textIndex))
         var results: [PairResult] = []
         var replacements: [Int: Data] = [:]
+        var layers: [Int: ReOCRLayer] = [:]
         let original: Data
         do {
             try writer.writeRecord(record, named: Record.file, for: op.journal.operationID)
@@ -128,10 +130,13 @@ struct ReOCRJob {
             }
             try Self.makePrivateDirectory(scratch)
             let oldDoc = PDFDocument(data: original)
+            let existingLayers = try ReOCRIncrementalWriter.hiddenTextPages(original, indexes: selected.map(\.imageIndex))
             for pair in selected {
                 try Task.checkCancellation()
                 let kind = kinds[pair.textIndex] ?? pair.header.kind
-                let oldText = oldDoc?.page(at: pair.textIndex).map { PDFHeaderParser.parse($0).body } ?? ""
+                let oldText = oldDoc?.page(at: pair.textIndex).map {
+                    pair.isSearchable ? ($0.string ?? "") : PDFHeaderParser.parse($0).body
+                } ?? ""
                 let image = scratch.appendingPathComponent("\(op.journal.operationID.uuidString)-p\(pair.imageIndex + 1).jpg")
                 guard Self.writeImageInput(original, pageIndex: pair.imageIndex, to: image) else {
                     throw Failure.imageNotExtracted(page: pair.imageIndex)
@@ -140,20 +145,35 @@ struct ReOCRJob {
                 try? FileManager.default.removeItem(at: image)   // a page of the archive; not kept past its reading
                 try Task.checkCancellation()
                 do {
-                    let page = try ReOCRPairs.replacementPage(for: pair, result: reading, model: pageModels[pair.textIndex] ?? model, kind: kind,
-                                                              gatewayDisplayName: gatewayDisplayName,
-                                                              localAgentDisplayName: localAgentDisplayName,
-                                                              localAgentModelName: localAgentModelName)
-                    replacements[pair.textIndex] = page
-                    // W42.int-s5: the image page's searchable layer follows the new reading, or the old one would stay.
-                    if let image = await Self.remadeImagePage(original, pair: pair, reading: reading, kind: kind,
-                                                              model: pageModels[pair.textIndex] ?? model) {
-                        replacements[pair.imageIndex] = image
+                    let text = try ReOCRPairs.readingText(reading, page: pair.textIndex)
+                    let pageModel = pageModels[pair.textIndex] ?? model
+                    let written: OCRPageKind?
+                    if pair.isSearchable {
+                        written = pair.header.kind
+                    } else {
+                        let page = try ReOCRPairs.replacementPage(
+                            for: pair, result: reading, model: pageModel, kind: kind,
+                            gatewayDisplayName: gatewayDisplayName, localAgentDisplayName: localAgentDisplayName,
+                            localAgentModelName: localAgentModelName)
+                        replacements[pair.textIndex] = page
+                        written = PDFDocument(data: page)?.page(at: 0).flatMap { PDFHeaderParser.parse($0).header?.kind }
                     }
+                    let hasLayer = existingLayers.contains(pair.imageIndex)
+                    let scanText = oldDoc?.page(at: pair.imageIndex)?.string ?? ""
+                    if !hasLayer && (pair.isSearchable || !scanText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+                        throw ReOCRPairs.Refusal.unsupportedLayer(page: pair.imageIndex)
+                    }
+                    let runReader = TextLayerRule.runReader(model: pageModel, gateway: gatewayDisplayName,
+                                                            localAgent: localAgentModelName)
+                    let placement = TextLayerRule.decide(kind: TextLayerRule.kind(explicit: kind, result: reading),
+                                                         reading: text, placeHandOnImage: true,
+                                                         readerModel: TextLayerRule.readerModel(of: reading, run: runReader),
+                                                         handPlacerInstalled: HandPlacer.isInstalled())
+                    layers[pair.imageIndex] = try await ReOCRLayer.make(from: original, pageIndex: pair.imageIndex,
+                                                                       reading: text, required: hasLayer,
+                                                                       scratch: scratch, placement: placement)
                     try Task.checkCancellation()
-                    // The Kind actually written, which falls back to the reader's own when none was chosen.
-                    let written = PDFDocument(data: page)?.page(at: 0).flatMap { PDFHeaderParser.parse($0).header?.kind }
-                    results.append(PairResult(pair: pair, oldText: oldText, kind: written, outcome: .success(reading.text ?? "")))
+                    results.append(PairResult(pair: pair, oldText: oldText, kind: written, outcome: .success(text)))
                 } catch let r as ReOCRPairs.Refusal {
                     results.append(PairResult(pair: pair, oldText: oldText, kind: kind, outcome: .failure(r)))
                 }
@@ -163,19 +183,16 @@ struct ReOCRJob {
             try? writer.reject(op)
             throw error
         }
-        func review(_ candidate: Data?, _ problem: String?) -> Review {
+        func review(_ candidate: Data? = nil, updatedLayers: Set<Int>? = nil, problem: String? = nil) -> Review {
             Review(operation: op, key: key, reviewedGeneration: reviewed.generation, flaggedAtReview: flaggedAtReview,
-                   results: results, candidate: candidate,
-                   replacedImagePages: candidate.map { _ in
-                       Set(selected.map(\.imageIndex).filter { replacements[$0] != nil })
-                   }, candidateProblem: problem)
+                   results: results, candidate: candidate, replacedImagePages: updatedLayers, candidateProblem: problem)
         }
-        // Every selected text page replaced (an image page beside one is extra, W42.int-s5).
-        guard Set(selected.map(\.textIndex)).isSubset(of: replacements.keys) else { return review(nil, nil) }
+        guard results.allSatisfy({ (try? $0.outcome.get()) != nil }) else { return review() }
         do {
-            return review(try ReOCRIncrementalWriter.candidate(original: original, replacements: replacements), nil)
+            let updated = try ReOCRIncrementalWriter.candidate(original: original, replacements: replacements, layers: layers)
+            return review(updated.bytes, updatedLayers: updated.layerPages)
         } catch {
-            return review(nil, "\(error)")
+            return review(problem: "\(error)")
         }
     }
 
@@ -527,38 +544,6 @@ struct ReOCRJob {
         try writer.reject(review.operation)
     }
 
-    // MARK: The image page's layer (W42.int-s5)
-
-    /// The pair's image page remade with a searchable layer of `reading` (`PDFGenerator.remadeImagePageData`), to
-    /// replace it beside the new text page; nil to leave the page as it is. The preservation check does not compare a
-    /// replaced page with the original, so this is the guard that the person sees the same page: the remade page must
-    /// embed exactly the original's JPEG bytes and render, pixel for pixel, as the original does (the layer paints
-    /// nothing). Left: a page with no text that would get none, a page whose own JPEG is not what it shows
-    /// (`embeddedJPEG`), a page not the Processor's letter size, one with a crop box of its own or annotations (the
-    /// remade page would drop them), and any remade page that fails either check. A page left keeps its old layer
-    /// (`KNOWN_ISSUES.md`). Off the main actor: the layer reads the page with Vision.
-    static func remadeImagePage(_ pdf: Data, pair: ReOCRPairs.Pair, reading: OCRResult, kind: OCRPageKind?,
-                                model: LLMModel? = nil) async -> Data? {
-        await PDFGenerator.runWorker { () -> Data? in
-            guard let jpeg = embeddedJPEG(pdf, pageIndex: pair.imageIndex),
-                  let doc = ReOCRPreservationCheck.document(pdf), let page = doc.page(at: pair.imageIndex + 1),
-                  page.getBoxRect(.mediaBox).size == CGSize(width: 612, height: 792),
-                  page.getBoxRect(.cropBox) == page.getBoxRect(.mediaBox), let dict = page.dictionary else { return nil }
-            var annots: CGPDFArrayRef?
-            if CGPDFDictionaryGetArray(dict, "Annots", &annots) { return nil }
-            let hadText = !(PDFDocument(data: pdf)?.page(at: pair.imageIndex)?.string ?? "")
-                .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            guard let made = PDFGenerator().remadeImagePageData(jpeg: jpeg, result: reading, pageKind: kind, options: .standard,
-                                                                runReader: TextLayerRule.runReader(model: model)) else { return nil }
-            if made.layer.route == .textPage && !hadText { return nil }
-            guard embeddedJPEG(made.pdf, pageIndex: 0) == jpeg,
-                  let madeDoc = ReOCRPreservationCheck.document(made.pdf), let madePage = madeDoc.page(at: 1),
-                  let before = ReOCRPreservationCheck.render(page), let after = ReOCRPreservationCheck.render(madePage),
-                  before == after else { return nil }
-            return made.pdf
-        }
-    }
-
     // MARK: Image input
 
     private static func makePrivateDirectory(_ url: URL) throws {
@@ -584,8 +569,12 @@ struct ReOCRJob {
     /// orientation. Text that paints nothing (render mode 3: the searchable layer, W42.int-s5) is allowed; anything else
     /// (visible text, paths, clipping, shading, inline images, a second image) is rendered instead.
     static func embeddedJPEG(_ pdf: Data, pageIndex: Int) -> Data? {
+        embeddedJPEGWithBounds(pdf, pageIndex: pageIndex)?.data
+    }
+
+    static func embeddedJPEGWithBounds(_ pdf: Data, pageIndex: Int) -> (data: Data, bounds: CGRect)? {
         guard let doc = ReOCRPreservationCheck.document(pdf) else { return nil }
-        return withExtendedLifetime(doc) { () -> Data? in
+        return withExtendedLifetime(doc) { () -> (Data, CGRect)? in
             guard let page = doc.page(at: pageIndex + 1), page.rotationAngle % 360 == 0, let dict = page.dictionary else {
                 return nil
             }
@@ -633,7 +622,7 @@ struct ReOCRJob {
             }
             let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
             if let o = props?[kCGImagePropertyOrientation] as? Int, o != 1 { return nil }
-            return data
+            return (data, drawn)
         }
     }
 
@@ -724,23 +713,31 @@ struct ReOCRJob {
         return drawn
     }
 
-    private static func render(_ page: CGPDFPage, to url: URL) -> Bool {
+    static func displaySize(_ page: CGPDFPage) -> CGSize {
         let box = page.getBoxRect(.cropBox)
-        let rotated = page.rotationAngle % 180 != 0
-        let size = rotated ? CGSize(width: box.height, height: box.width) : box.size
+        return page.rotationAngle % 180 != 0 ? CGSize(width: box.height, height: box.width) : box.size
+    }
+
+    static func renderedImage(_ page: CGPDFPage) -> CGImage? {
+        let size = displaySize(page)
         let scale = 300.0 / 72.0
-        let w = Int((size.width * scale).rounded()), h = Int((size.height * scale).rounded())
-        guard w > 0, h > 0, w * h <= 120_000_000,
-              let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+        let width = (size.width * scale).rounded(), height = (size.height * scale).rounded()
+        guard width > 0, height > 0, width * height <= 120_000_000 else { return nil }
+        let w = Int(width), h = Int(height)
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpaceCreateDeviceRGB(),
-                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return false }
+                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
         ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
         ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
         ctx.scaleBy(x: scale, y: scale)
         ctx.concatenate(page.getDrawingTransform(.cropBox, rect: CGRect(origin: .zero, size: size), rotate: 0,
                                                  preserveAspectRatio: true))
         ctx.drawPDFPage(page)
-        guard let image = ctx.makeImage(),
+        return ctx.makeImage()
+    }
+
+    private static func render(_ page: CGPDFPage, to url: URL) -> Bool {
+        guard let image = renderedImage(page),
               let dest = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
             return false
         }
