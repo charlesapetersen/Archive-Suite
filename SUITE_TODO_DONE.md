@@ -17983,3 +17983,14 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Processor's Debug build and headless recovery test, and the 30-case write-surface proof passed.
   No real corpus, bench cache or paid calls used.
   <!-- /W49.storage-writer -->
+
+- [x] **W49.storage-pair-recovery — Journal PDF and companion filing and recover partial transactions** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit)
+  Original scope: (lane: suite) (uses: build) (blocked-on: W49.storage-writer) — Persist both exact identities and paths before retiring input. Prove recovery at each partial-write boundary, including missing companions and a failed verification. [Design](execution-plans/storage-simplify.md).
+  ArchiveCore now journals the exact staged and final names, byte digests and physical identities of a
+  new PDF and its catalogue companion under the granted directory lock. Retries can finish partially filed
+  pairs and reverify completed receipts. Missing, changed or obstructed files withhold a receipt and preserve
+  available artifacts. Processor will connect the receipt to its source-retirement checks in W49.storage-processor.
+  Tier-2 scratch testing covered actual process termination at six boundaries, missing companions, changed
+  bytes, same-byte replacements, wrong grants, symlinks, torn staging, concurrent retries and exact filesystem
+  path spelling. The write-surface proof passed 30 checks. No real corpus, bench cache or paid calls used.
+  <!-- /W49.storage-pair-recovery -->

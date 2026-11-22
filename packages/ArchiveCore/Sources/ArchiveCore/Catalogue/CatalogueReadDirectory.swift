@@ -6,7 +6,7 @@ struct CatalogueReadDirectory {
     typealias Status = ItemFacts.Unavailable
     typealias Artifact = ItemFacts.Artifact
 
-    struct Identity: Equatable, Sendable {
+    struct Identity: Codable, Equatable, Sendable {
         let device: dev_t
         let inode: ino_t
         let birthSeconds: Int

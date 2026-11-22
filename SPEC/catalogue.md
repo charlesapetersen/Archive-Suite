@@ -156,4 +156,37 @@ retention policy would have to account for open edit bases and Undo. Coordinatio
 writers using this boundary. The writer attempts to restore a racing external version when it can still
 verify both exchange names. Changes outside the lock can leave an uncertain outcome, so both versions
 are kept. Network mounts are refused. Provider synchronization and multi-device writes require their
-own verification. Paired initial filing and the Reader Undo journal are separate implementation steps.
+own verification. Reader Undo is a separate implementation step.
+
+
+## Journaled initial pair filing
+
+`CataloguePairFiler` files a new derivative in an adopted local root. The producer persists one operation
+UUID, the grant's root-instance ID and the final PDF's exact root-relative path before starting.
+It prepares a finished PDF under the operation's hidden pending name beside that destination,
+supplies the initial companion record, and holds the root's grant. The identifying callback reads the PDF descriptor independently of the companion
+even at the pending name. The caller keeps the original input and is responsible for its own retirement
+ledger and all other retirement checks.
+
+Under the catalogue parent lock, the filer verifies and flushes the staged files and writes a hidden
+journal containing their pending and final names, physical identities and SHA-256 digests. The journal
+also binds the operation to the granted instance and the physical root and parent directory.
+The filer flushes the journal before claiming either final name. It claims each name exclusively, reopens and verifies the pair, then renames
+the journal to a completion receipt and flushes the directory before returning. The PDF's bytes and
+filesystem metadata travel with the staged file when its name changes.
+
+After interruption, use the same UUID and destination to recover the journaled operation. Recovery
+recognizes either exact member at its pending or final name and can finish a missing rename. A completed
+receipt is reverified against both files on each retry. A missing member, a different file at either name,
+a changed digest, a damaged journal or unverifiable scope withholds success and retains all available
+files for reconciliation. If the journal was never created, the producer can retry preparation with
+the same staged PDF and record. Unusable partial staging or journal bytes require reconciliation. The
+caller keeps the original input and can use a fresh operation once it confirms the destination names
+are free. Filing uses exclusive destination names throughout and leaves source retirement to its caller.
+
+The journal is local recovery data. A portable pair is still the final PDF and active companion. The
+protocol coordinates same-directory local writes through ArchiveCore. A receipt reflects the files
+at verification time. External writers can race a rename of a reserved staging name. The filer then
+withholds a receipt if the resulting files differ from the journal and leaves the available artifacts
+in place. Cloud synchronization and multi-device transactions need their own verification.
+Processor integration will connect this receipt to each output path's existing source-retirement checks.

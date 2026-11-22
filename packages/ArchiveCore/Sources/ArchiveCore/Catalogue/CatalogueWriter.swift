@@ -189,19 +189,10 @@ public struct CatalogueWriter: Sendable {
         guard faccessat(parent.descriptor, scope.companion, W_OK, AT_EACCESS | AT_SYMLINK_NOFOLLOW) == 0 else {
             throw Failure.io(operation: "check companion write access", code: errno)
         }
-        let fd = openat(parent.descriptor, name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
-        guard fd >= 0 else { throw Failure.io(operation: "stage companion edit", code: errno) }
+        let fd = try createExclusive(name, in: parent)
         created()
         defer { close(fd) }
-        try record.originalJSON.withUnsafeBytes { bytes in
-            var written = 0
-            while written < bytes.count {
-                let count = Darwin.write(fd, bytes.baseAddress!.advanced(by: written), bytes.count - written)
-                if count < 0, errno == EINTR { continue }
-                guard count > 0 else { throw Failure.io(operation: "write staged companion", code: count == 0 ? EIO : errno) }
-                written += count
-            }
-        }
+        try write(record.originalJSON, to: fd)
         // Preserve permissions, ACLs and xattrs of the existing JSON. Never open a PDF for writing.
         try reader.directory.withFile(scope.companion, in: parent, artifact: .companion) { source in
             guard CatalogueReadDirectory.FileVersion(source.info) == live.version else { throw Failure.changedDuringSave }
@@ -218,6 +209,24 @@ public struct CatalogueWriter: Sendable {
         var info = stat()
         guard fstat(fd, &info) == 0 else { throw Failure.io(operation: "inspect staged companion", code: errno) }
         return .init(info)
+    }
+
+    func createExclusive(_ name: String, in parent: CatalogueReadDirectory.Entry) throws -> Int32 {
+        let fd = openat(parent.descriptor, name, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+        guard fd >= 0 else { throw Failure.io(operation: "create new catalogue file", code: errno) }
+        return fd
+    }
+
+    func write(_ data: Data, to fd: Int32) throws {
+        try data.withUnsafeBytes { bytes in
+            var written = 0
+            while written < bytes.count {
+                let count = Darwin.write(fd, bytes.baseAddress!.advanced(by: written), bytes.count - written)
+                if count < 0, errno == EINTR { continue }
+                guard count > 0 else { throw Failure.io(operation: "write new catalogue file", code: count == 0 ? EIO : errno) }
+                written += count
+            }
+        }
     }
 
     private func version(of name: String, in parent: CatalogueReadDirectory.Entry) throws -> CatalogueReadDirectory.FileVersion {
@@ -247,7 +256,7 @@ public struct CatalogueWriter: Sendable {
         }
     }
 
-    private func sync(_ descriptor: Int32, operation: String) throws {
+    func sync(_ descriptor: Int32, operation: String) throws {
         while fsync(descriptor) != 0 {
             let code = errno
             guard code == EINTR else { throw Failure.io(operation: operation, code: code) }

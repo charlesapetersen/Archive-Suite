@@ -236,10 +236,13 @@ public struct CatalogueReader: Sendable {
 
     static func pathComponents(_ path: String) -> [String]? {
         guard path.utf8.count < MAXPATHLEN, !path.utf8.contains(0) else { return nil }
-        let parts = path.split(separator: "/", omittingEmptySubsequences: false)
+        // The filesystem splits on the slash byte even when Swift sees a single grapheme
+        // made of a slash followed by a combining mark.
+        let parts = path.utf8.split(separator: UInt8(ascii: "/"), omittingEmptySubsequences: false)
+            .map { String(decoding: $0, as: UTF8.self) }
         guard let filename = parts.last, filename.lowercased().hasSuffix(".pdf"),
               parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else { return nil }
-        return parts.map(String.init)
+        return parts
     }
 
     static func record(in entry: CatalogueReadDirectory.Entry) throws -> CatalogueRecord {
