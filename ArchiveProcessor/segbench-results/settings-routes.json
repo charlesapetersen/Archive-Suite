@@ -997,7 +997,7 @@
     "id": "nes_answered",
     "label": "NES on answered pages, failures beside",
     "higher_is_better": true,
-    "figure": "overall for all pages; <kind> per kind (strict), with hands16 and public_L1-L3 beside handwritten, and reflows (the reader joins the page's lines; its hand pages get the text page)"
+    "figure": "overall for all pages; <kind> per kind (strict), with hands16 and public_L1-L3 beside handwritten, and reflows (sample median below 70% of detected lines)"
    },
    "kinds": [
     "typewritten",
@@ -10650,7 +10650,7 @@
     },
     {
      "id": "place-hands",
-     "text": "Handwriting: every hand page gets a text page; kraken blla lines, CTC forced alignment and the conf pick also lay the layer on the image where confidence is 0.9 or more, never for a reflowing reader.",
+     "text": "Handwriting keeps a text page. The image also gets a layer when the reading keeps at least 70% of the detected lines and the ordered alignment confidence is 0.9 or more, with all words kept in order.",
      "source": "place-hands-lines.md §Verdict",
      "switch": {
       "id": "place.hand_on_image",

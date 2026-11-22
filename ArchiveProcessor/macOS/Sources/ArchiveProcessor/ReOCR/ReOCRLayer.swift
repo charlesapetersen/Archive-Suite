@@ -55,12 +55,13 @@ struct ReOCRLayer: Sendable {
         context.endPDFPage()
         context.closePDF()
 
-        func write(_ lines: TextLayer.Lines, frame: CGRect) -> Self? {
+        func write(_ lines: TextLayer.Lines, frame: CGRect, checkReadingOrder: Bool = false) -> Self? {
             guard !lines.isEmpty,
                   let missed = try? TextLayer.write(imagePage: blank, lines: lines, imageFrame: frame, to: layer),
                   let data = try? Data(contentsOf: layer),
                   let text = PDFDocument(data: data)?.page(at: 0)?.string,
                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            if checkReadingOrder && (missed != 0 || !TextLayerRule.preservesReadingOrder(reading, placed: text)) { return nil }
             if required && (missed != 0 || !OutputForm.holds(text, every: reading)) { return nil }
             return Self(pdf: data, intoPage: transform.inverted(), reading: required ? reading : text)
         }
@@ -75,7 +76,8 @@ struct ReOCRLayer: Sendable {
                 }
             case .placeHands:
                 if let hands = try? HandPlacer.place(image: image, reading: reading, isCancelled: { Task.isCancelled }),
-                   hands.passesGate, let made = write(hands.lines, frame: frame) { return made }
+                   TextLayerRule.handPlacementRefusal(hands, reading: reading) == nil,
+                   let made = write(hands.lines, frame: frame, checkReadingOrder: true) { return made }
             case .textPage:
                 break
             }

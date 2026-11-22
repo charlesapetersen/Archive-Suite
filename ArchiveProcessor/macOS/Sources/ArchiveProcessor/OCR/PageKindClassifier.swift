@@ -144,9 +144,46 @@ enum PageKindClassifier {
         return CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary)
     }
 
+    /// Checks a page whose kind was never recorded, before its searchable output would omit the text page.
+    /// Use the same hand features as routing. A weak call or a page without measurable text stays unknown.
+    static func handwritingForPlacement(_ image: CGImage) -> Bool? {
+        guard !Thread.isMainThread, let model = PageKindModel.bundled,
+              let signals = measureHand(image) else { return nil }
+        return handwritingForPlacement(signals, model: model)
+    }
+
+    static func handwritingForPlacement(_ signals: PageKindSignals, model: PageKindModel) -> Bool? {
+        guard signals.lines >= 2, signals.print.count == model.printLength,
+              let probabilities = model.hand.probabilities(signals.handFeatures()),
+              let top = probabilities.indices.max(by: { probabilities[$0] < probabilities[$1] }),
+              probabilities[top] >= PageKindRouting.minimumConfidence,
+              let kind = PageKindName(rawValue: model.hand.classes[top]) else { return nil }
+        switch kind {
+        case .handwritten: return true
+        case .typewritten, .printed: return false
+        default: return nil
+        }
+    }
+
     /// kind-signals.swift's measurements, minus its timings and the table counts the regressions do not read.
     static func measure(_ image: CGImage) async -> PageKindSignals? {
-        guard #available(macOS 26, *) else { return nil }
+        guard #available(macOS 26, *), var s = measureHand(image) else { return nil }
+        if let obs = try? await RecognizeDocumentsRequest().perform(on: image) {
+            var share = 0.0
+            for o in obs {
+                for t in o.document.tables {
+                    s.tableCells += t.rows.reduce(0) { $0 + $1.count }
+                    let b = t.boundingRegion.boundingBox
+                    share += Double(b.width * b.height)
+                }
+            }
+            s.tableShare = min(share, 1)
+        }
+
+        return s
+    }
+
+    private static func measureHand(_ image: CGImage) -> PageKindSignals? {
         let W = Double(image.width), H = Double(image.height)
         let handler = VNImageRequestHandler(cgImage: image, options: [:])
         let gray = Gray(image)
@@ -175,18 +212,6 @@ enum PageKindClassifier {
         s.conf = confs.isEmpty ? .nan : confs.reduce(0, +) / Double(confs.count)
         s.periodic = quantile(periodic, 0.5)
         s.harmonic = quantile(harmonic, 0.5)
-
-        if let obs = try? await RecognizeDocumentsRequest().perform(on: image) {
-            var share = 0.0
-            for o in obs {
-                for t in o.document.tables {
-                    s.tableCells += t.rows.reduce(0) { $0 + $1.count }
-                    let b = t.boundingRegion.boundingBox
-                    share += Double(b.width * b.height)
-                }
-            }
-            s.tableShare = min(share, 1)
-        }
 
         let fp = VNGenerateImageFeaturePrintRequest()
         fp.revision = VNGenerateImageFeaturePrintRequestRevision2   // the bench's (macOS 26's default); pinned

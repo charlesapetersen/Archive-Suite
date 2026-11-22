@@ -159,11 +159,9 @@ struct ReOCRJob {
                         written = PDFDocument(data: page)?.page(at: 0).flatMap { PDFHeaderParser.parse($0).header?.kind }
                     }
                     let hasLayer = existingLayers.contains(pair.imageIndex)
-                    let runReader = TextLayerRule.runReader(model: pageModel, gateway: gatewayDisplayName,
-                                                            localAgent: localAgentModelName)
-                    let placement = TextLayerRule.decide(kind: TextLayerRule.kind(explicit: kind, result: reading),
-                                                         reading: text, placeHandOnImage: true,
-                                                         readerModel: TextLayerRule.readerModel(of: reading, run: runReader),
+                    let layoutKind = TextLayerRule.kind(explicit: kind, result: reading)
+                    let placementKind = TextLayerRule.placementKind(layoutKind, result: reading)
+                    let placement = TextLayerRule.decide(kind: placementKind, reading: text, placeHandOnImage: true,
                                                          handPlacerInstalled: HandPlacer.isInstalled())
                     layers[pair.imageIndex] = try await ReOCRLayer.make(from: original, pageIndex: pair.imageIndex,
                                                                        reading: text, required: pair.isSearchable || hasLayer,

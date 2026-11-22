@@ -180,7 +180,7 @@ def reading_rows():
         if ohk and ohk in ownhand:
             F["hands16"] = {"value": r2(ownhand[ohk]), "n": 16, "truth": "owner-96 after the hand sheet", "source": src(PH, ohk, "owner_hand", ownhand[ohk])}
         k = keeps.get(F["hands16"]["source"]["route"]) if "hands16" in F else None
-        if k:  # W46.reader-keeps-lines: a reflowing reader's hand pages get the text page (05-placement.md)
+        if k:  # W46.reader-keeps-lines: measured line retention across each reader's sample
             F["reflows"] = {"value": k["reflows"], "median_line_share": k["median_ratio"], "pages": k["pages"], "pages_under": k["pages_under"],
                             "basis": "median page's reading lines over kraken blla's detected lines, owner hand pages; reflows under 0.7",
                             "source": src(KL, k["reading"], "rows.reflows", k["reflows"])}
@@ -515,7 +515,7 @@ ORDER = [("01-reading-copy.md", "reading-copy"), ("02-ocr-input.md", "ocr-input"
 # The figure key each stage's metric is read from: "<kind>" means the key named for the kind being ranked.
 METRIC_FIGURE = {
  "reading-copy": "owner-heldout", "ocr-input": None, "layout": "<kind>", "marks": None, "capture": None,
- "reading": "overall for all pages; <kind> per kind (strict), with hands16 and public_L1-L3 beside handwritten, and reflows (the reader joins the page's lines; its hand pages get the text page)",
+ "reading": "overall for all pages; <kind> per kind (strict), with hands16 and public_L1-L3 beside handwritten, and reflows (sample median below 70% of detected lines)",
  "placement": "<kind>", "segmentation": "test-boxes", "dating": "not_in_text", "entities": "sender", "kinds": "<kind>",
  "training-kit": "per row: each figure names its own metric",
 }

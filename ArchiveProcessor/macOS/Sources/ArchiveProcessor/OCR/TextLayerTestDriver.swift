@@ -11,7 +11,8 @@ import VisionOCRKit
 ///
 /// What has to be true:
 ///   1. The rule (`TextLayerRule`): print kinds are placed, handwritten and mixed pages go to the hand placer once it
-///      is downloaded (the text page alone before, with the switch off, or for a reader that reflows), an unknown kind is placed only when the reading aligns, and a reading in
+///      is downloaded (the text page alone before, with the switch off, or when the reading reflows), an unknown kind is
+///      placed only when the reading aligns, and a reading in
 ///      a right-to-left script or in CJK or Thai gets no layer.
 ///   2. Each output still has its two pages, the text page first line `Extracted text.`, and the image page's text,
 ///      read back through PDFKit, holds the reading: a selection over each drawn line returns that line's words, in
@@ -312,14 +313,35 @@ enum TextLayerTestDriver {
         handClipping.pageReader = PageReaderRecord(kind: PageKindName.clippings.rawValue, confidence: 0.9, reason: .kind,
                                                    provider: "Gemini", model: "m", readingKind: .handwritten)
         check("7 every hand kind, and a page read as handwriting, keeps its text page; other kinds may go without",
-              [PageKindName.handwritten, .mixed, .registers].allSatisfy { TextLayerRule.keepsTextPage(kind: $0, result: plain) }
-              && TextLayerRule.keepsTextPage(kind: .clippings, result: handClipping)
+              [PageKindName.handwritten, .mixed, .registers].allSatisfy { TextLayerRule.isHand(TextLayerRule.placementKind($0, result: plain)) }
+              && TextLayerRule.placementKind(.clippings, result: handClipping) == .handwritten
               && ([nil] + [PageKindName.typewritten, .printed, .forms, .newspapers, .clippings]).allSatisfy {
-                  !TextLayerRule.keepsTextPage(kind: $0, result: plain) }
+                  !TextLayerRule.isHand(TextLayerRule.placementKind($0, result: plain)) }
               && OutputForm.searchableRefusal(reading: reading, handwritten: true) == OutputForm.handKeepsTextPage
               && OutputForm.searchableRefusal(reading: reading, handwritten: false) == nil)
         check("7 the sheet offers no hand kind for the searchable form",
               Set(SettingsSheetModel.FormsRow.kinds) == Set(PageKindName.allCases).subtracting([.handwritten, .mixed, .registers]))
+
+        // Every page also matches an unknown page. Simulate an image too faint for the pixel classifier to
+        // identify the writing but whose OCR reader recovered a transcription.
+        let unknownInput = dir.appendingPathComponent("unknown-input.jpg")
+        let unknownOutput = dir.appendingPathComponent("searchable-unknown-faint.pdf")
+        if let image = drawPage([], to: unknownInput, type: "public.jpeg") {
+            let kept = await Self.write(image, reading: reading, kind: nil, rotation: 0, to: unknownOutput,
+                                        options: .init(searchableFor: ["*/*"]))
+            let doc = PDFDocument(url: unknownOutput)
+            check("7 Every page: an inconclusive handwriting check keeps the full text page",
+                  kept?.form == .imageAndText && kept?.formFallback == OutputForm.unknownKeepsTextPage
+                  && doc?.pageCount == 2 && (doc?.page(at: 1)?.string?.contains("MEMORANDUM") ?? false),
+                  "\(String(describing: kept))")
+        } else { check("7 Every page: inconclusive handwriting fixture prepared", false) }
+
+        let wildcardPrint = dir.appendingPathComponent("searchable-printed-wildcard.pdf")
+        let checkedPrint = await Self.write(jpeg, reading: reading, kind: .typewritten, rotation: 0, to: wildcardPrint,
+                                            options: .init(searchableFor: ["*/*"]))
+        check("7 Every page: a page already identified as typewritten still writes as one searchable page",
+              checkedPrint?.form == .searchable && PDFDocument(url: wildcardPrint)?.pageCount == 1,
+              "\(String(describing: checkedPrint))")
 
         // Words Vision never found (a note it missed): the placed layer would lose them, so the reading goes unplaced.
         let extra = dir.appendingPathComponent("searchable-extra.pdf")
@@ -495,6 +517,24 @@ enum TextLayerTestDriver {
                     && DispatchTime.now() < start + 5)
         } else { check("8 test hand placer started", false) }
 
+        let reflowing = """
+            #!/bin/sh
+            cat > "$5" <<'JSON'
+            {"lines":[{"text":"ONE LINE","box":[0.1,0.1,0.8,0.1]}],"confidence":0.99,"span":8,"detected":10,"reading_lines":1,"peak_rss":0}
+            JSON
+            """
+        do {
+            try Data(reflowing.utf8).write(to: interpreter)
+            let refusal = await PDFGenerator.runWorker {
+                guard let image = decode(jpeg),
+                      let placed = try? HandPlacer.place(image: image, reading: "ONE LINE", environment: environment)
+                else { return nil as String? }
+                return TextLayerRule.handPlacementRefusal(placed, reading: "ONE LINE")
+            }
+            check("8 a high-confidence hand placement is still refused when its reader joined the lines",
+                  refusal == TextLayerRule.reflowReason)
+        } catch { check("8 the reflowing hand placement fixture could not be written", false, error.localizedDescription) }
+
         // test-text-layer.sh gives this driver its own temporary root, and hence its own reader lock.
         let scratch = fm.temporaryDirectory
         let fd = open(scratch.appendingPathComponent("visionocr-model-reader.lock").path, O_CREAT | O_RDWR, 0o600)
@@ -556,21 +596,36 @@ enum TextLayerTestDriver {
     }
 
     private static func ruleChecks() {
-        func d(_ k: PageKindName?, _ r: String? = "a letter", hand: Bool = true, installed: Bool = false,
-               model: String? = nil) -> TextLayerRule.Decision {
-            TextLayerRule.decide(kind: k, reading: r, placeHandOnImage: hand, readerModel: model, handPlacerInstalled: installed)
+        func d(_ k: PageKindName?, _ r: String? = "a letter", hand: Bool = true,
+               installed: Bool = false) -> TextLayerRule.Decision {
+            TextLayerRule.decide(kind: k, reading: r, placeHandOnImage: hand, handPlacerInstalled: installed)
         }
         check("1 registers, placer not downloaded: text page", d(.registers) == .textPage(TextLayerRule.notDownloadedReason))
         for k in [PageKindName.handwritten, .mixed, .registers] {
             check("1 \(k.rawValue), placer downloaded: the hand placer", d(k, installed: true) == .placeHands)
         }
-        check("1 handwritten read by a reflowing reader: text page",
-              d(.handwritten, installed: true, model: "LightOnOCR-3-4B") == .textPage(TextLayerRule.reflowReason("LightOnOCR-3-4B")))
-        check("1 handwritten read by a line-keeping reader: the hand placer",
-              d(.handwritten, installed: true, model: "Qwen/Qwen3.6-27B-FP8") == .placeHands
-              && d(.handwritten, installed: true, model: "Gemini 3.8 Flash") == .placeHands)
-        check("1 the reflowing readers, every build", ["Infinity-Parser2-Pro", "lightonocr-3-1b", "PaddleOCR-VL 1.6 4bit",
-              "XiaomiMiMo/Xiaomi-OCR-0"].allSatisfy(TextLayerRule.reflows) && !TextLayerRule.reflows("qwen3.6-27b"))
+        check("1 reflow compares this reading's lines with the detected lines",
+              TextLayerRule.reflows(readingLines: 6, detectedLines: 10)
+              && TextLayerRule.reflows(readingLines: 1, detectedLines: 12)
+              && !TextLayerRule.reflows(readingLines: 7, detectedLines: 10)
+              && !TextLayerRule.reflows(readingLines: 1, detectedLines: 1)
+              && !TextLayerRule.reflows(readingLines: 1, detectedLines: 0))
+        check("1 ordered coverage accepts reading markup and detects swapped or skipped lines",
+              TextLayerRule.preservesReadingOrder("**First** line\n<mark>Second line [illegible]", placed: "First line Second line")
+              && !TextLayerRule.preservesReadingOrder("First line\nSecond line", placed: "Second line First line")
+              && !TextLayerRule.preservesReadingOrder("First line\nSecond line", placed: "Second line"))
+        func handCall(_ scores: [Double], lines: Int = 3) -> Bool? {
+            let classes = ["handwritten", "typewritten", "printed"]
+            let features = ["harmonic", "periodic", "conf", "text_px", "lines", "print0"]
+            let hand = PageKindModel.Regression(classes: classes, features: features,
+                                                mean: Array(repeating: 0, count: 6), sd: Array(repeating: 1, count: 6),
+                                                W: Array(repeating: [0, 0, 0], count: 6), b: scores)
+            let model = PageKindModel(measured: "fixture", hand: hand, form: hand)
+            return PageKindClassifier.handwritingForPlacement(PageKindSignals(lines: lines, print: [0]), model: model)
+        }
+        check("1 unknown kind: the hand check only uses a confident writing classification with measured text",
+              handCall([10, 0, 0]) == true && handCall([0, 10, 0]) == false && handCall([0, 0, 10]) == false
+              && handCall([1, 0, 0]) == nil && handCall([10, 0, 0], lines: 1) == nil)
         check("1 handwritten with no reading: text page", d(.handwritten, nil, installed: true) == .textPage(TextLayerRule.noReadingReason))
         check("1 handwritten, switch off, placer downloaded: text page",
               d(.handwritten, hand: false, installed: true) == .textPage(TextLayerRule.switchOffReason))

@@ -494,6 +494,7 @@ private struct SearchableFormatControls: View {
             Text("Write as one searchable page, with no text page").padding(.top, 4)
             Text("Search and select the reading on the page image. If the words cannot be placed, search still works "
                  + "but selections may not line up. Handwritten, mixed and register pages keep their separate text page. "
+                 + "Pages of unknown kind keep their text page if the handwriting check is inconclusive. "
                  + "Searchable images use less space when the compression tools are available.")
                 .font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
             Text(forms.source).font(.caption2).foregroundStyle(.primary)

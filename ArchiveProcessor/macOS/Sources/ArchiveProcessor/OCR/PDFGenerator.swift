@@ -150,7 +150,6 @@ struct PDFGenerator {
         var straightened: Double?
         // The searchable page's image and the lines its layer was written from, for its compression.
         var searchable: (image: ImagePageData, lines: TextLayer.Lines?)?
-        let runReader = TextLayerRule.runReader(model: model, gateway: gatewayDisplayName, localAgent: localAgentModelName)
         if let image = makeImagePageData(imageURL: imageURL, rotationDegrees: result.rotationDegrees, targetMB: pdfImageMB,
                                          straighten: textLayer?.straighten == true),
            let plain = PDFDocument(data: image.pdf)?.page(at: 0) {
@@ -158,13 +157,23 @@ struct PDFGenerator {
             var page = plain
             if let textLayer {
                 var layered: (page: PDFPage?, outcome: TextLayerOutcome)?
+                var placementKind = TextLayerRule.placementKind(kind, result: result)
                 if chosen == .searchable {
-                    switch OutputForm.searchableRefusal(reading: result.text,
-                                                         handwritten: TextLayerRule.keepsTextPage(kind: kind, result: result)) {
-                    case let why?: formFallback = why
-                    case nil:
-                        let s = searchableImagePage(image, result: result, pageKind: pageKind, options: textLayer,
-                                                    runReader: runReader)
+                    formFallback = OutputForm.searchableRefusal(reading: result.text,
+                                                                handwritten: TextLayerRule.isHand(placementKind))
+                    if formFallback == nil, placementKind == nil {
+                        // Only an Every page rule selects an unknown kind. Check the reading copy before omitting
+                        // its text page. The check affects placement only, never the source kind or PDF header.
+                        let handwritten = image.decoded().flatMap { PageKindClassifier.handwritingForPlacement($0) }
+                        if handwritten == true {
+                            placementKind = .handwritten
+                            formFallback = OutputForm.handKeepsTextPage
+                        } else if handwritten == nil {
+                            formFallback = OutputForm.unknownKeepsTextPage
+                        }
+                    }
+                    if formFallback == nil {
+                        let s = searchableImagePage(image, reading: result.text ?? "")
                         if s.page != nil {
                             layered = (s.page, s.outcome)
                             form = .searchable
@@ -173,7 +182,7 @@ struct PDFGenerator {
                     }
                 }
                 if layered == nil {
-                    layered = layeredImagePage(image, result: result, pageKind: pageKind, options: textLayer, runReader: runReader)
+                    layered = layeredImagePage(image, reading: result.text, kind: placementKind, options: textLayer)
                 }
                 if let layered {
                     layer = layered.outcome
@@ -366,13 +375,11 @@ struct PDFGenerator {
 
     /// The image page with its searchable layer, or nil (and why) when it gets none. Never worse than the plain page:
     /// any failure keeps the image page without a layer, and the text page carries the text either way.
-    private func layeredImagePage(_ image: ImagePageData, result: OCRResult, pageKind: OCRPageKind?,
-                                  options: TextLayerOptions, runReader: String?) -> (page: PDFPage?, outcome: TextLayerOutcome) {
-        let kind = TextLayerRule.kind(explicit: pageKind, result: result)
-        let reading = result.text.flatMap { $0.isEmpty ? nil : $0 }
+    private func layeredImagePage(_ image: ImagePageData, reading: String?, kind: PageKindName?,
+                                  options: TextLayerOptions) -> (page: PDFPage?, outcome: TextLayerOutcome) {
+        let reading = reading.flatMap { $0.isEmpty ? nil : $0 }
         let requireAligned: Bool
         switch TextLayerRule.decide(kind: kind, reading: reading, placeHandOnImage: options.placeHandOnImage,
-                                    readerModel: TextLayerRule.readerModel(of: result, run: runReader),
                                     handPlacerInstalled: HandPlacer.isInstalled()) {
         case .textPage(let why): return (nil, .textPage(why))
         case .placeHands: return handLayeredPage(image, reading: reading ?? "")
@@ -406,42 +413,24 @@ struct PDFGenerator {
         }
     }
 
-    /// W42.int-s5-searchable — the page of the searchable form: the image with the reading as its layer, since there is
-    /// no text page. Placed on Vision's lines where the reading aligns with them; otherwise (a kind the rule keeps off the
-    /// image, a reading that does not align, Vision failing) the reading's own lines, unplaced, down the image, so the
-    /// page stays searchable and the run report can name it. A handwritten page never reaches it: it keeps its text page
-    /// (`OutputForm.searchableRefusal`). Nil page (and why) only when no layer could be written at all; the caller then
-    /// writes the pair.
-    private func searchableImagePage(_ image: ImagePageData, result: OCRResult, pageKind: OCRPageKind?,
-                                     options: TextLayerOptions, runReader: String?)
+    /// Writes the reading on the image, using Vision's line positions when they can hold all the text.
+    /// If Vision misses words or lines, keep the full reading as a searchable, unplaced layer.
+    private func searchableImagePage(_ image: ImagePageData, reading: String)
         -> (page: PDFPage?, outcome: TextLayerOutcome, lines: TextLayer.Lines?) {
-        let kind = TextLayerRule.kind(explicit: pageKind, result: result)
-        let reading = result.text ?? ""
-        var why: String
-        switch TextLayerRule.decide(kind: kind, reading: reading, placeHandOnImage: options.placeHandOnImage,
-                                    readerModel: TextLayerRule.readerModel(of: result, run: runReader),
-                                    handPlacerInstalled: HandPlacer.isInstalled()) {
-        case .textPage(let reason): why = reason
-        case .placeHands:
-            // Refused before this (`OutputForm.searchableRefusal`): a handwritten page keeps its text page.
-            return (nil, .textPage(OutputForm.handKeepsTextPage), nil)
-        case .place:
-            why = "the reading did not align with Vision's lines"
-            if Thread.isMainThread { why = "written on the main thread" }
-            else if let cg = image.decoded(), cg.width > 0, let vision = TextLayer.visionLines(of: cg), !vision.isEmpty {
-                let lines = TextLayer.aligned(vision, reading: reading, aspect: Double(cg.height) / Double(cg.width))
-                // There is no text page to keep the rest, so the placed layer is used only when it holds every word
-                // of the reading (a line Vision never found keeps nothing of it) and the writer placed every line.
-                if lines.placement == .aligned {
-                    if let written = writeLayer(image, lines: lines), written.unplaced == 0,
-                       OutputForm.holds(written.page.string ?? "", every: reading) {
-                        return (written.page, TextLayerOutcome(route: .visionLinesAligned, reason: nil,
-                                                               lines: lines.lines.count, unplaced: 0), lines)
-                    }
-                    why = "some of the reading's words are not on Vision's lines"
+        var why = "the reading did not align with Vision's lines"
+        if Thread.isMainThread { why = "written on the main thread" }
+        else if let cg = image.decoded(), cg.width > 0, let vision = TextLayer.visionLines(of: cg), !vision.isEmpty {
+            let lines = TextLayer.aligned(vision, reading: reading, aspect: Double(cg.height) / Double(cg.width))
+            // The placed layer must hold every word because this form has no separate text page.
+            if lines.placement == .aligned {
+                if let written = writeLayer(image, lines: lines), written.unplaced == 0,
+                   OutputForm.holds(written.page.string ?? "", every: reading) {
+                    return (written.page, TextLayerOutcome(route: .visionLinesAligned, reason: nil,
+                                                           lines: lines.lines.count, unplaced: 0), lines)
                 }
-            } else { why = "Vision found no lines" }
-        }
+                why = "some of the reading's words are not on Vision's lines"
+            }
+        } else { why = "Vision found no lines" }
         let lines = OutputForm.unplacedLines(reading)
         let unplacedLayer = TextLayer.lines(lines)
         guard !lines.isEmpty, let written = writeLayer(image, lines: unplacedLayer) else {
@@ -458,13 +447,17 @@ struct PDFGenerator {
         switch handPlacement(image, reading: reading) {
         case .failure(let failure): return (nil, .textPage(failure.reason))
         case .success(let placed):
-            guard placed.passesGate else {
-                return (nil, Self.handOutcome(placed, reason: TextLayerRule.gateReason(placed.confidence), unplaced: 0))
+            if let refusal = TextLayerRule.handPlacementRefusal(placed, reading: reading) {
+                return (nil, Self.handOutcome(placed, reason: refusal, unplaced: 0))
             }
             guard let written = writeLayer(image, lines: placed.lines) else {
                 return (nil, .textPage("the layer could not be written"))
             }
-            return (written.page, Self.handOutcome(placed, reason: nil, unplaced: written.unplaced))
+            // The writer can sort columns or omit a line after alignment. Check the actual layer as read back.
+            guard written.unplaced == 0, TextLayerRule.preservesReadingOrder(reading, placed: written.page.string ?? "") else {
+                return (nil, Self.handOutcome(placed, reason: TextLayerRule.orderReason, unplaced: written.unplaced))
+            }
+            return (written.page, Self.handOutcome(placed, reason: nil, unplaced: 0))
         }
     }
 

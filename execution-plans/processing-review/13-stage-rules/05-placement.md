@@ -21,9 +21,9 @@ calls 6 s a page the hand route's time, which is blla's detection alone [M] `pla
 a page [M] `place-hands-cost.md`):
 
 > Print: Apple Vision's line geometry, with the chosen reader's words aligned onto it, written one run per line; free.
-> Handwriting: kraken blla lines with the reading force-aligned to them by a CTC recogniser; a page whose alignment
-> confidence is under 0.67, or whose reader merges a page's lines into paragraphs, gets a text page instead. The layer
-> sits on the reading copy the user chose (deskewed or as photographed).
+> Handwriting keeps a text page. Kraken blla detects the image lines and a CTC recogniser aligns the reading
+> to them. Where the reading preserves the lines and aligns confidently, the layer sits on the reading copy the
+> user chose (deskewed or as photographed).
 
 - Metric: strict line pass rate, the share of truth lines whose PDFKit drag from first ink to last returns exactly the
   line's words, in order, with no break (F-placement §6.2, owner 2026-10-29). Higher is better. Find and Find-placed
@@ -34,13 +34,13 @@ a page [M] `place-hands-cost.md`):
   page where under half of them anchor (F-placement §6.4) [M]. Fallback: `vision-own`.
 - Handwritten and mixed pages, switch on: `hand-blla-ctc`, the `conf` matcher pick (the higher mean CTC confidence of
   `s1` and `s8` per page), the 0.9 gate (owner, 2026-11-17, was 0.67). Every hand page gets a separate text page; the
-  layer stays on the image beside it only at 0.9 alignment or more, withheld below and named in the run report
-  (W46.place-hands-textpage). A reader flagged
-  `reflows` in stage 04's table goes to `text-page` on every hand page, since the gate does not rescue it (LightOnOCR-3
-  4B: 21.5% line pass, 8 of 20 pages gated) [M] `place-hands-lines.md`, `place-hands.md`. Measured for every hands
-  reader (W46.reader-keeps-lines): 7 of 28 reflow, their median page keeping 0.12 to 0.46 of blla's lines
-  (Infinity-Parser2-Pro, LightOnOCR-3 both builds, PaddleOCR-VL 1.6 both, Xiaomi-OCR-0 both); the other 21 keep
-  0.75 to 0.98, Qwen3.5 27B the closest [M] `reader-keeps-lines.md`.
+  layer stays on the image beside it only when at least 70% of the detected lines are retained and the ordered
+  alignment confidence reaches 0.9. The placed lines must also keep all words in order. The output log gives the reason when the layer is withheld. The line count
+  threshold comes from the handwriting benchmark (W46.reader-keeps-lines): 7 of 28 readers kept a median of
+  0.12 to 0.46 of blla's lines and the other 21 kept 0.75 to 0.98 (`reader-keeps-lines.md`). The app now checks
+  each reading's lines and alignment (W49.proc-settings-rules-proper).
+- A page with no kind on an Every page rule gets the local handwriting check. A handwritten or inconclusive
+  page keeps its text page. The check informs placement without changing the page's recorded kind.
 - Writer: the lab's SearchableWriter (one level run per line, font fitted, 0.25 em reserve) on every kind. One sloped
   run per line loses (−7.4, −10.7 to −4.2) [M] `place-geom.md`; per-word runs lose on owner hands (lab +8.4, +1.2 to
   +15.1) [M] `place-hands-lines.md`.
@@ -63,7 +63,7 @@ not a level, so the field is kept and the schema needs it or the level.
  "metric":{"id":"line_pass_strict","label":"strict line pass rate, PDFKit drag","higher_is_better":true},
  "kinds":["typewritten","printed","handwritten"],
  "rules":[{"id":"place-print-aligned","text":"Print: Vision's line geometry with the reader's words aligned onto it, one run per line.","source":"place-print.md §Verdict","switch":null},
-  {"id":"place-hands","text":"Handwriting: every hand page gets a text page; kraken blla lines, CTC forced alignment and the conf pick also lay the layer on the image where confidence is 0.9 or more, never for a reflowing reader.","source":"place-hands-lines.md §Verdict","switch":{"id":"place.hand_on_image","label":"Also place handwritten text on the page image where the aligner is sure (every hand page keeps a text page)","default":true}},
+  {"id":"place-hands","text":"Handwriting keeps a text page. The image also gets a layer when the reading keeps at least 70% of the detected lines and the ordered alignment confidence is 0.9 or more, with all words kept in order.","source":"place-hands-lines.md §Verdict","switch":{"id":"place.hand_on_image","label":"Also place handwritten text on the page image where the aligner is sure (every hand page keeps a text page)","default":true}},
   {"id":"place-text-only-scripts","text":"Text page only for RTL scripts, CJK and Thai, model-normalised readings and mark transcripts.","source":"F-placement.md §6","switch":null}],
  "fallback":"text-page"}
 ```

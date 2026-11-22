@@ -17910,3 +17910,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Only sampled PDF pages are rendered, in memory. Projects and collections can inherit the batch limit,
   enter an amount, or set No limit. The general no-spending rule and monthly cap still apply.
   <!-- /W49.proc-kind-sample-pdf -->
+
+- [x] **W49.proc-settings-rules-proper — placement by format on the sheet, unknown-kind hand pages, reflow by behaviour [M]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked — Owner, 2026-11-19 (call 21, the accepted-issues sheet; `execution-plans/processing-review/17-accepted-review.json` entry `p-settings-ui-scope`, answers in `answers/17-accepted-review-answers-20261119.json`): owner's note: "'Scope choices made while building settings' seems like a terrible reason for doing something. We should do this the correct way." A per-format placement entry on the sheet; a page no classifier names gets a handwriting check before "Every page" leaves it without a text page; detect a reflowing reader by its output (line order against the layer) rather than its model name.
+  SHIPPED 2026-11-22 (this commit; format picker checkpoint ff17ef22). The sheet edits JPEG, PNG, TIFF, HEIC, PDF
+  or all formats. An unknown page selected by Every page gets an on-device handwriting check and retains its
+  text page when the check reports handwriting or is inconclusive. Hand placement checks actual line retention,
+  alignment confidence and ordered PDF-layer readback. Improve OCR keeps its complete replacement fallback
+  for existing layers.
+  <!-- /W49.proc-settings-rules-proper -->

@@ -56,9 +56,39 @@ enum TextLayerRule {
     static let notDownloadedReason = "handwriting: the handwriting placer has not been downloaded (Settings, Text placement)"
     static let switchOffReason = "handwriting: \"Place handwritten text on the page image\" is off"
     static let noReadingReason = "handwriting: there is no reading to place"
-    static func reflowReason(_ model: String) -> String {
-        "handwriting: \(model) joins a page's lines into paragraphs, so its reading cannot be placed line by line"
+    static let orderReason = "handwriting: the layer did not keep the full reading in order"
+    static let reflowReason = "handwriting: the reading joins the page's lines, so it cannot be placed line by line"
+
+    /// The same line-retention threshold as the handwriting benchmark (reader-keeps-lines.md). Compare this
+    /// reading's cleaned lines with the image's detected lines. The confidence gate separately checks their match
+    /// in order, so a reading with the right number of lines can still fail placement.
+    static func reflows(readingLines: Int, detectedLines: Int) -> Bool {
+        detectedLines >= 2 && Double(readingLines) / Double(detectedLines) < 0.7
     }
+
+    static func handPlacementRefusal(_ placement: HandPlacer.Placement, reading: String) -> String? {
+        if reflows(readingLines: placement.readingLines, detectedLines: placement.detected) { return reflowReason }
+        guard !placement.lines.isEmpty else { return "handwriting: the placer found no lines to write" }
+        guard placement.passesGate else { return gateReason(placement.confidence) }
+        guard preservesReadingOrder(reading, placed: placement.lines.words.joined(separator: " ")) else {
+            return orderReason
+        }
+        return nil
+    }
+
+    /// Ordered alignment can skip a line and still have a high page-average score. Check that the layer
+    /// retains the transcription in image line order. Ignore decoration stripped by the placer and spacing
+    /// or line-end hyphens changed by the PDF writer.
+    static func preservesReadingOrder(_ reading: String, placed: String) -> Bool {
+        func lettersAndNumbers(_ text: String) -> String {
+            text.filter { $0.isLetter || $0.isNumber }
+        }
+        let plain = reading.replacingOccurrences(of: #"<[^>\r\n]+>|\[illegible\]"#, with: " ",
+                                                  options: [.regularExpression, .caseInsensitive])
+            .replacingOccurrences(of: "**", with: "").replacingOccurrences(of: "__", with: "")
+        return lettersAndNumbers(plain) == lettersAndNumbers(placed)
+    }
+
     static func gateReason(_ confidence: Double) -> String {
         String(format: "handwriting: the placer was unsure of the page (confidence %.2f, under %.2f)", confidence, HandPlacer.gate)
     }
@@ -72,46 +102,24 @@ enum TextLayerRule {
         }
     }
 
-    /// Whether a page keeps its text page whatever the form (owner, 2026-11-17): its layout kind is a hand kind, or it
-    /// was read as handwriting (a tagged clipping keeps the layout kind clippings when its hand is handwritten).
-    static func keepsTextPage(kind: PageKindName?, result: OCRResult) -> Bool {
-        isHand(kind) || isHand(result.pageReader?.readingKind)
+    /// A tagged clipping keeps its layout kind for the format rule while its writing goes to the hand placer.
+    static func placementKind(_ kind: PageKindName?, result: OCRResult) -> PageKindName? {
+        if isHand(kind) { return kind }
+        if let readingKind = result.pageReader?.readingKind, isHand(readingKind) { return readingKind }
+        return kind
     }
 
-    /// The readers `05-placement.md` §3 flags `reflows` (W46.reader-keeps-lines: their median page keeps 0.12 to 0.46
-    /// of blla's lines, and the gate does not rescue them): Infinity-Parser2-Pro, LightOnOCR-3, PaddleOCR-VL 1.6 and
-    /// Xiaomi-OCR-0, every build. Matched on the model's name as the run records it.
-    static func reflows(_ model: String) -> Bool {
-        let m = model.lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "_", with: "-")
-        return ["infinity-parser", "lightonocr", "paddleocr-vl", "xiaomi-ocr"].contains { m.contains($0) }
-    }
-
-    /// The model whose reading the page holds: an imported reading's, a second reader's, the reader its kind chose, else
-    /// the run's own (`run`, every name the run knows it by: the model, the gateway's or the local agent's).
-    static func readerModel(of result: OCRResult, run: String? = nil) -> String? {
-        result.imported?.model ?? result.secondReader?.model ?? result.pageReader?.model ?? run
-    }
-
-    /// The run's reader as `readerModel` takes it: every name it goes by, so a reflowing model is caught under any.
-    static func runReader(model: LLMModel?, gateway: String? = nil, localAgent: String? = nil) -> String? {
-        let names = [model?.id, model?.displayName, gateway, localAgent].compactMap { $0 }.filter { !$0.isEmpty }
-        return names.isEmpty ? nil : names.joined(separator: " ")
-    }
-
-    /// The decision for a page of `kind` (nil: unknown) read as `reading` by `readerModel`. `handPlacerInstalled`:
-    /// whether the hand placer's download is in place (`HandPlacer.isInstalled`).
-    static func decide(kind: PageKindName?, reading: String?, placeHandOnImage: Bool, readerModel: String? = nil,
+    /// A page of unknown kind is placed only if its reading aligns with Vision's lines.
+    static func decide(kind: PageKindName?, reading: String?, placeHandOnImage: Bool,
                        handPlacerInstalled: Bool) -> Decision {
         // Scripts the writer has no path for (right to left) or Vision gives no word boxes for (F-placement §6.6-6.7).
         if let reading, let script = unplaceableScript(reading) { return .textPage(script) }
         switch kind {
         case .handwritten?, .mixed?, .registers?:
             // §3: switch on, `hand-blla-ctc` beside the text page, the layer withheld under the 0.9 gate (the caller's,
-            // once the placer has run; owner, 2026-11-17); switch off, the text page; a reader that reflows, the text page
-            // on every hand page. A register is a handwritten ledger (`isHand`).
+            // once the placer has run; owner, 2026-11-17). A register is a handwritten ledger (`isHand`).
             guard placeHandOnImage else { return .textPage(switchOffReason) }
             guard let reading, !reading.isEmpty else { return .textPage(noReadingReason) }
-            if let readerModel, reflows(readerModel) { return .textPage(reflowReason(readerModel)) }
             return handPlacerInstalled ? .placeHands : .textPage(notDownloadedReason)
         case .typewritten?, .printed?, .forms?, .newspapers?, .clippings?:
             // §3's print kinds; a whole newspaper page is print read in columns, as Vision OCR places it.

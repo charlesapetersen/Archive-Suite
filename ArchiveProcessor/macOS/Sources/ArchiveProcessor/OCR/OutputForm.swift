@@ -39,8 +39,10 @@ enum OutputForm: String, Codable, Sendable {
     /// Said of a handwritten page chosen for the searchable form, which is written as a pair.
     static let handKeepsTextPage = "handwriting: every handwritten page keeps its text page"
 
+    static let unknownKeepsTextPage = "the page's writing could not be identified, so it keeps its text page"
+
     /// Why a page chosen for the searchable form is written as a pair: a handwritten page (`handwritten`,
-    /// `TextLayerRule.keepsTextPage`: every handwritten page keeps its text page, the placed layer only beside it;
+    /// `TextLayerRule.placementKind`: every handwritten page keeps its text page, the placed layer only beside it;
     /// owner, 2026-11-17), no reading (the text page says what failed), or a script the writer cannot hold even
     /// unplaced (`TextLayerRule.unplaceableScript`). Nil when it can be written.
     static func searchableRefusal(reading: String?, handwritten: Bool) -> String? {
