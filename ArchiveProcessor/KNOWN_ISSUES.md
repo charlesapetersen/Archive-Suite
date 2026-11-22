@@ -370,8 +370,9 @@ When label reading needs Gemma, the Processor checks the existing local servers 
 
 - **Its estimate is OpenRouter's generic one.** Image tokens are counted as for any OpenRouter model, reasoning as
   1,024 tokens a page whatever the level (High may spend up to its 8,000-token budget more), and `max_price` caps
-  the price per token, not the number of tokens. A model the listing gives a per-image or per-request charge is not
-  listed (typed, it is unpriced), since neither the estimate nor `max_price` counts that charge. (queued: W49.proc-openrouter-list-image-priced).
+  the price per token, not the number of tokens. OpenRouter models with a per-image or per-request charge appear
+  as “price not estimated” in the picker and estimate. The app sends those requests without a price ceiling
+  (W49.proc-openrouter-list-image-priced).
 - **No provider is pinned, so the precision and the upstream's terms are unknown**; `data_collection: "deny"` is
   sent on every request, so an upstream that may keep or train on pages is refused. (accepted: unmeasured models are unpinned by design; `data_collection: "deny"` guards the pages).
 

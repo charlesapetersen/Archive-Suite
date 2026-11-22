@@ -142,8 +142,7 @@ struct SettingsEstimateStrip: View {
                 localAgentCostPane
             } else if !useGateway, selectedProvider == .openrouter, openRouterPricesRead >= 0,
                       OpenRouterRoute.isUnpriced(selectedModel) {
-                // W41.app-openrouter-unmeasured: a typed OpenRouter id the listing does not price, as an unpriced gateway.
-                Text("OpenRouter's listing gives no price for this model, so there is no cost estimate and no price ceiling.")
+                Text(OpenRouterRoute.unpricedEstimateMessage)
                     .font(.caption).foregroundStyle(.primary)
             } else if let model = useGateway ? gatewayModel : selectedModel {
                 let gateway = GatewayConfig.fromDefaults()
@@ -252,6 +251,9 @@ struct SettingsEstimateStrip: View {
              ? "Apple Vision transcribes locally. Only the resulting text is sent to the selected direct LLM for judgement; no image or Vision setting leaves this Mac."
              : "Apple Vision transcribes locally using the Mac's performance cores. It sends no image, text, or API key off this Mac.")
             .font(.caption2).foregroundStyle(.primary)
+        if visionUseLLMJudgment && OpenRouterRoute.isUnpriced(selectedModel) {
+            Text(OpenRouterRoute.unpricedEstimateMessage).font(.caption)
+        }
         Divider().padding(.vertical, 2)
         Text("SCOPE").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)
         Text(visionUseLLMJudgment

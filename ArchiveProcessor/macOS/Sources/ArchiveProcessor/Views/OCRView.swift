@@ -399,7 +399,7 @@ struct OCRView: View {
         return modelStore.unavailableOpenRouterSelection(for: selectedProvider)
     }
 
-    /// W41.app-openrouter-unmeasured: the run's model is an OpenRouter model the listing gives no price for.
+    /// The OpenRouter model used for page reading has no usable estimate.
     private var openRouterUnpriced: Bool {
         openRouterListingRead >= 0 && !useGateway && !useLocalAgent && !useAppleVision
             && OpenRouterRoute.isUnpriced(selectedModel)
@@ -812,7 +812,9 @@ struct OCRView: View {
                                 .font(.caption2)
                                 .foregroundStyle(.primary)
                                 .padding(.top, 2)
-                            if visionUseLLMJudgment, let est = costEstimate {
+                            if visionUseLLMJudgment && OpenRouterRoute.isUnpriced(selectedModel) {
+                                Text(OpenRouterRoute.unpricedEstimateMessage).font(.caption)
+                            } else if visionUseLLMJudgment, let est = costEstimate {
                                 HStack {
                                     Text("Text-only judgement:").foregroundStyle(.primary)
                                     Spacer()
@@ -866,7 +868,7 @@ struct OCRView: View {
                 } else if openRouterUnpriced && !droppedFiles.isEmpty {
                     GroupBox("Cost Estimate") {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("OpenRouter's listing gives no price for this model, so there is no cost estimate and no price ceiling.")
+                            Text(OpenRouterRoute.unpricedEstimateMessage)
                                 .font(.caption)
                                 .foregroundStyle(.primary)
                                 .accessibilityIdentifier("ap.ocr.openRouterUnpriced")
@@ -1104,7 +1106,7 @@ struct OCRView: View {
                     } else if useAppleVision {
                         Text("Vision reads the regions locally, with no image-reading charge. Any optional text-only judgement is estimated separately above.")
                     } else if openRouterUnpriced {
-                        Text("OpenRouter lists no price for this model, so there is no dollar allowance; the request allowance still applies.")
+                        Text("Price not estimated. The request allowance still applies.")
                     } else if useGateway && !gatewayHasCosts {
                         Text("Gateway pricing is unknown. Enter model pricing to see a dollar allowance; the request allowance still applies.")
                     } else {

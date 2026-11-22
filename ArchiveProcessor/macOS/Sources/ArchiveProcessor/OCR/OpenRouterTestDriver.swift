@@ -364,9 +364,9 @@ enum OpenRouterTestDriver {
         eq("9 no listing read, nothing typed: the pinned routes only", LLMProvider.openrouter.models.map(\.id),
            OpenRouterRoute.makerRoutes.map(\.model.id) + OpenRouterRoute.openRoutes.map(\.model.id))
         func row(_ id: String, _ input: [String], _ output: [String], _ prompt: String?, _ completion: String?,
-                 _ params: [String] = [], image: String? = nil) -> String {
+                 _ params: [String] = [], image: String? = nil, request: String? = nil) -> String {
             let price = [prompt.map { #""prompt":"\#($0)""# }, completion.map { #""completion":"\#($0)""# },
-                         image.map { #""image":"\#($0)""# }]
+                         image.map { #""image":"\#($0)""# }, request.map { #""request":"\#($0)""# }]
                 .compactMap { $0 }.joined(separator: ",")
             return #"{"id":"\#(id)","name":"N \#(id)","architecture":{"input_modalities":\#(input),"output_modalities":\#(output)},"#
                 + #""pricing":{\#(price)},"supported_parameters":\#(params)}"#
@@ -376,26 +376,28 @@ enum OpenRouterTestDriver {
             row("x/text-only", ["text"], ["text"], "0.0000001", "0.0000001"),
             row("x/draws", ["text", "image"], ["image"], "0.0000001", "0.0000001"),
             row("openrouter/auto", ["text", "image"], ["text"], "-1", "-1"),
-            row("qwen/qwen3.6-27b", ["text", "image"], ["text"], "0.00000025", "0.000002"),
+            row("qwen/qwen3.6-27b", ["text", "image"], ["text"], "0.00000025", "0.000002", request: "0.005"),
             row("openai/gpt-5-nano", ["text", "image", "file"], ["text"], "0.00000005", "0.0000004", ["reasoning"]),
             row("y/free:free", ["image", "text"], ["text"], "0", "0"),
             row("y/half-priced", ["image"], ["text"], "0.000001", nil),
-            row("y/per-image", ["image"], ["text"], "0.000001", "0.000001", image: "0.001"),
+            row("y/per-image", ["image"], ["text"], "0.000001", "0.000001", ["reasoning"], image: "0.001"),
+            row("y/per-request", ["image"], ["text"], nil, nil, request: "0.01"),
             row("y/image-free", ["image"], ["text"], "0.000001", "0.000001", image: "0"),
         ].joined(separator: ",") + "]}"
         guard let entries = OpenRouterListing.parse(Data(json.utf8)) else { check("9 the listing parses", false); return }
         eq("9 the image filter: image in, text out", entries.map(\.id),
            ["anthropic/claude-sonnet-4.6", "openrouter/auto", "qwen/qwen3.6-27b", "openai/gpt-5-nano", "y/free:free",
-            "y/half-priced", "y/per-image", "y/image-free"])
-        eq("9 a router's -1, a half price and a per-image charge are no price", entries.filter { !$0.priced }.map(\.id),
-           ["openrouter/auto", "y/half-priced", "y/per-image"])
+            "y/half-priced", "y/per-image", "y/per-request", "y/image-free"])
+        eq("9 incomplete token rates and image or request charges give no token-only estimate",
+           entries.filter { !$0.priced }.map(\.id),
+           ["openrouter/auto", "qwen/qwen3.6-27b", "y/half-priced", "y/per-image", "y/per-request"])
         check("9 not a listing", OpenRouterListing.parse(Data(#"{"error":"x"}"#.utf8)) == nil)
         let listing = OpenRouterListing.Stored(entries: entries, fetched: Date())
         OpenRouterListing.testListing = listing
         let models = LLMProvider.openrouter.models
-        eq("9 the pinned routes, then the listing's priced image models no pin offers", models.map(\.id),
+        eq("9 pinned routes, then image models with token rates or an image/request charge", models.map(\.id),
            OpenRouterRoute.makerRoutes.map(\.model.id) + OpenRouterRoute.openRoutes.map(\.model.id)
-            + ["anthropic/claude-sonnet-4.6", "openai/gpt-5-nano", "y/free:free", "y/image-free"])
+            + ["anthropic/claude-sonnet-4.6", "openai/gpt-5-nano", "y/free:free", "y/per-image", "y/per-request", "y/image-free"])
         guard let claude = models.first(where: { $0.id == "anthropic/claude-sonnet-4.6" }),
               let nano = models.first(where: { $0.id == "openai/gpt-5-nano" }) else { check("9 models listed", false); return }
         eq("9 marked not measured in the picker", claude.displayName, "N anthropic/claude-sonnet-4.6 (not measured)")
@@ -426,6 +428,20 @@ enum OpenRouterTestDriver {
             let r = try? await client.ocr(imageURL: image)
             guard r?.text == "Hello archive", let data = wire.requests.first?.httpBody else { return nil }
             return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        }
+        for id in ["y/per-image", "y/per-request"] {
+            guard let model = models.first(where: { $0.id == id }) else {
+                check("9 charged image model is listed", false, id)
+                continue
+            }
+            check("9 charged model is offered and marked price not estimated", OpenRouterRoute.isUnpriced(model)
+                  && model.displayName.contains("price not estimated")
+                  && OpenRouterRoute.unavailableSelection(id) == nil, id)
+            eq("9 listed reasoning support survives unpriced model construction", model.supportsThinking, id == "y/per-image")
+            let body = await sent(model)
+            eq("9 the charged model itself reads", body?["model"] as? String, id)
+            eq("9 an unpriced request still denies data collection", (body?["provider"] as? [String: String]),
+               ["data_collection": "deny"])
         }
         guard let body = await sent(claude) else { check("9 an unpinned model reads", false); return }
         eq("9 the model's own id", body["model"] as? String, "anthropic/claude-sonnet-4.6")
@@ -460,10 +476,11 @@ enum OpenRouterTestDriver {
         let withTyped = LLMProvider.openrouter.models
         eq("9 typed ids follow, once each", withTyped.map(\.id).suffix(3), ["y/image-free", "someone/new-vision-model", "openrouter/auto"])
         guard let fresh = withTyped.first(where: { $0.id == "someone/new-vision-model" }) else { check("9 typed listed", false); return }
-        eq("9 a typed id is marked not measured", fresh.displayName, "someone/new-vision-model (not measured)")
+        eq("9 a typed id is marked unmeasured and unpriced", fresh.displayName,
+           "someone/new-vision-model (not measured, price not estimated)")
         check("9 a typed id the listing does not price is unpriced", OpenRouterRoute.isUnpriced(fresh)
               && withTyped.first { $0.id == "openrouter/auto" }.map(OpenRouterRoute.isUnpriced) == true)
-        check("9 the unpriced note", OpenRouterRoute.unmeasuredNote(fresh).contains("no cost estimate and no price ceiling"))
+        check("9 the unpriced note", OpenRouterRoute.unmeasuredNote(fresh).contains(OpenRouterRoute.unpricedEstimateMessage))
         guard let typedBody = await sent(fresh) else { check("9 a typed id reads", false); return }
         let typedProvider = typedBody["provider"] as? [String: Any] ?? [:]
         eq("9 unpriced: data_collection deny and no max_price", typedProvider.keys.sorted(), ["data_collection"])

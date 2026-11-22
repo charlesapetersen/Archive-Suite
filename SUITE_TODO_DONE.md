@@ -17876,3 +17876,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Batch resume, Retry, Live Capture recovery and dating contracts passed. The two-page Processor smoke and
   three-page Android-to-Mac capture round trip passed on synthetic images, with estimated API spend below $0.06.
   <!-- /W49.proc-training-deny-per-job -->
+
+- [x] **W49.proc-openrouter-list-image-priced — OpenRouter models priced per image or request are listed, marked unpriced [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit) — Owner, 2026-11-19 (call 21, the accepted-issues sheet; `execution-plans/processing-review/17-accepted-review.json` entry `p-openrouter-image-priced`, answers in `answers/17-accepted-review-answers-20261119.json`): change it. List them with "price not estimated" in the picker and the estimate; the measured-model handling stays as it is.
+  Image-reading models with a per-image or per-request charge appear after the pinned models. The picker
+  and cost panes show “price not estimated”. The requests still deny data collection and omit the price
+  ceiling. Measured models keep their existing routes and estimates. The new entries appear after the
+  normal catalogue refresh. The key-free OpenRouter and synthetic PDF smoke tests passed. The off-screen
+  UI test verified the picker, the Process Files estimate and the Settings estimate.
+  <!-- /W49.proc-openrouter-list-image-priced -->

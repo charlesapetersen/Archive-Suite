@@ -210,6 +210,18 @@ enum ProcessorUITestConfiguration {
         defaults.set(LocalAgentTool.claude.rawValue, forKey: DefaultsKeys.localAgentTool)
         defaults.set(claudeAuthFixture()?.path ?? "", forKey: DefaultsKeys.localAgentBinaryPath)
         defaults.set("", forKey: DefaultsKeys.localAgentModel)
+        if arguments.contains("-APUITestOpenRouterImageCharge") {
+            let listing = #"""
+                {"data":[{"id":"test/vision-per-image","name":"Fixture Image Reader",
+                "architecture":{"input_modalities":["image"],"output_modalities":["text"]},"pricing":{"image":"0.01"}}]}
+                """#
+            if let entries = OpenRouterListing.parse(Data(listing.utf8)),
+               let data = try? JSONEncoder().encode(OpenRouterListing.Stored(entries: entries, fetched: Date())) {
+                var domain = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
+                domain[OpenRouterListing.defaultsKey] = data
+                defaults.setVolatileDomain(domain, forName: UserDefaults.argumentDomain)
+            }
+        }
         // A test that picks Light or Dark must not leave the next test in that mode; the relaunch check keeps it.
         if !arguments.contains("-APUITestKeepAppearance") {
             defaults.removeObject(forKey: AppAppearance.defaultsKey)

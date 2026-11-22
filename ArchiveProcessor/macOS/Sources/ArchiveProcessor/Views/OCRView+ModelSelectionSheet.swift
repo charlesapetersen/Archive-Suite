@@ -146,9 +146,11 @@ struct ModelSelectionSheet: View {
                     Toggle(model.displayName, isOn: isOn)
                         .font(.caption)
                     Spacer()
-                    Text(formatCost(model))
-                        .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.primary)
+                    if !OpenRouterRoute.isUnpriced(model) {
+                        Text(formatCost(model))
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(.primary)
+                    }
                 }
                 .padding(.leading, 16)
             }

@@ -3,10 +3,10 @@ import Foundation
 /// W41.app-openrouter-unmeasured — OpenRouter's model listing (`GET /api/v1/models`, no key), so an OpenRouter key can
 /// run any image-reading model the user prefers, not only the pinned routes the bench measured (owner, 2026-11-18:
 /// "The user should be able to run any models they prefer via OpenRouter"). Every model the listing says takes an
-/// image and returns text, at a price it lists, is offered after the pinned routes, marked not measured; a model id
-/// the user typed (`CustomModelStore`, provider OpenRouter) is offered at the listing's price, or unpriced when the
-/// listing has none. Such a model has no provider pinned (`OpenRouterRoute.unpinned`): OpenRouter picks the upstream,
-/// every request says `data_collection: "deny"`, and its `max_price` is the price the estimate showed.
+/// image and returns text is offered after the pinned routes if it has usable token prices or a per-image or
+/// per-request charge. The latter are marked “price not estimated”. Typed IDs (`CustomModelStore`) are also offered.
+/// These models are unpinned (`OpenRouterRoute.unpinned`) and use `data_collection: "deny"`. A request includes
+/// `max_price` only when the price was estimated.
 ///
 /// Read with the endpoint prices (`OpenRouterPrices`), when the OpenRouter models show in Settings or a run is set up
 /// with an OpenRouter key: at most once a day, a failed attempt waits an hour, one request with no retries. Kept in
@@ -21,7 +21,11 @@ enum OpenRouterListing {
         /// The listing names `reasoning` among the model's supported parameters.
         let reasons: Bool
 
+        // Optional so listings cached before this field was added still decode.
+        var hasImageOrRequestCharge: Bool? = nil
+
         var priced: Bool { inputPer1M != nil && outputPer1M != nil }
+        var offeredInPicker: Bool { priced || hasImageOrRequestCharge == true }
     }
 
     struct Stored: Codable, Equatable, Sendable {
@@ -46,25 +50,34 @@ enum OpenRouterListing {
                   (arch["output_modalities"] as? [String])?.contains("text") == true else { return nil }
             let pricing = row["pricing"] as? [String: Any]
             var input = perMillion(pricing?["prompt"]), output = perMillion(pricing?["completion"])
-            // A charge per image or per request is one the estimate does not count and `max_price` does not cap, so a
-            // model with one is not priced here (offered only typed, as unpriced).
-            let extra = ["image", "request"].contains { key in
-                pricing?[key] != nil && perMillion(pricing?[key]).map { $0 > 0 } != false
+            let extraCharges = ["image", "request"].compactMap { pricing?[$0] }
+            // A positive or unreadable charge rules out a token-only estimate. Only a known positive charge
+            // makes an otherwise unpriced entry eligible for the picker.
+            let extraPrices = extraCharges.map(unitPrice)
+            let hasCharge = extraPrices.contains { ($0 ?? 0) > 0 }
+            if input == nil || output == nil || hasCharge || extraPrices.contains(nil) {
+                input = nil
+                output = nil
             }
-            if input == nil || output == nil || extra { input = nil; output = nil }
             let params = row["supported_parameters"] as? [String] ?? []
             return Entry(id: id, name: (row["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? id,
-                         inputPer1M: input, outputPer1M: output, reasons: params.contains("reasoning"))
+                         inputPer1M: input, outputPer1M: output, reasons: params.contains("reasoning"),
+                         hasImageOrRequestCharge: hasCharge ? true : nil)
         }
     }
 
     /// Dollars per token as the listing's string ("0.0000002"), per million; nil for a negative (a router's "-1"),
     /// non-finite, unreadable or missing price. Zero is a price (a free model).
     private static func perMillion(_ value: Any?) -> Double? {
-        guard let perToken = (value as? String).flatMap(Double.init) ?? (value as? Double),
-              perToken.isFinite, perToken >= 0 else { return nil }
+        guard let perToken = unitPrice(value) else { return nil }
         // Rounded to a millionth of a dollar per million tokens: the string's float noise is not a price.
         return (perToken * 1_000_000 * 1_000_000).rounded() / 1_000_000
+    }
+
+    private static func unitPrice(_ value: Any?) -> Double? {
+        guard let price = (value as? String).flatMap(Double.init) ?? (value as? Double),
+              price.isFinite, price >= 0 else { return nil }
+        return price
     }
 
     static func stored(_ defaults: UserDefaults = .standard) -> Stored? {
@@ -101,8 +114,7 @@ enum OpenRouterListing {
         (listing ?? stored())?.entries.first { $0.id == id }
     }
 
-    /// The picker's unmeasured models: every priced image model the listing has that no pinned route already offers,
-    /// marked not measured, at the listing's price, with no batch discount.
+    /// The picker's eligible image models, excluding IDs already offered by a pinned route.
     static func unmeasuredModels(_ listing: Stored? = nil) -> [LLMModel] {
         guard let listing = listing ?? stored() else { return [] }
         // Built once per listing: the model list is read on every render.
@@ -111,7 +123,7 @@ enum OpenRouterListing {
         let pinned = Set(OpenRouterRoute.catalog.map(\.model.id))
         var seen = Set<String>()
         let models = listing.entries.compactMap { e -> LLMModel? in
-            guard e.priced, !pinned.contains(e.id), seen.insert(e.id).inserted else { return nil }
+            guard e.offeredInPicker, !pinned.contains(e.id), seen.insert(e.id).inserted else { return nil }
             return model(e.id, name: e.name, entry: e)
         }
         builtModels = (listing, models)
@@ -123,14 +135,15 @@ enum OpenRouterListing {
     static func typed(_ custom: LLMModel, _ listing: Stored? = nil) -> LLMModel {
         let e = entry(custom.id, in: listing)
         let base = custom.displayName == custom.id ? (e?.name ?? custom.id) : custom.displayName
-        return model(custom.id, name: base, entry: e?.priced == true ? e : nil, reasons: custom.supportsThinking)
+        return model(custom.id, name: base, entry: e?.offeredInPicker == true ? e : nil, reasons: custom.supportsThinking)
     }
 
     private static func model(_ id: String, name: String, entry: Entry?, reasons: Bool = false) -> LLMModel {
-        LLMModel(id: id, displayName: "\(name) (not measured)", provider: .openrouter,
-                 supportsThinking: entry?.reasons ?? reasons, returnsMd: false,
-                 inputCostPer1M: entry?.inputPer1M ?? 0, outputCostPer1M: entry?.outputPer1M ?? 0, batchDiscount: 1,
-                 unpriced: entry == nil ? true : nil)
+        let label = entry?.priced == true ? "(not measured)" : "(not measured, price not estimated)"
+        return LLMModel(id: id, displayName: "\(name) \(label)", provider: .openrouter,
+                        supportsThinking: entry?.reasons ?? reasons, returnsMd: false,
+                        inputCostPer1M: entry?.inputPer1M ?? 0, outputCostPer1M: entry?.outputPer1M ?? 0, batchDiscount: 1,
+                        unpriced: entry?.priced == true ? nil : true)
     }
 
     /// Reads the listing when the stored one is missing or older than a day (always when `force`). Returns a line for

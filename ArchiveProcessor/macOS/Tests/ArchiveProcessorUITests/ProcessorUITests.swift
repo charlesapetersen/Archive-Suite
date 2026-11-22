@@ -155,6 +155,32 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(waitUntil { !warning.exists }, "an explicit replacement clears the saved-model warning")
     }
 
+    func testOpenRouterImageChargeIsListedAndShownWithoutAnEstimate() throws {
+        relaunch(extra: ["-APUITestSyntheticMultiPagePDF", "-APUITestOpenRouterImageCharge",
+                         "-selectedProvider", "OpenRouter", "-selectedModelId_OpenRouter", "test/vision-per-image",
+                         "-useAppleVision", "NO", "-useGateway", "NO", "-useLocalAgent", "NO"])
+        let estimate = element("ap.ocr.openRouterUnpriced")
+        XCTAssertTrue(estimate.waitForExistence(timeout: 10))
+        XCTAssertTrue(renderedText(of: estimate).contains("Price not estimated"))
+        XCTAssertFalse(element("ap.ocr.pdfPageCost").exists)
+        attachScreenshot("processor-openrouter-image-charge-estimate")
+
+        openSettings("Collection")
+        let settingsEstimate = element("ap.settings.costPane")
+        XCTAssertTrue(settingsEstimate.waitForExistence(timeout: 10))
+        XCTAssertTrue(renderedText(of: settingsEstimate).contains("Price not estimated"))
+
+        XCTAssertTrue(app.showSettingsPanel("Reading"))
+        let picker = element("ap.settings.modelPicker")
+        XCTAssertTrue(picker.waitForExistence(timeout: 5))
+        let label = "Fixture Image Reader (not measured, price not estimated)"
+        XCTAssertTrue(renderedText(of: picker).contains(label), picker.debugDescription)
+        picker.click()
+        XCTAssertTrue(app.menuItems[label].waitForExistence(timeout: 5))
+        attachScreenshot("processor-openrouter-image-charge-picker")
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
     /// W40.fix-suite-shortcuts: File ▸ Add Files… (⌘O) and Choose Output Folder… (⇧⌘O, the suite's "choose
     /// folder" key) open the panels their buttons open, and Processing ▸ Stop Processing is listed on ⌘.
     func testFileMenuShortcutsOpenTheirPanels() throws {

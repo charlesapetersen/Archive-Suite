@@ -693,9 +693,9 @@ struct OpenRouterRoute: Sendable, Equatable {
         return unavailableMessage(id)
     }
 
-    /// Whether the app offers `id` unpinned: a priced image model in OpenRouter's listing, or an id the user typed.
+    /// Whether the app offers `id` unpinned: an eligible image model in OpenRouter's listing, or an id the user typed.
     static func offered(_ id: String) -> Bool {
-        OpenRouterListing.entry(id)?.priced == true
+        OpenRouterListing.entry(id)?.offeredInPicker == true
             || OpenRouterListing.typedModels().contains { $0.id == id }
     }
 
@@ -706,12 +706,14 @@ struct OpenRouterRoute: Sendable, Equatable {
         OpenRouterRoute(model: model, providerTag: "", precision: "", reasoning: .none, measured: "", pinned: false)
     }
 
-    /// An unpinned model the listing gave no price for when it was offered (a typed id it does not list, or lists
-    /// without one): no estimate and no `max_price`. A priced model at $0 (a free one) is priced. Read from the model,
+    /// An unpinned model the app cannot estimate: no estimate and no `max_price`.
+    /// A priced model at $0 (a free one) is priced. Read from the model,
     /// never the live listing, so the request's ceiling is what the run's estimate said.
     static func isUnpriced(_ model: LLMModel) -> Bool {
         model.provider == .openrouter && model.unpriced == true && forModel(model.id) == nil
     }
+
+    static let unpricedEstimateMessage = "Price not estimated. OpenRouter may charge for this model without a price ceiling."
 
     /// Under the Settings model picker for an unpinned model.
     static func unmeasuredNote(_ model: LLMModel) -> String {
@@ -719,8 +721,7 @@ struct OpenRouterRoute: Sendable, Equatable {
             + "nor whose terms apply is known; every request asks OpenRouter not to use a provider that may keep or "
             + "train on the pages."
         if isUnpriced(model) {
-            return "Not measured: the bench has never read pages with this model. OpenRouter's listing gives no price "
-                + "for it, so there is no cost estimate and no price ceiling. " + terms
+            return "Not measured: the bench has never read pages with this model. " + unpricedEstimateMessage + " " + terms
         }
         let reasoning = model.supportsThinking
             ? " Its reasoning tokens are billed as output; the estimate allows \(Int(CostEstimator.estimatedThinkingTokens(for: model))) a page." : ""
