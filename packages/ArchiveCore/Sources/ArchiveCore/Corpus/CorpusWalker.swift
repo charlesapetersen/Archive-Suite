@@ -601,9 +601,11 @@ public enum CorpusWalker {
     /// This is the warm-start revalidation first phase: one cheap, fresh syscall per enumerated path,
     /// then callers compare against a persisted map and run the full trustworthy tag read only for
     /// new/changed/unverified rows. Byte-exact paths are preserved exactly as enumeration returned.
+    /// Pass `followFileSymlinks: false` when only physical files in the root are candidates.
     public static func scanFingerprints(
         root: URL,
         options: Options = Options(),
+        followFileSymlinks: Bool = true,
         isCancelled: @Sendable () -> Bool = { false },
         onProgress: (@Sendable (Int) -> Void)? = nil
     ) -> CorpusFingerprintScanResult {
@@ -644,7 +646,7 @@ public enum CorpusWalker {
             while let object = enumerator.nextObject() {
                 if isCancelled() { cancelled = true; break }
                 guard let url = object as? URL else { continue }
-                switch FileStat.capture(url) {
+                switch FileStat.capture(url, followSymlinks: followFileSymlinks) {
                 case .vanished:
                     vanished += 1
                 case let .failed(reason):
@@ -773,12 +775,13 @@ enum FileStat {
     /// not just the one it broke in. It is excluded from `entries` (as the Spotlight-era loader also
     /// excluded it) and deliberately does not make the pass unclean, so a tree full of dead links
     /// stays authoritative — but `vanishedMidScan` on such a tree is a floor, not a churn signal.
-    static func capture(_ url: URL) -> FileStat {
+    static func capture(_ url: URL, followSymlinks: Bool = true) -> FileStat {
         url.withUnsafeFileSystemRepresentation { rawPath -> FileStat in
             guard let rawPath else { return .failed("path has no filesystem representation") }
             var info = stat()
             errno = 0
-            guard stat(rawPath, &info) == 0 else {
+            let status = followSymlinks ? stat(rawPath, &info) : lstat(rawPath, &info)
+            guard status == 0 else {
                 let code = errno
                 return code == ENOENT ? .vanished : .failed("stat failed: \(describe(code))")
             }

@@ -11,6 +11,15 @@ public enum CatalogueAssociation {
             self.rootInstanceID = rootInstanceID
             self.relativePath = relativePath
         }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.rootInstanceID == rhs.rootInstanceID && lhs.relativePath.utf8.elementsEqual(rhs.relativePath.utf8)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(rootInstanceID)
+            hasher.combine(Data(relativePath.utf8))
+        }
     }
 
     /// Positive proof from the selected PDF's embedded Suite identity or a verified explicit association.

@@ -88,4 +88,33 @@ or historical value.
 `CatalogueRecord` retains the original JSON bytes for lossless unchanged export, including optional
 unknown data at any depth. Its typed view is for reading. A future editor must patch a lossless
 representation and revalidate it, or refuse the operation if it cannot safely preserve unfamiliar data.
-This contract has no file I/O or edit entry point.
+Record decoding is pure. The shared reader below supplies read-only file access.
+
+## Scoped reads and refresh
+
+`CatalogueReader` runs while the caller holds a successfully resolved, non-stale grant for one
+root instance. Full discovery inventories PDFs independent of tags. A caller with an existing scan
+can supply its canonical relative paths and say whether the entire root was successfully inventoried.
+Extra paths, such as a selected Notes link, are checked under the same grant. Reads reject symbolic
+links and aliased spellings inside the root. Hard-linked PDFs and companions are unavailable because
+two names can share one physical file. Reads never request cloud downloads. The reader obtains positive
+identity from a trusted callback on the open PDF descriptor, independently of the JSON. Production
+identity carriers and confirmed-association acquisition are staged with the writer and producer.
+
+`ItemFacts` reports legacy or the selected file's availability and resolves its document from the
+selected physical page. A file-only selection of a merged record has ambiguous document facts. File
+fields and the selected page stay available when a foreign owner cannot be resolved. A partial
+inventory cannot certify a unique foreign owner. Two positively identified PDF occurrences of the
+owner file ID are ambiguous even if one lacks a companion. A positively identified PDF whose
+companion is unavailable reports that failure for the owner. A PDF whose own bytes are offline
+cannot establish an owner ID on a cold scan. Its own row reports offline. If there is no independently
+identified occurrence of the requested owner, the split member reports missing owner. An enclosure
+resolves from the record declaring the edge, independently of the Sent with date.
+
+The caller publishes refreshed snapshots to `CatalogueFactsUpdates` for that root. A scoped
+subscription refreshes on availability changes, content generation or companion revisions, including
+changes to a split document's owner or enclosure. The comparison includes a hash of the companion
+bytes, so a conflicting record claiming the same revision with the same timestamp still invalidates
+cached facts. The hash is an invalidation input and proves no PDF association. Rebuilding a cache
+starts with a fresh read. Consumers connect their file-event loops during app integration, where
+cold discovery cost and cloud-provider behavior still need verification at the target scale.

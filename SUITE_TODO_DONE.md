@@ -17956,3 +17956,15 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   history, Notes source dates and shared Zotero payloads. Checked against the schema and current
   consumer paths. This closes the mapping stage. Implementation stays with the staged queue items.
   <!-- /W49.item-fields-home -->
+
+- [x] **W49.storage-reads — Resolve catalogue companions and their owning documents [M · Tier-2]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit)
+  Original scope: (lane: suite) (uses: build) (blocked-on: W49.storage-contract, W49.item-fields-home) — Implement scoped read/discovery and revision invalidation. Distinguish legacy, ready, offline, missing, invalid, ambiguous and newer records. Test stale paths, download placeholders and cache rebuilds. [Design](execution-plans/storage-simplify.md).
+  ArchiveCore now discovers adjacent companions within one granted root and resolves file, page,
+  document and enclosure facts. It reports legacy, offline, missing, invalid, ambiguous and newer
+  states independently of historical tags and exports. Scope checks reject stale roots, paths and
+  aliases. Per-selection subscriptions refresh on a companion or owner revision change, even with
+  identical PDF bytes and timestamps. Independent Tier-2 review and scratch PDF fixtures cover
+  split and merged documents, conflicting copies, scoped paths, simulated placeholders, owner-only
+  updates and cold cache rebuilds. The production identity carrier and app integration remain in
+  their queued rollout stages. No real corpus, bench cache or paid calls used.
+  <!-- /W49.storage-reads -->
