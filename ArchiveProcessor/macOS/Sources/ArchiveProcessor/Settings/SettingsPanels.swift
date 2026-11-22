@@ -76,7 +76,7 @@ enum SettingsPanelOwnership {
             SettingsSheetModel.overrideKey("segmentation").rawValue,
         ])
         add(.datesAndNames, [
-            SettingsKey.dateImageEveryDocument.rawValue, SettingsKey.lowConfidenceNames.rawValue,
+            SettingsKey.dateImageEveryDocument.rawValue, SettingsKey.dateLocalImage.rawValue, SettingsKey.lowConfidenceNames.rawValue,
             SettingsSheetModel.overrideKey("dating").rawValue, SettingsSheetModel.overrideKey("entities").rawValue,
         ])
         add(.pagesAndOutput, [
@@ -100,7 +100,7 @@ enum SettingsPanelOwnership {
     }()
 
     /// The sheet's switches (its rules tab and the dating card), each owned by the panel that holds its stage.
-    static let sheetSwitches: [SettingsKey] = [.straightenReadingCopy, .placeHandOnImage, .dateImageEveryDocument, .lowConfidenceNames,
+    static let sheetSwitches: [SettingsKey] = [.straightenReadingCopy, .placeHandOnImage, .dateImageEveryDocument, .dateLocalImage, .lowConfidenceNames,
                                                .scanNewspapersDocLayoutYOLO, .searchableFor]
 
     /// Which panel holds each settings-sheet stage: the four cards and the rule stages (`SettingsSheetModel`).
@@ -119,6 +119,7 @@ enum SettingsPanelOwnership {
         ("Settings sheet › each card's Use instead…", SettingsSheetModel.overrideKey("dating").rawValue),
         ("Settings sheet › each card's Use instead…", SettingsSheetModel.overrideKey("entities").rawValue),
         ("Settings sheet › the Dates card", SettingsKey.dateImageEveryDocument.rawValue),
+        ("Settings sheet › the Dates card", SettingsKey.dateLocalImage.rawValue),
         ("Settings sheet › the Names card", SettingsKey.lowConfidenceNames.rawValue),
         ("Settings sheet › Rules", SettingsKey.straightenReadingCopy.rawValue),
         ("Settings sheet › Rules", SettingsKey.placeHandOnImage.rawValue),

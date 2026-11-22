@@ -13269,6 +13269,16 @@
      "switch": null
     },
     {
+     "id": "local-image",
+     "text": "Advanced opt-in for Apple Vision without LLM judgment in Process Files. The local 8B image pass showed no measured gain and stays out of automatic route selection.",
+     "source": "date-8b-local.md",
+     "switch": {
+      "id": "dating.local_image",
+      "label": "Search page images for dates on this Mac (no measured gain)",
+      "default": false
+     }
+    },
+    {
      "id": "image-every-document",
      "text": "The image pass on documents whose text already has a year is the user's option, off by default; on, it adds stamp dates as second-role dates, about $1.93 more per 1,000 documents (owner, 2026-11-12).",
      "source": "date-route-pipeline.md",
@@ -13912,7 +13922,7 @@
      "kind_rules": [],
      "fallback": "step 4",
      "conditions": [
-      "not offered: its quotes do not improve the year as step 2 on the traces (W46.date-route-pipeline-8b) or on the laptop route (a) itself, 0/1 strict and 1/2 quote source gained/lost on 55 documents (W46.date-8b-local-baseline, date-8b-local.md); call 7.5 (c) not added"
+      "Advanced switch only (W47.wh-date-8b-image); no measured gain as step 2 on the traces or on the laptop route (a) itself, 0/1 strict and 1/2 quote source gained/lost on 55 documents (date-8b-local.md)"
      ],
      "step": [
       2

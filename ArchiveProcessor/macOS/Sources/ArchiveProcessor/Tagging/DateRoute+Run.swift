@@ -82,6 +82,101 @@ extension DateRoute {
         return d
     }
 
+    /// The 4-bit MLX build used in date-8b-local.md, independent of the OCR backend.
+    static let localImageMinimumMemory: Double = 16
+    static let localImageRoute = "This Mac · Qwen3-VL 8B (no measured gain)"
+    static let localRulesRoute = "This Mac · OCR text and nearby documents"
+    private static let localImageLimiter = RequestLimiter(limit: 1)
+
+    static func localImageEnabled(_ value: SettingsValue?, memoryGB: Double = LocalModelRoute.thisMacMemoryGB) -> Bool {
+        value?.bool == true && memoryGB >= localImageMinimumMemory
+    }
+
+    /// Apple Vision Auto Date without LLM judgment. The text rule goes first. The image supplies a quoted year
+    /// before the nearest earlier document's rule pick (up to three back in order), and sends no OCR text.
+    static func runLocal(_ input: Input) async -> Decision {
+        var note = imageNotNeeded
+        var image: ImageReading?
+        if candidates(input.text).isEmpty {
+            var pages: [Data] = []
+            for page in input.pages.prefix(imagePages) {
+                // Keep the page numbers in the model's reply aligned with the original pages.
+                guard let jpeg = ImageEncoding.uprightJPEG(url: page.url, rotationDegrees: page.rotation,
+                                                            longEdge: 1400) else { break }
+                pages.append(jpeg)
+            }
+            note = pages.isEmpty ? imageNoPages : imageFailed
+            if !pages.isEmpty, let reply = try? await localImageReply(pages) {
+                var reading = readImage(reply)
+                if reading.ok {
+                    // Option (c): the document date when quoted, otherwise the sole year the model quoted.
+                    // A received stamp is kept as stamp evidence by the shared decision rule.
+                    if reading.ownYear == nil {
+                        let years = Set(reading.dates.filter(\.written).compactMap(\.year))
+                        reading.docYear = years.count == 1 ? years.first : nil
+                        reading.docMonth = nil
+                        reading.docQuote = ""
+                    }
+                    image = reading
+                    note = imageSent
+                }
+            }
+        }
+        var decision = decide(text: input.text, near: input.near, traceRaw: nil, image: image,
+                              imageNote: note, allowStampFallback: false)
+        decision.route = note == imageSent || note == imageFailed ? localImageRoute : localRulesRoute
+        if decision.year == nil, let source = input.near.filter({ (1...nearCount).contains($0.dist) && $0.pick != nil })
+            .min(by: { $0.dist < $1.dist }), let pick = source.pick {
+            decision.year = pick.year
+            decision.evidenceClass = .estimate
+            decision.step = 4
+            decision.quote = pick.line
+            decision.line = pick.lineNo + 1
+            decision.cited = source.label
+            decision.sourceFile = source.file
+            decision.check = Check(verdict: "valid", reason: "nearest earlier document with a year in its OCR text")
+        }
+        return decision
+    }
+
+    private static func localImageReply(_ jpegs: [Data]) async throws -> String? {
+        let server = LocalModelRoute.Server.mlxVLM
+        guard let url = URL(string: server.baseURL + "/chat/completions") else { return nil }
+        var content: [[String: Any]] = jpegs.map {
+            ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64," + $0.base64EncodedString()]]
+        }
+        content.append(["type": "text", "text": imagePrompt])
+        let body: [String: Any] = [
+            "model": LocalModelRoute.qwen3VL8B4.modelID(for: server), "temperature": 0, "max_tokens": 700,
+            "messages": [["role": "user", "content": content]],
+        ]
+        var request = URLRequest(url: url, timeoutInterval: LocalModelRoute.requestTimeout)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer " + LocalModelRoute.placeholderKey, forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        try await localImageLimiter.acquire()
+        let result: (Data, URLResponse)
+        do {
+            try Task.checkCancellation()
+            result = try await NetworkSession.data(for: request, policy: .nonIdempotent, maxRetries: 0,
+                                                   followRedirects: false)
+        } catch {
+            await localImageLimiter.release()
+            throw error
+        }
+        await localImageLimiter.release()
+        let (data, response) = result
+        guard (response as? HTTPURLResponse)?.statusCode == 200,
+              let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let choice = (json["choices"] as? [[String: Any]])?.first,
+              let message = choice["message"] as? [String: Any],
+              let finish = choice["finish_reason"] as? String, finish == "stop",
+              let answer = LocalModelRoute.textAnswer(message["content"] as? String, finish: finish),
+              !LocalModelRoute.isRepetitionLoop(answer) else { return nil }
+        return answer
+    }
+
     /// W46.date-route-other-paths — what the route put in a manual card's date field (the tagging sheet's auto-date
     /// and the manual segment card): the decision, and the fields and flag it filled. Its evidence is written only while
     /// the card still holds exactly that date; a date the user typed or changed is theirs, and carries none.
@@ -339,7 +434,9 @@ extension DateRoute.Decision {
         if let step { o["step"] = step }
         switch evidenceClass {
         case .none:
-            o["reason"] = trace.parsed ? "no year with checked evidence" : "the dating call gave no reply"
+            let localDatingAnswered = route == DateRoute.localRulesRoute
+                || (route == DateRoute.localImageRoute && imageNote == DateRoute.imageSent)
+            o["reason"] = trace.parsed || localDatingAnswered ? "no year with checked evidence" : "the dating call gave no reply"
         case .inherited:
             o["source"] = sourceFile ?? "the covering letter"
         case .folder:

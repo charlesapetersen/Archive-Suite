@@ -25,7 +25,8 @@ struct OCRView: View {
     /// Who segments with the current settings (W36.seg-opt-review).
     private var segmentationPlan: SegmentationPlan {
         SegmentationPlan.resolve(tagging: taggingMode,
-                                 approach: SegmentationApproach(rawValue: segmentationApproachRaw) ?? .defaultApproach)
+                                 approach: visionLocalAutoDate ? .manual
+                                     : SegmentationApproach(rawValue: segmentationApproachRaw) ?? .defaultApproach)
     }
     /// Which keys / `claude` the segmentation approaches can use; read on appear and on a key change, never
     /// while rendering.
@@ -214,14 +215,19 @@ struct OCRView: View {
     private var pageReaderPlan: PageReaderPlan {
         pageKindsActive ? pageKinds.plan(droppedFiles, guidance: .bundled, runDefault: pageKindRunDefault) : .empty
     }
+    private var visionLocalAutoDate: Bool {
+        useAppleVision && !visionUseLLMJudgment && !preOCRedInput && taggingMode == .autoDate
+            && DateRoute.localImageEnabled(settingsStore.resolver(at: outputDirectory).resolve(.dateLocalImage).value)
+    }
+
     private var visionWorkflowIsSupported: Bool {
-        !useAppleVision || visionUseLLMJudgment || ((taggingMode == .none || taggingMode == .copySource)
-            && !enableCollectionSegmentation)
+        !useAppleVision || visionUseLLMJudgment || (!visionTaggingUnavailable && !enableCollectionSegmentation)
     }
     /// The Tagging mode is one transcription-only Apple Vision cannot run, so the Tagging box says so instead of
     /// describing what the mode would do (W40.fix-processor-settings-backend-mismatch).
     private var visionTaggingUnavailable: Bool {
-        useAppleVision && !visionUseLLMJudgment && taggingMode != .none && taggingMode != .copySource
+        useAppleVision && !visionUseLLMJudgment && !visionLocalAutoDate
+            && taggingMode != .none && taggingMode != .copySource
     }
     /// Whether this run needs the key `reloadAPIKey()` loads (W40.fix-processor-localagent-key). Apple Vision needs
     /// it only for its LLM judgement. The Local Agent needs none: its CLI signs in with the subscription, and no
@@ -713,7 +719,9 @@ struct OCRView: View {
                                ? "Not applied to a multi-page PDF — it is re-OCR'd into one alternating image/OCR-text PDF (a pure document rebuild, no tagging)."
                                : visionTaggingUnavailable
                                  ? "Apple Vision only transcribes, so this mode cannot run. Choose No tagging or Copy source file tags, or turn on LLM judgement in Settings (⌘,)."
-                                 : taggingMode.detail)
+                                 : visionLocalAutoDate
+                                   ? "This Mac suggests dates. Confirm the document boundaries and enter subjects yourself."
+                                   : taggingMode.detail)
                             .font(.caption2).foregroundStyle(.primary)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("ap.ocr.reOCRExplanation")
@@ -771,7 +779,9 @@ struct OCRView: View {
                             Text(visionWorkflowIsSupported
                                  ? (visionUseLLMJudgment
                                     ? "Vision transcribes locally. The selected LLM receives text only for judgement — never page images."
-                                    : "Apple Vision transcribes locally with no API key or network request. It uses the Mac's performance cores.")
+                                    : visionLocalAutoDate
+                                      ? "Apple Vision and Auto Date run on this Mac without an API key."
+                                      : "Apple Vision transcribes locally with no API key or network request. It uses the Mac's performance cores.")
                                  : "Apple Vision is transcription-only. Select No tagging or Copy source file tags, and turn off Collection ID, before starting.")
                                 .font(.caption2)
                                 .foregroundStyle(.primary)
@@ -1032,6 +1042,8 @@ struct OCRView: View {
         if ocrPostCorrection, !droppedFiles.isEmpty {
             let notice: String = if let policy = OCRPostCorrection.policyReason(at: outputDirectory, store: settingsStore) {
                 "Image correction is skipped. \(policy)"
+            } else if visionLocalAutoDate {
+                "This run stays on this Mac, so it skips OpenRouter image correction."
             } else if preOCRedInput || isPDFOnlyReOCR || useGateway || useLocalAgent
                         || (!useAppleVision && batchMode && effectiveProvider.supportsBatch)
                         || !customOCRPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -1128,8 +1140,10 @@ struct OCRView: View {
         if droppedFiles.isEmpty { return "Add images or PDFs to process." }
         if readingTree { return "Reading the folders inside…" }   // W47.ct-processor-intake
         if !visionWorkflowIsSupported {
-            return "Apple Vision only transcribes: set Tagging to No tagging or Copy source file tags"
-                + (enableCollectionSegmentation ? ", and turn off Collection ID in Settings." : ".")
+            if !visionTaggingUnavailable { return "Turn off Collection ID to process without LLM judgment." }
+            return "Set Tagging to No tagging or Copy source file tags. For Auto Date with Apple Vision, "
+                + "enable local image dating in Advanced Dates and names and process fresh images."
+                + (enableCollectionSegmentation ? " Turn off Collection ID as well." : "")
         }
         if runNeedsAPIKey && apiKey.isEmpty {
             if useGateway && !useAppleVision { return "No gateway key is saved. Add it in Settings (⌘,)." }

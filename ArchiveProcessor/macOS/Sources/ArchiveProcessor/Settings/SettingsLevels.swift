@@ -66,7 +66,7 @@ enum SettingsLevels {
         .overrides, .backend, .providerModel, .cascade, .pageKind, .handwritingOnTyped, .visionLanguages,
         .visionJudgement, .gatewayLocal, .cliAgent, .preOCRed, .batch, .outputSizes, .rotation, .vocabularyColours,
         .collectionID, .segmentationReview, .segmentationApproach, .dateImage, .scanNewspapers, .placeHand, .searchable, .downloads,
-        .driveRelay, .lowConfidenceNames, .thinking, .cascadeDisagreement, .postCorrection, .visionTuning, .gatewayFields, .cliFields, .customModels,
+        .driveRelay, .dateLocalImage, .lowConfidenceNames, .thinking, .cascadeDisagreement, .postCorrection, .visionTuning, .gatewayFields, .cliFields, .customModels,
         .imageSize, .workers, .logFile, .previousImage, .customPrompt, .localSegmenter,
     ]
 
@@ -234,6 +234,8 @@ extension SettingsLevels.Row {
 
     // MARK: Advanced: the twelve groups the owner moved (2026-11-19, levels.md §4)
 
+    static let dateLocalImage = Self("date-local-image", .advanced, [SettingsKey.dateLocalImage.rawValue],
+                                     why: "the extra pass took about 12 seconds per document on the test Mac")
     static let lowConfidenceNames = Self("low-confidence-names", .advanced, [SettingsKey.lowConfidenceNames.rawValue],
                                          why: "the finder can miss names or assign them to the wrong role")
     static let thinking = Self("thinking", .advanced, [DefaultsKeys.selectedThinking],

@@ -674,6 +674,9 @@ class OCRProcessor: ObservableObject {
         /// Only runs which actually enabled correction store this. Absence keeps older fingerprints valid.
         var postCorrection: Bool? = nil
 
+        /// Vision Auto Date's optional local image pass. Absence means off.
+        var dateLocalImage: Bool? = nil
+
         /// The run's per-page readers (W41.app-page-kind), so a resumed run reads each page with the reader it was
         /// planned for. Nil reads as none.
         var pageReaders: PageReaderPlan? = nil

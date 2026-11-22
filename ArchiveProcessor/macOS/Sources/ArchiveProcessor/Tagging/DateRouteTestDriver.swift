@@ -55,6 +55,7 @@ enum DateRouteTestDriver {
         }
         decision()
         await headerLine()
+        await localImage()
         await endToEnd()
         await liveCapture()
         lines.append(failures == 0 ? "ALL PASS" : "FAILURES \(failures)")
@@ -574,6 +575,106 @@ enum DateRouteTestDriver {
               let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.jpeg" as CFString, 1, nil) else { return }
         CGImageDestinationAddImage(dest, img, nil)
         CGImageDestinationFinalize(dest)
+    }
+
+    private static func localImage() async {
+        check("local image requires the switch and at least 16 GB",
+              !DateRoute.localImageEnabled(.bool(false), memoryGB: 16)
+                && !DateRoute.localImageEnabled(.bool(true), memoryGB: 8)
+                && DateRoute.localImageEnabled(.bool(true), memoryGB: 16))
+
+        let image = FileManager.default.temporaryDirectory.appendingPathComponent("APDateLocal-\(UUID().uuidString).jpg")
+        defer { try? FileManager.default.removeItem(at: image) }
+        writeJPEG(image, width: 1700)
+        let prior = DateRoute.Neighbour(label: "P2", dist: 2, text: "March 3, 1947", file: "prior.jpg")
+        let future = DateRoute.Neighbour(label: "N1", dist: -1, text: "March 3, 1948", file: "future.jpg")
+        let pages = [(image, 0), (image, 0), (image, 0)]
+        let reply = #"{"dates":[{"quote":"June 9, 1961","year":1961,"page":1,"where":"dateline"}],"document_date":null}"#
+
+        func standIn(_ content: String, finish: String) {
+            NetworkSession.testTransport = { request in
+                let body = request.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) } as? [String: Any]
+                let message = (body?["messages"] as? [[String: Any]])?.first
+                let parts = message?["content"] as? [[String: Any]]
+                let images = (parts ?? []).compactMap { part -> String? in
+                    (part["image_url"] as? [String: String])?["url"]
+                }
+                let jpeg = images.first?.components(separatedBy: "base64,").last.flatMap { Data(base64Encoded: $0) }
+                let source = jpeg.flatMap { CGImageSourceCreateWithData($0 as CFData, nil) }
+                let size = source.flatMap { CGImageSourceCopyPropertiesAtIndex($0, 0, nil) } as? [CFString: Any]
+                let conforms = request.url?.absoluteString == "http://127.0.0.1:8080/v1/chat/completions"
+                    && request.value(forHTTPHeaderField: "Authorization") == "Bearer local"
+                    && body?["model"] as? String == LocalModelRoute.qwen3VL8B4.modelID(for: .mlxVLM)
+                    && body?["max_tokens"] as? Int == 700 && body?["temperature"] as? Int == 0
+                    && parts?.count == 3 && images.count == 2 && size?[kCGImagePropertyPixelWidth] as? Int == 1400
+                    && parts?.last?["text"] as? String == DateRoute.imagePrompt
+                let bytes = try JSONSerialization.data(withJSONObject: [
+                    "choices": [["finish_reason": finish, "message": ["content": content]]],
+                ])
+                guard let url = request.url, let response = HTTPURLResponse(url: url, statusCode: conforms ? 200 : 400,
+                                                                           httpVersion: nil, headerFields: nil)
+                else { throw URLError(.badURL) }
+                return (bytes, response)
+            }
+        }
+        defer { NetworkSession.testTransport = nil }
+        standIn(reply, finish: "stop")
+        guard NetworkSession.testTransportIsActive else { check("local image stub installed", false); return }
+        let text = await DateRoute.runLocal(.init(text: "June 7, 1950", near: [prior], pages: pages))
+        check("local image skips documents with a text year", text.year == 1950 && text.imageNote == DateRoute.imageNotNeeded)
+        let read = await DateRoute.runLocal(.init(text: "Nothing printed", near: [prior], pages: pages))
+        check("local image requests two resized pages and accepts the only quoted year",
+              read.year == 1961 && read.month == 6 && read.day == 9 && read.evidenceClass == .image
+                && read.imageNote == DateRoute.imageSent && read.route == DateRoute.localImageRoute && !read.measured)
+
+        let card = OCRProcessor()
+        var config = SessionProcessingConfig.fromProcessFilesRunStart()
+        config.provider = .appleVision
+        config.model = LLMModel.appleVisionModels[0]
+        config.dateLocalImage = true
+        card.activeRunConfig = config
+        card.manualSegAutoDate = true
+        card.manualSegProvider = .appleVision
+        card.manualSegModel = config.model
+        let secondPage = image.deletingLastPathComponent().appendingPathComponent("APDateLocal-2-\(UUID().uuidString).jpg")
+        defer { try? FileManager.default.removeItem(at: secondPage) }
+        writeJPEG(secondPage, width: 1700)
+        card.manualSegImages = [image, secondPage].enumerated().map {
+            ManualSegImage(fileIndex: $0.offset, url: $0.element, rotationDegrees: 0, kind: .document)
+        }
+        await card.fetchManualSegDate(forIndices: [0, 1])
+        check("local image fills the actual Vision Auto Date card even when OCR returned no text",
+              card.manualSegDraftTags.year == "1961"
+                && card.manualSegDraftTags.standingDating?.route == DateRoute.localImageRoute)
+
+        standIn(reply, finish: "length")
+        let cut = await DateRoute.runLocal(.init(text: "", near: [future, prior], pages: pages))
+        check("local image discards a cut reply and propagates only from earlier documents",
+              cut.year == 1947 && cut.month == nil && cut.day == nil && cut.dateUncertain
+                && cut.imageNote == DateRoute.imageFailed && cut.sourceFile == "prior.jpg"
+                && cut.headerEvidence?.contains("90% interval") == false)
+
+        standIn(#"{"dates":[{"quote":"June 9, 1961","year":1961},{"quote":"June 9, 1962","year":1962}],"document_date":null}"#,
+                finish: "stop")
+        let ambiguous = await DateRoute.runLocal(.init(text: "", near: [future], pages: pages))
+        check("local image leaves ambiguous quotes and later documents undated",
+              ambiguous.year == nil && ambiguous.imageNote == DateRoute.imageSent && ambiguous.dateUncertain
+                && ambiguous.sidecarObject()["reason"] as? String == "no year with checked evidence")
+        var priorJob = OCRJob(sourceURL: image)
+        priorJob.result = OCRResult(text: "March 3, 1947", classification: .documentStart,
+                                    errorMessage: nil, errorCode: nil)
+        card.jobs = [priorJob]
+        card.manualSegCompleted = [CompletedManualSegment(indices: [0], tags: SegmentTagData())]
+        card.manualSegImages.append(ManualSegImage(fileIndex: 2, url: secondPage, rotationDegrees: 0, kind: .document))
+        card.manualSegDraftTags = SegmentTagData()
+        await card.fetchManualSegDate(forIndices: [1, 2])
+        check("local manual card can propagate a year within the same tree folder",
+              card.manualSegDraftTags.year == "1947" && card.manualSegDraftTags.dateUncertain)
+        card.manualSegImages[1].startsTreeFolder = true
+        card.manualSegDraftTags = SegmentTagData()
+        await card.fetchManualSegDate(forIndices: [1, 2])
+        check("local manual card never propagates a year across a tree folder boundary",
+              card.manualSegDraftTags.year.isEmpty && card.manualSegDraftTags.dateUncertain)
     }
 
     private static func endToEnd() async {

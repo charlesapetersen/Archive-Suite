@@ -1025,7 +1025,8 @@ struct SettingsSheetModel {
                              note: Self.switchPending.contains(key) ? Self.pendingNote
                                  : key == .placeHandOnImage && !HandPlacer.isInstalled() ? Self.handDownloadNote
                                  : key == .scanNewspapersDocLayoutYOLO ? Self.scanLayoutNote
-                                 : key == .lowConfidenceNames ? Self.lowConfidenceNamesNote : nil,
+                                 : key == .lowConfidenceNames ? Self.lowConfidenceNamesNote
+                                 : key == .dateLocalImage ? Self.dateLocalImageNote : nil,
                              offersHandDownload: key == .placeHandOnImage && !HandPlacer.isInstalled(),
                              offersScanLayoutDownload: key == .scanNewspapersDocLayoutYOLO && !ScanNewspaperLayout.isInstalled())
         }
@@ -1067,6 +1068,10 @@ struct SettingsSheetModel {
                     + "\(ScanNewspaperLayout.licence); until it is downloaded, scanned newspapers use the default helper.")
     }
 
+    static let dateLocalImageNote = """
+        In Process Files, choose Apple Vision with LLM judgment off and Auto date, manual subjects. Confirm document boundaries yourself. On a Mac with at least 16 GB of memory, start a local mlx-vlm server with Qwen3-VL 8B Instruct 4-bit on port 8080. It checks up to the first two pages when the OCR text has no year. In the benchmark, the image pass got 32 of 55 years right versus 33 from text and nearby documents alone. False years rose from 20 to 21 on 90 undated documents. If the server is unavailable, dating uses the text and nearby documents.
+        """
+
     static let lowConfidenceNamesNote = """
         Use Apple’s built-in English name finder on smaller Macs or for early handwriting and print. It replaces the regular names route for this selection. Rank Names for the collection and turn on Export segment JSON metadata in Documents. For Process Files, choose Automatic, No tagging or Copy source file tags. On 138 correspondence documents, the finder scored 0.14 out of 1 for sender F1, which penalizes wrong guesses and missed names. GLiNER scored 0.24 in the same benchmark. On early handwriting, extractors found different names in the OCR and reference text, with agreement scores of 0.02 to 0.37 out of 1.
         """
@@ -1077,7 +1082,7 @@ struct SettingsSheetModel {
         case .placeHandOnImage:
             return "Also put handwritten text on the page image, where it fits closely (every handwritten page gets a "
                 + "separate text page either way)"
-        case .lowConfidenceNames: return key.label
+        case .lowConfidenceNames, .dateLocalImage: return key.label
         case .dateImageEveryDocument:
             return "Search the page image on every document, not only those whose text has no year: finds stamp dates "
                 + "(kept beside the document's own date); about $1.93 more per 1,000 documents"
@@ -1094,6 +1099,7 @@ struct SettingsSheetModel {
         case "reading_copy.straighten": return .straightenReadingCopy
         case "place.hand_on_image": return .placeHandOnImage
         case "entities.low_confidence_on_mac": return .lowConfidenceNames
+        case "dating.local_image": return .dateLocalImage
         case "dating.image_every_document": return .dateImageEveryDocument
         case "layout.scan_newspapers_yolo": return .scanNewspapersDocLayoutYOLO
         default: return nil
@@ -1393,7 +1399,7 @@ struct SettingsSheetWords {
         case "none": return "not run"
         default:
             let g = f.replacingOccurrences(of: "no image pass; the document goes on to step 4",
-                                           with: "no program looks at the page image here; such documents go on to the folder estimate below")
+                                           with: "the default skips the image and uses the folder estimate below")
                 .replacingOccurrences(of: "goes on to step 4", with: "goes on to the folder estimate below")
             return g.prefix(1).uppercased() + g.dropFirst()
         }

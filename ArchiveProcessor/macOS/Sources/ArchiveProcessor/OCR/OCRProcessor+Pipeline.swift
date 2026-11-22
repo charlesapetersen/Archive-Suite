@@ -259,6 +259,10 @@ extension OCRProcessor {
         // backend; the only permitted fallback is no hybrid at all.
         let hybridFieldsPresent = config.visionTextProvider != nil
             || config.visionTextModel != nil || config.visionTextThinkingLevel != nil
+        if config.dateLocalImage == true {
+            guard config.taggingMode == .autoDate, config.segmentationApproach == .manual,
+                  !hybridFieldsPresent, !hasGateway, config.postCorrection != true else { return false }
+        }
         if hybridFieldsPresent {
             guard let textProvider = config.visionTextProvider,
                   let textModel = config.visionTextModel,
@@ -319,6 +323,7 @@ extension OCRProcessor {
             segmentationApproach: runConfig?.segmentationApproach ?? SegmentationApproach.stored(),
             cascade: runConfig?.cascade ?? OCRCascade.fromDefaults(),
             postCorrection: activePostCorrection == nil ? nil : true,
+            dateLocalImage: runConfig?.dateLocalImage == true ? true : nil,
             pageReaders: runConfig.map { $0.pageReaders.isEmpty ? nil : $0.pageReaders } ?? nil,
             institutionalComputeFolder: runConfig?.institutionalComputeImport?.folder.path,
             outputSubfolders: outputSubfolders.isEmpty ? nil : outputSubfolders
@@ -361,6 +366,8 @@ extension OCRProcessor {
             runConfig.pageReaders = runtime.pageReaders ?? .empty
             runConfig.institutionalComputeImport = runtime.institutionalComputeFolder.flatMap { Self.reloadInstitutionalComputeImport($0) }
             runConfig.segmentationApproach = runtime.segmentationApproach ?? .manual
+            runConfig.dateLocalImage = runtime.dateLocalImage == true
+            if runConfig.dateLocalImage { runConfig.visionTextLLM = nil }
             if let provider = runtime.visionTextProvider, let model = runtime.visionTextModel {
                 runConfig.visionTextLLM = LLMTextConfiguration(
                     provider: provider, model: model,
@@ -606,6 +613,8 @@ extension OCRProcessor {
                   !run.preOCRedInput,
                   (0...20_000).contains(run.previousTextCharCount),
                   run.gatewayConfig == nil || run.localAgent == nil,
+                  config.dateLocalImage != true || (run.provider == .appleVision && run.localAgent == nil
+                    && !run.enableCollectionSegmentation),
                   run.enableCollectionSegmentation
                     || (!run.confirmCollectionIDs && !run.reviewDocumentSegmentation),
                   validResultKeys, validOutputPaths,
@@ -3254,7 +3263,6 @@ extension OCRProcessor {
                                        reloadedImport: plannedImport)
             activePendingMixedPDF = resumingMixedPDF
         }
-        activeRunConfig = runConfig
         let runOutputSettings = lateRunOutputSettings(for: runConfig)
         currentModel = model
         currentGateway = gatewayConfig
@@ -3279,9 +3287,20 @@ extension OCRProcessor {
         let frozen = SettingsLayerStore.shared.snapshot(
             outputDirectory: outputDirectory, runID: runID, processing: ProcessingSettingsCapture.capture())
         activeResolvedSettings = frozen
+        if resumingMixedPDF == nil {
+            runConfig.dateLocalImage = provider == .appleVision && runConfig.visionTextLLM == nil
+                && taggingMode == .autoDate && enableTagging && !preOCRedInput
+                && !enableCollectionSegmentation && gatewayConfig == nil && localAgent == nil
+                && DateRoute.localImageEnabled(frozen.values[SettingsKey.dateLocalImage.rawValue]?.value)
+        }
+        if runConfig.dateLocalImage {
+            // This mode keeps the whole run local even if a paid segmenter or OCR correction was saved.
+            runConfig.segmentationApproach = .manual
+        }
+        activeRunConfig = runConfig
         let wantsCorrection = resumingMixedPDF.map { $0.runtimeConfig.postCorrection == true } ?? postCorrectionRequested
         activePostCorrection = Self.makePostCorrection(
-            requested: wantsCorrection && !preOCRedInput && !(autoReOCR && !mixedReOCR)
+            requested: wantsCorrection && !runConfig.dateLocalImage && !preOCRedInput && !(autoReOCR && !mixedReOCR)
                 && !(batchMode && provider.supportsBatch)
                 && segmentationContext.customPrompt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
             gateway: gatewayConfig, localAgent: localAgent, outputDirectory: outputDirectory, frozen: frozen.values)

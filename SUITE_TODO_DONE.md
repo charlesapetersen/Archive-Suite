@@ -17727,3 +17727,17 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   kept the notices and Clear dismissed them. ArchiveCore and all three app smoke checks passed.
   No bench cache was created.
   <!-- /W49.proc-tree-depth-say -->
+
+- [x] **W47.wh-date-8b-image — the Mac 8B image pass for dating as an optional switch, labelled "no measured gain" [S]** · §The withheld features — the owner's calls of 2026-11-19 (W47.wh) — SHIPPED 2026-11-22 (this commit).
+  Owner call 15 released this Advanced switch in Dates and names, off by default. The paired benchmark
+  got 32 of 55 years right with the image pass and 33 without it. False years rose from 20 to 21 on 90 undated
+  documents. Process Files can now use Apple Vision with LLM judgment off and Auto date, manual subjects.
+  This mode needs at least 16 GB and uses manual document boundaries. When the text has no candidate, it sends
+  up to two upright pages to Qwen3-VL 8B Instruct 4-bit through the local mlx-vlm server. With no image year, it
+  estimates from the closest earlier document with a printed year within three documents in the same folder.
+  That year is marked Date Uncertain and names its source. The request uses the local placeholder credential and
+  rejects redirects. Standard and mixed-PDF resumes keep the run's opt-in. Existing cloud dating is separate.
+  Verified the Debug build, scratch dating and recovery contracts, Vision OCR and hybrid smoke, settings source
+  and render checks, and four off-screen Settings tests. A two-page synthetic letter returned a quoted 1961
+  date from the cached 8B model over loopback. Verification cost $0 and created no bench cache.
+  <!-- /W47.wh-date-8b-image -->

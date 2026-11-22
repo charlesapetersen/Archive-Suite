@@ -54,6 +54,8 @@ struct SessionProcessingConfig: Sendable {
     /// `PendingRunRuntimeConfig`, so a resumed run keeps its approach. Live Capture ignores it: the phone
     /// gives the boundaries.
     var segmentationApproach: SegmentationApproach = .manual
+    /// Process Files only. Frozen for the manual date cards and interrupted runs.
+    var dateLocalImage = false
 
     /// The backend for all post-transcription text work. For ordinary runs this is the OCR backend;
     /// for the Vision hybrid it is the separately-selected direct LLM.

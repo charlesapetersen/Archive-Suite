@@ -81,6 +81,8 @@ extension OCRProcessor {
               (0.01...1).contains(pending.imageScale), pending.imageScale.isFinite,
               (0...20_000).contains(pending.previousTextCharCount),
               pending.gatewayConfig == nil || pending.localAgent == nil,
+              pending.runtimeConfig.dateLocalImage != true || (pending.provider == .appleVision
+                && pending.localAgent == nil && !pending.enableCollectionSegmentation && !pending.batchMode),
               pendingRunRuntimeConfigIsValid(
                 pending.runtimeConfig, fileCount: count,
                 enableTagging: pending.enableTagging,
@@ -234,6 +236,8 @@ extension OCRProcessor {
         config.exportedImageMB = runtime.exportedImageMB
         config.textColumns = runtime.textColumns
         config.visionSettings = runtime.visionSettings
+        config.dateLocalImage = runtime.dateLocalImage == true
+        if config.dateLocalImage { config.visionTextLLM = nil }
         config.cascade = runtime.cascade ?? .off
         config.pageReaders = runtime.pageReaders ?? .empty
         config.institutionalComputeImport = runtime.institutionalComputeFolder == nil ? nil : reloadedImport

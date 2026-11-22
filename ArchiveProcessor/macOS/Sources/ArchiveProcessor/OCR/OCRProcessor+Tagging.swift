@@ -688,8 +688,9 @@ extension OCRProcessor {
     ) async {
         // Gather segments still needing a date (main actor); skip already-dated ones (incl. Live
         // Capture pre-fills). W46.date-route-other-paths: each one's dating-route input, as Process Files reads it
-        // (its own text, the neighbouring documents, its first page images); nil for a document with no text.
+        // (its own text, the neighbouring documents, its first page images).
         let jobBySource = Dictionary(jobs.indices.map { (jobs[$0].sourceURL, $0) }, uniquingKeysWith: { first, _ in first })
+        let localImage = activeRunConfig?.dateLocalImage == true
         var work: [(idx: Int, input: DateRoute.Input?)] = []
         // W47.ct-folder-date-live: each dated card's folder run's confirmed date, step 3b, as Process Files takes it.
         var runsByFolder: [URL: [ContainerRun]] = [:]
@@ -701,7 +702,7 @@ extension OCRProcessor {
                 manualTagSegments[idx].dateLoading = false
                 continue
             }
-            let input = datingInput(for: segIndex, in: segments, jobBySource: jobBySource)
+            let input = datingInput(for: segIndex, in: segments, jobBySource: jobBySource, localImage: localImage)
             if input != nil { folderDates[idx] = confirmedFolderDate(for: segments[segIndex], runsByFolder: &runsByFolder) }
             work.append((idx, input))
         }
@@ -711,9 +712,10 @@ extension OCRProcessor {
         let imageEveryDocument = activeResolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
             .value.bool ?? false
         let maxConcurrent = min(6, work.count)
-        // A document with no text gets no dating call: no year, Date Uncertain (as before the route).
+        // A document with no text can still use the opt-in local image pass.
         let task: @Sendable ((idx: Int, input: DateRoute.Input?)) async -> (Int, DateRoute.Decision?) = { w in
             guard let input = w.input else { return (w.idx, nil) }
+            if localImage { return (w.idx, await DateRoute.runLocal(input)) }
             return (w.idx, await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument))
         }
 
@@ -1091,7 +1093,9 @@ extension OCRProcessor {
         var urls: [URL] = []
         var texts: [String] = []
         var pages: [(url: URL, rotation: Int)] = []
-        for i in indices where i >= 0 && i < manualSegImages.count && manualSegImages[i].kind == .document {
+        let localImage = activeRunConfig?.dateLocalImage == true
+        for i in indices where manualSegImages.indices.contains(i) && manualSegImages[i].kind == .document
+            && (!localImage || !manualSegRemoved.contains(i)) {
             let url = manualSegImages[i].url
             urls.append(url)
             texts.append(jobs.first { $0.sourceURL == url }?.result?.text ?? "")
@@ -1100,19 +1104,24 @@ extension OCRProcessor {
         guard !urls.isEmpty else { return }
 
         // W46.date-route-other-paths: the dating route on the card's pages (its own text and first page images, the
-        // rotation the user set); no neighbours, since the documents around it are not drawn yet. No text, no call.
+        // rotation the user set). Only the local route uses already confirmed earlier documents.
         let segment = DocumentSegment(pdfURLs: urls, texts: texts)
         var decision: DateRoute.Decision? = nil
-        if !segment.combinedText.isEmpty {
+        if localImage || !segment.combinedText.isEmpty {
             manualSegDateFetching = true
-            let backend = DateRoute.Backend(provider: manualSegProvider, model: model, apiKey: manualSegApiKey,
-                                            gateway: currentGateway, localAgent: currentLocalAgent)
-            let imageEveryDocument = activeResolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
-                .value.bool ?? false
-            decision = await DateRoute.run(
-                DateRoute.Input(text: DateRoute.ownText(segment), near: [],
-                                pages: Array(pages.prefix(DateRoute.imagePages))),
-                backend: backend, imageEveryDocument: imageEveryDocument)
+            let input = DateRoute.Input(text: DateRoute.ownText(segment),
+                                        near: localImage ? priorManualDatingDocuments(before: indices.min()) : [],
+                                        pages: Array(pages.prefix(DateRoute.imagePages)))
+            if localImage {
+                decision = await DateRoute.runLocal(input)
+            } else {
+                let backend = DateRoute.Backend(provider: manualSegProvider, model: model, apiKey: manualSegApiKey,
+                                                gateway: currentGateway, localAgent: currentLocalAgent)
+                let imageEveryDocument = activeResolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
+                    .value.bool ?? false
+                decision = await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument)
+            }
+            guard !Task.isCancelled else { return }
             manualSegDateFetching = false
             // W47.ct-folder-date-live: then the folder run's confirmed date, step 3b, as Process Files takes it.
             var runsByFolder: [URL: [ContainerRun]] = [:]
@@ -1132,6 +1141,28 @@ extension OCRProcessor {
             manualSegDraftTags.dateUncertain = true
         }
     }
+    /// Earlier document boundaries already confirmed in the manual view, in source order.
+    private func priorManualDatingDocuments(before index: Int?) -> [DateRoute.Neighbour] {
+        guard let index, manualSegImages.indices.contains(index) else { return [] }
+        let sourceFolder = manualSegImages[index].url.deletingLastPathComponent()
+        let folderStart = (0...index).reversed().first { i in
+            let image = manualSegImages[i]
+            return image.startsTreeFolder || image.kind != .document || image.url.deletingLastPathComponent() != sourceFolder
+        } ?? 0
+        let prior = manualSegCompleted.filter {
+            guard let first = $0.indices.first, let last = $0.indices.last else { return false }
+            return first >= folderStart && last < index
+                && manualSegImages[first].url.deletingLastPathComponent() == sourceFolder
+        }.sorted { $0.indices[0] > $1.indices[0] }
+        return prior.prefix(DateRoute.nearCount).enumerated().map { offset, document in
+            let images = document.indices.sorted().prefix(DateRoute.nearPages).map { manualSegImages[$0] }
+            let text = images.map { jobs[$0.fileIndex].result?.text ?? "" }.joined(separator: "\n\n")
+            let distance = offset + 1
+            return DateRoute.Neighbour(label: "P\(distance)", dist: distance, text: text,
+                                       file: images.first?.url.lastPathComponent)
+        }
+    }
+
     /// W47.ct-folder-date: the confirmed date of the folder run `segment` falls in, from the container file of its folder
     /// (`ContainerFolderDate.confirmed`; each folder's file read once through `runsByFolder`, never written). Only for a
     /// file tagged where it already is (the pre-OCRed route, output = source), whose name the runs were set on: a new
@@ -1317,14 +1348,27 @@ extension OCRProcessor {
         os_log(.error, "Tagging call failed for %{public}@: %{public}@", source.lastPathComponent, reason)
     }
     /// W46.date-route — what segment `i`'s dating route reads, or nil when no dating call is made: a box or folder
-    /// label (an input to folder inheritance, never dated as a document), a document with no text, or one whose phone
-    /// date wins anyway. Neighbours are named by their first page's source file, as the sidecar's `files` and
+    /// label (an input to folder inheritance, never dated as a document), a document with no text unless the local
+    /// image pass is on, or one whose phone date wins anyway. Neighbours are named by their first page's source file,
+    /// as the sidecar's `files` and
     /// `enclosure_of` name pages (an output PDF may be merged away later).
-    func datingInput(for i: Int, in snapshot: [DocumentSegment], jobBySource: [URL: Int]) -> DateRoute.Input? {
+    func datingInput(for i: Int, in snapshot: [DocumentSegment], jobBySource: [URL: Int],
+                     localImage: Bool = false) -> DateRoute.Input? {
         let seg = snapshot[i]
-        guard !seg.isBox, !seg.isFolder, !seg.combinedText.isEmpty, let first = seg.pdfURLs.first else { return nil }
+        guard !seg.isBox, !seg.isFolder, localImage || !seg.combinedText.isEmpty,
+              let first = seg.pdfURLs.first else { return nil }
         if let fileIdx = jobBySource[first], phoneYearTag(at: fileIdx) != nil { return nil }
-        let near = DateRoute.neighbours(of: i, in: snapshot) { $0.pdfURLs.first?.lastPathComponent }
+        let near: [DateRoute.Neighbour]
+        if localImage {
+            let folder = first.deletingLastPathComponent()
+            let earlier = snapshot[..<i].reversed().prefix(DateRoute.nearCount).prefix {
+                !$0.isBox && !$0.isFolder && $0.pdfURLs.first?.deletingLastPathComponent() == folder
+            }
+            let context = Array(earlier.reversed()) + [seg]
+            near = DateRoute.neighbours(of: context.count - 1, in: context) { $0.pdfURLs.first?.lastPathComponent }
+        } else {
+            near = DateRoute.neighbours(of: i, in: snapshot) { $0.pdfURLs.first?.lastPathComponent }
+        }
         let pages = seg.pdfURLs.prefix(DateRoute.imagePages).map { url in
             (url: url, rotation: jobBySource[url].flatMap { jobs[$0].result?.rotationDegrees } ?? 0)
         }

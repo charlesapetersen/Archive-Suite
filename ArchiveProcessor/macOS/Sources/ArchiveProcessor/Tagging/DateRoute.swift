@@ -805,7 +805,7 @@ enum DateRoute {
 
     /// One document's route. `traceRaw` is nil when the call failed; `image` nil when the pass was not sent.
     static func decide(text: String, near: [Neighbour], traceRaw: String?, image: ImageReading?,
-                       imageNote: String) -> Decision {
+                       imageNote: String, allowStampFallback: Bool = true) -> Decision {
         let cands = candidates(text)
         let own = Set(cands.map(\.year))
         let tr = parseTrace(traceRaw)
@@ -880,7 +880,7 @@ enum DateRoute {
         // ahead of the neighbour estimate (owner, 2026-11-17; date-stamp-fallback.md), with the month and day it is
         // quoted with when it is the only stamp (W46.p16-stamp-own-date, owner 2026-11-18). A covering document's year still wins (step 3a,
         // `inherit(fromCover:)`).
-        if let image, let st = image.stampEvidence, let y = st.year {
+        if allowStampFallback, let image, let st = image.stampEvidence, let y = st.year {
             d.year = y; d.dateUncertain = true; d.evidenceClass = .stamp; d.step = 2
             d.quote = st.quote; d.page = st.page; d.place = st.place
             // Only where it is the page's only stamped date: the earliest of several is not the page's only date.

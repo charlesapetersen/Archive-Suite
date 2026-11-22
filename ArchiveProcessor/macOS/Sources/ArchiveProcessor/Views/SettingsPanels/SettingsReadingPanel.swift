@@ -29,6 +29,9 @@ struct SettingsReadingPanel: View {
     @AppStorage(DefaultsKeys.ocrHandwritingOnTyped) private var ocrHandwritingOnTyped: Bool = true
     @AppStorage(DefaultsKeys.batchMode) private var batchMode: Bool = false
     @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
+    @AppStorage(DefaultsKeys.outputDirectory) private var outputPath: String = ""
+    @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput = false
+    @ObservedObject private var settingsStore = SettingsLayerStore.shared
     @AppStorage(DefaultsKeys.enableCollectionSegmentation) private var enableCollectionSegmentation: Bool = false
     @ObservedObject private var customModelStore = CustomModelStore.shared
     @ObservedObject private var modelStore = ModelSelectionStore.shared
@@ -85,6 +88,13 @@ struct SettingsReadingPanel: View {
         .onAppear { reloadKeys() }
         .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in reloadKeys() }
         .sheet(isPresented: $showManageModels) { ManageModelsView() }
+    }
+
+    private var visionLocalAutoDate: Bool {
+        _ = outputPath  // keep collection-dependent help current as the selected output changes
+        let settings = settingsStore.resolver(at: SettingsSheetButton.outputFolder())
+        return !preOCRedInput && taggingMode == .autoDate
+            && DateRoute.localImageEnabled(settings.resolve(.dateLocalImage).value)
     }
 
     /// The key fields' values, for the cascade's "no key" warning (the fields themselves are in Accounts).
@@ -377,11 +387,14 @@ struct SettingsReadingPanel: View {
             }
         }
         if !visionUseLLMJudgment {
-            Text("Transcription-only is fully offline and free. Use No tagging or Copy source file tags in Process Files.")
+            let localAutoDate = visionLocalAutoDate
+            Text(localAutoDate
+                 ? "Auto Date uses OCR text, nearby documents, and the optional image model on this Mac. Confirm document boundaries and enter subjects yourself."
+                 : "For transcription only, use No tagging or Copy source file tags in Process Files.")
                 .font(.caption2).foregroundStyle(.primary)
             // W40.fix-processor-settings-backend-mismatch — the line above used to sit beside a Tagging mode that
             // needs an LLM, with nothing saying the run could not start. Say so, and offer the switch.
-            if taggingMode != .none && taggingMode != .copySource {
+            if !localAutoDate && taggingMode != .none && taggingMode != .copySource {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Tagging is set to \(taggingMode.displayName), which Apple Vision cannot do on its own, so Start stays off.")
                         .font(.caption2).foregroundStyle(.primary)

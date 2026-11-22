@@ -78,6 +78,10 @@ enum SettingsPanelsTestDriver {
             }
             check("4 the dating card carries its image-pass switch",
                   model.stageSwitches["dating"]?.contains { $0.key == .dateImageEveryDocument } == true)
+            check("4 the Dates card carries a separate local image switch, off by default",
+                  model.stageSwitches["dating"]?.contains {
+                      $0.key == .dateLocalImage && !$0.isOn && $0.label.contains("no measured gain")
+                  } == true)
             check("4 the Names card carries its low-confidence switch, off by default",
                   model.stageSwitches["entities"]?.contains { $0.key == .lowConfidenceNames && !$0.isOn } == true)
             check("4 the layout stage carries its scanned-newspaper detector switch, off by default (W47.wh-yolo-scans)",
@@ -150,12 +154,12 @@ enum SettingsPanelsTestDriver {
 
         // 7. Advanced groups, each with its reason (levels.md §4 and §5).
         let advanced = rows.filter { $0.level == .advanced }
-        check("7 fourteen groups at Advanced", advanced.count == 14,
+        check("7 fifteen groups at Advanced", advanced.count == 15,
               "\(advanced.count): " + advanced.map(\.id).joined(separator: ", "))
         check("7 every Advanced row says why", advanced.allSatisfy { !($0.why ?? "").isEmpty })
         check("7 no row below Advanced carries a reason", rows.filter { $0.level != .advanced }.allSatisfy { $0.why == nil })
         let expected: [(String, SettingsLevel)] = [
-            (SettingsKey.lowConfidenceNames.rawValue, .advanced),
+            (SettingsKey.lowConfidenceNames.rawValue, .advanced), (SettingsKey.dateLocalImage.rawValue, .advanced),
             (DefaultsKeys.ocrPostCorrection, .advanced), (DefaultsKeys.selectedThinking, .advanced), (DefaultsKeys.ocrCascadeOnDisagreement, .advanced),
             (DefaultsKeys.visionMinimumConfidence, .advanced), (DefaultsKeys.gatewayBaseURL, .advanced),
             (DefaultsKeys.localAgentBinaryPath, .advanced), (DefaultsKeys.standardImageSizeMB, .advanced),

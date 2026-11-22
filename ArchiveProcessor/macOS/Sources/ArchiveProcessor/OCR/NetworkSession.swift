@@ -197,13 +197,19 @@ enum NetworkSession {
     /// Internal so a check can assert the seam is dormant before it installs one and dormant again after.
     nonisolated static var testTransportIsActive: Bool { activeTestTransport != nil }
 
+    private final class NoRedirects: NSObject, URLSessionTaskDelegate {
+        func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest) async -> URLRequest? { nil }
+    }
+
     /// Perform a data request through the global limiter, retrying transient transport errors
     /// and rate-limit/overload responses with exponential backoff + jitter (honoring
     /// `Retry-After` when present).
     static func data(
         for request: URLRequest,
         policy: NetworkRetryPolicy,
-        maxRetries: Int = 4
+        maxRetries: Int = 4,
+        followRedirects: Bool = true
     ) async throws -> (Data, URLResponse) {
         try await limiter.acquire()
         do {
@@ -218,8 +224,11 @@ enum NetworkSession {
             if let stub = activeTestTransport {
                 result = try await performWithRetry(
                     request, policy: policy, maxRetries: maxRetries, transport: stub)
-            } else {
+            } else if followRedirects {
                 result = try await performWithRetry(request, policy: policy, maxRetries: maxRetries)
+            } else {
+                result = try await performWithRetry(request, policy: policy, maxRetries: maxRetries,
+                                                    transport: { try await shared.data(for: $0, delegate: NoRedirects()) })
             }
             await limiter.release()
             return result
