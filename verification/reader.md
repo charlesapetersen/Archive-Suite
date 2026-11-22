@@ -84,23 +84,23 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
 
-### R-04 · Cloud placeholders are never downloaded
+### R-04 · Cloud placeholders stay cloud-only until explicitly downloaded
 
-- **Promise:** a dataless cloud placeholder may be listed, but the Reader never materialises it to extract its
-  content.
-- **Promised in:** `CLAUDE.md` §Verified Facts (Search/discovery).
+- **Promise:** a cloud-only PDF may be listed. Scanning, indexing, selection, thumbnails and neighbor
+  prefetch leave it cloud-only. The document window and Space preview require **Download and Show**.
+- **Promised in:** Reader `CLAUDE.md` §Verified Facts (discovery and extraction), owner call 30 (2026-11-21).
 - **Reached by:** automatic. The walker's `SF_DATALESS` flag (`CorpusWalker.swift:798`) becomes
   `ArchiveFile.isDataless` (`Search/ArchiveLibrary.swift:1347`). Indexing skips dataless files
   (`Search/ContentIndexer.swift:169-179`) and wraps its reads in `withDatalessMaterializationDisabled`
   (`:265`, `Search/LibraryScan.swift:28`, `:49`). The link writer skips their thumbnail (`Core/ArchiveLinkWriter.swift:58`).
 - **Real-path test:** `ArchiveReaderTests/ContentIndexerDatalessTests.testDatalessFileIsNeverOpenedAndItsDisposableContentRowIsRemoved`;
   `.testRacePathPDFOpenRunsInsideNoMaterialisationPolicy`.
-- **Runtime evidence:** none. `unverifiable-here` may be the right status for the real-cloud half: the corpus
-  is local disk, and a real placeholder needs a cloud-synced folder.
-- **Status:** `unproven`
+- **Runtime evidence:** [S-002 independent Reader test](evidence/reader/W49.reader-s002-reproduce-check.md).
+  The selection prefetch and the viewer's load each downloaded the OneDrive placeholder.
+- **Status:** `broken` · S3 · `W49.fix-reader-dataless-prefetch`
 - **History:**
   - 2026-10-12 W40.b1 — row written, `unproven`.
-- **Notes:** the viewer, preview and thumbnail paths were not seen to guard dataless files (`S-002`).
+  - 2026-11-21 W49.reader-s002-reproduce-check — independently reproduced and queued the fix.
 
 ### R-05 · Chronological default sort
 

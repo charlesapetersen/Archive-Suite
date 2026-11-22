@@ -33,14 +33,13 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   `DocumentViewerModel.load`, `PreviewSheet` or other thumbnail paths. If a user opens a dataless row, PDFKit may
   download the whole file. The cost is bandwidth and disk, not data loss.
 - **Where:** `Views/DocumentViewerModel.swift` `loadCurrent`; `Views/PreviewSheet.swift`; ledger `R-04`.
-- **Would confirm it:** a dataless file is hard to make here (no cloud-synced root). Either create a scratch
-  file-provider placeholder (`SF_DATALESS`) in a test, open it through `DocumentViewerModel.load`, and check that
-  the flag is still set afterwards, or decide that opening a file is an explicit user request to download it and
-  record that.
-- **Would clear it:** the flag is still set after the viewer loads, or the owner rules that opening a file may
-  download it.
-- **Status:** `reproduced` — awaiting the independent check (phase rule 5a(4), `W49.reader-s002-reproduce-check`);
-  evidence [`evidence/reader/W49.reader-s002-dataless-viewer.md`](evidence/reader/W49.reader-s002-dataless-viewer.md)
+- **Would confirm it:** on a real cloud-only PDF outside the corpus, `SF_DATALESS` clears after selection
+  prefetch or opening the PDF, before the user approves a download.
+- **Would clear it:** the file stays cloud-only through those paths and downloads when the user chooses
+  **Download and Show**, as required by owner call 30 (2026-11-21).
+- **Status:** `reproduced` — independently confirmed and queued as `W49.fix-reader-dataless-prefetch`.
+  [Original reproduction](evidence/reader/W49.reader-s002-dataless-viewer.md) ·
+  [Independent Reader test](evidence/reader/W49.reader-s002-reproduce-check.md)
 - **History:**
   - 2026-10-12 W40.b1 — raised.
   - 2026-11-20 W49.notes-s007-reproduce (no test of the Reader) — the route for this check exists now. The owner's OneDrive holds dataless PDFs, and a bare `PDFDocument(url:)` on one downloads it, while the thread guard keeps it dataless ([`evidence/notes/W49.notes-s007-dataless-preview.md`](evidence/notes/W49.notes-s007-dataless-preview.md)). An engine session must set the process materialization policy back to on first: it inherits off.
@@ -52,6 +51,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     checks it. The neighbour open holds (`NeighbourCache.start` skips a dataless file, its comment saying that would
     download unasked), so the prefetcher's download is not deliberate; whether an explicit open may download is asked
     in the Daemon Report. `performFind` over a multi-file selection opens bare as well. Evicted after each run.
+  - 2026-11-21 W49.reader-s002-reproduce-check (Codex gpt-6.2-sol) — the shipped selection prefetch
+    and viewer model each cleared `SF_DATALESS` on a 6.2 MB non-corpus OneDrive PDF. The guarded control
+    left it cloud-only, and it was evicted after both downloads. Owner call 30 requires **Download and Show**
+    for an explicit open and prohibits downloads during selection, thumbnail rendering and neighbor prefetch.
 
 ### S-003 · A dead Reader content index still shows "No matches" in the list
 

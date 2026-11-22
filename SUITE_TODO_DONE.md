@@ -17543,3 +17543,7 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   S-053 tracks gateway model availability. $0 spent. No bench cache used.
   [Reproduction and regression](verification/evidence/processor/W49.proc-s052-verify.md).
   <!-- /W49.proc-fix-s052 -->
+
+- [x] **W49.reader-s002-reproduce-check — check the S-002 reproduction in an independent session [S]** · §Known limits are queued, accepted or asked (lane: reader) (uses: build) — SHIPPED 2026-11-21 (this commit). Phase rule 5a(4), owner call 28. Independently confirmed Claude Opus 5.5's reproduction using the shipped Reader prefetcher and viewer model under Codex gpt-6.2-sol. A single selection prefetch and a separate explicit open each downloaded the same non-corpus OneDrive PDF. The guarded control left it cloud-only, and eviction restored that state after both downloads.
+  [Method and timings](verification/evidence/reader/W49.reader-s002-reproduce-check.md). Filed W49.fix-reader-dataless-prefetch per owner call 30. Retained the original diagnostic probes and removed the temporary app-hosted probe. No bench cache used.
+  <!-- /W49.reader-s002-reproduce-check -->
