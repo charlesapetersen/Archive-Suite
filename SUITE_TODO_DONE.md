@@ -17528,3 +17528,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   and both focused off-screen checks passed. The row and toolbar menus created the expected note
   on disk. No bench cache used.
   <!-- /W49.fix-notes-template-create -->
+
+- [x] **W49.reader-s005-reproduce-check — check the S-005 reproduction in an independent session [S]** · §Known limits are queued, accepted or asked (lane: reader) (uses: build) — Phase rule 5a(4) (owner, 2026-11-20, call 28): `W49.reader-s005-reproduce` reproduced, on Opus 5.5, the viewer half of S-005: a password-protected text PDF opens in the document viewer locked, with its page count, no load error, and a format note calling it image-only; nothing says it is encrypted (the indexer half holds: the row is `.unreadable`). Run this on another model (Codex). Read the `verification/SUSPECTS.md` S-005 entry and `ArchiveReaderTests/EncryptedPDFSuspectTests`, then reproduce it by the user's path without trusting that test: make a password-protected PDF on scratch, open it in the Reader's document window (VM XCUITest, or the model's `load`) and read what is shown. Confirmed: file a `W49.fix-reader-encrypted-pdf` item (the viewer names the problem, e.g. a load error that it is password-protected, and the format note no longer says image-only; the reproducing test kept as its test, its `XCTExpectFailure` removed). Not confirmed: say why in SUSPECTS.md and leave the suspect open for the owner. Nothing is fixed in this item.
+  SHIPPED 2026-11-21 (this commit). Codex gpt-6.2-sol independently reproduced the viewer behavior on
+  a qpdf-protected copy of a two-page text PDF. The plaintext control had no banner. The locked copy
+  reported both pages, no load error, and the image-only banner. The existing indexer test passed.
+  [Scratch run](verification/evidence/reader/W49.reader-s005-reproduce-check.md). Follow-up W49.fix-reader-encrypted-pdf. No bench cache used.
+  <!-- /W49.reader-s005-reproduce-check -->

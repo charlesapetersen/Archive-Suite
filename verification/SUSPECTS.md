@@ -117,8 +117,9 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   `kCGPDFContextUserPassword`). Run it through `ContentIndexer`'s row extraction and `DocumentViewerModel.load`,
   and record the format status and the error shown.
 - **Would clear it:** the status is `unreadable` and the viewer names the problem.
-- **Status:** `reproduced` (the viewer half) — awaiting the independent check (phase rule 5a(4),
-  `W49.reader-s005-reproduce-check`); tests `ArchiveReaderTests/EncryptedPDFSuspectTests`
+- **Status:** `reproduced` (viewer) — independently verified and queued as
+  `W49.fix-reader-encrypted-pdf`; [scratch evidence](evidence/reader/W49.reader-s005-reproduce-check.md),
+  tests `ArchiveReaderTests/EncryptedPDFSuspectTests`
 - **History:**
   - 2026-10-12 W40.b1 — raised.
   - 2026-11-20 owner walkthrough (call 24) — reproduce attempt queued as `W49.reader-s005-reproduce`.
@@ -132,6 +133,10 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     image-only…", which is wrong for a text PDF behind a password, and nothing mentions a password or encryption.
     Not deliberate: `PDFFormatStatus`'s comment counts an encrypted PDF as unreadable. The viewer check is an
     `XCTExpectFailure`, so the bundle stays green until a fix removes it. Cosmetic or misleading, no data loss.
+  - 2026-11-21 W49.reader-s005-reproduce-check (Codex, gpt-6.2-sol, `ba39eeb4`) — a separately
+    generated, qpdf-encrypted text PDF loaded locked with two pages, no load error and the image-only
+    banner. Its plaintext control showed no banner; PDFKit could read the encrypted copy’s text after
+    unlocking it separately. The existing indexer test still marked its locked fixture unreadable.
 
 ### S-006 · A Notes subject spelled "ArchiveSuite" loses its Finder tag on the note's next save
 

@@ -2,6 +2,12 @@
 
 Running log of quirks, risks, and things verified/unverified. Keep current.
 
+## Password-protected PDFs in the document viewer (S-005, 2026-11-21)
+
+- **The viewer calls a locked text PDF image-only** and gives no password message. Library health marks
+  it unreadable. [Independent scratch run](../verification/evidence/reader/W49.reader-s005-reproduce-check.md).
+  (queued: W49.fix-reader-encrypted-pdf)
+
 ## Data keyed by absolute path — the limits (W49.storage-simplify-audit, 2026-11-20)
 
 Found by the storage survey (`execution-plans/storage-simplify.md` §2, §6).
