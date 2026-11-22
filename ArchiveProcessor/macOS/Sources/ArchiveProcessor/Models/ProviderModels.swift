@@ -802,6 +802,8 @@ struct OCRJob: Identifiable {
     var result: OCRResult?
     var classification: DocumentClassification?
     var appliedTags: [String] = []
+    /// Rebuilt multi-page PDFs report layer notes by source page in the run log.
+    var pdfLayerLogNotes: [String]?
 
     enum JobStatus {
         case pending, processing, succeeded, failed, removed

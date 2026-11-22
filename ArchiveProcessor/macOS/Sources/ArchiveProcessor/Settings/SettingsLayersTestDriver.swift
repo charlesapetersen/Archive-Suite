@@ -372,6 +372,18 @@ enum SettingsLayersTestDriver {
             check("a first run creates the collection", false, "no document")
         }
 
+        let crowded = folder(root, "freeze-layer-note-limit")
+        let crowdedSnapshot = store.snapshot(outputDirectory: crowded, runID: UUID(), processing: [:], now: day)
+        let layerNotes = ["Photo 1: no searchable text on the image"] + Array(
+            repeating: String(repeating: "layer note ", count: 50), count: 2_000)
+        let crowdedError = store.record(crowdedSnapshot, kind: "liveCapture", fileCount: 1, in: crowded,
+                                        pdfLayerLogNotes: layerNotes)
+        let crowdedRun = CollectionSettingsFile.runs(in: crowded).first
+        check("large Live Capture logs keep the collection record readable and count omitted page notes",
+              crowdedError == nil && crowdedRun?.id == crowdedSnapshot.runID
+              && crowdedRun?.pdfLayerLogNotes?.first == layerNotes.first
+              && crowdedRun?.pdfLayerLogNotes?.last?.hasPrefix("Additional captured pages with layer notes:") == true)
+
         if let project { store.deleteProject(project.id) }
         let s4 = store.snapshot(outputDirectory: out, runID: UUID(), processing: [:], macMemoryGB: 16, now: day)
         check("a deleted project falls back to the general layer and keeps its name on record",

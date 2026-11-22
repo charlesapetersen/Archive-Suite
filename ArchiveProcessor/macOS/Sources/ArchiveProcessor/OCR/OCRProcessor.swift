@@ -608,6 +608,7 @@ class OCRProcessor: ObservableObject {
         let result: OCRResult
         let succeeded: Bool
         let outputURL: URL?
+        var pdfLayerLogNotes: [String]? = nil
     }
 
     /// Versioned, immutable snapshot of every mutable/runtime knob that the standard Process Files

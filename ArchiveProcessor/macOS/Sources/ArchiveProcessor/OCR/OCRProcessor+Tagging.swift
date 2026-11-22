@@ -247,12 +247,9 @@ extension OCRProcessor {
         textPageOnlyOutputs.removeAll { $0.name == name }
         searchableFormNotes.removeAll { $0.name == name }
         if outcome.route == .textPage, let reason = outcome.reason { textPageOnlyOutputs.append((name, reason)) }
-        if outcome.route == .unplaced {
-            searchableFormNotes.append((name, "its text is on the image but not placed on the words: \(outcome.reason ?? "unknown")"))
-        }
-        if let formFallback { searchableFormNotes.append((name, "written with a text page instead: \(formFallback)")) }
-        if let compression { searchableFormNotes.append((name, "written uncompressed: \(compression)")) }
-        if let compressedNote { searchableFormNotes.append((name, "compressed: \(compressedNote)")) }
+        let notes = PDFGenerator.Output.searchableFormLogNotes(
+            outcome, formFallback: formFallback, compression: compression, compressedNote: compressedNote)
+        searchableFormNotes.append(contentsOf: notes.map { (name, $0) })
     }
 
     /// The end-of-run warning text for both records, or "" when everything landed cleanly.

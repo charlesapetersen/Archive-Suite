@@ -17766,3 +17766,15 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 - [x] **W49.proc-child-cancel — compression children and the hand placer stop with the run; a date rewrite's Quartz fallback is logged [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked — SHIPPED 2026-11-22 (this commit).
   Filed by W49.ki-audit-processor. jbig2 and qpdf share a 60-second budget for a searchable page, including its PDF/A finish. Stop reaches the PDF worker, ends an active child with TERM then KILL when needed, and withdraws a hand placer waiting for a reader slot. Both paths clean their scratch. A stopped write keeps an already saved non-batch reading for Resume. Searchable header rewrites log the reason for falling back to Quartz.
   <!-- /W49.proc-child-cancel -->
+
+- [x] **W49.proc-runlog-all-paths — Live Capture and the multi-page PDF path report the layer outcome in their logs [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit).
+  Live Capture and rebuilt PDFs now name pages without an image text layer, pages with text laid out away from
+  the words and pages that fell back to an image and separate text page. The logs also carry the generator's
+  compression notes. The Live Capture collection record lists the original photos filed into that collection.
+  The processing log groups the notes by input PDF and numbers them by source page. Both paths retain the
+  notes through recovery. This closes the two run-log bullets under §W42.int-s5-searchable and §W42.int-s5.
+  Filed by W49.ki-audit-processor. The Processor smoke, three-document Android-to-Mac round trip, multi-page
+  re-OCR, Live Capture recovery and text-layer tests passed on scratch files. The large-record check passed.
+  The settings suite still reports two catalogue parity failures for missing Reader and Notes labels for
+  `dateLocalImage` and `lowConfidenceNames`. Both catalogues match the baseline.
+  <!-- /W49.proc-runlog-all-paths -->

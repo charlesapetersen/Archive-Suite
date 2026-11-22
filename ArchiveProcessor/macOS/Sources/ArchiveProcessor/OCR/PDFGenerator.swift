@@ -85,6 +85,25 @@ struct PDFGenerator {
         /// What the compressor said of a compressed page, for the run log (ink outside the words stored finer or
         /// coarser, `CompressedPage`); nil otherwise.
         var compressedNote: String? = nil
+
+        var layerLogNotes: [String] {
+            let noLayer = layer.route == .textPage
+                ? layer.reason.map { "no searchable text on the image: \($0)" } : nil
+            return [noLayer].compactMap { $0 } + Self.searchableFormLogNotes(
+                layer, formFallback: formFallback, compression: compression, compressedNote: compressedNote)
+        }
+
+        static func searchableFormLogNotes(_ layer: TextLayerOutcome, formFallback: String?,
+                                           compression: String?, compressedNote: String?) -> [String] {
+            var notes: [String] = []
+            if layer.route == .unplaced {
+                notes.append("its text is on the image but not placed on the words: \(layer.reason ?? "unknown")")
+            }
+            if let formFallback { notes.append("written with a text page instead: \(formFallback)") }
+            if let compression { notes.append("written uncompressed: \(compression)") }
+            if let compressedNote { notes.append("compressed: \(compressedNote)") }
+            return notes
+        }
     }
 
     @discardableResult

@@ -474,12 +474,10 @@ written where the `searchableFor` setting names the input's format and the page'
   and stop when the run is cancelled (accepted: the Quartz fallback keeps the page when compression fails, W49.proc-child-cancel).
 - **An unplaced layer selects in the wrong place.** Where the reading's words do not all land on Vision's lines
   (handwriting, a missed note, a reading that does not align), the layer is the reading's own lines spread down the
-  image: searchable and selectable, but a selection's highlight is not on the words. The run log names those pages (accepted: the reading has no word positions to place by; the run log names the pages).
+  image: searchable and selectable, but a selection's highlight is not on the words. The processing log and Live Capture session records name those pages (accepted: the reading has no word positions to place by).
 - **Improve OCR refuses a searchable file** (it replaces text pages, and there is none): reprocess it instead (queued: W49.proc-reocr-searchable).
 - **A file edited elsewhere can lose its headers.** A list whose count is not the page count is ignored (the file was
   edited, so which entry is which page is unknown), and the file is then read as pairs (accepted: the safe fallback for a file whose page order is unknown).
-- **Live Capture and the multi-page PDF path drop the run-log notes** (unplaced pages, pages written as pairs instead),
-  as they drop the layer outcome (queued: W49.proc-runlog-all-paths).
 - **The Reader's thumbnails read a file's pages as pairs until its roles are read** (a moment, on first showing) (accepted: a moment on first showing).
 
 ## Verification baseline (2026-11-14)
@@ -561,8 +559,6 @@ limits in their own section). Open:
 - **The PDF/A writer holds the whole output in memory** (`PDFGenerator.archivalData`, then `ArchivalFinish`'s rewrite):
   about three to four times the file at the peak, so a 200-page merge of 2 MB pages passes 1 GB. It draws each page's
   media box only, without crop box or annotations; every caller passes the app's own new pages, which have neither (queued: W49.proc-pdfa-memory).
-- **The run log names pages left without a layer for Process Files only** (its single-image writes and regenerations);
-  Live Capture and the multi-page PDF path drop the outcome (queued: W49.proc-runlog-all-paths).
 - **Image-plus-text is 2.6 to 17 times Vision OCR's size** (measured 2026-11-13, `scripts/measure-output.sh` on three
   UIUC pages and the drawn memo): 2.1-2.3 MB a photographed page against Vision OCR 1.16.0's 0.12-0.87 MB, because
   the image page is the 2 MB JPEG copy. The searchable form is compressed as Vision OCR compresses

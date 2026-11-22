@@ -68,6 +68,8 @@ final class LiveCaptureProcessor: ObservableObject {
         /// silently omits an untagged file, so this must be said out loud at finalize instead of discarded.
         /// `nil`/empty ⇒ every artifact was tagged (also the legacy-manifest reading).
         var untaggedOutputs: [URL]?
+        /// Layer notes for the captured pages, kept with the staged output through resume and regeneration.
+        var pdfLayerLogNotes: [String]? = nil
     }
 
     @Published private(set) var statuses: [SegmentStatus] = []
@@ -1682,6 +1684,7 @@ final class LiveCaptureProcessor: ObservableObject {
         var imageURLs: [URL] = []
         var placeholderSources: [URL] = []
         var untaggedOutputs: [URL] = []
+        var layerNotes: [String] = []
         // W3.cap-r1 — the app's OWN colour for this segment (the user's colour for a box/folder, if any;
         // nil for a document or no colour chosen — W40.suite-item-types),
         // passed to every tag write below so a *subject* string is never mistaken for one. See
@@ -1718,15 +1721,13 @@ final class LiveCaptureProcessor: ObservableObject {
             if type == .document, ocrFailed(page.result) { continue }
             let base = page.sourceURL.deletingPathExtension().lastPathComponent
             let stagedPDF = stagingDir.appendingPathComponent(base + ".pdf")
-            let imagePage = try? pdfGen.generate(imageURL: page.sourceURL, result: page.result, model: model,
-                                                 outputURL: stagedPDF, originalFileName: page.sourceURL.lastPathComponent,
-                                                 gatewayDisplayName: gatewayName,
-                                                 localAgentDisplayName: localAgentDisplayName,
-                                                 localAgentModelName: localAgentModelName,
-                                                 pdfImageMB: pdfImageMB, textColumns: textColumns,
-                                                 sourceDates: sourceDates, textLayer: textLayer,
-                                                 // W42.stroke-weight-processor: a live capture is the phone's photo.
-                                                 photographed: true)
+            let output = try? pdfGen.generateOutput(
+                imageURL: page.sourceURL, result: page.result, model: model, outputURL: stagedPDF,
+                originalFileName: page.sourceURL.lastPathComponent, gatewayDisplayName: gatewayName,
+                localAgentDisplayName: localAgentDisplayName, localAgentModelName: localAgentModelName,
+                pdfImageMB: pdfImageMB, textColumns: textColumns, sourceDates: sourceDates, textLayer: textLayer,
+                // W42.stroke-weight-processor: a live capture is the phone's photo.
+                photographed: true)
             // Only record a PDF we can PROVE is on disk. `generate` is `try?`, so a swallowed failure would
             // otherwise append a phantom URL — and finalize keys "safe to delete the source photo" off the
             // PDF actually reaching the destination. A phantom would let a never-written output masquerade as
@@ -1739,7 +1740,10 @@ final class LiveCaptureProcessor: ObservableObject {
             // (generate threw yet still left a file on disk) is UNKNOWN, and unknown resolves the safe way:
             // withhold the deletion. Erring here keeps a photo we could have deleted; erring the other way
             // destroys an irreplaceable page.
-            if imagePage != .embedded { placeholderSources.append(page.sourceURL) }
+            if output?.imagePage != .embedded { placeholderSources.append(page.sourceURL) }
+            if let notes = output?.layerLogNotes, !notes.isEmpty {
+                layerNotes.append("\(page.sourceURL.lastPathComponent): \(notes.joined(separator: "; "))")
+            }
             let tagList = tagsByApplyingPhoneQuality(baseTags, quality: page.quality)
             if writesFinderTags(taggingMode, tagList),
                !tagStagedArtifact(tagList, at: stagedPDF, appColor: appColor, stampUnread: stampUnread) {
@@ -1802,7 +1806,8 @@ final class LiveCaptureProcessor: ObservableObject {
         return StagedSegment(groupId: groupId, type: type.rawValue, collectionKey: collectionKey, order: order,
                              pdfURLs: pdfURLs, imageURLs: imageURLs, jsonURL: jsonURL, boxLabelText: boxLabelText,
                              pagesComplete: pagesComplete, placeholderSources: placeholderSources,
-                             untaggedOutputs: untaggedOutputs)
+                             untaggedOutputs: untaggedOutputs,
+                             pdfLayerLogNotes: layerNotes.isEmpty ? nil : layerNotes)
     }
 
     /// A page's Quality input: a saved card's decision, else the phone's. The card's 0 becomes the internal
@@ -2349,6 +2354,7 @@ final class LiveCaptureProcessor: ObservableObject {
         var order: [URL] = []
         var counts: [String: Int] = [:]
         var pages: [String: Int] = [:]
+        var layerNotes: [String: [String]] = [:]
         var labels: [String: Double] = [:]
         var labelCalls = 0
         var labelDollars = 0.0
@@ -2361,6 +2367,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 $0 + max(retained[$1.groupId]?.pages.count ?? 0, max($1.imageURLs.count, $1.pdfURLs.count))
             }
             for seg in filedSegments {
+                if let notes = seg.pdfLayerLogNotes { layerNotes[key, default: []].append(contentsOf: notes) }
                 guard let usd = labelCharge(seg.groupId) else { continue }
                 labels[key, default: 0] += usd
                 labelCalls += 1
@@ -2370,9 +2377,10 @@ final class LiveCaptureProcessor: ObservableObject {
         }
         let store = SettingsLayerStore.shared
         for folder in order {
-            guard let count = counts[folder.standardizedFileURL.path], count > 0 else { continue }
+            let key = folder.standardizedFileURL.path
+            guard let count = counts[key], count > 0 else { continue }
             let snapshot = store.snapshot(outputDirectory: folder, runID: UUID(), processing: processing)
-            store.record(snapshot, kind: "liveCapture", fileCount: count, in: folder)
+            store.record(snapshot, kind: "liveCapture", fileCount: count, in: folder, pdfLayerLogNotes: layerNotes[key])
             // The month's ledger (W46.settings-ledger-more): the pages filed here, priced as Process Files prices a
             // run of them. Filed pages only, so a finalize retried after a failure counts each page once.
             // The markers' label calls are added to the folder's pages (W47.ct-label-cost).

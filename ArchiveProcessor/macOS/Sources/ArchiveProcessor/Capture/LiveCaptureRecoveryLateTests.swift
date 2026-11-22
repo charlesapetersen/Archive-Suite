@@ -65,7 +65,11 @@ extension LiveCaptureRecoveryTestDriver {
             let af1Staged = await afSettle {
                 afProc.staged.first { $0.groupId == "AF1" }?.pdfURLs.isEmpty == false
             }
+            let af1Name = afProc.staged.first { $0.groupId == "AF1" }?.placeholderSources?.first?.lastPathComponent
             let af1Filed = af1Staged ? await afFinish("AF1") : false
+            let af1Notes = CollectionSettingsFile.runs(in: afOut).first { $0.kind == "liveCapture" }?.pdfLayerLogNotes
+            check("Live Capture's filed session record names the source photo and its missing layer",
+                  af1Name.map { af1Notes == ["\($0): no searchable text on the image: the image could not be embedded"] } == true)
             check("after-finish premise: the first document filed and its Finish reclaimed the staging folder",
                   af1Staged && af1Filed && afOutPDFs() == 1 && !fm.fileExists(atPath: afStaging.path)
                       && afSession.processingMode == .live)

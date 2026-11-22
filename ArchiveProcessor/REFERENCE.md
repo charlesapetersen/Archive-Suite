@@ -128,11 +128,15 @@ Each input image → one PDF with the same base filename.
 - If no text returned: `No text returned by model.` followed by the error code/reason if provided.
 - Gemini-specific: Gemini may refuse copyrighted text with error `"Recitation"` — handle and display this error clearly.
 
-### Batch log file
-Opt-in: Settings → **Write a processing log file** (`DefaultsKeys.writeLogFile`, off by default). When on, after all
-files are processed, `writeLogFile` (`OCR/OCRProcessor+Pipeline.swift`) writes `ArchiveProcessor_Log_<timestamp>.txt` listing:
-- All files that failed to produce OCR text
-- Error reason for each
+### Processing and Live Capture logs
+
+In Settings, **Write a processing log file** enables `ArchiveProcessor_Log_<timestamp>.txt` in the output folder.
+The log lists files that failed to produce OCR text and gives their reasons. It also describes searchable-layer
+and compression outcomes. Rebuilt multi-page PDFs have one row per source file, with notes numbered by source page.
+
+Live Capture adds the same notes to the session's collection record under `.archivesuite/runs/`.
+The optional `pdfLayerLogNotes` field names the original captured photos that were filed into that collection.
+If the notes exceed the record's size limit, the record keeps the settings and counts omitted page notes when space permits.
 
 ---
 

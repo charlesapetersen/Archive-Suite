@@ -544,7 +544,8 @@ extension OCRProcessor {
             let output = outputURLMap[source]
             guard succeeded == (output != nil) else { return nil }
             outcomes.append(MixedPDFOutcome(originalIndex: index, sourceURL: source,
-                                            result: result, succeeded: succeeded, outputURL: output))
+                                            result: result, succeeded: succeeded, outputURL: output,
+                                            pdfLayerLogNotes: jobs[index].pdfLayerLogNotes))
         }
         return outcomes
     }
@@ -582,6 +583,7 @@ extension OCRProcessor {
                 job.result = pdf.result
                 job.classification = pdf.result.classification
                 job.status = pdf.succeeded ? .succeeded : .failed
+                job.pdfLayerLogNotes = pdf.pdfLayerLogNotes
             }
             ordered[pdf.originalIndex] = job
         }
@@ -4044,9 +4046,9 @@ extension OCRProcessor {
                     + " named by their first input file):"]
             + failures.map { "  \u{2022} \($0.name): \($0.reason)" }
     }
-    private func writeLogFile(outputDirectory: URL) {
+    func writeLogFile(outputDirectory: URL, enabled: Bool = UserDefaults.standard.bool(forKey: DefaultsKeys.writeLogFile)) {
         // Opt-in: only write the log when the user has enabled it (default off).
-        guard UserDefaults.standard.bool(forKey: DefaultsKeys.writeLogFile) else { return }
+        guard enabled else { return }
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "d MMMM yyyy HH:mm"
         let dateStr = dateFormatter.string(from: Date())
@@ -4099,6 +4101,15 @@ extension OCRProcessor {
             lines.append("")
             lines.append("Pages set to be one searchable page, with no text page:")
             for entry in searchableFormNotes { lines.append("  \u{2022} \(entry.name): \(entry.note)") }
+        }
+
+        let rebuiltPDFRows = jobs.compactMap { job -> [String]? in
+            guard job.status == .succeeded, let notes = job.pdfLayerLogNotes, !notes.isEmpty else { return nil }
+            return ["  \u{2022} \(job.sourceURL.lastPathComponent):"] + notes.map { "    \($0)" }
+        }
+        if !rebuiltPDFRows.isEmpty {
+            lines += ["", "Searchable text on the image in rebuilt PDFs:"]
+            lines += rebuiltPDFRows.flatMap { $0 }
         }
 
         let content = lines.joined(separator: "\n")

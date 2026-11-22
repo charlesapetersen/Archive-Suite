@@ -141,6 +141,13 @@ enum MultiPageReOCRTestDriver {
         check("image pages carry no OCR-text marker (proves alternation)",
               !pageText(0).contains("OCRPAGE") && !pageText(2).contains("OCRPAGE") && !pageText(4).contains("OCRPAGE"))
 
+        processor.writeLogFile(outputDirectory: outDir, enabled: true)
+        let log = ((try? fm.contentsOfDirectory(at: outDir, includingPropertiesForKeys: nil)) ?? [])
+            .first { $0.pathExtension == "txt" }.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
+        check("the rebuilt PDF has one log row and identifies each source page without an image layer",
+              log.components(separatedBy: "  • doc.pdf:").count == 2
+              && (1...3).allSatisfy { log.contains("Page \($0): no searchable text on the image:") })
+
         // ── 3. File-safety: output must NOT overwrite the input when the dir coincides. ─────────────
         let sameDir = root.appendingPathComponent("same", isDirectory: true)
         try? fm.createDirectory(at: sameDir, withIntermediateDirectories: true)
@@ -294,6 +301,19 @@ enum MultiPageReOCRTestDriver {
                     })
                 check("second relaunch reuses completed output without a paid call",
                       await repeatedCalls.count() == 0 && secondRelaunch.outputURLMap[recoveryPDF] == output)
+                let durableNotes = completed?.completedOutcomes.first?.pdfLayerLogNotes
+                check("the completed PDF journal and a fresh resume preserve the same page notes",
+                      durableNotes?.count == 2 && secondRelaunch.jobs[1].pdfLayerLogNotes == durableNotes
+                      && secondRelaunch.captureMixedPDFOutcomes(indices: [1])?.first?.pdfLayerLogNotes == durableNotes)
+                if let outcome = completed?.completedOutcomes.first {
+                    let resumedImages = OCRProcessor()
+                    resumedImages.jobs = [OCRJob(sourceURL: recoveryImage)]
+                    resumedImages.restoreMixedPDFAssociations([outcome])
+                    resumedImages.restoreMixedPDFJobs([outcome])
+                    check("the image half of a resumed mixed run restores the PDF's notes to its original job",
+                          resumedImages.jobs[1].sourceURL == recoveryPDF
+                          && resumedImages.jobs[1].pdfLayerLogNotes == durableNotes)
+                }
                 if let completed {
                     let fingerprint = OCRProcessor.runFingerprint(
                         files: [recoveryImage], outputDirectory: recoveryOut, taggingMode: TaggingMode.none,

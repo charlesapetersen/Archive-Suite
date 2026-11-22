@@ -32,6 +32,8 @@ struct CollectionRunRecord: Codable, Equatable, Sendable {
     var kind: String
     var fileCount: Int
     var settings: ResolvedSettingsSnapshot
+    /// Live Capture's layer notes, named by the original captured pages filed in this collection.
+    var pdfLayerLogNotes: [String]? = nil
 }
 
 /// The collection's settings document.
@@ -219,8 +221,26 @@ enum CollectionSettingsFile {
     static func writeRun(_ record: CollectionRunRecord, in outputDirectory: URL) throws {
         try ensureFolders(in: outputDirectory, subfolder: CollectionSettingsDocument.runsFolderName)
         let data: Data
-        do { data = try encoder().encode(record) }
-        catch { throw CollectionSettingsError.writeFailed(error.localizedDescription) }
+        do {
+            let encoder = encoder()
+            var entry = record
+            var encoded = try encoder.encode(entry)
+            if let notes = record.pdfLayerLogNotes {
+                var kept = notes.count
+                while encoded.count > maxBytes, kept > 0 {
+                    kept /= 2
+                    entry.pdfLayerLogNotes = Array(notes.prefix(kept))
+                        + ["Additional captured pages with layer notes: \(notes.count - kept)."]
+                    encoded = try encoder.encode(entry)
+                }
+                if encoded.count > maxBytes {
+                    // The settings may themselves fill the record. Preserve the settings record.
+                    entry.pdfLayerLogNotes = nil
+                    encoded = try encoder.encode(entry)
+                }
+            }
+            data = encoded
+        } catch { throw CollectionSettingsError.writeFailed(error.localizedDescription) }
         let name = "\(stamp(record.startedAt))-\(record.id.uuidString).json"
         let url = CollectionSettingsDocument.runsFolder(in: outputDirectory).appendingPathComponent(name)
         guard probe(url) == .missing else { throw CollectionSettingsError.writeFailed("\(name) already exists") }
@@ -479,7 +499,8 @@ final class SettingsLayerStore: ObservableObject {
     /// run file. Called once the run is committed to start (its pending record saved), so a refused start leaves
     /// nothing. Returns the problem, if any, for the run log; it never stops the run.
     @discardableResult
-    func record(_ snapshot: ResolvedSettingsSnapshot, kind: String, fileCount: Int, in outputDirectory: URL) -> String? {
+    func record(_ snapshot: ResolvedSettingsSnapshot, kind: String, fileCount: Int, in outputDirectory: URL,
+                pdfLayerLogNotes: [String]? = nil) -> String? {
         var snapshot = snapshot
         var problem: String?
         switch CollectionSettingsFile.read(in: outputDirectory) {
@@ -496,7 +517,7 @@ final class SettingsLayerStore: ObservableObject {
         }
         if problem == nil {
             let record = CollectionRunRecord(id: snapshot.runID, startedAt: snapshot.resolvedAt, kind: kind,
-                                             fileCount: fileCount, settings: snapshot)
+                                             fileCount: fileCount, settings: snapshot, pdfLayerLogNotes: pdfLayerLogNotes)
             do { try CollectionSettingsFile.writeRun(record, in: outputDirectory) }
             catch { problem = "\(error)" }
         }

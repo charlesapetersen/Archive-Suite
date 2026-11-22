@@ -343,6 +343,7 @@ extension OCRProcessor {
                 jobs[index].result = saved.result
                 jobs[index].classification = saved.result.classification
                 jobs[index].status = saved.succeeded ? .succeeded : .failed
+                jobs[index].pdfLayerLogNotes = saved.pdfLayerLogNotes
                 if let output = saved.outputURL {
                     outputURLMap[pdfURL] = output
                     _takenOutputPaths.insert(OutputFileSafety.pathKey(output))
@@ -495,30 +496,34 @@ extension OCRProcessor {
             // merge copies those pages verbatim, so one undecodable page makes the merged output a
             // partially scan-less PDF and the operator has to be told.
             let layerOptions = textLayerOptions
-            let assembly: (ok: Bool, anyPlaceholder: Bool) = await PDFGenerator.runWorker(priority: .utility) {
+            let assembly: (ok: Bool, anyPlaceholder: Bool, layerNotes: [String]) = await PDFGenerator.runWorker(priority: .utility) {
                 let gen = PDFGenerator()
                 let fm = FileManager.default
                 var perPagePDFs: [URL] = []
                 var anyPlaceholder = false
+                var layerNotes: [String] = []
                 defer { for u in perPagePDFs { try? fm.removeItem(at: u) } }
                 do {
-                    for page in pageWork {
+                    for (pageIndex, page) in pageWork.enumerated() {
                         let tmp = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".pdf")
-                        let outcome = try gen.generate(imageURL: page.image, result: page.result, model: genModel,
-                                                       outputURL: tmp, originalFileName: originalName,
-                                                       gatewayDisplayName: gatewayName,
-                                                       localAgentDisplayName: localAgentDisplayName,
-                                                       localAgentModelName: localAgentModelName, pdfImageMB: pdfMB,
-                                                       textColumns: txtCols, textLayer: layerOptions, sourceFormat: "pdf")
-                        if outcome.isPlaceholder { anyPlaceholder = true }
+                        let output = try gen.generateOutput(
+                            imageURL: page.image, result: page.result, model: genModel,
+                            outputURL: tmp, originalFileName: originalName, gatewayDisplayName: gatewayName,
+                            localAgentDisplayName: localAgentDisplayName, localAgentModelName: localAgentModelName,
+                            pdfImageMB: pdfMB, textColumns: txtCols, textLayer: layerOptions, sourceFormat: "pdf")
+                        if output.imagePage.isPlaceholder { anyPlaceholder = true }
+                        let notes = output.layerLogNotes
+                        if !notes.isEmpty {
+                            layerNotes.append("Page \(pageIndex + 1): \(notes.joined(separator: "; "))")
+                        }
                         perPagePDFs.append(tmp)
                     }
                     try gen.mergeDocumentPDFs(sourcePDFs: perPagePDFs, outputURL: outputURL)
-                    return (true, anyPlaceholder)
+                    return (true, anyPlaceholder, layerNotes)
                 } catch {
                     os_log(.error, "multi-page re-OCR PDF write failed for %{public}@: %{public}@",
                            originalName, error.localizedDescription)
-                    return (false, false)
+                    return (false, false, [])
                 }
             }
             let ok = assembly.ok
@@ -527,6 +532,8 @@ extension OCRProcessor {
             for u in pageImages { try? FileManager.default.removeItem(at: u) }
 
             if Task.isCancelled && !ok { return }
+            let layerNotes = assembly.layerNotes.isEmpty ? nil : assembly.layerNotes
+            jobs[index].pdfLayerLogNotes = layerNotes
             if ok {
                 // Map by the original source URL so downstream consumers (log, view-text) find it. Only
                 // set on a confirmed write — never a phantom entry pointing at a nonexistent file.
@@ -567,7 +574,8 @@ extension OCRProcessor {
                     if let outputDigest { pending.outputDigests[String(index)] = outputDigest }
                     pending.completedOutcomes.append(
                         MixedPDFOutcome(originalIndex: index, sourceURL: pdfURL,
-                                        result: result, succeeded: ok, outputURL: ok ? outputURL : nil))
+                                        result: result, succeeded: ok, outputURL: ok ? outputURL : nil,
+                                        pdfLayerLogNotes: layerNotes))
                 }) {
                     jobs[index].status = .processing
                     cleanupTempFiles(); return

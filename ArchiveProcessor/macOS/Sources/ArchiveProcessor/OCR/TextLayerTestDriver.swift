@@ -329,6 +329,10 @@ enum TextLayerTestDriver {
         check("7 a reading Vision lacks words of: unplaced, every word kept", e?.form == .searchable
               && e?.layer.route == .unplaced && OutputForm.holds(extraText, every: fuller), "\(String(describing: e?.layer))")
 
+        check("7 unplaced output has a log note", e?.layerLogNotes.contains {
+            $0.contains("not placed on the words")
+        } == true)
+
         // Pages the form cannot hold are written as pairs, and say why.
         for (label, text, kind) in [("Hebrew", "שלום עולם זה מכתב ארוך מאוד על התקציב", OCRPageKind.printed),
                                     ("no reading", "", .typewritten), ("a kind not chosen", reading, .forms)] {
@@ -337,6 +341,8 @@ enum TextLayerTestDriver {
             let chosen = kind != .forms
             check("7 \(label): written as a pair", f?.form == .imageAndText && PDFDocument(url: out)?.pageCount == 2
                   && (f?.formFallback != nil) == chosen, "\(String(describing: f))")
+            check("7 \(label): the log notes a fallback only when the searchable form was chosen",
+                  f?.layerLogNotes.contains { $0.hasPrefix("written with a text page instead:") } == chosen)
         }
 
         // A merge mixing the forms keeps every page's header where it belongs.
