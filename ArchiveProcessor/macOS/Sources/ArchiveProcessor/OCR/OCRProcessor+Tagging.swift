@@ -658,11 +658,9 @@ extension OCRProcessor {
                 appliedGeneratedTags[sourceURL] = tags
                 enclosureDateReviews[sourceURL] = review
                 if let outputPDF = outputURLMap[sourceURL] {
-                    if let dating {
-                        await writeDateEvidence(dating.headerEvidence(giving: tags), to: outputPDF, source: sourceURL,
-                                          runConfig: runConfig)
-                        guard !Task.isCancelled, outputURLMap[sourceURL] == outputPDF else { return }
-                    }
+                    await writeTaggedHeader(tags, evidence: dating?.headerEvidence(giving: tags), to: outputPDF,
+                                            source: sourceURL, runConfig: runConfig)
+                    guard !Task.isCancelled, outputURLMap[sourceURL] == outputPDF else { return }
                     // Manual tagging modes are real-tagging modes; follow the run's mode.
                     tagOutput(tags, at: outputPDF, source: sourceURL, stampUnread: stampUnread)
                 }
@@ -1012,11 +1010,9 @@ extension OCRProcessor {
                 enclosureDateReviews[sourceURL] = .init(inheritance: nil, decision: dating,
                                                         manual: (data.sentWith, data.sentWithUncertain, true))
                 if let outputPDF = outputURLMap[sourceURL] {
-                    if let dating {
-                        await writeDateEvidence(dating.headerEvidence(giving: gtags), to: outputPDF, source: sourceURL,
-                                          runConfig: runConfig)
-                        guard !Task.isCancelled, outputURLMap[sourceURL] == outputPDF else { return }
-                    }
+                    await writeTaggedHeader(gtags, evidence: dating?.headerEvidence(giving: gtags), to: outputPDF,
+                                            source: sourceURL, runConfig: runConfig)
+                    guard !Task.isCancelled, outputURLMap[sourceURL] == outputPDF else { return }
                     // Manual segment tagging is a real-tagging mode; follow the run's mode.
                     tagOutput(gtags, at: outputPDF, source: sourceURL, stampUnread: outputSettings.stampUnread)
                 }
@@ -1500,11 +1496,11 @@ extension OCRProcessor {
             appliedGeneratedTags[sourceURL] = tags
             enclosureDateReviews[sourceURL] = review
             if let outputPDF = outputURLMap[sourceURL] {
-                if dating != nil || !headerFields.isEmpty {
-                    await writeDateEvidence(headerEvidence, itemFields: headerFields, to: outputPDF, source: sourceURL,
-                                      runConfig: runConfig)
-                    guard !Task.isCancelled, outputURLMap[sourceURL] == outputPDF else { return tags }
-                }
+                // A tagging redo may turn a previously dated page into a container label.
+                let headerTags = segment.isBox || segment.isFolder ? GeneratedTags() : tags
+                await writeTaggedHeader(headerTags, evidence: headerEvidence, itemFields: headerFields,
+                                        to: outputPDF, source: sourceURL, runConfig: runConfig)
+                guard !Task.isCancelled, outputURLMap[sourceURL] == outputPDF else { return tags }
                 tagOutput(tags, at: outputPDF, source: sourceURL,
                           stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
             }
@@ -1521,52 +1517,47 @@ extension OCRProcessor {
         }
         return tags
     }
-    /// W46.date-route-header — put the dating evidence in one output's `Date evidence:` header line (nil removes a stale
-    /// one), through `OutputFileSafety.replaceGeneratedOutput`, before its tags are written. Each page of a document
-    /// carries the line, so a later merge keeps it. An output it cannot safely rewrite is left as it is and logged: the
-    /// sidecar's `dating` object still carries the evidence.
-    @discardableResult
-    /// W47.item-fields-build: the item-field lines go in the same rewrite (`itemFields`; empty removes stale ones).
-    func writeDateEvidence(_ evidence: String?, itemFields: PDFItemFields = PDFItemFields(), to outputPDF: URL,
-                           source: URL, runConfig: SessionProcessingConfig?) async -> PDFGenerator.DateEvidenceRewrite {
-        guard let text = jobs.first(where: { $0.sourceURL == source })?.result?.text, !text.isEmpty else {
-            return .skipped("no text")
-        }
-        // Most documents have an explicit year and no old line: settle that from the text page alone, unread bytes.
-        if evidence == nil, itemFields.isEmpty, let doc = PDFDocument(url: outputPDF), doc.pageCount == 2,
+    /// Add the document's resolved dates, evidence and item fields to each generated page before tagging and merging.
+    private func writeTaggedHeader(_ tags: GeneratedTags, evidence: String?, itemFields: PDFItemFields = PDFItemFields(),
+                                   to outputPDF: URL, source: URL,
+                                   runConfig: SessionProcessingConfig?) async {
+        guard !reOCRSourceURLs.contains(source), !OutputFileSafety.isSameFile(outputPDF, source),
+              let result = jobs.first(where: { $0.sourceURL == source })?.result else { return }
+        let text = PDFGenerator.textPageBody(result)
+        let fields = PDFSourceDates(documentDate: EnclosureDates.ownDate(of: tags)?.display, sentWith: tags.sentWith?.display,
+                                    dateEvidence: evidence, itemFields: itemFields)
+        // For an undated pair with no item fields, check for stale fields without reading the whole PDF into memory.
+        if fields.isEmpty, let doc = PDFDocument(url: outputPDF), doc.pageCount == 2,
            PDFPageRole.roles(of: doc) == [.image, .text], let page = doc.page(at: 1),
-           let header = PDFHeaderParser.parse(page).header, header.dateEvidence == nil, header.itemFields.isEmpty {
-            return .unchanged
+           let header = PDFHeaderParser.parse(page).header, header.documentDate == nil, header.sentWith == nil,
+           header.dateEvidence == nil, header.itemFields.isEmpty {
+            return
         }
-        guard !OutputFileSafety.isSameFile(outputPDF, source), let data = try? Data(contentsOf: outputPDF) else {
-            return .skipped("not a readable generated output")
-        }
+        guard let data = try? Data(contentsOf: outputPDF) else { return }
         let columns = Self.pdfGenerationSettings(for: runConfig).textColumns
         let outcome = await PDFGenerator.runWorker {
-            PDFGenerator().dateEvidenceRewrite(of: data, sourceName: source.lastPathComponent, evidence: evidence,
-                                               itemFields: itemFields, body: text, textColumns: columns)
+            PDFGenerator().taggedHeaderRewrite(of: data, sourceName: source.lastPathComponent, fields: fields,
+                                               body: text, textColumns: columns)
         }
-        guard !Task.isCancelled, outputURLMap[source] == outputPDF else { return .skipped("the run stopped") }
+        guard !Task.isCancelled, outputURLMap[source] == outputPDF else { return }
         switch outcome {
         case .rewrite(let new):
             guard (try? Data(contentsOf: outputPDF)) == data else {
-                os_log(.info, "Date evidence left out of %{public}@: the output changed during the rewrite",
+                os_log(.info, "Tagging header left out of %{public}@: the output changed during the rewrite",
                        outputPDF.lastPathComponent)
-                return .skipped("the output changed during the rewrite")
+                return
             }
             do {
                 try OutputFileSafety.replaceGeneratedOutput(outputPDF, for: source, with: new)
             } catch {
-                os_log(.error, "Date evidence not written to %{public}@: %{public}@",
+                os_log(.error, "Tagging header not written to %{public}@: %{public}@",
                        outputPDF.lastPathComponent, String(describing: error))
-                return .skipped(String(describing: error))
             }
         case .skipped(let why):
-            os_log(.info, "Date evidence left out of %{public}@: %{public}@", outputPDF.lastPathComponent, why)
+            os_log(.info, "Tagging header left out of %{public}@: %{public}@", outputPDF.lastPathComponent, why)
         case .unchanged:
             break
         }
-        return outcome
     }
 
     /// W40.fix-processor-review-classification-stale — bring one output's `Classification:` header line to the job's
@@ -1620,13 +1611,13 @@ extension OCRProcessor {
     }
 
     /// What one job's header rewrite needs, taken on the main actor; nil when it has no output of its own text.
-    private func classificationHeaderWork(forJobAt index: Int) -> ClassificationHeaderWork? {
+    private func classificationHeaderWork(forJobAt index: Int, includePlaceholders: Bool = false) -> ClassificationHeaderWork? {
         guard jobs.indices.contains(index), jobs[index].status != .removed,
-              let result = jobs[index].result, let text = result.text, !text.isEmpty else { return nil }
+              let result = jobs[index].result, includePlaceholders || result.text?.isEmpty == false else { return nil }
         let source = jobs[index].sourceURL
         guard let outputPDF = outputURLMap[source], !reOCRSourceURLs.contains(source) else { return nil }
         return ClassificationHeaderWork(outputPDF: outputPDF, source: source,
-                                        classification: result.classification?.displayName, text: text)
+                                        classification: result.classification?.displayName, text: PDFGenerator.textPageBody(result))
     }
 
     struct ClassificationHeaderWork: Sendable, Equatable {
@@ -1726,6 +1717,7 @@ extension OCRProcessor {
                     }
                 }
 
+                let sentWithChanged = tags.sentWith != appliedGeneratedTags[source]?.sentWith
                 updated = Self.replacingSentWithTokens(in: updated, with: Self.sentWithTokens(for: tags))
                 if updated != current {
                     guard tagOutput(updated, at: outputURL, source: source,
@@ -1737,19 +1729,24 @@ extension OCRProcessor {
                 if let dateChange {
                     review?.decision = dateChange.after
                     if review?.pendingSidecarDecision == nil { review?.pendingSidecarDecision = dateChange.before }
-                    let evidence = dateChange.after.headerEvidence(giving: dateChange.after.dateTags)
-                    if let work = classificationHeaderWork(forJobAt: j),
-                       !OutputFileSafety.isSameFile(work.outputPDF, work.source),
-                       let data = try? Data(contentsOf: work.outputPDF) {
-                        let outcome = PDFGenerator().reviewDateEvidenceRewrite(
-                            of: data, sourceName: source.lastPathComponent, evidence: evidence, body: work.text,
-                            textColumns: Self.pdfGenerationSettings(for: runConfig).textColumns)
-                        if (try? Data(contentsOf: work.outputPDF)) == data {
-                            _ = Self.applyReviewHeaderRewrite(outcome, to: work, field: "Date evidence")
-                        } else {
-                            os_log(.info, "Date evidence left as it was in %{public}@: the output changed during the rewrite",
-                                   work.outputPDF.lastPathComponent)
-                        }
+                }
+                if dateChange != nil || sentWithChanged,
+                   let work = classificationHeaderWork(forJobAt: j, includePlaceholders: true),
+                   !OutputFileSafety.isSameFile(work.outputPDF, work.source),
+                   let data = try? Data(contentsOf: work.outputPDF) {
+                    let ownDating = dateChange.map {
+                        (date: EnclosureDates.ownDate(of: tags)?.display,
+                         evidence: $0.after.headerEvidence(giving: $0.after.dateTags))
+                    }
+                    let outcome = PDFGenerator().reviewDateHeaderRewrite(
+                        of: data, sourceName: source.lastPathComponent, sentWith: tags.sentWith?.display,
+                        ownDating: ownDating, body: work.text,
+                        textColumns: Self.pdfGenerationSettings(for: runConfig).textColumns)
+                    if (try? Data(contentsOf: work.outputPDF)) == data {
+                        _ = Self.applyReviewHeaderRewrite(outcome, to: work, field: "Date header")
+                    } else {
+                        os_log(.info, "Date header left as it was in %{public}@: the output changed during the rewrite",
+                               work.outputPDF.lastPathComponent)
                     }
                 }
                 let sidecar = outputURL.deletingPathExtension().appendingPathExtension("json")

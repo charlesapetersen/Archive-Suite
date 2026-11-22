@@ -472,13 +472,15 @@ final class ContentIndexTests: XCTestCase {
     func testReOCRHeaderThroughReaderExtractorKeepsFullSearchText() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("ReaderReOCR-\(UUID()).pdf")
         defer { try? FileManager.default.removeItem(at: url) }
-        let header = "Extracted text.\nKind: filename.jpg\nAtlas · Qwen fp8 · 7 November 2026\nClassification: Document Start\nKind: forms\nDocument date: 1957\nSent with: 1958\n\nReport from the harbour."
+        let header = "Extracted text.\nKind: filename.jpg\nAtlas · Qwen fp8 · 7 November 2026\nClassification: Document Start\nKind: forms\nDocument date: 1957\nSent with: Mar 12, 1958\nDate evidence: image; page 1; gave 1957\n\nReport from the harbour."
         XCTAssertTrue(TestPDFBuilder.write(pages: ["Scan text layer", header], to: url))
         let before = try Data(contentsOf: url)
         let content = try XCTUnwrap(PDFTextExtractor.extract(url))
         XCTAssertEqual(content.textPages.first?.header?.kind, .forms)
         XCTAssertEqual(content.textPages.first?.header?.provenance?.provider, "Atlas")
         XCTAssertEqual(content.textPages.first?.header?.documentDate, "1957")
+        XCTAssertEqual(content.textPages.first?.header?.sentWith, "Mar 12, 1958")
+        XCTAssertEqual(content.textPages.first?.header?.dateEvidence, "image; page 1; gave 1957")
         XCTAssertEqual(content.classification, "Document Start")
         XCTAssertEqual(content.strippedBody, "Report from the harbour.")
         XCTAssertTrue(content.fullBody.contains("Scan text layer"))

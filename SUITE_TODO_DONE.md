@@ -17845,3 +17845,7 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   billing, pacing, segmentation, settings and recovery contracts. Both off-screen billing UI checks
   passed and their screenshots were reviewed. No bench cache used.
   <!-- /W49.proc-claude-stored-key-cost -->
+
+- [x] **W49.proc-header-date-lines — Process Files PDFs get the Document date and Sent with header lines [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit) — Owner, 2026-11-19 (call 21, the accepted-issues sheet; `execution-plans/processing-review/17-accepted-review.json` entry `p-header-lines`, answers in `answers/17-accepted-review-answers-20261119.json`): change it. Write both lines with the same rewrite that adds the date-evidence line (W46.date-route-header), Tier-2 (tag/PDF output), SPEC/tag-format.md §399 updated in both apps.
+  Process Files now adds the resolved dates alongside evidence and item fields before merging, in either the text-page or searchable PDF header. The verified rewrite preserves the source, image page and OCR text. Enclosure reclassification updates the affected date lines, and Reader uses its existing shared parser.
+  <!-- /W49.proc-header-date-lines -->

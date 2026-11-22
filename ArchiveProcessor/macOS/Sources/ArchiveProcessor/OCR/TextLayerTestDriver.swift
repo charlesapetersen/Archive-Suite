@@ -374,21 +374,23 @@ enum TextLayerTestDriver {
                                                              outputURL: dir.appendingPathComponent("refused.pdf"))) == nil
         check("7 merge: a lone image before a searchable page is refused", refused)
 
-        // The date-evidence line goes into the XMP; the page stays as it is.
+        // Process Files adds the source dates and evidence to the XMP while keeping the page.
+        let dates = PDFSourceDates(documentDate: "1957", sentWith: "Mar 12, 1958", dateEvidence: "image; page 1")
         if let data = try? Data(contentsOf: typed),
-           case .rewrite(let new) = PDFGenerator().dateEvidenceRewrite(of: data, sourceName: name, evidence: "image; page 1", body: reading,
+           case .rewrite(let new) = PDFGenerator().taggedHeaderRewrite(of: data, sourceName: name, fields: dates, body: reading,
                                                                      textColumns: 1) {
             let out = dir.appendingPathComponent("searchable-dated.pdf")
             try? new.write(to: out)
             let content = PDFHeaderParser.extract(out)
             let header = content?.textPages.first?.header
-            check("7 date evidence: read back from the XMP", header?.dateEvidence == "image; page 1"
+            check("7 source dates and evidence: read back from the XMP", header?.dateEvidence == dates.dateEvidence
+                  && header?.documentDate == dates.documentDate && header?.sentWith == dates.sentWith
                   && header?.kind == .typewritten && header?.originalFilename == name, "\(String(describing: header))")
             check("7 date evidence: the page is kept", PDFDocument(url: out)?.page(at: 0)?.string == PDFDocument(url: typed)?.page(at: 0)?.string)
             archivalChecks("dated searchable output", out)
             check("7 date evidence: still compressed, not redrawn", !tools || (compressed(out)
                   && abs(size(out) - size(typed)) < 4_096), "\(size(out)) bytes against \(size(typed))")
-            if case .unchanged = PDFGenerator().dateEvidenceRewrite(of: new, sourceName: name, evidence: "image; page 1", body: reading, textColumns: 1) {
+            if case .unchanged = PDFGenerator().taggedHeaderRewrite(of: new, sourceName: name, fields: dates, body: reading, textColumns: 1) {
                 check("7 date evidence: the same line again is no change", true)
             } else { check("7 date evidence: the same line again is no change", false) }
         } else { check("7 date evidence: rewritten", false) }

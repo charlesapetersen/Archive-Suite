@@ -419,8 +419,11 @@ Recipient place: <place>; <place>
 - **Source-date lines (W37.dual-date).** `Document date:` / `Sent with:` are the SOURCE document's dates
   (`ArchiveDate.display` form), distinct from the processing date. They are output-time snapshots;
   fresh Finder tags remain authoritative. Exact case-sensitive prefixes, after Classification/Kind,
-  consumed only within the same ordered header block. Written only where dates are known at render
-  time (Live Capture); Process Files does not rewrite finished PDFs to add them.
+  consumed only within the same ordered header block. Live Capture writes the known dates at render time.
+  Process Files adds the resolved document and covering-letter dates to each generated page in the same
+  verified rewrite as the evidence and item fields, before merging. For a searchable output the fields are
+  in the page's XMP header. A reclassification that changes enclosure dating also updates the affected lines
+  on outputs eligible for the rewrite.
 - **Date evidence (W46.date-route-header; owner call 9, 2026-11-06).** The evidence behind a NON-explicit document
   year: one line, exact case-sensitive prefix `Date evidence: `, after the source-date lines in the same ordered
   header block (a source-date line after it starts the body). Written only for a year read off the page image,
@@ -439,12 +442,12 @@ Recipient place: <place>; <place>
   comma, the quote is cut to 60 characters with `…`, and the line is fitted to one physical line, so it never
   holds the provenance separator nor wraps into the body. It goes with the Finder-tag year (an output-time
   snapshot; the tags stay authoritative) and with the sidecar's `dating` object, which carries the same evidence
-  in full. Process Files writes it after its dating route, before the tags: the text page of a one-pair output is
-  laid out again from its own header lines read back verbatim and the run's OCR text, the image page kept, and the
-  result is used only when it reads back with every other header line and the body unchanged; it replaces the
-  output through a verified sibling write and one rename, never a file that aliases its source. An output of more
-  than one pair, or one that does not read back cleanly, is left as it is. Improve OCR keeps the line. No
-  migration is written because there is nothing to migrate.
+  in full. Process Files writes the source dates and any evidence after resolving the dates, before tagging the output:
+  it lays out the text page of a one-pair output again from its parsed header and the run's OCR text and keeps the
+  image page. It verifies that the requested fields, the other header lines and the body read back as expected
+  before replacing the output through a verified sibling write and one rename. An output that aliases its source,
+  an output of more than one pair or an output that fails verification keeps its existing bytes. Improve OCR
+  keeps the line. No migration is written because there is nothing to migrate.
 - **Item fields (W47.item-fields-build, owner 2026-10-21).** The document's own catalogue fields, from the Processor's
   item-field call (Gemini 3.7 Flash on the gateway, the bench's image prompt; `Tagging/ItemFieldExtractor.swift`).
   Optional lines after the date-evidence line, in the order `Document kind: `, `Title: `, `Byline: `, `Publication: `,

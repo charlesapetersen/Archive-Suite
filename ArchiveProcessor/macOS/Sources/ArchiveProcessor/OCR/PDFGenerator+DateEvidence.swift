@@ -2,42 +2,40 @@ import Foundation
 import PDFKit
 import ArchiveCore
 
-/// W46.date-route-header — the `Date evidence:` line of a Process Files output. Process Files renders each page before
-/// the dating route runs, so the line is added afterwards: the text page is laid out again from its own header lines,
-/// read back verbatim, and the run's OCR text, with the line in its SPEC place; the image page is kept as it is.
+/// Process Files renders each page before tagging. Add the source dates, dating evidence and item fields together
+/// once those values are known, keeping the image page and the rest of the text page.
 extension PDFGenerator {
     enum DateEvidenceRewrite: Equatable {
         /// The new file's bytes, verified to read back with every other header line and the body unchanged.
         case rewrite(Data)
-        /// The page already carries this evidence (or none, and none is wanted).
+        /// The page already carries the requested fields.
         case unchanged
-        /// Left as it is, and why: the sidecar still carries the evidence.
+        /// The output could not be safely rewritten.
         case skipped(String)
     }
 
-    /// The bytes `pdf` should have so its text page carries `evidence` (nil removes the line). Only a plain pair, one
-    /// image page and one text page, whose header parses with no problem and whose text is `body`: anything else is
-    /// skipped rather than guessed at.
-    /// W42.int-s5-searchable: a searchable output of one page has its header in the XMP; the line goes there, the page
-    /// kept as it is.
-    /// W47.item-fields-build: the item-field lines go in the same pass (`itemFields`; empty removes them), so one rewrite
-    /// carries both and neither caller's lines are lost to the other's.
-    /// W40.fix-processor-evidence-rewrite-name: `sourceName` is the source's file name, which the name line is written
-    /// from. PDFKit reads a U+00A0 back as a space (measured), so a name rebuilt from the old page is not the file's.
-    func dateEvidenceRewrite(of pdf: Data, sourceName: String, evidence: String?,
-                             itemFields: PDFItemFields = PDFItemFields(), body: String,
+    /// Rebuild a generated pair's text page, or update a searchable page's XMP header. Absent fields clear old values.
+    /// Use the actual source filename since PDFKit can read a nonbreaking space back as a space.
+    func taggedHeaderRewrite(of pdf: Data, sourceName: String, fields: PDFSourceDates, body: String,
                              textColumns: Int) -> DateEvidenceRewrite {
         headerRewrite(of: pdf, sourceName: sourceName, body: body, textColumns: textColumns) {
-            $0.dateEvidence = evidence
-            $0.itemFields = itemFields
+            $0.documentDate = fields.documentDate
+            $0.sentWith = fields.sentWith
+            $0.dateEvidence = fields.dateEvidence
+            $0.itemFields = fields.itemFields
         }
     }
 
-    /// A reclassification can change enclosure inheritance independently of the item fields.
-    func reviewDateEvidenceRewrite(of pdf: Data, sourceName: String, evidence: String?, body: String,
-                                   textColumns: Int) -> DateEvidenceRewrite {
+    /// A reclassification can change Sent with independently of the dating route's own date and evidence.
+    func reviewDateHeaderRewrite(of pdf: Data, sourceName: String, sentWith: String?,
+                                 ownDating: (date: String?, evidence: String?)?, body: String,
+                                 textColumns: Int) -> DateEvidenceRewrite {
         headerRewrite(of: pdf, sourceName: sourceName, body: body, textColumns: textColumns) {
-            $0.dateEvidence = evidence
+            $0.sentWith = sentWith
+            if let ownDating {
+                $0.documentDate = ownDating.date
+                $0.dateEvidence = ownDating.evidence
+            }
         }
     }
 

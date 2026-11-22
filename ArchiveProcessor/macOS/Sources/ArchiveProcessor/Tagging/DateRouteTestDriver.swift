@@ -377,47 +377,49 @@ enum DateRouteTestDriver {
         let text = "MEMORANDUM\nTo: Files\n\nThe harbour works continue."
         let result = OCRResult(text: text, classification: .documentStart, errorMessage: nil, errorCode: nil)
         let pdf = tmp.appendingPathComponent("scan_001.pdf")
-        let dates = PDFSourceDates(documentDate: "1957", sentWith: "Mar 12, 1958")
         _ = try? PDFGenerator().generate(imageURL: image, result: result, model: model, outputURL: pdf,
-                                         originalFileName: "scan_001.jpg", sourceDates: dates, pageKind: .typewritten)
+                                         originalFileName: "scan_001.jpg", pageKind: .typewritten)
         guard let original = try? Data(contentsOf: pdf),
               let oldHeader = PDFDocument(data: original)?.page(at: 1).map({ PDFHeaderParser.parse($0) })?.header else {
             check("4 a generated pair", false); return
         }
         let gen = PDFGenerator()
         let line = est.with(measured: true).headerEvidence
-        guard case .rewrite(let added) = gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: line, body: text, textColumns: 1) else {
-            check("4 rewrite adds the line", false, "\(gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: line, body: text, textColumns: 1))")
+        let fields = PDFSourceDates(documentDate: "1957", sentWith: "Mar 12, 1958", dateEvidence: line)
+        guard case .rewrite(let added) = gen.taggedHeaderRewrite(of: original, sourceName: "scan_001.jpg", fields: fields, body: text, textColumns: 1) else {
+            check("4 rewrite adds the line", false, "\(gen.taggedHeaderRewrite(of: original, sourceName: "scan_001.jpg", fields: fields, body: text, textColumns: 1))")
             return
         }
         let back = PDFDocument(data: added)?.page(at: 1).map { PDFHeaderParser.parse($0) }
         var expected = oldHeader
+        expected.documentDate = fields.documentDate
+        expected.sentWith = fields.sentWith
         expected.dateEvidence = line
-        check("4 rewrite adds the line after the source dates; every other line and the body read back unchanged",
+        check("4 rewrite adds both dates and the evidence; every other line and the body read back unchanged",
               back?.header == expected && PDFGenerator.squashed(back?.body ?? "") == PDFGenerator.squashed(text) && PDFDocument(data: added)?.pageCount == 2,
               "\(String(describing: back))")
         let image0 = PDFDocument(data: original)?.page(at: 0)?.bounds(for: .mediaBox)
         check("4 rewrite keeps the image page", PDFDocument(data: added)?.page(at: 0)?.bounds(for: .mediaBox) == image0)
-        check("4 the same evidence again: unchanged",
-              gen.dateEvidenceRewrite(of: added, sourceName: "scan_001.jpg", evidence: line, body: text, textColumns: 1) == .unchanged
-              && gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: nil, body: text, textColumns: 1) == .unchanged)
-        if case .rewrite(let removed) = gen.dateEvidenceRewrite(of: added, sourceName: "scan_001.jpg", evidence: nil, body: text, textColumns: 1) {
-            check("4 nil removes a stale line", PDFDocument(data: removed)?.page(at: 1).map { PDFHeaderParser.parse($0) }?.header == oldHeader)
-        } else { check("4 nil removes a stale line", false) }
-        if case .rewrite(let long) = gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: h, body: text, textColumns: 2) {
+        check("4 the same fields again: unchanged",
+              gen.taggedHeaderRewrite(of: added, sourceName: "scan_001.jpg", fields: fields, body: text, textColumns: 1) == .unchanged
+              && gen.taggedHeaderRewrite(of: original, sourceName: "scan_001.jpg", fields: PDFSourceDates(), body: text, textColumns: 1) == .unchanged)
+        if case .rewrite(let removed) = gen.taggedHeaderRewrite(of: added, sourceName: "scan_001.jpg", fields: PDFSourceDates(), body: text, textColumns: 1) {
+            check("4 empty fields remove stale dates and evidence", PDFDocument(data: removed)?.page(at: 1).map { PDFHeaderParser.parse($0) }?.header == oldHeader)
+        } else { check("4 empty fields remove stale dates and evidence", false) }
+        if case .rewrite(let long) = gen.taggedHeaderRewrite(of: original, sourceName: "scan_001.jpg", fields: PDFSourceDates(dateEvidence: h), body: text, textColumns: 2) {
             let lp = PDFDocument(data: long)?.page(at: 1).map { PDFHeaderParser.parse($0) }
             check("4 a long line is fitted to one line and reads back whole (two text columns)",
                   lp?.header?.dateEvidence == h && PDFGenerator.squashed(lp?.body ?? "") == PDFGenerator.squashed(text), "\(String(describing: lp))")
         } else { check("4 a long line is fitted to one line and reads back whole (two text columns)", false) }
-        if case .skipped = gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: line, body: "Some other text.", textColumns: 1) {
+        if case .skipped = gen.taggedHeaderRewrite(of: original, sourceName: "scan_001.jpg", fields: fields, body: "Some other text.", textColumns: 1) {
             check("4 a page whose text is not the run's is left alone", true)
         } else { check("4 a page whose text is not the run's is left alone", false) }
         let two = tmp.appendingPathComponent("two.pdf")
         try? gen.mergeDocumentPDFs(sourcePDFs: [pdf, pdf], outputURL: two)
-        if let twoData = try? Data(contentsOf: two), case .skipped = gen.dateEvidenceRewrite(of: twoData, sourceName: "scan_001.jpg", evidence: line, body: text, textColumns: 1) {
+        if let twoData = try? Data(contentsOf: two), case .skipped = gen.taggedHeaderRewrite(of: twoData, sourceName: "scan_001.jpg", fields: fields, body: text, textColumns: 1) {
             check("4 a file of more than one pair is left alone", true)
         } else { check("4 a file of more than one pair is left alone", false) }
-        if case .skipped = gen.dateEvidenceRewrite(of: Data("%PDF-1.4\n%%EOF\n".utf8), sourceName: "scan_001.jpg", evidence: line, body: text, textColumns: 1) {
+        if case .skipped = gen.taggedHeaderRewrite(of: Data("%PDF-1.4\n%%EOF\n".utf8), sourceName: "scan_001.jpg", fields: fields, body: text, textColumns: 1) {
             check("4 an unreadable file is left alone", true)
         } else { check("4 an unreadable file is left alone", false) }
 
@@ -795,6 +797,13 @@ enum DateRouteTestDriver {
         check("4 e2e A and D: no Date evidence line (an explicit text year; no year)",
               header(gOut, "DOCA")?.header != nil && header(gOut, "DOCA")?.header?.dateEvidence == nil
               && header(gOut, "DOCD")?.header != nil && header(gOut, "DOCD")?.header?.dateEvidence == nil)
+        check("4 e2e: explicit date, no date, image date and enclosure pair read back from Process Files",
+              header(gOut, "DOCA")?.header?.documentDate == "Mar 3, 1947"
+              && header(gOut, "DOCA")?.header?.sentWith == nil
+              && header(gOut, "DOCD")?.header?.documentDate == nil
+              && header(gOut, "DOCB")?.header?.documentDate == "Mar 30, 1961"
+              && header(gOut, "DOCE")?.header?.documentDate == "1947"
+              && header(gOut, "DOCE")?.header?.sentWith == "Mar 3, 1947")
         check("4 e2e B: the image class, its page, place and quote",
               header(gOut, "DOCB")?.header?.dateEvidence == "image; page 1; dateline; \"March 30, 1961\"; gave 1961-03-30",
               "\(String(describing: header(gOut, "DOCB")?.header?.dateEvidence))")
@@ -831,7 +840,8 @@ enum DateRouteTestDriver {
               && !standalone.contains("Sent With 1947-03-03") && standaloneJSON["date"] == nil
               && standaloneJSON["enclosure_of"] == nil && standaloneJSON["sent_with"] == nil
               && (standaloneJSON["dating"] as? [String: Any])?["class"] as? String == "none"
-              && header(gOut, "DOCE")?.header?.dateEvidence == nil,
+              && header(gOut, "DOCE")?.header?.dateEvidence == nil
+              && header(gOut, "DOCE")?.header?.documentDate == nil && header(gOut, "DOCE")?.header?.sentWith == nil,
               "\(standalone) \(standaloneJSON)")
         g.updateClassification(at: 0, to: .documentStart)
         let restored = (try? MacOSTagger.readTags(from: enclosurePDF)) ?? []
@@ -842,6 +852,7 @@ enum DateRouteTestDriver {
               && restoredJSON["sent_with"] as? String == "1947-03-03"
               && NSDictionary(dictionary: restoredJSON).isEqual(to: ed)
               && header(gOut, "DOCE")?.header?.dateEvidence == "inherited; from gateway-DOCA.jpg; gave 1947, Date Uncertain"
+              && header(gOut, "DOCE")?.header?.documentDate == "1947" && header(gOut, "DOCE")?.header?.sentWith == "Mar 3, 1947"
               && wire.lock.withLock { wire.tagging + wire.trace.count + wire.images.count } == reclassificationCalls,
               "\(restored) \(restoredJSON)")
 
@@ -1007,7 +1018,9 @@ enum DateRouteTestDriver {
               sheetEnclosure.contains("1947") && sheetEnclosure.contains("Sent With 1947-03-03")
               && sheetEnclosure.contains("Date Uncertain")
               && (se["dating"] as? [String: Any])?["class"] as? String == "inherited"
-              && header(sOut, "DOCE")?.header?.dateEvidence?.hasPrefix("inherited;") == true,
+              && header(sOut, "DOCE")?.header?.dateEvidence?.hasPrefix("inherited;") == true
+              && header(sOut, "DOCE")?.header?.documentDate == "1947"
+              && header(sOut, "DOCE")?.header?.sentWith == "Mar 3, 1947",
               "\(sheetEnclosure) \(se)")
         check("5 sheet B: the header line names the image evidence",
               header(sOut, "DOCB")?.header?.dateEvidence == "image; page 1; dateline; \"March 30, 1961\"; gave 1961-03-30",
@@ -1015,7 +1028,7 @@ enum DateRouteTestDriver {
         let sc = applied(sheet, sFiles[3])
         check("5 sheet C, retyped: the user's 1948, no dating object, no evidence line",
               sc.contains("1948") && !sc.contains("1947") && json(sOut["DOCC"])["dating"] == nil
-              && header(sOut, "DOCC")?.header != nil && header(sOut, "DOCC")?.header?.dateEvidence == nil, "\(sc)")
+              && header(sOut, "DOCC")?.header?.documentDate == "1948" && header(sOut, "DOCC")?.header?.dateEvidence == nil, "\(sc)")
 
         // 5. The manual segment card's auto-date: the route on the card's pages and on confirmed earlier documents.
         wire.lock.withLock { wire.tagging = 0; wire.trace = []; wire.images = []; wire.models = [] }

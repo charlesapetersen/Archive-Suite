@@ -171,7 +171,7 @@ enum DualDateTestDriver {
         processor.taggingMode = .automatic
         processor.jobs = files.enumerated().map { i, url in
             var job = OCRJob(sourceURL: url)
-            job.result = OCRResult(text: "text of \(names[i])", classification: classes[i], rotationDegrees: 0,
+            job.result = OCRResult(text: names[i] == "E1c.jpg" ? nil : "text of \(names[i])", classification: classes[i], rotationDegrees: 0,
                                    errorMessage: nil, errorCode: nil, enclosure: flags[i])
             job.classification = classes[i]
             return job
@@ -180,21 +180,26 @@ enum DualDateTestDriver {
         processor.preGroupedYears = [1958, 1957, nil, 1956, nil, 1960, nil, 1955, 1961]
         processor.preGroupedMonths = [3, nil, nil, nil, nil, nil, nil, nil, nil]
         processor.preGroupedSubjects = names.map { _ in ["Correspondence"] }
+        let model = LLMModel(id: "test", displayName: "Test", provider: .anthropic, supportsThinking: false,
+                             returnsMd: false, inputCostPer1M: 0, outputCostPer1M: 0, batchDiscount: 0)
         var outputs: [URL: URL] = [:]
-        for f in files {
+        for job in processor.jobs {
+            let f = job.sourceURL
             let pdf = outDir.appendingPathComponent(f.deletingPathExtension().lastPathComponent + ".pdf")
-            writeOnePagePDF(pdf)
+            if let result = job.result {
+                _ = try? PDFGenerator().generate(imageURL: f, result: result, model: model, outputURL: pdf,
+                                                 originalFileName: f.lastPathComponent)
+            }
             outputs[f] = pdf
         }
         processor.outputURLMap = outputs
         processor.rebuildSegments(files: files)
         check("rebuildSegments threads the persisted proposals", processor.segments.count == 8
               && processor.segments[1].enclosureOf == 0 && processor.segments[2].enclosureOf == 0)
-        let model = LLMModel(id: "test", displayName: "Test", provider: .anthropic, supportsThinking: false,
-                             returnsMd: false, inputCostPer1M: 0, outputCostPer1M: 0, batchDiscount: 0)
         await processor.performTaggingPhase(provider: .anthropic, model: model, apiKey: "",
                                             outputDirectory: outDir, enableSegmentJSON: true)
         func out(_ n: String) -> URL { outputs[u(n)]! }
+        func content(_ n: String) -> ExtractedContent? { PDFHeaderParser.extract(out(n)) }
         func json(_ n: String) -> [String: Any] { jsonOf(out(n).deletingPathExtension().appendingPathExtension("json")) }
         func sentWithTokens(_ url: URL) -> [String] { tagsOf(url).filter { $0.hasPrefix("Sent With") } }
         check("the covering letter keeps its own date and gets NO Sent With",
@@ -203,6 +208,11 @@ enum DualDateTestDriver {
               tagsOf(out("E1.jpg")).contains("1957") && sentWithTokens(out("E1.jpg")) == ["Sent With 1958-03"])
         check("enclosure continuation page: the same tags as its first page, nothing extra",
               tagsOf(out("E1c.jpg")) == tagsOf(out("E1.jpg")))
+        check("both enclosure pages carry the same dates, including the continuation's placeholder text page",
+              ["E1.jpg", "E1c.jpg"].allSatisfy {
+                  let h = content($0)?.textPages.first?.header
+                  return h?.documentDate == "1957" && h?.sentWith == "Mar 1958" && h?.dateEvidence == nil
+              } && content("E1c.jpg")?.strippedBody == "No text returned by model.")
         check("second enclosure: same letter date",
               tagsOf(out("E2.jpg")).contains("1956") && sentWithTokens(out("E2.jpg")) == ["Sent With 1958-03"])
         check("after a box label: no Sent With", sentWithTokens(out("X.jpg")).isEmpty)
@@ -226,6 +236,11 @@ enum DualDateTestDriver {
         processor.updateClassification(at: 1, to: .documentContinuation)
         check("MED-3: a page that stopped being an enclosure loses its Sent With tokens",
               sentWithTokens(out("E1.jpg")).isEmpty && sentWithTokens(out("E1c.jpg")).isEmpty)
+        check("review clears Sent with from both pages and preserves their recorded own date",
+              ["E1.jpg", "E1c.jpg"].allSatisfy {
+                  let h = content($0)?.textPages.first?.header
+                  return h?.documentDate == "1957" && h?.sentWith == nil
+              })
         check("MED-3: ...and its sidecar loses sent_with + enclosure_of",
               json("E1.jpg")["sent_with"] == nil && json("E1.jpg")["enclosure_of"] == nil)
         check("MED-3: an enclosure whose cover pages are unchanged keeps its letter date",
@@ -239,6 +254,12 @@ enum DualDateTestDriver {
         check("MED-3: ...and the new label page carries none either", sentWithTokens(out("E1c.jpg")).isEmpty)
         check("MED-3: the covering letter is still untouched", sentWithTokens(out("L.jpg")).isEmpty
               && tagsOf(out("L.jpg")).contains("1958"))
+        processor.rebuildSegments(files: files)
+        await processor.performTaggingPhase(provider: .anthropic, model: model, apiKey: "",
+                                            outputDirectory: outDir, enableSegmentJSON: true)
+        let labelHeader = content("E1c.jpg")?.textPages.first?.header
+        check("redo clears a former document's date snapshot from a page now tagged as a folder label",
+              labelHeader != nil && labelHeader?.documentDate == nil && labelHeader?.sentWith == nil)
         check("token replacement touches only valid sent-with tokens, never prose",
               OCRProcessor.replacingSentWithTokens(
                 in: ["1957", "Sent With 1950s", "Sent With Date Uncertain", "Harbours", "Sent with love", "Sent With Love"],

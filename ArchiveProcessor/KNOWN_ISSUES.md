@@ -599,14 +599,12 @@ What remains: a box with many such pages has more gaps to check than the figures
   (`segbench-results/date-route-pipeline.md`, W46.date-route-pipeline-8b) and gained no correct year over no image
   pass on either trace, so it is not added (08-dating.md call 7.5). The direct-key Gemini 3.8 route was dropped by
   the owner on 2026-11-13 (737b5bb9). This remains the supported scope, with no route pending under that item (accepted: settled by W46.date-route-image-routes; no other backend has a measured image route).
-- **The PDF header's `Date evidence:` line (W46.date-route-header) is written on one-pair outputs only.** A Re-OCR
-  multi-page output (several pairs in one file) and any output whose text page does not read back cleanly (a wrapped
-  filename PDFKit splits differently, a page whose text is not the run's) are left as they are, logged, with the
-  evidence in the sidecar alone. The rewrite lays the text page out with the run's current text-column setting: a
-  setting changed between the OCR and a resumed tagging pass changes the page's columns (the check ignores layout).
-  It runs on the main actor, one text page per document with a non-explicit year. A later manual year edit in review
-  leaves the line as it was (an output-time snapshot, like the source-date lines; the tags are authoritative), and a
-  rotation or retry that regenerates a page drops it until the run is tagged again (accepted: the sidecar holds the evidence; the header line is an output-time snapshot and the tags are authoritative).
+- **The Process Files header rewrite supports one image/text pair or one searchable page.** A Re-OCR multi-page
+  output and any output whose header or OCR body fails verification keep their existing PDF bytes. The Finder tags
+  and sidecar carry the dates, with any evidence in the sidecar. The rewrite uses the run's current text-column
+  setting. A change between OCR and resumed tagging can therefore change the text page's column count.
+  A later manual year edit in review changes the live tags. A rotation or retry that regenerates a page drops the
+  snapshot until the run is tagged again (accepted: the sidecar holds the evidence and the tags are authoritative).
 - **A year the reply quotes from the document itself counts as explicit** even when no rule candidate carries it (a
   two-digit `'47`, an OCR-damaged `196L`), as the measured bench route does (`date_route_pipeline.route`); 08-dating.md
   §3 words step 1 by the rule candidate alone. The model's own flag can still add `Date Uncertain` there (accepted: as the measured bench route does).
@@ -1172,10 +1170,6 @@ Runtime evidence and the final unattended rerun are under `verification/evidence
 
 ## ⚠️ LIMITATION (W37.dual-date, 2026-10-06): where enclosure dates are and are not produced
 
-- **Process Files PDFs carry no `Document date:` / `Sent with:` header lines.** Those PDFs are rendered at
-  OCR time, before tagging, and finished PDFs are not rewritten to add them (rewriting risks tags and bytes).
-  Live Capture renders after tagging and writes the `Document date:` line. The Finder tags are the live
-  value either way; the header is only a snapshot. (queued: W49.proc-header-date-lines)
 - **Enclosure proposals come only from the OCR prompt's `[enclosure]` marker**, so Mistral, Apple Vision and
   pre-OCRed classification-only runs propose none; the owner can still type a sent-with date in the manual
   tag sheet. Nothing checks that the covering unit is actually a letter. (queued: W49.proc-enclosure-other-routes)

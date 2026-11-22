@@ -830,16 +830,17 @@ struct PDFGenerator {
     }
 
     private func textPage(header: HeaderBlock, result: OCRResult, textColumns: Int) -> PDFPage {
-        let bodyText: String
-        if let text = result.text, !text.isEmpty {
-            bodyText = text
-        } else {
-            var msg = "No text returned by model."
-            if let errorMsg = result.errorMessage { msg += "\n\n\(errorMsg)" }
-            if let code = result.errorCode { msg += "\n\nError code: \(code)" }
-            bodyText = msg
-        }
-        return layoutTextPage(headerLine: header.text, fitRanges: header.fitRanges, bodyText: bodyText, textColumns: textColumns)
+        layoutTextPage(headerLine: header.text, fitRanges: header.fitRanges, bodyText: Self.textPageBody(result),
+                       textColumns: textColumns)
+    }
+
+    /// The body the generated text page actually carries, including a placeholder if OCR returned no text.
+    static func textPageBody(_ result: OCRResult) -> String {
+        if let text = result.text, !text.isEmpty { return text }
+        var message = "No text returned by model."
+        if let error = result.errorMessage { message += "\n\n\(error)" }
+        if let code = result.errorCode { message += "\n\nError code: \(code)" }
+        return message
     }
 
     /// The source-name line as written: the source's file name, its control characters made spaces; every other

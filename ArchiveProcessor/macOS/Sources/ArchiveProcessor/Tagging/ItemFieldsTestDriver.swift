@@ -228,7 +228,8 @@ enum ItemFieldsTestDriver {
                                       byline: "Mary Jones; John Smith",
                                       publication: "The Sun", publicationDate: "1967-03-02"), "\(fields)")
         let gen = PDFGenerator()
-        guard case .rewrite(let added) = gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: "image; page 1", itemFields: fields,
+        let headerFields = PDFSourceDates(documentDate: "1967", dateEvidence: "image; page 1", itemFields: fields)
+        guard case .rewrite(let added) = gen.taggedHeaderRewrite(of: original, sourceName: "scan_001.jpg", fields: headerFields,
                                                                 body: text, textColumns: 1) else {
             check("5 the rewrite adds the lines", false); return
         }
@@ -240,21 +241,23 @@ enum ItemFieldsTestDriver {
               back?.header == expected && PDFGenerator.squashed(back?.body ?? "") == PDFGenerator.squashed(text)
               && back?.header?.documentDate == "1967", "\(String(describing: back))")
         check("5 the same lines again: unchanged",
-              gen.dateEvidenceRewrite(of: added, sourceName: "scan_001.jpg", evidence: "image; page 1", itemFields: fields, body: text,
+              gen.taggedHeaderRewrite(of: added, sourceName: "scan_001.jpg", fields: headerFields, body: text,
                                       textColumns: 1) == .unchanged)
-        if case .rewrite(let removed) = gen.dateEvidenceRewrite(of: added, sourceName: "scan_001.jpg", evidence: nil, body: text, textColumns: 1) {
+        if case .rewrite(let removed) = gen.taggedHeaderRewrite(of: added, sourceName: "scan_001.jpg", fields: PDFSourceDates(documentDate: "1967"),
+                                                             body: text, textColumns: 1) {
             check("5 none removes stale lines", PDFDocument(data: removed)?.page(at: 1)
                     .map { PDFHeaderParser.parse($0) }?.header == oldHeader)
         } else { check("5 none removes stale lines", false) }
         let long = PDFItemFields(documentKind: "report", publication: PDFItemFields.lineValue(String(repeating: "Long ", count: 40)))
-        if case .rewrite(let l) = gen.dateEvidenceRewrite(of: original, sourceName: "scan_001.jpg", evidence: nil, itemFields: long, body: text,
+        if case .rewrite(let l) = gen.taggedHeaderRewrite(of: original, sourceName: "scan_001.jpg",
+                                                         fields: PDFSourceDates(documentDate: "1967", itemFields: long), body: text,
                                                           textColumns: 2) {
             let lp = PDFDocument(data: l)?.page(at: 1).map { PDFHeaderParser.parse($0) }
             check("5 a long value is fitted to one line and reads back whole (two text columns)",
                   lp?.header?.itemFields == long && PDFGenerator.squashed(lp?.body ?? "") == PDFGenerator.squashed(text),
                   "\(String(describing: lp?.header?.itemFields))")
         } else { check("5 a long value is fitted to one line and reads back whole (two text columns)", false) }
-        if case .skipped = gen.dateEvidenceRewrite(of: original, sourceName: "scan_002.jpg", evidence: "image; page 1",
+        if case .skipped = gen.taggedHeaderRewrite(of: original, sourceName: "scan_002.jpg", fields: headerFields,
                                                    body: text, textColumns: 1) {
             check("5 a header that names another file is left alone", true)
         } else { check("5 a header that names another file is left alone", false) }
@@ -268,8 +271,9 @@ enum ItemFieldsTestDriver {
                                          originalFileName: nbspName,
                                          sourceDates: PDFSourceDates(documentDate: "1918"), pageKind: .printed)
         if let data = try? Data(contentsOf: nbsp),
-           case .rewrite(let dated) = gen.dateEvidenceRewrite(of: data, sourceName: nbspName, evidence: "image; page 1",
-                                                              itemFields: fields, body: text, textColumns: 1) {
+           case .rewrite(let dated) = gen.taggedHeaderRewrite(of: data, sourceName: nbspName,
+                                                            fields: PDFSourceDates(documentDate: "1918", dateEvidence: "image; page 1", itemFields: fields),
+                                                            body: text, textColumns: 1) {
             let bytes = String(decoding: dated, as: UTF8.self)
             let back = PDFDocument(data: dated)?.page(at: 1).map { PDFHeaderParser.parse($0) }?.header
             check("5 a U+00A0 name: rewritten with both kinds of line, as PDF/A, with no unwritten object",
