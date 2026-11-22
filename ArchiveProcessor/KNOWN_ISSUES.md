@@ -2,6 +2,14 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## Review document segmentation has no effect on fresh Process Files runs (S-046)
+
+- With Automatic tagging, the Manual segmentation approach and Collection ID, both switch values open the
+  same whole-run review before tagging. Neither adds a per-collection review. The help implies the switch
+  controls the pre-tagging pause. Reproduced in the VM at `d1b38279` and traced to `startProcessing` and
+  `performPreOCRedProcessing`. The [verification record](../verification/evidence/processor/W49.proc-s046-verify.md)
+  links the test and tracks the separate check and pending behavior choice.
+
 ## Live Capture files a document silently after Automatic tagging gets HTTP 500 (S-045)
 
 - A refused tagging request leaves the filed PDF with its OCR text and phone-entered date but without model

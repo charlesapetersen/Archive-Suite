@@ -67,6 +67,93 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         XCTAssertNotEqual(shapeA, shapeB, "the 90° chosen in Review rotation is baked into photo 3's PDF")
     }
 
+    /// S-046: compare fresh runs after changing the actual Documents setting. Run off last to restore its default.
+    func testFreshProcessFilesDocumentReviewSetting() throws {
+        for enabled in [true, false] {
+            let name = enabled ? "s046-on" : "s046-off"
+            _ = try launch(name, [
+                "-taggingModeRaw", "automatic", "-segmentationApproach", "manual",
+                "-rotationModeRaw", "off", "-reviewRotation", "NO"
+            ], collectionID: true)
+            let settings = app.showSettingsWindow()
+            XCTAssertTrue(app.showSettingsPanel("Documents"))
+            let title = "Review document segmentation"
+            let label = settings.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", title, title))
+                .firstMatch
+            let scroll = settings.scrollViews.firstMatch
+            for _ in 0..<15 where !label.isHittable {
+                scroll.scroll(byDeltaX: 0, deltaY: -180)
+            }
+            XCTAssertTrue(label.isHittable)
+            // The grouped Form exposes the title, help button and switch as sibling AX elements.
+            let toggle = try XCTUnwrap(settings.switches.allElementsBoundByIndex.first {
+                abs($0.frame.midY - label.frame.midY) < 3
+            })
+            XCTAssertTrue(toggle.isHittable && toggle.isEnabled)
+            let target = enabled ? "1" : "0"
+            let value = { String(describing: toggle.value ?? "") }
+            if value() != target { toggle.click() }
+            XCTAssertEqual(value(), target)
+            print("[s046] \(name): switch value=\(target)")
+            if enabled {
+                let help = try XCTUnwrap(settings.buttons.matching(NSPredicate(format: "label == 'Help'"))
+                    .allElementsBoundByIndex.first { abs($0.frame.midY - label.frame.midY) < 3 })
+                help.click()
+                let promise = app.staticTexts.matching(NSPredicate(
+                    format: "label BEGINSWITH %@ OR value BEGINSWITH %@", "Pause after OCR", "Pause after OCR"
+                )).firstMatch
+                XCTAssertTrue(promise.waitForExistence(timeout: 5))
+                print("[s046] help: \(text(of: promise))")
+                shot("s046-help-on")
+                help.click()
+            } else {
+                shot("s046-setting-off")
+            }
+            settings.typeKey("w", modifierFlags: .command)
+            clickStart()
+
+            let review = reviewWindow("Document Segmentation Review", timeout: 120)
+            let footer = review.staticTexts.matching(NSPredicate(
+                format: "label CONTAINS 'new document' OR value CONTAINS 'new document'")).firstMatch
+            XCTAssertTrue(text(of: footer).contains("6 new documents"), "whole-run per-page review")
+            shot("\(name)-whole-run")
+            // Make the first page a box so the subsequent label confirmation is exercised too.
+            press(["3"], footer, reads: "1 box", "mark first page Box")
+            app.typeKey(.return, modifierFlags: [])
+            waitGone(review, "Return confirms the whole-run review")
+
+            let boxConfirmation = app.sheets.buttons["Confirm"]
+            XCTAssertTrue(boxConfirmation.waitForExistence(timeout: 60))
+            shot("\(name)-box-folder")
+            boxConfirmation.click()
+
+            let complete = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Complete'")).firstMatch
+            XCTAssertTrue(complete.waitForExistence(timeout: 120))
+            shot("\(name)-final-review")
+            complete.click()
+
+            let organize = app.sheets.buttons["Confirm and Organize"]
+            XCTAssertTrue(organize.waitForExistence(timeout: 60))
+            shot("\(name)-collection-names")
+            organize.click()
+
+            let done = app.staticTexts.matching(NSPredicate(
+                format: "label BEGINSWITH 'Done.' OR value BEGINSWITH 'Done.'")).firstMatch
+            let secondReview = app.windows.containing(.staticText, identifier: "Document Segmentation Review").firstMatch
+            let deadline = Date().addingTimeInterval(60)
+            while !done.exists && !secondReview.exists && Date() < deadline {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+            }
+            let sawCollectionReview = secondReview.exists
+            if sawCollectionReview {
+                shot("\(name)-per-collection")
+                app.typeKey(.return, modifierFlags: [])
+            }
+            print("[s046] \(name): whole-run per-page, box/folder, final tagging, collection names, per-collection=\(sawCollectionReview)")
+            waitForDone(name)
+        }
+    }
+
     // MARK: Run A — rotation review, per-page segmentation review, box/folder confirmation, Complete
 
     private func runA() throws -> [Int: Output] {
@@ -252,7 +339,7 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
 
     // MARK: Launch and waiting
 
-    private func launch(_ name: String, _ settings: [String]) throws -> URL {
+    private func launch(_ name: String, _ settings: [String], collectionID: Bool = false) throws -> URL {
         let out = scratchRoot.appendingPathComponent("\(name)-out", isDirectory: true)
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         app.terminate()
@@ -262,7 +349,8 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
             "-APUITestOutputDirectory", out.path, "-outputDirectory", out.path,
             "-localAgentBinaryPath", dir.appendingPathComponent("fake_local_agent.py").path,
             "-useAppleVision", "NO", "-useGateway", "NO", "-batchMode", "NO",
-            "-mergeDocuments", "NO", "-enableCollectionSegmentation", "NO", "-enableSegmentJSON", "YES",
+            "-mergeDocuments", "NO", "-enableCollectionSegmentation", collectionID ? "YES" : "NO",
+            "-confirmCollectionIDs", collectionID ? "YES" : "NO", "-enableSegmentJSON", "YES",
             "-tagVocabulary", ""
         ] + settings)
         app.launchEnvironment = [

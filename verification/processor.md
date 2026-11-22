@@ -727,8 +727,9 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Notes:** **Drift.** The rotation radios and `[`/`]` are not in this dialog: they appear only in the separate,
   opt-in Review rotation pass (`rotationOnly`, `:15-16`, `:201-213`; enabled by `reviewRotation` with rotation on,
   `OCR/OCRProcessor+Pipeline.swift:3084`). Keys 1 and 2 work only when document classes are shown (`:171-181`). The
-  Settings toggle Review document segmentation (`Views/SettingsView.swift:902`) is forced off on fresh runs
-  (`OCR/OCRProcessor+Pipeline.swift:3172`) — the dialog appears regardless.
+  fresh pipeline chooses the whole-run review independently of the Documents switch and passes `false` to the
+  later collection stage. S-046 reproduced this with the switch on and off in the VM
+  ([W49.proc-s046-verify evidence](evidence/processor/W49.proc-s046-verify.md)).
 
 ### P-33 · Generated tags
 

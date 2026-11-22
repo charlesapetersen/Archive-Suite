@@ -1139,12 +1139,17 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** ledger `P-32`.
 - **Seen:** `ArchiveProcessor/scripts/repro-suspects-filing.sh s017-images-toggle`: Automatic + Collection ID, toggle on
   and off, raised the same gates (whole-run review, box/folder confirmation, final review).
-- **Would confirm it:** that run, plus the owner's intent for the toggle (a per-collection pass, or the whole-run one).
+- **Would confirm it:** observe the same review sequence on two fresh user-started runs with the Documents switch
+  on and off. The owner chooses whether the whole-run review should remain required or be explicitly skippable.
 - **Would clear it:** the toggle is removed or wired, and its help says what it does.
-- **Status:** `open`
+- **Status:** `reproduced` — [scratch VM evidence](evidence/processor/W49.proc-s046-verify.md). Independent Claude check `W49.proc-s046-check` queued.
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
   - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s046-verify`; standing authorization for all bug suspects, phase rule 5a retained.
+  - 2026-11-21 W49.proc-s046-verify — Codex gpt-6.2-sol reproduced at `d1b38279`. Both switch values led
+    to the same whole-run per-page review, box/folder confirmation, final tagging review and collection
+    name confirmation. Both finished without a per-collection review. The whole-run review was introduced
+    deliberately in `a6da4e62`, so the behavior choice goes to the owner.
 
 
 ### S-047 · Windows that split a letter the OCR read as one document drop its enclosure's `Sent With`
