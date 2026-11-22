@@ -59,31 +59,33 @@ public enum FieldStatusPolicy {
     /// The fill rule, as `ItemFieldPolicy` states it (`segbench-results/item-fields-score.md`).
     public static let fillRule = "the fill rule is a Wilson lower bound of 0.85 and a point of 0.90 on 40 owner-checked pairs"
 
-    /// A page-2 item field. Each one written is from the Processor's item-field call (Gemini 3.7 Flash, image
-    /// prompt), which fills a field only where it cleared the rule. The figures are the stratified precision the
-    /// verdict rests on (`item-fields-score.md`, "Every route, field by field" and "The verdict"). Title cleared it
-    /// on its last look (W47.item-fields-title). The date fields are not item fields and have no figure here.
+    /// A page-2 item field. The gateway's Gemini 3.7 Flash image prompt fills fields that cleared the fill rule.
+    /// Its tooltips show those stratified scores, including title's last look (W47.item-fields-title).
+    /// The Mac suggestions explicitly carry lower confidence and show the separate complete-value rescore
+    /// in `item-fields-score.md`. Document and enclosure dates use their own status policy.
     public static func itemField(_ field: CheckableField, checked: Bool, lowerConfidence: Bool = false) -> FieldStatus {
         if lowerConfidence {
             let model: String
             let figure: String
-            // Owner-stratified precision after each model's own kind gates its fields. See item-fields-score.md.
+            // Complete-value estimates from the owner checks on cached in-process replies. See item-fields-score.md.
             switch field {
             case .documentKind:
                 model = "Qwen3-VL 8B reading page images and Vision text"
-                figure = "86%, 76 owner-checked values"
+                figure = "Exact kind: 76% (76 owner-checked fills). Bench interval: 62–84%."
             case .byline:
                 model = "Qwen3-VL 8B reading page images and Vision text"
-                figure = "88%, 41 owner-checked values"
+                figure = "Complete byline: 83% estimated over 74 of 81 scored fills (41 owner-checked). "
+                    + "Across all scored fills: 62–92%, including 6 outside the owner check sample."
             case .publicationDate:
                 model = "Qwen3.5 4B reading Vision text"
-                figure = "89%, 31 owner-checked values"
+                figure = "Full issue date: 70% estimated over 66 of 72 scored fills (31 owner-checked). "
+                    + "Across all scored fills: 48–85%, including 2 outside the owner check sample."
             default:
                 return FieldStatus(level: checked ? .checked : .lowerConfidence,
                                    source: "Read on the Processor’s Mac", measured: "")
             }
             return FieldStatus(level: checked ? .checked : .lowerConfidence, source: "Read on the Processor’s Mac by " + model,
-                               measured: "Estimated precision on the bench: " + figure + ".")
+                               measured: "Estimated from bench replies run in-process. " + figure)
         }
         let source = "Read by the Processor’s item-field call"
         let figure: String?

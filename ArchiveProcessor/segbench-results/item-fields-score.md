@@ -346,7 +346,7 @@ No Mac route meets the ordinary fill rule on either truth.
 
 ### What the Processor fills on this Mac (W47.wh-item-fields-mac-fill)
 
-Owner call 23 released kind and byline from the 8B image call and publication date from the 4B Vision-text call, marked lower confidence. The rescore applies each model's own kind to its fields and uses the app's strict JSON parsing. It reuses the 299 cached replies per model (no model calls, $0). The owner column estimates precision by weighting the sampled groups at their original sizes, and counts the filled values he checked. The drafted columns count right / filled.
+Owner call 23 released kind and byline from the 8B image call and publication date from the 4B Vision-text call, marked lower confidence. The rescore applies each model's own kind to its fields and requires a parseable JSON object without rescuing malformed replies. It reuses the 299 cached replies per model (no model calls, $0). The owner column estimates precision by weighting the sampled groups at their original sizes, and counts the filled values he checked. The drafted columns count right / filled.
 
 | Field | Drafted, truth kind | Drafted, model's kind | Owner precision estimate (interval) | Owner-checked fills |
 |---|---:|---:|---:|---:|
@@ -354,7 +354,26 @@ Owner call 23 released kind and byline from the 8B image call and publication da
 | byline | 72/79 | 68/81 | 88.44% [67.97%, 95.79%] | 41 |
 | publication_date | 60/70 | 61/72 | 89.36% [68.32%, 95.24%] | 31 |
 
-Regenerate these aggregates with `python3 scripts/segbench/item_fields_score.py --mac-fill-rescore` from ArchiveProcessor. The reported times are model inference. Vision reading and model switching add time.
+#### Complete values shown in the Reader (W46.p18-mac-field-precision)
+
+The table above preserves the loose comparison: Zotero type, any matching author, and date agreement up to the reference month. Here kind must match exactly, the byline must contain all and only the credited authors, including repeated names. The byline comparison folds case and whitespace and ignores order. The issue date must match every displayed component, including whether month and day were given. A year-only reference cannot verify added detail. Season and two-month owner answers folded to a year keep that precision.
+
+The weighted point uses the owner-checked census and the strata with an answered draw. The in-scope interval weights each sampled stratum's 95% Wilson bounds by its fill count and gives any stratum with no answered draw the full 0–100% range. The overall interval adds worst- and best-case correctness for unchecked fills outside the original truth-kind draw. This combines sampling uncertainty with bounds on missing evidence. Sideways documents and fields left unsettled are excluded as in the loose comparison. The Reader quotes the weighted bench point and overall interval for each suggestion.
+
+| Field | Drafted exact | Owner-checked exact | Weighted point (fills with evidence) | In-scope fills and interval | Outside kind scope (checked / fills) | Extra correct outside scope | Overall interval |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| kind | 236/292 | 50/76 | 75.52% (292) | 292: [62.22%, 84.20%] | 0/0 | 0–0 | [62.22%, 84.20%] |
+| byline | 65/81 | 35/41 | 82.67% (74) | 75: [66.93%, 91.86%] | 0/6 | 0–6 | [61.97%, 92.46%] |
+| publication_date | 47/72 | 22/31 | 70.22% (66) | 70: [49.28%, 84.21%] | 0/2 | 0–2 | [47.91%, 84.65%] |
+
+Input and guards: cached `item_fields_mac.py` in-process MLX-VLM `stream_generate` replies at temperature 0 and a 1,024-token cap, 8B on images with Apple Vision text for kind and byline, 4B on Apple Vision text for issue date. The app uses an HTTP server and requires a stopped, non-looping answer. Saved text permits replay of the content guards and token counts identify cap hits. HTTP status and finish reason were not recorded. No models or server requests were run for this rescore.
+
+| Input | Replies | Excluded by available reply guards | Otherwise scorable fills lost |
+|---|---:|---|---|
+| 8B images + Vision | 299 | 0 | kind 0, byline 0 |
+| 4B Vision | 299 | 2 token cap | publication_date 0 |
+
+Refresh these aggregates and the report with `python3 scripts/segbench/item_fields_score.py --mac-fill-rescore --update-report` from ArchiveProcessor. The reported times are model inference. Vision reading and model switching add time.
 
 ### Three fields off their measured kinds
 

@@ -1214,6 +1214,51 @@
  "fourth_sheet_open": false,
  "mac_fill_scores": {
   "byline": {
+   "displayed": {
+    "drafted": [
+     65,
+     81
+    ],
+    "guard_excluded_replies": {},
+    "guard_excluded_scored_fills": {},
+    "inside": {
+     "census": [
+      12,
+      12
+     ],
+     "filled": 75,
+     "hi": 0.9186069248044957,
+     "lo": 0.6693056413717361,
+     "pool": {
+      "image prompt empty": [
+       1,
+       0,
+       0
+      ],
+      "image prompt filled": [
+       62,
+       29,
+       23
+      ]
+     },
+     "precision": 0.8266542404473438
+    },
+    "inside_filled": 75,
+    "outside_checked": [
+     0,
+     0
+    ],
+    "outside_filled": 6,
+    "overall_interval": [
+     0.6197274457145705,
+     0.9246360414856442
+    ],
+    "owner_checked": [
+     35,
+     41
+    ],
+    "replies": 299
+   },
    "prediction": {
     "drafted_filled": 81,
     "drafted_right": 68,
@@ -1232,6 +1277,51 @@
    }
   },
   "kind": {
+   "displayed": {
+    "drafted": [
+     236,
+     292
+    ],
+    "guard_excluded_replies": {},
+    "guard_excluded_scored_fills": {},
+    "inside": {
+     "census": [
+      20,
+      38
+     ],
+     "filled": 292,
+     "hi": 0.8420217900879327,
+     "lo": 0.6221949846706742,
+     "pool": {
+      "image prompt empty": [
+       0,
+       0,
+       0
+      ],
+      "image prompt filled": [
+       254,
+       38,
+       30
+      ]
+     },
+     "precision": 0.7552271088680605
+    },
+    "inside_filled": 292,
+    "outside_checked": [
+     0,
+     0
+    ],
+    "outside_filled": 0,
+    "overall_interval": [
+     0.6221949846706742,
+     0.8420217900879327
+    ],
+    "owner_checked": [
+     50,
+     76
+    ],
+    "replies": 299
+   },
    "prediction": {
     "drafted_filled": 292,
     "drafted_right": 252,
@@ -1250,6 +1340,53 @@
    }
   },
   "publication_date": {
+   "displayed": {
+    "drafted": [
+     47,
+     72
+    ],
+    "guard_excluded_replies": {
+     "token cap": 2
+    },
+    "guard_excluded_scored_fills": {},
+    "inside": {
+     "census": [
+      6,
+      8
+     ],
+     "filled": 70,
+     "hi": 0.8421397106833711,
+     "lo": 0.4928235020695413,
+     "pool": {
+      "image prompt empty": [
+       4,
+       0,
+       0
+      ],
+      "image prompt filled": [
+       58,
+       23,
+       16
+      ]
+     },
+     "precision": 0.7022397891963109
+    },
+    "inside_filled": 70,
+    "outside_checked": [
+     0,
+     0
+    ],
+    "outside_filled": 2,
+    "overall_interval": [
+     0.47913396034538736,
+     0.8465247187199441
+    ],
+    "owner_checked": [
+     22,
+     31
+    ],
+    "replies": 299
+   },
    "prediction": {
     "drafted_filled": 72,
     "drafted_right": 61,

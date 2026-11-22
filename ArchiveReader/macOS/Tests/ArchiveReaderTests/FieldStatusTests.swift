@@ -94,7 +94,11 @@ final class FieldStatusTests: XCTestCase {
         XCTAssertEqual(rows.map(\.field), [.documentKind, .byline, .publicationDate, .recipientPlace])
         XCTAssertEqual(rows.map(\.value), ["report", "Mary Jones", "1967-03", "Boston, Massachusetts"])
         XCTAssertEqual(rows.map(\.status.level), [.lowerConfidence, .checked, .lowerConfidence, .unchecked])
-        XCTAssertTrue(rows[0].status.detail.contains("76 owner-checked values"))
+        XCTAssertTrue(rows[0].status.detail.contains("Exact kind: 76% (76 owner-checked fills)"))
+        XCTAssertTrue(rows[0].status.detail.contains("bench replies run in-process"))
+        XCTAssertTrue(rows[1].status.measured.contains("Complete byline: 83%"))
+        XCTAssertTrue(rows[1].status.measured.contains("including 6 outside the owner check sample"))
+        XCTAssertTrue(rows[2].status.detail.contains("Full issue date: 70%"))
         XCTAssertTrue(rows[2].status.detail.contains("Qwen3.5 4B"))
     }
 

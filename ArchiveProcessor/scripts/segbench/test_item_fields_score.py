@@ -199,5 +199,44 @@ class RuleStratified(unittest.TestCase):
         self.assertEqual(S.verdict(self.s(98, 100, 100)), "fill")
         self.assertEqual(S.verdict(self.s(98, 100, 100), err_hi=0.2), "too close")
 
+class DisplayedScore(unittest.TestCase):
+    def test_requires_the_complete_value(self):
+        match = S.displayed_match
+        self.assertFalse(match("kind", "clipping", "newspaper article"))
+        self.assertTrue(match("byline", ["Anna Doe", "JOHN  DOE"], ["John Doe", "Anna Doe"]))
+        self.assertFalse(match("byline", ["Anna Doe"], ["Anna Doe", "John Doe"]))
+        self.assertFalse(match("byline", ["Anna Doe", "Anna Doe"], ["Anna Doe"]))
+        self.assertFalse(match("publication_date", (1967, 3, 21), (1967, 3, 22)))
+        self.assertFalse(match("publication_date", (1967, 3, 22), (1967, 3, None)))
+
+    def test_scope_guard_and_unanswered_stratum_contribute_to_bounds(self):
+        field = "byline"
+        reading = {"kind": "report", field: ["Anna Doe"]}
+        rows = [
+            {"id": "checked", "label": reading, "owner": {field: "note"}, "unknown": []},
+            {"id": "undrawn", "label": reading, "owner": {}, "unknown": []},
+            {"id": "outside", "label": reading, "owner": {}, "unknown": []},
+            {"id": "capped", "label": reading, "owner": {}, "unknown": []},
+        ]
+        frame = {"checked": "report", "undrawn": "report", "outside": "letter", "capped": "report"}
+        legacy = dict.fromkeys(frame, reading)
+        pred = {**legacy, "capped": {}}
+        score = S.mac_display_score(pred, legacy, {}, rows, field, set(), frame, {"capped": "token cap"})
+        self.assertEqual(score["inside"]["precision"], 1.0)
+        self.assertEqual(score["outside_filled"], 1)
+        self.assertEqual(score["overall_interval"], [1 / 3, 1.0])
+        self.assertEqual(score["guard_excluded_scored_fills"], {"token cap": 1})
+
+    def test_replays_recorded_reply_guards(self):
+        def reply(raw, tokens=10):
+            return S.mac_reply_answer({"raw": raw, "tokens": [1, tokens], "max_tokens": 1024})
+
+        self.assertEqual(reply('reasoning</think> {"kind": "report"}'), ('{"kind": "report"}', None))
+        self.assertEqual(reply('<think> unfinished {"kind":"report"}'), (None, "unfinished reasoning"))
+        self.assertEqual(reply('{"kind":"report"}', 1024), (None, "token cap"))
+        self.assertEqual(reply("abcde" * 400), (None, "repetition loop"))
+        self.assertEqual(reply("." * 2000), ("." * 2000, None))
+
+
 if __name__ == "__main__":
     unittest.main()

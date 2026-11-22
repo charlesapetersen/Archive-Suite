@@ -5,7 +5,8 @@ truth's own error, score every route, and give each field's fill verdict (measur
 drafter-family routes on a stratified precision (measurement review pass 11, P11-2 and P11-6).
 
     python3 item_fields_score.py      # CACHE/truth-owner.jsonl and CACHE/note-answers.md (private), the report
-    python3 item_fields_score.py --mac-fill-rescore  # print aggregate scores with each Mac model's own kind gate
+    python3 item_fields_score.py --mac-fill-rescore  # aggregate scores with each Mac model's own kind gate
+    python3 item_fields_score.py --mac-fill-rescore --update-report  # refresh just the Mac fill aggregates/report
 
 Offline and $0: every reading it scores is already in the bench cache. It reads the corpus's Finder tags with
 getxattr(2) (corpus_survey.read_tags), nothing else there, and writes nothing in it.
@@ -62,6 +63,7 @@ import collections
 import json
 import os
 import sys
+import unicodedata
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -109,6 +111,8 @@ for _rk, _label, _short in IFM.route_rows():
     ROUTES.append((_rk, _label, False))
     SHORT[_rk] = _short
 MAC = [rk for rk, *_ in ROUTES if rk.startswith("mac-")]
+MAC_FILL_HEADING = "### What the Processor fills on this Mac (W47.wh-item-fields-mac-fill)"
+OFF_KIND_HEADING = "### Three fields off their measured kinds"
 OFF_KIND = ("byline", "publication_date", "recipient_place")   # the fields the app fills on its measured kinds only
 
 
@@ -400,7 +404,11 @@ def pairs(route, family, pred, frows, field, which, skip, *, kind_gate="truth"):
     return out
 
 
-def stratified(pred, gem, frows, field, skip, controls_out=False, *, kind_gate="truth"):
+def loose_match(field, pred, truth):
+    return IF.field_match(field, pred, truth, "ed2")
+
+
+def stratified(pred, gem, frows, field, skip, controls_out=False, *, kind_gate="truth", match=loose_match):
     """A route's precision over every pair it filled, from the owner's values (measurement review pass 11, P11-2).
     The pairs split in two: the ones the owner settled other than by the draw (the first sheet's kind crossings,
     disputes and controls, and the notes), known exactly, a census; and the rest, the pool the second sheet drew from
@@ -425,7 +433,7 @@ def stratified(pred, gem, frows, field, skip, controls_out=False, *, kind_gate="
         pv, tv = p.get(field), t["label"][field]
         if not IF.filled(field, pv):
             continue
-        right = IF.filled(field, tv) and IF.field_match(field, pv, tv, "ed2")
+        right = IF.filled(field, tv) and match(field, pv, tv)
         how = t["owner"].get(field)
         if controls_out and how == "control":
             how = None
@@ -723,23 +731,114 @@ def note_answers(frows, docs, fixes, tags, P):
 
 # --- build --------------------------------------------------------------------------------------------------------
 
+def displayed_match(field, pred, truth):
+    """Whole values: exact kind, all author spellings, or all displayed date components."""
+    if field == "byline":
+        def name_key(name):
+            return unicodedata.normalize("NFC", " ".join(name.split()).casefold())
+
+        return collections.Counter(map(name_key, pred)) == collections.Counter(map(name_key, truth))
+    return pred == truth
+
+
+def mac_reply_answer(reply):
+    """Replay the app's content guards and use saved token counts as the cap check.
+    The in-process runner did not save an HTTP response or finish reason."""
+    if reply["tokens"][1] >= reply["max_tokens"]:
+        return None, "token cap"
+    raw = reply["raw"]
+    while "<think>" in raw:
+        start = raw.index("<think>")
+        end = raw.find("</think>", start + len("<think>"))
+        if end < 0:
+            return None, "unfinished reasoning"
+        raw = raw[:start] + raw[end + len("</think>"):]
+    if "</think>" in raw:
+        raw = raw.split("</think>", 1)[1]
+    raw = raw.strip()
+    if not raw:
+        return None, "empty answer"
+
+    # LocalModelRoute.isRepetitionLoop checks the last 6,000 scalars for a repeating suffix.
+    tail = raw[-6000:]
+    for period in range(4, min(400, len(tail) // 8) + 1):
+        length = max(2000, period * 8)
+        if length > len(tail):
+            continue
+        span = tail[-period:]
+        if len({ch for ch in span if not ch.isspace()}) < 3:
+            continue
+        if tail[-length:-period] == tail[-length + period:]:
+            return None, "repetition loop"
+    return raw, None
+
+
+def mac_display_score(pred, legacy, gemini, frows, field, skip, frame, excluded):
+    """Owner estimates within the original draw's kind scope; unchecked fills outside it get 0–100% bounds."""
+    ks = IF.SCOPE[field]
+    def fills(reading):
+        return IF.filled(field, reading.get(field)) and (ks is None or reading.get("kind") in ks)
+
+    eligible = [t for t in frows if t["id"] not in skip and field not in t["unknown"]]
+    removed = collections.Counter(excluded[t["id"]] for t in eligible
+                                  if t["id"] in excluded and fills(legacy[t["id"]]))
+    kept = [t for t in eligible if fills(pred[t["id"]])]
+    inside, outside = [], []
+    for t in kept:
+        (inside if ks is None or frame[t["id"]] in ks else outside).append(t)
+    strat = stratified(pred, gemini, inside, field, skip, kind_gate="prediction", match=displayed_match)
+    checked = [t for t in kept if field in t["owner"]]
+
+    def correct(t):
+        return displayed_match(field, pred[t["id"]][field], t["label"][field])
+
+    drafted_right = sum(correct(t) for t in kept)
+    checked_right = sum(correct(t) for t in checked)
+    outside_checked = [t for t in outside if field in t["owner"]]
+    outside_right = sum(correct(t) for t in outside_checked)
+    n, total = len(inside), len(kept)
+    unchecked = len(outside) - len(outside_checked)
+    result = {
+        "drafted": [drafted_right, total],
+        "owner_checked": [checked_right, len(checked)],
+        "inside": strat,
+        "outside_filled": len(outside),
+        "outside_checked": [outside_right, len(outside_checked)],
+        "guard_excluded_scored_fills": dict(removed),
+    }
+    if total:
+        lo, hi = (strat["lo"], strat["hi"]) if strat else (0.0, 1.0)
+        result["overall_interval"] = [(lo * n + outside_right) / total,
+                                      (hi * n + outside_right + unchecked) / total]
+        result["inside_filled"] = n
+    return result
+
+
 def mac_fill_scores(rows, frows, skip):
-    """Score the strict-parser Mac replies as the app gates them, alongside the truth-kind scope."""
+    """Keep the historical loose comparison and score the complete values from the same in-process replies."""
     gemini = {r["id"]: r["readers"]["gemini"] for r in rows}
+    # Sheets 2 and 3 used the fold after sheet 1. Later corrections cannot put a pair back into that draw.
+    first, _ = fold(rows, *load_sheet(SHEET, "_notes"))
+    frame = {t["id"]: t["label"]["kind"] for t in first}
     result = {}
     for model, inp, fields in (
         ("qwen3-vl-8b", "image", ("kind", "byline")),
         ("qwen3.5-4b", "vision", ("publication_date",)),
     ):
-        pred = {}
+        pred, guarded, excluded = {}, {}, {}
         for row in rows:
             doc_id = row["id"]
             try:
                 with open(IFM.reading_path(model, inp, doc_id), encoding="utf-8") as fh:
-                    reading = IF.parse(json.load(fh)["raw"]) or {}
+                    reply = json.load(fh)
             except FileNotFoundError:
                 return None
+            reading = IF.parse(reply["raw"]) or {}
             pred[doc_id] = {f: norm(f, reading.get(f)) for f in FIELDS}
+            answer, reason = mac_reply_answer(reply)
+            if reason:
+                excluded[doc_id] = reason
+            guarded[doc_id] = IF.parse(answer) or {}
         for field in fields:
             result[field] = {}
             for gate in ("truth", "prediction"):
@@ -751,10 +850,14 @@ def mac_fill_scores(rows, frows, skip):
                     "owner_filled": checked, "precision": strat["precision"],
                     "lower": strat["lo"], "upper": strat["hi"],
                 }
+            exact = mac_display_score(guarded, pred, gemini, frows, field, skip, frame, excluded)
+            exact["guard_excluded_replies"] = dict(collections.Counter(excluded.values()))
+            exact["replies"] = len(pred)
+            result[field]["displayed"] = exact
     return result
 
 
-def mac_fill_rescore():
+def mac_fill_rescore(update_report=False):
     rows, _docs, key, answers, fixes = load()
     frows, _chk = fold(rows, key, answers, fixes)
     with open(RETRUTH_JSON, encoding="utf-8") as fh:
@@ -762,6 +865,22 @@ def mac_fill_rescore():
     result = mac_fill_scores(rows, frows, skip)
     if result is None:
         sys.exit("Both Mac model reading sets are required for the rescore.")
+    if update_report:
+        json_path = RESULTS.replace(".md", ".json")
+        with open(json_path, encoding="utf-8") as fh:
+            aggregates = json.load(fh)
+        aggregates["mac_fill_scores"] = result
+        with open(RESULTS, encoding="utf-8") as fh:
+            current = fh.read()
+        before, start, rest = current.partition(MAC_FILL_HEADING)
+        _, end, after = rest.partition(OFF_KIND_HEADING)
+        if not start or not end:
+            sys.exit("The Mac fill section was not found in the committed report.")
+        markdown = before + "\n".join(mac_fill_section(result)) + "\n\n" + end + after
+        with open(json_path, "w", encoding="utf-8") as fh:
+            json.dump(aggregates, fh, indent=1, sort_keys=True)
+        with open(RESULTS, "w", encoding="utf-8") as fh:
+            fh.write(markdown)
     print(json.dumps(result, indent=2, sort_keys=True))
 
 
@@ -887,6 +1006,77 @@ def strat_cell(st):
     return f"{f2(st['precision'])} [{f2(st['lo'])}, {f2(st['hi'])}] of {st['filled']}"
 
 
+def mac_fill_section(shipped):
+    L = [MAC_FILL_HEADING, "",
+          "Owner call 23 released kind and byline from the 8B image call and publication date from the 4B "
+          "Vision-text call, marked lower confidence. The rescore applies each model's own kind to its fields "
+          "and requires a parseable JSON object without rescuing malformed replies. "
+          "It reuses the 299 cached replies per model (no model calls, $0). "
+          "The owner column estimates precision by weighting the sampled groups at their original sizes, "
+          "and counts the filled values he checked. The drafted columns count right / filled.", "",
+          "| Field | Drafted, truth kind | Drafted, model's kind | Owner precision estimate (interval) | Owner-checked fills |",
+          "|---|---:|---:|---:|---:|"]
+    for f in ("kind", "byline", "publication_date"):
+        truth, pred = shipped[f]["truth"], shipped[f]["prediction"]
+        L.append(f"| {f} | {truth['drafted_right']}/{truth['drafted_filled']} | "
+                 f"{pred['drafted_right']}/{pred['drafted_filled']} | "
+                 f"{pred['precision']:.2%} [{pred['lower']:.2%}, {pred['upper']:.2%}] | {pred['owner_filled']} |")
+    L += mac_display_section(shipped)
+    L += ["", "Refresh these aggregates and the report with "
+          "`python3 scripts/segbench/item_fields_score.py --mac-fill-rescore --update-report` from ArchiveProcessor. "
+          "The reported times are model inference. Vision reading and model switching add time."]
+    return L
+
+
+def mac_display_section(shipped):
+    """Show where the owner design supports a point, and bound the remaining fills."""
+    L = ["", "#### Complete values shown in the Reader (W46.p18-mac-field-precision)", "",
+         "The table above preserves the loose comparison: Zotero type, any matching author, and date agreement "
+         "up to the reference month. Here kind must match exactly, the byline must contain all and only the credited "
+         "authors, including repeated names. The byline comparison folds case and whitespace and ignores order. "
+         "The issue date must match every displayed "
+         "component, including whether month and day were given. A year-only reference cannot verify added detail. "
+         "Season and two-month owner answers folded to a year keep that precision.", "",
+         "The weighted point uses the owner-checked census and the strata with an answered draw. The in-scope "
+         "interval weights each sampled stratum's 95% Wilson bounds by its fill count and gives any stratum with "
+         "no answered draw the full 0–100% range. The overall interval adds worst- and best-case correctness for "
+         "unchecked fills outside the original truth-kind draw. This combines sampling uncertainty with bounds on "
+         "missing evidence. Sideways documents and fields left unsettled are excluded as in the loose comparison. "
+         "The Reader quotes the weighted bench point and overall interval for each suggestion.", "",
+         "| Field | Drafted exact | Owner-checked exact | Weighted point (fills with evidence) | "
+         "In-scope fills and interval | Outside kind scope (checked / fills) | Extra correct outside scope | "
+         "Overall interval |",
+         "|---|---:|---:|---:|---:|---:|---:|---:|"]
+    for field in ("kind", "byline", "publication_date"):
+        x = shipped[field]["displayed"]
+        st = x["inside"]
+        outside_right, outside_checked = x["outside_checked"]
+        outside = x["outside_filled"]
+        point, inside = "—", f"{x.get('inside_filled', 0)}: [0%, 100%]" if x.get("inside_filled") else "0"
+        if st:
+            seen = st["census"][1] + sum(N for N, drawn, _right in st["pool"].values() if drawn)
+            point = f"{st['precision']:.2%} ({seen})"
+            inside = f"{st['filled']}: [{st['lo']:.2%}, {st['hi']:.2%}]"
+        overall = ("[{:.2%}, {:.2%}]".format(*x["overall_interval"]) if "overall_interval" in x else "—")
+        L.append(f"| {field} | {'/'.join(map(str, x['drafted']))} | {'/'.join(map(str, x['owner_checked']))} | "
+                 f"{point} | {inside} | {outside_checked}/{outside} | "
+                 f"{outside_right}–{outside_right + outside - outside_checked} | {overall} |")
+    L += ["", "Input and guards: cached `item_fields_mac.py` in-process MLX-VLM `stream_generate` replies "
+          "at temperature 0 and a 1,024-token cap, 8B on images with Apple Vision text for kind and byline, "
+          "4B on Apple Vision text for issue date. The app uses an HTTP server and requires a stopped, "
+          "non-looping answer. Saved text permits replay of the content guards and token counts identify cap hits. "
+          "HTTP status and finish reason were not recorded. No models or server requests were run for this rescore.", "",
+          "| Input | Replies | Excluded by available reply guards | Otherwise scorable fills lost |",
+          "|---|---:|---|---|"]
+    for field, label in (("kind", "8B images + Vision"), ("publication_date", "4B Vision")):
+        x = shipped[field]["displayed"]
+        reasons = ", ".join(f"{n} {r}" for r, n in x["guard_excluded_replies"].items()) or "0"
+        fields = ("kind", "byline") if field == "kind" else (field,)
+        lost = ", ".join(f"{f} {sum(shipped[f]['displayed']['guard_excluded_scored_fills'].values())}" for f in fields)
+        L.append(f"| {label} | {x['replies']} | {reasons} | {lost} |")
+    return L
+
+
 def mac_section(o):
     """W47.wh-item-fields-mac's rows: the runs, each field's two verdicts, and the three fields off their kinds."""
     if not MAC:
@@ -942,23 +1132,9 @@ def mac_section(o):
     L += ["", ("Fills by either verdict: " + "; ".join(f"{f} ({n})" for f, n in fills) + ".") if fills else
           "No Mac route meets the ordinary fill rule on either truth."]
     if shipped := o.get("mac_fill_scores"):
-        L += ["", "### What the Processor fills on this Mac (W47.wh-item-fields-mac-fill)", "",
-              "Owner call 23 released kind and byline from the 8B image call and publication date from the 4B "
-              "Vision-text call, marked lower confidence. The rescore applies each model's own kind to its fields "
-              "and uses the app's strict JSON parsing. It reuses the 299 cached replies per model (no model calls, $0). "
-              "The owner column estimates precision by weighting the sampled groups at their original sizes, "
-              "and counts the filled values he checked. The drafted columns count right / filled.", "",
-              "| Field | Drafted, truth kind | Drafted, model's kind | Owner precision estimate (interval) | Owner-checked fills |",
-              "|---|---:|---:|---:|---:|"]
-        for f in ("kind", "byline", "publication_date"):
-            truth, pred = shipped[f]["truth"], shipped[f]["prediction"]
-            L.append(f"| {f} | {truth['drafted_right']}/{truth['drafted_filled']} | "
-                     f"{pred['drafted_right']}/{pred['drafted_filled']} | "
-                     f"{pred['precision']:.2%} [{pred['lower']:.2%}, {pred['upper']:.2%}] | {pred['owner_filled']} |")
-        L += ["", "Regenerate these aggregates with `python3 scripts/segbench/item_fields_score.py --mac-fill-rescore` "
-              "from ArchiveProcessor. The reported times are model inference. Vision reading and model switching add time."]
+        L += [""] + mac_fill_section(shipped)
     ok = o["off_kind"]
-    L += ["", "### Three fields off their measured kinds", "",
+    L += ["", OFF_KIND_HEADING, "",
           "The app fills byline and publication date on printed kinds only and recipient place on correspondence "
           "only (ItemFieldPolicy.withheld, \"not measured on this kind\"). On the documents of every other kind: "
           "the pairs, how many carry a true value, and each route's filled, right and filled-where-the-truth-is-"
@@ -1260,7 +1436,7 @@ def report(o):
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["--mac-fill-rescore"]:
-        mac_fill_rescore()
+    if sys.argv[1:] in (["--mac-fill-rescore"], ["--mac-fill-rescore", "--update-report"]):
+        mac_fill_rescore(update_report="--update-report" in sys.argv)
     else:
         build()
