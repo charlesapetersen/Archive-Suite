@@ -17717,3 +17717,13 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   regression reads real Finder tags and JSON from scratch PDFs before and after merging.
   No bench cache was created.
   <!-- /W49.proc-tree-folder-docs -->
+
+- [x] **W49.proc-tree-depth-say — say when a tree's folders are too deep to read [XS]** · §Known limits are queued, accepted or asked — SHIPPED 2026-11-22 (this commit).
+  Process Files reports how many folder branches it skipped below the 12-level limit and the first skipped
+  path in scan order. It keeps that notice beside the run status, even if there were no files to process.
+  The summary also explains flat filing for a selected tree named with a leading dot. Filed by
+  W49.ki-audit-processor. The off-screen test processed a photo at level 12, saw two skipped branches
+  and the first path in Finder order, confirmed the flat PDF on disk, and checked that switching tabs
+  kept the notices and Clear dismissed them. ArchiveCore and all three app smoke checks passed.
+  No bench cache was created.
+  <!-- /W49.proc-tree-depth-say -->

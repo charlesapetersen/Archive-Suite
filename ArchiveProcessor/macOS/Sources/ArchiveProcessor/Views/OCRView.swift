@@ -110,6 +110,9 @@ struct OCRView: View {
     @State private var droppedFiles: [URL] = []
     /// W47.ct-processor-intake: for each file from a folder read as a tree, its folder below the output folder.
     @State private var droppedSubfolders: [URL: String] = [:]
+    @State private var foldersBeyondDepth: [URL] = []
+    @State private var flatDotFolders: [URL: String] = [:]
+    @State private var showingPendingIntake = false
     /// The level map offered at Start for a tree, and why saving it was refused.
     @State private var containerLevels: ContainerLevelsDraft?
     @State private var containerLevelsError: String?
@@ -432,7 +435,7 @@ struct OCRView: View {
             if droppedFiles.isEmpty, let volume = ProcessorUITestConfiguration.droppedVolume {
                 handleDroppedURLs(volume)
             }
-            if droppedFiles.isEmpty, let tree = MessageJourneyFixture.inputTree {
+            if droppedFiles.isEmpty, processor.statusMessage.isEmpty, let tree = MessageJourneyFixture.inputTree {
                 handleDroppedURLs([tree])
             }
             if droppedFiles.isEmpty, let images = ProcessorUITestConfiguration.droppedImages {
@@ -460,7 +463,7 @@ struct OCRView: View {
         .onChange(of: processor.stagedCaptureFiles) { _, staged in
             guard !staged.isEmpty else { return }
             // Live Capture handed off pre-grouped photos → load them as the input files.
-            droppedFiles = staged
+            replaceFiles(with: staged)
             captureBoundaries = processor.stagedCaptureBoundaries
             captureTypes = processor.stagedCaptureTypes
             captureQualities = processor.stagedCaptureQualities
@@ -474,7 +477,7 @@ struct OCRView: View {
             // stagedCaptureFiles changed and .onChange won't fire for it. Pick up anything pending.
             let staged = processor.stagedCaptureFiles
             guard !staged.isEmpty else { return }
-            droppedFiles = staged
+            replaceFiles(with: staged)
             captureBoundaries = processor.stagedCaptureBoundaries
             captureTypes = processor.stagedCaptureTypes
             captureQualities = processor.stagedCaptureQualities
@@ -1163,8 +1166,8 @@ struct OCRView: View {
                     }
                     .buttonStyle(.bordered)
                     .disabled(!canAddFiles)
-                    if !droppedFiles.isEmpty {
-                        Button("Clear") { droppedFiles = []; droppedSubfolders = [:]; intakeGeneration += 1; readingTree = false; captureBoundaries = []; captureTypes = []; captureQualities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = []; processor.progress = 0; processor.statusMessage = ""; processor.failedFiles = [] }
+                    if !droppedFiles.isEmpty || !foldersBeyondDepth.isEmpty || !processor.treeIntakeWarnings.isEmpty {
+                        Button("Clear") { replaceFiles(with: []); captureBoundaries = []; captureTypes = []; captureQualities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = []; processor.progress = 0; processor.statusMessage = ""; processor.failedFiles = [] }
                             .buttonStyle(.bordered)
                             .disabled(processor.isProcessing)   // Clear mid-run would wipe processor.jobs out from under the running task (wasted paid calls, discarded output)
                     }
@@ -1219,17 +1222,8 @@ struct OCRView: View {
                         }
                     }
 
-                    // Progress
-                    if processor.isProcessing || (!processor.statusMessage.isEmpty && !isInReviewMode) {
-                        Divider()
-                        VStack(alignment: .leading, spacing: 6) {
-                            ProgressView(value: processor.progress)
-                            Text(processor.statusMessage)
-                                .font(.caption)
-                                .foregroundStyle(.primary)
-                            if processor.isProcessing { PlanPauseCaption() }
-                        }
-                    }
+                    // Progress and intake warnings remain together when the run finishes.
+                    runSummary
                 }
             }
         }
@@ -1241,6 +1235,40 @@ struct OCRView: View {
                 SegmentationEditSheet(processor: processor, fileIndex: index, fileName: processor.jobs[index].sourceURL.lastPathComponent) {
                     editingFileIndex = nil
                 }
+            }
+        }
+    }
+
+    private var treeIntakeWarnings: [String] {
+        var warnings = ProcessFilesTree.depthWarning(foldersBeyondDepth).map { [$0] } ?? []
+        guard !preOCRedInput, !flatDotFolders.isEmpty else { return warnings }
+        let flatFolders = Set(droppedFiles.compactMap { file in
+            droppedSubfolders[file] == nil ? flatDotFolders[file] : nil
+        }).sorted()
+        warnings += flatFolders.map { name in
+            "The name “\(name)” starts with a dot. Its folder structure is skipped when filing PDFs."
+        }
+        return warnings
+    }
+
+    private var runSummary: some View {
+        let warnings = showingPendingIntake ? treeIntakeWarnings : processor.treeIntakeWarnings
+        let showProgress = processor.isProcessing || (!processor.statusMessage.isEmpty && !isInReviewMode)
+        return Group {
+            if showProgress || !warnings.isEmpty {
+                Divider()
+                VStack(alignment: .leading, spacing: 6) {
+                    if showProgress {
+                        ProgressView(value: processor.progress)
+                        Text(processor.statusMessage)
+                        if processor.isProcessing { PlanPauseCaption() }
+                    }
+                    ForEach(warnings, id: \.self) { warning in
+                        Text(warning).textSelection(.enabled)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.primary)
             }
         }
     }
@@ -1581,8 +1609,23 @@ struct OCRView: View {
     }
 
     private func add(_ intake: ProcessFilesTree.Intake) {
+        showingPendingIntake = true
         droppedFiles.append(contentsOf: intake.files)
         droppedSubfolders.merge(intake.subfolders) { $1 }
+        flatDotFolders.merge(intake.flatDotFolders) { $1 }
+        var seen = Set(foldersBeyondDepth)
+        foldersBeyondDepth.append(contentsOf: intake.foldersBeyondDepth.filter { seen.insert($0).inserted })
+    }
+
+    private func replaceFiles(with files: [URL]) {
+        droppedFiles = files
+        droppedSubfolders = [:]
+        flatDotFolders = [:]
+        foldersBeyondDepth = []
+        processor.treeIntakeWarnings = []
+        showingPendingIntake = false
+        intakeGeneration += 1
+        readingTree = false
     }
 
     /// The answer to `treeQuestion`. Reading a whole tree is done off the main thread.
@@ -1637,7 +1680,7 @@ struct OCRView: View {
 
     private func resumePendingBatch() {
         if let urls = processor.pendingBatchFileURLs {
-            droppedFiles = urls
+            replaceFiles(with: urls)
         }
         processor.passSourceTags = passSourceTags && enableTagging
         processor.taggingMode = taggingMode
@@ -1657,7 +1700,7 @@ struct OCRView: View {
     private func resumePendingRun(readWithoutClusterText: Bool = false) {
         guard let key = processor.pendingRunResumeKey(fieldKey: apiKey) else { return }
         if let urls = processor.pendingRunFileURLs {
-            droppedFiles = urls
+            replaceFiles(with: urls)
         }
         processor.passSourceTags = passSourceTags && enableTagging
         processor.taggingMode = taggingMode
@@ -1675,7 +1718,7 @@ struct OCRView: View {
     }
 
     private func resumePendingMixedPDF(readWithoutClusterText: Bool = false) {
-        if let urls = processor.pendingMixedPDFFileURLs { droppedFiles = urls }
+        if let urls = processor.pendingMixedPDFFileURLs { replaceFiles(with: urls) }
         processor.processingTask = Task {
             await processor.resumeMixedPDF(apiKey: apiKey, keyProvider: effectiveProvider,
                                            readWithoutClusterText: readWithoutClusterText)
@@ -1808,6 +1851,8 @@ struct OCRView: View {
         processor.pageReaders = pageReaderPlan   // W41.app-page-kind; the run ignores it where it does not apply
         processor.institutionalComputeImport = institutionalComputeActive ? institutionalComputeImport : nil   // W41.app-institutional-compute
         processor.plannedOutputSubfolders = plannedSubfolders   // W47.ct-processor-intake
+        processor.treeIntakeWarnings = treeIntakeWarnings
+        showingPendingIntake = false
         processor.tagVocabulary = tagVocabulary
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }

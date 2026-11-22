@@ -51,6 +51,8 @@ class OCRProcessor: ObservableObject {
         }
     }
     @Published var statusMessage = ""
+    /// The run's intake warnings, kept with its status when the user switches tabs.
+    @Published var treeIntakeWarnings: [String] = []
     @Published var failedFiles: [String] = []
     @Published var segments: [DocumentSegment] = []
     @Published var collectionSegments: [CollectionSegment] = []

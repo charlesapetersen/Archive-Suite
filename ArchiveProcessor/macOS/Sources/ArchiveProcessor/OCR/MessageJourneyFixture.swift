@@ -10,8 +10,12 @@ enum MessageJourneyFixture {
         && mode != nil
 
     static var inputTree: URL? {
-        guard isActive, mode == "duplicates", let out = ProcessorUITestConfiguration.outputDirectory else { return nil }
-        return out.deletingLastPathComponent().appendingPathComponent("in", isDirectory: true)
+        guard isActive, let out = ProcessorUITestConfiguration.outputDirectory else { return nil }
+        switch mode {
+        case "duplicates": return out.deletingLastPathComponent().appendingPathComponent("in", isDirectory: true)
+        case "tree-depth": return out.deletingLastPathComponent().appendingPathComponent(".in", isDirectory: true)
+        default: return nil
+        }
     }
 
     static func resetKeyWizardIfRequested() {

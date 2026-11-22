@@ -265,8 +265,9 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   Reader (File ▸ Container Levels… on that archive). A map above the output folder is not looked for: with the output
   inside a Reader archive, Save writes a map for the output folder's subtree, and Start Without Saving leaves the
   outer map reading the new folders from its own root. (accepted: the map is the archive's record and is edited in the Reader, not overwritten by a run).
-- **Depth.** Folders more than 12 below the given folder are not read, and nothing says so. A given folder whose own
-  name starts with "." is read but filed flat. (queued: W49.proc-tree-depth-say).
+- **Depth.** Process Files reads up to 12 levels below a selected folder. It lists the number of skipped folder
+  branches and the first skipped path in the run summary. A selected tree whose name starts with a dot is
+  filed flat, with a note in the summary. (accepted: retain the depth limit and explain flat filing).
 - **Collection organisation is skipped for a tree's outputs**, by design: the tree says where they go. Its status line
   still counts every collection the run found. (accepted: by design, the tree says where outputs go).
 - **The Files tab's sheet and question were not run in the VM**: the logic behind them is in the driver

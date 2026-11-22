@@ -166,6 +166,44 @@ final class MessageJourneyUITests: XCTestCase {
         print("[s030] \(reads.count) refusals; outputs \(files).\n\(log)")
     }
 
+    func testTreeSummaryReportsSkippedBranchesAndDotFolderFiling() throws {
+        try prepare()
+        let boundary = ".in/" + (1...12).map { "Level \($0)" }.joined(separator: "/")
+        try makePhoto("\(boundary)/edge.jpg")
+        try makePhoto("\(boundary)/Folder 10/ignored.jpg")
+        try makePhoto("\(boundary)/Folder 2/Below/ignored.jpg")
+        launch("tree-depth", loadPhotos: false, extra: ["-useGateway", "YES",
+                                                         "-gatewayBaseURL", "https://api.openai.com/v1",
+                                                         "-gatewayModelID", "scratch-transcription"])
+
+        let readInside = app.buttons["Read Folders Inside"]
+        XCTAssertTrue(readInside.waitForExistence(timeout: 10), app.debugDescription)
+        readInside.click()
+        let warning = text("Skipped 2 folder branches more than 12 levels deep.")
+        XCTAssertTrue(warning.waitForExistence(timeout: 10), app.debugDescription)
+        start()
+        waitForDone(succeeded: 1)
+
+        XCTAssertTrue(warning.exists)
+        XCTAssertTrue(text("\(boundary)/Folder 2").exists, app.debugDescription)
+        XCTAssertTrue(text("Its folder structure is skipped when filing PDFs.").exists, app.debugDescription)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("out/edge.pdf").path))
+        XCTAssertEqual(try calls().count, 1)
+        shot("tree-depth-summary")
+
+        let tools = [app.radioButtons["Tools"], app.buttons["Tools"]].first { $0.exists }
+        try XCTUnwrap(tools).click()
+        XCTAssertTrue(app.buttons["View History…"].waitForExistence(timeout: 5))
+        let processFiles = [app.radioButtons["Process Files"], app.buttons["Process Files"]].first { $0.exists }
+        try XCTUnwrap(processFiles).click()
+        waitForDone(succeeded: 1)
+        XCTAssertTrue(warning.exists, app.debugDescription)
+        XCTAssertTrue(text("Its folder structure is skipped when filing PDFs.").exists, app.debugDescription)
+
+        app.buttons["Clear"].click()
+        XCTAssertTrue(warning.waitForNonExistence(timeout: 5))
+    }
+
     private func prepare() throws {
         root = FileManager.default.temporaryDirectory.appendingPathComponent("archive-messages-\(UUID().uuidString)")
         for child in ["in", "out", "calls", "backup"] {

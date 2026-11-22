@@ -118,6 +118,15 @@ enum ProcessFilesTree {
         var files: [URL] = []
         /// For each file from a folder read as a tree, its folder below the output folder (`ContainerTree.relativePath`).
         var subfolders: [URL: String] = [:]
+        var foldersBeyondDepth: [URL] = []
+        var flatDotFolders: [URL: String] = [:]
+    }
+
+    static func depthWarning(_ folders: [URL]) -> String? {
+        guard let first = folders.first else { return nil }
+        let count = folders.count
+        return "Skipped \(count) folder branch\(count == 1 ? "" : "es") more than \(ContainerTree.maxDepth) levels deep. "
+            + "First skipped folder: \(first.path)"
     }
 
     /// The files Process Files takes: images and PDFs, or PDFs only for pre-OCRed input (`OCRView.isImageFile`).
@@ -153,26 +162,39 @@ enum ProcessFilesTree {
             var isDir: ObjCBool = false
             return fm.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
         }
-        let trees = urls.map { readSubfolders && isFolder($0) ? ContainerTree.files(in: $0, accept: accept) : nil }
+        var intake = Intake()
+        let trees = urls.map { url -> [ContainerTree.Entry]? in
+            guard readSubfolders, isFolder(url) else { return nil }
+            return ContainerTree.files(in: url, onDepthLimit: {
+                intake.foldersBeyondDepth.append($0.standardizedFileURL)
+            }, accept: accept)
+        }
         guard trees.contains(where: { $0.map(ContainerTree.isTree) == true }) else {
             var files: [URL] = []
             for url in urls {
                 if isFolder(url) {
                     let contents = (try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)) ?? []
                     let accepted = contents.filter(accept)
+                    if readSubfolders && url.lastPathComponent.hasPrefix(".") {
+                        for file in accepted { intake.flatDotFolders[file] = url.lastPathComponent }
+                    }
                     files.append(contentsOf: sortAll ? accepted : accepted.sorted { ContainerOrder.precedes($0.lastPathComponent, $1.lastPathComponent) })
                 } else if accept(url) {
                     files.append(url)
                 }
             }
-            return Intake(files: sortAll ? files.sorted { ContainerOrder.precedes($0.lastPathComponent, $1.lastPathComponent) } : files)
+            intake.files = sortAll ? files.sorted { ContainerOrder.precedes($0.lastPathComponent, $1.lastPathComponent) } : files
+            return intake
         }
-        var intake = Intake()
         for (url, tree) in zip(urls, trees) {
             if let tree {
                 for entry in tree {
                     intake.files.append(entry.url)
-                    if let relative = ContainerTree.relativePath(entry.directory) { intake.subfolders[entry.url] = relative }
+                    if let relative = ContainerTree.relativePath(entry.directory) {
+                        intake.subfolders[entry.url] = relative
+                    } else if url.lastPathComponent.hasPrefix(".") {
+                        intake.flatDotFolders[entry.url] = url.lastPathComponent
+                    }
                 }
             } else if accept(url) {
                 intake.files.append(url)

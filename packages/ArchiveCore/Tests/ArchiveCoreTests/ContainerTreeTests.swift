@@ -62,6 +62,23 @@ final class ContainerTreeTests: XCTestCase {
         XCTAssertEqual(entries.map(\.url.lastPathComponent), ["a.jpg"])
     }
 
+    func testDepthLimitReportsEachSkippedBranchInFinderOrder() throws {
+        let withinLimit = "Tree/" + Array(repeating: "Level", count: ContainerTree.maxDepth).joined(separator: "/")
+        try touch("\(withinLimit)/last.jpg")
+        try touch("\(withinLimit)/Folder 10/ignored.jpg")
+        try touch("\(withinLimit)/Folder 2/Nested/ignored.jpg")
+        try touch("\(withinLimit)/.hidden/ignored.jpg")
+        try touch("\(withinLimit)/Package.app/ignored.jpg")
+        try FileManager.default.createSymbolicLink(at: scratch.appendingPathComponent("\(withinLimit)/Link"),
+                                                   withDestinationURL: scratch.appendingPathComponent("Tree"))
+
+        var skipped: [String] = []
+        let entries = ContainerTree.files(in: scratch.appendingPathComponent("Tree"),
+                                         onDepthLimit: { skipped.append($0.lastPathComponent) }, accept: isPhoto)
+        XCTAssertEqual(entries.map(\.url.lastPathComponent), ["last.jpg"])
+        XCTAssertEqual(skipped, ["Folder 2", "Folder 10"])
+    }
+
     func testRelativePathsStayInsideTheOutputFolder() {
         XCTAssertEqual(ContainerTree.relativePath(["Glotzer", "Box 17"]), "Glotzer/Box 17")
         XCTAssertNil(ContainerTree.relativePath([]))

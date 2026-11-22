@@ -26,10 +26,10 @@ public enum ContainerTree {
 
     /// The files under `folder` that `accept` takes: each folder's own files in Finder order (`ContainerOrder`), then
     /// each subfolder's the same way, in Finder order. Hidden files and folders (`.archivesuite` among them), packages
-    /// and links to folders are not entered.
-    public static func files(in folder: URL, accept: (URL) -> Bool) -> [Entry] {
+    /// and links to folders are not entered. `onDepthLimit` receives the root of each skipped branch in walk order.
+    public static func files(in folder: URL, onDepthLimit: ((URL) -> Void)? = nil, accept: (URL) -> Bool) -> [Entry] {
         var found: [Entry] = []
-        walk(folder, path: [folder.lastPathComponent], accept: accept, into: &found)
+        walk(folder, path: [folder.lastPathComponent], accept: accept, onDepthLimit: onDepthLimit, into: &found)
         return found
     }
 
@@ -56,7 +56,8 @@ public enum ContainerTree {
             && !name.contains("\0")
     }
 
-    private static func walk(_ dir: URL, path: [String], accept: (URL) -> Bool, into found: inout [Entry]) {
+    private static func walk(_ dir: URL, path: [String], accept: (URL) -> Bool,
+                             onDepthLimit: ((URL) -> Void)?, into found: inout [Entry]) {
         let keys: [URLResourceKey] = [.isDirectoryKey, .isSymbolicLinkKey, .isPackageKey]
         guard let items = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys,
                                                                         options: [.skipsHiddenFiles]) else { return }
@@ -73,9 +74,12 @@ public enum ContainerTree {
             }
             if accept(item) { found.append(Entry(url: item, directory: path)) }
         }
-        guard path.count <= maxDepth else { return }
         for sub in subfolders {
-            walk(sub, path: path + [sub.lastPathComponent], accept: accept, into: &found)
+            if path.count <= maxDepth {
+                walk(sub, path: path + [sub.lastPathComponent], accept: accept, onDepthLimit: onDepthLimit, into: &found)
+            } else {
+                onDepthLimit?(sub)
+            }
         }
     }
 }
