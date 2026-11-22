@@ -350,15 +350,118 @@ final class LiveCaptureProcessor: ObservableObject {
     private var config: SessionProcessingConfig? {
         didSet {
             entitySettings = nil
-            // W46.training-optout-run: the session's OpenRouter calls refuse an upstream that may train when its
-            // output folder's collection says its pages must not train.
-            let deny = config.map {
-                OpenRouterDataPolicy.deny(SettingsLayerStore.shared.snapshot(outputDirectory: $0.outputDirectory,
-                                                                             runID: UUID(), processing: [:]).values)
-            } ?? false
-            OpenRouterDataPolicy.set(deny, for: openRouterPolicyToken)
+            trainingChecked = false
+            trainingWarning = nil
+            workAfterTrainingApproval = nil
+            approvedRefusalRoutes = nil
+            // The warning and OpenRouter deny both use the session output folder's resolved policy.
+            let resolver = config.map { SettingsLayerStore.shared.resolver(at: $0.outputDirectory) }
+            noTraining = resolver?.resolve(.noTraining).value.bool == true
+            trainingOff = Set(resolver?.resolve(.trainingOff).value.strings ?? [])
+            OpenRouterDataPolicy.set(noTraining, for: openRouterPolicyToken)
         }
     }
+    @Published private(set) var trainingWarning: String?
+    private var noTraining = false
+    private var trainingOff: Set<String> = []
+    private var trainingChecked = false
+    private var workAfterTrainingApproval: (() -> Void)?
+    // Capture the available refusal routes for a protected session so its background readers cannot
+    // discover a new route after the warning. nil preserves the usual lookup for other sessions.
+    private var approvedRefusalRoutes: [OCRRefusalFallback.Route]?
+
+    private func canProcessUnderTrainingPolicy(_ config: SessionProcessingConfig) -> Bool {
+        if trainingChecked { return true }
+        if trainingWarning != nil { return false }
+        if noTraining {
+            let gateway = config.gateway
+            let localAgent = config.localAgent?.tool
+            var ways = [(SettingsTraining.readingWay(provider: config.provider, modelID: config.model.id,
+                                                    gateway: gateway != nil,
+                                                    gatewayKnown: SettingsTraining.gatewayHasKnownTerms(gateway),
+                                                    localAgent: localAgent), "reading and tagging the pages")]
+            if let judgment = config.visionTextLLM {
+                ways.append((SettingsTraining.readingWay(provider: judgment.provider, modelID: judgment.model.id,
+                                                        gateway: false, localAgent: nil),
+                             "judging and tagging Vision’s text"))
+            }
+            // Label reading uses its gateway independently of the primary reader's Local Agent preference.
+            if localAgent != nil, let labelGateway = config.textGateway,
+               !SettingsTraining.gatewayHasKnownTerms(labelGateway) {
+                ways.append((.key("custom-gateway"), "reading box and folder labels"))
+            }
+            if localAgent == nil {
+                let firstModel = gateway?.asLLMModel() ?? config.model
+                let firstProvider = gateway == nil ? config.provider : firstModel.provider
+                if gateway == nil || (gateway?.isLocalModel == true && gateway?.localEscalates == true),
+                   config.cascade.applies(to: firstProvider, model: firstModel),
+                   let escalation = config.cascade.escalationModel {
+                    ways.append((SettingsTraining.readingWay(provider: escalation.provider, modelID: escalation.id,
+                                                            gateway: false, localAgent: nil),
+                                 "reading pages sent to the backup reader"))
+                }
+                let family = config.provider == .openrouter ? config.model.measuredModel.provider : config.provider
+                if gateway == nil, family == .gemini {
+                    let routes = OCRRefusalFallback.availableRoutes()
+                    approvedRefusalRoutes = routes
+                    ways += routes.map { route in
+                        (SettingsTraining.readingWay(provider: route.provider, modelID: route.model.id,
+                                                     gateway: false, localAgent: route.localAgent?.tool),
+                         "reading a page the first reader refuses")
+                    }
+                }
+            }
+            var resources = SettingsResources(macMemoryGB: SettingsLayerStore.thisMacMemoryGB)
+            resources.trainingOff = trainingOff
+            if let warning = SettingsTraining.runWarning(ways, resources: resources) {
+                trainingWarning = warning
+                return false
+            }
+        }
+        trainingChecked = true
+        return true
+    }
+
+    private var canResumeTrainingWork: Bool {
+        guard trainingWarning != nil, !stagingManifestBlocked else { return false }
+        guard !session.photoRosterNeedsSave else {
+            session.statusMessage = "A received photo could not be recorded. Let the phone resend it before resuming live processing."
+            return false
+        }
+        return true
+    }
+
+    func approveTrainingWarning() {
+        guard canResumeTrainingWork else { return }
+        trainingChecked = true
+        trainingWarning = nil
+        resumeTrainingWork()
+    }
+
+    func recheckTrainingWarning() {
+        guard canResumeTrainingWork else { return }
+        let deferredWork = workAfterTrainingApproval
+        let config = session.refreshLiveSettings()
+        workAfterTrainingApproval = deferredWork
+        if canProcessUnderTrainingPolicy(config) { resumeTrainingWork() }
+    }
+
+    private func resumeTrainingWork() {
+        let work = workAfterTrainingApproval
+        workAfterTrainingApproval = nil
+        processWaitingPages()
+        work?()
+    }
+
+    func cancelTrainingWarning() {
+        workAfterTrainingApproval = nil
+        // An optional retry or rotation refresh can be declined while already-staged output remains fileable.
+        if session.photos.allSatisfy({ finalizedGroups.contains($0.groupId) || session.filedGroupIds.contains($0.groupId) }) {
+            trainingWarning = nil
+        }
+    }
+
+    func releaseSettingsSnapshot() { config = nil }
     private let openRouterPolicyToken = "live-capture-" + UUID().uuidString
     // A session's entry ends with its processor; while the processor lives, it lasts as long as its config.
     deinit { OpenRouterDataPolicy.set(false, for: openRouterPolicyToken) }
@@ -565,6 +668,10 @@ final class LiveCaptureProcessor: ObservableObject {
         stagingRecoveryNotice = nil
         stagingDir = dir
         guard loadStagingManifest() else { return }   // preserve failed recovery state; never resume as empty
+        processWaitingPages()
+    }
+
+    private func processWaitingPages() {
         // Process photos already received (resume after a crash, or "chose live after some capture"). A page
         // of a staged or filed document is the session's own, not a late arrival: `photoIngested` would only
         // post the late-page warning for it, which Start's resume (W40.fix-processor-pending-invisible-after-
@@ -830,6 +937,11 @@ final class LiveCaptureProcessor: ObservableObject {
         guard !isFinalizing else { return }
         session.refreshProvisionalSnapshotIfUnused()   // a resumed session's first Retry reads Settings now
         let targets = groupIds ?? failedGroupIds
+        if let config, targets.contains(where: { id in session.photos.contains { $0.groupId == id } }),
+           !canProcessUnderTrainingPolicy(config) {
+            workAfterTrainingApproval = { [weak self] in self?.retryFailed(groupIds: targets, rotation: rotation) }
+            return
+        }
         let fm = FileManager.default
         var toReprocess: [String] = []
         for gid in Array(targets) {
@@ -988,6 +1100,8 @@ final class LiveCaptureProcessor: ObservableObject {
             return
         }
 
+        guard canProcessUnderTrainingPolicy(config) else { return }
+
         // New capture arrived while a Finish is pending: treat it as another segment to include — the
         // pending finish KEEPS waiting and will complete once this segment is tagged + processed too (it's
         // not dropped or force-completed). Just note it. If the operator never ends this new segment, the
@@ -1028,7 +1142,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 localAgent: config.localAgent,
                 rotationMode: config.rotationMode, standardImageMB: config.standardImageMB,
                 visionSettings: config.visionSettings, cascade: config.cascade,
-                visionTextLLM: config.visionTextLLM,
+                refusalRoutes: approvedRefusalRoutes, visionTextLLM: config.visionTextLLM,
                 scanDetector: NewspaperDetector.scans(liveSettings(config)))
         }
 
@@ -1161,7 +1275,8 @@ final class LiveCaptureProcessor: ObservableObject {
         guard !session.rejectPageForFiledGroup(groupId), !stagingManifestBlocked,
               session.processingMode == .live, let config, let stagingDir,
               !finalizedGroups.contains(groupId),
-              let group = session.groups.first(where: { $0.id == groupId }) else { return }
+              let group = session.groups.first(where: { $0.id == groupId }),
+              canProcessUnderTrainingPolicy(config) else { return }
         finalizedGroups.insert(groupId)
         session.lockSettings()   // first finalize locks the session's settings
         // B8: snapshot the clear-generation BEFORE any await. Every await below (box-label OCR, LLM tagging,
@@ -1913,7 +2028,8 @@ final class LiveCaptureProcessor: ObservableObject {
         imageURL: URL, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
         apiKey: String, customPrompt: String?, imageScale: Double, gateway: GatewayConfig?,
         localAgent: LocalAgentConfig?, rotationMode: RotationMode, standardImageMB: Double,
-        visionSettings: VisionOCRSettings, cascade: OCRCascade, visionTextLLM: LLMTextConfiguration?,
+        visionSettings: VisionOCRSettings, cascade: OCRCascade, refusalRoutes: [OCRRefusalFallback.Route]?,
+        visionTextLLM: LLMTextConfiguration?,
         scanDetector: NewspaperDetector
     ) -> Task<OCRResult, Never> {
         Task.detached(priority: .userInitiated) {
@@ -1922,7 +2038,7 @@ final class LiveCaptureProcessor: ObservableObject {
                 apiKey: apiKey, previousText: nil, previousImageURL: nil,
                 customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway,
                 localAgent: localAgent, rotationMode: rotationMode, standardImageMB: standardImageMB,
-                visionSettings: visionSettings, cascade: cascade, scanDetector: scanDetector)
+                visionSettings: visionSettings, cascade: cascade, refusalRoutes: refusalRoutes, scanDetector: scanDetector)
             return await OCRProcessor.applyingVisionTextClassification(
                 to: ocrResult, previousText: nil, customPrompt: customPrompt,
                 configuration: provider == .appleVision ? visionTextLLM : nil)
@@ -2070,7 +2186,8 @@ final class LiveCaptureProcessor: ObservableObject {
     ///     pending), don't proceed yet — otherwise those segments are missing from the rotation review.
     /// Once everything is staged, `proceedToFinishIfReady` runs `finishSession`.
     func requestFinish() {
-        guard !stagingManifestBlocked, !showFinalizeSheet, !showRotationReview, !isFinalizing else { return }   // a finish is already in progress
+        guard !stagingManifestBlocked, trainingWarning == nil,
+              !showFinalizeSheet, !showRotationReview, !isFinalizing else { return }   // a finish is already in progress
         guard session.completeAllOpenDocGroups() else {
             // A prior Finish may already have armed the watchdog. Cancel it too; otherwise it could later
             // advance after this re-tap rolled a newly-open group's undurable completion back.
@@ -2187,7 +2304,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // the claim), so the only way out was Clear, which Trashes the session's sources. The self-healing
         // timer above is the argument; the button is the operator's convenience on top of it.
         guard session.pendingTagGroup == nil, !stillProcessing, !session.phonePendingActive,
-              !perItemSheetUp else { return }
+              trainingWarning == nil, !perItemSheetUp else { return }
         pendingFinish = false
         finishSession()
     }
@@ -2220,13 +2337,29 @@ final class LiveCaptureProcessor: ObservableObject {
     func cancelRotationReview() {
         showRotationReview = false
         rotationReviewPages = []
+        cancelTrainingWarning()
     }
 
     /// Apply the reviewed rotations: regenerate each changed segment's staged PDF/JPG, then proceed
     /// to collection naming. Unchanged pages are left untouched. W47.ct-folder-date-live: every Finish passes here,
     /// reviewed or not, so a document whose folder card was saved after it was tagged is re-dated and regenerated too.
     func applyRotationReviewAndFinalize() {
-        guard !stagingManifestBlocked else { return }
+        guard !stagingManifestBlocked, trainingWarning == nil else { return }
+        let couldRefreshDating = rotationReviewPages.contains { page in
+            guard page.pageIndex < DateRoute.imagePages, let segment = retained[page.groupId],
+                  page.pageIndex < segment.pages.count, let decision = segment.routeDating,
+                  DateRoute.canRefreshLiveImage(decision) else { return false }
+            let rotation = ((page.rotationDegrees % 360) + 360) % 360
+            return rotation != segment.pages[page.pageIndex].result.rotationDegrees
+        }
+        if couldRefreshDating {
+            session.refreshProvisionalSnapshotIfUnused()
+            if let config, DateRoute.measuredRoute(gateway: config.textGateway, usesLocalAgent: config.textLocalAgent != nil),
+               !SettingsTraining.gatewayHasKnownTerms(config.textGateway), !canProcessUnderTrainingPolicy(config) {
+                workAfterTrainingApproval = { [weak self] in self?.applyRotationReviewAndFinalize() }
+                return
+            }
+        }
         showRotationReview = false
         var changedGroups: Set<String> = []
         var changedDatingImages: Set<String> = []
@@ -2271,7 +2404,6 @@ final class LiveCaptureProcessor: ObservableObject {
                   DateRoute.canRefreshLiveImage(decision) else { return nil }
             return seg.groupId
         })
-        if !refreshGroups.isEmpty { session.refreshProvisionalSnapshotIfUnused() }
         let datingGateway = DateRoute.measuredRoute(gateway: config?.textGateway, usesLocalAgent: config?.textLocalAgent != nil)
             ? config?.textGateway : nil
         isFinalizing = true

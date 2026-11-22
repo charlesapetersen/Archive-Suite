@@ -840,6 +840,31 @@ final class ProcessorUITests: XCTestCase {
         sheet.buttons["Cancel"].click()
     }
 
+    func testLiveCaptureTrainingWarningKeepsPhotosPausedUntilApproved() {
+        relaunch(extra: ["-APUITestLiveCaptureTrainingWarning"])
+
+        let notice = element("live.training-warning")
+        XCTAssertTrue(notice.waitForExistence(timeout: 10))
+        XCTAssertTrue(renderedText(of: notice).contains("Gemini CLI"))
+        let finish = element("live.finish")
+        XCTAssertTrue(app.staticTexts["2 photos · 1 group"].exists, "Both received photos should be available in Live Capture")
+        XCTAssertTrue(finish.exists)
+        XCTAssertFalse(finish.isEnabled, "Queued photos should not have started OCR")
+        app.buttons["Check Settings again"].click()
+        XCTAssertTrue(notice.exists, "The same route should still require a decision after rechecking")
+        XCTAssertFalse(finish.isEnabled)
+        attachScreenshot("live-capture-training-warning")
+
+        element("live.training-cancel").click()
+        let review = element("live.training-review")
+        XCTAssertTrue(review.waitForExistence(timeout: 5))
+        XCTAssertFalse(finish.isEnabled, "Cancel must leave OCR paused")
+        review.click()
+        element("live.training-continue").click()
+        XCTAssertTrue(finish.isEnabled, "Approval must start OCR for the already received photos")
+        XCTAssertFalse(notice.exists)
+    }
+
     func testFinishingScrimBlocksLiveCaptureKeyboardAndAccessibilityRoutes() throws {
         relaunch(extra: ["-APUITestLiveCaptureFinishingScrim"])
 

@@ -1922,6 +1922,7 @@ extension OCRProcessor {
         visionSettings: VisionOCRSettings = .default,
         cascade: OCRCascade,
         refusalFallback: Bool = true,
+        refusalRoutes: [OCRRefusalFallback.Route]? = nil,
         readers: PageReaderPlan = .empty,
         imported: InstitutionalComputeImport? = nil,
         newspaperSpend: NewspaperReadingSpend? = nil,
@@ -1935,7 +1936,8 @@ extension OCRProcessor {
                     previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt,
                     imageScale: imageScale, gatewayConfig: gatewayConfig, localAgent: localAgent,
                     rotationMode: rotationMode, standardImageMB: standardImageMB, visionSettings: visionSettings,
-                    cascade: cascade, refusalFallback: refusalFallback, readers: readers, imported: imported)
+                    cascade: cascade, refusalFallback: refusalFallback, refusalRoutes: refusalRoutes,
+                    readers: readers, imported: imported)
                 guard let postCorrection, gatewayConfig == nil, localAgent == nil,
                       customPrompt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false else {
                     return reading
@@ -1964,6 +1966,7 @@ extension OCRProcessor {
         visionSettings: VisionOCRSettings = .default,
         cascade: OCRCascade,
         refusalFallback: Bool = true,
+        refusalRoutes: [OCRRefusalFallback.Route]? = nil,
         readers: PageReaderPlan = .empty,
         imported: InstitutionalComputeImport? = nil
     ) async -> OCRResult {
@@ -2048,7 +2051,7 @@ extension OCRProcessor {
                 networkResult, cascade: cascade, provider: provider, model: model, refusalFallback: refusalFallback,
                 imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
                 customPrompt: customPrompt, imageScale: scale, costScale: imageScale,
-                visionSettings: visionSettings)
+                visionSettings: visionSettings, refusalRoutes: refusalRoutes)
         } else if localAgent == nil, let localGateway {
             let local = localGateway.asLLMModel()
             resolved = await OCRCascade.resolve(

@@ -57,7 +57,7 @@ enum OCRRefusalFallback {
     /// `ClaudeRoute`), then an OpenRouter key (Qwen3.6 27B, second only to Claude on printed pages, 94.8 —
     /// `ocr-page-guidance.json`; W41.app-openrouter-fu1), then an OpenAI key (GPT-5.4 mini, 93.55 NES), then a
     /// Mistral key (Mistral OCR, 92.91).
-    /// Reads the Keychain, so it runs only once a page has actually been refused.
+    /// Reads the Keychain. Protected Live Capture sessions snapshot this list before starting OCR.
     static func availableRoutes(_ defaults: UserDefaults = .standard) -> [Route] {
         if let routesOverride { return routesOverride() }
         let available = SegmentationRoutes.current(defaults)
@@ -108,7 +108,7 @@ enum OCRRefusalFallback {
     static func readRefusedPage(
         _ refused: OCRResult, imageURL: URL, previousText: String?, previousImageURL: URL?,
         customPrompt: String?, imageScale: Double, costScale: Double? = nil, excluding: LLMModel? = nil,
-        failedBefore: String? = nil, failedBeforeCode: String = ""
+        failedBefore: String? = nil, failedBeforeCode: String = "", available: [Route]? = nil
     ) async -> OCRResult {
         // Priced at the size-target slider fraction, as the pre-run line is (`OCRCascade.resolve`'s `costScale`).
         let costScale = costScale ?? imageScale
@@ -117,7 +117,7 @@ enum OCRRefusalFallback {
         // (Gemini's 500, then a 402 on each second reader) from a refusal (`OCRResult.readingCodes`).
         var codes = [refused.errorCode ?? ""] + (failedBefore == nil ? [] : [failedBeforeCode])
         // `excluding`: the cascade's route, which has already failed this page (W41.app-ocr-cascade).
-        let routes = availableRoutes().filter { route in
+        let routes = (available ?? availableRoutes()).filter { route in
             guard let excluding, route.localAgent == nil else { return true }
             return !(route.provider == excluding.provider && route.model.id == excluding.id)
         }

@@ -9,6 +9,7 @@ struct ContentView: View {
         ProcessInfo.processInfo.environment["LIVECAPTURE_AUTOSTART"] == "1"
         || ProcessorUITestConfiguration.showsLiveCaptureFinishingScrim
         || ProcessorUITestConfiguration.showsLiveCaptureEmptyPaneClear
+        || ProcessorUITestConfiguration.showsLiveCaptureTrainingWarning
     ) ? .live : .files
 #else
     @State private var mode: Mode =
@@ -50,6 +51,7 @@ struct ContentView: View {
             // real finalize would write files. This explicit launch switch changes only the observed model
             // flag: no receiver, OCR, Keychain, network, source, or output directory is touched.
             MoneyJourneyFixture.receiveScratchPhotosIfRequested(in: capture)
+            ProcessorUITestConfiguration.receiveTrainingWarningPhotos(in: capture)
             if ProcessorUITestConfiguration.showsLiveCaptureFinishingScrim {
                 capture.liveProcessor._uiTestShowFinishingScrim()
             }

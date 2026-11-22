@@ -328,6 +328,12 @@ Photograph documents with a phone and stream them straight into the pipeline —
 - **Stage for later** — captures collect in Live Capture; send them to Process Files for a normal batch run.
 - **Process live** — each segment is **OCR'd on arrival**, tagged (Mac subjects, or the LLM), turned into a **PDF + a renamed copy of the original image** (dual output), merged if multi-page, and staged — all while you keep shooting. At **Finish session** you confirm each collection's name (auto-suggested from the box label's OCR, **fuzzy-matched against existing output folders** so you can append to one). New files are numbered continuing an existing collection's sequence. Processing is durable and resumable: a mid-session crash reloads the staging manifest and never re-OCRs already-processed segments; failed-OCR segments can be retried.
 
+If the output collection says its pages must not train a provider’s models, Live Capture checks the session’s
+reader and any backup readers before processing. If a route may train, the Mac keeps receiving photos into the
+Backup Folder and pauses processing. Choose **Run anyway** to continue, or **Cancel** to leave the photos waiting.
+After changing the reader or account settings, open **Review training warning…** and select **Check Settings again**.
+OpenRouter’s instruction to refuse providers that may train still applies when you continue.
+
 ## Architecture
 
 - **Language:** Swift (macOS app + iPhone companion), Kotlin (Android companion)

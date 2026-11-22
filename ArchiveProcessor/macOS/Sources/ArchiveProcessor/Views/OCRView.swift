@@ -1780,10 +1780,7 @@ struct OCRView: View {
         guard resolver.resolve(.noTraining).value.bool == true else { return nil }
         var resources = SettingsResources(macMemoryGB: SettingsLayerStore.thisMacMemoryGB)
         resources.trainingOff = Set(resolver.resolve(.trainingOff).value.strings ?? [])
-        // Stanford's gateway and a model on this Mac are the gateway terms on record; another URL is not known.
-        let gatewayKnown = currentGatewayConfig.map { g in
-            g.isLocalModel || (URL(string: GatewayConfig.normalizedBaseURL(g.baseURL))?.host?.hasSuffix("stanford.edu") ?? false)
-        } ?? true
+        let gatewayKnown = SettingsTraining.gatewayHasKnownTerms(currentGatewayConfig)
         var ways: [(SettingsTraining.RunWay, String)] = [
             (SettingsTraining.readingWay(provider: effectiveProvider, modelID: effectiveModel.id,
                                          gateway: currentGatewayConfig != nil, gatewayKnown: gatewayKnown,

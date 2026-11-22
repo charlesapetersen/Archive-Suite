@@ -145,14 +145,16 @@ struct LiveCaptureView: View {
             // resolve the group; treating Escape/click-outside as Skip silently discards typed metadata.
             set: { _ in }
         )) { group in
-            if let type = group.type.itemType {
-                // W47.ct-processor-capture — a box or folder label's read, for correction.
-                ContainerLabelCard(group: group, type: type, session: session)
-                    .interactiveDismissDisabled(true)
-            } else {
-                SegmentTagCard(group: group, session: session)
-                    .interactiveDismissDisabled(true)
+            Group {
+                if let type = group.type.itemType {
+                    // W47.ct-processor-capture — a box or folder label's read, for correction.
+                    ContainerLabelCard(group: group, type: type, session: session)
+                } else {
+                    SegmentTagCard(group: group, session: session)
+                }
             }
+            .safeAreaInset(edge: .top) { LiveTrainingNotice(liveProc: liveProc) }
+            .interactiveDismissDisabled(true)
         }
         .sheet(isPresented: $liveProc.showFinalizeSheet) {
             CollectionFinalizeSheet(liveProc: liveProc)
@@ -221,6 +223,8 @@ struct LiveCaptureView: View {
                     .buttonStyle(.bordered)
                     .help("Open the Live Capture backup folder in Finder (~/Pictures/Archive Processor Live Capture). Every photo received from the phone is stored there until this run's output is fully written — so you can recover and copy the originals if anything fails.")
                 }
+
+                LiveTrainingNotice(liveProc: liveProc)
 
                 GroupBox("Connection") {
                     VStack(alignment: .leading, spacing: 10) {
@@ -624,7 +628,8 @@ struct LiveCaptureView: View {
             // three lines above describe. ADDED to the existing terms rather than replacing them — the
             // `statuses.isEmpty` term arguably implies it, but this is a money path and a derived-equivalence
             // argument is not worth the trade for one `||`.
-            .disabled(liveProc.statuses.isEmpty || liveProc.isFinalizing || liveProc.stagingRecoveryBlocked || !liveProc.canFinish)
+            .disabled(liveProc.statuses.isEmpty || liveProc.isFinalizing || liveProc.stagingRecoveryBlocked
+                      || liveProc.trainingWarning != nil || !liveProc.canFinish)
             .accessibilityIdentifier("live.finish")
         }
     }
@@ -1002,7 +1007,9 @@ private struct LiveProcessingBox: View {
                     Text("This session: \(cfg.summary)").font(.caption2).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("live.session-route")
-                    Text("A Settings change applies after Finish or Clear.")
+                    Text(liveProc.trainingWarning == nil
+                         ? "A Settings change applies after Finish or Clear."
+                         : "Use Check Settings again to apply changes while processing is paused.")
                         .font(.caption2).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -1291,6 +1298,44 @@ private struct SegmentTagCard: View {
     }
 }
 
+private struct LiveTrainingNotice: View {
+    @ObservedObject var liveProc: LiveCaptureProcessor
+    @State private var showDetails = true
+
+    var body: some View {
+        if let warning = liveProc.trainingWarning {
+            VStack(alignment: .leading, spacing: 8) {
+                Label("Live processing paused", systemImage: "exclamationmark.triangle")
+                    .font(.headline)
+                if showDetails {
+                    Text(warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("live.training-warning")
+                    Text("Photos already received stay in the Backup Folder.")
+                        .font(.caption)
+                    HStack {
+                        Button("Cancel") {
+                            liveProc.cancelTrainingWarning()
+                            showDetails = false
+                        }
+                        .accessibilityIdentifier("live.training-cancel")
+                        Button("Run anyway") { liveProc.approveTrainingWarning() }
+                            .accessibilityIdentifier("live.training-continue")
+                    }
+                    Button("Check Settings again") { liveProc.recheckTrainingWarning() }
+                } else {
+                    Button("Review training warning…") { showDetails = true }
+                        .accessibilityIdentifier("live.training-review")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            .onAppear { showDetails = true }
+        }
+    }
+}
+
 // MARK: - Live end-of-session rotation review
 
 /// Process Live rotation review: a dedicated, keyboard-fast pass over every captured page shown at
@@ -1325,6 +1370,9 @@ struct LiveRotationReviewSheet: View {
 
             Divider()
 
+            LiveTrainingNotice(liveProc: liveProc)
+                .padding(.horizontal)
+
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
@@ -1350,6 +1398,7 @@ struct LiveRotationReviewSheet: View {
                 Button("Cancel") { liveProc.cancelRotationReview() }
                     .keyboardShortcut(.cancelAction)
                 Button("Continue") { liveProc.applyRotationReviewAndFinalize() }
+                    .disabled(liveProc.trainingWarning != nil)
                     .prominentButtonStyle()
                     .controlSize(.large)
                     .keyboardShortcut(.return, modifiers: [])

@@ -22,6 +22,8 @@ final class CaptureSession: ObservableObject {
     /// Headless test seam for manifest durability failures. Nil in production; the closure owns no files
     /// unless the test explicitly writes them.
     var manifestWriteOverride: ((Data, URL) -> Bool)?
+    /// A deferred start must not replay the in-memory roster after an ingest manifest write failed.
+    private(set) var photoRosterNeedsSave = false
 
     /// Headless test seam: fires at the exact point a resolved tag card is handed to live processing
     /// (`notifySegmentResolved`), so a test can prove that point is never reached before the decision is
@@ -274,6 +276,7 @@ final class CaptureSession: ObservableObject {
         if processingMode == .live, !liveProcessor.holdsNoSessionWork { return }
         processingMode = .undecided
         config = nil
+        liveProcessor.releaseSettingsSnapshot()
         settingsLocked = false
         snapshotProvisional = false
     }
@@ -312,9 +315,19 @@ final class CaptureSession: ObservableObject {
         guard snapshotProvisional else { return }
         snapshotProvisional = false
         guard processingMode == .live, config != nil else { return }
-        let cfg = recoveryTestSettings ?? SessionProcessingConfig.fromDefaults()   // test stand-in, nil in production
+        _ = refreshLiveSettings()
+    }
+
+    /// Also used when the operator asks to read Settings again before approving the first external call.
+    @discardableResult
+    func refreshLiveSettings() -> SessionProcessingConfig {
+        let cfg = recoveryTestSettings ?? SessionProcessingConfig.fromDefaults()
         config = cfg
         liveProcessor.adoptSettingsSnapshot(cfg)
+        if recoveryTestSettings == nil {
+            liveProcessor.sessionProcessingSettings = ProcessingSettingsCapture.capture()
+        }
+        return cfg
     }
 
     func markPaired() { notePhoneContact() }
@@ -770,6 +783,7 @@ final class CaptureSession: ObservableObject {
         // un-retakeable archival photo) once the grouping/tag metadata is durably persisted. If the
         // manifest write fails, return nil → server responds 500 → phone retries. The JPEG is already
         // on disk and idempotent replace makes the retry safe; live processing waits until durable.
+        photoRosterNeedsSave = true
         guard writeManifest() else { return nil }
         activateProcessingIfNeeded()   // fix mode from Settings on first photo
         refreshProvisionalSnapshotIfUnused()   // a resumed session's first page still reads Settings now
@@ -814,7 +828,9 @@ final class CaptureSession: ObservableObject {
         if processingMode == .live { liveProcessor.photoRemoved(photos[idx]) }
         Self.trashOrRemove(photos[idx].url)   // to Trash, not a hard delete — recoverable
         photos.remove(at: idx)
-        writeManifest()
+        if writeManifest(), liveProcessor.trainingWarning != nil {
+            releaseSettingsSnapshotIfEmpty()
+        }
     }
 
     /// Remove a previously-received photo identified by (groupId, seq). Used when the phone reclassifies
@@ -1208,9 +1224,14 @@ final class CaptureSession: ObservableObject {
                                        filedGroupIds: filedGroupIds.sorted(), clearPhase: markerPhase,
                                        clearToken: markerToken)
         guard let data = try? JSONEncoder().encode(manifest) else { return false }
-        if let manifestWriteOverride { return manifestWriteOverride(data, manifestURL) }
-        do { try data.write(to: manifestURL, options: .atomic); return true }
-        catch { return false }
+        if let manifestWriteOverride {
+            guard manifestWriteOverride(data, manifestURL) else { return false }
+        } else {
+            do { try data.write(to: manifestURL, options: .atomic) }
+            catch { return false }
+        }
+        if photoOverride == nil { photoRosterNeedsSave = false }
+        return true
     }
 
     /// Decode a session manifest, accepting BOTH the current object form ({photos, completedDocGroups})

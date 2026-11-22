@@ -166,7 +166,8 @@ struct OCRCascade: Codable, Equatable, Sendable {
     static func resolve(
         _ first: OCRResult, cascade: OCRCascade, provider: LLMProvider, model: LLMModel, refusalFallback: Bool,
         imageURL: URL, previousText: String?, previousImageURL: URL?, customPrompt: String?, imageScale: Double,
-        costScale: Double? = nil, visionSettings: VisionOCRSettings, firstReaderLabel: String? = nil
+        costScale: Double? = nil, visionSettings: VisionOCRSettings, firstReaderLabel: String? = nil,
+        refusalRoutes: [OCRRefusalFallback.Route]? = nil
     ) async -> OCRResult {
         let costScale = costScale ?? imageScale
         // Gemini through OpenRouter refuses the same pages as Gemini itself (W41.app-openrouter-any).
@@ -176,7 +177,8 @@ struct OCRCascade: Codable, Equatable, Sendable {
             return refused
                 ? await OCRRefusalFallback.readRefusedPage(
                     first, imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                    customPrompt: customPrompt, imageScale: imageScale, costScale: costScale)
+                    customPrompt: customPrompt, imageScale: imageScale, costScale: costScale,
+                    available: refusalRoutes)
                 : first
         }
         cascade.breaker.notePage(imageURL)
@@ -204,7 +206,8 @@ struct OCRCascade: Codable, Equatable, Sendable {
             if refused, !Task.isCancelled {
                 return await OCRRefusalFallback.readRefusedPage(
                     first, imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
-                    customPrompt: customPrompt, imageScale: imageScale, costScale: costScale)
+                    customPrompt: customPrompt, imageScale: imageScale, costScale: costScale,
+                    available: refusalRoutes)
             }
             let note = " Not escalated: \(admitted.escalated) of the run's \(admitted.pages) pages already were, which "
                 + "points to a fault on the first route rather than hard pages."
@@ -267,7 +270,7 @@ struct OCRCascade: Codable, Equatable, Sendable {
             return await OCRRefusalFallback.readRefusedPage(
                 first, imageURL: imageURL, previousText: previousText, previousImageURL: previousImageURL,
                 customPrompt: customPrompt, imageScale: imageScale, costScale: costScale, excluding: target,
-                failedBefore: why, failedBeforeCode: whyCode)
+                failedBefore: why, failedBeforeCode: whyCode, available: refusalRoutes)
         }
         let firstWhy = first.errorMessage ?? "\(firstLabel) returned no text (\(firstCode))."
         return OCRResult(text: nil, classification: nil,

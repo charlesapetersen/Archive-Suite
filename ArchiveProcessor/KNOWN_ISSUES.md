@@ -652,14 +652,10 @@ record on the job the colour it was tagged with.
 
 ## ⚠️ LIMITATION (W46.training-optout, W46.training-optout-run, 2026-11-17): what "My pages must not train a provider's models" does not do
 
-- **Start warns; it does not choose for you.** Process Files still runs the app's processing settings. When the output
-  collection has the switch on and the run would send pages to a Gemini or Mistral key or a personal plan the user
-  has not marked as not training, to the Gemini CLI, to a gateway other than Stanford's, or to an OpenRouter model
-  pinned to an upstream that may train, Start asks first ("Run anyway" / "Cancel"). It counts the reader (the Local
-  Agent's plan, else the gateway, else the key), Apple Vision's judgement pass, each kind's own reader, the cascade's
-  escalation, a refused page's second readers and the window segmenter's voters. Resuming an interrupted run does
-  not ask again; Live Capture does not ask at all. A collection settings file that cannot be read counts as the
-  switch off, as the run's own frozen settings do. (queued: W49.proc-training-warn-capture)
+Process Files shows the training warning on Start. An interrupted run resumes with its saved settings.
+Live Capture checks before the first read under its output folder's settings. A missing or unreadable
+collection settings file leaves the General settings in effect.
+
 - **OpenRouter is told to refuse, so a training upstream fails.** While a job works with the switch on (a Process
   Files run, its tagging or retry; an open Live Capture session; an Improve OCR run), every OpenRouter request carries
   `provider.data_collection: "deny"` (`OpenRouterDataPolicy`); with the provider pinned and no fallbacks, a

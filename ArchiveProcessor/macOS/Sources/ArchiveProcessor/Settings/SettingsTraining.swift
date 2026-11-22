@@ -210,6 +210,7 @@ enum SettingsTraining {
     /// run's readers and segmenter, each with what it does in the run ("reads the pages").
     static func runWarning(_ ways: [(RunWay, String)], resources: SettingsResources) -> String? {
         var lines: [String] = []
+        var canUpdateAccountAnswer = false
         var seen = Set<String>()
         for (way, role) in ways {
             let rec: Record?
@@ -233,6 +234,7 @@ enum SettingsTraining {
                 rec = up ?? unpinned
             }
             guard let rec, !safe(rec, way: wayName, resources: resources), seen.insert(wayName + role).inserted else { continue }
+            if rec.terms == .unlessPaid || rec.terms == .unlessOptedOut { canUpdateAccountAnswer = true }
             if case .openRouter = way {
                 lines.append("• \(role.prefix(1).uppercased() + role.dropFirst()) through \(rec.provider): \(rec.summary). "
                              + "OpenRouter is told not to send these pages to a provider that may train, so those calls will fail.")
@@ -241,9 +243,11 @@ enum SettingsTraining {
             }
         }
         guard !lines.isEmpty else { return nil }
-        return "This collection's settings say its pages must not train a provider's models, but this run would send them where they may:\n\n"
-            + lines.joined(separator: "\n")
-            + "\n\nIf the key is billed or the plan's training setting is off, say so in Settings, under the general questions, and this warning stops."
+        let accountHint = canUpdateAccountAnswer
+            ? "\n\nIf the key is billed or the plan’s training setting is off, record that under the general questions in Settings."
+            : ""
+        return "This collection’s settings say its pages must not train a provider’s models. These routes need your review.\n\n"
+            + lines.joined(separator: "\n") + accountHint
     }
 
     /// The solver's blocker: one fixed prefix the sheet recognises, then the provider's own sentence.
@@ -254,6 +258,14 @@ enum SettingsTraining {
 // MARK: - The ways a Process Files run sends pages (W46.training-optout-run)
 
 extension SettingsTraining {
+    static func gatewayHasKnownTerms(_ gateway: GatewayConfig?) -> Bool {
+        guard let gateway else { return true }
+        if gateway.isLocalModel && LocalModelRoute.isLoopback(gateway.baseURL) { return true }
+        guard let host = URL(string: GatewayConfig.normalizedBaseURL(gateway.baseURL))?.host?.lowercased()
+        else { return false }
+        return host == "stanford.edu" || host.hasSuffix(".stanford.edu")
+    }
+
     /// The reader's way: the Local Agent's plan first, then the gateway, then the provider's own key, as the run
     /// picks them (`OCRProcessor`'s client choice).
     /// `gatewayKnown`: the gateway is Stanford's (the record's) or a model on this Mac; another is a way with no terms.

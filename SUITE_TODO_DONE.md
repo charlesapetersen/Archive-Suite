@@ -17803,3 +17803,13 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   The scratch Improve OCR smoke and both off-screen dialog tests passed. The tests exercised independent
   Kind choices, acceptance, a second Run in the same dialog, rejection, and restoring from history.
   <!-- /W49.proc-reocr-dialog -->
+
+- [x] **W49.proc-training-warn-capture — Live Capture warns when "must not train" pages would go to a route that may train [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit).
+  Process Files' Start asks "Run anyway / Cancel" when the output collection has `noTraining` on and a route may train (W46.training-optout-run). Live Capture asks nothing: its OpenRouter requests carry the deny, but a free Gemini or Mistral key, an un-opted-out plan, the Gemini CLI or a non-Stanford gateway reads its pages without a word. Run the same check when a session starts or first learns its collection. Tier-2 (Capture/). Covers §W46.training-optout "Start warns; it does not choose for you". Filed by W49.ki-audit-processor.
+  Live Capture checks its resolved output folder policy before dispatching OCR. The notice names the route,
+  and the phone can keep sending photos to the Backup Folder while processing waits. Cancel keeps the
+  photos and Check Settings again applies changes before starting OCR. Approving continues the same
+  session with the reviewed refusal routes and OpenRouter’s training deny.
+  Verified the signed Debug build, scratch recovery, the off-screen interaction, the Processor smoke and
+  three synthetic Android captures through OCR, Finder tags and finalized PDFs. No bench cache used.
+  <!-- /W49.proc-training-warn-capture -->

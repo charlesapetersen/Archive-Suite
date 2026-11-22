@@ -37,6 +37,45 @@ enum ProcessorUITestConfiguration {
     static var showsLiveCaptureEmptyPaneClear: Bool {
         isActive && arguments.contains("-APUITestLiveCaptureEmptyPaneClear")
     }
+    static var showsLiveCaptureTrainingWarning: Bool {
+        isActive && KeychainHelper.isHeadlessTestMode && arguments.contains("-APUITestLiveCaptureTrainingWarning")
+    }
+
+    /// Start the actual warning on the normal ingest path, with a disposable collection and an OCR stub.
+    @MainActor static func receiveTrainingWarningPhotos(in session: CaptureSession) {
+        guard showsLiveCaptureTrainingWarning, session.config == nil, let backupDirectory else { return }
+        let output = backupDirectory.appendingPathComponent("training-warning-output", isDirectory: true)
+        var settings = CollectionSettingsDocument(name: "Training warning test")
+        settings.collection.set(.noTraining, .bool(true), source: .setByUser(Date()))
+        guard (try? FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)) != nil,
+              (try? CollectionSettingsFile.write(settings, in: output)) != nil else { return }
+
+        var config = SessionProcessingConfig.fromDefaults()
+        config.outputDirectory = output
+        config.provider = .gemini
+        config.model = LLMModel.geminiModels[0]
+        config.gateway = nil
+        config.localAgent = LocalAgentConfig(tool: .gemini, binaryPath: "")
+        config.visionTextLLM = nil
+        config.taggingMode = .none
+        config.cascade = .off
+
+        let image = NSImage(size: NSSize(width: 32, height: 32))
+        image.lockFocus()
+        NSColor.white.setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: 0, width: 32, height: 32)).fill()
+        image.unlockFocus()
+        guard let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff),
+              let jpeg = bitmap.representation(using: .jpeg, properties: [:]) else { return }
+        LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(text: "Scratch transcription", classification: nil,
+                                                             errorMessage: nil, errorCode: nil)
+        session._recoveryTestBeginLive(config: config, stagingDir: LiveCaptureProcessor.stagingDir(for: session))
+        for seq in 1...2 {
+            session.ingest(jpeg: jpeg, groupId: "training-warning", seq: seq, type: .document,
+                           quality: nil, year: nil, month: nil, deviceName: "Scratch phone")
+        }
+    }
+
     /// Opens the review of flagged boundaries (W36.seg-opt-review) on two synthetic gaps, with no run, OCR,
     /// model call or output behind it. The answers land in a DEBUG-only label once Done is pressed.
     /// Opens the general interview as at first start (W46.settings-interviews); the UI suite's launches are headless,
