@@ -304,14 +304,13 @@ enum OCRFailureCode {
 
     /// W40.fix-processor-failed-ocr-filed-image-only / -wrapped — whether a reading's code says the request got
     /// no reading at all: an HTTP status (a 402, a 429, a 5xx, a bad key), no code (a thrown transport error, no
-    /// key, a stop, a page never started), an Anthropic error body's type other than `invalid_request_error`
-    /// (`rate_limit_error`, `overloaded_error`, `authentication_error`, `api_error`), or a Local Agent CLI that
-    /// did not answer (`cli_*` but `cli_bad_response`). Anything else is the reader's verdict on the page (a
-    /// Gemini finish or block reason, `vision_no_text`, a cut-off or unparsable reply) and repeats on a retry.
+    /// key, a stop, a page never started), an Anthropic error body's type (`*_error` or `request_too_large`),
+    /// or a Local Agent CLI that did not answer (`cli_*` except `cli_bad_response`). Other codes describe a
+    /// reader's verdict on the page, such as a Gemini block, `vision_no_text`, a cut-off or unparsable reply.
     static func requestFailed(_ code: String?) -> Bool {
         guard let code, !code.isEmpty else { return true }
         if code.allSatisfy(\.isNumber) { return true }
-        if code.hasSuffix("_error") { return code != "invalid_request_error" }
+        if code.hasSuffix("_error") || code == "request_too_large" { return true }
         return code.hasPrefix("cli_") && code != "cli_bad_response"
     }
 }

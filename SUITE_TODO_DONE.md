@@ -17823,3 +17823,13 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   resuming the other three without repeats, declining a provider batch before submission, and withholding an
   unaffordable second reader. The Debug build and key-free recovery, OCR, history and output checks passed.
   <!-- /W49.proc-ledger-limit-stop -->
+
+- [x] **W49.proc-request-failure-codes — one rule for a faulty request across providers [S]** (lane: processor) (uses: build) · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit).
+  Bare HTTP 400/413 from OpenAI, Mistral and OpenRouter count as request failures (page held for Retry), while Anthropic's `invalid_request_error` and `request_too_large` count as verdicts (page filed image-only), so the same faulty request is treated differently by route. Classify them alike (`OCRResult.readingCodes`, `LiveCaptureProcessor.ocrFailed`). Tier-2 (output). Covers the second edge bullet under §W40.fix-processor-failed-ocr-wrapped. Filed by W49.ki-audit-processor.
+  Live Capture keeps a document for Retry when the provider rejected the request, including when every
+  attempt in a cascade or fallback failed before reading. A genuine refusal or blank-page verdict still
+  allows image-only filing. Reopening a session also holds any previously staged PDFs whose retained
+  readings now qualify as failures, keeping the PDFs and source photos available and making no OCR call.
+  Verified the Debug build, 427 headless recovery and OCR checks, the two-image Processor smoke, and
+  three synthetic Android captures through OCR, Finder tags and finalized PDFs.
+  <!-- /W49.proc-request-failure-codes -->

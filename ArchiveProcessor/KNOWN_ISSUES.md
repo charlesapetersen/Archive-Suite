@@ -812,12 +812,13 @@ candidate. The independent 33.02% mixed-share estimate, owner answers and hand/f
 fails such a page for Retry when none of those readings was a verdict (`LiveCaptureProcessor.ocrFailed`): a Gemini
 500 with no second reader, or one whose readers answered 402, no key or a thrown error. A real refusal (`SAFETY`,
 `Recitation`) or a cut-off first reading still files image-only. Anthropic's low-credit reply (a 400
-`invalid_request_error`) is now recorded as a 402. Two edges remain:
+`invalid_request_error`) is recorded as a 402. W49.proc-request-failure-codes also holds pages for Retry
+when Anthropic rejects a faulty or oversized request (`invalid_request_error` or `request_too_large`),
+matching bare HTTP 400/413 from OpenAI, Mistral and OpenRouter. This applies to direct errors and to fallback
+or cascade results whose readings all failed. After reopening a session, Finish also holds any previously
+staged PDFs with those failures alongside their source photos. One edge remains:
 - A page AI Studio refuses with a bare 500 on every try, for a user with no second reader set up, now holds its
   document back until a second reader is added (the failure message says how); before, it filed image-only. (queued: W49.proc-unread-page-files-image)
-- Bare HTTP statuses from OpenAI, Mistral and OpenRouter (a 400, a 413) count as request failures, while
-  Anthropic's `invalid_request_error` and `request_too_large` count as verdicts, so the same faulty request is
-  failed on one route and filed image-only on another. (queued: W49.proc-request-failure-codes)
 
 ## FIXED (W40.fix-processor-after-finish-not-processed, 2026-11-01): a document ended after a full Finish, in the same run, staged with no output
 

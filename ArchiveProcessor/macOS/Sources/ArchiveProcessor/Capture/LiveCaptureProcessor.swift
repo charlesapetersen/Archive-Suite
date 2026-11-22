@@ -51,9 +51,9 @@ final class LiveCaptureProcessor: ObservableObject {
         var imageURLs: [URL]
         var jsonURL: URL?
         var boxLabelText: String?
-        /// Did EVERY source page produce a PDF on disk? `false` ⇒ a page's generation was silently dropped,
-        /// so the segment is INCOMPLETE and finalize must NOT file it (deleting its sources would lose the
-        /// page that has no output). `nil` ⇒ legacy manifest (older builds never dropped a page) → complete.
+        /// Is there a fileable PDF for every source page? `false` holds the whole segment and its sources
+        /// for Retry, including when a restored PDF reflects an OCR request failure. A legacy `nil` counts
+        /// as complete unless the retained readings show a request failure.
         var pagesComplete: Bool?
         /// W23.h5 — source photos whose staged PDF carries a PLACEHOLDER image page instead of the scan
         /// (`PDFGenerator.ImagePageOutcome.placeholder`, or a `generate` that threw yet still left a file on
@@ -772,8 +772,18 @@ final class LiveCaptureProcessor: ObservableObject {
             session.finishPreparedClear()
             return true
         }
-        let restored = manifest.staged
         for r in manifest.retained { retained[r.groupId] = r }   // enables the rotation review after resume
+        let restored = manifest.staged.map { record in
+            guard record.pagesComplete != false,
+                  (CaptureGroupType(rawValue: record.type) ?? .document) == .document,
+                  retained[record.groupId]?.pages.contains(where: { Self.ocrFailed($0.result) }) == true
+            else { return record }
+            // A prior build could stage image-only PDFs after a request failure. Preserve the staged PDFs
+            // and source photos, and make Finish respect the same failure the Retry row will show.
+            var held = record
+            held.pagesComplete = false
+            return held
+        }
         staged = restored
         for s in restored {
             finalizedGroups.insert(s.groupId)
@@ -1521,8 +1531,8 @@ final class LiveCaptureProcessor: ObservableObject {
         }
     }
 
-    /// A page whose OCR request got no reading at all: an HTTP status (the session's 402, a 429, a 5xx, a
-    /// bad key), a thrown transport error or a page never started (no code), or a Local Agent CLI that did not
+    /// A page whose OCR request got no reading at all: a rejected request (HTTP or a provider-specific code),
+    /// a thrown transport error or a page never started (no code), or a Local Agent CLI that did not
     /// answer. That is a failure, not an image-only page. An error that is the reader's verdict on the page
     /// (Vision's `vision_no_text` on a blank verso, a Gemini block or refusal, a cut-off or unreadable reply)
     /// comes back the same on every retry, so it still files image-only with its reason shown: failing it
@@ -3236,6 +3246,18 @@ final class LiveCaptureProcessor: ObservableObject {
     /// deliberately unwritable; this second write creates the crash/relaunch input without fabricating the
     /// processor's private `RetainedSegment` representation in the test.
     func _recoveryTestPersistManifest() { persistManifest() }
+
+#if DEBUG
+    /// Test-only: pair the staged PDFs with the result an older classifier would have accepted.
+    func _recoveryTestPersistPreviousReading(_ result: OCRResult, groupId: String) -> Bool {
+        guard var segment = retained[groupId] else { return false }
+        segment.pages = segment.pages.map { PageWork(sourceURL: $0.sourceURL, result: result, quality: $0.quality) }
+        var previousRetained = retained
+        previousRetained[groupId] = segment
+        return persistManifest(retained: previousRetained)
+    }
+#endif
+
     func _recoveryTestPersistClearManifest(token: String) -> Bool {
         persistManifest(staged: [], retained: [:], clearToken: token)
     }

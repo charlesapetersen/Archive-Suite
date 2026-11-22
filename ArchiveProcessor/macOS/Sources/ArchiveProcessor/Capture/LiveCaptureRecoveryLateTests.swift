@@ -187,30 +187,49 @@ extension LiveCaptureRecoveryTestDriver {
             }
             // One three-page document through a fresh live session with `stub` as every page's OCR, then
             // Finish. Returns the processor, the group's source photos and the output folder.
-            func foRun(_ name: String, stub: OCRResult) async
+            func foRun(_ name: String, stub: OCRResult, previousReading: OCRResult? = nil) async
                 -> (proc: LiveCaptureProcessor, sources: [URL], out: URL, staged: Bool, finished: Bool) {
                 let out = tmp.appendingPathComponent("failed-ocr-\(name)-out", isDirectory: true)
                 let staging = tmp.appendingPathComponent(
                     "APStaging-failedocr-\(name)-\(String(UUID().uuidString.prefix(8)))", isDirectory: true)
                 try? fm.createDirectory(at: staging, withIntermediateDirectories: true)
-                let session = CaptureSession()
+                let backup = tmp.appendingPathComponent("failed-ocr-\(name)-backup", isDirectory: true)
+                func loadSession() -> CaptureSession {
+                    let key = "ARCHIVEPROC_TEST_BACKUP_ROOT"
+                    let savedRoot = ProcessInfo.processInfo.environment[key]
+                    setenv(key, backup.path, 1)
+                    defer {
+                        if let savedRoot { setenv(key, savedRoot, 1) }
+                        else { unsetenv(key) }
+                    }
+                    return CaptureSession()
+                }
+                let session = loadSession()
+                defer { withExtendedLifetime(session) {} }
                 LiveCaptureProcessor._recoveryTestOCRStub = stub
                 LiveCaptureProcessor._recoveryTestOCRStarts = []
                 LiveCaptureProcessor._recoveryTestOCRTasks = [:]
-                session._recoveryTestBeginLive(config: SessionProcessingConfig(
+                let config = SessionProcessingConfig(
                     provider: .gemini, model: stubModel, thinkingLevel: .low, apiKey: "",
                     taggingMode: .human, rotationMode: .off, mergeDocuments: false, outputDirectory: out,
                     customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
-                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0, textColumns: 1),
-                    stagingDir: staging)
-                let proc = session.liveProcessor
+                    gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0, textColumns: 1)
+                session._recoveryTestBeginLive(config: config, stagingDir: staging)
+                var proc = session.liveProcessor
                 for seq in [1, 2, 3] {
                     session.ingest(jpeg: foJPEG, groupId: "FO", seq: seq,
                                    type: .document, quality: nil, year: nil, month: nil, deviceName: "TestPhone")
                 }
                 proc.segmentResolved(groupId: "FO")
-                let staged = await foSettle { proc.staged.contains { $0.groupId == "FO" } }
+                var staged = await foSettle { proc.staged.contains { $0.groupId == "FO" } }
                 let sources = session.photos.filter { $0.groupId == "FO" }.map(\.url)
+                if let previousReading {
+                    staged = staged && proc.staged.first?.pagesComplete == true
+                        && proc.staged.first?.pdfURLs.count == 3
+                        && proc._recoveryTestPersistPreviousReading(previousReading, groupId: "FO")
+                    proc = LiveCaptureProcessor(session: session)
+                    proc._recoveryTestResume(stagingDir: staging, config: config)
+                }
                 let key = proc.staged.first { $0.groupId == "FO" }?.collectionKey ?? "__unfiled__"
                 proc.finalize([LiveCaptureProcessor.CollectionDraft(
                     id: key, finalName: out.lastPathComponent, existingFolders: [], suggestedFolders: [],
@@ -244,8 +263,7 @@ extension LiveCaptureRecoveryTestDriver {
                       && foOutPDFs(failed.out) == 0 && failed.sources.count == 3
                       && failed.sources.allSatisfy { fm.fileExists(atPath: $0.path) })
 
-            // 1b. W40.fix-processor-failed-ocr-wrapped, end to end (before any run that files, which the
-            //     following runs do not stage in this driver): every page a Gemini 500 whose only second reader
+            // 1b. W40.fix-processor-failed-ocr-wrapped, end to end: every page a Gemini 500 whose only second reader
             //     answered 402 → failed, nothing filed, every source kept.
             let wrapped = await foRun("wrapped", stub: OCRResult(
                 text: nil, classification: nil,
@@ -257,6 +275,24 @@ extension LiveCaptureRecoveryTestDriver {
                       && wrapped.proc.failedGroupIds == ["FO"] && wrapped.finished && foOutPDFs(wrapped.out) == 0
                       && wrapped.sources.allSatisfy { fm.fileExists(atPath: $0.path) })
 
+            // W49.proc-request-failure-codes: exercise the real Anthropic error parser. An invalid
+            // request on its own and an oversized request from a second reader both got no reading.
+            for (status, type, wrapped) in [(400, "invalid_request_error", false), (413, "request_too_large", true)] {
+                let body = Data("""
+                    {"type":"error","error":{"type":"\(type)","message":"Request rejected"}}
+                    """.utf8)
+                let parsed = AnthropicClient.parseErrorResponse(data: body, statusCode: status)
+                let run = await foRun(type, stub: OCRResult(
+                    text: nil, classification: nil, errorMessage: parsed.message,
+                    errorCode: wrapped ? OCRRefusalFallback.exhaustedCode : parsed.code,
+                    readingCodes: wrapped ? ["500", parsed.code] : nil))
+                let row = run.proc.statuses.first { $0.id == "FO" }
+                check("Anthropic \(type) keeps the document for Retry and Finish leaves every source photo",
+                      parsed.code == type && run.staged && row?.phase == .failed && row?.failureKind == .provider
+                          && run.proc.failedGroupIds == ["FO"] && run.finished && foOutPDFs(run.out) == 0
+                          && run.sources.count == 3 && run.sources.allSatisfy { fm.fileExists(atPath: $0.path) })
+            }
+
             // 2. UNCHANGED: every page was read and has no text — Apple Vision's answer for a blank verso, which
             //    carries an error code and comes back the same on every retry. Image-only, not failed, filed.
             let empty = await foRun("notext", stub: OCRResult(
@@ -267,6 +303,20 @@ extension LiveCaptureRecoveryTestDriver {
                   empty.staged && empty.finished && foOutPDFs(empty.out) == 3
                       && empty.proc.failedGroupIds.isEmpty
                       && !empty.proc.statuses.contains { $0.id == "FO" && $0.phase == .failed })
+
+            // Simulate a manifest made when invalid_request_error was treated like no text.
+            let resumed = await foRun("previous-classification", stub: OCRResult(
+                text: nil, classification: nil, errorMessage: "No text", errorCode: "vision_no_text"),
+                previousReading: OCRResult(text: nil, classification: nil, errorMessage: "Request rejected",
+                                           errorCode: "invalid_request_error"))
+            let resumedRecord = resumed.proc.staged.first { $0.groupId == "FO" }
+            check("Finish holds a resumed document whose staged image-only PDFs came from request failures",
+                  resumed.staged && resumed.proc.failedGroupIds == ["FO"] && resumed.finished
+                      && resumedRecord?.pagesComplete == false && resumedRecord?.pdfURLs.count == 3
+                      && resumedRecord?.pdfURLs.allSatisfy { fm.fileExists(atPath: $0.path) } == true
+                      && foOutPDFs(resumed.out) == 0 && resumed.sources.count == 3
+                      && resumed.sources.allSatisfy { fm.fileExists(atPath: $0.path) }
+                      && LiveCaptureProcessor._recoveryTestOCRStarts.count == 3)
 
             // 3. The predicate both halves share: a request that got no reading fails; a reader's verdict on
             //    the page, any text, or no error at all does not.
@@ -282,8 +332,12 @@ extension LiveCaptureRecoveryTestDriver {
                   !foFails(nil, "x", "vision_no_text") && !foFails(nil, "x", "SAFETY")
                       && !foFails(nil, "x", "Recitation") && !foFails(nil, "x", "GeminiRefused")
                       && !foFails(nil, "x", "unparsable") && !foFails(nil, "x", "cli_bad_response")
-                      && !foFails(nil, "x", "invalid_request_error")
                       && !foFails("read", "x", "402") && !foFails(nil, nil, nil))
+
+            for (httpCode, typedCode) in [("400", "invalid_request_error"), ("413", "request_too_large")] {
+                check("bare HTTP \(httpCode) and Anthropic \(typedCode) both fail before reading",
+                      foFails(nil, "x", httpCode) && foFails(nil, "x", typedCode))
+            }
 
             // 4. W40.fix-processor-failed-ocr-wrapped — a page no reader read is judged by every reading's code.
             func foWrapped(_ code: String, _ codes: [String]?) -> Bool {
@@ -293,10 +347,12 @@ extension LiveCaptureRecoveryTestDriver {
             check("a GeminiRefused or CascadeExhausted page that no reader read fails OCR",
                   foWrapped("GeminiRefused", ["500"]) && foWrapped("GeminiRefused", ["500", "402"])
                       && foWrapped("GeminiRefused", ["500", "", "billing_error"])
-                      && foWrapped("CascadeExhausted", ["500", "402"]) && foWrapped("CascadeExhausted", ["api_error", ""]))
+                      && foWrapped("CascadeExhausted", ["500", "402"]) && foWrapped("CascadeExhausted", ["api_error", ""])
+                      && foWrapped("CascadeExhausted", ["400", "request_too_large"]))
             check("...and one with a real refusal or verdict among its readings still files image-only",
                   !foWrapped("GeminiRefused", ["SAFETY", "402"]) && !foWrapped("GeminiRefused", ["Recitation"])
-                      && !foWrapped("GeminiRefused", ["500", "invalid_request_error"])
+                      && !foWrapped("GeminiRefused", ["SAFETY", "invalid_request_error"])
+                      && !foWrapped("CascadeExhausted", ["request_too_large", "length"])
                       && !foWrapped("CascadeExhausted", ["length", "402"]) && !foWrapped("CascadeExhausted", ["500", "length"])
                       && !foWrapped("GeminiRefused", nil) && !foWrapped("CascadeExhausted", []))
 
