@@ -17639,3 +17639,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Codex gpt-6.2-sol independently confirmed both findings originally reproduced by Claude Opus 5.5. Android reported a segment sent after Drive refused its completion, cleared its pending signal, and sent nothing after re-pair. Headless Mac Finish filed one of two photos when the second was still pending, and the late photo stayed in Backup. The all-pages-first control filed both.
   Filed W49.proc-fix-s021 and W49.proc-fix-s038 with [scratch evidence and regression runs](verification/evidence/processor/W49.relay-suspects-check.md). Provider spend was $0. No bench cache used.
   <!-- /W49.relay-suspects-check -->
+
+- [x] **W47.reocr-price-check — Fix check 3 in test-reocr-ranking.sh [XS]** · §The withheld features — SHIPPED 2026-11-22 (this commit).
+  The test compared the app's cached OpenRouter endpoint price with the catalog fallback and expected OpenRouter
+  to cost more. A cached price can match Google's direct rate. Check 3 now supplies fixed endpoint rates and
+  checks both equal and higher OpenRouter prices against the direct route, including the estimate for 250 pages.
+  Improve OCR continues to scale the measured list cost using the selected route's rates.
+  <!-- /W47.reocr-price-check -->

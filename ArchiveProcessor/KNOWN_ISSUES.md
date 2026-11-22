@@ -2,6 +2,12 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (2026-11-22) — Improve OCR ranking price check depended on the OpenRouter price cache
+
+Check 3 in the headless ranking test could fail when the cached Gemini 3.8 Flash endpoint matched the
+direct Gemini rate. The test now uses fixed equal-price and higher-price cases and verifies both the
+per-1,000-page cost and the selected-page estimate. (W47.reocr-price-check)
+
 ## FIXED (2026-11-21) — Accounts Validated badge contrast
 
 The green label measured 2.07:1 in light mode on baseline `cb394d05`. The badge now uses the system text

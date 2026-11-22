@@ -167,17 +167,33 @@ enum ReOCRRankingTestDriver {
         if let g = or.rows.first(where: { $0.id == "gemini3.8-flash" }) {
             eq("3 Gemini 3.8 Flash's row runs through OpenRouter, ready",
                [g.provider.rawValue, g.modelID, "\(g.readiness)"], ["OpenRouter", "google/gemini-3.8-flash", "\(ReOCRRanking.Readiness.ready)"])
-            // Priced as the route the page takes, not the maker's own list price.
-            let route = OpenRouterRoute.makerRoutes[0].model, maker = LLMModel.geminiModels[0]
-            let direct = rank(.typewritten, resources: { var r = orOnly; r.keys = ["gemini"]; return r }())
-                .rows.first { $0.id == "gemini3.8-flash" }
-            let page = { (m: LLMModel) in CostEstimator.estimate(fileCount: 1, model: m, enableTagging: false,
-                                                                 sendPreviousImage: false, contextCharCount: 0).ocrCost }
-            check("3 its price is OpenRouter's route's", g.usdPer1000.flatMap { o in direct?.usdPer1000.map { abs(o - $0 * page(route) / page(maker)) < 1e-9 } } == true
-                  && (g.usdPer1000 ?? 0) > (direct?.usdPer1000 ?? .infinity),
-                  "\(String(describing: g.usdPer1000)) vs \(String(describing: direct?.usdPer1000))")
         } else {
             check("3 Gemini 3.8 Flash's row exists", false)
+        }
+        // An explicit listing snapshot keeps the check independent of endpoint prices cached on this Mac.
+        if let pinned = OpenRouterRoute.through(provider: .gemini, modelID: "gemini-3.8-flash"),
+           let maker = pinned.maker,
+           let directPrice = bare.rows.first(where: { $0.id == "gemini3.8-flash" })?.usdPer1000 {
+            for (label, multiplier) in [("equal rates", 1.0), ("higher OpenRouter rates", 1.25)] {
+                let price = OpenRouterPrices.Price(inputPer1M: maker.inputCostPer1M * multiplier,
+                                                   outputPer1M: maker.outputCostPer1M * multiplier,
+                                                   tag: pinned.providerTag, fetched: Date(timeIntervalSince1970: 0))
+                let priced = OpenRouterPrices.priced(pinned, [pinned.model.id: price])
+                let pricedModels = models.map { $0.provider == priced.provider && $0.id == priced.id ? priced : $0 }
+                let ranking = ReOCRRanking.rank(kind: .typewritten, pages: 250, table: table, pairs: pairs,
+                                                resources: orOnly, staysOnMac: false, level: .standard,
+                                                builtInModels: pricedModels)
+                let row = ranking.rows.first { $0.id == "gemini3.8-flash" }
+                let expected = directPrice * multiplier
+                check("3 OpenRouter price per 1,000 pages at \(label)",
+                      row?.usdPer1000.map { abs($0 - expected) < 1e-9 } == true,
+                      "got \(String(describing: row?.usdPer1000)), expected \(expected)")
+                check("3 OpenRouter estimate for 250 pages at \(label)",
+                      row?.estimateUSD.map { abs($0 - expected / 4) < 1e-9 } == true,
+                      "got \(String(describing: row?.estimateUSD)), expected \(expected / 4)")
+            }
+        } else {
+            check("3 Gemini 3.8 Flash has a pinned OpenRouter route and a direct price", false)
         }
         let mac = rank(.typewritten, staysOnMac: true)
         check("3 a batch that stays on the Mac disables every hosted row",
