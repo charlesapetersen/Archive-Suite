@@ -1212,8 +1212,8 @@ final class EditorTextView: NSTextView {
         return super.performDragOperation(sender)
     }
 
-    /// Attempt to read an image from the pasteboard, persist via assetStore, and insert
-    /// an inline image attachment. Returns true if an image was handled.
+    /// Save a pasted or dropped image through assetStore and insert its reference.
+    /// Raw mode inserts Markdown source. Styled mode inserts an inline attachment.
     @discardableResult
     private func tryPasteImage(from pb: NSPasteboard) -> Bool {
         // Refuse before reserving a filename or writing bytes, including the direct UITest seam.
@@ -1241,6 +1241,10 @@ final class EditorTextView: NSTextView {
 
         do {
             let relPath = try store.addAsset(data, preferredName: preferredName)
+            if !isRichText {
+                insertPlainText(InlineImageMarkdown.emit(alt: "", path: relPath))
+                return true
+            }
             let thumbnail = InlineImageAttachment.downsampledThumbnail(from: data)
             let attachment = InlineImageAttachment(
                 relativePath: relPath, altText: "", thumbnail: thumbnail

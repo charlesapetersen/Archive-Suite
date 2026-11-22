@@ -3,10 +3,11 @@
 Running log of quirks, risks, and things verified/unverified for the Notes app. Keep current.
 (Sibling logs: `../ArchiveReader/KNOWN_ISSUES.md`, `../ArchiveProcessor/KNOWN_ISSUES.md`.)
 
-## ⚠️ OPEN — Notes editor save failures verified on scratch data (2026-11-21)
+## ✅ FIXED (W49.fix-notes-raw-image-paste, 2026-11-21) — raw Markdown image pastes save a reference
 
-- **Pasting an image in raw Markdown mode** writes the image to the item's assets and saves a U+FFFC
-  character in the note. The note has no reference to the image. (queued: W49.fix-notes-raw-image-paste)
+Raw mode now inserts a literal `![](assets/…)` reference to the saved image at the selection.
+Paste and image drop share this path. Styled mode inserts the inline image and saves the same
+Markdown reference. The scratch regression is `NotesTextLossSuspectTests.s009RawModeImagePaste`.
 
 ## ✅ FIXED (W49.fix-notes-unclosed-header, 2026-11-21) — prose survives a typed comment closer
 

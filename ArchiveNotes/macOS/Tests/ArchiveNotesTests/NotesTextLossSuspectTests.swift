@@ -9,7 +9,7 @@ import AppKit
 /// through the text view's own editing calls, saved with `saveBody` and loaded again.
 ///
 /// S-019 and S-009 reproduced on 2026-11-20 and were independently confirmed by
-/// `W49.notes-suspects-text-check`. S-019 now guards the fix. S-009 remains an expected issue.
+/// `W49.notes-suspects-text-check`. Both tests now guard their fixes.
 @Suite("Notes text-loss suspects — reproduce attempts (W49.notes-suspects-text)")
 @MainActor
 struct NotesTextLossSuspectTests {
@@ -152,16 +152,16 @@ struct NotesTextLossSuspectTests {
 
     // MARK: - S-009
 
-    /// S-009: ⌘V of an image while the editor is in raw mode.
-    @Test("S-009: pasting an image in raw mode writes no orphan asset and no U+FFFC into the note")
+    /// S-009: paste an image over a selection while the editor is in raw mode.
+    @Test("S-009: raw image paste inserts a literal reference to the saved PNG")
     func s009RawModeImagePaste() throws {
         let assets = ScratchAssetStore()
         defer { try? FileManager.default.removeItem(at: assets.root) }
         let tv = EditorTextView()
         tv.assetStore = assets
         tv.applyRawMode(true, fontSize: 13)
-        tv.string = "Raw body\n"
-        tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
+        tv.string = "**Raw** before SELECT after"
+        tv.setSelectedRange((tv.string as NSString).range(of: "SELECT"))
         let image = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2,
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
             colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
@@ -173,13 +173,11 @@ struct NotesTextLossSuspectTests {
         tv.paste(nil)
 
         // Raw mode's write-back is the text view's string (`MarkdownEditorView.currentSerialization`).
-        let written = tv.string
         let dir = assets.root.appendingPathComponent("assets")
         let files = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
-        let orphan = !files.isEmpty && !written.contains("](assets/")
-        withKnownIssue("S-009: raw mode inserts an image attachment, which raw write-back saves as U+FFFC") {
-            #expect(!orphan, "an asset was written that the note does not reference: \(files)")
-            #expect(!written.unicodeScalars.contains("\u{FFFC}"), "the note gained U+FFFC: \(written.debugDescription)")
-        }
+        #expect(files.count == 1)
+        let file = try #require(files.first)
+        #expect(tv.string == "**Raw** before ![](assets/\(file)) after")
+        #expect(try Data(contentsOf: dir.appendingPathComponent(file)) == png)
     }
 }

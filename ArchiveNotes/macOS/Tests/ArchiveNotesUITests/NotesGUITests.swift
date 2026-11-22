@@ -1283,36 +1283,35 @@ final class NotesGUITests: NotesFixtureUITestCase {
     /// shortly after); the coordinator flushes the `![](…)` write-back so the reference is on disk at once.
     /// A before-snapshot of `assets/` tolerates a dirty fixture. The mutated note is wiped by the next rebuild.
     func testG4_PasteImageWritesAssetAndInlineReference() throws {
-        try withFixture { try runG4_PasteImageWritesAssetAndInlineReference() }
+        try withFixture { try runG4_PasteImageWritesAssetAndInlineReference(raw: false) }
     }
 
-    private func runG4_PasteImageWritesAssetAndInlineReference() throws {
+    func testG4_RawPasteImageWritesAssetAndLiteralReference() throws {
+        try withFixture { try runG4_PasteImageWritesAssetAndInlineReference(raw: true) }
+    }
+
+    private func runG4_PasteImageWritesAssetAndInlineReference(raw: Bool) throws {
+        try requireCanonicalScratchFixtureForStoreWrites()
         let uuid = Self.idPlain
         guard let png = Self.makePNGData() else {
             return XCTFail("should build PNG bytes for the pasteboard")
         }
 
         let assetsBefore = Set(assetFiles(inItemDir: uuid))
-        func newPastedAsset() -> String? {
+        func newAssets() -> Set<String> {
             Set(assetFiles(inItemDir: uuid)).subtracting(assetsBefore)
-                .first { $0.hasPrefix("pasted-") && $0.hasSuffix(".png") }
         }
-        func referenceOnDisk() -> Bool { (rawMarkdown(inItemDir: uuid) ?? "").contains("](assets/pasted-") }
 
-        // Select the plain note so the editor loads its body AND the ItemAssetStore is retargeted to it
-        // (W7-S5, keyed to nav.selectedItemID) — the paste writes into THIS item's assets/.
         selectItem(uuid: uuid)
         XCTAssertTrue(editor.waitForExistence(timeout: 10), "editor text view should exist")
         XCTAssertTrue(pollUntil(timeout: 10) { !((editor.value as? String) ?? "").isEmpty },
                       "the note body should load before pasting")
 
-        // Ensure STYLED mode: the image inserts + serializes as `![](…)` in styled mode (raw shows the
-        // monospaced literal source). idPlain loads styled by default; toggle back if a prior check left
-        // it raw (detected via the literal `**bold**` the fixture carries only in raw mode).
-        if ((editor.value as? String) ?? "").contains("**bold**") {
-            rawToggle.click()
-            _ = pollUntil(timeout: 5) { !(((editor.value as? String) ?? "").contains("**bold**")) }
-        }
+        // The fixture's literal bold markers are visible only in raw mode.
+        func editorIsRaw() -> Bool { ((editor.value as? String) ?? "").contains("**bold**") }
+        if editorIsRaw() != raw { rawToggle.click() }
+        XCTAssertTrue(pollUntil(timeout: 5) { editorIsRaw() == raw },
+                      "the editor should enter the requested mode before pasting")
 
         // Seed the pasteboard with PNG bytes (settable cross-process from the runner), then fire the seam.
         let pb = NSPasteboard.general
@@ -1328,12 +1327,23 @@ final class NotesGUITests: NotesFixtureUITestCase {
         XCTAssertTrue(outcome.contains("store=\(target)"),
                       "the asset store should target the plain note (\(target)) — got \(outcome)")
 
-        // The `![](…)` reference is flushed synchronously by the coordinator; the asset bytes land on a
-        // background Task shortly after. Poll both on disk.
-        XCTAssertTrue(pollUntil(timeout: 10) { newPastedAsset() != nil },
-                      "an assets/pasted-….png file should be written into the item — paste said \(outcome)")
-        XCTAssertTrue(pollUntil(timeout: 10) { referenceOnDisk() },
-                      "the note .md should gain an ![](assets/pasted-…) inline-image reference — paste said \(outcome)")
+        // The coordinator flushes the reference. The bytes land on a background task.
+        XCTAssertTrue(pollUntil(timeout: 10) { !newAssets().isEmpty },
+                      "the item should gain an asset — paste said \(outcome)")
+        let added = newAssets()
+        XCTAssertEqual(added.count, 1)
+        let asset = try XCTUnwrap(added.first)
+        XCTAssertTrue(asset.hasPrefix("pasted-") && asset.hasSuffix(".png"))
+        let reference = "![](assets/\(asset))"
+        XCTAssertTrue(pollUntil(timeout: 10) { (rawMarkdown(inItemDir: uuid) ?? "").contains(reference) },
+                      "the saved note should reference the exact PNG — paste said \(outcome)")
+        let saved = try XCTUnwrap(rawMarkdown(inItemDir: uuid))
+        XCTAssertFalse(saved.contains("\u{FFFC}"))
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: "\(itemsDir)/\(uuid)/assets/\(asset)")), png)
+        if raw {
+            XCTAssertTrue(((editor.value as? String) ?? "").contains(reference),
+                          "raw mode should display the literal reference")
+        }
         // (Left on disk — the runner can't delete under /Users/; wiped by the next pre-run fixture rebuild.)
     }
 

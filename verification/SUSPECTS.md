@@ -244,7 +244,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     `uiTestPasteImage()`, then inspect `string` and the scratch `assets/`.
 - **Would clear it:** the raw-mode paste is declined (no asset written), or it inserts the literal
   `![](assets/…)` text.
-- **Status:** `reproduced` — independently confirmed, queued as `W49.fix-notes-raw-image-paste`; [evidence](evidence/notes/W49.notes-suspects-text-check.md); test `ArchiveNotesTests/NotesTextLossSuspectTests` `s009RawModeImagePaste`
+- **Status:** `cleared` — fixed by W49.fix-notes-raw-image-paste. [Paste verification](evidence/notes/W49.notes-suspects-text-check.md#s-009-fix-verification). Regression `NotesTextLossSuspectTests.s009RawModeImagePaste`.
 - **History:**
   - 2026-10-12 W40.b2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.notes-suspects-text` under phase rule 5a.
