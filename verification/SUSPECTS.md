@@ -1302,7 +1302,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** the label read against a gateway that does not list the model; read its reply and the summary.
 - **Would clear it:** the reader uses a supported configured route or tells the operator that the label model
   is unavailable, with failed attempts excluded from the successful label count.
-- **Status:** `reproduced` — fix queued as W49.proc-fix-s053. [Scratch evidence](evidence/processor/W49.proc-s053-verify.md).
+- **Status:** `cleared` — fixed by W49.proc-fix-s053. [Scratch evidence and regression](evidence/processor/W49.proc-s053-verify.md).
 - **History:**
   - 2026-11-20 W49.proc-suspects-messages — raised.
   - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s053-verify`; standing authorization for all bug suspects, phase rule 5a retained.
@@ -1310,3 +1310,5 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     the request first observed by Claude Opus 5.5 (`08f85025`) and reproduced the refusal
     on a gateway without Luna. Two page transcriptions succeeded. Both label attempts were
     refused with HTTP 404 `model_not_found` and counted as failures without a diagnosis.
+  - 2026-11-21 W49.proc-fix-s053 — Process Files explains the gateway's explicit model refusal once in
+    the summary and keeps Vision proposals and the S-052 counts and charges.

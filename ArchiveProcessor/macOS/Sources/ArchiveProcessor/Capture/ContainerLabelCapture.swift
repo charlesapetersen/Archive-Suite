@@ -60,10 +60,11 @@ enum ContainerLabelCapture {
     /// error is not an empty label), whether a gateway call was made (real money) and what it is counted at
     /// (`charge`, 0 with no call), and whether a model's reading that parsed went into the fields. `useModel` false
     /// reads with Vision + parser alone: no gateway call and no local model.
+    /// `modelUnavailable` records an explicit refusal of the label model by the gateway.
     static func readLabel(type: ItemType, text: String, photo: URL, rotation: Int, gateway: GatewayConfig?,
                           useModel: Bool = true)
         async -> (fields: ContainerFieldSet, visionText: String, visionAnswered: Bool, gatewayCalled: Bool,
-                  dollars: Double, modelAnswered: Bool) {
+                  dollars: Double, modelAnswered: Bool, modelUnavailable: Bool) {
         let visionReader = try? PageReaders.reader(provider: .appleVision, model: LLMModel.appleVisionModels[0],
                                                    apiKey: "", thinkingLevel: nil, visionSettings: .default,
                                                    newspaperLayout: false)
@@ -74,6 +75,7 @@ enum ContainerLabelCapture {
         var model: [ContainerField: String]?
         var modelReader = gatewayReader
         var gatewayCalled = false
+        var modelUnavailable = false
         var dollars = 0.0
         if !useModel {
             // Vision + parser alone.
@@ -88,6 +90,7 @@ enum ContainerLabelCapture {
             let reply = await DateRoute.gatewayChatMetered(content: content, gateway: gateway, model: gatewayModel,
                                                            maxTokens: maxTokens, timeout: timeout)
             gatewayCalled = reply.status != 0
+            modelUnavailable = reply.errorCode == "model_not_found"
             dollars = charge(reply)
             if let raw = reply.text {
                 model = ContainerLabelReader.modelFields(fromReply: raw)
@@ -96,7 +99,8 @@ enum ContainerLabelCapture {
         let fields = ContainerLabelReader.proposals(lines: lines, type: type, model: model,
                                                     modelReader: model == nil ? nil : modelReader,
                                                     parserReader: parserReader, at: Date())
-        return (fields, visionText, vision != nil, gatewayCalled, dollars, !(model ?? [:]).isEmpty)
+        return (fields, visionText, vision != nil, gatewayCalled, dollars, !(model ?? [:]).isEmpty,
+                modelUnavailable)
     }
 
     /// The up-front estimate's line for label reads (W47.ct-label-cost), nil when the run will make no gateway call

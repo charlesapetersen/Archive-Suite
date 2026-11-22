@@ -17555,3 +17555,14 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Vision still recovered Box 17. Queued W49.proc-fix-s053. [Scratch evidence and reproduction](verification/evidence/processor/W49.proc-s053-verify.md).
   $0 spent. No bench cache used.
   <!-- /W49.proc-s053-verify -->
+
+- [x] **W49.proc-fix-s053 — explain an unavailable gateway label model [S]** · §Known limits are queued, accepted or asked
+  (lane: processor) (uses: build) — S-053 (S3). SHIPPED 2026-11-21 (this commit).
+  Process Files explains an explicit `model_not_found` refusal once per run. Vision proposals,
+  saved PDFs, Luna requests, and separate gateway success, failure and charge counts follow
+  the same paths. The scratch regression covers two missing-model replies, two ordinary HTTP 500
+  replies, and a usable Luna reply paired with an empty reply. [Evidence](verification/evidence/processor/W49.proc-s053-verify.md).
+  Debug build produced the same warnings as the baseline. Label billing, date routing, and Live Capture
+  recovery checks passed. A focused off-screen Process Files journey confirmed the completion
+  summary and empty-label warning render. No live gateway calls or provider spend.
+  <!-- /W49.proc-fix-s053 -->

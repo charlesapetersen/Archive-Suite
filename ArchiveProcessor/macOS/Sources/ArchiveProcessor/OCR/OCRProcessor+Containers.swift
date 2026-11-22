@@ -9,7 +9,7 @@ extension OCRProcessor {
     /// Call once the run's outputs are in their final place. `moves` is what collection organisation moved
     /// (`CollectionSegmenter.organizeOutput`), empty when it did not run. Writes only for an output this run wrote
     /// inside `outputDirectory` (never a source: the pre-OCRed route's outputs are its inputs, so it reads no labels).
-    /// Returns one line for the run's summary when something was not recorded or wants a look, else nil. Stops,
+    /// Returns a note for the run's summary about unavailable label reading or markers that need review. Stops,
     /// writing nothing, when the run is cancelled.
     /// What the label reads spent goes into the run's history snapshot and `containerLabelSpendNote` (W47.ct-label-cost).
     func recordContainerLabels(moves: [URL: URL], outputDirectory: URL, preOCRedInput: Bool) async -> String? {
@@ -53,6 +53,7 @@ extension OCRProcessor {
         var calls = 0
         var successfulReads = 0
         var dollars = 0.0
+        var modelUnavailable = false
         // The month's ledger gets the calls as a line of their own, Stop or not: a run's own line takes a top-up only
         // above a cent's fraction, which one label's charge may be under.
         defer {
@@ -67,6 +68,7 @@ extension OCRProcessor {
                                                           rotation: label.rotation, gateway: gateway)
             // W47.ct-label-cost: the call is real money: the history's cost counts it, and the ledger (above).
             if r.gatewayCalled {
+                modelUnavailable = modelUnavailable || r.modelUnavailable
                 calls += 1
                 // A parsed reply can still leave all proposals to the local reader.
                 if r.fields.values.values.contains(where: { $0.reader == ContainerLabelCapture.gatewayReader }) {
@@ -82,7 +84,10 @@ extension OCRProcessor {
         }
         guard !Task.isCancelled else { return nil }
         let problem = await Task.detached(operation: { ContainerLabelCapture.record(markers) }).value
-        let lines = [problem, skippedNote].compactMap { $0 }
+        let unavailableNote = modelUnavailable
+            ? "The configured gateway reported that GPT 5.6 Luna was unavailable for box and folder label reading."
+            : nil
+        let lines = [unavailableNote, problem, skippedNote].compactMap { $0 }
         return lines.isEmpty ? nil : lines.joined(separator: " ")
     }
 }

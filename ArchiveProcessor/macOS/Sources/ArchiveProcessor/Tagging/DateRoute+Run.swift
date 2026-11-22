@@ -139,6 +139,7 @@ extension DateRoute {
     struct GatewayReply: Sendable, Equatable {
         var text: String?
         var status: Int?
+        private(set) var errorCode: String?
         var reportedCost: Double?
         var promptTokens: Int?
         var completionTokens: Int?
@@ -157,6 +158,10 @@ extension DateRoute {
                 reportedCost = d
             }
             let json = data.flatMap { (try? JSONSerialization.jsonObject(with: $0)) as? [String: Any] }
+            if let status, (400..<500).contains(status),
+               let error = json?["error"] as? [String: Any] {
+                errorCode = error["code"] as? String
+            }
             if let usage = json?["usage"] as? [String: Any], let p = usage["prompt_tokens"] as? Int,
                let c = usage["completion_tokens"] as? Int {
                 // A proxy may report thinking outside completion_tokens; total_tokens then says so.

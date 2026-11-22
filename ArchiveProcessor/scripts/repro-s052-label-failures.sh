@@ -15,7 +15,10 @@ gateway_models=
 page_model=stand-in
 case "$scenario" in
     refused) label_replies='[]' ;;
-    mixed) label_replies='[{"collection_title":"Test Papers"}, {}]' ;;
+    mixed)
+        label_replies='[{"collection_title":"Test Papers"}, {}]'
+        gateway_models="$page_model,gpt-5.6-luna"
+        ;;
     missing-model)
         label_replies='[]'
         page_model=gpt-5.4-mini
@@ -139,6 +142,9 @@ else:
     expected_note = "0 box or folder labels read through the gateway (GPT 5.6 Luna), 2 failed attempts, $0.0000."
 if expected_note not in summary:
     sys.exit(f"Missing gateway summary {expected_note!r}")
+diagnosis = "The configured gateway reported that GPT 5.6 Luna was unavailable for box and folder label reading."
+if summary.count(diagnosis) != int(scenario == "missing-model"):
+    sys.exit(f"Expected one unavailable-model diagnosis only in the missing-model case. Got {summary!r}")
 if "1 label photo read nothing" not in summary:
     sys.exit("Missing the separate warning about the empty folder label.")
 container_file = run / ".archivesuite" / "containers.json"
