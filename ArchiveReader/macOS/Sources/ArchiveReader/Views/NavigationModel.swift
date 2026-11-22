@@ -2354,63 +2354,74 @@ final class NavigationModel: ObservableObject {
 
     // MARK: Root selection
 
+    private var choosingRoot = false
+
     func chooseRoot() {
+        guard !choosingRoot else { return }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Choose Common Archive Folder"
         panel.message = "Choose the folder that contains both “\(ReaderArchiveLayout.mainDirectoryName)” and “\(ReaderArchiveLayout.jpegDirectoryName)”."
-        if panel.runModal() == .OK, let url = panel.url {
-            // A refused pick used to be an `NSLog` and nothing else — no root, no scan, and a window
-            // that looked exactly as it had before the panel opened. Say why, and leave the previous
-            // root's view state alone rather than tearing it down for a root we did not get.
-            // (`W26.symroot-fu1`.)
-            if let refusal = rootStore.setRoot(url) {
-                statusMessage = refusal.message
-                announce(statusMessage)
-                return
-            }
-            // Scan the root we ADOPTED, which is not necessarily the URL that was picked: a symlinked
-            // pick is adopted as its target, because a security-scoped bookmark cannot open a link.
-            guard let adopted = rootStore.root else { return }
-            // A scope from the old root can't apply to a new one, nor can its folders' Back and Forward.
-            exitScope()
-            placeHistory.clear()
-            pendingVisitSelection = nil
-            indexer.resetPruneState()   // old root's pending-prune set is invalid for the new root
-            filter.pathPrefix = nil
-            filter.containerFacets = nil   // another root's boxes and collections
-            containerGeneration += 1       // a build for the old root still running is dropped when it lands
-            containerCatalog = .empty
-            containerSignature = nil
-            containerBuiltSignature = nil
-            containerPrefilledDraft = nil
-            containerLevelsDraft = nil     // a sheet for the old root must not save into this one
-            containerLevelsOpenRequest = nil
-            containerLevelsError = nil
-            containerEditError = nil       // the old root's refusal
-            containerSetAsideOffer = nil   // and its offer
-            itemFieldEditError = nil
-            filterSearchText = filter.searchText   // sync debounced field
-            // R-3: an OCR search active over the OLD corpus leaves ftsPaths holding old-root paths; once
-            // the new library loads, recompute would AND the new files against those → empty/wrong
-            // results while the search box + FTS indicator stay lit. Clear the full-text search so the
-            // new scope starts clean. (ftsPaths is cleared directly since fullTextQuery="" makes a later
-            // runFullTextSearch a no-op reset anyway.)
-            fullTextQuery = ""
-            ftsPaths = nil
-            ftsRank = nil
-            ftsSnippets = [:]
-            if sort.first?.field == .relevance { sort = LibrarySort.default }
-            ftsGeneration += 1   // R-3 race: invalidate any in-flight OLD-root FTS search so its completion
-                                 // (which passes the `generation == ftsGeneration` guard) can't repopulate
-                                 // ftsPaths with stale old-root paths after the new library loads.
-            // Asked before the scan, so the first rows are read through the answer.
-            askItemTypeColoursIfNeeded()
-            applyItemTypePreferences()
-            library.start(scope: adopted, markerGUID: rootStore.rootMarker?.guid)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        choosingRoot = true
+        Task {
+            defer { choosingRoot = false }
+            guard await CloudDriveWarning.confirmUse(of: [url]) else { return }
+            adoptChosenRoot(url)
         }
+    }
+
+    private func adoptChosenRoot(_ url: URL) {
+        // A refused pick used to be an `NSLog` and nothing else — no root, no scan, and a window
+        // that looked exactly as it had before the panel opened. Say why, and leave the previous
+        // root's view state alone rather than tearing it down for a root we did not get.
+        // (`W26.symroot-fu1`.)
+        if let refusal = rootStore.setRoot(url) {
+            statusMessage = refusal.message
+            announce(statusMessage)
+            return
+        }
+        // Scan the root we ADOPTED, which is not necessarily the URL that was picked: a symlinked
+        // pick is adopted as its target, because a security-scoped bookmark cannot open a link.
+        guard let adopted = rootStore.root else { return }
+        // A scope from the old root can't apply to a new one, nor can its folders' Back and Forward.
+        exitScope()
+        placeHistory.clear()
+        pendingVisitSelection = nil
+        indexer.resetPruneState()   // old root's pending-prune set is invalid for the new root
+        filter.pathPrefix = nil
+        filter.containerFacets = nil   // another root's boxes and collections
+        containerGeneration += 1       // a build for the old root still running is dropped when it lands
+        containerCatalog = .empty
+        containerSignature = nil
+        containerBuiltSignature = nil
+        containerPrefilledDraft = nil
+        containerLevelsDraft = nil     // a sheet for the old root must not save into this one
+        containerLevelsOpenRequest = nil
+        containerLevelsError = nil
+        containerEditError = nil       // the old root's refusal
+        containerSetAsideOffer = nil   // and its offer
+        itemFieldEditError = nil
+        filterSearchText = filter.searchText   // sync debounced field
+        // R-3: an OCR search active over the OLD corpus leaves ftsPaths holding old-root paths; once
+        // the new library loads, recompute would AND the new files against those → empty/wrong
+        // results while the search box + FTS indicator stay lit. Clear the full-text search so the
+        // new scope starts clean. (ftsPaths is cleared directly since fullTextQuery="" makes a later
+        // runFullTextSearch a no-op reset anyway.)
+        fullTextQuery = ""
+        ftsPaths = nil
+        ftsRank = nil
+        ftsSnippets = [:]
+        if sort.first?.field == .relevance { sort = LibrarySort.default }
+        ftsGeneration += 1   // R-3 race: invalidate any in-flight OLD-root FTS search so its completion
+                             // (which passes the `generation == ftsGeneration` guard) can't repopulate
+                             // ftsPaths with stale old-root paths after the new library loads.
+        // Asked before the scan, so the first rows are read through the answer.
+        askItemTypeColoursIfNeeded()
+        applyItemTypePreferences()
+        library.start(scope: adopted, markerGUID: rootStore.rootMarker?.guid)
     }
 
     /// Re-walk the granted archive folder (File ▸ Rescan Archive Folder, ⌘⌥R).

@@ -55,6 +55,12 @@ struct ArchiveReaderApp: App {
                 NavigationWindowView()
                     .environmentObject(deepLinkRouter)
                     .environmentObject(linkContext)
+                    .task {
+                        CloudDriveWarning.showAtFirstLaunch(
+                            testLaunch: ProcessInfo.processInfo.environment["AR_UI_TEST"] == "1"
+                                || UserDefaults.standard.string(forKey: "ARUITestRootPath") != nil
+                        )
+                    }
                     .onOpenURL { url in
                         NSApp.activate(ignoringOtherApps: true)
                         deepLinkRouter.handle(url)

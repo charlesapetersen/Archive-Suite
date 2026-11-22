@@ -22,6 +22,7 @@ struct CollectionInterviewView: View {
     @State private var measuring = false
     @State private var measuredCount = 0
     @State private var measureTotal = 0
+    @State private var pickedPhotos: [URL]?
     @State private var measureTask: Task<Void, Never>?
     @State private var problem: String?
     /// The collection's document, read once when the sheet opens rather than on every redraw.
@@ -80,7 +81,7 @@ struct CollectionInterviewView: View {
                 Spacer()
                 Button("Save") { save() }
                     .keyboardShortcut(.defaultAction)
-                    .disabled(measuring)
+                    .disabled(measuring || pickedPhotos != nil)
                     .accessibilityIdentifier("ap.collectionInterview.save")
             }
             .padding(16)
@@ -93,7 +94,16 @@ struct CollectionInterviewView: View {
             answers = CollectionInterviewAnswers(resolver: resolver, own: own)
             if answers.measuredShares.isEmpty, !photos.isEmpty { measure(photos) }
         }
-        .onDisappear { measureTask?.cancel() }
+        .task(id: pickedPhotos) {
+            guard let urls = pickedPhotos else { return }
+            defer { pickedPhotos = nil }
+            guard await CloudDriveWarning.confirmUse(of: urls) else { return }
+            measure(Self.imageFiles(in: urls))
+        }
+        .onDisappear {
+            pickedPhotos = nil
+            measureTask?.cancel()
+        }
     }
 
     // MARK: Starting points
@@ -131,6 +141,7 @@ struct CollectionInterviewView: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer()
                     Button(answers.measurement == nil ? "Measure from photos…" : "Measure again…") { choosePhotos() }
+                        .disabled(pickedPhotos != nil)
                         .help("Looks at up to \(KindMeasurement.sampleLimit) of the photographs on this Mac to tell typed, printed, handwritten and form pages apart. Nothing is sent anywhere.")
                 }
             }
@@ -348,7 +359,7 @@ struct CollectionInterviewView: View {
         panel.prompt = "Measure"
         panel.message = "Choose photographs from this material, or a folder of them."
         guard panel.runModal() == .OK else { return }
-        measure(Self.imageFiles(in: panel.urls))
+        pickedPhotos = panel.urls
     }
 
     /// The image files chosen, a folder's own files included (one level: a box's folder of photographs).

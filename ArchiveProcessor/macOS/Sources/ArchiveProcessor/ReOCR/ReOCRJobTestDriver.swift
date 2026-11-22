@@ -682,15 +682,15 @@ enum ReOCRJobTestDriver {
                 let link = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Letter.pdf"]).url()
                 var asked = 0
                 // The person cancels the folder panel: nothing comes up, and the request is not used up.
-                let cancelled = ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in nil })
+                let cancelled = await ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in nil })
                 check("14 a cancelled panel brings nothing up", isMessage(cancelled, "not available"), "\(cancelled)")
-                let first = ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return archiveDir })
+                let first = await ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return archiveDir })
                 check("14 the same link, sent again after the cancel, brings up the dialog for its file", first == .open([letter]), "\(first)")
                 check("14 the person was asked for the archive once", asked == 1)
-                let again = ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return nil })
+                let again = await ImproveOCRHandoff.handle(link, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return nil })
                 check("14 the same link does not come up twice", isMessage(again, "already"), "\(again)")
                 let second = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Letter.pdf"]).url()
-                let viaGrant = ImproveOCRHandoff.handle(second, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return nil })
+                let viaGrant = await ImproveOCRHandoff.handle(second, connection: conn, defaults: defaults, chooseRoot: { _ in asked += 1; return nil })
                 // The grant resolves through /private/var, the same folder as /var: compare resolved paths.
                 func same(_ o: ImproveOCRHandoff.Outcome) -> Bool {
                     if case .open(let urls, _) = o { return urls.map { $0.resolvingSymlinksInPath().path } == [letter.resolvingSymlinksInPath().path] }
@@ -698,20 +698,20 @@ enum ReOCRJobTestDriver {
                 }
                 check("14 the saved grant is used next time, without asking", same(viaGrant) && asked == 1, "\(viaGrant)")
                 let other = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: UUID(), relativePaths: ["Letter.pdf"]).url()
-                let wrong = ImproveOCRHandoff.handle(other, connection: conn, defaults: defaults, chooseRoot: { _ in archiveDir })
+                let wrong = await ImproveOCRHandoff.handle(other, connection: conn, defaults: defaults, chooseRoot: { _ in archiveDir })
                 check("14 a folder with another root marker is refused", isMessage(wrong), "\(wrong)")
                 let outside = try folder("handoff-outside")
                 try FileManager.default.createSymbolicLink(at: archiveDir.appendingPathComponent("Escape.pdf"),
                                                            withDestinationURL: outside.appendingPathComponent("x.pdf"))
                 let escape = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Escape.pdf"]).url()
                 check("14 a link out of the archive is refused",
-                      isMessage(ImproveOCRHandoff.handle(escape, connection: conn, defaults: defaults, chooseRoot: { _ in nil })))
+                      isMessage(await ImproveOCRHandoff.handle(escape, connection: conn, defaults: defaults, chooseRoot: { _ in nil })))
                 let noneSuite = suite + ".none"
                 guard let noneDefaults = UserDefaults(suiteName: noneSuite) else { return }
                 defer { noneDefaults.removePersistentDomain(forName: noneSuite) }
                 let third = try ImproveOCRRequest.inline(requestID: UUID(), rootGUID: guid, relativePaths: ["Letter.pdf"]).url()
                 check("14 without the shared folder nothing comes up",
-                      isMessage(ImproveOCRHandoff.handle(third, connection: ReOCRSupportConnection(defaults: noneDefaults),
+                      isMessage(await ImproveOCRHandoff.handle(third, connection: ReOCRSupportConnection(defaults: noneDefaults),
                                                          defaults: defaults, chooseRoot: { _ in nil }), "shared folder"))
             }
 

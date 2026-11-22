@@ -37,6 +37,7 @@ targets:
     platform: macOS
     sources:
       - Sources/ArchiveReader
+      - path: ../../packages/ArchiveAppSupport/CloudDriveWarning.swift
       - path: ../../packages/UITestSupport/App   # W40.e9 appearance seam, W40.e13 transient recorder (DEBUG)
       - path: ../../packages/UITestSupport/Shared   # W40.e13 transient analysis, also in the UI suite
     dependencies:

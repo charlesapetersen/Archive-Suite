@@ -68,6 +68,7 @@ extension XCUIApplication {
     static func archiveUITestApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += UITestLaunch.deterministicWindowState
+        app.launchEnvironment["AR_UI_TEST"] = "1"
         return app
     }
 }

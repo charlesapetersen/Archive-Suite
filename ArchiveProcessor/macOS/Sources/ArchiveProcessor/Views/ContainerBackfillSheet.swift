@@ -8,6 +8,7 @@ struct ContainerBackfillSheet: View {
     @StateObject private var model: ContainerBackfillModel
     @State private var confirmingCost = false
     @State private var showingLevels = false
+    @State private var pickedFolder: URL?
     let onDone: () -> Void
 
     /// `makeModel` runs once, when the sheet first appears (`StateObject`), not on every render of the view above.
@@ -44,6 +45,12 @@ struct ContainerBackfillSheet: View {
         }
         .padding(20)
         .frame(width: 780, height: 640)
+        .task(id: pickedFolder) {
+            guard let url = pickedFolder else { return }
+            defer { pickedFolder = nil }
+            guard await CloudDriveWarning.confirmUse(of: [url]) else { return }
+            model.choose(url)
+        }
         .alert("Read with GPT 5.6 Luna for about \(dollars(model.estimatedDollars)) more?", isPresented: $confirmingCost) {
             Button("Read") { model.startReading() }
             Button("Cancel", role: .cancel) {}
@@ -80,7 +87,7 @@ struct ContainerBackfillSheet: View {
                 .accessibilityIdentifier("ap.backfill.folder")
             Spacer()
             Button("Choose Folder…") { chooseFolder() }
-                .disabled(model.isBusy)
+                .disabled(model.isBusy || pickedFolder != nil)
                 .accessibilityIdentifier("ap.backfill.choose")
         }
     }
@@ -241,7 +248,7 @@ struct ContainerBackfillSheet: View {
                 Button(model.phase == .reviewing ? "Read Again" : "Read Labels") {
                     if model.needsCostConfirmation { confirmingCost = true } else { model.startReading() }
                 }
-                .disabled(model.rows.isEmpty)
+                .disabled(model.rows.isEmpty || pickedFolder != nil)
                 .accessibilityIdentifier("ap.backfill.read")
             }
             Button("Done") { model.cancel(); onDone() }
@@ -257,7 +264,7 @@ struct ContainerBackfillSheet: View {
         panel.allowsMultipleSelection = false
         panel.prompt = "Choose"
         panel.message = "Choose a folder of box and folder photos and the documents after them."
-        if panel.runModal() == .OK, let url = panel.url { model.choose(url) }
+        if panel.runModal() == .OK { pickedFolder = panel.url }
     }
 
     private func dollars(_ d: Double) -> String {

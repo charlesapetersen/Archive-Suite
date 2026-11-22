@@ -20,6 +20,11 @@ and tagging create no marker.
 Keep that identity file with the folder so copied archive links continue to resolve. See [CLAUDE.md](CLAUDE.md) → Core Directive & Safety
 Protocol.
 
+Keep your archive folder on this Mac, outside iCloud Drive, OneDrive, Google Drive, Dropbox or
+another cloud drive. Cloud storage can download many files at once, create conflicting copies, or
+lose Finder tags. The Reader explains this at first launch and warns before opening a chosen archive
+folder that macOS identifies as cloud-managed.
+
 ## What it does
 
 > **Status (2026-07-07):** shipped — v1 plus a full P2 pass (non-standard-PDF detection, near-duplicate

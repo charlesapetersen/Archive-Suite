@@ -28,6 +28,7 @@ CORE_SRC="packages/ArchiveCore/Sources/ArchiveCore"
 NOTES_SRC="ArchiveNotes/macOS/Sources/ArchiveNotes"
 # gate-fix (2026-11-06): the package's shared controls are their own target, read by every rule but 3.
 CORE_UI_SRC="packages/ArchiveCore/Sources/ArchiveCoreUI"
+APP_SUPPORT_SRC="packages/ArchiveAppSupport"
 
 pass=0; failed=0
 SCRATCH=""
@@ -38,7 +39,7 @@ trap cleanup EXIT
 fresh_tree() {
   cleanup
   SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/lint-write-surface-test.XXXXXX")"
-  for s in "$READER_SRC" "$CORE_SRC" "$NOTES_SRC" "$CORE_UI_SRC"; do
+  for s in "$READER_SRC" "$CORE_SRC" "$NOTES_SRC" "$CORE_UI_SRC" "$APP_SUPPORT_SRC"; do
     mkdir -p "$SCRATCH/$(dirname "$s")"
     cp -R "$REPO/$s" "$SCRATCH/$(dirname "$s")/"
   done
@@ -83,6 +84,12 @@ func plantedWrite(_ url: URL, _ tags: [String]) throws {
 }
 SWIFT
 expect 1 "planted setResourceValue in the Reader target FAILS" "PlantedTagWrite.swift"
+
+echo "── shared app sources take the Reader's write rules ────────────────────────────"
+fresh_tree
+printf 'func planted(_ url: URL) throws { try FileManager.default.removeItem(at: url) }\n' \
+  > "$SCRATCH/$APP_SUPPORT_SRC/PlantedSharedWrite.swift"
+expect 1 "a destructive write in shared app sources FAILS" "PlantedSharedWrite.swift"
 
 echo "── no file-level exemption: a NEW write inside the audited writer itself ────"
 fresh_tree
@@ -341,7 +348,7 @@ fresh_tree
 # drift it exists to catch: without the guard, renaming the Notes tree would silently narrow rules 1
 # and 3 back to nothing and the lint would print "✓ clean".
 MUT="$SCRATCH/mutant-lint.sh"
-/usr/bin/sed 's|^SRCS=( "\$SRC_READER" "\$SRC_CORE" "\$SRC_NOTES" "\$SRC_CORE_UI" )$|SRCS=( "$SRC_READER" "$SRC_CORE" "$SRC_CORE_UI" )|' \
+/usr/bin/sed '/^SRCS=(/s/ "\$SRC_NOTES"//' \
   "$LINT" > "$MUT"
 if cmp -s "$MUT" "$LINT"; then
   echo "✗ union-guard mutant changed NOTHING — the sed no longer matches, so this case is vacuous"

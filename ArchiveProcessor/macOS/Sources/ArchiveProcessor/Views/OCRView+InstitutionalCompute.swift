@@ -5,7 +5,8 @@ import SwiftUI
 /// each matching page's text from it instead of buying it from the run's model. Not persisted: it is chosen per run.
 struct InstitutionalComputeImportControl: View {
     @Binding var imported: InstitutionalComputeImport?
-    @State private var loading = false
+    @State private var pickedFolder: URL?
+    private var loading: Bool { pickedFolder != nil }
     @State private var problem: String?
 
     var body: some View {
@@ -36,6 +37,22 @@ struct InstitutionalComputeImportControl: View {
                     .accessibilityIdentifier("ap.ocr.institutionalComputeProblem")
             }
         }
+        .task(id: pickedFolder) {
+            guard let folder = pickedFolder else { return }
+            defer { pickedFolder = nil }
+            guard await CloudDriveWarning.confirmUse(of: [folder]) else { return }
+            problem = nil
+            let result = await Task.detached { Result { try InstitutionalComputeImport.load(folder: folder) } }.value
+            guard !Task.isCancelled else { return }
+            switch result {
+            case .success(let loaded) where loaded.count == 0:
+                problem = "\(folder.lastPathComponent) has no page with an image hash, cluster name and text to match. Use output from the institutional-computing kit."
+            case .success(let loaded):
+                imported = loaded
+            case .failure(let error):
+                problem = error.localizedDescription
+            }
+        }
     }
 
     /// ` (Qwen3.6-27B-FP8)`, or the number of models when a folder mixes runs.
@@ -54,20 +71,6 @@ struct InstitutionalComputeImportControl: View {
         panel.canChooseDirectories = true
         panel.prompt = "Use This Folder"
         panel.message = "Choose the output folder of an institutional-computing run: the folder that holds its _meta folder."
-        guard panel.runModal() == .OK, let folder = panel.url else { return }
-        loading = true
-        problem = nil
-        Task {
-            let result = await Task.detached { Result { try InstitutionalComputeImport.load(folder: folder) } }.value
-            loading = false
-            switch result {
-            case .success(let loaded) where loaded.count == 0:
-                problem = "\(folder.lastPathComponent) has no page with an image hash, cluster name and text to match. Use output from the institutional-computing kit."
-            case .success(let loaded):
-                imported = loaded
-            case .failure(let error):
-                problem = error.localizedDescription
-            }
-        }
+        if panel.runModal() == .OK { pickedFolder = panel.url }
     }
 }

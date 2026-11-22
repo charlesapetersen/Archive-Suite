@@ -17611,3 +17611,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   The badge measured 14.13:1 in light mode and 10.80:1 in dark mode against a 4.5:1 minimum.
   The audit displays and measures the badge using a launch-only setting. Both badge screenshots were reviewed.
   <!-- /W49.proc-validated-contrast -->
+
+- [x] **W49.cloud-drive-first-launch-warning — warn at first launch that material must not be in a cloud drive [S]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-21 (this commit)
+  Original item (lane: reader,processor) (uses: build) — Owner, 2026-11-20 walkthrough of 08:05 (call 27): "warn users at first launch that material must not be in a cloud drive." The Reader and the Processor assume local disk; in a cloud folder (iCloud Drive, Google Drive, Dropbox, any File Provider location) placeholders can be downloaded wholesale, conflict copies appear and Finder tags may not survive. At first launch, and when a corpus or input folder is chosen inside such a location, say so plainly and recommend a local folder. Detect the location by the File Provider and ubiquity resource values, not by path names alone; test with a scratch folder in each kind that can be made here.
+  Both apps show one first-launch notice. Reader archive selection and Processor source selection check macOS metadata before adopting or reading the selection. Cancel leaves the selection unused. Use Anyway proceeds.
+  Reader smoke ran 1,085 tests with seven skips and zero failures. Both focused off-screen app tests passed, both screenshots were reviewed, and all 30 write-surface lint checks passed. The shared warning is within the lint’s scope.
+  A local scratch folder with cloud-like names stayed local. Scratch symlinks to mounted OneDrive, Keep It and MacDroid proved detection from live metadata. iCloud Drive, Google Drive and Dropbox had no safe live scratch fixture.
+  <!-- /W49.cloud-drive-first-launch-warning -->

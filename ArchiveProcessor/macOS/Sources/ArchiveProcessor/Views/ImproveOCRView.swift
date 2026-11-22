@@ -306,41 +306,48 @@ struct ImproveOCRHooks: ViewModifier {
     let files: [URL]
     let canOpen: Bool
     @State private var showsHistory = false
+    @State private var requestTask: Task<Void, Never>?
+
+    private var canShowDialog: Bool {
+        canOpen && selection == nil && !showsHistory && requestTask == nil && !SheetGuard.sheetIsUp
+    }
 
     func body(content: Content) -> some View {
         content
             .onReceive(NotificationCenter.default.publisher(for: .improveOCRRequested)) { _ in
-                guard canOpen, !SheetGuard.sheetIsUp else { return }
+                guard canShowDialog else { return }
                 let pdfs = files.filter { $0.pathExtension.lowercased() == "pdf" }
                 if !pdfs.isEmpty { selection = ImproveOCRSelection(files: pdfs) }
             }
             .onReceive(NotificationCenter.default.publisher(for: .improveOCRHandoff)) { _ in takePending() }
             .onAppear { Self.recoverOnce(); takePending() }
+            .onDisappear { requestTask?.cancel() }
             .sheet(item: $selection) { ImproveOCRView(files: $0.files, pairs: $0.pairs) }
             .onReceive(NotificationCenter.default.publisher(for: .improveOCRHistoryRequested)) { _ in
-                guard canOpen, selection == nil, !SheetGuard.sheetIsUp else { return }
+                guard canShowDialog else { return }
                 showsHistory = true
             }
             .sheet(isPresented: $showsHistory) { ImproveOCRHistoryView() }
             .onReceive(NotificationCenter.default.publisher(for: .improveOCRFlaggedRequested)) { _ in
-                guard canOpen, selection == nil, !SheetGuard.sheetIsUp else { return }
+                guard canShowDialog else { return }
                 let panel = NSOpenPanel()
                 panel.canChooseDirectories = true
                 panel.canChooseFiles = false
                 panel.prompt = "Find Flagged Files"
                 panel.message = "Choose a folder: Improve OCR opens for the PDFs in it flagged OCR Poor."
                 guard panel.runModal() == .OK, let folder = panel.url else { return }
-                Task.detached {
-                    let found = ReOCRFlaggedFinder.find(in: folder)
-                    await MainActor.run {
-                        if found.files.isEmpty {
-                            message = "No PDF in \(folder.lastPathComponent) is flagged OCR Poor (\(found.scanned) checked)."
-                        } else {
-                            selection = ImproveOCRSelection(files: found.files)
-                            if found.truncated || found.unreadableFolders > 0 {
-                                message = (found.truncated ? "Showing the first \(found.files.count) flagged files. " : "")
-                                    + (found.unreadableFolders > 0 ? "\(found.unreadableFolders) folder(s) could not be read." : "")
-                            }
+                requestTask = Task {
+                    defer { requestTask = nil }
+                    guard await CloudDriveWarning.confirmUse(of: [folder]) else { return }
+                    let found = await Task.detached { ReOCRFlaggedFinder.find(in: folder) }.value
+                    guard !Task.isCancelled else { return }
+                    if found.files.isEmpty {
+                        message = "No PDF in \(folder.lastPathComponent) is flagged OCR Poor (\(found.scanned) checked)."
+                    } else {
+                        selection = ImproveOCRSelection(files: found.files)
+                        if found.truncated || found.unreadableFolders > 0 {
+                            message = (found.truncated ? "Showing the first \(found.files.count) flagged files. " : "")
+                                + (found.unreadableFolders > 0 ? "\(found.unreadableFolders) folder(s) could not be read." : "")
                         }
                     }
                 }
@@ -358,15 +365,20 @@ extension ImproveOCRHooks {
     /// is told, and the request is not recorded, so sending it again works.
     func takePending() {
         guard let url = ImproveOCRHandoff.pending else { return }
-        guard canOpen, selection == nil, !SheetGuard.sheetIsUp else {
+        guard canShowDialog else {
             ImproveOCRHandoff.pending = nil
             message = "The Processor is busy. The request was not used: send it again from the Reader when the current run or dialog is finished."
             return
         }
         ImproveOCRHandoff.pending = nil
-        switch ImproveOCRHandoff.handle(url, connection: ImproveOCRController.connection()) {
-        case .open(let found, let pairs): selection = ImproveOCRSelection(files: found, pairs: pairs)
-        case .message(let text): message = text
+        requestTask = Task {
+            defer { requestTask = nil }
+            let outcome = await ImproveOCRHandoff.handle(url, connection: ImproveOCRController.connection())
+            guard !Task.isCancelled else { return }
+            switch outcome {
+            case .open(let found, let pairs): selection = ImproveOCRSelection(files: found, pairs: pairs)
+            case .message(let text): message = text
+            }
         }
     }
 

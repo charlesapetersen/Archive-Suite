@@ -11,6 +11,11 @@ The app has three areas, selectable at the top of the window, plus a native Sett
 - **Tools** — one-off diagnostics: compare OCR across models, test how image resolution affects OCR, and look back over past runs.
 - **Settings (⌘,)** — all durable settings (provider, model, API key, rotation, tagging options, live-capture mode) in one place, with a live cost estimate for 1,000 files that updates as you change settings.
 
+Keep your source files in a folder on this Mac, outside iCloud Drive, OneDrive, Google Drive, Dropbox
+or another cloud drive. Cloud storage can download many files at once, create conflicting copies, or
+lose Finder tags. The Processor explains this at first launch and warns before reading a selection
+that macOS identifies as cloud-managed.
+
 ## Features
 
 ### Cloud and on-device OCR

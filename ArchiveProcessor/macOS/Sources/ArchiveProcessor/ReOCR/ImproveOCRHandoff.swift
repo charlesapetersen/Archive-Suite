@@ -25,7 +25,7 @@ enum ImproveOCRHandoff {
     static var pending: URL?
 
     static func handle(_ url: URL, connection: ReOCRSupportConnection, defaults: UserDefaults = .standard,
-                       chooseRoot: @MainActor (UUID) -> URL? = askForRoot) -> Outcome {
+                       chooseRoot: @MainActor (UUID) async -> URL? = askForRoot) async -> Outcome {
         let request: ImproveOCRRequest
         do { request = try ImproveOCRRequest(url: url) } catch { return .message("This Improve OCR link cannot be read (\(error)).") }
         let support: ReOCRSupportConnection.Connected
@@ -37,7 +37,8 @@ enum ImproveOCRHandoff {
         case .selectAgain(_, let why): return .message("Select the files again in the Reader: \(why).")
         case .refused(let why): return .message("This Improve OCR request was refused: \(why).")
         case .open(let resolved):
-            guard let root = root(resolved.rootGUID, hint: resolved.rootPathHint, defaults: defaults, choose: chooseRoot) else {
+            guard let root = await root(resolved.rootGUID, hint: resolved.rootPathHint, defaults: defaults, choose: chooseRoot),
+                  !Task.isCancelled else {
                 return .message("The archive this request names is not available to the Processor.")
             }
             var files: [URL] = []
@@ -74,13 +75,13 @@ enum ImproveOCRHandoff {
 
     /// The archive root with `guid`: the saved grant, else the hint, else the person's choice; each checked against the
     /// root marker, and a checked choice saved as the grant.
-    static func root(_ guid: UUID, hint: String?, defaults: UserDefaults, choose: @MainActor (UUID) -> URL?) -> URL? {
+    static func root(_ guid: UUID, hint: String?, defaults: UserDefaults,
+                     choose: @MainActor (UUID) async -> URL?) async -> URL? {
         func matches(_ url: URL) -> Bool { (try? RootMarker.read(at: url))?.guid == guid }
-        var grants = defaults.dictionary(forKey: grantsKey) as? [String: Data] ?? [:]
         // The Reader's hint first (where the archive is now), then the saved grant, then the person's choice.
         let hinted = hint.map { URL(fileURLWithPath: $0, isDirectory: true) }.flatMap { matches($0) ? $0 : nil }
         var granted: URL?
-        if hinted == nil, let data = grants[guid.uuidString] {
+        if hinted == nil, let data = defaults.dictionary(forKey: grantsKey)?[guid.uuidString] as? Data {
             var stale = false
             if let url = try? URL(resolvingBookmarkData: data, options: [.withoutUI], relativeTo: nil, bookmarkDataIsStale: &stale),
                matches(url) {
@@ -88,20 +89,29 @@ enum ImproveOCRHandoff {
                 granted = url
             }
         }
-        guard let url = hinted ?? granted ?? choose(guid).flatMap({ matches($0) ? $0 : nil }) else { return nil }
+        let selected: URL?
+        if let existing = hinted ?? granted {
+            selected = existing
+        } else {
+            selected = await choose(guid).flatMap { matches($0) ? $0 : nil }
+        }
+        guard let url = selected else { return nil }
         if let data = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil) {
+            var grants = defaults.dictionary(forKey: grantsKey) as? [String: Data] ?? [:]
             grants[guid.uuidString] = data
             defaults.set(grants, forKey: grantsKey)
         }
         return url
     }
 
-    static func askForRoot(_ guid: UUID) -> URL? {
+    static func askForRoot(_ guid: UUID) async -> URL? {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.prompt = "Use This Archive"
         panel.message = "Choose the archive folder the Archive Reader sent these files from."
-        return panel.runModal() == .OK ? panel.url : nil
+        guard panel.runModal() == .OK, let folder = panel.url,
+              await CloudDriveWarning.confirmUse(of: [folder]) else { return nil }
+        return folder
     }
 }

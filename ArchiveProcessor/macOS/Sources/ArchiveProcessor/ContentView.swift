@@ -129,7 +129,10 @@ struct ContentView: View {
             SegmentationChatGPTTestDriver.runIfRequested()   // $0 W36 ChatGPT plan route: Sign in with ChatGPT, fake server
             SegmentationProofDriver.runIfRequested()         // PAID (cents) W36 one real folder through real models
 #endif
-            maybePresentKeyOnboarding()
+            Task { @MainActor in
+                CloudDriveWarning.showAtFirstLaunch(testLaunch: KeychainHelper.isHeadlessTestMode)
+                maybePresentKeyOnboarding()
+            }
         }
 #if DEBUG
         .overlay(alignment: .bottomLeading) {

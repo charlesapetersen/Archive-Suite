@@ -114,6 +114,8 @@ struct OCRView: View {
     @State private var containerLevelsError: String?
     /// A drop or Add Files whose folders hold folders: whether to read those too is asked first.
     @State private var treeQuestion: TreeQuestion?
+    @State private var inputLocationCheck: Task<Void, Never>?
+    private var checkingInputLocation: Bool { inputLocationCheck != nil }
     /// A tree being read in the background, and the file list's generation: Clear and Start bump it, so a walk that
     /// ends after either adds nothing.
     @State private var readingTree = false
@@ -434,6 +436,7 @@ struct OCRView: View {
             }
 #endif
         }
+        .onDisappear { inputLocationCheck?.cancel() }
         .onChange(of: taggingModeRaw) { _, _ in
             if taggingMode.isManual { SystemTagsProvider.shared.warmUp() }
         }
@@ -1077,7 +1080,7 @@ struct OCRView: View {
     /// state and the ⌘R "Start Processing" shortcut (so the shortcut can never start a run the button
     /// wouldn't allow: no files, no key, no output folder, already busy, or mid-review).
     private var canStartProcessing: Bool {
-        !droppedFiles.isEmpty && !readingTree && (!runNeedsAPIKey || !apiKey.isEmpty) && visionWorkflowIsSupported && outputDirectory != nil
+        !droppedFiles.isEmpty && !checkingInputLocation && !readingTree && (!runNeedsAPIKey || !apiKey.isEmpty) && visionWorkflowIsSupported && outputDirectory != nil
             && !processor.isProcessing && !isInReviewMode
             && processor.pendingBatchInfo == nil && processor.pendingRunInfo == nil
             && processor.pendingMixedPDFInfo == nil
@@ -1092,6 +1095,7 @@ struct OCRView: View {
         if processor.pendingBatchInfo != nil { return "Resume or dismiss the pending batch above first." }
         if processor.pendingRunInfo != nil { return "Resume or dismiss the interrupted run above first." }
         if processor.pendingMixedPDFInfo != nil { return "Resume or dismiss the interrupted PDF run above first." }
+        if checkingInputLocation { return "Checking the selected files’ location…" }
         if droppedFiles.isEmpty { return "Add images or PDFs to process." }
         if readingTree { return "Reading the folders inside…" }   // W47.ct-processor-intake
         if !visionWorkflowIsSupported {
@@ -1114,6 +1118,10 @@ struct OCRView: View {
         reloadAPIKey()
     }
 
+    private var canAddFiles: Bool {
+        !processor.isProcessing && !isInReviewMode && !checkingInputLocation && treeQuestion == nil
+    }
+
     private var filePanel: some View {
         // The header stays put above the list, so Add Files… and Clear are in reach at any scroll position
         // (it scrolled away with 60 files; W40.fix-processor-visual-polish).
@@ -1128,7 +1136,7 @@ struct OCRView: View {
                         Label("Add Files…", systemImage: "plus")
                     }
                     .buttonStyle(.bordered)
-                    .disabled(processor.isProcessing)   // don't mutate the input set mid-run
+                    .disabled(!canAddFiles)
                     if !droppedFiles.isEmpty {
                         Button("Clear") { droppedFiles = []; droppedSubfolders = [:]; intakeGeneration += 1; readingTree = false; captureBoundaries = []; captureTypes = []; captureQualities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = []; processor.progress = 0; processor.statusMessage = ""; processor.failedFiles = [] }
                             .buttonStyle(.bordered)
@@ -1223,7 +1231,7 @@ struct OCRView: View {
                     .font(.system(size: 40))
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)   // decorative; the text below says what the zone is for
-                Text(preOCRedInput ? "Drop PDFs here" : "Drop images or PDFs here")
+                Text(checkingInputLocation ? "Checking file location…" : (preOCRedInput ? "Drop PDFs here" : "Drop images or PDFs here"))
                     .font(.headline)
                     .foregroundStyle(.primary)
                 Text("or use Add Files…")
@@ -1231,8 +1239,10 @@ struct OCRView: View {
                     .foregroundStyle(.primary)
             }
             .allowsHitTesting(false)
-            DropReceiver(isTargeted: $isTargeted) { urls in
-                handleDroppedURLs(urls)
+            if canAddFiles {
+                DropReceiver(isTargeted: $isTargeted) { urls in
+                    handleDroppedURLs(urls)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1320,7 +1330,7 @@ struct OCRView: View {
                     }
                 }
             }
-            if !isInReviewMode {
+            if canAddFiles {
                 DropReceiver(isTargeted: .constant(false)) { urls in
                     handleDroppedURLs(urls)
                 }
@@ -1525,6 +1535,17 @@ struct OCRView: View {
     /// W47.ct-processor-intake: a folder holding folders is read as a tree only when the user says so; otherwise, and
     /// for every other drop, its own files as before (`ProcessFilesTree.collect`).
     private func admit(_ urls: [URL], sortAll: Bool) {
+        guard canAddFiles, !urls.isEmpty else { return }
+        let generation = intakeGeneration
+        inputLocationCheck = Task {
+            defer { inputLocationCheck = nil }
+            guard await CloudDriveWarning.confirmUse(of: urls),
+                  generation == intakeGeneration, !processor.isProcessing, !isInReviewMode else { return }
+            admitCheckedURLs(urls, sortAll: sortAll)
+        }
+    }
+
+    private func admitCheckedURLs(_ urls: [URL], sortAll: Bool) {
         let holding = urls.filter(ProcessFilesTree.hasSubfolders)
         guard holding.isEmpty else {
             treeQuestion = TreeQuestion(urls: urls, sortAll: sortAll, names: holding.map(\.lastPathComponent))
@@ -1559,6 +1580,7 @@ struct OCRView: View {
     }
 
     private func selectFiles() {
+        guard canAddFiles else { return }
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseFiles = true
