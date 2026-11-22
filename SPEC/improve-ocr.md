@@ -70,8 +70,8 @@ so callers re-read the actual tag inside coordination.
 
 ## 4. Receipts
 
-`ImproveOCRReceipt`: operation ID, root GUID, relative path, the improved text-page indices (the scan's own index
-for a single searchable page), the SHA-256 before and after, `published` or `restored`, and a date. Written once per operation after the new bytes are in place and
+`ImproveOCRReceipt`: operation ID, root GUID, relative path, the improved text-page indices (the page's own index
+when its searchable layer is edited), the SHA-256 before and after, `published` or `restored`, and a date. Written once per operation after the new bytes are in place and
 verified, independently of the flag; a retried or rebuilt receipt for the same revision is the same receipt. It
 carries no OCR text and grants no access. The Reader (`ImproveOCRReceiptInbox`, on each library change, on activation
 and every 20 s while connected) finds the file among its own library's rows, inside its granted root, by the receipt's
@@ -83,22 +83,21 @@ format it cannot read) stays unseen and is looked at again when the library chan
 
 ## 5. What the Processor guarantees about the file
 
-The candidate is the original byte for byte followed by one incremental revision (pinned static PDFium) whose kept
-pages' active object graphs are unchanged (`ReOCRPreservationCheck`); publication keeps the path, the Finder tags as a
-multiset, label, other extended attributes, resource fork, ACL, mode, flags, and creation, modification and
-date-added times (the inode and change time do change), and keeps a verified copy of the replaced file until the
-person removes it in the Processor's history. In-place improvement accepts positively identified suite image/text
-pairs and a single suite searchable page with its header in XMP. Encrypted files, signed files, files ending in a
-cross-reference stream and other page arrangements are refused.
+Improve OCR accepts readable, unsigned, unencrypted PDFs. The candidate keeps a byte-for-byte original prefix
+when the file uses a cross-reference table. Files ending in a cross-reference stream use a full save with the pinned
+PDFium because its incremental revision after a stream does not open in Quartz. Both save modes check kept page object
+graphs and rendering, and verify the new text. Publication keeps the path, the Finder tags as a multiset, label, other
+extended attributes, resource fork, ACL, mode, flags, and creation, modification and date-added times. The inode and
+change time change. A verified copy of the replaced file stays available in Processor history until the person removes it.
 
-For a pair, the revision replaces its separate text page. If the scan has an invisible OCR layer, the revision
-replaces that layer on the existing page. A standalone searchable page gets the same layer edit and keeps the header
-and provenance stored in its original XMP. The new reading follows the detected lines where placement holds the whole
-reading. Otherwise it remains searchable and selectable, with lines spread down the page. The candidate must keep the scan's
-boxes, rotation, annotations and original image streams and pass a render comparison. If the writer cannot remove the
-old layer safely or verify the new one, the review reports the failure and disables acceptance. The receipt lists
-the separate text pages for pairs and page zero for a standalone searchable page. The Reader re-extracts the whole
-file in both cases.
+For positively identified suite pairs, the candidate replaces the separate text page and updates any invisible OCR
+layer on its scan. For a standalone or unpaired page, it writes searchable text directly on the existing page. Pages
+in an ambiguous arrangement stay in place and receive direct layer edits. Any suite header and provenance stored in
+XMP stay with the file. The new reading follows the detected lines when placement holds the whole reading. Otherwise,
+when the page needs an invisible layer, the new reading remains searchable and selectable with lines spread down the
+page. The candidate must keep the scan's boxes, rotation, annotations, and original image streams and pass a render
+comparison. A layer that cannot be edited safely or a candidate that fails verification disables acceptance. The receipt
+lists the physical page indices of the separate text pages or directly edited pages. The Reader re-extracts the whole file.
 
 ## 6. Why it is built this way (design record)
 
@@ -109,13 +108,11 @@ Folded from the design plan when the Reader side shipped (W44.reocr-plan, 2026-1
   spends, or writes file contents. The Reader's `TagWriter` stays metadata-only: content writes live only behind the
   Processor's `ReOCRFileWriter`, and ArchiveCore shares values and parsers, never a corpus content writer.
 - **A private candidate first, published only on acceptance**, at the original path, so no app ever sees a
-  provisional replacement; rejecting it leaves the original untouched. Incremental PDFium revision (not a PDFKit
-  whole-file save), proven by the original-as-prefix and active-object-graph check of §5; recoverable editing, not
-  redaction (the old text stays in the file's history). A verified copy of the replaced file is kept until the person
-  removes it, and Restore is its own guarded transaction.
-- **Pages, ranking, cost.** Improve OCR reads only the scan slots of validated pairs and the scan of a
-  single suite searchable page. Other file arrangements go to the separate-output route. Each page shows its stored
-  provenance and stored or provisional Kind. Correcting a Kind re-ranks through the same solver the settings use. Missing evidence is
+  provisional replacement. Rejecting it leaves the original untouched. The PDFium save is checked as described
+  in §5. Incremental revisions retain the previous text in the file's history. A verified copy of the replaced file
+  stays available until the person removes it, and Restore is its own guarded transaction.
+- **Pages, ranking, cost.** Improve OCR reads the scan slots of validated pairs and reads each unpaired page directly.
+  Each page shows its stored provenance where available and its stored or provisional Kind. Correcting a Kind re-ranks through the same solver the settings use. Missing evidence is
   "not measured", never zero; a run needs the person's explicit action after the estimate.
 - **Flag generations** (§3) exist so an acceptance can tell whether the flag it reviewed is still the flag on the file:
   a flag set again during a re-read must survive the acceptance. They cover cooperating suite actions only; a boolean

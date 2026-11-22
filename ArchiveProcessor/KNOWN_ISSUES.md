@@ -625,10 +625,9 @@ What remains: a box with many such pages has more gaps to check than the figures
 
 ## ⚠️ LIMITATION (W44.reocr-processor, 2026-11-12): what Improve OCR does not do yet
 
-- **Refused for in-place improvement:** encrypted or signed files, files ending in a cross-reference stream (the
-  pinned PDFium 8046d writes a revision Quartz cannot open after one; the Processor's own output uses tables), raw
-  one-page originals and arrangements outside suite image/text pairs or a single suite searchable page
-  (queued: W49.proc-reocr-allow-more).
+- **Improve OCR refuses encrypted or signed PDFs.** Cross-reference streams use a verified full
+  save, and ordinary pages gain searchable text on the original page (accepted: owner call 21, 2026-11-19,
+  shipped in W49.proc-reocr-allow-more).
 - **Apple Vision fails inside the macOS 27.2 VM guest** ("Foundation._GenericObjCError 0") while it reads the same
   page on the host; the VM UI journey uses a DEBUG stand-in reader, the host self-test the real Vision (accepted: a VM guest platform limit; the host self-test uses the real Vision).
 - **Opening the dialog reads the Keychain** for each provider (to know which readers are ready), which can bring back

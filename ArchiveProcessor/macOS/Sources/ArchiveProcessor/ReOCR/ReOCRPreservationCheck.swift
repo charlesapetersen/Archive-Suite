@@ -6,7 +6,7 @@ import Foundation
 /// Checks a re-read candidate against the file it replaces, independently of whatever wrote it
 /// (`SPEC/improve-ocr.md` §5). A candidate passes only when:
 ///
-/// 1. it holds the entire original byte for byte as its prefix, followed by an incremental revision;
+/// 1. an incremental candidate holds the entire original byte for byte as its prefix;
 /// 2. both open, neither is encrypted, and they have the same number of pages;
 /// 3. every page not being replaced has the same **active** object graph as before, read through Quartz with every
 ///    indirect reference resolved: the same dictionaries, arrays, names, numbers and strings, and every stream's
@@ -19,9 +19,10 @@ import Foundation
 /// The pages being replaced are checked by the caller against the new text. Empty `problems` means the candidate
 /// may go to review; any problem stops publication.
 enum ReOCRPreservationCheck {
-    static func problems(original: Data, candidate: Data, replacing: Set<Int>, editingLayers: Set<Int> = []) -> [String] {
+    static func problems(original: Data, candidate: Data, replacing: Set<Int>, editingLayers: Set<Int> = [],
+                         requiresOriginalPrefix: Bool = true) -> [String] {
         var out: [String] = []
-        guard candidate.count > original.count, candidate.prefix(original.count) == original else {
+        if requiresOriginalPrefix && (candidate.count <= original.count || candidate.prefix(original.count) != original) {
             return ["the candidate does not begin with the original file byte for byte"]
         }
         guard let oldDoc = document(original), let newDoc = document(candidate) else {
@@ -299,7 +300,13 @@ enum ReOCRPreservationCheck {
                       CGPDFObjectGetValue(inherited, .dictionary, &own) else { return nil }
                 return own
             }
-            guard let before = resources(a), let after = resources(b) else { return "\(path): its resources cannot be read" }
+            guard let after = resources(b) else { return "\(path): its updated resources cannot be read" }
+            guard let before = resources(a) else {
+                guard let newObjects = resourcesForLayerCheck(after), newObjects.images.isEmpty else {
+                    return "\(path): its image resources changed"
+                }
+                return nil
+            }
             if let diff = dictionaries(before, after, path: "\(path)/Resources", skip: ["Font", "XObject", "ExtGState", "ProcSet"]) {
                 return diff
             }

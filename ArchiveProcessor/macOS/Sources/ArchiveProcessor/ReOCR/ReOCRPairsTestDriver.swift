@@ -9,8 +9,7 @@ import PDFKit
 ///
 /// What has to be true:
 ///   1. A two-page and a three-pair Processor file validate, with each pair's header read.
-///   2. Refused: one page, three pages, a text page without the suite header, an image page that reads as a text
-///      page (pages in the wrong order), an encrypted file, a header-like trap on a one-page file.
+///   2. Raw and mixed arrangements use direct layer edits for unpaired pages. Encrypted and unreadable files are refused.
 ///   3. A replacement page keeps the pair's original filename, classification and source-date lines, names the new
 ///      reader and Kind, carries the new text and not the old; a failed or empty reading makes no page.
 ///   4. End to end: replacing pair 2 of three through `ReOCRIncrementalWriter` gives a candidate whose page 4 has
@@ -115,28 +114,28 @@ enum ReOCRPairsTestDriver {
             // 1. Valid files.
             guard case .success(let p1) = ReOCRPairs.validate(one) else { check("1 a two-page file validates", false); return }
             check("1 a two-page file validates as one pair", p1.count == 1 && p1[0].imageIndex == 0 && p1[0].textIndex == 1)
-            check("1 its header is read", p1[0].header.originalFilename?.replacingOccurrences(of: "\n", with: "") == "IMG_1.jpg" && p1[0].header.classification == "Document Start"
-                  && p1[0].header.kind == .typewritten && p1[0].header.documentDate == "12 March 1952", "\(p1[0].header)")
+            check("1 its header is read", p1[0].header?.originalFilename?.replacingOccurrences(of: "\n", with: "") == "IMG_1.jpg" && p1[0].header?.classification == "Document Start"
+                  && p1[0].header?.kind == .typewritten && p1[0].header?.documentDate == "12 March 1952", "\(String(describing: p1[0].header))")
             guard case .success(let p3) = ReOCRPairs.validate(three) else { check("1 a three-pair file validates", false); return }
             check("1 a three-pair file validates as three pairs", p3.map(\.textIndex) == [1, 3, 5])
 
-            // 2. Refusals.
-            refused("2 a single page is refused", textPDF("A letter.")) { $0 == .notPaired(pages: 1) }
-            refused("2 a header-like single page is refused", textPDF("Extracted text.\nGemini · Flash · 1 May 2026\n\nTrap")) {
-                $0 == .notPaired(pages: 1)
+            // 2. Only positively identified suite text pages are replaced.
+            func targets(_ data: Data) -> [Int] {
+                ((try? ReOCRPairs.validate(data).get()) ?? []).map(\.textIndex)
             }
-            refused("2 three pages are refused", pages([one, textPDF("x")])) {
-                $0 == .notPaired(pages: 3)
-            }
-            refused("2 a text page without the header is refused", pages([textPDF("image stand-in"), textPDF("Plain text.")])) {
-                $0 == .textPageWithoutHeader(page: 1)
-            }
+            check("2 a single page has a direct edit", targets(textPDF("A letter.")) == [0])
+            check("2 a header-like single page has a direct edit",
+                  targets(textPDF("Extracted text.\nGemini · Flash · 1 May 2026\n\nTrap")) == [0])
+            check("2 an ambiguous three-page file edits every page directly",
+                  targets(pages([one, textPDF("x")])) == [0, 1, 2])
+            check("2 a raw page before a header-like page cannot turn it into a replacement",
+                  targets(pages([textPDF("Front"), textPDF("Letter"), one])) == [0, 1, 2, 3])
+            check("2 ordinary text on both pages is edited directly",
+                  targets(pages([textPDF("A letter."), textPDF("Plain text.")])) == [0, 1])
             if let doc = PDFDocument(data: one), let image = doc.page(at: 0), let text = doc.page(at: 1) {
                 let swapped = PDFDocument()
                 swapped.insert(text, at: 0); swapped.insert(image, at: 1)
-                refused("2 pages in the wrong order are refused", swapped.dataRepresentation() ?? Data()) {
-                    $0 == .imagePageLooksLikeText(page: 0)
-                }
+                check("2 swapped pages are both edited directly", targets(swapped.dataRepresentation() ?? Data()) == [0, 1])
             }
             if let doc = PDFDocument(data: one),
                let enc = doc.dataRepresentation(options: [PDFDocumentWriteOption.userPasswordOption: "",
@@ -152,7 +151,7 @@ enum ReOCRPairsTestDriver {
             guard let newPage = PDFDocument(data: page)?.page(at: 0) else { check("3 the page is made", false); return }
             let parsed = PDFHeaderParser.parse(newPage)
             let h = parsed.header
-            check("3 the original filename reads back as before", h?.originalFilename == p1[0].header.originalFilename, "\(String(describing: h))")
+            check("3 the original filename reads back as before", h?.originalFilename == p1[0].header?.originalFilename, "\(String(describing: h))")
             check("3 the classification is the pair's, not the reading's", h?.classification == "Document Start")
             check("3 the source date is kept", h?.documentDate == "12 March 1952" && h?.sentWith == nil)
             check("3 the new Kind is written", h?.kind == .handwritten)
@@ -178,8 +177,8 @@ enum ReOCRPairsTestDriver {
             // (W44.reocr-header-longname), so the replacement page keeps the name.
             switch ReOCRPairs.validate(try Data(contentsOf: long)) {
             case .success(let pl):
-                check("3 a long underscored name is read", pl[0].header.originalFilename?.replacingOccurrences(of: "\n", with: "") == longName,
-                      "\(String(describing: pl[0].header.originalFilename))")
+                check("3 a long underscored name is read", pl[0].header?.originalFilename?.replacingOccurrences(of: "\n", with: "") == longName,
+                      "\(String(describing: pl[0].header?.originalFilename))")
                 let made = try? ReOCRPairs.replacementPage(for: pl[0], result: reading, model: model, kind: nil)
                 let kept = made.flatMap { PDFDocument(data: $0)?.page(at: 0) }.map { PDFHeaderParser.parse($0) }
                 check("3 a long underscored name is kept", kept?.header?.originalFilename?.replacingOccurrences(of: "\n", with: "") == longName
@@ -196,7 +195,7 @@ enum ReOCRPairsTestDriver {
             guard case .success(let after) = ReOCRPairs.validate(cand) else { check("4 the candidate validates", false); return }
             check("4 the candidate still has three pairs", after.count == 3)
             check("4 pair 2 has its new Kind and kept classification",
-                  after[1].header.kind == .printed && after[1].header.classification == "Continuation", "\(after[1].header)")
+                  after[1].header?.kind == .printed && after[1].header?.classification == "Continuation", "\(String(describing: after[1].header))")
             check("4 pairs 1 and 3 keep their headers", after[0].header == p3[0].header && after[2].header == p3[2].header)
             let text = PDFDocument(data: cand)?.page(at: 3)?.string ?? ""
             check("4 page 4 reads the new text", text.contains("New reading of image 3.") && !text.contains("Old reading of image 3."))

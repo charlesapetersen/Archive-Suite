@@ -133,7 +133,7 @@ struct ReOCRJob {
             let existingLayers = try ReOCRIncrementalWriter.hiddenTextPages(original, indexes: selected.map(\.imageIndex))
             for pair in selected {
                 try Task.checkCancellation()
-                let kind = kinds[pair.textIndex] ?? pair.header.kind
+                let kind = kinds[pair.textIndex] ?? pair.header?.kind
                 let oldText = oldDoc?.page(at: pair.textIndex).map {
                     pair.isSearchable ? ($0.string ?? "") : PDFHeaderParser.parse($0).body
                 } ?? ""
@@ -149,7 +149,7 @@ struct ReOCRJob {
                     let pageModel = pageModels[pair.textIndex] ?? model
                     let written: OCRPageKind?
                     if pair.isSearchable {
-                        written = pair.header.kind
+                        written = pair.header?.kind
                     } else {
                         let page = try ReOCRPairs.replacementPage(
                             for: pair, result: reading, model: pageModel, kind: kind,
@@ -159,10 +159,6 @@ struct ReOCRJob {
                         written = PDFDocument(data: page)?.page(at: 0).flatMap { PDFHeaderParser.parse($0).header?.kind }
                     }
                     let hasLayer = existingLayers.contains(pair.imageIndex)
-                    let scanText = oldDoc?.page(at: pair.imageIndex)?.string ?? ""
-                    if !hasLayer && (pair.isSearchable || !scanText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
-                        throw ReOCRPairs.Refusal.unsupportedLayer(page: pair.imageIndex)
-                    }
                     let runReader = TextLayerRule.runReader(model: pageModel, gateway: gatewayDisplayName,
                                                             localAgent: localAgentModelName)
                     let placement = TextLayerRule.decide(kind: TextLayerRule.kind(explicit: kind, result: reading),
@@ -170,7 +166,7 @@ struct ReOCRJob {
                                                          readerModel: TextLayerRule.readerModel(of: reading, run: runReader),
                                                          handPlacerInstalled: HandPlacer.isInstalled())
                     layers[pair.imageIndex] = try await ReOCRLayer.make(from: original, pageIndex: pair.imageIndex,
-                                                                       reading: text, required: hasLayer,
+                                                                       reading: text, required: pair.isSearchable || hasLayer,
                                                                        scratch: scratch, placement: placement)
                     try Task.checkCancellation()
                     results.append(PairResult(pair: pair, oldText: oldText, kind: written, outcome: .success(text)))

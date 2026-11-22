@@ -4,22 +4,13 @@ import PDFKit
 
 // MARK: - Improve OCR: which pages may be read again, and their new text pages (W44.reocr-processor)
 
-/// The suite image/text pairs or single searchable page of a file, positively validated before any in-place work (`execution-plans/reocr/
-/// 00-plan.md` §4), and the replacement text page for a pair (§2).
-///
-/// A suite-marked searchable page qualifies on its own. For pairs, the file must open unlocked, have an even
-/// number of pages, at least two, and every odd page (the
-/// second of each pair) begins with the suite header and carries a provenance line, and no even page (an image page)
-/// reads as a suite header. An even page count alone proves nothing. A raw one-page or image-only original, an odd
-/// or mixed structure, an encrypted file and a header-like trap are refused with the reason; the separate-output
-/// re-OCR route is the one for them. Signed files and cross-reference streams are refused later by
-/// `ReOCRIncrementalWriter`, which also proves the candidate kept everything else.
+/// Recognizes suite pairs and searchable pages. Every other page can receive searchable text on the page itself.
 enum ReOCRPairs {
     struct Pair: Equatable, Sendable {
-        /// 0-based page indices. For a searchable PDF the two refer to the same page.
+        /// 0-based page indices. For a direct layer edit the two refer to the same page.
         let imageIndex: Int
         let textIndex: Int
-        let header: PDFPageHeader
+        let header: PDFPageHeader?
 
         var isSearchable: Bool { imageIndex == textIndex }
     }
@@ -27,35 +18,21 @@ enum ReOCRPairs {
     enum Refusal: Error, Equatable, CustomStringConvertible {
         case unreadable
         case locked
-        case notPaired(pages: Int)
-        case textPageWithoutHeader(page: Int)
-        case textPageWithoutProvenance(page: Int)
-        case imagePageLooksLikeText(page: Int)
-        case unknownClassification(page: Int, String)
+        case signed
         case noReading(page: Int, String)
         case pageNotMade(page: Int)
         case layerNotMade(page: Int)
-        case unsupportedLayer(page: Int)
         case headerNotKept(page: Int, String)
-        case searchable(page: Int)
 
         var description: String {
             switch self {
             case .unreadable: "the file does not open as a PDF"
             case .locked: "the file is encrypted"
-            case .notPaired(let n):
-                n < 2 ? "the file is a single page, not an image page with its text page; use Reprocess to make a new file"
-                    : "the file has \(n) pages, not image and text pages in pairs"
-            case .textPageWithoutHeader(let p): "page \(p + 1) is not a suite text page (it does not begin with “Extracted text.”)"
-            case .textPageWithoutProvenance(let p): "page \(p + 1) has no reader line in its header"
-            case .imagePageLooksLikeText(let p): "page \(p + 1) should be an image page but reads as a text page"
-            case .unknownClassification(let p, let c): "page \(p + 1) has a classification this app does not write (“\(c)”)"
+            case .signed: "the file carries a digital signature"
             case .noReading(let p, let why): "page \(p + 1) was not read: \(why)"
-            case .unsupportedLayer(let p): "the existing text on image page \(p + 1) is not a supported invisible layer"
             case .layerNotMade(let p): "the new searchable text for page \(p + 1) could not be written and read back"
             case .pageNotMade(let p): "the new text page for page \(p + 1) could not be made"
             case .headerNotKept(let p, let what): "the new text page for page \(p + 1) would change its \(what)"
-            case .searchable(let p): "page \(p + 1) is searchable, but this file is not a supported single-page searchable PDF"
             }
         }
     }
@@ -63,31 +40,45 @@ enum ReOCRPairs {
     static func validate(_ data: Data) -> Result<[Pair], Refusal> {
         guard let doc = PDFDocument(data: data) else { return .failure(.unreadable) }
         if doc.isEncrypted || doc.isLocked { return .failure(.locked) }
+        switch ReOCRIncrementalWriter.eligibility(of: data) {
+        case .success: break
+        case .failure(.encrypted): return .failure(.locked)
+        case .failure(.signed): return .failure(.signed)
+        case .failure: return .failure(.unreadable)
+        }
         let count = doc.pageCount
-        if let p = PDFPageRole.roles(of: doc).firstIndex(of: .searchable) {
-            guard count == 1, let quartz = doc.documentRef,
-                  let entries = PDFHeaderCarrier.pages(of: quartz), let carried = entries[0],
-                  let header = PDFHeaderParser.parse(carried).header else { return .failure(.searchable(page: p)) }
-            guard header.rawProvenance != nil else { return .failure(.textPageWithoutProvenance(page: p)) }
-            return .success([Pair(imageIndex: p, textIndex: p, header: header)])
+        guard count > 0 else { return .failure(.unreadable) }
+        let carrier = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:))
+        let carried = carrier.flatMap { $0.count == count ? $0 : nil }
+        let roles = PDFPageRole.roles(carried: carried ?? [], pageCount: count)
+        var headers: [PDFPageHeader?] = []
+        for index in 0..<count {
+            guard let page = doc.page(at: index) else { return .failure(.unreadable) }
+            headers.append(PDFHeaderParser.parse(page).header)
         }
-        guard count >= 2, count % 2 == 0 else { return .failure(.notPaired(pages: count)) }
-        var pairs: [Pair] = []
-        for imageIndex in stride(from: 0, to: count, by: 2) {
-            guard let image = doc.page(at: imageIndex), let text = doc.page(at: imageIndex + 1) else {
-                return .failure(.unreadable)
+
+        // Only replace separate text pages if the entire arrangement agrees with the suite's roles.
+        // A header-like page in an ambiguous file is kept, like any other original page.
+        let suiteLayout = roles.indices.allSatisfy { index in
+            switch roles[index] {
+            case .image: headers[index] == nil && index + 1 < count && roles[index + 1] == .text
+            case .text:
+                headers[index]?.rawProvenance != nil
+                    && (headers[index]?.classification.map { classification($0) != nil } ?? true)
+            case .searchable: true
             }
-            if PDFHeaderParser.parse(image).header != nil { return .failure(.imagePageLooksLikeText(page: imageIndex)) }
-            guard let header = PDFHeaderParser.parse(text).header else {
-                return .failure(.textPageWithoutHeader(page: imageIndex + 1))
-            }
-            guard header.rawProvenance != nil else { return .failure(.textPageWithoutProvenance(page: imageIndex + 1)) }
-            if let c = header.classification, classification(c) == nil {
-                return .failure(.unknownClassification(page: imageIndex + 1, c))
-            }
-            pairs.append(Pair(imageIndex: imageIndex, textIndex: imageIndex + 1, header: header))
         }
-        return .success(pairs)
+        let targets: [Pair] = roles.indices.compactMap { index in
+            if suiteLayout {
+                if roles[index] == .image { return nil }
+                if roles[index] == .text {
+                    return Pair(imageIndex: index - 1, textIndex: index, header: headers[index])
+                }
+            }
+            let header = carried?[index].flatMap { PDFHeaderParser.parse($0).header }
+            return Pair(imageIndex: index, textIndex: index, header: header)
+        }
+        return .success(targets)
     }
 
     /// The classification a header line names, by the display name `makeTextPage` writes.
@@ -112,16 +103,17 @@ enum ReOCRPairs {
     static func replacementPage(for pair: Pair, result: OCRResult, model: LLMModel, kind: OCRPageKind?,
                                 gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil,
                                 localAgentModelName: String? = nil) throws -> Data {
+        guard !pair.isSearchable, let old = pair.header else { throw Refusal.pageNotMade(page: pair.textIndex) }
         let text = try readingText(result, page: pair.textIndex)
-        let kept = OCRResult(text: text, classification: pair.header.classification.flatMap(classification),
+        let kept = OCRResult(text: text, classification: old.classification.flatMap(classification),
                              rotationDegrees: result.rotationDegrees, errorMessage: result.errorMessage,
                              errorCode: result.errorCode, secondReader: result.secondReader,
                              pageReader: result.pageReader, imported: result.imported)
-        let dates = PDFSourceDates(documentDate: pair.header.documentDate, sentWith: pair.header.sentWith,
-                                   dateEvidence: pair.header.dateEvidence, itemFields: pair.header.itemFields)
+        let dates = PDFSourceDates(documentDate: old.documentDate, sentWith: old.sentWith,
+                                   dateEvidence: old.dateEvidence, itemFields: old.itemFields)
         // PDFKit reads a wrapped or underscore-split filename back as several lines; the written name never holds a
         // line break (`makeTextPage` turns control characters into spaces), so the lines join with nothing between.
-        let filename = pair.header.originalFilename?.replacingOccurrences(of: "\n", with: "")
+        let filename = old.originalFilename?.replacingOccurrences(of: "\n", with: "")
         guard let page = PDFGenerator().textPageData(result: kept, model: model, originalFileName: filename,
                                                      gatewayDisplayName: gatewayDisplayName,
                                                      localAgentDisplayName: localAgentDisplayName,
@@ -133,7 +125,6 @@ enum ReOCRPairs {
         guard let made = PDFDocument(data: page)?.page(at: 0), let h = PDFHeaderParser.parse(made).header else {
             throw Refusal.pageNotMade(page: pair.textIndex)
         }
-        let old = pair.header
         if h.originalFilename != old.originalFilename { throw Refusal.headerNotKept(page: pair.textIndex, "original filename") }
         if h.classification != old.classification { throw Refusal.headerNotKept(page: pair.textIndex, "classification") }
         if h.documentDate != old.documentDate || h.sentWith != old.sentWith || h.dateEvidence != old.dateEvidence {

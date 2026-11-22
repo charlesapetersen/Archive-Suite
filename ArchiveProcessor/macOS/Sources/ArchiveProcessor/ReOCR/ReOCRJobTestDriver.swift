@@ -253,16 +253,8 @@ enum ReOCRJobTestDriver {
                 check("4 the new header has the chosen Kind", header?.kind == .forms, "\(String(describing: header))")
             }
 
-            // 5. Ineligible.
-            do {
-                let d = try folder("ineligible"), j = job(d), reader = FakeReader()
-                let f = d.appendingPathComponent("raw.pdf")
-                let doc = PDFDocument(); doc.insert(PDFPage(), at: 0); try doc.dataRepresentation()?.write(to: f)
-                do { _ = try await j.start(file: f, root: archive(d), model: model, read: reader.read); check("5 a one-page file is refused", false) }
-                catch { check("5 a one-page file is refused", { if case ReOCRJob.Failure.notEligible = error { return true }; return false }(), "\(error)") }
-                check("5 nothing was kept or read", reader.calls.isEmpty
-                      && !FileManager.default.fileExists(atPath: j.writer.versionsRoot.path))
-            }
+            try await testEncryptedAndRawScan()
+            try await testRawScanWithVisibleText()
 
             // 6. Changed between run and accept.
             do {
@@ -573,8 +565,6 @@ enum ReOCRJobTestDriver {
                 let img = d.appendingPathComponent("u.jpg"); try jpeg(img, seed: 9)
                 try PDFGenerator().generate(imageURL: img, result: OCRResult(text: "old", classification: nil, errorMessage: nil,
                                             errorCode: nil), model: model, outputURL: unknown, originalFileName: "u.jpg")
-                let raw = d.appendingPathComponent("raw.pdf")
-                let one = PDFDocument(); one.insert(PDFPage(), at: 0); try one.dataRepresentation()?.write(to: raw)
                 var res = SettingsResources(macMemoryGB: 16)
                 res.keys = ["gemini", "openai", "anthropic", "mistral", "openrouter"]
                 let m = ReOCRDialogModel(table: table, pairs: OCRPairMatrix.bundled,
@@ -586,10 +576,9 @@ enum ReOCRJobTestDriver {
                 check("13 the Reader's chosen pairs are the only pages offered (one past the end ignored)",
                       picked.pages.map(\.pairIndex) == [3], "\(picked.pages.map(\.pairIndex))")
                 var progress: [Int] = []
-                await m.loadFiles([typed, unknown, raw]) { progress.append($0) }
-                check("13 the load reports each checked file", progress == [1, 2, 3])
-                check("13 every file is listed, the raw one refused", m.files.count == 3
-                      && { if case .failure = m.files[2].eligibility { return true }; return false }())
+                await m.loadFiles([typed, unknown]) { progress.append($0) }
+                check("13 the load reports each checked file", progress == [1, 2])
+                check("13 every file is listed", m.files.count == 2)
                 let call = m.pages.first { $0.fileID == unknown.path }
                 check("13 the classifier gives the unknown page a provisional Kind", call?.origin == .classifier && call?.kind != nil
                       && m.pages.first { $0.fileID == typed.path }?.origin == .header, "\(String(describing: call))")
@@ -629,7 +618,7 @@ enum ReOCRJobTestDriver {
                         let refreshed = m.pages.first { $0.fileID == unknown.path }
                         check("13 refresh reads the accepted Kind and reader back from disk",
                               refreshed?.origin == .header && refreshed?.kind == .forms
-                              && m.files[1].pair(at: 1)?.header.provenance == h?.provenance)
+                              && m.files[1].pair(at: 1)?.header?.provenance == h?.provenance)
                     }
                 } else {
                     check("13 with every key, a ready reader exists for each Kind", false, m.runBlocker ?? "")
@@ -902,6 +891,114 @@ enum ReOCRJobTestDriver {
             }
         } catch {
             check("no error is thrown", false, "\(error)")
+        }
+    }
+
+    private static func testEncryptedAndRawScan() async throws {
+        let d = try folder("raw"), j = job(d), reader = FakeReader()
+        let image = d.appendingPathComponent("scan.jpg")
+        try jpeg(image, seed: 2)
+        let original = handPDF(content: "q 200 0 0 250 0 0 cm /Im0 Do Q",
+                               jpeg: try Data(contentsOf: image), imageExtra: "", resources: "")
+        let encrypted = d.appendingPathComponent("encrypted.pdf")
+        let enc = PDFDocument(data: original)?.dataRepresentation(options: [
+            PDFDocumentWriteOption.userPasswordOption: "test", PDFDocumentWriteOption.ownerPasswordOption: "owner",
+        ])
+        if let enc {
+            try enc.write(to: encrypted)
+            do {
+                _ = try await j.start(file: encrypted, root: archive(d), model: model, read: reader.read)
+                check("5 an encrypted file is refused", false)
+            } catch {
+                check("5 an encrypted file is refused", error as? ReOCRJob.Failure == .notEligible(.locked), "\(error)")
+            }
+            check("5 nothing was kept or read", reader.calls.isEmpty
+                  && !FileManager.default.fileExists(atPath: j.writer.versionsRoot.path))
+        } else { check("5 the encrypted fixture is written", false) }
+
+        let raw = d.appendingPathComponent("raw.pdf")
+        try original.write(to: raw)
+        let review = try await j.start(file: raw, root: archive(d), kinds: [0: .forms], model: model, read: reader.read)
+        check("5 the one-page original has a candidate", review.replacedImagePages == [0],
+              review.candidateProblem ?? "")
+        if review.candidate != nil {
+            check("5 review leaves the raw file untouched", (try? Data(contentsOf: raw)) == original)
+            let done = try j.accept(review)
+            let published = PDFDocument(url: raw)
+            let receipt = try? ImproveOCRReceipt.read(ImproveOCRReceipt.url(for: done.journal.operationID, in: j.support))
+            check("5 the accepted reading is searchable on the only page", published?.pageCount == 1
+                  && (published?.page(at: 0)?.string ?? "").contains("New reading of image page 1."))
+            check("5 the receipt names page zero", receipt?.textPages == [0])
+            _ = try j.restore(done.journal.operationID)
+            check("5 restore returns the original bytes", (try? Data(contentsOf: raw)) == original)
+        }
+    }
+
+    private static func testRawScanWithVisibleText() async throws {
+        let d = try folder("raw-visible"), j = job(d), reader = FakeReader()
+        let image = d.appendingPathComponent("scan.jpg"), source = d.appendingPathComponent("source.pdf")
+        try jpeg(image, seed: 3)
+        let original = handPDF(content: "q 150 0 0 150 20 65 cm /Im0 Do Q BT /F1 18 Tf 20 25 Td (Visible words) Tj ET",
+                               jpeg: try Data(contentsOf: image), imageExtra: "",
+                               resources: "/Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >>")
+        try original.write(to: source)
+        var inputs = [source]
+        if let qpdf = ["/opt/homebrew/bin/qpdf", "/usr/local/bin/qpdf"].first(where: {
+            FileManager.default.isExecutableFile(atPath: $0)
+        }) {
+            let compressed = d.appendingPathComponent("stream.pdf")
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: qpdf)
+            process.arguments = ["--object-streams=generate", source.path, compressed.path]
+            try process.run()
+            process.waitUntilExit()
+            let data = try Data(contentsOf: compressed)
+            check("5b qpdf creates a cross-reference stream", process.terminationStatus == 0
+                  && ReOCRIncrementalWriter.endsInCrossReferenceStream(data))
+            inputs.append(compressed)
+        }
+        let multi = PDFDocument()
+        for index in 0..<3 {
+            guard let document = PDFDocument(data: original), let page = document.page(at: 0) else {
+                check("5b the ordinary multipage fixture opens", false)
+                return
+            }
+            multi.insert(page, at: index)
+        }
+        if let data = multi.dataRepresentation() {
+            let rawMulti = d.appendingPathComponent("ordinary-multipage.pdf")
+            try data.write(to: rawMulti)
+            let review = try await j.start(file: rawMulti, root: archive(d), model: model, read: reader.read)
+            if let candidate = review.candidate, let result = PDFDocument(data: candidate) {
+                let pages = (0..<result.pageCount).map { result.page(at: $0)?.string ?? "" }
+                check("5b each ordinary page gets only its own reading and keeps visible text",
+                      result.pageCount == 3 && pages.enumerated().allSatisfy { index, text in
+                          text.contains("Visible words") && text.contains("New reading of image page \(index + 1).")
+                      }, "\(pages)")
+                let done = try j.accept(review)
+                _ = try j.restore(done.journal.operationID)
+                check("5b the ordinary multipage original restores byte for byte",
+                      (try? Data(contentsOf: rawMulti)) == data)
+            } else {
+                check("5b a multipage PDF outside suite pairs has a candidate", false, review.candidateProblem ?? "")
+                try j.reject(review)
+            }
+        } else { check("5b the ordinary multipage fixture serializes", false) }
+
+        for input in inputs {
+            let before = try Data(contentsOf: input)
+            let review = try await j.start(file: input, root: archive(d), kinds: [0: .forms], model: model, read: reader.read)
+            guard let candidate = review.candidate else {
+                check("5b candidate for \(input.lastPathComponent)", false, review.candidateProblem ?? "")
+                try j.reject(review)
+                continue
+            }
+            let extracted = PDFDocument(data: candidate)?.page(at: 0)?.string ?? ""
+            check("5b \(input.lastPathComponent) keeps visible words and gains searchable OCR",
+                  extracted.contains("Visible words") && extracted.contains("New reading of image page 1."), extracted)
+            let done = try j.accept(review)
+            _ = try j.restore(done.journal.operationID)
+            check("5b \(input.lastPathComponent) restores the exact original", (try? Data(contentsOf: input)) == before)
         }
     }
 

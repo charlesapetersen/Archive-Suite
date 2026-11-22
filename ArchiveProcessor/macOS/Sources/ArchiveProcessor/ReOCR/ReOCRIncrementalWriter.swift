@@ -5,10 +5,10 @@ import PDFKit
 
 // MARK: - Improve OCR: the byte-preserving candidate (W44.reocr-processor)
 
-/// Builds an Improve OCR candidate as an **incremental revision** of the original, through the pinned static PDFium
+/// Builds an Improve OCR candidate through the pinned static PDFium
 /// (`scripts/bootstrap-pdfium.sh`; owner, 2026-11-12). Each replaced text page is imported from a one-page PDF made
 /// by `PDFGenerator.textPageData` at its old position, the old page leaves the page tree, and PDFium saves with
-/// `FPDF_INCREMENTAL`, which writes the original file first and appends the revision after it.
+/// `FPDF_INCREMENTAL` for table-based files, or a full save for cross-reference stream files.
 ///
 /// Invisible layers are edited on the existing scan page with its page identity, geometry and annotations. The
 /// old invisible objects are removed, and the new transparent layer is inserted as a Form XObject.
@@ -23,7 +23,6 @@ enum ReOCRIncrementalWriter {
         case originalUnreadable(code: UInt)
         case encrypted
         case signed
-        case crossReferenceStream
         case replacementUnreadable(page: Int)
         case replacementNotOnePage(page: Int)
         case pageOutOfRange(page: Int)
@@ -38,7 +37,6 @@ enum ReOCRIncrementalWriter {
             case .originalUnreadable(let code): "PDFium cannot open the original (error \(code))"
             case .encrypted: "the original is encrypted"
             case .signed: "the original carries a digital signature"
-            case .crossReferenceStream: "the original ends in a cross-reference stream, which this writer cannot extend safely"
             case .replacementUnreadable(let p): "the new text for page \(p + 1) does not open as a PDF"
             case .replacementNotOnePage(let p): "the new text for page \(p + 1) is not exactly one page"
             case .pageOutOfRange(let p): "page \(p + 1) is not in the file"
@@ -50,8 +48,7 @@ enum ReOCRIncrementalWriter {
         }
     }
 
-    /// The candidate bytes: `original` byte for byte, then a revision whose page `i` (0-based) is the single page of
-    /// `replacements[i]`, every other page unchanged. Throws rather than return a candidate that fails the check.
+    /// Return a verified candidate whose page `i` (0-based) is the single page of `replacements[i]`.
     static func candidate(original: Data, replacements: [Int: Data]) throws -> Data {
         try candidate(original: original, replacements: replacements, layers: [:]).bytes
     }
@@ -60,11 +57,13 @@ enum ReOCRIncrementalWriter {
         -> (bytes: Data, layerPages: Set<Int>) {
         guard !replacements.isEmpty || !layers.isEmpty else { throw Failure.noReplacements }
         if isSignedOrCertified(original) { throw Failure.signed }
-        if endsInCrossReferenceStream(original) { throw Failure.crossReferenceStream }
-        let revised = try PDFium.serialized { try revise(original, replacements, layers) }
+        let rewrite = endsInCrossReferenceStream(original)
+        let flags = rewrite ? FPDF_NO_INCREMENTAL : FPDF_INCREMENTAL
+        let revised = try PDFium.serialized { try revise(original, replacements, layers, flags: flags) }
         let layerPages = Set(layers.keys)
         let problems = ReOCRPreservationCheck.problems(original: original, candidate: revised,
-                                                       replacing: Set(replacements.keys), editingLayers: layerPages)
+                                                       replacing: Set(replacements.keys), editingLayers: layerPages,
+                                                       requiresOriginalPrefix: !rewrite)
             + replacedPageProblems(candidate: revised, replacements: replacements)
         guard problems.isEmpty else { throw Failure.notPreserved(problems) }
         try verifyLayerObjects(revised, indexes: layerPages)
@@ -79,34 +78,68 @@ enum ReOCRIncrementalWriter {
         return (revised, layerPages)
     }
 
-    /// PDFium counts only signature fields with a value at the top of the form; a certified file (`/Perms`) or one whose
-    /// form says it holds signatures (`/SigFlags` bit 1) is refused too, so no revision is ever appended to a signed
-    /// document and shown as "modified after signing".
-    private static func isSignedOrCertified(_ data: Data) -> Bool {
-        // Hold the document: its catalog is borrowed from it and dies with it.
-        guard let doc = ReOCRPreservationCheck.document(data) else { return false }
-        return withExtendedLifetime(doc) { () -> Bool in
-            guard let catalog = doc.catalog else { return false }
-        var perms: CGPDFDictionaryRef?
-        if CGPDFDictionaryGetDictionary(catalog, "Perms", &perms) { return true }
-        var form: CGPDFDictionaryRef?
-        var flags: CGPDFInteger = 0
-        if CGPDFDictionaryGetDictionary(catalog, "AcroForm", &form), let form,
-           CGPDFDictionaryGetInteger(form, "SigFlags", &flags), flags & 1 != 0 { return true }
-            return false
+    /// Check before offering a file for OCR, and again when building its candidate.
+    static func eligibility(of original: Data) -> Result<Void, Failure> {
+        if isSignedOrCertified(original) { return .failure(.signed) }
+        return PDFium.serialized {
+            original.withUnsafeBytes { raw in
+                switch openOriginal(raw) {
+                case .success(let doc):
+                    FPDF_CloseDocument(doc)
+                    return .success(())
+                case .failure(let error): return .failure(error)
+                }
+            }
         }
+    }
+
+    /// PDFium's signature enumeration misses fields nested under another form field. Quartz can also see
+    /// certification and usage-rights signatures stored in the catalog.
+    private static func isSignedOrCertified(_ data: Data) -> Bool {
+        guard let doc = ReOCRPreservationCheck.document(data) else { return false }
+        defer { withExtendedLifetime(doc) {} }
+        guard let catalog = doc.catalog else { return false }
+        var perms: CGPDFDictionaryRef?
+        if CGPDFDictionaryGetDictionary(catalog, "Perms", &perms), let perms {
+            for key in ["DocMDP", "UR", "UR3"] {
+                var value: CGPDFObjectRef?
+                if CGPDFDictionaryGetObject(perms, key, &value) { return true }
+            }
+        }
+        var form: CGPDFDictionaryRef?
+        guard CGPDFDictionaryGetDictionary(catalog, "AcroForm", &form), let form else { return false }
+        var fields: CGPDFArrayRef?
+        guard CGPDFDictionaryGetArray(form, "Fields", &fields), let fields else { return false }
+        var visited = Set<CGPDFDictionaryRef>()
+        var pending = [(fields, false)]
+        while let (fields, inheritedSignatureType) = pending.popLast() {
+            for index in 0..<CGPDFArrayGetCount(fields) {
+                var field: CGPDFDictionaryRef?
+                guard CGPDFArrayGetDictionary(fields, index, &field), let field,
+                      visited.insert(field).inserted else { continue }
+                var type: UnsafePointer<CChar>?
+                let signatureType = CGPDFDictionaryGetName(field, "FT", &type)
+                    ? type.map { String(cString: $0) == "Sig" } ?? false : inheritedSignatureType
+                var value: CGPDFDictionaryRef?
+                if signatureType && CGPDFDictionaryGetDictionary(field, "V", &value) { return true }
+                var children: CGPDFArrayRef?
+                if CGPDFDictionaryGetArray(field, "Kids", &children), let children {
+                    pending.append((children, signatureType))
+                }
+            }
+        }
+        return false
     }
 
     /// Whether the file's last cross-reference section is a stream (PDF 1.5) rather than an `xref` table. The pinned
     /// PDFium writes a broken revision after one (its new cross-reference stream has no `endobj`, and Quartz will not
-    /// open the result; measured 2026-11-12 on qpdf's object-stream output), so such a file is refused before PDFium
-    /// sees it. The Processor's own output is written by Quartz with tables.
+    /// open the result), so use PDFium's full save for those files. The Processor's own output uses tables.
     static func endsInCrossReferenceStream(_ data: Data) -> Bool {
         let tail = data.suffix(1024)
         // No readable pointer: not this question. PDFium then refuses the file or repairs it, and a repaired file's
         // revision still has to pass the preservation check.
         guard let range = tail.range(of: Data("startxref".utf8), options: .backwards) else { return false }
-        let digits = tail[range.upperBound...].drop { $0 == 0x20 || $0 == 0x0A || $0 == 0x0D }.prefix { (0x30...0x39).contains($0) }
+        let digits = tail[range.upperBound...].drop { [0x00, 0x09, 0x0A, 0x0C, 0x0D, 0x20].contains($0) }.prefix { (0x30...0x39).contains($0) }
         guard let offset = Int(String(decoding: digits, as: UTF8.self)), offset >= 0, offset < data.count else { return false }
         return !data[(data.startIndex + offset)...].prefix(4).elementsEqual(Data("xref".utf8))
     }
@@ -129,15 +162,32 @@ enum ReOCRIncrementalWriter {
 
     // MARK: PDFium, under one lock
 
-    private static func revise(_ original: Data, _ replacements: [Int: Data], _ layers: [Int: ReOCRLayer]) throws -> Data {
-        try original.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
-            guard let doc = FPDF_LoadMemDocument64(raw.baseAddress, raw.count, nil) else {
-                let code = FPDF_GetLastError()
-                throw code == UInt(FPDF_ERR_PASSWORD) ? Failure.encrypted : Failure.originalUnreadable(code: code)
+    private static func openOriginal(_ raw: UnsafeRawBufferPointer) -> Result<FPDF_DOCUMENT, Failure> {
+        guard let doc = FPDF_LoadMemDocument64(raw.baseAddress, raw.count, nil) else {
+            let code = FPDF_GetLastError()
+            return .failure(code == UInt(FPDF_ERR_PASSWORD) ? .encrypted : .originalUnreadable(code: code))
+        }
+        if FPDF_GetSecurityHandlerRevision(doc) != -1 {
+            FPDF_CloseDocument(doc)
+            return .failure(.encrypted)
+        }
+        // PDFium can count empty signature fields. Require signature data in this check.
+        for index in 0..<max(0, FPDF_GetSignatureCount(doc)) {
+            guard let signature = FPDF_GetSignatureObject(doc, index) else { continue }
+            if FPDFSignatureObj_GetContents(signature, nil, 0) > 0
+                || FPDFSignatureObj_GetByteRange(signature, nil, 0) > 0 {
+                FPDF_CloseDocument(doc)
+                return .failure(.signed)
             }
+        }
+        return .success(doc)
+    }
+
+    private static func revise(_ original: Data, _ replacements: [Int: Data], _ layers: [Int: ReOCRLayer],
+                               flags: Int32) throws -> Data {
+        try original.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+            let doc = try openOriginal(raw).get()
             defer { FPDF_CloseDocument(doc) }
-            if FPDF_GetSecurityHandlerRevision(doc) != -1 { throw Failure.encrypted }
-            if FPDF_GetSignatureCount(doc) > 0 { throw Failure.signed }
             let count = Int(FPDF_GetPageCount(doc))
             for (index, data) in replacements.sorted(by: { $0.key < $1.key }) {
                 guard index >= 0, index < count else { throw Failure.pageOutOfRange(page: index) }
@@ -159,7 +209,7 @@ enum ReOCRIncrementalWriter {
                 guard index >= 0, index < count, replacements[index] == nil else { throw Failure.pageOutOfRange(page: index) }
                 try editLayer(layer, in: doc, index: index)
             }
-            return try PDFium.save(doc, flags: FPDF_INCREMENTAL)
+            return try PDFium.save(doc, flags: flags)
         }
     }
 

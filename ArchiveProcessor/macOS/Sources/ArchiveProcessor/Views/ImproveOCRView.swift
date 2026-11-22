@@ -617,7 +617,7 @@ struct ImproveOCRView: View {
                     }
                     if pairs.count > 1 {
                         ForEach(pages, id: \.pairIndex) { page in
-                            let pageNumber = page.pairIndex   // the one-based image page number in the PDF
+                            let pageNumber = (file.pair(at: page.pairIndex)?.imageIndex ?? page.pairIndex) + 1
                             HStack(alignment: .firstTextBaseline) {
                                 Text("Page \(pageNumber)").foregroundStyle(.secondary)
                                 pageControls(page, file: file, label: "Kind for page \(pageNumber)", idSuffix: ".\(pageNumber)")
@@ -642,7 +642,7 @@ struct ImproveOCRView: View {
     private func pageControls(_ page: ReOCRPageChoice, file: ReOCRDialogModel.FileEntry,
                               label: String, idSuffix: String) -> some View {
         HStack {
-            if let pair = file.pair(at: page.pairIndex), let reader = pair.header.provenance {
+            if let pair = file.pair(at: page.pairIndex), let reader = pair.header?.provenance {
                 let label = pair.isSearchable ? "originally read by" : "now read by"
                 Text("\(label) \(reader.provider) · \(reader.model)")
                     .lineLimit(1)

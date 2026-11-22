@@ -13,7 +13,7 @@ final class ReOCRDialogModel {
     struct FileEntry: Identifiable, Sendable {
         let id: String
         let url: URL
-        /// The pairs, or why the file cannot be improved in place (the separate-output route is the one for it).
+        /// The pages available for Improve OCR, or the reason the file cannot be opened for it.
         let eligibility: Result<[ReOCRPairs.Pair], ReOCRPairs.Refusal>
         /// W47.wh-yolo-scans-reocr: its collection's detector for scanned newspapers, which its pages are read with.
         let scanDetector: NewspaperDetector
@@ -91,11 +91,19 @@ final class ReOCRDialogModel {
         let data = (try? Data(contentsOf: url)) ?? Data()
         let eligibility = ReOCRPairs.validate(data)
         let file = FileEntry(id: url.path, url: url, eligibility: eligibility, scanDetector: scanDetector)
-        let wanted = selectedPairs.map(Set.init)
         let found = (try? eligibility.get()) ?? []
-        var choices = found.filter { wanted?.contains($0.imageIndex / 2) ?? true }.map { pair in
-            ReOCRPageChoice(fileID: file.id, pairIndex: pair.textIndex, kind: pair.header.kind,
-                           origin: pair.header.kind == nil ? nil : .header, confidence: nil)
+        let targets: [ReOCRPairs.Pair]
+        if let selectedPairs {
+            let wanted = Set(selectedPairs)
+            // Explicit handoffs number separate suite pairs. A single suite searchable page also uses slot zero.
+            let numbered = found.count == 1 && found[0].header != nil ? found : found.filter { !$0.isSearchable }
+            targets = numbered.enumerated().compactMap { wanted.contains($0.offset) ? $0.element : nil }
+        } else {
+            targets = found
+        }
+        var choices = targets.map { pair in
+            ReOCRPageChoice(fileID: file.id, pairIndex: pair.textIndex, kind: pair.header?.kind,
+                           origin: pair.header?.kind == nil ? nil : .header, confidence: nil)
         }
         // A headerless page gets an on-device suggestion from its image.
         guard !Task.isCancelled, choices.contains(where: { $0.origin == nil }) else { return (file, choices) }
@@ -139,7 +147,7 @@ final class ReOCRDialogModel {
         let current: PDFReaderProvenance? = pages.first { $0.settledKind == kind }.flatMap { page in
             guard let pair = files.first(where: { $0.id == page.fileID })?.pair(at: page.pairIndex),
                   !pair.isSearchable else { return nil }
-            return pair.header.provenance
+            return pair.header?.provenance
         }
         return ReOCRRanking.rank(kind: kind, pages: count, table: table, pairs: pairs, resources: resources,
                                  staysOnMac: staysOnMac, noTraining: !trainingProtectedFiles.isEmpty, current: current)

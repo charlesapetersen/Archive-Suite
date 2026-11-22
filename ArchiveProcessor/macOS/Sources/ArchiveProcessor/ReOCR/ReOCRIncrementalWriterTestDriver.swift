@@ -21,7 +21,7 @@ import UniformTypeIdentifiers
 ///   5. A PDFKit whole-file save of the same change is refused by the check, the save this writer exists to avoid.
 ///   6. Pages inheriting MediaBox, Rotate and Resources from the page tree, an annotation and an information
 ///      dictionary all survive; a certified file or a form with signatures is refused.
-///   7. A file ending in a cross-reference stream (qpdf, when installed) is refused: the pinned PDFium extends one
+///   7. A file ending in a cross-reference stream (qpdf, when installed) is rewritten: the pinned PDFium extends one
 ///      into a file Quartz cannot open. Every Processor fixture above ends in a table.
 ///   8. Optionally, scratch copies in `REOCR_WRITER_TEST_EXTRA` (never the corpus itself).
 @MainActor
@@ -182,11 +182,33 @@ enum ReOCRIncrementalWriterTestDriver {
             refuses("6 a certified file (/Perms) is refused",
                     handFile(catalog: "<< /Type /Catalog /Pages 2 0 R /Perms << /DocMDP 12 0 R >> >>"),
                     [1: replacement]) { $0 == .signed }
-            refuses("6 a form that says it holds signatures is refused",
-                    handFile(catalog: "<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [] /SigFlags 3 >> >>"),
-                    [1: replacement]) { $0 == .signed }
+            let unsignedForm = handFile(catalog: """
+                << /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [<< /FT /Sig /T (Unsigned) >>] /SigFlags 3 >> >>
+                """)
+            check("6 an empty signature field is eligible", (try? ReOCRPairs.validate(unsignedForm).get()) != nil)
+            passes("6 an empty signature field survives the candidate save", unsignedForm, replacement)
+            let signedForm = handFile(catalog: """
+                << /Type /Catalog /Pages 2 0 R /AcroForm
+                << /Fields [<< /FT /Sig /T (Group) /Kids [<< /T (Signed) /V 12 0 R >>] >>] >> >>
+                """)
+            if case .failure(.signed) = ReOCRPairs.validate(signedForm) {
+                check("6 a nested signature is refused before the job", true)
+            } else { check("6 a nested signature is refused before the job", false) }
+            refuses("6 a nested signature is refused by the writer", signedForm, [1: replacement]) { $0 == .signed }
 
-            // 7. Cross-reference and object streams, made by qpdf when present; refused up front.
+            let staleHeader = PDFHeaderCarrier.xmpDescriptions(pages: ["Extracted text."])
+            let stale = handFile(catalog: "<< /Type /Catalog /Pages 2 0 R /Metadata 13 0 R >>", xmp: """
+                <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+                \(staleHeader)
+                </rdf:RDF>
+                """)
+            let staleDocument = ReOCRPreservationCheck.document(stale)
+            check("6 a short carrier fixture has only one entry for two pages",
+                  staleDocument.flatMap(PDFHeaderCarrier.pages(of:))?.count == 1)
+            check("6 a short carrier is ignored without losing pages",
+                  (try? ReOCRPairs.validate(stale).get().map(\.textIndex)) == [0, 1])
+
+            // 7. Cross-reference and object streams, made by qpdf when present; saved as full rewrites.
             for (name, data) in [("two-page", two), ("three-pair", six), ("inherited", inherited)] {
                 check("7 the \(name) fixture ends in an xref table", !ReOCRIncrementalWriter.endsInCrossReferenceStream(data))
             }
@@ -204,9 +226,7 @@ enum ReOCRIncrementalWriterTestDriver {
                     }
                     check("7 \(name) is rewritten with a cross-reference stream",
                           ReOCRIncrementalWriter.endsInCrossReferenceStream(data))
-                    refuses("7 \(name) with object streams is refused before PDFium", data, [1: replacement]) {
-                        $0 == .crossReferenceStream
-                    }
+                    passes("7 \(name) with object streams is rewritten and verified", data, replacement)
                 }
             } else {
                 lines.append("INFO 7 skipped: qpdf is not installed")
@@ -233,6 +253,9 @@ enum ReOCRIncrementalWriterTestDriver {
             let c = try ReOCRIncrementalWriter.candidate(original: original, replacements: [1: replacement])
             check(name, pageText(c, 1).contains("A better reading of page one."), "the new text is not on page 2")
             lines.append("INFO \(name): original \(original.count) bytes, revision \(c.count - original.count) bytes")
+            if ReOCRIncrementalWriter.endsInCrossReferenceStream(original) {
+                check("\(name) uses a full save", c.prefix(original.count) != original)
+            }
         } catch {
             check(name, false, "\(error)")
         }
@@ -240,13 +263,13 @@ enum ReOCRIncrementalWriterTestDriver {
 
     /// A hand-written two-page file whose pages inherit MediaBox, Rotate and Resources from the page tree; page 1
     /// draws an image and carries an annotation, and the trailer names an information dictionary.
-    private static func handFile(catalog: String) -> Data {
+    private static func handFile(catalog: String, xmp: String? = nil) -> Data {
         func stream(_ dict: String, _ bytes: Data) -> Data {
             var d = Data("<< \(dict) /Length \(bytes.count) >>\nstream\n".utf8)
             d.append(bytes); d.append(Data("\nendstream".utf8))
             return d
         }
-        let objects: [Int: Data] = [
+        var objects: [Int: Data] = [
             1: Data(catalog.utf8),
             2: Data(("<< /Type /Pages /Kids [3 0 R 6 0 R] /Count 2 /MediaBox [0 0 300 400] /Rotate 90 "
                      + "/Resources << /XObject << /Im1 5 0 R >> /Font << /F1 8 0 R >> >> >>").utf8),
@@ -261,6 +284,7 @@ enum ReOCRIncrementalWriterTestDriver {
             11: Data("<< /Type /Annot /Subtype /Text /Rect [10 10 30 30] /Contents (note) /P 3 0 R >>".utf8),
             12: Data("<< /Type /Sig /Filter /Adobe.PPKLite >>".utf8),
         ]
+        if let xmp { objects[13] = stream("/Type /Metadata /Subtype /XML", Data(xmp.utf8)) }
         var out = Data("%PDF-1.4\n%\u{E2}\u{E3}\u{CF}\u{D3}\n".utf8)
         var offsets: [Int: Int] = [:]
         for n in objects.keys.sorted() {
