@@ -154,11 +154,7 @@ extension OCRProcessor {
             guard let options = SegmentationOptionsStore.shared else { throw SegmentationOptionsError.missingResource }
             // The 2B beside the online model the user chose: only the gaps where the two disagree are put to the
             // user (W46.seg-review-rule). A partner that cannot run stops the run with what it needs, like any voter.
-            if let partner {
-                spec = try options.spec(for: approach, partner: partner)
-            } else {
-                spec = try options.spec(for: approach)
-            }
+            spec = try options.spec(for: approach, partner: partner)
         } catch {
             return await stopOrCheckAll(pages: pages, spec: nil, answered: [:],
                                         message: error.localizedDescription)

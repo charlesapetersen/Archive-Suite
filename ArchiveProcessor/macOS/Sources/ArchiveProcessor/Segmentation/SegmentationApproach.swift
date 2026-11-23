@@ -418,8 +418,9 @@ struct SegmentationOptions: Decodable, Sendable {
     /// (a) and call 7 (b), 2026-11-06): the 2B's boundaries, and the user checks only the gaps where the partner
     /// decides otherwise. Each voter reads its pages at the size it was measured at, so the one-size rule of a mix
     /// does not apply. The partner's own level is not used: the measured rule is disagreement alone.
-    func spec(for a: SegmentationApproach, partner: SegmentationApproach) throws -> ApproachSpec {
+    func spec(for a: SegmentationApproach, partner: SegmentationApproach?) throws -> ApproachSpec {
         let first = try spec(for: a)
+        guard let partner else { return first }
         guard a == .local, Self.partnerApproaches.contains(partner) else { throw SegmentationOptionsError.incomplete(partner.rawValue) }
         let other = try spec(for: partner)
         guard first.voters.count == 1, other.voters.count == 1 else { throw SegmentationOptionsError.incomplete(partner.rawValue) }

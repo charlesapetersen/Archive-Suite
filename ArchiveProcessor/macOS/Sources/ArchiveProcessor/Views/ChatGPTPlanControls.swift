@@ -40,7 +40,7 @@ struct ChatGPTPlanControls: View {
                     Button("Sign out") {
                         Task {
                             await ChatGPTAuth.shared.signOut()
-                            routes = SegmentationRoutes.current()
+                            refreshAccountState()
                         }
                     }
                     .controlSize(.small)
@@ -61,7 +61,7 @@ struct ChatGPTPlanControls: View {
                         Button("Use a different account") {
                             Task {
                                 await ChatGPTAuth.shared.signOut()
-                                routes = SegmentationRoutes.current()
+                                refreshAccountState()
                             }
                         }
                         .controlSize(.small)
@@ -86,6 +86,11 @@ struct ChatGPTPlanControls: View {
         }
     }
 
+    private func refreshAccountState() {
+        routes = SegmentationRoutes.current()
+        NotificationCenter.default.post(name: .apiKeyChanged, object: nil)
+    }
+
     private func signIn() {
         error = nil
         signingIn = true
@@ -94,7 +99,7 @@ struct ChatGPTPlanControls: View {
                 _ = try await ChatGPTAuth.shared.signIn(open: { url in
                     DispatchQueue.main.async { NSWorkspace.shared.open(url) }
                 })
-                routes = SegmentationRoutes.current()
+                refreshAccountState()
                 if !welcomeShown { showWelcome = true }
             } catch where Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
             } catch {

@@ -18045,3 +18045,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   The two Processor smoke checks also passed in Tart. The regression used synthetic photos and stubbed
   OCR replies. No provider spend or bench cache used.
   <!-- /W49.proc-tree-sheet-vm -->
+
+- [x] **W49.proc-fix-s032 — Check the segmentation key before starting OCR [S · S2]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build,vm) — S-032. Use the selected window route's credential rules at Start. Keep manual, pre-grouped and no-tagging runs eligible where they do not use that route. [VM evidence and regression](verification/evidence/processor/W49.proc-suspects-money-check.md). SHIPPED 2026-11-22 (this commit).
+  The Start button and shortcut share the window stage's credential rules for the selected segmenter and its
+  configured partner. The off-screen regression recorded zero OCR requests for three scratch pages with a missing
+  Gemini key. Manual segmentation and pre-grouped photos could start, and No tagging filed both scratch pages.
+  The regression used simulated responses and synthetic images, with no provider spend or bench cache.
+  <!-- /W49.proc-fix-s032 -->

@@ -68,9 +68,9 @@ See W49.proc-fix-s024 and the [original VM reproduction](../verification/evidenc
 
 - Live Capture handed off the same two photos after a successful Process Files run and again after relaunch. A second Start read both photos again. The handoff itself sent zero requests. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s039)
 
-## Gemini segmentation reports its missing key after OCR (S-032)
+## FIXED (S-032) — A missing segmentation credential is shown before OCR
 
-- With Automatic tagging and Gemini-only segmentation, Start made three OCR requests before the missing-key alert. The interrupted run offered Stop and resume later. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s032)
+- Start checks the selected document segmentation route and explains which credential is missing. The Start button and shortcut are blocked before reading pages. Manual segmentation, pre-grouped photo runs and runs without tagging can start without the unused credential. [Original VM reproduction](../verification/evidence/processor/W49.proc-suspects-money-check.md). (accepted: fixed by W49.proc-fix-s032)
 
 ## Gemini batch OCR bypasses the file-size target (S-026)
 

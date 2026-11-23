@@ -22,6 +22,9 @@ struct OCRView: View {
     private var taggingMode: TaggingMode { TaggingMode(rawValue: taggingModeRaw) ?? .automatic }
     @AppStorage(DefaultsKeys.segmentationApproach) private var segmentationApproachRaw: String =
         SegmentationApproach.defaultApproach.rawValue
+    @AppStorage(DefaultsKeys.localSegmenterPartner) private var localSegmenterPartner = ""
+    @AppStorage(DefaultsKeys.segmentationClaudeRoute) private var segmentationClaudeRoute: ClaudeRoute = .apiKey
+    @AppStorage(DefaultsKeys.segmentationChatGPTRoute) private var segmentationChatGPTRoute: ChatGPTRoute = .apiKey
     /// Who segments with the current settings (W36.seg-opt-review).
     private var segmentationPlan: SegmentationPlan {
         SegmentationPlan.resolve(tagging: taggingMode,
@@ -45,6 +48,28 @@ struct OCRView: View {
     private var enableTagging: Bool { taggingMode.enablesTagging }
     private var passSourceTags: Bool { taggingMode == .copySource }
     private var classifyPreOCRedInput: Bool { (enableTagging && !passSourceTags) || enableCollectionSegmentation }
+    private var hasCaptureGrouping: Bool { captureBoundaries.count == droppedFiles.count && !droppedFiles.isEmpty }
+
+    private var windowSegmentationSpec: ApproachSpec? {
+        guard !droppedFiles.isEmpty, !isPDFOnlyReOCR, preOCRedInput || !hasCaptureGrouping,
+              case .windows(let approach) = segmentationPlan,
+              let options = SegmentationOptionsStore.shared else { return nil }
+        // Pre-OCRed inputs still go through the window stage. A pure PDF rebuild and staged photos
+        // that already have their boundaries skip it.
+        let partner = SegmentationApproach(rawValue: localSegmenterPartner).flatMap {
+            approach == .local && SegmentationOptions.partnerApproaches.contains($0) ? $0 : nil
+        }
+        return try? options.spec(for: approach, partner: partner)
+    }
+
+    private var segmentationCredentialIssue: String? {
+        guard let spec = windowSegmentationSpec else { return nil }
+        var routes = segmentationRoutes
+        routes.claudeRoute = segmentationClaudeRoute
+        routes.chatGPTRoute = segmentationChatGPTRoute
+        routes.hasClaudeCLI = claudeBinary != nil
+        return WindowStageTransport.credentialIssue(spec, routes: routes)?.description
+    }
     /// Only a PDF-only drop disables tagging. A mixed drop also runs the standard image path,
     /// so the picker remains active for images while rebuilt PDFs stay untagged.
     private var hasMixedReOCR: Bool {
@@ -556,6 +581,7 @@ struct OCRView: View {
             // scene-phase transition at all.)
             guard phase == .active else { return }
             reloadAPIKey()
+            if keychainExplained { segmentationRoutes = SegmentationRoutes.currentPreselecting() }
             if let path = UserDefaults.standard.string(forKey: DefaultsKeys.outputDirectory), FileManager.default.fileExists(atPath: path) {
                 outputDirectory = URL(fileURLWithPath: path)
             }
@@ -1153,22 +1179,14 @@ struct OCRView: View {
         processor.awaitingFinalReview
     }
 
-    /// Whether a run can be started now — the single source of truth for both the Start button's enabled
-    /// state and the ⌘R "Start Processing" shortcut (so the shortcut can never start a run the button
-    /// wouldn't allow: no files, no key, no output folder, already busy, or mid-review).
+    /// Both Start and ⌘R use the same checks and the same explanation.
     private var canStartProcessing: Bool {
-        !droppedFiles.isEmpty && !checkingInputLocation && !readingTree && (!runNeedsAPIKey || !apiKey.isEmpty) && visionWorkflowIsSupported && outputDirectory != nil
-            && gatewaySetupIssue == nil && unavailableOpenRouterSelection == nil
-            && !processor.isProcessing && !isInReviewMode
-            && processor.pendingBatchInfo == nil && processor.pendingRunInfo == nil
-            && processor.pendingMixedPDFInfo == nil
+        !processor.isProcessing && startBlockedReason == nil
     }
 
-    /// Why Start is disabled, shown under the button (W40.fix-processor-start-why): the first unmet condition of
-    /// `canStartProcessing`, in the order the user would fix them. Nil while a run is going (Cancel shows) and
-    /// whenever Start is enabled. Keep the two in step: every condition there has a sentence here.
+    /// The first unmet Start condition. While a run is going, the Cancel control takes its place.
     private var startBlockedReason: String? {
-        guard !canStartProcessing, !processor.isProcessing else { return nil }
+        guard !processor.isProcessing else { return nil }
         if isInReviewMode { return "Finish the review on the right before starting another run." }
         if processor.pendingBatchInfo != nil { return "Resume or dismiss the pending batch above first." }
         if processor.pendingRunInfo != nil { return "Resume or dismiss the interrupted run above first." }
@@ -1189,6 +1207,9 @@ struct OCRView: View {
         if runNeedsAPIKey && apiKey.isEmpty {
             if useGateway && !useAppleVision { return "No gateway key is saved. Add it in Settings (⌘,)." }
             return "No \(selectedProvider.rawValue) API key is saved. Add one in Settings (⌘,)."
+        }
+        if let segmentationCredentialIssue {
+            return "Segmentation: " + segmentationCredentialIssue + " Change the route or add a key in Settings."
         }
         if outputDirectory == nil { return "Choose an output folder." }
         return nil
@@ -1783,7 +1804,7 @@ struct OCRView: View {
     /// Start, unless the output collection says its pages must not train and this run would send them where they
     /// may: then the warning asks first (W46.training-optout-run).
     private func startProcessing() {
-        guard outputDirectory != nil else { return }
+        guard canStartProcessing else { return }
         if let warning = trainingRunWarning() {
             trainingWarning = warning
             return
@@ -1868,6 +1889,12 @@ struct OCRView: View {
 
     private func runProcessing(confirmedMonthlyLimit: Bool = false) {
         guard !processor.isProcessing, let outDir = outputDirectory else { return }
+        // A confirmation sheet may have been open while a key or sign-in changed. Check again
+        // before creating the processing task, including when Start is reached by shortcut.
+        if let spec = windowSegmentationSpec {
+            segmentationRoutes = SegmentationRoutes.currentPreselecting()
+            if WindowStageTransport.credentialIssue(spec, routes: segmentationRoutes) != nil { return }
+        }
         if let gatewaySetupIssue {
             processor.statusMessage = gatewaySetupIssue
             return
@@ -1928,7 +1955,7 @@ struct OCRView: View {
         processor.rotationMode = rotationMode
         processor.reviewRotation = reviewRotation
         // Pre-grouped segmentation only applies when the loaded files match a Live Capture handoff.
-        if captureBoundaries.count == droppedFiles.count && !droppedFiles.isEmpty {
+        if hasCaptureGrouping {
             processor.preGroupedBoundaries = captureBoundaries
             processor.preGroupedTypes = captureTypes
             processor.preGroupedQualities = captureQualities.count == droppedFiles.count ? captureQualities : []

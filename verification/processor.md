@@ -693,15 +693,19 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** `ArchiveProcessorUITests/ProcessorUITests.testSegmentationChooserShowsEachApproachWithFiguresAndCost`
   drives the real picker; `scripts/test-segmentation-chooser.sh` checks the figures. Not covered: the `glm` and
   `local` rows, plan-versus-key cost lines, the Gemini preselect.
-- **Runtime evidence:** Start let three pages run through OpenAI OCR before reporting the missing Gemini segmentation key. [Independent VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
-  The `W36.seg-opt-proof` record in `SUITE_TODO_DONE.md` ran
-  the approaches end to end; it predates this ledger and is not in the evidence form.
-- **Status:** `broken` — W49.proc-fix-s032 (S2) for the missing-key Start check.
+- **Runtime evidence:** The [independent VM reproduction](evidence/processor/W49.proc-suspects-money-check.md)
+  recorded three OpenAI OCR requests before the missing Gemini key appeared. The replacement Tart regression
+  `MoneyJourneyUITests.testMissingGeminiSegmentationKeyBlocksStartBeforeAnyRead` sees the reason at Start,
+  checks the disabled button and presses ⌘R with zero requests recorded. The accompanying eligibility test
+  covers manual segmentation, No tagging and a pre-grouped photo handoff. The `W36.seg-opt-proof` record in
+  `SUITE_TODO_DONE.md` ran the approaches end to end before this ledger.
+- **Status:** `fixed-pending-recheck` — W49.proc-fix-s032 for S-032.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-21 W49.proc-suspects-money-check — `broken` on the tested path.
+  - 2026-11-22 W49.proc-fix-s032 — Start applies the selected window route's credential rules before reading.
 - **Notes:** **Drift.** ChatGPT gets tokens and an approximate dollar figure, not a plan share
-  (`Segmentation/SegmentationChooser.swift:253-257`); only Claude has a meter. Suspect `S-032`.
+  (`Segmentation/SegmentationChooser.swift:253-257`); only Claude has a meter.
 
 ### P-31 · Flagged boundaries, then a skim
 

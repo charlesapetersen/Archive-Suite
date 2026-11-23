@@ -203,6 +203,54 @@ enum WindowStageTransport {
         let description: String
     }
 
+    private enum Route {
+        case api, claudeCLI, chatGPTPlan, claudeThroughOpenRouter, local
+    }
+
+    private static func route(for provider: WindowProvider, in spec: ApproachSpec,
+                              hasKey: (WindowProvider) -> Bool, hasClaudeCLI: Bool, claude: ClaudeRoute,
+                              hasChatGPTPlan: Bool, chatGPT: ChatGPTRoute) -> Result<Route, Missing> {
+        if provider == .local { return .success(.local) }
+        let keyed = hasKey(provider)
+        if provider == .anthropic, hasClaudeCLI, claude == .plan || !keyed {
+            return .success(.claudeCLI)
+        }
+        if provider == .openai {
+            if hasChatGPTPlan, chatGPT == .plan || !keyed { return .success(.chatGPTPlan) }
+            if chatGPT == .plan, keyed {
+                return .failure(Missing(description:
+                    "ChatGPT is set to go by your ChatGPT plan, but ChatGPT is not signed in. Sign in with ChatGPT, or choose By API key."))
+            }
+        }
+        if keyed { return .success(.api) }
+
+        let includesChatGPT = spec.voters.contains { $0.provider == .openai }
+        switch provider {
+        case .anthropic:
+            // Claude can use OpenRouter outside the mix, which keeps both voters on their own keys or plans.
+            if !includesChatGPT, hasKey(.openrouter) { return .success(.claudeThroughOpenRouter) }
+            return .failure(Missing(description: includesChatGPT
+                ? "Claude needs an Anthropic API key or a signed-in claude."
+                : "Claude needs an Anthropic API key, an OpenRouter API key or a signed-in claude."))
+        case .gemini: return .failure(Missing(description: "Gemini needs an API key."))
+        case .openrouter: return .failure(Missing(description: "GLM-5.3 Flash needs an OpenRouter API key."))
+        case .openai: return .failure(Missing(description: "ChatGPT needs an OpenAI API key or Sign in with ChatGPT."))
+        case .local: return .success(.local)
+        }
+    }
+
+    /// Use the same routing rules before spending on OCR, from the view's credential snapshot.
+    static func credentialIssue(_ spec: ApproachSpec, routes: SegmentationRoutes) -> Missing? {
+        for voter in spec.voters {
+            if case .failure(let missing) = route(
+                for: voter.provider, in: spec, hasKey: routes.hasKey,
+                hasClaudeCLI: routes.hasClaudeCLI, claude: routes.claudeRoute,
+                hasChatGPTPlan: routes.hasChatGPTPlan, chatGPT: routes.chatGPTRoute
+            ) { return missing }
+        }
+        return nil
+    }
+
     /// The transport for an approach's voters, from what the user has: by API key where there is one, else Claude
     /// through the user's own `claude` and ChatGPT through the signed-in ChatGPT plan. With both routes, use
     /// the user's selection. `gate` meters and pauses the subscription Claude calls. `chatGPT` is the
@@ -218,45 +266,31 @@ enum WindowStageTransport {
         var routes: [WindowProvider: any WindowTransport] = [:]
         var api = APIWindowTransport(keys: keys.filter { !$0.value.isEmpty })
         if let http { api.http = http }
-        for p in Set(spec.voters.map(\.provider)) {
-            // The model on this Mac needs no key; whether its server answers is asked before the first window.
-            if p == .local {
-                var t = LocalWindowTransport(baseURL: local.baseURL, modelID: local.modelID)
-                if let http { t.http = http }
-                if let localProbe { t.probe = localProbe }
-                routes[p] = t
-                continue
-            }
-            let noKey = (keys[p] ?? "").isEmpty
-            let claudeUsesCLI = p == .anthropic && claudeBinary != nil && (route == .plan || noKey)
-            let chatGPTByPlan = p == .openai && chatGPT != nil && (chatGPTRoute == .plan || noKey)
-            if claudeUsesCLI, let claudeBinary {
-                routes[p] = LocalAgentWindowTransport(binaryPath: claudeBinary, billing: claudeBilling,
-                                                      gate: claudeBilling == .subscription ? gate : nil,
-                                                      checkBilling: checkClaudeBilling)
-            } else if chatGPTByPlan, let chatGPT {
-                var t = ChatGPTPlanWindowTransport(auth: chatGPT)
-                if let http { t.http = http }
-                routes[p] = t
-            } else if p == .openai, chatGPTRoute == .plan, !noKey {
-                // The user chose the plan and the chooser priced it so; never quietly bill the key instead.
-                return .failure(Missing(description:
-                    "ChatGPT is set to go by your ChatGPT plan, but ChatGPT is not signed in. Sign in with ChatGPT, or choose By API key."))
-            } else if !noKey {
-                routes[p] = api
-            } else if p == .anthropic, !spec.voters.contains(where: { $0.provider == .openai }),
-                      !(keys[.openrouter] ?? "").isEmpty {
-                // W41.app-openrouter-claude: no Anthropic key and no `claude`, but an OpenRouter key: Claude's windows on
-                // Anthropic's own endpoint. Not the mix's (`SegmentationRoutes.claudeThroughOpenRouter`).
-                routes[p] = OpenRouterClaudeWindowTransport(api: api)
-            } else {
-                return .failure(Missing(description: p == .anthropic
-                    ? (spec.voters.contains { $0.provider == .openai }
-                        ? "Claude needs an Anthropic API key or a signed-in claude."
-                        : "Claude needs an Anthropic API key, an OpenRouter API key or a signed-in claude.")
-                    : p == .gemini ? "Gemini needs an API key."
-                    : p == .openrouter ? "GLM-5.3 Flash needs an OpenRouter API key."
-                    : "ChatGPT needs an OpenAI API key or Sign in with ChatGPT."))
+        for voter in spec.voters where routes[voter.provider] == nil {
+            let provider = voter.provider
+            switch Self.route(for: provider, in: spec, hasKey: { !(keys[$0] ?? "").isEmpty },
+                              hasClaudeCLI: claudeBinary != nil, claude: route,
+                              hasChatGPTPlan: chatGPT != nil, chatGPT: chatGPTRoute) {
+            case .success(.local):
+                var transport = LocalWindowTransport(baseURL: local.baseURL, modelID: local.modelID)
+                if let http { transport.http = http }
+                if let localProbe { transport.probe = localProbe }
+                routes[provider] = transport
+            case .success(.claudeCLI):
+                if let claudeBinary {
+                    routes[provider] = LocalAgentWindowTransport(binaryPath: claudeBinary, billing: claudeBilling,
+                                                                gate: claudeBilling == .subscription ? gate : nil,
+                                                                checkBilling: checkClaudeBilling)
+                }
+            case .success(.chatGPTPlan):
+                if let chatGPT {
+                    var transport = ChatGPTPlanWindowTransport(auth: chatGPT)
+                    if let http { transport.http = http }
+                    routes[provider] = transport
+                }
+            case .success(.api): routes[provider] = api
+            case .success(.claudeThroughOpenRouter): routes[provider] = OpenRouterClaudeWindowTransport(api: api)
+            case .failure(let missing): return .failure(missing)
             }
         }
         return .success(RoutingWindowTransport(routes: routes))

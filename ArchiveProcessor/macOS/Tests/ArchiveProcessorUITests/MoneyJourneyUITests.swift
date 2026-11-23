@@ -41,25 +41,41 @@ final class MoneyJourneyUITests: XCTestCase {
         print("[s039] two distinct photos handed off again after completion and after relaunch: \(repeated)")
     }
 
-    func testStartReadsPagesBeforeMissingGeminiSegmentationKey() throws {
+    func testMissingGeminiSegmentationKeyBlocksStartBeforeAnyRead() throws {
         try preparePhotos(count: 3)
         launch(tagging: "automatic", extra: ["-segmentationApproach", "gemini"])
+        let reason = element("ap.ocr.startBlockedReason")
+        XCTAssertTrue(reason.waitForExistence(timeout: 10))
+        XCTAssertTrue(renderedText(reason).contains("Segmentation: Gemini needs an API key."), reason.debugDescription)
+        let button = element("ap.ocr.start")
+        revealInCostPanel(reason)
+        XCTAssertFalse(button.isEnabled)
+        app.typeKey("r", modifierFlags: .command)
+        XCTAssertTrue(reason.exists)
         XCTAssertTrue(try requestRecords().isEmpty)
+        XCTAssertFalse(element("ap.ocr.resumeRun").exists)
+        shot("s032-missing-key-before-ocr")
+    }
+
+    func testMissingSegmentationKeyDoesNotBlockModesThatSkipTheWindowStage() throws {
+        try preparePhotos(count: 2)
+        launch(tagging: "none", extra: ["-segmentationApproach", "gemini"])
         start()
-        let missing = text(containing: "Gemini needs an API key.")
-        let confirm = app.sheets.containing(.staticText, identifier: "Confirm Box & Folder Labels").firstMatch
-        let deadline = Date().addingTimeInterval(35)
-        while !missing.exists && Date() < deadline {
-            if confirm.exists { confirm.buttons["Confirm"].click() }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        }
-        XCTAssertTrue(missing.exists, app.debugDescription)
-        let calls = try requestRecords()
-        XCTAssertEqual(calls.map(\.route), ["openai", "openai", "openai"])
-        XCTAssertEqual(Set(calls.map(\.digest)).count, 3)
-        shot("s032-missing-key-after-three-reads")
-        print("[s032] the real Start made \(calls.count) page reads before the Gemini key alert")
-        app.buttons["Stop and resume later"].firstMatch.click()
+        waitForDone(count: 2)
+        XCTAssertEqual(try requestRecords().map(\.route), ["openai", "openai"])
+        app.terminate()
+
+        try preparePhotos(count: 2)
+        launch(tagging: "automatic", extra: ["-segmentationApproach", "manual"])
+        let button = element("ap.ocr.start")
+        XCTAssertTrue(button.waitForExistence(timeout: 10) && button.isEnabled, app.debugDescription)
+        app.terminate()
+
+        try preparePhotos(count: 2)
+        launch(tagging: "automatic", extra: ["-segmentationApproach", "gemini", "-APUITestReceiveScratchPhotos"], staged: true)
+        try handOff()
+        XCTAssertTrue(button.waitForExistence(timeout: 10) && button.isEnabled, app.debugDescription)
+        XCTAssertTrue(try requestRecords().isEmpty)
     }
 
     func testGeminiDirectAndBatchSendDifferentImageSizes() throws {

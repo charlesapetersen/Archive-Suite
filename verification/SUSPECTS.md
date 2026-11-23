@@ -849,7 +849,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** choose Gemini only with no Gemini key, three pages on a cheap OCR model; watch when the prompt
   appears.
 - **Would clear it:** Start is disabled, or the run stops before OCR.
-- **Status:** `reproduced` — independently confirmed; fix queued as `W49.proc-fix-s032`. [VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
+- **Status:** `cleared` — fixed by W49.proc-fix-s032. [Original VM reproduction](evidence/processor/W49.proc-suspects-money-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
@@ -858,6 +858,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     "Gemini needs an API key." (pages read 3/3). The run is resumable, so the reads are kept if the user adds the key and
     resumes. The chooser's comment promises the start gate, so it is not intended.
   - 2026-11-21 W49.proc-suspects-money-check (Codex gpt-6.2-sol at `f2b51e98`, original Claude Opus 5.5 in `325a3455`) — With Automatic tagging and Gemini-only segmentation, Start made three OCR requests before the missing-key alert. The interrupted run offered Stop and resume later.
+  - 2026-11-22 W49.proc-fix-s032 (Codex gpt-6.2-sol) — Start shows the segmentation credential requirement
+    before OCR. The off-screen regression recorded zero requests after pressing the Start shortcut.
 
 ### S-033 · A tag reply with no year and `date_uncertain: false` gets no date tags at all
 
