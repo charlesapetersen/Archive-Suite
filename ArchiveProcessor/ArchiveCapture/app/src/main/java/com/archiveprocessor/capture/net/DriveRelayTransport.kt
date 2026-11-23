@@ -85,9 +85,10 @@ class DriveRelayTransport(
 
     override fun segmentComplete(group: String, quality: String?, year: Int?, month: Int?, seqs: String?): Boolean {
         val f = folderId() ?: return false; val e = epoch(f) ?: return false
-        upsert(f, RelayObjectFormat.segmentName(group),
+        // The phone keeps this completion queued until Drive accepts the write. Photos have a separate
+        // receipt check, so their delivery still depends on the Mac's confirmation.
+        return upsert(f, RelayObjectFormat.segmentName(group),
             RelayObjectFormat.encodeSegment(token, e, group, quality, year?.toString(), month?.toString(), seqs), "application/json")
-        return true
     }
 
     override fun sessionComplete(): Boolean {

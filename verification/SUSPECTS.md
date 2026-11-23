@@ -605,7 +605,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a test in `DriveRelayTransportTest` whose `MockDrive` answers the segment create with a 500:
   `segmentComplete` returns `true` and no segment object exists.
 - **Would clear it:** `segmentComplete` returns `false` in that test.
-- **Status:** `reproduced` — independently confirmed. Fix queued as `W49.proc-fix-s021`. [Independent evidence](evidence/processor/W49.relay-suspects-check.md).
+- **Status:** `fixed` — W49.proc-fix-s021 returns the Drive write result and keeps failed completions queued. [Scratch evidence](evidence/processor/W49.relay-suspects-check.md).
 - **History:**
   - 2026-10-21 W40.i2 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.relay-suspects` under phase rule 5a.

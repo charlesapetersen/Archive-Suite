@@ -2,10 +2,12 @@ package com.archiveprocessor.capture.capture
 
 import android.app.Application
 import android.os.Looper
+import androidx.lifecycle.viewModelScope
 import com.archiveprocessor.capture.data.SessionStore
 import com.archiveprocessor.capture.net.DriveClient
 import com.archiveprocessor.capture.net.HttpExecuting
 import com.archiveprocessor.capture.net.MacEndpoint
+import kotlinx.coroutines.cancel
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -19,24 +21,21 @@ import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
-// S-021 baseline. Start at the shutter path and inject only the Drive HTTP response.
+// S-021 regression. Start at the shutter path and inject only the Drive HTTP response.
 class IndependentRelayEndTest {
     @Test fun healthyRelayDeliversEnd() = runCapture(false)
-    @Test fun driveFailureDropsCompletionEvenAfterPairingAgain() = runCapture(true)
+    @Test fun transientDriveFailureRetriesTaggedCompletionWhilePaired() = runCapture(true)
 
     private fun runCapture(refuseFirstEnd: Boolean) {
         val app = RuntimeEnvironment.getApplication() as Application
         val relay = Relay(refuseFirstEnd)
         CaptureViewModel.driveClientForTest = DriveClient(relay) { "fixture" }
+        val vm = CaptureViewModel(app)
         try {
-            val vm = CaptureViewModel(app)
             val endpoint = MacEndpoint("", 0, "CHECK1", "Scratch Mac", "cloud")
-            fun pair() {
-                var paired = false
-                vm.connectCloud(endpoint) { paired = it }
-                spin { paired }
-            }
-            pair()
+            var paired = false
+            vm.connectCloud(endpoint) { paired = it }
+            spin { paired }
             // The Drive client treats photo bytes as opaque; its mock peer returns a real receipt shape.
             val photo = vm.newCaptureFile().apply { writeBytes(byteArrayOf(1, 2, 3)) }
             vm.addDocumentPhoto(photo)
@@ -45,22 +44,14 @@ class IndependentRelayEndTest {
             vm.finishDocumentSegment()
             assertEquals(group, vm.pendingTagGroupId)
             vm.applyTagsAndContinue("Q2", 1968, 3)
+            spin { relay.endPublished }
             spin {
                 val persisted = SessionStore(app).load()
-                relay.endAttempts.get() > 0 && persisted != null &&
-                    persisted.items.isEmpty() && persisted.endedSegments.isEmpty()
+                persisted != null && persisted.items.isEmpty() && persisted.endedSegments.isEmpty()
             }
-            vm.disconnect()
-            pair()
-            val deadline = System.nanoTime() + 1_000_000_000L
-            while (System.nanoTime() < deadline) {
-                shadowOf(Looper.getMainLooper()).idle()
-                Thread.sleep(10)
-            }
-            assertEquals(1, relay.endAttempts.get())
-            assertEquals(!refuseFirstEnd, relay.endPublished)
-            println("refuseFirstEnd=$refuseFirstEnd photo=UPLOADED creates=${relay.endAttempts} endPublished=${relay.endPublished} persistedEnded=0 afterRePair=true")
+            assertEquals(if (refuseFirstEnd) 2 else 1, relay.endAttempts.get())
         } finally {
+            vm.viewModelScope.cancel()
             CaptureViewModel.driveClientForTest = null
         }
     }
@@ -105,6 +96,7 @@ class IndependentRelayEndTest {
                             if (endAttempts.incrementAndGet() == 1 && refuseFirstEnd) return response("fixture 500", 500)
                             endPublished = true
                         }
+                        name.startsWith("_phone.") -> Unit  // Queue status has no photo receipt.
                         name.endsWith(".json") -> {
                             val meta = JSONObject(parts[2].substringBefore("\r\n"))
                             receiptName = name.removeSuffix(".json") + ".receipt.json"

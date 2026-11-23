@@ -18152,3 +18152,14 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Three existing display-catalog assertions are red in the broader settings test on the baseline
   source. No rehearsal cache inputs were created.
   <!-- /W49.proc-ledger-track-paid -->
+- [x] **W49.proc-fix-s021 — Retry Android segment completion when Drive refuses the write [S · S2 · Tier-2]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build) — S-021. Keep the segment completion and its tags pending until Drive accepts the write. Verify transient and persistent failures, re-pair, and Mac completion after delivery. [Evidence and tests](verification/evidence/processor/W49.relay-suspects-check.md). SHIPPED 2026-11-23 (this commit).
+  Android keeps the completion and its tags queued until Drive accepts the write.
+  The 93 Android tests and screenshot comparisons passed. The relay cases exercised transient and
+  sustained refusals, re-pair, and recovery from the saved queue. The scratch Mac recorded Q2 and
+  March 1968 when it received the delayed completion, before Finish. All 13 Mac FileRelay checks passed.
+  The headless Android-to-Mac LAN run filed three fixture PDFs with the expected text and years
+  using on-device Vision. The standard Gemini run received all three groups and timed out before filing.
+  The prior 12.8 GB memory stop occurred during a cold Mac build whose Swift driver used 12 jobs.
+  The resumed build used two Xcode jobs and peaked at about 10 GB for the build process tree.
+  Android used one worker, in-process Kotlin compilation and capped JVM heaps. No rehearsal cache was used.
+  <!-- /W49.proc-fix-s021 -->

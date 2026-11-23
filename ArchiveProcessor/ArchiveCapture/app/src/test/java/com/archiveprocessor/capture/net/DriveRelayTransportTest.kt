@@ -7,6 +7,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.net.URLDecoder
+import java.util.Collections
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Offline verification of the Android DriveRelayTransport never-lose contract against a mock Drive (no
@@ -21,8 +23,10 @@ class DriveRelayTransportTest {
         class F(val id: String, val name: String, val appProps: MutableMap<String, String>, val parents: List<String>, var media: ByteArray, val mime: String)
         val store = LinkedHashMap<String, F>()
         /** W49.relay-suspects: object names whose create Drive answers with a 500, and each refused create. */
-        val failCreate = HashSet<String>()
-        val refusedCreates = ArrayList<String>()
+        val failCreate = Collections.synchronizedSet(HashSet<String>())
+        val refusedCreates = CopyOnWriteArrayList<String>()
+        val failUpdate = HashSet<String>()
+        val failLookup = HashSet<String>()
         private var seq = 0
         private fun newId(): String { seq++; return "f$seq" }
         fun injectFolder(relayToken: String) { val id = newId(); store[id] = F(id, "folder", mutableMapOf("relayToken" to relayToken, "relayFolder" to "1"), emptyList(), ByteArray(0), "application/vnd.google-apps.folder") }
@@ -30,9 +34,10 @@ class DriveRelayTransportTest {
             val folder = store.values.firstOrNull { it.mime == "application/vnd.google-apps.folder" && it.appProps["relayToken"] == token }
             val id = newId(); store[id] = F(id, name, mutableMapOf("relayName" to name, "relayToken" to token), if (folder != null) listOf(folder.id) else emptyList(), media, "")
         }
-        fun media(name: String) = store.values.filter { it.appProps["relayName"] == name }.map { it.media }
-        fun hasName(name: String) = store.values.any { it.appProps["relayName"] == name && it.appProps["relayRejected"] != "1" }
+        @Synchronized fun media(name: String) = store.values.filter { it.appProps["relayName"] == name }.map { it.media }
+        @Synchronized fun hasName(name: String) = store.values.any { it.appProps["relayName"] == name && it.appProps["relayRejected"] != "1" }
 
+        @Synchronized
         override fun execute(method: String, url: String, headers: Map<String, String>, body: ByteArray?): Triple<Int, ByteArray, Map<String, String>> {
             fun idFromPath(): String? { val i = url.indexOf("/files/"); if (i < 0) return null; return url.substring(i + 7).takeWhile { it != '?' } }
             if (method == "POST" && url.contains("/upload/drive/v3/files")) {
@@ -51,11 +56,19 @@ class DriveRelayTransportTest {
                 val id = newId(); store[id] = F(id, meta.optString("name"), ap, parents, content(parts[2]).toByteArray(Charsets.UTF_8), "")
                 return Triple(200, """{"id":"$id"}""".toByteArray(), emptyMap())
             }
-            if (method == "PATCH" && url.contains("/upload/drive/v3/files/")) { idFromPath()?.let { store[it]?.media = body ?: ByteArray(0) }; return Triple(200, "{}".toByteArray(), emptyMap()) }
+            if (method == "PATCH" && url.contains("/upload/drive/v3/files/")) {
+                val file = store[idFromPath()]
+                if (file?.name in failUpdate) return Triple(500, "{}".toByteArray(), emptyMap())
+                file?.media = body ?: ByteArray(0)
+                return Triple(200, "{}".toByteArray(), emptyMap())
+            }
             if (method == "GET" && url.contains("alt=media")) { return Triple(200, store[idFromPath()]?.media ?: ByteArray(0), emptyMap()) }
             if (method == "GET" && url.contains("/drive/v3/files?q=")) {
                 val q = URLDecoder.decode(url.substringAfter("?q=").substringBefore("&"), "UTF-8")
                 fun between(a: String, b: String): String? { val i = q.indexOf(a); if (i < 0) return null; val j = q.indexOf(b, i + a.length); if (j < 0) return null; return q.substring(i + a.length, j) }
+                if (failLookup.any { q.contains("key='relayName' and value='$it'") }) {
+                    return Triple(500, "{}".toByteArray(), emptyMap())
+                }
                 val matched = when {
                     q.contains("in parents") -> {
                         val fid = between("'", "' in parents") ?: ""
@@ -120,5 +133,29 @@ class DriveRelayTransportTest {
 
         assertTrue("segmentComplete -> true", t.segmentComplete("g", "Q1", 1968, 3))
         assertTrue("segment object written", mock.hasName("g.segment.json"))
+    }
+
+    @Test fun refusedUpdateDoesNotConfirmSegmentCompletion() {
+        val mock = MockDrive()
+        mock.injectFolder("TESTTK")
+        mock.injectFile("_epoch.json", "TESTTK", RelayObjectFormat.canonicalJson(mapOf("token" to "TESTTK", "epoch" to "EP1")))
+        val name = RelayObjectFormat.segmentName("g")
+        val previous = RelayObjectFormat.encodeSegment("TESTTK", "EP1", "g", "Q1", null, null, "1")
+        mock.injectFile(name, "TESTTK", previous)
+        mock.failUpdate.add(name)
+        val transport = DriveRelayTransport(DriveClient(mock) { "fake" }, "TESTTK")
+
+        assertFalse(transport.segmentComplete("g", "Q2", 1968, 3, "1"))
+        assertTrue(mock.store.values.single { it.name == name }.media.contentEquals(previous))
+
+        mock.failUpdate.remove(name)
+        mock.failLookup.add(name)
+        assertFalse("an uncertain lookup must not create a duplicate", transport.segmentComplete("g", "Q2", 1968, 3, "1"))
+        assertTrue(mock.store.values.single { it.name == name }.media.contentEquals(previous))
+
+        mock.failLookup.remove(name)
+        assertTrue(transport.segmentComplete("g", "Q2", 1968, 3, "1"))
+        val updated = mock.store.values.single { it.name == name }.media
+        assertTrue(updated.contentEquals(RelayObjectFormat.encodeSegment("TESTTK", "EP1", "g", "Q2", "1968", "3", "1")))
     }
 }

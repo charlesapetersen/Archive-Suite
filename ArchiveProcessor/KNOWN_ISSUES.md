@@ -62,9 +62,9 @@ See W49.proc-fix-s024 and the [original VM reproduction](../verification/evidenc
 
 - Both jobs failed and generated their own PDFs. The status and run log counted one failure and recorded a single reason. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md). (queued: W49.proc-fix-s030)
 
-## Android drops a segment completion after a failed Drive write (S-021)
+## FIXED (S-021) — Android retries segment completion after a failed Drive write
 
-- After the phone sends its photos, a Drive error on End segment can discard the completion signal and the tags it carries. Re-pairing leaves the signal missing, so the Mac can leave the segment open until Finish. [Independent scratch evidence](../verification/evidence/processor/W49.relay-suspects-check.md). (queued: W49.proc-fix-s021)
+- Android keeps the completion and its tags queued until Drive accepts the write. It retries while paired and recovers a pending completion after re-pairing or app restart. [Scratch evidence](../verification/evidence/processor/W49.relay-suspects-check.md). (accepted: fixed by W49.proc-fix-s021)
 
 ## FIXED (S-038, 2026-11-23) — Finish could file a relay document before its last photo arrived
 
