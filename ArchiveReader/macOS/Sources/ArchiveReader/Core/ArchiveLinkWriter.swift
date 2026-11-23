@@ -51,12 +51,8 @@ enum ArchiveLinkWriter {
             // The durable link remains document-level; this is only an optional, self-contained
             // representation for a Notes source block. Rendering failure degrades to the same link
             // payload rather than withholding the copy action.
-            let mtime = (try? file.url.resourceValues(forKeys: [.contentModificationDateKey]))?
-                .contentModificationDate ?? Date()
-            // A known cloud placeholder is deliberately never opened merely for an optional preview.
-            // `PDFThumbnailer` also owns a no-materialisation guard for the local→dataless race.
-            let thumbnailData = file.isDataless ? nil : await thumbnailer?.png(
-                fileURL: file.url, page: 1, linkKey: urlString, mtime: mtime
+            let thumbnailData = file.isDataless ? nil : await thumbnail(
+                with: thumbnailer, fileURL: file.url, page: 1, occurrence: urlString
             )
 
             plainURLs.append(urlString)
@@ -112,25 +108,21 @@ enum ArchiveLinkWriter {
         let base = pagePayload(fileURL: fileURL, page: page, rootPath: rootPath, marker: marker,
                                mainRootPath: mainRootPath, jpegPartnerIndex: jpegPartnerIndex)
 
-        // Render thumbnail if possible
-        var thumbBase64: String?
-        if let thumbnailer {
-            let mtime = (try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date()
-            if let pngData = await thumbnailer.png(
-                fileURL: fileURL, page: page,
-                linkKey: base.urlString, mtime: mtime
-            ) {
-                thumbBase64 = pngData.base64EncodedString()
-            }
-        }
+        let preview = await thumbnail(with: thumbnailer, fileURL: fileURL, page: page, occurrence: base.urlString)
 
         let entry = ArchiveLinkPayload.Entry(
             link: base.urlString,
             display: base.display,
             page: page,
-            thumbPNGBase64: thumbBase64
+            thumbPNGBase64: preview?.base64EncodedString()
         )
         return pasteboardItem(entries: [entry], plainURLs: [base.urlString])
+    }
+
+    private static func thumbnail(with thumbnailer: PDFThumbnailer?, fileURL: URL,
+                                  page: Int, occurrence: String) async -> Data? {
+        guard let thumbnailer, let source = ReaderThumbnailSource.capture(fileURL.path) else { return nil }
+        return await thumbnailer.readerPNG(fileURL: fileURL, page: page, occurrence: occurrence, source: source)
     }
 
     /// Text-first page link used immediately by the command while its optional image renders.

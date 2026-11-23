@@ -45,6 +45,9 @@ final class PreviewImagePrefetcher: ObservableObject {
         let modifiedSeconds: Int
         let modifiedNanoseconds: Int
         let inode: UInt64
+        let device: Int32
+        let birthSeconds: Int
+        let birthNanoseconds: Int
         /// The file's bytes are not on this Mac (an evicted cloud file): opening it would download it.
         let isDataless: Bool
 
@@ -54,7 +57,8 @@ final class PreviewImagePrefetcher: ObservableObject {
             guard stat(path, &st) == 0 else { return nil }
             return FileStamp(size: Int64(st.st_size), modifiedSeconds: st.st_mtimespec.tv_sec,
                              modifiedNanoseconds: st.st_mtimespec.tv_nsec, inode: UInt64(st.st_ino),
-                             isDataless: ViewerCloudFile.isDataless(path, flags: st.st_flags))
+                             device: st.st_dev, birthSeconds: st.st_birthtimespec.tv_sec,
+                             birthNanoseconds: st.st_birthtimespec.tv_nsec, isDataless: ViewerCloudFile.isDataless(path, flags: st.st_flags))
         }
     }
 

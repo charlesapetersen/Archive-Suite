@@ -23,18 +23,19 @@ still classifies the locked PDF as unreadable.
 [Independent scratch reproduction](../verification/evidence/reader/W49.reader-s005-reproduce-check.md).
 (W49.fix-reader-encrypted-pdf)
 
-## Data keyed by absolute path — the limits (W49.storage-simplify-audit, 2026-11-20)
+## Moving the archive folder (W49.reader-root-movable, 2026-11-23)
 
-Found by the storage survey (`execution-plans/storage-simplify.md` §2, §6).
-- **Legacy flags and page turns use absolute paths** (`FlagStore` in `flaggedPaths` and `PageTurnStore`
-  in the library database). These local values stay at their previous paths after a move. In an adopted
-  catalogue, the companion carries flags and view turns. Reader keeps the same adopted instance after a
-  same-volume root rename and can still offer the verified repair for a detached companion.
-  (W49.reader-root-movable)
-- **OCR search uses a local cache for each marked physical root.** An unchanged PDF keeps its indexed text when
-  the same directory moves on its mounted volume. A copy with the same marker builds its own index. A leaf
-  rename needs a new row, and settled scans retire the disappeared path. The first use of the scoped cache
-  rebuilds OCR text once. **Page thumbnails are still keyed by absolute path** (queued: W49.reader-root-movable).
+On the same mounted volume, Reader can reopen the same adopted directory at a new path and read flags and
+page turns from its verified companions. The OCR index and page pictures use the marker, local directory
+identity and relative path. Unchanged files reuse their text and pixels. A copied folder gets its own cache
+and its own adoption choice, even when it carries the same marker. A renamed leaf gets a fresh cache row, and
+settled scans retire the disappeared search path. A PDF-only rename requires the explicit companion repair.
+
+The first use of the scoped cache builds it once. The move needs a filesystem that can establish the same
+local directory identity. A cross-volume copy starts a separate cache. Before moving a root adopted by an
+older build, open it at its previous path once so Reader can carry forward the local adoption setting. A
+folder moved before that upgrade can be adopted again. The PDF and companion still carry their own identities.
+Legacy `FlagStore` flags and `PageTurnStore` turns keep their absolute-path behavior.
 
 ## Dating a folder's documents from its confirmed date — the limits (W47.ct-folder-date-reader, 2026-11-19)
 

@@ -43,9 +43,10 @@ extension NavigationModel {
         }
     }
 
-    func applyCatalogueRotation(path: String, pageIndex: Int, turns: Int,
+    func applyCatalogueRotation(path: String, pageIndex: Int, turns: Int, observed: ItemFacts,
                                 completed: ((Set<String>) -> Void)? = nil) {
-        editCatalogue(title: "Rotation", paths: [path], physicalPageIndex: pageIndex, completed: completed) { facts in
+        editCatalogue(title: "Rotation", paths: [path], physicalPageIndex: pageIndex, observed: [observed],
+                      completed: completed) { facts in
             guard let file = try? facts.file.get(), let page = facts.page else { return nil }
             let change: CatalogueEdit.Change = turns == 0 ? .clear : .set(.rotation(turns * 90))
             return (file, CatalogueEdit(.pageViewRotation(page.id), change))

@@ -18075,3 +18075,17 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Two VM smoke checks and all 14 new scratch organizer checks passed. The broader organizer test
   reported the same two label-record failures on unchanged main at 8e017001. No paid OCR was used.
   <!-- /W40.fix-processor-collection-name-filing -->
+
+- [x] **W49.reader-root-movable — Keep flags, page turns and the Reader index when a root moves [M]** · §W49 · SHIPPED 2026-11-23 (this commit).
+  Reader reopens the same adopted directory after a same-volume move and reads flags and turns from its
+  verified companions. The OCR index and page pictures retain their root-relative keys. A separate copy
+  with the same marker gets its own adoption choice and cache, including when it takes the previous path.
+  A leaf rename gets a fresh index row. When only the PDF was renamed, the explicit repair checks the former
+  pair, the exact physical occurrence and the new name before moving its companion.
+  Scratch tests verified saved-bookmark reopening, unchanged PDF bytes, cache reuse without another
+  extraction or thumbnail render, and isolated copies and repair evidence. Reader smoke recorded 1,090
+  passing tests and seven skips. All four focused off-screen tests passed, covering the repair prompt,
+  page views, rotation persistence and Undo/Redo. Write-surface lint and all 30 mutation checks passed.
+  No rehearsal cache inputs were created.
+  [Reader move limits](ArchiveReader/KNOWN_ISSUES.md#moving-the-archive-folder-w49reader-root-movable-2026-11-23)
+  <!-- /W49.reader-root-movable -->

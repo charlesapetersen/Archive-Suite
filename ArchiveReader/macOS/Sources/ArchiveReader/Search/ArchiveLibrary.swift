@@ -87,7 +87,7 @@ final class ArchiveLibrary: ObservableObject {
 
     /// The root being walked, so `rescan()` needs no argument.
     private var root: URL?
-    private var catalogueInstance: UUID?
+    private(set) var catalogueInstance: UUID?
     var usesCatalogue: Bool { catalogueInstance != nil }
     private(set) var catalogueReader: CatalogueReader?
     private(set) var catalogueSnapshot: CatalogueReader.Snapshot?

@@ -181,12 +181,13 @@ final class ContentIndexFreshnessTests: XCTestCase {
         let renamedHits = await driver.search("archival")
         XCTAssertTrue(renamedHits.contains(renamed.path))
 
-        let copyScope = try scope(copy)
+        try FileManager.default.moveItem(at: copy, to: original)
+        let copyScope = try scope(original)
         XCTAssertNotEqual(copyScope.key, movedScope.key)
         driver.setRootCache(copyScope)
         let copyWarmHits = await driver.search("archival")
         XCTAssertTrue(copyWarmHits.isEmpty, "A copy with the same marker cannot read the original cache.")
-        driver.startIndexing([try discover(copy.appendingPathComponent(name))])
+        driver.startIndexing([try discover(original.appendingPathComponent(name))])
         try await waitForPasses(driver, 4)
         XCTAssertEqual(probe.count, 3)
         await driver.closeForTesting()
@@ -229,6 +230,14 @@ final class ContentIndexFreshnessTests: XCTestCase {
         let removed = await reopened.catalogueHits(ftsExpression: "Borealis")
         XCTAssertTrue(removed.isEmpty)
         await reopened.close()
+        try FileManager.default.createDirectory(at: original, withIntermediateDirectories: false)
+        do {
+            try await initial.open()
+            XCTFail("A different directory at the original path cannot reopen its old scope.")
+            await initial.close()
+        } catch is CancellationError {
+            // The old scope belongs to the moved directory, regardless of the old spelling.
+        }
     }
 
     // MARK: - Helpers

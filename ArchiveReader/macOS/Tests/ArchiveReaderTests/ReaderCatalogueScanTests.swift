@@ -140,13 +140,17 @@ final class ReaderCatalogueScanTests: XCTestCase {
         let suite = "ReaderCatalogueMove.\(UUID())"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        let navigation = NavigationModel(defaults: defaults,
-                                         indexer: ContentIndexer(url: folder.appendingPathComponent("original-index.sqlite")))
+        let firstIndexer = ContentIndexer(url: folder.appendingPathComponent("original-index.sqlite"))
+        let navigation = NavigationModel(defaults: defaults, indexer: firstIndexer)
         XCTAssertNil(navigation.rootStore.setRoot(original))
-        navigation.setCatalogueMode(true)
+        let instance = UUID()
+        let priorKey = try XCTUnwrap(ReaderRootIdentity.legacyCatalogueKey(for: original))
+        defaults.set(instance.uuidString, forKey: priorKey)
+        defaults.set(true, forKey: priorKey + ".enabled")
+        navigation.startLibrary(original)
         let root = navigation.resolvedLibraryRoot(original)
         XCTAssertNotNil(root.markerGUID)
-        let instance = try XCTUnwrap(root.catalogueInstance)
+        XCTAssertEqual(root.catalogueInstance, instance)
         let originalReader = try CatalogueReader(grantedRoot: original, rootInstanceID: instance,
                                                  mode: .adopted, identifyPDF: CataloguePDFIdentity.identify)
         let facts = try originalReader.discover().facts(at: "Letter.pdf").file.get()
@@ -161,13 +165,28 @@ final class ReaderCatalogueScanTests: XCTestCase {
         try FileManager.default.copyItem(at: original, to: copy)
         try FileManager.default.moveItem(at: original, to: moved)
 
-        let reopened = NavigationModel(defaults: defaults,
-                                       indexer: ContentIndexer(url: folder.appendingPathComponent("reopened-index.sqlite")))
-        XCTAssertNil(reopened.rootStore.setRoot(moved))
-        XCTAssertEqual(reopened.resolvedLibraryRoot(moved).catalogueInstance, instance)
+        navigation.library.start(scope: nil)
+        await firstIndexer.closeForTesting()
+
+        let movedIndexer = ContentIndexer(url: folder.appendingPathComponent("reopened-index.sqlite"))
+        let reopened = NavigationModel(defaults: defaults, indexer: movedIndexer)
+        let reopenedRoot = try XCTUnwrap(reopened.rootStore.root)
+        XCTAssertEqual(reopenedRoot.resolvingSymlinksInPath().path, moved.path)
+        XCTAssertEqual(reopened.resolvedLibraryRoot(reopenedRoot).catalogueInstance, instance)
         let pass = ReaderCatalogueScan.run(root: moved, instance: instance, isCancelled: { false }, onProgress: { _ in })
         XCTAssertEqual(pass.rows.first?.catalogueFlag, true)
         XCTAssertEqual(pass.snapshot?.facts(at: "Letter.pdf", physicalPageIndex: 0).page?.viewRotation, 90)
+
+        let deadline = Date().addingTimeInterval(5)
+        while reopened.library.files.isEmpty && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let openPath = try XCTUnwrap(reopened.library.files.first).path
+        let viewer = DocumentViewerModel(persists: false)
+        viewer.followCatalogueRotation(reopened)
+        viewer.load(DocumentSelection(filePaths: [openPath]))
+        XCTAssertEqual(viewer.imageTurns, 1)
+        XCTAssertEqual(viewer.pageViewTurns(path: openPath, page: 0), 1)
 
         XCTAssertNil(reopened.rootStore.setRoot(copy))
         XCTAssertEqual(reopened.resolvedLibraryRoot(copy).markerGUID, root.markerGUID)
@@ -195,6 +214,9 @@ final class ReaderCatalogueScanTests: XCTestCase {
         XCTAssertEqual(repaired.page?.viewRotation, 90)
         XCTAssertEqual(try Data(contentsOf: renamed), originalPDF)
         XCTAssertTrue(FileManager.default.fileExists(atPath: copy.appendingPathComponent(sidecar.lastPathComponent).path))
+        XCTAssertFalse(viewer.canRotate, "A viewer opened in the original instance cannot edit the copy.")
+        reopened.library.start(scope: nil)
+        await movedIndexer.closeForTesting()
     }
 
     private func writePDF(at url: URL, metadata: Data?, pageCount: Int = 1) throws {

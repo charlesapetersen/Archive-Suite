@@ -27,13 +27,23 @@ enum PageThumbnails {
     }()
 
     /// The image of PDF page `pageIndex` (0-based) at most `maxPixel` on its longer side, turned `turns`
-    /// quarter turns clockwise (the reader's view-only turn, `PageTurnStore`). `nil` when the file or the page
+    /// quarter turns clockwise (the Reader's view-only turn). `nil` when the file or the page
     /// cannot be read. Read-only: the cache writes only its own folder.
     nonisolated static func image(path: String, pageIndex: Int, maxPixel: CGFloat, turns: Int = 0,
+                                  scope: ReaderRootCacheScope? = nil,
                                   thumbnailer: PDFThumbnailer = PageThumbnails.thumbnailer) async -> PageImage? {
-        guard pageIndex >= 0, let mtime = modificationDate(path) else { return nil }
-        guard let png = await thumbnailer.png(fileURL: URL(fileURLWithPath: path), page: pageIndex + 1, spec: spec,
-                                              linkKey: "reader-page-views:" + path, mtime: mtime),
+        guard pageIndex >= 0, let source = ReaderThumbnailSource.capture(path) else { return nil }
+        let occurrence: String
+        let matchedScope: ReaderRootCacheScope?
+        if let scope, let relative = scope.relativePath(path) {
+            occurrence = scope.key + "/" + relative
+            matchedScope = scope
+        } else {
+            occurrence = path
+            matchedScope = nil
+        }
+        guard let png = await thumbnailer.readerPNG(fileURL: URL(fileURLWithPath: path), page: pageIndex + 1,
+                                                    spec: spec, occurrence: occurrence, source: source, scope: matchedScope),
               !Task.isCancelled,
               let decoded = decode(png, maxPixel: maxPixel) else { return nil }
         return PageImage(cgImage: rotated(decoded, turns: turns))
@@ -53,14 +63,6 @@ enum PageThumbnails {
         return CorpusWalker.withDatalessMaterializationDisabled {
             CGPDFDocument(URL(fileURLWithPath: path) as CFURL).map { PDFPageRole.roles(of: $0) }
         }
-    }
-
-    /// `stat(2)`, not `URL.resourceValues`, which caches on a reused URL and would miss a re-OCR.
-    nonisolated private static func modificationDate(_ path: String) -> Date? {
-        var info = stat()
-        guard stat(path, &info) == 0, !ViewerCloudFile.isDataless(path, flags: info.st_flags) else { return nil }
-        return Date(timeIntervalSince1970: TimeInterval(info.st_mtimespec.tv_sec)
-                    + TimeInterval(info.st_mtimespec.tv_nsec) / 1_000_000_000)
     }
 
     nonisolated private static func decode(_ png: Data, maxPixel: CGFloat) -> CGImage? {
@@ -194,6 +196,7 @@ struct PageThumbnailCell: View {
     let maxPixel: CGFloat
     var inverted = false
     var awaitingDownload = false
+    var cacheScope: ReaderRootCacheScope?
     let identifier: String
     let accessibilityLabel: String
     let open: () -> Void
@@ -210,12 +213,13 @@ struct PageThumbnailCell: View {
         .accessibilityValue(selected ? "current" : "")
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityIdentifier(identifier)
-        .task(id: "\(path)#\(pageIndex)#\(turns)#\(awaitingDownload)") {
+        .task(id: "\(path)#\(pageIndex)#\(turns)#\(awaitingDownload)#\(cacheScope?.key ?? "")") {
             // A cell is reused by position when the files change, so the last file's picture must not linger.
             image = nil
             finished = awaitingDownload
             guard !awaitingDownload else { return }
-            let fetched = await PageThumbnails.image(path: path, pageIndex: pageIndex, maxPixel: maxPixel, turns: turns)
+            let fetched = await PageThumbnails.image(path: path, pageIndex: pageIndex, maxPixel: maxPixel, turns: turns,
+                                                     scope: cacheScope)
             guard !Task.isCancelled else { return }
             image = fetched
             finished = true

@@ -74,10 +74,12 @@ final class ContentIndexer: ObservableObject {
     /// Close a scratch index before its test directory is reclaimed. Production owns its cache for the
     /// process lifetime; tests deliberately use short-lived directories and must not unlink an open WAL.
     func closeForTesting() async {
-        task?.cancel()
-        _ = await task?.value
-        task = nil
-        pending = nil
+        let running = task
+        index.retire()
+        startIndexing([])
+        resetPruneState()
+        await running?.value
+        await previousClose?.value
         await index.close()
     }
 #endif

@@ -88,6 +88,48 @@ final class DocumentPageOverviewTests: XCTestCase {
                        "Reader's View menu must not offer automatic window tabbing")
     }
 
+    func testPageThumbnailCacheFollowsMovedRootAndIsolatesCopies() async throws {
+        let pdf = try fixture().resolvingSymlinksInPath()
+        let original = pdf.deletingLastPathComponent()
+        let parent = original.deletingLastPathComponent()
+        let moved = parent.appendingPathComponent("moved-thumbs-\(UUID())", isDirectory: true)
+        let copy = parent.appendingPathComponent("copy-thumbs-\(UUID())", isDirectory: true)
+        let cache = parent.appendingPathComponent("cache-thumbs-\(UUID())", isDirectory: true)
+        addTeardownBlock {
+            for url in [moved, copy, cache] { try? FileManager.default.removeItem(at: url) }
+        }
+        let marker = UUID()
+        let thumbnailer = PDFThumbnailer(cacheDirectory: cache)
+        func scope(_ root: URL) throws -> ReaderRootCacheScope {
+            ReaderRootCacheScope(markerGUID: marker, identity: try XCTUnwrap(ReaderRootIdentity.capture(root)),
+                                 rootPath: root.path)
+        }
+        let first = await PageThumbnails.image(path: pdf.path, pageIndex: 0, maxPixel: 280,
+                                                scope: try scope(original), thumbnailer: thumbnailer)
+        let upright = try XCTUnwrap(first?.cgImage)
+        try FileManager.default.copyItem(at: original, to: copy)
+        try FileManager.default.moveItem(at: original, to: moved)
+
+        let newPath = moved.appendingPathComponent(pdf.lastPathComponent).path
+        let second = await PageThumbnails.image(path: newPath, pageIndex: 0, maxPixel: 280, turns: 1,
+                                                 scope: try scope(moved), thumbnailer: thumbnailer)
+        let turned = try XCTUnwrap(second?.cgImage)
+        let expected = PageThumbnails.rotated(upright, turns: 1)
+        let uprightPNG = try XCTUnwrap(RenderProbe.pngData(from: upright))
+        let turnedPNG = try XCTUnwrap(RenderProbe.pngData(from: turned))
+        XCTAssertNotEqual(turnedPNG, uprightPNG)
+        XCTAssertEqual(turnedPNG, RenderProbe.pngData(from: expected))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: cache.path).filter { $0.hasSuffix(".png") }.count,
+                       1, "The same cached pixels are reused at the new path, even with a view turn.")
+
+        let copied = await PageThumbnails.image(path: copy.appendingPathComponent(pdf.lastPathComponent).path,
+                                                 pageIndex: 0, maxPixel: 280, scope: try scope(copy),
+                                                 thumbnailer: thumbnailer)
+        XCTAssertNotNil(copied)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: cache.path).filter { $0.hasSuffix(".png") }.count,
+                       2, "A distinct physical root does not borrow the original picture.")
+    }
+
     /// The contact sheet and the thumbnails draw from the on-disk thumbnail cache (W40.reader-page-views): each
     /// page is its own picture, a second visit is read back from the cache, and the PDF is never touched.
     func testPageThumbnailsDrawEveryPageFromTheDiskCacheWithoutChangingThePDF() async throws {

@@ -288,6 +288,7 @@ final class DocumentViewerModel: ObservableObject {
 
     /// `showing` opens on that file of the selection, if it is one (W40.reader-selection-current); else the first.
     func load(_ selection: DocumentSelection, showing path: String? = nil) {
+        openedCatalogueInstance = catalogueNavigation?.library.catalogueInstance
         urls = selection.filePaths.map { URL(fileURLWithPath: $0) }
         // The preview sheet loads each new selection: places in files that are no longer open are forgotten.
         let open = Set(selection.filePaths)
@@ -527,6 +528,7 @@ final class DocumentViewerModel: ObservableObject {
     private weak var catalogueNavigation: NavigationModel?
     private var catalogueRotationObservation: AnyCancellable?
     private var usedCatalogueRotation = false
+    private var openedCatalogueInstance: UUID?
 
     /// Follow the library even when a companion-only edit changes no visible list cell.
     func followCatalogueRotation(_ navigation: NavigationModel?) {
@@ -536,6 +538,9 @@ final class DocumentViewerModel: ObservableObject {
         catalogueRotationObservation = nil
         guard let navigation else { return }
         usedCatalogueRotation = navigation.library.usesCatalogue
+        if current != nil, openedCatalogueInstance == nil {
+            openedCatalogueInstance = navigation.library.catalogueInstance
+        }
         catalogueRotationObservation = navigation.library.$phase.combineLatest(navigation.$catalogueEditSaving)
             .receive(on: DispatchQueue.main)
             .sink { [weak self, weak navigation] _ in
@@ -547,28 +552,45 @@ final class DocumentViewerModel: ObservableObject {
             }
     }
 
-    private var usesCatalogueRotation: Bool { catalogueNavigation?.library.usesCatalogue ?? usedCatalogueRotation }
+    private var usesCatalogueRotation: Bool {
+        openedCatalogueInstance != nil || (catalogueNavigation?.library.usesCatalogue ?? usedCatalogueRotation)
+    }
 
-    private var catalogueImagePage: CatalogueRecord.Page? {
-        guard let catalogueNavigation, let path = currentFilePath, imagePage != nil,
-              let file = catalogueNavigation.libraryFiles(atPaths: [path]).first else { return nil }
-        let physicalIndex = pagePairs.imagePageIndex(pair: pair)
-        guard let page = catalogueNavigation.catalogueFacts(for: file, physicalPageIndex: physicalIndex)?.page,
-              ["image", "text", "searchable"].contains(page.role) else { return nil }
-        return page
+    var pageThumbnailScope: ReaderRootCacheScope? { catalogueNavigation?.indexer.rootCacheScope }
+
+    private func cataloguePageFacts(path: String, pageIndex: Int) -> ItemFacts? {
+        guard let navigation = catalogueNavigation,
+              let file = navigation.libraryFiles(atPaths: [path]).first,
+              let facts = navigation.catalogueFacts(for: file, physicalPageIndex: pageIndex),
+              let page = facts.page, ["image", "text", "searchable"].contains(page.role),
+              openedCatalogueInstance == nil || openedCatalogueInstance == navigation.library.catalogueInstance
+        else { return nil }
+        return facts
+    }
+
+    private var catalogueImageFacts: ItemFacts? {
+        guard let path = currentFilePath, imagePage != nil,
+              let loadedStamp = loaded?.stamp, loadedStamp == PreviewImagePrefetcher.FileStamp.of(path)
+        else { return nil }
+        return cataloguePageFacts(path: path, pageIndex: pagePairs.imagePageIndex(pair: pair))
+    }
+
+    func pageViewTurns(path: String, page: Int) -> Int {
+        if usesCatalogueRotation { return (cataloguePageFacts(path: path, pageIndex: page)?.page?.viewRotation ?? 0) / 90 }
+        return pageTurns.turns(path: path, page: page)
     }
 
     /// Quarter turns clockwise for the displayed image page. Its JPEG original and PDF image draw
     /// with the same turn. The separate OCR text page stays upright.
     var imageTurns: Int {
         guard let path = currentFilePath, imagePage != nil else { return 0 }
-        if usesCatalogueRotation { return (catalogueImagePage?.viewRotation ?? 0) / 90 }
+        if usesCatalogueRotation { return (catalogueImageFacts?.page?.viewRotation ?? 0) / 90 }
         return pageTurns.turns(path: path, page: pagePairs.imagePageIndex(pair: pair))
     }
 
     var canRotate: Bool {
         guard imagePage != nil, !showingAllPages else { return false }
-        return !usesCatalogueRotation || (catalogueNavigation?.catalogueEditSaving == false && catalogueImagePage != nil)
+        return !usesCatalogueRotation || (catalogueNavigation?.catalogueEditSaving == false && catalogueImageFacts != nil)
     }
     var isRotated: Bool { imageTurns != 0 }
 
@@ -582,7 +604,9 @@ final class DocumentViewerModel: ObservableObject {
         let before = imageTurns, after = ((turns % 4) + 4) % 4
         guard after != before else { return }   // Reset on an upright page is not an action to undo
         if usesCatalogueRotation {
-            catalogueNavigation?.applyCatalogueRotation(path: path, pageIndex: page, turns: after) { [weak self] verified in
+            guard let observed = catalogueImageFacts else { return }
+            catalogueNavigation?.applyCatalogueRotation(path: path, pageIndex: page, turns: after,
+                                                        observed: observed) { [weak self] verified in
                 guard let self, self.currentFilePath == path else { return }
                 if !verified.isEmpty { self.leftController.clearSelection() }
                 self.tagStatus = self.catalogueNavigation?.catalogueEditFeedback ?? ""

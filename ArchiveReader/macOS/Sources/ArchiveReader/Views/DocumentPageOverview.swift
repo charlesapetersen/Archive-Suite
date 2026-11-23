@@ -49,7 +49,7 @@ struct DocumentPageOverview: View {
     private func tile(_ cell: ContactSheetCell, name: String, fileCount: Int) -> some View {
         let file = cell.slot.file, pageIndex = cell.slot.index, number = pageIndex + 1
         let several = fileCount > 1, current = file == model.index
-        let turns = pages.pairs(cell.path).isImagePage(pageIndex) ? model.pageTurns.turns(path: cell.path, page: pageIndex) : 0
+        let turns = pages.pairs(cell.path).isImagePage(pageIndex) ? model.pageViewTurns(path: cell.path, page: pageIndex) : 0
         return VStack(spacing: 4) {
             if several {
                 // Every tile keeps the heading's line so the rows stay level; only a file's first page fills it.
@@ -69,7 +69,7 @@ struct DocumentPageOverview: View {
                 PageThumbnailCell(path: cell.path, pageIndex: pageIndex, turns: turns, label: "PDF page \(number)",
                                   selected: current && number == model.focusedPageNumber,
                                   height: 220, maxPixel: 520, inverted: model.invertingImages,
-                                  identifier: "\(idPrefix).pageTile.\(file + 1).\(number)",
+                                  cacheScope: model.pageThumbnailScope, identifier: "\(idPrefix).pageTile.\(file + 1).\(number)",
                                   accessibilityLabel: several ? "\(name), PDF page \(number)" : "PDF page \(number)") {
                     model.openTiledPage(file: file, page: number)
                     opened()
@@ -171,11 +171,11 @@ struct PageThumbnailSidebar: View {
     private func thumbnail(file: Int, path: String, pair: Int) -> some View {
         let pageIndex = pages.pairs(path).imagePageIndex(pair: pair)
         return PageThumbnailCell(path: path, pageIndex: pageIndex,
-                                 turns: model.pageTurns.turns(path: path, page: pageIndex), label: "\(pair + 1)",
+                                 turns: model.pageViewTurns(path: path, page: pageIndex), label: "\(pair + 1)",
                                  selected: file == model.index && pair == model.pair && !model.showingAllPages,
                                  height: 150, maxPixel: 340, inverted: model.invertingImages,
                                  awaitingDownload: file == model.index && model.cloudState != nil,
-                                 identifier: "\(idPrefix).thumb.\(file + 1).\(pair + 1)",
+                                 cacheScope: model.pageThumbnailScope, identifier: "\(idPrefix).thumb.\(file + 1).\(pair + 1)",
                                  accessibilityLabel: "Page \(pair + 1) of file \(file + 1)") {
             model.openThumbnail(file: file, pair: pair)
         }
