@@ -292,6 +292,14 @@ calls are section 1.
     Live Capture, in W49.proc-ledger-track-paid. The owner opted in to recording, marking and publishing the
     tracker update.
 
+35. **Reader catalogue repair after reopening, 2026-11-22 walkthrough at 22:22 Pacific.**
+    Remember the last verified physical PDF identity and catalogue companion location locally on this Mac.
+    After an ordinary same-folder Finder rename while Reader was closed, offer the guarded repair on reopening
+    when the current PDF and old companion can still be verified against that record. Require the user's
+    confirmation, preserve Undo, and show missing or ambiguous companions for manual handling. Do not infer a
+    match from identical PDF bytes or an embedded catalogue ID alone. Implement in W49.storage-reader.
+    The owner agreed to record the decision, mark the original report and publish the project record.
+
 ## 2. Settled by the figures, or decided by the session on the notes' recommendations (owner may veto)
 
 Each is a table default or a filed item, reversible without app work; the figures and files are in the note named.
