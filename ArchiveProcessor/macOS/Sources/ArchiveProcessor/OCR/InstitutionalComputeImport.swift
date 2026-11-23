@@ -16,7 +16,7 @@ import Foundation
 /// (`<cluster> · <model> (<precision>, job <id>)`, `SPEC/tag-format.md`), rotation 0 (the cluster read the file as
 /// stored, and asking the run's provider for the rotation would be a paid call), and — because the panel prompt
 /// the cluster reads with returns no document-start/continuation label — a text-only classification by the run's own
-/// model, as the Apple Vision hybrid does. A page with no match (escalated, failed, never read, or not in the
+/// model when the run uses classification. A page with no match (escalated, failed, never read, or not in the
 /// folder) is read by the run's model as usual: the run's cost estimate already counts every page, so falling
 /// through never spends more than the estimate said.
 ///
@@ -38,6 +38,8 @@ struct InstitutionalComputeImport: Sendable {
     let pages: [String: Page]
     /// `_meta` files that matched nothing because their provenance is incomplete or their `.txt` is missing.
     let unmatchable: Int
+    /// Frozen by Process Files from its tagging, merging, and collection-segmentation settings.
+    var classifyPages = true
 
     var count: Int { pages.count }
 

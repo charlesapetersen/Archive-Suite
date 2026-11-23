@@ -2115,13 +2115,15 @@ extension OCRProcessor {
         }
         // W41.app-institutional-compute: a page an institutional-computing bulk run already read is not bought again. Before the rotation
         // task, which would be a paid call too. Direct providers only, as for the page readers (the run start clears
-        // the import elsewhere); its classification comes from the run's model on the text alone.
+        // the import elsewhere). When needed, the run's model classifies the text alone.
         if let imported, localAgent == nil, gatewayConfig == nil, provider != .appleVision,
            let reading = imported.result(for: imageURL) {
+            let configuration = imported.classifyPages
+                ? LLMTextConfiguration(provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
+                : nil
             let classified = await applyingVisionTextClassification(
                 to: reading, previousText: previousText, customPrompt: customPrompt,
-                configuration: LLMTextConfiguration(provider: provider, model: model, thinkingLevel: thinkingLevel,
-                                                    apiKey: apiKey))
+                configuration: configuration)
             return await ReadQualityDisagreement.addingFlag(to: classified, route: nil, imageURL: imageURL)
         }
         // Start rotation detection concurrently with the network OCR call. Both are async, so

@@ -18335,3 +18335,7 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Two paid-batch cancellation assertions also failed on the unchanged baseline. A separate off-screen
   test expects outdated Local Agent caption wording. No paid requests or bench cache.
   <!-- /W49.proc-instcompute-resume-load -->
+
+- [x] **W49.proc-instcompute-classify — skip the classification call on imported pages when nothing reads it [S]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build) — Matched pages keep their cluster text and provenance and skip the paid classification request when tagging that creates new tags, document merging, and collection segmentation are all off. Fresh, standard resumed, and mixed-PDF resumed runs use their run settings.
+  The Debug build, scratch institutional-compute import, page-reader, fake Local Agent, and OCR prompt checks passed. The import-only Process Files regression counted zero provider calls and the classification path counted one text-only call. No paid requests or bench cache.
+  <!-- /W49.proc-instcompute-classify -->

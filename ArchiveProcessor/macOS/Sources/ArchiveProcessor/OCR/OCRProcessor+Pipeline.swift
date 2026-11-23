@@ -2216,6 +2216,9 @@ extension OCRProcessor {
             guard !Task.isCancelled else { return }
         }
 
+        runConfig.institutionalComputeImport?.classifyPages = (pending.enableTagging && runConfig.taggingMode != .copySource)
+            || runConfig.mergeDocuments || pending.enableCollectionSegmentation
+
         // W40.fix-processor-instcompute-resume-silent: ask before changing the saved run.
         if !readWithoutClusterText, let prompt = Self.institutionalComputeResumePrompt(
             recordedFolder: pending.runtimeConfig?.institutionalComputeFolder,
@@ -3610,6 +3613,8 @@ extension OCRProcessor {
                                        reloadedImport: plannedImport)
             activePendingMixedPDF = resumingMixedPDF
         }
+        runConfig.institutionalComputeImport?.classifyPages = (enableTagging && !passSourceTags)
+            || runConfig.mergeDocuments || enableCollectionSegmentation
         let runOutputSettings = lateRunOutputSettings(for: runConfig)
         currentModel = model
         currentGateway = gatewayConfig

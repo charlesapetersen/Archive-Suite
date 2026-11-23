@@ -1083,16 +1083,14 @@ A replaced folder can still load, and the run's model reads individual pages wit
 
 What the import does not do:
 - **The estimates count every page.** The cost and time lines do not know which pages will match until each is
-  hashed during the run, so they overstate a run with cluster text (a matched page costs one short text-only
-  classification call). (accepted: which pages match is known only once each is hashed during the run)
+  hashed during the run, so they overstate a run with cluster text. A matched page makes at most one short
+  text-only classification call. (accepted: which pages match is known only once each is hashed during the run)
 - **Rotation is 0** on an imported page: asking the run's provider would be a paid call per page, and the cluster read
   the file as stored. A sideways scan stays sideways in the PDF. (accepted: a rotation check would be a paid call per page)
 - **Imported text follows the bench panel's prompt**, not the Processor's: the custom OCR prompt and the
-  previous-page context do not apply to imported pages (the classification call does get the custom prompt). (accepted: the cluster read every page with the bench panel's prompt)
+  previous-page context do not change the imported transcription. When classification runs, it gets the custom prompt. (accepted: the cluster read every page with the bench panel's prompt)
 - **Only image inputs match.** A PDF input's pages are drawn to temporary JPEGs whose bytes the cluster never saw.
   Paid batches, the gateway, the Local Agent and Apple Vision runs ignore the import. (accepted: a PDF's pages are drawn during the run, so the cluster never saw their bytes; the other routes do not read pages through the import)
-- **Every imported page gets a classification call**, even when tagging, merging and segmentation are off:
-  `performOCRCall` cannot see the run's tagging mode. One short text call a page, inside the estimate. (queued: W49.proc-instcompute-classify)
 - **Every page is hashed** once more than it is read (one extra read of each input), the price of matching by
   content rather than by name. (accepted: the price of matching by content rather than by name)
 - **Older bulk output without `_meta.cluster` does not import.** No institution is guessed. Use a new output folder

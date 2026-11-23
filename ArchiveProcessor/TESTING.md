@@ -397,7 +397,8 @@ existing scratch, key-free, no-network execution remains unchanged.
 - **`test-institutional-compute-import.sh`** — W41.app-institutional-compute: a mixed-cluster bulk folder written as `cluster_ocr.py bulk`
   writes it, through the real `performOCRCall` over an injected transport (`INSTITUTIONAL_COMPUTE_IMPORT_TEST`): pages matched by
   their bytes (two boxes' `001.jpg`, a renamed copy), hashless, invalid-hash, unnamed-cluster and escalated pages matching nothing, a matched page
-  spending only the text-only classification call (no image, no rotation call), an unmatched one read by the run's
+  spending only the text-only call when classification is enabled, an import-only Process Files run making zero
+  requests and keeping the imported text and provenance, an unmatched page read by the run's
   model, the gateway ignoring the import, the `ImportedReading` record and precision label, both institutions' PDF headers, separator/newline sanitizing, replaced-reader metadata rejected, the
   persisted result and the resume snapshot, plus the Reader’s real parser stripping the full long header. `INSTITUTIONAL_COMPUTE_IMPORT_ARTIFACTS=/tmp/<scratch>` saves a rendered
   PDF-header PNG to inspect. No API key, network, corpus, or spend; not in the health gate.

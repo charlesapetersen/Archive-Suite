@@ -7,7 +7,7 @@ import ArchiveCore
 /// Key-free, no-network contract for W41.app-institutional-compute. Builds a mixed-cluster bulk folder in the form
 /// `cluster_ocr.py bulk` writes it (`<image>.txt`, `_meta/<image>.json` with `sha256`, `model`, `preset`, `vllm_args`,
 /// `job`, `cluster`) in a temporary directory, then drives the REAL `OCRProcessor.performOCRCall` through the injected HTTP
-/// transport: a matched page takes FarmShare's text and spends only the text-only classification call, an unmatched
+/// transport: a matched page takes FarmShare's text and can classify it with a text-only call, an unmatched
 /// one is read by the run's model, a page is matched by its bytes and never by a name two boxes share, and the
 /// gateway ignores the import. Also the PDF header, the precision label and the resume snapshot. Every file is
 /// scratch; nothing outside the temporary directory is read or written.
@@ -267,7 +267,7 @@ enum InstitutionalComputeImportTestDriver {
 
         // 6. W40.fix-processor-instcompute-resume-silent: the folder is removed between the run and its resume.
         if let runtime = back {
-            await resumeWithFolderGone(runtime, files: [box1, unread], pdf: pdf, bulk: bulk, root: root,
+            await checkProcessFiles(runtime, imported: imported, files: [box1, unread], pdf: pdf, root: root,
                                        script: script, check: check)
         } else { check("the resume snapshot decodes", false) }
         let prompt = { (folder: String?, reloaded: InstitutionalComputeImport?, pages: Int) in
@@ -308,17 +308,17 @@ enum InstitutionalComputeImportTestDriver {
         finish(results)
     }
 
-    /// An interrupted run that recorded `bulk`, resumed through the real `resumeRun` after the folder was moved away:
-    /// it must ask, spend nothing and leave the manifest as it was. The journal is redirected into `root` the way
-    /// `MultiPageReOCRTestDriver` does it, and nothing is written unless the redirection is proven.
-    private static func resumeWithFolderGone(_ runtime: OCRProcessor.PendingRunRuntimeConfig, files: [URL], pdf: URL, bulk: URL,
-                                             root: URL, script: Script,
-                                             check: (String, Bool, String) -> Void) async {
+    /// Drive Process Files with the cluster folder present, then verify that interrupted runs ask when it disappears.
+    private static func checkProcessFiles(_ runtime: OCRProcessor.PendingRunRuntimeConfig,
+                                          imported: InstitutionalComputeImport, files: [URL], pdf: URL, root: URL,
+                                          script: Script, check: (String, Bool, String) -> Void) async {
         let fm = FileManager.default
+        let bulk = imported.folder
         let stateRoot = root.appendingPathComponent("resume-state", isDirectory: true)
-        let saved = ["BATCHRESUME_TEST", "ARCHIVEPROC_TEST_STATE_ROOT"].map { ($0, ProcessInfo.processInfo.environment[$0]) }
-        setenv("BATCHRESUME_TEST", "1", 1)
-        setenv("ARCHIVEPROC_TEST_STATE_ROOT", stateRoot.path, 1)
+        // Use the text-layer test's state redirect, which also suppresses run history and user notifications.
+        let saved = ["TEXTLAYER_TEST", "TEXTLAYER_TEST_STATE"].map { ($0, ProcessInfo.processInfo.environment[$0]) }
+        setenv("TEXTLAYER_TEST", "1", 1)
+        setenv("TEXTLAYER_TEST_STATE", stateRoot.path, 1)
         defer {   // restored, not just unset: a harness that launched with them set keeps them
             for (key, value) in saved { if let value { setenv(key, value, 1) } else { unsetenv(key) } }
         }
@@ -328,6 +328,22 @@ enum InstitutionalComputeImportTestDriver {
             return
         }
         let model = LLMModel.geminiModels[0]
+        let fresh = OCRProcessor()
+        fresh.taggingMode = .none
+        fresh.institutionalComputeImport = imported
+        await script.set((200, #"{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"[document_start]\nMODEL-TEXT"}]}}]}"#))
+        await fresh.startProcessing(
+            files: [files[0]], provider: .gemini, model: model, thinkingLevel: nil, apiKey: "test-key",
+            outputDirectory: root.appendingPathComponent("import-only", isDirectory: true),
+            batchMode: false, enableTagging: false, enableSegmentJSON: false,
+            segmentationContext: .init(previousTextCharCount: 0, sendPreviousImage: false, customPrompt: nil))
+        let freshCalls = await script.calls()
+        let job = fresh.jobs.first
+        check("an import-only run spends zero requests and keeps the cluster reading without a class",
+              freshCalls.isEmpty && job?.status == .succeeded && job?.classification == nil
+              && job?.result?.text == "BOX-ONE text from FarmShare" && job?.result?.imported?.source == "FarmShare",
+              "\(freshCalls.count) calls; \(fresh.statusMessage)")
+
         var run = OCRProcessor.PendingRun(
             provider: .gemini, model: model, thinkingLevel: nil, fileURLs: files,
             outputDirectory: root.appendingPathComponent("resume-out", isDirectory: true),
