@@ -28,8 +28,6 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; cd "$ROOT" || { echo "cannot cd to 
 # test-smoke.sh scripts, and the Processor's host launch step), and the PATH shims below catch the rest.
 # Concretely, without this `AUTONOMOUS_GATE_OCR=1` would open the Processor on the owner's screen.
 export ARCHIVE_UNATTENDED=1
-# The shim and heavy-enter.sh lock only when this is set; set it here so a hand-run gate locks per step too.
-export AUTONOMOUS_HEAVY_ENABLED=1
 export PATH="$ROOT/ops/autonomous/bin:$PATH"
 # The retry list is read once into a shell variable and REMOVED from the environment. Exported, it reached every
 # step's children, and a harness that drives the real step() on its own fixture steps (prove-gate-report.sh,

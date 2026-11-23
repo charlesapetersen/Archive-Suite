@@ -48,10 +48,10 @@ read that section.
 
 `heavy-run.py run -- COMMAND ...` holds a kernel `heavy.lock` under
 `${AUTONOMOUS_HEAVY_STATE:-${AUTONOMOUS_STATE:-~/.local/state/archive-autonomous}/heavy}`.
-Every worktree uses the same state. The installed supervisor exports `AUTONOMOUS_HEAVY_ENABLED=1`
-on restart. Unattended wrappers from an older running supervisor retain their old path until then,
-so its older watchdog/timer cannot misclassify a new lock wait. Explicit helper runs activate their children. Source `heavy-enter.sh` at a script entry before changing directory
-or taking another lock; it re-enters that script under the supervisor and preserves its traps/argv.
+Every worktree uses the same state. Interactive and unattended entry points both acquire the shared lock,
+including when an older supervisor starts them without `AUTONOMOUS_HEAVY_ENABLED`. Source `heavy-enter.sh`
+at a script entry before changing directory or taking another lock. It re-enters that script under the
+supervisor and preserves its arguments and traps.
 The xcodebuild PATH shim intercepts direct builds after unattended and sandbox refusals; `-list`,
 `-showBuildSettings`, `-version` and `-showsdks` build nothing and pass straight through unlocked. Whole-script
 entries cover suite/app smokes, Processor headless tests, scale/standalone compiler and Android test
@@ -72,8 +72,8 @@ Fresh waiter records count as watchdog work only when their PID birth, ancestry 
 owner validate. Stale records cannot spare a wedged session. The outer session backstop still applies.
 The gate holds no lock as a whole (efficiency plan round 2, 2026-10-07): its light block runs first and
 unlocked, and each heavy step — the three app builds and unit suites, the Processor launch, tag-vocabulary,
-the paid OCR smoke, the VM lane — takes the lock for itself through the shim or `heavy-enter.sh`. The gate
-exports `AUTONOMOUS_HEAVY_ENABLED=1`, so a hand-run gate locks per step too. The daemon's execution cap skips
+the paid OCR smoke, the VM lane — takes the lock for itself through the shim or `heavy-enter.sh`, including
+when the gate is run by hand. The daemon's execution cap skips
 every poll during which a step of the gate is queued for the lock (`heavy-run.py waiting`). Both VM routes
 acquire heavy ownership before the VM lock, whose age never evicts a live owner.
 

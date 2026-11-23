@@ -309,8 +309,7 @@ health_watchdog {waiter.pid} /dev/null 0
         except subprocess.TimeoutExpired:
             waited = True
         check(waited, "a build still waits for the held lock")
-        # Old installed supervisors lack wait liveness and readiness timing;
-        # their source wrappers stay on the old path until an owner restart.
+        # Older supervisors may omit the activation flag. Neither entry point may skip the lock.
         entry = root / "entry.sh"
         entry_marker = root / "entry-marker"
         entry_cleanup = root / "entry-cleanup"
@@ -319,21 +318,35 @@ health_watchdog {waiter.pid} /dev/null 0
 trap {shlex.quote("touch " + shlex.quote(str(entry_cleanup)))} EXIT
 printf '%s' "$1" > {shlex.quote(str(entry_marker))}
 ''')
-        legacy = subprocess.run(["bash", str(entry), "sentinel value"], env=dict(env, AUTONOMOUS_HEAVY_ENABLED="0"),
-                                capture_output=True, text=True, timeout=3)
-        check(legacy.returncode == 0 and entry_marker.read_text() == "sentinel value" and entry_cleanup.exists(),
-              "old unattended supervisor does not activate source locking before restart")
-        entry_marker.unlink()
-        entry_cleanup.unlink()
-        activated = subprocess.Popen(["bash", str(entry), "sentinel value"], env=env, stdout=subprocess.PIPE,
-                                     stderr=subprocess.PIPE, text=True)
-        children.append(activated)
-        check(until(lambda: probe("waiting", activated.pid).returncode == 0) and not entry_marker.exists(),
-              "restarted supervisor serializes entry before any script work")
+        queued_entries = []
+        queued_builds = []
+        for setting in (None, "0"):
+            legacy_env = dict(env)
+            if setting is None:
+                legacy_env.pop("AUTONOMOUS_HEAVY_ENABLED")
+            else:
+                legacy_env["AUTONOMOUS_HEAVY_ENABLED"] = setting
+            legacy_entry = subprocess.Popen(["bash", str(entry), "sentinel value"], env=legacy_env,
+                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            children.append(legacy_entry)
+            queued_entries.append(legacy_entry)
+            legacy_build = subprocess.Popen(["bash", str(shim), "build"],
+                                            env=dict(legacy_env, ARCHIVE_REAL_TOOL=str(fake)),
+                                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            children.append(legacy_build)
+            queued_builds.append(legacy_build)
+            check(until(lambda: probe("waiting", legacy_entry.pid).returncode == 0) and not entry_marker.exists(),
+                  f"unattended script waits before doing work with activation flag {setting!r}")
+            check(until(lambda: probe("waiting", legacy_build.pid).returncode == 0),
+                  f"unattended xcodebuild waits with activation flag {setting!r}")
         holder.terminate()
         finish(holder, 143)
-        finish(activated)
-        check(entry_marker.read_text() == "sentinel value" and entry_cleanup.exists(), "activated entry resumes after contention without losing argv or traps")
+        for legacy_entry in queued_entries:
+            finish(legacy_entry)
+        for legacy_build in queued_builds:
+            check("real-ran" in finish(legacy_build), "waiting build reaches the real tool when the lock is free")
+        check(entry_marker.read_text() == "sentinel value" and entry_cleanup.exists(),
+              "waiting entry runs after contention and preserves its arguments and traps")
         p = subprocess.run(["bash", str(shim), "build"], env=dict(env, ARCHIVE_REAL_TOOL=str(fake)),
                            capture_output=True, text=True, timeout=5)
         check(p.returncode == 0 and "real-ran" in p.stdout, "safe shim build still reaches the real tool")

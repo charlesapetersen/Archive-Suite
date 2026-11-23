@@ -106,7 +106,7 @@ CLAIMS_CMD="${AUTONOMOUS_CLAIMS_CMD:-$REPO/ops/autonomous/worker-state.py}"
 HEAVY_CMD="${AUTONOMOUS_HEAVY_CMD:-$REPO/ops/autonomous/heavy-run.py}"
 HEAVY_STATE="${AUTONOMOUS_HEAVY_STATE:-$STATE/heavy}"
 export AUTONOMOUS_HEAVY_STATE="$HEAVY_STATE"
-export AUTONOMOUS_HEAVY_ENABLED=1   # installed supervisor activates coordination at owner restart
+export AUTONOMOUS_HEAVY_ENABLED=1   # older worktrees still expect this flag
 WORKER_ID="${AUTONOMOUS_WORKER_ID:-worker-1}"
 unset AUTONOMOUS_WORKER_ID
 WORKER_STATE="$STATE"
