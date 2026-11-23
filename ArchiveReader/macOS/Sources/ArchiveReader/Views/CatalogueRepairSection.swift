@@ -93,7 +93,7 @@ extension NavigationModel {
                     model.registerCatalogueRepairUndo(.redo(restored), reader: reader, root: root, on: undo)
                     model.finishCatalogueRepair("Catalogue companion repair undone.", refresh: false)
                     Task {
-                        await ReaderCataloguePairMemory.shared.remember([restored.formerPair], root: root)
+                        await ReaderCataloguePairMemory.shared.remember([restored.formerPair], instance: reader.rootInstanceID)
                         if model.hasCatalogueRepairScope(reader, root: root) { model.library.rescan() }
                     }
                 case .redo(let candidate):

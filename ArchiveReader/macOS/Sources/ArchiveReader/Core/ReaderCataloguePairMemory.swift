@@ -41,12 +41,12 @@ actor ReaderCataloguePairMemory {
 
     init(url: URL?) { self.url = url }
 
-    func remember(snapshot: CatalogueReader.Snapshot, root: URL) {
+    func remember(snapshot: CatalogueReader.Snapshot) {
         guard url != nil else { return }
-        remember(snapshot.rememberablePairs, root: root)
+        remember(snapshot.rememberablePairs, instance: snapshot.rootInstanceID)
     }
 
-    func remember(_ pairs: [CatalogueReader.RememberedPair], root: URL) {
+    func remember(_ pairs: [CatalogueReader.RememberedPair], instance: UUID) {
         guard !pairs.isEmpty, let db = open(create: true) else { return }
         defer { sqlite3_close(db) }
         guard sqlite3_exec(db, "BEGIN IMMEDIATE;", nil, nil, nil) == SQLITE_OK else {
@@ -56,8 +56,8 @@ actor ReaderCataloguePairMemory {
         var committed = false
         defer { if !committed { sqlite3_exec(db, "ROLLBACK;", nil, nil, nil) } }
         let sql = """
-            INSERT INTO pairs (root_path, physical_key, file_id, proof) VALUES (?, ?, ?, ?)
-            ON CONFLICT(root_path, physical_key) DO UPDATE SET file_id = excluded.file_id, proof = excluded.proof
+            INSERT INTO instance_pairs (root_instance, physical_key, file_id, proof) VALUES (?, ?, ?, ?)
+            ON CONFLICT(root_instance, physical_key) DO UPDATE SET file_id = excluded.file_id, proof = excluded.proof
             WHERE proof <> excluded.proof;
             """
         guard let statement = prepare(sql, in: db) else { return }
@@ -66,7 +66,7 @@ actor ReaderCataloguePairMemory {
         encoder.outputFormatting = .sortedKeys
         for pair in pairs {
             guard let data = try? encoder.encode(pair) else { return }
-            sqlite3_bind_text(statement, 1, root.path, -1, transient)
+            sqlite3_bind_text(statement, 1, instance.uuidString, -1, transient)
             sqlite3_bind_text(statement, 2, pair.physicalKey, -1, transient)
             sqlite3_bind_text(statement, 3, pair.fileID.uuidString, -1, transient)
             let binding = data.withUnsafeBytes {
@@ -86,11 +86,22 @@ actor ReaderCataloguePairMemory {
         guard let db = open(create: false) else { return nil }
         defer { sqlite3_close(db) }
         return try? reader.reassociationCandidate(at: relativePath) { fileID in
-            let sql = "SELECT proof FROM pairs WHERE root_path = ? AND file_id = ?;"
+            let sql = """
+            SELECT proof FROM instance_pairs WHERE root_instance = ? AND file_id = ?
+            UNION ALL
+            SELECT proof FROM pairs AS legacy WHERE root_path = ? AND file_id = ?
+                AND NOT EXISTS (
+                    SELECT 1 FROM instance_pairs AS current
+                    WHERE current.root_instance = ? AND current.physical_key = legacy.physical_key
+                );
+            """
             guard let statement = prepare(sql, in: db) else { return [] }
             defer { sqlite3_finalize(statement) }
-            sqlite3_bind_text(statement, 1, root.path, -1, transient)
+            sqlite3_bind_text(statement, 1, reader.rootInstanceID.uuidString, -1, transient)
             sqlite3_bind_text(statement, 2, fileID.uuidString, -1, transient)
+            sqlite3_bind_text(statement, 3, root.path, -1, transient)
+            sqlite3_bind_text(statement, 4, fileID.uuidString, -1, transient)
+            sqlite3_bind_text(statement, 5, reader.rootInstanceID.uuidString, -1, transient)
             let decoder = JSONDecoder()
             var results: [CatalogueReader.RememberedPair] = []
             while true {
@@ -124,7 +135,7 @@ actor ReaderCataloguePairMemory {
             return nil
         }
         var db: OpaquePointer?
-        let access = create ? SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE : SQLITE_OPEN_READONLY
+        let access = SQLITE_OPEN_READWRITE | (create ? SQLITE_OPEN_CREATE : 0)
         let flags = access | SQLITE_OPEN_NOFOLLOW
         guard sqlite3_open_v2(url.path, &db, flags, nil) == SQLITE_OK, let db else {
             sqlite3_close(db)
@@ -141,8 +152,16 @@ actor ReaderCataloguePairMemory {
                 PRIMARY KEY (root_path, physical_key)
             );
             CREATE INDEX IF NOT EXISTS pairs_by_file ON pairs (root_path, file_id);
+            CREATE TABLE IF NOT EXISTS instance_pairs (
+                root_instance TEXT NOT NULL,
+                physical_key TEXT NOT NULL,
+                file_id TEXT NOT NULL,
+                proof BLOB NOT NULL,
+                PRIMARY KEY (root_instance, physical_key)
+            );
+            CREATE INDEX IF NOT EXISTS instance_pairs_by_file ON instance_pairs (root_instance, file_id);
             """
-        guard !create || sqlite3_exec(db, schema, nil, nil, nil) == SQLITE_OK else {
+        guard sqlite3_exec(db, schema, nil, nil, nil) == SQLITE_OK else {
             sqlite3_close(db)
             Self.log.error("Could not initialize catalogue pair memory.")
             return nil

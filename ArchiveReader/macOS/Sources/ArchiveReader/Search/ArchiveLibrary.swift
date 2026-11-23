@@ -696,7 +696,7 @@ final class ArchiveLibrary: ObservableObject {
                       self.rootGeneration == rootGeneration, self.currentScan == generation else { return }
                 self.cancelScanStallDeadline()
                 if let snapshot = pass.snapshot {
-                    await ReaderCataloguePairMemory.shared.remember(snapshot: snapshot, root: root)
+                    await ReaderCataloguePairMemory.shared.remember(snapshot: snapshot)
                 }
                 guard !token.isCancelled,
                       self.rootGeneration == rootGeneration, self.currentScan == generation else { return }

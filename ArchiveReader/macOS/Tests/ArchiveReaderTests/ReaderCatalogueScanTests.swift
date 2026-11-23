@@ -110,6 +110,93 @@ final class ReaderCatalogueScanTests: XCTestCase {
         XCTAssertTrue(search.matchesPrepared(file, context))
     }
 
+    @MainActor
+    func testMovedCatalogueKeepsItsInstanceAndFactsButCopyCannotUseItsRepairEvidence() async throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("reader-catalogue-move-\(UUID())", isDirectory: true).resolvingSymlinksInPath()
+        let original = folder.appendingPathComponent("Original", isDirectory: true)
+        let moved = folder.appendingPathComponent("Moved", isDirectory: true)
+        let copy = folder.appendingPathComponent("Copy", isDirectory: true)
+        try FileManager.default.createDirectory(at: original, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let pdf = original.appendingPathComponent("Letter.pdf")
+        let sidecar = original.appendingPathComponent("Letter.pdf.archivesuite.json")
+        let identity = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+        let page = UUID(), document = UUID()
+        let packet = Data("""
+            <x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            </rdf:RDF></x:xmpmeta>
+            """.utf8)
+        try writePDF(at: pdf, metadata: XCTUnwrap(identity.adding(to: packet)))
+        let originalPDF = try Data(contentsOf: pdf)
+        try Data("""
+            {"schema":1,"fileID":"\(identity.fileID)","contentRevision":"\(identity.contentRevision)",
+             "revision":"\(UUID())","parents":[],
+             "pages":[{"id":"\(page)","physicalIndex":0,"documentID":"\(document)","role":"searchable"}],
+             "documents":[{"id":"\(document)","ownerFileID":"\(identity.fileID)","fields":{}}],"fileFields":{}}
+            """.utf8).write(to: sidecar)
+
+        let suite = "ReaderCatalogueMove.\(UUID())"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let navigation = NavigationModel(defaults: defaults,
+                                         indexer: ContentIndexer(url: folder.appendingPathComponent("original-index.sqlite")))
+        XCTAssertNil(navigation.rootStore.setRoot(original))
+        navigation.setCatalogueMode(true)
+        let root = navigation.resolvedLibraryRoot(original)
+        XCTAssertNotNil(root.markerGUID)
+        let instance = try XCTUnwrap(root.catalogueInstance)
+        let originalReader = try CatalogueReader(grantedRoot: original, rootInstanceID: instance,
+                                                 mode: .adopted, identifyPDF: CataloguePDFIdentity.identify)
+        let facts = try originalReader.discover().facts(at: "Letter.pdf").file.get()
+        _ = try CatalogueWriter(reader: originalReader).save([
+            CatalogueEdit(.file(.flagged), .set(.flag(true))),
+            CatalogueEdit(.pageViewRotation(page), .set(.rotation(90)))
+        ], basedOn: facts)
+
+        let verified = originalReader.discover()
+        let memory = ReaderCataloguePairMemory(url: folder.appendingPathComponent("pairs.sqlite"))
+        await memory.remember(snapshot: verified)
+        try FileManager.default.copyItem(at: original, to: copy)
+        try FileManager.default.moveItem(at: original, to: moved)
+
+        let reopened = NavigationModel(defaults: defaults,
+                                       indexer: ContentIndexer(url: folder.appendingPathComponent("reopened-index.sqlite")))
+        XCTAssertNil(reopened.rootStore.setRoot(moved))
+        XCTAssertEqual(reopened.resolvedLibraryRoot(moved).catalogueInstance, instance)
+        let pass = ReaderCatalogueScan.run(root: moved, instance: instance, isCancelled: { false }, onProgress: { _ in })
+        XCTAssertEqual(pass.rows.first?.catalogueFlag, true)
+        XCTAssertEqual(pass.snapshot?.facts(at: "Letter.pdf", physicalPageIndex: 0).page?.viewRotation, 90)
+
+        XCTAssertNil(reopened.rootStore.setRoot(copy))
+        XCTAssertEqual(reopened.resolvedLibraryRoot(copy).markerGUID, root.markerGUID)
+        XCTAssertNil(reopened.resolvedLibraryRoot(copy).catalogueInstance)
+        reopened.setCatalogueMode(true)
+        let copyInstance = try XCTUnwrap(reopened.resolvedLibraryRoot(copy).catalogueInstance)
+        XCTAssertNotEqual(copyInstance, instance)
+        let copiedReader = try CatalogueReader(grantedRoot: copy, rootInstanceID: copyInstance,
+                                               mode: .adopted, identifyPDF: CataloguePDFIdentity.identify)
+        try FileManager.default.moveItem(at: copy.appendingPathComponent("Letter.pdf"),
+                                         to: copy.appendingPathComponent("Renamed.pdf"))
+        let wrongRoot = await memory.candidate(reader: copiedReader, root: copy, relativePath: "Renamed.pdf")
+        XCTAssertNil(wrongRoot)
+
+        let movedReader = try XCTUnwrap(pass.reader)
+        let renamed = moved.appendingPathComponent("Renamed.pdf")
+        try FileManager.default.moveItem(at: moved.appendingPathComponent("Letter.pdf"), to: renamed)
+        XCTAssertThrowsError(try movedReader.discover().facts(at: "Renamed.pdf").file.get())
+        let candidate = await memory.candidate(reader: movedReader, root: moved, relativePath: "Renamed.pdf")
+        _ = try CatalogueWriter(reader: movedReader).reassociateCompanion(XCTUnwrap(candidate))
+        let repaired = movedReader.discover().facts(at: "Renamed.pdf", physicalPageIndex: 0)
+        guard case .value(true) = try repaired.file.get().pair.record.fileFields.flagged?.current else {
+            return XCTFail("The repaired companion should retain the flag.")
+        }
+        XCTAssertEqual(repaired.page?.viewRotation, 90)
+        XCTAssertEqual(try Data(contentsOf: renamed), originalPDF)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: copy.appendingPathComponent(sidecar.lastPathComponent).path))
+    }
+
     private func writePDF(at url: URL, metadata: Data?, pageCount: Int = 1) throws {
         var bounds = CGRect(x: 0, y: 0, width: 60, height: 60)
         let pdf = try XCTUnwrap(CGContext(url as CFURL, mediaBox: &bounds, nil))

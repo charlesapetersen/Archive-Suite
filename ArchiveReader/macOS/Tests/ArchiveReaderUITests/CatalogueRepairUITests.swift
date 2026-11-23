@@ -172,7 +172,7 @@ final class CatalogueRepairUITests: XCTestCase {
         defer { sqlite3_close(db) }
         guard opened == SQLITE_OK else { return false }
         var query: OpaquePointer?
-        let sql = "SELECT 1 FROM pairs WHERE file_id = '\(fileID.uuidString)'"
+        let sql = "SELECT 1 FROM instance_pairs WHERE file_id = '\(fileID.uuidString)'"
         guard sqlite3_prepare_v2(db, sql, -1, &query, nil) == SQLITE_OK else { return false }
         defer { sqlite3_finalize(query) }
         return sqlite3_step(query) == SQLITE_ROW

@@ -24,7 +24,9 @@ extension NavigationModel {
     }
 
     func setCatalogueMode(_ enabled: Bool) {
-        guard let root = rootStore.root, let key = cataloguePreferenceKey(for: root) else { return }
+        guard let root = rootStore.root, let identity = ReaderRootIdentity.capture(root) else { return }
+        let key = cataloguePreferenceKey(for: identity)
+        restoreCataloguePreference(for: identity, key: key)
         defaults.set(enabled, forKey: key + ".enabled")
         if defaults.string(forKey: key) == nil {
             defaults.set(UUID().uuidString, forKey: key)
@@ -35,7 +37,6 @@ extension NavigationModel {
     }
 
     private func catalogueInstance(for root: URL) -> UUID? {
-        guard let key = cataloguePreferenceKey(for: root) else { return nil }
 #if DEBUG
         // An explicit fixture root never reads or saves a real archive's mode.
         if defaults.string(forKey: "ARUITestRootPath") != nil {
@@ -44,15 +45,23 @@ extension NavigationModel {
                 : nil
         }
 #endif
+        guard let identity = ReaderRootIdentity.capture(root) else { return nil }
+        let key = cataloguePreferenceKey(for: identity)
+        restoreCataloguePreference(for: identity, key: key)
         guard defaults.bool(forKey: key + ".enabled") else { return nil }
         return defaults.string(forKey: key).flatMap(UUID.init(uuidString:))
     }
 
-    /// A copied marker or a different directory mounted at the same path cannot inherit this choice.
-    private func cataloguePreferenceKey(for root: URL) -> String? {
-        CorpusWalker.withDatalessMaterializationDisabled {
-            guard let stamp = CorpusRootFingerprint.capture(root) else { return nil }
-            return "readerCatalogue.\(stamp.filesystemID).\(stamp.deviceID).\(stamp.inode).\(root.path)"
-        }
+    private func cataloguePreferenceKey(for identity: ReaderRootIdentity) -> String {
+        "readerCatalogue.instance.\(identity.key)"
+    }
+
+    /// Keep the existing instance ID when reopening an adopted root at its previous path.
+    private func restoreCataloguePreference(for identity: ReaderRootIdentity, key: String) {
+        let prior = identity.previousCatalogueKey
+        guard defaults.string(forKey: key) == nil,
+              let existing = defaults.string(forKey: prior), UUID(uuidString: existing) != nil else { return }
+        defaults.set(existing, forKey: key)
+        defaults.set(defaults.bool(forKey: prior + ".enabled"), forKey: key + ".enabled")
     }
 }

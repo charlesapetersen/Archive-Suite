@@ -26,9 +26,11 @@ still classifies the locked PDF as unreadable.
 ## Data keyed by absolute path — the limits (W49.storage-simplify-audit, 2026-11-20)
 
 Found by the storage survey (`execution-plans/storage-simplify.md` §2, §6).
-- **Flags and page turns are keyed by the file's absolute path** (`FlagStore` in the `flaggedPaths` setting; page
-  turns in the library index), so moving or renaming a file, or moving or renaming the archive root, loses them.
-  They are the user's data kept in a cache. (queued: W49.reader-root-movable)
+- **Legacy flags and page turns use absolute paths** (`FlagStore` in `flaggedPaths` and `PageTurnStore`
+  in the library database). These local values stay at their previous paths after a move. In an adopted
+  catalogue, the companion carries flags and view turns. Reader keeps the same adopted instance after a
+  same-volume root rename and can still offer the verified repair for a detached companion.
+  (W49.reader-root-movable)
 - **The content index and page thumbnails are keyed by absolute path too**, so a moved root re-extracts every
   file's text and redraws thumbnails; old rows are never removed. (queued: W49.reader-root-movable)
 
