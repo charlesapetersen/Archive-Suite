@@ -20,7 +20,7 @@ import Foundation
 /// may go to review; any problem stops publication.
 enum ReOCRPreservationCheck {
     static func problems(original: Data, candidate: Data, replacing: Set<Int>, editingLayers: Set<Int> = [],
-                         requiresOriginalPrefix: Bool = true) -> [String] {
+                         requiresOriginalPrefix: Bool = true, catalogueMetadata: Data? = nil) -> [String] {
         var out: [String] = []
         if requiresOriginalPrefix && (candidate.count <= original.count || candidate.prefix(original.count) != original) {
             return ["the candidate does not begin with the original file byte for byte"]
@@ -40,11 +40,15 @@ enum ReOCRPreservationCheck {
             return [unsafeBitCast(old, to: Int.self), unsafeBitCast(new, to: Int.self)]
         }
         let layerDictionaries = Set(layerPages)
-        // Only the page tree may change at document level: the catalog's other entries (actions, forms, optional
-        // content, outlines, metadata) must be the same objects as before.
+        // Improve OCR may change the page tree. Preparing a catalogue derivative instead allows only
+        // the verified XMP packet to change, and compares the complete active page tree.
         if let ca = oldDoc.catalog, let cb = newDoc.catalog {
-            var compare = GraphCompare(layerPages: layerDictionaries)
-            if let diff = compare.dictionaries(ca, cb, path: "catalog", skip: ["Pages"]) { out.append(diff) }
+            var compare = GraphCompare(layerPages: layerDictionaries, compareParentLinks: catalogueMetadata != nil)
+            let skipped: Set<String> = catalogueMetadata == nil ? ["Pages"] : ["Metadata"]
+            if let diff = compare.dictionaries(ca, cb, path: "catalog", skip: skipped) { out.append(diff) }
+            if let catalogueMetadata, metadata(of: newDoc) != catalogueMetadata {
+                out.append("catalog/Metadata: the intended XMP did not read back exactly")
+            }
         } else {
             out.append("the catalog cannot be read")
         }
@@ -54,8 +58,9 @@ enum ReOCRPreservationCheck {
         switch (oldDoc.info, newDoc.info) {
         case (nil, nil): break
         case let (ia?, ib?):
-            var compare = GraphCompare(layerPages: layerDictionaries)
-            if let diff = compare.dictionaries(ia, ib, path: "document information", skip: ["Producer"]) {
+            var compare = GraphCompare(layerPages: layerDictionaries, compareParentLinks: catalogueMetadata != nil)
+            let skipped: Set<String> = catalogueMetadata == nil ? ["Producer"] : []
+            if let diff = compare.dictionaries(ia, ib, path: "document information", skip: skipped) {
                 out.append(diff)
             }
             let pa = Self.text(ia, "Producer"), pb = Self.text(ib, "Producer")
@@ -99,6 +104,9 @@ enum ReOCRPreservationCheck {
                     if let before = render(a, box: box), before == render(b, box: box) { continue }
                     out.append("page \(i + 1): its \(box) could not be verified to render identically")
                 }
+            } else if catalogueMetadata != nil {
+                if let before = render(a), before == render(b) { continue }
+                out.append("page \(i + 1): it could not be verified to render identically")
             } else if render(a) != render(b) {
                 out.append("page \(i + 1): it renders differently")
             }
@@ -125,6 +133,20 @@ enum ReOCRPreservationCheck {
 
     /// The one value a revision may give the information dictionary's `/Producer` (see `problems`).
     static let editorProducer = "PDFium"
+
+    static func metadata(of document: CGPDFDocument, requireKnownStreamKeys: Bool = false) -> Data? {
+        var stream: CGPDFStreamRef?
+        guard let catalog = document.catalog,
+              CGPDFDictionaryGetStream(catalog, "Metadata", &stream), let stream else { return nil }
+        if requireKnownStreamKeys {
+            guard let dictionary = CGPDFStreamGetDictionary(stream),
+                  GraphCompare().keys(dictionary).isSubset(of: ["Type", "Subtype", "Length", "Filter", "DecodeParms"])
+            else { return nil }
+        }
+        var format = CGPDFDataFormat.raw
+        guard let data = CGPDFStreamCopyData(stream, &format), format == .raw else { return nil }
+        return data as Data
+    }
 
     private static func text(_ d: CGPDFDictionaryRef, _ key: String) -> Data? {
         var s: CGPDFStringRef?
@@ -167,9 +189,13 @@ enum ReOCRPreservationCheck {
         static let maxDepth = 64
         static let pageTreeLink: Set<String> = ["Parent"]
         let layerPages: Set<[Int]>
+        let compareParentLinks: Bool
         private var seen = Set<[Int]>()
 
-        init(layerPages: Set<[Int]> = []) { self.layerPages = layerPages }
+        init(layerPages: Set<[Int]> = [], compareParentLinks: Bool = false) {
+            self.layerPages = layerPages
+            self.compareParentLinks = compareParentLinks
+        }
 
         mutating func dictionaries(_ a: CGPDFDictionaryRef, _ b: CGPDFDictionaryRef, path: String,
                                    skip: Set<String> = [], depth: Int = 0) -> String? {
@@ -181,8 +207,9 @@ enum ReOCRPreservationCheck {
             let excluded = layerPages.contains(pair)
                 ? skip.union(["Contents", "Resources", "MediaBox", "CropBox", "BleedBox", "TrimBox", "ArtBox", "Rotate"])
                 : skip
-            let ka = keys(a).subtracting(excluded).subtracting(Self.pageTreeLink)
-            let kb = keys(b).subtracting(excluded).subtracting(Self.pageTreeLink)
+            let skipped = compareParentLinks ? excluded : excluded.union(Self.pageTreeLink)
+            let ka = keys(a).subtracting(skipped)
+            let kb = keys(b).subtracting(skipped)
             if ka != kb { return "\(path): its keys changed (\(ka.symmetricDifference(kb).sorted().joined(separator: ", ")))" }
             for key in ka.sorted() {
                 var oa: CGPDFObjectRef?, ob: CGPDFObjectRef?
@@ -377,7 +404,7 @@ enum ReOCRPreservationCheck {
             return nil
         }
 
-        private func keys(_ d: CGPDFDictionaryRef) -> Set<String> {
+        fileprivate func keys(_ d: CGPDFDictionaryRef) -> Set<String> {
             final class Box { var keys = Set<String>() }
             let box = Box()
             CGPDFDictionaryApplyBlock(d, { key, _, info in

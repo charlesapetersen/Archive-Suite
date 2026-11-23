@@ -233,6 +233,49 @@ enum TextLayerTestDriver {
                 try PDFGenerator().mergeDocumentPDFs(sourcePDFs: [pair, searchable], outputURL: merged, catalogueIdentity: identity)
             }
             verify(merged, identity: identity, roles: [.image, .text, .searchable])
+            if SearchableArchival.isAvailable {
+                let existing = dir.appendingPathComponent("jpeg.pdf")
+                let derivative = dir.appendingPathComponent("catalogue-pre-ocr.pdf")
+                let before = try Data(contentsOf: existing)
+                let copyIdentity = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+                let data = try await PDFGenerator.runWorker {
+                    try SearchableArchival.catalogueCopy(of: existing, identity: copyIdentity)
+                }
+                try data.write(to: derivative, options: .withoutOverwriting)
+                verify(derivative, identity: copyIdentity, roles: [.image, .text])
+                check("8 pre-OCR source bytes stay unchanged", (try? Data(contentsOf: existing)) == before)
+                let refused = await PDFGenerator.runWorker {
+                    (try? SearchableArchival.catalogueCopy(of: derivative, identity: identity)) == nil
+                }
+                check("8 pre-OCR copy refuses multiple catalogue identities", refused)
+
+                let plain = PDFDocument()
+                plain.insert(PDFPage(), at: 0)
+                plain.documentAttributes = [PDFDocumentAttribute.titleAttribute: "Plain PDF fixture"]
+                let plainURL = dir.appendingPathComponent("plain-catalogue-source.pdf")
+                if let original = plain.dataRepresentation() {
+                    try original.write(to: plainURL, options: .withoutOverwriting)
+                    let carried = try await PDFGenerator.runWorker {
+                        try SearchableArchival.catalogueCopy(of: plainURL, identity: copyIdentity)
+                    }
+                    let result = PDFDocument(data: carried)
+                    check("8 a plain PDF keeps its page and document information",
+                          result?.pageCount == 1
+                            && result?.documentAttributes?[PDFDocumentAttribute.titleAttribute] as? String == "Plain PDF fixture"
+                            && (try? Data(contentsOf: plainURL)) == original
+                            && result?.documentRef.flatMap(CataloguePDFIdentity.identity(in:)) == copyIdentity)
+                } else { check("8 plain PDF fixture written", false) }
+                if let encrypted = plain.dataRepresentation(options: [
+                    PDFDocumentWriteOption.userPasswordOption: "", PDFDocumentWriteOption.ownerPasswordOption: "test-owner"
+                ]) {
+                    let encryptedURL = dir.appendingPathComponent("protected-catalogue-source.pdf")
+                    try encrypted.write(to: encryptedURL, options: .withoutOverwriting)
+                    let kept = await PDFGenerator.runWorker {
+                        (try? SearchableArchival.catalogueCopy(of: encryptedURL, identity: copyIdentity)) == nil
+                    }
+                    check("8 encrypted source is refused without changing it", kept && (try? Data(contentsOf: encryptedURL)) == encrypted)
+                } else { check("8 encrypted PDF fixture written", false) }
+            }
         } catch {
             check("8 write PDF with catalogue identity", false, "\(error)")
         }

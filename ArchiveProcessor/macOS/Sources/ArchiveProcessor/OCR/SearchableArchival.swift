@@ -31,6 +31,70 @@ enum SearchableArchival {
     /// Whether this Mac can write it.
     static var isAvailable: Bool { CompressedPage.qpdf != nil }
 
+    /// Prepare a new derivative of a pre-OCRed PDF. Only the catalogue identity is added. The
+    /// selected input stays untouched, and the candidate must preserve every active page and its
+    /// rendering, document information, catalog and existing XMP before it can become a working PDF.
+    static func catalogueCopy(of source: URL, identity: CataloguePDFIdentity) throws -> Data {
+        guard let qpdf = CompressedPage.qpdf else { throw Failure.noQPDF }
+        let original = try Data(contentsOf: source)
+        try ReOCRIncrementalWriter.eligibility(of: original).get()
+        guard let originalDoc = ReOCRPreservationCheck.document(original), originalDoc.numberOfPages > 0,
+              let catalog = originalDoc.catalog else { throw PDFError.sourceUnreadable(source) }
+        let packet: Data
+        if CGPDFDictionaryGetObject(catalog, "Metadata", nil) {
+            guard let existing = ReOCRPreservationCheck.metadata(of: originalDoc, requireKnownStreamKeys: true) else {
+                throw Failure.check("the source metadata could not be read")
+            }
+            packet = existing
+        } else {
+            packet = Data("""
+                <x:xmpmeta xmlns:x="adobe:ns:meta/">
+                <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+                </rdf:RDF></x:xmpmeta>
+                """.utf8)
+        }
+        guard let xmp = identity.adding(to: packet) else {
+            throw Failure.check("the source metadata could not safely carry a new identity")
+        }
+
+        let budget = PDFChildBudget(seconds: PDFChildBudget.secondsPerPage * Double(originalDoc.numberOfPages))
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appendingPathComponent("ap-catalogue-copy-" + UUID().uuidString, isDirectory: true)
+        try fm.createDirectory(at: dir, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+        defer { try? fm.removeItem(at: dir) }
+        let input = dir.appendingPathComponent("original.pdf")
+        let patch = dir.appendingPathComponent("catalogue.json")
+        let output = dir.appendingPathComponent("derivative.pdf")
+        try original.write(to: input, options: .withoutOverwriting)
+        let shape = try jsonShape(qpdf, input, budget: budget, allowWarnings: false)
+        var newCatalog = shape.catalog
+        let metadataObject = "\(shape.maxObject + 1) 0 R"
+        newCatalog["/Metadata"] = metadataObject
+        let update: [String: Any] = ["qpdf": [
+            ["jsonversion": 2, "pushedinheritedpageresources": false, "calledgetallpages": false,
+             "maxobjectid": shape.maxObject + 1],
+            [
+                "obj:\(shape.root)": ["value": newCatalog],
+                "obj:\(metadataObject)": ["stream": [
+                    "dict": ["/Type": "/Metadata", "/Subtype": "/XML"],
+                    "data": xmp.base64EncodedString()
+                ]]
+            ]
+        ]]
+        try JSONSerialization.data(withJSONObject: update, options: .withoutEscapingSlashes).write(to: patch)
+        try run(qpdf, [input.path, "--update-from-json=" + patch.path, "--stream-data=preserve",
+                       "--newline-before-endstream", output.path], budget: budget, allowWarnings: false)
+        let candidate = try Data(contentsOf: output)
+        let problems = ReOCRPreservationCheck.problems(original: original, candidate: candidate, replacing: [],
+                                                       requiresOriginalPrefix: false, catalogueMetadata: xmp)
+        guard problems.isEmpty, let written = ReOCRPreservationCheck.document(candidate),
+              CataloguePDFIdentity.identity(in: written) == identity else {
+            throw Failure.check(problems.first ?? "the copied catalogue identity could not be verified")
+        }
+        try budget.check()
+        return candidate
+    }
+
     /// `sources`' pages in order as one PDF/A-2b file at `url`, written atomically. `pageHeaders`: one entry per page
     /// of the result (`PDFHeaderCarrier`), nil for a pair's page.
     static func write(_ sources: [URL], pageHeaders: [String?], to url: URL, budget: PDFChildBudget,
@@ -155,30 +219,30 @@ enum SearchableArchival {
     }
 
     /// The catalog's object, its dictionary and the highest object number, from qpdf's own JSON.
-    private static func jsonShape(_ qpdf: URL, _ pdf: URL, budget: PDFChildBudget) throws -> (root: String, catalog: [String: Any], maxObject: Int) {
-        let json = try run(qpdf, ["--json=2", "--json-key=qpdf", pdf.path], budget: budget)
+    private static func jsonShape(_ qpdf: URL, _ pdf: URL, budget: PDFChildBudget, allowWarnings: Bool = true)
+        throws -> (root: String, catalog: [String: Any], maxObject: Int) {
+        let json = try run(qpdf, ["--json=2", "--json-key=qpdf", pdf.path], budget: budget, allowWarnings: allowWarnings)
         guard let top = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
               let q = top["qpdf"] as? [Any], q.count == 2,
               let header = q[0] as? [String: Any], let maxObject = header["maxobjectid"] as? Int,
               let objects = q[1] as? [String: Any],
               let trailer = (objects["trailer"] as? [String: Any])?["value"] as? [String: Any],
               let root = trailer["/Root"] as? String,
-              var catalog = (objects["obj:" + root] as? [String: Any])?["value"] as? [String: Any] else {
+              let catalog = (objects["obj:" + root] as? [String: Any])?["value"] as? [String: Any] else {
             throw Failure.qpdf("its JSON could not be read")
         }
-        catalog["/Metadata"] = nil
-        catalog["/OutputIntents"] = nil
         return (root, catalog, maxObject)
     }
 
     /// Runs qpdf; its output. Exit 3 is qpdf's "succeeded with warnings", which the read-back then judges.
     @discardableResult
-    private static func run(_ qpdf: URL, _ arguments: [String], budget: PDFChildBudget) throws -> Data {
+    private static func run(_ qpdf: URL, _ arguments: [String], budget: PDFChildBudget, allowWarnings: Bool = true) throws -> Data {
         let process = Process()
         process.executableURL = qpdf
         process.arguments = arguments
         let (data, message) = try budget.capture(process)
-        guard process.terminationReason == .exit, process.terminationStatus == 0 || process.terminationStatus == 3 else {
+        guard process.terminationReason == .exit,
+              process.terminationStatus == 0 || (allowWarnings && process.terminationStatus == 3) else {
             let text = String(decoding: message, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
             throw Failure.qpdf(text.isEmpty ? "exit \(process.terminationStatus)" : String(text.prefix(300)))
         }
