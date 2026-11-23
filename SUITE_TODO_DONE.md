@@ -18295,3 +18295,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   The live Processor smoke processed and tagged both synthetic inputs. Build added no warnings. A separate
   Codex review found the duplicate-name and filed-PDF cases, which are covered by the regression. No bench cache used.
   <!-- /W40.fix-processor-merged-classification-stale -->
+
+- [x] **W49.folder-date-stamp-first — a stamp's year on the page beats the folder's year [S]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-23 (this commit) (lane: core,processor,reader) (uses: build) — Owner, 2026-11-20 walkthrough of 06:07 (call 24): stamp beats folder. A stamp on the page ("Received 1962") is a year known for the document; today the folder's year (step 3b) stands ahead of it (SPEC/containers.md §Precedence, W47.ct-folder-date: stamp right 25 of 25 where it fired, the folder's checked date 88%). Put the stamp's year ahead of the folder's in the Processor's dating route, Live Capture and the Reader's folder-date offer (a stamp-dated file counts as dated), update SPEC/containers.md and the test drivers. Tier-2.
+  Processor and Live Capture preserve the stamp's date and its Date Uncertain flag. The stamp also wins if the
+  cover got its year from the folder. Reader leaves stamped dates out of the folder-date offer and can still
+  restore a stamp date if the folder date previously replaced it.
+  Verified on scratch PDFs and Live Capture inputs, including the in-place enclosure, rotation and Reader's
+  offer, apply and undo path. Separate adversarial review by Codex. No bench cache was created.
+  <!-- /W49.folder-date-stamp-first -->

@@ -79,8 +79,8 @@ extension ContainerFolderDate {
 
     /// Whether a document with `tags`, whose date rests on `evidence` (the Reader's record where it is still the
     /// file's date, else page 2's line), takes this date. As the dating route's step 3b: a document with no date takes
-    /// it, a document with no text included; a date from a stamp, the neighbour estimate or a folder gives way to it; a
-    /// date with no evidence line (the document's own text, or typed by hand) or read off the page image stands, and
+    /// it, including a document with no text; a neighbour estimate or an earlier folder date gives way to it.
+    /// A date with no evidence line (the document's own text, or typed by hand), a page image date or a stamp stands, and
     /// so does a covering letter's year, except where it is the folder's own single year. A checked date is the
     /// user's and is never replaced, nor is a date the file carries twice (which one to replace is unclear).
     public func dates(_ tags: DocumentTags, evidence: String?) -> Bool {
@@ -88,7 +88,7 @@ extension ContainerFolderDate {
               !tags.dateAmbiguities.contains(where: { $0.facet != .sentWith }) else { return false }
         guard tags.year != nil || tags.decade != nil else { return true }
         switch Self.evidenceClass(evidence) {
-        case "stamp", "estimate", "folder": return true
+        case "estimate", "folder": return true
         case "inherited":
             if case .year(let y, _, false) = got, tags.decade == nil, y == tags.year { return true }
             return false
@@ -119,8 +119,8 @@ extension ContainerFolderDate {
     /// The tag change that takes away a date a folder gave (`folderGave`) when the folder no longer gives one
     /// (W49.reader-folder-date-undo). Where the Reader's `record` still holds, the file goes back to the date it says the
     /// folder replaced, or to none (W49.reader-folder-date-undo-fu: a stamp's date the user had deleted stays deleted).
-    /// Otherwise, where page 2's `Date evidence:` is a stamp's, the estimate's or a covering letter's (the kinds a
-    /// folder's date replaces) and names the date it gave, the file goes back to that date and its `Date Uncertain`;
+    /// Otherwise, where page 2's `Date evidence:` names an estimate, a covering letter's date or a stamp previously
+    /// replaced by a folder date, the file goes back to that date and its `Date Uncertain`;
     /// otherwise its Year or Decade, Month, Day and `Date Uncertain` are removed. Never a check. A year the file's
     /// covering letter (`Sent With`) also gives is the file's own and stands: empty.
     public static func undatingDelta(given tags: DocumentTags, page: String?, record: FolderDateRecord? = nil) -> TagDelta {

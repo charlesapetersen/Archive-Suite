@@ -1755,9 +1755,10 @@ final class LiveCaptureProcessor: ObservableObject {
         var want = routeDating
         if let folder = liveFolderDate(for: seg.groupId) { want.inherit(fromFolder: folder) }
         // A marker filed by an earlier Finish can leave the session without ending the folder run.
-        // Keep that date unless the corrected image now gives the document a date of its own.
+        // Keep that date unless the document has its own date or the corrected image shows a dated stamp.
         if seg.dating?.evidenceClass == .folder,
-           want.evidenceClass != .folder, want.evidenceClass != .image, want.evidenceClass != .text { return false }
+           want.evidenceClass != .folder, want.evidenceClass != .image, want.evidenceClass != .text,
+           want.evidenceClass != .stamp { return false }
         guard want != seg.dating else { return false }
         let mac = session.macTags[seg.groupId]
         let tags = Self.datedTags(preDating, dating: want, mac: mac, group: group)

@@ -7,9 +7,9 @@ import Foundation
 ///      explicit when a rule candidate in the document's own text carries it, no `Date Uncertain`;
 ///   2. *explicit, from the image*: only where the own text has no year candidate (call 7.3), the image pass on the first
 ///      two pages; its document date counts when that year is written in a date it quoted;
-///   3. *inherited*: an established enclosure takes its cover's year with `Date Uncertain` when it has no explicit date
-///      of its own (applied by `OCRProcessor.applyGeneratedTags`, beside `Sent With`); then a document with neither
-///      takes its folder run's confirmed date (`inherit(fromFolder:)`, W47.ct-folder-date);
+///   3. *cover, stamp, folder*: an established enclosure can take its cover's year with `Date Uncertain`, beside
+///      `Sent With`. A stamp read from the page keeps its date with `Date Uncertain` ahead of the folder's confirmed
+///      date, including a year the cover took from a folder (W49.folder-date-stamp-first).
 ///   4. *estimated from neighbours*: the same trace reply, written only when its evidence passes `evidenceCheck`, always
 ///      with `Date Uncertain`; a reply whose evidence fails writes no year and is not shown (owner call 9).
 ///

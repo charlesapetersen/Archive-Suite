@@ -16,7 +16,7 @@ final class FolderDateDocumentsTests: XCTestCase {
         XCTAssertFalse(f.dates(tags(["1958"]), evidence: nil), "a date with no evidence line is the document's own")
         XCTAssertFalse(f.dates(tags(["1958"]), evidence: "image; page 1; top; \"1958\""))
         XCTAssertTrue(f.dates(tags(["1958", "Date Uncertain"]), evidence: "estimate; from 0003.pdf; line 2; \"x\""))
-        XCTAssertTrue(f.dates(tags(["1958"]), evidence: "stamp; page 1; \"MAR 1958\""))
+        XCTAssertFalse(f.dates(tags(["1958", "Date Uncertain"]), evidence: "stamp; page 1; gave 1958, Date Uncertain"))
         XCTAssertTrue(f.dates(tags(["1960s", "Date Uncertain"]), evidence: "folder; from 0001.pdf; \"1960s\""),
                       "an earlier folder date gives way to the confirmed one")
         XCTAssertFalse(f.dates(tags(["1958", "Date Uncertain"]), evidence: "inherited; from 0002.pdf"))
@@ -115,7 +115,8 @@ final class FolderDateDocumentsTests: XCTestCase {
                            "the user's \(changed) stands")
         }
         let kept = tags(["1958", "3 March"])
-        XCTAssertTrue(f.dates(kept, evidence: FolderDateRecord.evidence(nil, page: stamp, tags: kept)))
+        XCTAssertFalse(f.dates(kept, evidence: FolderDateRecord.evidence(nil, page: stamp, tags: kept)),
+                       "the stamp date stands")
         XCTAssertNil(FolderDateRecord.evidence(nil, page: stamp, tags: tags([])))
         XCTAssertTrue(f.dates(tags([]), evidence: nil), "an undated file still takes the folder's")
     }

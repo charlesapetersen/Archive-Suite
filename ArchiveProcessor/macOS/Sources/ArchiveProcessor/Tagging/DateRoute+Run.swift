@@ -213,10 +213,13 @@ extension DateRoute {
         let base: Decision
         let folder: ContainerFolderDate?
 
-        func resolve(cover: (tags: GeneratedTags, file: String?)?) -> Decision {
+        func resolve(cover: (tags: GeneratedTags, file: String?)?, coverDatedByFolder: Bool = false) -> Decision {
             var decision = base
-            if let cover { decision.inherit(fromCover: cover.tags, coverFile: cover.file) }
-            if let folder { decision.inherit(fromFolder: folder) }
+            // A cover dated only by its folder cannot displace a stamp on the enclosure.
+            if let cover, base.evidenceClass != .stamp || !coverDatedByFolder {
+                decision.inherit(fromCover: cover.tags, coverFile: cover.file)
+            }
+            if let folder, base.evidenceClass != .stamp { decision.inherit(fromFolder: folder) }
             return decision
         }
     }
@@ -394,14 +397,15 @@ extension DateRoute.Decision {
         quote = nil; line = nil; page = nil; place = nil; sourceFile = coverFile
     }
 
-    /// Step 3b (W47.ct-folder-date; owner, 2026-11-19): a document with no explicit date of its own and none from a
-    /// cover takes the confirmed date of the folder run it is in, by `ContainerFolderDate.inherited`: a single year with
-    /// its month and no `Date Uncertain`, a range's mid-point year or decade with it, nothing for 20 years or more.
-    /// Like the cover's year, it stands ahead of a stamp's and the neighbour estimate. A cover's year wins, except where
+    /// Step 3b (W47.ct-folder-date): a document with no explicit date of its own, cover year or stamped date
+    /// takes the confirmed date of its folder run, ahead of the neighbour estimate. By `ContainerFolderDate.inherited`,
+    /// that is a single year with its month and no `Date Uncertain`, a range's mid-point year or decade with it,
+    /// and nothing for 20 years or more. A cover's year wins, except where
     /// it is the folder's own single year (the cover took it from the same folder): then the folder's form stands, with
     /// its month and no `Date Uncertain`, as for any other document in the folder.
     mutating func inherit(fromFolder folder: ContainerFolderDate) {
-        guard evidenceClass != .text, evidenceClass != .image, let got = folder.inherited else { return }
+        guard evidenceClass != .text, evidenceClass != .image, evidenceClass != .stamp,
+              let got = folder.inherited else { return }
         if evidenceClass == .inherited {
             guard case .year(let y, _, false) = got, y == year else { return }
         }

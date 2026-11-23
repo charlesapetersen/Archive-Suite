@@ -40,7 +40,8 @@ Legacy `FlagStore` flags and `PageTurnStore` turns keep their absolute-path beha
 ## Dating a folder's documents from its confirmed date — the limits (W47.ct-folder-date-reader, 2026-11-19)
 
 Shipped: setting or confirming a folder run's date in the Container section offers to date the run's documents that
-have no date of their own, by the owner's folder-date rule (`SPEC/containers.md` §The folder-date rule). The tags go
+are eligible under the owner's folder-date rule (`SPEC/containers.md` §The folder-date rule). A date from a
+stamp counts as a document date and stays in place (W49.folder-date-stamp-first). The tags go
 through `TagWriter` in one undo group (Edit ▸ Undo Tag Change); the `Date evidence:` value is kept in the folder's
 `.archivesuite/item-fields.json` and the Checks name the folder for those dates.
 - **Choosing Not Now does not ask again until the folder's date is edited again**; its Edit ▸ Confirm asks again

@@ -133,10 +133,12 @@ Owner, 2026-10-31: a dated folder dates the otherwise undated documents inside i
 - **What a document takes**, by the span in years, inclusive: one year as it is, with its month (never a day), and no
   `Date Uncertain`; 2 to 7 years the mid-point year (an even span the earlier middle year) with `Date Uncertain`;
   8 to 19 the decade holding most of its years, a tie going to the earlier, with `Date Uncertain`; 20 or more nothing.
-- **Precedence.** A document's own date, from its text or its page image, always wins; then a covering letter's year
-  (step 3a), except a cover's year that is the folder's own single year, where the folder's form stands; then the
-  folder's (step 3b), ahead of a stamp's year and the neighbour estimate. A dated document in the folder does not date
-  its neighbours by this rule. The Live Capture phone date still wins over all; a decade takes no phone month.
+- **Precedence.** A document's own date, from its text or its page image, comes first, followed by an established
+  covering letter's year (step 3a). A stamped date comes before the folder's date (step 3b) and the neighbour
+  estimate (W49.folder-date-stamp-first, owner call 24). An enclosure's stamp also stands when its cover got its
+  year from a folder. Without a stamp, if the cover's year matches the folder's confirmed single year, the
+  folder's form applies. A dated document in the folder does not date its neighbours by this rule.
+  The Live Capture phone date still wins over all. A decade takes no phone month.
 - **Where.** Process Files' automatic dating route, for a file tagged where it already is (the pre-OCRed route,
   output = source), from its folder's container file, read and never written. A new output is not dated by it: its
   name was never in the runs, it would sort into another batch's run, and collection organisation renames and moves
@@ -150,19 +152,20 @@ Owner, 2026-10-31: a dated folder dates the otherwise undated documents inside i
   last box or folder marker captured before it, where that marker is a folder whose card the user saved with a date
   (Save makes every value `user`); a box ends it. Documents are tagged as they stage, before any file name exists, so
   the session's markers, not a container file, decide it: a run already in the collection folder chosen at Finish
-  dates none of the session's documents. A card saved after a document was tagged re-dates it at Finish (no call),
-  where its staged output is regenerated, reviewed or not; a re-date never takes a folder date away (a marker filed
-  by an earlier Finish, or its photo deleted, does not end the run). The evidence line names the folder (`folder; from the
+  dates none of the session's documents. A card saved after a document was tagged re-dates eligible documents at
+  Finish without a call, regenerating their staged output. A rotation correction can reveal a stamp that replaces a
+  staged folder date. A marker filed by an earlier Finish, or whose photo was deleted, leaves its date in place
+  until stronger evidence is found. The evidence line names the folder (`folder; from the
   folder; "<the date>"`), as the folder photo's filed name is not known until Finish. The phone's date wins.
 - **In the Reader, for documents already written (`W47.ct-folder-date-reader`).** When the user sets or confirms a
   folder run's `date` in the Inspector's Container section and the value dates documents, the Reader offers to date
-  the run's PDFs (every file on disk the same folder run is live at) that take it: no date at all, a document with no
-  text included; or a date whose evidence is a stamp, the estimate or a folder (an earlier folder date gives way),
+  the run's PDFs (every file on disk the same folder run is live at) that take it: no date at all, including a
+  document with no text, or a date whose evidence is an estimate or an earlier folder date,
   while page 2's evidence still names the file's date and `Date Uncertain` (W49.reader-finder-year-stands,
   W49.reader-finder-month-stands: a year, month, day or `Date Uncertain` changed in Finder, which records nothing, no
   longer matches it, so it is the user's and stands). A
-  date with no evidence line (the document's text, or typed), one read off the page image, a covering letter's year
-  (except the folder's own single year), a checked date, a date carried twice, a file tagged `Box`/`Folder` or whose
+  date with no evidence line (the document's text, or typed), one read off the page image or from a stamp,
+  a covering letter's year (except the folder's own single year), a checked date, a date carried twice, a file tagged `Box`/`Folder` or whose
   page 2 classifies it so, and a placeholder's date (never opened, so its evidence is unknown) stand. Accepting
   writes the tags of the rule above through `TagWriter`, one undo group, no check, after first recording the evidence
   beside the files: page 2 is never rewritten, so `<folder>/.archivesuite/item-fields.json` keeps, per file, the date
@@ -178,9 +181,9 @@ Owner, 2026-10-31: a dated folder dates the otherwise undated documents inside i
   them away, but only where the run's confirmed date dated documents just before the edit (a box's date, an edit that
   changed nothing, or folder evidence from elsewhere offers nothing): where the Reader's record holds, the file goes
   back to the date it records the folder replaced, or to none (`W49.reader-folder-date-undo-fu`: a date deleted before
-  the folder dated the file stays deleted); otherwise, where page 2's evidence is a stamp's, the estimate's or a
-  covering letter's and ends `gave <date>[, Date Uncertain]`, to that date; a year the file's `Sent With` also gives
-  stands; otherwise its Year or Decade, Month, Day and `Date Uncertain` are removed. No check is written; one undo
+  the folder dated the file stays deleted); otherwise, where page 2's evidence is an estimate, a covering letter's
+  date or a stamp previously replaced by a folder date and ends `gave <date>[, Date Uncertain]`, to that date.
+  A year the file's `Sent With` also gives stands; otherwise its Year or Decade, Month, Day and `Date Uncertain` are removed. No check is written; one undo
   group. Accepting reads the folder's date again: one set since, or a file that left the run, changes nothing. The
   records of the files undated are retired; Undo Tag Change of that change revives them with the date, and Redo
   retires them again; a change of a file's date seen made in Finder or another app while the Reader runs retires its

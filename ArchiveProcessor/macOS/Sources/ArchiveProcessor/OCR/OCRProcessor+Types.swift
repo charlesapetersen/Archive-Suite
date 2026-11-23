@@ -181,10 +181,10 @@ struct ManualTagSegment: Identifiable {
         return tags
     }
 
-    mutating func refreshInheritedDate(from cover: GeneratedTags?) {
+    mutating func refreshInheritedDate(from cover: GeneratedTags?, coverDatedByFolder: Bool = false) {
         guard !dateTextUnreadable, standingDating != nil, let dateInheritance else { return }
         let source = cover.map { (tags: $0, file: enclosureCoverName) }
-        setDate(fromRoute: dateInheritance.resolve(cover: source))
+        setDate(fromRoute: dateInheritance.resolve(cover: source, coverDatedByFolder: coverDatedByFolder))
     }
 
     var dateComponents: TypedDateTags.Components { .init(year: year, month: month, day: day) }

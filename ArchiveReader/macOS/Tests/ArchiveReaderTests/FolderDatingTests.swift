@@ -167,9 +167,15 @@ final class FolderDatingTests: XCTestCase {
 
     func testDatingWritesTheTagsAndTheEvidenceAndUndoTakesTheTagsBack() throws {
         try makeFolder(date: "Feb. 1966")
+        let stamped = folder.appendingPathComponent("0008.pdf")
+        let stampTags = ["Unread", "1960", "5 May", "Day 2", "Date Uncertain"]
+        let page2 = Self.page2(["Classification: Document Start",
+                                "Date evidence: stamp; page 1; gave 1960-05-02, Date Uncertain"])
+        try TestPDFBuilder.textPDFData(pages: ["(the page image)", page2]).write(to: stamped)
+        try (stamped as NSURL).setResourceValue(stampTags, forKey: .tagNamesKey)
         let before = try bytes()
         let model = fixtureNavigationModel(pinnedTo: root)
-        wait { model.library.files.count >= 7 }
+        wait { model.library.files.count >= 8 }
         let tree = try XCTUnwrap(model.containerTree, "the scratch root is the container tree")
         let edited = ([tree.path] + ["Box 3", "0002.pdf"]).joined(separator: "/")
 
@@ -178,6 +184,7 @@ final class FolderDatingTests: XCTestCase {
         let offer = try XCTUnwrap(model.folderDatingOffer)
         XCTAssertEqual(offer.paths.map { ($0 as NSString).lastPathComponent }, ["0002.pdf", "0003.pdf", "0006.pdf"])
         XCTAssertTrue(offer.message.contains("Feb 1966"), offer.message)
+        XCTAssertTrue(offer.message.contains("text, page image or stamp"), offer.message)
 
         model.applyFolderDating(offer)
         wait { model.statusMessage.hasPrefix("Dated ") }
@@ -188,6 +195,7 @@ final class FolderDatingTests: XCTestCase {
         XCTAssertEqual(try tagsOnDisk("0006.pdf"), ["Unread", "1966", "2 February"])
         XCTAssertEqual(try tagsOnDisk("0004.pdf"), ["Unread", "1961"])
         XCTAssertEqual(try tagsOnDisk("0005.pdf"), ["Unread", "1962"])
+        XCTAssertEqual(try tagsOnDisk(stamped.lastPathComponent), Set(stampTags))
         XCTAssertEqual(try tagsOnDisk("0001.pdf"), ["Unread", "Folder"])
         XCTAssertEqual(try tagsOnDisk("0007.pdf"), ["Unread", "1950", "Checked Date"])
         XCTAssertEqual(try bytes(), before, "only Finder tags and .archivesuite change")
@@ -200,6 +208,7 @@ final class FolderDatingTests: XCTestCase {
                        "the estimate's date is kept as the one replaced")
         XCTAssertNil(fields.dateRecord(for: "0002.pdf")?.replaced, "an undated file replaced none")
         XCTAssertNil(fields.dateRecord(for: "0004.pdf"))
+        XCTAssertNil(fields.dateRecord(for: stamped.lastPathComponent))
         let dated = DocumentTags.parse(raw: Array(try tagsOnDisk("0003.pdf")), labelNumber: nil)
         XCTAssertEqual(FieldStatusPolicy.date(checked: false, evidence: FolderDateRecord.evidence(
             record, page: "estimate; from 0002.pdf; gave 1958, Date Uncertain", tags: dated)).source,

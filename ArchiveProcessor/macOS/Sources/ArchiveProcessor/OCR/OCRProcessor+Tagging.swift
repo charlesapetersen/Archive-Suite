@@ -761,11 +761,13 @@ extension OCRProcessor {
         guard manualTagSegments.indices.contains(index) else { return }
         let segment = manualTagSegments[index].segmentIndex
         var cover: GeneratedTags?
+        var coverDatedByFolder = false
         if let c = manualTagSegments[index].enclosureOfSegmentIndex,
            Self.validCoverIndex(of: segment, in: segments) == c,
            let coverIndex = cardBySegment?[c] ?? manualTagSegments.firstIndex(where: { $0.segmentIndex == c }),
            !manualTagSegments[coverIndex].dateTextUnreadable {
             cover = manualTagSegments[coverIndex].ownDateTags
+            coverDatedByFolder = manualTagSegments[coverIndex].standingDating?.evidenceClass == .folder
         }
         if allowRuleFallback, manualTagSegments[index].dateInheritance == nil,
            let coverYear = cover?.year.flatMap({ Int($0) }), DateRoute.yearRange.contains(coverYear),
@@ -781,7 +783,7 @@ extension OCRProcessor {
                 base: base, folder: confirmedFolderDate(for: segments[segment], runsByFolder: &runsByFolder))
             manualTagSegments[index].setDate(fromRoute: base)
         }
-        manualTagSegments[index].refreshInheritedDate(from: cover)
+        manualTagSegments[index].refreshInheritedDate(from: cover, coverDatedByFolder: coverDatedByFolder)
     }
     /// UI: advance to the next manual-tag segment, or finish if on the last one.
     /// W37: refuses while the current card's Sent-with text is not a valid date (the sheet shows why),
@@ -1479,12 +1481,11 @@ extension OCRProcessor {
         let segment = snapshot[i]
         var tags = rawTags
         let inheritance = dating.map { DateRoute.Inheritance(base: $0, folder: folderDate) }
-        let cover = coverTags.flatMap { tags in
-            Self.validCoverIndex(of: i, in: snapshot).map { c in
-                (tags: tags, file: snapshot[c].pdfURLs.first?.lastPathComponent)
-            }
-        }
-        let dating = inheritance?.resolve(cover: cover)
+        let coverIndex = Self.validCoverIndex(of: i, in: snapshot)
+        let coverSource = coverIndex.flatMap { snapshot[$0].pdfURLs.first }
+        let cover = coverIndex.flatMap { _ in coverTags.map { (tags: $0, file: coverSource?.lastPathComponent) } }
+        let coverDatedByFolder = coverSource.flatMap { enclosureDateReviews[$0]?.decision?.evidenceClass } == .folder
+        let dating = inheritance?.resolve(cover: cover, coverDatedByFolder: coverDatedByFolder)
         dating?.apply(to: &tags)
         // Name the date given by the route before a phone month overrides it.
         var headerEvidence = dating?.headerEvidence(giving: tags)
@@ -1719,6 +1720,7 @@ extension OCRProcessor {
                 return source
             }
             let coverTags = coverSource.flatMap { appliedGeneratedTags[$0] }
+            let coverDatedByFolder = coverSource.flatMap { enclosureDateReviews[$0]?.decision?.evidenceClass } == .folder
             for source in seg.pdfURLs {
                 guard let j = jobIndexBySource[source], !jobs[j].appliedTags.isEmpty,
                       let outputURL = outputURLMap[source],
@@ -1738,7 +1740,8 @@ extension OCRProcessor {
                 var updated = current
                 var dateChange: (before: DateRoute.Decision, after: DateRoute.Decision)?
                 if let review, let inheritance = review.inheritance, let before = review.decision {
-                    let after = inheritance.resolve(cover: cover.map { (tags: $0, file: coverName) })
+                    let after = inheritance.resolve(cover: cover.map { (tags: $0, file: coverName) },
+                                                    coverDatedByFolder: coverDatedByFolder)
                     if after != before, before.evidenceClass == .inherited || after.evidenceClass == .inherited {
                         var date = after.dateTags
                         if let month = review.phoneMonth, date.year?.hasSuffix("s") != true { date.month = month }

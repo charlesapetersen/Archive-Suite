@@ -115,16 +115,16 @@ struct FolderDatingOffer: Identifiable, Equatable {
             ? "each would be dated " + (dates[0].inheritedDate.map { $0.date.display + ($0.uncertain ? ", marked uncertain" : "") } ?? "")
             : "each would take its own folder's date"
         let lead = several || dates.count > 1 ? "The folders are dated \(named). " : "The folder is dated \(named). "
-        let dated = "\(them(dating.flatMap(\.paths).count, "has", "have")) no date of its own, or one only estimated, "
-            + "taken from a stamp or given by the folder's earlier date; \(each). "
+        let dated = "\(them(dating.flatMap(\.paths).count, "has", "have")) no date, an estimated date "
+            + "or an earlier date from the folder. With this change, \(each). "
         guard undated > 0 else {
-            return lead + folderList + dated + "Dates read from a document's text or page image, checked dates and the "
-                + "folder photo are left as they are. " + undo
+            return lead + folderList + dated + "Dates read from a document's text, page image or stamp, checked dates "
+                + "and the folder photo are left as they are. " + undo
         }
         return lead + folderList + dated + "\(Self.documents(undated)) dated from a folder that no longer gives a date "
             + "\(undated == 1 ? "goes" : "go") back to the stamp's or estimate's date \(undated == 1 ? "it" : "each") had, "
-            + "or to no date. Dates you changed or checked since, dates read from a document's text or page image, and "
-            + "the folder photo are left as they are. " + undo
+            + "or to no date. Dates you changed or checked since, dates read from a document's text, page image or stamp, "
+            + "and the folder photo are left as they are. " + undo
     }
 
     var confirmTitle: String {

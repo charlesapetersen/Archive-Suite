@@ -657,8 +657,10 @@ What remains: a box with many such pages has more gaps to check than the figures
   tagging modes take a folder run's confirmed date only for the pre-OCRed route (output = source), whose names the
   runs were set on; a new output would sort into another batch's run, and collection organisation renames and moves
   it. The label reads a run records are proposals and date nothing; a folder date confirmed in the Reader
-  afterwards is offered there for the documents already written, tagged in place or not (accepted: the Reader's offer
-  covers them, W47.ct-folder-date-reader).
+  afterwards is offered there for the documents already written, tagged in place or not. A stamped date takes
+  precedence in Process Files and Live Capture, including when a rotation correction reveals the stamp
+  (accepted: the Reader's offer covers written files, W47.ct-folder-date-reader, and stamp precedence follows
+  owner call 24, W49.folder-date-stamp-first).
 - **Live Capture dates a document only from the session's own folder markers** (W47.ct-folder-date-live): a folder
   run already in the collection folder chosen at Finish dates none of the session's documents, since documents are
   tagged before that folder is chosen, and a session's first documents before any marker are in no run (accepted:

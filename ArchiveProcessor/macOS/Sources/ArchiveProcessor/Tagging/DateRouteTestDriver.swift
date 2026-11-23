@@ -288,12 +288,22 @@ enum DateRouteTestDriver {
               && fo8["source"] as? String == "00012.pdf" && fo8["folder_date"] as? String == "Feb. 1970"
               && single.headerEvidence == "folder; from 00012.pdf; \"Feb. 1970\"; gave 1970-02",
               "\(t8.allTags) \(fo8) \(String(describing: single.headerEvidence))")
-        var mid = byStamp
+        var mid = est
         mid.inherit(fromFolder: folder("1965-1967"))
         var t9 = GeneratedTags()
         mid.apply(to: &t9)
-        check("2 folder: a range under 8 years is its mid-point year with Date Uncertain, over a stamp's year",
+        check("2 folder: a range under 8 years is its mid-point year with Date Uncertain, ahead of an estimate",
               t9.year == "1966" && t9.dateUncertain && t9.month == nil && t9.day == nil && mid.evidenceClass == .folder)
+        for date in ["Feb. 1960", "1965-1967", "1958-1969"] {
+            let resolved = DateRoute.Inheritance(base: byStamp, folder: folder(date)).resolve(cover: nil)
+            check("2 stamp: keeps its date and evidence ahead of folder date \(date)", resolved == byStamp)
+        }
+        let stampedEnclosure = DateRoute.Inheritance(base: byStamp, folder: folder("Feb. 1970"))
+        let cover1970 = (tags: GeneratedTags(year: "1970", month: "2 February"), file: Optional("L.pdf"))
+        check("2 stamp: a cover's folder date does not override the enclosure's stamp",
+              stampedEnclosure.resolve(cover: cover1970, coverDatedByFolder: true) == byStamp)
+        check("2 stamp: a genuine cover year still wins even when the folder names the same year",
+              stampedEnclosure.resolve(cover: cover1970).evidenceClass == .inherited)
         var dec = failed
         dec.inherit(fromFolder: folder("1958-1969"))
         var t10 = GeneratedTags(year: "1958")
@@ -596,6 +606,7 @@ enum DateRouteTestDriver {
     }
 
     nonisolated private static let markers = ["DOCA", "DOCE", "DOCB", "DOCC", "DOCD"]
+    nonisolated private static let receivedStamp = #"{"dates":[{"quote":"RECEIVED MAY 2 1960","page":1,"where":"stamp","kind":"stamped","year":1960}],"document_date":null}"#
 
     private static func install(_ wire: Wire) {
         NetworkSession.testTransport = { request in
@@ -964,27 +975,41 @@ enum DateRouteTestDriver {
             return (url, try? Data(contentsOf: url))
         }
         wire.lock.withLock { wire.tagging = 0; wire.trace = []; wire.images = []; wire.models = [] }
-        let (fd, _, _) = processor(gateway: gw, out: "folderdate")
+        let (fd, _, fdOut) = processor(gateway: gw, out: "folderdate")
         let fdDir = tmp.appendingPathComponent("folderdate", isDirectory: true)
         let fdPDFs = markers.map { fdDir.appendingPathComponent("\($0).pdf") }
         fd.jobs = fd.jobs.enumerated().map { i, job in
             var inPlace = OCRJob(sourceURL: fdPDFs[i])
-            inPlace.result = job.result
+            // C is an enclosure of B. Its rotated scan is wider than the other PDFs in the image request.
+            inPlace.result = i == 3
+                ? OCRResult(text: job.result?.text, classification: .documentStart, rotationDegrees: 90,
+                            errorMessage: nil, errorCode: nil, enclosure: true)
+                : job.result
             inPlace.classification = job.classification
             return inPlace
         }
         fd.outputURLMap = Dictionary(uniqueKeysWithValues: fdPDFs.map { ($0, $0) })
         fd.rebuildSegments(files: fdPDFs)
         let (containerURL, before) = withFolderRuns(fdDir)
+        wire.lock.withLock { wire.imageReply[792] = receivedStamp }
         await fd.performTaggingPhase(provider: .gemini, model: route.model, apiKey: "", outputDirectory: fdDir,
                                      enableSegmentJSON: true)
+        wire.lock.withLock { wire.imageReply[792] = nil }
         let fdA = applied(fd, fdPDFs[0]), fdB = applied(fd, fdPDFs[2]), fdC = applied(fd, fdPDFs[3])
         let fdD = applied(fd, fdPDFs[4]), fdE = applied(fd, fdPDFs[1])
+        let fdBTags = (try? MacOSTagger.readTags(from: fdPDFs[2])) ?? []
+        check("3 folder, in place: B takes the confirmed folder's midpoint ahead of its estimate",
+              before != nil && fdB.contains("1966") && fdB.contains("Date Uncertain")
+              && !fdB.contains("1947") && fdBTags.contains("1966") && fdBTags.contains("Date Uncertain"),
+              "\(fdB) \(fdBTags)")
         let fdCTags = (try? MacOSTagger.readTags(from: fdPDFs[3])) ?? []
-        check("3 folder, in place: B and C, undated of their own, take the confirmed folder's mid-point 1966 with Date Uncertain",
-              before != nil && fd.segments.count == 5 && fdC.contains("1966") && fdC.contains("Date Uncertain")
-              && !fdC.contains("1947") && fdB.contains("1966") && fdB.contains("Date Uncertain")
-              && fdCTags.contains("1966") && fdCTags.contains("Date Uncertain"), "\(fdB) \(fdC) \(fdCTags)")
+        let fdCDating = json(fdOut["DOCC"])["dating"] as? [String: Any]
+        check("3 folder, in place: C keeps its stamp ahead of its cover's folder date",
+              fd.segments.count == 5 && fd.segments[3].enclosureOf == 2
+              && ["1960", "5 May", "Day 2", "Date Uncertain"].allSatisfy { fdC.contains($0) && fdCTags.contains($0) }
+              && !fdCTags.contains("1966") && fdCTags.contains("Sent With 1966")
+              && fdCDating?["class"] as? String == "stamp",
+              "\(fdC) \(fdCTags) \(wire.images)")
         check("3 folder, in place: A (before the run, its own text) and E (its cover, in the unconfirmed run) keep theirs",
               fdA.contains("1947") && !fdA.contains("Date Uncertain") && fdE.contains("1947") && fdE.contains("Date Uncertain")
               && !fdE.contains("1966"), "\(fdA) \(fdE)")
@@ -1419,10 +1444,13 @@ enum DateRouteTestDriver {
         func fTags(_ gid: String) -> [String] { fStaged(gid)?.pdfURLs.first.flatMap { try? MacOSTagger.readTags(from: $0) } ?? [] }
         func fDating(_ gid: String) -> [String: Any]? { json(fStaged(gid)?.jsonURL)["dating"] as? [String: Any] }
         var seq = 0
-        func capture(_ gid: String, _ type: CaptureGroupType, _ text: String, month: Int? = nil) async -> Bool {
+        func capture(_ gid: String, _ type: CaptureGroupType, _ text: String,
+                     month: Int? = nil, stamped: Bool = false) async -> Bool {
             seq += 1
             let page = tmp.appendingPathComponent("folder-\(gid).jpg")
-            writeJPEG(page, width: 300 + seq)
+            let width = 300 + seq
+            if stamped { wire.lock.withLock { wire.imageReply[width] = receivedStamp } }
+            writeJPEG(page, width: width)
             LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(text: text, classification: nil, errorMessage: nil,
                                                                   errorCode: nil)
             _ = f.ingest(jpeg: (try? Data(contentsOf: page)) ?? Data(), groupId: gid, seq: seq, type: type,
@@ -1438,6 +1466,7 @@ enum DateRouteTestDriver {
         }
         var captured = await capture("F1", .folder, "FOLDER 3")
         captured = save("F1", "1965-1967") && captured
+        captured = await capture("S", .document, "DOCC Note to the files", stamped: true) && captured
         for (gid, type, text) in [("G", CaptureGroupType.document, "DOCC Note to the files"),
                                   ("H", .document, "DOCA Washington\nMarch 3, 1947\nDear Mr. Hale:"),
                                   ("F2", .folder, "FOLDER 4"), ("K", .document, "DOCC Note to the files"),
@@ -1446,6 +1475,15 @@ enum DateRouteTestDriver {
             if gid == "G" { captured = await capture("M", .document, "DOCC Note to the files", month: 4) && captured }
         }
         check("6 Live folder: every marker and document stages", captured, "\(f.liveProcessor.staged.map(\.groupId))")
+        func hasStampDate(_ gid: String) -> Bool {
+            let tags = fTags(gid)
+            return tags.contains("1960") && tags.contains("5 May") && tags.contains("Day 2")
+                && tags.contains("Date Uncertain") && !tags.contains("1966")
+                && fDating(gid)?["class"] as? String == "stamp"
+                && readsCatalogueDate(fStaged(gid), "1960-05-02", source: "stamp", quote: "RECEIVED MAY 2 1960",
+                                      uncertain: true)
+        }
+        check("6 Live folder S: the stamped date wins when the folder's card is already saved", hasStampDate("S"))
         let g = fTags("G")
         check("6 Live folder G: the undated document takes the saved folder's uncertain midpoint",
               g.contains("1966") && g.contains("Date Uncertain") && fDating("G")?["class"] as? String == "folder"
@@ -1463,8 +1501,15 @@ enum DateRouteTestDriver {
               !fTags("K").contains("1970") && fDating("K")?["class"] as? String == "none", "\(fTags("K"))")
         let finishCalls = wire.lock.withLock { wire.trace.count + wire.images.count + wire.itemFields + wire.tagging }
         let saved = save("F2", "Feb. 1970") && save("X", "1980")
-        f.liveProcessor.finishSession()
-        if f.liveProcessor.showRotationReview { f.liveProcessor.applyRotationReviewAndFinalize() }
+        guard let source = f.photos.first(where: { $0.groupId == "G" })?.url else {
+            check("6 Live folder G: source for rotation review", false)
+            return
+        }
+        wire.lock.withLock { wire.imageReply[60] = receivedStamp }
+        f.liveProcessor.rotationReviewPages = [
+            .init(groupId: "G", pageIndex: 0, order: 1, sourceURL: source, rotationDegrees: 90),
+        ]
+        f.liveProcessor.applyRotationReviewAndFinalize()
         let finished = await settle { !f.liveProcessor.isFinalizing && fTags("K").contains("1970") }
         let k = fTags("K")
         check("6 Live folder K: Finish re-dates it from the card saved later: 1970, its month, no Date Uncertain",
@@ -1476,9 +1521,14 @@ enum DateRouteTestDriver {
         check("6 Live folder L: after a box, no folder date, and a box's date dates nothing",
               !l.contains("1970") && !l.contains("1980") && l.contains("Date Uncertain")
               && fDating("L")?["class"] as? String == "none", "\(l)")
-        check("6 Live folder: G and H unchanged at Finish, and Finish made no call",
-              fTags("G") == g && fTags("H") == h
-              && wire.lock.withLock { wire.trace.count + wire.images.count + wire.itemFields + wire.tagging } == finishCalls)
+        check("6 Live folder G: the stamp read after rotation replaces the folder date in the staged output",
+              hasStampDate("G"), "\(fTags("G")) \(String(describing: fDating("G")))")
+        check("6 Live folder: H and S keep their dates at Finish, with one call for the corrected image",
+              fTags("H") == h && hasStampDate("S")
+              && wire.lock.withLock {
+                  wire.images.last == [60]
+                      && wire.trace.count + wire.images.count + wire.itemFields + wire.tagging == finishCalls + 1
+              })
     }
 }
 #endif
