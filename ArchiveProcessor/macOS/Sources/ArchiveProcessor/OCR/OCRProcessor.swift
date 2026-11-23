@@ -293,6 +293,10 @@ class OCRProcessor: ObservableObject {
 
     /// Maps source image URL → output PDF URL (for tagging the output, not the source)
     var outputURLMap: [URL: URL] = [:]
+    var catalogueRun: ProcessorCatalogueRun?
+    var catalogueRunLease: ProcessorCatalogueRun.Lease?
+    var catalogueDocumentFields: [URL: ProcessorCatalogueRecord.DocumentFields] = [:]
+    var catalogueFilingWarning = ""
     /// W37.dual-date — the `GeneratedTags` last applied to each source page this run (every page of a
     /// segment), so a post-tagging reclassification can refresh an enclosure's `Sent With` from its
     /// cover's CURRENT own date. Reset with `segments` at each run start.

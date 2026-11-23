@@ -1,4 +1,6 @@
+import ArchiveCore
 import Foundation
+import PDFKit
 
 /// File-identity and destination helpers for Processor output paths.
 ///
@@ -12,6 +14,13 @@ enum OutputFileSafety {
 
     static func pathKey(_ url: URL) -> String {
         url.standardizedFileURL.resolvingSymlinksInPath().path.lowercased()
+    }
+
+    static func hasCatalogueIdentity(at pdf: URL) -> Bool {
+        let companion = pdf.appendingPathExtension("archivesuite.json")
+        return FileManager.default.fileExists(atPath: companion.path)
+            || (try? FileManager.default.destinationOfSymbolicLink(atPath: companion.path)) != nil
+            || PDFDocument(url: pdf)?.documentRef.flatMap(CataloguePDFIdentity.identity(in:)) != nil
     }
 
     /// Prove file identity using resolved exact paths or filesystem resource identifiers. Case-folded path
@@ -125,6 +134,7 @@ enum OutputFileSafety {
         allowedExisting: URL? = nil,
         reservedPaths: inout Set<String>,
         companionExtension: String? = nil,
+        reserveCatalogueCompanion: Bool = false,
         fileManager: FileManager = .default
     ) -> URL {
         let directory = preferred.deletingLastPathComponent()
@@ -141,8 +151,13 @@ enum OutputFileSafety {
                 return fileManager.fileExists(atPath: companion.path)
                     || (try? fileManager.destinationOfSymbolicLink(atPath: companion.path)) != nil
             } ?? false
-            if !companionTaken && !reservedPaths.contains(key)
-                && (!fileManager.fileExists(atPath: candidate.path) || allowed) {
+            let catalogue = candidate.appendingPathExtension("archivesuite.json")
+            let catalogueTaken = reserveCatalogueCompanion && (fileManager.fileExists(atPath: catalogue.path)
+                || (try? fileManager.destinationOfSymbolicLink(atPath: catalogue.path)) != nil)
+            let candidateTaken = fileManager.fileExists(atPath: candidate.path)
+                || (reserveCatalogueCompanion && (try? fileManager.destinationOfSymbolicLink(atPath: candidate.path)) != nil)
+            if !companionTaken && !catalogueTaken && !reservedPaths.contains(key)
+                && (!candidateTaken || allowed) {
                 reservedPaths.insert(key)
                 return candidate
             }
@@ -154,6 +169,7 @@ enum OutputFileSafety {
 
     enum ReplaceError: Error, Equatable {
         case aliasesSource, missing, notVerified
+        case cataloguePDF
     }
 
     /// W46.date-route-header — replace a generated output's bytes in place, never a file that aliases its source. The
@@ -164,6 +180,7 @@ enum OutputFileSafety {
     static func replaceGeneratedOutput(_ outputURL: URL, for sourceURL: URL, with data: Data,
                                        fileManager: FileManager = .default) throws {
         guard !isSameFile(outputURL, sourceURL) else { throw ReplaceError.aliasesSource }
+        guard !hasCatalogueIdentity(at: outputURL) else { throw ReplaceError.cataloguePDF }
         guard fileManager.fileExists(atPath: outputURL.path) else { throw ReplaceError.missing }
         let temp = outputURL.deletingLastPathComponent()
             .appendingPathComponent(".archiveprocessor-\(UUID().uuidString).tmp")   // short: a long output name still fits
@@ -223,6 +240,7 @@ enum OutputFileSafety {
     static func removeGeneratedOutput(_ outputURL: URL, for sourceURL: URL,
                                       fileManager: FileManager = .default) throws {
         guard !isSameFile(outputURL, sourceURL) else { return }
+        guard !hasCatalogueIdentity(at: outputURL) else { throw ReplaceError.cataloguePDF }
         if fileManager.fileExists(atPath: outputURL.path) {
             try fileManager.removeItem(at: outputURL)
         }

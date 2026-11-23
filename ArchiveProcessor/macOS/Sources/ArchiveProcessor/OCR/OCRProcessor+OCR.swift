@@ -108,8 +108,26 @@ extension OCRProcessor {
         for (index, url) in files.enumerated() {
             guard !Task.isCancelled else { return }
             jobs[index].status = .processing
-
-            let extraction = PDFTextExtractor.extract(from: url)
+            let readingPDF: URL
+            if let catalogueRun {
+                let working = uniqueOutputURL(baseName: url.deletingPathExtension().lastPathComponent,
+                                              ext: "pdf", in: outputDirectory, for: url)
+                do {
+                    try catalogueRun.copyPreOCRSource(url, to: working)
+                    readingPDF = working
+                } catch {
+                    jobs[index].result = OCRResult(text: nil, classification: nil,
+                                                  errorMessage: "Could not prepare a working PDF: \(error.localizedDescription)",
+                                                  errorCode: nil)
+                    jobs[index].status = .failed
+                    failedFiles.append(url.lastPathComponent)
+                    continue
+                }
+            } else {
+                readingPDF = url
+            }
+            outputURLMap[url] = readingPDF
+            let extraction = PDFTextExtractor.extract(from: readingPDF)
             let result = OCRResult(
                 text: extraction.text,
                 classification: extraction.classification,
@@ -122,9 +140,6 @@ extension OCRProcessor {
             if extraction.text == nil {
                 failedFiles.append(url.lastPathComponent)
             }
-
-            // Map the input PDF as the output (no new PDF generated)
-            outputURLMap[url] = url
 
             progress = Double(index + 1) / Double(total) * 0.3
             statusMessage = "Extracted text \(index + 1)/\(total)"
@@ -259,7 +274,7 @@ extension OCRProcessor {
         }
 
         // Organize into collection folders (after all processing)
-        if enableCollectionSegmentation && !collectionSegments.isEmpty {
+        if catalogueRun == nil && enableCollectionSegmentation && !collectionSegments.isEmpty {
             let segmenter2 = CollectionSegmenter()
             statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
             do {
@@ -609,13 +624,15 @@ extension OCRProcessor {
     /// path (idempotent on retry). @MainActor-serial (handleOCRResult runs on the collection loop), so the
     /// read-then-reserve needs no locking.
     func uniqueOutputURL(baseName: String, ext: String, in dir: URL, for sourceURL: URL) -> URL {
-        if let existing = outputURLMap[sourceURL] { return existing }
+        if let existing = outputURLMap[sourceURL], catalogueRun?.contains(existing) != false,
+           !OutputFileSafety.hasCatalogueIdentity(at: existing) { return existing }
         // Lazy rebuild after a reset (outputURLMap populated by resume-restore but cache was cleared).
         if _takenOutputPaths.isEmpty && !outputURLMap.isEmpty {
             _takenOutputPaths = Set(outputURLMap.values.map(OutputFileSafety.pathKey))
         }
         // W47.ct-processor-intake: a source from a tree goes in its folder below `dir`.
-        let preferred = outputFolder(for: sourceURL, in: dir).appendingPathComponent(baseName + "." + ext)
+        let preferred = outputFolder(for: sourceURL, in: catalogueRun?.workingRoot ?? dir)
+            .appendingPathComponent(baseName + "." + ext)
         return OutputFileSafety.reserveUniqueDestination(
             preferred: preferred,
             reservedPaths: &_takenOutputPaths,

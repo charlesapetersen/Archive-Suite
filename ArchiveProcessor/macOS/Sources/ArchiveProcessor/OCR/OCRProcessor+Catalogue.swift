@@ -1,0 +1,229 @@
+import ArchiveCore
+import Foundation
+import PDFKit
+
+extension OCRProcessor {
+    nonisolated static var pendingCatalogueURL: URL {
+        pendingRunURL.deletingLastPathComponent().appendingPathComponent("pending_catalogue.json")
+    }
+
+    nonisolated static func savedCatalogueRun() -> ProcessorCatalogueRun? {
+        try? ProcessorCatalogueRun.load(from: pendingCatalogueURL)
+    }
+
+    func beginCatalogueRun(outputRoot: URL, sources: [URL], resuming: Bool = false) -> Bool {
+        catalogueDocumentFields = [:]
+        catalogueFilingWarning = ""
+        do {
+            let lease = try ProcessorCatalogueRun.Lease(journal: Self.pendingCatalogueURL)
+            if let saved = Self.savedCatalogueRun() {
+                guard resuming, saved.outputRoot.path == outputRoot.standardizedFileURL.path else {
+                    checkForPendingBatch()
+                    statusMessage = "A Process Files working copy is still saved. Resume it before starting another run."
+                    return false
+                }
+                catalogueRun = saved
+                catalogueRunLease = lease
+                return true
+            }
+            catalogueRun = try ProcessorCatalogueRun.create(outputRoot: outputRoot, sources: sources,
+                                                            journal: Self.pendingCatalogueURL)
+            catalogueRunLease = lease
+            return true
+        } catch {
+            checkForPendingBatch()
+            statusMessage = "Could not save the catalogue filing state: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    func rememberCatalogueFields(_ tags: GeneratedTags, segment: DocumentSegment,
+                                 dateIsUserSet: Bool = false, subjectsAreUserSet: Bool = false,
+                                 dating: DateRoute.Decision? = nil, itemFields: ItemFieldResult? = nil,
+                                 entities: EntityResult? = nil) {
+        guard catalogueRun != nil else { return }
+        let type: ItemType? = segment.isBox ? .box : segment.isFolder ? .folder : nil
+        let fields = ProcessorCatalogueRecord.documentFields(tags: tags, type: type, dateIsUserSet: dateIsUserSet,
+                                                             subjectsAreUserSet: subjectsAreUserSet, dating: dating,
+                                                             itemFields: itemFields, entities: entities)
+        for source in segment.pdfURLs { catalogueDocumentFields[source] = fields }
+    }
+
+    private struct DraftFile: Sendable {
+        let pdf: URL
+        let sources: [URL]
+        let destination: URL
+        let identity: CataloguePDFIdentity
+        let document: ProcessorCatalogueRecord.Document
+        let fileFields: ProcessorCatalogueRecord.FileFields
+        let exports: [ProcessorCatalogueRun.Export]
+        let preOCRed: Bool
+    }
+
+    /// Reserve final destinations and prepare derivative copies after review, then freeze the whole plan
+    /// before publishing any member. Working PDFs remain usable for a local filing retry.
+    func finishCatalogueRun(organizing: Bool, preOCRed: Bool, exportingImages: Bool,
+                            stampsUnread: Bool) async -> [URL: URL]? {
+        guard var run = catalogueRun else { return [:] }
+        do {
+            if run.files == nil {
+                let drafts = try catalogueDrafts(run: run, organizing: organizing, preOCRed: preOCRed,
+                                                 exportingImages: exportingImages, stampsUnread: stampsUnread)
+                let workingRoot = run.workingRoot
+                let outputRoot = run.outputRoot
+                run.files = try await PDFGenerator.runWorker(priority: .utility) {
+                    try Self.prepareCatalogueFiles(drafts, workingRoot: workingRoot, outputRoot: outputRoot)
+                }
+                try run.save(to: Self.pendingCatalogueURL)
+                catalogueRun = run
+            }
+            return try await completeCatalogueRun(run)
+        } catch {
+            checkForPendingBatch()
+            statusMessage = "Catalogue filing needs attention. Working files are kept. \(error.localizedDescription)"
+            isProcessing = false
+            return nil
+        }
+    }
+
+    func completeCatalogueRun(_ run: ProcessorCatalogueRun) async throws -> [URL: URL] {
+        let unfiled = try await PDFGenerator.runWorker(priority: .utility) { try run.fileOutputs() }
+        try Task.checkCancellation()
+        try FileManager.default.removeItem(at: Self.pendingCatalogueURL)
+        let files = run.files ?? []
+        let moves = Dictionary(uniqueKeysWithValues: files.map { ($0.workingPDF, $0.destination) })
+        for file in files {
+            for source in file.sources { outputURLMap[source] = file.destination }
+        }
+        catalogueFilingWarning = unfiled.isEmpty ? "" : " Optional exports were kept in \(run.workingRoot.path)."
+        if unfiled.isEmpty { try? FileManager.default.removeItem(at: run.workingRoot) }
+        catalogueRun = nil
+        catalogueDocumentFields = [:]
+        return moves
+    }
+
+    private func catalogueDrafts(run: ProcessorCatalogueRun, organizing: Bool, preOCRed: Bool,
+                                 exportingImages: Bool, stampsUnread: Bool) throws -> [DraftFile] {
+        let work = outputURLMap.filter { run.contains($0.value) }
+        var sourcesByPDF: [URL: [URL]] = [:]
+        for job in jobs {
+            if let pdf = work[job.sourceURL] { sourcesByPDF[pdf, default: []].append(job.sourceURL) }
+        }
+        var seen = Set<URL>()
+        let distinct = jobs.compactMap { work[$0.sourceURL] }.filter { seen.insert($0).inserted }
+        let jobBySource = Dictionary(jobs.map { ($0.sourceURL, $0) }, uniquingKeysWith: { first, _ in first })
+        var segmentBySource: [URL: Int] = [:]
+        for (index, segment) in segments.enumerated() {
+            for source in segment.pdfURLs { segmentBySource[source] = index }
+        }
+        var planned: [URL: [OutputFileSafety.ArtifactMove]] = [:]
+        if organizing && !collectionSegments.isEmpty {
+            try CollectionSegmenter().organizeOutput(
+                collections: collectionsOutsideTrees, outputDirectory: run.outputRoot, outputURLMap: outputURLMapOutsideTrees,
+                moveSiblingImages: exportingImages, exportedImageMap: exportedImageMap
+            ) { pdf, artifacts in
+                planned[pdf] = artifacts
+            }
+        }
+
+        let identities = Dictionary(uniqueKeysWithValues: distinct.map {
+            ($0, CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID()))
+        })
+        var owners: [URL: (UUID, UUID)] = [:]
+        for pdf in distinct {
+            guard let source = sourcesByPDF[pdf]?.first, let fileID = identities[pdf]?.fileID else { continue }
+            let key = segmentBySource[source].flatMap { segments[$0].pdfURLs.first } ?? source
+            if owners[key] == nil { owners[key] = (UUID(), fileID) }
+        }
+        var reserved = Set<String>()
+        return try distinct.compactMap { pdf in
+            guard let sources = sourcesByPDF[pdf], let first = sources.first, let identity = identities[pdf] else {
+                return nil
+            }
+            let segmentIndex = segmentBySource[first]
+            let segment = segmentIndex.map { segments[$0] }
+            let key = segment?.pdfURLs.first ?? first
+            guard let (documentID, ownerID) = owners[key] else { return nil }
+            let tags = appliedGeneratedTags[first] ?? GeneratedTags()
+            let type: ItemType? = segment?.isBox == true ? .box : segment?.isFolder == true ? .folder : nil
+            let fields = catalogueDocumentFields[first]
+                ?? ProcessorCatalogueRecord.documentFields(tags: tags, type: type, dateIsUserSet: false,
+                                                           subjectsAreUserSet: false, dating: nil, itemFields: nil, entities: nil)
+            let belongsToOwner = identity.fileID == ownerID
+            let cover: ProcessorCatalogueRecord.DocumentReference? = belongsToOwner
+                && enclosureDateReviews[first]?.manual?.rejectedCover != true
+                ? segmentIndex.flatMap { Self.validCoverIndex(of: $0, in: segments) }
+                    .flatMap { segments[$0].pdfURLs.first }
+                    .flatMap { owners[$0] }
+                    .map { .init(documentID: $0.0, ownerFileID: $0.1) }
+                : nil
+            let document = ProcessorCatalogueRecord.Document(id: documentID, ownerFileID: ownerID,
+                                                             fields: belongsToOwner ? fields : nil, enclosedWith: cover)
+            let segmentJobs = sources.compactMap { jobBySource[$0] }
+            let manualQuality = (taggingMode == .human || taggingMode == .autoDate) && appliedGeneratedTags[first] != nil
+            let quality = manualQuality ? DocumentTags.qualityTag(for: tags.quality) ?? "Q0"
+                : segmentJobs.flatMap(\.appliedTags).first(where: DocumentTags.isRatingToken)
+            let failed = segmentJobs.contains { $0.status == .failed }
+            let fileFields = ProcessorCatalogueRecord.fileFields(tags: tags, quality: quality, unread: stampsUnread, failed: failed)
+            let destination: URL
+            let exports: [ProcessorCatalogueRun.Export]
+            if let artifacts = planned[pdf], let target = artifacts.first(where: { $0.source == pdf })?.destination {
+                destination = target
+                exports = artifacts.filter { $0.source != pdf }.map { .init(prepared: $0.source, destination: $0.destination) }
+            } else {
+                let json = pdf.deletingPathExtension().appendingPathExtension("json")
+                let hasJSON = FileManager.default.fileExists(atPath: json.path)
+                let desired = outputFolder(for: first, in: run.outputRoot).appendingPathComponent(pdf.lastPathComponent)
+                destination = OutputFileSafety.reserveUniqueDestination(preferred: desired, reservedPaths: &reserved,
+                                                                        companionExtension: hasJSON ? "json" : nil,
+                                                                        reserveCatalogueCompanion: true)
+                var outputs = [URL]()
+                if hasJSON { outputs.append(json) }
+                outputs += sources.compactMap { exportedImageMap[$0] }
+                exports = outputs.filter { run.contains($0) }.map { prepared in
+                    let target = destination.deletingPathExtension().appendingPathExtension(prepared.pathExtension)
+                    return .init(prepared: prepared, destination: target)
+                }
+            }
+            guard exports.allSatisfy({ run.contains($0.prepared) }) else { throw CocoaError(.fileWriteInvalidFileName) }
+            return DraftFile(pdf: pdf, sources: sources, destination: destination, identity: identity,
+                             document: document, fileFields: fileFields, exports: exports, preOCRed: preOCRed)
+        }
+    }
+
+    nonisolated private static func prepareCatalogueFiles(_ drafts: [DraftFile], workingRoot: URL,
+                                                          outputRoot: URL) throws -> [ProcessorCatalogueRun.File] {
+        let rootInstance = UUID()
+        return try drafts.map { draft in
+            try Task.checkCancellation()
+            guard let pdf = PDFDocument(url: draft.pdf), pdf.pageCount > 0 else { throw PDFError.sourceUnreadable(draft.pdf) }
+            var sourcePages: [ProcessorCatalogueRecord.SourcePage] = []
+            let suiteHeader = draft.preOCRed ? PDFHeaderParser.extract(draft.pdf) : nil
+            let hasSuiteProvenance = suiteHeader?.textPages.contains { $0.header?.provenance != nil } == true
+            if draft.preOCRed && !hasSuiteProvenance {
+                sourcePages = (0..<pdf.pageCount).map { _ in .init(roles: ["page"]) }
+            } else {
+                let roles = PDFPageRole.roles(of: pdf)
+                for index in roles.indices where roles[index] != .text {
+                    var rolesForSource = [roles[index].rawValue]
+                    if roles[index] == .image, roles.indices.contains(index + 1), roles[index + 1] == .text {
+                        rolesForSource.append(PDFPageRole.text.rawValue)
+                    }
+                    sourcePages.append(.init(roles: rolesForSource))
+                }
+            }
+            let record = ProcessorCatalogueRecord(identity: draft.identity, sourcePages: sourcePages,
+                                                  document: draft.document, fileFields: draft.fileFields)
+            let prepared = workingRoot.appendingPathComponent(draft.identity.fileID.uuidString + ".prepared.pdf")
+            let bytes = try SearchableArchival.catalogueCopy(of: draft.pdf, identity: draft.identity)
+            try bytes.write(to: prepared, options: .withoutOverwriting)
+            try OutputFileSafety.copyExtendedAttributes(from: draft.pdf, to: prepared)
+            try ProcessorCatalogueRun.flushFileAndParent(prepared)
+            let filing = try ProcessorCatalogueFiling(operationID: draft.identity.fileID, root: outputRoot,
+                                                      rootInstanceID: rootInstance, destination: draft.destination)
+            return ProcessorCatalogueRun.File(workingPDF: draft.pdf, prepared: prepared, sources: draft.sources,
+                                              destination: draft.destination, record: try record.encoded(),
+                                              filing: filing, exports: draft.exports)
+        }
+    }
+}

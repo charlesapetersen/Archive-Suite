@@ -649,6 +649,8 @@ extension OCRProcessor {
             recordManualQualityIntent(m.quality, for: seg.pdfURLs)
             // W46.date-route-other-paths: the route's evidence, while the card still holds the date it filled.
             let dating = m.standingDating
+            rememberCatalogueFields(tags, segment: seg, dateIsUserSet: m.dateEdited || mode == .human,
+                                    subjectsAreUserSet: true, dating: dating)
             let review = EnclosureDateReview(inheritance: dating == nil ? nil : m.dateInheritance, decision: dating,
                                              manual: (m.sentWith, m.sentWithUncertain,
                                                       m.enclosureOfSegmentIndex == nil &&
@@ -1004,6 +1006,8 @@ extension OCRProcessor {
             if manualData != nil { recordManualQualityIntent(data.quality, for: seg.pdfURLs) }
             // W46.date-route-other-paths: the route's evidence, while the card still holds the date it filled.
             let dating = data.standingDating
+            rememberCatalogueFields(gtags, segment: seg, dateIsUserSet: dating == nil,
+                                    subjectsAreUserSet: manualData != nil, dating: dating)
 
             for sourceURL in seg.pdfURLs {
                 appliedGeneratedTags[sourceURL] = gtags
@@ -1253,7 +1257,8 @@ extension OCRProcessor {
         // an in-place input PDF whose existing text layer could be ABBYY.
         let localNameEligible = snapshot.indices.map { i in
             let segment = snapshot[i]
-            guard enableSegmentJSON, entityBase[i].lowConfidenceNames, !segment.isBox, !segment.isFolder,
+            guard activeRunHistory?.preOCRedInput != true, enableSegmentJSON,
+                  entityBase[i].lowConfidenceNames, !segment.isBox, !segment.isFolder,
                   let source = segment.pdfURLs.first, let output = outputURLMap[source] else { return false }
             return !OutputFileSafety.isSameFile(output, source) && FileManager.default.fileExists(atPath: output.path)
         }
@@ -1502,6 +1507,9 @@ extension OCRProcessor {
             EnclosureDates.applySentWith(fromCover: coverTags, to: &tags)
             enclosureOfName = snapshot[c].pdfURLs.first?.lastPathComponent
         }
+        rememberCatalogueFields(EntityRunPolicy.sidecarTags(tags, withholdingSender: taggingSenderWithheld),
+                                segment: segment, dateIsUserSet: phoneYear != nil || phoneMonth != nil,
+                                dating: dating, itemFields: itemFields, entities: entities)
         for sourceURL in segment.pdfURLs {
             appliedGeneratedTags[sourceURL] = tags
             enclosureDateReviews[sourceURL] = review
@@ -1531,7 +1539,7 @@ extension OCRProcessor {
     private func writeTaggedHeader(_ tags: GeneratedTags, evidence: String?, itemFields: PDFItemFields = PDFItemFields(),
                                    to outputPDF: URL, source: URL,
                                    runConfig: SessionProcessingConfig?) async {
-        guard !reOCRSourceURLs.contains(source), !OutputFileSafety.isSameFile(outputPDF, source),
+        guard catalogueRun == nil, !reOCRSourceURLs.contains(source), !OutputFileSafety.isSameFile(outputPDF, source),
               let result = jobs.first(where: { $0.sourceURL == source })?.result else { return }
         let text = PDFGenerator.textPageBody(result)
         let fields = PDFSourceDates(documentDate: EnclosureDates.ownDate(of: tags)?.display, sentWith: tags.sentWith?.display,
@@ -1893,6 +1901,9 @@ extension OCRProcessor {
                                   dating: [String: Any]? = nil, itemFields: [String: Any]? = nil,
                                   newOutputOnly: Bool = false) {
         guard let firstFile = segment.pdfURLs.first else { return }
+        if let catalogueRun {
+            guard let working = outputURLMap[firstFile], catalogueRun.contains(working) else { return }
+        }
         // Write JSON next to the output PDF, using its base name so they match
         let jsonURL: URL
         if let outputPDF = outputURLMap[firstFile] {
@@ -1966,7 +1977,7 @@ extension OCRProcessor {
                 // collision advances the PDF too, keeping the pair aligned for downstream organization.
                 let hasJSON = FileManager.default.fileExists(atPath: originalJSONURL.path)
                 let mergeDirectory = outputSubfolders[segment.pdfURLs[0].standardizedFileURL.path] == nil
-                    ? outputDirectory : firstOutputPDF.deletingLastPathComponent()
+                    ? catalogueRun?.workingRoot ?? outputDirectory : firstOutputPDF.deletingLastPathComponent()
                 let mergedURL = OutputFileSafety.reserveUniqueDestination(
                     preferred: mergeDirectory.appendingPathComponent(baseName + "_merged.pdf"),
                     reservedPaths: &_takenOutputPaths, companionExtension: hasJSON || exportsLocalNames ? "json" : nil)

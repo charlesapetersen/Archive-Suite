@@ -58,6 +58,15 @@ enum TextLayerTestDriver {
             check("0 smoke pages drawn", false); return
         }
         let reading = memo.joined(separator: "\n")
+        if ProcessInfo.processInfo.environment["TEXTLAYER_CATALOGUE_ONLY"] == "1" {
+            let legacy = dir.appendingPathComponent("jpeg.pdf")
+            guard await write(jpeg, reading: reading, kind: .typewritten, rotation: 0, to: legacy) != nil else {
+                check("8 source PDF fixture written", false)
+                return
+            }
+            await catalogueChecks(dir: dir, jpeg: jpeg, reading: reading)
+            return
+        }
         await childProcessChecks(dir, jpeg: jpeg)
 
         // 2. Placed print, three ways onto the page.
@@ -275,10 +284,52 @@ enum TextLayerTestDriver {
                     }
                     check("8 encrypted source is refused without changing it", kept && (try? Data(contentsOf: encryptedURL)) == encrypted)
                 } else { check("8 encrypted PDF fixture written", false) }
+                await preOCRFilesCheck(dir: dir, source: existing, original: before)
             }
         } catch {
             check("8 write PDF with catalogue identity", false, "\(error)")
         }
+    }
+
+    private static func preOCRFilesCheck(dir: URL, source: URL, original: Data) async {
+        let fm = FileManager.default
+        guard let scratchState = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_STATE"],
+              OCRProcessor.pendingCatalogueURL.deletingLastPathComponent().path == scratchState else {
+            check("8 pre-OCR Process Files uses an isolated journal", false)
+            return
+        }
+        let out = dir.appendingPathComponent("filed pre-OCR", isDirectory: true)
+        try? fm.createDirectory(at: out, withIntermediateDirectories: true)
+        let occupied = out.appendingPathComponent(source.lastPathComponent).appendingPathExtension("archivesuite.json")
+        let unrelated = Data("unrelated existing companion".utf8)
+        try? unrelated.write(to: occupied, options: .withoutOverwriting)
+        let earlierPDF = out.appendingPathComponent(source.lastPathComponent)
+        try? original.write(to: earlierPDF, options: .withoutOverwriting)
+        let processor = OCRProcessor()
+        processor.taggingMode = .none
+        await processor.startProcessing(files: [source], provider: .appleVision, model: LLMModel.appleVisionModels[0],
+                                        thinkingLevel: nil, apiKey: "", outputDirectory: out,
+                                        batchMode: false, enableTagging: false, enableSegmentJSON: false,
+                                        preOCRedInput: true, skipAlreadyProcessed: true, segmentationContext: .init())
+        let pdf = out.appendingPathComponent(source.deletingPathExtension().lastPathComponent + " (2).pdf")
+        let recordURL = pdf.appendingPathExtension("archivesuite.json")
+        let record = (try? Data(contentsOf: recordURL)).flatMap { try? CatalogueRecord(json: $0) }
+        let identity = PDFDocument(url: pdf)?.documentRef.flatMap(CataloguePDFIdentity.identity(in:))
+        check("8 Process Files publishes a verified pre-OCR pair with export disabled",
+              processor.outputURLMap[source] == pdf && record != nil && record?.fileID == identity?.fileID
+                && record?.contentRevision == identity?.contentRevision && (try? Data(contentsOf: source)) == original
+                && (try? Data(contentsOf: occupied)) == unrelated,
+              processor.statusMessage)
+
+        let alias = dir.appendingPathComponent("pre-ocr-alias.pdf")
+        try? fm.createSymbolicLink(at: alias, withDestinationURL: source)
+        await processor.startProcessing(files: [alias], provider: .appleVision, model: LLMModel.appleVisionModels[0],
+                                        thinkingLevel: nil, apiKey: "", outputDirectory: out,
+                                        batchMode: false, enableTagging: false, enableSegmentJSON: false,
+                                        preOCRedInput: true, segmentationContext: .init())
+        check("8 Process Files refuses a pre-OCR symlink without touching its target",
+              processor.jobs.first?.status == .failed && processor.outputURLMap[alias] == nil
+                && (try? Data(contentsOf: source)) == original, processor.statusMessage)
     }
 
     private static func searchableChecks(dir: URL, jpeg: URL, reading: String) async {

@@ -30,7 +30,8 @@ enum IncrementalSkip {
     static func partition(
         inputs: [URL],
         outputDirectory: URL,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        verifiesOutput: (URL) -> Bool = { _ in true }
     ) -> Decision {
         // Count base names (extension-stripped, case-folded to match the output-collision domain in
         // OutputFileSafety.reserveUniqueDestination, which case-folds path keys). A base name shared by
@@ -43,7 +44,9 @@ enum IncrementalSkip {
         var toProcess: [URL] = []
         var skipped: [URL] = []
         for url in inputs {
-            if canSkip(source: url, outputDirectory: outputDirectory, baseCounts: baseCounts, fileManager: fileManager) {
+            let candidate = outputDirectory.appendingPathComponent(url.deletingPathExtension().lastPathComponent + ".pdf")
+            if canSkip(source: url, candidate: candidate, baseCounts: baseCounts, fileManager: fileManager),
+               verifiesOutput(candidate) {
                 skipped.append(url)
             } else {
                 toProcess.append(url)
@@ -55,15 +58,12 @@ enum IncrementalSkip {
     /// True only when EVERY guard passes; any uncertainty returns false (→ process). See type doc.
     private static func canSkip(
         source: URL,
-        outputDirectory: URL,
+        candidate: URL,
         baseCounts: [String: Int],
         fileManager: FileManager
     ) -> Bool {
         // (1) Ambiguous base name → the output can't be uniquely attributed to this source → PROCESS.
         guard (baseCounts[folCaseBase(source)] ?? 0) == 1 else { return false }
-
-        let base = source.deletingPathExtension().lastPathComponent
-        let candidate = outputDirectory.appendingPathComponent(base + ".pdf")
 
         // (2) The candidate "output" must be a DISTINCT generated file, never the input itself
         //     (e.g. re-OCR of a PDF whose output directory is its own folder). Guards against

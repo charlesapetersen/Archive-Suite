@@ -93,8 +93,8 @@ extension OCRProcessor {
     /// `IncrementalSkip.partition` with each source checked against the folder its output would go in, keeping the
     /// order of `files`.
     nonisolated static func incrementalPartition(_ files: [URL], outputDirectory: URL,
-                                                 subfolders: [URL: String]) -> IncrementalSkip.Decision {
-        guard !subfolders.isEmpty else { return IncrementalSkip.partition(inputs: files, outputDirectory: outputDirectory) }
+                                                 subfolders: [URL: String],
+                                                 requiresCatalogue: Bool = false) -> IncrementalSkip.Decision {
         var groups: [String: [URL]] = [:]
         for url in files { groups[subfolders[url] ?? "", default: []].append(url) }
         var skipped = Set<URL>()
@@ -105,7 +105,16 @@ extension OCRProcessor {
                 }
             // A folder that is not plain is never skipped: its source is processed, as any doubt is.
             guard let folder else { continue }
-            skipped.formUnion(IncrementalSkip.partition(inputs: inputs, outputDirectory: folder).skipped)
+            let reader = requiresCatalogue ? try? CatalogueReader(
+                grantedRoot: folder, rootInstanceID: UUID(), mode: .adopted, identifyPDF: CataloguePDFIdentity.identify
+            ) : nil
+            skipped.formUnion(IncrementalSkip.partition(inputs: inputs, outputDirectory: folder) { candidate in
+                guard requiresCatalogue else { return true }
+                guard let reader else { return false }
+                let name = candidate.lastPathComponent
+                let snapshot = reader.snapshot(.init(relativePDFPaths: [name], isComplete: false))
+                return (try? snapshot.facts(at: name).file.get()) != nil
+            }.skipped)
         }
         return IncrementalSkip.Decision(toProcess: files.filter { !skipped.contains($0) },
                                         skipped: files.filter { skipped.contains($0) })
