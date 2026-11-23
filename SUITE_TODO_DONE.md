@@ -18233,3 +18233,16 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   removing the private stage, and preserving PDF/A-2b, searchable headers, catalogue identity and merge
   tag/sidecar recovery. No paid calls or rehearsal-cache inputs.
   <!-- /W49.proc-pdfa-memory -->
+
+- [x] **W49.proc-straighten-record — the PDF says when and by how much the image page was turned [S]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build) — `PDFGenerator.Output.straightenedDegrees` is returned but not written, so nothing in the PDF tells a reader the page is a levelled copy, and with "output image file" off Live Capture keeps no unturned copy. Write the angle into the PDF header (a `SPEC/tag-format.md` change, both apps, Tier-2), and have Live Capture read the straighten switch per document rather than once a session. Covers §W42.int-s5 "A straightened page's only full-geometry copy is the exported image…". Filed by W49.ki-audit-processor.
+  Both the visible OCR-page header and the searchable PDF's per-page XMP record the actual turn with its direction
+  and two decimal places. The shared Reader/Processor parser keeps it out of the stripped OCR text. Merges, date and
+  classification rewrites, and Improve OCR preserve it. Live Capture resolves the switch when staging each document
+  and retains that choice for regeneration. Exact intake originals use the existing preservation-copy option.
+  Scratch PDF tests exercised both forms, a merge containing a level page, both rewrite paths, and three Live Capture
+  documents staged with the switch on, off and on. veraPDF passed all three straightened outputs. ArchiveCore,
+  Reader, Notes, write-surface lint and its mutation proof, and Live Capture recovery passed. The Android round trip
+  filed all three synthetic PDFs with the expected OCR tokens and years. The scratch-isolated Process Files smoke
+  tagged both synthetic inputs and wrote both PDFs. Tier-2 review by Codex (gpt-6.2-sol) caught the wrapped-filename
+  edge case, now covered by a parser regression. No bench cache was used.
+  <!-- /W49.proc-straighten-record -->

@@ -44,6 +44,8 @@ public struct PDFPageHeader: Sendable, Equatable {
     public var dateEvidence: String?
     /// W47.item-fields-build — the document's own catalogue fields, as the item-field lines give them.
     public var itemFields = PDFItemFields()
+    /// The applied straightening turn in degrees. Positive is counterclockwise.
+    public var straightenedDegrees: Double?
     public var diagnostics: [PDFHeaderDiagnostic] = []
 }
 
@@ -196,6 +198,23 @@ public enum PDFHeaderParser {
     public static let sentWithPrefix = "Sent with: "
     public static let dateEvidencePrefix = "Date evidence: "
     public static let kindPrefix = "Kind: "
+    private static let straighteningPrefix = "Image straightened: "
+
+    /// The correction applied to the oriented image, in a form readable on the text page as well as in XMP.
+    public static func straighteningLine(degrees: Double) -> String? {
+        guard (1...90).contains(abs(degrees)) else { return nil }
+        let magnitude = String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), abs(degrees))
+        let direction = degrees > 0 ? "counterclockwise" : "clockwise"
+        return "\(straighteningPrefix)\(magnitude) degrees \(direction)"
+    }
+
+    private static func straighteningDegrees(_ line: String) -> Double? {
+        guard line.hasPrefix(straighteningPrefix) else { return nil }
+        let parts = line.dropFirst(straighteningPrefix.count).split(separator: " ")
+        guard parts.count == 3, let magnitude = Double(parts[0]) else { return nil }
+        let degrees = parts[2] == "clockwise" ? -magnitude : magnitude
+        return straighteningLine(degrees: degrees) == line ? degrees : nil
+    }
     /// W47.item-fields-build — the item-field lines, after the date-evidence line, in this order.
     public static let documentKindPrefix = "Document kind: "
     public static let titlePrefix = "Title: "
@@ -377,6 +396,7 @@ public enum PDFHeaderParser {
             let field: Int
             let value: String
             var lowerConfidence = false
+            var turn: Double?
             if line.hasPrefix("Classification:") {
                 field = 0; value = String(line.dropFirst("Classification:".count)).trimmingCharacters(in: .whitespaces)
             } else if line.hasPrefix("Kind:") {
@@ -391,6 +411,8 @@ public enum PDFHeaderParser {
                 field = 5 + item.index
                 value = item.value
                 lowerConfidence = item.lowerConfidence
+            } else if let degrees = straighteningDegrees(line) {
+                field = 11; value = ""; turn = degrees
             } else { break }
             // Repeated or late Kind is consumed, diagnosed and never trusted. Other out-of-order
             // fields start the body; this preserves an archival Classification: security marking.
@@ -409,6 +431,7 @@ public enum PDFHeaderParser {
             case 8: header.itemFields.publication = value
             case 9: header.itemFields.publicationDate = value
             case 10: header.itemFields.recipientPlace = value
+            case 11: header.straightenedDegrees = turn
             default: break
             }
             if lowerConfidence {
@@ -487,7 +510,7 @@ public enum PDFHeaderParser {
 
     private static func isField(_ line: String) -> Bool {
         ["Classification:", "Kind:", documentDatePrefix, sentWithPrefix, dateEvidencePrefix]
-            .contains { line.hasPrefix($0) } || itemFieldLine(line) != nil
+            .contains { line.hasPrefix($0) } || itemFieldLine(line) != nil || straighteningDegrees(line) != nil
     }
 
     private static func endsWithYear(_ text: String) -> Bool {

@@ -598,15 +598,14 @@ VisionOCRKit `TextLayer`), and turns a page whose lines slope by 1 degree or mor
 switch `straightenReadingCopy`), and writes every output as PDF/A-2b; the text page stays. W42.int-s5 shipped
 2026-11-13; the searchable (layer-only) form is `W42.int-s5-searchable` and the hand placer `W42.int-s5-hands` (its
 limits in their own section). W49.proc-pdfa-memory streams the archival output and its metadata repair to disk.
+W49.proc-straighten-record records the applied turn in each PDF page's header and reads the current straighten
+switch at staging for each Live Capture document. Exact originals can be kept independently of the exported
+image with [preservation copies](../SPEC/catalogue.md#preservation-copies).
 Quartz draws the media box of the app's generated pages, which carry no crop box or annotations. Open:
 - **Image-plus-text is 2.6 to 17 times Vision OCR's size** (measured 2026-11-13, `scripts/measure-output.sh` on three
   UIUC pages and the drawn memo): 2.1-2.3 MB a photographed page against Vision OCR 1.16.0's 0.12-0.87 MB, because
   the image page is the 2 MB JPEG copy. The searchable form is compressed as Vision OCR compresses
   (W42.int-s5-compress); the pair is not (queued: W49.proc-pair-compress-hands).
-- **A straightened page's only full-geometry copy is the exported image.** The PDF shows the level copy; with
-  "output image file" off, Live Capture's finalize leaves no unturned copy of a skewed photo. Nothing in the PDF says
-  the page was turned (`PDFGenerator.Output.straightenedDegrees` is returned, not written). Live Capture reads the
-  switch once a session (`liveSettings`), so a change mid-session waits for the next (queued: W49.proc-straighten-record).
 - **The Reader indexes the text twice** (the layer and the text page, `ExtractedContent.fullBody`); on a page where the
   reading did not align, the layer is Vision's own words, so Vision's misreads are searchable there (accepted: both are the file's text, and the text page carries the reading).
 - **Time:** at output the engine's Vision pass runs once more per print page (seconds a page), and straightening reads

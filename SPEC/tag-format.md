@@ -271,7 +271,7 @@ sortDate = year * 10_000 + (month ?? 0) * 100 + (day ?? 0)     // nil when no ye
 
 Processor emits **one PDF per input image**, same base filename (`PDFGenerator`).
 
-- **Page 1** — the original photographed image, correctly oriented. In the test corpus it carries
+- **Page 1** — the photographed image, correctly oriented and optionally straightened for reading. In the test corpus it carries
   **no** text layer; **in production the image page will often also carry a searchable text layer**,
   so a consumer's copy/find must work on whichever pane holds the selection.
 - **Page 2** — the OCR text as **real selectable text**, on a single dynamically-tall page (no
@@ -347,6 +347,7 @@ Byline: <name>; <name>
 Publication: <name>
 Publication date: <YYYY[-MM[-DD]]>   ← the PRINTED issue date, never the document's own date
 Recipient place: <place>; <place>
+Image straightened: <magnitude> degrees <direction>  ← OPTIONAL, after all other header fields
                                ← blank line
 <body text…>                   ← or "No text returned by model." (+ error) on OCR failure
 ```
@@ -491,6 +492,16 @@ Recipient place: <place>; <place>
   page-2-only behavior until their consumers are explicitly changed. Do not assign page 2's metadata
   to every image of an interleaved file. Actual-reader provenance precedence stays imported, fallback,
   routed reader, Local Agent, gateway, then run model. This item adds no corpus content writer to Core.
+- **Image straightening (W49.proc-straighten-record).** When Processor actually levels the oriented image, its header
+  records the applied turn, for example `Image straightened: 3.25 degrees counterclockwise`. The magnitude is
+  1.00–90.00 with two decimal places and a decimal point. The direction is `clockwise` or `counterclockwise`.
+  It describes the small correction applied after orientation, independently of phone or OCR orientation.
+  There is no line for a page left as oriented, or a placeholder. The line belongs to the source page's text
+  header or its searchable-page XMP entry. Both apps read it through `PDFPageHeader.straightenedDegrees`
+  (positive counterclockwise, negative clockwise). Date and classification rewrites, merges and Improve OCR
+  retain the turn of each image they keep. Live Capture resolves the switch for each document at staging
+  and reuses that document's choice when regenerating staged output. See [Preservation copies](catalogue.md#preservation-copies)
+  for exact intake originals.
 - **Reading segments = document units.** A _document_ (a `Document Start` + following `Continuation`
   pages) is finer than the Red/Purple box/folder markers. The Classification lives in page-2 **text**,
   so it is read via the content index, not a tag.

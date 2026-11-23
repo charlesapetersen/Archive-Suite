@@ -120,6 +120,9 @@ extension PDFGenerator {
             }
             header += "\n" + line
         }
+        if let degrees = old.straightenedDegrees, let line = PDFHeaderParser.straighteningLine(degrees: degrees) {
+            header += "\n" + line
+        }
         return (header, fit)
     }
 

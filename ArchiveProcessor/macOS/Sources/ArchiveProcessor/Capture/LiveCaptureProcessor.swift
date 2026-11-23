@@ -1449,7 +1449,12 @@ final class LiveCaptureProcessor: ObservableObject {
         let dateIsUserSet = (mac?.year ?? group.year) != nil || (mac?.month ?? group.month) != nil
         let subjectsAreUserSet = !(mac?.subjects.isEmpty ?? true)
         let outputImageFile = config.outputImageFile, pdfImageMB = config.pdfImageMB, exportedImageMB = config.exportedImageMB, textColumns = config.textColumns
-        let textLayer = PDFGenerator.TextLayerOptions.from(liveSettings(config))
+        var options = PDFGenerator.TextLayerOptions.from(liveSettings(config))
+        // Each document reads the current collection, project and general layers for this switch.
+        // Retain this document's choice for any later regeneration of its staged output.
+        options.straighten = SettingsLayerStore.shared.resolver(at: config.outputDirectory)
+            .resolve(.straightenReadingCopy).value.bool ?? PDFGenerator.TextLayerOptions.standard.straighten
+        let textLayer = options
         let taggingMode = config.taggingMode
         let stampUnread = config.taggingMode.stampsUnread
 

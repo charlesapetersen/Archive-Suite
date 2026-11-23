@@ -145,11 +145,6 @@ struct PDFGenerator {
                                                      kind: kind, searchableFor: $0.searchableFor) } ?? .imageAndText
         var form = OutputForm.imageAndText
         var formFallback: String?
-        let header = headerBlock(result: result, model: model, originalFileName: originalFileName,
-                                 gatewayDisplayName: gatewayDisplayName, localAgentDisplayName: localAgentDisplayName,
-                                 localAgentModelName: localAgentModelName,
-                                 sourceDates: catalogueIdentity == nil ? sourceDates : nil, pageKind: pageKind)
-
         var straightened: Double?
         // The searchable page's image and the lines its layer was written from, for its compression.
         var searchable: (image: ImagePageData, lines: TextLayer.Lines?)?
@@ -203,6 +198,12 @@ struct PDFGenerator {
             outcome = .placeholder
             layer = .textPage("the image could not be embedded")
         }
+
+        let header = headerBlock(result: result, model: model, originalFileName: originalFileName,
+                                 gatewayDisplayName: gatewayDisplayName, localAgentDisplayName: localAgentDisplayName,
+                                 localAgentModelName: localAgentModelName,
+                                 sourceDates: catalogueIdentity == nil ? sourceDates : nil, pageKind: pageKind,
+                                 straightenedDegrees: straightened)
 
         // The searchable form has no text page: its header goes to the XMP (`PDFHeaderCarrier`).
         var pageHeaders: [String?]?
@@ -752,25 +753,17 @@ struct PDFGenerator {
     func textPageData(result: OCRResult, model: LLMModel, originalFileName: String? = nil,
                       gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil,
                       localAgentModelName: String? = nil, textColumns: Int = 1,
-                      sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil) -> Data? {
+                      sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil,
+                      straightenedDegrees: Double? = nil) -> Data? {
+        let header = headerBlock(result: result, model: model, originalFileName: originalFileName,
+                                 gatewayDisplayName: gatewayDisplayName, localAgentDisplayName: localAgentDisplayName,
+                                 localAgentModelName: localAgentModelName, sourceDates: sourceDates, pageKind: pageKind,
+                                 straightenedDegrees: straightenedDegrees)
         let doc = PDFDocument()
-        doc.insert(makeTextPage(result: result, model: model, originalFileName: originalFileName,
-                                gatewayDisplayName: gatewayDisplayName, localAgentDisplayName: localAgentDisplayName,
-                                localAgentModelName: localAgentModelName, textColumns: textColumns,
-                                sourceDates: sourceDates, pageKind: pageKind), at: 0)
+        doc.insert(textPage(header: header, result: result, textColumns: textColumns), at: 0)
         // PDFKit, not `archivalData`: PDFKit writes the page's own `/Rotate 0`, so the page shows upright in a file whose
         // page tree passes a turn down to its pages, and a page with no image has nothing PDFKit's write breaks PDF/A on.
         return doc.dataRepresentation()
-    }
-
-    private func makeTextPage(result: OCRResult, model: LLMModel, originalFileName: String? = nil,
-                              gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil,
-                              localAgentModelName: String? = nil, textColumns: Int = 1,
-                              sourceDates: PDFSourceDates? = nil, pageKind: OCRPageKind? = nil) -> PDFPage {
-        textPage(header: headerBlock(result: result, model: model, originalFileName: originalFileName,
-                                     gatewayDisplayName: gatewayDisplayName, localAgentDisplayName: localAgentDisplayName,
-                                     localAgentModelName: localAgentModelName, sourceDates: sourceDates, pageKind: pageKind),
-                 result: result, textColumns: textColumns)
     }
 
     /// A text page's header block (SPEC/tag-format.md §"Page-2 header"), ending in its blank separator, with the lines
@@ -784,7 +777,7 @@ struct PDFGenerator {
     func headerBlock(result: OCRResult, model: LLMModel, originalFileName: String? = nil,
                      gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil,
                      localAgentModelName: String? = nil, sourceDates: PDFSourceDates? = nil,
-                     pageKind: OCRPageKind? = nil) -> HeaderBlock {
+                     pageKind: OCRPageKind? = nil, straightenedDegrees: Double? = nil) -> HeaderBlock {
         let dateFormatter = DateFormatter()
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
         dateFormatter.dateFormat = "d MMMM yyyy"
@@ -832,6 +825,9 @@ struct PDFGenerator {
                 fitRanges.append(NSRange(location: headerLine.utf16.count + 1, length: line.utf16.count))
             }
             headerLine += "\n\(line)"
+        }
+        if let degrees = straightenedDegrees, let line = PDFHeaderParser.straighteningLine(degrees: degrees) {
+            headerLine += "\n" + line
         }
         headerLine += "\n\n"
         return HeaderBlock(text: headerLine, fitRanges: fitRanges)

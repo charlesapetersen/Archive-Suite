@@ -95,8 +95,8 @@ enum ReOCRPairs {
         return text
     }
 
-    /// The new text page for `pair`: the pair's original filename, classification and source-date lines as they
-    /// were, the new reader's provenance (today's date) and `kind`, then the new transcription. `result` is the
+    /// The new text page for `pair` keeps its original filename, classification, source dates and image straightening.
+    /// It replaces the reader provenance, processing date, `kind` and transcription. `result` is the
     /// reading of this pair's image page; its own classification is not used, since the classification belongs to
     /// segmentation, not to this re-read. A failed, refused, cut-off or empty reading is never made into a page: the
     /// old text stays.
@@ -112,13 +112,14 @@ enum ReOCRPairs {
         let dates = PDFSourceDates(documentDate: old.documentDate, sentWith: old.sentWith,
                                    dateEvidence: old.dateEvidence, itemFields: old.itemFields)
         // PDFKit reads a wrapped or underscore-split filename back as several lines; the written name never holds a
-        // line break (`makeTextPage` turns control characters into spaces), so the lines join with nothing between.
+        // line break (`headerBlock` turns control characters into spaces), so the lines join with nothing between.
         let filename = old.originalFilename?.replacingOccurrences(of: "\n", with: "")
         guard let page = PDFGenerator().textPageData(result: kept, model: model, originalFileName: filename,
                                                      gatewayDisplayName: gatewayDisplayName,
                                                      localAgentDisplayName: localAgentDisplayName,
                                                      localAgentModelName: localAgentModelName,
-                                                     sourceDates: dates.isEmpty ? nil : dates, pageKind: kind) else {
+                                                     sourceDates: dates.isEmpty ? nil : dates, pageKind: kind,
+                                                     straightenedDegrees: old.straightenedDegrees) else {
             throw Refusal.pageNotMade(page: pair.textIndex)
         }
         // The kept lines must read back exactly as the old page's did.
@@ -129,6 +130,9 @@ enum ReOCRPairs {
         if h.classification != old.classification { throw Refusal.headerNotKept(page: pair.textIndex, "classification") }
         if h.documentDate != old.documentDate || h.sentWith != old.sentWith || h.dateEvidence != old.dateEvidence {
             throw Refusal.headerNotKept(page: pair.textIndex, "document dates")
+        }
+        if h.straightenedDegrees != old.straightenedDegrees {
+            throw Refusal.headerNotKept(page: pair.textIndex, "image straightening")
         }
         if h.itemFields != old.itemFields { throw Refusal.headerNotKept(page: pair.textIndex, "item fields") }
         if let kind, h.kind != kind { throw Refusal.headerNotKept(page: pair.textIndex, "kind") }

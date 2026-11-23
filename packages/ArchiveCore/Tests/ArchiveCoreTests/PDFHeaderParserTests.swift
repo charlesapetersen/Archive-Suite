@@ -105,6 +105,41 @@ final class PDFHeaderParserTests: XCTestCase {
         XCTAssertEqual(stripped, "Body after unknown classification.")
     }
 
+    func testStraighteningIsAnOptionalOrderedHeaderField() throws {
+        let previous = "Title: A memo"
+        for (angle, direction) in [(3.25, "counterclockwise"), (-3.25, "clockwise")] {
+            let line = try XCTUnwrap(PDFHeaderParser.straighteningLine(degrees: angle))
+            XCTAssertEqual(line, "Image straightened: 3.25 degrees \(direction)")
+            let parsed = PDFHeaderParser.parse(page(previous + "\n" + line))
+            XCTAssertEqual(parsed.header?.straightenedDegrees, angle)
+            XCTAssertEqual(parsed.header?.itemFields.title, "A memo")
+            XCTAssertEqual(parsed.body, "The quick brown fox.")
+
+            let lookalike = PDFHeaderParser.parse(page(previous, body: line))
+            XCTAssertNil(lookalike.header?.straightenedDegrees)
+            XCTAssertEqual(lookalike.body, line)
+        }
+        let malformed = "Image straightened: 0.25 degrees clockwise"
+        let parsed = PDFHeaderParser.parse(page(previous + "\n" + malformed))
+        XCTAssertNil(parsed.header?.straightenedDegrees)
+        XCTAssertTrue(parsed.body.hasPrefix(malformed))
+        XCTAssertNil(PDFHeaderParser.straighteningLine(degrees: .infinity))
+    }
+
+    func testStraighteningPrefixDoesNotShadowAFilenameContinuation() {
+        let parsed = PDFHeaderParser.parse("""
+        Extracted text.
+        Long source name split at
+        Image straightened: scan.jpg
+        Apple Vision · macOS Vision · 23 November 2026
+
+        The memo.
+        """)
+        XCTAssertEqual(parsed.header?.originalFilename, "Long source name split at\nImage straightened: scan.jpg")
+        XCTAssertNil(parsed.header?.straightenedDegrees)
+        XCTAssertEqual(parsed.body, "The memo.")
+    }
+
     // MARK: - fullBody vs strippedBody contract
 
     func testFullBodyContainsHeaderAndStrippedBodyDoesNot() {

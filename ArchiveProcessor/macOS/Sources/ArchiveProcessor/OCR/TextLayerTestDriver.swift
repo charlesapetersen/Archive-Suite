@@ -118,6 +118,9 @@ enum TextLayerTestDriver {
             let o = await write(skewed, reading: reading, kind: .typewritten, rotation: 0, to: out)
             check("4 it is turned level", o?.straightenedDegrees.map { abs($0 - 3) < 0.5 } == true,
                   "\(String(describing: o?.straightenedDegrees))")
+            await straighteningHeaderChecks(dir: dir, image: skewed, pairURL: out, reading: reading,
+                                            degrees: o?.straightenedDegrees, levelURL: dir.appendingPathComponent("jpeg.pdf"))
+            await liveStraighteningChecks(dir: dir, image: skewed, reading: reading)
             if let doc = PDFDocument(url: out), let page = doc.page(at: 0), let jpg = jpegStreams(page).first,
                let cg = CGImageSourceCreateWithData(jpg as CFData, nil).flatMap({ CGImageSourceCreateImageAtIndex($0, 0, nil) }) {
                 check("4 on a canvas that holds all of it (nothing cropped)", cg.width > pageW && cg.height > pageH,
@@ -134,7 +137,8 @@ enum TextLayerTestDriver {
                                  options: PDFGenerator.TextLayerOptions(straighten: false))
             let source = (try? Data(contentsOf: skewed)) ?? Data()
             check("4 switched off, the page is left as photographed", o2?.straightenedDegrees == nil
-                  && PDFDocument(url: off)?.page(at: 0).map(jpegStreams)?.contains(source) == true)
+                  && PDFDocument(url: off)?.page(at: 0).map(jpegStreams)?.contains(source) == true
+                  && PDFHeaderParser.extract(off)?.textPages.first?.header?.straightenedDegrees == nil)
             let o3 = await write(slight, reading: reading, kind: .typewritten, rotation: 0,
                                  to: dir.appendingPathComponent("slight.pdf"))
             check("4 a page under 1 degree is left as it is", o3 != nil && o3?.straightenedDegrees == nil,
@@ -214,6 +218,99 @@ enum TextLayerTestDriver {
 
         await searchableChecks(dir: dir, jpeg: jpeg, reading: reading)
         await catalogueChecks(dir: dir, jpeg: jpeg, reading: reading)
+    }
+
+    private static func straighteningHeaderChecks(dir: URL, image: URL, pairURL: URL, reading: String,
+                                                  degrees: Double?, levelURL: URL) async {
+        guard let degrees, let pairData = try? Data(contentsOf: pairURL),
+              case .success(let pairs) = ReOCRPairs.validate(pairData), let pair = pairs.first else {
+            check("4 the straightened image has a readable pair", false)
+            return
+        }
+        let expected = (degrees * 100).rounded() / 100
+        check("4 the paired PDF header names the measured turn and direction",
+              pair.header?.straightenedDegrees == expected)
+        let searchableURL = dir.appendingPathComponent("skewed-searchable.pdf")
+        let output = await write(image, reading: reading, kind: .typewritten, rotation: 0, to: searchableURL,
+                                 options: PDFGenerator.TextLayerOptions(searchableFor: ["jpeg/typewritten"]))
+        let searchableTurn = output?.straightenedDegrees.map { ($0 * 100).rounded() / 100 }
+        check("4 the searchable PDF records the turn in its page header",
+              output?.form == .searchable && searchableTurn != nil
+              && PDFHeaderParser.extract(searchableURL)?.textPages.first?.header?.straightenedDegrees == searchableTurn)
+
+        let gen = PDFGenerator()
+        for url in [pairURL, searchableURL] {
+            guard let data = try? Data(contentsOf: url),
+                  case .rewrite = gen.taggedHeaderRewrite(of: data, sourceName: image.lastPathComponent,
+                                                          fields: PDFSourceDates(documentDate: "1958"),
+                                                          body: reading, textColumns: 1) else {
+                check("4 \(url.lastPathComponent) keeps its turn during the verified date rewrite", false)
+                continue
+            }
+            check("4 \(url.lastPathComponent) keeps its turn during the verified date rewrite", true)
+        }
+        do {
+            let newReading = OCRResult(text: "A better reading.", classification: nil,
+                                       errorMessage: nil, errorCode: nil)
+            let data = try ReOCRPairs.replacementPage(for: pair, result: newReading,
+                                                      model: LLMModel.appleVisionModels[0], kind: .typewritten)
+            let page = PDFDocument(data: data)?.page(at: 0)
+            check("4 Improve OCR keeps the turn of the same image",
+                  page.flatMap { PDFHeaderParser.parse($0).header?.straightenedDegrees } == expected)
+            let merged = dir.appendingPathComponent("skewed-mixed.pdf")
+            try gen.mergeDocumentPDFs(sourcePDFs: [pairURL, levelURL, searchableURL], outputURL: merged)
+            check("4 a mixed merge keeps the turn for each source page",
+                  PDFHeaderParser.extract(merged)?.textPages.map { $0.header?.straightenedDegrees }
+                      == [expected, nil, searchableTurn])
+            if let keep = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_KEEP"] {
+                for url in [pairURL, searchableURL, merged] {
+                    try FileManager.default.copyItem(at: url, to: URL(fileURLWithPath: keep).appendingPathComponent(url.lastPathComponent))
+                }
+            }
+        } catch { check("4 straightening survives Improve OCR and merging", false, "\(error)") }
+    }
+
+    private static func liveStraighteningChecks(dir: URL, image: URL, reading: String) async {
+        guard let backup = ProcessInfo.processInfo.environment["ARCHIVEPROC_TEST_BACKUP_ROOT"], !backup.isEmpty,
+              let bytes = try? Data(contentsOf: image) else {
+            check("4 Live Capture has scratch inputs and backup", false)
+            return
+        }
+        let destination = dir.appendingPathComponent("live")
+        let staging = dir.appendingPathComponent("live-staging")
+        do {
+            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
+            let session = CaptureSession()
+            let model = LLMModel.appleVisionModels[0]
+            session._recoveryTestBeginLive(config: SessionProcessingConfig(
+                provider: .appleVision, model: model, thinkingLevel: .low, apiKey: "",
+                taggingMode: .human, rotationMode: .off, mergeDocuments: false, outputDirectory: destination,
+                customOCRPrompt: "", imageScale: 1, enableSegmentJSON: false, tagVocabulary: [], gateway: nil,
+                outputImageFile: false, pdfImageMB: 0, exportedImageMB: 0, textColumns: 1), stagingDir: staging)
+            let processor = session.liveProcessor
+            processor._testFinalizeTasks = []
+            LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(text: reading, classification: nil,
+                                                                  errorMessage: nil, errorCode: nil)
+            defer {
+                LiveCaptureProcessor._recoveryTestOCRStub = nil
+                LiveCaptureProcessor._recoveryTestOCRStarts = []
+            }
+            var settings = CollectionSettingsDocument(name: "Scratch")
+            for (seq, straighten) in [(1, true), (2, false), (3, true)] {
+                let group = "straighten-\(seq)"
+                settings.collection.set(.straightenReadingCopy, .bool(straighten), source: .setByUser(Date()))
+                try CollectionSettingsFile.write(settings, in: destination)
+                session.ingest(jpeg: bytes, groupId: group, seq: seq, type: .document,
+                               quality: nil, year: nil, month: nil, deviceName: "TestPhone")
+                processor.segmentResolved(groupId: group)
+                await processor._testAwaitFinalizes()
+                let pdf = processor.staged.first { $0.groupId == group }?.pdfURLs.first
+                let header = pdf.flatMap { PDFHeaderParser.extract($0)?.textPages.first?.header }
+                check("4 Live Capture document \(seq) uses the current straighten switch",
+                      header != nil && (header?.straightenedDegrees != nil) == straighten)
+            }
+        } catch { check("4 Live Capture reads each document's switch", false, "\(error)") }
     }
 
     private static func catalogueChecks(dir: URL, jpeg: URL, reading: String) async {
