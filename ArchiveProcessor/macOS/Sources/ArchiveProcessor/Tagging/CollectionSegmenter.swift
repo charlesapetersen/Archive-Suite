@@ -287,6 +287,14 @@ class CollectionSegmenter {
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// A collection name is used both as a directory name and inside each numbered filename.
+    static func isFilingName(_ name: String) -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let separators = CharacterSet(charactersIn: "/\\:")
+        return !trimmed.isEmpty && trimmed != "." && trimmed != ".."
+            && !name.unicodeScalars.contains { separators.contains($0) || $0.properties.generalCategory == .control }
+    }
+
     // MARK: - Organize Output
 
     /// Create collection folders and move/rename output PDFs and JSONs into them.
@@ -321,9 +329,15 @@ class CollectionSegmenter {
             else { try OutputFileSafety.relocateArtifactSet(artifacts) }
         }
 
-        for collection in collections {
-            // Create collection folder
-            let folderURL = outputDirectory.appendingPathComponent(collection.collectionName)
+        // Check every collection before creating folders or moving the first output.
+        let folders = try collections.map { collection -> URL in
+            guard Self.isFilingName(collection.collectionName) else {
+                throw CocoaError(.fileWriteInvalidFileName,
+                                 userInfo: [NSLocalizedDescriptionKey: "A collection name must be a single folder name."])
+            }
+            return try filingDirectory(named: collection.collectionName, in: outputDirectory, fm: fm)
+        }
+        for (collection, folderURL) in zip(collections, folders) {
             if planMoves == nil { try fm.createDirectory(at: folderURL, withIntermediateDirectories: true) }
 
             // Move/rename PDFs and JSONs. A merged multi-page document has several source URLs that map
@@ -369,7 +383,8 @@ class CollectionSegmenter {
                         let mergedJSONName = pdfURL.deletingPathExtension().lastPathComponent + ".json"
                         let mergedJSONURL = (planMoves == nil ? outputDirectory : pdfURL.deletingLastPathComponent())
                             .appendingPathComponent(mergedJSONName)
-                        let hasMergedJSON = fm.fileExists(atPath: mergedJSONURL.path)
+                        let jsonFolder = fm.fileExists(atPath: mergedJSONURL.path)
+                            ? try filingDirectory(named: "JSON Output", in: folderURL, fm: fm) : nil
 
                         // Reserve one contiguous range for every page image; the merged PDF/JSON share the
                         // first page's number. Preflight the full set so no old sidecar can be falsely paired.
@@ -387,8 +402,8 @@ class CollectionSegmenter {
                             }
                             let firstBase = "\(CollectionNumbering.format(firstNumber)) \(collection.collectionName)"
                             taken = taken || occupied(folderURL.appendingPathComponent(firstBase + ".pdf"))
-                            if hasMergedJSON {
-                                taken = taken || occupied(folderURL.appendingPathComponent("JSON Output/" + firstBase + ".json"))
+                            if let jsonFolder {
+                                taken = taken || occupied(jsonFolder.appendingPathComponent(firstBase + ".json"))
                             }
                             if !taken { break }
                             firstNumber += 1
@@ -404,9 +419,9 @@ class CollectionSegmenter {
                         let firstBase = "\(CollectionNumbering.format(firstNumber)) \(collection.collectionName)"
                         artifactMoves.append(.init(source: pdfURL,
                                                    destination: folderURL.appendingPathComponent(firstBase + ".pdf")))
-                        if hasMergedJSON {
+                        if let jsonFolder {
                             artifactMoves.append(.init(source: mergedJSONURL,
-                                destination: folderURL.appendingPathComponent("JSON Output/" + firstBase + ".json")))
+                                destination: jsonFolder.appendingPathComponent(firstBase + ".json")))
                         }
                         try execute(artifactMoves, pdf: pdfURL)
                         movedPDFs[pdfURL] = folderURL.appendingPathComponent(firstBase + ".pdf")
@@ -420,7 +435,8 @@ class CollectionSegmenter {
                 // collision-safe export may intentionally give the image a different base from the PDF.
                 let jsonName = pdfURL.deletingPathExtension().lastPathComponent + ".json"
                 let jsonURL = (planMoves == nil ? outputDirectory : pdfURL.deletingLastPathComponent()).appendingPathComponent(jsonName)
-                let hasJSON = fm.fileExists(atPath: jsonURL.path)
+                let jsonFolder = fm.fileExists(atPath: jsonURL.path)
+                    ? try filingDirectory(named: "JSON Output", in: folderURL, fm: fm) : nil
                 var imageURL: URL?
                 if moveSiblingImages {
                     if let tracked = exportedImageMap[sourceURL] {
@@ -448,9 +464,7 @@ class CollectionSegmenter {
                     let seqNum = CollectionNumbering.format(sequence)
                     newBaseName = "\(seqNum) \(collection.collectionName)"
                     destPDF = folderURL.appendingPathComponent(newBaseName + ".pdf")
-                    destJSON = hasJSON
-                        ? folderURL.appendingPathComponent("JSON Output/" + newBaseName + ".json")
-                        : nil
+                    destJSON = jsonFolder?.appendingPathComponent(newBaseName + ".json")
                     destImage = imageURL.map {
                         let ext = $0.pathExtension.isEmpty ? "jpg" : $0.pathExtension
                         return folderURL.appendingPathComponent(newBaseName + "." + ext)
@@ -474,6 +488,21 @@ class CollectionSegmenter {
             reservedNumbers[folderURL] = movedCount
         }
         return movedPDFs
+    }
+
+    /// Existing destination directories must be real children, including the optional JSON directory.
+    private func filingDirectory(named name: String, in parent: URL, fm: FileManager) throws -> URL {
+        let directory = parent.appendingPathComponent(name, isDirectory: true)
+        var isDirectory: ObjCBool = false
+        let exists = fm.fileExists(atPath: directory.path, isDirectory: &isDirectory)
+        guard (try? fm.destinationOfSymbolicLink(atPath: directory.path)) == nil,
+              !exists || isDirectory.boolValue else {
+            throw CocoaError(.fileWriteInvalidFileName, userInfo: [
+                NSFilePathErrorKey: directory.path,
+                NSLocalizedDescriptionKey: "The filing destination must be a regular folder inside the selected output folder."
+            ])
+        }
+        return directory
     }
 
     // MARK: - LLM Calls

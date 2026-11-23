@@ -18066,3 +18066,12 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   The scratch PDF bytes stayed identical. No rehearsal cache inputs were created for this item.
   [Design](execution-plans/storage-simplify.md) · [Catalogue contract](SPEC/catalogue.md)
   <!-- /W49.storage-reader -->
+
+- [x] **W40.fix-processor-collection-name-filing — Keep collection filing inside the selected output folder [S · S1 · Tier-2]** · §W40 (lane: processor) (uses: build,vm) — S-036, independently reproduced at `bdfe3274`. Validate a collection name at confirmation and constrain the file destination before moving PDFs. Cover clicking Confirm and Organize without Return, Return in the field, empty and separator-containing names, parent components, and the normal safe path. Keep the VM reproduction. [Evidence](verification/evidence/processor/W49.proc-suspects-filing-check.md). SHIPPED 2026-11-23 (this commit).
+  Return and Confirm and Organize both validate the collection name. Safe edits keep their spelling
+  with surrounding spaces trimmed. An invalid name stays in the review with a correction hint. Filing
+  checks collection and segment-JSON destinations before moving the affected outputs.
+  Both off-screen confirmation paths filed six PDFs and their catalogue companions in the selected folder.
+  Two VM smoke checks and all 14 new scratch organizer checks passed. The broader organizer test
+  reported the same two label-record failures on unchanged main at 8e017001. No paid OCR was used.
+  <!-- /W40.fix-processor-collection-name-filing -->

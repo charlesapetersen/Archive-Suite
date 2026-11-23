@@ -119,9 +119,7 @@ extension OCRProcessor {
             guard !Task.isCancelled else { return }
 
             if !hasBoxes {
-                // No boxes — apply user-provided collection name
-                let name = noBoxCollectionName.trimmingCharacters(in: .whitespacesAndNewlines)
-                collectionSegments = [CollectionSegment(collectionName: name.isEmpty ? "Uncategorized" : name, fileURLs: files)]
+                collectionSegments = [CollectionSegment(collectionName: noBoxCollectionName, fileURLs: files)]
             } else {
                 // Apply user edits: rebuild collectionSegments from reviewItems
                 applyReviewEdits(files: files, runConfig: runConfig)
@@ -240,8 +238,27 @@ extension OCRProcessor {
             CollectionSegment(collectionName: name, fileURLs: collectionFiles[name] ?? [])
         }
     }
-    /// Called by the UI when the user confirms the collection review.
+
+    var canConfirmCollectionReview: Bool {
+        if collectionReviewItems.isEmpty {
+            return CollectionSegmenter.isFilingName(noBoxCollectionName)
+        }
+        return collectionReviewItems.allSatisfy {
+            $0.classification != .boxLabel || CollectionSegmenter.isFilingName($0.collectionName)
+        }
+    }
+
+    /// Validate the current field bindings even if the user clicked while still editing.
     func confirmCollectionReview() {
+        guard canConfirmCollectionReview else { return }
+        if collectionReviewItems.isEmpty {
+            noBoxCollectionName = noBoxCollectionName.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            for index in collectionReviewItems.indices where collectionReviewItems[index].classification == .boxLabel {
+                let name = collectionReviewItems[index].collectionName
+                collectionReviewItems[index].collectionName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
         awaitingCollectionConfirmation = false
         collectionConfirmationContinuation?.resume()
         collectionConfirmationContinuation = nil

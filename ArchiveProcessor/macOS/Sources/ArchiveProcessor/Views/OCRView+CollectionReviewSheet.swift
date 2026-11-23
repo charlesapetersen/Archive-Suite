@@ -52,8 +52,7 @@ struct CollectionReviewSheet: View {
                     Spacer()
                     Text("Collection Name")
                         .font(.headline)
-                    TextField("Enter collection name", text: $processor.noBoxCollectionName)
-                        .textFieldStyle(.roundedBorder)
+                    CollectionNameField(prompt: "Enter collection name", name: $processor.noBoxCollectionName)
                         .frame(maxWidth: 400)
                     Text("All \(processor.jobs.count) files will be organized into this collection.")
                         .font(.caption)
@@ -78,6 +77,7 @@ struct CollectionReviewSheet: View {
                 }
                 .prominentButtonStyle()
                 .controlSize(.large)
+                .disabled(!processor.canConfirmCollectionReview)
             }
             .padding()
         }
@@ -87,6 +87,29 @@ struct CollectionReviewSheet: View {
                 if let window = NSApp.keyWindow {
                     window.styleMask.insert(.resizable)
                 }
+            }
+        }
+    }
+}
+
+private struct CollectionNameField: View {
+    let prompt: String
+    @Binding var name: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            TextField(prompt, text: $name)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit {
+                    if CollectionSegmenter.isFilingName(name) {
+                        name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                }
+            if !CollectionSegmenter.isFilingName(name) {
+                Text("Enter one folder name. Slashes, colons, . and .. are reserved.")
+                    .accessibilityIdentifier("ap.collectionName.invalid")
+                    .font(.caption)
+                    .foregroundStyle(.primary)
             }
         }
     }
@@ -122,12 +145,8 @@ struct CollectionReviewRow: View {
             Spacer()
 
             // Collection name (editable)
-            TextField("Collection name", text: $item.collectionName)
-                .textFieldStyle(.roundedBorder)
+            CollectionNameField(prompt: "Collection name", name: $item.collectionName)
                 .frame(width: 280)
-                .onSubmit {
-                    item.collectionName = CollectionSegmenter.normalizeCollectionName(item.collectionName)
-                }
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 8)

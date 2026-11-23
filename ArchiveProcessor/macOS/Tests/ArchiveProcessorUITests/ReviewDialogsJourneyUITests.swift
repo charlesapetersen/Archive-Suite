@@ -264,51 +264,64 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         }
     }
 
-    /// Type into the real box row and click the sheet's confirmation button without submitting the field.
+    /// Exercise the same review that exposed S-036, including clicking while the field is active.
     func testCollectionNameConfirmedByClick() throws {
-        for (label, name) in [("separator", "a/b"), ("empty", ""), ("parent", "..")] {
-            let out = try launch("s036-\(label)", [
-                "-taggingModeRaw", "automatic", "-segmentationApproach", "manual",
-                "-rotationModeRaw", "off", "-reviewRotation", "NO",
-                "-reviewDocumentSegmentation", "NO", "-outputImageFile", "NO"
-            ], collectionID: true, classificationCycle: true)
-            clickStart()
-            confirmLabelReviews()
-            let complete = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Complete'")).firstMatch
-            XCTAssertTrue(complete.waitForExistence(timeout: 90))
-            complete.click()
+        try checkCollectionNameConfirmation(submitWithReturn: false)
+        try checkCollectionNameConfirmation(submitWithReturn: true)
+    }
 
-            let organize = app.sheets.buttons["Confirm and Organize"]
-            XCTAssertTrue(organize.waitForExistence(timeout: 60))
-            let field = app.sheets.textFields.firstMatch
-            XCTAssertEqual(app.sheets.textFields.count, 1, "one box name to edit")
+    private func checkCollectionNameConfirmation(submitWithReturn: Bool) throws {
+        let run = submitWithReturn ? "s036-return" : "s036-click"
+        let out = try launch(run, [
+            "-taggingModeRaw", "automatic", "-segmentationApproach", "manual",
+            "-rotationModeRaw", "off", "-reviewRotation", "NO",
+            "-reviewDocumentSegmentation", "NO", "-outputImageFile", "NO"
+        ], collectionID: true, classificationCycle: true)
+        clickStart()
+        confirmLabelReviews()
+        let complete = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Complete'")).firstMatch
+        XCTAssertTrue(complete.waitForExistence(timeout: 90))
+        complete.click()
+
+        let organize = app.sheets.buttons["Confirm and Organize"]
+        XCTAssertTrue(organize.waitForExistence(timeout: 60))
+        XCTAssertEqual(app.sheets.textFields.count, 1, "one box name to edit")
+        let field = app.sheets.textFields.firstMatch
+        func type(_ name: String) {
             field.click()
             field.typeKey("a", modifierFlags: .command)
             field.typeKey(.delete, modifierFlags: [])
             if !name.isEmpty { field.typeText(name) }
-            XCTAssertEqual(field.value as? String ?? "", name)
-            shot("s036-\(label)-before-click")
-            organize.click()
-            waitForDone("s036-\(label)")
-
-            let filed = filedPDFs(in: out)
-            let loose = try FileManager.default.contentsOfDirectory(at: scratchRoot, includingPropertiesForKeys: nil)
-                .filter { $0.pathExtension == "pdf" }
-            print("[s036] \(label): output=\(filed.map { relativePath($0, under: out) }); parent=\(loose.map(\.lastPathComponent).sorted())")
-            switch label {
-            case "parent":
-                XCTAssertTrue(filed.isEmpty)
-                XCTAssertEqual(loose.count, 6)
-            case "separator":
-                XCTAssertTrue(loose.isEmpty)
-                XCTAssertEqual(filed.count, 6)
-                XCTAssertTrue(filed.allSatisfy { relativePath($0, under: out).hasPrefix("a/b/") })
-            default:
-                XCTAssertTrue(loose.isEmpty)
-                XCTAssertEqual(filed.count, 6)
-                XCTAssertTrue(filed.allSatisfy { !relativePath($0, under: out).contains("/") })
-            }
         }
+
+        for invalidName in ["a/b", "", "..", "."] {
+            type(invalidName)
+            if submitWithReturn { field.typeKey(.return, modifierFlags: []) }
+            XCTAssertFalse(organize.isEnabled, "the sheet cannot organize with an invalid name (\(invalidName))")
+            XCTAssertTrue(app.sheets.staticTexts["ap.collectionName.invalid"].exists)
+            if !invalidName.isEmpty { XCTAssertEqual(field.value as? String, invalidName) }
+        }
+        shot("\(run)-invalid")
+
+        type(" Scratch RG Papers ")
+        if submitWithReturn {
+            field.typeKey(.return, modifierFlags: [])
+            XCTAssertEqual(field.value as? String, "Scratch RG Papers")
+        }
+        XCTAssertTrue(organize.isEnabled)
+        organize.click()
+        waitForDone(run)
+        shot("\(run)-done")
+
+        let filed = filedPDFs(in: out)
+        XCTAssertEqual(filed.map { relativePath($0, under: out) }, (1...6).map {
+            "Scratch RG Papers/" + String(format: "%06d", $0) + " Scratch RG Papers.pdf"
+        })
+        XCTAssertTrue(filed.allSatisfy {
+            FileManager.default.fileExists(atPath: $0.appendingPathExtension("archivesuite.json").path)
+        })
+        let parent = try FileManager.default.contentsOfDirectory(at: scratchRoot, includingPropertiesForKeys: nil)
+        XCTAssertFalse(parent.contains { $0.pathExtension == "pdf" })
     }
 
     private func confirmLabelReviews() {

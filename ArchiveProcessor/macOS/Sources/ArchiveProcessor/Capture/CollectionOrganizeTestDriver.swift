@@ -35,6 +35,47 @@ enum CollectionOrganizeTestDriver {
 
         let seg = CollectionSegmenter()
 
+        // Confirm the organizer guards destinations even when called without the review sheet.
+        do {
+            let root = fm.temporaryDirectory.appendingPathComponent("APOrgTest-boundary-\(UUID().uuidString)")
+            defer { try? fm.removeItem(at: root) }
+            let out = root.appendingPathComponent("output")
+            try fm.createDirectory(at: out, withIntermediateDirectories: true)
+            let pdf = out.appendingPathComponent("working.pdf")
+            let pdfBytes = Data("PDF".utf8)
+            try pdfBytes.write(to: pdf)
+            let json = out.appendingPathComponent("working.json")
+            let jsonBytes = Data("{}".utf8)
+            try jsonBytes.write(to: json)
+            let redirected = out.appendingPathComponent("Redirected")
+            let safe = out.appendingPathComponent("Safe")
+            try fm.createSymbolicLink(at: redirected, withDestinationURL: root)
+            try fm.createDirectory(at: safe, withIntermediateDirectories: true)
+            try fm.createSymbolicLink(at: safe.appendingPathComponent("JSON Output"), withDestinationURL: root)
+
+            for name in ["", " ", ".", "..", "a/b", "Redirected", "Safe"] {
+                let collection = CollectionSegment(collectionName: name, fileURLs: [pdf])
+                for planning in [false, true] {
+                    var planned = false
+                    let recordPlan: ((URL, [OutputFileSafety.ArtifactMove]) -> Void)? =
+                        planning ? { _, _ in planned = true } : nil
+                    do {
+                        try seg.organizeOutput(collections: [collection], outputDirectory: out,
+                                               outputURLMap: [pdf: pdf], moveSiblingImages: false,
+                                               planMoves: recordPlan)
+                        check("filing guard: rejects invalid or redirected destination '\(name)' (planning=\(planning))", false)
+                    } catch {
+                        check("filing guard: retains working artifacts for '\(name)' (planning=\(planning))",
+                              !planned && (try? Data(contentsOf: pdf)) == pdfBytes
+                                  && (try? Data(contentsOf: json)) == jsonBytes
+                                  && (try? fm.contentsOfDirectory(atPath: root.path)) == ["output"])
+                    }
+                }
+            }
+        } catch {
+            check("filing guard: scratch setup failed: \(error)", false)
+        }
+
         // ============================================================================================
         // Case 1 — THE BUG: merged 2-page document + dual output. Per-page images page1.jpg/page2.jpg
         // exist; merge collapsed page1.pdf+page2.pdf into page1_merged.pdf and repointed BOTH source URLs

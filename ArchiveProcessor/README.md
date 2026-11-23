@@ -235,7 +235,7 @@ When collection segmentation is enabled:
 
 1. Identifies archival collections from box label OCR text via LLM
 2. Clusters similar collection names (handles variations in case, abbreviation, punctuation)
-3. Normalizes names to title case with consistent formatting
+3. Normalizes the suggested names to title case with consistent formatting
 4. Organizes output PDFs into collection folders with sequential naming (`000001 Collection Name.pdf`; a folder filed earlier with five-digit names keeps them, and numbering continues past its highest number)
 
 ### Interactive Review Workflow
@@ -257,7 +257,7 @@ Review generated tags in the file pane. Double-click any file to edit its classi
 - **Complete** — proceed to collection organization
 
 #### 3. Collection Name Review (final step)
-Review and correct LLM-extracted collection names for box images before files are organized into collection folders.
+Review and correct the suggested names before filing. Enter one folder name for each box, or one name for the run if no box labels were found. Your spelling is kept and surrounding spaces are trimmed. The sheet shows a correction hint and disables **Confirm and Organize** until each name is valid.
 
 ### Tools tab
 

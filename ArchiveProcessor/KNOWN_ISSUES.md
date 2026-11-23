@@ -107,9 +107,9 @@ proposals, and separate gateway success and failure counts. [Scratch evidence an
 
 - After reopening a persisted, fully read Gemini scratch batch, Resume Batch opened neither pre-tagging review nor final tagging review. It opened collection names and the later per-collection page review, then filed all six tagged PDFs. Owner call 30 requires every applicable review except where the user already explicitly skipped it. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-filing-check.md). (queued: W40.fix-processor-resume-reviews)
 
-## Collection names can file PDFs outside the chosen folder (S-036)
+## FIXED (S-036, 2026-11-23) — Collection names could file PDFs outside the selected folder
 
-- In the box row of Review Collection Names, Confirm and Organize without Return used all three typed names as entered. Six PDFs went to the parent, six nested under the separator-containing name, and six landed loose for the empty name. The assigned output folder is the filing boundary. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-filing-check.md). (queued: W40.fix-processor-collection-name-filing)
+- Review Collection Names requires a single folder name before confirmation. Filing refuses invalid collection names and linked collection or segment-JSON directories. [Original independent VM evidence](../verification/evidence/processor/W49.proc-suspects-filing-check.md). (accepted: fixed by W40.fix-processor-collection-name-filing)
 
 ## Ordinary Resume bypasses two reviews before tagging (S-050)
 

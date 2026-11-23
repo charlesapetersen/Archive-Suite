@@ -944,7 +944,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** call `organizeOutput` (as `scripts/test-collection-organize.sh` does) with the names `a/b`,
   `..` and empty, in a scratch directory.
 - **Would clear it:** each is normalised or refused before anything is filed.
-- **Status:** `reproduced` — independently confirmed; fix queued as `W40.fix-processor-collection-name-filing`. [VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
+- **Status:** `fixed` by `W40.fix-processor-collection-name-filing`. The VM regression exercises field Return and clicking Confirm and Organize with the field still active. [Original VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
