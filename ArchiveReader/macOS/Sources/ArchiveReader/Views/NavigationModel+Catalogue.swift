@@ -18,15 +18,25 @@ extension NavigationModel {
                             catalogueInstance: catalogueInstance(for: url))
     }
 
+    func configureContentIndex(for root: URL?) {
+        let scope: ReaderRootCacheScope?
+        if let root, let marker = rootStore.rootMarker, let rootPath = rootStore.discoveredPathPrefix,
+           let identity = ReaderRootIdentity.capture(root) {
+            scope = ReaderRootCacheScope(markerGUID: marker.guid, identity: identity, rootPath: rootPath)
+        } else {
+            scope = nil
+        }
+        indexer.setRootCache(scope)
+    }
+
     func startLibrary(_ url: URL) {
+        configureContentIndex(for: url)
         let resolved = resolvedLibraryRoot(url)
         library.start(scope: url, markerGUID: resolved.markerGUID, catalogueInstance: resolved.catalogueInstance)
     }
 
     func setCatalogueMode(_ enabled: Bool) {
-        guard let root = rootStore.root, let identity = ReaderRootIdentity.capture(root) else { return }
-        let key = cataloguePreferenceKey(for: identity)
-        restoreCataloguePreference(for: identity, key: key)
+        guard let root = rootStore.root, let key = cataloguePreferenceKey(for: root) else { return }
         defaults.set(enabled, forKey: key + ".enabled")
         if defaults.string(forKey: key) == nil {
             defaults.set(UUID().uuidString, forKey: key)
@@ -45,15 +55,19 @@ extension NavigationModel {
                 : nil
         }
 #endif
-        guard let identity = ReaderRootIdentity.capture(root) else { return nil }
-        let key = cataloguePreferenceKey(for: identity)
-        restoreCataloguePreference(for: identity, key: key)
-        guard defaults.bool(forKey: key + ".enabled") else { return nil }
+        guard let key = cataloguePreferenceKey(for: root),
+              defaults.bool(forKey: key + ".enabled") else { return nil }
         return defaults.string(forKey: key).flatMap(UUID.init(uuidString:))
     }
 
-    private func cataloguePreferenceKey(for identity: ReaderRootIdentity) -> String {
-        "readerCatalogue.instance.\(identity.key)"
+    private func cataloguePreferenceKey(for root: URL) -> String? {
+        // Preserve the in-place setting on filesystems without a usable directory birth time.
+        guard let identity = ReaderRootIdentity.capture(root) else {
+            return ReaderRootIdentity.legacyCatalogueKey(for: root)
+        }
+        let key = "readerCatalogue.instance.\(identity.key)"
+        restoreCataloguePreference(for: identity, key: key)
+        return key
     }
 
     /// Keep the existing instance ID when reopening an adopted root at its previous path.

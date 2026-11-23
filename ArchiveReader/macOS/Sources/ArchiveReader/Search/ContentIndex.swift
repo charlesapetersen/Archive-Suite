@@ -1,5 +1,6 @@
 import Foundation
 import SQLite3
+import os
 import ArchiveCore
 
 /// A row of extracted content ready for batch insertion. `Sendable` so task-group children
@@ -55,18 +56,36 @@ actor ContentIndex {
 
     private var db: OpaquePointer?
     private let url: URL
+    private let scope: ReaderRootCacheScope?
+    private let waitForPrevious: Task<Void, Never>?
+    private let retired = OSAllocatedUnfairLock(initialState: false)
 
     // SQLite wants a destructor telling it to copy bound text; -1 == SQLITE_TRANSIENT.
     private let TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-    init(url: URL) { self.url = url }
+    init(url: URL, scope: ReaderRootCacheScope? = nil, waitForPrevious: Task<Void, Never>? = nil) {
+        self.url = url
+        self.scope = scope
+        self.waitForPrevious = waitForPrevious
+    }
+
+    nonisolated func retire() {
+        retired.withLock { $0 = true }
+    }
+
+    private func checkCurrentScope() throws {
+        try Task.checkCancellation()
+        guard !retired.withLock({ $0 }), scope?.isCurrent != false else { throw CancellationError() }
+    }
 
     /// Open (creating if needed) and bring the schema up to date. **All-or-nothing:** it either
     /// returns with `db` fully set up, or it throws with `db` back to nil. That nil is as load-bearing
     /// as the throw — the `guard db == nil` below is what makes this idempotent, so a handle left
     /// behind by a failed PRAGMA/schema step would turn every later `open()` into a silent no-op and
     /// poison the index for the life of the process (W23.m9).
-    func open() throws {
+    func open() async throws {
+        await waitForPrevious?.value
+        try checkCurrentScope()
         guard db == nil else { return }   // idempotent — callers open() before every use
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
@@ -131,7 +150,7 @@ actor ContentIndex {
     func needsIndex(path: String, mtime: Double, identity: ContentIdentity? = nil) -> Bool {
         guard let stmt = prepare("SELECT mtime, inode, size FROM files WHERE path = ?;") else { return true }
         defer { sqlite3_finalize(stmt) }
-        bindText(stmt, 1, path)
+        bindPath(stmt, 1, path)
         if sqlite3_step(stmt) == SQLITE_ROW {
             return stamp(stmt, from: 0) != ContentStamp(mtime: mtime, identity: identity)
         }
@@ -145,8 +164,8 @@ actor ContentIndex {
         defer { sqlite3_finalize(stmt) }
         var map: [String: ContentStamp] = [:]
         while sqlite3_step(stmt) == SQLITE_ROW {
-            if let c = sqlite3_column_text(stmt, 0) {
-                map[String(cString: c)] = stamp(stmt, from: 1)
+            if let path = readPath(stmt, 0) {
+                map[path] = stamp(stmt, from: 1)
             }
         }
         return map
@@ -193,6 +212,7 @@ actor ContentIndex {
                 headerFields: [CheckableField: String] = [:], userFields: [CheckableField: String] = [:],
                 sidecarNames: [CheckableField: String] = [:], sidecarStamp: String = "",
                 isCatalogue: Bool = false) throws {
+        try checkCurrentScope()
         try exec("BEGIN IMMEDIATE;")
         do {
             try upsertRow(path: path, mtime: mtime, identity: identity, name: name, classification: classification,
@@ -210,7 +230,7 @@ actor ContentIndex {
     /// this — no `await`/suspension between BEGIN and COMMIT (actor-reentrancy invariant: the
     /// synchronous exec/prepare/run/insertFTS calls must not be interleaved by another actor call).
     func upsertBatch(_ rows: [IndexRow]) throws {
-        try Task.checkCancellation()
+        try checkCurrentScope()
         guard !rows.isEmpty else { return }
         try exec("BEGIN IMMEDIATE;")
         do {
@@ -236,6 +256,9 @@ actor ContentIndex {
                            headerFields: [CheckableField: String], userFields: [CheckableField: String],
                            sidecarNames: [CheckableField: String], sidecarStamp: String,
                            isCatalogue: Bool) throws {
+        guard scope == nil || scope?.relativePath(path) != nil else {
+            throw IndexError.sql("content path is outside the granted archive")
+        }
         let header = isCatalogue ? "" : IndexedItemFields.encode(headerFields)
         let user = isCatalogue ? "" : IndexedItemFields.encode(userFields)
         let names = isCatalogue ? "" : IndexedItemFields.encode(sidecarNames)
@@ -243,7 +266,7 @@ actor ContentIndex {
         let sidecarStamp = isCatalogue ? "" : sidecarStamp
         var rowid: Int64? = nil
         if let sel = prepare("SELECT rowid FROM files WHERE path = ?;") {
-            bindText(sel, 1, path)
+            bindPath(sel, 1, path)
             if sqlite3_step(sel) == SQLITE_ROW { rowid = sqlite3_column_int64(sel, 0) }
             sqlite3_finalize(sel)
         }
@@ -265,7 +288,7 @@ actor ContentIndex {
             try insertFTS(rowid: rowid, body: body, classification: classification, name: name, fields: fields, path: path)
         } else {
             try run("INSERT INTO files(path, mtime, inode, size, page_count, has_text, readable, header_fields, user_fields, sidecar_names, sidecar_stamp, is_catalogue) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);") {
-                self.bindText($0, 1, path); sqlite3_bind_double($0, 2, mtime)
+                self.bindPath($0, 1, path); sqlite3_bind_double($0, 2, mtime)
                 self.bindIdentity($0, 3, identity)
                 sqlite3_bind_int($0, 5, Int32(pageCount))
                 sqlite3_bind_int($0, 6, hasText ? 1 : 0)
@@ -287,7 +310,7 @@ actor ContentIndex {
         defer { sqlite3_finalize(stmt) }
         var paths: Set<UTF8Key> = []
         while sqlite3_step(stmt) == SQLITE_ROW {
-            if let path = sqlite3_column_text(stmt, 0) { paths.insert(UTF8Key(String(cString: path))) }
+            if let path = readPath(stmt, 0) { paths.insert(UTF8Key(path)) }
         }
         return paths
     }
@@ -296,11 +319,13 @@ actor ContentIndex {
     /// available facts supplies an empty document map and invalidates any prior metadata.
     func syncCatalogue(_ documents: [UTF8Key: [UUID: CatalogueIndexedDocument]],
                        adopting: Set<UTF8Key>, returningToLegacy: Set<UTF8Key>) throws -> Int {
-        try Task.checkCancellation()
+        try checkCurrentScope()
         guard !documents.isEmpty || !returningToLegacy.isEmpty else { return 0 }
         let stored = try storedCatalogueDocuments()
         let stale = returningToLegacy.filter { stored[$0] != nil }
-        let changed = documents.filter { stored[$0.key, default: [:]] != $0.value }
+        let changed = documents.filter {
+            (scope == nil || scope?.relativePath($0.key.string) != nil) && stored[$0.key, default: [:]] != $0.value
+        }
         guard !adopting.isEmpty || !changed.isEmpty || !stale.isEmpty else { return 0 }
 
         try exec("BEGIN IMMEDIATE;")
@@ -309,12 +334,12 @@ actor ContentIndex {
                 // Readers may have a warm cache from legacy mode. Remove previous catalogue-like text
                 // while preserving the PDF's own text, classifications and name.
                 try run("UPDATE fts SET fields = '' WHERE rowid = (SELECT rowid FROM files WHERE path = ? AND is_catalogue = 0);") {
-                    self.bindText($0, 1, path.string)
+                    self.bindPath($0, 1, path.string)
                 }
                 try run("""
                     UPDATE files SET header_fields = '', user_fields = '', sidecar_names = '',
                     sidecar_stamp = '', is_catalogue = 1 WHERE path = ? AND is_catalogue = 0;
-                    """) { self.bindText($0, 1, path.string) }
+                    """) { self.bindPath($0, 1, path.string) }
             }
             for path in stale {
                 try deleteCatalogueDocuments(at: path.string)
@@ -323,7 +348,7 @@ actor ContentIndex {
                 try deleteCatalogueDocuments(at: path.string)
                 for (id, doc) in docs {
                     try run("INSERT INTO catalogue_documents(path, document_id, digest, fields) VALUES(?, ?, ?, ?);") {
-                        self.bindText($0, 1, path.string)
+                        self.bindPath($0, 1, path.string)
                         self.bindText($0, 2, id.uuidString)
                         self.bindText($0, 3, doc.companionSHA256.base64EncodedString())
                         self.bindText($0, 4, doc.fields)
@@ -365,8 +390,8 @@ actor ContentIndex {
     private func deleteCatalogueDocuments(at path: String) throws {
         try run("""
             DELETE FROM catalogue_fts WHERE rowid IN (SELECT rowid FROM catalogue_documents WHERE path = ?);
-            """) { self.bindText($0, 1, path) }
-        try run("DELETE FROM catalogue_documents WHERE path = ?;") { self.bindText($0, 1, path) }
+            """) { self.bindPath($0, 1, path) }
+        try run("DELETE FROM catalogue_documents WHERE path = ?;") { self.bindPath($0, 1, path) }
     }
 
     /// Matching logical documents, each stamped with the companion bytes that supplied its fields.
@@ -386,11 +411,11 @@ actor ContentIndex {
     }
 
     private func catalogueIdentity(_ stmt: OpaquePointer) -> (UTF8Key, UUID, Data)? {
-        guard let path = sqlite3_column_text(stmt, 0),
+        guard let path = readPath(stmt, 0),
               let id = sqlite3_column_text(stmt, 1).flatMap({ UUID(uuidString: String(cString: $0)) }),
               let digest = sqlite3_column_text(stmt, 2).flatMap({ Data(base64Encoded: String(cString: $0)) })
         else { return nil }
-        return (UTF8Key(String(cString: path)), id, digest)
+        return (UTF8Key(path), id, digest)
     }
 
     /// Full-text search of the **OCR text** (the body column) → matching file paths. This is the
@@ -445,8 +470,8 @@ actor ContentIndex {
         if let limit { sqlite3_bind_int(stmt, 2, Int32(limit)) }
         var hits: [(rowid: Int64, path: String)] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
-            if let c = sqlite3_column_text(stmt, 1) {
-                hits.append((sqlite3_column_int64(stmt, 0), String(cString: c)))
+            if let path = readPath(stmt, 1) {
+                hits.append((sqlite3_column_int64(stmt, 0), path))
             }
         }
         return hits
@@ -510,7 +535,7 @@ actor ContentIndex {
         var hits: [(rowid: Int64, path: String)] = []
         for path in paths {
             sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
-            bindText(stmt, 1, path)
+            bindPath(stmt, 1, path)
             if sqlite3_step(stmt) == SQLITE_ROW { hits.append((sqlite3_column_int64(stmt, 0), path)) }
         }
         sqlite3_finalize(stmt)
@@ -606,8 +631,7 @@ actor ContentIndex {
         let wanted = Set(paths)
         var out: [String: IndexedItemFields] = [:]
         while sqlite3_step(stmt) == SQLITE_ROW {
-            guard let p = sqlite3_column_text(stmt, 0) else { continue }
-            let path = String(cString: p)
+            guard let path = readPath(stmt, 0) else { continue }
             guard wanted.contains(path) else { continue }
             let header = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
             let user = sqlite3_column_text(stmt, 2).map { String(cString: $0) } ?? ""
@@ -626,9 +650,9 @@ actor ContentIndex {
         defer { sqlite3_finalize(stmt) }
         var out: [String: [CheckableField: String]] = [:]
         while sqlite3_step(stmt) == SQLITE_ROW {
-            guard let p = sqlite3_column_text(stmt, 0), let u = sqlite3_column_text(stmt, 1) else { continue }
+            guard let path = readPath(stmt, 0), let u = sqlite3_column_text(stmt, 1) else { continue }
             let values = IndexedItemFields.decode(String(cString: u))
-            if !values.isEmpty { out[String(cString: p)] = values }
+            if !values.isEmpty { out[path] = values }
         }
         return out
     }
@@ -637,6 +661,7 @@ actor ContentIndex {
     /// extraction reads them). The number of rows changed.
     @discardableResult
     func setUserFields(_ changes: [String: [CheckableField: String]]) throws -> Int {
+        try checkCurrentScope()
         guard !changes.isEmpty else { return 0 }
         try exec("BEGIN IMMEDIATE;")
         do {
@@ -644,7 +669,7 @@ actor ContentIndex {
             for (path, values) in changes {
                 var rowid: Int64?, names: [CheckableField: String] = [:]
                 if let sel = prepare("SELECT rowid, sidecar_names FROM files WHERE path = ? AND is_catalogue = 0;") {
-                    bindText(sel, 1, path)
+                    bindPath(sel, 1, path)
                     if sqlite3_step(sel) == SQLITE_ROW {
                         rowid = sqlite3_column_int64(sel, 0)
                         names = IndexedItemFields.decode(sqlite3_column_text(sel, 1).map { String(cString: $0) } ?? "")
@@ -676,8 +701,8 @@ actor ContentIndex {
         defer { sqlite3_finalize(stmt) }
         var out: [String: String] = [:]
         while sqlite3_step(stmt) == SQLITE_ROW {
-            guard let p = sqlite3_column_text(stmt, 0) else { continue }
-            out[String(cString: p)] = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
+            guard let path = readPath(stmt, 0) else { continue }
+            out[path] = sqlite3_column_text(stmt, 1).map { String(cString: $0) } ?? ""
         }
         return out
     }
@@ -686,6 +711,7 @@ actor ContentIndex {
     /// `fields` from them and the stored corrections; the text is left alone. Paths not indexed are skipped. The
     /// number of rows changed.
     func setSidecarNames(_ changes: [String: SidecarRead]) throws -> Int {
+        try checkCurrentScope()
         guard !changes.isEmpty else { return 0 }
         try exec("BEGIN IMMEDIATE;")
         do {
@@ -693,7 +719,7 @@ actor ContentIndex {
             for (path, change) in changes {
                 var rowid: Int64?, user: [CheckableField: String] = [:]
                 if let sel = prepare("SELECT rowid, user_fields FROM files WHERE path = ? AND is_catalogue = 0;") {
-                    bindText(sel, 1, path)
+                    bindPath(sel, 1, path)
                     if sqlite3_step(sel) == SQLITE_ROW {
                         rowid = sqlite3_column_int64(sel, 0)
                         user = IndexedItemFields.decode(sqlite3_column_text(sel, 1).map { String(cString: $0) } ?? "")
@@ -728,7 +754,7 @@ actor ContentIndex {
         var out: [String: String] = [:]
         for path in paths {
             sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
-            bindText(stmt, 1, path)
+            bindPath(stmt, 1, path)
             if sqlite3_step(stmt) == SQLITE_ROW, let c = sqlite3_column_text(stmt, 0) {
                 let value = String(cString: c)
                 if !value.isEmpty { out[path] = value }
@@ -746,7 +772,7 @@ actor ContentIndex {
         var out: [String: PDFFormatStatus] = [:]
         for p in paths {
             sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
-            bindText(stmt, 1, p)
+            bindPath(stmt, 1, p)
             if sqlite3_step(stmt) == SQLITE_ROW {
                 let readable = sqlite3_column_int(stmt, 0) != 0
                 let hasText  = sqlite3_column_int(stmt, 1) != 0
@@ -776,7 +802,7 @@ actor ContentIndex {
         var count = 0
         for p in paths {
             sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
-            bindText(stmt, 1, p)
+            bindPath(stmt, 1, p)
             if sqlite3_step(stmt) == SQLITE_ROW {
                 let readable = sqlite3_column_int(stmt, 0) != 0
                 let hasText  = sqlite3_column_int(stmt, 1) != 0
@@ -798,7 +824,7 @@ actor ContentIndex {
         defer { sqlite3_finalize(stmt) }
         var set = Set<String>()
         while sqlite3_step(stmt) == SQLITE_ROW {
-            if let c = sqlite3_column_text(stmt, 0) { set.insert(String(cString: c)) }
+            if let path = readPath(stmt, 0) { set.insert(path) }
         }
         return set
     }
@@ -807,6 +833,7 @@ actor ContentIndex {
     /// transaction (mirrors `upsertBatch`'s discipline). Fully synchronous within each transaction
     /// (no await between BEGIN and COMMIT) to preserve the actor-reentrancy invariant.
     func deletePaths(_ paths: [String]) throws {
+        try checkCurrentScope()
         guard !paths.isEmpty else { return }
         let batchSize = 500
         for start in stride(from: 0, to: paths.count, by: batchSize) {
@@ -819,7 +846,7 @@ actor ContentIndex {
                     // Look up the rowid so we can delete the matching FTS row (FTS5 content tables
                     // are keyed by rowid, not by a column value).
                     if let sel = prepare("SELECT rowid FROM files WHERE path = ?;") {
-                        bindText(sel, 1, path)
+                        bindPath(sel, 1, path)
                         if sqlite3_step(sel) == SQLITE_ROW {
                             let rowid = sqlite3_column_int64(sel, 0)
                             sqlite3_finalize(sel)
@@ -907,6 +934,27 @@ actor ContentIndex {
 
     // MARK: - SQLite helpers
 
+    /// A scope owns a separate database, so only relative paths are stored. Keeping the
+    /// mapping at the SQL boundary preserves absolute paths for the caller and for PDF I/O.
+    private func bindPath(_ statement: OpaquePointer?, _ index: Int32, _ path: String) {
+        guard let scope else { bindText(statement, index, path); return }
+        if let relative = scope.relativePath(path) {
+            bindText(statement, index, relative)
+        } else {
+            sqlite3_bind_null(statement, index)
+        }
+    }
+
+    private func readPath(_ statement: OpaquePointer, _ index: Int32) -> String? {
+        guard let bytes = sqlite3_column_text(statement, index),
+              let value = String(bytes: UnsafeBufferPointer(start: bytes,
+                                                            count: Int(sqlite3_column_bytes(statement, index))),
+                                 encoding: .utf8)
+        else { return nil }
+        guard let scope else { return value }
+        return scope.absolutePath(value)
+    }
+
     private func insertFTS(rowid: Int64, body: String, classification: String?, name: String, fields: String,
                            path: String) throws {
         try run("INSERT INTO fts(rowid, body, classification, name, fields, path) VALUES(?, ?, ?, ?, ?, ?);") { stmt in
@@ -915,7 +963,7 @@ actor ContentIndex {
             self.bindText(stmt, 3, classification ?? "")
             self.bindText(stmt, 4, name)
             self.bindText(stmt, 5, fields)
-            self.bindText(stmt, 6, path)
+            self.bindPath(stmt, 6, path)
         }
     }
 

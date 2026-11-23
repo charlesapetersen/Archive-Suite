@@ -31,8 +31,10 @@ Found by the storage survey (`execution-plans/storage-simplify.md` §2, §6).
   catalogue, the companion carries flags and view turns. Reader keeps the same adopted instance after a
   same-volume root rename and can still offer the verified repair for a detached companion.
   (W49.reader-root-movable)
-- **The content index and page thumbnails are keyed by absolute path too**, so a moved root re-extracts every
-  file's text and redraws thumbnails; old rows are never removed. (queued: W49.reader-root-movable)
+- **OCR search uses a local cache for each marked physical root.** An unchanged PDF keeps its indexed text when
+  the same directory moves on its mounted volume. A copy with the same marker builds its own index. A leaf
+  rename needs a new row, and settled scans retire the disappeared path. The first use of the scoped cache
+  rebuilds OCR text once. **Page thumbnails are still keyed by absolute path** (queued: W49.reader-root-movable).
 
 ## Dating a folder's documents from its confirmed date — the limits (W47.ct-folder-date-reader, 2026-11-19)
 

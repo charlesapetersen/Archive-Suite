@@ -136,6 +136,101 @@ final class ContentIndexFreshnessTests: XCTestCase {
         await index.close()
     }
 
+    func testWholeRootMoveReusesTextAndCopyWithSameMarkerStartsCold() async throws {
+        let parent = scratch.resolvingSymlinksInPath()
+        let original = parent.appendingPathComponent("Original", isDirectory: true)
+        let moved = parent.appendingPathComponent("Moved", isDirectory: true)
+        let copy = parent.appendingPathComponent("Copy", isDirectory: true)
+        let name = "letter.pdf"
+        let file = original.appendingPathComponent(name)
+        let marker = UUID()
+        let date = Date(timeIntervalSince1970: 1_700_000_000)
+        try FileManager.default.createDirectory(at: original, withIntermediateDirectories: false)
+        try write("unique archival words", to: file, date: date)
+        let (driver, _, probe) = makeDriver()
+        func scope(_ root: URL) throws -> ReaderRootCacheScope {
+            ReaderRootCacheScope(markerGUID: marker, identity: try XCTUnwrap(ReaderRootIdentity.capture(root)),
+                                 rootPath: root.path)
+        }
+        let originalScope = try scope(original)
+        driver.setRootCache(originalScope)
+        driver.startIndexing([try discover(file)])
+        try await waitForPasses(driver, 1)
+        XCTAssertEqual(probe.count, 1)
+
+        try FileManager.default.copyItem(at: original, to: copy)
+        try FileManager.default.moveItem(at: original, to: moved)
+        let movedFile = moved.appendingPathComponent(name)
+        let movedScope = try scope(moved)
+        XCTAssertEqual(movedScope.key, originalScope.key)
+        driver.setRootCache(movedScope)
+        driver.startIndexing([try discover(movedFile)])
+        try await waitForPasses(driver, 2)
+        XCTAssertEqual(probe.count, 1, "An unchanged file needs no extraction after the whole root moves.")
+        let ranked = await driver.searchRanked("archival")
+        XCTAssertEqual(ranked.paths, [movedFile.path])
+        XCTAssertNotNil(ranked.snippets[movedFile.path])
+        let oldStatus = await driver.formatStatuses(for: [file.path])
+        XCTAssertTrue(oldStatus.isEmpty)
+
+        let renamed = moved.appendingPathComponent("renamed.pdf")
+        try FileManager.default.moveItem(at: movedFile, to: renamed)
+        driver.startIndexing([try discover(renamed)])
+        try await waitForPasses(driver, 3)
+        XCTAssertEqual(probe.count, 2, "A leaf rename is a different relative occurrence.")
+        let renamedHits = await driver.search("archival")
+        XCTAssertTrue(renamedHits.contains(renamed.path))
+
+        let copyScope = try scope(copy)
+        XCTAssertNotEqual(copyScope.key, movedScope.key)
+        driver.setRootCache(copyScope)
+        let copyWarmHits = await driver.search("archival")
+        XCTAssertTrue(copyWarmHits.isEmpty, "A copy with the same marker cannot read the original cache.")
+        driver.startIndexing([try discover(copy.appendingPathComponent(name))])
+        try await waitForPasses(driver, 4)
+        XCTAssertEqual(probe.count, 3)
+        await driver.closeForTesting()
+    }
+
+    func testScopedCatalogueHitsAndDeletionUseMovedRelativeOccurrence() async throws {
+        let parent = scratch.resolvingSymlinksInPath()
+        let original = parent.appendingPathComponent("Catalogue", isDirectory: true)
+        let moved = parent.appendingPathComponent("Moved", isDirectory: true)
+        try FileManager.default.createDirectory(at: original, withIntermediateDirectories: false)
+        let file = original.appendingPathComponent("sub/Letter.pdf").path
+        let document = UUID(), marker = UUID()
+        let digest = Data([5])
+        let database = parent.appendingPathComponent("catalogue-index.sqlite3")
+        func index(at root: URL) throws -> ContentIndex {
+            let identity = try XCTUnwrap(ReaderRootIdentity.capture(root))
+            return ContentIndex(url: database,
+                                scope: ReaderRootCacheScope(markerGUID: marker, identity: identity, rootPath: root.path))
+        }
+        let initial = try index(at: original)
+        try await initial.open()
+        try await initial.upsert(path: file, mtime: 1, name: "Letter", classification: nil,
+                                 body: "source words", isCatalogue: true)
+        _ = try await initial.syncCatalogue(
+            [UTF8Key(file): [document: CatalogueIndexedDocument(companionSHA256: digest, fields: "Borealis")]],
+            adopting: [], returningToLegacy: []
+        )
+        await initial.close()
+
+        try FileManager.default.moveItem(at: original, to: moved)
+        let reopened = try index(at: moved)
+        try await reopened.open()
+        let newPath = moved.appendingPathComponent("sub/Letter.pdf").path
+        let hits = await reopened.catalogueHits(ftsExpression: "Borealis")
+        XCTAssertEqual(hits, [UTF8Key(newPath): [document: digest]])
+        try await reopened.deletePaths([file])
+        let kept = await reopened.allPaths()
+        XCTAssertEqual(kept, [newPath], "An old absolute path cannot evict the moved row.")
+        try await reopened.deletePaths([newPath])
+        let removed = await reopened.catalogueHits(ftsExpression: "Borealis")
+        XCTAssertTrue(removed.isEmpty)
+        await reopened.close()
+    }
+
     // MARK: - Helpers
 
     private func write(_ text: String, to url: URL, date: Date) throws {

@@ -50,7 +50,11 @@ final class ContentIndexer: ObservableObject {
     /// Published so the status bar can show a degraded index instead of an idle one.
     @Published private(set) var failure: Failure?
 
-    private let index: ContentIndex
+    private var index: ContentIndex
+    private(set) var rootCacheScope: ReaderRootCacheScope?
+    private var previousClose: Task<Void, Never>?
+    private let indexURL: URL
+    private let scopesRootCaches: Bool
     /// Handle to the running detached pass so a scope change can cancel it (otherwise the stale pass
     /// holds the slot forever — its `Task.isCancelled` check was dead code without this).
     private var task: Task<Void, Never>?
@@ -80,7 +84,9 @@ final class ContentIndexer: ObservableObject {
 
     /// Point the driver at a specific index file. The app path uses `init()`; tests pass a scratch
     /// (or deliberately corrupt) URL so the `Failure` paths are exercisable headlessly.
-    init(url: URL) {
+    init(url: URL, scopesRootCaches: Bool = true) {
+        indexURL = url
+        self.scopesRootCaches = scopesRootCaches
         index = ContentIndex(url: url)
         extractPDF = PDFTextExtractor.extract
     }
@@ -88,6 +94,8 @@ final class ContentIndexer: ObservableObject {
     /// Test-only shape: inject at the PDF-open boundary while retaining the production dataless
     /// filter and thread-scoped no-materialisation policy around every invocation.
     init(url: URL, extractPDFForTesting: @escaping @Sendable (URL) -> ExtractedContent?) {
+        indexURL = url
+        scopesRootCaches = true
         index = ContentIndex(url: url)
         extractPDF = extractPDFForTesting
     }
@@ -95,7 +103,8 @@ final class ContentIndexer: ObservableObject {
     convenience init() {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
             .appendingPathComponent("ArchiveReader", isDirectory: true)
-        var indexURL = dir.appendingPathComponent("content-index-v2.sqlite3")
+        let regularIndex = dir.appendingPathComponent("content-index-v2.sqlite3")
+        var indexURL = regularIndex
 #if DEBUG
         // Fixture UITests may point the rebuildable cache into their verified scratch root so they
         // can corrupt and repair it without touching the app's own content index.
@@ -115,7 +124,7 @@ final class ContentIndexer: ObservableObject {
         // clean full re-index — safe, since the index is an explicitly disposable/rebuildable cache.
         // (The stale content-index.sqlite3 is left in place: the write-surface lint bans file-delete
         // APIs app-wide, and the orphan is a rebuildable cache the user can clear.)
-        self.init(url: indexURL)
+        self.init(url: indexURL, scopesRootCaches: indexURL == regularIndex)
     }
 
 #if DEBUG
@@ -133,6 +142,30 @@ final class ContentIndexer: ObservableObject {
     }
 #endif
 
+    /// Switch the SQL path mapping before discovery can publish rows from the newly resolved grant.
+    /// A moved root opens the same database with a new prefix. Closing the preceding actor first
+    /// prevents a suspended old-path operation from racing the new connection to that database.
+    func setRootCache(_ newScope: ReaderRootCacheScope?) {
+        guard scopesRootCaches, rootCacheScope != newScope else { return }
+        let old = index
+        old.retire()
+        let preceding = previousClose
+        let close = Task {
+            await preceding?.value
+            await old.close()
+        }
+        let url = newScope.map {
+            indexURL.deletingLastPathComponent().appendingPathComponent("ContentIndexes", isDirectory: true)
+                .appendingPathComponent($0.key + ".sqlite3")
+        } ?? indexURL
+        previousClose = close
+        rootCacheScope = newScope
+        index = ContentIndex(url: url, scope: newScope, waitForPrevious: close)
+        startIndexing([])
+        resetPruneState()
+        setFailure(nil)
+    }
+
     /// Incrementally index the given files (skips unchanged content via `existingStamps`).
     ///
     /// - An **empty** set means the library was cleared (a scope change, or no tagged files): cancel any
@@ -148,6 +181,7 @@ final class ContentIndexer: ObservableObject {
     /// disposable cache; the files are untouched. False when the index could not be changed.
     func forget(_ paths: [String]) async -> Bool {
         guard !paths.isEmpty else { return true }
+        let index = self.index
         do {
             try await index.open()
             try await index.deletePaths(paths)
@@ -405,8 +439,7 @@ final class ContentIndexer: ObservableObject {
     /// or redo, W49.reader-item-fields-search). True when a row changed. A file not yet indexed takes its
     /// corrections when it is.
     func syncUserFields(_ files: [ArchiveFile]) async -> Bool {
-        guard !files.isEmpty, await openForQuery() else { return false }
-        let idx = index
+        guard !files.isEmpty, let idx = await openForQuery() else { return false }
         let changed = await Task.detached(priority: .userInitiated) { () -> Int in
             let current = Self.userFields(of: files)
             let changes = Self.userFieldChanges(stored: await idx.storedUserFields(), current: current, among: files)
@@ -435,8 +468,7 @@ final class ContentIndexer: ObservableObject {
     /// Reads the sidecars of `files` again where they changed since the index read them (the watcher saw a `.json`
     /// written, W49.reader-sidecar-names-refresh). True when a row changed.
     func syncSidecarNames(_ files: [ArchiveFile]) async -> Bool {
-        guard !files.isEmpty, await openForQuery() else { return false }
-        let idx = index
+        guard !files.isEmpty, let idx = await openForQuery() else { return false }
         let changed = await Task.detached(priority: .userInitiated) { () -> Int in
             let changes = Self.sidecarChanges(stored: await idx.storedSidecarStamps(),
                                               current: SidecarStamp.stamps(of: files.filter { !$0.isCatalogue }), among: files)
@@ -447,7 +479,7 @@ final class ContentIndexer: ObservableObject {
 
     /// Page 2's item fields and the user's corrections, per indexed path that has either.
     func itemFields(for paths: [String]) async -> [String: IndexedItemFields] {
-        guard await openForQuery() else { return [:] }
+        guard let index = await openForQuery() else { return [:] }
         return await index.itemFields(for: paths)
     }
 
@@ -464,17 +496,21 @@ final class ContentIndexer: ObservableObject {
         }
     }
 
-    /// Open the index for a query, recording an `unavailable` failure (and returning false) when it
+    /// Open the current index for a query, recording an `unavailable` failure (and returning nil) when it
     /// can't be opened — a query over a dead index otherwise degrades to an empty result the user
     /// reads as "no matches" (W23.m9).
-    private func openForQuery() async -> Bool {
+    private func openForQuery() async -> ContentIndex? {
+        let current = index
         do {
-            try await index.open()
-            if case .unavailable = failure { setFailure(nil) }   // it opened; that claim is now false
-            return true
+            try await current.open()
+            guard current === index, !Task.isCancelled else { return nil }
+            if case .unavailable = failure { setFailure(nil) }
+            return current
+        } catch is CancellationError {
+            return nil
         } catch {
-            setFailure(.unavailable(detail: Self.detail(error)))
-            return false
+            if current === index { setFailure(.unavailable(detail: Self.detail(error))) }
+            return nil
         }
     }
 
@@ -486,13 +522,13 @@ final class ContentIndexer: ObservableObject {
 
     /// Current catalogue-rule hits with each resolved owner's companion digest.
     func catalogueHits(ftsExpression: String) async -> [UTF8Key: [UUID: Data]] {
-        guard await openForQuery() else { return [:] }
+        guard let index = await openForQuery() else { return [:] }
         return await index.catalogueHits(ftsExpression: ftsExpression)
     }
 
     /// Full-text search → matching file paths in **bm25 relevance order** (best match first).
     func search(_ query: String, bodyOnly: Bool = false) async -> [String] {
-        guard await openForQuery() else { return [] }
+        guard let index = await openForQuery() else { return [] }
         return await index.search(query, bodyOnly: bodyOnly)
     }
 
@@ -501,43 +537,43 @@ final class ContentIndexer: ObservableObject {
     /// for every match at corpus scale.
     func searchRanked(_ query: String, snippetLimit: Int = 300,
                       bodyOnly: Bool = false) async -> ContentIndex.RankedSearch {
-        guard await openForQuery() else { return ContentIndex.RankedSearch(paths: [], snippets: [:]) }
+        guard let index = await openForQuery() else { return ContentIndex.RankedSearch(paths: [], snippets: [:]) }
         return await index.searchRanked(query, snippetLimit: snippetLimit, bodyOnly: bodyOnly)
     }
 
     /// Paths matching a ready-made FTS5 expression (an Advanced Search text rule), bm25 order.
     func search(expression: String, bodyOnly: Bool = false) async -> [String] {
-        guard await openForQuery() else { return [] }
+        guard let index = await openForQuery() else { return [] }
         return await index.search(expression: expression, bodyOnly: bodyOnly)
     }
 
     /// `searchRanked` for a ready-made expression (an Advanced Search's text rules together).
     func searchRanked(expression: String, snippetLimit: Int = 300,
                       bodyOnly: Bool = false) async -> ContentIndex.RankedSearch {
-        guard await openForQuery() else { return ContentIndex.RankedSearch(paths: [], snippets: [:]) }
+        guard let index = await openForQuery() else { return ContentIndex.RankedSearch(paths: [], snippets: [:]) }
         return await index.searchRanked(expression: expression, snippetLimit: snippetLimit, bodyOnly: bodyOnly)
     }
 
     func snippets(expression: String, for paths: [String], bodyOnly: Bool = false) async -> (snippets: [String: String], attempted: Int) {
-        guard await openForQuery() else { return ([:], 0) }
+        guard let index = await openForQuery() else { return ([:], 0) }
         return await index.snippets(expression: expression, for: paths, bodyOnly: bodyOnly)
     }
 
     /// The snippets `searchRanked` left out, for the hits the list is showing (see `ContentIndex.snippets`).
     func snippets(_ query: String, for paths: [String], bodyOnly: Bool = false) async -> (snippets: [String: String], attempted: Int) {
-        guard await openForQuery() else { return ([:], 0) }
+        guard let index = await openForQuery() else { return ([:], 0) }
         return await index.snippets(query, for: paths, bodyOnly: bodyOnly)
     }
 
     /// Classification (`Document Start`/`Continuation`/`Box`/`Folder`) per path, where indexed.
     func classifications(for paths: [String]) async -> [String: String] {
-        guard await openForQuery() else { return [:] }
+        guard let index = await openForQuery() else { return [:] }
         return await index.classifications(for: paths)
     }
 
     /// Non-standard-PDF status per path (unreadable / no-text-layer / standard), where indexed.
     func formatStatuses(for paths: [String]) async -> [String: PDFFormatStatus] {
-        guard await openForQuery() else { return [:] }
+        guard let index = await openForQuery() else { return [:] }
         return await index.formatFlags(for: paths)
     }
 
@@ -545,7 +581,7 @@ final class ContentIndexer: ObservableObject {
     /// paths** — the shared index is never pruned, so a corpus-wide count over-reports after a root
     /// switch. Scoped so the badge matches the path-scoped `needsAttentionOnly` filter.
     func needsAttentionCount(among paths: [String]) async -> Int {
-        guard await openForQuery() else { return 0 }
+        guard let index = await openForQuery() else { return 0 }
         return await index.needsAttentionCount(among: paths)
     }
 

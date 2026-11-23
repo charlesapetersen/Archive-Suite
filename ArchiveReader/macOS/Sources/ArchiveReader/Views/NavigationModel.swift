@@ -351,8 +351,10 @@ final class NavigationModel: ObservableObject {
         self.excludedFolders = excludedFolders
             ?? (defaults === UserDefaults.standard ? .shared : ExcludedFoldersStore(defaults: defaults))
         library.setRootResolver { [weak self] in
-            guard let self, let url = self.rootStore.reResolveSavedRoot() else { return nil }
-            return self.resolvedLibraryRoot(url)
+            guard let self else { return nil }
+            let url = self.rootStore.reResolveSavedRoot()
+            self.configureContentIndex(for: url)
+            return url.map(self.resolvedLibraryRoot)
         }
         library.onExternalTagChanges = { [weak self] in self?.folderDateRecordsSeeExternal($0) }   // W49…fu2
         filter.read = AppSettings.defaultReadFilter
