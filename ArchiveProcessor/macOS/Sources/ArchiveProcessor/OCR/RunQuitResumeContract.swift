@@ -185,9 +185,16 @@ enum RunQuitResumeContract {
         check("the second resume reads only pages the first did not", readAgain > 0
               && secondKeys.count == inFlight + readAgain && secondKeys.isSuperset(of: firstKeys),
               "\(readAgain) read, \(secondKeys.sorted()) saved")
-        let pdfs = ((try? fm.contentsOfDirectory(atPath: output.path)) ?? []).filter { $0.hasSuffix(".pdf") }
-        check("each saved page has one output PDF, none written twice", pdfs.count == secondKeys.count,
-              pdfs.sorted().joined(separator: ", "))
+        let published = ((try? fm.contentsOfDirectory(atPath: output.path)) ?? []).filter { $0.hasSuffix(".pdf") }
+        let working = OCRProcessor.savedCatalogueRun()?.workingRoot
+        let staged = working.flatMap { try? fm.contentsOfDirectory(atPath: $0.path) } ?? []
+        let pdfs = staged.filter { $0.hasSuffix(".pdf") }
+        let recordedPaths = Set(afterSecond?.completedOutputPaths?.values.map {
+            URL(fileURLWithPath: $0).lastPathComponent
+        } ?? [])
+        check("each saved page has one private PDF and quit exposes no incomplete output",
+              pdfs.count == secondKeys.count && Set(pdfs) == recordedPaths && published.isEmpty,
+              "working \(pdfs.sorted()), published \(published.sorted())")
         OCRProcessor.quitApproved = false
 
         // 4. Stop pressed while the quit waits takes the quit back.

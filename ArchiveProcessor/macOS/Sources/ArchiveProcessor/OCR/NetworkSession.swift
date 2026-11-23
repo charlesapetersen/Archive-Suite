@@ -189,6 +189,8 @@ enum NetworkSession {
                || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[RetryBackendTestDriver.envKey])
                || testTransportIsEnabled(
+                flag: ProcessInfo.processInfo.environment[TextLayerTestDriver.envKey])
+               || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[OpenRouterTestDriver.envKey])
                || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[OCRCascadeTestDriver.envKey])

@@ -847,17 +847,17 @@ extension OCRProcessor {
 
     /// The live answer for this process, resolved from its environment.
     nonisolated static var pendingStateDirectoryFromEnvironment: URL {
+        let env = ProcessInfo.processInfo.environment
 #if DEBUG
         if PaidBatchUITestFixture.isActive { return PaidBatchUITestFixture.stateDirectory }
         if MoneyJourneyFixture.isActive { return MoneyJourneyFixture.directory.appendingPathComponent("state") }
-        if ProcessInfo.processInfo.environment["TEXTLAYER_TEST"] == "1",
-           let scoped = validatedPendingStateOverride(testFlag: "1",
-                                                      overrideRoot: ProcessInfo.processInfo.environment["TEXTLAYER_TEST_STATE"],
-                                                      fileManager: .default) {
-            return scoped
+        for (flag, key) in [("TEXTLAYER_TEST", "TEXTLAYER_TEST_STATE"),
+                            ("RETRY_BACKEND_TEST", "RETRY_BACKEND_TEST_STATE")] {
+            if let scoped = validatedPendingStateOverride(testFlag: env[flag], overrideRoot: env[key], fileManager: .default) {
+                return scoped
+            }
         }
 #endif
-        let env = ProcessInfo.processInfo.environment
         return pendingStateDirectory(testFlag: env[batchResumeTestEnvKey],
                                      overrideRoot: env[pendingStateTestRootEnvKey])
     }
@@ -927,7 +927,7 @@ extension OCRProcessor {
     }
 
     /// Bind the frozen plan to the exact journals it supersedes. Each has its own consistency checks.
-    func catalogueInputJournalDigests(for run: ProcessorCatalogueRun) throws -> [String: String] {
+    func catalogueInputJournalDigests(for run: ProcessorCatalogueRun, completed: Bool = true) throws -> [String: String] {
         func sameRun(_ root: URL, _ sources: [URL]?) -> Bool {
             root.standardizedFileURL.path == run.outputRoot.path
                 && sources?.map { $0.standardizedFileURL.path } == run.sources.map { $0.standardizedFileURL.path }
@@ -942,15 +942,17 @@ extension OCRProcessor {
                         && sameRun($0.outputDirectory, Self.mixedInputURLs(images: $0.fileURLs, pdfs: $0.mixedPDFOutcomes))
                 } == true
             case Self.pendingBatchURL:
-                verified = !batchPollInterrupted && Self.loadPendingBatch().map {
-                    Self.pendingBatchIsSelfConsistent($0) && $0.submissionComplete
+                verified = Self.loadPendingBatch().map {
+                    Self.pendingBatchIsSelfConsistent($0)
+                        && (!completed || (!batchPollInterrupted
+                            && ($0.submissionComplete || !$0.effectiveChunkIds.isEmpty)))
                         && sameRun($0.outputDirectory, Self.mixedInputURLs(images: $0.fileURLs, pdfs: $0.mixedPDFOutcomes))
                 } == true
             default:
                 verified = Self.loadPendingMixedPDF().map {
                     Self.pendingMixedPDFIsSelfConsistent($0) && sameRun($0.outputDirectory, $0.originalFiles)
-                        && $0.inFlightPage == nil && $0.completedOutcomes.count == $0.pdfIndices.count
-                        && Self.mixedPDFOutputsMatchJournal($0)
+                        && (!completed || ($0.inFlightPage == nil && $0.completedOutcomes.count == $0.pdfIndices.count
+                            && Self.mixedPDFOutputsMatchJournal($0)))
                 } == true
             }
             guard verified, let digest = Self.mixedPDFSourceDigest(url) else { throw CocoaError(.fileReadCorruptFile) }
@@ -959,15 +961,29 @@ extension OCRProcessor {
         return digests
     }
 
-    func retireCatalogueInputJournals(for run: ProcessorCatalogueRun) throws {
+    func retireCatalogueInputJournals(for run: ProcessorCatalogueRun) throws -> URL? {
         let journals = [Self.pendingRunURL, Self.pendingBatchURL, Self.pendingMixedPDFURL]
             .filter(Self.workingOutputOccupied)
         for journal in journals {
             guard let expected = run.inputJournalDigests?[journal.lastPathComponent],
                   Self.mixedPDFSourceDigest(journal) == expected else { throw CocoaError(.fileReadCorruptFile) }
         }
+        let batchArchive = Self.pendingBatchURL.deletingLastPathComponent()
+            .appendingPathComponent(run.workingRoot.lastPathComponent + "-partial-batch.json")
+        if let pending = Self.loadPendingBatch(), !pending.submissionComplete {
+            let fingerprint = run.inputJournalDigests?[Self.pendingBatchURL.lastPathComponent]
+            if !Self.workingOutputOccupied(batchArchive) {
+                let data = try Data(contentsOf: Self.pendingBatchURL)
+                try data.write(to: batchArchive, options: .withoutOverwriting)
+                try ProcessorCatalogueRun.flushFileAndParent(batchArchive)
+            }
+            guard fingerprint != nil, Self.mixedPDFSourceDigest(batchArchive) == fingerprint else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+        }
         for journal in journals { try FileManager.default.removeItem(at: journal) }
         try ProcessorCatalogueRun.flushFileAndParent(Self.pendingCatalogueURL)
+        return Self.workingOutputOccupied(batchArchive) ? batchArchive : nil
     }
 
     // MARK: - Processing history (cost + run log)
@@ -1638,6 +1654,7 @@ extension OCRProcessor {
            !Self.workingOutputOccupied(Self.pendingRunURL), !Self.workingOutputOccupied(Self.pendingBatchURL),
            !Self.workingOutputOccupied(Self.pendingMixedPDFURL) {
             pendingBatchInfo = nil
+            pendingMixedPDFInfo = nil
             pendingRunInfo = "Process Files kept a working copy before it could prepare the catalogue filing. Set it aside with Dismiss before starting the run again."
             pendingRunBackend = nil
             return
@@ -1686,6 +1703,9 @@ extension OCRProcessor {
                 NSLog("[ArchiveProcessor] WARNING: pending RUN manifest failed the self-consistency check but is being PRESERVED (kept on disk so its cached results are not lost/re-charged).")
                 pendingRunInfo = "An interrupted run was found but its manifest failed a self-consistency check (it may be torn or tampered). It has NOT been discarded; the manifest was kept for recovery."
             }
+        } else if Self.workingOutputOccupied(Self.pendingRunURL) {
+            pendingRunInfo = "An interrupted run's record could not be read. Dismiss sets aside its recovery files."
+            pendingRunBackend = nil
         } else {
             pendingRunInfo = nil
             pendingRunBackend = nil
@@ -1783,17 +1803,24 @@ extension OCRProcessor {
         Self.deletePendingBatch()
         activePendingBatch = nil
     }
-    /// Dismiss a pending batch notification (deletes local state only — server-side batch continues).
+    /// Dismiss stops local recovery. The provider can still run and charge for a submitted batch.
     func dismissPendingBatch() {
-        // The provider still runs and bills the job (W46.settings-ledger-more); a Stop or an interruption that
-        // already counted it, by its run id, is not counted again.
-        if let pending = Self.loadPendingBatch() {
-            let config = makePendingBatchResumeConfig(pending, apiKey: "")
-            Self.recordLedgerSpend(RunHistorySnapshot(resuming: pending, rotationMode: config.rotationMode,
-                                                      imageScale: config.imageScale), jobs: [], wholeRun: true)
+        guard !isProcessing else { return }
+        do {
+            let lease = try ProcessorCatalogueRun.Lease(journal: Self.pendingCatalogueURL)
+            defer { withExtendedLifetime(lease) {} }
+            let batch = Self.loadPendingBatch()
+            if try !setAsideCatalogueRecovery(requestedJournal: Self.pendingBatchURL) { Self.deletePendingBatch() }
+            if let batch {
+                let config = makePendingBatchResumeConfig(batch, apiKey: "")
+                Self.recordLedgerSpend(RunHistorySnapshot(resuming: batch, rotationMode: config.rotationMode,
+                                                          imageScale: config.imageScale), jobs: [], wholeRun: true)
+            }
+            activePendingBatch = nil
+            checkForPendingBatch()
+        } catch {
+            statusMessage = "The batch recovery files are still active. \(error.localizedDescription)"
         }
-        Self.deletePendingBatch()
-        checkForPendingBatch()
     }
     /// W49.proc-resume-standard-runs: a resume reads the run's own file list, so a page moved, renamed or deleted since
     /// is not found. Said in the Interrupted Run box before Resume, rather than discovered as failures afterwards.
@@ -1811,26 +1838,60 @@ extension OCRProcessor {
     /// Dismiss a pending run notification.
     func dismissPendingRun() {
         guard !isProcessing else { return }
-        if FileManager.default.fileExists(atPath: Self.pendingCatalogueURL.path) {
-            let recovery = Self.pendingCatalogueURL.deletingLastPathComponent()
-                .appendingPathComponent("catalogue-recovery-" + UUID().uuidString + ".json")
-            do {
-                let lease = try ProcessorCatalogueRun.Lease(journal: Self.pendingCatalogueURL)
-                try withExtendedLifetime(lease) { try FileManager.default.moveItem(at: Self.pendingCatalogueURL, to: recovery) }
-            }
-            catch {
-                statusMessage = "Could not set aside the catalogue recovery record. Its working files remain saved."
-                return
-            }
-            catalogueRun = nil
-            statusMessage = "Catalogue recovery record and working files kept in \(recovery.deletingLastPathComponent().path)."
+        do {
+            let lease = try ProcessorCatalogueRun.Lease(journal: Self.pendingCatalogueURL)
+            defer { withExtendedLifetime(lease) {} }
+            if try !setAsideCatalogueRecovery(requestedJournal: Self.pendingRunURL) { Self.deletePendingRun() }
+            activePendingRun = nil
+            checkForPendingBatch()
+        } catch {
+            statusMessage = "The run recovery files are still active. \(error.localizedDescription)"
         }
-        Self.deletePendingRun()
-        // The banner describes this in-memory manifest as well as its on-disk counterpart. Leaving the
-        // former live lets a later paid batch misclassify its results as part of the dismissed run.
-        activePendingRun = nil
-        pendingRunInfo = nil
     }
+
+    /// The lease couples the working plan to its input journals. Copy and flush the entire set
+    /// before releasing its active names. The private working directory stays with the saved plan.
+    func setAsideCatalogueRecovery(requestedJournal: URL) throws -> Bool {
+        let journal = Self.pendingCatalogueURL
+        guard Self.workingOutputOccupied(journal) else { return false }
+        let inputs = [Self.pendingRunURL, Self.pendingBatchURL, Self.pendingMixedPDFURL]
+            .filter(Self.workingOutputOccupied)
+        if !inputs.isEmpty, inputs != [requestedJournal] {
+            guard let run = Self.savedCatalogueRun() else { throw CocoaError(.fileReadCorruptFile) }
+            let expected = try run.files == nil ? catalogueInputJournalDigests(for: run, completed: false)
+                : run.inputJournalDigests ?? [:]
+            for input in inputs {
+                guard let digest = expected[input.lastPathComponent], Self.mixedPDFSourceDigest(input) == digest else {
+                    throw CocoaError(.fileReadCorruptFile)
+                }
+            }
+        }
+        let recovery = journal.deletingLastPathComponent()
+            .appendingPathComponent("catalogue-recovery-" + UUID().uuidString, isDirectory: true)
+        let fm = FileManager.default
+        try fm.createDirectory(at: recovery, withIntermediateDirectories: false,
+                               attributes: [.posixPermissions: 0o700])
+        for file in [journal] + inputs {
+            guard (try? fm.destinationOfSymbolicLink(atPath: file.path)) == nil else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            let contents = try Data(contentsOf: file)
+            let archived = recovery.appendingPathComponent(file.lastPathComponent)
+            try contents.write(to: archived, options: .withoutOverwriting)
+            try ProcessorCatalogueRun.flushFileAndParent(archived)
+        }
+        try ProcessorCatalogueRun.flushFileAndParent(journal)
+        for input in inputs { try fm.removeItem(at: input) }
+        try ProcessorCatalogueRun.flushFileAndParent(journal)
+        try fm.removeItem(at: journal)
+        catalogueRun = nil
+        activePendingRun = nil
+        activePendingBatch = nil
+        activePendingMixedPDF = nil
+        statusMessage = "Catalogue recovery records kept in \(recovery.path)."
+        return true
+    }
+
     /// Resume polling a previously submitted batch.
     func resumeBatch(apiKey: String) async {
         // Ignore a torn/tampered manifest rather than misapply it (Tier-2 rule e).
@@ -1847,7 +1908,10 @@ extension OCRProcessor {
               beginCatalogueRun(outputRoot: pending.outputDirectory,
                                 sources: Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes) ?? pending.fileURLs,
                                 resuming: true, confirmResume: {
-            guard let current = Self.loadPendingBatch() else { return false }
+            guard let current = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(current) else { return false }
+            if let savedFingerprint = savedBatch.lifecycleFingerprint {
+                return current.lifecycleFingerprint == savedFingerprint
+            }
             return Self.sameJournalPayload(current, savedBatch)
         }) else { return }
         defer { catalogueRunLease = nil }
@@ -2201,7 +2265,8 @@ extension OCRProcessor {
               beginCatalogueRun(outputRoot: pending.outputDirectory,
                                 sources: Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes) ?? pending.fileURLs,
                                 resuming: true, confirmResume: {
-            guard let current = Self.loadPendingRun() else { return false }
+            guard let current = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(current) else { return false }
+            if pending.runtimeConfig != nil && pending.runFingerprint != nil { return current.runFingerprint == pending.runFingerprint }
             return Self.sameJournalPayload(current, pending)
         }) else { return }
         defer { catalogueRunLease = nil }

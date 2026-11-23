@@ -248,7 +248,9 @@ enum BatchPollCancelContract {
         let survived = fm.fileExists(atPath: OCRProcessor.pendingBatchURL.path)
         let offersResume = processor.pendingBatchInfo != nil
         let stoppedProcessing = !processor.isProcessing
-        OCRProcessor.deletePendingBatch()
+        processor.dismissPendingBatch()
+        check("resumed poll: explicit Dismiss sets aside the scratch batch and its catalogue plan together",
+              OCRProcessor.savedCatalogueRun() == nil && !fm.fileExists(atPath: OCRProcessor.pendingBatchURL.path))
 
         check("resumed poll: Stop during a RESUMED paid batch leaves its journal on disk",
               existedBefore && resumable && survived)

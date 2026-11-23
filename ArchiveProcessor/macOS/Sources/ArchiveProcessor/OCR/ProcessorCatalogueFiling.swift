@@ -105,7 +105,14 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
         let pending = ".archivesuite-export-" + UUID().uuidString.lowercased()
         let output = openat(parent, pending, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
         guard output >= 0 else { throw ioError() }
-        defer { close(output) }
+        defer {
+            var held = stat(), named = stat()
+            if fstat(output, &held) == 0, fstatat(parent, pending, &named, AT_SYMLINK_NOFOLLOW) == 0,
+               held.st_dev == named.st_dev, held.st_ino == named.st_ino {
+                _ = unlinkat(parent, pending, 0)
+            }
+            close(output)
+        }
         guard fcopyfile(input, output, nil, copyfile_flags_t(COPYFILE_ALL)) == 0 else { throw ioError() }
 
         let original = FileHandle(fileDescriptor: input, closeOnDealloc: false)

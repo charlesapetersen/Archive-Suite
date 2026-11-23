@@ -20,7 +20,8 @@ fake="$PWD/scripts/localagent-fake-cli.sh"
 chmod +x "$fake" 2>/dev/null || true
 
 ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$work/backup" \
-    RETRY_BACKEND_TEST=1 RETRY_BACKEND_TEST_OUT="$report" LOCALAGENT_FAKE_CLI="$fake" \
+    RETRY_BACKEND_TEST=1 RETRY_BACKEND_TEST_OUT="$report" RETRY_BACKEND_TEST_STATE="$work/state" \
+    LOCALAGENT_FAKE_CLI="$fake" \
     processor_test_start pid "$bin" >"$log" 2>&1
 
 wait_for_test_report "$report" "$log" "$pid" "Retry-backend" "RETRY" 120

@@ -40,10 +40,29 @@ struct ProcessorCatalogueRun: Codable, Sendable {
 
     let outputRoot: URL
     let workingRoot: URL
+    private let workingDirectory: DirectoryIdentity?
     let openedAt: Date
     let sources: [URL]
     var files: [File]?
     var inputJournalDigests: [String: String]?
+
+    private struct DirectoryIdentity: Codable, Equatable, Sendable {
+        let device: dev_t
+        let inode: ino_t
+
+        init?(_ url: URL) {
+            var info = stat()
+            guard lstat(url.path, &info) == 0, info.st_mode & S_IFMT == S_IFDIR,
+                  info.st_uid == geteuid(), info.st_mode & 0o077 == 0 else { return nil }
+            device = info.st_dev
+            inode = info.st_ino
+        }
+    }
+
+    var hasWorkingDirectory: Bool {
+        guard let live = DirectoryIdentity(workingRoot) else { return false }
+        return workingDirectory.map { $0 == live } ?? true
+    }
 
     private struct Envelope: Codable {
         let contents: Data
@@ -55,10 +74,18 @@ struct ProcessorCatalogueRun: Codable, Sendable {
             .appendingPathComponent("catalogue-work-" + UUID().uuidString.lowercased(), isDirectory: true)
         try FileManager.default.createDirectory(at: working, withIntermediateDirectories: false,
                                                 attributes: [.posixPermissions: 0o700])
-        let run = Self(outputRoot: outputRoot.standardizedFileURL, workingRoot: working,
+        guard let identity = DirectoryIdentity(working) else { throw CocoaError(.fileWriteNoPermission) }
+        let run = Self(outputRoot: outputRoot.standardizedFileURL, workingRoot: working, workingDirectory: identity,
                        openedAt: Date(), sources: sources)
-        try run.save(to: journal, new: true)
-        return run
+        do {
+            try run.save(to: journal, new: true)
+            return run
+        } catch {
+            if !OCRProcessor.workingOutputOccupied(journal) && run.hasWorkingDirectory {
+                try? FileManager.default.removeItem(at: working)
+            }
+            throw error
+        }
     }
 
     static func load(from journal: URL) throws -> Self {
@@ -73,7 +100,7 @@ struct ProcessorCatalogueRun: Codable, Sendable {
         let prefix = "catalogue-work-"
         guard run.workingRoot.deletingLastPathComponent().standardizedFileURL == stateRoot,
               name.hasPrefix(prefix), UUID(uuidString: String(name.dropFirst(prefix.count))) != nil,
-              run.outputRoot.isFileURL,
+              run.outputRoot.isFileURL, run.hasWorkingDirectory,
               (run.files ?? []).allSatisfy({ run.contains($0.workingPDF) && run.contains($0.prepared) && $0.filing.root == run.outputRoot
                   && $0.exports.allSatisfy { run.contains($0.prepared) } }) else {
             throw CocoaError(.fileReadCorruptFile)
@@ -108,7 +135,7 @@ struct ProcessorCatalogueRun: Codable, Sendable {
     }
 
     func copyPreOCRSource(_ source: URL, to working: URL) throws {
-        guard contains(working) else { throw CocoaError(.fileWriteInvalidFileName) }
+        guard hasWorkingDirectory, contains(working) else { throw CocoaError(.fileWriteInvalidFileName) }
         let input = open(source.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
         guard input >= 0 else { throw CocoaError(.fileReadNoPermission) }
         defer { close(input) }
@@ -136,7 +163,7 @@ struct ProcessorCatalogueRun: Codable, Sendable {
     }
 
     func fileOutputs() throws -> [URL] {
-        guard let files else { throw CocoaError(.fileReadCorruptFile) }
+        guard hasWorkingDirectory, let files else { throw CocoaError(.fileReadCorruptFile) }
         for file in files {
             try Task.checkCancellation()
             _ = try file.filing.file(preparedPDF: file.prepared, record: file.record)

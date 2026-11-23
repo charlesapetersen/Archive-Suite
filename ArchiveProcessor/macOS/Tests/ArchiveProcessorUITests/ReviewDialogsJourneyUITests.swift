@@ -331,6 +331,8 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
             "-rotationModeRaw", "off", "-reviewRotation", "NO", "-outputImageFile", "NO"
         ]
         let out = try launch("s035-paid", args + ["-APUITestSeedPaidBatch"], collectionID: true)
+        let legacy = try Dictionary(uniqueKeysWithValues: filedPDFs(in: out).map { ($0, try Data(contentsOf: $0)) })
+        XCTAssertEqual(legacy.count, 6)
         let resume = app.buttons["Resume Batch"]
         XCTAssertTrue(resume.waitForExistence(timeout: 30), "the scratch journal was persisted")
         _ = try launch("s035-paid", args, collectionID: true, preservePendingRun: true)
@@ -377,7 +379,12 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         XCTAssertTrue(text(of: done).hasPrefix("Done. 6 succeeded, 0 failed."))
         XCTAssertEqual(reviews, ["collection names", "per-collection pages"])
         shot("s035-paid-done")
-        let pdfs = filedPDFs(in: out)
+        for (pdf, original) in legacy {
+            XCTAssertEqual(try Data(contentsOf: pdf), original)
+        }
+        let pdfs = filedPDFs(in: out).filter {
+            FileManager.default.fileExists(atPath: $0.appendingPathExtension("archivesuite.json").path)
+        }
         XCTAssertEqual(pdfs.count, 6)
         XCTAssertTrue(pdfs.allSatisfy { $0.deletingLastPathComponent().lastPathComponent == "Scratch Papers" })
         XCTAssertTrue(pdfs.allSatisfy { finderTags(of: $0).contains("Unread") })
@@ -627,7 +634,9 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
             "-selectedProvider", "Gemini", "-preOCRedInput", "NO",
             "-mergeDocuments", "NO", "-enableCollectionSegmentation", collectionID ? "YES" : "NO",
             "-confirmCollectionIDs", collectionID ? "YES" : "NO", "-enableSegmentJSON", "YES",
-            "-tagVocabulary", ""
+            // Keep the journey on its stand-in reader. The separate date and item-field contracts
+            // exercise enrichment with offline transports.
+            "-macItemFields", "NO", "-tagVocabulary", ""
         ] + settings)
         app.launchEnvironment = [
             "ARCHIVEPROC_HEADLESS": "1",   // keychain quiet; the window still draws

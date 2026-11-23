@@ -338,7 +338,10 @@ extension OCRProcessor {
                 rotationDegrees: existingResult.rotationDegrees
             )
         }
-        if filed { return }
+        if filed {
+            statusMessage = "Classification updated in the working list."
+            return
+        }
         // Page 2's Classification follows the edit (W40.fix-processor-review-classification-stale).
         if rewriteHeader, oldClassification != newClassification {
             writeClassificationHeader(forJobAt: index, runConfig: runConfig)

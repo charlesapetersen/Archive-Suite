@@ -1206,6 +1206,20 @@ enum DateRouteTestDriver {
         func staged(_ gid: String) -> LiveCaptureProcessor.StagedSegment? { s.liveProcessor.staged.first { $0.groupId == gid } }
         func dating(_ gid: String) -> [String: Any]? { json(staged(gid)?.jsonURL)["dating"] as? [String: Any] }
         func tags(_ gid: String) -> [String] { staged(gid)?.pdfURLs.first.flatMap { try? MacOSTagger.readTags(from: $0) } ?? [] }
+        func catalogueDate(_ segment: LiveCaptureProcessor.StagedSegment?)
+            -> (CatalogueRecord.DateValue, CatalogueRecord.Evidence<CatalogueRecord.DateValue>?)? {
+            guard let data = segment?.catalogueRecords?.first, let record = try? CatalogueRecord(json: data),
+                  let field = record.documents.first?.fields?.documentDate,
+                  case .value(let date) = field.current else { return nil }
+            return (date, field.evidence.first)
+        }
+        func readsCatalogueDate(_ segment: LiveCaptureProcessor.StagedSegment?, _ value: String,
+                                source: String, quote: String, observed: String? = nil, uncertain: Bool = false) -> Bool {
+            guard let (date, evidence) = catalogueDate(segment) else { return false }
+            return date.date == ArchiveDate.parse(wireValue: value) && date.uncertain == uncertain
+                && evidence?.source == source && evidence?.quote == quote
+                && evidence?.observedValue?.date == ArchiveDate.parse(wireValue: observed ?? value)
+        }
         func evidence(_ gid: String) -> String? {
             guard let pdf = staged(gid)?.pdfURLs.first, let doc = PDFDocument(url: pdf), let page = doc.page(at: 1) else { return nil }
             return PDFHeaderParser.parse(page).header?.dateEvidence
@@ -1225,8 +1239,9 @@ enum DateRouteTestDriver {
               b.contains("1961") && b.contains("3 March") && !b.contains("1950") && !b.contains("Date Uncertain")
               && (dating("B")?["second_role_dates"] as? [[String: Any]])?.first?["quote"] as? String == "RECEIVED APR 4 1961",
               "\(b)")
-        check("6 Live B: the staged PDF's header names the image evidence",
-              evidence("B") == "image; page 1; dateline; \"March 30, 1961\"; gave 1961-03-30", "\(String(describing: evidence("B")))")
+        check("6 Live B: the staged record holds the exact image date and its quoted evidence",
+              readsCatalogueDate(staged("B"), "1961-03-30", source: "image", quote: "March 30, 1961")
+                && evidence("B") == nil)
         let c = tags("C")
         check("6 Live C: an estimate with no neighbour sent writes no year (not the tagging call's 1950), Date Uncertain",
               !c.contains("1947") && !c.contains("1950") && c.contains("Date Uncertain")
@@ -1283,13 +1298,13 @@ enum DateRouteTestDriver {
               }, "\(wire.images)")
         check("6 Live: B keeps its date when the refreshed image reply cannot be read",
               ((dating("B") ?? [:]) as NSDictionary) == before
-              && evidence("B") == "image; page 1; dateline; \"March 30, 1961\"; gave 1961-03-30")
+              && readsCatalogueDate(staged("B"), "1961-03-30", source: "image", quote: "March 30, 1961"))
         let corrected = tags("C")
-        check("6 Live: the corrected image dates C in the Finder tags, sidecar and PDF header",
+        check("6 Live: the corrected image dates C in the Finder tags, optional export and catalogue record",
               corrected.contains("1962") && corrected.contains("Day 10") && !corrected.contains("Date Uncertain")
               && dating("C")?["class"] as? String == "image"
               && json(staged("C")?.jsonURL)["date"] as? String == "1962-04-10"
-              && evidence("C") == "image; page 1; dateline; \"April 10, 1962\"; gave 1962-04-10"
+              && readsCatalogueDate(staged("C"), "1962-04-10", source: "image", quote: "April 10, 1962")
               && !fieldsBefore.allKeys.isEmpty && ((fields("C") ?? [:]) as NSDictionary) == fieldsBefore,
               "\(corrected) \(String(describing: dating("C")))")
         let refreshed = CaptureSession()
@@ -1309,10 +1324,6 @@ enum DateRouteTestDriver {
         func fStaged(_ gid: String) -> LiveCaptureProcessor.StagedSegment? { f.liveProcessor.staged.first { $0.groupId == gid } }
         func fTags(_ gid: String) -> [String] { fStaged(gid)?.pdfURLs.first.flatMap { try? MacOSTagger.readTags(from: $0) } ?? [] }
         func fDating(_ gid: String) -> [String: Any]? { json(fStaged(gid)?.jsonURL)["dating"] as? [String: Any] }
-        func fEvidence(_ gid: String) -> String? {
-            guard let pdf = fStaged(gid)?.pdfURLs.first, let doc = PDFDocument(url: pdf), let page = doc.page(at: 1) else { return nil }
-            return PDFHeaderParser.parse(page).header?.dateEvidence
-        }
         var seq = 0
         func capture(_ gid: String, _ type: CaptureGroupType, _ text: String, month: Int? = nil) async -> Bool {
             seq += 1
@@ -1342,18 +1353,15 @@ enum DateRouteTestDriver {
         }
         check("6 Live folder: every marker and document stages", captured, "\(f.liveProcessor.staged.map(\.groupId))")
         let g = fTags("G")
-        check("6 Live folder G: an undated document after a saved folder card takes its mid-point 1966, Date Uncertain",
+        check("6 Live folder G: the undated document takes the saved folder's uncertain midpoint",
               g.contains("1966") && g.contains("Date Uncertain") && fDating("G")?["class"] as? String == "folder"
               && fDating("G")?["folder_date"] as? String == "1965-1967"
-              && fEvidence("G") == "folder; from the folder; \"1965-1967\"; gave 1966, Date Uncertain", "\(g) \(String(describing: fEvidence("G")))")
-        let m = fTags("M"), mEvidence = fEvidence("M")
-        check("6 Live folder M: the phone's month over the folder's year; the line names the folder's date alone, so the "
-              + "Reader reads the month as the user's (W49.reader-finder-month-stands)",
+              && readsCatalogueDate(fStaged("G"), "1966", source: "folder", quote: "1965-1967", uncertain: true), "\(g)")
+        let m = fTags("M")
+        check("6 Live folder M: the catalogue date keeps the phone month and the folder evidence gives its year",
               m.contains("1966") && m.contains("4 April") && m.contains("Date Uncertain")
-              && mEvidence == "folder; from the folder; \"1965-1967\"; gave 1966, Date Uncertain"
-              && !ContainerFolderDate.evidenceDescribes(mEvidence, tags: DocumentTags.parse(raw: m, labelNumber: nil))
-              && ContainerFolderDate.evidenceDescribes(fEvidence("G"), tags: DocumentTags.parse(raw: g, labelNumber: nil)),
-              "\(m) \(String(describing: mEvidence))")
+              && readsCatalogueDate(fStaged("M"), "1966-04", source: "folder", quote: "1965-1967",
+                                    observed: "1966", uncertain: true), "\(m)")
         let h = fTags("H")
         check("6 Live folder H: its own text year wins", h.contains("1947") && !h.contains("1966")
               && !h.contains("Date Uncertain"), "\(h)")
@@ -1367,7 +1375,8 @@ enum DateRouteTestDriver {
         let k = fTags("K")
         check("6 Live folder K: Finish re-dates it from the card saved later: 1970, its month, no Date Uncertain",
               saved && finished && k.contains("1970") && k.contains("2 February") && !k.contains("Date Uncertain")
-              && fDating("K")?["class"] as? String == "folder" && fEvidence("K") == "folder; from the folder; \"Feb. 1970\"; gave 1970-02"
+              && fDating("K")?["class"] as? String == "folder"
+              && readsCatalogueDate(fStaged("K"), "1970-02", source: "folder", quote: "Feb. 1970")
               && f.liveProcessor._datingTestRetained("K")?.evidenceClass == .folder, "\(k)")
         let l = fTags("L")
         check("6 Live folder L: after a box, no folder date, and a box's date dates nothing",

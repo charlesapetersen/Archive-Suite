@@ -185,7 +185,8 @@ tagging mode **Automatic**, an output folder in the scratchpad (not inside `Test
 - [ ] Start processing → progress advances; multiple workers run concurrently (fast).
 - [ ] **Segmentation review** appears; boundaries are sensible (box=new box, folder=new folder, letters split by To/From/signature).
 - [ ] **Tagging review** appears; each doc has Year + `MM Month`, 2–6 subjects; undeterminable date → year estimated + `Date Uncertain`, month never guessed.
-- [ ] Output = **one PDF per input image**, same basename, in the output folder.
+- [ ] Each input image produces one PDF and its `<PDF filename>.archivesuite.json` companion in the output folder.
+  The PDF's embedded file and content-revision IDs match those in the companion.
 - [ ] **Page 1** = the original image full-page.
 - [ ] **Page 2** = header `Extracted text.`, subheader `[Provider] · [Model] · [D Month YYYY]`, then the body; **all text on a single tall page** (never overflows to page 3).
 - [ ] macOS Finder **tags applied**: year, month, subjects; **box photo → Red**, **folder photo → Purple**; **`Unread` present and applied last**.

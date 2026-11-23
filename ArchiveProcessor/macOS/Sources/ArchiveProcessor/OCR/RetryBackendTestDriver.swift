@@ -31,6 +31,11 @@ enum RetryBackendTestDriver {
     }
 
     static func run() async {
+        guard let state = ProcessInfo.processInfo.environment["RETRY_BACKEND_TEST_STATE"],
+              OCRProcessor.pendingCatalogueURL.deletingLastPathComponent().path == state else {
+            finish(["FAIL: retry requires an isolated test state directory"])
+            return
+        }
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appendingPathComponent(
             "APRetryBackend-\(UUID().uuidString)", isDirectory: true)

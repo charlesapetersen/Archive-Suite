@@ -111,7 +111,10 @@ enum SegmentationReviewTestDriver {
         defer {
             NetworkSession.testTransport = nil
             OCRProcessor.deletePendingBatch()
+            let catalogue = OCRProcessor()
+            catalogue.dismissPendingRun()
         }
+        let treePDF = try? Data(contentsOf: outputs[0])
         let id = "batches/segmentation-resume"
         var batch = OCRProcessor.PendingBatch(
             batchId: id, provider: .gemini, model: model,
@@ -163,8 +166,12 @@ enum SegmentationReviewTestDriver {
         }
         let canStop = await waitFor { stopped.processor.windowStopPrompt?.canResumeLater == true }
         check("26 a resumed paid batch opens its saved segmenter and offers Stop at a usage limit", canStop)
-        check("26 Resume reuses the recorded output in its tree folder",
-              stopped.processor.outputURLMap[urls[0]]?.path == outputs[0].path)
+        check("26 Resume preserves the recorded output and uses its private tree working copy",
+              stopped.processor.outputURLMap[urls[0]].map { working in
+                  working != outputs[0] && stopped.processor.catalogueRun?.contains(working) == true
+                      && working.deletingLastPathComponent().lastPathComponent == treeFolder.lastPathComponent
+                      && (try? Data(contentsOf: outputs[0])) == treePDF
+              } == true)
         check("26 a saved window was reused", limited.calls.count == 2 && !limited.calls.contains(firstWindow))
         if canStop { stopped.processor.answerWindowStop(.stop) } else { stopped.processor.cancel() }
         await stopped.task.value

@@ -23,9 +23,9 @@ extension OCRProcessor {
                 return false
             }
             if let saved = Self.savedCatalogueRun() {
-                let originalPaths = Set(saved.sources.map { $0.standardizedFileURL.path })
+                let originalPaths = saved.sources.map { $0.standardizedFileURL.path }
                 guard resuming, saved.files == nil, saved.outputRoot.path == outputRoot.standardizedFileURL.path,
-                      sources.allSatisfy({ originalPaths.contains($0.standardizedFileURL.path) }) else {
+                      sources.map({ $0.standardizedFileURL.path }) == originalPaths else {
                     checkForPendingBatch()
                     statusMessage = "A Process Files working copy is still saved. Resume it before starting another run."
                     return false
@@ -33,6 +33,14 @@ extension OCRProcessor {
                 catalogueRun = saved
                 catalogueRunLease = lease
                 return true
+            }
+            guard !Self.workingOutputOccupied(Self.pendingCatalogueURL) else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+            if !resuming, [Self.pendingRunURL, Self.pendingBatchURL, Self.pendingMixedPDFURL].contains(where: Self.workingOutputOccupied) {
+                checkForPendingBatch()
+                statusMessage = "An interrupted run is still saved. Resume it before starting another run."
+                return false
             }
             catalogueRun = try ProcessorCatalogueRun.create(outputRoot: outputRoot, sources: sources,
                                                             journal: Self.pendingCatalogueURL)
@@ -98,7 +106,7 @@ extension OCRProcessor {
     func completeCatalogueRun(_ run: ProcessorCatalogueRun) async throws -> [URL: URL] {
         let unfiled = try await PDFGenerator.runWorker(priority: .utility) { try run.fileOutputs() }
         try Task.checkCancellation()
-        try retireCatalogueInputJournals(for: run)
+        let archivedBatch = try retireCatalogueInputJournals(for: run)
         try FileManager.default.removeItem(at: Self.pendingCatalogueURL)
         activePendingRun = nil
         activePendingBatch = nil
@@ -113,7 +121,10 @@ extension OCRProcessor {
             for source in file.sources { outputURLMap[source] = file.destination }
         }
         catalogueFilingWarning = unfiled.isEmpty ? "" : " Optional exports were kept in \(run.workingRoot.path)."
-        if unfiled.isEmpty { try? FileManager.default.removeItem(at: run.workingRoot) }
+        if let archivedBatch {
+            catalogueFilingWarning += " Known batch results were filed. The interrupted submission record is saved at \(archivedBatch.path)."
+        }
+        if unfiled.isEmpty, run.hasWorkingDirectory { try? FileManager.default.removeItem(at: run.workingRoot) }
         catalogueRun = nil
         catalogueDocumentFields = [:]
         return moves
@@ -216,14 +227,18 @@ extension OCRProcessor {
                     .flatMap { owners[$0] }
                     .map { .init(documentID: $0.0, ownerFileID: $0.1) }
                 : nil
-            let document = ProcessorCatalogueRecord.Document(id: documentID, ownerFileID: ownerID,
-                                                             fields: belongsToOwner ? fields : nil, enclosedWith: cover)
             let segmentJobs = sources.compactMap { jobBySource[$0] }
             let manualQuality = (taggingMode == .human || taggingMode == .autoDate) && appliedGeneratedTags[first] != nil
             let quality = manualQuality ? DocumentTags.qualityTag(for: tags.quality) ?? "Q0"
                 : segmentJobs.flatMap(\.appliedTags).first(where: DocumentTags.isRatingToken)
             let failed = segmentJobs.contains { $0.status == .failed }
-            let fileFields = ProcessorCatalogueRecord.fileFields(tags: tags, quality: quality, unread: stampsUnread, failed: failed)
+            var fileFields = ProcessorCatalogueRecord.fileFields(tags: tags, quality: quality, unread: stampsUnread, failed: failed)
+            if passSourceTags {
+                let copiedTags = DocumentTags.parse(raw: jobBySource[first]?.appliedTags ?? [], labelNumber: nil)
+                ProcessorCatalogueRecord.applySourceTags(copiedTags, document: &fields, file: &fileFields)
+            }
+            let document = ProcessorCatalogueRecord.Document(id: documentID, ownerFileID: ownerID,
+                                                             fields: belongsToOwner ? fields : nil, enclosedWith: cover)
             let destination: URL
             let exports: [ProcessorCatalogueRun.Export]
             if let artifacts = planned[pdf], let target = artifacts.first(where: { $0.source == pdf })?.destination {

@@ -35,7 +35,7 @@ enum TextLayerTestDriver {
     private static var lines: [String] = []
     private static var failures = 0
 
-    private static func check(_ name: String, _ ok: Bool, _ detail: @autoclosure () -> String = "") {
+    static func check(_ name: String, _ ok: Bool, _ detail: @autoclosure () -> String = "") {
         if ok { lines.append("PASS \(name)") } else {
             failures += 1
             lines.append("FAIL \(name) \(detail())")
@@ -66,6 +66,7 @@ enum TextLayerTestDriver {
             }
             await catalogueChecks(dir: dir, jpeg: jpeg, reading: reading)
             await freshCatalogueChecks(dir: dir, inputs: [jpeg, png])
+            await catalogueRecoveryChecks(dir: dir, image: jpeg, multipagePDF: legacy)
             return
         }
         await childProcessChecks(dir, jpeg: jpeg)
@@ -340,14 +341,6 @@ enum TextLayerTestDriver {
             check("9 fresh Process Files uses an isolated journal", false)
             return
         }
-        func record(at url: URL?) -> CatalogueRecord? {
-            guard let url, let pdf = PDFDocument(url: url),
-                  let identity = pdf.documentRef.flatMap(CataloguePDFIdentity.identity(in:)),
-                  let data = try? Data(contentsOf: url.appendingPathExtension("archivesuite.json")),
-                  let record = try? CatalogueRecord(json: data), record.fileID == identity.fileID,
-                  record.contentRevision == identity.contentRevision, pdf.pageCount == record.pages.count else { return nil }
-            return record
-        }
         let originals = inputs.map { try? Data(contentsOf: $0) }
         let model = LLMModel.appleVisionModels[0]
         let processor = OCRProcessor()
@@ -371,7 +364,7 @@ enum TextLayerTestDriver {
                                             apiKey: "", outputDirectory: out, batchMode: false,
                                             enableTagging: false, enableSegmentJSON: false, segmentationContext: .init())
             let urls = inputs.compactMap { processor.outputURLMap[$0] }
-            let records = urls.compactMap { record(at: $0) }
+            let records = urls.compactMap { catalogueRecord(at: $0) }
             let expectedFiles = merge ? 1 : 2
             check("9 fresh Process Files publishes \(merge ? "merged" : "split") output pairs",
                   urls.count == 2 && Set(urls).count == expectedFiles && records.count == 2
@@ -386,16 +379,19 @@ enum TextLayerTestDriver {
                     && records.allSatisfy {
                         Set($0.pages.map(\.sourcePageID)).count == (merge ? 2 : 1)
                     }, processor.statusMessage)
-            if !merge, let previous = urls.first, let first = inputs.first {
-                let baseline = try? Data(contentsOf: previous)
-                let previousRecord = try? Data(contentsOf: previous.appendingPathExtension("archivesuite.json"))
-                let retried = await processor.retryOne(index: 0, outputDirectory: out)
-                let next = processor.outputURLMap[first]
-                let succeeded = retried && next != previous && record(at: next) != nil
-                check("9 post-run retry files a new verified pair and preserves the existing pair",
-                      succeeded && baseline == (try? Data(contentsOf: previous))
-                        && previousRecord == (try? Data(contentsOf: previous.appendingPathExtension("archivesuite.json"))),
-                      processor.statusMessage)
+            if !merge, let first = inputs.first {
+                for attempt in 1...2 {
+                    guard let previous = processor.outputURLMap[first] else { break }
+                    let baseline = try? Data(contentsOf: previous)
+                    let previousRecord = try? Data(contentsOf: previous.appendingPathExtension("archivesuite.json"))
+                    let retried = await processor.retryOne(index: 0, outputDirectory: out)
+                    let next = processor.outputURLMap[first]
+                    let succeeded = retried && next != previous && catalogueRecord(at: next) != nil
+                    check("9 post-run retry \(attempt) files a new verified pair and preserves the earlier pair",
+                          succeeded && baseline == (try? Data(contentsOf: previous))
+                            && previousRecord == (try? Data(contentsOf: previous.appendingPathExtension("archivesuite.json"))),
+                          processor.statusMessage)
+                }
             }
         }
         check("9 fresh, split, merge and retry leave all original bytes intact",

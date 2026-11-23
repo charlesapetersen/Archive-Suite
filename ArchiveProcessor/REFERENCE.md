@@ -751,7 +751,8 @@ the build. VisionOCRKit's `Tools/bundle-libs.py` copies their library closure in
 rewrites dependencies to `@loader_path`, and places notices in `third-party-licences` (including jbig2enc's
 PATENTS). Each changed library and helper is signed with the app's identity, then Xcode signs the outer app.
 Helpers run without hardened runtime so the local certificate's lack of a Team ID does not block their dylibs;
-the Processor keeps hardened runtime and strict library validation. Debug skips bundling. Helpers have the
+the Processor keeps hardened runtime and strict library validation. Local Debug builds use installed tools. The
+off-screen Processor runner stages a portable qpdf for Debug so the guest can file catalogue pairs. Helpers have the
 installed Homebrew tools' architectures: this Mac supplies arm64; Intel uses its own installed native tools.
 No DMG or release is produced by this build phase.
 

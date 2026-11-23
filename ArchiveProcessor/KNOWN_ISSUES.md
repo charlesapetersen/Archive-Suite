@@ -2,6 +2,13 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (2026-11-22) — interrupted filing could drop saved OCR state
+
+Process Files verifies the PDF and catalogue companion before retiring the journals for saved readings.
+If a final path is obstructed, the working files and their prepared plan stay available for Resume Run.
+A partial paid submission keeps a local copy of its provider record after its known results are filed.
+See W49.storage-processor.
+
 ## FIXED (2026-11-22) — Benchmark cluster pricing omitted capped attempts
 
 ArchiveOCRBench's per-kind whole-page cluster estimates now use the same attempted pages as strict accuracy,

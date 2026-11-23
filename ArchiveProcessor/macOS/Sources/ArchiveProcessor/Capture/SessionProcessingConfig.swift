@@ -324,7 +324,8 @@ struct SessionProcessingConfig: Sendable {
             cascade: OCRCascade.fromDefaults(d),
             visionTextLLM: visionTextLLM,
             segmentationApproach: SegmentationApproach.stored(d),
-            macItemFields: d.object(forKey: DefaultsKeys.macItemFields) as? Bool ?? true
+            macItemFields: d.object(forKey: DefaultsKeys.macItemFields) == nil
+                || d.bool(forKey: DefaultsKeys.macItemFields)
         )
     }
 

@@ -292,14 +292,27 @@ A **pinned pane on the right** recomputes live for 1,000 files (at your standard
 
 The image-resolution slider is a **target fraction of a standard image size** (default 3 MB, configurable in Settings), not a fixed percentage of each file's dimensions. At 100% it targets the standard size, so **larger files are downscaled more** while average/small files are left full-resolution — evening out cost and time across a collection. Batch runs don't do this yet: they scale every image by the plain slider percentage, so at 100% a large scan goes up whole.
 
+### Catalogue companions
+
+Process Files and Live Capture file each new PDF with a matching `<PDF filename>.archivesuite.json`.
+The companion stores the PDF's current archive fields and its link to the document. A merged document
+has one PDF and one companion. When a document is split across PDFs, keep all of its pairs together
+so every page can find the companion that owns the shared document fields. The segment JSON option
+still exports OCR text and related data separately.
+
+If filing stops after preparation, **Resume Run** can finish the saved pairs locally. A row retry
+after filing creates a new pair alongside the earlier pair. In Live Capture, Finish verifies the
+pairs before releasing the saved source photos.
+
 ### Pre-OCRed PDF Input
 
 Process PDFs that already contain OCR text (e.g., from a previous run):
 
 - Extracts text without API calls
 - Classifies via text-only LLM calls (no image processing)
-- Applies tagging and collection segmentation normally
-- Useful for re-tagging or re-organizing previously processed files
+- Applies tagging and collection segmentation to a new output copy
+- Preserves the original PDF bytes and any original signature. Inputs that cannot be safely copied,
+  such as signed or encrypted PDFs, are reported without filing a derivative.
 
 ### File Input
 

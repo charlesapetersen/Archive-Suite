@@ -355,8 +355,14 @@ extension OCRProcessor {
     func dismissPendingMixedPDF() {
         guard !isProcessing, !mixedPDFCancellationUnwinding,
               !FileManager.default.fileExists(atPath: Self.pendingBatchURL.path) else { return }
-        Self.deletePendingMixedPDF()
-        activePendingMixedPDF = nil
-        pendingMixedPDFInfo = nil
+        do {
+            let lease = try ProcessorCatalogueRun.Lease(journal: Self.pendingCatalogueURL)
+            defer { withExtendedLifetime(lease) {} }
+            if try !setAsideCatalogueRecovery(requestedJournal: Self.pendingMixedPDFURL) { Self.deletePendingMixedPDF() }
+            activePendingMixedPDF = nil
+            checkForPendingBatch()
+        } catch {
+            statusMessage = "The PDF recovery files are still active. \(error.localizedDescription)"
+        }
     }
 }

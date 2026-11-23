@@ -320,7 +320,7 @@ struct OCRView: View {
             measuredRoute: DateRoute.measuredRoute(gateway: useGateway ? currentGatewayConfig : nil,
                                                    usesLocalAgent: useLocalAgent),
             dateImageEveryDocument: DateRoute.imageEveryDocument(settings),
-            sidecars: enableSegmentJSON,
+            sidecars: enableSegmentJSON || !preOCRedInput,
             namesCallShare: namesCallShare
         ).addingOCR(readersDelta)
     }

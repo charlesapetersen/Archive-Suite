@@ -452,6 +452,10 @@ gen_project() {
     # The Processor links a pinned static PDFium from a gitignored folder of this checkout (W44.reocr-processor).
     # The guest has no copy of the zip, so install it here; the guest's pre-build phase then only checks its hash.
     "$REPO/ArchiveProcessor/scripts/bootstrap-pdfium.sh" || die "the pinned PDFium is not installed (see its message)."
+    # The guest has no Homebrew qpdf. Stage the same relocated helper used by Release in this checkout.
+    python3 "$REPO/ArchiveProcessor/scripts/bundle-compression-tools.py" --prepare-debug-qpdf \
+      "$REPO/ArchiveProcessor/macOS/Vendor/catalogue-debug-tools" \
+      || die "the Processor PDF preparation tool could not be staged for the guest."
   fi
   if [ "$NOTES_INTEGRATIONS" = 1 ]; then
     log "xcodegen generate (reader, for the integration journey)…"

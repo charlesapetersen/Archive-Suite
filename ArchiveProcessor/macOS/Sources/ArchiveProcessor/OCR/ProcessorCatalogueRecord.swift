@@ -31,6 +31,7 @@ struct ProcessorCatalogueRecord: Encodable, Sendable {
         var readState: Field<String>?
         var colour: Field<String>?
         var quality: Field<Int>?
+        var ocrPoor: Field<Bool>? = nil
         var ocrFailed: Field<Bool>?
     }
 
@@ -161,6 +162,22 @@ struct ProcessorCatalogueRecord: Encodable, Sendable {
             fields.sendingPlaces = names([], fallback: tags.authorLocation, route: nil)
         }
         return fields
+    }
+
+    /// Copy Source Tags explicitly carries established tags onto the derivative. Interpret the
+    /// same facets as Reader so its catalogue view agrees with the optional Finder projection.
+    static func applySourceTags(_ tags: DocumentTags, document: inout DocumentFields, file: inout FileFields) {
+        let date = tags.decade.flatMap(ArchiveDate.init(decade:))
+            ?? tags.year.flatMap { ArchiveDate(year: $0, month: tags.month?.number, day: tags.day) }
+        document.documentDate = date.map { Field(.init(date: $0, uncertain: tags.dateUncertain), origin: "import") }
+        document.sentWith = tags.sentWith.map { Field(.init(date: $0, uncertain: tags.sentWithUncertain), origin: "import") }
+        document.subjects = nonempty(tags.subjects).map { Field($0, origin: "import") }
+        if let type = tags.itemType {
+            document.itemType = Field(type.rawValue, origin: "import")
+        }
+        file.readState = tags.readState.map { Field($0.rawValue.lowercased(), origin: "import") }
+        file.quality = tags.quality.map { Field($0, origin: "import") }
+        file.ocrPoor = tags.hasPoorOCR ? Field(true, origin: "import") : nil
     }
 
     private static func names(_ read: [EntityExtractor.Name], fallback: String?, route: String?) -> Field<[String]>? {

@@ -18013,3 +18013,17 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   read-only input, stale Undo and a racing replacement. ArchiveCore, Reader and Notes unit suites and the write-surface
   proof passed. No real corpus, paid calls or bench cache used.
   <!-- /W49.reader-item-fields-rename -->
+
+- [x] **W49.storage-processor — File catalogue companions for every Processor output path [L · Tier-2]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit)
+  (lane: processor) (uses: build) (blocked-on: W49.storage-pair-recovery) — Cover fresh and pre-OCRed input, Live Capture, batch, resume, retries and split/merge. Verify every pair before retiring a scratch input. Keep optional segment JSON and immutable OCR provenance distinct. Improve OCR/restore is the rerun item. [Design](execution-plans/storage-simplify.md).
+  Processor embeds a file and content-revision identity in each new PDF and files its authoritative
+  catalogue companion. Process Files and Live Capture cover fresh and pre-OCRed PDFs, mixed runs, batch,
+  resume, retry, split and merge. Split files share one document owner. A frozen plan keeps its source
+  and journal associations until pair verification, and a local retry reuses its exact paths and IDs.
+  Optional segment JSON remains an export. Pre-OCR filing preserves the source and checks the derivative.
+  Scratch verification covered core interruption after PDF publication, Processor source-tag facts,
+  typed dating evidence, frozen-plan collision recovery, cached OCR, partial batch, shutdown and
+  repeated retry. Four generated forms passed veraPDF. The Android-to-Mac Live Capture run filed
+  three synthetic PDF pairs. Off-screen Resume Run reused the six saved readings with both review
+  settings, and Resume Batch filed six pairs while preserving its earlier outputs.
+  <!-- /W49.storage-processor -->

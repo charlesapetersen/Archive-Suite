@@ -159,7 +159,7 @@ struct SettingsEstimateStrip: View {
                     imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil, gatewayRotation: gatewayRotation,
                     measuredRoute: DateRoute.measuredRoute(gateway: gateway, usesLocalAgent: false),
                     dateImageEveryDocument: DateRoute.imageEveryDocument(settingsStore.resolver(for: nil)),
-                    sidecars: enableSegmentJSON, namesCallShare: namesCallShare)
+                    sidecars: enableSegmentJSON || !preOCRedInput, namesCallShare: namesCallShare)
                 let time = TimeEstimator.estimate(
                     fileCount: 1000, model: model, rotationMode: rotationMode,
                     sequentialOCR: contextCharCount > 0, enableTagging: tagging,
