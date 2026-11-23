@@ -153,6 +153,8 @@ final class MoneyJourneyUITests: XCTestCase {
         let batchInput = try preparePhotos(count: 1, width: 2000, height: 1500)
         XCTAssertEqual(batchInput, directInput, "both runs start from the same JPEG bytes")
         launch(provider: "Gemini", batch: true)
+        XCTAssertTrue(element("ap.ocr.batchTotal").waitForExistence(timeout: 10))
+        XCTAssertFalse(element("ap.ocr.institutionalComputeChoose").exists)
         start()
         let deadline = Date().addingTimeInterval(35)
         while try requestRecords().isEmpty && Date() < deadline {
@@ -170,50 +172,54 @@ final class MoneyJourneyUITests: XCTestCase {
         print("[s026] source \(directInput.count) B, direct \(direct), batch \(batch)")
     }
 
-    func testStoredBatchFlagOnOpenAIStillSuppressesPageReaders() throws {
-        try preparePhotos(count: 2)
+    func testStoredBatchFlagOnOpenAIUsesStandardEstimateAndPageReaders() throws {
         let routing = ["-APUITestScratchPageKinds", "-ocrPageKindRouting", "YES"]
-        launch(extra: routing)
-        let readers = element("ap.ocr.pageKindBatch")
-        XCTAssertTrue(readers.waitForExistence(timeout: 15))
-        revealInCostPanel(readers)
-        readers.click()
-        let nano = app.menuItems["OpenAI · GPT-5 nano for every page"].firstMatch
-        XCTAssertTrue(nano.waitForExistence(timeout: 5), app.debugDescription)
-        nano.click()
-        XCTAssertFalse(element("ap.ocr.batchTotal").exists)
-        XCTAssertTrue(element("ap.ocr.institutionalComputeChoose").exists)
-        start()
-        waitForDone(count: 2)
-        let standard = try requestRecords()
-        XCTAssertEqual(standard.map(\.model), ["gpt-5-nano", "gpt-5-nano"])
-        app.terminate()
+        var standardTotals: [String] = []
+        for storedBatch in [false, true] {
+            try preparePhotos(count: 2)
+            launch(batch: storedBatch, extra: routing)
 
-        try preparePhotos(count: 2)
-        launch(batch: true, extra: routing)
-        let total = element("ap.ocr.batchTotal")
-        XCTAssertTrue(total.waitForExistence(timeout: 10))
-        XCTAssertFalse(readers.exists, "the same reader setting no longer offers page readers")
-        XCTAssertFalse(element("ap.ocr.institutionalComputeChoose").exists)
-        revealInCostPanel(total)
-        print("[s027] displayed batch total \(renderedText(total))")
-        shot("s027-openai-shows-batch-estimate")
-        let settings = app.showSettingsWindow()
-        XCTAssertTrue(app.showSettingsPanel("Pages and output"))
-        let toggle = settings.descendants(matching: .any)["ap.settings.batchMode"].firstMatch
-        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
-        reveal(toggle, in: settings.scrollViews.firstMatch)
-        XCTAssertFalse(toggle.isEnabled)
-        XCTAssertTrue(text(containing: "OpenAI has no batch API here.").exists)
-        shot("s027-openai-batch-disabled")
-        app.typeKey("w", modifierFlags: .command)
-        XCTAssertTrue(settings.waitForNonExistence(timeout: 5))
-        start()
-        waitForDone(count: 2)
-        let flagged = try requestRecords()
-        XCTAssertEqual(flagged.map(\.route), ["openai", "openai"])
-        XCTAssertEqual(flagged.map(\.model), ["gpt-5.4-mini", "gpt-5.4-mini"])
-        print("[s027] batch off \(standard); stored batch on \(flagged)")
+            if storedBatch {
+                let settings = app.showSettingsWindow()
+                XCTAssertTrue(app.showSettingsPanel("Pages and output"))
+                let toggle = settings.descendants(matching: .any)["ap.settings.batchMode"].firstMatch
+                XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+                reveal(toggle, in: settings.scrollViews.firstMatch)
+                XCTAssertFalse(toggle.isEnabled)
+                XCTAssertTrue(text(containing: "OpenAI has no batch API here.").exists)
+                shot("s027-openai-batch-disabled")
+                app.typeKey("w", modifierFlags: .command)
+                XCTAssertTrue(settings.waitForNonExistence(timeout: 5))
+            }
+
+            let standard = element("ap.ocr.standardTotal")
+            XCTAssertTrue(standard.waitForExistence(timeout: 15))
+            let defaultTotal = renderedText(standard)
+            let readers = element("ap.ocr.pageKindBatch")
+            XCTAssertTrue(readers.exists)
+            XCTAssertTrue(element("ap.ocr.institutionalComputeChoose").exists)
+            revealInCostPanel(readers)
+            readers.click()
+            let nano = app.menuItems["OpenAI · GPT-5 nano for every page"].firstMatch
+            XCTAssertTrue(nano.waitForExistence(timeout: 5), app.debugDescription)
+            nano.click()
+            let adjustedTotal = renderedText(standard)
+            XCTAssertNotEqual(adjustedTotal, defaultTotal, "the estimate uses the chosen page reader")
+            XCTAssertFalse(element("ap.ocr.batchTotal").exists)
+            standardTotals += [defaultTotal, adjustedTotal]
+
+            if storedBatch {
+                revealInCostPanel(standard)
+                shot("s027-openai-standard-estimate")
+            }
+            start()
+            waitForDone(count: 2)
+            let requests = try requestRecords()
+            XCTAssertEqual(requests.map(\.route), ["openai", "openai"])
+            XCTAssertEqual(requests.map(\.model), ["gpt-5-nano", "gpt-5-nano"])
+            app.terminate()
+        }
+        XCTAssertEqual(Array(standardTotals.prefix(2)), Array(standardTotals.suffix(2)))
     }
 
     func testMonthlyLimitWarnsStopsParallelReadsAndResumesWithoutRepeatingThem() throws {

@@ -743,7 +743,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** OpenAI selected, Batch on, page kinds on: check the estimate and whether the run read pages
   with the per-kind reader.
 - **Would clear it:** the toggle is disabled there, or those sites test `provider.supportsBatch`.
-- **Status:** `reproduced` — independently confirmed; fix queued as `W49.proc-fix-s027`. [VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
+- **Status:** `fixed` — W49.proc-fix-s027. [Scratch VM verification](evidence/processor/W49.proc-suspects-money-check.md#s-027-fix-verification).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
@@ -754,6 +754,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     GPT-5 nano. The pane's batch line tests the raw flag (code; not drawn). Nothing intends a run with no batch to lose
     its readers.
   - 2026-11-21 W49.proc-suspects-money-check (Codex gpt-6.2-sol at `f2b51e98`, original Claude Opus 5.5 in `325a3455`) — Settings disables Batch for OpenAI. A stored on value still displays a $0.0052 batch estimate against $0.0105 standard and suppresses page-reader choices. Both standard requests used GPT-5.4 mini, where both with Batch off used the chosen GPT-5 nano.
+  - 2026-11-23 W49.proc-fix-s027 — OpenAI offers the same estimate, reader menu and import picker with either
+    stored Batch value. Both runs read their two pages with GPT-5 nano when that reader was selected.
 
 ### S-028 · A chosen folder is read one level deep; nested photos are silently left out
 

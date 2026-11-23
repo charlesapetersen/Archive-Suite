@@ -88,17 +88,20 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   §2.2.
 - **Reached by:** drop files on the drop zone (`Views/OCRView.swift:901`) → `costEstimate` (`:197`) →
   `GroupBox("Cost Estimate")` (`:631`): "Total (standard)" (`:694`), "Total (batch)" (`:703`, `ap.ocr.batchTotal`).
-- **Real-path test:** `MoneyJourneyUITests.testStoredBatchFlagOnOpenAIStillSuppressesPageReaders`
-  compares standard and batch estimates in Process Files and inspects the requests sent on Start.
-  `ProcessorUITests.testMultiPageScratchPDFDisablesTaggingAndExplainsAutoReOCR` checks `ap.ocr.pdfPageCost`.
-- **Runtime evidence:** OpenAI showed a $0.0052 batch estimate alongside a $0.0105 standard estimate with the stored Batch flag on. Both reads took the standard path. [Independent VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
-- **Status:** `broken` — W49.proc-fix-s027 (S2) for unsupported batch estimates.
+- **Real-path test:** `MoneyJourneyUITests.testStoredBatchFlagOnOpenAIUsesStandardEstimateAndPageReaders`
+  compares estimates with both stored Batch values and inspects requests built on Start.
+  `MoneyJourneyUITests.testGeminiDirectAndBatchSendDifferentImageSizes` checks that Gemini's batch estimate appears
+  and Start submits a batch. `ProcessorUITests.testMultiPageScratchPDFDisablesTaggingAndExplainsAutoReOCR`
+  checks `ap.ocr.pdfPageCost`.
+- **Runtime evidence:** The OpenAI standard estimate followed the selected page reader and stayed the same
+  across both stored Batch values. The Gemini batch estimate appeared with Batch on. [Scratch VM verification](evidence/processor/W49.proc-suspects-money-check.md#s-027-fix-verification).
+- **Status:** `works` on the tested OpenAI and Gemini estimate paths.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-21 W49.proc-suspects-money-check — `broken` on the tested path.
-- **Notes:** **Drift.** Batch is shown only with batch mode on, no gateway and no pre-OCRed input (`:701`).
-  Vision, Local Agent and an unpriced gateway replace the dollar figure (`:554`, `:603`, `:621`). The Gemini
-  refusal reader's cost is excluded from the totals (`:713-718`). See also S-027.
+  - 2026-11-23 W49.proc-fix-s027 — checked both estimates through Process Files in the scratch VM.
+- **Notes:** **Drift.** The batch estimate is shown only for eligible OCR with Batch on. Vision, Local Agent
+  and an unpriced gateway replace the dollar figure. The Gemini refusal reader's cost is excluded from the totals.
 
 ### P-04 · Guided API-key setup
 
@@ -349,13 +352,14 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** `scripts/test-ocr-page-kind.sh` (`OCRPAGEKIND_TEST=1`, `OCR/OCRPageKindTestDriver.swift`):
   classifier weights, routing, the plan, the estimate, the real `performOCRCall`, history and a row render. Not
   covered: the Settings toggle, the Start freeze, drag and drop.
-- **Runtime evidence:** With Batch off, two OpenAI pages followed the GPT-5 nano selection. With Batch stored on, the menu disappeared and both standard requests used GPT-5.4 mini. [Independent VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
-- **Status:** `broken` — W49.proc-fix-s027 (S2) when Batch is stored on for OpenAI.
+- **Runtime evidence:** The Process Files reader menu offered GPT-5 nano with both stored Batch values.
+  Selecting it sent both pages to that model on Start. [Scratch VM verification](evidence/processor/W49.proc-suspects-money-check.md#s-027-fix-verification).
+- **Status:** `works` on the tested OpenAI path.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-21 W49.proc-suspects-money-check — `broken` on the tested path.
-- **Notes:** limits are in Processor `KNOWN_ISSUES.md` (PDFs are not classified; the 0.8 floor is unmeasured). The
-  feature is dropped whenever the raw batch toggle is on, even for a provider with no batch (S-027).
+  - 2026-11-23 W49.proc-fix-s027 — checked page-reader selection and requests with both stored Batch values.
+- **Notes:** Limits are in Processor `KNOWN_ISSUES.md` (PDFs are not classified and the 0.8 floor is unmeasured).
 
 ### P-15 · Institutional computing text import
 
@@ -371,7 +375,8 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** `scripts/test-institutional-compute-import.sh` (`INSTITUTIONAL_COMPUTE_IMPORT_TEST=1`) runs the
   real load and the real `performOCRCall`; `ProcessorUITests.testInstitutionalComputingImportOffersNeutralFolderChooser`
   drives the real button and panel. Not covered: the Start hand-off and a whole run with an import.
-- **Runtime evidence:** none.
+- **Runtime evidence:** The import picker was available with both stored Batch values on OpenAI and hidden
+  during Gemini batch OCR. [Scratch VM verification](evidence/processor/W49.proc-suspects-money-check.md#s-027-fix-verification).
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
@@ -457,7 +462,8 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-18 W40.d4 — real batch submit, poll, collect and a cancel: `works` for Anthropic and Mistral.
-- **Notes:** Settings disables Batch for unsupported providers. A stored Batch flag still affects standard OpenAI runs and their estimates (S-027). [Independent VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
+- **Notes:** Settings disables Batch for unsupported providers. Process Files ignores the saved flag on the
+  standard OpenAI route. [Scratch VM verification](evidence/processor/W49.proc-suspects-money-check.md#s-027-fix-verification).
 
 ### P-20 · Automatic retry and the retry dialog
 

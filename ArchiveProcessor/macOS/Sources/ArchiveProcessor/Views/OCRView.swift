@@ -241,18 +241,22 @@ struct OCRView: View {
         // The Mac's reader: Vision, or the on-device model when the reading card chose it (W47.wh-readers-lost-clients).
         useAppleVision ? modelStore.model(for: .appleVision) : (currentGatewayConfig?.asLLMModel() ?? selectedModel)
     }
+    private var isDirectOCR: Bool {
+        !useGateway && !useLocalAgent && !useAppleVision && !preOCRedInput
+    }
+    private var effectiveBatchMode: Bool {
+        batchMode && effectiveProvider.supportsBatch && isDirectOCR
+    }
+    /// Both reader selection and institutional computing imports apply to direct, non-batch OCR.
+    private var allowsPageReaders: Bool { isDirectOCR && !effectiveBatchMode }
     /// W41.app-page-kind applies to a direct API model reading pages one by one: not a paid batch (one model), the
     /// gateway or the Local Agent (the user's single route), Apple Vision (free; the guide never sends a page to it,
     /// and moving its pages to a paid model is not what choosing it asks for), or pre-OCRed input.
     private var pageKindsActive: Bool {
-        ocrPageKindRouting && !useGateway && !useLocalAgent && !useAppleVision && !batchMode && !preOCRedInput
+        ocrPageKindRouting && allowsPageReaders
     }
     private var pageKindRunDefault: PageKindRouting.Candidate {
         .init(provider: effectiveModel.provider, modelID: effectiveModel.id)
-    }
-    /// Where an institutional-computing import applies: the page readers' runs (a direct provider, not a paid batch).
-    private var institutionalComputeActive: Bool {
-        !useGateway && !useLocalAgent && !useAppleVision && !batchMode && !preOCRedInput
     }
     private var pageReaderPlan: PageReaderPlan {
         pageKindsActive ? pageKinds.plan(droppedFiles, guidance: .bundled, runDefault: pageKindRunDefault) : .empty
@@ -1008,8 +1012,9 @@ struct OCRView: View {
                                     images: costEstimate, directPDFPages: pdfPageEstimate, batch: false)
                                     + (segmentationRow?.apiDollars ?? 0)))
                                     .fontWeight(.medium)
+                                    .accessibilityIdentifier("ap.ocr.standardTotal")
                             }
-                            if !useGateway && batchMode && effectiveProvider.supportsBatch && !preOCRedInput && costEstimate != nil {
+                            if effectiveBatchMode && costEstimate != nil {
                                 HStack {
                                     Text(pdfPageEstimate == nil ? "Whole-page estimate (batch):" : "Whole-page estimate (batch images + direct PDF pages):")
                                         .foregroundStyle(.primary)
@@ -1042,7 +1047,7 @@ struct OCRView: View {
                                 PageKindBatchControl(store: pageKinds, plan: pageReaderPlan,
                                                      runDefault: pageKindRunDefault, runModel: effectiveModel)
                             }
-                            if institutionalComputeActive && !droppedFiles.isEmpty {
+                            if allowsPageReaders && !droppedFiles.isEmpty {
                                 InstitutionalComputeImportControl(imported: $institutionalComputeImport)
                             }
                             let cascade = OCRCascade(routeID: ocrCascadeRoute, onDisagreement: ocrCascadeOnDisagreement)
@@ -1126,7 +1131,7 @@ struct OCRView: View {
             } else if visionLocalAutoDate {
                 "This run stays on this Mac, so it skips OpenRouter image correction."
             } else if preOCRedInput || isPDFOnlyReOCR || useGateway || useLocalAgent
-                        || (!useAppleVision && batchMode && effectiveProvider.supportsBatch)
+                        || effectiveBatchMode
                         || !customOCRPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 "This run skips image correction."
             } else if !segmentationRoutes.hasOpenRouterKey {
@@ -1169,7 +1174,7 @@ struct OCRView: View {
                             Text(CostEstimate.money(standard * 130))
                                 .accessibilityIdentifier("ap.ocr.newspaperStandardAllowance")
                         }
-                        if !useGateway && batchMode && effectiveProvider.supportsBatch && !preOCRedInput && costEstimate != nil {
+                        if effectiveBatchMode && costEstimate != nil {
                             let batch = CostEstimator.runTotal(images: costEstimate, directPDFPages: pdfPageEstimate, batch: true)
                                 + (segmentationRow?.apiDollars ?? 0)
                             HStack {
@@ -1933,6 +1938,7 @@ struct OCRView: View {
         }
         let provider = effectiveProvider
         let model = effectiveModel
+        let useBatch = effectiveBatchMode
         if let warning = unavailableOpenRouterSelection {
             processor.statusMessage = warning
             return
@@ -1954,7 +1960,6 @@ struct OCRView: View {
             }
             let spent = settingsStore.spentThisMonthUSD()
             let remaining = ProcessFilesMonthlySpend.remaining(limit: limit, spent: spent)
-            let useBatch = batchMode && provider.supportsBatch && !useGateway && !useLocalAgent && !useAppleVision && !preOCRedInput
             let readingCost = useLocalAgent ? 0 : CostEstimator.runTotal(
                 images: costEstimate, directPDFPages: pdfPageEstimate, batch: useBatch)
             let segmentationCost: Double
@@ -2006,7 +2011,7 @@ struct OCRView: View {
         }
         processor.mergeDocuments = mergeDocuments
         processor.pageReaders = pageReaderPlan   // W41.app-page-kind; the run ignores it where it does not apply
-        processor.institutionalComputeImport = institutionalComputeActive ? institutionalComputeImport : nil   // W41.app-institutional-compute
+        processor.institutionalComputeImport = allowsPageReaders ? institutionalComputeImport : nil   // W41.app-institutional-compute
         processor.plannedOutputSubfolders = plannedSubfolders   // W47.ct-processor-intake
         processor.treeIntakeWarnings = treeIntakeWarnings
         showingPendingIntake = false
@@ -2025,7 +2030,7 @@ struct OCRView: View {
                 thinkingLevel: !useAppleVision && !useGateway && model.supportsThinking ? selectedThinking : nil,
                 apiKey: useAppleVision ? "" : apiKey,
                 outputDirectory: outDir,
-                batchMode: (useGateway || useLocalAgent || useAppleVision) ? false : batchMode,
+                batchMode: useBatch,
                 enableTagging: enableTagging,
                 enableSegmentJSON: enableSegmentJSON,
                 enableCollectionSegmentation: useAppleVision && !visionUseLLMJudgment ? false : enableCollectionSegmentation,

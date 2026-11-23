@@ -3421,6 +3421,8 @@ extension OCRProcessor {
             config.requiresSubscription = SettingsLayerStore.shared.resolver(at: outputDirectory).monthlyLimitUSD != nil
             return config
         }
+        let isDirectOCR = gatewayConfig == nil && localAgent == nil && provider != .appleVision && !preOCRedInput
+        let useBatch = batchMode && provider.supportsBatch && isDirectOCR
         // W41.app-page-kind: taken and cleared before any early return, so a start that is refused cannot leave its
         // plan for a later run whose caller set none.
         let plannedReaders = pageReaders
@@ -3581,14 +3583,10 @@ extension OCRProcessor {
         runConfig.gateway = gatewayConfig
         runConfig.outputImageFile = exportOriginals
         runConfig.localAgent = localAgent
-        // W41.app-page-kind: per-page readers apply to a direct, non-batch run only (a paid batch is one model).
-        runConfig.pageReaders = batchMode || gatewayConfig != nil || localAgent != nil || provider == .appleVision
-            || preOCRedInput
-            ? .empty : plannedReaders
-        // W41.app-institutional-compute: where the page readers apply, and for the same reason (a paid batch is one model).
-        runConfig.institutionalComputeImport = batchMode || gatewayConfig != nil || localAgent != nil || provider == .appleVision
-            || preOCRedInput
-            ? nil : plannedImport
+        // Per-page readers and institutional imports apply to direct OCR outside a provider batch.
+        let allowsPageReaders = isDirectOCR && !useBatch
+        runConfig.pageReaders = allowsPageReaders ? plannedReaders : .empty
+        runConfig.institutionalComputeImport = allowsPageReaders ? plannedImport : nil
         if let resumingMixedPDF {
             applyMixedPDFRuntimeConfig(resumingMixedPDF.runtimeConfig, to: &runConfig, apiKey: apiKey,
                                        reloadedImport: plannedImport)
@@ -3632,7 +3630,7 @@ extension OCRProcessor {
         let wantsCorrection = resumingMixedPDF.map { $0.runtimeConfig.postCorrection == true } ?? postCorrectionRequested
         activePostCorrection = Self.makePostCorrection(
             requested: wantsCorrection && !runConfig.dateLocalImage && !preOCRedInput && !(autoReOCR && !mixedReOCR)
-                && !(batchMode && provider.supportsBatch)
+                && !useBatch
                 && segmentationContext.customPrompt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
             gateway: gatewayConfig, localAgent: localAgent, outputDirectory: outputDirectory, frozen: frozen.values)
         if let resumingMixedPDF {
@@ -3646,7 +3644,7 @@ extension OCRProcessor {
             guard beginMixedPDFJournal(
                 originalFiles: files, pdfIndices: pdfIndices, outputDirectory: outputDirectory,
                 provider: provider, model: model, thinkingLevel: thinkingLevel,
-                batchMode: batchMode, enableTagging: enableTagging,
+                batchMode: useBatch, enableTagging: enableTagging,
                 enableSegmentJSON: enableSegmentJSON,
                 enableCollectionSegmentation: enableCollectionSegmentation,
                 confirmCollectionIDs: confirmCollectionIDs,
@@ -3688,7 +3686,7 @@ extension OCRProcessor {
             // tagging, and segmentation. Do not attribute an unused text backend to its history row.
             visionTextProvider: autoReOCR && !mixedReOCR ? nil : runConfig.visionTextLLM?.provider,
             visionTextModel: autoReOCR && !mixedReOCR ? nil : runConfig.visionTextLLM?.model,
-            batchMode: batchMode && provider.supportsBatch && gatewayConfig == nil && localAgent == nil,
+            batchMode: useBatch,
             enableTagging: taggingMode.llmTags,
             enableCollectionSegmentation: enableCollectionSegmentation,
             preOCRedInput: preOCRedInput,
@@ -3828,7 +3826,7 @@ extension OCRProcessor {
                 let imageURLs = convertPDFInputs(files)
 
                 // Phase 1: OCR + Classification
-                if batchMode && provider.supportsBatch && localAgent == nil {
+                if useBatch {
                     await performBatchOCR(
                         fileURLs: imageURLs,
                         originalFiles: files,

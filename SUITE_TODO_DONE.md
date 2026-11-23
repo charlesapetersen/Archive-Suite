@@ -18257,3 +18257,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   [Scratch VM and segmentation evidence](verification/evidence/processor/W49.proc-s046-verify.md#fix-verification).
   Used existing rehearsal inputs and synthetic fixtures at $0. No new bench cache.
   <!-- /W49.proc-s046-review-toggle -->
+
+- [x] **W49.proc-fix-s027 — Ignore stored Batch for providers without batch OCR [S · S2]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build,vm) — S-027. Use effective batch mode for estimates and reader/import eligibility. Test the stale Batch flag through the OpenAI standard path. [VM evidence and regression](verification/evidence/processor/W49.proc-suspects-money-check.md).
+  A stored Batch preference applies only to eligible OCR. The estimate and Start use the same mode,
+  and standard direct OCR keeps per-page reader selection and institutional computing imports.
+  The off-screen tests compare both stored Batch values on OpenAI and check a Gemini batch submission.
+  [Regression evidence](verification/evidence/processor/W49.proc-suspects-money-check.md#s-027-fix-verification).
+  No paid provider calls or bench cache.
+  <!-- /W49.proc-fix-s027 -->

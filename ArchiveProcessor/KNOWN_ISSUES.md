@@ -99,9 +99,11 @@ See W49.proc-fix-s024 and the [original VM reproduction](../verification/evidenc
 
 - At 100% and the 3 MB standard size, direct Gemini sent 602,467 B at 985×739. Batch sent the original 12,349,513 B at 2000×1500. Both routes retain the 2,048-pixel cap. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s026)
 
-## A stored Batch flag affects standard OpenAI runs (S-027)
+## FIXED (S-027, 2026-11-23) — A stored Batch flag affected standard OpenAI runs
 
-- Settings disables Batch for OpenAI. A stored on value still displays a $0.0052 batch estimate against $0.0105 standard and suppresses page-reader choices. Both standard requests used GPT-5.4 mini, where both with Batch off used the chosen GPT-5 nano. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s027)
+Process Files uses the standard estimate and offers per-page readers and institutional computing imports
+when the selected direct provider has no batch OCR. The saved Batch preference still applies when
+returning to a provider that supports it. [Scratch VM verification](../verification/evidence/processor/W49.proc-suspects-money-check.md#s-027-fix-verification) (W49.proc-fix-s027).
 
 ## FIXED (S-051, 2026-11-22) — A refused batch create shows the provider's reason
 
