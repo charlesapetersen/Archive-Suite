@@ -197,7 +197,7 @@ extension NavigationModel {
     /// it, with whether it dated before. One offer covers every run that would change a document; a run named twice
     /// counts once.
     func offerFolderDating(runs edited: [(path: String, datedBefore: Bool)], window: ObjectIdentifier?) {
-        guard let tree = containerTree else { return }
+        guard !library.usesCatalogue, let tree = containerTree else { return }
         var byFolder: [[String]: [(name: String, datedBefore: Bool)]] = [:]
         var order: [[String]] = []
         for e in edited {
@@ -281,7 +281,7 @@ extension NavigationModel {
     func applyFolderDating(_ offer: FolderDatingOffer) {
         folderDatingOffer = nil
         itemFieldEditPath = nil   // a refusal is shown in the Checks whatever is selected
-        guard let tree = containerTree, tree.path == offer.treePath else { return }
+        guard !library.usesCatalogue, let tree = containerTree, tree.path == offer.treePath else { return }
         // Each folder's records, every part of it together.
         var records: [[String]: [(name: String, record: FolderDateRecord)]] = [:]
         for part in offer.parts {
@@ -311,6 +311,7 @@ extension NavigationModel {
 
     /// The tag half of `applyFolderDating`, on the main thread as every other tag edit.
     private func writeFolderDates(_ offer: FolderDatingOffer) {
+        guard !library.usesCatalogue else { return }
         var partOf: [String: FolderDatingOffer.Part] = [:]
         for part in offer.parts { for path in part.paths { partOf[path] = part } }
         let reverified = reverifyCacheRows(libraryFiles(atPaths: offer.paths))

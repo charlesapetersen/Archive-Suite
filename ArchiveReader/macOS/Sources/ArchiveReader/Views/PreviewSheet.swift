@@ -51,6 +51,7 @@ struct PreviewSheet: View {
         .accessibilityIdentifier("ar.preview.content")
         .archiveLinkCopyError(model: model)
         .onAppear {
+            model.followCatalogueRotation(nav)
             model.showingThumbnails = thumbnailsVisible
             model.invertingImages = invertImages
             model.load(selection)

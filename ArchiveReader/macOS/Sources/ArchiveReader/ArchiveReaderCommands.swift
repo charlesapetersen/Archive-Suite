@@ -65,23 +65,35 @@ struct ArchiveReaderCommands: Commands {
     /// The container and item-field edits made in the window in front (`ContainerHistory`).
     private var containerUndoStep: ContainerHistory.Step? { tagModel?.containerUndo(on: windowUndo) }
     private var containerRedoStep: ContainerHistory.Step? { tagModel?.containerUndo(on: windowUndo, redo: true) }
+    private var catalogueChangeInProgress: Bool {
+        guard let model = tagModel else { return false }
+        return model.library.usesCatalogue && model.catalogueEditSaving
+    }
+    private var catalogueUndoStep: CatalogueEditJournal.Step? { catalogueHistory?.undo }
+    private var catalogueRedoStep: CatalogueEditJournal.Step? { catalogueHistory?.redo }
+    private var catalogueHistory: CatalogueEditJournal.Heads? {
+        guard let model = tagModel, model.library.usesCatalogue, !model.catalogueEditSaving,
+              doc?.findFieldFocused != true else { return nil }
+        return model.catalogueHistory
+    }
 
     /// W49.reader-undo-menu-names: Edit ▸ Undo and Redo take the newest change of the tag ledger, the viewer's turns
     /// and the window's container edits, and are named for it. The title reads the history last read; the action
     /// reads the ledger fresh. A tag change whose time is not read yet still counts, as the oldest.
     private func nextUndo(tag: Date?) -> ReaderUndoSource? {
         ReaderUndoSource.newest(tag: tagCanUndo ? tag ?? .distantPast : nil, rotation: doc?.nextRotationUndoDate,
-                                container: containerUndoStep?.date)
+                                container: containerUndoStep?.date, catalogue: catalogueUndoStep?.date)
     }
     private func nextRedo(tag: Date?) -> ReaderUndoSource? {
         ReaderUndoSource.newest(tag: tagCanRedo ? tag ?? .distantPast : nil, rotation: doc?.nextRotationRedoDate,
-                                container: containerRedoStep?.date)
+                                container: containerRedoStep?.date, catalogue: catalogueRedoStep?.date)
     }
 
     private var undoTitle: String {
         switch nextUndo(tag: tagModel?.knownUndoDate) {
         case .tag: return ReaderCommand.undoTagChange.title
         case .rotation: return "Undo Rotation"
+        case .catalogue: return "Undo \(catalogueUndoStep?.title ?? "Catalogue Change")"
         case .container: return "Undo \(containerUndoStep?.action ?? "")"
         case nil: return "Undo"
         }
@@ -91,14 +103,17 @@ struct ArchiveReaderCommands: Commands {
         switch nextRedo(tag: tagModel?.knownRedoDate) {
         case .tag: return ReaderCommand.redoTagChange.title
         case .rotation: return "Redo Rotation"
+        case .catalogue: return "Redo \(catalogueRedoStep?.title ?? "Catalogue Change")"
         case .container: return "Redo \(containerRedoStep?.action ?? "")"
         case nil: return "Redo"
         }
     }
 
     private func undo() {
+        guard !catalogueChangeInProgress else { return }
         switch nextUndo(tag: tagCanUndo ? tagModel?.nextUndoDate() : nil) {
         case .rotation: doc?.undoRotation()
+        case .catalogue: tagModel?.reverseCatalogueEdit(redo: false)
         case .container: windowUndo?.undo()
         case .tag: if let nav { nav.undoLast() } else { docTags?.undo() }
         case nil: break
@@ -106,8 +121,10 @@ struct ArchiveReaderCommands: Commands {
     }
 
     private func redo() {
+        guard !catalogueChangeInProgress else { return }
         switch nextRedo(tag: tagCanRedo ? tagModel?.nextRedoDate() : nil) {
         case .rotation: doc?.redoRotation()
+        case .catalogue: tagModel?.reverseCatalogueEdit(redo: true)
         case .container: windowUndo?.redo()
         case .tag: if let nav { nav.redoLast() } else { docTags?.redo() }
         case nil: break
@@ -184,10 +201,12 @@ struct ArchiveReaderCommands: Commands {
         CommandGroup(replacing: .undoRedo) {
             Button(undoTitle) { undo() }
                 .keyboardShortcut(.undoTagChange)
-                .disabled(!tagCanUndo && !(doc?.canUndoRotation ?? false) && containerUndoStep == nil)
+                .disabled(catalogueChangeInProgress || (!tagCanUndo && !(doc?.canUndoRotation ?? false)
+                           && containerUndoStep == nil && catalogueUndoStep == nil))
             Button(redoTitle) { redo() }
                 .keyboardShortcut(.redoTagChange)
-                .disabled(!tagCanRedo && !(doc?.canRedoRotation ?? false) && containerRedoStep == nil)
+                .disabled(catalogueChangeInProgress || (!tagCanRedo && !(doc?.canRedoRotation ?? false)
+                           && containerRedoStep == nil && catalogueRedoStep == nil))
         }
 
         CommandGroup(after: .pasteboard) {
@@ -225,6 +244,11 @@ struct ArchiveReaderCommands: Commands {
             Button(ReaderCommand.rescan.title) { nav?.rescan() }
                 .keyboardShortcut(.rescan)
                 .disabled(nav == nil)
+            Toggle("Use Catalogue Companions for This Folder", isOn: Binding(
+                get: { nav?.library.usesCatalogue ?? false },
+                set: { nav?.setCatalogueMode($0) }
+            ))
+            .disabled(nav?.rootStore.root == nil || nav?.catalogueEditSaving == true)
             Button(ReaderCommand.saveSearch.title) { nav?.showingSaveDialog = true }
                 .disabled(nav == nil)
             Button(ReaderCommand.containerLevels.title) { nav?.openContainerLevels() }

@@ -486,7 +486,7 @@ private struct FolderDatingAlert: ViewModifier {
 
 /// W49.reader-ct-set-aside: the offer to set aside a container file the last edit could not overwrite, asked in the
 /// window whose Inspector the edit was made in.
-private struct ContainerSetAsideAlert: ViewModifier {
+struct ContainerSetAsideAlert: ViewModifier {
     let model: NavigationModel
     let window: ObjectIdentifier?
 

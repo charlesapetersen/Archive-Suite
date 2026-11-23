@@ -27,6 +27,113 @@ final class ItemFieldsSearchTests: XCTestCase {
                  pageCount: 2, hasText: true, readable: true, headerFields: header, userFields: user)
     }
 
+    func testCatalogueSearchKeepsDocumentAndByteDistinctPathBoundaries() async throws {
+        let index = ContentIndex(url: database)
+        try await index.open()
+        let path = UTF8Key("/scratch/caf\u{00e9}.pdf")
+        let sameSpelling = UTF8Key("/scratch/cafe\u{0301}.pdf")
+        let harbor = UUID(), quarry = UUID()
+        let firstDigest = Data(repeating: 1, count: 32)
+        let secondDigest = Data(repeating: 2, count: 32)
+        _ = try await index.syncCatalogue([
+            path: [harbor: .init(companionSHA256: firstDigest, fields: "Harbor survey"),
+                   quarry: .init(companionSHA256: firstDigest, fields: "Quarry ledger")],
+            sameSpelling: [harbor: .init(companionSHA256: secondDigest, fields: "Harbor receipts")]
+        ], adopting: [], returningToLegacy: [])
+
+        let harborHits = await index.catalogueHits(ftsExpression: #""Harbor""#)
+        XCTAssertEqual(harborHits, [path: [harbor: firstDigest], sameSpelling: [harbor: secondDigest]])
+        let mixed = await index.catalogueHits(ftsExpression: #""Harbor" AND "ledger""#)
+        XCTAssertTrue(mixed.isEmpty, "each matching document has to contain both terms")
+        let joined = await index.catalogueHits(ftsExpression: #""Harbor" AND "survey""#)
+        XCTAssertEqual(joined, [path: [harbor: firstDigest]])
+
+        try await index.deletePaths([path.string])
+        let remaining = await index.catalogueHits(ftsExpression: #""Harbor""#)
+        XCTAssertEqual(remaining, [sameSpelling: [harbor: secondDigest]])
+        await index.close()
+    }
+
+    func testAnAdoptedPairUpdatesFieldSearchWithoutReextractingPDFText() async throws {
+        let pdf = root.appendingPathComponent("letter.pdf")
+        let companion = root.appendingPathComponent(CatalogueRecord.companionFilename(forPDFFilename: pdf.lastPathComponent))
+        let pdfBytes = Data("Scratch, with injected identity and OCR extraction.".utf8)
+        try pdfBytes.write(to: pdf)
+        try setTitle("Legacy corrections", pdf.lastPathComponent, in: root)
+        let fileID = UUID(), contentID = UUID(), documentID = UUID(), pageID = UUID()
+        let reader = try CatalogueReader(grantedRoot: root, rootInstanceID: UUID(), mode: .adopted) { _, _ in
+            .init(fileID: fileID, contentRevision: contentID, pageCount: 1)
+        }
+        let inventory = CatalogueReader.Inventory(relativePDFPaths: [pdf.lastPathComponent], isComplete: true)
+        let date = Date(timeIntervalSince1970: 20)
+        func writeCompanion(title: String) throws {
+            let record = try CatalogueRecord(json: Data("""
+                {"schema":1,"fileID":"\(fileID)","contentRevision":"\(contentID)","revision":"\(UUID())","parents":[],
+                "pages":[{"id":"\(pageID)","physicalIndex":0,"documentID":"\(documentID)","role":"searchable"}],
+                "documents":[{"id":"\(documentID)","ownerFileID":"\(fileID)","fields":{
+                "title":{"state":"value","value":"\(title)","fieldRevision":"\(UUID())","origin":"user"}
+                }}],"fileFields":{}}
+                """.utf8))
+            try record.originalJSON.write(to: companion)
+            try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: companion.path)
+        }
+        func adoptedFile() -> ArchiveFile {
+            let snapshot = reader.snapshot(inventory)
+            return ArchiveFile(url: pdf, name: pdf.lastPathComponent, fileType: "PDF",
+                               tags: DocumentTags.parse(raw: [], labelNumber: nil), contentModified: date,
+                               isCatalogue: true, catalogueFacts: snapshot.facts(at: pdf.lastPathComponent),
+                               catalogueDocuments: [snapshot.facts(at: pdf.lastPathComponent, physicalPageIndex: 0)])
+        }
+
+        let counter = ExtractionCounter()
+        let driver = ContentIndexer(url: database, extractPDFForTesting: { _ in
+            counter.bump()
+            return ExtractedContent(fullBody: "Old header and original transcription",
+                                    strippedBody: "Original transcription", classification: nil, pageCount: 1)
+        })
+        driver.startIndexing([file(pdf)])
+        try await waitForPasses(driver, 1)
+        let legacy = await driver.search("corrections")
+        XCTAssertEqual(legacy, [pdf.path])
+        let scopedLegacy = await driver.search("corrections", bodyOnly: true)
+        XCTAssertTrue(scopedLegacy.isEmpty, "scope switches must exclude stale legacy corrections immediately")
+
+        try writeCompanion(title: "Harbor survey")
+        let first = adoptedFile()
+        let firstDigest = try XCTUnwrap(first.catalogueFacts?.file.get().revision.companionSHA256)
+        driver.startIndexing([first])
+        try await waitForPasses(driver, 2)
+        let harbor = await driver.catalogueHits(ftsExpression: #""Harbor""#)
+        XCTAssertEqual(harbor, [UTF8Key(pdf.path): [documentID: firstDigest]])
+        let legacyGone = await driver.search("corrections")
+        XCTAssertTrue(legacyGone.isEmpty)
+        let header = await driver.search("header", bodyOnly: true)
+        XCTAssertEqual(header, [pdf.path], "historical PDF header words are still searchable as text")
+        let canonicalNotBody = await driver.search("Harbor", bodyOnly: true)
+        XCTAssertTrue(canonicalNotBody.isEmpty)
+
+        try writeCompanion(title: "Quarry ledger")
+        let revised = adoptedFile()
+        let revisedDigest = try XCTUnwrap(revised.catalogueFacts?.file.get().revision.companionSHA256)
+        driver.startIndexing([revised])
+        try await waitForPasses(driver, 3)
+        let quarry = await driver.catalogueHits(ftsExpression: #""Quarry""#)
+        XCTAssertEqual(quarry, [UTF8Key(pdf.path): [documentID: revisedDigest]])
+        let old = await driver.catalogueHits(ftsExpression: #""Harbor""#)
+        XCTAssertTrue(old.isEmpty)
+        XCTAssertNotEqual(firstDigest, revisedDigest)
+        XCTAssertEqual(counter.count, 1)
+
+        try FileManager.default.removeItem(at: companion)
+        driver.startIndexing([adoptedFile()])
+        try await waitForPasses(driver, 4)
+        let detached = await driver.catalogueHits(ftsExpression: #""Quarry""#)
+        XCTAssertTrue(detached.isEmpty, "unavailable facts remove the old canonical search values")
+        XCTAssertEqual(counter.count, 1)
+        XCTAssertEqual(try Data(contentsOf: pdf), pdfBytes)
+        await driver.closeForTesting()
+    }
+
     func testTheOCRSearchFindsACorrectionAndForgetsItWhenRemoved() async throws {
         let index = ContentIndex(url: database)
         try await index.open()

@@ -21,6 +21,7 @@ enum RuleField: String, Codable, Sendable, CaseIterable {
     case text
     /// The OCR text alone (the index's body column).
     case ocrText
+    case catalogueFields
     /// The file name, as a substring (like the filter bar's name box), not through the index.
     case fileName
     case tags
@@ -33,6 +34,7 @@ enum RuleField: String, Codable, Sendable, CaseIterable {
     case folder
     case needsAttention
     case ambiguousDate
+    case poorOCR
     case flagged
     /// A container facet's value (W47.ct-reader-facet-rules): `SearchRule.containerFacet` and `text`, compared by
     /// `ContainerFacet.key` against the model's `ContainerCatalog` through `RuleContext.containers`.
@@ -46,7 +48,7 @@ enum RuleField: String, Codable, Sendable, CaseIterable {
     /// become a folder path or a date.
     var textKind: Int {
         switch self {
-        case .text, .ocrText, .fileName: return 0
+        case .text, .ocrText, .catalogueFields, .fileName: return 0
         case .folder: return 1
         case .date: return 2
         case .container: return 4
@@ -57,12 +59,13 @@ enum RuleField: String, Codable, Sendable, CaseIterable {
     /// The operators a row for this field offers, the first being the default.
     var operators: [RuleOperator] {
         switch self {
+        case .catalogueFields: return [.allWords, .phrase, .anyWords]
         case .text, .ocrText: return [.allWords, .phrase, .anyWords, .noWords]
         case .fileName: return [.contains, .doesNotContain, .beginsWith, .endsWith]
         case .tags: return [.hasAll, .hasAny, .hasNone]
         case .quality, .readState, .fileType, .folder, .container: return [.is, .isNot]
         case .date: return [.between, .after, .before, .undated]
-        case .needsAttention, .ambiguousDate, .flagged: return [.is, .isNot]
+        case .needsAttention, .ambiguousDate, .poorOCR, .flagged: return [.is, .isNot]
         case .group: return [.is]
         }
     }
@@ -153,7 +156,7 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
     /// Whether the row has a value to test. An inactive row is skipped (it neither passes nor fails).
     var isActive: Bool {
         switch field {
-        case .text, .ocrText: return !AdvancedSearch.words(text).isEmpty
+        case .text, .ocrText, .catalogueFields: return !AdvancedSearch.words(text).isEmpty
         case .fileName, .container: return !text.trimmingCharacters(in: .whitespaces).isEmpty
         case .folder: return !text.isEmpty
         case .tags: return !tags.isEmpty
@@ -161,7 +164,7 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
         case .readState: return read != .all
         case .fileType: return !fileType.isEmpty
         case .date: return op == .undated || dateBounds != nil
-        case .needsAttention, .ambiguousDate, .flagged: return true
+        case .needsAttention, .ambiguousDate, .poorOCR, .flagged: return true
         case .group: return children.contains(where: \.isActive)
         }
     }
@@ -170,11 +173,23 @@ struct SearchRule: Codable, Equatable, Identifiable, Sendable {
     /// missing or unreadable. A year runs from its first to its last day, a month likewise.
     var dateBounds: DateRangeFilter? { AdvancedSearchText.dateBounds(op: op, from: text, to: text2) }
 
+    var catalogueExpression: String? {
+        guard field == .catalogueFields, isActive else { return nil }
+        return AdvancedSearch.ftsExpression(op: op, text: text, column: nil)
+    }
+
     /// The FTS5 expression whose hits a text rule needs, or nil for other rules. For `noWords` it is the files
     /// to leave out (any of the words).
-    var ftsExpression: String? {
+    var ftsExpression: String? { ftsExpression(catalogueMode: false) }
+
+    func ftsExpression(catalogueMode: Bool) -> String? {
         guard field.isText, isActive else { return nil }
-        let column = field == .ocrText ? ContentIndex.ocrTextColumns : nil   // with the corrected item fields
+        let column: String?
+        if catalogueMode {
+            column = field == .ocrText ? "body" : "{body classification name}"
+        } else {
+            column = field == .ocrText ? ContentIndex.ocrTextColumns : nil
+        }
         return AdvancedSearch.ftsExpression(op: op, text: text, column: column)
     }
 }
@@ -184,6 +199,7 @@ struct RuleContext: Sendable {
     /// Per text rule id, the paths matching its `ftsExpression`. A text rule missing here (its query has not
     /// returned yet) is skipped like an inactive one.
     var textHits: [UUID: Set<String>] = [:]
+    var catalogueHits: [UUID: [UTF8Key: [UUID: Data]]] = [:]
     var needsAttention: Set<String> = []
     var flagged: Set<String> = []
     /// The listed files' containers, by path, from the catalog built for the open root. nil while there is none
@@ -212,7 +228,14 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
         return walk(rules)
     }
 
-    var hasTextRules: Bool { !textRules.isEmpty }
+    var catalogueRules: [SearchRule] {
+        func walk(_ rules: [SearchRule]) -> [SearchRule] {
+            rules.flatMap { $0.field == .group ? walk($0.children) : ($0.catalogueExpression == nil ? [] : [$0]) }
+        }
+        return walk(rules)
+    }
+
+    var hasTextRules: Bool { !textRules.isEmpty || !catalogueRules.isEmpty }
 
     /// Whether an active rule, groups included, tests `field`.
     func uses(_ field: RuleField) -> Bool {
@@ -223,14 +246,16 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
     }
 
     /// One expression for ranking and snippets: the positive text rules OR-ed. nil when there are none.
-    var rankingExpression: String? {
-        let parts = textRules.filter { $0.op != .noWords }.compactMap(\.ftsExpression)
+    var rankingExpression: String? { rankingExpression(catalogueMode: false) }
+
+    func rankingExpression(catalogueMode: Bool) -> String? {
+        let parts = textRules.filter { $0.op != .noWords }.compactMap { $0.ftsExpression(catalogueMode: catalogueMode) }
         guard !parts.isEmpty else { return nil }
         return parts.count == 1 ? parts[0] : parts.map { "(\($0))" }.joined(separator: " OR ")
     }
 
     func matches(_ file: ArchiveFile, _ context: RuleContext) -> Bool {
-        Self.evaluate(rules, combine, file, context, prepared: false)
+        matches(file, context, prepared: false)
     }
 
     /// The same search ready for a pass over many rows: inactive rows (and groups left with none) taken out
@@ -252,14 +277,23 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
 
     /// `matches` for a search from `prepared()`.
     func matchesPrepared(_ file: ArchiveFile, _ context: RuleContext) -> Bool {
-        Self.evaluate(rules, combine, file, context, prepared: true)
+        matches(file, context, prepared: true)
+    }
+
+    private func matches(_ file: ArchiveFile, _ context: RuleContext, prepared: Bool) -> Bool {
+        if file.isCatalogue, !file.catalogueDocuments.isEmpty {
+            return file.catalogueDocuments.contains { document in
+                Self.evaluate(rules, combine, file, context, document: document, prepared: prepared)
+            }
+        }
+        return Self.evaluate(rules, combine, file, context, document: nil, prepared: prepared)
     }
 
     private static func evaluate(_ rules: [SearchRule], _ combine: RuleCombine, _ file: ArchiveFile,
-                                 _ context: RuleContext, prepared: Bool) -> Bool {
+                                 _ context: RuleContext, document: ItemFacts?, prepared: Bool) -> Bool {
         var anyTested = false
         for rule in rules {
-            guard let result = test(rule, file, context, prepared: prepared) else { continue }
+            guard let result = test(rule, file, context, document: document, prepared: prepared) else { continue }
             anyTested = true
             if combine == .all, !result { return false }
             if combine == .any, result { return true }
@@ -269,13 +303,17 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
 
     /// nil = the rule is skipped (inactive, or its index answer has not arrived).
     private static func test(_ rule: SearchRule, _ file: ArchiveFile, _ context: RuleContext,
-                             prepared: Bool) -> Bool? {
+                             document: ItemFacts?, prepared: Bool) -> Bool? {
         guard prepared || rule.isActive else { return nil }
         let positive = rule.op != .isNot
         switch rule.field {
         case .text, .ocrText:
             guard let hits = context.textHits[rule.id] else { return nil }
             return rule.op == .noWords ? !hits.contains(file.path) : hits.contains(file.path)
+        case .catalogueFields:
+            guard let resolved = try? document?.document.get() else { return false }
+            let digest = context.catalogueHits[rule.id]?[UTF8Key(file.path)]?[resolved.document.id]
+            return digest == resolved.owner.revision.companionSHA256
         case .fileName:
             let q = prepared ? rule.text : rule.text.trimmingCharacters(in: .whitespaces)
             let opts: String.CompareOptions = [.caseInsensitive]   // as the filter bar's name box
@@ -286,14 +324,25 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
             default: return file.name.range(of: q, options: opts) != nil
             }
         case .tags:
+            let hasSubject: (String) -> Bool
+            if file.isCatalogue {
+                guard let subjects = ReaderCatalogueFacets.document(document)?.subjects else { return false }
+                let keys = Set((subjects.readerValue ?? []).map(tagKey))
+                hasSubject = { keys.contains(tagKey($0)) }
+            } else {
+                hasSubject = file.hasSubject
+            }
             switch rule.op {
-            case .hasAny: return rule.tags.contains(where: file.hasSubject)
-            case .hasNone: return !rule.tags.contains(where: file.hasSubject)
-            default: return rule.tags.allSatisfy(file.hasSubject)
+            case .hasAny: return rule.tags.contains(where: hasSubject)
+            case .hasNone: return !rule.tags.contains(where: hasSubject)
+            default: return rule.tags.allSatisfy(hasSubject)
             }
         case .quality:
+            if file.isCatalogue, file.catalogueFileFields?.quality == nil { return false }
             return rule.qualities.contains(file.quality ?? 0) == positive
         case .readState:
+            if file.isCatalogue,
+               file.readState == nil, file.catalogueFileFields?.readState?.readerIsCleared != true { return false }
             let state: Bool
             switch rule.read {
             case .all: return nil
@@ -305,19 +354,41 @@ struct AdvancedSearch: Codable, Equatable, Sendable {
         case .fileType:
             return (Self.fileTypeChoice(file.fileType) == rule.fileType) == positive
         case .date:
-            return AdvancedSearchText.dateMatches(op: rule.op, bounds: rule.dateBounds, role: rule.dateRole,
-                                                  keys: file.tags.dateKeysByRole)
+            let keys: [DateRole: Int]
+            if file.isCatalogue {
+                guard let fields = ReaderCatalogueFacets.document(document) else { return false }
+                if rule.op == .undated, !ReaderCatalogueFacets.hasAssessedDate(fields, roles: rule.dateRole.roles) {
+                    return false
+                }
+                keys = ReaderCatalogueFacets.tags(file: nil, document: document).dateKeysByRole
+            } else {
+                keys = file.tags.dateKeysByRole
+            }
+            return AdvancedSearchText.dateMatches(op: rule.op, bounds: rule.dateBounds, role: rule.dateRole, keys: keys)
         case .folder:
             let dir = rule.text.hasSuffix("/") ? String(rule.text.dropLast()) : rule.text
             return (file.path == dir || file.path.hasPrefix(dir + "/")) == positive
         case .needsAttention: return context.needsAttention.contains(file.path) == positive
-        case .ambiguousDate: return file.dateIsAmbiguous == positive
-        case .flagged: return context.flagged.contains(file.path) == positive
+        case .ambiguousDate:
+            if file.isCatalogue, ReaderCatalogueFacets.document(document) == nil { return false }
+            return file.dateIsAmbiguous == positive
+        case .poorOCR:
+            if file.isCatalogue {
+                guard let value = file.catalogueFileFields?.ocrPoor?.readerValue else { return false }
+                return value == positive
+            }
+            return file.tags.hasPoorOCR == positive
+        case .flagged:
+            if file.isCatalogue {
+                guard let flag = file.catalogueFlag else { return false }
+                return flag == positive
+            }
+            return context.flagged.contains(file.path) == positive
         case .container:
             guard let containers = context.containers else { return nil }
             let key = prepared ? rule.text : ContainerFacet.key(rule.text)
             return (containers[file.path]?.facetKeys[rule.containerFacet] == key) == positive
-        case .group: return evaluate(rule.children, rule.combine, file, context, prepared: prepared)
+        case .group: return evaluate(rule.children, rule.combine, file, context, document: document, prepared: prepared)
         }
     }
 
@@ -364,7 +435,7 @@ extension Array where Element == SearchRule {
 extension AdvancedSearch {
     /// The rules that say what a filter-bar state and Find query say, for saving it as a smart folder. The Find
     /// box's own rule is kept: its last word matches as a prefix when longer than two characters.
-    init(filter f: LibraryFilter, fullTextQuery: String) {
+    init(filter f: LibraryFilter, fullTextQuery: String, catalogueMode: Bool = false) {
         var rules: [SearchRule] = []
         let findWords = AdvancedSearch.words(fullTextQuery)
         if !findWords.isEmpty {
@@ -400,10 +471,14 @@ extension AdvancedSearch {
         }
         if f.needsAttentionOnly { rules.append(SearchRule(field: .needsAttention)) }
         if f.ambiguousDatesOnly { rules.append(SearchRule(field: .ambiguousDate)) }
-        // The poor-OCR filter is the `OCR Poor` tag (`DocumentTags.hasPoorOCR` is that tag by identity), so a smart
-        // folder saved from it needs no rule of its own.
         if f.poorOCROnly {
-            var r = SearchRule(field: .tags, op: .hasAll); r.tags = [DocumentTags.poorOCRTag]; rules.append(r)
+            if catalogueMode {
+                rules.append(SearchRule(field: .poorOCR))
+            } else {
+                var rule = SearchRule(field: .tags, op: .hasAll)
+                rule.tags = [DocumentTags.poorOCRTag]
+                rules.append(rule)
+            }
         }
         for (facet, value) in f.activeContainerFacets {
             var r = SearchRule(field: .container); r.containerFacet = facet; r.text = value; rules.append(r)

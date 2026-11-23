@@ -30,6 +30,8 @@ extension NavigationModel {
             defaults.set(UUID().uuidString, forKey: key)
         }
         startLibrary(root)
+        refreshCatalogueEditHistory()
+        refreshFullTextSearchIfActive()
     }
 
     private func catalogueInstance(for root: URL) -> UUID? {

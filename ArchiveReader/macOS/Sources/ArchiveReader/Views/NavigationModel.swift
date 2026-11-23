@@ -117,6 +117,7 @@ final class NavigationModel: ObservableObject {
     /// answered yet is absent and skipped. Separate from `ftsPaths` so a scoped OCR query never lights the user
     /// filter indicators.
     @Published private(set) var baseTextHits: [UUID: Set<String>] = [:]
+    private var baseCatalogueHits: [UUID: [UTF8Key: [UUID: Data]]] = [:]
     /// The scope's positive text rules together (`AdvancedSearch.rankingExpression`): their bm25 order, used for
     /// the relevance sort while Find is empty. Scope rules never supply preview snippets.
     private var baseRank: [String: Int]?
@@ -219,6 +220,12 @@ final class NavigationModel: ObservableObject {
     @Published var containerEditError: String?
     /// A container edit is being written (`NavigationModel+ContainerEdits`); one at a time.
     @Published var containerEditSaving = false
+
+    @Published var catalogueEditSaving = false
+    @Published var catalogueEditFeedback: String?
+    @Published var catalogueEditFailures: [String] = []
+    @Published var catalogueHistory = CatalogueEditJournal.Heads()
+    var catalogueHistoryRootID: UUID?
     /// W40.reader-item-field-edit: why the last item-field edit was refused, for the Inspector's Checks.
     @Published var itemFieldEditError: String?
     /// W47.ct-folder-date-reader: the offer to date a folder run's undated documents by its confirmed date.
@@ -592,7 +599,7 @@ final class NavigationModel: ObservableObject {
     /// What the list shows, as rules: the base scope (smart folder or Advanced Search) AND the filter bar AND
     /// the Find box, as `rowPredicate` applies them.
     var effectiveSearch: AdvancedSearch {
-        (scopeRules ?? AdvancedSearch()).narrowed(by: AdvancedSearch(filter: filter, fullTextQuery: fullTextQuery))
+        (scopeRules ?? AdvancedSearch()).narrowed(by: AdvancedSearch(filter: filter, fullTextQuery: fullTextQuery, catalogueMode: library.usesCatalogue))
     }
 
     /// A human-readable default name for "save current filters as a smart folder", built from the
@@ -653,7 +660,7 @@ final class NavigationModel: ObservableObject {
 
     /// `folder`'s saved rules AND the filter bar AND the Find box.
     private func scopeNarrowedByFilters(_ folder: SavedSearch) -> AdvancedSearch {
-        folder.search.narrowed(by: AdvancedSearch(filter: filter, fullTextQuery: fullTextQuery))
+        folder.search.narrowed(by: AdvancedSearch(filter: filter, fullTextQuery: fullTextQuery, catalogueMode: library.usesCatalogue))
     }
 
     /// Whether the filter bar offers Save to the smart folder in scope: one is, and filters narrow it.
@@ -751,6 +758,7 @@ final class NavigationModel: ObservableObject {
         let hits = await textHits(for: rules, stopOnCancel: cancellable)
         var context = ruleContext(for: rules)
         context.textHits = hits
+        context.catalogueHits = await catalogueHits(for: rules, stopOnCancel: cancellable)
         let files = library.files, excluded = excludedAbsolutePrefixes()
         let basis = CountBasis(search: search, rules: rules.prepared(), context: context,
                                filesRevision: library.filesRevision)
@@ -799,10 +807,22 @@ final class NavigationModel: ObservableObject {
     /// Each active text rule's index answer, by rule id.
     private func textHits(for search: AdvancedSearch, stopOnCancel: Bool = false) async -> [UUID: Set<String>] {
         var hits: [UUID: Set<String>] = [:]
+        let catalogueMode = library.usesCatalogue
         for rule in search.textRules {
             if stopOnCancel, Task.isCancelled { break }
-            guard let expression = rule.ftsExpression else { continue }
+            guard let expression = rule.ftsExpression(catalogueMode: catalogueMode) else { continue }
             hits[rule.id] = Set(await indexer.search(expression: expression))
+        }
+        return hits
+    }
+
+    private func catalogueHits(for search: AdvancedSearch, stopOnCancel: Bool = false) async
+        -> [UUID: [UTF8Key: [UUID: Data]]] {
+        var hits: [UUID: [UTF8Key: [UUID: Data]]] = [:]
+        for rule in search.catalogueRules {
+            if stopOnCancel, Task.isCancelled { break }
+            guard let expression = rule.catalogueExpression else { continue }
+            hits[rule.id] = await indexer.catalogueHits(ftsExpression: expression)
         }
         return hits
     }
@@ -849,6 +869,7 @@ final class NavigationModel: ObservableObject {
         guard rulesChanged else { return }   // a rename: the rows, their answers and the sort all stand
         scopeRules = rules
         baseTextHits = [:]
+        baseCatalogueHits = [:]
         baseRank = nil
         if rules.rankingExpression != nil, sort.first?.field != .relevance { sort = [ARSortDescriptor(field: .relevance)] }
         runBaseFullTextSearch()
@@ -857,7 +878,7 @@ final class NavigationModel: ObservableObject {
     /// Leave the scope (smart folder or Advanced Search); the caller recomputes.
     private func exitScope() {
         scope = nil; scopeIsSaved = false; scopeRules = nil
-        baseFtsGeneration += 1; baseTextHits = [:]; baseRank = nil
+        baseFtsGeneration += 1; baseTextHits = [:]; baseCatalogueHits = [:]; baseRank = nil
         if ftsRank == nil, sort.first?.field == .relevance { sort = LibrarySort.default }
     }
 
@@ -895,7 +916,7 @@ final class NavigationModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             var ranked: ContentIndex.RankedSearch?
-            if let expression = rules.rankingExpression {
+            if let expression = rules.rankingExpression(catalogueMode: self.library.usesCatalogue) {
                 ranked = await self.indexer.searchRanked(expression: expression, snippetLimit: 0)
             }
             // One positive text rule is its own ranking expression: its hits are the ranked paths, not a second query.
@@ -906,8 +927,10 @@ final class NavigationModel: ObservableObject {
             } else {
                 hits = await self.textHits(for: rules)
             }
+            let catalogueHits = await self.catalogueHits(for: rules)
             guard generation == self.baseFtsGeneration else { return }
             self.baseTextHits = hits
+            self.baseCatalogueHits = catalogueHits
             self.baseRank = ranked.map { Dictionary($0.paths.enumerated().map { ($1, $0) }) { a, _ in a } }
             self.recompute()
         }
@@ -963,13 +986,26 @@ final class NavigationModel: ObservableObject {
 
     // MARK: Flags (app-side, never written to the corpus)
 
-    func toggleFlagSelection() { flags.toggleFlag(selectedFiles.map(\.path)); resortAfterFlagChange() }
+    func toggleFlagSelection() {
+        let paths = selectedFiles.map(\.path)
+        guard !paths.isEmpty else { return }
+        toggleFlag(paths: paths)
+    }
 
     /// The document window's Toggle Flag (W40.fix-reader-menus-follow-window): the open file, not the list's selection.
     /// Returns false, with the reason in `statusMessage`, when none of the paths is in the library.
     @discardableResult func toggleFlag(paths: [String]) -> Bool {
         let files = libraryFiles(atPaths: paths)
         guard !files.isEmpty else { reportNotInLibrary(); return false }
+        if library.usesCatalogue {
+            let on = files.contains { row in
+                guard let facts = catalogueFacts(for: row), let file = try? facts.file.get(),
+                      case .value(let value) = file.pair.record.fileFields.flagged?.current else { return true }
+                return !value
+            }
+            applyCatalogueFileField(.flagged, .set(.flag(on)), paths: paths)
+            return true
+        }
         flags.toggleFlag(files.map(\.path))
         resortAfterFlagChange()
         return true
@@ -1251,7 +1287,7 @@ final class NavigationModel: ObservableObject {
     /// What `search`'s rules need from outside the file: the scope's text hits, and the needs-attention and
     /// flagged sets, built only when a rule asks for them.
     private func ruleContext(for search: AdvancedSearch) -> RuleContext {
-        var context = RuleContext(textHits: baseTextHits)
+        var context = RuleContext(textHits: baseTextHits, catalogueHits: baseCatalogueHits)
         if search.uses(.needsAttention) {
             context.needsAttention = Set(formatStatuses.lazy.filter { $0.value.needsAttention }.map(\.key))
         }
@@ -1490,7 +1526,7 @@ final class NavigationModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             let result: ContentIndex.RankedSearch? = q.isEmpty
-                ? nil : await self.indexer.searchRanked(q, snippetLimit: self.ftsSnippetLimit)
+                ? nil : await self.indexer.searchRanked(q, snippetLimit: self.ftsSnippetLimit, bodyOnly: self.library.usesCatalogue)
             guard generation == self.ftsGeneration else { return }   // superseded by a newer search
             if let result {
                 self.ftsPaths = Set(result.paths)
@@ -1565,7 +1601,7 @@ final class NavigationModel: ObservableObject {
         while snippetFill.resultGeneration == generation, !snippetFill.pending.isEmpty {
             let batch = Array(snippetFill.pending.suffix(Self.snippetFillBatch).reversed())
             snippetFill.pending.removeLast(batch.count)
-            let filled = await indexer.snippets(query, for: batch)
+            let filled = await indexer.snippets(query, for: batch, bodyOnly: library.usesCatalogue)
             guard snippetFill.resultGeneration == generation, ftsGeneration == generation else { return }
             // What the time budget did not reach goes back on the queue, still first in line.
             snippetFill.pending.append(contentsOf: batch[filled.attempted...].reversed())
@@ -1998,6 +2034,7 @@ final class NavigationModel: ObservableObject {
         // Filter excluded folders before indexing so excluded files are never added to the content index.
         let filesToIndex = indexableFiles(files)
         indexer.startIndexing(filesToIndex)             // incremental; no-op if running
+        if library.usesCatalogue { refreshCatalogueEditHistory() }
         checkImproveOCRReceipts(libraryChanged: true)   // W44.reocr-reader: replaced files keep their dates
         if pathsChanged {
             refreshFormatStatuses()     // format status is path-keyed; tag-only edits can't change it
@@ -2560,6 +2597,7 @@ final class NavigationModel: ObservableObject {
 
     /// `paths` nil acts on the list's selection; the document window passes its open file.
     func mark(_ target: ReadState, paths: [String]? = nil) {
+        if library.usesCatalogue { markCatalogue(target, paths: paths); return }
         let targets = tagTargets(paths)
         if paths != nil, targets.isEmpty { reportNotInLibrary(); return }
         let reverified = ReaderStages.measure("model.reverifyCacheRows") {
@@ -2815,6 +2853,14 @@ final class NavigationModel: ObservableObject {
                 target = ids[t]
             }
         }
+        if library.usesCatalogue {
+            markCatalogue(.read) { [weak self] verified in
+                guard let self, self.selection == sel, !verified.isEmpty, let target else { return }
+                self.selection = [target]
+                self.requestScroll(to: target)
+            }
+            return
+        }
         mark(.read)                       // removes Unread / adds Read via TagWriter; pushes one undo step
         if let target {
             selection = [target]
@@ -2829,8 +2875,12 @@ final class NavigationModel: ObservableObject {
 
     /// Apply one edit operation to every selected file (per-file delta), with grouped undo.
     /// `paths` nil acts on the list's selection; the tag editor opened from the document window passes its file.
-    func applyEdit(_ op: TagEditOp, paths: [String]? = nil) {
+    func applyEdit(_ op: TagEditOp, paths: [String]? = nil, physicalPageIndex: Int? = nil) {
         let op = inLibrarySpelling(op)
+        if library.usesCatalogue {
+            applyCatalogueTagEdit(op, paths: paths, physicalPageIndex: physicalPageIndex)
+            return
+        }
         let targets = tagTargets(paths)
         if paths != nil, targets.isEmpty { reportNotInLibrary(); return }
         let reverified = ReaderStages.measure("model.reverifyCacheRows") { reverifyCacheRows(targets) }
@@ -2900,6 +2950,17 @@ final class NavigationModel: ObservableObject {
         // same tag is how its spelling is changed, so that keeps the case as typed.
         let new = isSameTag(typed, old) ? typed : spellingForNewTag(typed)
         guard !old.isEmpty, !new.isEmpty, new != old || hasOtherSpellings(of: old) else { return }
+        if library.usesCatalogue {
+            let paths = library.files.filter { $0.hasSubject(old) }.map(\.path)
+            editCatalogueSubjects(paths: paths) { subjects in
+                if isSameTag(old, new) {
+                    return subjects.map { isSameTag($0, old) ? new : $0 }
+                }
+                let retained = subjects.filter { !isSameTag($0, old) }
+                return retained.contains { isSameTag($0, new) } ? retained : retained + [new]
+            }
+            return
+        }
         let reverified = reverifyCacheRows(library.files.filter { $0.hasSubject(old) })
         let affected = reverified.files
         guard !affected.isEmpty else {
@@ -2944,6 +3005,7 @@ final class NavigationModel: ObservableObject {
     // group editor; these act on exactly one file, still via the audited TagWriter + grouped undo.
 
     func applyEdit(_ op: TagEditOp, to file: ArchiveFile) {
+        if library.usesCatalogue { applyEdit(op, paths: [file.path]); return }
         guard let file = reverifyCacheRow(file) else { return }
         applyDelta(TagEditing.userDelta(for: inLibrarySpelling(op), given: file.tags), to: file)
     }
@@ -2964,11 +3026,20 @@ final class NavigationModel: ObservableObject {
     /// Returns whether the file now has the edit: false when it could not be verified or written.
     @discardableResult
     func commitSubjectEdit(from base: [String], to edited: [String], for file: ArchiveFile) -> Bool {
+        if library.usesCatalogue {
+            let delta = TagEditing.subjectDelta(from: base, to: edited.map(spellingForNewTag))
+            guard !delta.isEmpty else { return true }
+            return editCatalogueSubjects(paths: [file.path]) { subjects in
+                let retained = subjects.filter { subject in !delta.remove.contains { isSameTag($0, subject) } }
+                return retained + delta.add.filter { new in !retained.contains { isSameTag($0, new) } }
+            }
+        }
         guard let file = reverifyCacheRow(file) else { return false }
         return applyDelta(TagEditing.subjectDelta(from: base, to: edited.map(spellingForNewTag)), to: file)
     }
 
     func setReadStateInline(_ target: ReadState, for file: ArchiveFile) {
+        if library.usesCatalogue { markCatalogue(target, paths: [file.path]); return }
         guard let file = reverifyCacheRow(file, readState: true) else { return }
         let identity = file.liveIdentity()   // §6: capture lazily at edit time
         let group = UUID()
@@ -2983,6 +3054,10 @@ final class NavigationModel: ObservableObject {
 
     /// A click on the Read cell: Read → Unread; Unread/none → Read.
     func toggleReadState(for file: ArchiveFile) {
+        if library.usesCatalogue {
+            setReadStateInline(file.readState == .read ? .unread : .read, for: file)
+            return
+        }
         guard let file = reverifyCacheRow(file, readState: true) else { return }
         setReadStateInline(file.readState == .read ? .unread : .read, for: file)
     }
@@ -2990,6 +3065,10 @@ final class NavigationModel: ObservableObject {
     /// The Read cell's Clear Read State. Both tokens are named, not the row's: `TagWriter` re-reads the file and
     /// matches Read/Unread in any case, so a row that is behind the file still clears whatever the file holds.
     func clearReadState(for file: ArchiveFile) {
+        if library.usesCatalogue {
+            applyCatalogueFileField(.readState, .clear, paths: [file.path])
+            return
+        }
         guard let file = reverifyCacheRow(file, readState: true) else { return }
         applyDelta(TagDelta(remove: ReadState.allCases.map(\.rawValue)), to: file, readState: true)
     }

@@ -12,7 +12,9 @@ owner in the same granted root instance. A file field describes the selected PDF
 document fields come from another PDF. For a merged PDF, a document-specific edit must identify its
 target. In results spanning several documents, keep each matched fact with the document that supplied
 it. A bulk file edit applies once per selected occurrence. A bulk document edit applies once per
-resolved owner occurrence and document ID.
+resolved owner occurrence and document ID. Reader's Advanced Search ▸ Catalogue fields searches
+those current document values. Its OCR text search searches the PDF text, which can still include
+historical processing headers.
 
 | Inspector value | Current companion location | Existing source and meaning |
 |---|---|---|

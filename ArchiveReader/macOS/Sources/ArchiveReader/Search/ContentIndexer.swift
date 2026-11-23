@@ -185,8 +185,10 @@ final class ContentIndexer: ObservableObject {
                 await self?.finish(gen, .couldNotOpen(Self.detail(error)))
                 return
             }
+            guard !Task.isCancelled else { return }
             // Pull all stored stamps in one query to partition work without per-file actor round-trips.
             let existing = await idx.existingStamps()
+            let previouslyCatalogue = await idx.existingCataloguePaths()
             let datalessPaths = files.filter(\.isDataless).map(\.path)
             var cacheRowsDropped = 0
             if !datalessPaths.isEmpty {
@@ -199,22 +201,39 @@ final class ContentIndexer: ObservableObject {
                 }
                 catch { cacheRowsDropped = datalessPaths.count }
             }
+            let legacyFiles = files.filter { !$0.isCatalogue }
+            let catalogueDocuments = Self.catalogueDocuments(of: files)
+            let adopting = Set(catalogueDocuments.keys.filter {
+                existing[$0.string] != nil && !previouslyCatalogue.contains($0)
+            })
+            let legacyPaths = Set(legacyFiles.map { UTF8Key($0.path) })
+            do {
+                if try await idx.syncCatalogue(catalogueDocuments, adopting: adopting,
+                                               returningToLegacy: legacyPaths) > 0 {
+                    await self?.didCommit(gen)
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                // Canonical facts are a separate cache operation even for files with current OCR text.
+                cacheRowsDropped += catalogueDocuments.count + previouslyCatalogue.intersection(legacyPaths).count
+            }
+
             // W49.reader-item-fields-search: the user's corrections beside the files, read fresh each pass. A
             // file whose text is current gets them here; one extracted below takes them with its row.
-            let userFields = Self.userFields(of: files)
+            let userFields = Self.userFields(of: legacyFiles)
             if let changed = try? await idx.setUserFields(Self.userFieldChanges(
-                stored: await idx.storedUserFields(), current: userFields, among: files)), changed > 0 {
+                stored: await idx.storedUserFields(), current: userFields, among: legacyFiles)), changed > 0 {
                 await self?.didCommit(gen)
             }
             let work = files.filter { f in
                 guard !f.isDataless else { return false }
                 guard let stored = existing[f.path] else { return true }
-                return stored != Self.stamp(f)
+                return stored != Self.stamp(f) || (!f.isCatalogue && previouslyCatalogue.contains(UTF8Key(f.path)))
             }
             // W49.reader-sidecar-names-refresh: a file whose text is current has its sidecar's names read again when
             // the sidecar changed since; one extracted below reads them with its text, at this stamp.
-            let sidecarStamps = SidecarStamp.stamps(of: files)
-            let textCurrent = files.filter { f in !f.isDataless && existing[f.path].map { $0 == Self.stamp(f) } == true }
+            let sidecarStamps = SidecarStamp.stamps(of: legacyFiles)
+            let textCurrent = legacyFiles.filter { f in !f.isDataless && existing[f.path].map { $0 == Self.stamp(f) } == true }
             if let changed = try? await idx.setSidecarNames(Self.sidecarChanges(
                 stored: await idx.storedSidecarStamps(), current: sidecarStamps, among: textCurrent)), changed > 0 {
                 await self?.didCommit(gen)
@@ -286,6 +305,8 @@ final class ContentIndexer: ObservableObject {
                 }
             }
 
+            // Scope changes cancel old work before another scope can rebuild these cache rows.
+            guard !Task.isCancelled else { return }
             // Flush any remaining rows.
             if !batch.isEmpty {
                 do {
@@ -299,6 +320,27 @@ final class ContentIndexer: ObservableObject {
 
             await self?.finish(gen, droppedRows > 0 ? .rowsDropped(droppedRows) : .ok)
         }
+    }
+
+    /// The path's document selections already resolve split ownership under the root grant.
+    /// One document contributes one index row regardless of how many of its pages were selected.
+    private nonisolated static func catalogueDocuments(of files: [ArchiveFile])
+        -> [UTF8Key: [UUID: CatalogueIndexedDocument]] {
+        var out: [UTF8Key: [UUID: CatalogueIndexedDocument]] = [:]
+        for file in files where file.isCatalogue {
+            var documents: [UUID: CatalogueIndexedDocument] = [:]
+            if !file.isDataless {
+                for facts in file.catalogueDocuments {
+                    guard let resolved = try? facts.document.get(), let fields = resolved.document.fields else { continue }
+                    let id = resolved.document.id
+                    documents[id] = CatalogueIndexedDocument(
+                        companionSHA256: resolved.owner.revision.companionSHA256,
+                        fields: ReaderCatalogueFacets.searchValues(fields).joined(separator: "\n"))
+                }
+            }
+            out[UTF8Key(file.path)] = documents
+        }
+        return out
     }
 
     /// Each extraction worker owns the thread-scoped dataless policy for exactly its synchronous
@@ -318,13 +360,14 @@ final class ContentIndexer: ObservableObject {
                                 classification: content.classification, body: content.fullBody,
                                 pageCount: content.pageCount,
                                 hasText: !content.fullBody.isEmpty, readable: true,
-                                headerFields: IndexedItemFields.values(of: IndexedItemFields.header(of: content)),
-                                userFields: user, sidecarNames: names, sidecarStamp: sidecarStamp)
+                                headerFields: file.isCatalogue ? [:] : IndexedItemFields.values(of: IndexedItemFields.header(of: content)),
+                                userFields: user, sidecarNames: names, sidecarStamp: sidecarStamp,
+                                isCatalogue: file.isCatalogue)
             }
             return IndexRow(path: path, mtime: stamp.mtime, identity: stamp.identity, name: file.name,
                             classification: nil, body: "",
                             pageCount: 0, hasText: false, readable: false, userFields: user,
-                            sidecarNames: names, sidecarStamp: sidecarStamp)
+                            sidecarNames: names, sidecarStamp: sidecarStamp, isCatalogue: file.isCatalogue)
         }
     }
 
@@ -333,7 +376,7 @@ final class ContentIndexer: ObservableObject {
     /// files have no row, so they are left out.
     nonisolated static func userFields(of files: [ArchiveFile]) -> [String: [CheckableField: String]] {
         var out: [String: [CheckableField: String]] = [:]
-        let byFolder = Dictionary(grouping: files.lazy.filter { !$0.isDataless }) {
+        let byFolder = Dictionary(grouping: files.lazy.filter { !$0.isDataless && !$0.isCatalogue }) {
             $0.url.deletingLastPathComponent().path
         }
         for group in byFolder.values {
@@ -351,7 +394,7 @@ final class ContentIndexer: ObservableObject {
                                              current: [String: [CheckableField: String]],
                                              among files: [ArchiveFile]) -> [String: [CheckableField: String]] {
         var out: [String: [CheckableField: String]] = [:]
-        for file in files where !file.isDataless {
+        for file in files where !file.isDataless && !file.isCatalogue {
             let now = current[file.path] ?? [:]
             if (stored[file.path] ?? [:]) != now { out[file.path] = now }
         }
@@ -378,7 +421,7 @@ final class ContentIndexer: ObservableObject {
                                            among files: [ArchiveFile]) -> [String: SidecarRead] {
         CorpusWalker.withDatalessMaterializationDisabled {
             var out: [String: SidecarRead] = [:]
-            for file in files where !file.isDataless {
+            for file in files where !file.isDataless && !file.isCatalogue {
                 guard let was = stored[file.path] else { continue }
                 let now = current[file.path] ?? ""
                 guard was != now else { continue }
@@ -396,7 +439,7 @@ final class ContentIndexer: ObservableObject {
         let idx = index
         let changed = await Task.detached(priority: .userInitiated) { () -> Int in
             let changes = Self.sidecarChanges(stored: await idx.storedSidecarStamps(),
-                                              current: SidecarStamp.stamps(of: files), among: files)
+                                              current: SidecarStamp.stamps(of: files.filter { !$0.isCatalogue }), among: files)
             return (try? await idx.setSidecarNames(changes)) ?? 0
         }.value
         return changed > 0
@@ -441,41 +484,49 @@ final class ContentIndexer: ObservableObject {
         if failure != new { failure = new }
     }
 
+    /// Current catalogue-rule hits with each resolved owner's companion digest.
+    func catalogueHits(ftsExpression: String) async -> [UTF8Key: [UUID: Data]] {
+        guard await openForQuery() else { return [:] }
+        return await index.catalogueHits(ftsExpression: ftsExpression)
+    }
+
     /// Full-text search → matching file paths in **bm25 relevance order** (best match first).
-    func search(_ query: String) async -> [String] {
+    func search(_ query: String, bodyOnly: Bool = false) async -> [String] {
         guard await openForQuery() else { return [] }
-        return await index.search(query)
+        return await index.search(query, bodyOnly: bodyOnly)
     }
 
     /// Full-text search → every matching path (bm25 order) plus bounded keyword-in-context snippets
     /// for the top hits (see `ContentIndex.searchRanked`), so a broad query doesn't compute a fragment
     /// for every match at corpus scale.
-    func searchRanked(_ query: String, snippetLimit: Int = 300) async -> ContentIndex.RankedSearch {
+    func searchRanked(_ query: String, snippetLimit: Int = 300,
+                      bodyOnly: Bool = false) async -> ContentIndex.RankedSearch {
         guard await openForQuery() else { return ContentIndex.RankedSearch(paths: [], snippets: [:]) }
-        return await index.searchRanked(query, snippetLimit: snippetLimit)
+        return await index.searchRanked(query, snippetLimit: snippetLimit, bodyOnly: bodyOnly)
     }
 
     /// Paths matching a ready-made FTS5 expression (an Advanced Search text rule), bm25 order.
-    func search(expression: String) async -> [String] {
+    func search(expression: String, bodyOnly: Bool = false) async -> [String] {
         guard await openForQuery() else { return [] }
-        return await index.search(expression: expression)
+        return await index.search(expression: expression, bodyOnly: bodyOnly)
     }
 
     /// `searchRanked` for a ready-made expression (an Advanced Search's text rules together).
-    func searchRanked(expression: String, snippetLimit: Int = 300) async -> ContentIndex.RankedSearch {
+    func searchRanked(expression: String, snippetLimit: Int = 300,
+                      bodyOnly: Bool = false) async -> ContentIndex.RankedSearch {
         guard await openForQuery() else { return ContentIndex.RankedSearch(paths: [], snippets: [:]) }
-        return await index.searchRanked(expression: expression, snippetLimit: snippetLimit)
+        return await index.searchRanked(expression: expression, snippetLimit: snippetLimit, bodyOnly: bodyOnly)
     }
 
-    func snippets(expression: String, for paths: [String]) async -> (snippets: [String: String], attempted: Int) {
+    func snippets(expression: String, for paths: [String], bodyOnly: Bool = false) async -> (snippets: [String: String], attempted: Int) {
         guard await openForQuery() else { return ([:], 0) }
-        return await index.snippets(expression: expression, for: paths)
+        return await index.snippets(expression: expression, for: paths, bodyOnly: bodyOnly)
     }
 
     /// The snippets `searchRanked` left out, for the hits the list is showing (see `ContentIndex.snippets`).
-    func snippets(_ query: String, for paths: [String]) async -> (snippets: [String: String], attempted: Int) {
+    func snippets(_ query: String, for paths: [String], bodyOnly: Bool = false) async -> (snippets: [String: String], attempted: Int) {
         guard await openForQuery() else { return ([:], 0) }
-        return await index.snippets(query, for: paths)
+        return await index.snippets(query, for: paths, bodyOnly: bodyOnly)
     }
 
     /// Classification (`Document Start`/`Continuation`/`Box`/`Folder`) per path, where indexed.

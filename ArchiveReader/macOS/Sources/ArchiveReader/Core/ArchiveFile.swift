@@ -93,6 +93,25 @@ struct ArchiveFile: Identifiable, Sendable {
     var catalogueFacts: ItemFacts? { fields.catalogueFacts }
     /// One physical page per logical document, resolving fields through the owning PDF.
     var catalogueDocuments: [ItemFacts] { fields.catalogueDocuments }
+
+    var catalogueFileFields: CatalogueRecord.FileFields? { (try? catalogueFacts?.file.get())?.pair.record.fileFields }
+    var catalogueFlag: Bool? { catalogueFileFields?.flagged?.readerValue }
+    var canEditFileFacets: Bool { !isCatalogue || catalogueFileFields != nil }
+    var canEditDocumentFacets: Bool { !isCatalogue || ReaderCatalogueFacets.document(catalogueFacts) != nil }
+    var subjectDisplay: [String] { isCatalogue ? subjects : tags.topicalTags }
+
+    var catalogueFieldLabels: [(field: CheckableField, value: String)] {
+        let order = IndexedItemFields.columnOrder + CheckableField.nameFields
+        return catalogueDocuments.flatMap { facts -> [(CheckableField, String)] in
+            guard let fields = ReaderCatalogueFacets.document(facts) else { return [] }
+            let values = ReaderCatalogueFacets.itemFields(fields)
+            return order.compactMap { key in values[key].map { (key, $0) } }
+        }
+    }
+    var catalogueItemFieldsText: String? {
+        let labels = catalogueFieldLabels
+        return labels.isEmpty ? nil : labels.map(\.value).joined(separator: " · ")
+    }
     var contentModified: Date? { fields.contentModified }
     /// The inode and size discovery saw, beside the date in the content index's freshness key
     /// (W44.reocr-reader-freshness). Nil for a row built without a `stat(2)` (synthetic test rows).

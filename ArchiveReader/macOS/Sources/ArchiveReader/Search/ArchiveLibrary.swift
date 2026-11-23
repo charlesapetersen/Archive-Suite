@@ -691,10 +691,15 @@ final class ArchiveLibrary: ObservableObject {
                     self?.reportProgress(generation: generation, found: 0, seen: seen)
                 }
             })
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor [weak self] in
                 guard let self, !token.isCancelled,
                       self.rootGeneration == rootGeneration, self.currentScan == generation else { return }
                 self.cancelScanStallDeadline()
+                if let snapshot = pass.snapshot {
+                    await ReaderCataloguePairMemory.shared.remember(snapshot: snapshot, root: root)
+                }
+                guard !token.isCancelled,
+                      self.rootGeneration == rootGeneration, self.currentScan == generation else { return }
                 self.catalogueReader = pass.reader
                 self.catalogueSnapshot = pass.snapshot
                 let phase = DiscoveryHealth.phase(after: pass.health, root: pass.rootStability,
@@ -1641,7 +1646,8 @@ final class ArchiveLibrary: ObservableObject {
     /// this a beat later, on its next update; doing it here is the same end state, immediately, and
     /// without a live query it is the only thing that would.
     func applyVerifiedWrites(_ results: [TagWriteResult]) {
-        guard !results.isEmpty else { return }
+        // A late result from a tag edit started before a mode switch cannot replace a catalogue row.
+        guard !usesCatalogue, !results.isEmpty else { return }
         var replacements: [URL: VerifiedWrite] = [:]
         for r in results {
             clock += 1
@@ -1693,7 +1699,7 @@ final class ArchiveLibrary: ObservableObject {
             defer { state = colours }
             return state != colours
         }
-        guard changed, !files.isEmpty else { return }
+        guard changed, !usesCatalogue, !files.isEmpty else { return }
         commit(files.map { f in
             (f.path, ArchiveFile(url: f.url, name: f.name, fileType: f.fileType,
                                  tags: Self.parse(f.tags.raw, f.tags.labelNumber),

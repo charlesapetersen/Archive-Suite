@@ -20,7 +20,7 @@ struct CatalogueReadDirectory {
         }
     }
 
-    struct FileVersion: Equatable, Sendable {
+    struct FileVersion: Codable, Equatable, Sendable {
         let identity: Identity
         private let size: off_t
         private let mode: mode_t

@@ -21,6 +21,13 @@ struct IndexRow: Sendable {
     /// (`SidecarStamp`, empty for none; W49.reader-sidecar-names-refresh).
     var sidecarNames: [CheckableField: String] = [:]
     var sidecarStamp = ""
+    var isCatalogue = false
+}
+
+/// Search material for one logical document as resolved for one listed PDF.
+struct CatalogueIndexedDocument: Equatable, Sendable {
+    let companionSHA256: Data
+    let fields: String
 }
 
 /// A sidecar's names read again, and the `SidecarStamp` they were read at (W49.reader-sidecar-names-refresh).
@@ -89,8 +96,19 @@ actor ContentIndex {
                 try exec("DROP TABLE IF EXISTS fts;")
                 try exec("DROP TABLE files;")
             }
-            try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL, inode INTEGER, size INTEGER, page_count INTEGER, has_text INTEGER, readable INTEGER, header_fields TEXT, user_fields TEXT, sidecar_names TEXT, sidecar_stamp TEXT);")
+            try exec("CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY, mtime REAL, inode INTEGER, size INTEGER, page_count INTEGER, has_text INTEGER, readable INTEGER, header_fields TEXT, user_fields TEXT, sidecar_names TEXT, sidecar_stamp TEXT, is_catalogue INTEGER NOT NULL DEFAULT 0);")
+            if !columns.isEmpty, !columns.contains("is_catalogue"),
+               columns.contains("inode"), columns.contains("user_fields"), columns.contains("sidecar_stamp") {
+                try exec("ALTER TABLE files ADD COLUMN is_catalogue INTEGER NOT NULL DEFAULT 0;")
+            }
             try exec("CREATE VIRTUAL TABLE IF NOT EXISTS fts USING fts5(body, classification, name, fields, path UNINDEXED);")
+            try exec("""
+                CREATE TABLE IF NOT EXISTS catalogue_documents(
+                    path TEXT NOT NULL, document_id TEXT NOT NULL, digest TEXT NOT NULL,
+                    fields TEXT NOT NULL, UNIQUE(path, document_id)
+                );
+                CREATE VIRTUAL TABLE IF NOT EXISTS catalogue_fts USING fts5(fields);
+                """)
         } catch {
             // `sqlite3_open_v2` is lazy: a corrupt or foreign file opens cleanly and fails on the
             // FIRST statement ("file is not a database"). Drop the handle so the next open() re-reads
@@ -173,13 +191,14 @@ actor ContentIndex {
                 classification: String?, body: String,
                 pageCount: Int = 0, hasText: Bool = true, readable: Bool = true,
                 headerFields: [CheckableField: String] = [:], userFields: [CheckableField: String] = [:],
-                sidecarNames: [CheckableField: String] = [:], sidecarStamp: String = "") throws {
+                sidecarNames: [CheckableField: String] = [:], sidecarStamp: String = "",
+                isCatalogue: Bool = false) throws {
         try exec("BEGIN IMMEDIATE;")
         do {
             try upsertRow(path: path, mtime: mtime, identity: identity, name: name, classification: classification,
                           body: body, pageCount: pageCount, hasText: hasText, readable: readable,
                           headerFields: headerFields, userFields: userFields, sidecarNames: sidecarNames,
-                          sidecarStamp: sidecarStamp)
+                          sidecarStamp: sidecarStamp, isCatalogue: isCatalogue)
             try exec("COMMIT;")
         } catch {
             try? exec("ROLLBACK;")
@@ -191,6 +210,7 @@ actor ContentIndex {
     /// this — no `await`/suspension between BEGIN and COMMIT (actor-reentrancy invariant: the
     /// synchronous exec/prepare/run/insertFTS calls must not be interleaved by another actor call).
     func upsertBatch(_ rows: [IndexRow]) throws {
+        try Task.checkCancellation()
         guard !rows.isEmpty else { return }
         try exec("BEGIN IMMEDIATE;")
         do {
@@ -199,7 +219,7 @@ actor ContentIndex {
                               classification: row.classification, body: row.body,
                               pageCount: row.pageCount, hasText: row.hasText, readable: row.readable,
                               headerFields: row.headerFields, userFields: row.userFields,
-                              sidecarNames: row.sidecarNames, sidecarStamp: row.sidecarStamp)
+                              sidecarNames: row.sidecarNames, sidecarStamp: row.sidecarStamp, isCatalogue: row.isCatalogue)
             }
             try exec("COMMIT;")
         } catch {
@@ -214,10 +234,13 @@ actor ContentIndex {
                            classification: String?,
                            body: String, pageCount: Int, hasText: Bool, readable: Bool,
                            headerFields: [CheckableField: String], userFields: [CheckableField: String],
-                           sidecarNames: [CheckableField: String], sidecarStamp: String) throws {
-        let header = IndexedItemFields.encode(headerFields), user = IndexedItemFields.encode(userFields)
-        let names = IndexedItemFields.encode(sidecarNames)
-        let fields = IndexedItemFields.searchText(userFields, names: sidecarNames)
+                           sidecarNames: [CheckableField: String], sidecarStamp: String,
+                           isCatalogue: Bool) throws {
+        let header = isCatalogue ? "" : IndexedItemFields.encode(headerFields)
+        let user = isCatalogue ? "" : IndexedItemFields.encode(userFields)
+        let names = isCatalogue ? "" : IndexedItemFields.encode(sidecarNames)
+        let fields = isCatalogue ? "" : IndexedItemFields.searchText(userFields, names: sidecarNames)
+        let sidecarStamp = isCatalogue ? "" : sidecarStamp
         var rowid: Int64? = nil
         if let sel = prepare("SELECT rowid FROM files WHERE path = ?;") {
             bindText(sel, 1, path)
@@ -226,7 +249,7 @@ actor ContentIndex {
         }
         if let rowid {
             try run("DELETE FROM fts WHERE rowid = ?;") { sqlite3_bind_int64($0, 1, rowid) }
-            try run("UPDATE files SET mtime = ?, inode = ?, size = ?, page_count = ?, has_text = ?, readable = ?, header_fields = ?, user_fields = ?, sidecar_names = ?, sidecar_stamp = ? WHERE rowid = ?;") {
+            try run("UPDATE files SET mtime = ?, inode = ?, size = ?, page_count = ?, has_text = ?, readable = ?, header_fields = ?, user_fields = ?, sidecar_names = ?, sidecar_stamp = ?, is_catalogue = ? WHERE rowid = ?;") {
                 sqlite3_bind_double($0, 1, mtime)
                 self.bindIdentity($0, 2, identity)
                 sqlite3_bind_int($0, 4, Int32(pageCount))
@@ -236,11 +259,12 @@ actor ContentIndex {
                 self.bindText($0, 8, user)
                 self.bindText($0, 9, names)
                 self.bindText($0, 10, sidecarStamp)
-                sqlite3_bind_int64($0, 11, rowid)
+                sqlite3_bind_int($0, 11, isCatalogue ? 1 : 0)
+                sqlite3_bind_int64($0, 12, rowid)
             }
             try insertFTS(rowid: rowid, body: body, classification: classification, name: name, fields: fields, path: path)
         } else {
-            try run("INSERT INTO files(path, mtime, inode, size, page_count, has_text, readable, header_fields, user_fields, sidecar_names, sidecar_stamp) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);") {
+            try run("INSERT INTO files(path, mtime, inode, size, page_count, has_text, readable, header_fields, user_fields, sidecar_names, sidecar_stamp, is_catalogue) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);") {
                 self.bindText($0, 1, path); sqlite3_bind_double($0, 2, mtime)
                 self.bindIdentity($0, 3, identity)
                 sqlite3_bind_int($0, 5, Int32(pageCount))
@@ -250,10 +274,123 @@ actor ContentIndex {
                 self.bindText($0, 9, user)
                 self.bindText($0, 10, names)
                 self.bindText($0, 11, sidecarStamp)
+                sqlite3_bind_int($0, 12, isCatalogue ? 1 : 0)
             }
             let newRow = sqlite3_last_insert_rowid(db)
             try insertFTS(rowid: newRow, body: body, classification: classification, name: name, fields: fields, path: path)
         }
+    }
+
+    /// Adopted content rows must be re-extracted if the path later returns to legacy mode.
+    func existingCataloguePaths() -> Set<UTF8Key> {
+        guard let stmt = prepare("SELECT path FROM files WHERE is_catalogue = 1;") else { return [] }
+        defer { sqlite3_finalize(stmt) }
+        var paths: Set<UTF8Key> = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let path = sqlite3_column_text(stmt, 0) { paths.insert(UTF8Key(String(cString: path))) }
+        }
+        return paths
+    }
+
+    /// Replace canonical search facts independently of the PDF extraction stamp. An adopted path without
+    /// available facts supplies an empty document map and invalidates any prior metadata.
+    func syncCatalogue(_ documents: [UTF8Key: [UUID: CatalogueIndexedDocument]],
+                       adopting: Set<UTF8Key>, returningToLegacy: Set<UTF8Key>) throws -> Int {
+        try Task.checkCancellation()
+        guard !documents.isEmpty || !returningToLegacy.isEmpty else { return 0 }
+        let stored = try storedCatalogueDocuments()
+        let stale = returningToLegacy.filter { stored[$0] != nil }
+        let changed = documents.filter { stored[$0.key, default: [:]] != $0.value }
+        guard !adopting.isEmpty || !changed.isEmpty || !stale.isEmpty else { return 0 }
+
+        try exec("BEGIN IMMEDIATE;")
+        do {
+            for path in adopting {
+                // Readers may have a warm cache from legacy mode. Remove previous catalogue-like text
+                // while preserving the PDF's own text, classifications and name.
+                try run("UPDATE fts SET fields = '' WHERE rowid = (SELECT rowid FROM files WHERE path = ? AND is_catalogue = 0);") {
+                    self.bindText($0, 1, path.string)
+                }
+                try run("""
+                    UPDATE files SET header_fields = '', user_fields = '', sidecar_names = '',
+                    sidecar_stamp = '', is_catalogue = 1 WHERE path = ? AND is_catalogue = 0;
+                    """) { self.bindText($0, 1, path.string) }
+            }
+            for path in stale {
+                try deleteCatalogueDocuments(at: path.string)
+            }
+            for (path, docs) in changed {
+                try deleteCatalogueDocuments(at: path.string)
+                for (id, doc) in docs {
+                    try run("INSERT INTO catalogue_documents(path, document_id, digest, fields) VALUES(?, ?, ?, ?);") {
+                        self.bindText($0, 1, path.string)
+                        self.bindText($0, 2, id.uuidString)
+                        self.bindText($0, 3, doc.companionSHA256.base64EncodedString())
+                        self.bindText($0, 4, doc.fields)
+                    }
+                    let rowid = sqlite3_last_insert_rowid(db)
+                    try run("INSERT INTO catalogue_fts(rowid, fields) VALUES(?, ?);") {
+                        sqlite3_bind_int64($0, 1, rowid)
+                        self.bindText($0, 2, doc.fields)
+                    }
+                }
+            }
+            try exec("COMMIT;")
+            return adopting.count + changed.count + stale.count
+        } catch {
+            try? exec("ROLLBACK;")
+            throw error
+        }
+    }
+
+    private func storedCatalogueDocuments() throws -> [UTF8Key: [UUID: CatalogueIndexedDocument]] {
+        guard let stmt = prepare("SELECT path, document_id, digest, fields FROM catalogue_documents;") else {
+            throw IndexError.sql(lastMessage)
+        }
+        defer { sqlite3_finalize(stmt) }
+        var out: [UTF8Key: [UUID: CatalogueIndexedDocument]] = [:]
+        var status = sqlite3_step(stmt)
+        while status == SQLITE_ROW {
+            if let (path, id, digest) = catalogueIdentity(stmt),
+               let fields = sqlite3_column_text(stmt, 3) {
+                out[path, default: [:]][id] = CatalogueIndexedDocument(
+                    companionSHA256: digest, fields: String(cString: fields))
+            }
+            status = sqlite3_step(stmt)
+        }
+        guard status == SQLITE_DONE else { throw IndexError.sql(lastMessage) }
+        return out
+    }
+
+    private func deleteCatalogueDocuments(at path: String) throws {
+        try run("""
+            DELETE FROM catalogue_fts WHERE rowid IN (SELECT rowid FROM catalogue_documents WHERE path = ?);
+            """) { self.bindText($0, 1, path) }
+        try run("DELETE FROM catalogue_documents WHERE path = ?;") { self.bindText($0, 1, path) }
+    }
+
+    /// Matching logical documents, each stamped with the companion bytes that supplied its fields.
+    /// Callers compare the digest to their live facts before accepting a hit.
+    func catalogueHits(ftsExpression: String) -> [UTF8Key: [UUID: Data]] {
+        guard !ftsExpression.isEmpty, let stmt = prepare("""
+            SELECT d.path, d.document_id, d.digest FROM catalogue_fts
+            JOIN catalogue_documents AS d ON catalogue_fts.rowid = d.rowid WHERE catalogue_fts MATCH ?;
+            """) else { return [:] }
+        defer { sqlite3_finalize(stmt) }
+        bindText(stmt, 1, ftsExpression)
+        var hits: [UTF8Key: [UUID: Data]] = [:]
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            if let (path, id, digest) = catalogueIdentity(stmt) { hits[path, default: [:]][id] = digest }
+        }
+        return hits
+    }
+
+    private func catalogueIdentity(_ stmt: OpaquePointer) -> (UTF8Key, UUID, Data)? {
+        guard let path = sqlite3_column_text(stmt, 0),
+              let id = sqlite3_column_text(stmt, 1).flatMap({ UUID(uuidString: String(cString: $0)) }),
+              let digest = sqlite3_column_text(stmt, 2).flatMap({ Data(base64Encoded: String(cString: $0)) })
+        else { return nil }
+        return (UTF8Key(String(cString: path)), id, digest)
     }
 
     /// Full-text search of the **OCR text** (the body column) → matching file paths. This is the
@@ -266,24 +403,25 @@ actor ContentIndex {
     /// Returns **all** matching paths by default (`limit == nil`), ordered by **bm25 relevance**
     /// (best match first). `limit` remains available for callers/tests that deliberately want a
     /// bounded result.
-    func search(_ query: String, limit: Int? = nil) -> [String] {
-        rankedHits(query, limit: limit).map { $0.path }
+    func search(_ query: String, limit: Int? = nil, bodyOnly: Bool = false) -> [String] {
+        rankedHits(query, limit: limit, bodyOnly: bodyOnly).map { $0.path }
     }
 
     /// `search`'s hits with their FTS rowids, which `snippetMap` seeks by.
-    private func rankedHits(_ query: String, limit: Int? = nil) -> [(rowid: Int64, path: String)] {
-        rankedHits(match: ocrTextMatchExpression(query), limit: limit)
+    private func rankedHits(_ query: String, limit: Int? = nil, bodyOnly: Bool) -> [(rowid: Int64, path: String)] {
+        rankedHits(match: Self.scopeToBody(ocrTextMatchExpression(query), bodyOnly), limit: limit)
     }
 
     /// Paths matching a ready-made FTS5 expression (an Advanced Search text rule, `AdvancedSearch`), bm25
     /// order. The expression's words arrive quoted; one SQLite still rejects gives no hits.
-    func search(expression: String) -> [String] {
-        rankedHits(match: expression).map { $0.path }
+    func search(expression: String, bodyOnly: Bool = false) -> [String] {
+        rankedHits(match: Self.scopeToBody(expression, bodyOnly)).map { $0.path }
     }
 
     /// `searchRanked` for a ready-made expression; its snippets highlight the expression's own terms.
     func searchRanked(expression: String, snippetLimit: Int = 300,
-                      snippetBudget: TimeInterval = SearchSnippet.timeBudget) -> RankedSearch {
+                      snippetBudget: TimeInterval = SearchSnippet.timeBudget, bodyOnly: Bool = false) -> RankedSearch {
+        let expression = Self.scopeToBody(expression, bodyOnly)
         let hits = rankedHits(match: expression)
         guard !hits.isEmpty else { return RankedSearch(paths: [], snippets: [:]) }
         let top = Array(hits.prefix(max(0, snippetLimit)))
@@ -332,12 +470,12 @@ actor ContentIndex {
     /// fragment for a few hundred rows, not for every match, and stops at `snippetBudget` seconds of
     /// snippet work, so one query cannot hold the actor for long (W40.fix-reader-fts-snippet-stall).
     func searchRanked(_ query: String, snippetLimit: Int = 300,
-                      snippetBudget: TimeInterval = SearchSnippet.timeBudget) -> RankedSearch {
-        let hits = rankedHits(query)
+                      snippetBudget: TimeInterval = SearchSnippet.timeBudget, bodyOnly: Bool = false) -> RankedSearch {
+        let hits = rankedHits(query, bodyOnly: bodyOnly)
         guard !hits.isEmpty else { return RankedSearch(paths: [], snippets: [:]) }
         let top = Array(hits.prefix(max(0, snippetLimit)))
         return RankedSearch(paths: hits.map { $0.path },
-                            snippets: snippetMap(match: snippetMatchExpression(query),
+                            snippets: snippetMap(match: Self.scopeToBody(snippetMatchExpression(query), bodyOnly),
                                                  stopTerms: stopWordSnippetTerms(query), hits: top,
                                                  budget: snippetBudget).snippets)
     }
@@ -347,16 +485,22 @@ actor ContentIndex {
     /// after `budget` seconds, as in `searchRanked`. `attempted` is how many of `paths`, from the front, were
     /// looked at — those without an entry in `snippets` have none to give (no body text, an unindexed path),
     /// and the rest are for the caller to ask for again.
-    func snippets(_ query: String, for paths: [String],
-                  budget: TimeInterval = SearchSnippet.timeBudget) -> (snippets: [String: String], attempted: Int) {
-        snippets(match: snippetMatchExpression(query), stopTerms: stopWordSnippetTerms(query), for: paths,
+    func snippets(_ query: String, for paths: [String], budget: TimeInterval = SearchSnippet.timeBudget,
+                  bodyOnly: Bool = false) -> (snippets: [String: String], attempted: Int) {
+        snippets(match: Self.scopeToBody(snippetMatchExpression(query), bodyOnly),
+                 stopTerms: stopWordSnippetTerms(query), for: paths,
                  budget: budget)
     }
 
     /// `snippets(_:for:)` for a ready-made expression (`searchRanked(expression:)`).
-    func snippets(expression: String, for paths: [String],
-                  budget: TimeInterval = SearchSnippet.timeBudget) -> (snippets: [String: String], attempted: Int) {
-        snippets(match: expression, stopTerms: nil, for: paths, budget: budget)
+    func snippets(expression: String, for paths: [String], budget: TimeInterval = SearchSnippet.timeBudget,
+                  bodyOnly: Bool = false) -> (snippets: [String: String], attempted: Int) {
+        snippets(match: Self.scopeToBody(expression, bodyOnly), stopTerms: nil, for: paths, budget: budget)
+    }
+
+    private nonisolated static func scopeToBody(_ expression: String, _ bodyOnly: Bool) -> String {
+        guard bodyOnly, !expression.isEmpty else { return expression }
+        return "body : (\(expression))"
     }
 
     private func snippets(match: String, stopTerms: [SearchSnippet.Term]?, for paths: [String],
@@ -456,8 +600,8 @@ actor ContentIndex {
     /// any. One scan of the rows that have any, since most files (made before the apps) have none.
     func itemFields(for paths: [String]) -> [String: IndexedItemFields] {
         guard !paths.isEmpty, let stmt = prepare("SELECT path, header_fields, user_fields, sidecar_names FROM files "
-                                                 + "WHERE header_fields <> '' OR user_fields <> '' "
-                                                 + "OR sidecar_names <> '';") else { return [:] }
+                                                 + "WHERE is_catalogue = 0 AND (header_fields <> '' OR user_fields <> '' "
+                                                 + "OR sidecar_names <> '');") else { return [:] }
         defer { sqlite3_finalize(stmt) }
         let wanted = Set(paths)
         var out: [String: IndexedItemFields] = [:]
@@ -478,7 +622,7 @@ actor ContentIndex {
 
     /// Every indexed path with corrections stored, and them.
     func storedUserFields() -> [String: [CheckableField: String]] {
-        guard let stmt = prepare("SELECT path, user_fields FROM files WHERE user_fields <> '';") else { return [:] }
+        guard let stmt = prepare("SELECT path, user_fields FROM files WHERE is_catalogue = 0 AND user_fields <> '';") else { return [:] }
         defer { sqlite3_finalize(stmt) }
         var out: [String: [CheckableField: String]] = [:]
         while sqlite3_step(stmt) == SQLITE_ROW {
@@ -499,7 +643,7 @@ actor ContentIndex {
             var changed = 0
             for (path, values) in changes {
                 var rowid: Int64?, names: [CheckableField: String] = [:]
-                if let sel = prepare("SELECT rowid, sidecar_names FROM files WHERE path = ?;") {
+                if let sel = prepare("SELECT rowid, sidecar_names FROM files WHERE path = ? AND is_catalogue = 0;") {
                     bindText(sel, 1, path)
                     if sqlite3_step(sel) == SQLITE_ROW {
                         rowid = sqlite3_column_int64(sel, 0)
@@ -528,7 +672,7 @@ actor ContentIndex {
 
     /// Every indexed path's stored sidecar stamp, empty for a row read with no sidecar (W49.reader-sidecar-names-refresh).
     func storedSidecarStamps() -> [String: String] {
-        guard let stmt = prepare("SELECT path, sidecar_stamp FROM files;") else { return [:] }
+        guard let stmt = prepare("SELECT path, sidecar_stamp FROM files WHERE is_catalogue = 0;") else { return [:] }
         defer { sqlite3_finalize(stmt) }
         var out: [String: String] = [:]
         while sqlite3_step(stmt) == SQLITE_ROW {
@@ -548,7 +692,7 @@ actor ContentIndex {
             var changed = 0
             for (path, change) in changes {
                 var rowid: Int64?, user: [CheckableField: String] = [:]
-                if let sel = prepare("SELECT rowid, user_fields FROM files WHERE path = ?;") {
+                if let sel = prepare("SELECT rowid, user_fields FROM files WHERE path = ? AND is_catalogue = 0;") {
                     bindText(sel, 1, path)
                     if sqlite3_step(sel) == SQLITE_ROW {
                         rowid = sqlite3_column_int64(sel, 0)
@@ -650,7 +794,7 @@ actor ContentIndex {
 
     /// All stored paths as a set — one query, used by the pruner to diff against the live library.
     func allPaths() -> Set<String> {
-        guard let stmt = prepare("SELECT path FROM files;") else { return [] }
+        guard let stmt = prepare("SELECT path FROM files UNION SELECT path FROM catalogue_documents;") else { return [] }
         defer { sqlite3_finalize(stmt) }
         var set = Set<String>()
         while sqlite3_step(stmt) == SQLITE_ROW {
@@ -671,6 +815,7 @@ actor ContentIndex {
             try exec("BEGIN IMMEDIATE;")
             do {
                 for path in batch {
+                    try deleteCatalogueDocuments(at: path)
                     // Look up the rowid so we can delete the matching FTS row (FTS5 content tables
                     // are keyed by rowid, not by a column value).
                     if let sel = prepare("SELECT rowid FROM files WHERE path = ?;") {
@@ -700,8 +845,10 @@ actor ContentIndex {
     func performMaintenance(rowsIndexed: Int) {
         if rowsIndexed > 5000 {
             try? exec("INSERT INTO fts(fts) VALUES('optimize');")
+            try? exec("INSERT INTO catalogue_fts(catalogue_fts) VALUES('optimize');")
         } else if rowsIndexed > 0 {
             try? exec("INSERT INTO fts(fts, rank) VALUES('merge', 500);")
+            try? exec("INSERT INTO catalogue_fts(catalogue_fts, rank) VALUES('merge', 500);")
         }
         // Checkpoint: reclaim WAL space. TRUNCATE shrinks the -wal file; single-connection
         // design means no concurrent reader can leave it partial. Busy result is non-fatal.

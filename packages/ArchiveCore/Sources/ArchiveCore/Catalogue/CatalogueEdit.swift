@@ -2,20 +2,23 @@ import Foundation
 
 /// A batch of user edits to one verified companion. Document fields target their owning record.
 public struct CatalogueEdit: Sendable {
-    public enum FileField: String, Sendable { case readState, flagged, colour, quality, ocrPoor }
-    public enum DocumentField: String, Sendable {
+    public enum FileField: String, Codable, Sendable { case readState, flagged, colour, quality, ocrPoor }
+    public enum DocumentField: String, Codable, Sendable {
         case documentDate, sentWith, publicationDate, documentKind, itemType, title, byline, publication
         case senders, recipients, sendingPlaces, recipientPlaces, subjects
     }
 
-    public enum Target: Hashable, Sendable {
+    public enum Target: Codable, Hashable, Sendable {
         case file(FileField)
         case document(UUID, DocumentField)
+        /// A persisted quarter turn of the physically selected page, in clockwise degrees.
+        case pageViewRotation(UUID)
 
-        fileprivate var location: (document: UUID?, key: String) {
+        fileprivate var location: (document: UUID?, key: String)? {
             switch self {
             case .file(let field): (nil, field.rawValue)
             case .document(let id, let field): (id, field.rawValue)
+            case .pageViewRotation: nil
             }
         }
     }
@@ -26,6 +29,7 @@ public struct CatalogueEdit: Sendable {
         case flag(Bool)
         case rating(Int)
         case date(CatalogueRecord.DateValue)
+        case rotation(Int)
     }
 
     public enum Change: Sendable {
@@ -84,30 +88,74 @@ struct CatalogueEditPatch {
         }
     }
 
+
+    static func changedTargets(_ targets: [CatalogueEdit.Target], before: CatalogueRecord,
+                               after: CatalogueRecord) throws -> [CatalogueEdit.Target] {
+        let prior = try Fields(before)
+        let written = try Fields(after)
+        return try targets.filter { try prior.value(at: $0) != written.value(at: $0) }
+    }
+
+    static func restoring(_ targets: [CatalogueEdit.Target], before: CatalogueRecord,
+                          after: CatalogueRecord, current: CatalogueRecord) throws -> CatalogueRecord {
+        let prior = try Fields(before)
+        let written = try Fields(after)
+        var live = try Fields(current)
+        let conflicts = try targets.filter { target in
+            do { return try written.value(at: target) != live.value(at: target) }
+            catch CatalogueEdit.Invalid.unavailableTarget { return true }
+        }
+        if !conflicts.isEmpty { throw CatalogueWriter.UndoRefusal.changedFields(conflicts) }
+        for target in targets { try live.set(prior.value(at: target), at: target) }
+        return try live.record(parent: current.revision)
+    }
+
     private struct Fields {
         private var root: CatalogueJSON.Object
         private var documents: [Data]
+        private var pages: [Data]
         private let ownerIndices: [UUID: Int]
+        private let pageIndices: [UUID: Int]
+        private var changedPages: [UUID: CatalogueJSON.Object] = [:]
         private var fileFields: CatalogueJSON.Object?
         private var changedDocuments: [UUID: CatalogueJSON.Object] = [:]
 
         init(_ record: CatalogueRecord) throws {
             root = try CatalogueJSON.Object(record.originalJSON)
-            guard let rawDocuments = root["documents"] else { throw CatalogueRecord.Invalid.inconsistentRecord }
+            guard let rawDocuments = root["documents"], let rawPages = root["pages"] else {
+                throw CatalogueRecord.Invalid.inconsistentRecord
+            }
             documents = try CatalogueJSON.entries(in: rawDocuments)
+            pages = try CatalogueJSON.entries(in: rawPages)
+            pageIndices = Dictionary(uniqueKeysWithValues: record.pages.enumerated().compactMap { index, page in
+                ["image", "text", "searchable"].contains(page.role) ? (page.id, index) : nil
+            })
             ownerIndices = Dictionary(uniqueKeysWithValues: record.documents.enumerated().compactMap { index, document in
                 document.ownerFileID == record.fileID ? (document.id, index) : nil
             })
         }
 
         func value(at target: CatalogueEdit.Target) throws -> Data? {
-            let value = try fields(at: target)[target.location.key]
+            let value: Data?
+            if case .pageViewRotation(let id) = target {
+                value = try page(id, target: target)["viewRotation"]
+            } else if let location = target.location {
+                value = try fields(at: target)[location.key]
+            } else {
+                throw CatalogueEdit.Invalid.unavailableTarget(target)
+            }
             return value == Data("null".utf8) ? nil : value
         }
 
         mutating func set(_ value: Data?, at target: CatalogueEdit.Target) throws {
+            if case .pageViewRotation(let id) = target {
+                var raw = try page(id, target: target)
+                raw["viewRotation"] = value
+                changedPages[id] = raw
+                return
+            }
+            guard let (document, key) = target.location else { throw CatalogueEdit.Invalid.unavailableTarget(target) }
             var fields = try fields(at: target)
-            let (document, key) = target.location
             fields[key] = value
             if let document {
                 changedDocuments[document] = fields
@@ -116,8 +164,14 @@ struct CatalogueEditPatch {
             }
         }
 
+        private func page(_ id: UUID, target: CatalogueEdit.Target) throws -> CatalogueJSON.Object {
+            if let changed = changedPages[id] { return changed }
+            guard let index = pageIndices[id] else { throw CatalogueEdit.Invalid.unavailableTarget(target) }
+            return try CatalogueJSON.Object(pages[index])
+        }
+
         private func fields(at target: CatalogueEdit.Target) throws -> CatalogueJSON.Object {
-            guard let id = target.location.document else {
+            guard let id = target.location?.document else {
                 if let fileFields { return fileFields }
                 guard let rawFields = root["fileFields"] else { throw CatalogueRecord.Invalid.inconsistentRecord }
                 return try CatalogueJSON.Object(rawFields)
@@ -138,6 +192,11 @@ struct CatalogueEditPatch {
                 documents[index] = try document.encoded()
             }
             if !changedDocuments.isEmpty { root["documents"] = CatalogueJSON.array(documents) }
+            for (id, page) in changedPages {
+                guard let index = pageIndices[id] else { throw CatalogueRecord.Invalid.inconsistentRecord }
+                pages[index] = try page.encoded()
+            }
+            if !changedPages.isEmpty { root["pages"] = CatalogueJSON.array(pages) }
             let encoder = JSONEncoder()
             root["revision"] = try encoder.encode(UUID())
             root["parents"] = try encoder.encode([parent])
@@ -150,6 +209,16 @@ private extension CatalogueEdit {
     func apply(_ prior: Data?) throws -> Data? {
         let encoder = JSONEncoder()
         let decoder = JSONDecoder()
+        if case .pageViewRotation = target {
+            switch change {
+            case .set(.rotation(let degrees)) where [0, 90, 180, 270].contains(degrees):
+                return try encoder.encode(degrees)
+            case .clear:
+                return nil
+            default:
+                throw Invalid.incompatibleValue(target)
+            }
+        }
         var field = try CatalogueJSON.Object(prior ?? Data("{}".utf8))
         if let origin = field["origin"], !["user", "model", "imported"].contains(try decoder.decode(String.self, from: origin)) {
             throw Invalid.unsupportedFieldData(target)

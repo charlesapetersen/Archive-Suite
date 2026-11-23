@@ -22,6 +22,13 @@ extension CatalogueReader {
             self.owners = owners
         }
 
+        /// Only pairs whose PDF identity and adjacent companion both verified in this scan.
+        public var rememberablePairs: [CatalogueReader.RememberedPair] {
+            files.values.compactMap { result in
+                (try? result.get()).map { CatalogueReader.RememberedPair($0) }
+            }
+        }
+
         public func facts(at relativePath: String, physicalPageIndex: Int? = nil) -> ItemFacts {
             let file: FileResult
             if let rootFailure {

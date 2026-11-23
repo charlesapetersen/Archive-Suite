@@ -262,7 +262,7 @@ private struct RuleValueView: View {
 
     var body: some View {
         switch rule.field {
-        case .text, .ocrText, .fileName:
+        case .text, .ocrText, .catalogueFields, .fileName:
             TextField(rule.op == .phrase ? "phrase" : (rule.field == .fileName ? "text" : "words"), text: $rule.text)
                 .textFieldStyle(.roundedBorder)
                 .frame(minWidth: 160, maxWidth: .infinity)
@@ -357,7 +357,7 @@ private struct RuleValueView: View {
                     .frame(width: 340)
                 }
             }
-        case .needsAttention, .ambiguousDate, .flagged, .group:
+        case .needsAttention, .ambiguousDate, .poorOCR, .flagged, .group:
             EmptyView()
         }
     }
@@ -379,6 +379,7 @@ extension RuleField {
         switch self {
         case .text: return "Any text"
         case .ocrText: return "OCR text"
+        case .catalogueFields: return "Catalogue fields"
         case .fileName: return "File name"
         case .tags: return "Tags"
         case .quality: return "Quality"
@@ -387,6 +388,7 @@ extension RuleField {
         case .date: return "Date"
         case .folder: return "Folder"
         case .needsAttention: return "Needs attention"
+        case .poorOCR: return "OCR Poor"
         case .ambiguousDate: return "Ambiguous date"
         case .flagged: return "Flagged"
         case .container: return "Container"
@@ -418,7 +420,7 @@ extension RuleOperator {
             switch field {
             case .quality: return yes ? "is one of" : "is none of"
             case .folder: return yes ? "is inside" : "is not inside"
-            case .needsAttention, .ambiguousDate, .flagged: return yes ? "yes" : "no"
+            case .needsAttention, .ambiguousDate, .poorOCR, .flagged: return yes ? "yes" : "no"
             default: return yes ? "is" : "is not"
             }
         }

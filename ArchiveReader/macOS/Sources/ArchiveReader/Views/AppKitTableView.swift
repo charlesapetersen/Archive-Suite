@@ -677,9 +677,13 @@ struct AppKitTableView: NSViewRepresentable {
 
             switch colID {
             case "flag":
-                let flagged = parent.model.flags.isFlagged(file.path)
+                let flagged = file.isCatalogue ? file.catalogueFlag == true : parent.model.flags.isFlagged(file.path)
                 tf.stringValue = flagged ? "⚑" : ""
-                tf.setAccessibilityLabel(flagged ? "Flagged" : "Not flagged")
+                if file.isCatalogue, file.catalogueFlag == nil {
+                    tf.setAccessibilityLabel(file.canEditFileFacets ? "Flag unassessed" : "Flag unavailable")
+                } else {
+                    tf.setAccessibilityLabel(flagged ? "Flagged" : "Not flagged")
+                }
                 cell.tint = flagged ? ReaderColors.warningCellTint : nil
 
             case "warning":
@@ -695,7 +699,11 @@ struct AppKitTableView: NSViewRepresentable {
 
             case "date":
                 let calendar = parent.model.displayCalendar(for: file)   // W24.cal1-reader; nil = as tagged
-                let dateText = file.dateCellText(in: calendar)
+                let dateText = if file.isCatalogue, !file.canEditDocumentFacets {
+                    file.catalogueDocuments.count > 1 ? "Multiple documents" : "Unavailable"
+                } else {
+                    file.dateCellText(in: calendar)
+                }
                 tf.toolTip = file.storedDateTooltip(in: calendar)
                 // W40.fix-reader-date-ambiguity: two tags for one date facet are flagged on the row, and the
                 // tooltip names the one the last-wins rule set aside.
@@ -738,7 +746,13 @@ struct AppKitTableView: NSViewRepresentable {
                 )
 
             case AppKitTableView.itemFieldsColumnID:
-                Self.configureItemFieldsTextField(tf, fields: parent.model.itemFields(for: file.path))
+                if file.isCatalogue {
+                    tf.stringValue = file.catalogueItemFieldsText ?? (file.catalogueDocuments.isEmpty ? "Unavailable" : "")
+                    tf.lineBreakMode = .byTruncatingTail
+                    tf.toolTip = file.catalogueFieldLabels.map { "\($0.field.label): \($0.value)" }.joined(separator: "\n")
+                } else {
+                    Self.configureItemFieldsTextField(tf, fields: parent.model.itemFields(for: file.path))
+                }
 
             case AppKitTableView.containerColumnID:
                 let row = parent.model.containerRow(for: file.path)
@@ -754,10 +768,15 @@ struct AppKitTableView: NSViewRepresentable {
             case "read":
                 Self.configureReadStateCell(cell, state: file.readState)
                 if let readCell = cell as? ReadStateCellView {
-                    readCell.file = file
+                    readCell.file = file.canEditFileFacets ? file : nil
                     readCell.onAction = { [weak self] action, file in self?.performReadAction(action, on: file) }
                 }
-                tf.toolTip = "Click to switch Read and Unread · right-click for more"
+                if file.canEditFileFacets {
+                    tf.toolTip = "Click to switch Read and Unread · right-click for more"
+                } else {
+                    tf.toolTip = "Catalogue read state is unavailable"
+                    tf.setAccessibilityLabel("Read state unavailable")
+                }
 
             default:
                 tf.stringValue = ""
@@ -1016,6 +1035,8 @@ struct AppKitTableView: NSViewRepresentable {
             // Freeze during edit: don't clobber the in-progress token field or its target file.
             if tagCell.tokenField.currentEditor() == nil {
                 tagCell.tokenField.objectValue = file?.subjects ?? []
+                tagCell.tokenField.isEditable = file?.canEditDocumentFacets == true
+                tagCell.tokenField.placeholderString = file?.canEditDocumentFacets == false ? nil : "Add tags…"
                 tagCell.itemID = itemID
                 tagCell.editBase = nil
             }
@@ -1753,10 +1774,16 @@ final class QualityCellView: NSTableCellView {
     /// "Q1"…"Q3", or "None" for a file with no quality.
     static func title(for quality: Int?) -> String { quality.map { "Q\($0)" } ?? "None" }
 
+    private static func qualityLabel(for file: ArchiveFile) -> String {
+        guard file.canEditFileFacets else { return "Unavailable" }
+        guard !file.isCatalogue || file.catalogueFileFields?.quality != nil else { return "Unassessed" }
+        return title(for: file.quality)
+    }
+
     private func refresh() {
-        textField?.stringValue = file.map { Self.title(for: $0.quality) } ?? ""
-        chevron.isHidden = file == nil
-        toolTip = file == nil ? nil : "Set this file's quality"
+        textField?.stringValue = file.map(Self.qualityLabel) ?? ""
+        chevron.isHidden = file?.canEditFileFacets != true
+        toolTip = file.map { $0.canEditFileFacets ? "Set this file's quality" : "Catalogue quality is unavailable" }
         button.setAccessibilityIdentifier(file.map { "ar.quality.menu.\($0.name)" } ?? "")
         button.setAccessibilityLabel(file.map { "Quality for \($0.name)" })
     }
@@ -1779,9 +1806,9 @@ final class QualityCellView: NSTableCellView {
         weak var cell: QualityCellView?
         override func isAccessibilityElement() -> Bool { cell?.file != nil }
         override func accessibilityRole() -> NSAccessibility.Role? { .popUpButton }
-        override func accessibilityValue() -> Any? { cell?.file.map { QualityCellView.title(for: $0.quality) } }
+        override func accessibilityValue() -> Any? { cell?.file.map(QualityCellView.qualityLabel) }
         override func accessibilityPerformPress() -> Bool {
-            guard cell?.file != nil else { return false }
+            guard cell?.file?.canEditFileFacets == true else { return false }
             DispatchQueue.main.async { [weak self] in self?.cell?.openMenu() }
             return true
         }
@@ -1801,7 +1828,7 @@ final class QualityCellView: NSTableCellView {
 
     /// Opens the menu for a plain single click and returns true; false when the press belongs to the table.
     func handleMouseDown(_ event: NSEvent) -> Bool {
-        guard file != nil, event.clickCount == 1 else { return false }
+        guard file?.canEditFileFacets == true, event.clickCount == 1 else { return false }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard modifiers.isDisjoint(with: [.command, .shift, .control]) else { return false }
         openMenu()
@@ -1818,14 +1845,15 @@ final class QualityCellView: NSTableCellView {
     }
 
     func makeMenu() -> NSMenu? {
-        guard let file else { return nil }
+        guard let file, file.canEditFileFacets else { return nil }
         let menu = NSMenu(title: "Quality")
         menu.autoenablesItems = false
         for quality in [nil] + QualityLevels.all.map(Optional.some) {
             let item = NSMenuItem(title: Self.title(for: quality), action: #selector(choose(_:)), keyEquivalent: "")
             item.target = self
             item.representedObject = Choice(quality: quality, file: file)
-            item.state = quality == file.quality ? .on : .off
+            let assessed = !file.isCatalogue || file.catalogueFileFields?.quality != nil
+            item.state = assessed && quality == file.quality ? .on : .off
             menu.addItem(item)
         }
         return menu

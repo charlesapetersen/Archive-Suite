@@ -83,6 +83,7 @@ struct DocumentWindowView: View {
             model.updateArchiveContext(target: target, index: index)
         }
         .onAppear {
+            model.followCatalogueRotation(router.nav)
             model.showingTagEditor = infoVisible
             model.showingThumbnails = thumbnailsVisible
             model.invertingImages = invertImages
@@ -113,7 +114,10 @@ struct DocumentWindowView: View {
         }
         // The list marks this window's file "on view" while it is the frontmost (W40.reader-selection-current).
         .onChange(of: model.currentFilePath) { noteFileOnView() }
-        .onChange(of: activeState, initial: true) { noteFileOnView() }
+        .onChange(of: activeState, initial: true) {
+            model.followCatalogueRotation(router.nav)
+            noteFileOnView()
+        }
     }
 
     private func noteFileOnView() {
@@ -400,7 +404,8 @@ struct DocumentWindowView: View {
     /// The inspector beside this window’s document, editing the open file through the navigation window's model.
     @ViewBuilder private var tagInspector: some View {
         if let nav = router.nav, let path = model.currentFilePath {
-            TagInspectorView(model: nav, paths: [path], identity: path, isVisible: model.showingTagEditor) {
+            TagInspectorView(model: nav, paths: [path], identity: path, isVisible: model.showingTagEditor,
+                             physicalPageIndex: model.pagePairs.imagePageIndex(pair: model.pair)) {
                 model.showingTagEditor = false
             }
             .equatable()

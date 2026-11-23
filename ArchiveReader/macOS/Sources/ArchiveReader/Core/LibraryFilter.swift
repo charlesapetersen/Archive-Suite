@@ -115,20 +115,33 @@ struct LibraryFilter: Sendable, Equatable, Codable {
         case .all: break
         case .read: if file.readState != .read { return false }
         case .unread: if file.readState != .unread { return false }
-        case .noReadState: if file.readState != nil { return false }
+        case .noReadState:
+            if file.isCatalogue {
+                guard file.catalogueFileFields?.readState?.readerIsCleared == true else { return false }
+            } else if file.readState != nil { return false }
         }
         // Quality (empty set = any). Files with no quality are excluded when a level is required.
         if !qualities.isEmpty {
             guard let q = file.quality, qualities.contains(q) else { return false }
         }
         // Subjects, every one of them, by tag identity: "lincoln" in the filter matches a file's "Lincoln".
-        if !subjects.allSatisfy(file.hasSubject) { return false }
+        if file.isCatalogue {
+            if (!subjects.isEmpty || dateRange != nil), !file.catalogueDocuments.contains(where: { fact in
+                guard let fields = ReaderCatalogueFacets.document(fact) else { return false }
+                let keys = Set((fields.subjects?.readerValue ?? []).map(tagKey))
+                guard subjects.allSatisfy({ keys.contains(tagKey($0)) }) else { return false }
+                guard let dateRange else { return true }
+                let tags = ReaderCatalogueFacets.tags(file: nil, document: fact)
+                return dateRange.matchingRoles(tags.dateKeysByRole).contains(where: dateRangeRoles.roles.contains)
+            }) { return false }
+        } else {
+            if !subjects.allSatisfy(file.hasSubject) { return false }
+            if let dateRange, !dateRange.matchingRoles(file.tags.dateKeysByRole).contains(where: dateRangeRoles.roles.contains) {
+                return false
+            }
+        }
         if ambiguousDatesOnly, !file.dateIsAmbiguous { return false }
         if poorOCROnly, !file.tags.hasPoorOCR { return false }
-        // Date range — the chosen roles, the same value meeting both bounds.
-        if let dateRange, !dateRange.matchingRoles(file.tags.dateKeysByRole).contains(where: dateRangeRoles.roles.contains) {
-            return false
-        }
         // Filename text
         let q = searchText.trimmingCharacters(in: .whitespaces)
         if !q.isEmpty, file.name.range(of: q, options: .caseInsensitive) == nil { return false }
@@ -210,10 +223,10 @@ enum LibrarySort {
             case .readState: stringColumns.append((c, files.map { $0.readState?.rawValue }))
             case .subjects:  stringColumns.append((c, files.map { subjectsKey($0) }))
             // 0 or 1, never `Int.max`: an unmarked row is a value, so descending puts it first.
-            case .flag:      columns[c] = files.map { marks.flagged.contains($0.path) ? 0 : 1 }
+            case .flag:      columns[c] = files.map { ($0.isCatalogue ? $0.catalogueFlag == true : marks.flagged.contains($0.path)) ? 0 : 1 }
             case .attention: columns[c] = files.map { marks.needsAttention.contains($0.path) ? 0 : 1 }
             case .container: stringColumns.append((c, files.map { marks.containers[$0.path] }))
-            case .itemFields: stringColumns.append((c, files.map { marks.itemFields[$0.path] }))
+            case .itemFields: stringColumns.append((c, files.map { $0.isCatalogue ? $0.catalogueItemFieldsText : marks.itemFields[$0.path] }))
             case .relevance: break
             }
         }
@@ -272,10 +285,10 @@ enum LibrarySort {
             case .fileType:  return string(f.fileType)
             case .readState: return string(f.readState?.rawValue)
             case .subjects:  return string(subjectsKey(f))
-            case .flag:      return .int(marks.flagged.contains(f.path) ? 0 : 1)
+            case .flag:      return .int((f.isCatalogue ? f.catalogueFlag == true : marks.flagged.contains(f.path)) ? 0 : 1)
             case .attention: return .int(marks.needsAttention.contains(f.path) ? 0 : 1)
             case .container: return string(marks.containers[f.path])
-            case .itemFields: return string(marks.itemFields[f.path])
+            case .itemFields: return string(f.isCatalogue ? f.catalogueItemFieldsText : marks.itemFields[f.path])
             case .relevance: return .missing
             }
         }
@@ -302,7 +315,7 @@ enum LibrarySort {
     /// Sort key for the File-tags column: the topical tags joined, or nil when there are none
     /// (so files with no topical tags sort last, like other missing facets).
     private static func subjectsKey(_ f: ArchiveFile) -> String? {
-        let s = f.tags.topicalTags.joined(separator: ", ")
+        let s = f.subjectDisplay.joined(separator: ", ")
         return s.isEmpty ? nil : s
     }
 }

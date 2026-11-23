@@ -160,7 +160,7 @@ ALLOW=(
 
   # ── rule 4 (raw POSIX write) ────────────────────────────────────────────────────────────────────
   # The audit ledger's append handle (already audited above as the ledger's own file).
-  "posixwrite${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Core/AuditLedger.swift${SEP}let fd = open(url.path, O_WRONLY | O_APPEND | O_CLOEXEC)"
+  "posixwrite${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Core/AuditLedger.swift${SEP}let fd = open(url.path, O_WRONLY | O_APPEND | O_CLOEXEC | (creating ? O_CREAT | O_NOFOLLOW : 0), 0o600)"
   # W44.reocr-processor: Improve OCR's flag generations, in the connected SHARED SUPPORT folder only (never an
   # archive: `checkSuitable` refuses a folder inside a root marker). Lock file, private folders, temporary-then-link
   # publication of intent/event files, removal of a finished intent and of the temporary.

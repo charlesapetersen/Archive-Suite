@@ -43,8 +43,8 @@ Archival image files are **irreplaceable** and their tagging was **extremely tim
   swaps it back (W49.reader-ct-set-aside, `NavigationModel+ContainerSetAside`). No archive file's
   bytes, tags or location change. Contract: `SPEC/containers.md` §File safety.
 - **Adopted catalogue companions** (owner call 32) use ArchiveCore's `CatalogueWriter` for deliberate
-  edits to the adjacent JSON. [Scope and recovery](../SPEC/catalogue.md#guarded-local-saves-and-recovery).
-  Reader wiring follows separately.
+  edits to the adjacent JSON, with guarded Undo and Finder-rename repair.
+  [Scope and recovery](../SPEC/catalogue.md#guarded-local-saves-and-recovery).
 - Everything else — discovery, filtering, viewing, ordinary copying — is strictly **read-only**.
 
 This is an architectural property, not a coding-discipline hope: **all tag writes route through the
@@ -158,7 +158,7 @@ The shared contract is the risk (a divergence would corrupt or mis-read irreplac
 
 ## Architecture — the rules (detail in REFERENCE.md §Architecture)
 
-- **Filesystem tags are the sole truth**; only a clean completed pass may make absence authoritative.
+- **Finder tags are the legacy authority.** Adopted roots use companions. Only a clean scan can prove absence.
   `LibraryIndex` and the FTS5 content index are **disposable, rebuildable caches** in OS SQLite — no third-party
   ORM/GRDB. Stale-row pruning stays the separate gated `pruneIfSettled` pass (gated on settled + non-empty +
   two-emission absence confirmation + component-boundary root scope), never folded into the indexing emission.

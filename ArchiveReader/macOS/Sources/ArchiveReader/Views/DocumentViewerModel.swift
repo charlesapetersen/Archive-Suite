@@ -524,15 +524,52 @@ final class DocumentViewerModel: ObservableObject {
 
     // MARK: Rotation — a view of the page, the file untouched (W40.reader-view-rotate)
 
-    /// Quarter turns clockwise the reader gave the current image page, 0…3, from `pageTurns`. The PDF's image
-    /// page and its JPEG original are the same photograph, so one turn serves both; the OCR text page is not
-    /// turned. The image pane's identity includes it, so a turn builds a fresh view.
+    private weak var catalogueNavigation: NavigationModel?
+    private var catalogueRotationObservation: AnyCancellable?
+    private var usedCatalogueRotation = false
+
+    /// Follow the library even when a companion-only edit changes no visible list cell.
+    func followCatalogueRotation(_ navigation: NavigationModel?) {
+        guard catalogueNavigation !== navigation else { return }
+        catalogueNavigation = navigation
+        catalogueRotationObservation?.cancel()
+        catalogueRotationObservation = nil
+        guard let navigation else { return }
+        usedCatalogueRotation = navigation.library.usesCatalogue
+        catalogueRotationObservation = navigation.library.$phase.combineLatest(navigation.$catalogueEditSaving)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak navigation] _ in
+                MainActor.assumeIsolated {
+                    guard let self, let navigation else { return }
+                    self.usedCatalogueRotation = navigation.library.usesCatalogue
+                    self.objectWillChange.send()
+                }
+            }
+    }
+
+    private var usesCatalogueRotation: Bool { catalogueNavigation?.library.usesCatalogue ?? usedCatalogueRotation }
+
+    private var catalogueImagePage: CatalogueRecord.Page? {
+        guard let catalogueNavigation, let path = currentFilePath, imagePage != nil,
+              let file = catalogueNavigation.libraryFiles(atPaths: [path]).first else { return nil }
+        let physicalIndex = pagePairs.imagePageIndex(pair: pair)
+        guard let page = catalogueNavigation.catalogueFacts(for: file, physicalPageIndex: physicalIndex)?.page,
+              ["image", "text", "searchable"].contains(page.role) else { return nil }
+        return page
+    }
+
+    /// Quarter turns clockwise for the displayed image page. Its JPEG original and PDF image draw
+    /// with the same turn. The separate OCR text page stays upright.
     var imageTurns: Int {
         guard let path = currentFilePath, imagePage != nil else { return 0 }
+        if usesCatalogueRotation { return (catalogueImagePage?.viewRotation ?? 0) / 90 }
         return pageTurns.turns(path: path, page: pagePairs.imagePageIndex(pair: pair))
     }
-    /// An image page is on screen, so there is something to turn.
-    var canRotate: Bool { imagePage != nil && !showingAllPages }
+
+    var canRotate: Bool {
+        guard imagePage != nil, !showingAllPages else { return false }
+        return !usesCatalogueRotation || (catalogueNavigation?.catalogueEditSaving == false && catalogueImagePage != nil)
+    }
     var isRotated: Bool { imageTurns != 0 }
 
     func rotateLeft() { setImageTurns(imageTurns - 1) }
@@ -544,6 +581,14 @@ final class DocumentViewerModel: ObservableObject {
         let page = pagePairs.imagePageIndex(pair: pair)
         let before = imageTurns, after = ((turns % 4) + 4) % 4
         guard after != before else { return }   // Reset on an upright page is not an action to undo
+        if usesCatalogueRotation {
+            catalogueNavigation?.applyCatalogueRotation(path: path, pageIndex: page, turns: after) { [weak self] verified in
+                guard let self, self.currentFilePath == path else { return }
+                if !verified.isEmpty { self.leftController.clearSelection() }
+                self.tagStatus = self.catalogueNavigation?.catalogueEditFeedback ?? ""
+            }
+            return
+        }
         writeTurns(after, path: path, page: page)
         turnUndos.append(TurnChange(path: path, page: page, before: before, after: after, date: Date()))
         turnRedos.removeAll()

@@ -3,7 +3,7 @@ import Foundation
 public enum CatalogueAssociation {
     /// The root instance identifies this granted replica, even if a copied root has the same marker GUID.
     /// Discovery supplies the canonical relative path after checking scope and filesystem aliases.
-    public struct Occurrence: Hashable, Sendable {
+    public struct Occurrence: Codable, Hashable, Sendable {
         public let rootInstanceID: UUID
         public let relativePath: String
 

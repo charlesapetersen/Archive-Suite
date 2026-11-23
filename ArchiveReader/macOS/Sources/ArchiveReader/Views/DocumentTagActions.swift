@@ -29,21 +29,38 @@ struct DocumentTagActions {
 
     func mark(_ state: ReadState) {
         guard let navigation, let paths else { return }
-        navigation.mark(state, paths: paths)
-        viewer.tagStatus = navigation.statusMessage
+        if navigation.library.usesCatalogue {
+            navigation.markCatalogue(state, paths: paths) { _ in viewer.tagStatus = navigation.statusMessage }
+        } else {
+            navigation.mark(state, paths: paths)
+            viewer.tagStatus = navigation.statusMessage
+        }
     }
 
     /// Marks the open file Read, then moves this window on to the next file it holds that is still Unread.
     /// The list's version moves the list's selection; here the window's own files are the run being read.
     func markReadAndNextUnread() {
         guard let navigation, let paths else { return }
-        navigation.mark(.read, paths: paths)
-        let status = navigation.statusMessage
-        // Moves on only once the open file reads Read; a refused or failed mark keeps it in front with the reason.
-        guard navigation.libraryFiles(atPaths: paths).first?.readState == .read else {
-            viewer.tagStatus = status
+        if navigation.library.usesCatalogue {
+            let original = viewer.currentFilePath
+            navigation.markCatalogue(.read, paths: paths) { verified in
+                guard viewer.currentFilePath == original else { return }
+                if !verified.isEmpty { advance(using: navigation) }
+                else { viewer.tagStatus = navigation.statusMessage }
+            }
             return
         }
+        navigation.mark(.read, paths: paths)
+        // Moves on only once the open file reads Read; a refused or failed mark keeps it in front with the reason.
+        guard navigation.libraryFiles(atPaths: paths).first?.readState == .read else {
+            viewer.tagStatus = navigation.statusMessage
+            return
+        }
+        advance(using: navigation)
+    }
+
+    private func advance(using navigation: NavigationModel) {
+        let status = navigation.statusMessage
         let later = viewer.urls.indices.filter { $0 > viewer.index }
         let unread = Set(navigation.libraryFiles(atPaths: later.map { viewer.urls[$0].path })
             .filter { $0.readState == .unread }.map(\.path))
@@ -63,7 +80,9 @@ struct DocumentTagActions {
     func toggleFlag() {
         guard let navigation, let paths else { return }
         guard navigation.toggleFlag(paths: paths) else { viewer.tagStatus = navigation.statusMessage; return }
-        viewer.tagStatus = paths.allSatisfy(navigation.flags.isFlagged) ? "Flagged." : "Flag removed."
+        if !navigation.library.usesCatalogue {
+            viewer.tagStatus = paths.allSatisfy(navigation.flags.isFlagged) ? "Flagged." : "Flag removed."
+        }
     }
 
     /// W44.reocr-reader: the Tags menu's poor-OCR toggle and Improve OCR… for the open file.
@@ -71,6 +90,7 @@ struct DocumentTagActions {
 
     func togglePoorOCR() {
         guard let navigation, let paths else { return }
+        if navigation.library.usesCatalogue { navigation.togglePoorOCR(paths: paths); return }
         let flag = !navigation.poorOCRWouldClear(paths: paths)
         let targets = navigation.libraryFiles(atPaths: paths)
         guard !targets.isEmpty else { navigation.togglePoorOCR(paths: paths); viewer.tagStatus = navigation.statusMessage; return }

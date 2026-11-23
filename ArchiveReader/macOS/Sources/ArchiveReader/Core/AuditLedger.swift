@@ -813,8 +813,8 @@ final class AuditLedger: @unchecked Sendable {
 
     /// `O_APPEND`: every write lands at the end of the file as it is at that moment, so two running
     /// copies sharing the container's ledger never write over each other's lines.
-    private static func appendHandle(_ url: URL) throws -> FileHandle {
-        let fd = open(url.path, O_WRONLY | O_APPEND | O_CLOEXEC)
+    static func appendHandle(_ url: URL, creating: Bool = false) throws -> FileHandle {
+        let fd = open(url.path, O_WRONLY | O_APPEND | O_CLOEXEC | (creating ? O_CREAT | O_NOFOLLOW : 0), 0o600)
         guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
         return FileHandle(fileDescriptor: fd, closeOnDealloc: true)
     }
@@ -842,7 +842,7 @@ final class AuditLedger: @unchecked Sendable {
     /// `F_FULLFSYNC`, so a synchronized line survives power loss and not only process death: plain
     /// `fsync(2)` on macOS leaves it in the drive's cache. Falls back to `fsync` where the file system
     /// does not support it.
-    private static func flushToStorage(_ handle: FileHandle) throws {
+    static func flushToStorage(_ handle: FileHandle) throws {
         guard fcntl(handle.fileDescriptor, F_FULLFSYNC) == -1 else { return }
         let code = errno
         guard code == ENOTSUP || code == EINVAL else { throw POSIXError(POSIXErrorCode(rawValue: code) ?? .EIO) }

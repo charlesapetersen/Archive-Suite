@@ -31,14 +31,22 @@ extension NavigationModel {
             announce(statusMessage)
             return
         }
-        guard connectImproveOCRFolderIfNeeded() else { return }
         let flag = !targets.allSatisfy(\.tags.hasPoorOCR)
+        if library.usesCatalogue {
+            applyCatalogueFileField(.ocrPoor, .set(.flag(flag)), paths: targets.map(\.path))
+            return
+        }
+        guard connectImproveOCRFolderIfNeeded() else { return }
         Task { await setPoorOCR(flag, on: targets) }
     }
 
     /// The flag write itself, awaited by tests. Returns the verified results.
     @discardableResult
     func setPoorOCR(_ flag: Bool, on targets: [ArchiveFile]) async -> [TagWriteResult] {
+        if library.usesCatalogue {
+            applyCatalogueFileField(.ocrPoor, .set(.flag(flag)), paths: targets.map(\.path))
+            return []
+        }
         let reverified = reverifyCacheRows(targets)
         let files = reverified.files
         let delta = flag ? TagDelta(add: [DocumentTags.poorOCRTag]) : TagDelta(remove: [DocumentTags.poorOCRTag])

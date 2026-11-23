@@ -97,6 +97,26 @@ extension CatalogueWriter {
         return ancestry(of: current, through: artifacts, in: scope.parent, stoppingAt: baseDigest).last?.before == baseDigest
     }
 
+    /// Return the exact known successor of a retained operation in the live ancestry.
+    func undoRecords(for inverse: Inverse, current: CatalogueRecord, in scope: Scope)
+        throws -> (before: CatalogueRecord, after: CatalogueRecord) {
+        let prefix = CatalogueEditArtifact.prefix(for: scope.filename, pdf: scope.base.pdfVersion.identity)
+        let artifacts = try editArtifacts(prefix: prefix, in: scope.parent)
+        let history = ancestry(of: current, through: artifacts, in: scope.parent, stoppingAt: inverse.beforeDigest)
+        guard let last = history.last, last.name == inverse.artifact,
+              last.before == inverse.beforeDigest, last.after == inverse.afterDigest else {
+            throw UndoRefusal.unverifiedHistory
+        }
+        let after = try history.dropLast().last.map { try readRecord($0.name, in: scope.parent).record } ?? current
+        let before = try readRecord(last.name, in: scope.parent).record
+        guard CatalogueEditArtifact.digest(after) == inverse.afterDigest,
+              CatalogueEditArtifact.digest(before) == inverse.beforeDigest,
+              after.revision == inverse.afterRevision, before.revision == inverse.beforeRevision else {
+            throw UndoRefusal.unverifiedHistory
+        }
+        return (before, after)
+    }
+
     private func ancestry(of live: CatalogueRecord, through artifacts: [CatalogueEditArtifact],
                           in parent: CatalogueReadDirectory.Entry, stoppingAt stop: String? = nil) -> [CatalogueEditArtifact] {
         let byAfter = Dictionary(grouping: artifacts, by: \.after)

@@ -18052,3 +18052,17 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Gemini key. Manual segmentation and pre-grouped photos could start, and No tagging filed both scratch pages.
   The regression used simulated responses and synthetic images, with no provider spend or bench cache.
   <!-- /W49.proc-fix-s032 -->
+- [x] **W49.storage-reader — Read, edit and undo catalogue fields in Reader [L · Tier-2]** · §W49 · SHIPPED 2026-11-23 (this commit)
+  File ▸ Use Catalogue Companions for This Folder remembers the mode for the open physical root on
+  this Mac. Reader lists untagged PDFs, projects verified document and file fields into the Inspector,
+  list and filters, and searches typed fields per document through Advanced Search. OCR text still
+  describes the PDF. Grouped edits de-duplicate document owners and log per-file results before
+  offering guarded Undo and Redo. Flags and page view rotations travel in their companions.
+  Owner call 35 is covered by a local record of verified physical pairs. After a same-folder Finder
+  rename and a relaunch, Reader offers a repair only after verifying the PDF, old companion and new
+  name. The user confirms the repair. Undo restores the previous companion name. An identical copy,
+  replaced PDF and competing companion were refused in scratch tests. Off-screen journeys verified
+  the rename offer, confirmation, repair and Undo, and a title edit with relaunch, Undo and Redo.
+  The scratch PDF bytes stayed identical. No rehearsal cache inputs were created for this item.
+  [Design](execution-plans/storage-simplify.md) · [Catalogue contract](SPEC/catalogue.md)
+  <!-- /W49.storage-reader -->

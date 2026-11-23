@@ -133,8 +133,21 @@ enum SavedSearchFixtures {
                                                    search: AdvancedSearch(combine: .any, rules: rows))]
     }
 
-    /// The newest builder; the coverage test holds it to everything the form offers today.
-    static var newest: [SavedSearch] { november2026Container }
+    /// The new saved rules from W49.storage-reader, captured in a supplementary fixture.
+    static var november2026Catalogue: [SavedSearch] {
+        let rows = [
+            rule(3001, .catalogueFields, .allWords) { $0.text = "letter Paris" },
+            rule(3002, .catalogueFields, .phrase) { $0.text = "archive letter" },
+            rule(3003, .catalogueFields, .anyWords) { $0.text = "Paris Rome" },
+            rule(3004, .poorOCR, .is),
+            rule(3005, .poorOCR, .isNot)
+        ]
+        return [SavedSearch(id: id(9), name: "Catalogue fields",
+                            search: AdvancedSearch(combine: .any, rules: rows))]
+    }
+
+    /// The newest coverage includes the unchanged legacy fixture and the supplementary catalogue fixture.
+    static var newest: [SavedSearch] { november2026Container + november2026Catalogue }
 }
 
 @MainActor
@@ -189,6 +202,10 @@ final class SavedSearchFixtureTests: XCTestCase {
         try assertLoads("saved-searches-2026-11-container", as: asLoadedToday(SavedSearchFixtures.november2026Container))
     }
 
+    func testTheCatalogueFixtureLoadsUnchanged() throws {
+        try assertLoads("saved-searches-2026-11-catalogue", as: SavedSearchFixtures.november2026Catalogue)
+    }
+
     /// W40.reader-quality-levels: the November fixture saved Quality rows with 0, 2 and 5; they load, keeping
     /// none and 2. A row of only 4 and 5 loads too, empty, so it is inactive rather than undecodable.
     func testQualityLevelsTheSuiteNeverWritesAreDroppedOnLoad() throws {
@@ -205,9 +222,8 @@ final class SavedSearchFixtureTests: XCTestCase {
         XCTAssertFalse(rule.isActive)
     }
 
-    /// The newest fixture covers every field, operator, read state, file type, container facet, date role and combine
-    /// the form offers. A new
-    /// case fails here: add a new fixture with it (never edit an old one).
+    /// The current fixtures cover every field, operator, read state, file type, container facet, date role and
+    /// combination the form offers. Add a new fixture when adding cases and keep the older fixtures unchanged.
     func testTheNewestFixtureCoversEveryRuleKind() {
         func walk(_ rules: [SearchRule], depth: Int) -> [(SearchRule, Int)] {
             rules.flatMap { [($0, depth)] + walk($0.children, depth: depth + 1) }

@@ -55,6 +55,71 @@ struct CatalogueWriterTests {
         #expect(try Data(contentsOf: fixture.pdf) == fixture.pdfBytes)
     }
 
+    @Test func persistedInverseRestoresOnlyTouchedEnvelopeAndSupportsRedo() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let writer = CatalogueWriter(reader: try fixture.reader())
+        let target = CatalogueEdit.Target.document(fixture.document, .title)
+        let original = try writer.save([.init(target, .set(.text("Original")))], basedOn: fixture.selection())
+        let checked = try writer.save([.init(target, .check(true))], basedOn: original.after)
+        let revised = try writer.save([.init(target, .set(.text("Revised")))], basedOn: checked.after)
+        let inverse = try #require(revised.inverse)
+        let encoded = try JSONEncoder().encode(inverse)
+        let durable = try JSONDecoder().decode(CatalogueWriter.Inverse.self, from: encoded)
+        _ = try writer.save([.init(.file(.quality), .set(.rating(3)))], basedOn: revised.after)
+
+        let reopened = CatalogueWriter(reader: try fixture.reader())
+        let undo = try reopened.reverse(durable, basedOn: fixture.selection())
+        #expect(try title(undo.after.pair.record) == "Original")
+        let restored = try #require(undo.after.pair.record.documents.first?.fields?.title)
+        let previous = try #require(checked.after.pair.record.documents.first?.fields?.title)
+        #expect(restored.isChecked && restored.fieldRevision == previous.fieldRevision)
+        if case .value(3)? = undo.after.pair.record.fileFields.quality?.current {} else { Issue.record("Quality was lost") }
+
+        let redo = try reopened.reverse(#require(undo.inverse), basedOn: fixture.selection())
+        #expect(try title(redo.after.pair.record) == "Revised")
+        #expect(redo.after.pair.record.documents.first?.fields?.title?.isChecked == false)
+        if case .value(3)? = redo.after.pair.record.fileFields.quality?.current {} else { Issue.record("Quality was lost") }
+        #expect(try Data(contentsOf: fixture.pdf) == fixture.pdfBytes)
+    }
+
+    @Test func viewRotationUpdatesOnlyTheSelectedCataloguePageAndCanBeUndone() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let writer = CatalogueWriter(reader: try fixture.reader())
+        let base = try fixture.selection()
+        let page = try #require(base.pair.record.pages.first)
+        let target = CatalogueEdit.Target.pageViewRotation(page.id)
+        #expect(throws: CatalogueEdit.Invalid.incompatibleValue(target)) {
+            try writer.save([.init(target, .set(.rotation(45)))], basedOn: base)
+        }
+        let turned = try writer.save([.init(target, .set(.rotation(90)))], basedOn: base)
+        #expect(turned.after.pair.record.pages.first?.viewRotation == 90)
+        let inverse = try #require(turned.inverse)
+        let undo = try writer.reverse(inverse, basedOn: fixture.selection())
+        #expect(undo.after.pair.record.pages.first?.viewRotation == nil)
+        #expect(undo.after.pair.record.pages.first?.id == page.id)
+        #expect(try Data(contentsOf: fixture.pdf) == fixture.pdfBytes)
+    }
+
+    @Test func inverseRefusesAChangedFieldAndPhysicalReplacement() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let writer = CatalogueWriter(reader: try fixture.reader())
+        let target = CatalogueEdit.Target.document(fixture.document, .title)
+        let first = try writer.save([.init(target, .set(.text("First")))], basedOn: fixture.selection())
+        let inverse = try #require(first.inverse)
+        let second = try writer.save([.init(target, .set(.text("External change")))], basedOn: first.after)
+        #expect(throws: CatalogueWriter.UndoRefusal.changedFields([target])) {
+            try writer.reverse(inverse, basedOn: fixture.selection())
+        }
+        try fixture.pdfBytes.write(to: fixture.pdf, options: .atomic)
+        #expect(throws: CatalogueWriter.UndoRefusal.changedOccurrence) {
+            try writer.reverse(#require(second.inverse), basedOn: fixture.selection())
+        }
+        #expect(try Data(contentsOf: fixture.companion) == second.after.pair.record.originalJSON)
+    }
+
     @Test func replayedAndContradictoryRevisionsRefuseAStaleEdit() throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }

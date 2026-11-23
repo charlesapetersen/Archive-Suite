@@ -13,20 +13,25 @@ struct TagInspectorView: View, Equatable {
     /// Changes exactly when `paths` names other files: the library window passes its `inspectorTarget`'s
     /// generation, a document window its open file's path.
     let identity: String
+    let usesCatalogue: Bool
+    let physicalPageIndex: Int?
     var isVisible = true
     var onClose: () -> Void
 
     init(model: NavigationModel, paths: [String], identity: String? = nil, isVisible: Bool = true,
-         onClose: @escaping () -> Void) {
+         physicalPageIndex: Int? = nil, onClose: @escaping () -> Void) {
         self.model = model
         self.paths = paths
         self.identity = identity ?? paths.sorted().joined(separator: "\n")
+        self.usesCatalogue = model.library.usesCatalogue
+        self.physicalPageIndex = physicalPageIndex
         self.isVisible = isVisible
         self.onClose = onClose
     }
 
     nonisolated static func == (a: Self, b: Self) -> Bool {
         a.identity == b.identity && a.isVisible == b.isVisible && a.model === b.model
+            && a.usesCatalogue == b.usesCatalogue && a.physicalPageIndex == b.physicalPageIndex
     }
 
     var body: some View {
@@ -42,6 +47,10 @@ struct TagInspectorView: View, Equatable {
                     Spacer()
                 }
                 .padding()
+            } else if usesCatalogue {
+                CatalogueInspectorView(model: model, paths: paths, physicalPageIndex: physicalPageIndex,
+                                       isVisible: isVisible, onClose: onClose)
+                    .id(identity)
             } else {
                 TagEditorView(model: model, targetPaths: paths, isVisible: isVisible, onClose: onClose)
                     .id(identity)

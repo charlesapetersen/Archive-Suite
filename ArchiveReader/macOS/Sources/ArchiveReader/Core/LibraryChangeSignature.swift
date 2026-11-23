@@ -43,6 +43,13 @@ enum LibraryChangeSignature {
         h.combine(f.pathHash)
         h.combine(f.readState)
         h.combine(f.quality)
+        if f.isCatalogue {
+            h.combine(f.catalogueFlag)
+            h.combine(f.catalogueFileFields?.readState?.fieldRevision)
+            for document in f.catalogueDocuments {
+                h.combine((try? document.document.get())?.owner.revision)
+            }
+        }
         for s in f.subjects { h.combine(s) }
         return h.finalize()
     }

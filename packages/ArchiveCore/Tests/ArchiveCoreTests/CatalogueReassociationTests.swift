@@ -29,6 +29,70 @@ struct CatalogueReassociationTests {
         #expect(try Data(contentsOf: fixture.renamedPDF) == fixture.pdfBytes)
     }
 
+    @Test func persistedPairEvidenceSurvivesReopenAndSupportsGuardedRedo() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let memory = try fixture.reopenedMemory()
+        try fixture.renamePDF()
+        let reopened = try fixture.reopenReader()
+        let candidate = try #require(reopened.reassociationCandidate(at: fixture.newName) { _ in memory })
+        #expect(candidate.formerRelativePath == "Letter.pdf")
+        #expect(!FileManager.default.fileExists(atPath: fixture.newCompanion.path))
+        #expect(try Data(contentsOf: fixture.oldCompanion) == fixture.record.originalJSON)
+
+        let writer = CatalogueWriter(reader: reopened)
+        let receipt = try writer.reassociateCompanion(candidate)
+        let redo = try writer.undoReassociation(receipt)
+        #expect(try Data(contentsOf: fixture.oldCompanion) == fixture.record.originalJSON)
+        let redone = try writer.reassociateCompanion(redo)
+        #expect(redone.current.revision == receipt.current.revision)
+        #expect(try Data(contentsOf: fixture.renamedPDF) == fixture.pdfBytes)
+    }
+
+    @Test func reopeningRefusesToOfferRepairForAnIdenticalCopy() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let memory = try fixture.reopenedMemory()
+        // The original name is vacant to exclude competing-name refusal as the reason.
+        try FileManager.default.moveItem(at: fixture.oldPDF, to: fixture.root.appendingPathComponent("Held.pdf"))
+        try fixture.pdfBytes.write(to: fixture.renamedPDF)
+        let reopened = try fixture.reopenReader()
+        #expect(try reopened.reassociationCandidate(at: fixture.newName) { _ in memory } == nil)
+        #expect(try Data(contentsOf: fixture.oldCompanion) == fixture.record.originalJSON)
+    }
+
+    @Test(arguments: [true, false])
+    func reopeningRefusesAReplacementAtTheOldNameOrACompetingCompanion(replacement: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let memory = try fixture.reopenedMemory()
+        try fixture.renamePDF()
+        if replacement {
+            try fixture.pdfBytes.write(to: fixture.oldPDF)
+        } else {
+            try fixture.record.originalJSON.write(to: fixture.newCompanion)
+        }
+        let reopened = try fixture.reopenReader()
+        let refusal: ItemFacts.Unavailable = replacement ? .ambiguous(.pdf) : .ambiguous(.companion)
+        #expect(throws: refusal) {
+            try reopened.reassociationCandidate(at: fixture.newName) { _ in memory }
+        }
+        #expect(try Data(contentsOf: fixture.oldCompanion) == fixture.record.originalJSON)
+    }
+
+    @Test func reopeningRefusesAByteIdenticalReplacementOfTheOldCompanion() throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        let memory = try fixture.reopenedMemory()
+        try fixture.renamePDF()
+        try fixture.record.originalJSON.write(to: fixture.oldCompanion, options: .atomic)
+        let reopened = try fixture.reopenReader()
+        #expect(throws: CatalogueWriter.Failure.changedDuringSave) {
+            try reopened.reassociationCandidate(at: fixture.newName) { _ in memory }
+        }
+        #expect(!FileManager.default.fileExists(atPath: fixture.newCompanion.path))
+    }
+
     @Test func unrelatedReplacementAtTheFormerNameCannotReadTheCorrectionOrAuthorizeARepair() throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }
@@ -184,6 +248,16 @@ struct CatalogueReassociationTests {
             reader = try CatalogueReader(grantedRoot: root, rootInstanceID: UUID(), mode: .adopted,
                                          identifyPDF: CataloguePDFIdentity.identify)
             base = try reader.discover().facts(at: "Letter.pdf").file.get()
+        }
+
+        func reopenReader() throws -> CatalogueReader {
+            try CatalogueReader(grantedRoot: root, rootInstanceID: UUID(), mode: .adopted,
+                                identifyPDF: CataloguePDFIdentity.identify)
+        }
+
+        func reopenedMemory() throws -> [CatalogueReader.RememberedPair] {
+            try JSONDecoder().decode([CatalogueReader.RememberedPair].self,
+                                     from: JSONEncoder().encode(reader.discover().rememberablePairs))
         }
 
         func renamePDF() throws {

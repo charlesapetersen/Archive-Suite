@@ -134,8 +134,9 @@ embedded IDs, and identical bytes at a replaced path, cannot use the original se
 The writer does not open the PDF for writing or alter its tags, content or location. It also refuses
 unsupported, stale, offline, read-only and invalid inputs without inventing a replacement record.
 
-Edits address file fields or fields of a locally owned document. An intentional clear gets its own
-field revision. A change to a value or its uncertainty drops the old check and retains historical
+Edits address file fields, fields of a locally owned document or an individual physical page's view
+rotation. An intentional field clear gets its own revision. Resetting a page's view rotation removes
+the override without changing the PDF's intrinsic orientation. A change to a value or its uncertainty drops the old check and retains historical
 evidence. Checking or unchecking keeps the field revision. A batch targets each field once. If the
 base is stale, the live record must be linked to the exact base bytes through retained local exchanges.
 The writer then compares the complete touched field envelopes, including checks, evidence and
@@ -160,7 +161,17 @@ retention policy would have to account for open edit bases and Undo. Coordinatio
 writers using this boundary. The writer attempts to restore a racing external version when it can still
 verify both exchange names. Changes outside the lock can leave an uncertain outcome, so both versions
 are kept. Network mounts are refused. Provider synchronization and multi-device writes require their
-own verification. Reader Undo is a separate implementation step.
+own verification.
+
+File ▸ Use Catalogue Companions for This Folder selects catalogue mode for the open physical root on
+this Mac. In that mode Reader lists PDFs independently of Finder tags. Reader records each attempted
+companion change in local application support before saving and records
+its verified result afterward. One user action groups distinct companion occurrences. Document field
+edits address their resolved owner and document ID once even if several selected PDFs refer to it.
+Undo and Redo compare the exact targeted envelopes against verified before and after records, then
+apply only the inverse changes. They preserve unrelated values and refuse a changed target or PDF.
+An interrupted save with an uncertain result withholds older Undo for the affected occurrence while
+verified changes to other occurrences remain available.
 
 
 ## Repair after a Finder rename
@@ -183,10 +194,11 @@ historical edit artifacts at their original names. Those artifacts use the origi
 their lookup key. An outside writer that races the repair can leave an uncertain outcome, in which
 case the writer reports both companion names for inspection and never overwrites either one.
 
-A cold launch with no surviving verified pair and a PDF moved to another folder remain unresolved
-by this operation. An embedded identifier can be shared by copies that later received different
-corrections. Reader integration supplies the offer, availability wording and user-facing undo
-controls through the catalogue UI.
+Reader remembers the physical identity and companion digest of previously verified pairs in its
+local application support. After relaunch it checks the renamed PDF and former companion before
+offering repair in the Inspector. The user confirms the new companion name. The writer repeats the
+checks before the rename, and Edit ▸ Undo and Redo verify the paths before changing them again.
+Without a remembered, verifiable pair, or after a cross-folder move, the names need manual review.
 
 
 ## Journaled initial pair filing

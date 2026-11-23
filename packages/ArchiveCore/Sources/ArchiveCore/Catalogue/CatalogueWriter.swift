@@ -10,6 +10,7 @@ public struct CatalogueWriter: Sendable {
         public let after: ItemFacts.FileFacts
         /// Nil when there was no change. The named sibling retains the exact before-image.
         public let recoveryArtifact: String?
+        public let inverse: Inverse?
     }
 
     public struct Conflict: Error, Sendable {
@@ -49,32 +50,38 @@ public struct CatalogueWriter: Sendable {
     /// Serialize saves on this parent directory, including saves from other cooperating processes.
     /// A stale edit is rebased only through verified local history and onto untouched field envelopes.
     public func save(_ edits: [CatalogueEdit], basedOn base: ItemFacts.FileFacts) throws -> Receipt {
-        let occurrence = base.pair.occurrence
         let patch = CatalogueEditPatch(edits: edits)
+        return try commit(targets: edits.map(\.target), basedOn: base) { live, scope in
+            let baseRecord = base.pair.record
+            let proposed = try patch.applying(to: baseRecord)
+            if live.revision == base.revision { return proposed }
+            guard try descends(live.pair.record, from: baseRecord, in: scope) else {
+                throw Conflict(reason: .unverifiedHistory, current: live, proposed: proposed)
+            }
+            let overlaps = try patch.conflicts(base: baseRecord, current: live.pair.record)
+            guard overlaps.isEmpty else {
+                throw Conflict(reason: .overlappingFields(overlaps), current: live, proposed: proposed)
+            }
+            return try patch.applying(to: live.pair.record)
+        }
+    }
+
+    func commit(targets: [CatalogueEdit.Target], basedOn base: ItemFacts.FileFacts,
+                prepare: (ItemFacts.FileFacts, Scope) throws -> CatalogueRecord) throws -> Receipt {
+        let occurrence = base.pair.occurrence
         var recoveryArtifact: String?
         do {
             return try reader.withOccurrence(occurrence) { root, parent, filename in
                 try withLock(on: parent) {
                     let scope = Scope(root: root, parent: parent, filename: filename, base: base)
                     let live = try readLive(in: scope)
-                    let baseRecord = base.pair.record
-                    let proposed = try patch.applying(to: baseRecord)
-                    let candidate: CatalogueRecord
-                    if live.facts.revision == base.revision {
-                        candidate = proposed
-                    } else {
-                        guard try descends(live.facts.pair.record, from: baseRecord, in: scope) else {
-                            throw Conflict(reason: .unverifiedHistory, current: live.facts, proposed: proposed)
-                        }
-                        let overlaps = try patch.conflicts(base: baseRecord, current: live.facts.pair.record)
-                        guard overlaps.isEmpty else {
-                            throw Conflict(reason: .overlappingFields(overlaps), current: live.facts, proposed: proposed)
-                        }
-                        candidate = try patch.applying(to: live.facts.pair.record)
-                    }
+                    let candidate = try prepare(live.facts, scope)
                     guard candidate.revision != live.facts.revision.facts else {
-                        return Receipt(before: live.facts, after: live.facts, recoveryArtifact: nil)
+                        return Receipt(before: live.facts, after: live.facts, recoveryArtifact: nil, inverse: nil)
                     }
+                    let changed = try CatalogueEditPatch.changedTargets(targets, before: live.facts.pair.record,
+                                                                       after: candidate)
+                    guard !changed.isEmpty else { throw CatalogueRecord.Invalid.inconsistentRecord }
                     let artifact = CatalogueEditArtifact(filename: filename, pdf: base.pdfVersion.identity,
                                                          before: live.facts.pair.record, after: candidate)
                     let staged = try stage(candidate, as: artifact.name, replacing: live, in: scope) {
@@ -122,7 +129,10 @@ public struct CatalogueWriter: Sendable {
                         throw error
                     }
                     try sync(parent.descriptor, operation: "flush exchange")
-                    return Receipt(before: live.facts, after: verified.facts, recoveryArtifact: artifact.name)
+                    let inverse = Inverse(before: live.facts, after: verified.facts, targets: changed,
+                                          artifact: artifact)
+                    return Receipt(before: live.facts, after: verified.facts, recoveryArtifact: artifact.name,
+                                   inverse: inverse)
                 }
             }
         } catch {

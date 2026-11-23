@@ -14,6 +14,42 @@ extension CatalogueRecord.Field {
 }
 
 enum ReaderCatalogueFacets {
+    static func itemFields(_ document: CatalogueRecord.DocumentFields) -> [CheckableField: String] {
+        let item: [(CheckableField, String?)] = [
+            (.title, document.title?.readerValue), (.publication, document.publication?.readerValue),
+            (.documentKind, document.documentKind?.readerValue),
+            (.publicationDate, document.publicationDate?.readerValue?.date.wireValue),
+            (.byline, document.byline?.readerValue?.joined(separator: " · ")),
+            (.sender, document.senders?.readerValue?.joined(separator: " · ")),
+            (.recipient, document.recipients?.readerValue?.joined(separator: " · ")),
+            (.sendingPlace, document.sendingPlaces?.readerValue?.joined(separator: " · ")),
+            (.recipientPlace, document.recipientPlaces?.readerValue?.joined(separator: " · "))
+        ]
+        return Dictionary(uniqueKeysWithValues: item.compactMap { field, value in value.map { (field, $0) } })
+    }
+
+    static func searchValues(_ document: CatalogueRecord.DocumentFields) -> [String] {
+        let strings = [
+            document.title?.readerValue, document.publication?.readerValue, document.documentKind?.readerValue,
+            document.itemType?.readerValue, document.documentDate?.readerValue?.date.wireValue,
+            document.sentWith?.readerValue?.date.wireValue, document.publicationDate?.readerValue?.date.wireValue
+        ].compactMap { $0 }
+        let lists = [
+            document.byline?.readerValue, document.senders?.readerValue, document.recipients?.readerValue,
+            document.sendingPlaces?.readerValue, document.recipientPlaces?.readerValue, document.subjects?.readerValue
+        ]
+        return strings + lists.compactMap { $0 }.flatMap { $0 }
+    }
+
+    static func document(_ facts: ItemFacts?) -> CatalogueRecord.DocumentFields? {
+        (try? facts?.document.get())?.document.fields
+    }
+
+    static func hasAssessedDate(_ fields: CatalogueRecord.DocumentFields, roles: [DateRole]) -> Bool {
+        roles.allSatisfy { role in role == .own ? fields.documentDate != nil : fields.sentWith != nil }
+    }
+
+
     /// Produce the list's existing facet interface from typed values. Subjects never pass through
     /// the Finder token parser and the companion's quality or colour cannot imply an item type.
     static func tags(file: ItemFacts?, document: ItemFacts?) -> DocumentTags {

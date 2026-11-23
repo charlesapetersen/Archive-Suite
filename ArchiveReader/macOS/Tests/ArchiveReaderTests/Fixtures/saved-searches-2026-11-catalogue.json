@@ -1,0 +1,86 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000009",
+    "name": "Catalogue fields",
+    "search": {
+      "combine": "any",
+      "rules": [
+        {
+          "children": [],
+          "combine": "all",
+          "containerFacet": "container",
+          "dateRole": "either",
+          "field": "catalogueFields",
+          "fileType": "PDF",
+          "id": "00000000-0000-4000-8000-000000003001",
+          "op": "allWords",
+          "qualities": [],
+          "read": "unread",
+          "tags": [],
+          "text": "letter Paris",
+          "text2": ""
+        },
+        {
+          "children": [],
+          "combine": "all",
+          "containerFacet": "container",
+          "dateRole": "either",
+          "field": "catalogueFields",
+          "fileType": "PDF",
+          "id": "00000000-0000-4000-8000-000000003002",
+          "op": "phrase",
+          "qualities": [],
+          "read": "unread",
+          "tags": [],
+          "text": "archive letter",
+          "text2": ""
+        },
+        {
+          "children": [],
+          "combine": "all",
+          "containerFacet": "container",
+          "dateRole": "either",
+          "field": "catalogueFields",
+          "fileType": "PDF",
+          "id": "00000000-0000-4000-8000-000000003003",
+          "op": "anyWords",
+          "qualities": [],
+          "read": "unread",
+          "tags": [],
+          "text": "Paris Rome",
+          "text2": ""
+        },
+        {
+          "children": [],
+          "combine": "all",
+          "containerFacet": "container",
+          "dateRole": "either",
+          "field": "poorOCR",
+          "fileType": "PDF",
+          "id": "00000000-0000-4000-8000-000000003004",
+          "op": "is",
+          "qualities": [],
+          "read": "unread",
+          "tags": [],
+          "text": "",
+          "text2": ""
+        },
+        {
+          "children": [],
+          "combine": "all",
+          "containerFacet": "container",
+          "dateRole": "either",
+          "field": "poorOCR",
+          "fileType": "PDF",
+          "id": "00000000-0000-4000-8000-000000003005",
+          "op": "isNot",
+          "qualities": [],
+          "read": "unread",
+          "tags": [],
+          "text": "",
+          "text2": ""
+        }
+      ]
+    }
+  }
+]

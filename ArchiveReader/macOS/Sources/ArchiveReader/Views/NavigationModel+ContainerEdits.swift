@@ -261,12 +261,20 @@ extension NavigationModel {
     private func registerContainerUndo(_ step: ContainerUndoStep, action: String, on undo: UndoManager?) {
         guard let undo, !step.restores.isEmpty else { return }
         let tree = containerTree?.path
+        registerContainerUndoAction(action, on: undo) { model, undo in
+            model.applyContainerUndo(step, action: action, tree: tree, on: undo)
+        }
+    }
+
+    /// Keep manually guarded filesystem actions on the same window chronology as container edits.
+    func registerContainerUndoAction(_ action: String, on undo: UndoManager,
+                                     perform: @escaping @MainActor (NavigationModel, UndoManager) -> Void) {
         // An edit's save lands after its event has ended, outside any undo group, where the action's name is lost
         // (Edit ▸ Undo read a bare "Undo"); an undo or redo already has its group, and the reverse step goes in it.
         let ownGroup = !undo.isUndoing && !undo.isRedoing
         if ownGroup { undo.beginUndoGrouping() }
         undo.registerUndo(withTarget: self) { model in
-            MainActor.assumeIsolated { model.applyContainerUndo(step, action: action, tree: tree, on: undo) }
+            MainActor.assumeIsolated { perform(model, undo) }
         }
         undo.setActionName(action)
         if ownGroup { undo.endUndoGrouping() }
@@ -297,6 +305,12 @@ extension NavigationModel {
         return step
     }
 
+    func takeContainerUndoStep(on undo: UndoManager) {
+        if let index = containerHistory.firstIndex(where: { $0.manager === undo }) {
+            _ = undo.isRedoing ? containerHistory[index].redos.popLast() : containerHistory[index].undos.popLast()
+        }
+    }
+
     /// Undo or Redo of a container edit. Run here, on the main thread, so the step that reverses it is registered
     /// while the undo manager is undoing (it then goes to Redo, and the other way). The files are small and the store
     /// waits at most `lockWait` for another writer.
@@ -304,9 +318,7 @@ extension NavigationModel {
         let document = step.document
         let redoing = undo.isRedoing
         // The undo manager has taken this step off its stack; the history follows (`recordContainerHistory`).
-        if let index = containerHistory.firstIndex(where: { $0.manager === undo }) {
-            _ = redoing ? containerHistory[index].redos.popLast() : containerHistory[index].undos.popLast()
-        }
+        takeContainerUndoStep(on: undo)
         guard tree == containerTree?.path else {
             if document == .itemFields { itemFieldEditPath = nil }
             setEditError("That change was made in another archive, so it was not undone.", document)

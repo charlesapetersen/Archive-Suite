@@ -30,6 +30,15 @@ public struct ItemFacts: Sendable {
         let rootIdentity: CatalogueReadDirectory.Identity
         let pdfVersion: CatalogueReadDirectory.FileVersion
         let companionVersion: CatalogueReadDirectory.FileVersion
+
+        /// True for a later observation of this exact occurrence and PDF generation.
+        /// A companion-only edit, or Finder tag change that only changes ctime, may advance
+        /// independently. An identical copy or replacement is a different physical occurrence.
+        public func samePhysicalOccurrence(as other: Self) -> Bool {
+            pair.occurrence == other.pair.occurrence && rootIdentity == other.rootIdentity
+                && pdfVersion.matchesAcrossRename(other.pdfVersion) && revision.fileID == other.revision.fileID
+                && revision.content == other.revision.content
+        }
     }
 
     public struct DocumentFacts: Sendable {

@@ -301,5 +301,7 @@ final class PoorOCRFlagGuardTests: XCTestCase {
         let rules = AdvancedSearch(filter: f, fullTextQuery: "").rules
         XCTAssertEqual(rules.map(\.field), [.tags])
         XCTAssertEqual(rules.first?.tags, [DocumentTags.poorOCRTag])
+        let catalogueRules = AdvancedSearch(filter: f, fullTextQuery: "", catalogueMode: true).rules
+        XCTAssertEqual(catalogueRules.map(\.field), [.poorOCR])
     }
 }
