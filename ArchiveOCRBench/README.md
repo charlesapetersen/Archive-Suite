@@ -106,6 +106,10 @@ The Apple Vision language-detection comparison in part 7 uses a paired table for
 for this experiment, with the remaining English public strata outside its scope.
 See [the measurement card](../ArchiveProcessor/segbench-results/vision-language-auto.md).
 
+The archive-label table gives per-field results for the external mlx-vlm Gemma route beside in-process Gemma and Apple
+Vision with the benchmark parser. It keeps the 135 photos encoded by the Processor separate from the 60-photo Pillow
+pilot. See [the label measurement card](../ArchiveProcessor/segbench-results/ct-gemma-route-fields.md).
+
 W46.r1-foundation's Apple on-device model (macOS 27, `segbench-results/r1-foundation.json`) is on the 96's four charts
 and the speed table as a free Mac route, with no app memory figure (the model runs in the OS). The speed table shows
 its median, 9.5 s a page; the mean is 32 s, because the third of pages that loop to the 4,096-token cap take about 80 s

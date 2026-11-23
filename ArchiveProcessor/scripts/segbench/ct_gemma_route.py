@@ -77,34 +77,22 @@ def report():
     rec = json.load(open(OUT, encoding="utf-8"))
     rows = {r["id"]: r for r in R.truth()}
     ids = sample(rec["photos"])
-    per = []   # per photo: right through the server, in-process, Vision + parser; cells
     by_field = {f: [0, 0, 0, 0] for f in FOUR}
     for mid, c in zip(ids, rec["calls"]):
         r, v = rows[mid], R.reading(rows[mid], "vision") or {}
-        t = [0, 0, 0, 0]
         for f, (a, b) in c["right"].items():
             got = [a, b, R.same(f, v.get(f), r["fields"].get(f)), 1]
-            t = [x + y for x, y in zip(t, got)]
             by_field[f] = [x + y for x, y in zip(by_field[f], got)]
-        per.append(t)
-
-    def gap(k):
-        rng, g = random.Random(R.SEED), []
-        for _ in range(4000):
-            smp = [per[rng.randrange(len(per))] for _ in per]
-            g.append(100 * sum(p[0] - p[k] for p in smp) / sum(p[3] for p in smp))
-        g.sort()
-        n = sum(p[3] for p in per)
-        return f"{100 * sum(p[0] - p[k] for p in per) / n:+.1f} ({g[100]:+.1f} to {g[3899]:+.1f})"
-
-    n = sum(p[3] for p in per)
+    n = sum(v[3] for v in by_field.values())
     pc = lambda k, m: f"{k} of {m} ({100 * k / m:.1f}%)"   # noqa: E731
     L = ["# Gemma 3 12B for a label's titles, through the app's route (W47.ct-capture-gemma)", "",
          "The Processor asks Gemma 3 12B on a server on this Mac for a box or folder label's repository, collection "
          "title, collection number and date when the gateway is off or local (`ContainerLabelGemma`). `ct-read.md` "
-         "scored Gemma in-process (`mlx_vlm` `stream_generate` on the photo file); this times and checks the app's "
-         f"request through {rec['server']}: `ct_read.py`'s prompt, temperature 0, 640 tokens, reasoning off, the "
-         "upright photo as a JPEG at 1600 px, quality 0.9. Built by `scripts/segbench/ct_gemma_route.py --report`.", "",
+         "scored Gemma in-process (`mlx_vlm` `stream_generate` on the photo file). This pilot used the app's "
+         f"request through {rec['server']}: `ct_read.py`'s prompt, temperature 0, 640 tokens and reasoning off. "
+         "Pillow approximated the app's 1,600 px JPEG at quality 0.9. The "
+         "[held-out follow-up](ct-gemma-route-fields.md) uses the app's Swift encoder and reports per-field intervals. "
+         "Built by `scripts/segbench/ct_gemma_route.py --report`.", "",
          "## Time a label on this Mac", "",
          f"- {rec['photos']} label photos, one at a time, on the 18 GB M3 Pro: median **{rec['median_s']} s** a photo "
          f"(mean {rec['mean_s']}, slowest {rec['max_s']}), the first call apart ({rec['first_call_s']} s). The server "
@@ -117,29 +105,22 @@ def report():
          "has two, so a server that has not loaded it does not list it, and the app does not use it.", "",
          "## Right against the truth, on the same cells", "",
          f"The cells `ct_read.py` scores on these photos ({n}: the owner's, rule-settled and unanimous cells, less "
-         "carried ones). Each reading against the truth; gaps are the server route less each other, with a 95% "
-         "bootstrap interval over photos.", "",
+         "carried ones). Each reading against the truth.", "",
          "| field | cells | through the server | in-process (ct-read) | Vision + parser |", "|---|---|---|---|---|"]
     for f in FOUR:
         s, i, v, m = by_field[f]
         L.append(f"| {f.replace('_', ' ')} | {m} | {pc(s, m)} | {pc(i, m)} | {pc(v, m)} |")
-    S, I, V = (sum(p[k] for p in per) for k in range(3))
-    L += [f"| **all four** | {n} | {pc(S, n)} | {pc(I, n)} | {pc(V, n)} |", "",
-          f"- Server less in-process: {gap(1)} points, a tie within this sample's noise, though "
-          "the point estimate is lower (collection number and title most); the two readings differ on some photos (a "
-          "resized JPEG through the server's chat template, against the photo file).",
-          f"- Server less Vision + parser: {gap(2)} points, on these {rec['photos']} photos a lead whose interval "
-          "touches zero; `ct-read.md`'s 195 photos are the figure for choosing the route.", "",
+    L += ["",
           "## Measurement card", "",
           "- **Truth:** W47.ct-truth-final's (as `ct-read.md`): the owner's answers and notes, his rules, and for the "
-          "rest the three drafters unanimous. Gemma drafted none of it.",
+          "rest the three drafters unanimous, including Gemini 3.7 Flash from Google, like Gemma. Gemma itself drafted none.",
           f"- **Selection:** {rec['photos']} photos drawn with seed {R.SEED} from the truth photos the in-process run "
           "read; not by any tested route.",
           "- **Comparison:** the same photos and cells for all three readings; the same prompt and temperature for "
-          "both Gemma readings, which differ in the image path (the app's 1600 px JPEG through the server's template "
+          "both Gemma readings, which differ in the image path (the Pillow approximation of the app's 1600 px JPEG through the server's template "
           "against `mlx_vlm`'s own load of the photo) and in run date.",
-          "- **Noise:** one pass each at temperature 0; paired bootstrap over photos; no rerun floor measured, so a gap "
-          "inside its interval is a tie.",
+          "- **Noise:** one pass each at temperature 0. Per-field paired intervals for this pilot are in the "
+          "[held-out follow-up](ct-gemma-route-fields.md).",
           "- **Scope:** mlx-vlm only (LM Studio and Ollama serve other builds, unmeasured); labels alone on an idle "
           "Mac, not interleaved with a local OCR model on the same server; this researcher's photos.", ""]
     path = os.path.join(R.HERE, "..", "..", "segbench-results", "ct-gemma-route.md")

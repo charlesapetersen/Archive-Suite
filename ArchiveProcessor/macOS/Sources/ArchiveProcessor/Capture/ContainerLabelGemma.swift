@@ -7,8 +7,9 @@ import ArchiveCore
 /// prompt (`ContainerLabelReader.localModelPrompt`), the upright photo, temperature 0, a 640-token cap.
 ///
 /// Measured there (`segbench-results/ct-read.md`, 4-bit MLX on the 18 GB M3 Pro): a median 14.93 s a label photo,
-/// 8.04 GB at its peak; through mlx-vlm's server with this request, a median 13.04 s and a tie with that reading
-/// (`segbench-results/ct-gemma-route.md`). It is used only when a server on this Mac lists it (`find`): the gateway's own address when it
+/// 8.04 GB at its peak. See `segbench-results/ct-gemma-route-fields.md` for paired accuracy by field through
+/// mlx-vlm's server using the app's JPEG encoder. The external route needs a server on this Mac that lists Gemma
+/// (`find`): the gateway's own address when it
 /// is a local model, else the three presets' (`LocalModelRoute.Server`): only addresses on this Mac, though a server
 /// there that forwards to the cloud (a proxy) cannot be told apart. If no external server answers, the app can
 /// use the reader downloaded with the operator's consent.

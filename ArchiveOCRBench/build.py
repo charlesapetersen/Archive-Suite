@@ -1721,6 +1721,12 @@ def main():
             elif k.removesuffix("-nothink") in op["models"]:
                 sys.exit(f"dating model {k} has an OpenRouter price but no token means in inputs.json")
     pub = public()
+    label_report = RESULTS / "ct-gemma-route-fields.md"
+    container_labels = None
+    if label_report.exists():
+        label_md = label_report.read_text()
+        container_labels = {"held_out": table_after(label_md, "## Held-out 135 photos"),
+                            "pilot": table_after(label_md, "## Original 60-photo pilot")}
     built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(op), "handwriting": handwriting(), "r6_spot": json.loads(R6_SPOT.read_text()),
              "farmshare": farmshare(op, own["routes"]), "difficulty": diff, "headline": headline(routes), "rerun_noise": rerun_noise(),
              "regions_orderfree": regions_orderfree(), "public_segmentation": public_segmentation(),
@@ -1740,7 +1746,7 @@ def main():
              "seg_context": seg_context(), "seg_adapt_lora": seg_adapt_lora(), "seg_window_modality": seg_window_modality(), "seg_tabme": seg_tabme(),
              "seg_kit_gate_sherlock": seg_kit_gate_sherlock(), "seg_boxes_score": seg_boxes_score(),
              "seg_magazine_rule": seg_magazine_rule(),
-             "public": pub, "ocr_scorers": ocr_scorers(),
+             "public": pub, "ocr_scorers": ocr_scorers(), "container_labels": container_labels,
              "vision_language_auto": json.loads(VISION_LANGUAGE_AUTO.read_text()) if VISION_LANGUAGE_AUTO.exists() else None,
              "ppocrv6_hands": ppocrv6_hands(pub and pub["open_sweep"]),
              "hands_icl": {k: v for k, v in json.loads((RESULTS / "ocr-ppocrv6-hands-paid.json").read_text()).items()

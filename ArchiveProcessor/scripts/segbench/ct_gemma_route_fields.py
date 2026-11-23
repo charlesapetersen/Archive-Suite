@@ -12,8 +12,10 @@ import hashlib
 from importlib.metadata import version
 import json
 import os
+import random
 from pathlib import Path
 import socket
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -29,6 +31,8 @@ BASELINE = 60
 TOTAL = 195
 IN_PROCESS = "gemma3-12b-mlx4"
 OUT = Path(R.OUT) / "gemma-route-fields.json"
+REPORT = Path(__file__).resolve().parents[2] / "segbench-results/ct-gemma-route-fields.md"
+BOOTSTRAP = 10_000
 APP = Path(__file__).resolve().parents[2] / "macOS/Sources/ArchiveProcessor"
 MODEL_REVISION = "86cc6a8dedbc456dd0e4af01a9d09f396f77e558"
 SERVER_VERSION = "0.7.4"
@@ -61,14 +65,13 @@ def json_request(url, body=None):
         return json.load(response)
 
 
-def server_body(model, jpeg):
+def server_body(model, jpeg, text_first=False):
     data_url = "data:image/jpeg;base64," + base64.b64encode(jpeg).decode("ascii")
+    image = {"type": "image_url", "image_url": {"url": data_url}}
+    text = {"type": "text", "text": R.PROMPT}
     return {
         "model": model, "temperature": 0, "max_tokens": R.MAX_TOKENS, "stream": False,
-        "messages": [{"role": "user", "content": [
-            {"type": "image_url", "image_url": {"url": data_url}},
-            {"type": "text", "text": R.PROMPT},
-        ]}],
+        "messages": [{"role": "user", "content": [text, image] if text_first else [image, text]}],
         "enable_thinking": False, "chat_template_kwargs": {"enable_thinking": False}, "think": False,
     }
 
@@ -84,7 +87,7 @@ def server(port):
         raise RuntimeError("Pinned Gemma snapshot missing from model cache")
     if (model_store.HUB / ("models--" + G.MODEL.replace("/", "--")) / "refs/main").read_text().strip() != MODEL_REVISION:
         raise RuntimeError("Cache's main ref differs from the benchmark snapshot")
-    env = dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")
+    env = dict(os.environ, HF_HUB_CACHE=str(model_store.HUB), HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")
     base = f"http://127.0.0.1:{port}/v1"
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", port))
@@ -124,9 +127,9 @@ def encoder(folder):
     return binary
 
 
-def read_server(base, jpeg):
+def read_server(base, jpeg, text_first=False):
     start = time.monotonic()
-    reply = json_request(base + "/chat/completions", server_body(G.MODEL, jpeg))["choices"][0]
+    reply = json_request(base + "/chat/completions", server_body(G.MODEL, jpeg, text_first))["choices"][0]
     finish = reply.get("finish_reason")
     raw = reply["message"].get("content") or ""
     # Match LocalModelRoute for completed replies, then apply the same bench parser to all Gemma arms.
@@ -218,22 +221,223 @@ def collect(rows, ids, record, cache, port, limit):
                 print(f"Held-out label {index + 1}/{len(ids)}: {wall:.2f}s, parsed={answer is not None}", flush=True)
 
 
+
+NUMBER = "collection_number"
+# Same endpoint, same request settings. Only the JPEG bytes and image marker position vary.
+CONTROLS = {
+    "app_image_first": (False, False),
+    "app_text_first": (False, True),
+    "source_image_first": (True, False),
+    "source_text_first": (True, True),
+}
+
+
+def diagnostic_selection(holdout):
+    present, blanks = [], []
+    for index, call in enumerate(holdout):
+        cell = call["cells"].get(NUMBER)
+        if cell:
+            (present if cell["truth_filled"] else blanks).append(index)
+    rng = random.Random(R.SEED + 1)
+    sample = rng.sample(blanks, 15)
+    repeats = set(rng.sample(present, 9) + rng.sample(sample, 3))
+    return sorted(present + sample), repeats
+
+
+def diagnose(rows, ids, record, cache, port):
+    """Run the crossed JPEG and chat-order controls on every present number and 15 fixed blanks."""
+    holdout = record["holdout"]
+    if len(holdout) != TOTAL - BASELINE:
+        raise RuntimeError("Finish the held-out panel before running the diagnosis")
+    indices, repeats = diagnostic_selection(holdout)
+    calls = record.setdefault("diagnosis", [])
+    if len(calls) == len(indices):
+        return
+    with tempfile.TemporaryDirectory(prefix="ct-gemma-diagnostic-") as folder:
+        binary = encoder(folder)
+        with server(port) as base:
+            print("Gemma collection-number controls ready on loopback", flush=True)
+            for index in indices[len(calls):]:
+                mid = ids[index]
+                path = Path(R.page_of(mid))
+                want = rows[mid]["fields"].get(NUMBER)
+                jpeg = {False: subprocess.check_output([binary, path]), True: path.read_bytes()}
+                arms = [arm for arm in CONTROLS if arm != "app_image_first" or index in repeats]
+                random.Random(R.SEED + index).shuffle(arms)
+                calls_at_photo = {}
+                for arm in arms:
+                    source, text_first = CONTROLS[arm]
+                    prediction, wall, finish = read_server(base, jpeg[source], text_first)
+                    value = (prediction or {}).get(NUMBER)
+                    calls_at_photo[arm] = dict(right=R.same(NUMBER, value, want), filled=bool(value),
+                                               wall_s=wall, finish=finish, parsed=prediction is not None)
+                calls.append(calls_at_photo)
+                store(cache, record)
+                print(f"Diagnostic label {len(calls)}/{len(indices)} done ({len(arms)} requests)", flush=True)
+
+
+def paired_interval(pairs, first, second):
+    """One matched photo per pair for this field, including skipped replies as absent values."""
+    differences = [int(pair[first]) - int(pair[second]) for pair in pairs]
+    n = len(differences)
+    if not n:
+        raise ValueError("No eligible pairs")
+    rng = random.Random(R.SEED)
+    boot = sorted(sum(differences[rng.randrange(n)] for _ in pairs) for _ in range(BOOTSTRAP))
+    return tuple(100 * total / n for total in
+                 (sum(differences), boot[BOOTSTRAP // 40], boot[BOOTSTRAP - 1 - BOOTSTRAP // 40]))
+
+
+def gap_text(gap):
+    delta, lower, upper = gap
+    return f"{delta:+.1f} ({lower:+.1f} to {upper:+.1f})"
+
+
+def comparison(pairs):
+    n = len(pairs)
+    return [str(n), *[f"{right}/{n} ({100 * right / n:.1f}%)" for right in map(sum, zip(*pairs))],
+            gap_text(paired_interval(pairs, 0, 1)), gap_text(paired_interval(pairs, 0, 2))]
+
+
+def field_pairs(panel, *, pilot=False):
+    return {field: [call["cells"][field] if pilot else call["cells"][field]["right"]
+                    for call in panel if field in call["cells"]] for field in G.FOUR}
+
+
+def table(headings, rows):
+    return ["| " + " | ".join(headings) + " |", "| " + " | ".join(["---"] * len(headings)) + " |",
+            *["| " + " | ".join(row) + " |" for row in rows]]
+
+
+def value_rows(holdout):
+    for field in G.FOUR:
+        cells = [call["cells"][field] for call in holdout if field in call["cells"]]
+        present = [cell for cell in cells if cell["truth_filled"]]
+        absent = [cell for cell in cells if not cell["truth_filled"]]
+        for label, index in zip(("Server", "In-process", "Vision + parser"), range(3)):
+            yield [field.replace("_", " ").capitalize(), label,
+                   f"{sum(c['right'][index] for c in present)}/{len(present)}",
+                   f"{sum(c['filled'][index] for c in absent)}/{len(absent)}"]
+
+
+def interpretation(holdout, pairs):
+    number_gap = paired_interval(pairs["collection_number"], 0, 1)
+    if number_gap[2] < 0:
+        number_result = "The held-out sample also puts the server below in-process Gemma on collection number."
+    elif number_gap[1] > 0:
+        number_result = "The held-out sample puts the server ahead of in-process Gemma on collection number."
+    else:
+        number_result = ("The held-out comparison does not confirm the pilot’s collection-number loss. Its interval "
+                         "includes zero, leaving the size and direction of any difference unresolved.")
+    breakdown = []
+    for field in ("collection_number", "date"):
+        eligible = [c["cells"][field]["right"] for c in holdout
+                    if field in c["cells"] and not c["cells"][field]["rule"]]
+        breakdown.append([field.replace("_", " ").capitalize(), *comparison(eligible)])
+    boxes = [call["cells"]["collection_number"] for call in holdout
+             if not call["folder"] and "collection_number" in call["cells"]]
+    fallback_pairs = [(cell["right"][0] if cell["filled"][0] else cell["right"][2], cell["right"][2])
+                      for cell in boxes]
+    combined, vision = map(sum, zip(*fallback_pairs))
+    return [number_result, "",
+            "### The owner and unanimous-reader cells", "",
+            "This sensitivity drops rule-settled cells to match the truth categories of the number and date headline "
+            "in [the in-process report](ct-read.md).", "",
+            *table(HEADINGS, breakdown), "",
+            "### Collection-number proposals on box markers", "",
+            f"On {len(boxes)} eligible box-marker cells, preferring a nonempty server reading and using the benchmark "
+            f"Vision parser otherwise gets {combined} right, compared with {vision} for the parser alone. "
+            f"The gap is {gap_text(paired_interval(fallback_pairs, 0, 1))} percentage points. "
+            "This models field precedence with the benchmark parser. Folder proposals omit collection number.", ""]
+
+
+HEADINGS = ("Field", "Eligible cells", "Gemma through the server", "Gemma in-process", "Vision + parser",
+            "Server less in-process (95% interval)", "Server less Vision (95% interval)")
+
+
+def report(pilot, holdout):
+    paired = field_pairs(holdout)
+    times = [c["wall_s"] for c in holdout]
+    parsed = sum(c["parsed"] for c in holdout)
+    capped = sum(c["finish"] == "length" for c in holdout)
+    return "\n".join([
+        "# Gemma label fields through the Processor’s image path", "",
+        "W46.p17-gemma-route-fields · Gemma 3 12B IT, MLX 4-bit · local mlx-vlm 0.7.4 on an 18 GB M3 Pro · $0.", "",
+        "Generated by `scripts/segbench/ct_gemma_route_fields.py --report` from counts and the frozen comparator input.", "",
+        "## Held-out 135 photos", "",
+        "All four fields use the same photo and truth cell for all three readings. The server columns show exact "
+        "normalized matches. Differences are in percentage points.", "",
+        *table(HEADINGS, [[field.replace("_", " ").capitalize(), *comparison(values)]
+                          for field, values in paired.items()]), "",
+        f"The server returned {parsed} parseable replies for 135 photos. "
+        f"{capped} replies reached the token limit and were scored as having no values. "
+        f"Median request time was {statistics.median(times):.2f} s, with JPEG encoding outside the timer. "
+        "No paid calls.", "",
+        *interpretation(holdout, paired),
+        "### When a value is present or absent", "",
+        "A correct blank contributes to overall accuracy. These counts show how many actual values each route "
+        "read correctly and how often it supplied a value where the truth was blank.", "",
+        *table(("Field", "Route", "Correct where present", "Filled where absent"), value_rows(holdout)), "",
+        "## Original 60-photo pilot", "",
+        "The pilot used Pillow to approximate the app’s 1,600 px JPEG encoding. The held-out run called the Swift "
+        "encoder itself. These tables describe the two cohorts separately.", "",
+        *table(HEADINGS, [[field.replace("_", " ").capitalize(), *comparison(values)]
+                          for field, values in field_pairs(pilot, pilot=True).items()]), "",
+        "## Measurement card", "",
+        "- **Truth.** The frozen W47.ct-truth-final label set. The owner’s answers and notes, rule-settled cells, "
+        "and otherwise three unanimous drafts. Gemini 3.7 Flash, from Google like Gemma, was one of those drafters, "
+        "alongside two Qwen readers. Gemma itself drafted none of the truth. The common scorer excludes carried, "
+        "illegible, cut-off, and unresolved cells.",
+        "- **Selection.** The 135 photos remaining after the fixed seed 4702 draw of 60. Cache preflight verified the "
+        "195 truth photos, paired in-process replies and Vision line caches before collection. Reply quality did "
+        "not select photos.",
+        "- **Comparison.** The app’s ImageIO/CoreGraphics encoder with rotation zero on the already upright photos, "
+        "1,600 px long-edge cap, JPEG quality 0.9. Same invented-example prompt, temperature 0, 640-token ceiling "
+        "and reasoning off for server Gemma. Its request puts the image before the prompt text. The original "
+        "in-process template puts the image token after the text and reads the source JPEG. In-process Gemma "
+        "and cached Apple Vision with the bench’s pattern parser are the frozen ct-read comparators. "
+        "A parse failure supplies no value. HTTP or transport failure stops "
+        "the run so a connectivity problem cannot be mistaken for an absent label field.",
+        "- **Noise.** 95% paired percentile bootstrap intervals over the eligible photos for each field "
+        "(10,000 resamples). The collection-number comparison against in-process Gemma was specified before the "
+        "held-out run. Other intervals are descriptive. One pass per route and cohort leaves rerun variation "
+        "unmeasured. An interval containing zero leaves the direction unresolved.",
+        "- **Scope.** External mlx-vlm server on this Mac, served the pinned Gemma snapshot, on one researcher’s "
+        "held-out label photos. Ollama, LM Studio, the Processor-managed Gemma worker, and labels interleaved with "
+        "an OCR model were outside this test. The scored fields use the benchmark normalization and parser.",
+        "",
+    ])
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=18091)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--cache", type=Path, default=OUT)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--report", action="store_true")
+    mode.add_argument("--diagnose", action="store_true")
     args = parser.parse_args()
     rows, ids = inputs()
-    original_panel(rows, ids)
+    pilot = original_panel(rows, ids)
     # No photo identifiers in the counts file. Pin selection and ordering across restarts.
     fingerprint = hashlib.sha256("\n".join(ids).encode()).hexdigest()
     cache = args.cache
     record = (json.loads(cache.read_text(encoding="utf-8")) if cache.exists()
               else {"schema": 1, "panel": fingerprint, "holdout": []})
-    if record.get("schema") != 1 or record["panel"] != fingerprint:
-        raise RuntimeError("The frozen panel has changed since the counts were recorded")
-    collect(rows, ids[BASELINE:], record, cache, args.port, args.limit)
+    if record.get("schema") != 1:
+        raise RuntimeError("Unrecognized schema in the counts file")
+    if record["panel"] != fingerprint:
+        raise RuntimeError("The photo selection or order has changed since the counts were recorded")
+    if args.report:
+        if len(record["holdout"]) != TOTAL - BASELINE:
+            raise RuntimeError("Run all 135 held-out photos before publishing a report")
+        REPORT.write_text(report(pilot, record["holdout"]), encoding="utf-8")
+        print(REPORT)
+    elif args.diagnose:
+        diagnose(rows, ids[BASELINE:], record, cache, args.port)
+    else:
+        collect(rows, ids[BASELINE:], record, cache, args.port, args.limit)
 
 
 if __name__ == "__main__":

@@ -554,6 +554,13 @@ footer p { font-size: 13px; }
     <p class="note">Open line recognisers for the hardest strata (W43.script-specialists), read on our Mac with kraken: its default blla segmenter cuts each page into lines once, and every model reads the same lines, so a model's score includes the segmenter's reading order. That costs a line model against a whole-page reader, which chrF, nearly blind to order, shows. "Unknown" means the model's record gives no training list to check against our sources; a named source means the model was trained on that test source, so its score is an upper bound, not a specialist's. BiblIA's model writes lines in visual order and is reversed to logical order before scoring. Same pages and scorer as the table above; no money. FarmShare now supplies CHURRO-3B (its own XML prompt), Qari and Fanar on Arabic pages, and the Bern Qwen model on the same German line crops. Capped or malformed replies count as failures; any missing or capped German line fails its page. CHURRO has known source overlap on L5, L7 and L8. The German adapter has an unstated licence and possible Hufeland overlap, so it is scored only; the survey is <code>ArchiveProcessor/segbench-results/bench-corpus/specialists.md</code>.</p>
   </section>
 
+  <section class="panel" id="container-labels" aria-labelledby="container-labels-heading" hidden>
+    <div class="head"><h2 id="container-labels-heading">Reading archive labels with Gemma on a Mac</h2><span class="meta">Gemma 3 12B, 4-bit MLX · $0</span></div>
+    <p class="note">Accuracy is the share of eligible label fields that matched the reference. Gaps are in percentage points, paired on the same photos. The held-out run used the Processor’s 1,600 px JPEG encoder. The 60-photo pilot used Pillow to approximate the encoding.</p>
+    <div class="tbl"><table><thead><tr><th scope="col">Cohort</th><th scope="col">Field</th><th scope="col">Eligible cells</th><th scope="col">Gemma through the server</th><th scope="col">Gemma in-process</th><th scope="col">Vision + parser</th><th scope="col">Server less in-process (95% interval)</th><th scope="col">Server less Vision (95% interval)</th></tr></thead><tbody id="container-labels-rows"></tbody></table></div>
+    <p class="note">The reference comes from owner answers, rules and cases where three readers agreed, including Google’s Gemini 3.7 Flash. The scope is the external mlx-vlm route. Source and measurement card <code>ArchiveProcessor/segbench-results/ct-gemma-route-fields.md</code>.</p>
+  </section>
+
   <footer>
     <p><strong>OCR costs.</strong> Prices are per 1,000 pages. The hosted panels use recorded charges for their pinned endpoints (Mistral's published rate for Mistral OCR). Gemini 3.7 Flash on the Stanford gateway and Gemini 4 Hydrogen use list-price estimates from recorded usage. The overall hosted figures average over the 96 accuracy pages, and the kind charts use each kind's pages where usage is available. Apple Vision and the readers run on our Mac are free. Whole-page FarmShare and Sherlock estimates apply frozen OpenRouter rates to the cluster runs' token counts. Their overall figures average over the answered pages of the 99-image panel, including any answered agreement-only images. Their kind figures average over every attempt scored for that kind, including capped or otherwise unanswered readings with recorded usage. Cluster crop routes use the tokens from their own scored pages. Claude Sonnet 5.5 has one API list-price estimate across the charts. It uses 4,815 input tokens per page, counted by Anthropic on 99 panel images including the prompt, and 816 output tokens per page from the subscription run, at $2 and $10 per million input and output tokens.</p>
     <p id="vision-os" hidden><strong>Apple Vision's OS.</strong> <span id="vision-os-text"></span></p>
@@ -49240,6 +49247,84 @@ true,
 }
 }
 },
+"container_labels":{
+"held_out":[
+[
+"Repository",
+"131",
+"97/131 (74.0%)",
+"103/131 (78.6%)",
+"94/131 (71.8%)",
+"-4.6 (-9.9 to +0.0)",
+"+2.3 (-3.1 to +7.6)"
+],
+[
+"Collection title",
+"132",
+"87/132 (65.9%)",
+"96/132 (72.7%)",
+"78/132 (59.1%)",
+"-6.8 (-14.4 to +0.8)",
+"+6.8 (-1.5 to +15.2)"
+],
+[
+"Collection number",
+"134",
+"96/134 (71.6%)",
+"111/134 (82.8%)",
+"96/134 (71.6%)",
+"-11.2 (-17.9 to -4.5)",
+"+0.0 (-6.7 to +6.7)"
+],
+[
+"Date",
+"134",
+"103/134 (76.9%)",
+"111/134 (82.8%)",
+"95/134 (70.9%)",
+"-6.0 (-13.4 to +0.7)",
+"+6.0 (-2.2 to +14.2)"
+]
+],
+"pilot":[
+[
+"Repository",
+"58",
+"50/58 (86.2%)",
+"49/58 (84.5%)",
+"45/58 (77.6%)",
+"+1.7 (-5.2 to +8.6)",
+"+8.6 (+0.0 to +17.2)"
+],
+[
+"Collection title",
+"58",
+"39/58 (67.2%)",
+"43/58 (74.1%)",
+"34/58 (58.6%)",
+"-6.9 (-17.2 to +3.4)",
+"+8.6 (+0.0 to +17.2)"
+],
+[
+"Collection number",
+"60",
+"44/60 (73.3%)",
+"49/60 (81.7%)",
+"44/60 (73.3%)",
+"-8.3 (-16.7 to -1.7)",
+"+0.0 (-11.7 to +11.7)"
+],
+[
+"Date",
+"60",
+"46/60 (76.7%)",
+"45/60 (75.0%)",
+"46/60 (76.7%)",
+"+1.7 (-8.3 to +11.7)",
+"+0.0 (-11.7 to +11.7)"
+]
+]
+},
 "vision_language_auto":{
 "rows":[
 {
@@ -74586,6 +74671,18 @@ if (DU) {
     ['Rerun: the same year', DU.rerun_same_year],
     ['Rerun: the same Date Uncertain', DU.rerun_same_du]].map(([l, x]) => '<tr><td>' + l + '</td><td>' + (typeof x === 'string' ? x : f(x)) + '</td></tr>').join('');
   document.getElementById('date-undated').hidden = false;
+}
+
+const labelResults = DATA.container_labels;
+if (labelResults) {
+  const body = document.getElementById('container-labels-rows');
+  for (const [name, rows] of [['135 held out', labelResults.held_out], ['60 pilot', labelResults.pilot]]) {
+    for (const row of rows) {
+      const tr = body.insertRow();
+      for (const value of [name, ...row]) tr.insertCell().textContent = value;
+    }
+  }
+  document.getElementById('container-labels').hidden = false;
 }
 
 // Part 7: the public strata.
