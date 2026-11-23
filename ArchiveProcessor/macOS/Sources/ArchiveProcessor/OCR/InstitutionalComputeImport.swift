@@ -13,10 +13,9 @@ import Foundation
 /// pilot's neutral-named renders, which are not the corpus files' bytes anyway) matches nothing.
 ///
 /// What a match gives the page: the cluster's text, its reader in the PDF header's provider/model positions
-/// (`<cluster> · <model> (<precision>, job <id>)`, `SPEC/tag-format.md`), rotation 0 (the cluster read the file as
-/// stored, and asking the run's provider for the rotation would be a paid call), and — because the panel prompt
-/// the cluster reads with returns no document-start/continuation label — a text-only classification by the run's own
-/// model when the run uses classification. A page with no match (escalated, failed, never read, or not in the
+/// (`<cluster> · <model> (<precision>, job <id>)`, `SPEC/tag-format.md`), and a local Vision rotation check in
+/// the OCR pipeline when rotation is on. The cluster's panel prompt gives no document-start/continuation label,
+/// so the run's model classifies the text alone when the run uses classification. A page with no match (escalated, failed, never read, or not in the
 /// folder) is read by the run's model as usual: the run's cost estimate already counts every page, so falling
 /// through never spends more than the estimate said.
 ///

@@ -47,7 +47,8 @@ enum InstitutionalComputeImportTestDriver {
         // The run's input images: two boxes that both have a 001.jpg, a page FarmShare escalated, one it never read.
         let input = root.appendingPathComponent("input", isDirectory: true)
         let bulk = root.appendingPathComponent("bulk-out", isDirectory: true)
-        guard let box1 = makeJPEG(input.appendingPathComponent("box1/001.jpg"), shade: 0.2),
+        let farmShareText = "BOX-ONE text from FarmShare"
+        guard let box1 = sidewaysJPEG(input.appendingPathComponent("box1/001.jpg"), text: farmShareText, root: root),
               let box2 = makeJPEG(input.appendingPathComponent("box2/001.jpg"), shade: 0.6),
               let escalated = makeJPEG(input.appendingPathComponent("box1/002.jpg"), shade: 0.4),
               let unread = makeJPEG(input.appendingPathComponent("box3/009.jpg"), shade: 0.8),
@@ -169,8 +170,17 @@ enum InstitutionalComputeImportTestDriver {
         check("a matched page spends one text-only call (its classification), with no image and no rotation call",
               calls.count == 1 && !calls[0].contains("inline_data") && !calls[0].contains("inlineData"),
               "\(calls.count) calls")
-        check("its classification comes from the run's model; rotation stays 0",
+        check("its classification comes from the run's model and Vision leaves the blank image unturned",
               r.classification == .documentStart && r.rotationDegrees == 0)
+        await script.set((200, #"{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"[document_start]"}]}}]}"#))
+        let upright = await ocr(box1)
+        calls = await script.calls()
+        check("Vision corrects the sideways import even in comparative mode, with only a text classification request",
+              upright.rotationDegrees == 270 && upright.text == farmShareText && upright.classification == .documentStart
+              && calls.count == 1 && !calls[0].contains("inline_data") && !calls[0].contains("inlineData"),
+              "correction \(upright.rotationDegrees); \(calls.count) calls")
+        let unturned = await ocr(box1, rotation: .off)
+        check("Off leaves the same sideways import unturned", unturned.rotationDegrees == 0 && unturned.text == farmShareText)
         await script.set((500, #"{"error":{"message":"down"}}"#))
         r = await ocr(box2)
         check("a failed classification call still keeps the cluster's text, unclassified",
@@ -199,9 +209,23 @@ enum InstitutionalComputeImportTestDriver {
               matched.with(classification: .documentContinuation, rotationDegrees: 0).imported == matched.imported)
         let pdf = root.appendingPathComponent("out/001.pdf")
         try? fm.createDirectory(at: pdf.deletingLastPathComponent(), withIntermediateDirectories: true)
-        _ = try? PDFGenerator().generate(imageURL: box1, result: matched, model: flash, outputURL: pdf,
-                                         originalFileName: "001.jpg")
-        let page2 = PDFDocument(url: pdf)?.page(at: 1)?.string ?? ""
+        let output = await Task.detached {
+            try? PDFGenerator().generateOutput(imageURL: box1, result: upright, model: flash, outputURL: pdf,
+                                               originalFileName: "001.jpg")
+        }.value
+        let written = PDFDocument(url: pdf)
+        if let page = written?.page(at: 0) {
+            let bounds = page.bounds(for: .mediaBox)
+            // The original ink is near the top of the upright image. A 90° error moves it to the side,
+            // and a 180° error moves it to the bottom. Select only the band where the words should lie.
+            let band = CGRect(x: bounds.minX, y: bounds.maxY - bounds.height * 0.15,
+                              width: bounds.width, height: bounds.height * 0.12)
+            let placed = page.selection(for: band)?.string?.trimmingCharacters(in: .whitespacesAndNewlines)
+            check("the PDF places the imported words on the upright image's top line",
+                  output?.layer.route == .visionLinesAligned && placed == farmShareText,
+                  "\(String(describing: output?.layer)); selected \(String(describing: placed))")
+        } else { check("the corrected PDF has an image page", false) }
+        let page2 = written?.page(at: 1)?.string ?? ""
         check("the PDF header names FarmShare, its model, precision and job in the provider/model positions",
               page2.contains("FarmShare \u{00B7} Qwen3.6-27B-FP8 (FP8 weights, fp8 KV cache, job 1849739) \u{00B7} ")
               && page2.contains("BOX-ONE text from FarmShare"), String(page2.prefix(200)))
@@ -330,6 +354,7 @@ enum InstitutionalComputeImportTestDriver {
         let model = LLMModel.geminiModels[0]
         let fresh = OCRProcessor()
         fresh.taggingMode = .none
+        fresh.rotationMode = .localVision
         fresh.institutionalComputeImport = imported
         await script.set((200, #"{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"[document_start]\nMODEL-TEXT"}]}}]}"#))
         await fresh.startProcessing(
@@ -339,9 +364,9 @@ enum InstitutionalComputeImportTestDriver {
             segmentationContext: .init(previousTextCharCount: 0, sendPreviousImage: false, customPrompt: nil))
         let freshCalls = await script.calls()
         let job = fresh.jobs.first
-        check("an import-only run spends zero requests and keeps the cluster reading without a class",
+        check("an import-only run turns the image and keeps the unclassified cluster reading with zero requests",
               freshCalls.isEmpty && job?.status == .succeeded && job?.classification == nil
-              && job?.result?.text == "BOX-ONE text from FarmShare" && job?.result?.imported?.source == "FarmShare",
+              && job?.result?.rotationDegrees == 270 && job?.result?.text == "BOX-ONE text from FarmShare" && job?.result?.imported?.source == "FarmShare",
               "\(freshCalls.count) calls; \(fresh.statusMessage)")
 
         var run = OCRProcessor.PendingRun(
@@ -435,6 +460,18 @@ enum InstitutionalComputeImportTestDriver {
         let side = bulk.appendingPathComponent("_meta").appendingPathComponent(rel + ".json")
         try? fm.createDirectory(at: side.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? JSONSerialization.data(withJSONObject: meta).write(to: side)
+    }
+
+    private static func sidewaysJPEG(_ url: URL, text: String, root: URL) -> URL? {
+        let fm = FileManager.default
+        try? fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        guard let upright = TextLayerTestDriver.drawPage([text], to: root.appendingPathComponent("upright.jpg"),
+                                                         type: "public.jpeg"),
+              let image = ImageEncoding.orientedCGImage(url: upright),
+              let sideways = ImageEncoding.rotate(image, byDegreesClockwise: 90),
+              let jpeg = ImageEncoding.encodeToTargetMB(sideways, targetMB: 0),
+              (try? jpeg.data.write(to: url)) != nil else { return nil }
+        return url
     }
 
     private static func makeJPEG(_ url: URL, shade: CGFloat) -> URL? {

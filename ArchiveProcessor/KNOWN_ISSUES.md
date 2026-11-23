@@ -2,6 +2,13 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (2026-11-23) — Imported cluster pages could stay sideways
+
+When rotation is enabled, matched pages use the on-device Vision check, including in comparative modes.
+If Vision cannot establish a direction or rotation is Off, the image keeps its displayed orientation.
+The PDF places the imported words using the corrected image, and its header still credits the cluster.
+See W49.proc-import-rotation.
+
 ## FIXED (2026-11-23) — Advanced reading comparisons used different sets of answered pages
 
 The Advanced Reading range now compares OCR accuracy on pages both readers answered and shows the score with
@@ -1085,8 +1092,6 @@ What the import does not do:
 - **The estimates count every page.** The cost and time lines do not know which pages will match until each is
   hashed during the run, so they overstate a run with cluster text. A matched page makes at most one short
   text-only classification call. (accepted: which pages match is known only once each is hashed during the run)
-- **Rotation is 0** on an imported page: asking the run's provider would be a paid call per page, and the cluster read
-  the file as stored. A sideways scan stays sideways in the PDF. (accepted: a rotation check would be a paid call per page)
 - **Imported text follows the bench panel's prompt**, not the Processor's: the custom OCR prompt and the
   previous-page context do not change the imported transcription. When classification runs, it gets the custom prompt. (accepted: the cluster read every page with the bench panel's prompt)
 - **Only image inputs match.** A PDF input's pages are drawn to temporary JPEGs whose bytes the cluster never saw.

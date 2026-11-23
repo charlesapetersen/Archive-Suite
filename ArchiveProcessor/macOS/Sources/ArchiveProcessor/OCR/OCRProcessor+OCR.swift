@@ -2113,18 +2113,19 @@ extension OCRProcessor {
                              errorMessage: "The file is no longer where the run found it, so it was not read.",
                              errorCode: "source_missing")
         }
-        // W41.app-institutional-compute: a page an institutional-computing bulk run already read is not bought again. Before the rotation
-        // task, which would be a paid call too. Direct providers only, as for the page readers (the run start clears
-        // the import elsewhere). When needed, the run's model classifies the text alone.
+        // A matched cluster page uses only local Vision for rotation, alongside optional text-only classification.
+        // Direct providers only, as for the page readers (run start clears the import on other routes).
         if let imported, localAgent == nil, gatewayConfig == nil, provider != .appleVision,
            let reading = imported.result(for: imageURL) {
+            async let correction = rotationMode == .off ? nil : RotationDetector.detectCorrection(imageURL: imageURL)
             let configuration = imported.classifyPages
                 ? LLMTextConfiguration(provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey)
                 : nil
             let classified = await applyingVisionTextClassification(
                 to: reading, previousText: previousText, customPrompt: customPrompt,
                 configuration: configuration)
-            return await ReadQualityDisagreement.addingFlag(to: classified, route: nil, imageURL: imageURL)
+            let rotated = mergeRotation(into: classified, verdict: RotationVerdict(correction: await correction))
+            return await ReadQualityDisagreement.addingFlag(to: rotated, route: nil, imageURL: imageURL)
         }
         // Start rotation detection concurrently with the network OCR call. Both are async, so
         // the extra rotation work overlaps the OCR round-trip and adds little wall-clock time.
