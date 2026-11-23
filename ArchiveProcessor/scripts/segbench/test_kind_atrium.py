@@ -119,6 +119,22 @@ class MixedSupport(unittest.TestCase):
         lo, hi = r['full']['finite_completion']['unrestricted']['precision']
         self.assertLess(lo, hi)
 
+    def test_varying_calls_use_original_weights_and_known_domain_size(self):
+        labels, key, truth, calls = self.fixture()
+        calls['test']['clean--0'] = True
+        domain = {p for p in labels if not p.startswith('disagree-B-') and p != 'clean--3'}
+        with self.assertRaisesRegex(ValueError, 'varies within a fixed design group'):
+            K.mixed_support(labels, key, truth, calls)
+        _, (r,) = K.mixed_support(labels, key, truth, calls, domains={'test': domain})
+        covered = r['covered']
+        self.assertEqual((covered['pages'], covered['calls'], covered['tp'], covered['fp']), (45, 43, 41, 2))
+        self.assertEqual(covered['precision'], 41/43)
+        self.assertEqual(covered['recall'], 1.0)
+        self.assertEqual(r['sheet']['mixed'], 39)
+        self.assertEqual(r['full']['finite_completion']['unrestricted']['recall'][0], 39/41)
+        with self.assertRaisesRegex(ValueError, 'calls outside'):
+            K.mixed_support(labels, key, truth, calls, domains={'test': domain - {'clean--0'}})
+
     def test_top_up_constrains_finite_bounds_without_design_weight(self):
         args = self.fixture()
         _, (before,) = K.mixed_support(*args)

@@ -102,6 +102,26 @@ final class SettingsLevelsUITests: XCTestCase {
                hidden: ["ap.settings.level.why.cli-fields"], level: "Standard")
     }
 
+    func testHandwritingSwitchHelpShowsEligibleReplay() throws {
+        guard let settings = launch(["-settingsLevel", "advanced", "-ocrPageKindRouting", "YES",
+                                     "-useGateway", "NO", "-useLocalAgent", "NO", "-useAppleVision", "NO"]) else { return }
+        XCTAssertTrue(app.showSettingsPanel("Reading"))
+        let help = settings.buttons["ap.settings.handwritingOnTyped.help"]
+        XCTAssertTrue(help.waitForExistence(timeout: 5))
+        let form = settings.scrollViews.firstMatch
+        for _ in 0..<15 where !form.frame.contains(help.frame) {
+            form.scroll(byDeltaX: 0, deltaY: -110)
+        }
+        XCTAssertTrue(form.frame.contains(help.frame))
+        help.click()
+        let explanation = settings.popovers.firstMatch.staticTexts.firstMatch
+        XCTAssertTrue(explanation.waitForExistence(timeout: 5))
+        let text = try XCTUnwrap(explanation.value as? String)
+        XCTAssertTrue(text.contains("412 were eligible and flagged"))
+        XCTAssertTrue(text.contains("12% to 95%"))
+        shoot(XCUIScreen.main.screenshot(), "settings-handwriting-switch-help")
+    }
+
     func testAdvancedShowsTheControlsAndTheirReasons() throws {
         guard let settings = launch(["-settingsLevel", "advanced"]) else { return }
         expect(settings, panel: "Reading",
@@ -182,7 +202,10 @@ final class SettingsLevelsUITests: XCTestCase {
     }
 
     private func shoot(_ element: XCUIElement, _ name: String) {
-        let screenshot = element.screenshot()
+        shoot(element.screenshot(), name)
+    }
+
+    private func shoot(_ screenshot: XCUIScreenshot, _ name: String) {
         let attachment = XCTAttachment(screenshot: screenshot)
         attachment.name = name
         attachment.lifetime = .keepAlways

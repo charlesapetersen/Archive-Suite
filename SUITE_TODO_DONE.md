@@ -18174,3 +18174,18 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   and updated route tables with identical output.
   Used committed aggregates only. No model calls, spend or rehearsal-cache inputs.
   <!-- /W46.p18-reader-comparisons -->
+- [x] **W46.p18-mixed-switch-score — Measure what the handwriting switch adds on eligible pages [S]** · §Document processing review — W46 (lane: segbench,processor) (uses: light,build) — Measurement review 2026-11-22 pass 18, P18-5, baseline dbb10584. Apply the existing owner checks, population weights and completion bounds to typed/printed pages eligible for the ATRIUM pre-flag. Report the added handwriting-reader calls and the combined rule separately from the standalone detector. Account for runtime eligibility where the saved fields allow, name unobserved conditions, and update Settings help. Reuse saved labels and rulings for $0. The owner’s default stands. SHIPPED 2026-11-23 (this commit).
+  The saved-feature replay applied the form decision and 0.8 confidence floor, leaving 1,449
+  eligible typed or printed pages. The downloaded pre-flag added 412 candidates to the 157
+  handwriting-kind picks, for 569 combined. Standalone ATRIUM made 563 calls on the full draw.
+  Reusing the 170 owner checks and original weights gives 71.65% estimated precision and 61.63%
+  estimated recall among eligible mixed pages for the additions. Unrestricted finite bounds are
+  11.89–95.15% precision and 4.58–98.99% eligible recall. See `mixed-switch-score.md` for the
+  combined rule, both completion assumptions and live conditions the replay cannot observe.
+  Settings and the bench show the replay's scope. The switch is on by default.
+  Verified the replay against the original standalone score and an independent calculation.
+  The Debug build, headless Settings and page-routing checks, focused off-screen Settings test,
+  40 scorer checks and regenerated bench check passed.
+  Cost $0. Kept the shared saved labels, signals and owner checks for reproducibility.
+  No new rehearsal-cache files were created.
+  <!-- /W46.p18-mixed-switch-score -->

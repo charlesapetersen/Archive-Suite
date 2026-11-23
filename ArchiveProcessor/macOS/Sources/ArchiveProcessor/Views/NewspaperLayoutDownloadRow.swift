@@ -145,7 +145,7 @@ struct MixedPagePreflagDownloadRow: View {
                         .fixedSize(horizontal: false, vertical: true)
                     Button("Try Again") { download.start() }
                 case .installed:
-                    Text("The mixed-page pre-flag is downloaded: only the typed and printed pages it flags are sent for their handwriting.")
+                    Text("The pre-flag is downloaded. A page it checks and leaves unflagged keeps its usual reader.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
             }

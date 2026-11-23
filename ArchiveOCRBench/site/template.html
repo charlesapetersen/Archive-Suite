@@ -339,6 +339,17 @@ footer p { font-size: 13px; }
     <p class="note">Keep the shipped kind classifier for hand and forms. ATRIUM TEXT remains a candidate mixed signal; covered point estimates do not establish full-frame accuracy or a statistical recall lead. Truth is the owner's blind sheet under his any-handwriting-on-print cut; selection used four classifiers' disagreements, including ATRIUM's. Same saved inputs, no new truth or inference. Full measurement card: ArchiveProcessor/segbench-results/kind-atrium.md.</p>
   </section>
 
+  <section class="panel" id="mixed-switch" hidden>
+    <div class="head"><h2>What the handwriting switch adds</h2></div>
+    <p class="note" id="mixed-switch-note"></p>
+    <div class="tbl"><table><thead><tr><th>Routing rule</th><th>Pages selected</th><th>Covered precision</th><th>Covered recall</th></tr></thead><tbody id="mixed-switch-covered"></tbody></table></div>
+    <details><summary>Point sensitivities and finite-population bounds</summary>
+      <p class="note">Point sensitivity holds the weighted estimates fixed and varies unchecked truth in the omitted strata. Finite-population bounds let every unchecked page vary. “Hand not mixed” assumes unchecked agreed-handwritten pages are wholly handwritten. The ranges describe truth completions. The upper weighted precision for kind-only routing slightly exceeds its finite bound because weighting estimates half a mixed hit more than the exact maximum.</p>
+      <div class="tbl"><table><thead><tr><th>Rule and range</th><th>Precision, hand not mixed</th><th>Recall, hand not mixed</th><th>Precision, unrestricted</th><th>Recall, unrestricted</th></tr></thead><tbody id="mixed-switch-bounds"></tbody></table></div>
+    </details>
+    <p class="note">This is a replay of saved classifier features and completed pre-flags. Live settings, overrides, available readers, pre-flag failures and newspaper layout can change assignments. A selected handwriting reader can replace the usual reader for a page. The replay measures which reader would be selected. Detail in ArchiveProcessor/segbench-results/mixed-switch-score.md.</p>
+  </section>
+
   <section class="panel" id="ocr-regions" hidden>
     <div class="head"><h2>Read the page whole, in regions or in tiles</h2><span class="meta">255 public pages + the 96 · W46.ocr-regions</span></div>
     <p class="note">Regions rescue GLM-OCR and PaddleOCR on newspaper scans; they usually lose on the other material. DocLayout-YOLO drops many hands and forms as figures. Whole-page reading remains the general choice. These are the same frozen images: 4,096 tokens per crop versus 8,192 per whole page. A capped crop gives no text; other crops may still give a partial page. Empty detection scores zero. Annotation groups overlap; the charts above use the exact panel kinds.</p>
@@ -1132,6 +1143,28 @@ if (KA && KA.bulk_mixed_design) {
       return '<td>' + range(b.precision) + '</td><td>' + range(b.recall) + (b.recall_undefined_possible ? ' (zero-mixed completion also possible)' : '') + '</td>';
     }).join('') + '</tr>').join('');
   }
+}
+const MS = DATA.mixed_switch;
+if (MS) {
+  document.getElementById('mixed-switch').hidden = false;
+  const eligible = Object.values(MS.eligible_by_kind).reduce((a, b) => a + b, 0);
+  const added = Object.values(MS.added_by_kind).reduce((a, b) => a + b, 0);
+  const pct = x => x === null ? 'undefined' : (100*x).toFixed(2) + '%';
+  const range = v => v.map(pct).join('–');
+  document.getElementById('mixed-switch-note').textContent =
+    'Of ' + MS.design.population.toLocaleString() + ' saved pages, ' + eligible.toLocaleString() +
+    ' met the typewritten/printed and confidence rules. The downloaded pre-flag adds ' + added +
+    ' candidates (' + pct(added/eligible) + ' of eligible pages). Precision is the estimated share of selected pages with handwriting on typed or printed text. Recall counts the share of such mixed pages selected. The same ' +
+    MS.design.observed_answers + ' owner checks and population weights support these figures.';
+  document.getElementById('mixed-switch-covered').innerHTML = MS.routing.map(r =>
+    '<tr><td>' + r.label + '</td><td>' + r.full.calls + '</td><td>' + pct(r.covered.precision) +
+    '</td><td>' + pct(r.covered.recall) + '</td></tr>').join('');
+  document.getElementById('mixed-switch-bounds').innerHTML = MS.routing.map(r =>
+    [['point_completion', 'weighted point'], ['finite_completion', 'finite']].map(([field, label]) =>
+      '<tr><td>' + r.label + ' (' + label + ')</td>' + ['hand_not_mixed', 'unrestricted'].map(a => {
+        const b = r.full[field][a];
+        return '<td>' + range(b.precision) + '</td><td>' + range(b.recall) + '</td>';
+      }).join('') + '</tr>').join('')).join('');
 }
 const SC = DATA.ocr_scorers;
 if (SC) {

@@ -247,14 +247,15 @@ Rules → Columns and reading order, off by default.
 
 VisionOCRKit `MixedPagePreflag` (ATRIUM v4.3 as Core ML), `Views/OCRView+PageKind.swift` (`PageKindStore`); the
 download row is under "Read handwriting on typed pages" in Settings › Reading.
-- **About half the pages with handwriting are not flagged, and so not read for it.** With the pre-flag downloaded an
-  unflagged typed or printed page keeps its kind's reader: on the 2,000 bulk pages it found 51-60% of the pages with
-  handwriting at 69.8% precision (finite bounds 18-95% precision, 7-97% recall; `kind-atrium.md` §5). The switch's note
-  says so (accepted: owner, 2026-11-19, call 15, "release with a label").
-- **Without the pre-flag, every typed page goes to the handwriting reader.** The switch is on by default since
-  W47.wh-mixed-preflag-default (it still acts only with "Choose each page's reader by its kind" on), so until the
-  pre-flag is downloaded each told typed or printed page is read for handwriting, about 25 s a page on an M3 Pro
-  (accepted: owner, 2026-11-20, call 24, "on by default, whether or not the pre-flag is downloaded").
+- **A checked page that the pre-flag leaves unflagged keeps its kind’s reader.** The saved bulk replay found 412 flag
+  positives among 1,449 eligible typed and printed pages. The owner’s checks estimate 72% of the eligible pages it flagged
+  had handwriting on typed or printed text and that the flag found 62% of the mixed pages among eligibles. Across
+  unchecked pages the possible ranges are 12–95% and 5–99%, respectively. See `segbench-results/mixed-switch-score.md`
+  for the replay’s scope and the standalone detector figures (accepted: owner, 2026-11-19, call 15, "release with a label").
+- **An absent or failed pre-flag lets the switch act on any eligible page.** It applies to typed and printed pages
+  at the app’s routing confidence floor when kind-based reading is enabled, a handwriting reader is available, and
+  there is no manual reader override. The switch is on by default (accepted: owner, 2026-11-20, call 24, "on by
+  default, whether or not the pre-flag is downloaded").
 
 ## ⚠️ LIMITATION (W40.fix-processor-review-classification-stale, 2026-11-20): where page 2's Classification is not rewritten
 

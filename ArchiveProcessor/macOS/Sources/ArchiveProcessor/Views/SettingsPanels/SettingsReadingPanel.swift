@@ -353,7 +353,16 @@ struct SettingsReadingPanel: View {
         Toggle(isOn: $ocrHandwritingOnTyped) {
             HStack {
                 Text("Read handwriting on typed pages (signatures, dates, notes in the margin)")
-                HelpButton(text: "Sends every typewritten or printed page to the reader picked for handwriting, so a signature, a handwritten date or a note in the margin is read with the typed text. Without the mixed-page pre-flag it acts on every typed or printed page. With the pre-flag downloaded (below), only the pages it flags as carrying handwriting are sent: on the bench's 2,000 pages, judged against the owner's answers (any handwriting, a signature included), it found about 51–60% of the typed and printed pages with handwriting, and 70% of the pages it flagged had some; over the pages nobody checked the exact bounds are 18–95% of flagged pages and 7–97% of pages with handwriting. The page-kind check alone finds 12–14%. A page it does not flag keeps its kind's reader, so its handwriting may go unread. Measured level on typed pages, not measured on mixed pages: on the bench's 78 typed and printed pages the handwriting readers read the typed text no worse than Apple Vision on average (for the Mac reader a tie, 14 of 78 pages more than 2 points lower); on the 2 mixed pages scored, worse. Cost: hosted, about $0.002–0.004 a page; the estimate shows what it adds to your batch. Time: on an M3 Pro Mac with 18 GB the Mac handwriting reader took about 25 seconds a typed page where Apple Vision took 0.2, about 140 times as long; a hosted handwriting reader about 9 to 22 seconds a page, waiting on the service rather than this Mac. Acts only with “Choose each page's reader by its kind” on, since it uses the kind this Mac tells. Your own choice for a page or a batch in the file list wins. On by default; turn it off to keep typed and printed pages on their kind's reader.")
+                HelpButton(text: """
+                With “Choose each page's reader by its kind” on, a handwriting reader can take over a confidently classified typed or printed page. Your reader choice for a page or the whole file list takes priority.
+
+                With the mixed-page pre-flag installed, a page it checks and leaves unflagged keeps its usual reader. If the pre-flag is missing or could not check the page, the switch can still send it to the handwriting reader.
+
+                In a replay of 2,000 bench pages, 412 were eligible and flagged. The owner’s checks estimate that 72% of those had handwriting on typed or printed text, including signatures. The unchecked pages give a wide possible range of 12% to 95%. Actual reader choices depend on your settings and available readers.
+
+                On the two mixed pages tested, handwriting readers read the typed text worse than Apple Vision. Hosted handwriting reading took about 9–22 seconds and cost $0.002–0.004 per page on the bench. The Mac handwriting reader took about 25 seconds per typed page on an M3 Pro with 18 GB. The switch is on by default.
+                """)
+                .accessibilityIdentifier("ap.settings.handwritingOnTyped.help")
             }
         }
         .disabled(!ocrPageKindRouting)

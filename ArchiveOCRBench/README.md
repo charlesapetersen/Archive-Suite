@@ -267,6 +267,11 @@ record:
   partial-identification bounds, not confidence intervals. The 25 singleton patterns include six one-page
   censuses and 19 with unjudged pages. The separate mixed-share estimate remains unchanged. ATRIUM TEXT is a
   candidate signal; the shipped hand/form classifier stays preferred.
+- `mixed-switch-score.json` / `.md` (`scripts/segbench/mixed_switch_score.py`, W46.p18-mixed-switch-score):
+  the Settings switch replay on the same 2,000 pages. Uses saved Vision features to apply the form decision and
+  confidence floor, then the saved ATRIUM flag. The panel reports additional handwriting-reader candidates,
+  eligible-page and full-draw recall, and the combined kind-plus-switch rule, using the original owner checks and
+  completion bounds. The separate standalone signal is in `kind-atrium.json`.
 - `options.md`: the segmentation approaches on the test boxes (manual, Claude, Gemini, ChatGPT, Claude and
   ChatGPT together), each at the flag level frozen on the development boxes, with their API cost.
 - `seg-boxes-score.json` (`seg_boxes_score.py score`, W46.seg-boxes-score): Gemini 3.7 Flash through the

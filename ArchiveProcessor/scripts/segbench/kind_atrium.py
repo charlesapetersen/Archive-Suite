@@ -245,12 +245,15 @@ def completion_bounds(tp, mixed, calls, unknown_called, unknown_not_called):
     return {'precision': precision, 'recall': recall, 'recall_undefined_possible': mixed == 0}
 
 
-def mixed_support(labels, key, truth, calls):
+def mixed_support(labels, key, truth, calls, *, domains=None):
     """Fixed-pattern N_h/n_h point estimates plus finite-frame identification bounds.
 
     `truth` is the owner's threshold truth, never a classifier label. Top-ups have no
     design weight but remain observed constraints on finite completions. Fail on lost
     sheet answers, missing patterns/census members, or a changed saved sampling frame.
+    Explicit domains allow eligibility or calls to vary within a group. Keep the
+    original design weights for estimated mixed counts, and use known census
+    counts for the precision denominator and the nonmixed residuals.
     """
     if not set(key['pages']) <= truth.keys() or not truth.keys() <= labels.keys():
         raise ValueError('mixed support requires every sheet answer and only frame IDs')
@@ -296,43 +299,59 @@ def mixed_support(labels, key, truth, calls):
                              'no design-based variance estimate from noncensus singleton patterns'}
     out = []
     for name, call in calls.items():
-        # These saved label calls are constant within the design groups. Check this:
-        # a new call varying within a group needs a different estimator/calibration.
-        if any(len({call[p] for p in ps}) != 1 for ps in groups.values()):
+        domain = labels.keys() if domains is None else domains[name]
+        judged = domain & truth.keys()
+        supported = domain & covered
+        unsupported = domain & omitted
+        if not domain <= labels.keys() or any(call[p] for p in labels.keys() - domain):
+            raise ValueError(f'{name}: invalid domain or calls outside it')
+        if domains is None and any(len({call[p] for p in ps}) != 1 for ps in groups.values()):
             raise ValueError(f'{name}: call varies within a fixed design group')
-        tp = sum(v for p, v in w.items() if call[p] and truth[p])
-        fp = sum(v for p, v in w.items() if call[p] and not truth[p])
-        fn = sum(v for p, v in w.items() if not call[p] and truth[p])
-        tn = sum(v for p, v in w.items() if not call[p] and not truth[p])
+        tp = sum(v for p, v in w.items() if p in domain and call[p] and truth[p])
+        fn = sum(v for p, v in w.items() if p in domain and not call[p] and truth[p])
         all_calls = sum(call.values())
-        covered_calls = sum(call[p] for p in covered)
-        if not math.isclose(tp + fp, covered_calls):
-            raise ValueError('weighted calls do not match covered-frame calls')
-        known_tp = sum(call[p] and truth[p] for p in truth)
-        known_mixed = sum(truth.values())
+        covered_calls = sum(call[p] for p in supported)
+        if domains is None:
+            fp = sum(v for p, v in w.items() if call[p] and not truth[p])
+            tn = sum(v for p, v in w.items() if not call[p] and not truth[p])
+            if not math.isclose(tp + fp, covered_calls):
+                raise ValueError('weighted calls do not match covered-frame calls')
+        else:
+            fp, tn = covered_calls - tp, len(supported) - covered_calls - fn
+            if min(fp, tn) < -1e-9:
+                raise ValueError(f'{name}: weighted mixed counts exceed known domain counts')
+        known_tp = sum(call[p] and truth[p] for p in judged)
+        known_mixed = sum(truth[p] for p in judged)
         point, finite = {}, {}
         for assumption in ('hand_not_mixed', 'unrestricted'):
             # Assumptions constrain only unobserved truths; an owner answer always wins.
             def possible(p):
                 return assumption == 'unrestricted' or labels[p]['kind'] != 'hand'
-            point_unknown = [p for p in omitted if p not in truth and possible(p)]
-            finite_unknown = [p for p in labels if p not in truth and possible(p)]
-            point[assumption] = completion_bounds(tp + sum(call[p] and truth[p] for p in omitted if p in truth),
-                tp + fn + sum(truth[p] for p in omitted if p in truth), all_calls,
+            point_unknown = [p for p in unsupported if p not in truth and possible(p)]
+            finite_unknown = [p for p in domain if p not in truth and possible(p)]
+            point[assumption] = completion_bounds(tp + sum(call[p] and truth[p] for p in unsupported if p in truth),
+                tp + fn + sum(truth[p] for p in unsupported if p in truth), all_calls,
                 sum(call[p] for p in point_unknown), sum(not call[p] for p in point_unknown))
             finite[assumption] = completion_bounds(known_tp, known_mixed, all_calls,
                 sum(call[p] for p in finite_unknown), sum(not call[p] for p in finite_unknown))
         out.append({'label': name,
-                    'sheet': {'found': known_tp, 'false': sum(call[p] and not truth[p] for p in truth),
-                              'mixed': known_mixed, 'n': len(truth)},
-                    'covered': {'pages': len(covered), 'calls': covered_calls, 'tp': tp, 'fp': fp, 'fn': fn, 'tn': tn,
+                    'sheet': {'found': known_tp, 'false': sum(call[p] and not truth[p] for p in judged),
+                              'mixed': known_mixed, 'n': len(judged)},
+                    'covered': {'pages': len(supported), 'calls': covered_calls, 'tp': tp, 'fp': fp, 'fn': fn, 'tn': tn,
                                 'recall': tp / (tp + fn) if tp + fn else None,
                                 'precision': tp / covered_calls if covered_calls else None},
                     'full': {'calls': all_calls,
-                             'unsampled_calls': {s: sum(call[p] for p in omitted if labels[p]['kind'] == s)
+                             'unsampled_calls': {s: sum(call[p] for p in unsupported if labels[p]['kind'] == s)
                                                  for s in design['unsampled_by_stratum']},
                              'point_completion': point, 'finite_completion': finite}})
     return design, out
+
+
+def mixed_owner_checks():
+    answers = json.loads((MD.CACHE / 'sheet/answers.json').read_text())
+    key = json.loads((MD.CACHE / 'sheet/key.json').read_text())
+    got = {p: a for p, a in answers.items() if p in key['pages'] and a.get('hand') and a['hand'] != 'notext'}
+    return key, got, {p: a['hand'] in MD.ORDER for p, a in got.items()}
 
 
 def mixed_support_md(design, rows):
@@ -597,12 +616,8 @@ def report():
     blab = {r['page']: r for r in MD.read_csv(MD.CACHE / 'labels.tsv', '\t')}
     same_label = sum(CLASSES[int(BP[i].argmax())] == blab[p]['atrium'] for i, p in enumerate(bids))
     J['bulk_rerun_same_label'] = [same_label, len(bids)]
-    answers = json.loads((MD.CACHE / 'sheet/answers.json').read_text())
-    key = json.loads((MD.CACHE / 'sheet/key.json').read_text())
-    kp = key['pages']
+    key, got, truth_m = mixed_owner_checks()
     bix = {p: i for i, p in enumerate(bids)}
-    got = {p: a for p, a in answers.items() if p in kp and a.get('hand') and a['hand'] != 'notext'}
-    truth_m = {p: a['hand'] in MD.ORDER for p, a in got.items()}
     calls = {'ATRIUM TEXT (its top class)': lambda p: CLASSES[int(BP[bix[p]].argmax())] == 'TEXT',
              'Qwen3.6-27B mixed (saved bulk label)': lambda p: blab[p]['qwen'] == 'mixed',
              'Shipped classifier handwritten': lambda p: blab[p]['regression'] == 'handwritten'}

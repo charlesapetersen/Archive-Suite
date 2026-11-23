@@ -56,6 +56,7 @@ HANDWRITING = HERE / "data" / "vision-ocr-handwriting.json"
 R6_SPOT = HERE / "data" / "r6-spot.json"
 KIND_CLASSIFIER = RESULTS / "kind-classifier.json"  # W41.bench-kind-classifier: kind_classifier.py report
 KIND_ATRIUM = RESULTS / "kind-atrium.json"  # W46.kind-mixed-support: covered estimates and full-call bounds
+MIXED_SWITCH = RESULTS / "mixed-switch-score.json"
 KIND_FLOOR = RESULTS / "kind-floor.json"  # W47.wh-kinds-floor: the routing floor at each cut, with a prior (kind_floor.py)
 PAGE_KINDS = RESULTS / "page-kinds.json"  # W42.int-s3: the app's one list of kinds, per kind (page_kinds.py report)
 DATING = RESULTS / "date-tagging.json"  # W41.date-tag-measure: date_tagging.py score
@@ -1722,6 +1723,7 @@ def main():
              "regions_orderfree": regions_orderfree(), "public_segmentation": public_segmentation(),
              "kind_classifier": json.loads(KIND_CLASSIFIER.read_text()) if KIND_CLASSIFIER.exists() else None,
              "kind_atrium": json.loads(KIND_ATRIUM.read_text()) if KIND_ATRIUM.exists() else None,
+             "mixed_switch": json.loads(MIXED_SWITCH.read_text()) if MIXED_SWITCH.exists() else None,
              "page_kinds": json.loads(PAGE_KINDS.read_text()) if PAGE_KINDS.exists() else None,
              "kind_floor": json.loads(KIND_FLOOR.read_text()) if KIND_FLOOR.exists() else None,
              "dating": dating,
