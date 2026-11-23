@@ -47,9 +47,16 @@ final class ProcessorUITests: XCTestCase {
         let rules = app.sheets.firstMatch.radioButtons["Rules"]
         XCTAssertTrue(rules.waitForExistence(timeout: 10))
         rules.click()
+        let scroll = app.sheets.firstMatch.scrollViews.firstMatch
+        let scan = element("ap.sheet.switch.layout.scan_newspapers_yolo")
+        for _ in 0..<15 where !scroll.frame.contains(scan.frame) {
+            scroll.scroll(byDeltaX: 0, deltaY: -110)
+        }
+        XCTAssertTrue(scan.exists && scroll.frame.contains(scan.frame), "the scan rule and its note fit in the sheet")
+        attachScreenshot("processor-newspaper-scan-evidence")
+
         let download = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Download the newspaper layout helper")).firstMatch
         XCTAssertTrue(download.waitForExistence(timeout: 5), "the rule offers the checked helper download")
-        let scroll = app.sheets.firstMatch.scrollViews.firstMatch
         for _ in 0..<15 where !download.isHittable { scroll.scroll(byDeltaX: 0, deltaY: -180) }
         XCTAssertTrue(download.isHittable)
         attachScreenshot("processor-newspaper-layout-rule")

@@ -5713,7 +5713,13 @@ const DATA = {
 ]
 },
 "spent":"Textract $1.349 for the 71 ($1.824 on all 96); Azure on the F0 free tier, $0",
-"transkribus":"still on the 25: the other 71 wait for the owner's hand upload"
+"azure_vs_textract":[
+2.44,
+-0.29,
+5.09
+],
+"matrix_floor":0.49,
+"status":"Azure and Textract remain benchmark comparisons without Processor clients. Transkribus remains a 25-page spot check. The owner declined the remaining 71 uploads (call 25)."
 }
 },
 "farmshare":{
@@ -73884,11 +73890,14 @@ document.getElementById('r6-rows').innerHTML = R6.rows.map(r => '<tr><td>' + r.r
   '</td><td>' + (r.usd_1000 ? money(r.usd_1000) + ' (' + r.price_note + ')' : '') + '</td></tr>').join('');
 document.getElementById('r6-note').textContent = 'Same pages, same scorer; panel routes are their stored panel replies on these ' + R6.pages + '. Against Mistral OCR 4.1, paired: Azure ' +
   R6.vs_mistral.azure[0] + ' NES points (' + R6.vs_mistral.azure[1] + ' to ' + R6.vs_mistral.azure[2] + '), Textract ' + R6.vs_mistral.textract[0] + ' (' +
-  R6.vs_mistral.textract[1] + ' to ' + R6.vs_mistral.textract[2] + ', a tie at this n)' +
+  R6.vs_mistral.textract[1] + ' to ' + R6.vs_mistral.textract[2] + ', an interval spanning zero)' +
   (R6.vs_mistral.transkribus ? ', Transkribus ' + R6.vs_mistral.transkribus[0] + ' (' + R6.vs_mistral.transkribus[1] + ' to ' + R6.vs_mistral.transkribus[2] + ')' : '') + '. A spot check, not on the 96 charts. ' + R6.splitters + ' Source: ' + R6.source + '.' +
   (R6.all96 ? ' On all ' + R6.all96.pages + ' (p081 apart, ' + R6.all96.spent + '): ' + R6.all96.rows.map(r => r.route + ' ' + r.nes.toFixed(2) + (r.handwritten ? ' (handwritten ' + r.handwritten.toFixed(2) + ')' : '')).join(', ') +
    '; paired against Mistral OCR 4.1, Azure ' + R6.all96.vs_mistral.azure[0] + ' (' + R6.all96.vs_mistral.azure[1] + ' to ' + R6.all96.vs_mistral.azure[2] + '), Textract ' +
-   R6.all96.vs_mistral.textract[0] + ' (' + R6.all96.vs_mistral.textract[1] + ' to ' + R6.all96.vs_mistral.textract[2] + '). Transkribus is ' + R6.all96.transkribus + '.' : '');
+   R6.all96.vs_mistral.textract[0] + ' (' + R6.all96.vs_mistral.textract[1] + ' to ' + R6.all96.vs_mistral.textract[2] + '). Azure scored ' +
+   R6.all96.azure_vs_textract[0] + ' points higher than Textract (paired interval ' + R6.all96.azure_vs_textract[1] + ' to +' + R6.all96.azure_vs_textract[2] +
+   '). The interval spans zero, so the direction is uncertain on other pages. The observed gap exceeds the ' + R6.all96.matrix_floor +
+   '-point overall threshold in the formal tie rule for the 96-page matrix. Neither vendor has a pair in that matrix. ' + R6.all96.status : '');
 
 // Part 4: FarmShare.
 const FS = DATA.farmshare;

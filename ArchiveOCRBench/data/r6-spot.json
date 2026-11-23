@@ -100,6 +100,8 @@
    ]
   },
   "spent": "Textract $1.349 for the 71 ($1.824 on all 96); Azure on the F0 free tier, $0",
-  "transkribus": "still on the 25: the other 71 wait for the owner's hand upload"
+  "azure_vs_textract": [2.44, -0.29, 5.09],
+  "matrix_floor": 0.49,
+  "status": "Azure and Textract remain benchmark comparisons without Processor clients. Transkribus remains a 25-page spot check. The owner declined the remaining 71 uploads (call 25)."
  }
 }

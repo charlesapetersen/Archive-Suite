@@ -5,8 +5,8 @@
   r6_spot.py report            # scores beside the panel's routes on the same 25 -> stdout (markdown)
   r6_spot.py transkribus-pack  # copy the 25 images and an instruction sheet for the owner's hand upload
                                # (report also scores its PAGE XML export, in the export's own reading order)
-  R6_SET=rest r6_spot.py select|run|transkribus-pack  # W47.wh-readers-lost-vendors-read: the other 71 of the 96
-  R6_SET=all r6_spot.py report  # all 96 (Transkribus only once both packs' exports are in)
+  R6_SET=rest r6_spot.py select|run  # W47.wh-readers-lost-vendors-read: Azure and Textract on the other 71
+  R6_SET=all r6_spot.py report  # all 96 for Azure and Textract; Transkribus stays at 25 (owner call 25)
 
 Azure: prebuilt-layout (text in reading order, paragraphs, per-span handwriting style), F0 free tier, $0.
 Textract: AnalyzeDocument LAYOUT + one QUERY ("the document's date"), $4 + $15 per 1,000 pages at list, so
@@ -316,7 +316,7 @@ def cmd_report():
     tk = transkribus_pages()
     if tk and set(tk) != {j['page'] for j in sel}:
         assert set(tk) < {j['page'] for j in sel}, sorted(set(tk) - {j['page'] for j in sel})
-        print(f'(Transkribus export covers {len(tk)} of the {N}: not scored until every pack is back)\n')
+        print(f'(Transkribus export covers {len(tk)} of the {N}; use the spot report for its 25-page result.)\n')
         tk = {}
     for j in sel:
         truth = (P.TRUTH / 'truth' / (j['page'] + '.txt')).read_text()
@@ -402,17 +402,15 @@ The {n} images in `images/` are the same pages the Azure and Textract arms read.
 
 
 def cmd_transkribus_pack():
-    assert SET in PACK, 'pack one set at a time'
+    if SET != 'spot':
+        raise SystemExit('Transkribus is limited to the 25-page spot check (owner call 25).')
     pack = CACHE / PACK[SET]
     (pack / 'images').mkdir(parents=True, exist_ok=True); (pack / 'export').mkdir(exist_ok=True)
     jobs = selection()['jobs']
     for j in jobs:
         shutil.copy2(IMAGES / (j['id'] + '.jpg'), pack / 'images' / (j['page'] + '.jpg'))
-    (pack / 'README.md').write_text(SHEET.format(**(
-        {'item': 'W46.r6-spot', 'model': 'Text Titan II', 'credits': 'the 50 free a month'} if SET == 'spot' else
-        {'item': 'W47.wh-readers-lost-vendors-read', 'credits': 'more than the 50 free a month, so two months or '
-         'a split upload; buy nothing without asking',
-         'model': 'Text Titan I (the model the 25 were read with; not Text Titan II)'}), n=len(jobs)))
+    (pack / 'README.md').write_text(SHEET.format(
+        item='W46.r6-spot', model='Text Titan I', credits='the 50 free a month', n=len(jobs)))
     print(pack)
 
 

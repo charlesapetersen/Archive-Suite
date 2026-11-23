@@ -195,11 +195,10 @@ CHURRO-DS, the source of those strata, so its row carries OCR-15 until item 8 co
 −1.72 [−6.76, +3.17], each a tie by the interval (the 895 has no floor; the earlier "under the floor" applied a 96
 rule), so no row (four GPUs, 76.6 pages an hour; W46.pair-matrix-cover). The dominated hosted routes have no public run of their own.
 
-R6, commercial document services: none found worth a row (still none after W47.wh-readers-lost: their figures are on 25
-of the 96 only, not comparable to the rows' 95, and the app has no client for any of them). On 25 of the 96 Azure Document Intelligence read 89.6,
-AWS Textract 86.6 and Transkribus Text Titan I 82.5, each under Mistral OCR 4.1's 92.5 on the same pages (Azure -2.9,
--6.3 to -0.2; Transkribus -10.0, -16.9 to -4.5; Textract -5.8, -13.4 to +1.5, a tie at n 25), at list prices of $10
-and $19 per 1,000 for the first two (`r6-spot.md`; panel-data.json `r6_spot`) [M].
+R6, commercial document services. Azure Document Intelligence (90.90) and AWS Textract (88.45) have benchmark rows
+on the same 95 scorable pages as Mistral OCR 4.1 (93.01). Owner call 25 declined Processor clients for both and the
+remaining 71 Transkribus uploads. Transkribus Text Titan I scored 82.5 on its 25-page spot check, where Mistral scored
+92.5 (`r6-spot.md`; panel-data.json `r6_spot`) [M].
 
 Fields used beyond 00-index.md's schema: `stages`, `trigger`; figure fields `strict`, `failures`, `vs_qwen3.6-27b`,
 `basis`, `strata`, `empty`, `failed`, `unresolved_range`, `split_half`, `single_route_split_half`, `escalated`,

@@ -28,19 +28,19 @@ rows'.
 | qwen3.8-flash | 95.11 (92) | 92.11 | 93.42 | 91.27 | 91.25 | 68.47 |
 
 - Paired on the 95 (10,000 bootstrap rounds): Azure − Mistral OCR 4.1 **−2.11** (−3.50 to −0.91); Textract −
-  Mistral OCR 4.1 **−4.55** (−7.41 to −1.76); Azure − Textract +2.44 (−0.29 to +5.09, a tie). Both vendors are
-  below Mistral OCR 4.1, which costs no more ($4 per 1,000 pages at list against Azure's $10 and Textract
-  LAYOUT's $4), so each is a lower-scoring reading row (owner call 15).
+  Mistral OCR 4.1 **−4.55** (−7.41 to −1.76); Azure − Textract **+2.44** (−0.29 to +5.09). The latter interval
+  spans zero, leaving the direction uncertain on other pages. The observed gap exceeds the 0.49-point overall
+  threshold in the owner's formal tie rule for the 96-page matrix. The matrix contains no pairs for either vendor.
+  Both vendors scored below Mistral OCR 4.1, which costs no more ($4 per 1,000 pages at list against Azure's $10
+  and Textract LAYOUT's $4).
 - All 96 with p081: Azure 90.51, Textract 88.14; p081 alone 53.51 and 58.04.
 - The 25 were not a skewed draw: on them Azure read 89.6 and Textract 86.6, on all 96 90.51 and 88.14.
 - Handwriting is where they fall furthest behind: 81.77 and 72.92 on the 16 against Mistral OCR 4.1's 89.10.
 - Date query on all 96: answered 73, a four-digit year in 36; the year matches a tagged year or decade on 26 of
   34 pages that have both, and is in the page's date bin on 28 of 34. Folder tags, not page truth: still a weak
   check.
-- **Transkribus is not on the 96 yet.** The 71 are packed for the owner's hand upload
-  (`r6-spot/transkribus-pack-rest/`, Text Titan I as the 25 were); 71 credits is more than a month's free 50.
-  Its row waits for the export (W47.wh-readers-lost-vendors-tk). The report scores it on all 96 once both exports
-  are in.
+- **Vendor status (owner call 25, 2026-11-20):** Azure and Textract remain benchmark comparisons without Processor
+  clients. Transkribus remains a 25-page spot check. The owner declined the remaining 71 uploads.
 - Public 895 not run: on all 895 it is about $3.58 for Textract LAYOUT alone ($17.00 with the date query) and
   $8.95 for Azure past the F0 page allowance, over the $7 per item, so it stays a line in
   `execution-plans/paid-runs-deferred.md`.
@@ -63,7 +63,7 @@ rows'.
 | **transkribus-text-titan** (PAGE XML, the export's reading order) | **82.5** |
 
 Paired against Mistral OCR 4.1 (10,000 bootstrap rounds): Azure −2.9 NES points (interval −6.3 to −0.2);
-Textract layout −5.8 (−13.4 to +1.5, a tie at n = 25). Textract's LAYOUT ordering adds 3.2 points over its raw
+Textract layout −5.8 (−13.4 to +1.5, an interval spanning zero). Textract's LAYOUT ordering adds 3.2 points over its raw
 line order, so its reading order is part of the gap.
 
 ## Transkribus (owner's hand upload, scored 2026-11-05)
@@ -77,7 +77,7 @@ credits (about 25 of the monthly 50), $0. Export: `r6-spot/transkribus-pack/expo
 the truth keeps the printed hyphen (82.4 without the mapping).
 
 - **82.5 mean NES**, the lowest vendor here. Paired: −10.0 against Mistral OCR 4.1 (−16.9 to −4.5), −7.1 against
-  Azure (−13.6 to −2.1), −4.1 against Textract layout (−11.5 to +3.0, a tie).
+  Azure (−13.6 to −2.1), −4.1 against Textract layout (−11.5 to +3.0, an interval spanning zero).
 - By kind: typewritten 92.2 (14 pages), printed 71.0 (7), handwritten 76.2 (2), mixed 60.6 (2). On the two
   handwritten pages it is level with Azure (p007 64.6 against 56.1, p051 87.7 against 91.6); n = 2 settles nothing.
 - **Reading and order both cost it.** Order-free, it misses 11.6% of the 8,276 truth words, against 2.9% for Azure
@@ -121,12 +121,12 @@ $1.50 for a full pass"; $1.50 at $5 per 1,000 is 300 pages. Corrected by W46.r6-
 - **Comparison:** the same original JPEGs (`ocr-panel-cloud/images`, SHA-256 checked) and the same scorer as the
   panel; panel routes are their stored panel replies on these 25. Transkribus read byte-identical copies
   (`transkribus-pack/images`, copied by `r6_spot.py transkribus-pack`), uploaded by hand in the web app.
-- **Noise:** n = 95 for the all-96 figures, both gaps to Mistral OCR 4.1 outside their paired intervals and over
-  the 0.49 floor; Azure against Textract a tie. n = 25; paired bootstrap intervals above; the 96's rerun floor is 0.49 NES points. Textract's gap to
-  Mistral is inside its interval (a tie); Azure's is just outside; Transkribus's is well outside, and its gap to
-  Textract is a tie.
-- **Scope:** Azure and Textract on all 96 since 2026-11-20; Transkribus still on the first 25 (the owner's
-  scoping for W46.r6-spot); one model per vendor, default settings; the public
+- **Noise:** n = 95 for the all-96 comparison. Both gaps to Mistral OCR 4.1 have paired intervals wholly below zero.
+  The Azure–Textract interval spans zero. All three observed gaps exceed the 0.49-point overall matrix threshold;
+  none of these vendor pairs is in the matrix. In the 25-page spot check, the Textract–Mistral and
+  Transkribus–Textract intervals span zero. The Azure–Mistral and Transkribus–Mistral intervals lie below zero.
+- **Scope:** Azure and Textract on all 96 since 2026-11-20; Transkribus on the first 25 only (owner call 25);
+  one model per vendor, default settings; the public
   895 half is not run (a line in `execution-plans/paid-runs-deferred.md`). Says nothing about Document AI (no account),
   custom splitters (price read only), Transkribus Text Titan II (not offered on the account; Text Titan I stood
   in) or any Transkribus model trained on this material.

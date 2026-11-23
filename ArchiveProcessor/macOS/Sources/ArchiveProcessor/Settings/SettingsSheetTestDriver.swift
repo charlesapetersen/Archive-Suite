@@ -72,6 +72,17 @@ enum SettingsSheetTestDriver {
         check("B1 layout: regions on newspapers only, never on handwriting or registers",
               layout?.text.contains("Newspapers") == true && layout?.text.contains("never split") == true
               && layout?.rules.contains { $0.id == "layout-never-hands-registers" } == true)
+        let scanRule = layout?.rules.first { $0.id == "layout-scans-doclayout-yolo" }?.text ?? ""
+        let scanNote = layout?.switches.first { $0.key == .scanNewspapersDocLayoutYOLO }?.note ?? ""
+        let scanEvidence = ["raw crops", "4.6", "+1.1 to +8.0", "GLM-OCR", "PaddleOCR-VL 1.5", "LightOnOCR-3 4B",
+                            "Qwen3.6 27B", "masked regions", "whole page"]
+        check("layout detector evidence describes the benchmark and current app in both places",
+              [scanRule, scanNote].allSatisfy { note in scanEvidence.allSatisfy { note.contains($0) } })
+        let readingRoutes = table.stage("reading")?.routes ?? []
+        let vendorRows = readingRoutes.filter { ["azure-di-layout", "textract-layout"].contains($0.id) }
+        check("vendor measurements remain in the benchmark without Processor choices",
+              vendorRows.count == 2 && vendorRows.allSatisfy { !$0.offered && $0.lowerScoring }
+              && !readingRoutes.contains { $0.id.contains("transkribus") })
         // E: placement's hand line setting visible.
         let place = free.ruleStages.first { $0.id == "placement" }
         check("E placement: the handwriting placement switch is visible, on by default",

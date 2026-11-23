@@ -18189,3 +18189,13 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Cost $0. Kept the shared saved labels, signals and owner checks for reproducibility.
   No new rehearsal-cache files were created.
   <!-- /W46.p18-mixed-switch-score -->
+- [x] **W46.p18-bench-wording — Correct the scan-detector and vendor evidence shown to users [S]** · §Document processing review — W46 (lane: segbench,processor) (uses: light,build) — Measurement review 2026-11-22 pass 18, P18-6, baseline dbb10584. Identify raw crops, four tested readers and the currently bypassed 27B in the scan detector’s +4.6 point figure. Reconcile vendor status in r6-spot.md, its generator if applicable, the rendered bench data and settings_routes.py with owner call 25. Distinguish the Azure–Textract sampling interval from the owner’s formal tie rule. Use existing aggregates for $0. SHIPPED 2026-11-23 (this commit).
+  Settings identifies the four readers and raw crops behind the 4.6-point result (95% interval
+  +1.1 to +8.0), the app's masked regions and outside crops, and Qwen3.6 27B's whole-page bypass.
+  Azure and Textract remain benchmark comparisons without Processor clients. Transkribus remains a
+  25-page spot check under owner call 25. The bench shows Azure's +2.44 paired gap (−0.29 to +5.09)
+  separately from the 0.49-point matrix rule. Neither vendor has a matrix pair.
+  Used committed aggregates only. No model calls, spend or rehearsal-cache inputs.
+  The Debug build, Settings sheet and panel smoke checks, generated bench and route checks, and the
+  focused off-screen newspaper Settings test passed. The screenshot showed the full note.
+  <!-- /W46.p18-bench-wording -->

@@ -6,9 +6,9 @@ import UniformTypeIdentifiers
 import Vision
 import VisionOCRKit
 
-/// Which detector finds a newspaper page's regions (W47.wh-yolo-scans). PP-DocLayoutV3 is the default and the only
-/// one measured after the quad on photographs; DocLayout-YOLO through newspaper-ocr's route is the user's choice for
-/// scanned newspapers (owner, 2026-11-19, call 15), measured 4.6 points above it on 15 L9 scans.
+/// PP-DocLayoutV3 is the default and the only option for photographed newspapers (W47.wh-yolo-scans).
+/// DocLayout-YOLO is optional for scans (owner call 15). Its 4.6-point lead on 15 L9 scans used raw benchmark
+/// crops. Qwen3.6 27B now bypasses both detectors. See scan-layout-parity.md.
 enum NewspaperDetector: String, Sendable, Equatable {
     case ppDocLayoutV3, docLayoutYOLO
 

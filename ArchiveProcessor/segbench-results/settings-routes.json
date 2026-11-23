@@ -627,7 +627,7 @@
     },
     {
      "id": "layout-scans-doclayout-yolo",
-     "text": "Scanned newspapers may use DocLayout-YOLO through newspaper-ocr's route instead, the user's choice, off by default: 4.6 NES above PP-DocLayoutV3 (1.1 to 8.0) on 15 L9 scans, 14 from one collection, a direction; unmeasured on photographs, which keep PP-DocLayoutV3. An optional download, its weights AGPL-3.0.",
+     "text": "DocLayout-YOLO is optional and off by default. On raw crops from 15 newspaper scans (14 from one collection), it averaged 4.6 reading-accuracy points above PP-DocLayoutV3 (95% interval +1.1 to +8.0) across GLM-OCR, PaddleOCR-VL 1.5, LightOnOCR-3 4B and Qwen3.6 27B. The comparison did not measure Processor's masked regions and outside crops. Qwen3.6 27B now reads whole pages without the detector. Photographed newspapers were outside the comparison and keep PP-DocLayoutV3. The optional download uses AGPL-3.0 weights.",
      "source": "layout-pair-newspapers.md §What this says",
      "switch": {
       "id": "layout.scan_newspapers_yolo",
@@ -757,7 +757,7 @@
       "time re-taken like for like (LAY-3): 0.19 s a page beside Vision's 0.19 s on the same 16 pages; the lab's 0.47 s (E-layout claim 36) and the 0.27 s of layout-photo-hands.md were other runs and inputs",
       "memory: the lab's 794 MB peak RSS stands in the table; the like-for-like run saw a 441 MB process RSS and a 1.52 GB MLX peak, not the same measure",
       "L9 is scans; photographed newspapers unmeasured",
-      "on L9 scans DocLayout-YOLO leads it by 4.6 NES paired, a direction on 15 pages (at most 12 items, one collection), descriptive (layout-pair-newspapers.md)",
+      "on raw L9 crops DocLayout-YOLO averaged 4.6 NES points higher across four readers, a descriptive result on 15 scans (layout-pair-newspapers.md)",
       "regions drop marks (LAY-2)",
       "96 deltas order-sensitive (OCR-6)",
       "one reader, GLM-OCR (layout-photo.md card)"
@@ -824,11 +824,11 @@
      },
      "memory": null,
      "caveats": [
-      "paired over four readers on the 15 L9 scans: 4.6 NES above PP-DocLayoutV3 (1.1 to 8.0), beyond the interval for 3 of 4 readers, PaddleOCR-VL 1.5 a tie (layout-pair-newspapers.md)",
+      "on raw L9 crops, 4.6 NES points above PP-DocLayoutV3 (95% interval +1.1 to +8.0), averaged across GLM-OCR, PaddleOCR-VL 1.5, LightOnOCR-3 4B and Qwen3.6 27B (layout-pair-newspapers.md)",
       "15 pages, 14 from one Library of Congress collection and four from one item: a direction, not a settled gap",
       "scans only: photographed newspapers unmeasured, so they keep PP-DocLayoutV3; on photographed modern print and the owner's 96 the same detector with the app's sort trails it (layout-photo-tables.md)",
-      "measured on the regions as the library cut them, not on the app's partition (W46.layout-partition-fix)",
-      "the app's regions equal the measured route's on all 15 pages (scan-layout-parity.md)",
+      "Processor uses masked regions and outside crops (W46.layout-partition-fix), and Qwen3.6 27B reads whole pages without the detector",
+      "the app's boxes and region order matched on all 15 pages (scan-layout-parity.md); OCR accuracy through Processor's crop path is unmeasured",
       "memory not measured"
      ],
      "kind_rules": [
@@ -5010,8 +5010,8 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: Mistral OCR 4.1 scored 2.11 points higher on the same 95 benchmark pages, with every page answered by both readers (r6-spot.md). List prices per 1,000 pages were $4.00 for Mistral and $10.00 for this route; offered at the Advanced level only, never the app's pick (owner call 15)",
-      "not offered until the Processor has a reader for it (queued: W47.wh-readers-lost-vendors-clients)"
+      "lower-scoring: Mistral OCR 4.1 scored 2.11 points higher on the same 95 benchmark pages, with every page answered by both readers (r6-spot.md). List prices per 1,000 pages were $4.00 for Mistral and $10.00 for this route.",
+      "not offered: kept as a benchmark comparison (owner call 25)"
      ]
     },
     {
@@ -5114,8 +5114,8 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: Mistral OCR 4.1 scored 4.55 points higher on the same 95 benchmark pages, with every page answered by both readers (r6-spot.md). List prices per 1,000 pages were $4.00 for Mistral and $4.00 for this route; offered at the Advanced level only, never the app's pick (owner call 15)",
-      "not offered until the Processor has a reader for it (queued: W47.wh-readers-lost-vendors-clients)"
+      "lower-scoring: Mistral OCR 4.1 scored 4.55 points higher on the same 95 benchmark pages, with every page answered by both readers (r6-spot.md). List prices per 1,000 pages were $4.00 for Mistral and $4.00 for this route.",
+      "not offered: kept as a benchmark comparison (owner call 25)"
      ]
     },
     {

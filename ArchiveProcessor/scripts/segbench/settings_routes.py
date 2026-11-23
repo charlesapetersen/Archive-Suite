@@ -325,9 +325,8 @@ def reading_rows():
             cloud_time(rid, {"per_unit_s": None, "measured": False, "measured_on": "no time in its call log (ocr-time-like-for-like.md)", "source": None}), {"peak_gb": 0, "source": None}, cav)
 
     # W47.wh-readers-lost-vendors-read: the document services on all 96 (r6-spot.md §"All 96"), by the panel's scorer;
-    # both below Mistral OCR 4.1 at no less cost, so lower-scoring (owner call 15). No Processor client reads them yet:
-    # not offered until W47.wh-readers-lost-vendors-clients, so the rows say so rather than "not in the app yet".
-    # Transkribus waits for the owner's upload of the other 71 (W47.wh-readers-lost-vendors-tk).
+    # Both scored below Mistral OCR 4.1 at no less cost. Owner call 25 keeps them as measured comparisons,
+    # without Processor clients, and leaves Transkribus on the initial 25-page spot check.
     for rid, nm, keys, ov, gap, kinds, usd, cav in [
         ("azure-di-layout", "Azure Document Intelligence, prebuilt-layout (vendor service)", ["azure"], 90.90, 2.11,
          (95.57, 88.07, 81.77), 10.0, ["read on the F0 free tier ($0); list price $10 per 1,000 pages", "96 only"]),
@@ -341,10 +340,10 @@ def reading_rows():
         add(rid, nm, "cloud", None, "measured", {"key": keys}, F,
             {"usd_1000_list": usd, "usd_1000_batch": None, "price_read": "2026-11-04 (W46.r6-spot)", "source": src(R6S, rid, "list price", f"${usd:g} per 1,000")},
             {"per_unit_s": None, "measured": False, "measured_on": "no call times recorded", "source": None}, {"peak_gb": 0, "source": None}, cav,
-            conditions=[lower(f"Mistral OCR 4.1 scored {gap:.2f} points higher on the same 95 benchmark pages, "
-                              "with every page answered by both readers (r6-spot.md). "
-                              f"List prices per 1,000 pages were ${routes['mistral-ocr-4-1']['std']:.2f} for Mistral and ${usd:.2f} for this route."),
-                        "not offered until the Processor has a reader for it (queued: W47.wh-readers-lost-vendors-clients)"])
+            conditions=[f"lower-scoring: Mistral OCR 4.1 scored {gap:.2f} points higher on the same 95 benchmark pages, "
+                        "with every page answered by both readers (r6-spot.md). "
+                        f"List prices per 1,000 pages were ${routes['mistral-ocr-4-1']['std']:.2f} for Mistral and ${usd:.2f} for this route.",
+                        "not offered: kept as a benchmark comparison (owner call 25)"])
 
     def hosted_by(rid, comparator):
         name = next(r["name"] for r in rows if r["id"] == comparator)

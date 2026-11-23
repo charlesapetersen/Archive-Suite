@@ -1092,9 +1092,12 @@ struct SettingsSheetModel {
     static let pendingNote = "Saved, but not used yet: it takes effect in a later version of the Processor."
     /// The scanned-newspaper switch's figures, as any row carries its own (owner, call 15), and what it needs.
     static var scanLayoutNote: String {
-        "Measured on 15 scanned newspaper pages, 14 of them from one Library of Congress collection: 4.6 points of "
-            + "reading accuracy above PP-DocLayoutV3 (95% interval 1.1 to 8.0) across four readers, a direction rather "
-            + "than a settled gap; not measured on photographed newspapers, which keep PP-DocLayoutV3. "
+        "On raw crops from 15 scanned newspaper pages (14 from one Library of Congress collection), DocLayout-YOLO "
+            + "averaged 4.6 reading-accuracy points above PP-DocLayoutV3 (95% interval +1.1 to +8.0) across GLM-OCR, "
+            + "PaddleOCR-VL 1.5, LightOnOCR-3 4B and Qwen3.6 27B. "
+            + "Processor uses masked regions and crops for text outside them, so its accuracy gain is unmeasured. "
+            + "Qwen3.6 27B now reads the whole page and skips the detector. Photographed newspapers still use "
+            + "PP-DocLayoutV3 and were outside this comparison. "
             + (ScanNewspaperLayout.isInstalled() ? ""
                 : "Needs its detector, a \(ScanNewspaperLayout.downloadMB) MB download whose weights are "
                     + "\(ScanNewspaperLayout.licence); until it is downloaded, scanned newspapers use the default helper.")

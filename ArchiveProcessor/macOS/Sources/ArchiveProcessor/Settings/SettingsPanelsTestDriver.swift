@@ -228,8 +228,7 @@ enum SettingsPanelsTestDriver {
                   !card.alternatives.contains { a in stageRoutes.first { $0.id == a.id }?.lowerScoring == true }
                     && !card.better.contains { b in stageRoutes.first { $0.id == b.id }?.lowerScoring == true })
             if card.id == "reading" {
-                // A lower-scoring row the Processor has no reader for yet is not offered at all (the document services,
-                // until W47.wh-readers-lost-vendors-clients), so it is not a choice.
+                // Owner call 25 keeps the document services as benchmark rows without Processor choices.
                 let lower = Set(stageRoutes.filter { $0.lowerScoring && $0.offered }.map(\.id))
                 let offered = Set(card.options.filter { $0.level == .advanced }.map(\.id)).intersection(lower)
                 check("8 the reading card offers the lower-scoring rows at Advanced", offered == lower,

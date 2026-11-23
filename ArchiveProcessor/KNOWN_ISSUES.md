@@ -224,18 +224,18 @@ lower-scoring row runs since W47.wh-readers-lost-clients (the on-device model th
   W47.wh-readers-lost-vendors-read (90.90 and 88.45 on the 95, under Mistral OCR 4.1's 93.01, so lower-scoring), and
   the rows say "not offered": the Processor has no client for either and will not get one (accepted: owner, 2026-11-20,
   call 25, "It would be a bit much to build whole clients just for these inadequate readers").
-- **Transkribus has no row.** Its figures are on 25 of the 96 only; the other 71 are packed for the owner's hand
-  upload at app.transkribus.org, which is not needed now (accepted: owner, 2026-11-20, call 25, as for Azure and Textract).
+- **Transkribus remains a 25-page spot check.** The owner declined the remaining 71 uploads and the service stays
+  out of Processor (accepted: owner, 2026-11-20, call 25).
 
 ## ⚠️ LIMITATION (W47.wh-yolo-scans, 2026-11-20): what the scanned-newspaper detector does not yet do
 
 `OCR/NewspaperPageReader.swift` (`NewspaperDetector`), VisionOCRKit `ScanNewspaperLayout`; the switch is in Settings →
 Rules → Columns and reading order, off by default.
-- **Measured on scans from one collection, and on raw regions.** The 4.6-point lead is 15 L9 scans, 14 from one Library
-  of Congress collection, read on the regions as newspaper-ocr cut them, not through the app's partition
-  (W46.layout-partition-fix); photographed newspapers are unmeasured and always use PP-DocLayoutV3 (accepted: owner,
-  2026-11-19, call 15, "release as measured"; the photographed half is W46.layout-photo-newspapers, behind
-  W46.nice-to-have).
+- **The 4.6-point lead used raw crops.** GLM-OCR, PaddleOCR-VL 1.5, LightOnOCR-3 4B and Qwen3.6 27B read them
+  on 15 L9 scans, 14 from one Library of Congress collection. Processor uses masked regions and outside crops
+  (W46.layout-partition-fix), and Qwen3.6 27B now reads the whole page. The app's accuracy gain is unmeasured.
+  Photographed newspapers always use PP-DocLayoutV3 (accepted: owner, 2026-11-19, call 15, "release as measured";
+  the photographed half is W46.layout-photo-newspapers, behind W46.nice-to-have).
 - **Pictures are left out on this route.** As the measured arm did, DocLayout-YOLO's figure boxes (some headlines among
   them) are not read as regions; text Vision finds in them is read as leftover lines (accepted: owner, 2026-11-19,
   call 15, "release as measured": the measured arm drops them).
