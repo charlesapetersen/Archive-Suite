@@ -2,6 +2,7 @@ package com.archiveprocessor.capture.net
 
 import org.json.JSONArray
 import org.json.JSONObject
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,6 +30,7 @@ class DriveRelayTransportTest {
             val folder = store.values.firstOrNull { it.mime == "application/vnd.google-apps.folder" && it.appProps["relayToken"] == token }
             val id = newId(); store[id] = F(id, name, mutableMapOf("relayName" to name, "relayToken" to token), if (folder != null) listOf(folder.id) else emptyList(), media, "")
         }
+        fun media(name: String) = store.values.filter { it.appProps["relayName"] == name }.map { it.media }
         fun hasName(name: String) = store.values.any { it.appProps["relayName"] == name && it.appProps["relayRejected"] != "1" }
 
         override fun execute(method: String, url: String, headers: Map<String, String>, body: ByteArray?): Triple<Int, ByteArray, Map<String, String>> {
@@ -70,6 +72,25 @@ class DriveRelayTransportTest {
             }
             if (method == "DELETE") { idFromPath()?.let { store.remove(it) }; return Triple(204, ByteArray(0), emptyMap()) }
             return Triple(404, "{}".toByteArray(), emptyMap())
+        }
+    }
+
+    @Test fun pendingStatusIsUpdatedInPlace() {
+        val mock = MockDrive()
+        val relay = DriveRelayTransport(DriveClient(mock) { "fake" }, "TESTTK")
+        val sender = "01234567-89ab-cdef-0123-456789abcdef"
+        assertFalse(relay.reportStatus(PhoneQueueStatus(sender, 1, 2)))
+        mock.injectFolder("TESTTK")
+        mock.injectFile("_epoch.json", "TESTTK", RelayObjectFormat.canonicalJson(
+            mapOf("kind" to "epoch", "token" to "TESTTK", "epoch" to "EP1")))
+        mock.failCreate.add(RelayObjectFormat.phoneStatusName(sender))
+        assertFalse(relay.reportStatus(PhoneQueueStatus(sender, 2, 2)))
+        mock.failCreate.clear()
+        for ((index, count) in listOf(2, 0).withIndex()) {
+            val status = PhoneQueueStatus(sender, index.toLong() + 3, count)
+            assertTrue(relay.reportStatus(status))
+            assertArrayEquals(RelayObjectFormat.encodePhoneStatus("TESTTK", "EP1", status),
+                mock.media(RelayObjectFormat.phoneStatusName(sender)).single())
         }
     }
 

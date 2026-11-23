@@ -2,10 +2,20 @@ package com.archiveprocessor.capture.data
 
 import android.content.Context
 import com.archiveprocessor.capture.net.MacEndpoint
+import com.archiveprocessor.capture.net.PhoneQueueStatus
+import java.util.UUID
 
 /** Lightweight persistence: the paired Mac endpoint + recently used years (for quick date chips). */
 class Prefs(context: Context) {
     private val sp = context.getSharedPreferences("archivecapture", Context.MODE_PRIVATE)
+
+    // A stable installation ID and ordered reports let the same phone drain across a route change.
+    fun nextPhoneStatus(pending: Int): PhoneQueueStatus {
+        val sender = sp.getString("statusSender", null) ?: UUID.randomUUID().toString()
+        val revision = maxOf(System.currentTimeMillis(), sp.getLong("statusRevision", 0) + 1)
+        sp.edit().putString("statusSender", sender).putLong("statusRevision", revision).apply()
+        return PhoneQueueStatus(sender, revision, pending)
+    }
 
     fun saveEndpoint(e: MacEndpoint) {
         sp.edit().putString("host", e.host).putInt("port", e.port)

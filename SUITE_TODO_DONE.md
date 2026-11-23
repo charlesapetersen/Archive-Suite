@@ -18112,3 +18112,17 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   off-screen UI tests, the Reader render guards and the two-image Processor smoke passed.
   The two Gemini fixture runs cost an estimated total below $0.10. No rehearsal-cache data was used.
   <!-- /W49.preservation-copies-build -->
+- [x] **W49.proc-fix-s038 — Wait for pending relay pages before Finish files a collection [M · S2 · Tier-2]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build) — S-038/P-48. Carry pending status through the relay or provide an equivalent drain signal. Coordinate the Mac and both phones and update SPEC/relay-object-format.md when the object contract changes. Verify that Finish waits for an outstanding page, then files both after durable receipt. [Evidence and tests](verification/evidence/processor/W49.relay-suspects-check.md). SHIPPED 2026-11-23 (this commit).
+  Android and iOS publish ordered queue status through the file and Drive relays. Live Capture waits
+  before completing an open group while a phone still owes a page. A newer zero from the same phone can
+  clear the hold over Cloud, Wi-Fi or USB. A different phone's zero, an earlier status and a failed scan
+  leave the hold in place. The Mac retains the relay state across a restart.
+  The scratch regression held Finish with the final page on the phone, then verified one PDF with both
+  image sheets after durable receipt. It also checked wrong-epoch and invalid statuses and a deferred End
+  Segment marker. [Relay contract](SPEC/relay-object-format.md#relay-drain-before-finish).
+  The Android-to-Mac round trip filed all three fixtures with their expected text and dates. The two-image
+  Processor smoke, 316 recovery checks, 13 FileRelay checks, both companion builds and the three-platform
+  relay golden passed. The focused off-screen Processor relay test also passed. Estimated Gemini
+  cost for the round trip and smoke was below $0.10.
+  No rehearsal cache inputs were created.
+  <!-- /W49.proc-fix-s038 -->

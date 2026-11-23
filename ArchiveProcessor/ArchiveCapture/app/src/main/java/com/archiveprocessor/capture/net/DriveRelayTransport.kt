@@ -27,17 +27,15 @@ class DriveRelayTransport(
         client.listFiles("mimeType = 'application/vnd.google-apps.folder' and appProperties has { key='relayToken' and value='${esc(token)}' } and trashed = false").firstOrNull()?.id
     } catch (e: Exception) { null }
 
-    private fun fileId(folder: String, name: String): String? = try {
+    private fun fileId(folder: String, name: String): String? =
         client.listFiles("'${esc(folder)}' in parents and appProperties has { key='relayName' and value='${esc(name)}' } and trashed = false").firstOrNull()?.id
-    } catch (e: Exception) { null }
 
-    private fun upsert(folder: String, name: String, data: ByteArray, mime: String) {
-        try {
+    private fun upsert(folder: String, name: String, data: ByteArray, mime: String): Boolean =
+        runCatching {
             val id = fileId(folder, name)
             if (id != null) client.updateMedia(id, data, mime)
             else client.createFile(name, listOf(folder), mapOf("relayName" to name, "relayToken" to token), data, mime)
-        } catch (e: Exception) { /* best-effort: no receipt → phone's receipt-wait times out + retries; never a loss */ }
-    }
+        }.isSuccess
 
     private fun read(folder: String, name: String): ByteArray? = try {
         val id = fileId(folder, name); if (id != null) client.getMedia(id) else null
@@ -96,6 +94,12 @@ class DriveRelayTransport(
         val f = folderId() ?: return false; val e = epoch(f) ?: return false
         upsert(f, RelayObjectFormat.SESSION_COMPLETE_NAME, RelayObjectFormat.encodeSessionComplete(token, e), "application/json")
         return true
+    }
+
+    override fun reportStatus(status: PhoneQueueStatus): Boolean {
+        val f = folderId() ?: return false
+        val e = epoch(f) ?: return false
+        return upsert(f, RelayObjectFormat.phoneStatusName(status.sender), RelayObjectFormat.encodePhoneStatus(token, e, status), "application/json")
     }
 
     override fun sessionDisconnect(): Boolean = true

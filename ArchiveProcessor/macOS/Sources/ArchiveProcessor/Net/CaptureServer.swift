@@ -633,8 +633,16 @@ final class CaptureServer: @unchecked Sendable, CaptureReceiver {
         case "POST /phone/status":
             // Heartbeat: how many photos the phone still has un-sent. Lets the Mac surface "phone still
             // has N to send" and hold Finish until the phone has drained.
-            let pending = (req.headers["x-pending"]).flatMap { Int($0) } ?? 0
-            Task { @MainActor [weak self] in self?.session?.updatePhonePending(max(0, pending)) }
+            let pending = req.headers["x-pending"].flatMap(Int.init)
+            let status: PhoneQueueStatus?
+            if let sender = req.headers["x-phone-sender"].flatMap(UUID.init(uuidString:)),
+               let revision = req.headers["x-phone-status-revision"].flatMap(Int64.init), revision > 0,
+               let pending, pending >= 0 {
+                status = PhoneQueueStatus(sender: sender, revision: revision, pending: pending)
+            } else {
+                status = nil
+            }
+            Task { @MainActor [weak self] in self?.session?.updatePhonePending(max(0, pending ?? 0), status: status) }
             respond(conn, status: "200 OK", json: ["ok": true])
 
         case "POST /session/disconnect":

@@ -60,9 +60,15 @@ See W49.proc-fix-s024 and the [original VM reproduction](../verification/evidenc
 
 - After the phone sends its photos, a Drive error on End segment can discard the completion signal and the tags it carries. Re-pairing leaves the signal missing, so the Mac can leave the segment open until Finish. [Independent scratch evidence](../verification/evidence/processor/W49.relay-suspects-check.md). (queued: W49.proc-fix-s021)
 
-## Finish can file a relay document before its last photo arrives (S-038)
+## FIXED (S-038, 2026-11-23) — Finish could file a relay document before its last photo arrived
 
-- The relay has no pending-photo status for Finish. In the scratch run, Finish filed the first photo and the second stayed in Backup after it arrived. [Independent scratch evidence](../verification/evidence/processor/W49.relay-suspects-check.md). (queued: W49.proc-fix-s038)
+- Both companions report their pending relay pages. Finish waits before completing an open document
+  when the relay reports an outstanding page. A newer zero from the same phone also clears the hold
+  after switching to Wi-Fi or USB. The scratch run held the last page, then filed both image sheets.
+  (accepted: fixed by W49.proc-fix-s038)
+  [Original evidence](../verification/evidence/processor/W49.relay-suspects-check.md) ·
+  [Regression](scripts/check-relay-finish.py) ·
+  [Relay contract](../SPEC/relay-object-format.md#relay-drain-before-finish)
 
 ## Stage for later offers already-processed photos (S-039)
 

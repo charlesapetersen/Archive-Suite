@@ -38,8 +38,8 @@ final class DriveObjectStore: RelayObjectStore, @unchecked Sendable {
 
     func publishEpoch(_ data: Data) { writeAtomic(RelayObjectFormat.epochMarkerName, data) }
 
-    func listNames() -> [String] {
-        do { try _refreshCacheUnlocked() } catch { return [] }
+    func listNames() throws -> [String] {
+        try _refreshCacheUnlocked()
         lock.lock(); defer { lock.unlock() }
         return Array(cache.keys)
     }

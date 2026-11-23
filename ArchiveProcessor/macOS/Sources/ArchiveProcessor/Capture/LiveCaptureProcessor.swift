@@ -124,6 +124,8 @@ final class LiveCaptureProcessor: ObservableObject {
     /// True after the operator hit "Finish session" while segments are still being OCR'd/tagged: we hold
     /// off the rotation review / collection naming until every segment is staged, so none are missed.
     @Published private(set) var pendingFinish = false
+    private var finishNeedsOpenGroupCompletion = false
+    private var finishAfterRelayScan: Int?
     /// Segments still being processed (OCR or tagging) **that can still resolve** — the count behind the
     /// pending-finish row's "(N left)" and the capture panel's "Processing…" spinner.
     ///
@@ -2331,22 +2333,32 @@ final class LiveCaptureProcessor: ObservableObject {
     func requestFinish() {
         guard !stagingManifestBlocked, trainingWarning == nil,
               !showFinalizeSheet, !showRotationReview, !isFinalizing else { return }   // a finish is already in progress
-        guard session.completeAllOpenDocGroups() else {
-            // A prior Finish may already have armed the watchdog. Cancel it too; otherwise it could later
-            // advance after this re-tap rolled a newly-open group's undurable completion back.
-            pendingFinish = false
-            session.statusMessage = "Could not save session completion — check the backup folder and try Finish again."
-            return
-        }
+        // Completing an open relay group here could stage it before its last photo is received.
+        finishNeedsOpenGroupCompletion = true
+        // A status may already be on the relay but still awaiting the next poll. Require a scan
+        // begun after the tap for sessions with relay traffic, without delaying direct-only Finish.
+        finishAfterRelayScan = session.hasSeenRelayTraffic && session.relayScanExpected
+            ? session.relayScanStarted + 1 : nil
+        if finishAfterRelayScan == nil, session.relayPhonePendingCount == 0,
+           !completeOpenGroupsForFinish() { return }
         let wasPending = pendingFinish
         pendingFinish = true
         if !wasPending { startFinishWatchdog() }   // one watchdog per pending-finish episode
         proceedToFinishIfReady()
     }
 
+    private func completeOpenGroupsForFinish() -> Bool {
+        finishNeedsOpenGroupCompletion = false
+        guard session.completeAllOpenDocGroups() else {
+            pendingFinish = false
+            session.statusMessage = "Could not save session completion — check the backup folder and try Finish again."
+            return false
+        }
+        return true
+    }
+
     /// While a Finish is pending, re-evaluate periodically so it auto-advances even when nothing else
-    /// re-triggers it — in particular when a phone that was still sending goes silent and its heartbeat
-    /// lapses to stale (`phonePendingActive` flips false at 20s) with no further event to notice it.
+    /// re-triggers it, such as when a direct phone heartbeat reaches its 20-second expiry.
     private func startFinishWatchdog() {
         Task { [weak self] in
             while true {
@@ -2375,11 +2387,8 @@ final class LiveCaptureProcessor: ObservableObject {
     /// are the two that can last indefinitely with nothing on screen to resolve.
     ///
     /// WHAT IT DELIBERATELY DOES **NOT** DO:
-    ///  • **It does not roll back `requestFinish`'s `completeAllOpenDocGroups()`.** That force-completion is a
-    ///    durable RECOVERY — it surfaces the Mac tag card for a doc group the operator never ended — and it
-    ///    is not part of the wait. There is also no supported way to undo it: `completeAllOpenDocGroups`
-    ///    rolls a completion back only when its own `writeManifest()` FAILED, i.e. only one that never
-    ///    reached disk. Cancel un-arms the wait; it does not rewind the session.
+    ///  • **A saved force-completion stays in the manifest.** It recovers the Mac tag card for a
+    ///    document the operator never ended. Cancel un-arms the remaining wait.
     ///  • **It cancels no OCR, drops no `staged`/`retained`, and touches no file.** Nothing already paid for
     ///    is discarded and nothing on disk moves. That is the whole difference from Clear, and the reason
     ///    this needs no `isFinalizing`-style refusal: there is no write it can interrupt.
@@ -2419,7 +2428,9 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Called after each segment stages and whenever a card is resolved, so a Finish requested mid-run
     /// waits for processing to complete instead of dropping unstaged segments from the review.
     private func proceedToFinishIfReady() {
-        guard !stagingManifestBlocked, pendingFinish else { return }
+        guard !stagingManifestBlocked, pendingFinish, session.relayPhonePendingCount == 0 else { return }
+        if session.relayScanExpected, let scan = finishAfterRelayScan, session.relayScanFinished < scan { return }
+        if finishNeedsOpenGroupCompletion, !completeOpenGroupsForFinish() { return }
         // Only count segments that still EXIST — a status left at .ocr/.tagging for a group whose photos
         // were deleted (thumbnail X) or reclassified away (X-Replaces) can never resolve (no group → no tag
         // card, no finalizeSegment), so it must not block the finish forever. Finalized groups are .staged/.failed.
@@ -2429,9 +2440,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // a page the finish had already stopped waiting for. One definition, so the wait and the message
         // describing it cannot come apart again.
         let stillProcessing = processingCount > 0
-        // Also wait while a FRESH phone heartbeat says it still has photos to send, so a segment whose pages
-        // are all still in flight isn't omitted. A stale heartbeat (phone disconnected) does NOT block — the
-        // Finish button stays tappable as the escape.
+        // Also wait while a fresh direct heartbeat says the phone still has photos to send.
         // W3.cap-r3-fu9 — and wait while one of the Processing list's PER-ITEM sheets is up. Same class as
         // the `pendingTagGroup` term beside it: a modal the operator has open, which the finish must not
         // walk into. The difference is that this one is not the finish flow's own, so raising the rotation

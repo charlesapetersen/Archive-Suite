@@ -1,6 +1,12 @@
 import Foundation
 import CryptoKit
 
+struct PhoneQueueStatus: Codable, Equatable, Sendable {
+    let sender: UUID
+    let revision: Int64
+    let pending: Int
+}
+
 /// On-disk format for the local-directory capture relay — the offline stand-in for the Google Drive
 /// backend that proves the cloud-transport contract without OAuth/network. SINGLE SOURCE OF TRUTH for
 /// object names, canonical JSON, the metadata fingerprint (A1), and parse/encode. The iOS + Android
@@ -19,14 +25,16 @@ enum RelayObjectFormat {
     static func sidecarName(group: String, seq: Int) -> String { "\(group)__\(seq).json" }
     static func receiptName(group: String, seq: Int) -> String { "\(group)__\(seq).receipt.json" }
     static func segmentName(group: String) -> String { "\(group).segment.json" }
+    static func phoneStatusName(sender: UUID) -> String { "_phone.\(sender.uuidString.lowercased()).status.json" }
     static let sessionCompleteName = "_session.complete.json"
     static let epochMarkerName = "_epoch.json"
 
-    enum Kind { case media, photo, segmentComplete, sessionComplete, receipt, epoch, ignored }
+    enum Kind { case media, photo, segmentComplete, sessionComplete, phoneStatus, receipt, epoch, ignored }
 
     static func classify(_ name: String) -> Kind {
         if name.hasPrefix(".") || name.hasSuffix(".part") { return .ignored }
         if name == epochMarkerName { return .epoch }
+        if name.hasPrefix("_phone.") && name.hasSuffix(".status.json") { return .phoneStatus }
         if name == sessionCompleteName { return .sessionComplete }
         if name.hasSuffix(".receipt.json") { return .receipt }
         if name.hasSuffix(".segment.json") { return .segmentComplete }
@@ -123,6 +131,12 @@ enum RelayObjectFormat {
                               quality: String?, year: String?, month: String?, seqs: String?) -> Data {
         canonicalJSON(["kind": "segment-complete", "token": token, "epoch": epoch, "group": group,
                        "quality": quality, "year": year, "month": month, "seqs": seqs])
+    }
+
+    static func encodePhoneStatus(token: String, epoch: String, status: PhoneQueueStatus) -> Data {
+        canonicalJSON(["kind": "phone-status", "token": token, "epoch": epoch,
+                       "sender": status.sender.uuidString.lowercased(), "rev": String(status.revision),
+                       "pending": String(status.pending)])
     }
 
     static func encodeSessionComplete(token: String, epoch: String) -> Data {

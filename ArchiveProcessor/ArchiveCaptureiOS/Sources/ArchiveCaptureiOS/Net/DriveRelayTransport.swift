@@ -22,15 +22,15 @@ struct DriveRelayTransport: SegmentTransport {
     private func folderId() -> String? {
         (try? client.listFiles(query: "mimeType = 'application/vnd.google-apps.folder' and appProperties has { key='relayToken' and value='\(esc(token))' } and trashed = false"))?.first?.id
     }
-    private func fileId(_ folder: String, _ name: String) -> String? {
-        (try? client.listFiles(query: "'\(esc(folder))' in parents and appProperties has { key='relayName' and value='\(esc(name))' } and trashed = false"))?.first?.id
+    private func fileId(_ folder: String, _ name: String) throws -> String? {
+        try client.listFiles(query: "'\(esc(folder))' in parents and appProperties has { key='relayName' and value='\(esc(name))' } and trashed = false").first?.id
     }
     private func upsert(_ folder: String, _ name: String, _ data: Data, _ mime: String) throws {
-        if let id = fileId(folder, name) { try client.updateMedia(fileId: id, media: data, mimeType: mime) }
+        if let id = try fileId(folder, name) { try client.updateMedia(fileId: id, media: data, mimeType: mime) }
         else { _ = try client.createFile(name: name, parents: [folder], appProperties: ["relayName": name, "relayToken": token], media: data, mimeType: mime) }
     }
     private func read(_ folder: String, _ name: String) -> Data? {
-        guard let id = fileId(folder, name) else { return nil }
+        guard let id = try? fileId(folder, name) else { return nil }
         return try? client.getMedia(fileId: id)
     }
     private func epoch(_ folder: String) -> String? {
@@ -83,5 +83,14 @@ struct DriveRelayTransport: SegmentTransport {
             return true
         } catch { return false }
     }
+    func reportStatus(_ status: PhoneQueueStatus) async -> Bool {
+        guard let f = folderId(), let e = epoch(f) else { return false }
+        do {
+            try upsert(f, RelayObjectFormat.phoneStatusName(sender: status.sender),
+                       RelayObjectFormat.encodePhoneStatus(token: token, epoch: e, status: status), "application/json")
+            return true
+        } catch { return false }
+    }
+
     func sessionDisconnect() async -> Bool { true }
 }

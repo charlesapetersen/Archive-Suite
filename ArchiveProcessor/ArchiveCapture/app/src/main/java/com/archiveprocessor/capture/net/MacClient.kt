@@ -104,10 +104,12 @@ class MacClient(private val endpoint: MacEndpoint) : SegmentTransport {
 
     /** Heartbeat: how many photos are still un-sent on the phone, so the Mac can surface "phone still has
      *  N photos to send" (and hold Finish until they arrive). No body; best-effort. */
-    override fun reportStatus(pending: Int): Boolean = try {
+    override fun reportStatus(status: PhoneQueueStatus): Boolean = try {
         val req = Request.Builder().url("${endpoint.baseUrl}/phone/status")
             .header("Authorization", auth())
-            .header("X-Pending", pending.toString())
+            .header("X-Pending", status.pending.toString())
+            .header("X-Phone-Sender", status.sender)
+            .header("X-Phone-Status-Revision", status.revision.toString())
             .post(ByteArray(0).toRequestBody(null)).build()
         client.newCall(req).execute().use { it.isSuccessful }
     } catch (e: Exception) {

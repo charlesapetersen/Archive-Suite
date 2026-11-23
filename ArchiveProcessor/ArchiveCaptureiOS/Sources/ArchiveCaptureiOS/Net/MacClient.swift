@@ -121,9 +121,11 @@ struct MacClient {
     /// N photos to send" (and hold Finish until they arrive). No body; best-effort. The timeout is short because
     /// reports share one ordered writer: one stalled on a Mac just unpaired from would otherwise hold the next
     /// Mac's reports past its 20 s staleness window (W40.i-fix-ios-heartbeat-count).
-    func reportStatus(pending: Int) async -> Bool {
+    func reportStatus(_ status: PhoneQueueStatus) async -> Bool {
         guard var req = makeRequest("/phone/status", method: "POST", timeout: 5) else { return false }
-        req.setValue(String(pending), forHTTPHeaderField: "X-Pending")
+        req.setValue(String(status.pending), forHTTPHeaderField: "X-Pending")
+        req.setValue(status.sender.uuidString.lowercased(), forHTTPHeaderField: "X-Phone-Sender")
+        req.setValue(String(status.revision), forHTTPHeaderField: "X-Phone-Status-Revision")
         do { let (_, resp) = try await session.upload(for: req, from: Data()); return Self.isSuccess(resp) }
         catch { return false }
     }

@@ -16,7 +16,7 @@ import Foundation
 protocol RelayObjectStore: Sendable {
     func ensureSessionFolder() throws
     func publishEpoch(_ data: Data)
-    func listNames() -> [String]
+    func listNames() throws -> [String]
     func readData(_ name: String) -> Data?
     func exists(_ name: String) -> Bool
     func modificationDate(_ name: String) -> Date?
@@ -127,28 +127,28 @@ let store: RelayObjectStore = DriveObjectStore(client: client, token: "TESTTK")
 try! store.ensureSessionFolder()
 store.writeAtomic("g1__7.json", Data("SIDE1".utf8))
 store.writeAtomic("g1__7.jpg", Data("JPEG1".utf8))
-check("list has both objects", Set(store.listNames()) == Set(["g1__7.json", "g1__7.jpg"]))
+check("list has both objects", Set(try! store.listNames()) == Set(["g1__7.json", "g1__7.jpg"]))
 check("read sidecar bytes", store.readData("g1__7.json") == Data("SIDE1".utf8))
 check("exists true / false", store.exists("g1__7.json") && !store.exists("nope.json"))
 
 store.writeAtomic("g1__7.json", Data("SIDE2".utf8))                       // idempotent overwrite
 check("overwrite updates bytes", store.readData("g1__7.json") == Data("SIDE2".utf8))
-check("overwrite does NOT duplicate", store.listNames().filter { $0 == "g1__7.json" }.count == 1)
+check("overwrite does NOT duplicate", (try! store.listNames()).filter { $0 == "g1__7.json" }.count == 1)
 
 store.publishEpoch(Data("EPOCHBYTES".utf8))
 check("publishEpoch writes _epoch.json", store.readData("_epoch.json") == Data("EPOCHBYTES".utf8))
 
 store.quarantine("g1__7.jpg")                                            // flagged out of listing
-check("quarantine removes from listing", !store.listNames().contains("g1__7.jpg"))
+check("quarantine removes from listing", !(try! store.listNames()).contains("g1__7.jpg"))
 
 store.delete("g1__7.json")
-check("delete removes object", !store.listNames().contains("g1__7.json") && store.readData("g1__7.json") == nil)
+check("delete removes object", !(try! store.listNames()).contains("g1__7.json") && store.readData("g1__7.json") == nil)
 
 // Coexisting same-name duplicates (D7 fix): newest by rev survives, older is reaped, never re-ingested.
 mock.injectDup("dup__9.json", rev: "1", media: "OLD")
 mock.injectDup("dup__9.json", rev: "2", media: "NEW")
 check("dup: newest rev survives (no stale revert)", store.readData("dup__9.json") == Data("NEW".utf8))
-check("dup: listed exactly once (older reaped)", store.listNames().filter { $0 == "dup__9.json" }.count == 1)
+check("dup: listed exactly once (older reaped)", (try! store.listNames()).filter { $0 == "dup__9.json" }.count == 1)
 
 print(pass ? "DRIVE STORE (mock): PASS" : "DRIVE STORE (mock): FAIL")
 exit(pass ? 0 : 1)

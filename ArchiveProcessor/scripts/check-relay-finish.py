@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Compare filed sheets when a relay page arrives before or after headless Finish.
+"""Verify headless Finish waits for a delayed relay page and files it with the first.
 
 Run outside the Codex sandbox under the suite heavy lock with a Debug build.
 See verification/evidence/processor/W49.relay-suspects-check.md for the command.
-This records the S-038 failure at the baseline. The fix should turn the late
-case into a regression that waits before filing.
 """
 
 import hashlib
@@ -15,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 
 if os.environ.get('CODEX_SANDBOX'):
     sys.exit('Run the headless Processor check outside the Codex sandbox.')
@@ -80,18 +79,59 @@ def run(name, deliver_before_finish):
             wait_for(f'page {seq} receipt', receipt.exists)
             assert json.loads(receipt.read_bytes())['fp'] == fp
 
+        sender = str(uuid.uuid4())
+        revision = 0
+
+        def status(count, **overrides):
+            nonlocal revision
+            revision += 1
+            atomic(relay / f'_phone.{sender}.status.json', encode(identity | {
+                'kind': 'phone-status', 'pending': str(count), 'sender': sender, 'rev': str(revision),
+            } | overrides))
+
+        def open_groups():
+            return json.loads(manifest.read_bytes())['completedDocGroups']
+
+        def assert_finish_held(seconds):
+            deadline = time.monotonic() + seconds
+            while time.monotonic() < deadline:
+                assert app.poll() is None, 'Processor stopped during Finish'
+                assert group not in open_groups(), 'Finish completed a group with a pending page'
+                assert not done.exists() and not list(out.rglob('*.pdf')), 'Finish filed a partial PDF'
+                time.sleep(.2)
+
         send(1)
         if deliver_before_finish:
             send(2)
             seg = relay / f'{group}.segment.json'
             atomic(seg, encode(identity | {'kind': 'segment-complete', 'group': group, 'seqs': '1,2'}))
             wait_for('segment consumed', lambda: not seg.exists())
+            status(0)
+        else:
+            status(1)
+            wait_for('Mac relay count', lambda: b'LIVECAPTURE_RELAY_PENDING 1' in (folder / 'app.log').read_bytes())
         manifest = wait_for('manifest', lambda: next((folder / 'backup').rglob('manifest.json'), None))
-        completed = json.loads(manifest.read_bytes())['completedDocGroups']
+        completed = open_groups()
         assert (group in completed) == deliver_before_finish
         start = time.monotonic()
         atomic(relay / '_session.complete.json', encode(identity | {'kind': 'session-complete'}))
         done = out / 'DONE.txt'
+        if not deliver_before_finish:
+            # No further valid status for longer than the direct heartbeat's 20 s expiry.
+            # A previous session or an invalid count must not release a known pending page.
+            status(0, epoch='old-epoch')
+            assert_finish_held(22)
+            status(-1)
+            assert_finish_held(2)
+            send(2)
+            assert any(p['seq'] == 2 for p in json.loads(manifest.read_bytes())['photos'])
+            assert_finish_held(2)
+            # An ended-segment snapshot can still name a page explicitly removed from the queue.
+            # It must not prevent Finish from using a valid zero to complete the two retained pages.
+            atomic(relay / f'{group}.segment.json', encode(identity | {
+                'kind': 'segment-complete', 'group': group, 'seqs': '1,2,3',
+            }))
+            status(0)
         wait_for('Finish done', done.exists, 90)
         print(f'{name}: finished in {time.monotonic() - start:.2f}s, completed before Finish={completed}, {done.read_text().strip()}', flush=True)
         assert done.read_text().startswith('Finalized')
@@ -101,18 +141,8 @@ def run(name, deliver_before_finish):
         pages = int(next(line for line in info.splitlines() if line.startswith('Pages:')).split()[1])
         listing = subprocess.check_output(['pdfimages', '-list', str(pdfs[0])], text=True)
         image_pages = {line.split()[0] for line in listing.splitlines()[2:] if line.strip()}
-        assert len(image_pages) == (2 if deliver_before_finish else 1), listing
+        assert pages == 4 and len(image_pages) == 2, listing
         print(f'{name}: PDF pages={pages}, source image pages={len(image_pages)}', flush=True)
-        if not deliver_before_finish:
-            before = pdfs[0].read_bytes()
-            send(2)
-            state = json.loads(manifest.read_bytes())
-            late = [p for p in state['photos'] if p['seq'] == 2]
-            assert late and group in state['filedGroupIds'], state
-            backup_files = sorted(path.name for path in (folder / 'backup').rglob('*.jpg'))
-            assert any(path.startswith('000002-') for path in backup_files), backup_files
-            assert sorted(out.rglob('*.pdf')) == pdfs and pdfs[0].read_bytes() == before
-            print(f'{name}: page 2 receipted; backup={backup_files}; filedGroupIds={state["filedGroupIds"]}; PDF unchanged', flush=True)
     finally:
         app.terminate()
         try:
@@ -123,4 +153,4 @@ def run(name, deliver_before_finish):
         log.close()
 
 run('all-pages-before-finish', True)
-run('last-page-after-finish', False)
+run('last-page-while-finish-waits', False)

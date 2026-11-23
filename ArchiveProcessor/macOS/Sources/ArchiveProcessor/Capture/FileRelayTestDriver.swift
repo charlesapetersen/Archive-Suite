@@ -37,6 +37,9 @@ enum FileRelayTestDriver {
         w("g1__7.receipt.json", RelayObjectFormat.encodeReceipt(token: tok, epoch: ep, group: "g1", seq: 7, fp: fp))
         w("g1.segment.json", RelayObjectFormat.encodeSegment(token: tok, epoch: ep, group: "g1",
             quality: "Q1", year: "1968", month: "3", seqs: "6,7"))
+        let sender = UUID(uuidString: "01234567-89ab-cdef-0123-456789abcdef")!
+        let status = PhoneQueueStatus(sender: sender, revision: 7, pending: 2)
+        w(RelayObjectFormat.phoneStatusName(sender: sender), RelayObjectFormat.encodePhoneStatus(token: tok, epoch: ep, status: status))
         w("_session.complete.json", RelayObjectFormat.encodeSessionComplete(token: tok, epoch: ep))
         w("_epoch.json", RelayObjectFormat.encodeEpochMarker(token: tok, epoch: ep))
         // Nasty-unicode device fixture (escape check): right-single-quote + grinning-face emoji + C0 SOH.
@@ -252,6 +255,49 @@ enum FileRelayTestDriver {
                 && session.completedDocGroups.contains("c10g0")
             rec("session-control-retained-until-manifest-durable(B10)", retained && recovered,
                 "retained=\(retained) recovered=\(recovered)")
+        }
+
+        do {
+            let d = caseDir("phone-status"); let r = makeRcv(d)
+            let firstPhone = UUID(), secondPhone = UUID()
+            let cloud = PhoneQueueStatus(sender: firstPhone, revision: 2, pending: 1)
+            let path = d.appendingPathComponent(RelayObjectFormat.phoneStatusName(sender: firstPhone))
+            try? RelayObjectFormat.encodePhoneStatus(token: token, epoch: epoch, status: cloud).write(to: path)
+            _ = await r.scanOnce()
+            let cloudHeld = session.relayPhonePendingCount == 1
+            let otherPhone = PhoneQueueStatus(sender: secondPhone, revision: 10, pending: 0)
+            session.updatePhonePending(0, status: otherPhone)
+            let older = PhoneQueueStatus(sender: firstPhone, revision: 1, pending: 0)
+            session.updatePhonePending(0, status: older)
+            let staleKeptHold = session.relayPhonePendingCount == 1
+            let directPending = PhoneQueueStatus(sender: firstPhone, revision: 3, pending: 1)
+            session.updatePhonePending(1, status: directPending)
+            let switchKeptHold = session.relayPhonePendingCount == 1
+            let directDrained = PhoneQueueStatus(sender: firstPhone, revision: 4, pending: 0)
+            session.updatePhonePending(0, status: directDrained)
+            _ = await r.scanOnce()
+            let drained = !session.phonePendingActive
+            let newDirectPending = PhoneQueueStatus(sender: firstPhone, revision: 5, pending: 1)
+            session.updatePhonePending(1, status: newDirectPending)
+            _ = await r.scanOnce()
+            let noRelatch = session.phonePendingActive && session.relayPhonePendingCount == 0
+            let reopened = CaptureSession()
+            let loadedRelayState = reopened.sessionId == session.sessionId
+                && reopened.hasSeenRelayTraffic && !reopened.photos.isEmpty
+            let reopenedRelay = FileRelayReceiver(session: reopened, token: token, epoch: epoch,
+                                                   store: LocalDirectoryStore(dir: d),
+                                                   processedURL: d.appendingPathComponent("processed.json"))
+            _ = await reopenedRelay.scanOnce()
+            let stayDrained = loadedRelayState && !reopened.phonePendingActive
+            let priorScan = reopened.relayScanFinished
+            let unavailable = LocalDirectoryStore(dir: d.appendingPathComponent("missing", isDirectory: true))
+            let unavailableRelay = FileRelayReceiver(session: reopened, token: token, epoch: epoch,
+                                                       store: unavailable, processedURL: d.appendingPathComponent("other.json"))
+            _ = await unavailableRelay.scanOnce()
+            let failedScanSkipped = reopened.relayScanStarted > priorScan && reopened.relayScanFinished == priorScan
+            rec("relay-status-holds-across-transport-switch(S-038)",
+                cloudHeld && staleKeptHold && switchKeptHold && drained && noRelatch && stayDrained && failedScanSkipped,
+                "cloudHeld=\(cloudHeld) staleIgnored=\(staleKeptHold) switchHeld=\(switchKeptHold) drained=\(drained) noRelatch=\(noRelatch) loadedRelayState=\(loadedRelayState) stayDrained=\(stayDrained) failedScanSkipped=\(failedScanSkipped)")
         }
 
         // ── Case 11: the relay boundary admits only Q1...Q3; Q0 is Mac-internal and P is not an alias. ──

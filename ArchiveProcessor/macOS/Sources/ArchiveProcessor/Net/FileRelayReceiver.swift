@@ -20,7 +20,7 @@ struct ScanReport: Sendable {
 protocol RelayObjectStore: Sendable {
     func ensureSessionFolder() throws
     func publishEpoch(_ data: Data)                 // atomic write of _epoch.json (A2)
-    func listNames() -> [String]                    // entries in the session folder (dotfiles/.part excluded)
+    func listNames() throws -> [String]             // entries in the session folder (dotfiles/.part excluded)
     func readData(_ name: String) -> Data?
     func exists(_ name: String) -> Bool
     func modificationDate(_ name: String) -> Date?
@@ -124,7 +124,25 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
     @discardableResult
     func scanOnce() async -> ScanReport {
         var report = ScanReport()
-        let names = store.listNames()
+        let s = session
+        let scan = await MainActor.run { s?.beginRelayScan() }
+        guard let names = try? store.listNames() else { return report }
+        let statusNames = names.filter { RelayObjectFormat.classify($0) == .phoneStatus }
+        let statusObjects = statusNames.compactMap { name in store.readData(name).map { (name, $0) } }
+        let checkedPhoneStatus = statusObjects.count == statusNames.count
+        let statuses: [PhoneQueueStatus] = statusObjects.compactMap { name, data in
+            guard let meta = RelayObjectFormat.parse(data),
+                  meta["kind"] == "phone-status", meta["token"] == token, meta["epoch"] == epoch,
+                  let sender = meta["sender"].flatMap(UUID.init(uuidString:)),
+                  name == RelayObjectFormat.phoneStatusName(sender: sender),
+                  let revision = meta["rev"].flatMap(Int64.init), revision > 0,
+                  let pending = meta["pending"].flatMap(Int.init), pending >= 0 else { return nil }
+            return PhoneQueueStatus(sender: sender, revision: revision, pending: pending)
+        }
+        // Positive reports hold Finish before ingest or a segment callback can advance it.
+        await MainActor.run {
+            for status in statuses where status.pending > 0 { s?.updateRelayPhonePending(status) }
+        }
         var sidecars: [String] = [], segments: [String] = [], sessionCompletes: [String] = []
         for n in names {
             switch RelayObjectFormat.classify(n) {
@@ -238,6 +256,14 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
             store.delete(seg); report.segmentsApplied.append(group)
         }
 
+        // A valid zero releases the queue hold after the photo and segment passes. An older deferred
+        // End Segment marker can still list a photo the operator removed from the phone queue.
+        let receivedPhoto = !report.ingested.isEmpty
+        await MainActor.run {
+            for status in statuses where status.pending == 0 { s?.updateRelayPhonePending(status) }
+            if let scan { s?.endRelayScan(scan, receivedPhoto: receivedPhoto, checkedPhoneStatus: checkedPhoneStatus) }
+        }
+
         // A session-complete marker force-completes the whole session (completeAllOpenDocGroups → tag
         // cards), so it must be gated on token+epoch EXACTLY like the photo/segment branches — the fixed
         // filename `_session.complete.json` alone is not proof of ownership. Parse each marker's body and
@@ -247,7 +273,7 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
             guard let data = store.readData(n), let meta = RelayObjectFormat.parse(data) else { return false }
             return meta["token"] == token && meta["epoch"] == epoch
         }
-        if !mySessionCompletes.isEmpty {
+        if checkedPhoneStatus, !mySessionCompletes.isEmpty {
             let anyUnprocessed = sidecars.contains { n in
                 guard let id = RelayObjectFormat.identityFromName(n) else { return false }
                 return processed[key(id.group, id.seq)] == nil
@@ -255,7 +281,7 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
             if !anyUnprocessed && report.segmentsDeferred.isEmpty {
                 let s = session
                 let durable = await MainActor.run {
-                    let durable = s?.completeAllOpenDocGroups() ?? false
+                    let durable = s?.completeRelaySession() ?? false
                     if durable {
                         s?.statusMessage = "Phone finished capturing — review any remaining tag cards, then Finish session."
                     }
@@ -296,7 +322,7 @@ final class FileRelayReceiver: @unchecked Sendable, CaptureReceiver {
 
     private func sweep() {
         let now = Date()
-        let names = store.listNames()
+        guard let names = try? store.listNames() else { return }
         let mediaPresent = Set(names.filter { $0.hasSuffix(".jpg") })
         let sidecarJpgs = Set(names.filter { RelayObjectFormat.classify($0) == .photo }
             .compactMap { RelayObjectFormat.identityFromName($0).map { RelayObjectFormat.jpegName(group: $0.group, seq: $0.seq) } })
@@ -361,8 +387,8 @@ final class LocalDirectoryStore: RelayObjectStore, @unchecked Sendable {
     }
     func publishEpoch(_ data: Data) { writeAtomic(RelayObjectFormat.epochMarkerName, data) }
 
-    func listNames() -> [String] {
-        let names = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
+    func listNames() throws -> [String] {
+        let names = try FileManager.default.contentsOfDirectory(atPath: dir.path)
         return names.filter { !$0.hasPrefix(".") && !$0.hasSuffix(".part") }
     }
     func readData(_ name: String) -> Data? { try? Data(contentsOf: dir.appendingPathComponent(name)) }

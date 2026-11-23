@@ -41,6 +41,12 @@ class RelayObjectFormatTest {
         assertArrayEquals("g1.segment.json must match golden byte-for-byte", golden("g1.segment.json"), out)
     }
 
+    @Test fun phoneStatusMatchesGolden() {
+        val sender = "01234567-89ab-cdef-0123-456789abcdef"
+        val out = RelayObjectFormat.encodePhoneStatus("TESTTK", "EP1", PhoneQueueStatus(sender, 7, 2))
+        assertArrayEquals(golden(RelayObjectFormat.phoneStatusName(sender)), out)
+    }
+
     @Test fun sessionCompleteMatchesGolden() {
         val out = RelayObjectFormat.encodeSessionComplete("TESTTK", "EP1")
         assertArrayEquals("_session.complete.json must match golden byte-for-byte", golden("_session.complete.json"), out)

@@ -508,13 +508,20 @@ final class CaptureViewModel: ObservableObject {
     /// mailbox needs no lock.
     private func sendStatusReport() {
         guard let c = client else { return }
-        guard heartbeat.offer(StatusReport(client: c, pending: queue.heartbeatCount)) else { return }
+        let defaults = UserDefaults.standard
+        let sender = defaults.string(forKey: "statusSender").flatMap(UUID.init(uuidString:)) ?? UUID()
+        let revision = max(Int64(Date().timeIntervalSince1970 * 1000),
+                           Int64(defaults.integer(forKey: "statusRevision")) + 1)
+        defaults.set(sender.uuidString, forKey: "statusSender")
+        defaults.set(revision, forKey: "statusRevision")
+        let status = PhoneQueueStatus(sender: sender, revision: revision, pending: queue.heartbeatCount)
+        guard heartbeat.offer(StatusReport(client: c, status: status)) else { return }
         Task {
-            while let next = heartbeat.take() { _ = await next.client.reportStatus(pending: next.pending) }
+            while let next = heartbeat.take() { _ = await next.client.reportStatus(next.status) }
         }
     }
 
-    private struct StatusReport { let client: any SegmentTransport; let pending: Int }
+    private struct StatusReport { let client: any SegmentTransport; let status: PhoneQueueStatus }
     private var heartbeat = HeartbeatMailbox<StatusReport>()
 
     private func startNewGroup() { queue.startNewGroup(); persist() }

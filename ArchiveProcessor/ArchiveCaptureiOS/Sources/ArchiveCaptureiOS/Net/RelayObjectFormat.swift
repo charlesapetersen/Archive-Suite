@@ -1,6 +1,12 @@
 import Foundation
 import CryptoKit
 
+struct PhoneQueueStatus: Sendable {
+    let sender: UUID
+    let revision: Int64
+    let pending: Int
+}
+
 /// iOS mirror of the Mac's `RelayObjectFormat` — MUST produce byte-identical output (canonical JSON, escape
 /// table, fingerprint) so the Mac receiver reads what this writes. Guarded by the golden byte-check against
 /// `SPEC/relay-golden/`. Keep in lockstep with `ArchiveProcessor/.../Net/RelayObjectFormat.swift` and the
@@ -12,6 +18,7 @@ enum RelayObjectFormat {
     static func sidecarName(group: String, seq: Int) -> String { "\(group)__\(seq).json" }
     static func receiptName(group: String, seq: Int) -> String { "\(group)__\(seq).receipt.json" }
     static func segmentName(group: String) -> String { "\(group).segment.json" }
+    static func phoneStatusName(sender: UUID) -> String { "_phone.\(sender.uuidString.lowercased()).status.json" }
     static let sessionCompleteName = "_session.complete.json"
     static let epochMarkerName = "_epoch.json"
 
@@ -69,6 +76,12 @@ enum RelayObjectFormat {
                               quality: String?, year: String?, month: String?, seqs: String?) -> Data {
         canonicalJSON(["kind": "segment-complete", "token": token, "epoch": epoch, "group": group,
                        "quality": quality, "year": year, "month": month, "seqs": seqs])
+    }
+
+    static func encodePhoneStatus(token: String, epoch: String, status: PhoneQueueStatus) -> Data {
+        canonicalJSON(["kind": "phone-status", "token": token, "epoch": epoch,
+                       "sender": status.sender.uuidString.lowercased(), "rev": String(status.revision),
+                       "pending": String(status.pending)])
     }
 
     static func encodeSessionComplete(token: String, epoch: String) -> Data {

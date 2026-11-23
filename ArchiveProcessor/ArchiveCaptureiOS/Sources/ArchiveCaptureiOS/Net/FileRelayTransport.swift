@@ -20,16 +20,7 @@ struct FileRelayTransport: SegmentTransport {
     }
 
     private func writeAtomic(_ name: String, _ data: Data) throws {
-        let final = sessionDir.appendingPathComponent(name)
-        let tmp = sessionDir.appendingPathComponent("." + name + ".\(UUID().uuidString).part")
-        do {
-            try data.write(to: tmp, options: .atomic)
-            try? FileManager.default.removeItem(at: final)
-            try FileManager.default.moveItem(at: tmp, to: final)
-        } catch {
-            try? FileManager.default.removeItem(at: tmp)
-            throw error
-        }
+        try data.write(to: sessionDir.appendingPathComponent(name), options: .atomic)
     }
 
     private func validReceipt(group: String, seq: Int, epoch: String, fp: String) -> Bool {
@@ -80,6 +71,15 @@ struct FileRelayTransport: SegmentTransport {
         guard let epoch = currentEpoch() else { return false }
         do {
             try writeAtomic(RelayObjectFormat.sessionCompleteName, RelayObjectFormat.encodeSessionComplete(token: token, epoch: epoch))
+            return true
+        } catch { return false }
+    }
+
+    func reportStatus(_ status: PhoneQueueStatus) async -> Bool {
+        guard let epoch = currentEpoch() else { return false }
+        do {
+            try writeAtomic(RelayObjectFormat.phoneStatusName(sender: status.sender),
+                            RelayObjectFormat.encodePhoneStatus(token: token, epoch: epoch, status: status))
             return true
         } catch { return false }
     }

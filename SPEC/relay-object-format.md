@@ -53,6 +53,7 @@ the filename** (a group id may contain `_`, so `<group>__<seq>` is ambiguous by 
 | Photo media | `<group>__<seq>.jpg` | phone | — (paired with its sidecar) |
 | Photo sidecar (commit marker) | `<group>__<seq>.json` | phone | `photo` |
 | Segment-complete | `<group>.segment.json` | phone | `segment-complete` |
+| Phone pending status | `_phone.<sender>.status.json` | phone | `phone-status` |
 | Session-complete | `_session.complete.json` | phone | `session-complete` |
 | Receipt | `<group>__<seq>.receipt.json` | **Mac** | `receipt` |
 | Epoch marker | `_epoch.json` | **Mac** | `epoch` |
@@ -93,6 +94,12 @@ and byte-order is a non-issue, so `canonicalJSON` is FileRelay/CI-internal.
 - **Segment-complete** `<group>.segment.json`
   `{"epoch","group","kind":"segment-complete","month"?,"quality"?,"seqs"?,"token","year"?}`
   `seqs` = comma-joined page seqs of the segment, e.g. `"6,7"` (A5: snapshotted at End-segment).
+- **Phone pending status** `_phone.<sender>.status.json`
+  `{"epoch","kind":"phone-status","pending","rev","sender","token"}`
+  `sender` is a lowercase UUID created and retained by the phone app. `rev` is its increasing
+  positive 64-bit report number, shared with the direct route. `pending` is a nonnegative decimal count of the pages the phone still needs the Mac to receive.
+  It includes failed pages eligible for retry and pages held for review. Zero follows durable receipt
+  of all retained pages or explicit removal from the phone queue.
 - **Session-complete** `_session.complete.json`
   `{"epoch","kind":"session-complete","token"}`
 - **Receipt** `<group>__<seq>.receipt.json`
@@ -108,6 +115,8 @@ Golden byte examples (`ArchiveProcessor/SPEC/relay-golden/`, fixed inputs `token
 g1__7.json          {"device":"X","epoch":"EP1","fp":"1f20bc45d93d2046","group":"g1","kind":"photo","month":"3","quality":"Q1","seq":"7","token":"TESTTK","type":"document","year":"1968"}
 g1__7.receipt.json  {"epoch":"EP1","fp":"1f20bc45d93d2046","group":"g1","kind":"receipt","received":"true","seq":"7","token":"TESTTK"}
 g1.segment.json     {"epoch":"EP1","group":"g1","kind":"segment-complete","month":"3","quality":"Q1","seqs":"6,7","token":"TESTTK","year":"1968"}
+_phone.01234567-89ab-cdef-0123-456789abcdef.status.json
+  {"epoch":"EP1","kind":"phone-status","pending":"2","rev":"7","sender":"01234567-89ab-cdef-0123-456789abcdef","token":"TESTTK"}
 _session.complete.json  {"epoch":"EP1","kind":"session-complete","token":"TESTTK"}
 _epoch.json         {"epoch":"EP1","kind":"epoch","token":"TESTTK"}
 nasty__0.json       {"device":"X’😀",...,"fp":"3569ca955db85c80","group":"nasty","kind":"photo","seq":"0","token":"TESTTK","type":"document"}
@@ -167,16 +176,39 @@ path stays the single immediate-prior group — behavior-identical there.)*
 Skip dotfiles and `*.part`, then:
 
 1. `_epoch.json` → epoch marker
-2. `_session.complete.json` → session-complete
-3. `*.receipt.json` → receipt (the Mac ignores its own)
-4. `*.segment.json` → segment-complete
-5. `*.jpg` → media
-6. remaining `*.json` → photo sidecar
+2. `_phone.<sender>.status.json` → phone pending status
+3. `_session.complete.json` → session-complete
+4. `*.receipt.json` → receipt (the Mac ignores its own)
+5. `*.segment.json` → segment-complete
+6. `*.jpg` → media
+7. remaining `*.json` → photo sidecar
 
 A photo is "ready" only when **both** the `.jpg` and its sidecar exist (the sidecar, written last, is the
 commit marker). **A10:** the receiver requires the sidecar's filename to be exactly `<group>__<seq>.json`
 for the body's `(group, seq)`, `<seq>` in canonical decimal, and quarantines a mismatch; the body stays
 authoritative.
+
+## Relay drain before Finish
+
+Both companions publish queue snapshots using their ordered status writer on pairing, queue changes,
+and the periodic retry loop. The durable photo receipt is the acknowledgement of delivery. The Mac
+accepts relay reports for its current token and epoch when the filename matches the sender in the body. It applies
+positive counts before processing scan events and zeros after processing the scan's photos and segment
+controls. A deferred End Segment marker can describe a page explicitly removed from the phone queue.
+An explicit zero still clears the photo hold.
+
+A positive relay count keeps Finish from completing any still-open group or filing the session until the
+same phone reports a newer zero. Each phone has its own status object. The direct `POST /phone/status`
+heartbeat carries the sender and report number in `X-Phone-Sender` and `X-Phone-Status-Revision` alongside
+`X-Pending`. If that phone switches to Wi-Fi or cable, its newer reports can keep or clear its relay hold.
+Another phone's zero and an older relay report leave it in force. Older direct clients can still send
+`X-Pending` alone.
+
+The Mac retains active holds and the zeros that superseded them in its session's private backup
+folder. The hold persists across disconnects until the phone reconnects and reports a newer zero.
+Cancel Finish leaves the session open. Once the Mac sees relay traffic, Finish waits for a successful
+scan that starts after the tap while the relay receiver is enabled. The Mac can account for a page
+once its pending report reaches the relay.
 
 ## Write / delete ordering (D3)
 
@@ -242,17 +274,17 @@ contract. Severity in brackets.
 
 | Piece | Path |
 |---|---|
-| **Mac** format module (names, `classify`, `identityFromName`, `canonicalJSON`, `fingerprint`, encode sidecar/receipt/segment/session/**epoch**, lenient `parse`) | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/RelayObjectFormat.swift` |
+| **Mac** format module (names, `classify`, `identityFromName`, `canonicalJSON`, `fingerprint`, encode sidecar/receipt/segment/session/status/**epoch**, lenient `parse`) | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/RelayObjectFormat.swift` |
 | **Mac** receiver (poll, `scanOnce`, ingest-then-ack, tombstones, sweep, epoch-scoped `relay-processed.json`) | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/FileRelayReceiver.swift` |
 | **Mac** group-id traversal guard (shared with `CaptureServer`) | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/CaptureValidation.swift` |
 | **Mac** Drive backend (same object shapes over `appProperties`) | `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift` |
-| **iOS** format module (names, `canonicalJSON`, `fingerprint`, encode sidecar/segment/session, lenient `parse` for receipt+epoch) | `ArchiveProcessor/ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/Net/RelayObjectFormat.swift` |
-| **Android** format module (pure Kotlin — names, `canonicalJson`, `fingerprint`, encode sidecar/segment/session) | `ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/net/RelayObjectFormat.kt` |
+| **iOS** format module (names, `canonicalJSON`, `fingerprint`, encode sidecar/segment/session/status, lenient `parse` for receipt+epoch) | `ArchiveProcessor/ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/Net/RelayObjectFormat.swift` |
+| **Android** format module (pure Kotlin — names, `canonicalJson`, `fingerprint`, encode sidecar/segment/session/status) | `ArchiveProcessor/ArchiveCapture/app/src/main/java/com/archiveprocessor/capture/net/RelayObjectFormat.kt` |
 | **Golden fixtures** (`input.jpg` + expected canonical bytes for fixed inputs; `nasty` unicode fixture) | `ArchiveProcessor/SPEC/relay-golden/*.json`, `.../input.jpg` |
 | **Cross-platform guard** (swiftc-standalone iOS emit + Android JVM JUnit, byte-diffed vs golden) | `ArchiveProcessor/scripts/test-relay-golden.sh` |
 
 > Module-surface asymmetry is intentional, not drift: only the **Mac** writes receipts + the epoch
-> marker and does `classify`/`identityFromName`; the **phones** only write sidecar/segment/session and
+> marker and does `classify`/`identityFromName`; the **phones** only write sidecar/segment/session/status and
 > only *read* the receipt + epoch marker (Android does its receipt/epoch parsing in the transport, so its
 > format module has no `parse`). The load-bearing shared surface is the **canonical bytes**, which the
 > golden guards on all three.

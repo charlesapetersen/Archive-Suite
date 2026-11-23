@@ -10,11 +10,14 @@ import java.security.MessageDigest
  *
  * No `org.json` here (keeps it JVM-unit-testable); the transport does its own receipt/epoch parsing.
  */
+data class PhoneQueueStatus(val sender: String, val revision: Long, val pending: Int)
+
 object RelayObjectFormat {
     fun jpegName(group: String, seq: Int) = "${group}__${seq}.jpg"
     fun sidecarName(group: String, seq: Int) = "${group}__${seq}.json"
     fun receiptName(group: String, seq: Int) = "${group}__${seq}.receipt.json"
     fun segmentName(group: String) = "${group}.segment.json"
+    fun phoneStatusName(sender: String) = "_phone.$sender.status.json"
     const val SESSION_COMPLETE_NAME = "_session.complete.json"
     const val EPOCH_MARKER_NAME = "_epoch.json"
 
@@ -71,6 +74,10 @@ object RelayObjectFormat {
                       quality: String?, year: String?, month: String?, seqs: String?): ByteArray =
         canonicalJson(mapOf("kind" to "segment-complete", "token" to token, "epoch" to epoch, "group" to group,
             "quality" to quality, "year" to year, "month" to month, "seqs" to seqs))
+
+    fun encodePhoneStatus(token: String, epoch: String, status: PhoneQueueStatus): ByteArray =
+        canonicalJson(mapOf("kind" to "phone-status", "token" to token, "epoch" to epoch,
+            "sender" to status.sender, "rev" to status.revision.toString(), "pending" to status.pending.toString()))
 
     fun encodeSessionComplete(token: String, epoch: String): ByteArray =
         canonicalJson(mapOf("kind" to "session-complete", "token" to token, "epoch" to epoch))

@@ -32,6 +32,13 @@ writeObj(RelayObjectFormat.epochMarkerName, RelayObjectFormat.canonicalJSON(["ki
 var pass = true
 func check(_ l: String, _ c: Bool) { print("  [\(c ? "PASS":"FAIL")] \(l)"); if !c { pass = false } }
 var t = FileRelayTransport(sessionDir: dir, token: token); t.receiptWaitTimeout = 1.5; t.receiptPollInterval = 0.2
+let sender = UUID()
+for (index, count) in [2, 0].enumerated() {
+    let status = PhoneQueueStatus(sender: sender, revision: Int64(index + 1), pending: count)
+    let ok = await t.reportStatus(status)
+    let data = try? Data(contentsOf: dir.appendingPathComponent(RelayObjectFormat.phoneStatusName(sender: sender)))
+    check("phone status publishes \(count)", ok && data == RelayObjectFormat.encodePhoneStatus(token: token, epoch: epoch, status: status))
+}
 let r1 = await t.postPhoto(jpeg: Data("b1".utf8), group:"g", seq:1, type:"document", quality:"Q1", year:1968, month:3, device:"X", replaces:nil)
 check("no-receipt -> false (timeout, never-lose)", r1 == false)
 check("no-receipt -> sidecar+jpeg written", exists(RelayObjectFormat.sidecarName(group:"g",seq:1)) && exists(RelayObjectFormat.jpegName(group:"g",seq:1)))

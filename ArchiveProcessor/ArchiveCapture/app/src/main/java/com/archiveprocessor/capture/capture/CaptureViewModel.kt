@@ -15,6 +15,7 @@ import com.archiveprocessor.capture.net.DriveClient
 import com.archiveprocessor.capture.net.DriveRelayTransport
 import com.archiveprocessor.capture.net.MacClient
 import com.archiveprocessor.capture.net.SegmentTransport
+import com.archiveprocessor.capture.net.PhoneQueueStatus
 import com.archiveprocessor.capture.net.MacEndpoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -126,7 +127,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     private val storeChannel = Channel<StoreOperation>(Channel.CONFLATED)
     /** One ordered heartbeat writer. Independent launch-per-report coroutines could reach the Mac out of
      *  order, allowing an older zero to overwrite a newer nonzero. Conflation keeps the newest queued state. */
-    private data class StatusSnapshot(val client: SegmentTransport, val pending: Int)
+    private data class StatusSnapshot(val client: SegmentTransport, val status: PhoneQueueStatus)
     private val statusChannel = Channel<StatusSnapshot>(Channel.CONFLATED)
 
     init {
@@ -175,7 +176,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch(Dispatchers.IO) {
-            for (snap in statusChannel) runCatching { snap.client.reportStatus(snap.pending) }
+            for (snap in statusChannel) runCatching { snap.client.reportStatus(snap.status) }
         }
         // Crash resilience: restore any prior session and re-send whatever wasn't confirmed uploaded.
         store.load()?.let { r ->
@@ -748,7 +749,7 @@ class CaptureViewModel(app: Application) : AndroidViewModel(app) {
     private fun sendStatusReport() {
         val c = client ?: return
         val pending = pendingReportCount(items)
-        statusChannel.trySend(StatusSnapshot(c, pending))
+        statusChannel.trySend(StatusSnapshot(c, prefs.nextPhoneStatus(pending)))
     }
 
     private fun startNewGroup() {

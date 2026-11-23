@@ -29,14 +29,14 @@ class FileRelayTransport(
         } catch (e: Exception) { null }
     }
 
-    private fun writeAtomic(name: String, data: ByteArray) {
+    private fun writeAtomic(name: String, data: ByteArray): Boolean {
         val finalF = File(sessionDir, name)
         val tmp = File(sessionDir, "." + name + "." + UUID.randomUUID() + ".part")
-        try {
+        return try {
             tmp.writeBytes(data)
-            if (finalF.exists()) finalF.delete()
             if (!tmp.renameTo(finalF)) { tmp.copyTo(finalF, overwrite = true); tmp.delete() }
-        } catch (e: Exception) { tmp.delete() }
+            true
+        } catch (e: Exception) { tmp.delete(); false }
     }
 
     private fun validReceipt(group: String, seq: Int, epoch: String, fp: String): Boolean {
@@ -84,6 +84,12 @@ class FileRelayTransport(
         val epoch = currentEpoch() ?: return false
         writeAtomic(RelayObjectFormat.SESSION_COMPLETE_NAME, RelayObjectFormat.encodeSessionComplete(token, epoch))
         return true
+    }
+
+    override fun reportStatus(status: PhoneQueueStatus): Boolean {
+        val epoch = currentEpoch() ?: return false
+        return writeAtomic(RelayObjectFormat.phoneStatusName(status.sender),
+            RelayObjectFormat.encodePhoneStatus(token, epoch, status))
     }
 
     override fun sessionDisconnect(): Boolean = true   // no persistent connection to drop

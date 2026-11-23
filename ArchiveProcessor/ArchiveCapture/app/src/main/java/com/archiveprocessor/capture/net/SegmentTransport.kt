@@ -27,9 +27,8 @@ interface SegmentTransport {
     fun segmentComplete(group: String, quality: String?, year: Int?, month: Int?, seqs: String? = null): Boolean
 
     /** Report how many photos are still un-sent on the phone (a heartbeat), so the Mac can tell the
-     *  operator "the phone still has N photos to send" at Finish. Best-effort; the default is a no-op for
-     *  transports that don't carry it (the file relays), so only the HTTP [MacClient] implements it. */
-    fun reportStatus(pending: Int): Boolean = true
+     *  operator "the phone still has N photos to send" at Finish. Best-effort. */
+    fun reportStatus(status: PhoneQueueStatus): Boolean = true
 
     /** Signal the capture session is finished (flush any still-open segment on the Mac). */
     fun sessionComplete(): Boolean

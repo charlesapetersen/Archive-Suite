@@ -35,6 +35,10 @@ final class MockDrive: HTTPExecuting, @unchecked Sendable {
     func injectFile(_ name: String, token: String, media: Data) { lock.lock(); defer { lock.unlock() }
         let folder = store.values.first { $0.mime == "application/vnd.google-apps.folder" && $0.appProps["relayToken"] == token }
         let id = newId(); store[id] = File(id: id, name: name, appProps: ["relayName": name, "relayToken": token], parents: folder.map { [$0.id] } ?? [], media: media, mime: "") }
+    func media(named name: String) -> [Data] {
+        lock.lock(); defer { lock.unlock() }
+        return store.values.filter { $0.appProps["relayName"] == name }.map(\.media)
+    }
     func hasName(_ name: String) -> Bool { lock.lock(); defer { lock.unlock() }
         return store.values.contains { $0.appProps["relayName"] == name && $0.appProps["relayRejected"] != "1" } }
 
@@ -93,6 +97,13 @@ var t = DriveRelayTransport(client: client, token: ns); t.receiptWaitTimeout = 1
 var pass = true
 func check(_ l: String, _ c: Bool) { print("  [\(c ? "PASS":"FAIL")] \(l)"); if !c { pass = false } }
 
+let sender = UUID()
+for (index, count) in [2, 0].enumerated() {
+    let status = PhoneQueueStatus(sender: sender, revision: Int64(index + 1), pending: count)
+    let ok = await t.reportStatus(status)
+    check("phone status upserts \(count)", ok && mock.media(named: RelayObjectFormat.phoneStatusName(sender: sender))
+        == [RelayObjectFormat.encodePhoneStatus(token: ns, epoch: ep, status: status)])
+}
 let r1 = await t.postPhoto(jpeg: Data("b1".utf8), group: "g", seq: 1, type: "document", quality: "Q1", year: 1968, month: 3, device: "X", replaces: nil)
 check("no-receipt -> false (timeout, never-lose)", r1 == false)
 check("no-receipt -> sidecar+jpeg upserted to Drive", mock.hasName("g__1.json") && mock.hasName("g__1.jpg"))

@@ -30,25 +30,112 @@ final class CaptureSession: ObservableObject {
     /// durable. Nil in production.
     var resolvedNotifyHookForTest: ((String) -> Void)?
 
-    /// How many photos the phone still has un-sent (its last heartbeat), + when we last heard it, so the
-    /// Mac can surface "phone still has N to send" and hold Finish until the phone has drained.
-    @Published private(set) var phonePendingCount = 0
-    private var phonePendingAt: Date?
-    /// True only if a FRESH heartbeat (within 20s) says the phone still has photos to send — staleness
-    /// guards against blocking Finish forever if the phone disconnects mid-send.
-    var phonePendingActive: Bool {
-        phonePendingCount > 0 && (phonePendingAt.map { Date().timeIntervalSince($0) < 20 } ?? false)
+    private struct PhoneReport: Codable, Equatable {
+        let status: PhoneQueueStatus
+        let relayPendingRevision: Int64
+        let drainedRevision: Int64
+        let receivedAt: Date
+        var holdsRelayDrain: Bool { relayPendingRevision > drainedRevision }
     }
 
-    /// Phone heartbeat (`POST /phone/status`): record the un-sent count + freshness, and (during a live
-    /// session) re-evaluate a pending Finish so it advances once the phone has drained.
-    func updatePhonePending(_ count: Int) {
-        phonePendingCount = count
-        phonePendingAt = Date()
+    @Published private var directPhonePendingCount = 0   // older direct clients lack sender and revision
+    private var phonePendingAt: Date?
+    @Published private var phoneReports: [UUID: PhoneReport] = [:]
+    private var savedRelayReports: [UUID: PhoneReport] = [:]
+    private var relayDrainURL: URL { incomingFolder.appendingPathComponent("relay-drain.json") }
+    private(set) var hasSeenRelayTraffic = false
+    private(set) var relayScanExpected = false
+    private(set) var relayScanStarted = 0
+    private(set) var relayScanFinished = 0
+
+    var relayPhonePendingCount: Int {
+        phoneReports.values.lazy.filter(\.holdsRelayDrain).map(\.status.pending).max() ?? 0
+    }
+
+    /// A direct heartbeat expires on disconnect. A relay hold needs an explicit newer count from
+    /// the same phone, even if the phone changes transport before draining its queue.
+    var phonePendingCount: Int {
+        let now = Date()
+        let legacy = phonePendingAt.map { now.timeIntervalSince($0) < 20 } == true
+            ? directPhonePendingCount : 0
+        let reported = phoneReports.values.lazy.filter {
+            $0.holdsRelayDrain || now.timeIntervalSince($0.receivedAt) < 20
+        }.map(\.status.pending).max() ?? 0
+        return max(legacy, reported)
+    }
+    var phonePendingActive: Bool { phonePendingCount > 0 }
+
+    func updatePhonePending(_ count: Int, status: PhoneQueueStatus? = nil) {
+        if let status {
+            recordPhoneStatus(status, viaRelay: false)
+        } else {
+            phonePendingAt = Date()
+            directPhonePendingCount = count
+        }
         // Headless E2E only (W40.i-sim-ui): the count as the Mac received it, for the harness's log.
         if headlessAutostart { FileHandle.standardError.write(Data("LIVECAPTURE_PHONE_PENDING \(count)\n".utf8)) }
         notePhoneContact()
         if processingMode == .live { liveProcessor.phoneStatusChanged() }
+    }
+
+    func beginRelayScan() -> Int {
+        relayScanStarted += 1
+        return relayScanStarted
+    }
+
+    func endRelayScan(_ scan: Int, receivedPhoto: Bool, checkedPhoneStatus: Bool) {
+        hasSeenRelayTraffic = hasSeenRelayTraffic || receivedPhoto
+        guard checkedPhoneStatus else { return }
+        relayScanFinished = scan
+        if processingMode == .live, liveProcessor.pendingFinish { liveProcessor.phoneStatusChanged() }
+    }
+
+    func updateRelayPhonePending(_ status: PhoneQueueStatus) {
+        hasSeenRelayTraffic = true
+        let previous = relayPhonePendingCount
+        recordPhoneStatus(status, viaRelay: true)
+        let current = relayPhonePendingCount
+        if headlessAutostart, previous != current {
+            FileHandle.standardError.write(Data("LIVECAPTURE_RELAY_PENDING \(current)\n".utf8))
+        }
+    }
+
+    private func recordPhoneStatus(_ status: PhoneQueueStatus, viaRelay: Bool) {
+        let previous = phoneReports[status.sender]
+        let previousDrained = previous?.drainedRevision ?? 0
+        let drained = status.pending == 0 ? max(previousDrained, status.revision) : previousDrained
+        let previousRelayPending = previous?.relayPendingRevision ?? 0
+        let relayPending = viaRelay && status.pending > 0
+            ? max(previousRelayPending, status.revision) : previousRelayPending
+
+        let latest = status.revision > (previous?.status.revision ?? 0)
+        let report = PhoneReport(status: latest ? status : previous?.status ?? status,
+                                 relayPendingRevision: relayPending, drainedRevision: drained,
+                                 receivedAt: latest ? Date() : previous?.receivedAt ?? .distantPast)
+        if report != previous { phoneReports[status.sender] = report }
+        if relayPending > 0 { saveRelayDrain(report) }
+    }
+
+    /// Keep active relay holds and the zeros that superseded them across Mac restarts.
+    private func saveRelayDrain(_ report: PhoneReport) {
+        let sender = report.status.sender
+        let saved: PhoneReport
+        if report.holdsRelayDrain {
+            saved = report
+        } else {
+            let zero = PhoneQueueStatus(sender: sender, revision: report.drainedRevision, pending: 0)
+            saved = PhoneReport(status: zero, relayPendingRevision: report.relayPendingRevision,
+                                drainedRevision: report.drainedRevision, receivedAt: .distantPast)
+        }
+        guard savedRelayReports[sender] != saved else { return }
+        var next = savedRelayReports
+        next[sender] = saved
+        do {
+            try JSONEncoder().encode(next).write(to: relayDrainURL, options: .atomic)
+            savedRelayReports = next
+        } catch {
+            NSLog("Live Capture could not save relay drain state: %@", error.localizedDescription)
+        }
     }
 
     // MARK: - Headless E2E autopilot (Tier-2 test seam; env-gated, PROD-UNCHANGED when unset)
@@ -81,6 +168,16 @@ final class CaptureSession: ObservableObject {
         // stop instead of spinning forever on a group that cannot be persisted. The caller re-enters this
         // (the finalize autopilot polls), so a transient failure is still retried, just not in a hot loop.
         while let g = pendingTagGroup, skipMacTags(groupId: g.id) {}
+    }
+
+    /// A relay marker can request the headless Finish button before it is safe to complete the groups.
+    /// In production the marker only surfaces cards, once the relay has drained.
+    func completeRelaySession() -> Bool {
+        if relayPhonePendingCount > 0 {
+            startHeadlessFinalizeIfRequested()
+            return false
+        }
+        return completeAllOpenDocGroups()
     }
 
     /// (b)+(c) Launch the headless finish→finalize autopilot once (guarded), when armed. Called from
@@ -346,8 +443,8 @@ final class CaptureSession: ObservableObject {
     /// (B4-i). Received photos + all session/processing state are UNTOUCHED — the phone retains its captures
     /// and re-uploads them to the new endpoint (idempotent `ingest`), so nothing is lost. Also nudges the
     /// USB bridge to re-assert `adb reverse` at once so a wired re-pair reconnects without waiting for the
-    /// 5s heal tick (B4-iii). The drain-gate counters (`phonePending*`) are deliberately left to expire on
-    /// their own (20s staleness window) so a re-pair mid-Finish can't prematurely un-gate finalize.
+    /// 5s heal tick (B4-iii). A direct-only report retains its 20s freshness window during a re-pair.
+    /// A relay hold follows the same phone until its queue drains.
     func phoneDidDisconnect() {
         paired = false
         phoneConnected = false
@@ -594,6 +691,13 @@ final class CaptureSession: ObservableObject {
             incomingFolder = root.appendingPathComponent(sessionId, isDirectory: true)
             try? FileManager.default.createDirectory(at: incomingFolder, withIntermediateDirectories: true)
         }
+        if let data = try? Data(contentsOf: relayDrainURL),
+           let reports = try? JSONDecoder().decode([UUID: PhoneReport].self, from: data) {
+            savedRelayReports = reports
+            phoneReports = reports
+        }
+        hasSeenRelayTraffic = !savedRelayReports.isEmpty || ["relay-processed.json", "relay-processed-cloud.json"]
+            .contains { FileManager.default.fileExists(atPath: incomingFolder.appendingPathComponent($0).path) }
         if strandedSessionCount > 0 {
             let noun = strandedSessionCount == 1 ? "session has" : "sessions have"
             statusMessage = "Recovery: \(strandedSessionCount) prior \(noun) staged output in the Backup Folder."
@@ -623,13 +727,14 @@ final class CaptureSession: ObservableObject {
         if let forced = forcedTestTransport {
             switch forced {
             case .lan: if !serverRunning { server.start() }
-            case .fileRelay: fileRelay.start()                       // own idempotency guard
-            case .cloud: cloudRelay.start(); cloudRelayStarted = true
+            case .fileRelay: relayScanExpected = true; fileRelay.start()
+            case .cloud: relayScanExpected = true; cloudRelay.start(); cloudRelayStarted = true
             }
             return
         }
         if !serverRunning { server.start() }        // LAN: BYTE-IDENTICAL to the prior default behavior
         if isDriveSignedIn {                        // Drive watcher auto-runs, gated to this active session
+            relayScanExpected = true
             cloudRelay.start()
             cloudRelayStarted = true
         }
@@ -638,6 +743,7 @@ final class CaptureSession: ObservableObject {
 
     func stop() {
         stopConnectionTimer()
+        relayScanExpected = false
         phoneConnected = false
         server.stop()
         if let forced = forcedTestTransport {
@@ -1067,6 +1173,7 @@ final class CaptureSession: ObservableObject {
     /// the last segment if the operator finished without tapping End segment — so nothing is stranded.
     @discardableResult
     func completeAllOpenDocGroups() -> Bool {
+        guard relayPhonePendingCount == 0 else { return false }
         var newlyCompleted: [String] = []
         for g in groups where g.type == .document && !resolvedGroupIds.contains(g.id)
             && !filedGroupIds.contains(g.id) {
