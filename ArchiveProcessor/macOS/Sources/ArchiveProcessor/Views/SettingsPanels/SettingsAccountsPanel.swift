@@ -163,13 +163,32 @@ struct SettingsAccountsPanel: View {
                     UserDefaults.standard.set(false, forKey: "keyValidated_\(account)")   // manual edit → needs re-validation
                     NotificationCenter.default.post(name: .apiKeyChanged, object: nil)
                 }
-            keyStatusChip(account: account, hasKey: !text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty)
+            KeyStatusChip(account: account, hasKey: !text.wrappedValue.trimmingCharacters(in: .whitespaces).isEmpty)
         }
     }
 
-    /// Small status chip: "Validated" once the guided wizard's live check passed, else "Saved".
-    @ViewBuilder private func keyStatusChip(account: String, hasKey: Bool) -> some View {
-        switch Self.keyChip(account: account, hasKey: hasKey) {
+    enum KeyChip: String { case saveFailed, validated, saved, none }
+
+    static func keyChip(hasKey: Bool, validated: Bool, saveFailed: Bool) -> KeyChip {
+        if saveFailed { return .saveFailed }
+        guard hasKey else { return .none }
+        return validated ? .validated : .saved
+    }
+}
+
+private struct KeyStatusChip: View {
+    let hasKey: Bool
+    @AppStorage private var validated: Bool
+    @AppStorage private var saveFailed: Bool
+
+    init(account: String, hasKey: Bool) {
+        self.hasKey = hasKey
+        _validated = AppStorage(wrappedValue: false, "keyValidated_\(account)")
+        _saveFailed = AppStorage(wrappedValue: false, "keySaveFailed_\(account)")
+    }
+
+    var body: some View {
+        switch SettingsAccountsPanel.keyChip(hasKey: hasKey, validated: validated, saveFailed: saveFailed) {
         case .saveFailed:
             Label("Save failed", systemImage: "exclamationmark.triangle.fill")
                 .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.red)
@@ -181,14 +200,5 @@ struct SettingsAccountsPanel: View {
         case .none:
             EmptyView()
         }
-    }
-
-    enum KeyChip: String { case saveFailed, validated, saved, none }
-
-    /// Which chip the key row shows (W49.proc-suspects-messages: `KeyWizardTestDriver` reads it as the row does).
-    static func keyChip(account: String, hasKey: Bool, defaults: UserDefaults = .standard) -> KeyChip {
-        if hasKey && defaults.bool(forKey: "keySaveFailed_\(account)") { return .saveFailed }
-        if defaults.bool(forKey: "keyValidated_\(account)") { return .validated }
-        return hasKey ? .saved : .none
     }
 }

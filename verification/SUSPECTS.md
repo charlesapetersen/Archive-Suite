@@ -677,7 +677,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** drive the wizard where `save` returns false (headless mode already makes it do so,
   `Models/KeychainHelper.swift:30`) and read the chip state.
 - **Would clear it:** the chip reads "Save failed" or not-set in that run.
-- **Status:** `reproduced` — independently confirmed and queued as W49.proc-fix-s024. [Independent VM evidence](evidence/processor/W49.proc-suspects-messages-check.md).
+- **Status:** `cleared` — fixed by W49.proc-fix-s024. [Independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
@@ -685,6 +685,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     run with `save` refusing (headless), then the key row as it reloads: `save` returned false, the field reloaded empty,
     and the chip was "Validated" (Gemini and OpenAI). The button press itself was not driven. Nothing calls it deliberate.
   - 2026-11-21 W49.proc-suspects-messages-check (Codex gpt-6.2-sol, baseline `8e89c29b`) — The OpenAI wizard passed the synthetic provider check. Returning to Accounts showed Validated beside an empty OpenAI key field.
+  - 2026-11-22 W49.proc-fix-s024 — the off-screen regression checks the provider success and save warning in
+    the wizard, then checks **Save failed** beside the empty OpenAI field after returning to Accounts.
 
 ### S-025 · The gateway's "Fill in OpenAI preset" picks a reasoning model the gateway request cannot drive
 

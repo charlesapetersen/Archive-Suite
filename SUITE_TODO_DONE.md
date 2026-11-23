@@ -18027,3 +18027,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   three synthetic PDF pairs. Off-screen Resume Run reused the six saved readings with both review
   settings, and Resume Batch filed six pairs while preserving its earlier outputs.
   <!-- /W49.storage-processor -->
+
+- [x] **W49.proc-fix-s024 — Report when the key wizard cannot save a validated key [S · S2]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build,vm) — S-024. Keep provider authentication and Keychain persistence distinct. Exercise the Validate button with a refused save and inspect the Accounts row after reopening it. [VM evidence and reproducer](verification/evidence/processor/W49.proc-suspects-messages-check.md). SHIPPED 2026-11-22 (this commit).
+  The wizard reports a refused Keychain save separately from the provider result and keeps the pasted key
+  available to retry. Accounts displays Save failed immediately and after reopening, even if the field
+  is empty. The off-screen regression uses a synthetic provider response and a headless save refusal.
+  The regression and two Processor smoke checks passed in Tart. Reviewed both screenshots.
+  No provider spend or bench cache used.
+  <!-- /W49.proc-fix-s024 -->

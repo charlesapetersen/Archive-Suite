@@ -16,7 +16,7 @@ final class MessageJourneyUITests: XCTestCase {
 
     override func tearDown() async throws { app?.terminate() }
 
-    func testWizardShowsValidatedAboveAnEmptyKey() throws {
+    func testWizardReportsRefusedKeySave() throws {
         try prepare()
         launch("key", loadPhotos: false)
         let settings = app.showSettingsWindow()
@@ -35,24 +35,28 @@ final class MessageJourneyUITests: XCTestCase {
         let validate = sheet.buttons["Validate key"]
         reveal(validate, in: sheet.scrollViews.firstMatch)
         validate.click()
-        XCTAssertTrue(sheet.buttons["Test OCR on a sample page"].waitForExistence(timeout: 10))
+        let failure = element("ap.keyWizard.saveFailure")
+        XCTAssertTrue(failure.waitForExistence(timeout: 10), sheet.debugDescription)
+        reveal(failure, in: sheet.scrollViews.firstMatch)
+        XCTAssertTrue(sheet.staticTexts["✓ Your OpenAI key works."].exists)
+        shot("s024-wizard-save-failed")
         sheet.buttons["Done"].click()
         XCTAssertTrue(sheet.waitForNonExistence(timeout: 10))
 
-        let validatedImmediately = text("Validated").exists
+        XCTAssertTrue(text("Save failed").waitForExistence(timeout: 5))
+        XCTAssertFalse(text("Validated").exists)
         XCTAssertTrue(app.showSettingsPanel("General"))
         XCTAssertTrue(app.showSettingsPanel("Accounts"))
         let account = settings.secureTextFields["OpenAI API key"].firstMatch
         XCTAssertTrue(account.exists, settings.debugDescription)
         reveal(account, in: settings.scrollViews.firstMatch)
-        let chip = text("Validated")
+        let chip = text("Save failed")
         XCTAssertTrue(chip.waitForExistence(timeout: 5), settings.debugDescription)
         XCTAssertEqual(chip.frame.midY, account.frame.midY, accuracy: 12, "the chip belongs to the OpenAI row")
         let value = account.value as? String ?? ""
         XCTAssertTrue(value.isEmpty || value == "Not set — paste a key", account.debugDescription)
-        XCTAssertFalse(text("Save failed").exists)
-        shot("s024-validated-empty")
-        print("[s024] Validated immediately: \(validatedImmediately); it appears on returning to Accounts; key field is empty.")
+        XCTAssertFalse(text("Validated").exists)
+        shot("s024-accounts-save-failed")
     }
 
     func testOpenAIPresetBuildsLegacyTokenLimit() throws {

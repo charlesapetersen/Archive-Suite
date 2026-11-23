@@ -60,6 +60,7 @@ private struct ProviderKeyStep: View {
     @State private var reveal = false
     @State private var validating = false
     @State private var status: KeyValidator.KeyStatus?
+    @State private var saveFailed = false
     @State private var testing = false
     @State private var testStatus: KeyValidator.KeyStatus?
     @State private var clipboardCandidate: String?
@@ -130,7 +131,11 @@ private struct ProviderKeyStep: View {
                 }
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier("ap.keyWizard.keyField")
-                .onChange(of: key) { _, _ in status = nil; testStatus = nil }
+                .onChange(of: key) { _, _ in
+                    status = nil
+                    saveFailed = false
+                    testStatus = nil
+                }
                 Button { reveal.toggle() } label: { Image(systemName: reveal ? "eye.slash" : "eye") }
                     .buttonStyle(.borderless)
                 #if canImport(AppKit)
@@ -154,6 +159,17 @@ private struct ProviderKeyStep: View {
             .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || validating)
 
             if let status { statusView(status) }
+
+            if saveFailed {
+                Label("Couldn’t save the key to Keychain. Check that your Keychain is unlocked, then click Validate key to try again.",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.orange.opacity(0.12)))
+                    .accessibilityIdentifier("ap.keyWizard.saveFailure")
+            }
 
             if status?.isUsable == true {
                 Button { testOCR() } label: {
@@ -199,12 +215,16 @@ private struct ProviderKeyStep: View {
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         validating = true
         status = nil
+        saveFailed = false
         testStatus = nil
         Task {
             let result = await spec.validate(trimmed)
             validating = false
+            guard key.trimmingCharacters(in: .whitespacesAndNewlines) == trimmed else { return }
             status = result
-            if result.isUsable { ProviderKeyWizard.recordUsableKey(account: spec.account, key: trimmed) }
+            if result.isUsable {
+                saveFailed = !ProviderKeyWizard.recordUsableKey(account: spec.account, key: trimmed)
+            }
         }
     }
 
@@ -244,11 +264,14 @@ private struct ProviderKeyStep: View {
 }
 
 extension ProviderKeyWizard {
-    /// What the wizard does with a key its live check passed: store it and mark the account Validated
-    /// (W49.proc-suspects-messages: `KeyWizardTestDriver` runs this as the wizard does).
-    static func recordUsableKey(account: String, key: String, defaults: UserDefaults = .standard) {
-        KeychainHelper.save(account: account, password: key)
-        defaults.set(true, forKey: "keyValidated_\(account)")
-        NotificationCenter.default.post(name: .apiKeyChanged, object: nil)
+    /// Record whether a key that passed the provider check was saved to Keychain.
+    static func recordUsableKey(account: String, key: String, defaults: UserDefaults = .standard) -> Bool {
+        let saved = KeychainHelper.save(account: account, password: key)
+        defaults.set(saved, forKey: "keyValidated_\(account)")
+        defaults.set(!saved, forKey: "keySaveFailed_\(account)")
+        if saved {
+            NotificationCenter.default.post(name: .apiKeyChanged, object: nil)
+        }
+        return saved
     }
 }

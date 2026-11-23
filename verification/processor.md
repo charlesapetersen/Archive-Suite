@@ -115,14 +115,15 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Real-path test:** `ProcessorUITests.testAnthropicGuidedKeySetupShowsConsoleCostPrivacyAndKeyShape` opens the
   wizard from Settings and checks the Anthropic page text. The tests leave two paths open: the first-run
   presentation and a successful save to a real Keychain.
-- **Runtime evidence:** [Independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md) via
-  `MessageJourneyUITests.testWizardShowsValidatedAboveAnEmptyKey`. Settings → Accounts → guided key setup →
-  OpenAI → Validate key. With the headless save refused, returning to Accounts shows Validated beside the
-  empty OpenAI field.
-- **Status:** `broken` — W49.proc-fix-s024 for S-024.
+- **Runtime evidence:** The [independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md)
+  showed Validated beside an empty OpenAI field. `MessageJourneyUITests.testWizardReportsRefusedKeySave` now
+  drives the same Validate button with a successful synthetic provider reply and a refused save. It checks the
+  wizard's provider result and Keychain warning, then checks **Save failed** in Accounts after revisiting the panel.
+- **Status:** `fixed-pending-recheck` — W49.proc-fix-s024 for S-024.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-21 W49.proc-suspects-messages-check — S-024, see runtime evidence.
+  - 2026-11-22 W49.proc-fix-s024 — the wizard reports the Keychain refusal and Accounts shows it.
 - **Notes:** **Drift.** The key is confirmed by a cheap model-list call (`OCR/KeyValidator.swift:48`), not a sample
   OCR, and saved straight after (`Views/ProviderKeyWizard.swift:206`); the sample OCR is a separate optional
   button. The format check only shows a caption (`:144-147`), it does not block Validate. The wizard covers

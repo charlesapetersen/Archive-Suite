@@ -34,9 +34,11 @@ The green label measured 2.07:1 in light mode on baseline `cb394d05`. The badge 
 color and keeps its checkmark seal. The off-screen accessibility audit measured 14.13:1 in light mode and
 10.80:1 in dark mode (W49.proc-validated-contrast).
 
-## The key wizard labels an empty key field Validated (S-024)
+## FIXED (2026-11-22) — The key wizard labels an empty key field Validated (S-024)
 
-- The OpenAI wizard passed the synthetic provider check. Returning to Accounts showed Validated beside an empty OpenAI key field. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md). (queued: W49.proc-fix-s024)
+The wizard now reports a refused Keychain save separately from the provider check. Accounts shows
+**Save failed** for the affected key, even when the field is empty. The key stays in the wizard for another try.
+See W49.proc-fix-s024 and the [original VM reproduction](../verification/evidence/processor/W49.proc-suspects-messages-check.md).
 
 ## The OpenAI gateway preset contradicts its help (S-025)
 
