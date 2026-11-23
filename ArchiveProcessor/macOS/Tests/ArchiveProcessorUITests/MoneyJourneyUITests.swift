@@ -16,29 +16,92 @@ final class MoneyJourneyUITests: XCTestCase {
 
     override func tearDown() async throws { app?.terminate() }
 
-    func testStageForLaterOffersTheSamePhotosAfterProcessingAndRelaunch() throws {
+    func testStageForLaterKeepsTheBackupWithoutOfferingCompletedPhotos() throws {
         try preparePhotos(count: 2)
         launch(extra: ["-APUITestReceiveScratchPhotos"], staged: true)
         try handOff()
+        // Switching back before Start still offers the same two photos and costs nothing.
+        try handOff()
+        XCTAssertTrue(try requestRecords().isEmpty)
         start()
         waitForDone(count: 2)
         let first = try requestRecords()
         XCTAssertEqual(first.count, 2)
         XCTAssertEqual(Set(first.map(\.digest)).count, 2)
+        XCTAssertFalse(element("ap.ocr.start").isEnabled)
+        app.typeKey("r", modifierFlags: .command)
+        try assertNoHandoff()
+        shot("s039-completed-capture")
 
-        try handOff()
-        XCTAssertEqual(try requestRecords(), first, "the handoff alone sends no provider requests")
-        shot("s039-second-handoff")
         app.terminate()
         launch(staged: true)
+        try assertNoHandoff()
+        try assertBackupCopies()
+        app.terminate()
+
+        // Replay the two uploads through ingest, as when the phone missed an acknowledgement.
+        launch(extra: ["-APUITestReceiveScratchPhotos"], staged: true)
+        try assertNoHandoff()
+        try assertBackupCopies()
+        XCTAssertEqual(try requestRecords(), first)
+        app.terminate()
+
+        launch(extra: ["-APUITestReceiveScratchPhotos", "-APUITestReceiveChangedScratchPhoto"], staged: true)
+        let changedHandoff = try openLiveCapture().buttons["Process 1 →"]
+        XCTAssertTrue(changedHandoff.waitForExistence(timeout: 10) && changedHandoff.isEnabled)
+        try assertBackupCopies()
+        XCTAssertEqual(try requestRecords(), first)
+    }
+
+    func testStageForLaterResumesAnIncompleteRunWithoutReadingCompletedPagesAgain() throws {
+        try preparePhotos(count: 2)
+        launch(extra: ["-APUITestReceiveScratchPhotos", "-APUITestMonthlyLimit", "1.008", "-ocrWorkerCount", "1"],
+               staged: true)
         try handOff()
-        shot("s039-relaunch-handoff")
         start()
+        let confirm = app.buttons["Start Within Limit"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10))
+        confirm.click()
+        XCTAssertTrue(text(containing: "Stopped at the monthly spending limit").waitForExistence(timeout: 30))
+        let paid = try requestRecords()
+        XCTAssertEqual(paid.count, 1)
+        XCTAssertTrue(element("ap.ocr.resumeRun").exists)
+
+        app.terminate()
+        launch(extra: ["-APUITestMonthlyLimit", "1.03"], staged: true)
+        try handOff()
+        let resume = element("ap.ocr.resumeRun")
+        XCTAssertTrue(resume.waitForExistence(timeout: 10))
+        resume.click()
         waitForDone(count: 2)
-        let repeated = try requestRecords()
-        XCTAssertEqual(repeated.count, 4)
-        for call in first { XCTAssertEqual(repeated.filter { $0 == call }.count, 2) }
-        print("[s039] two distinct photos handed off again after completion and after relaunch: \(repeated)")
+        XCTAssertFalse(element("ap.ocr.start").isEnabled)
+        try assertNoHandoff()
+        try assertBackupCopies()
+        let final = try requestRecords()
+        XCTAssertEqual(final.count, 2)
+        XCTAssertEqual(Set(final.map(\.digest)).count, 2)
+        XCTAssertTrue(final.contains(paid[0]))
+    }
+
+    func testStageForLaterRecoversWhenTheReceiptCannotBeSaved() throws {
+        try preparePhotos(count: 2)
+        launch(extra: ["-APUITestReceiveScratchPhotos", "-APUITestRefuseHandoffReceipt"], staged: true)
+        try handOff()
+        start()
+        XCTAssertTrue(text(containing: "the completed photos could not be marked").waitForExistence(timeout: 45))
+        let first = try requestRecords()
+        XCTAssertEqual(first.count, 2)
+        try assertBackupCopies()
+        app.terminate()
+
+        launch(staged: true)
+        let resume = element("ap.ocr.resumeRun")
+        XCTAssertTrue(resume.waitForExistence(timeout: 10))
+        resume.click()
+        XCTAssertTrue(text(containing: "Recovered catalogue filing for 2 PDFs.").waitForExistence(timeout: 30))
+        try assertNoHandoff()
+        try assertBackupCopies()
+        XCTAssertEqual(try requestRecords(), first)
     }
 
     func testMissingGeminiSegmentationKeyBlocksStartBeforeAnyRead() throws {
@@ -238,15 +301,37 @@ final class MoneyJourneyUITests: XCTestCase {
         XCTAssertTrue(element("ap.mode.picker").waitForExistence(timeout: 15))
     }
 
-    private func handOff() throws {
+    private func openLiveCapture() throws -> XCUIElement {
         let main = app.windows.containing(.any, identifier: "ap.mode.picker").firstMatch
         let live = [main.radioButtons["Live Capture"], main.buttons["Live Capture"]].first { $0.exists }
         try XCTUnwrap(live).click()
-        let process = main.buttons["Process 2 →"]
+        return main
+    }
+
+    private func handOff() throws {
+        let process = try openLiveCapture().buttons["Process 2 →"]
         XCTAssertTrue(process.waitForExistence(timeout: 10) && process.isEnabled)
         process.click()
         for index in 1...2 {
             XCTAssertTrue(text(containing: String(format: "%06d-doc.jpg", index)).waitForExistence(timeout: 10))
+        }
+    }
+
+    private func assertNoHandoff() throws {
+        let main = try openLiveCapture()
+        XCTAssertTrue(text(containing: "0 photos · 0 groups").waitForExistence(timeout: 10))
+        XCTAssertFalse(main.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Process ")).allElementsBoundByIndex
+            .contains { $0.label.hasSuffix("→") })
+    }
+
+    private func assertBackupCopies() throws {
+        let backup = root.appendingPathComponent("backup")
+        let session = try XCTUnwrap(FileManager.default.contentsOfDirectory(at: backup, includingPropertiesForKeys: nil)
+            .first { FileManager.default.fileExists(atPath: $0.appendingPathComponent("manifest.json").path) })
+        for index in 1...2 {
+            let original = try Data(contentsOf: root.appendingPathComponent("in/photo-\(index).jpg"))
+            let copy = try Data(contentsOf: session.appendingPathComponent(String(format: "%06d-doc.jpg", index)))
+            XCTAssertEqual(copy, original)
         }
     }
 

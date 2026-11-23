@@ -3,7 +3,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var processor = OCRProcessor()
-    @StateObject private var capture = CaptureSession()
+    @ObservedObject var capture: CaptureSession
     @ObservedObject private var gemma = ManagedGemma.shared
     @AppStorage(DefaultsKeys.readContainerLabels) private var readContainerLabels = true
 #if DEBUG
@@ -57,6 +57,7 @@ struct ContentView: View {
 #endif
         }
         .onAppear {
+            processor.captureSession = capture
 #if DEBUG
             // The UI test needs the exact no-sheet regeneration window, but manufacturing it through a
             // real finalize would write files. This explicit launch switch changes only the observed model
@@ -208,7 +209,7 @@ struct ContentView: View {
 
             switch mode {
             case .files:
-                OCRView(processor: processor)
+                OCRView(processor: processor, capture: capture)
             case .live:
                 LiveCaptureView(session: capture, processor: processor, liveProc: capture.liveProcessor, onProcess: { mode = .files })
             case .tools:

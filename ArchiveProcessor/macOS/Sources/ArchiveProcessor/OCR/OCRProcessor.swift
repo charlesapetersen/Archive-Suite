@@ -79,6 +79,7 @@ class OCRProcessor: ObservableObject {
     // MARK: Live Capture staging (set by LiveCaptureView, consumed by OCRView → startProcessing)
     /// Ordered captured photo URLs waiting to be loaded as the input file list.
     @Published var stagedCaptureFiles: [URL] = []
+    weak var captureSession: CaptureSession?
     /// Parallel to the staged/loaded files: whether each starts a new group, and its type.
     var stagedCaptureBoundaries: [Bool] = []
     var stagedCaptureTypes: [CaptureGroupType] = []

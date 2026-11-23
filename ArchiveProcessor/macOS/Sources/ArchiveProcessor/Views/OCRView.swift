@@ -8,6 +8,7 @@ struct OCRView: View {
     // MARK: - State
     /// Shared processor (injected so the Live Capture tab can stage files into this view).
     @ObservedObject var processor: OCRProcessor
+    @ObservedObject var capture: CaptureSession
 
     // Persisted via @AppStorage (UserDefaults)
     @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
@@ -174,6 +175,7 @@ struct OCRView: View {
     /// Re-OCR calls the model once per page, so the cost pane prices those pages separately.
     @State private var droppedPDFFileCount = 0
     @State private var droppedPDFPageCount = 0
+    @State private var stagedSelection: Set<URL> = []
     /// Pre-grouped segmentation from a Live Capture handoff (aligned to droppedFiles); empty otherwise.
     @State private var captureBoundaries: [Bool] = []
     @State private var captureTypes: [CaptureGroupType] = []
@@ -210,8 +212,9 @@ struct OCRView: View {
     @ObservedObject private var modelStore = ModelSelectionStore.shared
     @ObservedObject private var settingsStore = SettingsLayerStore.shared
 
-    init(processor: OCRProcessor) {
+    init(processor: OCRProcessor, capture: CaptureSession) {
         _processor = ObservedObject(wrappedValue: processor)
+        _capture = ObservedObject(wrappedValue: capture)
         _apiKey = State(initialValue: "")
 #if DEBUG
         // The UI suite owns this temporary output directory. Never recover the operator's
@@ -519,6 +522,7 @@ struct OCRView: View {
             guard !staged.isEmpty else { return }
             // Live Capture handed off pre-grouped photos → load them as the input files.
             replaceFiles(with: staged)
+            stagedSelection = Set(staged)
             captureBoundaries = processor.stagedCaptureBoundaries
             captureTypes = processor.stagedCaptureTypes
             captureQualities = processor.stagedCaptureQualities
@@ -533,6 +537,7 @@ struct OCRView: View {
             let staged = processor.stagedCaptureFiles
             guard !staged.isEmpty else { return }
             replaceFiles(with: staged)
+            stagedSelection = Set(staged)
             captureBoundaries = processor.stagedCaptureBoundaries
             captureTypes = processor.stagedCaptureTypes
             captureQualities = processor.stagedCaptureQualities
@@ -1207,6 +1212,10 @@ struct OCRView: View {
         if processor.pendingMixedPDFInfo != nil { return "Resume or dismiss the interrupted PDF run above first." }
         if checkingInputLocation { return "Checking the selected files’ location…" }
         if droppedFiles.isEmpty { return "Add images or PDFs to process." }
+        if !stagedSelection.isEmpty,
+           capture.hasCompletedHandoff(in: droppedFiles.filter { stagedSelection.contains($0) }) {
+            return "This selection includes photos already filed. To process another capture, start from Live Capture."
+        }
         if readingTree { return "Reading the folders inside…" }   // W47.ct-processor-intake
         if !visionWorkflowIsSupported {
             if !visionTaggingUnavailable { return "Turn off Collection ID to process without LLM judgment." }
@@ -1709,6 +1718,7 @@ struct OCRView: View {
 
     private func replaceFiles(with files: [URL]) {
         droppedFiles = files
+        stagedSelection = []
         droppedSubfolders = [:]
         flatDotFolders = [:]
         foldersBeyondDepth = []
@@ -1768,9 +1778,17 @@ struct OCRView: View {
         ProcessFilesTree.isInput(url, preOCRed: preOCRedInput)
     }
 
+    private func replaceFilesForResume(_ urls: [URL]) {
+        replaceFiles(with: urls)
+        if let captureHandoff = OCRProcessor.savedCatalogueRun()?.captureHandoffPhotos {
+            stagedSelection = Set(captureHandoff.keys).intersection(urls)
+            capture.registerHandoff(Array(stagedSelection))
+        }
+    }
+
     private func resumePendingBatch() {
         if let urls = processor.pendingBatchFileURLs {
-            replaceFiles(with: urls)
+            replaceFilesForResume(urls)
         }
         processor.passSourceTags = passSourceTags && enableTagging
         processor.taggingMode = taggingMode
@@ -1790,7 +1808,7 @@ struct OCRView: View {
     private func resumePendingRun(readWithoutClusterText: Bool = false) {
         guard let key = processor.pendingRunResumeKey(fieldKey: apiKey) else { return }
         if let urls = processor.pendingRunFileURLs {
-            replaceFiles(with: urls)
+            replaceFilesForResume(urls)
         }
         processor.passSourceTags = passSourceTags && enableTagging
         processor.taggingMode = taggingMode
@@ -1808,7 +1826,7 @@ struct OCRView: View {
     }
 
     private func resumePendingMixedPDF(readWithoutClusterText: Bool = false) {
-        if let urls = processor.pendingMixedPDFFileURLs { replaceFiles(with: urls) }
+        if let urls = processor.pendingMixedPDFFileURLs { replaceFilesForResume(urls) }
         processor.processingTask = Task {
             await processor.resumeMixedPDF(apiKey: apiKey, keyProvider: effectiveProvider,
                                            readWithoutClusterText: readWithoutClusterText)
@@ -1902,7 +1920,7 @@ struct OCRView: View {
     }
 
     private func runProcessing(confirmedMonthlyLimit: Bool = false) {
-        guard !processor.isProcessing, let outDir = outputDirectory else { return }
+        guard canStartProcessing, let outDir = outputDirectory else { return }
         // A confirmation sheet may have been open while a key or sign-in changed. Check again
         // before creating the processing task, including when Start is reached by shortcut.
         if let spec = windowSegmentationSpec {

@@ -72,9 +72,18 @@ enum MoneyJourneyFixture {
     @MainActor static func receiveScratchPhotosIfRequested(in session: CaptureSession) {
         guard isActive, ProcessInfo.processInfo.arguments.contains("-APUITestReceiveScratchPhotos"),
               session.photos.isEmpty else { return }
+        if ProcessInfo.processInfo.arguments.contains("-APUITestRefuseHandoffReceipt") {
+            session.manifestWriteOverride = { data, url in
+                guard CaptureSession.decodeManifest(data)?.completedHandoff.isEmpty == true else { return false }
+                do { try data.write(to: url, options: .atomic); return true }
+                catch { return false }
+            }
+        }
         session.beginStageSessionForTest()
         for index in 1...2 {
-            let photo = directory.appendingPathComponent("in/photo-\(index).jpg")
+            let changed = ProcessInfo.processInfo.arguments.contains("-APUITestReceiveChangedScratchPhoto")
+            let sourceIndex = index == 1 && changed ? 2 : index
+            let photo = directory.appendingPathComponent("in/photo-\(sourceIndex).jpg")
             guard let data = try? Data(contentsOf: photo),
                   session.ingest(jpeg: data, groupId: "doc", seq: index, type: .document,
                                  quality: nil, year: nil, month: nil, deviceName: "Scratch phone") != nil else {

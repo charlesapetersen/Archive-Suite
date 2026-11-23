@@ -18126,3 +18126,16 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   cost for the round trip and smoke was below $0.10.
   No rehearsal cache inputs were created.
   <!-- /W49.proc-fix-s038 -->
+- [x] **W49.proc-fix-s039 — Keep completed Stage for later runs from offering the same photos again [S · S2 · Tier-2]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build,vm) — S-039. Record completed handoffs durably and keep the backup recoverable. Verify repeat clicks, relaunch and retry after an incomplete run. [VM evidence and regression](verification/evidence/processor/W49.proc-suspects-money-check.md). SHIPPED 2026-11-23 (this commit).
+  Process Files retires each successfully read photo from the capture list only after its output
+  is verified at the destination. The Backup Folder keeps its original bytes. The capture receipt
+  survives relaunch and identical phone retries. Changed bytes at a completed capture ID get a
+  separate backup path. Interrupted runs can resume with their saved reads, and a failed receipt
+  write leaves the filing journal available for recovery.
+  Three off-screen regressions and the Process Files launch smoke passed. They verified repeat
+  clicks, a restart, replayed uploads, changed bytes, an interrupted read and a refused receipt.
+  The request log showed two distinct reads for each completed two-photo run. The Android-to-Mac
+  round trip filed all three synthetic photos with the expected text and dates. All 316 capture
+  recovery, 314 OCR prompt and 59 smoke-harness checks passed. Estimated Gemini spend was below
+  $0.05. No rehearsal cache inputs were created.
+  <!-- /W49.proc-fix-s039 -->

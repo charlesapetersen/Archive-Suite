@@ -47,6 +47,9 @@ struct ProcessorCatalogueRun: Codable, Sendable {
     var preservationIntake: [URL: ProcessorPreservationFiling.Intake]?
     var files: [File]?
     var inputJournalDigests: [String: String]?
+    /// Captured source bytes at run start. When the output plan is frozen, only successfully
+    /// read sources represented in the plan stay here, so recovery can complete the same handoff.
+    var captureHandoffPhotos: [URL: PreservationCopy.Fingerprint]?
 
     private struct DirectoryIdentity: Codable, Equatable, Sendable {
         let device: dev_t
@@ -72,14 +75,16 @@ struct ProcessorCatalogueRun: Codable, Sendable {
     }
 
     static func create(outputRoot: URL, sources: [URL], journal: URL,
-                       preservationIntake: [URL: ProcessorPreservationFiling.Intake]?) throws -> Self {
+                       preservationIntake: [URL: ProcessorPreservationFiling.Intake]?,
+                       captureHandoffPhotos: [URL: PreservationCopy.Fingerprint]? = nil) throws -> Self {
         let working = journal.deletingLastPathComponent()
             .appendingPathComponent("catalogue-work-" + UUID().uuidString.lowercased(), isDirectory: true)
         try FileManager.default.createDirectory(at: working, withIntermediateDirectories: false,
                                                 attributes: [.posixPermissions: 0o700])
         guard let identity = DirectoryIdentity(working) else { throw CocoaError(.fileWriteNoPermission) }
         let run = Self(outputRoot: outputRoot.standardizedFileURL, workingRoot: working, workingDirectory: identity,
-                       openedAt: Date(), sources: sources, preservationIntake: preservationIntake)
+                       openedAt: Date(), sources: sources, preservationIntake: preservationIntake,
+                       captureHandoffPhotos: captureHandoffPhotos)
         do {
             try run.save(to: journal, new: true)
             return run
@@ -98,6 +103,13 @@ struct ProcessorCatalogueRun: Codable, Sendable {
             throw CocoaError(.fileReadCorruptFile)
         }
         let run = try decoder.decode(Self.self, from: envelope.contents)
+        if let captureHandoff = run.captureHandoffPhotos {
+            let planned = Set(run.files?.flatMap(\.sources) ?? run.sources)
+            guard Set(captureHandoff.keys).isSubset(of: planned),
+                  Set(captureHandoff.keys).isSubset(of: Set(run.sources)) else {
+                throw CocoaError(.fileReadCorruptFile)
+            }
+        }
         let stateRoot = journal.deletingLastPathComponent().standardizedFileURL
         let name = run.workingRoot.lastPathComponent
         let prefix = "catalogue-work-"

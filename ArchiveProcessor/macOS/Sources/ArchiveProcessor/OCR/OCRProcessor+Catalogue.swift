@@ -43,6 +43,7 @@ extension OCRProcessor {
                 statusMessage = "An interrupted run is still saved. Resume it before starting another run."
                 return false
             }
+            let captureHandoff = captureSession?.handoffPhotoSnapshot(for: sources) ?? [:]
             let intake = SettingsLayerStore.shared.keepsPreservationCopies
                 ? try await PDFGenerator.runWorker(priority: .utility) {
                     var verified: [URL: ProcessorPreservationFiling.Intake] = [:]
@@ -60,7 +61,8 @@ extension OCRProcessor {
                     return verified
                 } : nil
             catalogueRun = try ProcessorCatalogueRun.create(outputRoot: outputRoot, sources: sources,
-                                                            journal: Self.pendingCatalogueURL, preservationIntake: intake)
+                                                            journal: Self.pendingCatalogueURL, preservationIntake: intake,
+                                                            captureHandoffPhotos: captureHandoff.isEmpty ? nil : captureHandoff)
             catalogueRunLease = lease
             return true
         } catch {
@@ -112,9 +114,18 @@ extension OCRProcessor {
                                                  exportingImages: exportingImages, stampsUnread: stampsUnread)
                 let workingRoot = run.workingRoot
                 let outputRoot = run.outputRoot
-                run.files = try await PDFGenerator.runWorker(priority: .utility) {
-                    try Self.prepareCatalogueFiles(drafts, workingRoot: workingRoot, outputRoot: outputRoot)
+                let captureCandidates: [URL: PreservationCopy.Fingerprint] = run.captureHandoffPhotos.map { snapshot in
+                    let read = Set(jobs.lazy.filter { $0.status == .succeeded }.map(\.sourceURL))
+                    let warnings = Set(placeholderOutputs)
+                    return snapshot.filter { read.contains($0.key) && !warnings.contains($0.key.lastPathComponent) }
+                } ?? [:]
+                let prepared = try await PDFGenerator.runWorker(priority: .utility) {
+                    try Self.prepareCatalogueFiles(drafts, workingRoot: workingRoot, outputRoot: outputRoot,
+                                                   captureSources: Set(captureCandidates.keys))
                 }
+                run.files = prepared.files
+                run.captureHandoffPhotos = captureCandidates.filter { prepared.completedCapture.contains($0.key) }
+                if run.captureHandoffPhotos?.isEmpty == true { run.captureHandoffPhotos = nil }
                 try run.save(to: Self.pendingCatalogueURL)
                 catalogueRun = run
             }
@@ -130,6 +141,10 @@ extension OCRProcessor {
     func completeCatalogueRun(_ run: ProcessorCatalogueRun) async throws -> [URL: URL] {
         let unfiled = try await PDFGenerator.runWorker(priority: .utility) { try run.fileOutputs() }
         try Task.checkCancellation()
+        if let captureHandoff = run.captureHandoffPhotos, !captureHandoff.isEmpty,
+           captureSession?.recordCompletedHandoff(captureHandoff) != true {
+            throw CaptureHandoffSaveFailure()
+        }
         let archivedBatch = try retireCatalogueInputJournals(for: run)
         try FileManager.default.removeItem(at: Self.pendingCatalogueURL)
         activePendingRun = nil
@@ -152,6 +167,12 @@ extension OCRProcessor {
         catalogueRun = nil
         catalogueDocumentFields = [:]
         return moves
+    }
+
+    private struct CaptureHandoffSaveFailure: LocalizedError {
+        var errorDescription: String? {
+            "The PDFs were filed, but the completed photos could not be marked in the Backup Folder. Resume the run to retry."
+        }
     }
 
     nonisolated static func catalogueWorkingRun(outputRoot: URL, sources: [URL]) -> ProcessorCatalogueRun? {
@@ -349,12 +370,22 @@ extension OCRProcessor {
         return try pagesForSource(source, range: pages[...])
     }
 
-    nonisolated private static func prepareCatalogueFiles(_ drafts: [DraftFile], workingRoot: URL,
-                                                          outputRoot: URL) throws -> [ProcessorCatalogueRun.File] {
+    nonisolated private static func prepareCatalogueFiles(_ drafts: [DraftFile], workingRoot: URL, outputRoot: URL,
+                                                          captureSources: Set<URL>)
+        throws -> (files: [ProcessorCatalogueRun.File], completedCapture: Set<URL>) {
         let rootInstance = UUID()
-        return try drafts.map { draft in
+        var completedCapture = Set<URL>()
+        let files = try drafts.map { draft in
             try Task.checkCancellation()
             guard let pdf = PDFDocument(url: draft.pdf), pdf.pageCount > 0 else { throw PDFError.sourceUnreadable(draft.pdf) }
+            let captured = captureSources.intersection(draft.sources)
+            // A resumed run may have lost its in-memory placeholder warning. Check the actual
+            // working PDF, including merged pages, before withdrawing any originals it represents.
+            if !captured.isEmpty, !(0..<pdf.pageCount).contains(where: {
+                pdf.page(at: $0)?.string?.hasPrefix(PDFGenerator.imagePlaceholderPrefix) == true
+            }) {
+                completedCapture.formUnion(captured)
+            }
             var sourcePages: [ProcessorCatalogueRecord.SourcePage] = []
             let suiteHeader = draft.preOCRed ? PDFHeaderParser.extract(draft.pdf) : nil
             let hasSuiteProvenance = suiteHeader?.textPages.contains { $0.header?.provenance != nil } == true
@@ -391,5 +422,6 @@ extension OCRProcessor {
                                               destination: draft.destination, record: data, filing: filing, exports: draft.exports,
                                               preservation: preservation)
         }
+        return (files, completedCapture)
     }
 }

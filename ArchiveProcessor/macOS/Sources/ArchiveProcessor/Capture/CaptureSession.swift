@@ -562,6 +562,10 @@ final class CaptureSession: ObservableObject {
     /// The subset known to be on disk. An in-memory-only ID still refuses late pages, but source retirement
     /// must wait until a manifest write confirms that ID is durable.
     private var durableFiledGroupIds: Set<String> = []
+    /// Exact Stage-for-later originals that have a verified Process Files output. They stay in
+    /// the Backup Folder, outside the active roster and its Clear/Remove actions.
+    private var completedHandoffPhotos: [String: PreservationCopy.Fingerprint] = [:]
+    private var handedOffFiles: Set<URL> = []
 
     /// Durable, user-VISIBLE parent for all Live Capture session folders: `~/Pictures/Archive Processor
     /// Live Capture/`. Kept in Pictures (not the hidden Application Support container) so the operator can
@@ -675,6 +679,7 @@ final class CaptureSession: ObservableObject {
             photos = restored.photos
             filedGroupIds = restored.filed
             durableFiledGroupIds = restored.filed
+            completedHandoffPhotos = restored.completedHandoff
             clearPhase = restored.clearPhase
             clearToken = restored.clearToken
             // Restore which document groups the phone had signalled complete (B5-ii). Without this a
@@ -864,9 +869,40 @@ final class CaptureSession: ObservableObject {
                 return nil
             }
         }
-        let name = "\(CollectionNumbering.format(seq))-\(groupId).jpg"
+        let number = CollectionNumbering.format(seq)
+        let originalName = "\(number)-\(groupId).jpg"
+        let fingerprint = PreservationCopy.Fingerprint(bytes: jpeg)
+        let name: String
+        if let receipt = completedHandoffPhotos[originalName], receipt != fingerprint {
+            // Different bytes at a completed phone ID get their own stable backup path.
+            // The dot in this name distinguishes it from every canonical phone filename.
+            let key = PreservationCopy.Fingerprint(bytes: Data(originalName.utf8) + fingerprint.sha256)
+            let hex = key.sha256.map { String(format: "%02x", $0) }.joined()
+            name = "\(number).repeat-\(hex).jpg"
+        } else {
+            name = originalName
+        }
         let finalURL = incomingFolder.appendingPathComponent(name)
         let tempURL = incomingFolder.appendingPathComponent("." + name + ".part")
+        if completedHandoffPhotos[name] == fingerprint {
+            // A replay may restore a missing backup, but must preserve any existing bytes.
+            if FileManager.default.fileExists(atPath: finalURL.path) {
+                guard (try? Data(contentsOf: finalURL, options: .mappedIfSafe)) == jpeg else {
+                    statusMessage = "A completed photo’s backup has changed. The phone’s copy has been kept."
+                    return nil
+                }
+            } else {
+                do {
+                    try jpeg.write(to: tempURL, options: .atomic)
+                    try FileManager.default.moveItem(at: tempURL, to: finalURL)
+                } catch {
+                    try? FileManager.default.removeItem(at: tempURL)
+                    return nil
+                }
+            }
+            notePhoneContact()
+            return finalURL
+        }
         do {
             try jpeg.write(to: tempURL, options: .atomic)
             try? FileManager.default.removeItem(at: finalURL)
@@ -877,7 +913,7 @@ final class CaptureSession: ObservableObject {
         }
         let photo = CapturedPhoto(url: finalURL, groupId: groupId, seq: seq, type: type,
                                   quality: quality, year: year, month: month,
-                                  preservationFingerprint: .init(bytes: jpeg))
+                                  preservationFingerprint: fingerprint)
         // Idempotent re-upload (phone resume after a crash): replace an existing same-group+seq
         // photo instead of duplicating it. Otherwise keep the list ordered by seq.
         if let existing = photos.firstIndex(where: { $0.groupId == groupId && $0.seq == seq }) {
@@ -996,6 +1032,7 @@ final class CaptureSession: ObservableObject {
     func finishPreparedClear() {
         for p in photos { Self.trashOrRemove(p.url) }   // to Trash, not a hard delete — recoverable
         photos = []
+        handedOffFiles.removeAll()
         completedDocGroups.removeAll()
         resolvedGroupIds.removeAll(); macTags.removeAll(); containerFields.removeAll(); containerFallbacks.removeAll()   // B9: keep the persisted resolve state in sync
         if writeManifest(preserveClearMarker: false) { clearPhase = nil; clearToken = nil }
@@ -1068,6 +1105,51 @@ final class CaptureSession: ObservableObject {
     }
 
     // MARK: - Grouping / handoff
+
+    private func backupFingerprint(at url: URL) -> PreservationCopy.Fingerprint? {
+        (try? Data(contentsOf: url, options: .mappedIfSafe)).map(PreservationCopy.Fingerprint.init(bytes:))
+    }
+
+    func registerHandoff(_ files: [URL]) {
+        handedOffFiles.formUnion(files)
+    }
+
+    func handoffPhotoSnapshot(for sources: [URL]) -> [URL: PreservationCopy.Fingerprint] {
+        guard processingMode != .live, !handedOffFiles.isEmpty else { return [:] }
+        let selected = handedOffFiles.intersection(sources)
+        return Dictionary(uniqueKeysWithValues: photos.compactMap { photo in
+            guard selected.contains(photo.url),
+                  let fingerprint = photo.preservationFingerprint ?? backupFingerprint(at: photo.url) else { return nil }
+            return (photo.url, fingerprint)
+        })
+    }
+
+    func hasCompletedHandoff(in sources: [URL]) -> Bool {
+        sources.contains {
+            $0.deletingLastPathComponent().path == incomingFolder.path
+                && completedHandoffPhotos[$0.lastPathComponent] != nil
+        }
+    }
+
+    /// Update the receipt and active roster in one manifest write. If it fails, the caller
+    /// keeps the filing journal so Resume can verify the same outputs and retry the write.
+    func recordCompletedHandoff(_ verified: [URL: PreservationCopy.Fingerprint]) -> Bool {
+        var receipts = completedHandoffPhotos
+        let remaining = photos.filter { photo in
+            guard let expected = verified[photo.url], backupFingerprint(at: photo.url) == expected else { return true }
+            receipts[photo.url.lastPathComponent] = expected
+            return false
+        }
+        guard remaining.count != photos.count else { return true }
+        guard writeManifest(photos: remaining, completedHandoff: receipts) else { return false }
+        do { try ProcessorCatalogueRun.flushFileAndParent(manifestURL) }
+        catch { return false }
+        completedHandoffPhotos = receipts
+        photos = remaining
+        handedOffFiles.formIntersection(remaining.map(\.url))
+        releaseSettingsSnapshotIfEmpty()
+        return true
+    }
 
     /// Photos grouped as the phone marked them, in capture order.
     var groups: [CaptureGroup] {
@@ -1311,6 +1393,7 @@ final class CaptureSession: ObservableObject {
         // W3.cap-r3-fu4: a filed group stays remembered after its source photos leave the Backup Folder.
         // Optional so pre-fu4 manifests continue to decode.
         var filedGroupIds: [String]? = nil
+        var completedHandoffPhotos: [String: PreservationCopy.Fingerprint]? = nil
         var clearPhase: String? = nil
         var clearToken: String? = nil
     }
@@ -1327,6 +1410,7 @@ final class CaptureSession: ObservableObject {
                                macTags macTagsOverride: [String: MacSegmentTags]? = nil,
                                containerFields containerFieldsOverride: [String: ContainerFieldSet]? = nil,
                                containerFallbacks containerFallbacksOverride: [String: ContainerLabelCapture.Fallback]? = nil,
+                               completedHandoff completedHandoffOverride: [String: PreservationCopy.Fingerprint]? = nil,
                                clearPhase: String? = nil,
                                clearToken: String? = nil,
                                preserveClearMarker: Bool = true) -> Bool {
@@ -1342,7 +1426,9 @@ final class CaptureSession: ObservableObject {
                                        macTags: macTagsOverride ?? macTags,
                                        containerFields: containerFieldsOverride ?? containerFields,
                                        containerFallbacks: (containerFallbacksOverride ?? containerFallbacks).mapValues(\.rawValue),
-                                       filedGroupIds: filedGroupIds.sorted(), clearPhase: markerPhase,
+                                       filedGroupIds: filedGroupIds.sorted(),
+                                       completedHandoffPhotos: completedHandoffOverride ?? completedHandoffPhotos,
+                                       clearPhase: markerPhase,
                                        clearToken: markerToken)
         guard let data = try? JSONEncoder().encode(manifest) else { return false }
         if let manifestWriteOverride {
@@ -1361,20 +1447,22 @@ final class CaptureSession: ObservableObject {
     nonisolated static func decodeManifest(_ data: Data) -> (entries: [ManifestEntry], completed: Set<String>,
                                                              resolved: Set<String>, macTags: [String: MacSegmentTags],
                                                              filed: Set<String>, clearPhase: String?, clearToken: String?,
-                                                             containerFields: [String: ContainerFieldSet], containerFallbacks: [String: ContainerLabelCapture.Fallback])? {
+                                                             containerFields: [String: ContainerFieldSet], containerFallbacks: [String: ContainerLabelCapture.Fallback],
+                                                             completedHandoff: [String: PreservationCopy.Fingerprint])? {
         let d = JSONDecoder()
         if let m = try? d.decode(SessionManifest.self, from: data) {
             // A fallback label from a newer version must never block recovery of its photos and proposals.
             let fallbacks = m.containerFallbacks?.compactMapValues(ContainerLabelCapture.Fallback.init(rawValue:)) ?? [:]
             return (m.photos, Set(m.completedDocGroups), Set(m.resolvedGroupIds ?? []), m.macTags ?? [:],
-                    Set(m.filedGroupIds ?? []), m.clearPhase, m.clearToken, m.containerFields ?? [:], fallbacks)
+                    Set(m.filedGroupIds ?? []), m.clearPhase, m.clearToken, m.containerFields ?? [:], fallbacks,
+                    m.completedHandoffPhotos ?? [:])
         }
-        if let legacy = try? d.decode([ManifestEntry].self, from: data) { return (legacy, [], [], [:], [], nil, nil, [:], [:]) }
+        if let legacy = try? d.decode([ManifestEntry].self, from: data) { return (legacy, [], [], [:], [], nil, nil, [:], [:], [:]) }
         return nil
     }
 
     /// Newest session folder that still has photos + a manifest (received but not yet cleared).
-    static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto], completed: Set<String>, resolved: Set<String>, macTags: [String: MacSegmentTags], filed: Set<String>, clearPhase: String?, clearToken: String?, containerFields: [String: ContainerFieldSet], containerFallbacks: [String: ContainerLabelCapture.Fallback])? {
+    static func latestUnprocessedSession(under root: URL) -> (folder: URL, photos: [CapturedPhoto], completed: Set<String>, resolved: Set<String>, macTags: [String: MacSegmentTags], filed: Set<String>, clearPhase: String?, clearToken: String?, containerFields: [String: ContainerFieldSet], containerFallbacks: [String: ContainerLabelCapture.Fallback], completedHandoff: [String: PreservationCopy.Fingerprint])? {
         let fm = FileManager.default
         guard let subdirs = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return nil }
         // ISO-8601 folder names sort lexically = chronologically; check newest first.
@@ -1397,11 +1485,12 @@ final class CaptureSession: ObservableObject {
             }
             // With no surviving sources, the durable ledger still marks this as the active session. Restore
             // its epoch so a late phone retry is checked against the same set after relaunch.
-            if !restored.isEmpty || !decoded.filed.isEmpty
+            if !restored.isEmpty || !decoded.filed.isEmpty || !decoded.completedHandoff.isEmpty
                 || decoded.clearPhase == "prepared" || decoded.clearPhase == "committed" {
                 restored.sort { $0.seq < $1.seq }
                 return (folder, restored, decoded.completed, decoded.resolved, decoded.macTags,
-                        decoded.filed, decoded.clearPhase, decoded.clearToken, decoded.containerFields, decoded.containerFallbacks)
+                        decoded.filed, decoded.clearPhase, decoded.clearToken, decoded.containerFields,
+                        decoded.containerFallbacks, decoded.completedHandoff)
             }
         }
         return nil
@@ -1500,7 +1589,8 @@ final class CaptureSession: ObservableObject {
         // An empty Captured pane does not mean the session ended: keep its filed-ID ledger so a late retry
         // remains detectable after relaunch.
         if let data = try? Data(contentsOf: folder.appendingPathComponent("manifest.json")),
-           let manifest = decodeManifest(data), !manifest.filed.isEmpty { return false }
+           let manifest = decodeManifest(data),
+           !manifest.filed.isEmpty || !manifest.completedHandoff.isEmpty { return false }
 
         let sourceImageExts: Set<String> = ["jpg", "jpeg", "png", "tif", "tiff", "heic", "heif"]
         let knownMetadata: Set<String> = ["manifest.json", "_epoch.json",

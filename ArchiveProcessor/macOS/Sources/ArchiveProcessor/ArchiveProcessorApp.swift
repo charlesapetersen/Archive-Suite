@@ -4,6 +4,8 @@ import ArchiveCore
 @main
 struct ArchiveProcessorApp: App {
     @NSApplicationDelegateAdaptor(ProcessorAppDelegate.self) private var appDelegate
+    // The Backup Folder has one active capture roster, even with multiple Process Files windows.
+    @StateObject private var capture = CaptureSession()
 
     init() {
         var appearanceForced = false
@@ -47,7 +49,7 @@ struct ArchiveProcessorApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(capture: capture)
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)

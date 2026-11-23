@@ -857,7 +857,8 @@ struct LiveCaptureView: View {
 
     private func stageForProcessing() {
         let (files, boundaries, types, qualities, years, months, subjects) = session.orderedFilesAndGroups()
-        guard !files.isEmpty else { return }
+        guard !files.isEmpty, !processor.isProcessing else { return }
+        session.registerHandoff(files)
         processor.stagedCaptureFiles = files
         processor.stagedCaptureBoundaries = boundaries
         processor.stagedCaptureTypes = types

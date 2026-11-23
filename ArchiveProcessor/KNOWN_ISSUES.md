@@ -70,9 +70,13 @@ See W49.proc-fix-s024 and the [original VM reproduction](../verification/evidenc
   [Regression](scripts/check-relay-finish.py) ·
   [Relay contract](../SPEC/relay-object-format.md#relay-drain-before-finish)
 
-## Stage for later offers already-processed photos (S-039)
+## FIXED (S-039) — Stage for later offered already-processed photos
 
-- Live Capture handed off the same two photos after a successful Process Files run and again after relaunch. A second Start read both photos again. The handoff itself sent zero requests. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s039)
+- Live Capture now withdraws successfully filed photos from the handoff and keeps the original JPEGs
+  in the Backup Folder. A repeat selection or an identical phone retry no longer starts another read.
+  An interrupted run keeps its recoverable work, including when the PDFs were filed but the capture
+  receipt could not be saved. (accepted: fixed by W49.proc-fix-s039)
+  [Original VM reproduction](../verification/evidence/processor/W49.proc-suspects-money-check.md).
 
 ## FIXED (S-032) — A missing segmentation credential is shown before OCR
 

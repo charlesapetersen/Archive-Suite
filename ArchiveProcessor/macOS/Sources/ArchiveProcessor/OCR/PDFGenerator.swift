@@ -54,6 +54,8 @@ struct PDFGenerator {
         try await runWorker(priority: priority) { Result { try operation() } }.get()
     }
 
+    static let imagePlaceholderPrefix = "Original image could not be embedded ("
+
     /// W23.h5 — what the written PDF's **image page** actually contains. `generate` succeeds either way (the
     /// 2-page archival contract and `PDFTextExtractor`'s `pageCount >= 2` heuristic are preserved on purpose),
     /// so a caller that only checks "did it throw / does the file exist" cannot tell the two apart. It must:
@@ -197,7 +199,7 @@ struct PDFGenerator {
             // The source image couldn't be decoded/embedded. Insert a visible placeholder rather than
             // silently emitting a 1-page (text-only) PDF — that preserves the 2-page archival contract,
             // keeps PDFTextExtractor's pageCount>=2 heuristic valid, and surfaces the failure.
-            pdfDocument.insert(makePlaceholderImagePage(note: "Original image could not be embedded (\(imageURL.lastPathComponent))."), at: 0)
+            pdfDocument.insert(makePlaceholderImagePage(note: "\(Self.imagePlaceholderPrefix)\(imageURL.lastPathComponent))."), at: 0)
             outcome = .placeholder
             layer = .textPage("the image could not be embedded")
         }
