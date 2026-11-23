@@ -1730,6 +1730,11 @@ def main():
         if "\n## Collection-number controls\n" in label_md:
             container_labels["number_controls"] = table_after(label_md, "## Collection-number controls")
             container_labels["number_contrasts"] = table_after(label_md, "## Collection-number controls", nth=1)
+        if "\n## Paired validation of the revised request\n" in label_md:
+            validation_heading = "## Paired validation of the revised request"
+            container_labels["validation_accuracy"] = table_after(label_md, validation_heading)
+            container_labels["validation_presence"] = table_after(label_md, validation_heading, nth=1)
+            container_labels["validation_resources"] = table_after(label_md, validation_heading, nth=2)
     built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(op), "handwriting": handwriting(), "r6_spot": json.loads(R6_SPOT.read_text()),
              "farmshare": farmshare(op, own["routes"]), "difficulty": diff, "headline": headline(routes), "rerun_noise": rerun_noise(),
              "regions_orderfree": regions_orderfree(), "public_segmentation": public_segmentation(),

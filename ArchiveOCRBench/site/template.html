@@ -564,6 +564,14 @@ footer p { font-size: 13px; }
       <div class="tbl"><table><thead><tr><th scope="col">JPEG</th><th scope="col">Chat content order</th><th scope="col">Correct where present</th><th scope="col">Filled where absent</th><th scope="col">Unparsed replies</th></tr></thead><tbody id="container-number-control-rows"></tbody></table></div>
       <div class="tbl"><table><thead><tr><th scope="col">Change on the 60 photos with a number</th><th scope="col">Gap in points (95% paired interval)</th></tr></thead><tbody id="container-number-contrast-rows"></tbody></table></div>
     </details>
+    <details id="container-route-validation" hidden>
+      <summary>Paired validation of the revised request</summary>
+      <p class="note">Both requests read all 135 held-out photos again. The revised request sends the upright source benchmark JPEG and puts text first. The current request encodes the JPEG in Swift and puts the image first.</p>
+      <div class="tbl"><table><thead><tr><th scope="col">Field</th><th scope="col">Eligible cells</th><th scope="col">Current correct</th><th scope="col">Revised correct</th><th scope="col">Revised less current (95% interval, points)</th></tr></thead><tbody id="container-validation-accuracy"></tbody></table></div>
+      <div class="tbl"><table><thead><tr><th scope="col">Field</th><th scope="col">Current correct where present</th><th scope="col">Revised correct where present</th><th scope="col">Current false fills</th><th scope="col">Revised false fills</th><th scope="col">False-fill gap (95% interval, points)</th></tr></thead><tbody id="container-validation-presence"></tbody></table></div>
+      <div class="tbl"><table><thead><tr><th scope="col">Request</th><th scope="col">Parseable</th><th scope="col">Capped</th><th scope="col">JPEG MB (median / p95)</th><th scope="col">Request s (median / p95)</th><th scope="col">With JPEG preparation s (median / p95)</th><th scope="col">Server peak GiB (median / p95)</th><th scope="col">Highest sampled GiB</th></tr></thead><tbody id="container-validation-resources"></tbody></table></div>
+      <p class="note">Memory is the sampled physical footprint of the warm server. Timing covers serial label requests. The app continues to use its current request and collection-number fallback.</p>
+    </details>
     <p class="note">The reference comes from owner answers, rules and cases where three readers agreed, including Google’s Gemini 3.7 Flash. The scope is the external mlx-vlm route. Source and measurement card <code>ArchiveProcessor/segbench-results/ct-gemma-route-fields.md</code>.</p>
   </section>
 
@@ -1649,6 +1657,12 @@ if (labelResults) {
     renderLabelRows('container-number-control-rows', labelResults.number_controls);
     renderLabelRows('container-number-contrast-rows', labelResults.number_contrasts);
     document.getElementById('container-number-controls').hidden = false;
+  }
+  if (labelResults.validation_accuracy) {
+    renderLabelRows('container-validation-accuracy', labelResults.validation_accuracy);
+    renderLabelRows('container-validation-presence', labelResults.validation_presence);
+    renderLabelRows('container-validation-resources', labelResults.validation_resources);
+    document.getElementById('container-route-validation').hidden = false;
   }
   document.getElementById('container-labels').hidden = false;
 }

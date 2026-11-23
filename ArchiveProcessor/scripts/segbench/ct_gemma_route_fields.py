@@ -532,7 +532,16 @@ def validation_report(holdout, calls):
                          *[f"{sum(c['filled'][arm] for c in blank)}/{len(blank)}" for arm in range(2)],
                          gap_text(paired_interval([c["filled"] for c in blank], 1, 0))])
 
+    repeats = {field: [0, 0] for field in G.FOUR}
     for prior, call in zip(holdout, calls, strict=True):
+        if prior["cells"].keys() != call["cells"].keys():
+            raise RuntimeError("Validation scoring mask differs from the original held-out run")
+        for field, cell in call["cells"].items():
+            first = prior["cells"][field]
+            if first["truth_filled"] != cell["truth_filled"]:
+                raise RuntimeError("Validation truth presence differs from the original held-out run")
+            repeats[field][0] += (first["right"][0], first["filled"][0]) == (cell["right"][0], cell["filled"][0])
+            repeats[field][1] += 1
         if prior["folder"] or NUMBER not in call["cells"]:
             continue
         cell = call["cells"][NUMBER]
@@ -561,13 +570,17 @@ def validation_report(holdout, calls):
         "## Paired validation of the revised request", "",
         "Fresh pairs on all 135 held-out photos. The current arm uses the Swift encoder and puts the image first. "
         "The revised arm sends the source benchmark JPEG and puts text first. The same local server read both arms "
-        "in a seeded shuffled order per photo, after both arms warmed up on a pilot photo. Truth and scoring "
-        "follow the held-out comparison. The intervals describe this cohort, which also supplied the earlier "
+        "in a seeded shuffled order per photo. Both arms warmed up on a pilot photo when the server started for "
+        "the first pair and again when the run resumed. Truth and scoring follow the held-out comparison. "
+        "The intervals describe this cohort, which also supplied the earlier "
         "collection-number diagnostic.", "",
         *table(("Field", "Eligible cells", "Current correct", "Revised correct",
                 "Revised less current (95% interval, points)"), accuracy), "",
         *table(("Field", "Current correct where present", "Revised correct where present",
                 "Current false fills", "Revised false fills", "False-fill gap (95% interval, points)"), presence), "",
+        "Correctness and presence flags agreed between the two runs of the current request on "
+        + ", ".join(f"{n}/{total} {field.replace('_', ' ')} cells" for field, (n, total) in repeats.items())
+        + ".", "",
         f"With the same benchmark Vision parser fallback, the current and revised routes got "
         f"{sum(pair[0] for pair in box_pairs)}/{len(box_pairs)} and {sum(pair[1] for pair in box_pairs)}/{len(box_pairs)} "
         f"box-marker collection numbers right, respectively ({gap_text(paired_interval(box_pairs, 1, 0))} points). "
@@ -638,7 +651,9 @@ def report(pilot, holdout, diagnosis, validation=None):
         "- **Noise.** 95% paired percentile bootstrap intervals over the eligible photos for each field "
         "(10,000 resamples). The collection-number comparison against in-process Gemma was specified before the "
         "held-out run. Other intervals are descriptive. One pass per route and cohort leaves rerun variation "
-        "unmeasured. An interval containing zero leaves the direction unresolved.",
+        "unmeasured for the frozen comparators and the revised request. The paired validation repeats the current "
+        "server request and reports agreement with its original run. An interval containing zero leaves the direction "
+        "unresolved.",
         "- **Scope.** External mlx-vlm server on this Mac, served the pinned Gemma snapshot, on one researcher’s "
         "held-out label photos. Ollama, LM Studio, the Processor-managed Gemma worker, and labels interleaved with "
         "an OCR model were outside this test. The scored fields use the benchmark normalization and parser.",

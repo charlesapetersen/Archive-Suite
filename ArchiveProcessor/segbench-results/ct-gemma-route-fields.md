@@ -91,10 +91,41 @@ Among the 45 box marks with a number, the modeled Gemma-first policy with the sa
 
 The JPEG comparison covers resizing and re-encoding together. The last comparison can also reflect differences in the server and in-process execution paths. The 15 blank photos give a limited check for false fills. Title, repository and date were outside these controls, as were the managed reader and other servers.
 
+## Paired validation of the revised request
+
+Fresh pairs on all 135 held-out photos. The current arm uses the Swift encoder and puts the image first. The revised arm sends the source benchmark JPEG and puts text first. The same local server read both arms in a seeded shuffled order per photo. Both arms warmed up on a pilot photo when the server started for the first pair and again when the run resumed. Truth and scoring follow the held-out comparison. The intervals describe this cohort, which also supplied the earlier collection-number diagnostic.
+
+| Field | Eligible cells | Current correct | Revised correct | Revised less current (95% interval, points) |
+| --- | --- | --- | --- | --- |
+| Repository | 131 | 97/131 | 103/131 | +4.6 (+0.0 to +9.9) |
+| Collection title | 132 | 87/132 | 96/132 | +6.8 (-0.8 to +14.4) |
+| Collection number | 134 | 96/134 | 111/134 | +11.2 (+4.5 to +17.9) |
+| Date | 134 | 103/134 | 111/134 | +6.0 (-0.7 to +13.4) |
+
+| Field | Current correct where present | Revised correct where present | Current false fills | Revised false fills | False-fill gap (95% interval, points) |
+| --- | --- | --- | --- | --- | --- |
+| Repository | 31/59 | 36/59 | 6/72 | 5/72 | -1.4 (-6.9 to +4.2) |
+| Collection title | 28/71 | 38/71 | 2/61 | 3/61 | +1.6 (+0.0 to +4.9) |
+| Collection number | 22/60 | 38/60 | 0/74 | 1/74 | +1.4 (+0.0 to +4.1) |
+| Date | 42/62 | 44/62 | 11/72 | 5/72 | -8.3 (-16.7 to -1.4) |
+
+Correctness and presence flags agreed between the two runs of the current request on 131/131 repository cells, 132/132 collection title cells, 134/134 collection number cells, 134/134 date cells.
+
+With the same benchmark Vision parser fallback, the current and revised routes got 46/67 and 58/67 box-marker collection numbers right, respectively (+17.9 (+7.5 to +28.4) points). That calculation uses a cached Vision reading when Gemma supplies no number.
+
+| Request | Parseable | Capped | JPEG MB (median / p95) | Request s (median / p95) | With JPEG preparation s (median / p95) | Server peak GiB (median / p95) | Highest sampled GiB |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Current | 133/135 | 2 | 0.27 / 0.40 | 14.40 / 20.36 | 14.63 / 20.52 | 9.56 / 9.84 | 9.85 |
+| Revised | 135/135 | 0 | 0.20 / 0.30 | 14.90 / 18.73 | 14.90 / 18.73 | 9.56 / 9.85 | 9.85 |
+
+Request time includes JSON/base64 work and the loopback round trip. Preparation includes launching the Swift encoder for the current arm and reading the source JPEG for the revised arm. Server physical footprint was sampled at the start, every 100 ms during each request and at the end. Each request's maximum includes the warm model and allocations retained by the server. Sampling can miss shorter peaks. These timings and memory figures cover serial label reads, without an OCR model loaded alongside.
+
+The owner approved validation on 2026-11-23. The app continues to use the existing external request and Gemma-first/Vision-fallback collection-number rule. The source JPEGs here are already upright benchmark inputs. A production change requires a separate decision.
+
 ## Measurement card
 
 - **Truth.** The frozen W47.ct-truth-final label set. The owner’s answers and notes, rule-settled cells, and otherwise three unanimous drafts. Gemini 3.7 Flash, from Google like Gemma, was one of those drafters, alongside two Qwen readers. Gemma itself drafted none of the truth. The common scorer excludes carried, illegible, cut-off, and unresolved cells.
 - **Selection.** The 135 photos remaining after the fixed seed 4702 draw of 60. Cache preflight verified the 195 truth photos, paired in-process replies and Vision line caches before collection. Reply quality did not select photos.
 - **Comparison.** The app’s ImageIO/CoreGraphics encoder with rotation zero on the already upright photos, 1,600 px long-edge cap, JPEG quality 0.9. Same invented-example prompt, temperature 0, 640-token ceiling and reasoning off for server Gemma. Its request puts the image before the prompt text. The original in-process template puts the image token after the text and reads the source JPEG. In-process Gemma and cached Apple Vision with the bench’s pattern parser are the frozen ct-read comparators. A parse failure supplies no value. HTTP or transport failure stops the run so a connectivity problem cannot be mistaken for an absent label field.
-- **Noise.** 95% paired percentile bootstrap intervals over the eligible photos for each field (10,000 resamples). The collection-number comparison against in-process Gemma was specified before the held-out run. Other intervals are descriptive. One pass per route and cohort leaves rerun variation unmeasured. An interval containing zero leaves the direction unresolved.
+- **Noise.** 95% paired percentile bootstrap intervals over the eligible photos for each field (10,000 resamples). The collection-number comparison against in-process Gemma was specified before the held-out run. Other intervals are descriptive. One pass per route and cohort leaves rerun variation unmeasured for the frozen comparators and the revised request. The paired validation repeats the current server request and reports agreement with its original run. An interval containing zero leaves the direction unresolved.
 - **Scope.** External mlx-vlm server on this Mac, served the pinned Gemma snapshot, on one researcher’s held-out label photos. Ollama, LM Studio, the Processor-managed Gemma worker, and labels interleaved with an OCR model were outside this test. The scored fields use the benchmark normalization and parser.
