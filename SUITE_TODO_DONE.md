@@ -18219,3 +18219,17 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   A focused two-line check covered shifted offsets, combining mark order, equivalent Unicode forms and fallback.
   Debug build and the offline text-layer smoke (including veraPDF) passed. No paid calls or bench cache created.
   <!-- /W49.proc-hand-nfd -->
+
+- [x] **W49.proc-pdfa-memory — the PDF/A writer streams pages instead of holding the whole output [M]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build) — `PDFGenerator.archivalData` plus `ArchivalFinish`'s rewrite peak at three to four times the file, so a 200-page merge of 2 MB pages passes 1 GB. Write pages to a file-backed consumer and rewrite from disk; measure the peak footprint on a scratch 200-page merge before and after. Tier-2 (file-writing output). Covers §W42.int-s5 "The PDF/A writer holds the whole output in memory…". Filed by W49.ki-audit-processor.
+  Quartz draws from one source PDF at a time into a file-backed context. The PDF/A repair copies the body in
+  1 MiB chunks and rebuilds the xref and XMP on disk. Searchable merges keep their qpdf stream-copy path and
+  read back the candidate by URL. Process Files publishes a verified same-volume candidate after its
+  cancellation and source-map checks. The same-volume stage can temporarily hold two copies of the output.
+  In fresh Debug processes on macOS 27.2, the same 200 synthetic pages with distinct JPEGs (458,689,896-byte
+  result) used 1,954,483,776 bytes before and 715,916,920 bytes after at peak physical footprint
+  (`/usr/bin/time -l`, including page read-back, down 63%). Both read back all page markers in order.
+  Peak resident size fell from 2,497,724,416 to 804,487,168 bytes. qpdf reported no syntax or stream errors.
+  Scratch checks cover leaving an existing output intact on unreadable input or refused publication,
+  removing the private stage, and preserving PDF/A-2b, searchable headers, catalogue identity and merge
+  tag/sidecar recovery. No paid calls or rehearsal-cache inputs.
+  <!-- /W49.proc-pdfa-memory -->

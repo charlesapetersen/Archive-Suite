@@ -5,7 +5,7 @@ import PDFKit
 import VisionOCRKit
 
 /// W42.int-s5-compress — a PDF/A-2b file made from finished pages without drawing them again, for the searchable
-/// form's compressed page (`CompressedPage`): Quartz's PDF/A writer (`PDFGenerator.archivalData`) redraws every page
+/// form's compressed page (`CompressedPage`): Quartz's PDF/A writer redraws every page
 /// and re-encodes its JBIG2 images, which undoes the compression. qpdf copies the pages as they are (`--empty
 /// --pages`), and its JSON update gives the catalog what PDF/A-2b asks of it: the XMP (`pdfaid` part 2, conformance
 /// B, the header list, `PDFHeaderCarrier`), stored unfiltered as `ArchivalFinish` stores Quartz's; an sRGB output
@@ -99,30 +99,32 @@ enum SearchableArchival {
     /// of the result (`PDFHeaderCarrier`), nil for a pair's page.
     static func write(_ sources: [URL], pageHeaders: [String?], to url: URL, budget: PDFChildBudget,
                       catalogueIdentity: CataloguePDFIdentity? = nil) throws {
-        let data = try data(sources, pageHeaders: pageHeaders, budget: budget, catalogueIdentity: catalogueIdentity)
+        let dir = try PDFGenerator.stagingDirectory(in: url.deletingLastPathComponent())
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let candidate = try prepare(sources, pageHeaders: pageHeaders, in: dir, budget: budget,
+                                    catalogueIdentity: catalogueIdentity)
         try budget.check()
-        do { try data.write(to: url, options: .atomic) } catch { throw PDFError.writeFailed }
+        try PDFGenerator.installArchival(candidate, at: url)
     }
 
-    /// `write` into memory. Read back before it is returned: every page of every source in order, each with the text
-    /// it had, and the header list as given.
+    /// The bounded header-edit API still returns bytes.
     static func data(_ sources: [URL], pageHeaders: [String?], budget: PDFChildBudget? = nil,
                      catalogueIdentity: CataloguePDFIdentity? = nil) throws -> Data {
         let budget = budget ?? PDFChildBudget(seconds: PDFChildBudget.secondsPerPage * Double(max(1, pageHeaders.count)))
+        let dir = try PDFGenerator.stagingDirectory(in: FileManager.default.temporaryDirectory)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let candidate = try prepare(sources, pageHeaders: pageHeaders, in: dir, budget: budget,
+                                    catalogueIdentity: catalogueIdentity)
+        try budget.check()
+        return try Data(contentsOf: candidate)
+    }
+
+    private static func prepare(_ sources: [URL], pageHeaders: [String?], in dir: URL, budget: PDFChildBudget,
+                                catalogueIdentity: CataloguePDFIdentity?) throws -> URL {
         try budget.check()
         guard let qpdf = CompressedPage.qpdf else { throw Failure.noQPDF }
-        guard !sources.isEmpty else { throw PDFError.writeFailed }
-        let docs = try sources.map { url -> PDFDocument in
-            guard let doc = PDFDocument(url: url), !doc.isLocked else { throw PDFError.sourceUnreadable(url) }
-            return doc
-        }
-        let pageCount = docs.map(\.pageCount).reduce(0, +)
-        guard pageCount > 0, pageHeaders.count == pageCount else { throw Failure.check("the header list does not fit the pages") }
+        guard !sources.isEmpty, !pageHeaders.isEmpty else { throw PDFError.writeFailed }
 
-        let fm = FileManager.default
-        let dir = fm.temporaryDirectory.appendingPathComponent("ap-archival-" + UUID().uuidString, isDirectory: true)
-        defer { try? fm.removeItem(at: dir) }
-        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         let merged = dir.appendingPathComponent("merged.pdf"), patch = dir.appendingPathComponent("patch.json")
         let out = dir.appendingPathComponent("out.pdf")
 
@@ -152,25 +154,35 @@ enum SearchableArchival {
         try JSONSerialization.data(withJSONObject: update, options: .withoutEscapingSlashes).write(to: patch)
         try run(qpdf, [merged.path, "--update-from-json=" + patch.path, "--newline-before-endstream", out.path], budget: budget)
 
-        let data = try Data(contentsOf: out)
-        try check(data, against: docs, pageHeaders: pageHeaders, xmp: xmp, catalogueIdentity: catalogueIdentity)
-        try budget.check()
-        return data
+        try check(out, against: sources, pageHeaders: pageHeaders, xmp: xmp, catalogueIdentity: catalogueIdentity,
+                  budget: budget)
+        return out
     }
 
     /// The result opens with every page in order, each with its source's size, turn and text, its XMP as written
     /// (unfiltered, so PDFium's rewrite in an Improve OCR revision keeps it) and the header list as given.
-    private static func check(_ data: Data, against docs: [PDFDocument], pageHeaders: [String?], xmp: Data,
-                              catalogueIdentity: CataloguePDFIdentity?) throws {
-        guard let made = PDFDocument(data: data), let ref = made.documentRef else { throw Failure.check("the file does not open") }
-        let pages = docs.flatMap { doc in (0..<doc.pageCount).compactMap { doc.page(at: $0) } }
-        guard made.pageCount == pages.count else { throw Failure.check("the file does not have every page") }
-        for (i, page) in pages.enumerated() {
-            guard let p = made.page(at: i), p.bounds(for: .mediaBox) == page.bounds(for: .mediaBox),
-                  p.rotation == page.rotation, (p.string ?? "") == (page.string ?? "") else {
-                throw Failure.check("page \(i + 1) does not read back as it was")
+    private static func check(_ url: URL, against sources: [URL], pageHeaders: [String?], xmp: Data,
+                              catalogueIdentity: CataloguePDFIdentity?, budget: PDFChildBudget) throws {
+        guard let made = PDFDocument(url: url), let ref = made.documentRef else { throw Failure.check("the file does not open") }
+        guard made.pageCount == pageHeaders.count else { throw Failure.check("the header list does not fit the pages") }
+        var index = 0
+        for source in sources {
+            try autoreleasepool {
+                guard let doc = PDFDocument(url: source), !doc.isLocked else { throw PDFError.sourceUnreadable(source) }
+                for i in 0..<doc.pageCount {
+                    try budget.check()
+                    try autoreleasepool {
+                        guard let page = doc.page(at: i), index < made.pageCount, let p = made.page(at: index),
+                              p.bounds(for: .mediaBox) == page.bounds(for: .mediaBox), p.rotation == page.rotation,
+                              (p.string ?? "") == (page.string ?? "") else {
+                            throw Failure.check("page \(index + 1) does not read back as it was")
+                        }
+                        index += 1
+                    }
+                }
             }
         }
+        guard made.pageCount == index else { throw Failure.check("the file does not have every page") }
         var stream: CGPDFStreamRef?
         var format = CGPDFDataFormat.raw
         guard let catalog = ref.catalog, CGPDFDictionaryGetStream(catalog, "Metadata", &stream), let stream,

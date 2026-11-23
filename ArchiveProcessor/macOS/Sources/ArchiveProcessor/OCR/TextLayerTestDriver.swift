@@ -179,6 +179,24 @@ enum TextLayerTestDriver {
         archivalChecks("layered output", layered)
         let merged = dir.appendingPathComponent("merged.pdf")
         do {
+            let sentinel = Data("previous output".utf8)
+            try sentinel.write(to: merged, options: .withoutOverwriting)
+            let missing = dir.appendingPathComponent("missing.pdf")
+            let badMerge: Void? = try? PDFGenerator().mergeDocumentPDFs(sourcePDFs: [layered, missing], outputURL: merged)
+            check("6 unreadable later source leaves the previous output intact",
+                  badMerge == nil && (try? Data(contentsOf: merged)) == sentinel)
+
+            // A nonempty directory refuses the final rename after the candidate was drawn and verified.
+            let occupied = dir.appendingPathComponent("occupied.pdf", isDirectory: true)
+            try fm.createDirectory(at: occupied, withIntermediateDirectories: false)
+            let marker = occupied.appendingPathComponent("keep")
+            try sentinel.write(to: marker, options: .withoutOverwriting)
+            let refused: Void? = try? PDFGenerator().mergeDocumentPDFs(sourcePDFs: [layered], outputURL: occupied)
+            let siblings = try fm.contentsOfDirectory(atPath: dir.path)
+            check("6 refused publication keeps the destination and removes the staging directory",
+                  refused == nil && (try? Data(contentsOf: marker)) == sentinel
+                      && !siblings.contains { $0.hasPrefix(".archiveprocessor-") })
+
             try PDFGenerator().mergeDocumentPDFs(sourcePDFs: [layered, layered], outputURL: merged)
             check("6 the merged document has every page", PDFDocument(url: merged)?.pageCount == 4)
             archivalChecks("merged document", merged)

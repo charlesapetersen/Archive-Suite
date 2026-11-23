@@ -597,10 +597,8 @@ New output puts an invisible text layer on the image page of print pages (`OCR/T
 VisionOCRKit `TextLayer`), and turns a page whose lines slope by 1 degree or more level (`OCR/ReadingCopy.swift`,
 switch `straightenReadingCopy`), and writes every output as PDF/A-2b; the text page stays. W42.int-s5 shipped
 2026-11-13; the searchable (layer-only) form is `W42.int-s5-searchable` and the hand placer `W42.int-s5-hands` (its
-limits in their own section). Open:
-- **The PDF/A writer holds the whole output in memory** (`PDFGenerator.archivalData`, then `ArchivalFinish`'s rewrite):
-  about three to four times the file at the peak, so a 200-page merge of 2 MB pages passes 1 GB. It draws each page's
-  media box only, without crop box or annotations; every caller passes the app's own new pages, which have neither (queued: W49.proc-pdfa-memory).
+limits in their own section). W49.proc-pdfa-memory streams the archival output and its metadata repair to disk.
+Quartz draws the media box of the app's generated pages, which carry no crop box or annotations. Open:
 - **Image-plus-text is 2.6 to 17 times Vision OCR's size** (measured 2026-11-13, `scripts/measure-output.sh` on three
   UIUC pages and the drawn memo): 2.1-2.3 MB a photographed page against Vision OCR 1.16.0's 0.12-0.87 MB, because
   the image page is the 2 MB JPEG copy. The searchable form is compressed as Vision OCR compresses

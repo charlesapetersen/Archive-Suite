@@ -289,54 +289,82 @@ struct PDFGenerator {
     /// `pageHeaders`: one entry per page for a file with searchable pages (`PDFHeaderCarrier`), nil for pairs only.
     static func writeArchival(_ document: PDFDocument, to url: URL, pageHeaders: [String?]? = nil,
                               catalogueIdentity: CataloguePDFIdentity? = nil) throws {
-        guard let data = archivalData(document, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity) else {
-            throw PDFError.writeFailed
+        let count = document.pageCount
+        try writeQuartz(to: url, pageCount: count, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity) { context in
+            for index in 0..<count {
+                try Task.checkCancellation()
+                autoreleasepool { drawArchivalPage(document.page(at: index)?.pageRef, in: context) }
+            }
         }
-        do { try data.write(to: url, options: .atomic) } catch { throw PDFError.writeFailed }
     }
 
-    /// `writeArchival` into memory. It
-    /// is drawn as the output's own pages are, so it renders as they do.
+    /// The bounded header-edit API still returns bytes. The main output and merge paths write to URLs.
     static func archivalData(_ document: PDFDocument, pageHeaders: [String?]? = nil,
                              catalogueIdentity: CataloguePDFIdentity? = nil) -> Data? {
-        if let pageHeaders, pageHeaders.count != document.pageCount { return nil }
-        let data = NSMutableData()
-        guard let consumer = CGDataConsumer(data: data as CFMutableData),
-              let pages = try? drawArchival(document, into: consumer),
-              let out = ArchivalFinish.finished(data as Data, pageHeaders: pageHeaders,
-                                                 catalogueIdentity: catalogueIdentity) else { return nil }
-        guard let provider = CGDataProvider(data: out as CFData), CGPDFDocument(provider)?.numberOfPages == pages else {
-            return nil
-        }
-        return out
+        do {
+            let dir = try stagingDirectory(in: FileManager.default.temporaryDirectory)
+            defer { try? FileManager.default.removeItem(at: dir) }
+            let url = dir.appendingPathComponent("out.pdf")
+            try writeArchival(document, to: url, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity)
+            return try Data(contentsOf: url)
+        } catch { return nil }
     }
 
-    /// Draws every page of `document` into one PDF/A context on `consumer`; returns how many.
-    private static func drawArchival(_ document: PDFDocument, into consumer: CGDataConsumer) throws -> Int {
-        guard document.pageCount > 0 else { throw PDFError.writeFailed }
-        // A page with no content of its own (the bare `PDFPage()` the text and placeholder pages fall back to) is a blank
-        // letter page, as PDFKit wrote it.
-        let pages = (0..<document.pageCount).map { document.page(at: $0)?.pageRef }
-        let letter = CGRect(x: 0, y: 0, width: 612, height: 792)
-        var firstBox = pages[0].map(drawnBox(of:)) ?? letter
+    /// A private, same-volume directory for unverified bytes.
+    static func stagingDirectory(in parent: URL) throws -> URL {
+        let dir = parent
+            .appendingPathComponent(".archiveprocessor-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: false,
+                                                attributes: [.posixPermissions: 0o700])
+        return dir
+    }
+
+    /// Publish a verified candidate in one filesystem operation. Process Files reserves a fresh name.
+    static func installArchival(_ candidate: URL, at destination: URL, replacingExisting: Bool = true) throws {
+        try Task.checkCancellation()
+        let result = replacingExisting ? rename(candidate.path, destination.path)
+            : renamex_np(candidate.path, destination.path, UInt32(RENAME_EXCL))
+        guard result == 0 else { throw PDFError.writeFailed }
+    }
+
+    private static func writeQuartz(to url: URL, pageCount: Int, pageHeaders: [String?]?,
+                                    catalogueIdentity: CataloguePDFIdentity?,
+                                    draw: (CGContext) throws -> Void) throws {
+        guard pageCount > 0, pageHeaders == nil || pageHeaders?.count == pageCount else { throw PDFError.writeFailed }
+        let dir = try stagingDirectory(in: url.deletingLastPathComponent())
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let raw = dir.appendingPathComponent("quartz.pdf")
+        try drawQuartz(to: raw, draw: draw)
+        let candidate = try ArchivalFinish.finishFile(raw, rewritten: dir.appendingPathComponent("finished.pdf"),
+                                                      expectedPages: pageCount, pageHeaders: pageHeaders,
+                                                      catalogueIdentity: catalogueIdentity)
+        try installArchival(candidate, at: url)
+    }
+
+    // Close and release the file-backed context before the repair opens the file.
+    private static func drawQuartz(to url: URL, draw: (CGContext) throws -> Void) throws {
         let info: [CFString: Any] = [kCGPDFContextCreatePDFA: true, kCGPDFContextCreator: "Archive Processor"]
-        guard let context = CGContext(consumer: consumer, mediaBox: &firstBox, info as CFDictionary) else {
+        guard let consumer = CGDataConsumer(url: url as CFURL),
+              let context = CGContext(consumer: consumer, mediaBox: nil, info as CFDictionary) else {
             throw PDFError.writeFailed
         }
-        for page in pages {
-            var box = page.map(drawnBox(of:)) ?? letter
-            let boxData = withUnsafeBytes(of: &box) { Data($0) } as CFData
-            context.beginPDFPage([kCGPDFContextMediaBox: boxData] as CFDictionary)
-            guard let page else { context.endPDFPage(); continue }
+        defer { context.closePDF() }
+        try draw(context)
+    }
+
+    private static func drawArchivalPage(_ page: CGPDFPage?, in context: CGContext) {
+        // Bare PDFPage() fallbacks become a blank letter page, as they did in the buffered writer.
+        var box = page.map(drawnBox(of:)) ?? CGRect(x: 0, y: 0, width: 612, height: 792)
+        let boxData = withUnsafeBytes(of: &box) { Data($0) } as CFData
+        context.beginPDFPage([kCGPDFContextMediaBox: boxData] as CFDictionary)
+        if let page {
             context.saveGState()
-            // The page's own transform, so a /Rotate or an offset media box comes out as the page showed.
+            // The page's own transform preserves its display turn and offset media box.
             context.concatenate(page.getDrawingTransform(.mediaBox, rect: box, rotate: 0, preserveAspectRatio: true))
             context.drawPDFPage(page)
             context.restoreGState()
-            context.endPDFPage()
         }
-        context.closePDF()
-        return pages.count
+        context.endPDFPage()
     }
 
     /// The page as drawn, at the origin: its media box, turned by its /Rotate.
@@ -1033,57 +1061,71 @@ struct PDFGenerator {
     /// Throws `PDFError.sourceUnreadable` if any source PDF cannot be loaded (fail-loud
     /// to prevent silent page-drop in this no-undo path).
     func mergeDocumentPDFs(sourcePDFs: [URL], outputURL: URL, catalogueIdentity: CataloguePDFIdentity? = nil) throws {
-        let data = try mergedDocumentData(sourcePDFs: sourcePDFs, catalogueIdentity: catalogueIdentity)
         try Task.checkCancellation()
-        do { try data.write(to: outputURL, options: .atomic) } catch { throw PDFError.writeFailed }
-    }
-
-    func mergedDocumentData(sourcePDFs: [URL], catalogueIdentity: CataloguePDFIdentity? = nil) throws -> Data {
-        try Task.checkCancellation()
-        let merged = PDFDocument()
-        var pageIndex = 0
-        var headers: [String?] = []
-        // A source before the last that ends on an image with no text page (as before, allowed in a merge of pairs).
-        var openImage: URL?
-
-        for (n, pdfURL) in sourcePDFs.enumerated() {
-            guard let doc = PDFDocument(url: pdfURL) else {
-                throw PDFError.sourceUnreadable(pdfURL)
-            }
-            let carried = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:))
-            // A list that does not fit the pages would be read as pairs and its headers lost: refuse it.
-            if let carried, carried.count != doc.pageCount { throw PDFError.sourceUnreadable(pdfURL) }
-            let roles = PDFPageRole.roles(of: doc)
-            if n < sourcePDFs.count - 1, roles.last == .image { openImage = openImage ?? pdfURL }
-            for i in 0..<doc.pageCount {
-                guard let page = doc.page(at: i) else {
-                    throw PDFError.sourceUnreadable(pdfURL)
-                }
-                merged.insert(page, at: pageIndex)
-                headers.append(roles[i] == .searchable ? carried?[i] ?? nil : nil)
-                pageIndex += 1
-            }
-        }
-
-        guard merged.pageCount > 0 else { throw PDFError.writeFailed }
-        let pageHeaders: [String?]? = headers.contains { $0 != nil } ? headers : nil
-        // With a list, such an image would pair with the next source's page, which its own file never did: refuse.
-        if pageHeaders != nil, let openImage { throw PDFError.sourceUnreadable(openImage) }
-        // W42.int-s5-compress: with searchable pages, the pages are copied as they are (`SearchableArchival`), so a
-        // compressed page stays compressed; Quartz redraws them where qpdf is missing or fails.
+        let (sources, pageHeaders) = try Self.mergeMetadata(sourcePDFs)
+        // qpdf copies the original compressed streams. Quartz supplies the fallback and the pair-only path.
         if let pageHeaders, SearchableArchival.isAvailable {
             do {
-                return try SearchableArchival.data(sourcePDFs, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity)
+                let budget = PDFChildBudget(seconds: PDFChildBudget.secondsPerPage * Double(pageHeaders.count))
+                try SearchableArchival.write(sourcePDFs, pageHeaders: pageHeaders, to: outputURL, budget: budget,
+                                             catalogueIdentity: catalogueIdentity)
+                return
             } catch {
                 try Task.checkCancellation()
                 NSLog("ArchiveProcessor: merge through qpdf failed (%@); merging through Quartz", "\(error)")
             }
         }
-        try Task.checkCancellation()
-        guard let data = Self.archivalData(merged, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity) else {
-            throw PDFError.writeFailed
+        let pageCount = sources.reduce(0) { $0 + $1.count }
+        try Self.writeQuartz(to: outputURL, pageCount: pageCount, pageHeaders: pageHeaders,
+                             catalogueIdentity: catalogueIdentity) { context in
+            for source in sources {
+                try Task.checkCancellation()
+                try autoreleasepool {
+                    // Reopen one source at a time and refuse a changed page count or carrier.
+                    guard let doc = PDFDocument(url: source.url), !doc.isLocked, doc.pageCount == source.count,
+                          doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:)) == source.carried else {
+                        throw PDFError.sourceUnreadable(source.url)
+                    }
+                    for index in 0..<source.count {
+                        try Task.checkCancellation()
+                        try autoreleasepool {
+                            guard let page = doc.page(at: index) else { throw PDFError.sourceUnreadable(source.url) }
+                            Self.drawArchivalPage(page.pageRef, in: context)
+                        }
+                    }
+                }
+            }
         }
-        return data
+    }
+
+    private struct MergeSource {
+        let url: URL
+        let count: Int
+        let carried: [String?]?
+    }
+
+    private static func mergeMetadata(_ sourcePDFs: [URL]) throws -> ([MergeSource], [String?]?) {
+        var sources: [MergeSource] = []
+        var headers: [String?] = []
+        var openImage: URL?
+        for (n, url) in sourcePDFs.enumerated() {
+            try Task.checkCancellation()
+            try autoreleasepool {
+                guard let doc = PDFDocument(url: url), !doc.isLocked else { throw PDFError.sourceUnreadable(url) }
+                let count = doc.pageCount
+                let carried = doc.documentRef.flatMap(PDFHeaderCarrier.pages(of:))
+                // A list that does not fit would be read as pairs and its headers lost.
+                if let carried, carried.count != count { throw PDFError.sourceUnreadable(url) }
+                let roles = carried.map { PDFPageRole.roles(carried: $0, pageCount: count) } ?? PDFPageRole.pairs(count)
+                if n < sourcePDFs.count - 1, roles.last == .image, openImage == nil { openImage = url }
+                sources.append(MergeSource(url: url, count: count, carried: carried))
+                headers.append(contentsOf: carried ?? Array(repeating: nil, count: count))
+            }
+        }
+        let pageHeaders: [String?]? = headers.contains { $0 != nil } ? headers : nil
+        // A carried list would pair a trailing image with the next source's page.
+        if pageHeaders != nil, let openImage { throw PDFError.sourceUnreadable(openImage) }
+        return (sources, pageHeaders)
     }
 }
 

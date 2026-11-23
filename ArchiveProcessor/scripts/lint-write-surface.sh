@@ -20,9 +20,15 @@ SEP=$'\x1f'
 # PDFGenerator must be re-audited just as surely as one in a new source file.
 ALLOW=(
   # W42.int-s5: generated pages use the Quartz PDF/A writer or the stream-preserving writer for a compressed
-  # searchable page. Merges assemble PDF/A bytes in memory through archivalData or SearchableArchival.data.
+  # searchable page. Merges use the stream-preserving writer when available and stage on the destination volume.
   "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try Self.writeArchival(pdfDocument, to: outputURL, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity)"
   "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try SearchableArchival.write([page], pageHeaders: [header], to: url, budget: budget, catalogueIdentity: catalogueIdentity)"
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try writeArchival(document, to: url, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity)"
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try SearchableArchival.write(sourcePDFs, pageHeaders: pageHeaders, to: outputURL, budget: budget,"
+  # Publication only after candidate read-back, plus Process Files' guard after the worker returns.
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try installArchival(candidate, at: url)"
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/SearchableArchival.swift${SEP}try PDFGenerator.installArchival(candidate, at: url)"
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift${SEP}try PDFGenerator.installArchival(candidate, at: mergedURL, replacingExisting: false)"
   # W49.storage-processor: the DEBUG recovery driver stages a synthetic PDF carrying the companion's
   # catalogue identity. All calls write under its UUID-named test directory with isolated backup enabled.
   "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/Capture/LiveCaptureRecoveryTestDriver.swift${SEP}try? PDFGenerator.writeArchival(document, to: pdf, catalogueIdentity: identity)"
@@ -137,11 +143,11 @@ pdf_document_write_hits() {
   done < <(find "$SRC" -name '*.swift' -type f -print0)
 }
 
-# Every call of the PDF/A output writer, its definition and comment lines aside. A new caller is a new PDF
+# Every call of the Quartz PDF/A writer or the shared publication function, except definitions and comments. A new caller is a new PDF
 # output site and must be audited (and allowed by its exact line).
 archival_write_hits() {
-  grep -rnE '\bwriteArchival[[:space:]]*\(' "$SRC" --include='*.swift' 2>/dev/null \
-    | /usr/bin/perl -ne 'next if /^[^:]+:\d+:\s*(?:\/\/|\/\*|\*)/; next if /\bfunc\s+writeArchival\b/; print' || true
+  grep -rnE '\b(writeArchival|installArchival)[[:space:]]*\(' "$SRC" --include='*.swift' 2>/dev/null \
+    | /usr/bin/perl -ne 'next if /^[^:]+:\d+:\s*(?:\/\/|\/\*|\*)/; next if /\bfunc\s+(?:writeArchival|installArchival)\b/; print' || true
 }
 
 # The stream-preserving PDF/A writer is subject to the same call-site audit as Quartz's writer above.
@@ -160,7 +166,7 @@ scan_stream pdfwrite \
   'SearchableArchival.write outside its audited output sites:' \
   < <(searchable_write_hits)
 scan_stream pdfwrite \
-  'PDFGenerator.writeArchival outside its audited output sites (or an allowed line changed):' \
+  'PDFGenerator write or publication outside its audited output sites (or an allowed line changed):' \
   < <(archival_write_hits)
 
 if [ "$FAIL" -eq 0 ]; then

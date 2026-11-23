@@ -1985,22 +1985,29 @@ extension OCRProcessor {
             let firstOutputPDF = sourcePDFs[0]
             let baseName = firstOutputPDF.deletingPathExtension().lastPathComponent
             let originalJSONURL = firstOutputPDF.deletingPathExtension().appendingPathExtension("json")
+            func mergeParent() -> URL {
+                outputSubfolders[segment.pdfURLs[0].standardizedFileURL.path] == nil
+                    ? catalogueRun?.workingRoot ?? outputDirectory : firstOutputPDF.deletingLastPathComponent()
+            }
             do {
-                let merged = try await PDFGenerator.runWorker(priority: .utility) {
-                    try PDFGenerator().mergedDocumentData(sourcePDFs: sourcePDFs)
+                let mergeDirectory = mergeParent()
+                let staging = try PDFGenerator.stagingDirectory(in: mergeDirectory)
+                defer { try? FileManager.default.removeItem(at: staging) }
+                let candidate = staging.appendingPathComponent("merged.pdf")
+                try await PDFGenerator.runWorker(priority: .utility) {
+                    try PDFGenerator().mergeDocumentPDFs(sourcePDFs: sourcePDFs, outputURL: candidate)
                 }
-                guard !Task.isCancelled, segment.pdfURLs.compactMap({ outputURLMap[$0] }) == sourcePDFs else { return }
+                guard !Task.isCancelled, segment.pdfURLs.compactMap({ outputURLMap[$0] }) == sourcePDFs,
+                      mergeParent() == mergeDirectory else { return }
 
                 // Reserve the PDF and its optional JSON sidecar after the suspension. A JSON-only prior-run
                 // collision advances the PDF too, keeping the pair aligned for downstream organization.
                 let hasJSON = FileManager.default.fileExists(atPath: originalJSONURL.path)
-                let mergeDirectory = outputSubfolders[segment.pdfURLs[0].standardizedFileURL.path] == nil
-                    ? catalogueRun?.workingRoot ?? outputDirectory : firstOutputPDF.deletingLastPathComponent()
                 let mergedURL = OutputFileSafety.reserveUniqueDestination(
                     preferred: mergeDirectory.appendingPathComponent(baseName + "_merged.pdf"),
                     reservedPaths: &_takenOutputPaths, companionExtension: hasJSON || exportsLocalNames ? "json" : nil)
                 let mergedJSONURL = mergedURL.deletingPathExtension().appendingPathExtension("json")
-                try merged.write(to: mergedURL, options: .atomic)
+                try PDFGenerator.installArchival(candidate, at: mergedURL, replacingExisting: false)
 
                 // Apply tags to the merged PDF. Prefer the first page's tags, but fall back to the
                 // first page in the segment that actually has tags, so the merged PDF isn't left

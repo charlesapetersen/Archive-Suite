@@ -140,7 +140,7 @@ extension PDFGenerator {
     }
 }
 SWIFT
-expect 1 'an extra writeArchival call inside PDFGenerator fails (W42.int-s5)' 'PDFGenerator.writeArchival outside'
+expect 1 'an extra writeArchival call inside PDFGenerator fails (W42.int-s5)' 'PDFGenerator write or publication outside'
 
 fresh_tree
 mkdir -p "$SCRATCH/$SRC/OCR"
@@ -152,6 +152,14 @@ func plantedArchivalWriteElsewhere(_ document: PDFDocument, _ outputURL: URL) th
 }
 SWIFT
 expect 1 'a writeArchival call in a new source file fails (W42.int-s5)' 'PlantedArchivalWrite.swift:3:'
+
+fresh_tree
+cat > "$SCRATCH/$SRC/OCR/PlantedArchivalInstall.swift" <<'SWIFT'
+func plantedArchivalInstall(_ candidate: URL, _ output: URL) throws {
+    try PDFGenerator.installArchival(candidate, at: output)
+}
+SWIFT
+expect 1 'publication of an unaudited PDF candidate fails' 'PlantedArchivalInstall.swift:2:'
 
 fresh_tree
 /usr/bin/perl -0pi -e 's/try Self\.writeArchival\(pdfDocument, to: outputURL,/try Self.writeArchival(pdfDocument, to: changedURL,/' \
