@@ -425,10 +425,11 @@ When label reading needs Gemma, the Processor checks the existing local servers 
 - **Thinking at High is not capped by a budget.** Claude 4.7 and later think adaptively (a `budget_tokens` is a 400),
   so High is `effort: high` inside the same `max_tokens` (8,192 plus 8,000 for a page). A page that thinks past that
   fails as cut off rather than returning short text, and the estimate counts no Anthropic thinking tokens. (accepted: Anthropic's adaptive thinking takes no budget; a cut-off page fails loudly).
-- **Its OpenRouter windows have not been sent live.** The request is the Anthropic key's (no thinking field), pinned to
-  Anthropic's endpoint with `require_parameters`; the bench's pilot found that endpoint refuses reasoning *off*
-  (`enabled: false`), which this request does not send. No live call was made (no money for this item); the first real
-  run is the check, and a refusal fails every window loudly (a 400 is fatal). (accepted: no money for this item; the first real run is the check and a refusal fails loudly).
+- **OpenRouter accepted the app's window and reading requests in a live smoke test on 2026-11-23.** Claude
+  Sonnet 5.5 on Anthropic's endpoint identified two synthetic document pages and the boundary between them
+  using the window request with no explicit reasoning field. Its low-effort reading classified the memo as a
+  document start and transcribed its exact test identifier. OpenRouter charged $0.023728 for the two calls.
+  (accepted: live route check passed in W49.proc-openrouter-claude-live; the plan-route benchmark figures still have no parity check).
 
 ## ⚠️ LIMITATION (W41.app-openrouter-unmeasured, 2026-11-18): what an unmeasured OpenRouter model does not do
 

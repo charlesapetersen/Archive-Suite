@@ -18311,3 +18311,12 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   [Regression evidence](verification/evidence/processor/W49.proc-suspects-messages-check.md#s-025-fix--openai-preset-help-and-request).
   No OpenAI key was available for a live response. No paid calls or bench cache.
   <!-- /W49.proc-fix-s025 -->
+
+- [x] **W49.proc-openrouter-claude-live — one live window of Claude through OpenRouter before a user's first run [S]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build,paid) — Owner, 2026-11-19, settled by the existing spending rule in the accepted-issues review. Verify one live segmentation window and one reading page before the guided session.
+  On baseline 5a0375d8, the app's shipped window prompt and request classified the synthetic memo and letter as
+  documents with a new boundary between them. The app's low-effort OCR reader returned `document_start` and the
+  exact memo identifier `MEMO-ALPHA-4471`. OpenRouter identified Anthropic as upstream and returned HTTP 200 for both.
+  The window used 6,266 input and 149 output tokens ($0.014022). OCR used 4,338 input and 103 output tokens
+  ($0.009706). OpenRouter reported $0.023728 total, under the $0.20 pre-run estimate. This was a route smoke test.
+  No production code changes or bench cache. Scratch copies were deleted after the run.
+  <!-- /W49.proc-openrouter-claude-live -->
