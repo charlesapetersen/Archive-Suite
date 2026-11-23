@@ -55,8 +55,6 @@ GOOD_HI = 0.90
 CEILING = 0.05
 FOLDS, SEEDS = 5, 20
 FAILED = float('inf')
-# These rules are deployed pending the separate removal in W46.p17-flag-unflag-five.
-DEPLOYED_WITHOUT_HITS = {'gemini3.8-flash', 'gemini3.1-pro', 'gemini3.5-flash-lite', 'qwen3.8-flash', 'qwen3.6-27b'}
 
 
 # --- statistics (pure; self-tested) ---------------------------------------------------------------------------
@@ -466,7 +464,7 @@ def app_readers(rows96, rowsl):
             fitted_sets = [e['on_96'], e['on_ladder_defects']]
         e['ships'] = cut is not None and ev['crossval']['hits'] > 0 and all(
             r['fa_rate'] is not None and r['fa_rate'] <= CEILING for r in fitted_sets)
-        e['in_app'] = e['ships'] or k in DEPLOYED_WITHOUT_HITS
+        e['in_app'] = e['ships']
         out[k] = e
     return out
 
@@ -561,8 +559,8 @@ def check_swift(out):
     import re
     src = (HERE.parents[1] / 'macOS/Sources/ArchiveProcessor/OCR/ReadQualityDisagreement.swift').read_text()
     have = {m.group(2): float(m.group(1)) for m in re.finditer(
-        r'flagAtOrAbove: ([0-9.]+),\s*measuredOn: "[^"]*",\s*benchKey: "([^"]+)"', src)}
-    have.update({m.group(2): float(m.group(1)) for m in re.finditer(r'plain\("[^"]+", ([0-9.]+), "([^"]+)"\)', src)})
+        r'flagAtOrAbove: ([0-9.]+),\s*measuredOn: "[^"]*",\s*benchReaderID: "([^"]+)"', src)}
+    have.update({m.group(2): float(m.group(1)) for m in re.finditer(r'plain\("[^"]+", ([0-9.]+), "([^"]+)", caught: \d+, poor: \d+\)', src)})
     want = {k: e['flag_at'] for k, e in out['app_readers'].items() if e['in_app']}
     bad = sorted(set(have) ^ set(want)) + sorted(k for k in set(have) & set(want) if have[k] != want[k])
     if bad:
@@ -641,11 +639,11 @@ CARD = """
 FINDINGS_READERS = """
 ## Findings for the other readers (W46.p17-flag-answered-hits)
 
-- Nine of sixteen cuts qualify on answered readings. Five deployed cuts catch zero poor answers at their fitted
+- Nine of sixteen cuts qualify on answered readings. Five former app cuts catch zero poor answers at their fitted
   thresholds or in cross-validation: Gemini 3.8 Flash (0/3), Gemini 3.1 Pro (0/2), Gemini 3.5 Flash Lite (0/3),
   Qwen3.8 Flash (0/3), and Qwen3.6 27B (0/3). Each flags four good plain-photo answers in the fit. Their earlier
-  reported hits came from failed requests. Gemini 3.8 Flash's AUC falls from 0.897 to about 0.83. The removal of
-  those five cuts is tracked in W46.p17-flag-unflag-five, following the owner's call 24. Claude Sonnet 5.5 and
+  reported hits came from failed requests. Gemini 3.8 Flash's AUC falls from 0.897 to about 0.83. The app removed
+  those five cuts in W46.p17-flag-unflag-five, following the owner's call 24. Claude Sonnet 5.5 and
   Mistral OCR also catch zero poor answers (0/2 and 0/7) and have no app rule (call 17).
 - Four readers catch one poor answer each at their fitted cuts: Gemini 3.1 Flash Lite (1/5), GPT-5.4 mini (1/4),
   Qwen3.5 9B through OpenRouter (1/5), and Qwen3-VL 8B on the Mac (1/3).
@@ -653,7 +651,7 @@ FINDINGS_READERS = """
   Its cut is near-total disagreement. The table above gives its plain and damaged results separately.
 - The check compares the reader's text with Apple Vision's. A completed Vision pass with no text is total
   disagreement. Region-ordered newspaper text, failed reader replies and failed Vision passes are outside
-  the check. The run summary names the images each reader's threshold was measured on.
+  the check. The run summary names the images each flagged reader's threshold was measured on and what it caught there.
 """
 
 

@@ -64,10 +64,11 @@ enum ReadQualityFlagTestDriver {
               (try? JSONDecoder().decode(OCRResult.self, from: Data(legacy.utf8)))?.readPoorly == nil)
 
         // 3. The run's summary and history.
-        let visionSaid = " Apple Vision's check was measured on \(F.visionMeasuredOn)."
+        let visionSaid = " Apple Vision's check was measured on \(F.visionMeasuredOn) and \(F.visionMeasuredCatch)."
         let differs = ReadQualityFlag(visionConfidence: nil, disagreement: 0.8, reader: "LightOnOCR-3",
-                                      measuredOn: "96 plain photographs, read on this Mac")
-        let lightOnSaid = "LightOnOCR-3's check was measured on 96 plain photographs, read on this Mac"
+                                      measuredOn: "96 plain photographs, read on this Mac",
+                                      measuredCatch: "caught 8 of 11 poor readings")
+        let lightOnSaid = "LightOnOCR-3's check was measured on 96 plain photographs, read on this Mac and caught 8 of 11 poor readings"
         check("3 no flagged pages, no clause", OCRProcessor.readPoorlyClause([]).isEmpty)
         check("3 one page is named, with what its check was measured on",
               OCRProcessor.readPoorlyClause([("a.jpg", flagged!)])
@@ -81,7 +82,7 @@ enum ReadQualityFlagTestDriver {
         check("3 both kinds in one run name both, each reader once",
               OCRProcessor.readPoorlyClause([("a", differs), ("b", flagged!), ("c", differs)])
                 == " 3 pages may have read poorly (Apple Vision was unsure, or read the page differently); check a, b, c. "
-                + "\(lightOnSaid); Apple Vision's check was measured on \(F.visionMeasuredOn).")
+                + "\(lightOnSaid); Apple Vision's check was measured on \(F.visionMeasuredOn) and \(F.visionMeasuredCatch).")
         check("3 a PDF keeps its most concerning page's flag",
               F.worst([flagged!, differs]) == differs && F.worst([flagged!]) == flagged && F.worst([]) == nil)
         let processor = OCRProcessor()
@@ -142,10 +143,22 @@ enum ReadQualityFlagTestDriver {
                 && D.rule(for: route(.gemini, "qwen/qwen3-vl-8b-thinking", gateway: true, local: true)) == nil)
         check("5 the Mac's Qwen3-VL 8B", D.rule(for: route(.gemini, "qwen/qwen3-vl-8b", gateway: true, local: true)) == D.qwenVL8Mac)
         check("5 a measured model through OpenRouter on its maker's endpoint has the model's rule",
-              D.rule(for: route(.openrouter, "google/gemini-3.8-flash")) == D.direct[.gemini]?["gemini-3.8-flash"]
-                && D.rule(for: route(.openrouter, "openai/gpt-5.4-mini")) == D.direct[.openai]?["gpt-5.4-mini"]
-                && D.rule(for: route(.openrouter, "google/gemini-3.1-pro-preview")) == D.direct[.gemini]?["gemini-3.1-pro"]
+              D.rule(for: route(.openrouter, "google/gemini-3.5-flash"))?.reader == "Gemini 3.5 Flash"
+                && D.rule(for: route(.openrouter, "openai/gpt-5.4-mini"))?.reader == "GPT-5.4 mini"
                 && D.rule(for: route(.openrouter, "anthropic/claude-sonnet-5.5")) == nil)
+        let unflaggedRoutes = [
+            route(.gemini, "gemini-3.8-flash"), route(.gemini, "gemini-3.1-pro"),
+            route(.gemini, "gemini-3.5-flash-lite"), route(.openrouter, "google/gemini-3.8-flash"),
+            route(.openrouter, "google/gemini-3.1-pro-preview"), route(.openrouter, "google/gemini-3.5-flash-lite"),
+            route(.openrouter, "qwen/qwen3.8-flash"), route(.openrouter, "qwen/qwen3.6-27b"),
+        ]
+        check("5 owner call 24 removes the five cuts, including their maker aliases",
+              unflaggedRoutes.allSatisfy { D.rule(for: $0) == nil })
+        check("5 the four one-catch readers keep their cuts",
+              D.rule(for: route(.gemini, "gemini-3.1-flash-lite"))?.flagAtOrAbove == 0.6978
+                && D.rule(for: route(.openai, "gpt-5.4-mini"))?.flagAtOrAbove == 0.6721
+                && D.rule(for: route(.openrouter, "qwen/qwen3.5-9b"))?.flagAtOrAbove == 0.6979
+                && D.qwenVL8Mac.flagAtOrAbove == 0.7013)
         check("5 the Mac's Qwen3.5 9B under each server's name",
               ["mlx-community/Qwen3.5-9B-4bit", "qwen3.5:9b", "qwen/qwen3.5-9b"]
                 .allSatisfy { D.rule(for: route(.gemini, $0, gateway: true, local: true)) == D.qwenMac })
@@ -171,7 +184,7 @@ enum ReadQualityFlagTestDriver {
         check("5 a reading that disagrees at the cut is flagged, with its reader and what it was measured on",
               D.assess(readerText: text(differingIn: at), visionText: base, rule: rule)
                 == ReadQualityFlag(visionConfidence: nil, disagreement: Double(at) / 100, reader: rule.reader,
-                                   measuredOn: rule.measuredOn))
+                                   measuredOn: rule.measuredOn, measuredCatch: rule.measuredCatch))
         check("5 just under it is not", D.assess(readerText: text(differingIn: under), visionText: base, rule: rule) == nil)
         check("5 Vision reading nothing counts as total disagreement, as in the fit",
               D.assess(readerText: base, visionText: nil, rule: rule)?.disagreement == 1)
@@ -198,8 +211,8 @@ enum ReadQualityFlagTestDriver {
         check("5 a second reader without a rule does not inherit the primary cut",
               await D.check(result(far, secondReader: second), route: lightOn, imageURL: page) == nil)
         let gpt = SecondReader(provider: "OpenAI", model: "GPT-5.4 mini", firstCode: "length", modelID: "gpt-5.4-mini")
-        let gemini = route(.gemini, "gemini-3.8-flash")
-        // 0.68 is above GPT's cut (0.6721) and below Gemini's (0.6882).
+        let gemini = route(.gemini, "gemini-3.5-flash")
+        // 0.68 is above GPT's cut (0.6721) and below Gemini's (0.6847).
         let borderline = text(differingIn: 68)
         check("5 the fallback uses the second reader's cut",
               await D.check(result(borderline, secondReader: gpt), route: gemini, imageURL: page)?.reader == "GPT-5.4 mini")
@@ -212,7 +225,9 @@ enum ReadQualityFlagTestDriver {
         }
         check("5 an unmeasured cluster build does not inherit the preset or primary cut",
               await D.check(imported("Qwen/Qwen3.6-27B"), route: gemini, imageURL: page) == nil)
-        check("5 a region-ordered import stays unflagged even with a measured model",
+        check("5 the official FP8 import stays unflagged without the hosted reader's cut",
+              await D.check(imported("Qwen/Qwen3.6-27B-FP8"), route: gemini, imageURL: page) == nil)
+        check("5 a region-ordered import stays unflagged",
               await D.check(imported("Qwen/Qwen3.6-27B-FP8", inRegions: true), route: gemini, imageURL: page) == nil)
         var regions = result(far)
         regions.newspaperLayout = NewspaperLayoutRecord(regions: 3, requests: 3, coverage: 0.9, filled: true, fallback: nil)

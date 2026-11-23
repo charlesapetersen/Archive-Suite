@@ -7,8 +7,7 @@ import VisionOCRKit
 /// reaches the reader's own cut is flagged. Each cut was fitted by `scripts/segbench/post_read_flag.py report`
 /// (`app_readers` in `segbench-results/post-read-flag.json`) for at most 5% false alarms among that reader's readings
 /// at 70 NES or above, on the sets named in `measuredOn`. The bench counts hits and false alarms on answered
-/// readings and requires a held-out poor answer caught to recommend a cut. Five deployed cuts precede this
-/// correction (W46.p17-flag-answered-hits); their removal is tracked in W46.p17-flag-unflag-five.
+/// readings and requires a held-out poor answer caught to recommend a cut.
 ///
 /// The check skips failed or blank reader replies, region-ordered newspaper text, and failed Vision passes.
 /// A completed Vision pass with no text counts as total disagreement, as in the fit.
@@ -31,10 +30,12 @@ enum ReadQualityDisagreement {
         /// What the cut was measured on, in the run summary's words.
         let measuredOn: String
         /// The bench reader it was fitted for (`post_read_flag.py`'s key).
-        let benchKey: String
+        let benchReaderID: String
+        /// Poor answers caught at the fitted cut on the benchmark pages.
+        let measuredCatch: String
     }
 
-    /// The rule for a route, or nil when the bench measured none for it.
+    /// The enabled rule for a route, if any.
     static func rule(for route: Route) -> Rule? {
         guard route.provider != .appleVision else { return nil }
         let id = route.modelID.lowercased()
@@ -56,12 +57,8 @@ enum ReadQualityDisagreement {
 
     /// Select the route that wrote the retained text, even if the run's main reader has a different cut.
     private static func rule(for result: OCRResult, primary: Route?) -> Rule? {
-        if let imported = result.imported {
-            // The cluster's official FP8 checkpoint and the hosted FP8 route read comparably on the 96
-            // (FARMSHARE_MEASUREMENTS.md). Use the hosted fit for that checkpoint. Other builds have no fit.
-            guard imported.readInRegions != true, imported.model.lowercased() == "qwen/qwen3.6-27b-fp8" else { return nil }
-            return direct[.openrouter]?["qwen/qwen3.6-27b"]
-        }
+        // Imported text was read elsewhere. An app reader used for classification supplies no cut.
+        guard result.imported == nil else { return nil }
         if let second = result.secondReader {
             guard let provider = LLMProvider(rawValue: second.provider), let id = second.modelID else { return nil }
             return rule(for: Route(provider: provider, modelID: id))
@@ -71,47 +68,39 @@ enum ReadQualityDisagreement {
 
     // MARK: The fitted rules (post-read-flag.json `app_readers`)
 
-    // Cross-validated on the 96 (the estimate for new pages; in-sample and every interval in the report): LightOnOCR-3
-    // catches 62% of its poor readings at 5% false alarms, Qwen3.5 9B 36% at 5%, Qwen3-VL 8B 63% at 4%. Gemini 3.7
-    // Flash's cut holds the ceiling on the 96 and on the ladder's damaged images each: 35% at 4% over both, none of
-    // its 3 poor plain readings. The Mac rules were measured on the 4- and 8-bit MLX builds; another server's build
-    // of the same model is taken to read alike.
+    // The Mac rules were measured on the 4- and 8-bit MLX builds. Other builds of the same model are
+    // assumed to read alike. Gemini 3.7 Flash's cut was fitted on both plain and damaged photographs.
     static let lightOnOCR = Rule(reader: "LightOnOCR-3", flagAtOrAbove: 0.6481,
-                                 measuredOn: "96 plain photographs, read on this Mac", benchKey: "lightonocr-3-4b-mlx8")
+                                 measuredOn: "96 plain photographs, read on this Mac", benchReaderID: "lightonocr-3-4b-mlx8",
+                                 measuredCatch: "caught 8 of 11 poor readings")
     static let qwenMac = Rule(reader: "Qwen3.5 9B", flagAtOrAbove: 0.6754,
-                              measuredOn: "96 plain photographs, read on this Mac", benchKey: "qwen3.5-9b-mlx4")
+                              measuredOn: "96 plain photographs, read on this Mac", benchReaderID: "qwen3.5-9b-mlx4",
+                              measuredCatch: "caught 3 of 8 poor readings")
     static let qwenVL8Mac = Rule(reader: "Qwen3-VL 8B", flagAtOrAbove: 0.7013,
-                                 measuredOn: "96 plain photographs, read on this Mac", benchKey: "qwen3-vl-8b-mlx4")
+                                 measuredOn: "96 plain photographs, read on this Mac", benchReaderID: "qwen3-vl-8b-mlx4",
+                                 measuredCatch: "caught 1 of 3 poor readings")
     static let gemini37Gateway = Rule(reader: "Gemini 3.7 Flash", flagAtOrAbove: 0.9764,
-                                      measuredOn: "96 plain photographs and 480 damaged copies of 48 of them",
-                                      benchKey: "gemini3.7-flash")
+                                     measuredOn: "96 plain photographs and 480 damaged copies of 48 of them",
+                                     benchReaderID: "gemini3.7-flash",
+                                     measuredCatch: "caught 0 of 3 poor plain readings and 20 of 53 poor damaged readings")
 
-    /// Direct routes, by provider and the app's model id; each measured on the 96 plain photographs. Cross-validated
-    /// catch rates at 4-5% false alarms: Gemini 3.8 Flash 40%, 3.5 Flash 67%, 3.1 Pro 50%, 3.5 Flash Lite 40%, 3.1
-    /// Flash Lite 42%, GPT-5.4 mini 40%, and through OpenRouter Qwen3-VL 235B 28%, Qwen3.8 Flash 50%, Qwen3.6 27B
-    /// 25%, Qwen3.5 9B 51%. The bench read GPT-5.4 mini through OpenRouter's OpenAI endpoint, the same model the app
-    /// calls directly. Not here: Claude Sonnet 5.5 and Mistral OCR, whose cuts hold the ceiling but caught none of
-    /// their poor readings (0 of 2 and 0 of 7), so a flag would only be false alarms; that is the owner's call
-    /// (W47.wh-read-flag-cm-owner-ok).
+    /// Direct routes measured on the 96 plain photographs. The bench read GPT-5.4 mini on OpenAI's
+    /// OpenRouter endpoint. Owner calls 17 and 24 leave seven readers without a cut after zero measured catches.
     static let direct: [LLMProvider: [String: Rule]] = [
         .gemini: [
-            "gemini-3.8-flash": plain("Gemini 3.8 Flash", 0.6882, "gemini3.8-flash"),
-            "gemini-3.5-flash": plain("Gemini 3.5 Flash", 0.6847, "gemini3.5-flash"),
-            "gemini-3.1-pro": plain("Gemini 3.1 Pro", 0.7006, "gemini3.1-pro"),
-            "gemini-3.5-flash-lite": plain("Gemini 3.5 Flash Lite", 0.6967, "gemini3.5-flash-lite"),
-            "gemini-3.1-flash-lite": plain("Gemini 3.1 Flash Lite", 0.6978, "gemini3.1-flash-lite"),
+            "gemini-3.5-flash": plain("Gemini 3.5 Flash", 0.6847, "gemini3.5-flash", caught: 2, poor: 4),
+            "gemini-3.1-flash-lite": plain("Gemini 3.1 Flash Lite", 0.6978, "gemini3.1-flash-lite", caught: 1, poor: 5),
         ],
-        .openai: ["gpt-5.4-mini": plain("GPT-5.4 mini", 0.6721, "gpt5.4-mini")],
+        .openai: ["gpt-5.4-mini": plain("GPT-5.4 mini", 0.6721, "gpt5.4-mini", caught: 1, poor: 4)],
         .openrouter: [
-            "qwen/qwen3-vl-235b-a22b-instruct": plain("Qwen3-VL 235B", 0.7106, "qwen3-vl-235b"),
-            "qwen/qwen3.8-flash": plain("Qwen3.8 Flash", 0.7243, "qwen3.8-flash"),
-            "qwen/qwen3.6-27b": plain("Qwen3.6 27B", 0.7034, "qwen3.6-27b"),
-            "qwen/qwen3.5-9b": plain("Qwen3.5 9B", 0.6979, "qwen3.5-9b"),
+            "qwen/qwen3-vl-235b-a22b-instruct": plain("Qwen3-VL 235B", 0.7106, "qwen3-vl-235b", caught: 2, poor: 5),
+            "qwen/qwen3.5-9b": plain("Qwen3.5 9B", 0.6979, "qwen3.5-9b", caught: 1, poor: 5),
         ],
     ]
 
-    private static func plain(_ reader: String, _ cut: Double, _ key: String) -> Rule {
-        Rule(reader: reader, flagAtOrAbove: cut, measuredOn: "96 plain photographs", benchKey: key)
+    private static func plain(_ reader: String, _ cut: Double, _ key: String, caught: Int, poor: Int) -> Rule {
+        Rule(reader: reader, flagAtOrAbove: cut, measuredOn: "96 plain photographs", benchReaderID: key,
+             measuredCatch: "caught \(caught) of \(poor) poor readings")
     }
 
     static var all: [Rule] { [lightOnOCR, qwenMac, qwenVL8Mac, gemini37Gateway] + direct.values.flatMap(\.values) }
@@ -165,7 +154,8 @@ enum ReadQualityDisagreement {
     static func assess(readerText: String, visionText: String?, rule: Rule) -> ReadQualityFlag? {
         let d = visionText.map { 1 - similarity($0, readerText) } ?? 1
         guard d >= rule.flagAtOrAbove else { return nil }
-        return ReadQualityFlag(visionConfidence: nil, disagreement: d, reader: rule.reader, measuredOn: rule.measuredOn)
+        return ReadQualityFlag(visionConfidence: nil, disagreement: d, reader: rule.reader,
+                               measuredOn: rule.measuredOn, measuredCatch: rule.measuredCatch)
     }
 
     /// The bench's NES of `hypothesis` against `reference` (`ocr_panel_score.score`, stratum S0): both normalized, then

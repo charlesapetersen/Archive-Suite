@@ -2341,7 +2341,7 @@
     "under_90_of_flags": 0.0
    },
    "ships": false,
-   "in_app": true
+   "in_app": false
   },
   "gemini3.5-flash": {
    "label": "Gemini 3.5 Flash",
@@ -2457,7 +2457,7 @@
     "under_90_of_flags": 0.25
    },
    "ships": false,
-   "in_app": true
+   "in_app": false
   },
   "gemini3.5-flash-lite": {
    "label": "Gemini 3.5 Flash Lite",
@@ -2515,7 +2515,7 @@
     "under_90_of_flags": 0.0
    },
    "ships": false,
-   "in_app": true
+   "in_app": false
   },
   "gemini3.1-flash-lite": {
    "label": "Gemini 3.1 Flash Lite",
@@ -2863,7 +2863,7 @@
     "under_90_of_flags": 0.37681159420289856
    },
    "ships": false,
-   "in_app": true
+   "in_app": false
   },
   "qwen3.6-27b": {
    "label": "Qwen3.6 27B",
@@ -2921,7 +2921,7 @@
     "under_90_of_flags": 0.26666666666666666
    },
    "ships": false,
-   "in_app": true
+   "in_app": false
   },
   "qwen3.5-9b": {
    "label": "Qwen3.5 9B",

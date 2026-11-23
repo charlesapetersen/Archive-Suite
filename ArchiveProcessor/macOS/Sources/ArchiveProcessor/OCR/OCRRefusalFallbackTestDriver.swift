@@ -177,7 +177,7 @@ enum OCRRefusalFallbackTestDriver {
         ReadQualityDisagreement.visionOverride = { _, _ in .nothing }
         r = await ocr()
         ReadQualityDisagreement.visionOverride = nil
-        check("the refusal fallback's measured reader owns the read-poorly flag", r.readPoorly?.reader == "Qwen3.6 27B")
+        check("Qwen3.6 27B can read a refusal without supplying a read-poorly flag", r.readPoorly == nil)
         calls = await script.calls()
         let pin = await script.openRouterPin()
         check("when Claude fails, Qwen3.6 27B on OpenRouter reads the page and OpenAI is never called",

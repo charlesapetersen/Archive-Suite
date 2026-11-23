@@ -1053,7 +1053,7 @@ extension OCRProcessor {
     var readPoorlyNames: [String] { readPoorlyPages.map(\.name) }
 
     /// The run summary's clause naming them: up to three files, then how many more; why they were flagged; and, per
-    /// reader, what its check was measured on (owner, 2026-11-19).
+    /// reader, the pages it was measured on and what it caught at its fitted cut.
     static func readPoorlyClause(_ pages: [(name: String, flag: ReadQualityFlag)]) -> String {
         guard !pages.isEmpty else { return "" }
         let names = pages.map(\.name)
@@ -1065,9 +1065,13 @@ extension OCRProcessor {
             : differs ? "Apple Vision read \(names.count == 1 ? "it" : "them") differently" : "Apple Vision was unsure"
         var measured: [String] = []
         for page in pages {
-            let line = page.flag.visionConfidence != nil
+            let vision = page.flag.visionConfidence != nil
+            var line = vision
                 ? "Apple Vision's check was measured on \(ReadQualityFlag.visionMeasuredOn)"
                 : "\(page.flag.reader ?? "the reader")'s check was measured on \(page.flag.measuredOn ?? "the bench's pages")"
+            if let caught = vision ? ReadQualityFlag.visionMeasuredCatch : page.flag.measuredCatch {
+                line += " and \(caught)"
+            }
             if !measured.contains(line) { measured.append(line) }
         }
         return " \(names.count) \(names.count == 1 ? "page" : "pages") may have read poorly (\(why)); "

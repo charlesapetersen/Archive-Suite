@@ -72362,7 +72362,7 @@
    {
     "reader": "Gemini 3.8 Flash",
     "set": "the 96, plain",
-    "signal": "against Vision, the app's cut, zero held-out hits",
+    "signal": "against Vision, candidate cut",
     "auc": 0.8278388278388278,
     "poor": 3,
     "good": 91,
@@ -72384,7 +72384,7 @@
    {
     "reader": "Gemini 3.1 Pro",
     "set": "the 96, plain",
-    "signal": "against Vision, the app's cut, zero held-out hits",
+    "signal": "against Vision, candidate cut",
     "auc": 0.8260869565217391,
     "poor": 2,
     "good": 92,
@@ -72395,7 +72395,7 @@
    {
     "reader": "Gemini 3.5 Flash Lite",
     "set": "the 96, plain",
-    "signal": "against Vision, the app's cut, zero held-out hits",
+    "signal": "against Vision, candidate cut",
     "auc": 0.7362637362637363,
     "poor": 3,
     "good": 91,
@@ -72461,7 +72461,7 @@
    {
     "reader": "Qwen3.8 Flash, OpenRouter",
     "set": "the 96, plain",
-    "signal": "against Vision, the app's cut, zero held-out hits",
+    "signal": "against Vision, candidate cut",
     "auc": 0.8185185185185185,
     "poor": 3,
     "good": 90,
@@ -72472,7 +72472,7 @@
    {
     "reader": "Qwen3.6 27B, OpenRouter",
     "set": "the 96, plain",
-    "signal": "against Vision, the app's cut, zero held-out hits",
+    "signal": "against Vision, candidate cut",
     "auc": 0.8442028985507246,
     "poor": 3,
     "good": 92,
@@ -72549,7 +72549,7 @@
    "poor_lad": 207,
    "fa_lad": 7,
    "good_lad": 249,
-   "readers_shipped": 14,
+   "readers_shipped": 9,
    "readers_qualifying": 9,
    "readers_fitted": 16
   },

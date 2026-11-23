@@ -161,8 +161,7 @@ enum InstitutionalComputeImportTestDriver {
         ReadQualityDisagreement.visionOverride = { _, _ in .text(String(repeating: "z", count: 200)) }
         var r = await ocr(box2)
         ReadQualityDisagreement.visionOverride = nil
-        check("a measured import uses the cluster model's cut instead of the classifier's",
-              r.readPoorly?.reader == "Qwen3.6 27B" && (r.readPoorly?.disagreement ?? 0) >= 0.7034)
+        check("an FP8 import stays unflagged even when Vision disagrees", r.readPoorly == nil)
         var calls = await script.calls()
         check("a matched page keeps the other institution's text and its reader",
               r.text == "BOX-TWO text from Example University" && r.imported?.job == "1849740"

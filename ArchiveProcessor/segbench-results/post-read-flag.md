@@ -103,17 +103,17 @@ Owner, 2026-11-19 (call 15): every reader the bench has read gets the disagreeme
 | LightOnOCR-3 | local lightonocr | 96 plain photographs, read on this Mac | 0.963 | 0.651 | 0.6481 | 8/11 73% (43-90) | 4/85 5% (2-11) | 83% | 0 | 137/220 62% (56-68) | 85/1700 5% (4-6) | 0 | yes | yes |
 | Qwen3.5 9B | local qwen3.5-9b | 96 plain photographs, read on this Mac | 0.888 | 0.677 | 0.6754 | 3/8 38% (14-69) | 4/87 5% (2-11) | 57% | 1 | 44/160 28% (21-35) | 81/1740 5% (4-6) | 20 | yes | yes |
 | Gemini 3.7 Flash | gateway gemini-3.7-flash | 96 plain photographs and 480 damaged copies of 48 of them | 0.896 | 0.980 | 0.9764 | 20/56 36% (24-49) | 21/520 4% (3-6) | 61% | 0 | 388/1120 35% (32-37) | 415/10400 4% (4-4) | 0 | yes | yes |
-| Gemini 3.8 Flash | gemini gemini-3.8-flash | 96 plain photographs | 0.828 | 0.695 | 0.6882 | 0/3 0% (0-56) | 4/91 4% (2-11) | 0% | 2 | 0/60 0% (0-6) | 72/1820 4% (3-5) | 40 | no | yes |
+| Gemini 3.8 Flash | gemini gemini-3.8-flash | 96 plain photographs | 0.828 | 0.695 | 0.6882 | 0/3 0% (0-56) | 4/91 4% (2-11) | 0% | 2 | 0/60 0% (0-6) | 72/1820 4% (3-5) | 40 | no | no |
 | Gemini 3.5 Flash | gemini gemini-3.5-flash | 96 plain photographs | 0.928 | 0.695 | 0.6847 | 2/4 50% (15-85) | 4/90 4% (2-11) | 33% | 2 | 40/80 50% (39-61) | 72/1800 4% (3-5) | 40 | yes | yes |
-| Gemini 3.1 Pro | gemini gemini-3.1-pro | 96 plain photographs | 0.826 | 0.702 | 0.7006 | 0/2 0% (0-66) | 4/92 4% (2-11) | 25% | 2 | 0/40 0% (0-9) | 80/1840 4% (4-5) | 40 | no | yes |
-| Gemini 3.5 Flash Lite | gemini gemini-3.5-flash-lite | 96 plain photographs | 0.736 | 0.697 | 0.6967 | 0/3 0% (0-56) | 4/91 4% (2-11) | 0% | 2 | 0/60 0% (0-6) | 75/1820 4% (3-5) | 40 | no | yes |
+| Gemini 3.1 Pro | gemini gemini-3.1-pro | 96 plain photographs | 0.826 | 0.702 | 0.7006 | 0/2 0% (0-66) | 4/92 4% (2-11) | 25% | 2 | 0/40 0% (0-9) | 80/1840 4% (4-5) | 40 | no | no |
+| Gemini 3.5 Flash Lite | gemini gemini-3.5-flash-lite | 96 plain photographs | 0.736 | 0.697 | 0.6967 | 0/3 0% (0-56) | 4/91 4% (2-11) | 0% | 2 | 0/60 0% (0-6) | 75/1820 4% (3-5) | 40 | no | no |
 | Gemini 3.1 Flash Lite | gemini gemini-3.1-flash-lite | 96 plain photographs | 0.802 | 0.699 | 0.6978 | 1/5 20% (4-62) | 4/88 5% (2-11) | 20% | 3 | 8/100 8% (4-15) | 75/1760 4% (3-5) | 60 | yes | yes |
 | GPT-5.4 mini | openai gpt-5.4-mini | 96 plain photographs | 0.885 | 0.696 | 0.6721 | 1/4 25% (5-70) | 4/91 4% (2-11) | 40% | 1 | 20/80 25% (17-35) | 81/1820 4% (4-5) | 20 | yes | yes |
 | Claude Sonnet 5.5 | anthropic claude-sonnet-5-5 | 96 plain photographs | 0.835 | 0.708 | 0.7052 | 0/2 0% (0-66) | 4/94 4% (2-10) | 0% | 0 | 0/40 0% (0-9) | 75/1880 4% (3-5) | 0 | no | no |
 | Mistral OCR | mistral mistral-ocr-latest | 96 plain photographs | 0.815 | 0.703 | 0.7034 | 0/7 0% (0-35) | 4/89 4% (2-11) | 0% | 0 | 0/140 0% (0-3) | 72/1780 4% (3-5) | 0 | no | no |
 | Qwen3-VL 235B | openrouter qwen/qwen3-vl-235b-a22b-instruct | 96 plain photographs | 0.886 | 0.711 | 0.7106 | 2/5 40% (12-77) | 4/91 4% (2-11) | 67% | 0 | 28/100 28% (20-37) | 75/1820 4% (3-5) | 0 | yes | yes |
-| Qwen3.8 Flash | openrouter qwen/qwen3.8-flash | 96 plain photographs | 0.819 | 0.737 | 0.7243 | 0/3 0% (0-56) | 4/90 4% (2-11) | 50% | 3 | 0/60 0% (0-6) | 69/1800 4% (3-5) | 60 | no | yes |
-| Qwen3.6 27B | openrouter qwen/qwen3.6-27b | 96 plain photographs | 0.844 | 0.711 | 0.7034 | 0/3 0% (0-56) | 4/92 4% (2-11) | 25% | 1 | 0/60 0% (0-6) | 75/1840 4% (3-5) | 20 | no | yes |
+| Qwen3.8 Flash | openrouter qwen/qwen3.8-flash | 96 plain photographs | 0.819 | 0.737 | 0.7243 | 0/3 0% (0-56) | 4/90 4% (2-11) | 50% | 3 | 0/60 0% (0-6) | 69/1800 4% (3-5) | 60 | no | no |
+| Qwen3.6 27B | openrouter qwen/qwen3.6-27b | 96 plain photographs | 0.844 | 0.711 | 0.7034 | 0/3 0% (0-56) | 4/92 4% (2-11) | 25% | 1 | 0/60 0% (0-6) | 75/1840 4% (3-5) | 20 | no | no |
 | Qwen3.5 9B | openrouter qwen/qwen3.5-9b | 96 plain photographs | 0.885 | 0.700 | 0.6979 | 1/5 20% (4-62) | 4/87 5% (2-11) | 60% | 4 | 11/100 11% (6-19) | 80/1740 5% (4-6) | 80 | yes | yes |
 | Qwen3-VL 8B | local qwen3-vl-8b | 96 plain photographs, read on this Mac | 0.884 | 0.708 | 0.7013 | 1/3 33% (6-79) | 4/89 4% (2-11) | 60% | 4 | 8/60 13% (7-24) | 76/1780 4% (3-5) | 80 | yes | yes |
 
@@ -145,11 +145,11 @@ Gemini 3.7 Flash at its cut: on the 96 0/3 0% (0-56) | 0/93 0% (0-4) | – | 0; 
 
 ## Findings for the other readers (W46.p17-flag-answered-hits)
 
-- Nine of sixteen cuts qualify on answered readings. Five deployed cuts catch zero poor answers at their fitted
+- Nine of sixteen cuts qualify on answered readings. Five former app cuts catch zero poor answers at their fitted
   thresholds or in cross-validation: Gemini 3.8 Flash (0/3), Gemini 3.1 Pro (0/2), Gemini 3.5 Flash Lite (0/3),
   Qwen3.8 Flash (0/3), and Qwen3.6 27B (0/3). Each flags four good plain-photo answers in the fit. Their earlier
-  reported hits came from failed requests. Gemini 3.8 Flash's AUC falls from 0.897 to about 0.83. The removal of
-  those five cuts is tracked in W46.p17-flag-unflag-five, following the owner's call 24. Claude Sonnet 5.5 and
+  reported hits came from failed requests. Gemini 3.8 Flash's AUC falls from 0.897 to about 0.83. The app removed
+  those five cuts in W46.p17-flag-unflag-five, following the owner's call 24. Claude Sonnet 5.5 and
   Mistral OCR also catch zero poor answers (0/2 and 0/7) and have no app rule (call 17).
 - Four readers catch one poor answer each at their fitted cuts: Gemini 3.1 Flash Lite (1/5), GPT-5.4 mini (1/4),
   Qwen3.5 9B through OpenRouter (1/5), and Qwen3-VL 8B on the Mac (1/3).
@@ -157,7 +157,7 @@ Gemini 3.7 Flash at its cut: on the 96 0/3 0% (0-56) | 0/93 0% (0-4) | – | 0; 
   Its cut is near-total disagreement. The table above gives its plain and damaged results separately.
 - The check compares the reader's text with Apple Vision's. A completed Vision pass with no text is total
   disagreement. Region-ordered newspaper text, failed reader replies and failed Vision passes are outside
-  the check. The run summary names the images each reader's threshold was measured on.
+  the check. The run summary names the images each flagged reader's threshold was measured on and what it caught there.
 
 ## Measurement card
 

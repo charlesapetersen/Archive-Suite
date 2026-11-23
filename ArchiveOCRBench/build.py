@@ -1038,8 +1038,6 @@ def postread():
     for e in app_readers:
         cv = e["crossval"]
         status = "the app's cut" if e["in_app"] else "candidate cut"
-        if e["in_app"] and not e["ships"]:
-            status += ", zero held-out hits"
         rows.append({"reader": e["label"] + (", Mac" if e["route"][0] == "local" else ", OpenRouter"
                                              if e["route"][0] == "openrouter" else ""),
                      "set": "the 96 + ladder defects" if "damaged" in e["measured_on"] else "the 96, plain",

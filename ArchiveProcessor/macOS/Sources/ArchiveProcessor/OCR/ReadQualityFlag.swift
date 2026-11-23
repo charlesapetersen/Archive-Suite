@@ -10,7 +10,7 @@ import Foundation
 ///   24 images produced no answer);
 /// * W47.wh-read-flag-readers (owner, 2026-11-19, call 15): a page another reader read, its disagreement with Apple
 ///   Vision's reading of the same image, at that reader's own cut (`ReadQualityDisagreement`). A reader with no
-///   measured cut is not flagged.
+///   cut enabled in the app is not flagged.
 ///
 /// UI only (the run summary and the history); nothing is written to a file.
 struct ReadQualityFlag: Codable, Equatable, Sendable {
@@ -22,6 +22,7 @@ struct ReadQualityFlag: Codable, Equatable, Sendable {
     /// The reader whose disagreement cut fired, and what that cut was measured on, for the run summary.
     var reader: String? = nil
     var measuredOn: String? = nil
+    var measuredCatch: String? = nil
 
     /// How far past its signal's cut this flag is: what picks the one a multi-page PDF keeps.
     var concern: Double {
@@ -33,6 +34,8 @@ struct ReadQualityFlag: Codable, Equatable, Sendable {
     static let flagBelow = 0.9815
     /// What that cut was measured on, in the run summary's words: fitted on the 96, applied once to the ladder.
     static let visionMeasuredOn = "96 plain photographs and 480 damaged copies of 48 of them"
+
+    static let visionMeasuredCatch = "caught 10 of 21 poor plain readings and 155 of 207 poor damaged readings"
 
     /// The character-weighted mean confidence of Vision's kept lines; nil when they hold no characters.
     static func weightedConfidence(_ lines: [(text: String, confidence: Float)]) -> Double? {
