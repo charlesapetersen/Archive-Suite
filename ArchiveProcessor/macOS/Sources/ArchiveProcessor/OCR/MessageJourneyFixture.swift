@@ -12,7 +12,7 @@ enum MessageJourneyFixture {
     static var inputTree: URL? {
         guard isActive, let out = ProcessorUITestConfiguration.outputDirectory else { return nil }
         switch mode {
-        case "duplicates": return out.deletingLastPathComponent().appendingPathComponent("in", isDirectory: true)
+        case "duplicates", "tree-levels": return out.deletingLastPathComponent().appendingPathComponent("in", isDirectory: true)
         case "tree-depth": return out.deletingLastPathComponent().appendingPathComponent(".in", isDirectory: true)
         default: return nil
         }

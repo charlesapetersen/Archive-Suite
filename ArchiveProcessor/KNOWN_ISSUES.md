@@ -301,9 +301,6 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   filed flat, with a note in the summary. (accepted: retain the depth limit and explain flat filing).
 - **Collection organisation is skipped for a tree's outputs**, by design: the tree says where they go. Its status line
   still counts every collection the run found. (accepted: by design, the tree says where outputs go).
-- **The Files tab's sheet and question were not run in the VM**: the logic behind them is in the driver
-  (`test-collection-organize.sh`) and a real Apple Vision run on a scratch tree (`PROCESSFILES_TREE=1`); the two SwiftUI
-  views follow the Reader's levels sheet, which the VM checked (W47.ct-reader-view). (queued: W49.proc-tree-sheet-vm).
 
 ## ⚠️ LIMITATION (W47.ct-processor-capture, 2026-11-19): what reading box and folder labels does not do
 When label reading needs Gemma, the Processor checks the existing local servers first. If none lists it,

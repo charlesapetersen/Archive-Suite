@@ -170,6 +170,78 @@ final class MessageJourneyUITests: XCTestCase {
         print("[s030] \(reads.count) refusals; outputs \(files).\n\(log)")
     }
 
+    func testTreeQuestionCanReadOnlyTheSelectedFoldersOwnFiles() throws {
+        try launchTreeLevelsJourney()
+        shot("files-tree-question")
+        app.buttons["Only Its Own Files"].click()
+
+        XCTAssertTrue(text("cover.jpg").waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(text("letter.jpg").exists)
+        XCTAssertFalse(element("ap.files.treeNote").exists)
+        start()
+        waitForDone(succeeded: 1)
+
+        XCTAssertEqual(try calls().count, 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("out/cover.pdf").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: treeLevelMap.path))
+    }
+
+    func testTreeLevelsCanBeEditedAndSavedBeforeFiling() throws {
+        try launchTreeLevelsJourney(includeCover: false)
+        app.buttons["Read Folders Inside"].click()
+        XCTAssertTrue(element("ap.files.treeNote").waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(text("letter.jpg").exists, app.debugDescription)
+
+        start()
+        let title = text("What do these folder levels name?")
+        XCTAssertTrue(title.waitForExistence(timeout: 10), app.debugDescription)
+        element("ap.containerLevels.cancel").click()
+        XCTAssertTrue(title.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(element("ap.ocr.start").isEnabled, app.debugDescription)
+        XCTAssertTrue(try calls().isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: treeLevelMap.path))
+
+        start()
+        XCTAssertTrue(title.waitForExistence(timeout: 10), app.debugDescription)
+        let preview = text("Container: Box 17")
+        XCTAssertTrue(preview.exists, app.debugDescription)
+        XCTAssertTrue(text("Folder 8").exists, app.debugDescription)
+        element("ap.containerLevels.level1").click()
+        app.menuItems["Series"].firstMatch.click()
+        XCTAssertTrue(text("Series: in").waitForExistence(timeout: 5), app.debugDescription)
+        shot("files-tree-levels")
+
+        element("ap.containerLevels.save").click()
+        XCTAssertTrue(title.waitForNonExistence(timeout: 5))
+        waitForDone(succeeded: 1)
+
+        let map = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: treeLevelMap)) as? [String: Any])
+        XCTAssertEqual(map["levels"] as? [String], ["series", "box", "folder"])
+        XCTAssertTrue(FileManager.default.fileExists(
+            atPath: root.appendingPathComponent("out/in/Box 17/Folder 8/letter.pdf").path
+        ))
+        XCTAssertFalse(FileManager.default.fileExists(
+            atPath: root.appendingPathComponent("in/.archivesuite/container-levels.json").path
+        ))
+    }
+
+    private var treeLevelMap: URL {
+        root.appendingPathComponent("out/.archivesuite/container-levels.json")
+    }
+
+    private func launchTreeLevelsJourney(includeCover: Bool = true) throws {
+        try prepare()
+        if includeCover { try makePhoto("in/cover.jpg") }
+        try makePhoto("in/Box 17/Folder 8/letter.jpg")
+        launch("tree-levels", loadPhotos: false, extra: ["-useGateway", "YES",
+                                                         "-gatewayBaseURL", "https://api.openai.com/v1",
+                                                         "-gatewayModelID", "scratch-transcription"])
+        XCTAssertTrue(text("Read the folders inside?").waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.buttons["Read Folders Inside"].exists)
+        XCTAssertTrue(app.buttons["Only Its Own Files"].exists)
+        XCTAssertTrue(app.buttons["Cancel"].exists)
+    }
+
     func testTreeSummaryReportsSkippedBranchesAndDotFolderFiling() throws {
         try prepare()
         let boundary = ".in/" + (1...12).map { "Level \($0)" }.joined(separator: "/")

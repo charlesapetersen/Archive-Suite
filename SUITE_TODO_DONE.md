@@ -18035,3 +18035,13 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   The regression and two Processor smoke checks passed in Tart. Reviewed both screenshots.
   No provider spend or bench cache used.
   <!-- /W49.proc-fix-s024 -->
+
+- [x] **W49.proc-tree-sheet-vm — Verify the Files tab's folder question and level-map sheet [S]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-22 (this commit)
+  (lane: processor) (uses: build) — Follow-up to W47.ct-processor-intake's driver and Apple Vision checks, filed by W49.ki-audit-processor.
+  Two off-screen XCUITests verified that Only Its Own Files files the top-level photo without a level map,
+  and Read Folders Inside admits the nested photo and offers a level map. Cancelling the sheet leaves the
+  run unstarted. Reopening it and choosing Series updates the preview, saves the edited map in the scratch
+  output folder and files the PDF under Box 17/Folder 8. Reviewed screenshots of both dialogs.
+  The two Processor smoke checks also passed in Tart. The regression used synthetic photos and stubbed
+  OCR replies. No provider spend or bench cache used.
+  <!-- /W49.proc-tree-sheet-vm -->
