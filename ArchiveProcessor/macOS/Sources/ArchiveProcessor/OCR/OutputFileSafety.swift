@@ -168,7 +168,7 @@ enum OutputFileSafety {
     }
 
     enum ReplaceError: Error, Equatable {
-        case aliasesSource, missing, notVerified
+        case aliasesSource, missing, notVerified, outputChanged
         case cataloguePDF
     }
 
@@ -178,7 +178,7 @@ enum OutputFileSafety {
     /// output is the old file or the new one, never partial. Any failure before the swap removes only the sibling and
     /// leaves the output untouched.
     static func replaceGeneratedOutput(_ outputURL: URL, for sourceURL: URL, with data: Data,
-                                       fileManager: FileManager = .default) throws {
+                                       replacing original: Data? = nil, fileManager: FileManager = .default) throws {
         guard !isSameFile(outputURL, sourceURL) else { throw ReplaceError.aliasesSource }
         guard !hasCatalogueIdentity(at: outputURL) else { throw ReplaceError.cataloguePDF }
         guard fileManager.fileExists(atPath: outputURL.path) else { throw ReplaceError.missing }
@@ -192,6 +192,9 @@ enum OutputFileSafety {
             try handle.close()
             guard flushed else { throw ReplaceError.notVerified }
             try copyExtendedAttributes(from: outputURL, to: temp)
+            if let original, (try? Data(contentsOf: outputURL)) != original {
+                throw ReplaceError.outputChanged
+            }
             guard rename(temp.path, outputURL.path) == 0 else {
                 throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
             }

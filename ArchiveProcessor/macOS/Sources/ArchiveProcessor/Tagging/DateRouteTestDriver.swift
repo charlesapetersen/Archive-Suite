@@ -373,7 +373,7 @@ enum DateRouteTestDriver {
         try? fm.createDirectory(at: tmp, withIntermediateDirectories: true)
         guard let model = OpenRouterRoute.catalog.first?.model else { check("4 a model", false); return }
         let image = tmp.appendingPathComponent("scan_001.jpg")
-        writeJPEG(image, width: 120)
+        writeJPEG(image, width: 120, marked: true)
         let text = "MEMORANDUM\nTo: Files\n\nThe harbour works continue."
         let result = OCRResult(text: text, classification: .documentStart, errorMessage: nil, errorCode: nil)
         let pdf = tmp.appendingPathComponent("scan_001.pdf")
@@ -447,6 +447,12 @@ enum DateRouteTestDriver {
         catch { missing = (error as? OutputFileSafety.ReplaceError) == .missing }
         check("4 replace never creates a missing output", missing && !fm.fileExists(atPath: tmp.appendingPathComponent("gone.pdf").path))
 
+        var staleRefused = false
+        do { try OutputFileSafety.replaceGeneratedOutput(pdf, for: image, with: original, replacing: original) }
+        catch { staleRefused = (error as? OutputFileSafety.ReplaceError) == .outputChanged }
+        check("4 replace refuses to overwrite bytes changed since the rewrite began",
+              staleRefused && (try? Data(contentsOf: pdf)) == added)
+
         // W40.fix-processor-review-classification-stale — the Classification line follows a review's class.
         if case .rewrite(let boxed) = gen.classificationRewrite(of: added, sourceName: "scan_001.jpg", classification: "Box",
                                                                  body: text, textColumns: 1) {
@@ -467,11 +473,11 @@ enum DateRouteTestDriver {
         } else { check("4c nil removes the line", false) }
         if let twoData = try? Data(contentsOf: two), case .skipped = gen.classificationRewrite(
             of: twoData, sourceName: "scan_001.jpg", classification: "Box", body: text, textColumns: 1) {
-            check("4c a file of more than one pair is left alone", true)
-        } else { check("4c a file of more than one pair is left alone", false) }
+            check("4c an ambiguous duplicate source name is left alone", true)
+        } else { check("4c an ambiguous duplicate source name is left alone", false) }
 
         // Through the processor: the file pane's edit, then a review that set the class on the job alone (the per-page
-        // review, Segment & Tag) and the pass before merge. The Finder tags stay; a merged output is left alone.
+        // review, Segment & Tag) and the pass before merge. The Finder tags stay.
         let p = OCRProcessor()
         p.taggingMode = .automatic
         var job = OCRJob(sourceURL: image)
@@ -492,10 +498,79 @@ enum DateRouteTestDriver {
         check("4c the pass before merge writes a class set on the job alone", pageTwo(pdf)?.classification == "Folder")
         await p.writeClassificationHeaders(runConfig: nil)
         check("4c ...and leaves a page that already agrees as it is", pageTwo(pdf)?.classification == "Folder")
-        let twoBefore = try? Data(contentsOf: two)
-        p.outputURLMap = [image: two]
-        await p.writeClassificationHeaders(runConfig: nil)
-        check("4c a merged output is left as it is", (try? Data(contentsOf: two)) == twoBefore)
+        let secondImage = tmp.appendingPathComponent("scan_002.jpg")
+        let secondPDF = secondImage.deletingPathExtension().appendingPathExtension("pdf")
+        writeJPEG(secondImage, width: 140, marked: true)
+        let secondText = "The next page has a different reading."
+        let secondResult = OCRResult(text: secondText, classification: .documentContinuation, errorMessage: nil, errorCode: nil)
+        _ = try? gen.generate(imageURL: secondImage, result: secondResult, model: model, outputURL: secondPDF,
+                              originalFileName: secondImage.lastPathComponent, pageKind: .typewritten,
+                              textLayer: .init(searchableFor: ["jpeg/typewritten"]))
+        let merged = tmp.appendingPathComponent("mixed.pdf")
+        try? gen.mergeDocumentPDFs(sourcePDFs: [pdf, secondPDF], outputURL: merged)
+        _ = try? MacOSTagger.applyTags(["1957"], to: merged, appColor: nil, colorIsAuthoritative: false, stampUnread: false)
+        var secondJob = OCRJob(sourceURL: secondImage)
+        secondJob.classification = .documentContinuation
+        secondJob.result = secondResult
+        secondJob.appliedTags = ["1957"]
+        p.jobs.append(secondJob)
+        p.outputURLMap = [image: merged, secondImage: merged]
+        let before = PDFHeaderParser.extract(merged)
+        let scansBefore = [0, 2].map { renderedScan(in: merged, at: $0) }
+        p.updateClassification(at: 1, to: .documentStart)
+        let afterSearchable = PDFHeaderParser.extract(merged)
+        check("4c a post-merge edit updates the selected searchable page only",
+              before?.pageRoles == [.image, .text, .searchable]
+              && afterSearchable?.textPages.map { $0.header?.classification } == ["Folder", "Document Start"])
+        p.updateClassification(at: 0, to: .boxLabel)
+        let afterPair = PDFHeaderParser.extract(merged)
+        check("4c a post-merge edit updates the selected text page only, keeping both readings, evidence and Finder tags",
+              afterPair?.pageRoles == before?.pageRoles
+              && afterPair?.textPages.map { $0.header?.classification } == ["Box", "Document Start"]
+              && afterPair?.textPages.first?.header?.dateEvidence == line
+              && afterPair?.strippedBody == before?.strippedBody
+              && PDFDocument(url: merged)?.page(at: 2).map { OutputForm.holds($0.string ?? "", every: secondText) } == true
+              && ((try? MacOSTagger.readTags(from: merged)) ?? []).contains("1957"))
+        check("4c both scans still render with the same visible marks after both edits",
+              scansBefore.allSatisfy { $0?.contains(where: { $0 < 128 }) == true }
+              && [0, 2].map { renderedScan(in: merged, at: $0) } == scansBefore)
+
+        let secondPair = tmp.appendingPathComponent("second-pair.pdf")
+        _ = try? gen.generate(imageURL: secondImage, result: secondResult, model: model, outputURL: secondPair,
+                              originalFileName: secondImage.lastPathComponent, pageKind: .typewritten)
+        let mergedPairs = tmp.appendingPathComponent("pairs.pdf")
+        try? gen.mergeDocumentPDFs(sourcePDFs: [pdf, secondPair], outputURL: mergedPairs)
+        p.outputURLMap = [image: mergedPairs, secondImage: mergedPairs]
+        p.updateClassification(at: 1, to: .folderLabel)
+        let afterPairs = PDFHeaderParser.extract(mergedPairs)
+        check("4c a post-merge edit finds the later text page in a file of pairs",
+              afterPairs?.pageRoles == [.image, .text, .image, .text]
+              && afterPairs?.textPages.map { $0.header?.classification } == ["Folder", "Folder"])
+
+        let repeatedName = tmp.appendingPathComponent("other").appendingPathComponent(secondImage.lastPathComponent)
+        p.outputURLMap = [image: merged, secondImage: merged, repeatedName: merged]
+        let mergedBefore = try? Data(contentsOf: merged)
+        p.updateClassification(at: 1, to: .boxLabel)
+        check("4c duplicate source names in the merge prevent a rewrite even with one matching header",
+              mergedBefore != nil && (try? Data(contentsOf: merged)) == mergedBefore
+              && p.statusMessage.contains("merged PDF's classification header could not be updated"))
+
+        let ambiguous = try? Data(contentsOf: two)
+        p.outputURLMap = [image: two, secondImage: two]
+        p.updateClassification(at: 0, to: .folderLabel)
+        check("4c an ambiguous merged header keeps the PDF bytes and reports the skipped edit",
+              ambiguous != nil && (try? Data(contentsOf: two)) == ambiguous
+              && p.statusMessage.contains("merged PDF's classification header could not be updated"))
+        let filed = tmp.appendingPathComponent("filed.pdf")
+        let identity = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+        try? gen.mergeDocumentPDFs(sourcePDFs: [pdf, secondPDF], outputURL: filed, catalogueIdentity: identity)
+        let filedBefore = try? Data(contentsOf: filed)
+        p.outputURLMap = [image: filed, secondImage: filed]
+        p.updateClassification(at: 1, to: .documentStart)
+        check("4c a filed merge preserves the PDF and explicitly reports a working-list-only edit",
+              filedBefore != nil && (try? Data(contentsOf: filed)) == filedBefore
+              && p.jobs[1].classification == .documentStart
+              && p.statusMessage.contains("The filed PDF still has its saved classification."))
         p.outputURLMap = [image: image]
         await p.writeClassificationHeaders(runConfig: nil)
         check("4c an output that is its own source is never written", (try? Data(contentsOf: image)) == imageBytes)
@@ -567,12 +642,31 @@ enum DateRouteTestDriver {
         }
     }
 
-    private static func writeJPEG(_ url: URL, width: Int) {
+    private static func renderedScan(in url: URL, at index: Int) -> [UInt8]? {
+        guard let doc = PDFDocument(url: url), let page = doc.page(at: index)?.pageRef,
+              let ctx = CGContext(data: nil, width: 64, height: 64, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue),
+              let pixels = ctx.data?.assumingMemoryBound(to: UInt8.self) else { return nil }
+        let frame = CGRect(x: 0, y: 0, width: 64, height: 64)
+        ctx.setFillColor(gray: 1, alpha: 1)
+        ctx.fill(frame)
+        ctx.concatenate(page.getDrawingTransform(.mediaBox, rect: frame, rotate: 0, preserveAspectRatio: true))
+        ctx.drawPDFPage(page)
+        return (0..<64).flatMap { row in
+            Array(UnsafeBufferPointer(start: pixels + row * ctx.bytesPerRow, count: 64))
+        }
+    }
+
+    private static func writeJPEG(_ url: URL, width: Int, marked: Bool = false) {
         guard let ctx = CGContext(data: nil, width: width, height: 60, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpaceCreateDeviceRGB(),
                                   bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return }
         ctx.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
         ctx.fill(CGRect(x: 0, y: 0, width: width, height: 60))
+        if marked {
+            ctx.setFillColor(CGColor(gray: 0, alpha: 1))
+            ctx.fill(CGRect(x: 10, y: 10, width: 45, height: 30))
+        }
         guard let img = ctx.makeImage(),
               let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.jpeg" as CFString, 1, nil) else { return }
         CGImageDestinationAddImage(dest, img, nil)

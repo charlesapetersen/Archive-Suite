@@ -109,18 +109,20 @@ enum SearchableArchival {
 
     /// The bounded header-edit API still returns bytes.
     static func data(_ sources: [URL], pageHeaders: [String?], budget: PDFChildBudget? = nil,
-                     catalogueIdentity: CataloguePDFIdentity? = nil) throws -> Data {
+                     catalogueIdentity: CataloguePDFIdentity? = nil,
+                     replacing: (index: Int, page: URL)? = nil) throws -> Data {
         let budget = budget ?? PDFChildBudget(seconds: PDFChildBudget.secondsPerPage * Double(max(1, pageHeaders.count)))
         let dir = try PDFGenerator.stagingDirectory(in: FileManager.default.temporaryDirectory)
         defer { try? FileManager.default.removeItem(at: dir) }
         let candidate = try prepare(sources, pageHeaders: pageHeaders, in: dir, budget: budget,
-                                    catalogueIdentity: catalogueIdentity)
+                                    catalogueIdentity: catalogueIdentity, replacing: replacing)
         try budget.check()
         return try Data(contentsOf: candidate)
     }
 
     private static func prepare(_ sources: [URL], pageHeaders: [String?], in dir: URL, budget: PDFChildBudget,
-                                catalogueIdentity: CataloguePDFIdentity?) throws -> URL {
+                                catalogueIdentity: CataloguePDFIdentity?,
+                                replacing: (index: Int, page: URL)? = nil) throws -> URL {
         try budget.check()
         guard let qpdf = CompressedPage.qpdf else { throw Failure.noQPDF }
         guard !sources.isEmpty, !pageHeaders.isEmpty else { throw PDFError.writeFailed }
@@ -128,7 +130,19 @@ enum SearchableArchival {
         let merged = dir.appendingPathComponent("merged.pdf"), patch = dir.appendingPathComponent("patch.json")
         let out = dir.appendingPathComponent("out.pdf")
 
-        try run(qpdf, ["--empty", "--pages"] + sources.map(\.path) + ["--", merged.path], budget: budget)
+        let selection: [String]
+        if let replacing {
+            guard sources.count == 1, let source = sources.first, pageHeaders.indices.contains(replacing.index) else {
+                throw PDFError.writeFailed
+            }
+            // PDF indices here are zero-based. qpdf ranges are inclusive and start at one.
+            let before = replacing.index == 0 ? [] : [source.path, "1-\(replacing.index)"]
+            let after = replacing.index == pageHeaders.count - 1 ? [] : [source.path, "\(replacing.index + 2)-z"]
+            selection = before + [replacing.page.path, "1"] + after
+        } else {
+            selection = sources.map(\.path)
+        }
+        try run(qpdf, ["--empty", "--pages"] + selection + ["--", merged.path], budget: budget)
         let shape = try jsonShape(qpdf, merged, budget: budget)
         guard let xmp = metadata(pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity),
               let icc = CGColorSpace(name: CGColorSpace.sRGB)?.copyICCData() as Data? else {

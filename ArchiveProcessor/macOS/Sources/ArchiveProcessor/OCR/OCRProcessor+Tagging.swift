@@ -1585,11 +1585,12 @@ extension OCRProcessor {
     /// current class. Every page is rendered with the reader's proposal; the per-page review, the box/folder
     /// confirmation, the final review's edit sheet, Segment & Tag and the window stage change the class afterwards.
     /// Through `OutputFileSafety.replaceGeneratedOutput`, which keeps the file's Finder tags and label. An output it
-    /// cannot safely rewrite (a merged document, a pre-OCRed source, a page whose text is not this run's) is left as it
-    /// is and logged.
+    /// cannot safely rewrite (such as a pre-OCRed source or an ambiguous match in a merge) is left as it is and logged.
     @discardableResult
     func writeClassificationHeader(forJobAt index: Int, runConfig: SessionProcessingConfig?) -> PDFGenerator.DateEvidenceRewrite {
-        guard let work = classificationHeaderWork(forJobAt: index) else { return .skipped("no generated output") }
+        guard let work = classificationHeaderWork(forJobAt: index), hasUniqueSourceName(in: work) else {
+            return .skipped("no generated output or the source name is shared in the merge")
+        }
         return Self.rewriteClassificationHeader(work, textColumns: Self.pdfGenerationSettings(for: runConfig).textColumns)
     }
 
@@ -1598,7 +1599,7 @@ extension OCRProcessor {
                                       runConfig: SessionProcessingConfig?) async {
         guard !Task.isCancelled, jobs.indices.contains(index) else { return }
         let jobID = jobs[index].id
-        if let current = classificationHeaderWork(forJobAt: index),
+        if let current = classificationHeaderWork(forJobAt: index), hasUniqueSourceName(in: current),
            !OutputFileSafety.isSameFile(current.outputPDF, current.source),
            let original = try? Data(contentsOf: current.outputPDF) {
             let columns = Self.pdfGenerationSettings(for: runConfig).textColumns
@@ -1610,9 +1611,9 @@ extension OCRProcessor {
                                                       textColumns: columns)
             }
             guard !Task.isCancelled, jobs.indices.contains(index), jobs[index].id == jobID,
-                  classificationHeaderWork(forJobAt: index) == current,
+                  classificationHeaderWork(forJobAt: index) == current, hasUniqueSourceName(in: current),
                   (try? Data(contentsOf: current.outputPDF)) == original else { return }
-            _ = Self.applyReviewHeaderRewrite(outcome, to: proposed, field: "Classification")
+            _ = Self.applyReviewHeaderRewrite(outcome, to: proposed, original: original, field: "Classification")
         }
         updateClassification(at: index, to: classification, runConfig: runConfig, rewriteHeader: false)
     }
@@ -1641,6 +1642,18 @@ extension OCRProcessor {
                                         classification: result.classification?.displayName, text: PDFGenerator.textPageBody(result))
     }
 
+    /// Even if one page's header is unreadable, a second source with the same displayed name makes
+    /// selecting a page by that name unsafe.
+    private func hasUniqueSourceName(in work: ClassificationHeaderWork) -> Bool {
+        func nameKey(_ source: URL) -> String {
+            PDFGenerator.squashed(PDFGenerator.headerFileName(source.lastPathComponent))
+        }
+        let selectedName = nameKey(work.source)
+        return !outputURLMap.contains { source, output in
+            source != work.source && output == work.outputPDF && nameKey(source) == selectedName
+        }
+    }
+
     struct ClassificationHeaderWork: Sendable, Equatable {
         let outputPDF: URL, source: URL, classification: String?, text: String
     }
@@ -1660,15 +1673,16 @@ extension OCRProcessor {
                                                            classification: w.classification, body: w.text,
                                                            textColumns: textColumns)
         guard !Task.isCancelled else { return .skipped("the run stopped") }
-        return applyReviewHeaderRewrite(outcome, to: w, field: "Classification")
+        return applyReviewHeaderRewrite(outcome, to: w, original: data, field: "Classification")
     }
 
     private nonisolated static func applyReviewHeaderRewrite(_ outcome: PDFGenerator.DateEvidenceRewrite,
-                                                             to w: ClassificationHeaderWork, field: String) -> PDFGenerator.DateEvidenceRewrite {
+                                                             to w: ClassificationHeaderWork, original: Data,
+                                                             field: String) -> PDFGenerator.DateEvidenceRewrite {
         switch outcome {
         case .rewrite(let new):
             do {
-                try OutputFileSafety.replaceGeneratedOutput(w.outputPDF, for: w.source, with: new)
+                try OutputFileSafety.replaceGeneratedOutput(w.outputPDF, for: w.source, with: new, replacing: original)
             } catch {
                 os_log(.error, "%{public}@ not written to %{public}@: %{public}@",
                        field, w.outputPDF.lastPathComponent, String(describing: error))
@@ -1776,7 +1790,7 @@ extension OCRProcessor {
                         ownDating: ownDating, body: work.text,
                         textColumns: Self.pdfGenerationSettings(for: runConfig).textColumns)
                     if (try? Data(contentsOf: work.outputPDF)) == data {
-                        _ = Self.applyReviewHeaderRewrite(outcome, to: work, field: "Date header")
+                        _ = Self.applyReviewHeaderRewrite(outcome, to: work, original: data, field: "Date header")
                     } else {
                         os_log(.info, "Date header left as it was in %{public}@: the output changed during the rewrite",
                                work.outputPDF.lastPathComponent)

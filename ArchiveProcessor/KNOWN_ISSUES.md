@@ -262,12 +262,11 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
   there is no manual reader override. The switch is on by default (accepted: owner, 2026-11-20, call 24, "on by
   default, whether or not the pre-flag is downloaded").
 
-## ⚠️ LIMITATION (W40.fix-processor-review-classification-stale, 2026-11-20): where page 2's Classification is not rewritten
+## FIXED (W40.fix-processor-merged-classification-stale, 2026-11-23) — The Files pane left merged PDF classifications stale
 
-`OCR/OCRProcessor+Tagging.swift` `writeClassificationHeader`; the rewrite is `PDFGenerator.classificationRewrite`.
-- A class changed in the file pane after the run has merged a document leaves that document's pages reading the old
-  class: the rewrite handles one image page and one text page, and a merged file is left as it is and logged
-  (queued: W40.fix-processor-merged-classification-stale).
+An edit updates the selected page's classification in an unfiled merge, including searchable pages. If the source
+cannot be identified safely, the Files pane reports that the merged header could not be updated. For filed PDFs,
+the status explains that the change applies to the working list and the PDF still has its saved classification.
 
 ## ⚠️ LIMITATION (W47.wh-read-flag-readers, 2026-11-19): what the read-poorly flag for other readers does not do
 

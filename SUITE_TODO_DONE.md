@@ -18283,3 +18283,15 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   [Regression evidence](verification/evidence/processor/W49.proc-suspects-messages-check.md#s-030-fix--two-same-named-failed-inputs).
   No paid calls or bench cache.
   <!-- /W49.proc-fix-s030 -->
+
+- [x] **W40.fix-processor-merged-classification-stale — a class changed after merge leaves the merged document's page 2 lines stale [XS · S4 · Tier-2]** · §W40 · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build) — Found by `W40.fix-processor-review-classification-stale`'s review, 2026-11-20: a file-pane class edit after the run merged a document rewrites the merged PDF's tags, but `writeClassificationHeader` (`OCR/OCRProcessor+Tagging.swift`) handles one image page and one text page, so each text page in the merged file keeps its old `Classification:` line. Rewrite the edited page's text page inside the merged document (the searchable form's pages too), with the same read-back checks as `PDFGenerator.classificationRewrite`, or say in the edit that page 2 is unchanged. Tier-2: it rewrites an output PDF. Test: DateRouteTestDriver section 4c's merged case, made to expect the new line.
+  Unfiled merges update the selected text page or searchable page header after checking its name and reading.
+  Page order, other headers, scans and Finder tags are preserved. If the source is ambiguous or the check fails,
+  the Files pane reports that the merged header could not be updated. For a filed PDF the edit affects the
+  working list, and the status tells the user the filed PDF still has its saved classification.
+  Verified on scratch files. The baseline failed both new mixed-document edit checks. The final date-route
+  regression passed, including unchanged scan pixels, Finder tags, ambiguous source names, a late replacement
+  conflict and a filed merge. The searchable text-layer test passed and veraPDF accepted all 21 of its PDFs.
+  The live Processor smoke processed and tagged both synthetic inputs. Build added no warnings. A separate
+  Codex review found the duplicate-name and filed-PDF cases, which are covered by the regression. No bench cache used.
+  <!-- /W40.fix-processor-merged-classification-stale -->

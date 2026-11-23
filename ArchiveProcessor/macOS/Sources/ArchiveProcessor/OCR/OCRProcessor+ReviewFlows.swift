@@ -356,12 +356,16 @@ extension OCRProcessor {
             )
         }
         if filed {
-            statusMessage = "Classification updated in the working list."
+            statusMessage = "Classification updated in the working list. The filed PDF still has its saved classification."
             return
         }
         // Page 2's Classification follows the edit (W40.fix-processor-review-classification-stale).
-        if rewriteHeader, oldClassification != newClassification {
-            writeClassificationHeader(forJobAt: index, runConfig: runConfig)
+        var mergedHeaderWasSkipped = false
+        if rewriteHeader, oldClassification != newClassification,
+           case .skipped = writeClassificationHeader(forJobAt: index, runConfig: runConfig),
+           let currentOutput {
+            let editedSource = jobs[index].sourceURL
+            mergedHeaderWasSkipped = outputURLMap.contains { $0.key != editedSource && $0.value == currentOutput }
         }
         // Copy-source reviews update the classification. The collection pass adds its marker once
         // the classification is final, so copied names that look like markers stay intact.
@@ -379,6 +383,9 @@ extension OCRProcessor {
         // W37: the edit can invalidate (or move) an enclosure relation.
         if oldClassification != newClassification {
             reconcileEnclosureDatesAfterReclassification(runConfig: runConfig)
+        }
+        if mergedHeaderWasSkipped {
+            statusMessage = "Classification updated in the working list. The merged PDF's classification header could not be updated."
         }
     }
     /// Dedicated, standalone rotation-review pass (separate from the tagging/segmentation review).
