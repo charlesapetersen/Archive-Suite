@@ -460,6 +460,37 @@ enum SegmentationReviewTestDriver {
            [["page-3.jpg", "page-4.jpg", "new"]])
         eq("5 the approach", recorded?.approach, "claude")
 
+        // S-046: Off still checks labels and flagged gaps, and files those answers without opening the skim.
+        let withoutSkim = makeProcessor(urls: urls)
+        withoutSkim.windowTransportOverride = FakeTransport(verdicts: verdicts)
+        let skippedOutcome = Box<WindowStageOutcome>()
+        let skippedRun = UUID()
+        let skippedSettings = ResolvedSettingsSnapshot(runID: skippedRun, resolvedAt: Date(), collectionID: nil,
+                                                       projectID: nil, projectName: nil, macMemoryGB: 16, values: [:],
+                                                       processing: [:])
+        Task {
+            skippedOutcome.value = await withoutSkim.runWindowSegmentationStage(
+                files: urls, approach: .claude, runConfig: nil, outputDirectory: dir,
+                settings: skippedSettings, reviewWholeRun: false)
+        }
+        check("S-046 Off still confirms the folder photo", await waitFor { withoutSkim.awaitingBoxFolderConfirmation })
+        withoutSkim.confirmBoxFolderReview()
+        check("S-046 Off still opens the flagged pass", await waitFor { withoutSkim.awaitingFlaggedReview })
+        if let first = withoutSkim.flaggedGapItems.indices.first {
+            withoutSkim.flaggedGapItems[first].answer = .split
+        }
+        withoutSkim.confirmFlaggedReview()
+        check("S-046 Off finishes without the skim", await waitFor {
+            skippedOutcome.value != nil || withoutSkim.awaitingDocumentReview
+        } && skippedOutcome.value == .done && !withoutSkim.awaitingDocumentReview)
+        eq("S-046 Off applies the checked split and rebuilds the segments", withoutSkim.segments.count, 5)
+        check("S-046 Off records the checked gap", await waitFor {
+            ReviewCorrections.gapRecords(in: dir).contains { $0.runID == skippedRun }
+        })
+        let skippedRecord = ReviewCorrections.gapRecords(in: dir).first { $0.runID == skippedRun }
+        eq("S-046 Off records only gaps the person answered", skippedRecord?.gaps.map(\.gap), [2])
+        eq("S-046 Off records the checked ruling", skippedRecord?.gaps.first?.ruling, .checked)
+
         // 6. Resume.
         let silent = FakeTransport(verdicts: [:], failWith: .fatal("must not be called"))
         let r = makeProcessor(urls: urls)

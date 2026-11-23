@@ -5,7 +5,7 @@ import PDFKit
 //
 // For a run whose approach proposes boundaries (`SegmentationPlan.windows`), this stage replaces the per-page
 // review: the box and folder photos are confirmed, the window segmenter proposes every gap, the user answers each
-// flagged gap one at a time (page n beside page n+1), and then skims the whole run in the existing review sheet.
+// flagged gap one at a time (page n beside page n+1), and then can skim the whole run in the review sheet.
 // Design: execution-plans/segmentation/04-options-build.md Part 3 §1 and §5. Nothing here writes an output file:
 // the stage only sets `jobs[i].classification`, which the user has reviewed before tagging reads it.
 
@@ -59,7 +59,8 @@ extension OCRProcessor {
     /// is recorded.
     func runWindowSegmentationStage(files: [URL], approach: SegmentationApproach,
                                     runConfig: SessionProcessingConfig?, outputDirectory: URL,
-                                    settings: ResolvedSettingsSnapshot?) async -> WindowStageOutcome {
+                                    settings: ResolvedSettingsSnapshot?,
+                                    reviewWholeRun: Bool = true) async -> WindowStageOutcome {
         segmentationCheckSummary = nil
         // The photos are known before the windows run, as the figures were scored (Part 3 §1).
         await showBoxFolderConfirmation(files: files, runConfig: runConfig)
@@ -105,7 +106,7 @@ extension OCRProcessor {
             }
         }
 
-        // Apply every boundary, then the skim.
+        // Apply every boundary before the optional skim.
         let classes = FlaggedReview.classifications(proposals: proposals, photoKinds: pages.photoKinds,
                                                     answers: items)
         for (k, i) in pages.fileIndices.enumerated() where k < classes.count {
@@ -114,14 +115,21 @@ extension OCRProcessor {
                 jobs[i].result = r.with(classification: classes[k], rotationDegrees: r.rotationDegrees)
             }
         }
-        reviewCheckedFileIndices = Set(items.map { pages.fileIndices[$0.id + 1] })
-        reviewSkimNote = FlaggedReview.skimNote(approach, partner: partner, options: SegmentationOptionsStore.shared)
-        await showFullSegmentationReview(files: files, runConfig: runConfig, showsDocumentClasses: true)
-        reviewCheckedFileIndices = []
-        reviewSkimNote = nil
-        guard !Task.isCancelled else { return .stopped }
-        recordReviewedGaps(pages: pages, proposals: proposals, items: items, afterFlagged: classes, approach: approach,
-                           partner: partner, outputDirectory: outputDirectory, settings: settings)
+        if reviewWholeRun {
+            reviewCheckedFileIndices = Set(items.map { pages.fileIndices[$0.id + 1] })
+            reviewSkimNote = FlaggedReview.skimNote(approach, partner: partner, options: SegmentationOptionsStore.shared)
+            await showFullSegmentationReview(files: files, runConfig: runConfig, showsDocumentClasses: true)
+            reviewCheckedFileIndices = []
+            reviewSkimNote = nil
+            guard !Task.isCancelled else { return .stopped }
+        }
+        // Without the skim, only the gaps a person answered belong in the review record.
+        let answered = Set(items.filter { $0.answer != nil }.map(\.id))
+        let reviewedProposals = reviewWholeRun ? proposals : proposals.filter { answered.contains($0.gap) }
+        if !reviewedProposals.isEmpty {
+            recordReviewedGaps(pages: pages, proposals: reviewedProposals, items: items, afterFlagged: classes,
+                               approach: approach, partner: partner, outputDirectory: outputDirectory, settings: settings)
+        }
         rebuildSegments(files: files)
         segmentationCheckSummary = FlaggedReview.summary(items)
         return .done

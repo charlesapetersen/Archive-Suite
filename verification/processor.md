@@ -760,9 +760,9 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Notes:** **Drift.** The rotation radios and `[`/`]` are not in this dialog: they appear only in the separate,
   opt-in Review rotation pass (`rotationOnly`, `:15-16`, `:201-213`; enabled by `reviewRotation` with rotation on,
   `OCR/OCRProcessor+Pipeline.swift:3084`). Keys 1 and 2 work only when document classes are shown (`:171-181`). The
-  fresh pipeline chooses the whole-run review independently of the Documents switch and passes `false` to the
-  later collection stage. S-046 reproduced this with the switch on and off in the VM
-  ([W49.proc-s046-verify evidence](evidence/processor/W49.proc-s046-verify.md)).
+  Documents switch defaults on and controls the whole-run review on fresh runs with model-proposed boundaries
+  (W49.proc-s046-review-toggle). The fresh pipeline still skips the later per-collection review. S-046
+  [documents the earlier mismatch and its verification](evidence/processor/W49.proc-s046-verify.md).
   Ordinary Resume bypasses the whole-run review with either saved setting. A saved On opens the per-collection
   review after tagging ([S-050 VM evidence](evidence/processor/W49.proc-s050-verify.md)).
 

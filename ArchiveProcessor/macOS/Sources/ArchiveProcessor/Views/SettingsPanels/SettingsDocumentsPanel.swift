@@ -12,7 +12,7 @@ struct SettingsDocumentsPanel: View {
     @AppStorage(DefaultsKeys.itemTypeColourFolder) private var itemTypeColourFolder: Int = 0
     @AppStorage(DefaultsKeys.enableCollectionSegmentation) private var enableCollectionSegmentation: Bool = false
     @AppStorage(DefaultsKeys.confirmCollectionIDs) private var confirmCollectionIDs: Bool = false
-    @AppStorage(DefaultsKeys.reviewDocumentSegmentation) private var reviewDocumentSegmentation: Bool = false
+    @AppStorage(DefaultsKeys.reviewDocumentSegmentation) private var reviewDocumentSegmentation: Bool = true
     @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = true
     @AppStorage(DefaultsKeys.macItemFields) private var macItemFields = true
     @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
@@ -83,8 +83,7 @@ struct SettingsDocumentsPanel: View {
                 itemTypeColourPicker("Box colour", selection: $itemTypeColourBox)
                 itemTypeColourPicker("Folder colour", selection: $itemTypeColourFolder)
             }
-            SettingsLevelRows(.collectionID, changed: SettingsLevels.changed(.collectionID)
-                              || SettingsLevels.changed(DefaultsKeys.reviewDocumentSegmentation)) {
+            SettingsLevelRows(.collectionID, changed: SettingsLevels.changed(.collectionID)) {
                 Toggle(isOn: $enableCollectionSegmentation) {
                     HStack {
                         Text("Collection ID + file renaming")
@@ -98,16 +97,16 @@ struct SettingsDocumentsPanel: View {
                             HelpButton(text: "Pause before filing so you can review and correct the collection names the model extracted from box labels.")
                         }
                     }
-                    Toggle(isOn: $reviewDocumentSegmentation) {
-                        HStack {
-                            Text("Review document segmentation")
-                            HelpButton(text: "Pause after OCR to review and correct each page's classification (document start / continuation / box / folder) before tagging. Only applies when a model proposes the segmentation (Automatic tagging, or any Segmentation approach other than Manual).")
-                        }
-                    }
-                    .disabled(!segmentationPlan.reviewShowsDocumentClasses)
-                .settingsLevel(.segmentationReview)
                 }
             }
+            Toggle(isOn: $reviewDocumentSegmentation) {
+                HStack {
+                    Text("Review document segmentation")
+                    HelpButton(text: "Pause before tagging to review how the model grouped all pages into documents. Turn this off to skip that pause. Rotation, flagged boundary checks, and box and folder confirmation have their own rules. With Collection ID on, this setting is also saved for the per-collection review on Resume.")
+                }
+            }
+            .disabled(!segmentationPlan.reviewShowsDocumentClasses)
+            .settingsLevel(.segmentationReview)
             Toggle(isOn: $enableSegmentJSON) {
                 HStack {
                     Text("Export segment JSON metadata")

@@ -78,7 +78,7 @@ struct OCRView: View {
             && droppedFiles.contains { !PDFToImageConverter.isMultiPagePDF($0) }
     }
     private var isPDFOnlyReOCR: Bool { droppedHasMultiPagePDF && !preOCRedInput && !hasMixedReOCR }
-    @AppStorage(DefaultsKeys.reviewDocumentSegmentation) private var reviewDocumentSegmentation: Bool = false
+    @AppStorage(DefaultsKeys.reviewDocumentSegmentation) private var reviewDocumentSegmentation: Bool = true
     @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = true
     @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
     @AppStorage(DefaultsKeys.tagVocabulary) private var tagVocabulary: String = ""
@@ -2031,6 +2031,7 @@ struct OCRView: View {
                 enableCollectionSegmentation: useAppleVision && !visionUseLLMJudgment ? false : enableCollectionSegmentation,
                 confirmCollectionIDs: (!useAppleVision || visionUseLLMJudgment) && confirmCollectionIDs && enableCollectionSegmentation,
                 reviewDocumentSegmentation: (!useAppleVision || visionUseLLMJudgment) && reviewDocumentSegmentation && enableCollectionSegmentation,
+                reviewFreshDocumentSegmentation: reviewDocumentSegmentation,
                 preOCRedInput: preOCRedInput,
                 skipAlreadyProcessed: skipAlreadyProcessed,
                 segmentationContext: context,

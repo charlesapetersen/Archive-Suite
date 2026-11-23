@@ -794,7 +794,7 @@ enum ProcessingSettingsCapture {
         .init(key: DefaultsKeys.segmentationApproach, def: .string(SegmentationApproach.defaultApproach.rawValue)),
         .init(key: DefaultsKeys.enableCollectionSegmentation, def: .bool(false)),
         .init(key: DefaultsKeys.confirmCollectionIDs, def: .bool(false)),
-        .init(key: DefaultsKeys.reviewDocumentSegmentation, def: .bool(false)),
+        .init(key: DefaultsKeys.reviewDocumentSegmentation, def: .bool(true)),
         .init(key: DefaultsKeys.enableSegmentJSON, def: .bool(true)),
         .init(key: DefaultsKeys.tagVocabulary, def: .string("")),
 

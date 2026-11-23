@@ -159,14 +159,11 @@ classification edit. [Independent VM evidence](../verification/evidence/processo
   which to derive Sent With. Owner call 33 chooses optional explicit cover selection in review.
   Implementation follows independent reproduction. [Scratch evidence](../verification/evidence/processor/W49.proc-s047-verify.md). (queued: W49.proc-s047-check)
 
-## Review document segmentation has no effect on fresh Process Files runs (S-046)
+## FIXED (S-046, 2026-11-23) — the Documents switch controls the fresh whole-run review
 
-- With Automatic tagging, the Manual segmentation approach and Collection ID, both switch values open the
-  same whole-run review before tagging. Neither adds a per-collection review. The help implies the switch
-  controls the pre-tagging pause. Reproduced in the VM at `d1b38279` and traced to `startProcessing` and
-  `performPreOCRedProcessing`. The [verification record](../verification/evidence/processor/W49.proc-s046-verify.md)
-  includes the separate Codex confirmation at `df7f295d`. Owner call 31 sets fresh review on by default and lets
-  the user switch it off. (queued: W49.proc-s046-review-toggle)
+- Fresh Process Files runs with model-proposed document boundaries pause before tagging by default.
+  Turning **Review document segmentation** off skips that pause. Other confirmations still apply.
+  [Verification record](../verification/evidence/processor/W49.proc-s046-verify.md). (shipped: W49.proc-s046-review-toggle)
 
 ## Live Capture files a document silently after Automatic tagging gets HTTP 500 (S-045)
 

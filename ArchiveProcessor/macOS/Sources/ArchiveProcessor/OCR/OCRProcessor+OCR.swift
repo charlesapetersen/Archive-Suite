@@ -95,7 +95,7 @@ extension OCRProcessor {
         enableSegmentJSON: Bool = true,
         enableCollectionSegmentation: Bool,
         confirmCollectionIDs: Bool = false,
-        reviewDocumentSegmentation: Bool = false,
+        reviewWholeRun: Bool = true,
         customPrompt: String? = nil,
         runConfig: SessionProcessingConfig? = nil,
         settings: ResolvedSettingsSnapshot?
@@ -194,12 +194,15 @@ extension OCRProcessor {
             // W36.seg-opt-review: the window segmenter proposes, the user checks the flagged gaps, then skims.
             guard await runWindowSegmentationStage(files: files, approach: approach,
                                                    runConfig: runConfig, outputDirectory: outputDirectory,
-                                                   settings: settings) == .done else { return }
+                                                   settings: settings,
+                                                   reviewWholeRun: reviewWholeRun) == .done else { return }
         } else if case .manualWindow = plan {
             // no-op: handled in the combined manual window
         } else if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
-            await showFullSegmentationReview(files: files, runConfig: runConfig)
-            guard !Task.isCancelled else { return }
+            if reviewWholeRun || plan == .noTagging {
+                await showFullSegmentationReview(files: files, runConfig: runConfig)
+                guard !Task.isCancelled else { return }
+            }
 
             // Final confirmation of box/folder identifications
             await showBoxFolderConfirmation(files: files, runConfig: runConfig)

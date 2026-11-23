@@ -67,47 +67,36 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         XCTAssertNotEqual(shapeA, shapeB, "the 90° chosen in Review rotation is baked into photo 3's PDF")
     }
 
-    /// S-046: compare fresh runs after changing the actual Documents setting. Run off last to restore its default.
+    /// S-046: an unset preference opens the review. An explicit Off skips it and keeps the later confirmations.
     func testFreshProcessFilesDocumentReviewSetting() throws {
         for enabled in [true, false] {
-            let name = enabled ? "s046-on" : "s046-off"
-            _ = try launch(name, [
+            let name = enabled ? "s046-default-on" : "s046-off"
+            let arguments = [
                 "-taggingModeRaw", "automatic", "-segmentationApproach", "manual",
                 "-rotationModeRaw", "off", "-reviewRotation", "NO"
-            ], collectionID: true)
-            let (settings, label, toggle) = try documentReviewSetting()
-            setDocumentReview(toggle, enabled: enabled)
-            let target = enabled ? "1" : "0"
-            print("[s046] \(name): switch value=\(target)")
-            if enabled {
-                let help = try XCTUnwrap(settings.buttons.matching(NSPredicate(format: "label == 'Help'"))
-                    .allElementsBoundByIndex.first { abs($0.frame.midY - label.frame.midY) < 3 })
-                help.click()
-                let promise = app.staticTexts.matching(NSPredicate(
-                    format: "label BEGINSWITH %@ OR value BEGINSWITH %@", "Pause after OCR", "Pause after OCR"
-                )).firstMatch
-                XCTAssertTrue(promise.waitForExistence(timeout: 5))
-                print("[s046] help: \(text(of: promise))")
-                shot("s046-help-on")
-                help.click()
-            } else {
-                shot("s046-setting-off")
-            }
+            ]
+            let defaults = enabled ? ["-APUITestUnsetDocumentReview"] : []
+            let out = try launch(name, arguments + defaults, collectionID: true, classificationCycle: true)
+            let (settings, _, toggle) = try documentReviewSetting()
+            XCTAssertEqual(String(describing: toggle.value ?? ""), "1", "the document review defaults to on")
+            if !enabled { setDocumentReview(toggle, enabled: false) }
+            shot("\(name)-setting")
             settings.typeKey("w", modifierFlags: .command)
             clickStart()
 
-            let review = reviewWindow("Document Segmentation Review", timeout: 120)
-            let footer = review.staticTexts.matching(NSPredicate(
-                format: "label CONTAINS 'new document' OR value CONTAINS 'new document'")).firstMatch
-            XCTAssertTrue(text(of: footer).contains("6 new documents"), "whole-run per-page review")
-            shot("\(name)-whole-run")
-            // Make the first page a box so the subsequent label confirmation is exercised too.
-            press(["3"], footer, reads: "1 box", "mark first page Box")
-            app.typeKey(.return, modifierFlags: [])
-            waitGone(review, "Return confirms the whole-run review")
+            if enabled {
+                let review = reviewWindow("Document Segmentation Review", timeout: 120)
+                let counts = review.staticTexts.matching(NSPredicate(
+                    format: "label CONTAINS '1 box' OR value CONTAINS '1 box'")).firstMatch
+                XCTAssertTrue(text(of: counts).contains("1 folder"))
+                shot("\(name)-whole-run")
+                app.typeKey(.return, modifierFlags: [])
+                waitGone(review, "Return confirms the whole-run review")
+            }
 
             let boxConfirmation = app.sheets.buttons["Confirm"]
-            XCTAssertTrue(boxConfirmation.waitForExistence(timeout: 60))
+            XCTAssertTrue(boxConfirmation.waitForExistence(timeout: 120),
+                          "a detected box and folder still go through label confirmation")
             shot("\(name)-box-folder")
             boxConfirmation.click()
 
@@ -123,18 +112,62 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
 
             let done = app.staticTexts.matching(NSPredicate(
                 format: "label BEGINSWITH 'Done.' OR value BEGINSWITH 'Done.'")).firstMatch
-            let secondReview = app.windows.containing(.staticText, identifier: "Document Segmentation Review").firstMatch
+            let review = app.windows.containing(.staticText, identifier: "Document Segmentation Review").firstMatch
             let deadline = Date().addingTimeInterval(60)
-            while !done.exists && !secondReview.exists && Date() < deadline {
+            while !done.exists && !review.exists && Date() < deadline {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.5))
             }
-            let sawCollectionReview = secondReview.exists
-            if sawCollectionReview {
-                shot("\(name)-per-collection")
-                app.typeKey(.return, modifierFlags: [])
+            XCTAssertFalse(review.exists, "a fresh run never opens a second document review after tagging")
+            XCTAssertTrue(text(of: done).hasPrefix("Done. 6 succeeded, 0 failed."))
+            XCTAssertEqual(filedPDFs(in: out).count, 6)
+            print("[s046] \(name): whole-run review=\(enabled), box/folder confirmation, final tagging, collection names; \(text(of: done))")
+            shot("\(name)-done")
+            if !enabled {
+                let (settings, _, toggle) = try documentReviewSetting()
+                setDocumentReview(toggle, enabled: true)
+                settings.typeKey("w", modifierFlags: .command)
             }
-            print("[s046] \(name): whole-run per-page, box/folder, final tagging, collection names, per-collection=\(sawCollectionReview)")
+        }
+    }
+
+    func testFreshSearchablePDFDocumentReviewSetting() throws {
+        let pdf = scratchRoot.appendingPathComponent("Searchable page.pdf")
+        let page = NSTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 300))
+        page.string = "Scratch searchable text for the document review test."
+        try page.dataWithPDF(inside: page.bounds).write(to: pdf)
+        XCTAssertTrue(PDFDocument(url: pdf)?.string?.contains(page.string) == true)
+
+        for enabled in [true, false] {
+            let name = enabled ? "s046-searchable-on" : "s046-searchable-off"
+            let out = try launch(name, [
+                "-taggingModeRaw", "automatic", "-segmentationApproach", "manual",
+                "-rotationModeRaw", "off", "-reviewRotation", "NO", "-APUITestUnsetDocumentReview"
+            ], searchablePDF: pdf)
+            let (settings, _, toggle) = try documentReviewSetting()
+            XCTAssertEqual(String(describing: toggle.value ?? ""), "1", "the switch is available even with Collection ID off")
+            if !enabled { setDocumentReview(toggle, enabled: false) }
+            settings.typeKey("w", modifierFlags: .command)
+            clickStart()
+
+            if enabled {
+                let review = reviewWindow("Document Segmentation Review", timeout: 90)
+                app.typeKey(.return, modifierFlags: [])
+                waitGone(review, "the searchable input's page review has been confirmed")
+            }
+            let complete = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Complete'")).firstMatch
+            XCTAssertTrue(complete.waitForExistence(timeout: 90), "the run reaches final tagging review")
+            complete.click()
+
             waitForDone(name)
+            let readingCopies = filedPDFs(in: out).filter {
+                FileManager.default.fileExists(atPath: $0.appendingPathExtension("archivesuite.json").path)
+            }
+            XCTAssertEqual(readingCopies.count, 1, "the preservation copy is separate from the filed PDF")
+            if !enabled {
+                let (settings, _, toggle) = try documentReviewSetting()
+                setDocumentReview(toggle, enabled: true)
+                settings.typeKey("w", modifierFlags: .command)
+            }
         }
     }
 
@@ -155,10 +188,11 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
             settings.typeKey("w", modifierFlags: .command)
             clickStart()
 
-            let firstReview = reviewWindow("Document Segmentation Review", timeout: 120)
-            let counts = firstReview.staticTexts.matching(NSPredicate(
-                format: "label CONTAINS '1 box' OR value CONTAINS '1 box'")).firstMatch
-            XCTAssertTrue(text(of: counts).contains("1 folder"), "the saved OCR must include both label candidates")
+            let firstReview = app.windows.containing(.staticText, identifier: "Document Segmentation Review").firstMatch
+            let boxSheet = app.sheets.containing(.staticText, identifier: "Confirm Box & Folder Labels").firstMatch
+            let interruptionPoint = enabled ? firstReview : boxSheet
+            XCTAssertTrue(interruptionPoint.waitForExistence(timeout: 120),
+                          "the first applicable review opens after all pages are saved")
             shot("\(name)-before-interruption")
             XCTAssertEqual(try ocrCallCount(name), 6)
 
@@ -179,7 +213,6 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
             resume.click()
 
             let complete = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Complete'")).firstMatch
-            let boxSheet = app.sheets.containing(.staticText, identifier: "Confirm Box & Folder Labels").firstMatch
             let deadline = Date().addingTimeInterval(90)
             var sawPageReview = false
             var sawBoxReview = false
@@ -279,7 +312,7 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         let out = try launch(run, [
             "-taggingModeRaw", "automatic", "-segmentationApproach", "manual",
             "-rotationModeRaw", "off", "-reviewRotation", "NO",
-            "-reviewDocumentSegmentation", "NO", "-outputImageFile", "NO"
+            "-reviewDocumentSegmentation", "YES", "-outputImageFile", "NO"
         ], collectionID: true, classificationCycle: true)
         clickStart()
         confirmLabelReviews()
@@ -456,7 +489,7 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
     private func runA() throws -> [Int: Output] {
         let out = try launch("a", [
             "-taggingModeRaw", "automatic", "-segmentationApproach", "manual",
-            "-rotationModeRaw", "localVision", "-reviewRotation", "YES"
+            "-rotationModeRaw", "localVision", "-reviewRotation", "YES", "-reviewDocumentSegmentation", "YES"
         ])
         clickStart()
 
@@ -638,23 +671,27 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
 
     private func launch(_ name: String, _ settings: [String], collectionID: Bool = false,
                         classificationCycle: Bool = false, preservePendingRun: Bool = false,
-                        input: URL? = nil) throws -> URL {
+                        input: URL? = nil, searchablePDF: URL? = nil) throws -> URL {
         let out = scratchRoot.appendingPathComponent("\(name)-out", isDirectory: true)
         try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
         app.terminate()
+        let inputs = if let searchablePDF {
+            ["-APUITestDroppedPDFPath", searchablePDF.path, "-preOCRedInput", "YES"]
+        } else {
+            ["-APUITestInputImages", (input ?? dir.appendingPathComponent("in")).path, "-preOCRedInput", "NO"]
+        }
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode", "-APUITestLocalAgent",
-            "-APUITestInputImages", (input ?? dir.appendingPathComponent("in")).path,
             "-APUITestOutputDirectory", out.path, "-outputDirectory", out.path,
             "-localAgentBinaryPath", dir.appendingPathComponent("fake_local_agent.py").path,
             "-useAppleVision", "NO", "-useGateway", "NO", "-batchMode", "NO",
-            "-selectedProvider", "Gemini", "-preOCRedInput", "NO",
+            "-selectedProvider", "Gemini",
             "-mergeDocuments", "NO", "-enableCollectionSegmentation", collectionID ? "YES" : "NO",
             "-confirmCollectionIDs", collectionID ? "YES" : "NO", "-enableSegmentJSON", "YES",
             // Keep the journey on its stand-in reader. The separate date and item-field contracts
             // exercise enrichment with offline transports.
             "-macItemFields", "NO", "-tagVocabulary", ""
-        ] + settings)
+        ] + inputs + settings)
         app.launchEnvironment = [
             "ARCHIVEPROC_HEADLESS": "1",   // keychain quiet; the window still draws
             "FAKE_AGENT_CLASS_CYCLE": classificationCycle ? "1" : "0",

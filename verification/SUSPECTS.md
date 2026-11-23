@@ -1186,8 +1186,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** observe the same review sequence on two fresh user-started runs with the Documents switch
   on and off. The owner chooses whether the whole-run review should remain required or be explicitly skippable.
 - **Would clear it:** fresh document review defaults on and an explicit off skips the before-tagging review.
-  Owner call 31 approved this behavior. The fix is queued as `W49.proc-s046-review-toggle`.
-- **Status:** `reproduced` — [scratch VM evidence and separate confirmation](evidence/processor/W49.proc-s046-verify.md).
+  Owner call 31 approved this behavior. Shipped as `W49.proc-s046-review-toggle`.
+- **Status:** `fixed` — [scratch VM evidence and separate confirmation](evidence/processor/W49.proc-s046-verify.md).
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
   - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s046-verify`; standing authorization for all bug suspects, phase rule 5a retained.
@@ -1197,6 +1197,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     deliberately in `a6da4e62`, so the behavior choice goes to the owner.
   - 2026-11-23 W49.proc-s046-check — a separate Codex gpt-6.2-sol VM run under the owner override confirmed
     the same sequence at `df7f295d`. Both switch values reached Done with six succeeded and zero failed.
+  - 2026-11-23 W49.proc-s046-review-toggle — the switch defaults on and an explicit off skips the fresh
+    whole-run review. The other review stages still apply.
 
 
 ### S-047 · Windows that split a letter the OCR read as one document drop its enclosure's `Sent With`

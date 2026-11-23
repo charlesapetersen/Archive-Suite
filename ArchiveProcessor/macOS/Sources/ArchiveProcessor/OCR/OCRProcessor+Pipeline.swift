@@ -2438,7 +2438,6 @@ extension OCRProcessor {
                     enableSegmentJSON: pending.enableSegmentJSON,
                     enableCollectionSegmentation: pending.enableCollectionSegmentation,
                     confirmCollectionIDs: pending.confirmCollectionIDs,
-                    reviewDocumentSegmentation: pending.reviewDocumentSegmentation,
                     customPrompt: pending.customPrompt,
                     runConfig: runConfig,
                     settings: pending.resolvedSettings
@@ -3406,6 +3405,7 @@ extension OCRProcessor {
         enableCollectionSegmentation: Bool = false,
         confirmCollectionIDs: Bool = false,
         reviewDocumentSegmentation: Bool = false,
+        reviewFreshDocumentSegmentation: Bool = true,
         preOCRedInput: Bool = false,
         skipAlreadyProcessed: Bool = false,
         segmentationContext: SegmentationContext,
@@ -3414,6 +3414,8 @@ extension OCRProcessor {
         resumingMixedPDF: PendingMixedPDF? = nil,
         postCorrectionRequested: Bool = false
     ) async {
+        // A mixed PDF resume keeps its existing review flow. The fresh switch controls only Start.
+        let reviewWholeRun = resumingMixedPDF != nil || reviewFreshDocumentSegmentation
         let localAgent = requestedLocalAgent.map { config in
             var config = config
             config.requiresSubscription = SettingsLayerStore.shared.resolver(at: outputDirectory).monthlyLimitUSD != nil
@@ -3807,7 +3809,7 @@ extension OCRProcessor {
                     enableSegmentJSON: enableSegmentJSON,
                     enableCollectionSegmentation: enableCollectionSegmentation,
                     confirmCollectionIDs: confirmCollectionIDs,
-                    reviewDocumentSegmentation: reviewDocumentSegmentation,
+                    reviewWholeRun: reviewWholeRun,
                     customPrompt: segmentationContext.customPrompt,
                     runConfig: runConfig,
                     settings: activeResolvedSettings
@@ -3973,15 +3975,18 @@ extension OCRProcessor {
                 } else if case .windows(let approach) = plan {
                     guard await runWindowSegmentationStage(files: files, approach: approach,
                                                            runConfig: runConfig, outputDirectory: outputDirectory,
-                                                           settings: activeResolvedSettings) == .done else {
+                                                           settings: activeResolvedSettings,
+                                                           reviewWholeRun: reviewWholeRun) == .done else {
                         cleanupTempFiles(); return
                     }
                 } else if case .manualWindow = plan {
                     // Manual modes: the combined segment+tag window owns rotation, box/folder, and
                     // segmentation, so skip the separate review here (it rebuilds segments itself).
                 } else if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
-                    await showFullSegmentationReview(files: files, runConfig: runConfig)
-                    guard !Task.isCancelled else { cleanupTempFiles(); return }
+                    if reviewWholeRun || plan == .noTagging {
+                        await showFullSegmentationReview(files: files, runConfig: runConfig)
+                        guard !Task.isCancelled else { cleanupTempFiles(); return }
+                    }
 
                     // Final confirmation of box/folder identifications
                     await showBoxFolderConfirmation(files: files, runConfig: runConfig)

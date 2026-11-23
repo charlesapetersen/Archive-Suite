@@ -202,6 +202,9 @@ enum ProcessorUITestConfiguration {
     static func installScratchDefaults() {
         guard isActive else { return }
         let defaults = UserDefaults.standard
+        if arguments.contains("-APUITestUnsetDocumentReview") {
+            defaults.removeObject(forKey: DefaultsKeys.reviewDocumentSegmentation)
+        }
         defaults.set(true, forKey: DefaultsKeys.hasSeenKeyOnboarding)
         defaults.set(true, forKey: DefaultsKeys.keychainExplained)
         defaults.set(!arguments.contains("-APUITestGeneralInterview"), forKey: DefaultsKeys.hasSeenGeneralInterview)

@@ -18249,3 +18249,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 
 - [x] **W49.proc-s046-check — Independently reproduce S-046 [S]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build,vm) (agent: codex) (blocked-on: W49.proc-s046-verify) — SHIPPED 2026-11-23 (this commit). Owner override 2026-11-23. In a separate scratch VM run on `df7f295d`, Codex gpt-6.2-sol confirmed that On and Off both open the whole-run pre-tagging review, box/folder confirmation, final tag review and collection name confirmation. Both finished with six succeeded, zero failed and one collection organized, without a per-collection review. [Evidence and reproduction command](verification/evidence/processor/W49.proc-s046-verify.md#separate-verification). $0. The local VM log and screenshots were retained as evidence.
   <!-- /W49.proc-s046-check -->
+
+- [x] **W49.proc-s046-review-toggle — default fresh document review on and let the switch skip it [S]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build,vm) (blocked-on: W49.proc-s046-check) — SHIPPED 2026-11-23 (this commit). Owner call 31.
+  The Documents switch defaults on for the whole-run page review before tagging. Off skips that pause. The switch
+  is available when the run uses model-proposed boundaries, even with Collection ID off. Rotation, label checks,
+  flagged boundaries, final tagging, collection naming and the separate Resume review follow their existing rules.
+  [Scratch VM and segmentation evidence](verification/evidence/processor/W49.proc-s046-verify.md#fix-verification).
+  Used existing rehearsal inputs and synthetic fixtures at $0. No new bench cache.
+  <!-- /W49.proc-s046-review-toggle -->

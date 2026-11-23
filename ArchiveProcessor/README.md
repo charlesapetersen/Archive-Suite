@@ -89,6 +89,12 @@ Every image is automatically classified as one of:
 
 Mistral (which uses a dedicated OCR endpoint without prompt support) classifies via text heuristics instead; for pre-OCRed PDFs it uses a short text-only Mistral chat call. Apple Vision returns no classification unless its text-only LLM judgement is turned on.
 
+In **Settings › Documents**, **Review document segmentation** starts on. For a fresh Process Files run with
+model-proposed document boundaries, turn it off to skip the whole-run review before tagging. The run still
+confirms detected box and folder labels, checks flagged boundaries when a window model is used, and shows any
+rotation, final tagging and collection-name reviews that apply. Manual Segment & Tag uses its own combined window.
+With Collection ID enabled, the run also saves this preference for the separate per-collection review on Resume.
+
 ### Previous-page image context
 
 Optionally send the **previous page's image** alongside the current one to improve classification
