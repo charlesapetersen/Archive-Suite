@@ -53,9 +53,12 @@ The wizard now reports a refused Keychain save separately from the provider chec
 **Save failed** for the affected key, even when the field is empty. The key stays in the wizard for another try.
 See W49.proc-fix-s024 and the [original VM reproduction](../verification/evidence/processor/W49.proc-suspects-messages-check.md).
 
-## The OpenAI gateway preset contradicts its help (S-025)
+## FIXED (2026-11-23) — The OpenAI gateway preset contradicted its help (S-025)
 
-- The preset fills GPT-5.4 mini, which supports reasoning, while the help promises a non-reasoning model. Starting a run built a request with the deprecated max_tokens field. Live OpenAI acceptance remains open. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md). (queued: W49.proc-fix-s025)
+The preset explains that GPT-5.4 mini supports reasoning and uses OpenAI’s default. OCR and text
+requests to the public OpenAI gateway use `max_completion_tokens`. Other compatible gateway
+addresses use `max_tokens`. No OpenAI key was available to capture a live reply.
+See W49.proc-fix-s025 and the [VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md#s-025-fix--openai-preset-help-and-request).
 
 ## Codex OCR stops before the usage window resets (S-018)
 

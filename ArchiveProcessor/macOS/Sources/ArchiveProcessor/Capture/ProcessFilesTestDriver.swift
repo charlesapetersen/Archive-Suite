@@ -200,8 +200,8 @@ enum ProcessFilesTestDriver {
         // "Fill in OpenAI preset" does (`SettingsReadingPanel.applyOpenAIGatewayPreset`); send it to the stand-in with
         // PROCESSFILES_REDIRECT_URL.
         if env["PROCESSFILES_GATEWAY_PRESET"] == "openai" {
-            guard let m = SettingsReadingPanel.openAIGatewayPresetModel else { return fail("no OpenAI preset model", marker: donePath) }
-            gateway = GatewayConfig(baseURL: GatewayConfig.normalizedBaseURL("https://api.openai.com/v1"), modelID: m.id,
+            let m = SettingsReadingPanel.openAIGatewayPresetModel
+            gateway = GatewayConfig(baseURL: OpenAICompatibleClient.openAIBaseURL, modelID: m.id,
                                     displayName: "OpenAI", inputCostPer1M: m.inputCostPer1M, outputCostPer1M: m.outputCostPer1M)
         }
         // W49.proc-suspects-messages (S-018): PROCESSFILES_LOCALAGENT=<tool>:<absolute CLI path> reads with the Local

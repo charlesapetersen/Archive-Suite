@@ -18303,3 +18303,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Verified on scratch PDFs and Live Capture inputs, including the in-place enclosure, rotation and Reader's
   offer, apply and undo path. Separate adversarial review by Codex. No bench cache was created.
   <!-- /W49.folder-date-stamp-first -->
+
+- [x] **W49.proc-fix-s025 — Make the OpenAI gateway preset match its model and request guidance [S · S3]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build,vm) — S-025. Resolve the contradiction between the preset help and the selected reasoning-capable model. Exercise the Settings button and the production request builder. Capture the live service response if an OpenAI key becomes available. [VM evidence and reproducer](verification/evidence/processor/W49.proc-suspects-messages-check.md).
+  The preset fills GPT-5.4 mini and explains its default reasoning setting. The public OpenAI
+  gateway uses `max_completion_tokens`. Custom gateways use `max_tokens`.
+  Both off-screen gateway journeys and two smoke tests passed on synthetic inputs.
+  [Regression evidence](verification/evidence/processor/W49.proc-suspects-messages-check.md#s-025-fix--openai-preset-help-and-request).
+  No OpenAI key was available for a live response. No paid calls or bench cache.
+  <!-- /W49.proc-fix-s025 -->

@@ -26,9 +26,10 @@ enum MessageJourneyFixture {
     }
 
     static func reply(to request: URLRequest) throws -> (Data, URLResponse) {
-        guard let mode,
-              let output = ProcessorUITestConfiguration.outputDirectory,
-              let url = request.url, url.host == "api.openai.com" else {
+        guard let mode else { throw URLError(.unsupportedURL) }
+        let host = mode == "custom-gateway" ? "example.invalid" : "api.openai.com"
+        guard let output = ProcessorUITestConfiguration.outputDirectory,
+              let url = request.url, url.host == host else {
             throw URLError(.unsupportedURL)
         }
         if mode == "key", request.httpMethod == "GET", url.path == "/v1/models" {
@@ -77,6 +78,7 @@ enum MessageJourneyFixture {
             "url": url.absoluteString, "model": model, "status": status, "images": imageCount,
             "max_tokens": json["max_tokens"] ?? NSNull(),
             "max_completion_tokens": json["max_completion_tokens"] ?? NSNull(),
+            "reasoning_effort": json["reasoning_effort"] ?? NSNull(),
         ]
         let log = output.deletingLastPathComponent().appendingPathComponent("calls", isDirectory: true)
         try JSONSerialization.data(withJSONObject: record, options: [.sortedKeys])

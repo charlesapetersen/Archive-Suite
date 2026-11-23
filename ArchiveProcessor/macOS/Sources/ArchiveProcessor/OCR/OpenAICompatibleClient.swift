@@ -6,9 +6,8 @@ struct OpenAICompatibleClient: Sendable {
     let apiKey: String
     let modelID: String
 
-    /// Token-limit parameter name. Native OpenAI reasoning models use `max_completion_tokens`, which
-    /// bounds visible and reasoning tokens; OpenAI-compatible gateways retain `max_tokens`. Defaults to
-    /// `max_tokens`, so existing gateway callers build a byte-identical request.
+    /// Public OpenAI gateway requests and native reasoning models use `max_completion_tokens`,
+    /// which bounds visible and reasoning tokens. Other compatible gateways use `max_tokens`.
     var maxTokensParam: String = "max_tokens"
     /// Optional OpenAI `reasoning_effort` ("low"/"medium"/"high"), sent only when non-nil (reasoning
     /// models only). Set by the `openAI(model:apiKey:thinkingLevel:)` factory from the caller's
@@ -24,8 +23,11 @@ struct OpenAICompatibleClient: Sendable {
 
     /// The client for the user's gateway, local or remote.
     static func gateway(_ config: GatewayConfig) -> OpenAICompatibleClient {
-        OpenAICompatibleClient(baseURL: config.baseURL, apiKey: config.apiKey, modelID: config.modelID,
-                               localModel: config.isLocalModel, paidGateway: config.isLocalModel ? nil : config)
+        let baseURL = GatewayConfig.normalizedBaseURL(config.baseURL)
+        let usesPublicOpenAI = !config.isLocalModel && baseURL == openAIBaseURL
+        return OpenAICompatibleClient(baseURL: baseURL, apiKey: config.apiKey, modelID: config.modelID,
+                                      maxTokensParam: usesPublicOpenAI ? "max_completion_tokens" : "max_tokens",
+                                      localModel: config.isLocalModel, paidGateway: config.isLocalModel ? nil : config)
     }
 
     private var requestTimeout: TimeInterval { localModel ? LocalModelRoute.requestTimeout : 120 }

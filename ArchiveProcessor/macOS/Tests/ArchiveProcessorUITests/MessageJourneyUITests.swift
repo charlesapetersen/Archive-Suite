@@ -59,7 +59,7 @@ final class MessageJourneyUITests: XCTestCase {
         shot("s024-accounts-save-failed")
     }
 
-    func testOpenAIPresetBuildsLegacyTokenLimit() throws {
+    func testOpenAIPresetHelpAndRequestMatchSelectedModel() throws {
         try prepare()
         try makePhoto("in/one.jpg")
         launch("preset")
@@ -72,6 +72,17 @@ final class MessageJourneyUITests: XCTestCase {
         let preset = settings.buttons["Fill in OpenAI preset"]
         reveal(preset, in: settings.scrollViews.firstMatch)
         preset.click()
+        let help = element("ap.settings.openAIPresetHelp")
+        XCTAssertTrue(help.exists)
+        help.click()
+        let guidance = settings.popovers.firstMatch.staticTexts.firstMatch
+        XCTAssertTrue(guidance.waitForExistence(timeout: 5), settings.debugDescription)
+        let helpText = try XCTUnwrap(guidance.value as? String)
+        XCTAssertTrue(helpText.contains("GPT-5.4 mini"), helpText)
+        XCTAssertTrue(helpText.contains("supports reasoning"), helpText)
+        XCTAssertTrue(helpText.contains("uses its OpenAI default"), helpText)
+        shot("s025-openai-preset-help")
+        app.typeKey(XCUIKeyboardKey.escape.rawValue, modifierFlags: [])
         let model = settings.textFields["Model ID"]
         reveal(model, in: settings.scrollViews.firstMatch)
         XCTAssertEqual(model.value as? String, "gpt-5.4-mini")
@@ -84,9 +95,29 @@ final class MessageJourneyUITests: XCTestCase {
         XCTAssertEqual(reads.count, 1)
         let read = try XCTUnwrap(reads.first)
         XCTAssertEqual(read["url"] as? String, "https://api.openai.com/v1/chat/completions")
+        XCTAssertEqual(read["max_completion_tokens"] as? Int, 8192)
+        XCTAssertTrue(read["max_tokens"] is NSNull)
+        XCTAssertTrue(read["reasoning_effort"] is NSNull)
+        print("[s025] preset OCR request \(read)")
+    }
+
+    func testCustomGatewayKeepsCompatibleTokenLimitForSameModel() throws {
+        try prepare()
+        try makePhoto("in/one.jpg")
+        launch("custom-gateway", extra: [
+            "-useGateway", "YES", "-gatewayLocalModel", "NO", "-gatewayBaseURL", "https://example.invalid/v1",
+            "-gatewayModelID", "gpt-5.4-mini", "-gatewayUpstreamProvider", "OpenAI",
+        ])
+        start()
+        waitForDone(succeeded: 1)
+        let reads = try calls().filter { ($0["images"] as? Int) == 1 }
+        XCTAssertEqual(reads.count, 1)
+        let read = try XCTUnwrap(reads.first)
+        XCTAssertEqual(read["model"] as? String, "gpt-5.4-mini")
+        XCTAssertEqual(read["url"] as? String, "https://example.invalid/v1/chat/completions")
         XCTAssertEqual(read["max_tokens"] as? Int, 8192)
         XCTAssertTrue(read["max_completion_tokens"] is NSNull)
-        print("[s025] preset OCR request \(read)")
+        XCTAssertTrue(read["reasoning_effort"] is NSNull)
     }
 
     func testCodexEndsPageBeforeThePromisedRetry() throws {

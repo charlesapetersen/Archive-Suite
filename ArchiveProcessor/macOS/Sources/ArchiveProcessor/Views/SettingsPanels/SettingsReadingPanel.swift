@@ -204,7 +204,8 @@ struct SettingsReadingPanel: View {
                         } label: {
                             Label("Fill in OpenAI preset", systemImage: "sparkles")
                         }
-                        HelpButton(text: "One-click fill for OpenAI's public API: sets the Gateway URL to https://api.openai.com/v1, a cost-effective OpenAI model, a display name, and its pricing. Paste your OpenAI key into the Gateway key field in Settings › Accounts. The gateway sends standard chat-completions requests, so this fills a non-reasoning model; for GPT-5 reasoning models pick OpenAI under the Direct API mode instead. For Azure OpenAI or another OpenAI-compatible proxy, apply this then edit the Gateway URL to your endpoint.")
+                        HelpButton(text: "Fills in OpenAI’s public API address, \(Self.openAIGatewayPresetModel.displayName), and its pricing. The model supports reasoning and uses its OpenAI default. To choose a reasoning level, use OpenAI in Direct API mode. Enter your OpenAI key under Gateway in Settings › Accounts. For a different gateway, enter the URL and model ID it provides.")
+                            .accessibilityIdentifier("ap.settings.openAIPresetHelp")
                     }
                     if gatewayLocalModel {   // a local model's looped page needs a fallback, if the user allows the cloud
                         Toggle(isOn: $gatewayLocalEscalates) {
@@ -469,30 +470,17 @@ struct SettingsReadingPanel: View {
             .font(.caption2).foregroundStyle(.primary)
     }
 
-    /// One-click "OpenAI" gateway preset — prefills the public OpenAI endpoint plus a default OpenAI model
-    /// and its pricing, read from the single source of truth (`LLMModel.openaiModels`), so a verified
-    /// model-ID/price change there flows through here automatically. A custom base URL covers Azure OpenAI /
-    /// OpenAI-compatible proxies — apply this, then edit the Gateway URL to that endpoint.
-    ///
-    /// Model choice: the gateway path builds a plain `OpenAICompatibleClient` that sends `max_tokens` (it does
-    /// NOT apply the reasoning-model param adapter — that lives on the native `.openai` provider), and OpenAI
-    /// reasoning models reject `max_tokens`. So this defaults to the cheapest **non-reasoning** OpenAI model,
-    /// which the gateway request works with as-is; GPT-5 reasoning models go through the Direct API provider.
+    /// Start with the same default OpenAI model and prices as Direct API mode.
     private func applyOpenAIGatewayPreset() {
-        gatewayLocalModel = false   // OpenAI is remote
-        gatewayBaseURL = "https://api.openai.com/v1"
+        let model = Self.openAIGatewayPresetModel
+        gatewayLocalModel = false
+        gatewayBaseURL = OpenAICompatibleClient.openAIBaseURL
         gatewayDisplayName = "OpenAI"
         gatewayUpstreamProvider = .openai
-        if let m = Self.openAIGatewayPresetModel {
-            gatewayModelID = m.id
-            gatewayInputCost = m.inputCostPer1M
-            gatewayOutputCost = m.outputCostPer1M
-        }
+        gatewayModelID = model.id
+        gatewayInputCost = model.inputCostPer1M
+        gatewayOutputCost = model.outputCostPer1M
     }
 
-    /// The model "Fill in OpenAI preset" puts in the gateway's fields (W49.proc-suspects-messages: the driver's
-    /// `PROCESSFILES_GATEWAY_PRESET=openai` takes it from here).
-    static var openAIGatewayPresetModel: LLMModel? {
-        LLMModel.openaiModels.first(where: { !$0.supportsThinking }) ?? LLMModel.openaiModels.first
-    }
+    static var openAIGatewayPresetModel: LLMModel { LLMModel.openaiModels[0] }
 }
