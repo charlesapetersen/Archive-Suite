@@ -18209,3 +18209,13 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Removed the five cuts from the Processor and benchmark deployment list. This also covers OpenRouter maker aliases, Qwen3.6 27B second reads and official FP8 imports. The four one-catch readers retain their thresholds. The run summary gives the benchmark sample and counts caught at the fitted setting for readers that flagged pages.
   A Gemini refusal with no second reader returns no text and an explicit setup message. Process Files marks it failed, includes it in OCR Failures and offers retry on the original backend. The failed file detail shows the full error. The exhausted verdict bypasses automatic timeout retries. A configured cascade or second reader can still supply text. No paid calls.
   <!-- /W46.p17-flag-unflag-five -->
+
+- [x] **W49.proc-hand-nfd — normalise the reading to NFD before hand alignment [XS]** · §Known limits are queued, accepted or asked — SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build) — McCATMuS is an NFD model; a precomposed accent in the reading scores 0 and lowers the page's confidence against the 0.9 gate. Decompose the reading before it goes to `place-hands.py`, map the placed spans back to the original text, and check on an accented scratch page that the confidence rises and the layer text is unchanged. Covers §W42.int-s5-hands "Accented readings align worse…". Filed by W49.ki-audit-processor.
+  `place-hands.py` matches and aligns in NFD and uses the aligned word starts to place the original words.
+  The score denominator uses the same decomposed reading as the aligner. The 0.9 gate uses the existing
+  raw score, which can exceed 1. On scratch page p052 the worker score rose from 1.017548 to 1.018590,
+  with identical placed text and boxes. The headless Processor score rose from 1.016 to 1.017 as displayed.
+  Extracted text was byte-identical before and after on both PDF pages, including the precomposed accent.
+  A focused two-line check covered shifted offsets, combining mark order, equivalent Unicode forms and fallback.
+  Debug build and the offline text-layer smoke (including veraPDF) passed. No paid calls or bench cache created.
+  <!-- /W49.proc-hand-nfd -->

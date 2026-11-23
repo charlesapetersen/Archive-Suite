@@ -8,7 +8,8 @@ written lines; McCATMuS recognises each line once, keeping its CTC output; the r
 the found lines by character error, two ways (`s1`, one found line a reading line; `s8`, a reading line over up to 8
 found lines, for a reader that reflows); each matched run's text is force-aligned on the run's CTC output, so a reading
 line over several written lines is split where the ink says; and the matcher whose alignment is the surer (`conf`, ties
-to `s1`) is kept. The page's confidence is the mean aligned-character score over the reading's characters, an unaligned
+to `s1`) is kept. The reading is decomposed to NFD for matching and alignment; placed words keep their source spelling.
+The page's confidence is the mean aligned-character score over the decomposed reading's characters, an unaligned
 character counting 0. The 0.9 gate is the caller's (`HandPlacer.gate`).
 
 Writes {"lines": [{"text", "box": [x, y, w, h]}], "confidence", "span", "detected", "reading_lines", "fallback_lines",
@@ -24,6 +25,7 @@ import re
 import resource
 import sys
 import time
+import unicodedata
 
 FRAC = 0.78          # place_truth.BASELINE_FRAC: the share of a line's height above its baseline
 SPANS = (1, 8)       # the two matchers
@@ -173,31 +175,33 @@ def ctc_char_spans(net, logits_list, text, pad):
 
 def place(rl, dl, recs, recog, net, pad, span):
     """One matcher: {found index: text} and the page's confidence (place_hands.place_ctc's `place`)."""
+    normalized = [unicodedata.normalize('NFD', line) for line in rl]
     memo = {}
 
     def cost(i, j, k):
         if (i, j, k) not in memo:
-            memo[(i, j, k)] = min(1.0, cer(' '.join(recog.get(j + n, '') for n in range(k)), rl[i]))
+            memo[(i, j, k)] = min(1.0, cer(' '.join(recog.get(j + n, '') for n in range(k)), normalized[i]))
         return memo[(i, j, k)]
     m = dp_match(len(rl), len(dl), cost, SKIP, span)
     assigned, fallback, conf = {}, 0, []
     for i, (j, k) in m.items():
-        text, run = rl[i], range(j, j + k)
+        text, run = normalized[i], range(j, j + k)
         got = None
         if all(recs.get(n) is not None and recs[n].logits is not None for n in run):
             got = ctc_char_spans(net, [recs[n].logits for n in run], text, pad)
         if got is None:
             fallback += 1
-            for n, chunk in zip(run, split_by_length(text, [dl[n]['len'] for n in run])):
+            for n, chunk in zip(run, split_by_length(rl[i], [dl[n]['len'] for n in run])):
                 if chunk:
                     assigned[n] = chunk
             continue
         spans, scores = got
         conf += scores
-        for mt in re.finditer(r'\S+', text):
-            n0 = spans[mt.start()][0]
-            assigned[j + n0] = (assigned.get(j + n0, '') + ' ' + mt.group()).strip()
-    n_chars = sum(len(r.replace(' ', '')) for r in rl)
+        # NFD changes offsets within words, but keeps the cleaned line's space delimiters.
+        for word, match in zip(rl[i].split(), re.finditer(r'\S+', text)):
+            n0 = spans[match.start()][0]
+            assigned[j + n0] = (assigned.get(j + n0, '') + ' ' + word).strip()
+    n_chars = sum(len(line.replace(' ', '')) for line in normalized)
     return {'assigned': assigned, 'confidence': sum(conf) / max(1, n_chars), 'fallback': fallback, 'span': span}
 
 

@@ -576,7 +576,8 @@ is on and the handwriting placer is downloaded: VisionOCRKit `HandPlacer` runs k
 alignment, `place-hands.py`) in its own process. Every hand page keeps its separate text page, in the searchable form
 too. The layer goes on the image beside it at 0.9 alignment confidence or more (owner, 2026-11-17,
 W46.place-hands-textpage), when the reading keeps at least 70% of the detected lines and the layer
-reads back in order (W49.proc-settings-rules-proper).
+reads back in order (W49.proc-settings-rules-proper). The placer decomposes accents for McCATMuS and writes the
+reading's original words into the image layer (W49.proc-hand-nfd).
 Measured with `scripts/measure-hands.sh` on 21 owner hand pages (qwen3.6-27b readings) and 3 public ledger pages
 (Apple Vision readings) at the earlier 0.67 gate: 21 placed, 3 to the text page by the gate; at 0.9 the bench keeps the
 layer on 9 of 20 owner hand pages (`place-hands-lines.md`, Qwen3.6-27B). Open:
@@ -589,8 +590,6 @@ layer on 9 of 20 owner hand pages (`place-hands-lines.md`, Qwen3.6-27B). Open:
   confidence rose (p031 0.70 to 0.89, p096 0.57 to 0.72), and p096 is placed where the bench gated it (20 of 21 on the
   same side). The 0.9 gate was read off the originals' line-pass table; its refit waits on more hand truth
   (`05-placement.md` §6) (accepted: the 0.9 gate is the owner's call of 2026-11-17, W46.place-hands-textpage; its refit waits on more hand truth).
-- **Accented readings align worse**: McCATMuS is an NFD model and the reading is not normalised to NFD (as on the
-  bench), so a precomposed accent scores 0 and lowers the page's confidence (queued: W49.proc-hand-nfd).
 
 ## ⚠️ LIMITATION (W42.int-s5, 2026-11-13): what the image page's searchable layer and the PDF/A output do not yet do
 
