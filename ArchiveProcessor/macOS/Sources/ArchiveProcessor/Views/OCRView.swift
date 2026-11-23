@@ -744,6 +744,7 @@ struct OCRView: View {
                                     .accessibilityIdentifier("ap.ocr.resumeRun")
                                 Button("Dismiss") { processor.dismissPendingRun() }
                                     .buttonStyle(.bordered)
+                                    .disabled(processor.isProcessing)
                             }
                         }
                         .padding(4)

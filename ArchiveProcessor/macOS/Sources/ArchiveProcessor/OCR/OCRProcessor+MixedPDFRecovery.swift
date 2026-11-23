@@ -253,6 +253,7 @@ extension OCRProcessor {
 
     /// `readWithoutClusterText`: as `resumeRun`'s, for the run's images (a PDF's pages never match the cluster).
     func resumeMixedPDF(apiKey: String, keyProvider: LLMProvider, readWithoutClusterText: Bool = false) async {
+        guard !isProcessing else { return }
         guard let pending = Self.loadPendingMixedPDF(),
               Self.pendingMixedPDFIsSelfConsistent(pending) else {
             checkForPendingBatch()
@@ -290,12 +291,22 @@ extension OCRProcessor {
             statusMessage = "Restore the \(textProvider.rawValue) judgement key before resuming this run."
             return
         }
-        let reloaded = pending.runtimeConfig.institutionalComputeFolder.flatMap { Self.reloadInstitutionalComputeImport($0) }
+        var reloaded: InstitutionalComputeImport?
+        if let folder = pending.runtimeConfig.institutionalComputeFolder {
+            do {
+                reloaded = try await reloadInstitutionalComputeImport(folder)
+            } catch { return }
+            guard !Task.isCancelled else { return }
+        }
         if !readWithoutClusterText, let folder = pending.runtimeConfig.institutionalComputeFolder,
            let prompt = Self.institutionalComputeResumePrompt(
             recordedFolder: folder, reloaded: reloaded,
             remainingPages: pending.originalFiles.count - pending.pdfIndices.count,
             model: pending.model.displayName, mixedPDF: true) {
+            guard Self.loadPendingMixedPDF()?.integrity == pending.integrity else {
+                checkForPendingBatch()
+                return
+            }
             institutionalComputeResumePrompt = prompt
             return
         }

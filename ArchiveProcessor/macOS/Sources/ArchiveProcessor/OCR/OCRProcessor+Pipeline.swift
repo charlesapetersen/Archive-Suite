@@ -388,7 +388,6 @@ extension OCRProcessor {
             runConfig.visionSettings = runtime.visionSettings
             runConfig.cascade = runtime.cascade ?? .off
             runConfig.pageReaders = runtime.pageReaders ?? .empty
-            runConfig.institutionalComputeImport = runtime.institutionalComputeFolder.flatMap { Self.reloadInstitutionalComputeImport($0) }
             runConfig.segmentationApproach = runtime.segmentationApproach ?? .manual
             runConfig.dateLocalImage = runtime.dateLocalImage == true
             runConfig.macItemFields = runtime.macItemFields ?? true
@@ -2169,8 +2168,8 @@ extension OCRProcessor {
     /// `readWithoutClusterText` is the operator's answer to `institutionalComputeResumePrompt`: read the pages of a
     /// run whose cluster folder is gone with the run's model.
     func resumeRun(apiKey: String, readWithoutClusterText: Bool = false) async {
+        guard !isProcessing else { return }
         if let run = Self.savedCatalogueRun(), run.files != nil {
-            guard !isProcessing else { return }
             isProcessing = true
             defer { isProcessing = false }
             do {
@@ -2200,12 +2199,6 @@ extension OCRProcessor {
     }
 
     private func resumeRun(_ pending: PendingRun, apiKey: String, readWithoutClusterText: Bool) async {
-        let runConfig = {
-            var config = makePendingRunResumeConfig(pending, apiKey: apiKey)
-            config.localAgent?.requiresSubscription = SettingsLayerStore.shared.resolver(at: pending.outputDirectory)
-                .monthlyLimitUSD != nil
-            return config
-        }()
         if pending.provider == .openrouter, pending.gatewayConfig == nil, pending.localAgent == nil,
            pending.completedResults.count < pending.fileURLs.count || pending.enableTagging
                || pending.enableCollectionSegmentation,
@@ -2213,14 +2206,28 @@ extension OCRProcessor {
             statusMessage = warning + Self.unavailableModelRecoveryNote
             return
         }
-        // W40.fix-processor-instcompute-resume-silent: ask before any state changes, so stopping leaves the
-        // interrupted run exactly as it was.
+        var runConfig = makePendingRunResumeConfig(pending, apiKey: apiKey)
+        runConfig.localAgent?.requiresSubscription = SettingsLayerStore.shared.resolver(at: pending.outputDirectory)
+            .monthlyLimitUSD != nil
+        if let folder = pending.runtimeConfig?.institutionalComputeFolder {
+            do {
+                runConfig.institutionalComputeImport = try await reloadInstitutionalComputeImport(folder)
+            } catch { return }
+            guard !Task.isCancelled else { return }
+        }
+
+        // W40.fix-processor-instcompute-resume-silent: ask before changing the saved run.
         if !readWithoutClusterText, let prompt = Self.institutionalComputeResumePrompt(
             recordedFolder: pending.runtimeConfig?.institutionalComputeFolder,
             reloaded: runConfig.institutionalComputeImport,
             remainingPages: Self.remainingIndices(totalFiles: pending.fileURLs.count,
                                                   completedResults: pending.completedResults).count,
             model: pending.model.displayName) {
+            // A resume in another window can update or dismiss the journal during the scan.
+            guard Self.loadPendingRun()?.runFingerprint == pending.runFingerprint else {
+                checkForPendingBatch()
+                return
+            }
             institutionalComputeResumePrompt = prompt
             return
         }
@@ -3254,6 +3261,11 @@ extension OCRProcessor {
     }
 
     func cancel() {
+        if let reload = institutionalComputeReloadTask {
+            reload.cancel()
+            statusMessage = "Resume stopped. The interrupted run is still saved."
+            return
+        }
         let unavailableModel = unavailableOpenRouterRunMessage
         let spendingLimit = monthlyStopMessage
         monthlyStopMessage = nil

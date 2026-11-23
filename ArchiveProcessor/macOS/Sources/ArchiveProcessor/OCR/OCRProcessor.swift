@@ -227,6 +227,7 @@ class OCRProcessor: ObservableObject {
     @Published var planCheckPrompt: PlanCheckPrompt? = nil
     /// A resume whose cluster folder is gone, waiting for the operator (W40.fix-processor-instcompute-resume-silent).
     @Published var institutionalComputeResumePrompt: InstitutionalComputeResumePrompt? = nil
+    var institutionalComputeReloadTask: Task<InstitutionalComputeImport?, Never>?
     var planCheckContinuation: CheckedContinuation<Bool, Never>?
     /// "37 boundaries checked, 6 changed", added to the run's closing status. Never sent anywhere.
     var segmentationCheckSummary: String?

@@ -18327,3 +18327,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Median time with JPEG preparation was 14.63 s current and 14.90 s revised. The 95th percentile was 20.52 s current and 18.73 s revised. Both peaked at 9.85 GiB of sampled server footprint. The app continues to use the existing request and Gemma-first/Vision-fallback collection-number rule.
   Verified 270 local requests in 135 pairs under the heavy lock, the report and rendered bench tables. Cost was $0. Only the counts and timings file `~/Library/Caches/ArchiveSuiteRehearsal/ct-read/results/gemma-route-fields.json` was retained for reproducing [the results](ArchiveProcessor/segbench-results/ct-gemma-route-fields.md). The run created no rendered pages, written PDFs or private environment.
   <!-- /W46.p17-gemma-route-fields -->
+
+- [x] **W49.proc-instcompute-resume-load — reload a resumed run's institutional-computing folder off the main actor [S]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build) — Both resume paths read the recorded folder in a background task.
+  Stop cancels the scan and leaves the saved run available. If the folder has no usable cluster entries,
+  both paths ask before sending pages to the run’s model. The Debug build and scratch import and catalogue
+  recovery tests passed, as did the off-screen interrupted-run journey that reuses saved pages.
+  Two paid-batch cancellation assertions also failed on the unchanged baseline. A separate off-screen
+  test expects outdated Local Agent caption wording. No paid requests or bench cache.
+  <!-- /W49.proc-instcompute-resume-load -->

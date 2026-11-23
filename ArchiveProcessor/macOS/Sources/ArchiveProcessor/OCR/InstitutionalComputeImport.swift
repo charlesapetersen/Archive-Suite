@@ -67,6 +67,7 @@ struct InstitutionalComputeImport: Sendable {
         // given, so its URLs' components cannot be cut at the folder's count.
         let walker = fm.enumerator(atPath: meta.path)
         while let relPath = walker?.nextObject() as? String {
+            try Task.checkCancellation()
             guard relPath.hasSuffix(".json") else { continue }
             let url = meta.appendingPathComponent(relPath)
             // `_meta/box1/a.jpg.json` → `box1/a.jpg.txt` beside `_meta`.
@@ -209,8 +210,32 @@ struct InstitutionalComputeResumePrompt: Equatable, Sendable {
 extension OCRProcessor {
     /// A resumed run's import, read again from its folder. A folder that is gone or no longer a bulk run gives nil.
     /// Resume does not then read its pages with the run's model unasked: see `institutionalComputeResumePrompt`.
-    nonisolated static func reloadInstitutionalComputeImport(_ path: String) -> InstitutionalComputeImport? {
-        try? InstitutionalComputeImport.load(folder: URL(fileURLWithPath: path, isDirectory: true))
+    func reloadInstitutionalComputeImport(_ path: String) async throws -> InstitutionalComputeImport? {
+        try Task.checkCancellation()
+        guard !isProcessing else { throw CancellationError() }
+
+        let previousStatus = statusMessage
+        let reload = Task.detached {
+            try? InstitutionalComputeImport.load(folder: URL(fileURLWithPath: path, isDirectory: true))
+        }
+        institutionalComputeReloadTask = reload
+        isProcessing = true
+        let checkingStatus = "Checking the cluster folder…"
+        statusMessage = checkingStatus
+        defer {
+            institutionalComputeReloadTask = nil
+            isProcessing = false
+            if statusMessage == checkingStatus { statusMessage = previousStatus }
+        }
+
+        let imported = await withTaskCancellationHandler {
+            await reload.value
+        } onCancel: {
+            reload.cancel()
+        }
+        guard !reload.isCancelled else { throw CancellationError() }
+        try Task.checkCancellation()
+        return imported
     }
 
     /// W40.fix-processor-instcompute-resume-silent: what a resume must ask before going on, or nil when it may go on.

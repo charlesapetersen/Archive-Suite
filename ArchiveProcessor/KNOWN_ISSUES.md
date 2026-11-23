@@ -1074,7 +1074,14 @@ the estimate and its time does not).
 
 ## ⚠️ LIMITATION (W41.app-institutional-compute, 2026-10-18): what the institutional computing import leaves open
 
-`InstitutionalComputeImport` takes a cluster bulk run's text for the pages whose image bytes it read. What it does not do:
+`InstitutionalComputeImport` takes a cluster bulk run's text for the pages whose image bytes it read.
+Both resume paths reload the recorded folder in the background. If the folder was moved, deleted or emptied,
+resume asks whether to read the remaining pages with the run's model or stop and put the folder back
+(W40.fix-processor-instcompute-resume-silent). A mixed PDF resume gives an upper bound for its image pages.
+If the folder still contains a readable index, each image is checked against it by hash at read time.
+A replaced folder can still load, and the run's model reads individual pages with no match.
+
+What the import does not do:
 - **The estimates count every page.** The cost and time lines do not know which pages will match until each is
   hashed during the run, so they overstate a run with cluster text (a matched page costs one short text-only
   classification call). (accepted: which pages match is known only once each is hashed during the run)
@@ -1084,12 +1091,6 @@ the estimate and its time does not).
   previous-page context do not apply to imported pages (the classification call does get the custom prompt). (accepted: the cluster read every page with the bench panel's prompt)
 - **Only image inputs match.** A PDF input's pages are drawn to temporary JPEGs whose bytes the cluster never saw.
   Paid batches, the gateway, the Local Agent and Apple Vision runs ignore the import. (accepted: a PDF's pages are drawn during the run, so the cluster never saw their bytes; the other routes do not read pages through the import)
-- **A resumed run reloads the folder on the main actor** (every `_meta` file); a very large run may pause the resume
-  for some seconds. A folder moved, deleted or emptied since gives no import, so resume first asks whether to read
-  the remaining pages with the run's model or stop and put the folder back (W40.fix-processor-instcompute-resume-silent).
-  An interrupted mixed PDF run asks the same, counting its image pages as "up to": which of them are still unread
-  is not known until the resume runs. It asks only when the folder gives no page at all: a folder swapped for another
-  bulk run's still loads, so pages it does not match are read by the run's model without a question. (queued: W49.proc-instcompute-resume-load)
 - **Every imported page gets a classification call**, even when tagging, merging and segmentation are off:
   `performOCRCall` cannot see the run's tagging mode. One short text call a page, inside the estimate. (queued: W49.proc-instcompute-classify)
 - **Every page is hashed** once more than it is read (one extra read of each input), the price of matching by

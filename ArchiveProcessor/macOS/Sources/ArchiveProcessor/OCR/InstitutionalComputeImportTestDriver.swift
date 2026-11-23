@@ -256,19 +256,20 @@ enum InstitutionalComputeImportTestDriver {
         let back = (try? JSONEncoder().encode(runtime)).flatMap {
             try? JSONDecoder().decode(OCRProcessor.PendingRunRuntimeConfig.self, from: $0) }
         check("the run snapshot records the folder", back?.institutionalComputeFolder == bulk.path)
-        check("a resumed run reloads the folder",
-              back?.institutionalComputeFolder.flatMap { OCRProcessor.reloadInstitutionalComputeImport($0) }?.count == 2)
-        check("a folder gone since gives no import (its pages go to the run's model)",
-              OCRProcessor.reloadInstitutionalComputeImport(root.appendingPathComponent("gone").path) == nil)
+        let reloaded = try? await processor.reloadInstitutionalComputeImport(bulk.path)
+        check("a resumed run reloads the folder", reloaded?.count == 2 && !processor.isProcessing)
+        let missing = try? await processor.reloadInstitutionalComputeImport(root.appendingPathComponent("gone").path)
+        check("a folder gone since gives no import", missing == nil && !processor.isProcessing)
         check("a run without an import records none and its call values carry none",
               processor.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil).institutionalComputeFolder == nil
               && OCRProcessor.ocrCallValues(for: nil).imported == nil
               && OCRProcessor.ocrCallValues(for: config).imported?.count == 2)
 
         // 6. W40.fix-processor-instcompute-resume-silent: the folder is removed between the run and its resume.
-        if let runtime = back { await resumeWithFolderGone(runtime, files: [box1, unread], bulk: bulk, root: root,
-                                                           script: script, check: check) }
-        else { check("the resume snapshot decodes", false) }
+        if let runtime = back {
+            await resumeWithFolderGone(runtime, files: [box1, unread], pdf: pdf, bulk: bulk, root: root,
+                                       script: script, check: check)
+        } else { check("the resume snapshot decodes", false) }
         let prompt = { (folder: String?, reloaded: InstitutionalComputeImport?, pages: Int) in
             OCRProcessor.institutionalComputeResumePrompt(recordedFolder: folder, reloaded: reloaded,
                                                           remainingPages: pages, model: "M") }
@@ -310,7 +311,7 @@ enum InstitutionalComputeImportTestDriver {
     /// An interrupted run that recorded `bulk`, resumed through the real `resumeRun` after the folder was moved away:
     /// it must ask, spend nothing and leave the manifest as it was. The journal is redirected into `root` the way
     /// `MultiPageReOCRTestDriver` does it, and nothing is written unless the redirection is proven.
-    private static func resumeWithFolderGone(_ runtime: OCRProcessor.PendingRunRuntimeConfig, files: [URL], bulk: URL,
+    private static func resumeWithFolderGone(_ runtime: OCRProcessor.PendingRunRuntimeConfig, files: [URL], pdf: URL, bulk: URL,
                                              root: URL, script: Script,
                                              check: (String, Bool, String) -> Void) async {
         let fm = FileManager.default
@@ -369,7 +370,44 @@ enum InstitutionalComputeImportTestDriver {
               processor.institutionalComputeResumePrompt == nil
               && processor.statusMessage.contains(bulk.path) && (try? Data(contentsOf: manifest)) == before,
               processor.statusMessage)
+        let cancelled = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            await processor.resumeRun(apiKey: "test-key")
+        }
+        await cancelled.value
+        let callsAfterCancel = await script.calls()
+        check("a cancelled reload keeps the saved run without prompting or buying readings",
+              !processor.isProcessing && processor.institutionalComputeResumePrompt == nil
+              && (try? Data(contentsOf: manifest)) == before && callsAfterCancel.isEmpty, "")
         try? fm.removeItem(at: manifest)
+
+        let mixed = OCRProcessor()
+        let mixedManifest = OCRProcessor.pendingMixedPDFURL
+        guard mixedManifest.deletingLastPathComponent().standardizedFileURL == stateRoot.standardizedFileURL,
+              let digest = OCRProcessor.mixedPDFSourceDigest(pdf) else {
+            check("the mixed PDF journal is redirected into scratch and its source exists", false, mixedManifest.path)
+            return
+        }
+        let mixedRun = OCRProcessor.PendingMixedPDF(
+            originalFiles: files + [pdf], pdfIndices: [files.count], outputDirectory: run.outputDirectory,
+            provider: .gemini, model: model, thinkingLevel: nil, batchMode: false,
+            enableTagging: runtime.taggingMode.enablesTagging, enableSegmentJSON: false,
+            enableCollectionSegmentation: false, confirmCollectionIDs: false, reviewDocumentSegmentation: false,
+            previousTextCharCount: 0, sendPreviousImage: false, customPrompt: nil, imageScale: 1,
+            gatewayConfig: nil, localAgent: nil, runtimeConfig: runtime, startedAt: Date(),
+            sourceDigests: [String(files.count): digest])
+        guard OCRProcessor.savePendingMixedPDF(mixedRun) != nil,
+              let mixedBefore = try? Data(contentsOf: mixedManifest) else {
+            check("the mixed PDF journal is written in scratch", false, mixedManifest.path)
+            return
+        }
+        await mixed.resumeMixedPDF(apiKey: "test-key", keyProvider: .gemini)
+        let mixedPrompt = mixed.institutionalComputeResumePrompt
+        let mixedCalls = await script.calls()
+        check("mixed PDF resume asks before buying image readings and keeps its journal",
+              mixedPrompt?.folder == bulk.path && mixedPrompt?.mixedPDF == true && mixedPrompt?.pages == files.count
+              && !mixed.isProcessing && (try? Data(contentsOf: mixedManifest)) == mixedBefore
+              && mixedCalls.isEmpty, String(describing: mixedPrompt))
     }
 
     private static func write(_ bulk: URL, _ rel: String, text: String, meta: [String: Any]?) {
