@@ -2,6 +2,11 @@ import Foundation
 import ArchiveCore
 import UserNotifications
 
+struct ProcessFileFailure: Equatable {
+    let reason: String
+    var code: String? = nil
+}
+
 // MARK: - Collection Review Item
 
 /// Represents a single file's classification and collection assignment for user review.

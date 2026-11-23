@@ -65,7 +65,8 @@ class OCRProcessor: ObservableObject {
     @Published var statusMessage = ""
     /// The run's intake warnings, kept with its status when the user switches tabs.
     @Published var treeIntakeWarnings: [String] = []
-    @Published var failedFiles: [String] = []
+    /// Source paths and their last failure, retained independently of the visible job rows.
+    @Published var failedFiles: [String: ProcessFileFailure] = [:]
     @Published var segments: [DocumentSegment] = []
     @Published var collectionSegments: [CollectionSegment] = []
 

@@ -809,7 +809,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `P-26`.
 - **Would confirm it:** a run with two same-named failing files from two folders, logging on.
 - **Would clear it:** each line carries its own file's reason.
-- **Status:** `reproduced` — independently confirmed and queued as W49.proc-fix-s030. [Independent VM evidence](evidence/processor/W49.proc-suspects-messages-check.md).
+- **Status:** `fixed` — W49.proc-fix-s030 counts every failed source path and logs its own reason. The log-write
+  error path remains untested. [Independent VM evidence](evidence/processor/W49.proc-suspects-messages-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.

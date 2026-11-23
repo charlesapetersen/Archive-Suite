@@ -346,7 +346,7 @@ Process PDFs that already contain OCR text (e.g., from a previous run):
 - **Source tag pass-through** — optionally copy existing Finder tags from source files to output PDFs
 - **Progress tracking** — real-time status messages and progress bar
 - **Error display** — full error text visible in the file pane
-- **Log file** — optional (*Write a processing log file* in Settings, off by default): a `.txt` written after processing, listing all failures with reasons
+- **Log file** — Turn on *Write a processing log file* in Settings to save a text file after processing. It lists the full source path and reason for each failed input.
 - **Secure networking** — ephemeral URLSession, retry with backoff on transient errors, cellular network support
 
 ## Live Capture (phone companion + streaming)

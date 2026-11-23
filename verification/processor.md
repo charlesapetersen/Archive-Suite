@@ -603,23 +603,23 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 
 ### P-26 · Run log and on-screen errors
 
-- **Promise:** after a run a `.txt` log lists every file that produced no OCR text and why; the full error text is
-  visible in the file pane; progress shows in real time.
+- **Promise:** when enabled, the processing log lists each failed input path and the reason. The file pane
+  shows the full error text, and progress updates during the run.
 - **Promised in:** `README.md` §Other Features; `CLAUDE.md` §Batch log file; `TESTING.md` §2.4, §2.13.
 - **Reached by:** ⌘, → Write a processing log file (`Views/SettingsView.swift:831`, off by default `:75`) →
   `writeLogFile` (`OCR/OCRProcessor+Pipeline.swift:3396`) → `ArchiveProcessor_Log_<timestamp>.txt` (`:3443`). Row
   errors `Views/Shared/ProcessableItemRow.swift:213-217`; View text sheet `Views/OCRView+FileRowView.swift:149-151`.
 - **Real-path test:** the Process Files folder intake and Start, with the run log enabled.
-- **Runtime evidence:** [Independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md) via
-  `MessageJourneyUITests.testRunLogLosesOneOfTwoSameNamedFailures`. Folder intake and Start produced two
-  failed same.jpg outputs in different folders. The status and run log counted one failure and the log
-  showed one reason.
-- **Status:** `broken` — W49.proc-fix-s030 for S-030.
+- **Runtime evidence:** [Independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md).
+  Folder intake and Start produced two failed same.jpg outputs in different folders. The status and run log
+  counted one failure and the log showed one reason. The regression is
+  `MessageJourneyUITests.testRunLogKeepsBothSameNamedFailuresByPath`. [Fix verification](evidence/processor/W49.proc-suspects-messages-check.md#s-030-fix--two-same-named-failed-inputs).
+- **Status:** `verified` — W49.proc-fix-s030.
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-21 W49.proc-suspects-messages-check — S-030, see runtime evidence.
-- **Notes:** **Drift.** README, `CLAUDE.md` §Batch log file and `TESTING.md` §2.4 read as always-on; it is opt-in and
-  off by default. Suspect `S-030`.
+  - 2026-11-23 W49.proc-fix-s030 — the summary and opt-in log count both failed paths and the log carries both reasons.
+- **Notes:** The run log is opt-in and off by default. The log-write error path is untested.
 
 ### P-27 · Per-segment JSON metadata
 

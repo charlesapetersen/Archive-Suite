@@ -152,10 +152,10 @@ final class MessageJourneyUITests: XCTestCase {
         }
     }
 
-    func testRunLogLosesOneOfTwoSameNamedFailures() throws {
+    func testRunLogKeepsBothSameNamedFailuresByPath() throws {
         try prepare()
         try makePhoto("in/a/same.jpg")
-        try makePhoto("in/b/same.jpg", width: 280, height: 420)
+        try makePhoto("in/b/same.jpg", width: 420, height: 280)
         launch("duplicates", loadPhotos: false, extra: ["-useGateway", "YES",
                                                           "-gatewayBaseURL", "https://api.openai.com/v1",
                                                           "-gatewayModelID", "scratch-transcription"])
@@ -166,19 +166,23 @@ final class MessageJourneyUITests: XCTestCase {
         let skipLevels = element("ap.containerLevels.skip")
         if skipLevels.waitForExistence(timeout: 4) { skipLevels.click() }
         continueAfterFailures()
-        waitForDone(succeeded: 0, failed: 1)
+        waitForDone(succeeded: 0, failed: 2)
         let reads = try calls().filter { ($0["images"] as? Int) == 1 }
         XCTAssertEqual(reads.count, 2)
         XCTAssertTrue(reads.allSatisfy { ($0["status"] as? Int) == 400 })
         let log = try runLog()
         XCTAssertTrue(log.contains("Total files: 2"), log)
-        XCTAssertTrue(log.contains("Failed: 1"), log)
+        XCTAssertTrue(log.contains("Failed: 2"), log)
         let refusals = log.split(whereSeparator: \.isNewline)
-            .filter { $0.contains("• same.jpg [400]: Scratch refusal") }
-        XCTAssertEqual(refusals.count, 1, log)
+            .filter { $0.contains("[400]: Scratch refusal") }
+        XCTAssertEqual(refusals.count, 2, log)
+        for (folder, orientation) in [("a", "portrait"), ("b", "landscape")] {
+            let input = root.appendingPathComponent("in/\(folder)/same.jpg").standardizedFileURL.path
+            XCTAssertTrue(refusals.contains("  • \(input) [400]: Scratch refusal for the \(orientation) page"), log)
+        }
         let files = FileManager.default.enumerator(atPath: root.appendingPathComponent("out").path)?.allObjects as? [String] ?? []
         XCTAssertEqual(files.filter { $0.hasSuffix("/same.pdf") }.sorted(), ["in/a/same.pdf", "in/b/same.pdf"])
-        shot("s030-two-failures-counted-as-one")
+        shot("s030-two-failures-reported-by-path")
         print("[s030] \(reads.count) refusals; outputs \(files).\n\(log)")
     }
 

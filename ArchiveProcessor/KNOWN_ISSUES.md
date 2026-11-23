@@ -68,9 +68,12 @@ Apple Vision still checks the page locally. The summary distinguishes pages left
 that were turned but still need checking. See W49.proc-fix-s029 and the
 [original VM reproduction](../verification/evidence/processor/W49.proc-suspects-messages-check.md).
 
-## Process Files counts two same-named failed files as one (S-030)
+## FIXED (S-030) — Process Files counts each failed source path
 
-- Both jobs failed and generated their own PDFs. The status and run log counted one failure and recorded a single reason. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md). (queued: W49.proc-fix-s030)
+- The completion summary counts files in different folders separately even when they share a name. The
+  opt-in run log lists each failed source path with its own reason and available error code. A successful retry
+  clears the entry for that source path. [Independent VM reproduction](../verification/evidence/processor/W49.proc-suspects-messages-check.md).
+  (accepted: fixed by W49.proc-fix-s030)
 
 ## FIXED (S-021) — Android retries segment completion after a failed Drive write
 

@@ -590,14 +590,16 @@ extension OCRProcessor {
                         continue
                     }
                 }
-                if !failedFiles.contains(pdf.sourceURL.lastPathComponent) {
-                    failedFiles.append(pdf.sourceURL.lastPathComponent)
-                }
-            } else if !failedFiles.contains(pdf.sourceURL.lastPathComponent) {
-                failedFiles.append(pdf.sourceURL.lastPathComponent)
+                failedFiles[pdf.sourceURL.standardizedFileURL.path] = Self.missingRebuiltPDFFailure
+            } else {
+                recordFileFailure(for: pdf.sourceURL, result: pdf.result)
             }
         }
     }
+
+    private static let missingRebuiltPDFFailure = ProcessFileFailure(
+        reason: "The rebuilt PDF output is missing. Re-run this source PDF to recover it.",
+        code: "pdf_output_missing")
 
     func restoreMixedPDFJobs(_ outcomes: [MixedPDFOutcome]?) {
         guard let outcomes, !outcomes.isEmpty else { return }
@@ -607,8 +609,7 @@ extension OCRProcessor {
             var job = OCRJob(sourceURL: pdf.sourceURL)
             if pdf.succeeded && outputURLMap[pdf.sourceURL] == nil {
                 job.result = OCRResult(text: nil, classification: nil,
-                    errorMessage: "The rebuilt PDF output is missing. Re-run this source PDF to recover it.",
-                    errorCode: "pdf_output_missing")
+                    errorMessage: Self.missingRebuiltPDFFailure.reason, errorCode: Self.missingRebuiltPDFFailure.code)
                 job.status = .failed
             } else {
                 job.result = pdf.result
@@ -1896,7 +1897,7 @@ extension OCRProcessor {
         isProcessing = true
         paidRequestScope = PaidRequests.context
         pendingBatchInfo = nil
-        failedFiles = []
+        failedFiles = [:]
         clearOutputWarnings()
         segments = []
         appliedGeneratedTags = [:]
@@ -1947,8 +1948,7 @@ extension OCRProcessor {
             jobs[index].classification = result.classification
             jobs[index].status = result.text == nil ? .failed : .succeeded
             if result.text == nil {
-                let name = jobs[index].sourceURL.lastPathComponent
-                if !failedFiles.contains(name) { failedFiles.append(name) }
+                recordFileFailure(for: jobs[index].sourceURL, result: result)
             }
             if let previous = restoredOutputs[index], FileManager.default.fileExists(atPath: previous.path) {
                 let outputURL = catalogueResumeOutput(previous, for: jobs[index].sourceURL, in: pending.outputDirectory)
@@ -2238,7 +2238,7 @@ extension OCRProcessor {
         isProcessing = true
         paidRequestScope = PaidRequests.context
         pendingRunInfo = nil
-        failedFiles = []
+        failedFiles = [:]
         clearOutputWarnings()
         segments = []
         appliedGeneratedTags = [:]
@@ -2403,7 +2403,7 @@ extension OCRProcessor {
                 jobs[r.index].result = r.result
                 jobs[r.index].classification = r.result.classification
                 jobs[r.index].status = r.result.text != nil ? .succeeded : .failed
-                if r.result.text == nil { failedFiles.append(r.sourceURL.lastPathComponent) }
+                if r.result.text == nil { recordFileFailure(for: r.sourceURL, result: r.result) }
                 // Only populate outputURLMap when the PDF actually exists on disk (already
                 // present or successfully regenerated). Skipping prevents phantom entries.
                 if !failedRegenURLs.contains(r.outputURL) {
@@ -3502,7 +3502,7 @@ extension OCRProcessor {
             incrementalSkipped = decision.skipped.count
             files = decision.toProcess
             guard !files.isEmpty else {
-                jobs = []; failedFiles = []; segments = []; collectionSegments = []
+                jobs = []; failedFiles = [:]; segments = []; collectionSegments = []
                 clearOutputWarnings()
                 progress = 1.0
                 statusMessage = "All \(incrementalSkipped) file(s) already processed — nothing to do."
@@ -3555,7 +3555,7 @@ extension OCRProcessor {
         }) else { return }
         defer { catalogueRunLease = nil }
         isProcessing = true
-        failedFiles = []
+        failedFiles = [:]
         clearOutputWarnings()
         segments = []
         appliedGeneratedTags = [:]
@@ -4394,6 +4394,15 @@ extension OCRProcessor {
                     + " named by their first input file):"]
             + failures.map { "  \u{2022} \($0.name): \($0.reason)" }
     }
+    func recordFileFailure(for source: URL, result: OCRResult) {
+        failedFiles[source.standardizedFileURL.path] = ProcessFileFailure(
+            reason: result.errorMessage ?? "No OCR text", code: result.errorCode)
+    }
+
+    func clearFileFailure(for source: URL) {
+        failedFiles.removeValue(forKey: source.standardizedFileURL.path)
+    }
+
     func writeLogFile(outputDirectory: URL, enabled: Bool = UserDefaults.standard.bool(forKey: DefaultsKeys.writeLogFile)) {
         // Opt-in: only write the log when the user has enabled it (default off).
         guard enabled else { return }
@@ -4415,12 +4424,10 @@ extension OCRProcessor {
         if failedFiles.isEmpty {
             lines.append("All files processed successfully.")
         } else {
-            lines.append("Files that did not produce OCR text:")
-            for f in failedFiles {
-                let job = jobs.first { $0.sourceURL.lastPathComponent == f }
-                let reason = job?.result?.errorMessage ?? "Unknown error"
-                let code = job?.result?.errorCode.map { " [\($0)]" } ?? ""
-                lines.append("  \u{2022} \(f)\(code): \(reason)")
+            lines.append("Failed input files:")
+            for (path, failure) in failedFiles.sorted(by: { $0.key < $1.key }) {
+                let code = failure.code.map { " [\($0)]" } ?? ""
+                lines.append("  \u{2022} \(path)\(code): \(failure.reason)")
             }
         }
 

@@ -18273,3 +18273,13 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   failed replies in each mode. [Rendered PDF comparison](verification/evidence/processor/W49.proc-suspects-messages-check.md#s-029-fix--both-comparative-modes).
   No paid calls or bench cache.
   <!-- /W49.proc-fix-s029 -->
+
+- [x] **W49.proc-fix-s030 — Count and report failed files by path in Process Files [S · S3]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build,vm) — S-030. Keep each failed job's identity and reason through the summary and run log. Verify two failures for two same-named files in different folders. [VM evidence and reproducer](verification/evidence/processor/W49.proc-suspects-messages-check.md).
+  The completion summary counts the two paths independently. The optional run log lists the full source path,
+  reason and available error code for each failure. A successful retry clears that path's entry.
+  The off-screen test verified two same-named images in different folders with two distinct reasons and two output PDFs.
+  The headless retry check verified that a successful retry leaves the other same-named failure in place.
+  Both the patched and baseline batch runs reported 409 passes and the same stale Gemini warning assertion.
+  [Regression evidence](verification/evidence/processor/W49.proc-suspects-messages-check.md#s-030-fix--two-same-named-failed-inputs).
+  No paid calls or bench cache.
+  <!-- /W49.proc-fix-s030 -->

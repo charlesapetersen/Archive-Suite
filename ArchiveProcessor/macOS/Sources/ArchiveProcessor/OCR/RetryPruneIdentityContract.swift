@@ -9,12 +9,12 @@ import Foundation
 /// file, and then read `jobs[index]` on that bare index — no bounds check, no identity check, and no
 /// `Task.isCancelled` between the suspension and the read. The operator can spend that window pressing Stop,
 /// then **Clear** (`jobs = []`), re-dropping files and pressing **Start**. Out of range the subscript **TRAPS
-/// the app**; in range it pruned the LIVE run's failure entry under a stopped row's filename, so the new
+/// the app**; in range it pruned the LIVE run's failure entry under a replacement row's path, so the new
 /// run's own "N failed" summary and `.txt` log under-counted. `W16.bat9` closed this class for the completion
 /// sweep and `W16.bat10` for every `handleOCRResult` caller's writes; this was the one read neither reached.
 ///
 /// **The fix it pins is a deletion, not a guard**, and that changes what this section can attribute. The
-/// retry's prune was redundant: `handleOCRResult` prunes the same name, off the same `(index, jobID)` pair,
+/// retry's prune was redundant: `handleOCRResult` prunes the same source path, off the same `(index, jobID)` pair,
 /// under the same `result.text != nil` condition, behind the identity guard `W16.bat10` gave it, with nothing
 /// observing `failedFiles` in between. So the prune now has one owner and the retry loop reads `jobs` only
 /// where it is main-actor-synchronous. §1's honest-prune check is therefore a check on `handleOCRResult`'s
@@ -145,7 +145,11 @@ enum RetryPruneIdentityContract {
         try? fm.createDirectory(at: outDir, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: dir) }
 
-        let stoppedRunSources = (0..<2).map { makeJPEG("busy-\($0).jpg", in: dir) }
+        let stoppedRunSources = (0..<2).map { index in
+            let folder = dir.appendingPathComponent("busy-\(index)", isDirectory: true)
+            try? fm.createDirectory(at: folder, withIntermediateDirectories: true)
+            return makeJPEG("same.jpg", in: folder)
+        }
         let newRunSources = (0..<2).map { makeJPEG("fresh-\($0).jpg", in: dir) }
 
         let processor = OCRProcessor()
@@ -159,10 +163,13 @@ enum RetryPruneIdentityContract {
                                    errorMessage: "The model is experiencing high demand", errorCode: "503")
             return job
         }
-        // What the run recorded before the retry: both busy files failed. `fresh-0.jpg` is a failure the NEW
-        // run recorded for itself, and is the entry the quiet half of the bug destroys.
-        let failuresBefore = ["busy-0.jpg", "busy-1.jpg", "fresh-0.jpg"]
-        processor.failedFiles = failuresBefore
+        // Both busy files share a basename, but a successful retry must clear only its own path.
+        for job in processor.jobs {
+            if let result = job.result { processor.recordFileFailure(for: job.sourceURL, result: result) }
+        }
+        let freshPath = newRunSources[0].standardizedFileURL.path
+        processor.failedFiles[freshPath] = ProcessFileFailure(reason: "The new run's own failure")
+        let failuresBefore = processor.failedFiles
 
         let transcript = Transcript()
         NetworkSession.testTransport = stub(mutation, on: processor, newRunSources: newRunSources,
@@ -181,9 +188,9 @@ enum RetryPruneIdentityContract {
             requests: transcript.requests,
             mutationLandedDuringTheCall: transcript.mutated,
             listWasEmptyAfterwards: processor.jobs.isEmpty,
-            prunedTheHonestFile: !after.contains("busy-0.jpg"),
-            keptTheStaleFile: after.contains("busy-1.jpg"),
-            keptTheNewRunsFailure: after.contains("fresh-0.jpg"),
+            prunedTheHonestFile: after[stoppedRunSources[0].standardizedFileURL.path] == nil,
+            keptTheStaleFile: after[stoppedRunSources[1].standardizedFileURL.path] != nil,
+            keptTheNewRunsFailure: after[freshPath] != nil,
             failureListUnchanged: after == failuresBefore)
     }
 

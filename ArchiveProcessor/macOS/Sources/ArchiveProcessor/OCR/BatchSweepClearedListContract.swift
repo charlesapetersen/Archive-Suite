@@ -357,14 +357,14 @@ enum BatchSweepClearedListContract {
 
         let flagged = processor.batchPollInterrupted
         let first = processor.jobs.first
-        let recorded = processor.failedFiles.contains(sources[0].lastPathComponent)
+        let recorded = processor.failedFiles[sources[0].standardizedFileURL.path] != nil
         let intruderUntouched = first?.sourceURL == intruder && first?.status == .pending
             && first?.result == nil && first?.appliedTags.isEmpty == true
         let newRunUntouched = processor.jobs.count == newRunSources.count
             && zip(processor.jobs, newRunSources).allSatisfy { job, source in
                 job.sourceURL == source && job.status == .processing && job.result == nil
             }
-            && !processor.failedFiles.contains(newRunSources[0].lastPathComponent)
+            && processor.failedFiles[newRunSources[0].standardizedFileURL.path] == nil
         // The re-dropped run holds the same files as the swept slots, so "untouched" is asked of the
         // rows: fresh instances, still `.processing`, no result. Index 0 was already in flight when the
         // mutation landed, so only index 1 — the slot the loop re-validates AFTER the mutation — can carry
@@ -373,7 +373,7 @@ enum BatchSweepClearedListContract {
             && zip(processor.jobs, sources).allSatisfy { job, source in
                 job.sourceURL == source && job.status == .processing && job.result == nil
             }
-            && sources.count > 1 && !processor.failedFiles.contains(sources[1].lastPathComponent)
+            && sources.count > 1 && processor.failedFiles[sources[1].standardizedFileURL.path] == nil
         // Read BEFORE the tail, which may legitimately delete the journal these came from.
         let journaledResult = processor.activePendingRun?.completedResults["0"] != nil
             || processor.activePendingBatch?.completedResults["0"] != nil

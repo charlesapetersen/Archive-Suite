@@ -116,11 +116,12 @@ extension OCRProcessor {
                     try catalogueRun.copyPreOCRSource(url, to: working)
                     readingPDF = working
                 } catch {
-                    jobs[index].result = OCRResult(text: nil, classification: nil,
-                                                  errorMessage: "Could not prepare a working PDF: \(error.localizedDescription)",
-                                                  errorCode: nil)
+                    let result = OCRResult(text: nil, classification: nil,
+                                           errorMessage: "Could not prepare a working PDF: \(error.localizedDescription)",
+                                           errorCode: nil)
+                    jobs[index].result = result
                     jobs[index].status = .failed
-                    failedFiles.append(url.lastPathComponent)
+                    recordFileFailure(for: url, result: result)
                     continue
                 }
             } else {
@@ -138,7 +139,9 @@ extension OCRProcessor {
             jobs[index].classification = extraction.classification
             jobs[index].status = extraction.text != nil ? .succeeded : .failed
             if extraction.text == nil {
-                failedFiles.append(url.lastPathComponent)
+                recordFileFailure(for: url, result: result)
+            } else {
+                clearFileFailure(for: url)
             }
 
             progress = Double(index + 1) / Double(total) * 0.3
@@ -384,8 +387,8 @@ extension OCRProcessor {
                     }
                     outputURLMap[pdfURL] = output
                     _takenOutputPaths.insert(OutputFileSafety.pathKey(output))
-                } else if !failedFiles.contains(pdfURL.lastPathComponent) {
-                    failedFiles.append(pdfURL.lastPathComponent)
+                } else {
+                    recordFileFailure(for: pdfURL, result: saved.result)
                 }
                 progress = Double(ordinal + 1) / Double(total)
                 continue
@@ -423,11 +426,11 @@ extension OCRProcessor {
                       + "encrypted, or password-protected."
                     : "Skipped: not a PDF. This input reached the multi-page PDF re-OCR transform, which "
                       + "accepts only PDFs. The standard image path must process it."
-                jobs[index].result = OCRResult(text: nil, classification: nil,
-                                               errorMessage: reason,
-                                               errorCode: isPDF ? "pdf_render_failed" : "not_a_pdf_in_reocr_run")
+                let result = OCRResult(text: nil, classification: nil, errorMessage: reason,
+                                       errorCode: isPDF ? "pdf_render_failed" : "not_a_pdf_in_reocr_run")
+                jobs[index].result = result
                 jobs[index].status = .failed
-                if !failedFiles.contains(pdfURL.lastPathComponent) { failedFiles.append(pdfURL.lastPathComponent) }
+                recordFileFailure(for: pdfURL, result: result)
                 statusMessage = isPDF
                     ? "Could not render \(pdfURL.lastPathComponent)."
                     : "Skipped \(pdfURL.lastPathComponent) — not a PDF (multi-page re-OCR run)."
@@ -612,18 +615,19 @@ extension OCRProcessor {
                 )
                 jobs[index].classification = pageResults.first?.classification
                 jobs[index].status = .succeeded
-                failedFiles.removeAll { $0 == pdfURL.lastPathComponent }
+                clearFileFailure(for: pdfURL)
             } else {
                 // The generate/merge threw; the only record used to be an os_log (which is not reliably
                 // retrievable) plus a nil errorMessage that the UI mislabels as "No OCR text". Give the
                 // operator the real reason — this is an OUTPUT-write failure, not an empty OCR result.
-                jobs[index].result = OCRResult(
+                let result = OCRResult(
                     text: nil, classification: nil,
                     errorMessage: "OCR succeeded but the output PDF could not be written or merged. "
                                 + "Check that the output folder exists and is writable, and that there is free disk space.",
                     errorCode: "pdf_write_failed")
+                jobs[index].result = result
                 jobs[index].status = .failed
-                if !failedFiles.contains(pdfURL.lastPathComponent) { failedFiles.append(pdfURL.lastPathComponent) }
+                recordFileFailure(for: pdfURL, result: result)
             }
             if activePendingMixedPDF != nil, let result = jobs[index].result {
                 let outputDigest = ok ? Self.mixedPDFSourceDigest(outputURL) : nil
@@ -1120,10 +1124,7 @@ extension OCRProcessor {
                             else { batchPollInterrupted = true; return }
                         } else {
                             statusMessage = "Batch completed but no results available"
-                            for i in jobs.indices where jobs[i].status == .processing {
-                                jobs[i].status = .failed
-                                failedFiles.append(jobs[i].sourceURL.lastPathComponent)
-                            }
+                            markBatchJobsWithoutResults(reason: statusMessage)
                         }
                         batchComplete = true
                     }
@@ -1146,10 +1147,7 @@ extension OCRProcessor {
                             else { batchPollInterrupted = true; return }
                         } else {
                             statusMessage = "Batch \(status.status.lowercased())"
-                            for i in jobs.indices where jobs[i].status == .processing {
-                                jobs[i].status = .failed
-                                failedFiles.append(jobs[i].sourceURL.lastPathComponent)
-                            }
+                            markBatchJobsWithoutResults(reason: statusMessage)
                         }
                         batchComplete = true
                     }
@@ -1269,10 +1267,7 @@ extension OCRProcessor {
 
                     if allComplete {
                         if anyFailed {
-                            for i in jobs.indices where jobs[i].status == .processing {
-                                jobs[i].status = .failed
-                                failedFiles.append(jobs[i].sourceURL.lastPathComponent)
-                            }
+                            markBatchJobsWithoutResults(reason: "The batch ended without an OCR result for this file.")
                         }
                         batchComplete = true
                     }
@@ -1879,13 +1874,9 @@ extension OCRProcessor {
         jobs[index].classification = result.classification
         jobs[index].status = result.text != nil ? .succeeded : .failed
         if result.text == nil {
-            // Dedup: a file that fails again on a retry is already in failedFiles. Without this the
-            // "N failed" summary and the .txt log over-count (the same filename listed 2–3×).
-            let name = sourceURL.lastPathComponent
-            if !failedFiles.contains(name) { failedFiles.append(name) }
+            recordFileFailure(for: sourceURL, result: result)
         } else {
-            // Succeeded (possibly on retry): make sure a prior failure entry is cleared.
-            failedFiles.removeAll { $0 == sourceURL.lastPathComponent }
+            clearFileFailure(for: sourceURL)
         }
         // Use original source name for output PDF naming
         let baseName = sourceURL.deletingPathExtension().lastPathComponent
@@ -2004,7 +1995,7 @@ extension OCRProcessor {
             // `rotationDegrees` (all `OCRResult` fields are `let`, so this must be rebuilt, not mutated —
             // dropping rotationDegrees here would silently lose the detected rotation) and add the reason.
             if slotIsStillOurs {
-                jobs[index].result = OCRResult(
+                let failure = OCRResult(
                     text: result.text,
                     classification: result.classification,
                     rotationDegrees: result.rotationDegrees,
@@ -2012,15 +2003,24 @@ extension OCRProcessor {
                                 + "output folder exists and is writable, and that there is free disk space.",
                     errorCode: "pdf_write_failed", secondReader: result.secondReader, pageReader: result.pageReader, imported: result.imported,
                     newspaperLayout: result.newspaperLayout)
+                jobs[index].result = failure
                 jobs[index].status = .failed
+                recordFileFailure(for: sourceURL, result: failure)
             }
-            let name = sourceURL.lastPathComponent
-            if !failedFiles.contains(name) { failedFiles.append(name) }
         }
         // The paid-batch journal advances only after materialization. Non-batch recovery already has
         // the reading and its assigned path, including when this write failed.
         return readingSavedBeforeWrite || saveResultToPendingRun(index: index, result: result, outputURL: outputURL)
     }
+    private func markBatchJobsWithoutResults(reason: String) {
+        for index in jobs.indices where jobs[index].status == .processing {
+            let result = OCRResult(text: nil, classification: nil, errorMessage: reason, errorCode: nil)
+            jobs[index].result = result
+            jobs[index].status = .failed
+            recordFileFailure(for: jobs[index].sourceURL, result: result)
+        }
+    }
+
     nonisolated static func isTimeoutError(_ result: OCRResult) -> Bool {
         // A refused page whose second readers failed: re-running would buy the refusal and every reader again.
         if result.errorCode == OCRRefusalFallback.exhaustedCode || result.errorCode == OCRCascade.exhaustedCode {
@@ -2379,9 +2379,9 @@ extension OCRProcessor {
             // This is where the loop used to prune the retried file from `failedFiles`, on the bare index it
             // chose ten seconds and one network call ago. Out of range that subscript TRAPS the app (Stop →
             // Clear (`jobs = []`) → the in-flight call returns with text); in range but re-dropped it pruned
-            // the LIVE run's failure entry under a stopped row's filename, so that run's own "N failed"
+            // the live run's failure entry under the replacement row's path, so that run's own "N failed"
             // summary and `.txt` log under-counted. It is not GUARDED but GONE, because it was redundant:
-            // `handleOCRResult` below prunes the same name, off the same `(index, jobID)` pair, under the
+            // `handleOCRResult` below clears the source path, off the same `(index, jobID)` pair, under the
             // same `result.text != nil` condition, behind the identity guard `W16.bat10` gave it — and
             // nothing observes `failedFiles` in between. Measured, not argued: without this prune all 377
             // checks of `test-batch-resume.sh` are green, and neutering `handleOCRResult`'s reddens the

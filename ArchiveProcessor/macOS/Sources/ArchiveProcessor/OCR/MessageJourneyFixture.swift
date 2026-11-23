@@ -1,5 +1,6 @@
 #if DEBUG
 import Foundation
+import ImageIO
 
 /// Off-screen scratch journeys. Only a headless UI-test launch can substitute these replies.
 enum MessageJourneyFixture {
@@ -48,8 +49,24 @@ enum MessageJourneyFixture {
         let rotation = imageCount == 4
         let status: Int
         let payload: [String: Any]
-        if mode == "duplicates" || (rotation && mode == "rotation-fail") {
-            status = mode == "duplicates" ? 400 : 500
+        if mode == "duplicates" {
+            // The two same-named inputs have different orientations. Identify the page in the
+            // reply from the image actually sent so the test can check each path-reason pair.
+            guard let imagePart = messages.compactMap({ $0["content"] as? [[String: Any]] })
+                    .flatMap({ $0 }).first(where: { $0["type"] as? String == "image_url" }),
+                  let dataURL = (imagePart["image_url"] as? [String: String])?["url"],
+                  let encoded = dataURL.split(separator: ",", maxSplits: 1).last,
+                  let data = Data(base64Encoded: String(encoded)),
+                  let source = CGImageSourceCreateWithData(data as CFData, nil),
+                  let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any],
+                  let width = props[kCGImagePropertyPixelWidth as String] as? Int,
+                  let height = props[kCGImagePropertyPixelHeight as String] as? Int,
+                  width != height else { throw URLError(.cannotDecodeContentData) }
+            status = 400
+            let orientation = width < height ? "portrait" : "landscape"
+            payload = ["error": ["message": "Scratch refusal for the \(orientation) page"]]
+        } else if rotation && mode == "rotation-fail" {
+            status = 500
             payload = ["error": ["message": "Scratch refusal \(id)"]]
         } else {
             status = 200

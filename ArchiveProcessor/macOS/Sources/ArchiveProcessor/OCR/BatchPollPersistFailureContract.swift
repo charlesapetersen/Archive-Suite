@@ -461,7 +461,7 @@ enum BatchPollPersistFailureContract {
         let flagged = processor.batchPollInterrupted
         let swept = processor.jobs.first?.status == .failed
             && processor.jobs.first?.result?.errorCode == "no_result"
-            && processor.failedFiles.contains(source.lastPathComponent)
+            && processor.failedFiles[source.standardizedFileURL.path] != nil
         let stopped = !processor.isProcessing
 
         // The real first-run tail, reading the flag the sweep just decided.

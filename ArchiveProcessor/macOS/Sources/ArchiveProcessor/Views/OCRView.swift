@@ -1271,7 +1271,7 @@ struct OCRView: View {
                     .buttonStyle(.bordered)
                     .disabled(!canAddFiles)
                     if !droppedFiles.isEmpty || !foldersBeyondDepth.isEmpty || !processor.treeIntakeWarnings.isEmpty {
-                        Button("Clear") { replaceFiles(with: []); captureBoundaries = []; captureTypes = []; captureQualities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = []; processor.progress = 0; processor.statusMessage = ""; processor.failedFiles = [] }
+                        Button("Clear") { replaceFiles(with: []); captureBoundaries = []; captureTypes = []; captureQualities = []; captureYears = []; captureMonths = []; captureSubjects = []; processor.jobs = []; processor.segments = []; processor.collectionSegments = []; processor.progress = 0; processor.statusMessage = ""; processor.failedFiles = [:] }
                             .buttonStyle(.bordered)
                             .disabled(processor.isProcessing)   // Clear mid-run would wipe processor.jobs out from under the running task (wasted paid calls, discarded output)
                     }

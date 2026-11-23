@@ -107,7 +107,7 @@ enum BatchInterruptTailContract {
 
         /// Run state a resume needs, sampled after the tail.
         let jobCount: Int
-        let failedFiles: [String]
+        let failedFiles: [String: ProcessFileFailure]
         let outputURLMap: [URL: URL]
         let exportedImageMap: [URL: URL]
         let progress: Double
@@ -180,7 +180,7 @@ enum BatchInterruptTailContract {
 
         // The run's own results, which a resume reuses verbatim — the tail may not discard them.
         processor.jobs = sources.map { OCRJob(sourceURL: $0) }
-        processor.failedFiles = ["scan-9.pdf"]
+        processor.failedFiles = ["/scratch/scan-9.pdf": ProcessFileFailure(reason: "OCR refused", code: "400")]
         processor.outputURLMap = sources.isEmpty ? [:] : [sources[0]: output]
         processor.exportedImageMap = sources.isEmpty ? [:] : [sources[0]: temps[0]]
         processor.progress = 0.42
@@ -417,7 +417,7 @@ enum BatchInterruptTailContract {
         // (`resolveResumeOutputURLs`). Clearing them here would not lose the paid work — it is journaled —
         // but it would blank the file list under the operator while the batch is still resumable.
         check("interrupt tail: the run's jobs, failures, output associations and progress are untouched",
-              tail.jobCount == 3 && tail.failedFiles == ["scan-9.pdf"]
+              tail.jobCount == 3 && tail.failedFiles == ["/scratch/scan-9.pdf": ProcessFileFailure(reason: "OCR refused", code: "400")]
               && tail.outputURLMap.count == 1 && tail.exportedImageMap.count == 1
               && tail.progress == 0.42)
         // The interrupted-run manifest is a different recovery path with a different durable file. The tail
@@ -476,7 +476,7 @@ enum BatchInterruptTailContract {
                         kept.require(tail.bystandersIntact, shape)
                         untouched.require(tail.statusMessage == "unchanged"
                                           && tail.jobCount == conversions
-                                          && tail.failedFiles == ["scan-9.pdf"]
+                                          && tail.failedFiles == ["/scratch/scan-9.pdf": ProcessFileFailure(reason: "OCR refused", code: "400")]
                                           && tail.progress == 0.42
                                           && tail.keptInterruptedRunState, shape)
                     }

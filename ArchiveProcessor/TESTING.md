@@ -190,7 +190,7 @@ tagging mode **Automatic**, an output folder in the scratchpad (not inside `Test
 - [ ] **Page 1** = the original image full-page.
 - [ ] **Page 2** = header `Extracted text.`, subheader `[Provider] · [Model] · [D Month YYYY]`, then the body; **all text on a single tall page** (never overflows to page 3).
 - [ ] macOS Finder **tags applied**: year, month, subjects; **box photo → Red**, **folder photo → Purple**; **`Unread` present and applied last**.
-- [ ] With **Write a processing log file** on in Settings (off by default), a **log `.txt`** (`ArchiveProcessor_Log_<timestamp>.txt`) lists any files that produced no OCR text, with the reason.
+- [ ] With **Write a processing log file** on in Settings (off by default), `ArchiveProcessor_Log_<timestamp>.txt` lists each failed input by full source path with its own reason. Two failed files with the same name in different folders count as two.
 
 ### 2.5 Tagging modes
 For each mode, run 2 images and verify behavior (esp. the **`Unread`-last** rule):
