@@ -104,7 +104,7 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 - **`Unread`**: every output (PDF **and** any exported original) gets it, applied **last**, only in real-tagging
   modes (`.automatic`/`.autoDate`/`.human`), never "No tagging" or "Copy source tags"; via the **required**
   `stampUnread:` of `MacOSTagger.applyTags` (from `TaggingMode.stampsUnread`), no ambient flag (W16.cfg6-fu).
-- **No tagging** leaves Quality and all metadata untouched; **Copy source** keeps a source tag's spelling verbatim.
+- **No tagging** and **Copy source** mark label PDFs with Collection ID. Copied tag names stay verbatim.
 - **A refused Finder-tag write or a placeholder image page is REPORTED**, never swallowed by `try?` (W23.m5/h5-fu;
   `PROCESSFILES_TAGWARN_TEST=1`).
 - **Quality** crosses the capture protocol as `Q1`–`Q3` (omitted = Unrated) and is written to Finder as that token.

@@ -168,7 +168,7 @@ extension OCRProcessor {
     /// Internal rather than private so `ProcessFilesTagWarningTestDriver` can drive the real
     /// reclassification re-tag headlessly; the UI reaches it only through `confirmCollectionReview`.
     func applyReviewEdits(files: [URL], runConfig: SessionProcessingConfig?) {
-        let stampUnread = lateRunOutputSettings(for: runConfig).stampUnread
+        let outputSettings = lateRunOutputSettings(for: runConfig)
         // Build a lookup from file index to the reviewed item
         var reviewByIndex: [Int: CollectionReviewItem] = [:]
         for item in collectionReviewItems {
@@ -193,13 +193,13 @@ extension OCRProcessor {
                 // deleted along with them — and, because a subject word can now SURVIVE the strip, the
                 // colour has to be authoritative (W23.m5-fu) or raw-array detection would promote that
                 // surviving "Red" straight back to the box label. One fix, two halves.
-                if oldClassification != newClassification,
+                if outputSettings.taggingMode != .copySource, oldClassification != newClassification,
                    let outputURL = outputURLMap[item.fileURL] {
                     let updatedTags = Self.reclassifiedTags(jobs[item.fileIndex].appliedTags,
                                                             from: oldClassification, to: newClassification)
                     tagOutput(updatedTags, at: outputURL, source: item.fileURL,
                               appColor: Self.authoritativeColor(for: newClassification),
-                              colorIsAuthoritative: true, stampUnread: stampUnread)
+                              colorIsAuthoritative: true, stampUnread: outputSettings.stampUnread)
                     jobs[item.fileIndex].appliedTags = updatedTags
                 }
             }
@@ -363,15 +363,17 @@ extension OCRProcessor {
         if rewriteHeader, oldClassification != newClassification {
             writeClassificationHeader(forJobAt: index, runConfig: runConfig)
         }
-        // Update tags on the output file (W23.m5-fu2 — see `applyReviewEdits`).
-        if oldClassification != newClassification,
+        // Copy-source reviews update the classification. The collection pass adds its marker once
+        // the classification is final, so copied names that look like markers stay intact.
+        let outputSettings = lateRunOutputSettings(for: runConfig)
+        if outputSettings.taggingMode != .copySource, oldClassification != newClassification,
            let outputURL = outputURLMap[jobs[index].sourceURL] {
             let updatedTags = Self.reclassifiedTags(jobs[index].appliedTags,
                                                     from: oldClassification, to: newClassification)
             tagOutput(updatedTags, at: outputURL, source: jobs[index].sourceURL,
                       appColor: Self.authoritativeColor(for: newClassification),
                       colorIsAuthoritative: true,
-                      stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
+                      stampUnread: outputSettings.stampUnread)
             jobs[index].appliedTags = updatedTags
         }
         // W37: the edit can invalidate (or move) an enclosure relation.
@@ -659,6 +661,7 @@ extension OCRProcessor {
         runConfig: SessionProcessingConfig?
     ) -> Bool {
         var collectionChanged = false
+        let outputSettings = lateRunOutputSettings(for: runConfig)
 
         for item in documentReviewItems {
             guard item.fileIndex < jobs.count else { continue }
@@ -674,14 +677,14 @@ extension OCRProcessor {
             }
 
             // W23.m5-fu2 — see `applyReviewEdits`. Same rule, same authoritative colour.
-            if oldClassification != newClassification,
+            if outputSettings.taggingMode != .copySource, oldClassification != newClassification,
                let outputURL = outputURLMap[item.fileURL] {
                 let updatedTags = Self.reclassifiedTags(jobs[item.fileIndex].appliedTags,
                                                         from: oldClassification, to: newClassification)
                 tagOutput(updatedTags, at: outputURL, source: jobs[item.fileIndex].sourceURL,
                           appColor: Self.authoritativeColor(for: newClassification),
                           colorIsAuthoritative: true,
-                          stampUnread: lateRunOutputSettings(for: runConfig).stampUnread)
+                          stampUnread: outputSettings.stampUnread)
                 jobs[item.fileIndex].appliedTags = updatedTags
             }
 

@@ -192,6 +192,38 @@ enum ProcessFilesTagWarningTestDriver {
         check("...and re-running it once the file is writable clears the warning",
               wired.untaggedOutputs.isEmpty && tagsOf(wireOutput).contains("Box"))
 
+        // Copy-source marking can add a label without repairing an earlier copy failure.
+        wired.taggingMode = .copySource
+        let copied = ["1983", "Mixed CASE Subject", "Unread", "Unread"]
+        check("seed the label PDF with verbatim copied tags",
+              OCRProcessor.writeOutputTags(copied, to: wireOutput, stampUnread: false))
+        wired.recordTagWrite(succeeded: false, forSource: wireSource)
+        for _ in 0..<2 { wired.applyBoxFolderLabelTags(enableTagging: false) }
+        check("repeated label marking keeps copied spelling and occurrences and adds the marker once",
+              tagsOf(wireOutput).sorted() == (copied + ["Box", "Red"]).sorted())
+        check("successful label marking does not clear a failed source-tag copy",
+              wired.untaggedOutputs == ["boxphoto.jpg"])
+
+        let conflicting = ["Box", "Mixed CASE Subject", "Folder"]
+        check("seed copied tags with conflicting type tokens",
+              OCRProcessor.writeOutputTags(conflicting, to: wireOutput, stampUnread: false))
+        for _ in 0..<2 { wired.applyBoxFolderLabelTags(enableTagging: false) }
+        let markedTags = tagsOf(wireOutput)
+        check("the confirmed collection type takes precedence without losing any copied names",
+              markedTags.sorted() == (conflicting + ["Red"]).sorted()
+              && DocumentTags.parse(raw: markedTags, labelNumber: nil).itemType == .box)
+
+        let beforeReview = ["Box", "Red", "Sent With 1983", "Mixed CASE Subject"]
+        check("seed a label PDF with copied tokens that resemble generated tags",
+              OCRProcessor.writeOutputTags(beforeReview, to: wireOutput, stampUnread: false))
+        wired.jobs[0].appliedTags = beforeReview
+        wired.updateClassification(at: 0, to: .folderLabel, rewriteHeader: false)
+        wired.applyBoxFolderLabelTags(enableTagging: false)
+        let afterReview = tagsOf(wireOutput)
+        check("a reclassified label keeps copied type, colour and Sent With tokens",
+              afterReview.sorted() == (beforeReview + ["Folder", "Purple"]).sorted()
+              && DocumentTags.parse(raw: afterReview, labelNumber: nil).itemType == .folder)
+
         // --- 3c. A step that ATTEMPTS no tag write must not read as a success. `handleOCRResult`
         // regenerates the PDF on a post-run retry and (outside copy-source) does not re-tag it, so if
         // "no attempt" were recorded as `true`, that retry would silently clear a warning about a file

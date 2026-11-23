@@ -56,12 +56,12 @@ extension OCRProcessor {
     nonisolated static func writeOutputTags(
         _ tags: [String], to url: URL,
         appColor: String? = nil, colorIsAuthoritative: Bool = false,
-        stampUnread: Bool
+        stampUnread: Bool, preservingCopiedTags: Bool = false
     ) -> Bool {
         do {
             _ = try MacOSTagger.applyTags(tags, to: url, appColor: appColor,
                                           colorIsAuthoritative: colorIsAuthoritative,
-                                          stampUnread: stampUnread)
+                                          stampUnread: stampUnread, preservingCopiedTags: preservingCopiedTags)
             return true
         } catch {
             os_log(.error, "Finder-tag write FAILED for %{public}@: %{public}@",
@@ -292,9 +292,8 @@ extension OCRProcessor {
         return names.count > 3 ? "\(shown) +\(names.count - 3) more" : shown
     }
 
-    /// Applies Red/Purple color tags to box/folder label PDFs when full LLM tagging
-    /// is disabled (or when passing source tags through). When automatic tagging is enabled
-    /// these tags are already applied by the normal tagging pass, so this is a no-op.
+    /// Mark collection label PDFs when full tagging is disabled or source tags are copied.
+    /// The normal tagging pass handles labels in the automatic modes.
     func applyBoxFolderLabelTags(
         enableTagging: Bool,
         runConfig: SessionProcessingConfig? = nil
@@ -302,26 +301,23 @@ extension OCRProcessor {
         guard !enableTagging || passSourceTags else { return }
         applyBoxFolderLabelTagsUnconditionally(runConfig: runConfig)
     }
-    /// Applies Red/Purple color tags to every box/folder label output PDF, unconditionally.
-    /// Used by manual tagging modes, which don't run the automatic tagging pass.
+    /// Apply the label tags. Manual tagging also calls this because it skips automatic tagging.
     private func applyBoxFolderLabelTagsUnconditionally(
         runConfig: SessionProcessingConfig? = nil
     ) {
-        let stampUnread = lateRunOutputSettings(for: runConfig).stampUnread
+        let outputSettings = lateRunOutputSettings(for: runConfig)
         for job in jobs {
-            guard let classification = job.result?.classification else { continue }
-            let tags: GeneratedTags
-            switch classification {
-            case .boxLabel, .folderLabel:
-                tags = GeneratedTags(subjectTags: [Self.structureTag(for: classification)].compactMap { $0 },
-                                     colorTag: Self.authoritativeColor(for: classification))
-            default: continue
-            }
-            if let outputPDF = outputURLMap[job.sourceURL] {
-                // Mode-dependent: reached BOTH from `applyBoxFolderLabelTags` (only when tagging is
-                // off or copy-source → verbatim) AND unconditionally from the manual tagging modes
-                // (→ real-tagging, label written + trailing Unread). Must follow the run's mode.
-                tagOutput(tags, at: outputPDF, source: job.sourceURL, stampUnread: stampUnread)
+            guard let classification = job.result?.classification,
+                  let marker = Self.structureTag(for: classification),
+                  let outputPDF = outputURLMap[job.sourceURL] else { continue }
+            let tags = GeneratedTags(subjectTags: [marker], colorTag: Self.authoritativeColor(for: classification))
+            if outputSettings.taggingMode == .copySource {
+                let marked = Self.writeOutputTags(tags.allTags, to: outputPDF,
+                                                  stampUnread: false, preservingCopiedTags: true)
+                // Adding label tags does not retry a failed source-tag copy.
+                if !marked { recordTagWrite(succeeded: false, forSource: job.sourceURL) }
+            } else {
+                tagOutput(tags, at: outputPDF, source: job.sourceURL, stampUnread: outputSettings.stampUnread)
             }
         }
     }
@@ -1683,7 +1679,10 @@ extension OCRProcessor {
     /// Reapply enclosure dates against the current segmentation, using the decisions already read for this run.
     /// A former enclosure returns to its standalone date. A typed date or a checked date from the page still stands.
     func reconcileEnclosureDatesAfterReclassification(runConfig: SessionProcessingConfig?) {
-        guard jobs.contains(where: { !$0.appliedTags.isEmpty }),
+        let outputSettings = lateRunOutputSettings(for: runConfig)
+        // Copied Sent With tags belong to the source metadata, independent of this run's grouping.
+        guard outputSettings.taggingMode != .copySource,
+              jobs.contains(where: { !$0.appliedTags.isEmpty }),
               jobs.contains(where: { job in
                   job.result?.enclosure == true || job.appliedTags.contains(where: Self.isSentWithToken)
                       || enclosureDateReviews[job.sourceURL]?.decision?.evidenceClass == .inherited
@@ -1692,7 +1691,6 @@ extension OCRProcessor {
         let segs = currentSegments(files: jobs.map(\.sourceURL))
         let jobIndexBySource = Dictionary(jobs.indices.map { (jobs[$0].sourceURL, $0) },
                                           uniquingKeysWith: { first, _ in first })
-        let stampUnread = lateRunOutputSettings(for: runConfig).stampUnread
 
         for (i, seg) in segs.enumerated() {
             let coverSource = Self.validCoverIndex(of: i, in: segs).flatMap { c -> URL? in
@@ -1742,7 +1740,7 @@ extension OCRProcessor {
                 if updated != current {
                     guard tagOutput(updated, at: outputURL, source: source,
                                     appColor: Self.authoritativeColor(forJob: jobs[j]),
-                                    colorIsAuthoritative: true, stampUnread: stampUnread) else { continue }
+                                    colorIsAuthoritative: true, stampUnread: outputSettings.stampUnread) else { continue }
                     jobs[j].appliedTags = updated
                 }
                 if appliedGeneratedTags[source] != nil { appliedGeneratedTags[source] = tags }

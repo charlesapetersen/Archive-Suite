@@ -549,12 +549,15 @@ never crash (Reader `PDFTextExtractor`, `PDFPaneView`).
 6. **`Unread` stamped last, once.** In real-tagging modes only (`.automatic`/`.autoDate`/
    `.human`; `autoDateManualSeg` was folded into `autoDate` by W36.seg-opt-review, 2026-10-11), Processor drops any incoming `Unread`, writes all other tags,
    then appends exactly one `Unread` as the final element (`MacOSTagger.applyTags`, lines 42–66).
-   "No tagging" and "Copy source tags" modes stamp nothing and pass source tags through verbatim.
-   "No tagging" means no *generated* tag (no LLM subject or date, no app colour, no `Unread`); in
-   Live Capture it still writes what a person set: the tag card's subjects, date and Quality, and the
+   "No tagging" and "Copy source tags" do not stamp `Unread`. Copy source tags passes source tag names
+   through verbatim. With Collection ID enabled in Process Files, both modes write the `Box` or `Folder`
+   marker on the corresponding label PDF, with the configured colour name as a tag if set. This pass leaves
+   the Finder label number alone. In Copy source tags, it adds only missing label tags and preserves
+   every copied tag. The final marker comes last among type tokens if copied type tokens conflict
+   (see [Item type](#item-type)). Ordinary document PDFs receive no generated tags in either mode.
+   In Live Capture, "No tagging" still writes the tag card's subjects, date and Quality and the
    phone's date and Quality (W40.fix-live-vision-drops-card-tags). With nothing set, no write at all.
-   Box and folder photos stay untagged in this mode: without their type token, a year or Q would make a
-   label photo read as a rated document.
+   Live Capture box and folder photos stay untagged in this mode.
 7. **App-authoritative type and color.** In real-tagging modes Processor writes the `Box`/`Folder` token
    for a label photo, and `.labelNumberKey` from the colour the user chose for that type (or `0` to clear
    a stale swatch, which is also what a new user, with no colour chosen, gets). A subject string equal to

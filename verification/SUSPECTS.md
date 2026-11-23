@@ -892,7 +892,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   output's tags.
 - **Would clear it:** the source tags survive (or the owner rules that Red/Purple belongs in those modes, and the SPEC
   says so).
-- **Status:** `reproduced` — independently confirmed; fix queued as `W40.fix-processor-copy-label-tags`. [VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
+- **Status:** `fixed` by `W40.fix-processor-copy-label-tags`. The collection pass adds the final label marker while retaining the copied names. [Original VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.

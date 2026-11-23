@@ -231,8 +231,9 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         let photos = try FileManager.default.contentsOfDirectory(at: input, includingPropertiesForKeys: nil)
             .filter { ["jpg", "jpeg", "png", "tiff", "tif", "heic"].contains($0.pathExtension.lowercased()) }
         XCTAssertEqual(photos.count, 6)
+        let sourceTags = ["1978", "Scratch Subject"]
         for photo in photos {
-            XCTAssertTrue(Set(finderTags(of: photo)).isSuperset(of: ["Scratch Subject", "1978"]))
+            XCTAssertEqual(finderTags(of: photo).sorted(), sourceTags)
         }
 
         for (mode, title) in [("none", "No tagging"), ("copySource", "Copy source file tags")] {
@@ -257,10 +258,13 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
             XCTAssertEqual(pdfs.count, 6)
             let tags = pdfs.map { finderTags(of: $0).sorted() }
             print("[s034] \(mode): \(tags)")
-            XCTAssertEqual(tags.filter { $0 == ["Box"] }.count, 1)
-            XCTAssertEqual(tags.filter { $0 == ["Folder"] }.count, 1)
-            let documentTags = mode == "copySource" ? ["1978", "Scratch Subject"] : []
+            let documentTags = mode == "copySource" ? sourceTags : []
+            XCTAssertEqual(tags.filter { $0 == (documentTags + ["Box"]).sorted() }.count, 1)
+            XCTAssertEqual(tags.filter { $0 == (documentTags + ["Folder"]).sorted() }.count, 1)
             XCTAssertEqual(tags.filter { $0 == documentTags }.count, 4)
+            for photo in photos {
+                XCTAssertEqual(finderTags(of: photo).sorted(), sourceTags)
+            }
         }
     }
 

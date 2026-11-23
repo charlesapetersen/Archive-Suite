@@ -71,13 +71,16 @@ struct MacOSTagger {
     ///   Pass `taggingMode.stampsUnread` for a real-tagging write, or a literal `false` for a
     ///   copy-source pass-through. There is deliberately no default: choosing wrongly silently
     ///   rewrites Finder metadata on irreplaceable files (W16.cfg4).
+    /// - Parameter preservingCopiedTags: for a verbatim collection-label write, add missing label tags
+    ///   to the names read under coordination. Keep existing occurrences and their colours.
     @discardableResult
     static func applyTags(
         _ tags: [String],
         to url: URL,
         appColor: String? = nil,
         colorIsAuthoritative: Bool = false,
-        stampUnread isStamping: Bool
+        stampUnread isStamping: Bool,
+        preservingCopiedTags: Bool = false
     ) throws -> TagWriteResult {
 
         let result = try CoordinatedTagWriter.write(url) { current, label in
@@ -88,6 +91,19 @@ struct MacOSTagger {
             if !isStamping {
                 let verbatim = tags.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
                 guard !verbatim.isEmpty else { return nil }
+                if preservingCopiedTags {
+                    var updated = current + verbatim.filter { !current.contains($0) }
+                    // The Reader uses the last type token. If the copied tags already include the
+                    // intended marker before a conflicting token, move one occurrence to the end.
+                    if let marker = verbatim.first(where: { ItemType(token: $0) != nil }),
+                       updated.last(where: { ItemType(token: $0) != nil }) != marker,
+                       let index = updated.lastIndex(of: marker) {
+                        updated.remove(at: index)
+                        updated.append(marker)
+                    }
+                    guard updated != current else { return nil }
+                    return (updated, label)
+                }
                 return (verbatim, label)  // preserve existing label untouched
             }
 

@@ -833,14 +833,19 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Runtime evidence:** W40.d2, 2026-11-19: Human with the Manual approach writes only the typed tags and `Unread` ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)).
   Automatic: W40.d1. Auto date remains unproven.
   With Collection ID on, No tagging wrote Box and Folder markers. Copy source file tags wrote those markers but removed both source Finder tags from the label PDFs. All four other PDFs kept both tags. [Independent VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
-- **Status:** `broken` — `W40.fix-processor-copy-label-tags` (S2)
+  W40.fix-processor-copy-label-tags, 2026-11-23: in the same VM journey, No tagging produced the two
+  label markers and four untagged document PDFs. Copy source file tags preserved both source tags
+  on all six PDFs and added the respective marker to each label. The input copies kept their tags
+  in both runs.
+- **Status:** `fixed-pending-recheck` — W40.fix-processor-copy-label-tags (S-034).
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-19 W40.d2 — stays `unproven`: Human and Automatic shown, the other three not.
   - 2026-11-21 W49.proc-suspects-filing-check — `unproven` → `broken` on this path.
+  - 2026-11-23 W40.fix-processor-copy-label-tags — `fixed-pending-recheck`. SPEC invariant 6 records
+    owner call 30's label-marker exception.
 - **Notes:** **Drift.** `TESTING.md` §2.5 still names "Auto date + manual seg", folded into Auto date by
-  `W36.seg-opt-review`. Owner call 30 keeps the Box/Folder markers in both modes and requires all copied
-  source tags to survive (S-034). Update the SPEC with the fix.
+  `W36.seg-opt-review`.
 
 ### P-36 · Controlled vocabulary
 

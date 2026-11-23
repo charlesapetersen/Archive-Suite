@@ -99,9 +99,12 @@ When the gateway returns `model_not_found` for a label request, the run summary 
 GPT 5.6 Luna was unavailable through the configured gateway. The app keeps the PDFs, Vision
 proposals, and separate gateway success and failure counts. [Scratch evidence and regression](../verification/evidence/processor/W49.proc-s053-verify.md) (W49.proc-fix-s053).
 
-## Copy source file tags drops Finder tags from collection labels (S-034)
+## FIXED (S-034, 2026-11-23) — Copy source file tags dropped Finder tags from collection labels
 
-- In Process Files, No tagging wrote Box and Folder on the two label PDFs. Copy source file tags replaced both original Finder tags on those labels with the marker, while all four other PDFs kept both source tags. Owner call 30 keeps the label markers and requires preservation of every copied tag. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-filing-check.md). (queued: W40.fix-processor-copy-label-tags)
+Process Files with Collection ID keeps the Box and Folder markers in both modes. Copy source file tags
+preserves every copied tag on label and document PDFs, including copied type and Sent With tags after a
+classification edit. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-filing-check.md).
+(accepted: fixed by W40.fix-processor-copy-label-tags)
 
 ## Paid-batch Resume bypasses three reviews (S-035)
 

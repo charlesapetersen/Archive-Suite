@@ -18089,3 +18089,12 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   No rehearsal cache inputs were created.
   [Reader move limits](ArchiveReader/KNOWN_ISSUES.md#moving-the-archive-folder-w49reader-root-movable-2026-11-23)
   <!-- /W49.reader-root-movable -->
+- [x] **W40.fix-processor-copy-label-tags — Preserve copied Finder tags on collection labels [S · S2 · Tier-2]** · §W40 (lane: processor) (uses: build,vm) — S-034, independently reproduced at `bdfe3274`. Call 30 keeps Box/Folder markers in No tagging and Copy source tags. Preserve every copied source tag on label PDFs and update SPEC/tag-format.md in the same fix. Keep the VM reproduction and cover both modes plus the normal document files. [Evidence](verification/evidence/processor/W49.proc-suspects-filing-check.md). SHIPPED 2026-11-23 (this commit).
+  In Copy source mode, Collection ID adds missing label markers to the tags read from the PDF inside
+  the coordinated write. The final type marker wins if copied type tokens conflict. Classification
+  review preserves copied tags, including Sent With.
+  The off-screen scratch journey passed both tagging modes, checking six PDFs per run and the input
+  tags after each run. The Debug build and headless tag-warning suite passed, including repeated
+  marking, duplicate names, conflicting types, reclassification and warning retention. No paid OCR
+  or rehearsal cache changes.
+  <!-- /W40.fix-processor-copy-label-tags -->
