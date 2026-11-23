@@ -8,6 +8,7 @@ The resumable cache holds per-photo correctness flags and timings only.
 import argparse
 import base64
 from contextlib import contextmanager
+import ctypes
 import hashlib
 from importlib.metadata import version
 import json
@@ -19,6 +20,7 @@ import statistics
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
@@ -77,7 +79,7 @@ def server_body(model, jpeg, text_first=False):
 
 
 @contextmanager
-def server(port):
+def server(port, *, with_pid=False):
     if version("mlx-vlm") != SERVER_VERSION:
         raise RuntimeError(f"This comparison needs mlx-vlm {SERVER_VERSION}")
     model_store.use()
@@ -106,7 +108,7 @@ def server(port):
                 continue
             if child.poll() is not None or G.pick(listed) != G.MODEL:
                 raise RuntimeError("The loopback server did not select the pinned Gemma model")
-            yield base
+            yield (base, child.pid) if with_pid else base
             return
         raise RuntimeError("MLX server did not become ready")
     finally:
@@ -276,6 +278,95 @@ def diagnose(rows, ids, record, cache, port):
                 print(f"Diagnostic label {len(calls)}/{len(indices)} done ({len(arms)} requests)", flush=True)
 
 
+def footprint_reader(pid):
+    """Read macOS physical footprint, including memory charged to the server for GPU work."""
+    # sys/resource.h: rusage_info_v0 starts with a 16-byte UUID, then ten uint64 fields.
+    libproc = ctypes.CDLL("/usr/lib/libproc.dylib", use_errno=True)
+    rusage = libproc.proc_pid_rusage
+    rusage.argtypes = (ctypes.c_int, ctypes.c_int, ctypes.c_void_p)
+    rusage.restype = ctypes.c_int
+
+    def footprint():
+        usage = (ctypes.c_uint64 * 12)()
+        if rusage(pid, 0, ctypes.byref(usage)) != 0:
+            raise OSError(ctypes.get_errno(), "proc_pid_rusage failed")
+        return usage[9]  # ri_phys_footprint
+    return footprint
+
+
+def measured_request(base, footprint, jpeg, text_first):
+    """Sample the server footprint during a single request, including its warm model."""
+    stop = threading.Event()
+    samples = [footprint()]
+    failures = []
+
+    def sample():
+        while not stop.wait(0.1):
+            try:
+                samples.append(footprint())
+            except OSError as error:
+                failures.append(error)
+                return
+
+    thread = threading.Thread(target=sample)
+    thread.start()
+    try:
+        prediction, wall, finish = read_server(base, jpeg, text_first)
+    finally:
+        stop.set()
+        thread.join()
+    if failures:
+        raise failures[0]
+    peak = max(*samples, footprint())
+    return prediction, dict(wall_s=wall, peak_bytes=peak, jpeg_bytes=len(jpeg),
+                            parsed=prediction is not None, finish=finish)
+
+
+def validation_jpeg(path, binary, text_first):
+    return path.read_bytes() if text_first else subprocess.check_output([binary, path])
+
+
+def validate(rows, ids, record, cache, port, limit):
+    """Compare both external Gemma settings on every held-out label, with fresh reads."""
+    if len(record["holdout"]) != len(ids) - BASELINE:
+        raise RuntimeError("Finish the held-out panel before running validation")
+    calls = record.setdefault("validation", [])
+    holdout_ids = ids[BASELINE:]
+    target = len(holdout_ids) if limit is None else min(len(holdout_ids), len(calls) + limit)
+    if len(calls) >= target:
+        return
+    with tempfile.TemporaryDirectory(prefix="ct-gemma-validation-") as folder:
+        binary = encoder(folder)
+        with server(port, with_pid=True) as (base, pid):
+            footprint = footprint_reader(pid)
+            warmup = Path(R.page_of(ids[0]))
+            for revised in (False, True):
+                read_server(base, validation_jpeg(warmup, binary, revised), revised)
+            print("Gemma validation server warmed on a pilot photo", flush=True)
+            for index in range(len(calls), target):
+                row = rows[holdout_ids[index]]
+                path = Path(R.page_of(row["id"]))
+                order = [False, True]
+                random.Random(R.SEED + index).shuffle(order)
+                metrics, predictions = {}, {}
+                for revised in order:
+                    start = time.monotonic()
+                    jpeg = validation_jpeg(path, binary, revised)
+                    preparation = time.monotonic() - start
+                    predictions[revised], metrics[revised] = measured_request(base, footprint, jpeg, revised)
+                    metrics[revised]["prepare_s"] = round(preparation, 4)
+                cells = {}
+                for field, control in record["holdout"][index]["cells"].items():
+                    want = row["fields"].get(field)
+                    values = [(predictions[arm] or {}).get(field) for arm in (False, True)]
+                    cells[field] = dict(right=[R.same(field, value, want) for value in values],
+                                        filled=[bool(value) for value in values],
+                                        truth_filled=control["truth_filled"])
+                calls.append(dict(cells=cells, baseline=metrics[False], revised=metrics[True]))
+                store(cache, record)
+                print(f"Validation label {len(calls)}/{len(holdout_ids)} done (two requests)", flush=True)
+
+
 def paired_interval(pairs, first, second):
     """One matched photo per pair for this field, including skipped replies as absent values."""
     differences = [int(pair[first]) - int(pair[second]) for pair in pairs]
@@ -422,11 +513,84 @@ def diagnostic_report(holdout, diagnosis):
     ]
 
 
+def validation_report(holdout, calls):
+    if not calls:
+        return []
+    if len(calls) != len(holdout):
+        raise RuntimeError("Complete all held-out validation pairs before reporting them")
+
+    accuracy, presence, box_pairs = [], [], []
+    for field in G.FOUR:
+        label = field.replace("_", " ").capitalize()
+        cells = [call["cells"][field] for call in calls if field in call["cells"]]
+        pairs = [cell["right"] for cell in cells]
+        accuracy.append([label, str(len(cells)), *[f"{right}/{len(cells)}" for right in map(sum, zip(*pairs))],
+                         gap_text(paired_interval(pairs, 1, 0))])
+        present = [cell for cell in cells if cell["truth_filled"]]
+        blank = [cell for cell in cells if not cell["truth_filled"]]
+        presence.append([label, *[f"{sum(c['right'][arm] for c in present)}/{len(present)}" for arm in range(2)],
+                         *[f"{sum(c['filled'][arm] for c in blank)}/{len(blank)}" for arm in range(2)],
+                         gap_text(paired_interval([c["filled"] for c in blank], 1, 0))])
+
+    for prior, call in zip(holdout, calls, strict=True):
+        if prior["folder"] or NUMBER not in call["cells"]:
+            continue
+        cell = call["cells"][NUMBER]
+        vision_correct = prior["cells"][NUMBER]["right"][2]
+        box_pairs.append([right if filled else vision_correct
+                          for right, filled in zip(cell["right"], cell["filled"], strict=True)])
+
+    def summary(values, digits, scale=1):
+        median = statistics.median(values) / scale
+        upper = statistics.quantiles(values, n=20, method="inclusive")[-1] / scale
+        return f"{median:.{digits}f} / {upper:.{digits}f}"
+
+    resources = []
+    for arm, name in (("baseline", "Current"), ("revised", "Revised")):
+        metrics = [call[arm] for call in calls]
+        resources.append([
+            name, f"{sum(m['parsed'] for m in metrics)}/{len(metrics)}",
+            str(sum(m["finish"] == "length" for m in metrics)),
+            summary([m["jpeg_bytes"] for m in metrics], 2, 1e6),
+            summary([m["wall_s"] for m in metrics], 2),
+            summary([m["wall_s"] + m["prepare_s"] for m in metrics], 2),
+            summary([m["peak_bytes"] for m in metrics], 2, 2**30),
+            f"{max(m['peak_bytes'] for m in metrics) / 2**30:.2f}",
+        ])
+    return [
+        "## Paired validation of the revised request", "",
+        "Fresh pairs on all 135 held-out photos. The current arm uses the Swift encoder and puts the image first. "
+        "The revised arm sends the source benchmark JPEG and puts text first. The same local server read both arms "
+        "in a seeded shuffled order per photo, after both arms warmed up on a pilot photo. Truth and scoring "
+        "follow the held-out comparison. The intervals describe this cohort, which also supplied the earlier "
+        "collection-number diagnostic.", "",
+        *table(("Field", "Eligible cells", "Current correct", "Revised correct",
+                "Revised less current (95% interval, points)"), accuracy), "",
+        *table(("Field", "Current correct where present", "Revised correct where present",
+                "Current false fills", "Revised false fills", "False-fill gap (95% interval, points)"), presence), "",
+        f"With the same benchmark Vision parser fallback, the current and revised routes got "
+        f"{sum(pair[0] for pair in box_pairs)}/{len(box_pairs)} and {sum(pair[1] for pair in box_pairs)}/{len(box_pairs)} "
+        f"box-marker collection numbers right, respectively ({gap_text(paired_interval(box_pairs, 1, 0))} points). "
+        "That calculation uses a cached Vision reading when Gemma supplies no number.", "",
+        *table(("Request", "Parseable", "Capped", "JPEG MB (median / p95)", "Request s (median / p95)",
+                "With JPEG preparation s (median / p95)", "Server peak GiB (median / p95)",
+                "Highest sampled GiB"), resources), "",
+        "Request time includes JSON/base64 work and the loopback round trip. Preparation includes launching the "
+        "Swift encoder for the current arm and reading the source JPEG for the revised arm. Server physical "
+        "footprint was sampled at the start, every 100 ms during each request and at the end. Each request's maximum "
+        "includes the warm model and allocations retained by the server. Sampling can miss shorter peaks. These "
+        "timings and memory figures cover serial label reads, without an OCR model loaded alongside.", "",
+        "The owner approved validation on 2026-11-23. The app continues to use the existing external request and "
+        "Gemma-first/Vision-fallback collection-number rule. The source JPEGs here are already upright benchmark "
+        "inputs. A production change requires a separate decision.", "",
+    ]
+
+
 HEADINGS = ("Field", "Eligible cells", "Gemma through the server", "Gemma in-process", "Vision + parser",
             "Server less in-process (95% interval)", "Server less Vision (95% interval)")
 
 
-def report(pilot, holdout, diagnosis):
+def report(pilot, holdout, diagnosis, validation=None):
     paired = field_pairs(holdout)
     times = [c["wall_s"] for c in holdout]
     parsed = sum(c["parsed"] for c in holdout)
@@ -455,6 +619,7 @@ def report(pilot, holdout, diagnosis):
         *table(HEADINGS, [[field.replace("_", " ").capitalize(), *comparison(values)]
                           for field, values in field_pairs(pilot, pilot=True).items()]), "",
         *diagnostic_report(holdout, diagnosis),
+        *validation_report(holdout, validation),
         "## Measurement card", "",
         "- **Truth.** The frozen W47.ct-truth-final label set. The owner’s answers and notes, rule-settled cells, "
         "and otherwise three unanimous drafts. Gemini 3.7 Flash, from Google like Gemma, was one of those drafters, "
@@ -489,6 +654,7 @@ def main():
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--report", action="store_true")
     mode.add_argument("--diagnose", action="store_true")
+    mode.add_argument("--validate", action="store_true")
     args = parser.parse_args()
     rows, ids = inputs()
     pilot = original_panel(rows, ids)
@@ -504,10 +670,13 @@ def main():
     if args.report:
         if len(record["holdout"]) != TOTAL - BASELINE:
             raise RuntimeError("Run all 135 held-out photos before publishing a report")
-        REPORT.write_text(report(pilot, record["holdout"], record.get("diagnosis")), encoding="utf-8")
+        REPORT.write_text(report(pilot, record["holdout"], record.get("diagnosis"), record.get("validation")),
+                          encoding="utf-8")
         print(REPORT)
     elif args.diagnose:
         diagnose(rows, ids[BASELINE:], record, cache, args.port)
+    elif args.validate:
+        validate(rows, ids, record, cache, args.port, args.limit)
     else:
         collect(rows, ids[BASELINE:], record, cache, args.port, args.limit)
 
