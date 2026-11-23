@@ -244,6 +244,11 @@ private struct RangeRow: View {
                 }
                 Text(row.figures).font(.caption2).fixedSize(horizontal: false, vertical: true)
                 if let p = row.publicFigure { Text(p).font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+                if let reason = row.advancedReason {
+                    Text(reason).font(.caption2).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("ap.sheet.range.\(stage).comparison.\(row.id)")
+                }
                 Text("\(row.listPrice); \(row.batchCost); \(row.time); \(row.canUse).")
                     .font(.caption2)
                     .foregroundStyle(row.state == .usable ? Color.secondary : row.state == .outsideLimits ? Color.orange : Color.red.opacity(0.8))

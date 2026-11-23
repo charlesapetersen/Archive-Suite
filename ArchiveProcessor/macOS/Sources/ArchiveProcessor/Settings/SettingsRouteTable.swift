@@ -287,9 +287,8 @@ struct SettingsRouteTable: Decodable, Sendable {
             !conditions.contains { $0.hasPrefix("not offered") || $0.hasPrefix("never offered") }
         }
 
-        /// W47.wh-readers-lost (owner call 15, 2026-11-19): a reading row that scored below a row it is measured
-        /// against ("lower-scoring: …"). It is the user's to choose at the Advanced level, with its figures, and never a
-        /// default or the solver's pick.
+        /// Owner call 15 reserves previously withheld readers for explicit choice at Advanced where supported.
+        /// The "lower-scoring: …" condition is the eligibility marker, independent of the paired verdict.
         var lowerScoring: Bool { conditions.contains { $0.hasPrefix("lower-scoring") } }
 
         var afterTraining: Bool { status == "after-training" }

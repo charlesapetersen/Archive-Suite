@@ -151,6 +151,26 @@ final class SettingsLevelsUITests: XCTestCase {
         shootCorrection(settings, "settings-level-basic-changed-post-correction")
     }
 
+    func testAdvancedReadingRangeShowsPairedAccuracyAndMeasuredThroughput() {
+        guard let settings = launch(["-settingsLevel", "advanced"]) else { return }
+        XCTAssertTrue(app.showSettingsPanel("Reading"))
+        let seeRange = element(settings, "ap.sheet.seeRange.reading")
+        guard seeRange.waitForExistence(timeout: 5) else { return XCTFail("Reading range link is missing") }
+        for _ in 0..<12 where !seeRange.isHittable { settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -200) }
+        seeRange.click()
+        let comparison = app.staticTexts["ap.sheet.range.reading.comparison.qwen3.5-122b-a10b-farmshare"]
+        guard comparison.waitForExistence(timeout: 10) else { return XCTFail("Paired reading comparison is missing") }
+        let scroll = app.scrollViews.containing(.staticText, identifier: comparison.identifier).firstMatch
+        for _ in 0..<24 where !comparison.isHittable && scroll.exists { scroll.scroll(byDeltaX: 0, deltaY: -240) }
+        XCTAssertTrue(comparison.isHittable)
+        let wording = (comparison.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? comparison.label
+        XCTAssertTrue(wording.contains("tied (0.23 points lower, within 0.49 points) on the 93 benchmark pages"), wording)
+        XCTAssertTrue(wording.contains("1.54 points lower on 95 pages with failures scored as zero"), wording)
+        XCTAssertTrue(wording.contains("3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock)"), wording)
+        XCTAssertTrue(wording.contains("729.4 pages per hour per GPU (four NVIDIA L40S, Stanford FarmShare)"), wording)
+        shoot(app.windows.firstMatch, "advanced-reading-paired-comparison")
+    }
+
     private func shootCorrection(_ settings: XCUIElement, _ name: String) {
         let form = settings.scrollViews.firstMatch
         let results = element(settings, "ap.settings.postCorrection.results")

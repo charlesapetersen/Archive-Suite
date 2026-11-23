@@ -2,6 +2,13 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (2026-11-23) — Advanced reading comparisons used different sets of answered pages
+
+The Advanced Reading range now compares OCR accuracy on pages both readers answered and shows the score with
+failures counted as zero. Four comparisons with Sherlock Qwen3.5 9B tie on common answers under the 0.49-point
+rule. The two Qwen3.8 27B comparisons also tie when failures count as zero. Benchmarked price and throughput
+appear separately, with cluster hardware named. Owner call 15 still governs eligibility. (accepted: fixed by W46.p18-reader-comparisons)
+
 ## FIXED (2026-11-23) — Processor PDF write and iOS relay gate checks
 
 The Processor write lint pins the catalogue-aware PDF writers and the recovery test's scratch fixture write.

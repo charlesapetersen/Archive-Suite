@@ -6,6 +6,7 @@ The schema is execution-plans/processing-review/13-stage-rules/00-index.md §"Th
 - Reading (stage 04), single routes: computed here from the bench's own files (panel-data.json, ocr-hands-rescore.json,
   ocr-scorers.json, ocr-ppocrv6-hands.json, reader-keeps-lines.json, and the Mac speed and memory tables of ocr-mac-local*.md). No figure is
   computed from other figures; values are rounded to two places from the raw value the `source` holds.
+  Advanced route comparisons use the owner96 overall entries in ocr-pair-matrix.json where available.
 - Every other row, the reading stage's cascade rows, and the stage objects the notes give: the JSON blocks of each
   stage note's section 4 (13-stage-rules/NN-*.md), each figure carrying its `source`. Stage headers a note gives only in
   prose (01's geometry, 04, 07, 08, 10, 12) are written below from that note's section 3, each rule with its source.
@@ -93,6 +94,7 @@ M8 = "ArchiveProcessor/segbench-results/ocr-mac-local.md"
 R1F = "ArchiveProcessor/segbench-results/r1-foundation.md"
 OT = "ArchiveProcessor/segbench-results/ocr-time-like-for-like.json"   # W46.ocr-time-like-for-like
 R6S = "ArchiveProcessor/segbench-results/r6-spot.md"   # W47.wh-readers-lost-vendors-read
+PAIRS = "ArchiveProcessor/segbench-results/ocr-pair-matrix.json"
 
 
 def src(f, route, attr, val):
@@ -157,6 +159,21 @@ def reading_rows():
     l13 = {r["route"]: r for r in ph["public"]}
     ownhand = ph["owner_hand"]
     keeps = {r["reading"]: r for r in load(KL)["rows"] if r["pages"]}
+    pairs = {frozenset((e["a"], e["b"])): e for e in load(PAIRS)["pairs"]
+             if e["set"] == "owner96" and e["group"] == "all"}
+
+    def paired_accuracy(rid, comparator, name):
+        pair = pairs[frozenset((rid, comparator))]
+        direction = 1 if pair["a"] == comparator else -1
+
+        def result(basis):
+            delta = direction * basis["delta"]
+            gap = f"{abs(delta):.2f} points {'higher' if delta > 0 else 'lower'}" if delta else "0.00 points apart"
+            return f"tied ({gap}, within {pair['floor']:g} points)" if basis["tie"] else f"scored {gap}"
+
+        answered, strict = pair["answered"], pair["strict"]
+        return (f"{name} {result(answered)} on the {answered['n']} benchmark pages both readers answered. "
+                f"It {result(strict)} on {strict['n']} pages with failures scored as zero.")
 
     def figs(hid=None, cid=None, hk=None, pk=None, lk=None, ohk=None):
         F = {}
@@ -258,7 +275,8 @@ def reading_rows():
         {"peak_gb": None, "measured_on": "runs in the OS", "source": None},
         ["42.4 strict against Vision's 83.1, both 27.2, -40.7 (-49.0 to -32.5); 33 of 96 loop to the 4,096-token cap (r1-foundation.md)", "not in the ranking table (no ocr-pages.csv rows)", "its 100 public pages are L5-L8 of the 440, drawn where Vision is cached (P7-6); off the public tables",
          "the app stops a reply that starts repeating itself and fails the page, as the bench scored a loop: empty"],
-        [], None, [lower("Apple Vision (apple-vision) reads 83.1 strict on the same 96 against 42.4, at no more cost")])
+        [], None, [lower("Apple Vision scored 83.1 on the same 96 pages, against 42.4 for the on-device model, "
+                        "with failures scored as zero (r1-foundation.md). Both are built into macOS at no extra cost.")])
     add("ppocrv6-kraken-blla", "kraken PP-OCRv6 medium on blla lines (Mac CPU)", "mac", None, "measured", {"mac": True},
         figs(lk="ppocrv6-kraken-blla", ohk="ppocrv6-kraken-blla"), {"usd_1000_list": 0.0, "source": None},
         lfl_time("ppocrv6-kraken-blla"),
@@ -310,27 +328,29 @@ def reading_rows():
     # both below Mistral OCR 4.1 at no less cost, so lower-scoring (owner call 15). No Processor client reads them yet:
     # not offered until W47.wh-readers-lost-vendors-clients, so the rows say so rather than "not in the app yet".
     # Transkribus waits for the owner's upload of the other 71 (W47.wh-readers-lost-vendors-tk).
-    for rid, nm, keys, ov, kinds, usd, cav in [
-        ("azure-di-layout", "Azure Document Intelligence, prebuilt-layout (vendor service)", ["azure"], 90.90,
+    for rid, nm, keys, ov, gap, kinds, usd, cav in [
+        ("azure-di-layout", "Azure Document Intelligence, prebuilt-layout (vendor service)", ["azure"], 90.90, 2.11,
          (95.57, 88.07, 81.77), 10.0, ["read on the F0 free tier ($0); list price $10 per 1,000 pages", "96 only"]),
-        ("textract-layout", "AWS Textract, AnalyzeDocument LAYOUT (vendor service)", ["aws"], 88.45,
+        ("textract-layout", "AWS Textract, AnalyzeDocument LAYOUT (vendor service)", ["aws"], 88.45, 4.55,
          (94.08, 87.76, 72.92), 4.0, ["lines in LAYOUT block order (+3.2 over raw line order on the 25)", "read with the date QUERY as well ($15 per 1,000 more); the row's price is LAYOUT's", "96 only"]),
     ]:
         F = {"overall": {"value": ov, "n": "95/95 answered, p081 apart", "strict": ov, "failures": {}, "truth": "owner-96",
                          "source": src(R6S, rid, "All 96: answered (n)", f"{ov:.2f}")}}
         for k, v, n in zip(("typewritten", "printed", "handwritten"), kinds, (50, 28, 16)):
             F[k] = {"value": v, "answered": n, "n": n, "basis": "strict, failure as 0", "truth": "owner-96", "source": src(R6S, rid, f"All 96: {k}", f"{v:.2f}")}
-        dom = "mistral-ocr-4-1"
         add(rid, nm, "cloud", None, "measured", {"key": keys}, F,
             {"usd_1000_list": usd, "usd_1000_batch": None, "price_read": "2026-11-04 (W46.r6-spot)", "source": src(R6S, rid, "list price", f"${usd:g} per 1,000")},
             {"per_unit_s": None, "measured": False, "measured_on": "no call times recorded", "source": None}, {"peak_gb": 0, "source": None}, cav,
-            conditions=[lower(f"{dom} scores higher on the same 95, {head[dom]['nes_answered']} answered against {ov}, and costs no more, "
-                              f"${routes[dom]['std']:.2f} per 1,000 pages"),
+            conditions=[lower(f"Mistral OCR 4.1 scored {gap:.2f} points higher on the same 95 benchmark pages, "
+                              "with every page answered by both readers (r6-spot.md). "
+                              f"List prices per 1,000 pages were ${routes['mistral-ocr-4-1']['std']:.2f} for Mistral and ${usd:.2f} for this route."),
                         "not offered until the Processor has a reader for it (queued: W47.wh-readers-lost-vendors-clients)"])
 
-    def hosted_by(dom):
-        return lower(f"{dom} scores higher on the 96, "
-                     f"{head[dom]['nes_answered']} answered, and costs no more, ${routes[dom]['std']:.2f} per 1,000 pages")
+    def hosted_by(rid, comparator):
+        name = next(r["name"] for r in rows if r["id"] == comparator)
+        return lower(f"{paired_accuracy(rid, comparator, name)} "
+                     f"Benchmark prices per 1,000 pages were ${routes[comparator]['std']:.2f} for that reader "
+                     f"and ${routes[rid]['std']:.2f} for this route.")
 
     # W47.wh-readers-lost (owner call 15, 2026-11-19): the hosted routes a row of the same family dominates on the 96
     # (04-reading.md §4, "Not in the table"), offered at Advanced with their figures, never a default or a pick. Each is
@@ -344,7 +364,7 @@ def reading_rows():
     ]:
         add(rid, nm, "cloud", None, "measured", {"key": keys}, figs(rid, rid, hk or rid), cost(rid),
             cloud_time(rid, {"per_unit_s": None, "measured": False, "measured_on": "no time in its call log (ocr-time-like-for-like.md)", "source": None}), {"peak_gb": 0, "source": None},
-            cav, conditions=[hosted_by(dom)])
+            cav, conditions=[hosted_by(rid, dom)])
 
     # ---- plans (R5), read by the plan or by key
     # W41.app-claude-plan-reading (owner, 2026-11-19): measured through `claude -p` on the owner's plan, and the app reads
@@ -387,13 +407,23 @@ def reading_rows():
         add(rid, nm, "cluster", None, "measured", {"cluster": True, "gpus": fsrows[label].get("gpus")}, figs(rid, rid, hk, pk, lk), cost(rid, money=False), cluster_time(label),
             {"peak_gb": None, "measured_on": "GPU memory not tabulated", "source": None}, cav)
 
-    def cluster_by(dom, dom_label):
-        return lower(f"{dom} scores higher on the 96, {head[dom]['nes_answered']} answered, and reads more pages an hour, "
-                     f"{fsrows[dom_label]['per_hour']:,} on {fsrows[dom_label].get('gpus') or 1} GPU")
+    cluster_specs = load("ArchiveOCRBench/data/inputs.json")["own_hardware"]["routes"]
+
+    def cluster_throughput(rid):
+        spec = cluster_specs[rid]
+        # The aggregate normalises collector throughput by GPU count, including for multi-GPU jobs.
+        machine = spec["machine"].split(" (", 1)[0]
+        return f"{fsrows[spec['run']]['per_hour']:,.1f} pages per hour per GPU ({machine})"
+
+    def cluster_by(rid, comparator):
+        name = cluster_specs[comparator]["name"]
+        return lower(f"{paired_accuracy(rid, comparator, name)} "
+                     f"In their respective runs, {name} processed {cluster_throughput(comparator)} "
+                     f"and this reader processed {cluster_throughput(rid)}.")
 
     # W47.wh-readers-lost (owner call 15, 2026-11-19): the cluster routes a faster cluster row dominates on the 96
     # (04-reading.md §4, "Not in the table"), offered at Advanced with their figures, never a default or a pick.
-    Q9, P16 = ("qwen3.5-9b-sherlock", "qwen3.5-9b-49202328"), ("paddleocr-vl1.6-sherlock", "paddleocr-vl1.6-49202331")
+    Q9, P16 = "qwen3.5-9b-sherlock", "paddleocr-vl1.6-sherlock"
     for rid, nm, hk, pk, lk, label, dom, cav in [
         ("qwen3.5-122b-a10b-farmshare", "Qwen3.5 122B-A10B (your cluster)", None, None, None, "qwen3.5-122b-a10b-1850212", Q9, ["four GPUs", "96 only in the scorer tables"]),
         ("ling3-flash-vl-farmshare", "Ling3 Flash VL fp8 (your cluster)", "ling3-flash-vl-fp8", ("ling3-flash-vl-fp8", "FarmShare panel"), "ling3-flash-vl-fp8", "ling3-flash-vl-fp8-1861703", Q9,
@@ -412,7 +442,7 @@ def reading_rows():
          ["its Mac form is ppocrv6-kraken-blla"]),
     ]:
         add(rid, nm, "cluster", None, "measured", {"cluster": True, "gpus": fsrows[label].get("gpus")}, figs(rid, rid, hk, pk, lk), cost(rid, money=False), cluster_time(label),
-            {"peak_gb": None, "measured_on": "GPU memory not tabulated", "source": None}, cav, conditions=[cluster_by(*dom)])
+            {"peak_gb": None, "measured_on": "GPU memory not tabulated", "source": None}, cav, conditions=[cluster_by(rid, dom)])
     for rid, nm in [("german-handwriting", "kraken German handwriting model"), ("tridis", "kraken TRIDIS"), ("catmus-medieval", "kraken CATMuS Medieval"), ("greek-minuscule", "kraken Greek minuscule"), ("biblia", "kraken BiblIA")]:
         add(f"kraken-{rid}", f"{nm} (script specialist, kraken)", "mac", None, "measured", {"mac": True},
             figs(pk=(rid, "kraken specialist")), {"usd_1000_list": 0.0, "source": None}, lfl_time(f"kraken-{rid}"), {"peak_gb": None, "source": None},
@@ -440,7 +470,7 @@ HEADERS = {
     {"id": "newspapers-layout-first", "text": "Newspapers and multi-column clippings: the layout stage's regions run first for every reader; required for GLM-OCR and PaddleOCR-VL. Never on handwriting or registers.", "source": "layout-photo.md §Answer", "switch": None},
     {"id": "free-default", "text": "Free: typed and printed pages with Apple Vision; handwritten pages on a 16 GB Mac get LightOnOCR-3 4B 8-bit proposed as a download, else flagged needs a download or a key; a page Vision returns empty for is flagged, never skipped.", "source": "14-owner-calls.md §1. The owner's calls", "switch": None},
     {"id": "no-apple-fm", "text": "The macOS 27 on-device model is never the app's pick for reading; it is offered at the Advanced level with its figures (owner call 15).", "source": "r1-foundation.md", "switch": None},
-    {"id": "lower-scoring-advanced", "text": "A route that scored below a row it is measured against (a row of its family higher on the 96 at no more cost, or more pages an hour on a cluster) is offered at the Advanced level with its figures, never as a default or the app's pick.", "source": "14-owner-calls.md §1. The owner's calls", "switch": None},
+    {"id": "lower-scoring-advanced", "text": "Owner call 15 makes previously withheld readers available at the Advanced level where supported. The app gives their benchmark figures and keeps them out of its automatic picks.", "source": "14-owner-calls.md §1. The owner's calls", "switch": None},
     {"id": "no-post-correction", "text": "Image-grounded correction is off by default and available in Advanced Reading settings. A log-probability score only flags a reading for checking.", "source": "ocr-postcorrect.md", "switch": None},
     {"id": "cascade-as-route", "text": "Each measured cascade is a route row, picked when it beats the single routes within the limits; failure is its only trigger, the Vision word-count trigger opt-in.", "source": "14-owner-calls.md §1. The owner's calls", "switch": None},
     {"id": "loop-fallback", "text": "A local reader's loop falls to a second reader or kraken PP-OCRv6 on lines, never a half-size retry.", "source": "bench-corpus/loop-rerun-20261021.md", "switch": None},
@@ -549,10 +579,9 @@ KEY_NAMES = {"stanford-gateway": "gateway"}
 
 
 def lower(why):
-    """W47.wh-readers-lost: a reading row that scored below a row it is measured against. The owner released them on
-    2026-11-19 (call 15): selectable at the Advanced level with their figures, never a default or a solver pick. The
-    app reads the prefix (`SettingsRouteTable.Route.lowerScoring`)."""
-    return f"lower-scoring: {why}; offered at the Advanced level only, never the app's pick (owner call 15)"
+    """Owner call 15 keeps these routes at Advanced and out of automatic picks. The legacy condition prefix
+    is the app's eligibility marker (`SettingsRouteTable.Route.lowerScoring`), independent of the paired verdict."""
+    return f"lower-scoring: {why.rstrip('.')}; offered at the Advanced level only, never the app's pick (owner call 15)"
 
 
 def norm_needs(n, family):

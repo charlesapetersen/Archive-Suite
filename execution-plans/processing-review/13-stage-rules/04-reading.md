@@ -75,10 +75,11 @@ cascades) keep the floor alone and "pair not measured". A tie goes to the cheape
 - Cyrillic (N2): the best figure is 27.06 (Xiaomi-OCR-0, Sherlock); the sheet says no route reads it well.
 - The macOS 27 on-device model is never the app's pick (42.4 against Vision's 83.1, r1-foundation.md); since owner
   call 15 (2026-11-19, W47.wh-readers-lost) it is a lower-scoring row, offered at the Advanced level with its figures.
-- Lower-scoring rows (owner call 15, W47.wh-readers-lost): a route a row of its family dominates on the 96 (below) is
-  a row with a `lower-scoring: …` condition naming what beats it. It sits at the Advanced level with its figures and is
-  never a default, the solver's pick, a suggested alternative or the Improve OCR suggestion; chosen on the card, it is
-  what the stage reads with (the solver keeps it only where `onlyRoutes` names it).
+- Previously withheld readers (owner call 15, W47.wh-readers-lost) carry the `lower-scoring: …` eligibility marker.
+  They sit at the Advanced level with their figures, outside the defaults, solver picks, suggested alternatives and
+  Improve OCR suggestions. Where supported, an explicit choice uses that reader (the solver keeps it only where
+  `onlyRoutes` names it). The Reading range explains comparisons using the same pages for both readers and states
+  measured throughput or price separately.
 - Image-grounded correction is off by default and optional in Advanced Reading settings (owner call 15,
   W47.wh-post-correction). On middle-accuracy readings it tied re-reading with the 27B on the 96 (−0.42,
   95% interval −1.47 to +0.64) and gained +1.47 (+0.55 to +2.63) on 120 public readings. It worsened
@@ -149,13 +150,11 @@ chosen and scored on the same pages, is a caveat. Costs are `difficulty.md`'s "$
 ]
 ```
 
-Not in the table: 18 of the 53 headline routes had no row (W46.ocr-rows-omitted, 2026-11-11, added five: the four cheap
-hosted routes and `churro-3b-farmshare`; each of the 18 below has its stated reason). Since W47.wh-readers-lost
-(2026-11-20, owner call 15) the fifteen dominated routes below, the four hosted and the eleven cluster, are rows with a
-`lower-scoring` condition, offered at the Advanced level only; three remain without a row (`qwen3.5-27b`,
-`paddleocr-vl1.5-farmshare`, `granite-docling-258m-mlx`) (panel-data.json `headline`, answered NES; prices
-`routes.std`; cluster pages an hour `farmshare.truth`). "Dominated" means a row in the same family scores higher on
-the 96 and costs no more (hosted) or reads more pages an hour (cluster).
+Previously omitted routes. W46.ocr-rows-omitted added the four cheap hosted routes and `churro-3b-farmshare`
+on 2026-11-11. W47.wh-readers-lost added fifteen more at Advanced (four hosted and eleven cluster), leaving three
+without a row (`qwen3.5-27b`, `paddleocr-vl1.5-farmshare`, `granite-docling-258m-mlx`). The historical comparisons
+below used each reader's own answered pages (`panel-data.json` `headline`), hosted prices (`routes.std`) and
+cluster throughput (`farmshare.truth`, pages per hour per GPU).
 - `qwen3.5-27b` (hosted, 95.86, 5th): 14 of 96 pages lost to transport errors, strict 81.73, so its answered figure
   rests on 82 pages; held out until a rerun answers the 96. The rerun is a paid hosted run (about $0.17 at its $1.80
   per 1,000 list), so it waits behind the paid-benchmarking hold in `execution-plans/paid-runs-deferred.md` (W43.sweep)
@@ -163,21 +162,29 @@ the 96 and costs no more (hosted) or reads more pages an hour (cluster).
 - Rows since W46.ocr-rows-omitted: the cheap hosted routes, priced under every other hosted row, `gemma4-31b` 93.76
   ($0.38), `qwen3.5-9b` 93.38 ($0.25), `gemma4-26b-a4b` 92.38 ($0.41), `mistral-small-24b` 91.45 ($0.32), all 96
   only. A price cap under $0.60 now finds a hosted row.
-- Dominated hosted routes: `qwen3-vl-8b` 93.85 ($1.49) and `qwen3-vl-30b-a3b` 91.79 ($0.98) by `qwen3.8-flash` 95.11
+- Hosted comparisons: `qwen3-vl-8b` 93.85 ($1.49) and `qwen3-vl-30b-a3b` 91.79 ($0.98) against `qwen3.8-flash` 95.11
   ($0.60); `qwen3.5-35b-a3b` 92.82 ($0.83) by the same (it is `casc-5-fail`'s second stage); `mistral-medium3.5`
   90.94 ($7.29) by `mistral-large4` 93.25 ($2.69).
-- Dominated cluster routes, all under `qwen3.5-9b-sherlock` (95.13, 3,898.9 pages an hour, one GPU) and slower:
+- Cluster comparisons against `qwen3.5-9b-sherlock` (95.13, 3,898.9 pages an hour per GPU, one Sherlock GPU):
   `qwen3.5-122b-a10b-farmshare` 94.67 (4 GPUs, 729.4), `ling3-flash-vl-farmshare` 93.81 (4 GPUs, 76.6),
   `qwen3-vl-8b-farmshare` 93.56 (1,105.5), `qwen3.8-27b-sherlock` 93.48 (2,886.8), `qwen3.8-27b-farmshare` 93.17
   (1,063.2), `glm-ocr-farmshare` 92.05 (3,463.2; its layout role is note 03's), `qwen3.5-4b-farmshare` 91.94
   (1,936.7), `nemotron-parse-2-sherlock` 86.87 (1,061.3),
   `unlimited-ocr-sherlock` 85.46 (202.8).
-- Dominated by `paddleocr-vl1.6-sherlock` (90.89, 12,327.9 pages an hour): `lightonocr3-0.8b-farmshare` 88.04
+- Compared with `paddleocr-vl1.6-sherlock` (90.89, 12,327.9 pages an hour per GPU): `lightonocr3-0.8b-farmshare` 88.04
   (5,527.3), `ppocrv6-medium-farmshare` 77.17 (8,106.9; its Mac form is `ppocrv6-kraken-blla`).
 - Superseded: `paddleocr-vl1.5-farmshare`, 93.53 answered but 84.67 strict with 9 caps, by 1.6 (strict 88.98).
 - `granite-docling-258m-mlx` 77.39: no public figure anywhere (P5-1).
 
-Domination is judged on the 96 overall only. Item 10's check of the public strata (ocr-scorers.json, public895, NES
+The Advanced Reading range now uses `ocr-pair-matrix.json` (owner96, overall) for these fifteen comparisons
+(W46.p18-reader-comparisons). Sherlock Qwen3.5 9B ties FarmShare Qwen3.5 122B, FarmShare Ling3 Flash VL,
+Sherlock Qwen3.8 27B and FarmShare Qwen3.8 27B on the 93 pages each pair both answered, with gaps of −0.23,
++0.05, +0.38 and +0.41 points respectively (Sherlock 9B minus the row). Scoring failed readings as zero
+on 95 pages gives −1.54, −0.69, −0.35 and −0.04 points. The last two also fall within the 0.49-point tie floor.
+Throughput describes the recorded runs on their own hardware. The paired evidence describes the benchmark and
+owner call 15 governs route eligibility.
+
+Item 10's check of the public strata (ocr-scorers.json, public895, NES
 strict; each dominated route against every row's public figures in its family and against all rows): one dominated
 route leads, `churro-3b-farmshare`, now a row. It is the best cluster route on seven strata of the 440 (L5 62.78
 against LightOnOCR-3 4B 58.90, L6 69.45 against Infinity-Parser2-Pro 54.46, L7 53.85 against Xiaomi-OCR-0 43.93, L8

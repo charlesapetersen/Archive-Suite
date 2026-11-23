@@ -1,6 +1,6 @@
 {
  "version": 1,
- "built": "2026-11-22",
+ "built": "2026-11-23",
  "item": "W46.settings-routes-table",
  "method": "ArchiveProcessor/scripts/segbench/settings_routes.py",
  "schema": "execution-plans/processing-review/13-stage-rules/00-index.md §The table schema",
@@ -1081,7 +1081,7 @@
     },
     {
      "id": "lower-scoring-advanced",
-     "text": "A route that scored below a row it is measured against (a row of its family higher on the 96 at no more cost, or more pages an hour on a cluster) is offered at the Advanced level with its figures, never as a default or the app's pick.",
+     "text": "Owner call 15 makes previously withheld readers available at the Advanced level where supported. The app gives their benchmark figures and keeps them out of its automatic picks.",
      "source": "14-owner-calls.md §1. The owner's calls",
      "switch": null
     },
@@ -2125,7 +2125,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: Apple Vision (apple-vision) reads 83.1 strict on the same 96 against 42.4, at no more cost; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Apple Vision scored 83.1 on the same 96 pages, against 42.4 for the on-device model, with failures scored as zero (r1-foundation.md). Both are built into macOS at no extra cost; offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -5010,7 +5010,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: mistral-ocr-4-1 scores higher on the same 95, 93.01 answered against 90.9, and costs no more, $4.00 per 1,000 pages; offered at the Advanced level only, never the app's pick (owner call 15)",
+      "lower-scoring: Mistral OCR 4.1 scored 2.11 points higher on the same 95 benchmark pages, with every page answered by both readers (r6-spot.md). List prices per 1,000 pages were $4.00 for Mistral and $10.00 for this route; offered at the Advanced level only, never the app's pick (owner call 15)",
       "not offered until the Processor has a reader for it (queued: W47.wh-readers-lost-vendors-clients)"
      ]
     },
@@ -5114,7 +5114,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: mistral-ocr-4-1 scores higher on the same 95, 93.01 answered against 88.45, and costs no more, $4.00 per 1,000 pages; offered at the Advanced level only, never the app's pick (owner call 15)",
+      "lower-scoring: Mistral OCR 4.1 scored 4.55 points higher on the same 95 benchmark pages, with every page answered by both readers (r6-spot.md). List prices per 1,000 pages were $4.00 for Mistral and $4.00 for this route; offered at the Advanced level only, never the app's pick (owner call 15)",
       "not offered until the Processor has a reader for it (queued: W47.wh-readers-lost-vendors-clients)"
      ]
     },
@@ -5233,7 +5233,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: qwen3.8-flash scores higher on the 96, 95.11 answered, and costs no more, $0.60 per 1,000 pages; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.8 Flash (OpenRouter) scored 1.32 points higher on the 90 benchmark pages both readers answered. It tied (0.24 points higher, within 0.49 points) on 95 pages with failures scored as zero. Benchmark prices per 1,000 pages were $0.60 for that reader and $1.49 for this route; offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -5351,7 +5351,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: qwen3.8-flash scores higher on the 96, 95.11 answered, and costs no more, $0.60 per 1,000 pages; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.8 Flash (OpenRouter) scored 3.60 points higher on the 90 benchmark pages both readers answered. It scored 2.25 points higher on 95 pages with failures scored as zero. Benchmark prices per 1,000 pages were $0.60 for that reader and $0.98 for this route; offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -5470,7 +5470,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: qwen3.8-flash scores higher on the 96, 95.11 answered, and costs no more, $0.60 per 1,000 pages; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.8 Flash (OpenRouter) scored 2.96 points higher on the 90 benchmark pages both readers answered. It scored 1.25 points higher on 95 pages with failures scored as zero. Benchmark prices per 1,000 pages were $0.60 for that reader and $0.83 for this route; offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -5585,7 +5585,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: mistral-large4 scores higher on the 96, 93.25 answered, and costs no more, $2.69 per 1,000 pages; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Mistral Large 4 scored 2.31 points higher on the 95 benchmark pages both readers answered. It scored 2.31 points higher on 95 pages with failures scored as zero. Benchmark prices per 1,000 pages were $2.69 for that reader and $7.29 for this route; offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -7724,7 +7724,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.5 9B (Sherlock) tied (0.23 points lower, within 0.49 points) on the 93 benchmark pages both readers answered. It scored 1.54 points lower on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 729.4 pages per hour per GPU (four NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -7952,7 +7952,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.5 9B (Sherlock) tied (0.05 points higher, within 0.49 points) on the 93 benchmark pages both readers answered. It scored 0.69 points lower on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 76.6 pages per hour per GPU (four NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -8180,7 +8180,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.5 9B (Sherlock) scored 0.89 points higher on the 92 benchmark pages both readers answered. It scored 0.56 points higher on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 1,105.5 pages per hour per GPU (one NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -8405,7 +8405,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.5 9B (Sherlock) tied (0.38 points higher, within 0.49 points) on the 93 benchmark pages both readers answered. It tied (0.35 points lower, within 0.49 points) on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 2,886.8 pages per hour per GPU (one 48 or 80 GB GPU, Stanford Sherlock); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -8512,7 +8512,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.5 9B (Sherlock) tied (0.41 points higher, within 0.49 points) on the 93 benchmark pages both readers answered. It tied (0.04 points lower, within 0.49 points) on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 1,063.2 pages per hour per GPU (one NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -8742,7 +8742,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.5 9B (Sherlock) scored 2.35 points higher on the 92 benchmark pages both readers answered. It scored 2.05 points higher on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 3,463.2 pages per hour per GPU (one NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -8970,7 +8970,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.5 9B (Sherlock) scored 3.05 points higher on the 93 benchmark pages both readers answered. It scored 2.15 points higher on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 1,936.7 pages per hour per GPU (one NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -9198,7 +9198,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.5 9B (Sherlock) scored 7.65 points higher on the 89 benchmark pages both readers answered. It scored 9.92 points higher on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 1,061.3 pages per hour per GPU (one 48 or 80 GB GPU, Stanford Sherlock); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -9426,7 +9426,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: qwen3.5-9b-sherlock scores higher on the 96, 95.13 answered, and reads more pages an hour, 3,898.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.5 9B (Sherlock) scored 8.44 points higher on the 92 benchmark pages both readers answered. It scored 8.57 points higher on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 202.8 pages per hour per GPU (one 48 or 80 GB GPU, Stanford Sherlock); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -9651,7 +9651,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: paddleocr-vl1.6-sherlock scores higher on the 96, 90.89 answered, and reads more pages an hour, 12,327.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: PaddleOCR-VL 1.6, native (Sherlock) scored 1.82 points higher on the 93 benchmark pages both readers answered. It scored 0.94 points higher on 95 pages with failures scored as zero. In their respective runs, PaddleOCR-VL 1.6, native (Sherlock) processed 12,327.9 pages per hour per GPU (one 48 or 80 GB GPU, Stanford Sherlock) and this reader processed 5,527.3 pages per hour per GPU (one NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -9878,7 +9878,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: paddleocr-vl1.6-sherlock scores higher on the 96, 90.89 answered, and reads more pages an hour, 12,327.9 on 1 GPU; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: PaddleOCR-VL 1.6, native (Sherlock) scored 13.24 points higher on the 93 benchmark pages both readers answered. It scored 11.81 points higher on 95 pages with failures scored as zero. In their respective runs, PaddleOCR-VL 1.6, native (Sherlock) processed 12,327.9 pages per hour per GPU (one 48 or 80 GB GPU, Stanford Sherlock) and this reader processed 8,106.9 pages per hour per GPU (one NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {

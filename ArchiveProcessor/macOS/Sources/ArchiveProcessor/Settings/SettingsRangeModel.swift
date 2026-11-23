@@ -43,6 +43,7 @@ struct SettingsRangeChart: Identifiable {
         let figures: String
         /// The public test pages' figure, where the route was run on them.
         let publicFigure: String?
+        let advancedReason: String?
         let listPrice: String
         let batchCost: String
         let time: String
@@ -272,6 +273,7 @@ extension SettingsSheetModel {
                         : words.family(r.family).replacingOccurrences(of: " (shared research computers)", with: ""),
                     figures: Self.rangeFigures(stage, r, y: b.y.map { $0 / scale }, words: words),
                     publicFigure: stage.id == "reading" ? Self.rangePublic(r, picks: s.picks, answers: a, words: words) : nil,
+                    advancedReason: advanced && r.lowerScoring ? SettingsLevels.why(r) : nil,
                     listPrice: priceText(r, b.x),
                     batchCost: priceText(r, b.x) == "no price listed" ? "its cost for this batch is not known"
                         : batch < 0.005 ? "nothing to pay for this batch" : "about \(words.money(batch)) for this batch",

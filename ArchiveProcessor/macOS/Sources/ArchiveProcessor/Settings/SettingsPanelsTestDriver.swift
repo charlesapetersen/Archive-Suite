@@ -205,7 +205,7 @@ enum SettingsPanelsTestDriver {
         check("8 every route row has a level", routes > 0 && wrong.isEmpty,
               "\(routes) rows; wrong: " + wrong.joined(separator: ", "))
         if let fm = table.stage("reading")?.route("apple-fm-27") {
-            check("8 a lower-scoring row says what scored higher", SettingsLevels.why(fm)?.hasPrefix("scored lower: Apple Vision") == true,
+            check("8 the on-device row reports the Apple Vision comparison", SettingsLevels.why(fm)?.hasPrefix("Apple Vision scored 83.1") == true,
                   SettingsLevels.why(fm) ?? "nil")
         } else {
             check("8 apple-fm-27 is a reading row", false)

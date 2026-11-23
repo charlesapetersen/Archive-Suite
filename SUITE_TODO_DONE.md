@@ -18163,3 +18163,14 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   The resumed build used two Xcode jobs and peaked at about 10 GB for the build process tree.
   Android used one worker, in-process Kotlin compilation and capped JVM heaps. No rehearsal cache was used.
   <!-- /W49.proc-fix-s021 -->
+- [x] **W46.p18-reader-comparisons — Use paired scores in Advanced reader comparisons [S]** · §Document processing review — W46 (lane: segbench,processor) (uses: light,build) — Measurement review 2026-11-22 pass 18, P18-4, baseline dbb10584. Audit the new Advanced comparator explanations from settings_routes.py against common-answer and strict results in ocr-pair-matrix.json. Four comparisons with Sherlock 9B are common-answer ties by the owner’s 0.49-point rule. Give speed, price or availability as a separate reason where measured, with hardware named. Keep owner call 15 and eligibility intact. $0, committed aggregates. SHIPPED 2026-11-23 (this commit).
+  The Advanced Reading range shows both common-answer and failure-as-zero results for 15 comparator pairs.
+  Four pairs with Sherlock Qwen3.5 9B tie on common answers, and the two Qwen3.8 27B pairs also tie
+  when failures count as zero. Hosted comparisons give benchmark prices separately. Cluster comparisons
+  state throughput per GPU on the recorded hardware. The separate Apple Vision and vendor evidence
+  comes from their respective benchmark reports. Owner call 15 still governs route eligibility.
+  The Debug build, route drift check, settings panels and sheet render checks, and focused off-screen UI test
+  passed. The solver's reader-eligibility checks passed. Its dating B1 assertion failed on the published
+  and updated route tables with identical output.
+  Used committed aggregates only. No model calls, spend or rehearsal-cache inputs.
+  <!-- /W46.p18-reader-comparisons -->
