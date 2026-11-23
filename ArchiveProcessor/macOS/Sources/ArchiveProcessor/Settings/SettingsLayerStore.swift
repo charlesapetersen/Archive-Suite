@@ -2,7 +2,8 @@ import Foundation
 
 // MARK: - Where the layers live (W46.settings-layers)
 //
-// The general layer, the projects and the money ledger are the app's own store: one JSON file in Application Support.
+// The general layer, projects and older spend estimates live in a JSON file in Application Support.
+// New paid requests use a separate SQLite journal in the same directory.
 // A collection's layer is a document inside the collection's output folder, `.archivesuite/collection-settings.json`
 // (owner call 1, 2026-11-06), and each run that wrote into the collection is one small file beside it in
 // `.archivesuite/runs/`, so the Reader, Notes and a second Mac can read what produced the collection. Its format is
@@ -13,7 +14,7 @@ import Foundation
 // could not read (an unreadable one is renamed aside, never deleted; one it could not even open, or a newer build's,
 // is left alone).
 
-/// The general layer, the projects and the ledger, in the app's own store.
+/// The general layer, projects and older spend estimates in the app's own store.
 struct GeneralSettingsFile: Codable, Equatable, Sendable {
     static let currentSchemaVersion = 1
     var schemaVersion = Self.currentSchemaVersion
@@ -537,16 +538,157 @@ final class SettingsLayerStore: ObservableObject {
         return problem
     }
 
-    /// What the ledger records for the current calendar month, which a per-month ceiling is read against.
-    func spentThisMonthUSD(now: Date = Date(), calendar: Calendar = .current) -> Double {
-        monthSpend(now: now, calendar: calendar).usd
+    private var requestJournal: PaidRequestJournal?
+    private var requestJournalProblem: String?
+
+    private func paidJournal() throws -> PaidRequestJournal {
+        if let requestJournal { return requestJournal }
+        let url = ledgerStaysInMemory ? nil : directory.appendingPathComponent("paid-requests.sqlite")
+        let journal = try PaidRequestJournal(url: url)
+        requestJournal = journal
+        return journal
     }
 
-    /// The current calendar month's ledger lines and their total.
+    private func withPaidJournal<T>(_ operation: (PaidRequestJournal) throws -> T) throws -> T {
+        do {
+            let result = try operation(paidJournal())
+            if let requestJournalProblem, lastProblem == requestJournalProblem { lastProblem = standingProblem }
+            requestJournalProblem = nil
+            return result
+        } catch is ProcessFilesMonthlySpend.ReadingDeclined {
+            throw ProcessFilesMonthlySpend.ReadingDeclined()
+        } catch {
+            requestJournalProblem = error.localizedDescription
+            if lastProblem != requestJournalProblem { lastProblem = requestJournalProblem }
+            throw error
+        }
+    }
+
+    private func legacyMonthEntries(now: Date, calendar: Calendar) -> [SettingsLedgerEntry] {
+        file.ledger.filter { calendar.isDate($0.date, equalTo: now, toGranularity: .month) && $0.usd.isFinite }
+    }
+
+    /// What the ledger records for the current calendar month, which a per-month ceiling is read against.
+    func spentThisMonthUSD(now: Date = Date(), calendar: Calendar = .current) -> Double {
+        let legacy = legacyMonthEntries(now: now, calendar: calendar).reduce(0) { $0 + max(0, $1.usd) }
+        let current = calendar.dateInterval(of: .month, for: now).flatMap { month in
+            try? paidJournal().amount(in: month)
+        }
+        return legacy + (current ?? 0)
+    }
+
+    func paidRequestsThisMonth(now: Date = Date(), calendar: Calendar = .current) -> [SettingsLedgerEntry] {
+        guard let month = calendar.dateInterval(of: .month, for: now) else { return [] }
+        return (try? paidJournal().entries(in: month)) ?? []
+    }
+
+    /// Group request attempts by run for display. The original rows stay itemized for reconciliation.
     func monthSpend(now: Date = Date(), calendar: Calendar = .current) -> SettingsMonthSpend {
-        let lines = file.ledger.filter { calendar.isDate($0.date, equalTo: now, toGranularity: .month) && $0.usd.isFinite }
+        let requests = paidRequestsThisMonth(now: now, calendar: calendar)
+        let grouped = Dictionary(grouping: requests, by: \.runID).values.compactMap { group -> SettingsLedgerEntry? in
+            guard var row = group.max(by: { $0.date < $1.date }) else { return nil }
+            row.usd = group.reduce(0) { $0 + $1.usd }
+            // Keep the least certain member's label on the summary.
+            row.request = group.first { $0.request?.basis == .unresolved && $0.request?.estimate == nil }?.request
+                ?? group.first { $0.request?.basis == .unresolved }?.request
+                ?? group.first { $0.request?.basis == .estimate }?.request
+                ?? row.request
+            return row
+        }
+        let lines = legacyMonthEntries(now: now, calendar: calendar) + grouped
         return SettingsMonthSpend(usd: lines.reduce(0) { $0 + max(0, $1.usd) },
                                   entries: lines.sorted { $0.date > $1.date })
+    }
+
+    func beginPaidRequest(_ request: PaidRequestRecord, runID: UUID, outputDirectory: URL?, limit: Double?) throws {
+        let now = Date()
+        let document: CollectionSettingsDocument?
+        if let outputDirectory, case .document(let doc) = CollectionSettingsFile.read(in: outputDirectory) {
+            document = doc
+        } else {
+            document = nil
+        }
+        let entry = SettingsLedgerEntry(date: now, usd: request.estimate ?? 0, collectionID: document?.collection.id,
+                                        runID: runID, collectionName: document?.collection.name ?? outputDirectory?.lastPathComponent,
+                                        request: request)
+        try withPaidJournal { journal in
+            try journal.transaction {
+                if let limit {
+                    let calendar = Calendar.current
+                    guard let month = calendar.dateInterval(of: .month, for: now) else {
+                        throw ProcessFilesMonthlySpend.ReadingDeclined()
+                    }
+                    let legacy = legacyMonthEntries(now: now, calendar: calendar).reduce(0) { $0 + max(0, $1.usd) }
+                    let balance = try ProcessFilesMonthlySpend.remaining(limit: limit, spent: legacy + journal.amount(in: month))
+                    guard let estimate = request.estimate, ProcessFilesMonthlySpend.fits(estimate, remaining: balance) else {
+                        throw ProcessFilesMonthlySpend.ReadingDeclined()
+                    }
+                }
+                try journal.save(entry)
+                try journal.prune(before: now.addingTimeInterval(-Double(Self.ledgerKeepDays) * 86_400))
+            }
+        }
+        objectWillChange.send()
+    }
+
+    func settlePaidRequest(id: UUID, basis: PaidRequestRecord.Basis, amount: Double?, jobID: String?) {
+        updatePaidJournal { journal in
+            guard var entry = try journal.entry(id: id) else { return }
+            if let amount = PaidRequests.nonnegative(amount) { entry.usd = amount }
+            entry.request?.basis = basis
+            entry.request?.jobID = jobID
+            try journal.save(entry)
+        }
+    }
+
+    func linkPaidBatch(attemptID: UUID, provider: LLMProvider, jobID: String, runID: UUID) throws {
+        try withPaidJournal { journal in
+            try journal.transaction {
+                guard var entry = try journal.entry(id: attemptID), let request = entry.request,
+                      request.provider == provider, entry.runID == runID,
+                      request.jobID == nil || request.jobID == jobID else {
+                    throw OCRError.networkError("The paid request record does not match the recovered batch.")
+                }
+                if request.jobID == jobID { return }
+                entry.request?.jobID = jobID
+                try journal.save(entry)
+            }
+        }
+    }
+
+    func reconcilePaidBatch(provider: LLMProvider, jobID: String, usage: [String: Double],
+                            confirmedNoCharge: Int) throws {
+        try withPaidJournal { journal in
+            try journal.transaction {
+                guard var entry = try journal.entry(provider: provider, jobID: jobID),
+                      let request = entry.request, request.basis == .unresolved,
+                      request.count > 0, confirmedNoCharge >= 0 else { return }
+                // Downloads can overlap or be incomplete. Merge the usage by provider result ID.
+                var observed = request.batchUsage ?? [:]
+                observed.merge(usage.filter { PaidRequests.nonnegative($0.value) != nil }) { old, _ in old }
+                let unbilled = max(request.batchUnbilled ?? 0, confirmedNoCharge)
+                guard observed.count <= request.count, unbilled <= request.count - observed.count else { return }
+                let remainder = request.count - observed.count - unbilled
+                let amount = observed.values.reduce(0, +) + (request.estimate ?? 0) / Double(request.count) * Double(remainder)
+                guard amount.isFinite else { return }
+                entry.usd = amount
+                entry.request?.batchUsage = observed
+                entry.request?.batchUnbilled = unbilled
+                if remainder == 0 { entry.request?.basis = observed.isEmpty ? .declined : .estimate }
+                try journal.save(entry)
+            }
+        }
+        objectWillChange.send()
+    }
+
+    private func updatePaidJournal(_ update: (PaidRequestJournal) throws -> Void) {
+        do {
+            try withPaidJournal { journal in try journal.transaction { try update(journal) } }
+            objectWillChange.send()
+        } catch {
+            // A failed reconciliation leaves the durable provisional row for a later poll or Resume.
+            NSLog("ArchiveProcessor: paid request reconciliation failed: %@", error.localizedDescription)
+        }
     }
 
     /// Lines older than this are dropped when a batch is recorded: only the current month is read, and a year back
@@ -566,18 +708,18 @@ final class SettingsLayerStore: ObservableObject {
                      now: Date = Date(), calendar: Calendar = .current) -> Bool {
         guard usd.isFinite, usd > 0 else { return false }
         if let runID {
-            let counted = file.ledger.filter { $0.runID == runID && $0.usd.isFinite }.reduce(0) { $0 + max(0, $1.usd) }
+            let counted = file.ledger.filter { $0.runID == runID && $0.request == nil && $0.usd.isFinite }.reduce(0) { $0 + max(0, $1.usd) }
             // A cent's fraction is an estimate's rounding (a resume prices with the live image scale), not new spend.
             guard usd - counted > (counted > 0 ? 0.000_5 : 0) else { return false }
             if let i = file.ledger.lastIndex(where: {
-                $0.runID == runID && calendar.isDate($0.date, equalTo: now, toGranularity: .month)
+                $0.runID == runID && $0.request == nil && calendar.isDate($0.date, equalTo: now, toGranularity: .month)
             }) {
                 file.ledger[i].usd += usd - counted
                 file.ledger[i].date = now
                 file.ledger[i].files = max(file.ledger[i].files ?? 0, files)
                 return saveLedger()
             }
-            if let prior = file.ledger.last(where: { $0.runID == runID }) {
+            if let prior = file.ledger.last(where: { $0.runID == runID && $0.request == nil }) {
                 return appendLedger(SettingsLedgerEntry(date: now, usd: usd - counted, collectionID: prior.collectionID,
                                                         runID: runID, collectionName: prior.collectionName,
                                                         files: files))
@@ -590,7 +732,7 @@ final class SettingsLayerStore: ObservableObject {
             name = d.collection.name
         }
         let cutoff = now.addingTimeInterval(-Double(Self.ledgerKeepDays) * 86_400)
-        file.ledger.removeAll { $0.date < cutoff }
+        file.ledger.removeAll { $0.date < cutoff && $0.request?.basis != .unresolved }
         return appendLedger(SettingsLedgerEntry(date: now, usd: usd, collectionID: collectionID, runID: runID,
                                                 collectionName: name, files: files))
     }

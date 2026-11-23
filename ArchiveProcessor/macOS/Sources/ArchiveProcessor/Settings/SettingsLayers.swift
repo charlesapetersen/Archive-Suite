@@ -450,10 +450,7 @@ enum MoneyHabit: String, Codable, CaseIterable, Sendable {
     case none, perBatch, perMonth, noCeiling
 }
 
-/// What a batch spent, in the general layer, so a per-month ceiling can be tracked (W46.settings-ledger). Written
-/// when a batch finishes, at the same list-price estimate the processing history shows, and for the pages it read
-/// when it ends early or a Live Capture session files (W46.settings-ledger-more); `date` is when it was last counted,
-/// which is the month it counts against. One line per run and month.
+/// An older run estimate or one paid request attempt.
 struct SettingsLedgerEntry: Codable, Equatable, Sendable {
     var date: Date
     var usd: Double
@@ -462,6 +459,15 @@ struct SettingsLedgerEntry: Codable, Equatable, Sendable {
     /// The collection's name when the batch ran, for a ledger line whose collection has since moved.
     var collectionName: String? = nil
     var files: Int? = nil
+    var request: PaidRequestRecord? = nil
+
+    var paymentNote: String? {
+        switch request?.basis {
+        case .reported, .declined: return nil
+        case .estimate, nil: return "list-price estimate"
+        case .unresolved: return request?.estimate == nil ? "amount unknown" : "estimate, awaiting confirmation"
+        }
+    }
 }
 
 /// The ledger's total for one calendar month, and the batches behind it, newest first.
@@ -469,16 +475,17 @@ struct SettingsMonthSpend: Equatable, Sendable {
     var usd: Double = 0
     var entries: [SettingsLedgerEntry] = []
     var batches: Int { entries.count }
+    private var qualifier: String { entries.contains { $0.paymentNote != nil } ? "about " : "" }
 
     /// "$12.40 by 3 batches", or "nothing yet".
     var summary: String {
         entries.isEmpty ? "nothing yet"
-            : String(format: "$%.2f", usd) + " by \(batches) \(batches == 1 ? "batch" : "batches")"
+            : qualifier + String(format: "$%.2f", usd) + " by \(batches) \(batches == 1 ? "batch" : "batches")"
     }
 
     /// "$12.40 of $20.00, from 3 batches", or "$0.00 of $20.00, no batches yet".
     func summary(of limit: Double) -> String {
-        String(format: "$%.2f of $%.2f, ", usd, limit)
+        qualifier + String(format: "$%.2f of $%.2f, ", usd, limit)
             + (entries.isEmpty ? "no batches yet" : "from \(batches) \(batches == 1 ? "batch" : "batches")")
     }
 }

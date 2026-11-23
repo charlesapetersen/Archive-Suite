@@ -13,6 +13,8 @@ enum LiveCaptureTaggingFailureTestDriver {
     private actor Gateway {
         private(set) var statuses: [Int] = []
         private(set) var macModels: [String] = []
+        private(set) var pageRequests = 0
+        private(set) var fieldRequests = 0
 
         func respond(to request: URLRequest) throws -> (Data, URLResponse) {
             guard let url = request.url,
@@ -31,6 +33,22 @@ enum LiveCaptureTaggingFailureTestDriver {
                 ])
                 return (body, HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!)
             }
+            if url.host == "gateway.test", json["model"] as? String == ItemFieldExtractor.gatewayModel {
+                fieldRequests += 1
+                let body = Data(#"{"choices":[{"message":{"content":"{\"kind\":\"report\"}"}}]}"#.utf8)
+                return (body, HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil,
+                    headerFields: ["x-litellm-response-cost": "0.001"])!)
+            }
+            if url.host == "gateway.test", messages.first?["content"] is [[String: Any]] {
+                pageRequests += 1
+                let id = pageRequests == 1 ? "CONTROL-MEMO" : "REFUSED-MEMO"
+                let body = try JSONSerialization.data(withJSONObject: [
+                    "choices": [["message": ["content": "[document_start]\n\(id)\nMemorandum dated March 1918."],
+                                 "finish_reason": "stop"]]
+                ])
+                return (body, HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil,
+                    headerFields: ["x-litellm-response-cost": "0.003"])!)
+            }
             guard let prompt = messages.first?["content"] as? String,
                   prompt.contains("You are a metadata tagging assistant"),
                   prompt.contains("CONTROL-MEMO") != prompt.contains("REFUSED-MEMO") else {
@@ -43,7 +61,8 @@ enum LiveCaptureTaggingFailureTestDriver {
             let tags = #"{"year":"1918","subject_tags":["War Department","Military Intelligence"],"format":"memo"}"#
             let bodyData = status == 500 ? error : try JSONSerialization.data(
                 withJSONObject: ["choices": [["message": ["content": tags]]]])
-            guard let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: nil) else {
+            guard let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil,
+                    headerFields: status == 200 ? ["x-litellm-response-cost": "0.002"] : nil) else {
                 throw URLError(.badServerResponse)
             }
             return (bodyData, response)
@@ -80,12 +99,19 @@ enum LiveCaptureTaggingFailureTestDriver {
               out.path == root.path + "/out" else { throw ProbeError("paths must be under one temporary root") }
 
         let gateway = Gateway()
+        GatewayConfig.testKeyOverride = "scratch-capture"
         NetworkSession.testTransport = { try await gateway.respond(to: $0) }
         defer {
             NetworkSession.testTransport = nil
+            GatewayConfig.testKeyOverride = nil
             LiveCaptureProcessor._recoveryTestOCRStub = nil
         }
         guard NetworkSession.testTransportIsActive else { throw ProbeError("no injected transport") }
+
+        // This collection is synthetic. Keep the fixture independent of the Mac's training preference.
+        var settings = CollectionSettingsDocument(name: "Scratch Capture")
+        settings.collection.set(.noTraining, .bool(false), source: .setByUser(Date()))
+        try CollectionSettingsFile.write(settings, in: out)
 
         let staging = root.appendingPathComponent("stage", isDirectory: true)
         try fm.createDirectory(at: staging, withIntermediateDirectories: true)
@@ -95,7 +121,8 @@ enum LiveCaptureTaggingFailureTestDriver {
         let macFields = env["LIVECAPTURE_MAC_ITEM_FIELDS"] == "1"
         let gatewayConfig = GatewayConfig(
             baseURL: macFields ? "http://127.0.0.1:1234/v1" : "https://gateway.test/v1",
-            modelID: "synthetic-tagger", displayName: "Synthetic gateway", localModel: macFields)
+            modelID: "synthetic-tagger", displayName: "Synthetic gateway",
+            inputCostPer1M: 1, outputCostPer1M: 2, localModel: macFields)
         let config = SessionProcessingConfig(
             provider: .gemini, model: model, thinkingLevel: .low, apiKey: "",
             taggingMode: .automatic, rotationMode: .off, mergeDocuments: false, outputDirectory: out,
@@ -115,15 +142,18 @@ enum LiveCaptureTaggingFailureTestDriver {
         let documents = macFields ? ["CONTROL-MEMO"] : ["CONTROL-MEMO", "REFUSED-MEMO"]
         var lines: [String] = []
         for (index, id) in documents.enumerated() {
-            LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(
-                text: "\(id)\nMemorandum dated March 1918.", classification: .documentStart,
-                errorMessage: nil, errorCode: nil)
+            if macFields {
+                LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(
+                    text: "\(id)\nMemorandum dated March 1918.", classification: .documentStart,
+                    errorMessage: nil, errorCode: nil)
+            }
             guard session.ingest(jpeg: jpeg, groupId: id, seq: index + 1, type: .document,
                                  quality: nil, year: 1918, month: 3, deviceName: "TestPhone") != nil,
                   session.markSegmentComplete(groupId: id, quality: nil, year: 1918, month: 3),
                   session.pendingTagGroup?.id == id, session.skipMacTags(groupId: id) else {
                 throw ProbeError("could not receive and resolve \(id)")
             }
+            if let warning = processor.trainingWarning { throw ProbeError(warning) }
             try await wait(for: "staging \(id)") {
                 guard let phase = processor.statuses.first(where: { $0.id == id })?.phase else { return false }
                 return !phase.isProcessing
@@ -147,6 +177,24 @@ enum LiveCaptureTaggingFailureTestDriver {
         }
         lines.append("Gateway responses, in order: \(requests)")
 
+        let paidBeforeFinish = SettingsLayerStore.shared.paidRequestsThisMonth()
+        if !macFields {
+            let reported = paidBeforeFinish.filter { $0.request?.basis == .reported }
+            let pageRequests = await gateway.pageRequests
+            let fieldRequests = await gateway.fieldRequests
+            let reportedUSD = reported.reduce(0) { $0 + $1.usd }
+            guard pageRequests == 2, fieldRequests == 2, paidBeforeFinish.count == 6, reported.count == 5,
+                  abs(reportedUSD - 0.010) < 1e-9,
+                  paidBeforeFinish.contains(where: { $0.request?.basis == .unresolved && $0.usd > 0 })
+            else {
+                throw ProbeError("Live Capture billing before Finish: \(pageRequests) page reads, \(fieldRequests) field reads,"
+                                 + " \(paidBeforeFinish.count) ledger entries, \(reported.count) reported at \(reportedUSD)")
+            }
+            lines.append("Live Capture recorded both page reads, both tagging attempts, and both item field calls before Finish.")
+        } else if !paidBeforeFinish.isEmpty {
+            throw ProbeError("Local model requests appeared in the paid ledger")
+        }
+
         processor.requestFinish()
         guard processor.showFinalizeSheet, processor.drafts.count == 1 else {
             throw ProbeError("Finish did not reach collection naming")
@@ -155,6 +203,9 @@ enum LiveCaptureTaggingFailureTestDriver {
         draft.finalName = "S045"
         processor.finalize([draft])
         try await wait(for: "Finish") { processor.finalizeSummary != nil }
+        guard SettingsLayerStore.shared.paidRequestsThisMonth() == paidBeforeFinish else {
+            throw ProbeError("Finish changed the paid request ledger")
+        }
         let summary = processor.finalizeSummary ?? ""
         lines.append("Finish summary: \(summary)")
         lines.append("Finish shows warning: \(LiveCaptureProcessor.summaryReportsProblem(summary))")

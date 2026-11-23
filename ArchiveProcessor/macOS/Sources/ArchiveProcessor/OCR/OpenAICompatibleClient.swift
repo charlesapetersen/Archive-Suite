@@ -20,11 +20,12 @@ struct OpenAICompatibleClient: Sendable {
     /// W41.app-local-models: a model on this Mac (`LocalModelRoute`): a lower token cap, temperature 0, a long
     /// timeout, reasoning text stripped and a looping reply failed. false for every other caller.
     var localModel = false
+    var paidGateway: GatewayConfig? = nil
 
     /// The client for the user's gateway, local or remote.
     static func gateway(_ config: GatewayConfig) -> OpenAICompatibleClient {
         OpenAICompatibleClient(baseURL: config.baseURL, apiKey: config.apiKey, modelID: config.modelID,
-                               localModel: config.isLocalModel)
+                               localModel: config.isLocalModel, paidGateway: config.isLocalModel ? nil : config)
     }
 
     private var requestTimeout: TimeInterval { localModel ? LocalModelRoute.requestTimeout : 120 }
@@ -287,7 +288,16 @@ struct OpenAICompatibleClient: Sendable {
     }
 
     private func sendRequest(body: [String: Any], timeoutInterval: TimeInterval) async throws -> (Data, URLResponse) {
-        try await NetworkSession.data(for: makeRequest(body: body, timeoutInterval: timeoutInterval), policy: .nonIdempotent)
+        let billing: PaidRequests.Billing?
+        if let paidGateway {
+            billing = await PaidRequests.gateway(paidGateway, modelID: modelID)
+        } else if let route = openRouterRoute {
+            billing = .init(provider: .openrouter, price: OpenRouterRoute.isUnpriced(route.model) ? nil : .init(model: route.model))
+        } else {
+            billing = nil
+        }
+        return try await NetworkSession.data(for: makeRequest(body: body, timeoutInterval: timeoutInterval),
+                                             policy: .nonIdempotent, billing: billing)
     }
 
     private func makeRequest(body: [String: Any], timeoutInterval: TimeInterval) throws -> URLRequest {

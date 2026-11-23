@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 /// One paid batch request. Expanded newspaper regions keep the original page's identity and previous page;
 /// without an expansion the batch clients retain their `file-N` ids and existing context cache.
@@ -47,16 +48,22 @@ struct BatchCreateRefusal: LocalizedError {
 /// Only a complete, structured rejection of the create itself establishes that no job was made.
 /// Timeouts, conflicts, server errors and unusable replies leave the pre-submit journal in place.
 private func batchCreateError(data: Data, statusCode: Int, apiKey: String) -> any Error {
-    switch statusCode {
-    case 400, 401, 402, 403, 404, 413, 415, 422, 429:
-        if let reason = batchErrorReason(data)?.trimmingCharacters(in: .whitespacesAndNewlines), !reason.isEmpty {
-            let safeReason = apiKey.isEmpty ? reason : reason.replacingOccurrences(of: apiKey, with: "[redacted]")
-            return BatchCreateRefusal(statusCode: statusCode, reason: safeReason)
-        }
-    default:
-        break
+    if let reason = definiteBatchCreateRefusal(data: data, statusCode: statusCode) {
+        let safeReason = apiKey.isEmpty ? reason : reason.replacingOccurrences(of: apiKey, with: "[redacted]")
+        return BatchCreateRefusal(statusCode: statusCode, reason: safeReason)
     }
     return OCRError.networkError(parseBatchErrorBody(data: data, statusCode: statusCode))
+}
+
+func definiteBatchCreateRefusal(data: Data, statusCode: Int) -> String? {
+    switch statusCode {
+    case 400, 401, 402, 403, 404, 413, 415, 422, 429:
+        guard let reason = batchErrorReason(data)?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !reason.isEmpty else { return nil }
+        return reason
+    default:
+        return nil
+    }
 }
 
 /// URL-encodes a value for safe interpolation into a URL query/path component (RFC 3986 unreserved).
@@ -75,6 +82,74 @@ private func makeBatchURL(_ string: String) throws -> URL {
                       userInfo: [NSLocalizedDescriptionKey: "Invalid batch request URL (check the API key and model id for stray spaces)."])
     }
     return url
+}
+
+private enum PaidBatchAccounting {
+    // The OCR endpoint prices pages, independent of image scale or text length.
+    static let mistralOCRPerPageUSD = 0.004
+
+    static func estimate(model: LLMModel, count: Int, imageScale: Double, sendPreviousImage: Bool) -> Double {
+        if model.provider == .mistral {
+            return Double(count) * mistralOCRPerPageUSD * model.batchDiscount
+        }
+        return CostEstimator.estimate(fileCount: count, model: model, enableTagging: false,
+            sendPreviousImage: sendPreviousImage, contextCharCount: 0, imageScale: imageScale).batchOcrCost
+    }
+
+    static func jobID(_ data: Data, key: String) -> String? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let id = json[key] as? String ?? (json["metadata"] as? [String: Any])?[key] as? String,
+              !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return id
+    }
+
+    // A nil payload is only used for a result the provider explicitly identifies as unbilled.
+    typealias ObserveUsage = (_ id: String, _ response: [String: Any]?) -> Void
+
+    static func successful(_ response: URLResponse) -> Bool {
+        (response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false
+    }
+
+    static func checked(_ response: URLResponse) throws {
+        guard successful(response) else {
+            throw OCRError.networkError("Could not read the provider batch status or results")
+        }
+    }
+
+    static func count(_ value: Any?) -> Int? {
+        if let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() { return nil }
+        let count = (value as? Int) ?? (value as? String).flatMap { Int($0) }
+        guard let count, count >= 0 else { return nil }
+        return count
+    }
+
+    struct Observation {
+        let model: LLMModel
+        private var pricedRequests: [String: Double] = [:]
+        private var unbilledRequests: Set<String> = []
+
+        init(model: LLMModel) { self.model = model }
+
+        mutating func add(id: String, response: [String: Any]?) {
+            guard !id.isEmpty, pricedRequests[id] == nil else { return }
+            guard let response else { unbilledRequests.insert(id); return }
+            let price = PaidRequests.Price(input: model.inputCostPer1M, output: model.outputCostPer1M,
+                imageProvider: model.provider, perPage: model.provider == .mistral ? mistralOCRPerPageUSD : nil,
+                multiplier: model.batchDiscount)
+            if let amount = price.amount(forJSON: response), amount.isFinite, amount >= 0 {
+                pricedRequests[id] = amount
+                unbilledRequests.remove(id)
+            }
+        }
+
+        func reconcile(jobID: String, confirmedNoCharge: Int) async throws {
+            let unbilled = max(confirmedNoCharge, unbilledRequests.count)
+            guard !pricedRequests.isEmpty || unbilled > 0 else { return }
+            // These endpoints report usage units. The configured list price applied to those units is an estimate.
+            try await PaidRequests.reconcileBatch(provider: model.provider, jobID: jobID,
+                usage: pricedRequests, confirmedNoCharge: unbilled)
+        }
+    }
 }
 
 // MARK: - Anthropic Batch Client
@@ -188,7 +263,10 @@ struct AnthropicBatchClient: Sendable {
         }
         request.httpBody = bodyData
 
-        let (data, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
+        let estimate = PaidBatchAccounting.estimate(model: model, count: count, imageScale: imageScale,
+            sendPreviousImage: sendPreviousImage)
+        let (data, response) = try await PaidRequests.recordBatch(request, estimate: estimate, count: count,
+            provider: .anthropic, parseID: { PaidBatchAccounting.jobID($0, key: "id") })
         guard let http = response as? HTTPURLResponse else {
             throw OCRError.networkError("No HTTP response")
         }
@@ -197,9 +275,7 @@ struct AnthropicBatchClient: Sendable {
             throw batchCreateError(data: data, statusCode: http.statusCode, apiKey: apiKey)
         }
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let batchId = json["id"] as? String,
-              !batchId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard let batchId = PaidBatchAccounting.jobID(data, key: "id") else {
             throw OCRError.networkError("No batch ID in response")
         }
 
@@ -217,6 +293,8 @@ struct AnthropicBatchClient: Sendable {
 
         var total: Int { processing + succeeded + errored + expired + canceled }
         var completed: Int { succeeded + errored + expired + canceled }
+        // Anthropic bills only batch requests that produce a Message.
+        var confirmedNoCharge: Int { isComplete ? max(0, errored) + max(0, expired) + max(0, canceled) : 0 }
     }
 
     /// Check batch processing status.
@@ -227,8 +305,14 @@ struct AnthropicBatchClient: Sendable {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
 
-        let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
-        return try Self.parseStatusBody(data)
+        let (data, response) = try await NetworkSession.data(for: request, policy: .idempotent)
+        try PaidBatchAccounting.checked(response)
+        let status = try Self.parseStatusBody(data)
+        if status.resultsURL == nil {
+            try await PaidBatchAccounting.Observation(model: model).reconcile(jobID: batchId,
+                confirmedNoCharge: status.confirmedNoCharge)
+        }
+        return status
     }
 
     /// Pure parse of a `messages/batches/{id}` status body — no network, no state, no cost. Lifted
@@ -244,17 +328,18 @@ struct AnthropicBatchClient: Sendable {
 
         return StatusResult(
             isComplete: status == "ended",
-            processing: counts["processing"] as? Int ?? 0,
-            succeeded: counts["succeeded"] as? Int ?? 0,
-            errored: counts["errored"] as? Int ?? 0,
-            expired: counts["expired"] as? Int ?? 0,
-            canceled: counts["canceled"] as? Int ?? 0,
+            processing: (counts["processing"] as? Int) ?? 0,
+            succeeded: (counts["succeeded"] as? Int) ?? 0,
+            errored: (counts["errored"] as? Int) ?? 0,
+            expired: (counts["expired"] as? Int) ?? 0,
+            canceled: (counts["canceled"] as? Int) ?? 0,
             resultsURL: json["results_url"] as? String
         )
     }
 
     /// Retrieve batch results from the results URL.
-    func retrieveResults(resultsURL: String) async throws -> [String: OCRResult] {
+    func retrieveResults(resultsURL: String, jobID: String? = nil,
+                         confirmedNoCharge: Int = 0) async throws -> [String: OCRResult] {
         guard let url = URL(string: resultsURL) else {
             throw OCRError.networkError("Invalid results URL")
         }
@@ -264,14 +349,24 @@ struct AnthropicBatchClient: Sendable {
         request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
 
-        let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
-        return Self.parseResultsJSONL(String(data: data, encoding: .utf8) ?? "")
+        let (data, response) = try await NetworkSession.data(for: request, policy: .idempotent)
+        try PaidBatchAccounting.checked(response)
+        let text = String(data: data, encoding: .utf8) ?? ""
+        guard let jobID else { return Self.parseResultsJSONL(text) }
+        var usage = PaidBatchAccounting.Observation(model: model)
+        let results = Self.parseResultsJSONL(text, observe: { usage.add(id: $0, response: $1) })
+        try await usage.reconcile(jobID: jobID, confirmedNoCharge: confirmedNoCharge)
+        return results
     }
 
     /// Pure parse of the results JSONL body (one `{custom_id, result}` object per line) — no network,
     /// no cost. Lifted verbatim out of `retrieveResults`; a line the parser cannot read is a page of
     /// *paid* OCR silently missing from the run, so the shape is pinned headlessly.
     static func parseResultsJSONL(_ text: String) -> [String: OCRResult] {
+        parseResultsJSONL(text, observe: nil)
+    }
+
+    private static func parseResultsJSONL(_ text: String, observe: PaidBatchAccounting.ObserveUsage?) -> [String: OCRResult] {
         var results: [String: OCRResult] = [:]
 
         for line in text.components(separatedBy: .newlines) where !line.isEmpty {
@@ -281,6 +376,11 @@ struct AnthropicBatchClient: Sendable {
 
             let resultObj = json["result"] as? [String: Any] ?? [:]
             let resultType = resultObj["type"] as? String
+            if resultType == "succeeded", let message = resultObj["message"] as? [String: Any] {
+                observe?(customId, message)
+            } else if resultType == "canceled" || resultType == "expired" || resultType == "errored" {
+                observe?(customId, nil)
+            }
 
             if resultType == "succeeded",
                let message = resultObj["message"] as? [String: Any],
@@ -332,7 +432,20 @@ struct AnthropicBatchClient: Sendable {
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         do {
             let (_, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
-            return (response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false
+            return PaidBatchAccounting.successful(response)
+        } catch { return false }
+    }
+
+    /// A cancellation acknowledgement alone leaves requests in flight.
+    func confirmCancellation(batchId: String) async -> Bool {
+        do {
+            let status = try await checkStatus(batchId: batchId)
+            guard status.isComplete else { return false }
+            if let url = status.resultsURL {
+                _ = try await retrieveResults(resultsURL: url, jobID: batchId,
+                    confirmedNoCharge: status.confirmedNoCharge)
+            }
+            return true
         } catch { return false }
     }
 }
@@ -432,12 +545,14 @@ struct GeminiBatchClient: Sendable {
 
         if totalSize < Self.inlineMaxBytes {
             // Small batch — use inline requests
-            let batchName = try await submitInlineBatch(jsonlLines: jsonlLines)
+            let batchName = try await submitInlineBatch(jsonlLines: jsonlLines,
+                imageScale: imageScale, sendPreviousImage: sendPreviousImage)
             try await onJobCreated?(batchName)
             return batchName
         } else if totalSize < Self.fileMaxBytes {
             // Medium batch — single file upload
-            let batchName = try await submitFileBatch(jsonlLines: jsonlLines)
+            let batchName = try await submitFileBatch(jsonlLines: jsonlLines,
+                imageScale: imageScale, sendPreviousImage: sendPreviousImage)
             try await onJobCreated?(batchName)
             return batchName
         } else {
@@ -462,7 +577,8 @@ struct GeminiBatchClient: Sendable {
 
             var batchNames: [String] = []
             for chunk in chunks {
-                let name = try await submitFileBatch(jsonlLines: chunk)
+                let name = try await submitFileBatch(jsonlLines: chunk,
+                    imageScale: imageScale, sendPreviousImage: sendPreviousImage)
                 try await onJobCreated?(name)
                 batchNames.append(name)
             }
@@ -471,7 +587,7 @@ struct GeminiBatchClient: Sendable {
     }
 
     /// Submit a batch using inline requests (for small batches under 20MB).
-    private func submitInlineBatch(jsonlLines: [String]) async throws -> String {
+    private func submitInlineBatch(jsonlLines: [String], imageScale: Double, sendPreviousImage: Bool) async throws -> String {
         // Parse JSONL lines back into request objects for inline format
         var inlinedRequests: [[String: Any]] = []
         for line in jsonlLines {
@@ -495,11 +611,12 @@ struct GeminiBatchClient: Sendable {
             ] as [String: Any]
         ]
 
-        return try await createBatchJob(body: batchBody)
+        return try await createBatchJob(body: batchBody, count: inlinedRequests.count,
+            imageScale: imageScale, sendPreviousImage: sendPreviousImage)
     }
 
     /// Submit a batch using file upload (for batches over 20MB).
-    private func submitFileBatch(jsonlLines: [String]) async throws -> String {
+    private func submitFileBatch(jsonlLines: [String], imageScale: Double, sendPreviousImage: Bool) async throws -> String {
         let jsonlContent = jsonlLines.joined(separator: "\n")
         guard let jsonlData = jsonlContent.data(using: .utf8) else {
             throw OCRError.networkError("Failed to create batch data")
@@ -516,18 +633,23 @@ struct GeminiBatchClient: Sendable {
             ] as [String: Any]
         ]
 
-        return try await createBatchJob(body: batchBody)
+        return try await createBatchJob(body: batchBody, count: jsonlLines.count,
+            imageScale: imageScale, sendPreviousImage: sendPreviousImage)
     }
 
     /// Create a batch job with the given request body. Returns the batch name.
-    private func createBatchJob(body: [String: Any]) async throws -> String {
+    private func createBatchJob(body: [String: Any], count: Int, imageScale: Double,
+                                sendPreviousImage: Bool) async throws -> String {
         let createURL = try makeBatchURL("\(baseURL)/models/\(urlComponentEncoded(model.id)):batchGenerateContent?key=\(urlComponentEncoded(apiKey))")
         var request = URLRequest(url: createURL, timeoutInterval: 120)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
+        let estimate = PaidBatchAccounting.estimate(model: model, count: count, imageScale: imageScale,
+            sendPreviousImage: sendPreviousImage)
+        let (data, response) = try await PaidRequests.recordBatch(request, estimate: estimate, count: count,
+            provider: .gemini, parseID: { PaidBatchAccounting.jobID($0, key: "name") })
         guard let http = response as? HTTPURLResponse else {
             throw OCRError.networkError("No HTTP response")
         }
@@ -536,14 +658,7 @@ struct GeminiBatchClient: Sendable {
             throw batchCreateError(data: data, statusCode: http.statusCode, apiKey: apiKey)
         }
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw OCRError.networkError("No batch name in response")
-        }
-
-        let metadata = json["metadata"] as? [String: Any]
-        guard let batchName = json["name"] as? String
-                ?? metadata?["name"] as? String,
-              !batchName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard let batchName = PaidBatchAccounting.jobID(data, key: "name") else {
             throw OCRError.networkError("No batch name in response")
         }
 
@@ -602,6 +717,7 @@ struct GeminiBatchClient: Sendable {
         let inlineResults: [String: OCRResult]?
         /// Result file for download-based retrieval (fallback).
         let resultFileName: String?
+        let confirmedNoCharge: Int
     }
 
     /// Where a finished chunk's pages are actually readable from.
@@ -674,8 +790,14 @@ struct GeminiBatchClient: Sendable {
         var request = URLRequest(url: statusURL, timeoutInterval: 30)
         request.httpMethod = "GET"
 
-        let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
-        return try Self.parseStatusBody(data)
+        let (data, response) = try await NetworkSession.data(for: request, policy: .idempotent)
+        try PaidBatchAccounting.checked(response)
+        var usage = PaidBatchAccounting.Observation(model: model)
+        let status = try Self.parseStatusBody(data, observe: { usage.add(id: $0, response: $1) })
+        // The result-file read combines its usage with the same terminal counters.
+        if case .file = Self.resultsSource(for: status) { return status }
+        try await usage.reconcile(jobID: batchName, confirmedNoCharge: status.confirmedNoCharge)
+        return status
     }
 
     /// Pure parse of a `batches/{name}` status body — no network, no state, no cost. Lifted verbatim
@@ -684,6 +806,10 @@ struct GeminiBatchClient: Sendable {
     /// **six** accepted spellings. Nothing else pins them, and getting one wrong reads a *finished,
     /// paid* batch as unfinished or empty — hence the headless contract driver.
     static func parseStatusBody(_ data: Data) throws -> StatusResult {
+        try parseStatusBody(data, observe: nil)
+    }
+
+    private static func parseStatusBody(_ data: Data, observe: PaidBatchAccounting.ObserveUsage?) throws -> StatusResult {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw OCRError.networkError("Malformed status response")
         }
@@ -712,7 +838,7 @@ struct GeminiBatchClient: Sendable {
                 ?? metaOutput?["inlinedResponses"] as? [String: Any]
 
             if let responses = inlinedContainer?["inlinedResponses"] as? [[String: Any]] {
-                inlineResults = Self.parseInlinedResponses(responses)
+                inlineResults = Self.parseInlinedResponses(responses, observe: observe)
             }
         }
 
@@ -731,8 +857,21 @@ struct GeminiBatchClient: Sendable {
             isComplete: isComplete,
             state: state,
             inlineResults: inlineResults,
-            resultFileName: resultFileName
+            resultFileName: resultFileName,
+            confirmedNoCharge: Self.unprocessedAfterCancellation(state: state,
+                stats: (metadata?["batchStats"] ?? json["batchStats"]) as? [String: Any])
         )
+    }
+
+    private static func unprocessedAfterCancellation(state: String, stats: [String: Any]?) -> Int {
+        // Missing replies or failed requests alone cannot establish that the provider did no work.
+        guard state.hasSuffix("_CANCELLED"),
+              let total = PaidBatchAccounting.count(stats?["requestCount"]),
+              let pending = PaidBatchAccounting.count(stats?["pendingRequestCount"]), pending <= total,
+              let succeeded = PaidBatchAccounting.count(stats?["successfulRequestCount"]), succeeded <= total - pending,
+              let failed = PaidBatchAccounting.count(stats?["failedRequestCount"]),
+              failed == total - pending - succeeded else { return 0 }
+        return pending
     }
 
     /// Parse inline batch responses into OCRResult dictionary.
@@ -740,6 +879,11 @@ struct GeminiBatchClient: Sendable {
     ///
     /// Internal (not `private`) so the headless contract driver can reach it directly.
     static func parseInlinedResponses(_ responses: [[String: Any]]) -> [String: OCRResult] {
+        parseInlinedResponses(responses, observe: nil)
+    }
+
+    private static func parseInlinedResponses(_ responses: [[String: Any]],
+                                              observe: PaidBatchAccounting.ObserveUsage?) -> [String: OCRResult] {
         var results: [String: OCRResult] = [:]
 
         for entry in responses {
@@ -761,6 +905,7 @@ struct GeminiBatchClient: Sendable {
                 continue
             }
 
+            observe?(normalizedKey, response)
             results[normalizedKey] = parseSingleResponse(response)
         }
 
@@ -808,15 +953,22 @@ struct GeminiBatchClient: Sendable {
     }
 
     /// Retrieve results from a batch output file (fallback if results aren't inlined).
-    func retrieveResults(resultFileName: String) async throws -> [String: OCRResult] {
+    func retrieveResults(resultFileName: String, jobID: String? = nil,
+                         confirmedNoCharge: Int = 0) async throws -> [String: OCRResult] {
         let downloadBase = "https://generativelanguage.googleapis.com/download/v1beta"
         let downloadURL = try makeBatchURL("\(downloadBase)/\(resultFileName):download?alt=media&key=\(urlComponentEncoded(apiKey))")
 
         var request = URLRequest(url: downloadURL, timeoutInterval: 120)
         request.httpMethod = "GET"
 
-        let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
-        return Self.parseResultsJSONL(String(data: data, encoding: .utf8) ?? "")
+        let (data, response) = try await NetworkSession.data(for: request, policy: .idempotent)
+        try PaidBatchAccounting.checked(response)
+        let text = String(data: data, encoding: .utf8) ?? ""
+        guard let jobID else { return Self.parseResultsJSONL(text) }
+        var usage = PaidBatchAccounting.Observation(model: model)
+        let results = Self.parseResultsJSONL(text, observe: { usage.add(id: $0, response: $1) })
+        try await usage.reconcile(jobID: jobID, confirmedNoCharge: confirmedNoCharge)
+        return results
     }
 
     /// Pure parse of a downloaded batch output file (one `{key, response}` object per line) — no
@@ -824,6 +976,10 @@ struct GeminiBatchClient: Sendable {
     /// when the status response did *not* inline the results, so it is the only way those paid pages
     /// ever reach the run.
     static func parseResultsJSONL(_ text: String) -> [String: OCRResult] {
+        parseResultsJSONL(text, observe: nil)
+    }
+
+    private static func parseResultsJSONL(_ text: String, observe: PaidBatchAccounting.ObserveUsage?) -> [String: OCRResult] {
         var results: [String: OCRResult] = [:]
 
         for line in text.components(separatedBy: .newlines) where !line.isEmpty {
@@ -842,6 +998,7 @@ struct GeminiBatchClient: Sendable {
             }
 
             let response = json["response"] as? [String: Any] ?? json
+            observe?(normalizedKey, response)
             results[normalizedKey] = Self.parseSingleResponse(response)
         }
 
@@ -855,7 +1012,20 @@ struct GeminiBatchClient: Sendable {
         request.httpMethod = "POST"
         do {
             let (_, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
-            return (response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false
+            return PaidBatchAccounting.successful(response)
+        } catch { return false }
+    }
+
+    /// A cancellation acknowledgement alone leaves requests in flight.
+    func confirmCancellation(batchName: String) async -> Bool {
+        do {
+            let status = try await checkStatus(batchName: batchName)
+            guard status.isComplete else { return false }
+            if case .file(let name) = Self.resultsSource(for: status) {
+                _ = try await retrieveResults(resultFileName: name, jobID: batchName,
+                    confirmedNoCharge: status.confirmedNoCharge)
+            }
+            return true
         } catch { return false }
     }
 }
@@ -925,7 +1095,11 @@ struct MistralBatchClient: Sendable {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
+        let count = jsonlLines.count
+        let estimate = PaidBatchAccounting.estimate(model: model, count: count, imageScale: imageScale,
+            sendPreviousImage: false)
+        let (data, response) = try await PaidRequests.recordBatch(request, estimate: estimate, count: count,
+            provider: .mistral, parseID: { PaidBatchAccounting.jobID($0, key: "id") })
         guard let http = response as? HTTPURLResponse else {
             throw OCRError.networkError("No HTTP response")
         }
@@ -934,9 +1108,7 @@ struct MistralBatchClient: Sendable {
             throw batchCreateError(data: data, statusCode: http.statusCode, apiKey: apiKey)
         }
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let batchId = json["id"] as? String,
-              !batchId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard let batchId = PaidBatchAccounting.jobID(data, key: "id") else {
             throw OCRError.networkError("No batch ID in response")
         }
 
@@ -979,6 +1151,9 @@ struct MistralBatchClient: Sendable {
         let succeededRequests: Int
         let failedRequests: Int
         let outputFileId: String?
+        let confirmedNoCharge: Int
+
+        var isTerminal: Bool { isComplete && status != "CANCELLATION_REQUESTED" }
     }
 
     /// Check batch job status.
@@ -988,8 +1163,14 @@ struct MistralBatchClient: Sendable {
         request.httpMethod = "GET"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
-        let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
-        return try Self.parseStatusBody(data)
+        let (data, response) = try await NetworkSession.data(for: request, policy: .idempotent)
+        try PaidBatchAccounting.checked(response)
+        let status = try Self.parseStatusBody(data)
+        if status.outputFileId == nil {
+            try await PaidBatchAccounting.Observation(model: model).reconcile(jobID: batchId,
+                confirmedNoCharge: status.confirmedNoCharge)
+        }
+        return status
     }
 
     /// Pure parse of a `batch/jobs/{id}` status body — no network, no state, no cost. Lifted verbatim
@@ -1003,32 +1184,54 @@ struct MistralBatchClient: Sendable {
         let status = json["status"] as? String ?? ""
         let isComplete = ["SUCCESS", "FAILED", "TIMEOUT_EXCEEDED", "CANCELLATION_REQUESTED", "CANCELLED"].contains(status)
 
+        let total = PaidBatchAccounting.count(json["total_requests"])
+        let completed = PaidBatchAccounting.count(json["completed_requests"])
+        let succeeded = PaidBatchAccounting.count(json["succeeded_requests"])
+        let failed = PaidBatchAccounting.count(json["failed_requests"])
+        var unprocessed = 0
+        if status == "CANCELLED", let total, let completed, let succeeded, let failed,
+           completed <= total, succeeded <= completed, failed == completed - succeeded {
+            unprocessed = total - completed
+        }
+
         return StatusResult(
             isComplete: isComplete,
             status: status,
-            totalRequests: json["total_requests"] as? Int ?? 0,
-            completedRequests: json["completed_requests"] as? Int ?? 0,
-            succeededRequests: json["succeeded_requests"] as? Int ?? 0,
-            failedRequests: json["failed_requests"] as? Int ?? 0,
-            outputFileId: json["output_file"] as? String
+            totalRequests: total ?? 0,
+            completedRequests: completed ?? 0,
+            succeededRequests: succeeded ?? 0,
+            failedRequests: failed ?? 0,
+            outputFileId: json["output_file"] as? String,
+            confirmedNoCharge: unprocessed
         )
     }
 
     /// Retrieve results from the batch output file.
-    func retrieveResults(outputFileId: String) async throws -> [String: OCRResult] {
+    func retrieveResults(outputFileId: String, jobID: String? = nil,
+                         confirmedNoCharge: Int = 0) async throws -> [String: OCRResult] {
         let reqURL = try makeBatchURL("\(filesURL)/\(outputFileId)/content")
         var request = URLRequest(url: reqURL, timeoutInterval: 120)
         request.httpMethod = "GET"
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
-        let (data, _) = try await NetworkSession.data(for: request, policy: .idempotent)
-        return Self.parseResultsJSONL(String(data: data, encoding: .utf8) ?? "")
+        let (data, response) = try await NetworkSession.data(for: request, policy: .idempotent)
+        try PaidBatchAccounting.checked(response)
+        let text = String(data: data, encoding: .utf8) ?? ""
+        guard let jobID else { return Self.parseResultsJSONL(text) }
+        var usage = PaidBatchAccounting.Observation(model: model)
+        let results = Self.parseResultsJSONL(text, observe: { usage.add(id: $0, response: $1) })
+        try await usage.reconcile(jobID: jobID, confirmedNoCharge: confirmedNoCharge)
+        return results
     }
 
     /// Pure parse of the batch output file (one `{custom_id, response}` object per line) — no network,
     /// no cost. Lifted verbatim out of `retrieveResults`; Mistral's OCR body carries `pages[].markdown`
     /// (with a `text` fallback), and a shape change there is a page of *paid* OCR read as empty.
     static func parseResultsJSONL(_ text: String) -> [String: OCRResult] {
+        parseResultsJSONL(text, observe: nil)
+    }
+
+    private static func parseResultsJSONL(_ text: String, observe: PaidBatchAccounting.ObserveUsage?) -> [String: OCRResult] {
         var results: [String: OCRResult] = [:]
 
         for line in text.components(separatedBy: .newlines) where !line.isEmpty {
@@ -1041,6 +1244,7 @@ struct MistralBatchClient: Sendable {
             let body = response?["body"] as? [String: Any]
 
             if statusCode == 200 {
+                if let body { observe?(customId, body) }
                 var ocrText: String? = nil
                 if let pages = body?["pages"] as? [[String: Any]] {
                     let pageText = pages.compactMap { $0["markdown"] as? String }.joined(separator: "\n\n")
@@ -1069,7 +1273,20 @@ struct MistralBatchClient: Sendable {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         do {
             let (_, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent)
-            return (response as? HTTPURLResponse).map { (200..<300).contains($0.statusCode) } ?? false
+            return PaidBatchAccounting.successful(response)
+        } catch { return false }
+    }
+
+    /// A cancellation acknowledgement alone leaves requests in flight.
+    func confirmCancellation(batchId: String) async -> Bool {
+        do {
+            let status = try await checkStatus(batchId: batchId)
+            guard status.isTerminal else { return false }
+            if let fileId = status.outputFileId {
+                _ = try await retrieveResults(outputFileId: fileId, jobID: batchId,
+                    confirmedNoCharge: status.confirmedNoCharge)
+            }
+            return true
         } catch { return false }
     }
 }

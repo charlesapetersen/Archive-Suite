@@ -18139,3 +18139,16 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   recovery, 314 OCR prompt and 59 smoke-harness checks passed. Estimated Gemini spend was below
   $0.05. No rehearsal cache inputs were created.
   <!-- /W49.proc-fix-s039 -->
+- [x] **W49.proc-ledger-track-paid — Track paid requests as they happen [M · Tier-2]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build,vm) — Owner call 34 (2026-11-22). Record and reconcile paid work as it is admitted and reported in Process Files and Live Capture. Cover retries, extra readers, interrupted runs, confirmed cancellation after partial completion and ambiguous provider batch outcomes. Prevent double-counting on Resume, use provider usage where available, and label uncertain or list-price amounts as estimates. Verify interrupted and concurrent runs with scratch providers. SHIPPED 2026-11-23 (this commit).
+  Processor saves each provisional charge before transport and reconciles it from the response.
+  Monthly admission and its reservation are one database transaction. Provider batch usage is
+  matched to the job and result IDs, so polling and Resume can update amounts without duplicating
+  charges. An ambiguous create remains visible as an estimate. Live Capture counts its reads and
+  tagging attempts before Finish. Legacy run estimates remain readable and labeled.
+  Verification used synthetic providers at $0. The 16 transport and ledger checks, 410 batch
+  recovery checks, newspaper retry checks, CLI fixture, settings sheet and 314 OCR prompt checks
+  passed. Three off-screen tests verified the monthly limit, second-reader admission and Resume.
+  Live Capture recorded six requests before Finish and filed both documents without adding charges.
+  Three existing display-catalog assertions are red in the broader settings test on the baseline
+  source. No rehearsal cache inputs were created.
+  <!-- /W49.proc-ledger-track-paid -->

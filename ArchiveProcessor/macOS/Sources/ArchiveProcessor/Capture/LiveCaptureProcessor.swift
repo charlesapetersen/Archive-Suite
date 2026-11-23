@@ -525,6 +525,11 @@ final class LiveCaptureProcessor: ObservableObject {
     /// files it. In memory only: a marker filed after a relaunch is counted at the per-label estimate when its fields
     /// carry the gateway's reading (`labelCharge`).
     private var labelCharges: [String: Double] = [:]
+    private var paidRequestRunID = UUID()
+
+    private func paidRequests(_ config: SessionProcessingConfig) -> PaidRequests {
+        PaidRequests(runID: paidRequestRunID, outputDirectory: config.outputDirectory)
+    }
     /// Everything `writeSegmentFiles` needs, retained per finalized segment so the end-of-session
     /// rotation review can regenerate a segment's staged PDF/JPG with corrected rotation. In-memory
     /// for the current run only (rotation review is a same-session step, before finalization).
@@ -1187,7 +1192,8 @@ final class LiveCaptureProcessor: ObservableObject {
                 rotationMode: config.rotationMode, standardImageMB: config.standardImageMB,
                 visionSettings: config.visionSettings, cascade: config.cascade,
                 refusalRoutes: approvedRefusalRoutes, visionTextLLM: config.visionTextLLM,
-                scanDetector: NewspaperDetector.scans(liveSettings(config)), denyDataCollection: noTraining)
+                scanDetector: NewspaperDetector.scans(liveSettings(config)), denyDataCollection: noTraining,
+                paidRequests: paidRequests(config))
         }
 
         let pageCount = session.groups.first(where: { $0.id == photo.groupId })?.photos.count ?? 1
@@ -1322,7 +1328,7 @@ final class LiveCaptureProcessor: ObservableObject {
               !finalizedGroups.contains(groupId),
               let group = session.groups.first(where: { $0.id == groupId }),
               canProcessUnderTrainingPolicy(config) else { return }
-        await OpenRouterDataPolicy.$denyDataCollection.withValue(noTraining) {
+        await paidRequests(config).run(denyDataCollection: noTraining) {
             await finalizeSegment(groupId: groupId, config: config, stagingDir: stagingDir, group: group)
         }
     }
@@ -1369,12 +1375,7 @@ final class LiveCaptureProcessor: ObservableObject {
             let r = await ContainerLabelCapture.readLabel(type: itemType, text: texts.first ?? "", photo: photo.url,
                                                           rotation: results.first?.rotationDegrees ?? 0,
                                                           gateway: config.textGateway)
-            // W47.ct-label-cost: the call's charge, counted with the marker's pages when finalize files it (a group
-            // read again adds its second call); a session cleared during the read has it in the ledger at once.
-            if r.gatewayCalled {
-                if clearGeneration == startedGeneration { labelCharges[groupId, default: 0] += r.dollars }
-                else { recordUnfiledLabelSpend(r.dollars, calls: 1) }
-            }
+            if r.gatewayCalled, clearGeneration == startedGeneration { labelCharges[groupId, default: 0] += r.dollars }
             guard clearGeneration == startedGeneration else { return }
             containerRead = (r.fields, r.fallback)
         }
@@ -2164,19 +2165,21 @@ final class LiveCaptureProcessor: ObservableObject {
         localAgent: LocalAgentConfig?, rotationMode: RotationMode, standardImageMB: Double,
         visionSettings: VisionOCRSettings, cascade: OCRCascade, refusalRoutes: [OCRRefusalFallback.Route]?,
         visionTextLLM: LLMTextConfiguration?,
-        scanDetector: NewspaperDetector, denyDataCollection: Bool
+        scanDetector: NewspaperDetector, denyDataCollection: Bool, paidRequests: PaidRequests
     ) -> Task<OCRResult, Never> {
         Task.detached(priority: .userInitiated) {
-            await OpenRouterDataPolicy.$denyDataCollection.withValue(denyDataCollection) {
-                let ocrResult = await OCRProcessor.performOCRCall(
-                    imageURL: imageURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
-                    apiKey: apiKey, previousText: nil, previousImageURL: nil,
-                    customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway,
-                    localAgent: localAgent, rotationMode: rotationMode, standardImageMB: standardImageMB,
-                    visionSettings: visionSettings, cascade: cascade, refusalRoutes: refusalRoutes, scanDetector: scanDetector)
-                return await OCRProcessor.applyingVisionTextClassification(
-                    to: ocrResult, previousText: nil, customPrompt: customPrompt,
-                    configuration: provider == .appleVision ? visionTextLLM : nil)
+            await PaidRequests.$context.withValue(paidRequests) {
+                await OpenRouterDataPolicy.$denyDataCollection.withValue(denyDataCollection) {
+                    let ocrResult = await OCRProcessor.performOCRCall(
+                        imageURL: imageURL, provider: provider, model: model, thinkingLevel: thinkingLevel,
+                        apiKey: apiKey, previousText: nil, previousImageURL: nil,
+                        customPrompt: customPrompt, imageScale: imageScale, gatewayConfig: gateway,
+                        localAgent: localAgent, rotationMode: rotationMode, standardImageMB: standardImageMB,
+                        visionSettings: visionSettings, cascade: cascade, refusalRoutes: refusalRoutes, scanDetector: scanDetector)
+                    return await OCRProcessor.applyingVisionTextClassification(
+                        to: ocrResult, previousText: nil, customPrompt: customPrompt,
+                        configuration: provider == .appleVision ? visionTextLLM : nil)
+                }
             }
         }
     }
@@ -2563,13 +2566,17 @@ final class LiveCaptureProcessor: ObservableObject {
         })
         let datingGateway = DateRoute.measuredRoute(gateway: config?.textGateway, usesLocalAgent: config?.textLocalAgent != nil)
             ? config?.textGateway : nil
+        let paid = config.map { paidRequests($0) }
         isFinalizing = true
         Task { [weak self] in
             guard let self else { return }
             var writeInputs = segsToRegen
             if let gateway = datingGateway {
                 for i in writeInputs.indices where refreshGroups.contains(writeInputs[i].groupId) {
-                    writeInputs[i] = await self.refreshRotationDating(writeInputs[i], gateway: gateway)
+                    let input = writeInputs[i]
+                    writeInputs[i] = await PaidRequests.$context.withValue(paid) {
+                        await self.refreshRotationDating(input, gateway: gateway)
+                    }
                 }
             }
             // A request can take time. Recheck the sources before replacing existing staged output.
@@ -2687,10 +2694,8 @@ final class LiveCaptureProcessor: ObservableObject {
         // Two drafts may file into one existing folder: one record per folder, counting every filed document in it.
         var order: [URL] = []
         var counts: [String: Int] = [:]
-        var pages: [String: Int] = [:]
         var layerNotes: [String: [String]] = [:]
         var unreadImageOnlyPages: [String: Int] = [:]
-        var labels: [String: Double] = [:]
         var labelCalls = 0
         var labelDollars = 0.0
         for plan in plans {
@@ -2698,14 +2703,10 @@ final class LiveCaptureProcessor: ObservableObject {
             if counts[key] == nil { order.append(plan.folder) }
             let filedSegments = plan.segments.filter { filed.contains($0.groupId) }
             counts[key, default: 0] += filedSegments.count
-            pages[key, default: 0] += filedSegments.reduce(0) {
-                $0 + max(retained[$1.groupId]?.pages.count ?? 0, max($1.imageURLs.count, $1.pdfURLs.count))
-            }
             for seg in filedSegments {
                 if let notes = seg.pdfLayerLogNotes { layerNotes[key, default: []].append(contentsOf: notes) }
                 unreadImageOnlyPages[key, default: 0] += seg.unreadImageOnlyPageCount ?? 0
                 guard let usd = labelCharge(seg.groupId) else { continue }
-                labels[key, default: 0] += usd
                 labelCalls += 1
                 labelDollars += usd
                 labelCharges[seg.groupId] = nil
@@ -2723,23 +2724,8 @@ final class LiveCaptureProcessor: ObservableObject {
             }
             store.record(snapshot, kind: "liveCapture", fileCount: count, in: folder,
                          pdfLayerLogNotes: notes.isEmpty ? nil : notes)
-            // The month's ledger (W46.settings-ledger-more): the pages filed here, priced as Process Files prices a
-            // run of them. Filed pages only, so a finalize retried after a failure counts each page once.
-            // The markers' label calls are added to the folder's pages (W47.ct-label-cost).
-            if let config, let filedPages = pages[folder.standardizedFileURL.path] {
-                store.recordSpend(usd: Self.estimatedSpend(config, pages: filedPages, namesSettings: liveSettings(config))
-                                      + (labels[folder.standardizedFileURL.path] ?? 0),
-                                  runID: snapshot.runID, outputDirectory: folder, files: count)
-            }
         }
         return ContainerLabelCapture.spendNote(calls: labelCalls, dollars: labelDollars)
-    }
-
-    /// Label calls of markers the session never filed (cleared, or discarded before a Clear) were paid for all the
-    /// same: the month's ledger gets them on a line of their own (W47.ct-label-cost).
-    private func recordUnfiledLabelSpend(_ usd: Double, calls: Int) {
-        SettingsLayerStore.shared.recordSpend(usd: usd, runID: UUID(), outputDirectory: currentOutputDirectory,
-                                              files: calls)
     }
 
     /// A filed marker's label call through the gateway, nil when it made none: its counted charge, or after a relaunch
@@ -2749,28 +2735,6 @@ final class LiveCaptureProcessor: ObservableObject {
         guard let fields = session.containerFields[groupId],
               fields.values.values.contains(where: { $0.reader == ContainerLabelCapture.gatewayReader }) else { return nil }
         return ContainerLabelCapture.gatewayDollarsPerLabel
-    }
-
-    /// The list-price estimate for `pages` pages read with the session's settings, by the same math as the
-    /// processing history (a Local Agent session costs nothing; Apple Vision alone costs nothing).
-    private static func estimatedSpend(_ config: SessionProcessingConfig, pages: Int,
-                                       namesSettings: [String: ResolvedSetting]) -> Double {
-        guard pages > 0 else { return 0 }
-        var snapshot = RunHistorySnapshot(
-            startedAt: Date(), provider: config.provider, gatewayConfig: config.gateway, localAgent: config.localAgent,
-            imageTokenProvider: config.gateway != nil ? OCRProcessor.gatewayUpstreamProviderFromDefaults() : nil,
-            model: config.model, visionTextProvider: config.visionTextLLM?.provider,
-            visionTextModel: config.visionTextLLM?.model, batchMode: false,
-            enableTagging: config.taggingMode.llmTags, enableCollectionSegmentation: false, preOCRedInput: false,
-            reOCRMultiPagePDF: false, mixedReOCR: false, sendPreviousImage: false, contextCharCount: 0,
-            imageScale: config.imageScale, rotationMode: config.rotationMode, fileCount: pages
-        )
-        // The dating and item-field terms (W49.proc-fix-s041), with the switches `liveDating` and `liveItemFields` read.
-        snapshot.sidecars = true   // document fields and eligible names also feed the catalogue
-        let settings = SettingsLayerStore.shared.resolver(at: config.outputDirectory)
-        snapshot.dateImageEveryDocument = DateRoute.imageEveryDocument(settings)
-        snapshot.setNamesEstimate(taggingMode: config.taggingMode) { namesSettings[$0.rawValue]?.value }
-        return snapshot.estimatedCost
     }
 
     func beginFinalize() {
@@ -3167,8 +3131,8 @@ final class LiveCaptureProcessor: ObservableObject {
         retained.removeAll()
         groupCollectionKey.removeAll()
         groupRotationOverride.removeAll()
-        recordUnfiledLabelSpend(labelCharges.values.reduce(0, +), calls: labelCharges.count)   // W47.ct-label-cost
         labelCharges.removeAll()
+        paidRequestRunID = UUID()
         pageTasks.removeAll()
         rotationReviewPages.removeAll()
         currentCollectionKey = "__unfiled__"

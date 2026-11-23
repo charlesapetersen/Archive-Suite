@@ -199,7 +199,9 @@ enum LLMRotationDetector {
             "messages": [["role": "user", "content": chatContent(images)]]
         ]
         guard let url = URL(string: "\(GatewayConfig.normalizedBaseURL(gateway.baseURL))/chat/completions") else { return nil }
-        return await chatLetter(url: url, body: body, apiKey: gateway.apiKey)
+        let billing = await PaidRequests.gateway(gateway, modelID: gatewayModel,
+                                                  fallback: CostEstimator.gemini37RotationCallCost)
+        return await chatLetter(url: url, body: body, apiKey: gateway.apiKey, billing: billing)
     }
 
     private static func askOpenRouter(images: [(label: String, base64: String)], apiKey: String) async -> String? {
@@ -217,7 +219,9 @@ enum LLMRotationDetector {
             "messages": [["role": "user", "content": chatContent(images)]]
         ]
         guard let url = URL(string: "\(OpenAICompatibleClient.openRouterBaseURL)/chat/completions") else { return nil }
-        return await chatLetter(url: url, body: body, apiKey: apiKey)
+        let billing = PaidRequests.Billing(provider: .openrouter, price: PaidRequests.fixedPrice(gatewayModel),
+                                           fallback: CostEstimator.gemini37RotationCallCost)
+        return await chatLetter(url: url, body: body, apiKey: apiKey, billing: billing)
     }
 
     /// The prompt and four labelled candidates as OpenAI-style content parts.
@@ -231,7 +235,8 @@ enum LLMRotationDetector {
     }
 
     /// POST a chat-completions body and return the first choice's text; nil on any failure or a non-200.
-    private static func chatLetter(url: URL, body: [String: Any], apiKey: String) async -> String? {
+    private static func chatLetter(url: URL, body: [String: Any], apiKey: String,
+                                   billing: PaidRequests.Billing?) async -> String? {
         guard let data = try? JSONSerialization.data(withJSONObject: body) else { return nil }
         var request = URLRequest(url: url, timeoutInterval: 90)
         request.httpMethod = "POST"
@@ -239,7 +244,7 @@ enum LLMRotationDetector {
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = data
         guard let (respData, response) = try? await NetworkSession.data(
-            for: request, policy: .nonIdempotent, maxRetries: 1),
+            for: request, policy: .nonIdempotent, maxRetries: 1, billing: billing),
               (response as? HTTPURLResponse)?.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: respData) as? [String: Any],
               json["error"] as? [String: Any] == nil,

@@ -167,6 +167,7 @@ extension OCRProcessor {
                     thinkingLevel: thinkingLevel, apiKey: apiKey
                 )
 
+                guard monthlyStopMessage == nil else { break }
                 jobs[index].classification = classification
                 jobs[index].result = OCRResult(
                     text: jobs[index].result?.text,
@@ -183,7 +184,7 @@ extension OCRProcessor {
             }
         }
 
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { return }
         progress = 0.5
 
         // Interactive Review: document segmentation (rotation + classification) review. Manual
@@ -254,7 +255,7 @@ extension OCRProcessor {
             }
         }
 
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { return }
 
         // Step 4: Collection Segmentation + name review (last step before completion)
         if enableCollectionSegmentation {
@@ -387,9 +388,9 @@ extension OCRProcessor {
                 continue
             }
             if monthlySpend != nil, let history = activeRunHistory, history.localAgent == nil {
-                // A PDF is only usable once it is rebuilt. Reserve it together, including pages that this
-                // interrupted PDF has already read but has yet to put into the ledger.
-                let pages = RunHistorySnapshot.directPDFPageCount([pdfURL])
+                // Check enough headroom for the remaining pages. The ledger already includes saved reads.
+                let savedPages = activePendingMixedPDF?.pageResults.keys.filter { $0.hasPrefix("\(index):") }.count ?? 0
+                let pages = max(0, RunHistorySnapshot.directPDFPageCount([pdfURL]) - savedPages)
                 let price = CostEstimator.estimateDirectPDFPages(
                     pageCount: pages, model: model, imageScale: history.imageScale,
                     rotationMode: history.rotationMode, useGateway: gatewayConfig != nil,
@@ -476,6 +477,14 @@ extension OCRProcessor {
                         standardImageMB: ocrRun.standardImageMB,
                         visionSettings: ocrRun.visionSettings, cascade: ocrRun.cascade, readers: ocrRun.readers, imported: ocrRun.imported, newspaperSpend: newspaperSpend, scanDetector: scanDetector
                     )
+                    }
+                    if monthlyStopMessage != nil, result.text == nil {
+                        if activePendingMixedPDF != nil {
+                            _ = persistMixedPDFMutation { $0.inFlightPage = nil }
+                        }
+                        for u in pageImages { try? FileManager.default.removeItem(at: u) }
+                        cleanupTempFiles()
+                        return
                     }
                     if !Task.isCancelled, result.errorCode == OpenRouterRoute.unavailableModelCode {
                         if activePendingMixedPDF != nil,
@@ -975,6 +984,18 @@ extension OCRProcessor {
                 isProcessing = false
                 return
             }
+        } catch is ProcessFilesMonthlySpend.ReadingDeclined {
+            reportInterruptedBatchSubmission(localRefusal: monthlyStopMessage,
+                address: ClosedPaidBatchJournalAddress(persistedInitialBatch))
+            return
+        } catch let link as PaidRequests.BatchLinkFailure {
+            if recordSubmittedBatchChunk(link.jobID, paidAttemptID: link.attemptID) {
+                statusMessage = link.localizedDescription
+            }
+            batchPollInterrupted = true
+            isProcessing = false
+            checkForPendingBatch()
+            return
         } catch {
             NSLog("[ArchiveProcessor] paid-batch submission interrupted: %@", error.localizedDescription)
             reportInterruptedBatchSubmission(
@@ -1086,7 +1107,8 @@ extension OCRProcessor {
                     if status.isComplete {
                         if let url = status.resultsURL {
                             statusMessage = "Retrieving batch results…"
-                            let results = try await client.retrieveResults(resultsURL: url)
+                            let results = try await client.retrieveResults(resultsURL: url, jobID: batchId,
+                                                                             confirmedNoCharge: status.confirmedNoCharge)
                             // W16.bat7 — `processBatchResults` only says no when a result could not be
                             // PERSISTED, which leaves paid pages unwritten. Keep the journal.
                             guard await processBatchResults(
@@ -1109,10 +1131,11 @@ extension OCRProcessor {
                     progress = Double(status.completedRequests) / Double(max(1, status.totalRequests)) * 0.7
                     statusMessage = "Batch processing… \(status.completedRequests)/\(status.totalRequests) complete"
 
-                    if status.isComplete {
-                        if status.status == "SUCCESS", let fileId = status.outputFileId {
+                    if status.isTerminal {
+                        if let fileId = status.outputFileId {
                             statusMessage = "Retrieving batch results…"
-                            let results = try await client.retrieveResults(outputFileId: fileId)
+                            let results = try await client.retrieveResults(outputFileId: fileId, jobID: batchId,
+                                                                             confirmedNoCharge: status.confirmedNoCharge)
                             // W16.bat7 — same exit, same reason as the Anthropic arm above.
                             guard await processBatchResults(
                                 results, fileURLs: fileURLs, model: model, apiKey: apiKey,
@@ -1168,7 +1191,8 @@ extension OCRProcessor {
                                 case .inline(let inlineResults):
                                     results = inlineResults
                                 case .file(let fileName):
-                                    results = try await client.retrieveResults(resultFileName: fileName)
+                                    results = try await client.retrieveResults(resultFileName: fileName, jobID: singleBatchId,
+                                                                                     confirmedNoCharge: status.confirmedNoCharge)
                                 case .noneAvailable:
                                     results = [:]
                                 }
@@ -1224,6 +1248,10 @@ extension OCRProcessor {
                                     emptyResultChecks[singleBatchId] = nil
                                 }
                             } else {
+                                if case .file(let fileName) = GeminiBatchClient.resultsSource(for: status) {
+                                    _ = try await client.retrieveResults(resultFileName: fileName, jobID: singleBatchId,
+                                                                         confirmedNoCharge: status.confirmedNoCharge)
+                                }
                                 anyFailed = true
                             }
                         }
@@ -1689,7 +1717,7 @@ extension OCRProcessor {
 
             // A page that Stop cut short (a call cancelled, or one waiting for the Claude plan's window) is not recorded, so
             // Resume reads it in its main pass instead of taking it as already tried (W41.app-claude-plan-reading).
-            if Task.isCancelled && result.text == nil { return }
+            if (Task.isCancelled || monthlyStopMessage != nil) && result.text == nil { return }
             if result.errorCode == OpenRouterRoute.unavailableModelCode,
                stopForUnavailableOpenRouterModel(provider: provider, model: model, knownUnavailable: true) { return }
             guard await handleOCRResult(
@@ -1770,6 +1798,7 @@ extension OCRProcessor {
                 guard !Task.isCancelled else { group.cancelAll(); return }
                 if result.errorCode == OpenRouterRoute.unavailableModelCode,
                    stopForUnavailableOpenRouterModel(provider: provider, model: model, knownUnavailable: true) { continue }
+                if monthlyStopMessage != nil, result.text == nil { continue }
                 let url = fileURLs[index]
                 guard await handleOCRResult(
                     result, index: index, jobID: jobID, url: url, model: model,
@@ -2030,22 +2059,24 @@ extension OCRProcessor {
         scanDetector: NewspaperDetector = .ppDocLayoutV3,
         postCorrection: OCRPostCorrection? = nil
     ) async -> OCRResult {
-        await NewspaperPageReader.$spend.withValue(newspaperSpend) {
-            await NewspaperPageReader.$scanDetector.withValue(scanDetector) {
-                let reading = await performOCRCallUntracked(
-                    imageURL: imageURL, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
-                    previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt,
-                    imageScale: imageScale, gatewayConfig: gatewayConfig, localAgent: localAgent,
-                    rotationMode: rotationMode, standardImageMB: standardImageMB, visionSettings: visionSettings,
-                    cascade: cascade, refusalFallback: refusalFallback, refusalRoutes: refusalRoutes,
-                    readers: readers, imported: imported)
-                guard let postCorrection, gatewayConfig == nil, localAgent == nil,
-                      customPrompt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false else {
-                    return reading
+        await PaidRequests.$imageScale.withValue(imageScale) {
+            await NewspaperPageReader.$spend.withValue(newspaperSpend) {
+                await NewspaperPageReader.$scanDetector.withValue(scanDetector) {
+                    let reading = await performOCRCallUntracked(
+                        imageURL: imageURL, provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
+                        previousText: previousText, previousImageURL: previousImageURL, customPrompt: customPrompt,
+                        imageScale: imageScale, gatewayConfig: gatewayConfig, localAgent: localAgent,
+                        rotationMode: rotationMode, standardImageMB: standardImageMB, visionSettings: visionSettings,
+                        cascade: cascade, refusalFallback: refusalFallback, refusalRoutes: refusalRoutes,
+                        readers: readers, imported: imported)
+                    guard let postCorrection, gatewayConfig == nil, localAgent == nil,
+                          customPrompt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false else {
+                        return reading
+                    }
+                    let scale = targetDimensionScale(forFileAt: imageURL, sizeFraction: imageScale,
+                                                     standardImageMB: standardImageMB)
+                    return await postCorrection.apply(to: reading, imageURL: imageURL, scale: scale, spend: newspaperSpend)
                 }
-                let scale = targetDimensionScale(forFileAt: imageURL, sizeFraction: imageScale,
-                                                 standardImageMB: standardImageMB)
-                return await postCorrection.apply(to: reading, imageURL: imageURL, scale: scale, spend: newspaperSpend)
             }
         }
     }
@@ -2330,6 +2361,8 @@ extension OCRProcessor {
                 stopForUnavailableOpenRouterModel(provider: provider, model: model, knownUnavailable: true)
                 return
             }
+
+            if monthlyStopMessage != nil, result.text == nil { return }
 
             // W16.bat11 — there is deliberately NO `jobs[index]` read here.
             //

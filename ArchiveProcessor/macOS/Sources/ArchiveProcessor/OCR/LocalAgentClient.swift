@@ -260,11 +260,24 @@ struct LocalAgentClient: Sendable {
                                          prompt: String, timeout: TimeInterval, pacing: UsageWindowPacing?,
                                          billing: ClaudeCLIBilling) async -> InvokeOutcome {
         let args = cliArguments(tool: tool, modelOverride: modelOverride)
+        let paidAttempt: PaidRequests.Attempt?
+        do {
+            paidAttempt = tool == .claude
+                ? try await PaidRequests.admitClaudeCLI(billing: billing, modelID: modelOverride, prompt: prompt)
+                : nil
+        } catch {
+            return .failure(code: "cli_admission", message: error.localizedDescription)
+        }
         let cli = await runAsync(binaryPath: binary, args: args, stdinText: prompt, timeout: timeout,
                                  currentDirectory: tool == .claude ? claudeWorkingDirectory : nil,
                                  unsetEnvironment: credentialVariables(for: tool))
 
         let stream = tool == .claude ? ClaudeStreamOutput.parse(cli.stdout) : nil
+        if let stream {
+            let apiKey = stream.billedByAPIKey(billing)
+            await PaidRequests.settleClaudeCLI(paidAttempt, usageUSD: stream.notionalUSD, byAPIKey: apiKey,
+                byPlan: !apiKey && (billing != .unknown || stream.hasPlanEvidence), spawnFailed: cli.spawnFailed)
+        }
         let byAPIKey = stream?.billedByAPIKey(billing) == true
         if byAPIKey { await ClaudeCLIUsage.shared.reportAPIUsage(stream?.notionalUSD, binary: binary) }
         if let pacing, !byAPIKey { await readingGate.record(stream?.meter, pacing: pacing) }

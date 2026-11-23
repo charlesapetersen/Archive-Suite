@@ -313,9 +313,17 @@ extension DateRoute {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(gateway.apiKey)", forHTTPHeaderField: "Authorization")
         request.httpBody = data
-        guard let (respData, response) = try? await NetworkSession.data(for: request, policy: .nonIdempotent,
-                                                                        maxRetries: 3) else { return GatewayReply() }
-        return GatewayReply(data: respData, response: response)
+        let fallback = model == ContainerLabelCapture.gatewayModel ? ContainerLabelCapture.gatewayDollarsPerLabel : nil
+        let billing = await PaidRequests.gateway(gateway, modelID: model, fallback: fallback)
+        do {
+            let (respData, response) = try await NetworkSession.data(for: request, policy: .nonIdempotent,
+                                                                     maxRetries: 3, billing: billing)
+            return GatewayReply(data: respData, response: response)
+        } catch is ProcessFilesMonthlySpend.ReadingDeclined {
+            return GatewayReply(status: 0)
+        } catch {
+            return GatewayReply()
+        }
     }
 }
 

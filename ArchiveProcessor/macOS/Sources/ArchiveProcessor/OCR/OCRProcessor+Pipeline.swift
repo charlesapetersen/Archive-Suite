@@ -153,6 +153,7 @@ extension OCRProcessor {
         let segmentationWindows: [AnsweredWindow]?
         let segmentationAnswers: [String: SavedGapAnswer]?
         let resultsCollected: Bool?
+        let paidRequestLinks: [String: UUID]?
 
         struct AnsweredWindow: Encodable {
             let key: WindowKey
@@ -195,6 +196,7 @@ extension OCRProcessor {
                           ($1.key.voter, $1.key.pages, $1.key.start, $1.key.end) }
             segmentationAnswers = batch.segmentationAnswers
             resultsCollected = batch.resultsCollected
+            paidRequestLinks = batch.paidRequestLinks
         }
     }
 
@@ -692,7 +694,7 @@ extension OCRProcessor {
         guard let lifecycleVersion = batch.lifecycleVersion else {
             return batch.mixedPDFOutcomes == nil && batch.segmentationApproach == nil
                 && batch.segmentationPartner == nil && batch.segmentationWindows == nil
-                && batch.segmentationAnswers == nil && batch.resultsCollected == nil
+                && batch.segmentationAnswers == nil && batch.resultsCollected == nil && batch.paidRequestLinks == nil
         }
         guard lifecycleVersion == PendingBatch.currentLifecycleVersion,
               !batch.fileURLs.isEmpty,
@@ -734,6 +736,7 @@ extension OCRProcessor {
             }
         guard NewspaperBatch.valid(batch.newspaperManifest, parts: batch.newspaperParts, files: batch.fileURLs.count),
               outputPathsAreValid,
+              batch.paidRequestLinks?.keys.allSatisfy({ batch.submittedChunkIds.contains($0) }) ?? true,
               batch.resultsCollected != true || (batch.submissionComplete && batch.usesWindowSegmentation
                   && batch.completedResults.count == batch.fileURLs.count),
               mixedPDFOutcomesAreValid(batch.mixedPDFOutcomes, images: batch.fileURLs,
@@ -1007,7 +1010,6 @@ extension OCRProcessor {
     /// provider/model + file counts), then clear the in-memory snapshot so it can't be double-logged.
     /// A no-op when no snapshot was captured (e.g. a cancelled run cleared it, or an unexpected path).
     /// Called only from genuine success tails, never on cancel/interruption.
-    /// The same cost goes into the settings ledger (W46.settings-ledger), which a per-month ceiling is read against.
     func recordRunHistory(succeeded: Int) {
         guard let snapshot = activeRunHistory else { return }
 #if DEBUG
@@ -1024,65 +1026,7 @@ extension OCRProcessor {
             readPoorly: readPoorlyNames.count,
             layouts: jobs.compactMap { $0.result?.newspaperLayout })
         ProcessingHistoryStore.shared.record(run)
-        // The label calls are already in the ledger on a line of their own (W47.ct-label-cost).
-        Self.recordNewspaperAdjustedSpend(snapshot, jobs: jobs, usd: max(0, run.cost - snapshot.labelDollars),
-                                          files: run.fileCount, baseSources: nil)
         activeRunHistory = nil
-    }
-
-    /// A run that ends without reaching a success tail still spent money on the pages it read
-    /// (W46.settings-ledger-more): a Stop, a stop before segmentation, a mixed run whose image half failed a safety
-    /// check. Records that share in the ledger under the run's id, so a resume that finishes it adds only the rest,
-    /// and clears the snapshot so nothing else records it. `wholeRun` counts every page, for a batch job left to
-    /// finish at the provider, which bills it whether or not the app collects the results.
-    func recordUnfinishedRunSpend(wholeRun: Bool = false) {
-        guard let snapshot = activeRunHistory else { return }
-        activeRunHistory = nil
-        Self.recordLedgerSpend(snapshot, jobs: jobs, wholeRun: wholeRun)
-    }
-
-    static func recordLedgerSpend(_ snapshot: RunHistorySnapshot, jobs: [OCRJob], wholeRun: Bool) {
-        // The label calls are already in the ledger on a line of their own (W47.ct-label-cost).
-        var snapshot = snapshot
-        snapshot.labelDollars = 0
-        let usd: Double
-        var files = snapshot.fileCount
-        var baseSources: Set<URL>? = nil
-        if wholeRun {
-            usd = snapshot.makeRun(succeeded: 0, secondReaders: jobs.compactMap { $0.result?.secondReader },
-                                   pageReaders: jobs.compactMap { $0.result?.pageReader },
-                                   layouts: jobs.compactMap { $0.result?.newspaperLayout }).cost
-        } else {
-            let read = jobs.filter { $0.result != nil || $0.status == .succeeded || $0.status == .failed }
-            let sources = Set(read.map(\.sourceURL))
-            baseSources = sources
-            files = snapshot.pdfHalfRead ? sources.union(snapshot.pdfSources).count : sources.count
-            usd = snapshot.spentSoFar(readSources: sources,
-                                      secondReaders: read.compactMap { $0.result?.secondReader },
-                                      pageReaders: read.compactMap { $0.result?.pageReader },
-                                      layouts: read.compactMap { $0.result?.newspaperLayout })
-        }
-        recordNewspaperAdjustedSpend(snapshot, jobs: jobs, usd: usd, files: min(files, snapshot.fileCount),
-                                     baseSources: baseSources)
-    }
-
-    /// Abandoned region calls have their own stable attempt IDs in the ledger. A resumed page buys another
-    /// reading: it must add to those charges, rather than replacing them via the original run's high-water mark.
-    /// A late batch result can carry the same IDs back from its journal; subtract already-recorded attempts
-    /// from the parent run, so collecting that result later cannot charge them twice.
-    static func recordNewspaperAdjustedSpend(_ snapshot: RunHistorySnapshot, jobs: [OCRJob], usd: Double,
-                                             files: Int, baseSources: Set<URL>?, store: SettingsLayerStore = .shared) {
-        let layouts = jobs.compactMap { $0.result?.newspaperLayout }
-        let charges = snapshot.newspaperSpend.unreportedCharges(layouts: layouts, baseSources: baseSources,
-                                                                allPDFPagesRead: snapshot.pdfHalfRead)
-        for (id, amount) in charges {
-            store.recordSpend(usd: amount, runID: id, outputDirectory: snapshot.outputDirectory, files: 0)
-        }
-        let separateIDs = Set(layouts.flatMap { $0.spendIDs ?? [] }).union(charges.keys)
-        let separateCost = store.file.ledger.filter { $0.runID.map(separateIDs.contains) ?? false }
-            .reduce(0) { $0 + max(0, $1.usd) }
-        store.recordSpend(usd: max(0, usd - separateCost), runID: snapshot.ledgerRunID ?? snapshot.newspaperSpend.parentLedgerID,
-                          outputDirectory: snapshot.outputDirectory, files: files)
     }
 
     /// The run summary's last line: the counts, and how many pages a second reader read (W41.app-ocr-default-fu1).
@@ -1347,9 +1291,11 @@ extension OCRProcessor {
     /// `processingTask`: this runs *on* that task, and the run is ending under its own power.
     func reportInterruptedBatchSubmission(
         refusal: BatchCreateRefusal? = nil,
+        localRefusal: String? = nil,
         address: ClosedPaidBatchJournalAddress? = nil
     ) {
-        if let refusal, let address, !Task.isCancelled, paidJobsCreatedThisSubmission.isEmpty,
+        let refusalMessage = localRefusal ?? refusal?.localizedDescription
+        if let refusalMessage, let address, !Task.isCancelled, paidJobsCreatedThisSubmission.isEmpty,
            let activePendingBatch, address.matches(activePendingBatch),
            activePendingBatch.effectiveChunkIds.isEmpty,
            let journal = Self.loadPendingBatch(), address.matches(journal),
@@ -1360,8 +1306,8 @@ extension OCRProcessor {
             // A first-create refusal proves there is no batch work to recover or charge. The mixed PDF
             // journal, if any, still holds the PDF work and remains available after this batch is retired.
             Self.deletePendingBatch()
-            recordUnfinishedRunSpend()
-            statusMessage = refusal.localizedDescription
+            activeRunHistory = nil
+            statusMessage = refusalMessage
             if Self.paidBatchJournalState().onDisk {
                 statusMessage += " The local batch journal could not be removed."
             }
@@ -1369,7 +1315,7 @@ extension OCRProcessor {
             statusMessage = Self.interruptedSubmissionMessage(
                 createdJobCount: paidJobsCreatedThisSubmission.count,
                 journal: Self.paidBatchJournalState(),
-                priorReport: refusal?.localizedDescription ?? lastPaidBatchInterruptionReport)
+                priorReport: refusalMessage ?? lastPaidBatchInterruptionReport)
         }
         batchPollInterrupted = true
         isProcessing = false
@@ -1467,7 +1413,7 @@ extension OCRProcessor {
     /// resume guard checks the comma-joined mirror and the lifecycle fingerprint the writer recomputes, so
     /// a hand-rolled write would produce a journal the app then refuses to offer for resume.
     @discardableResult
-    func appendChunkIdToClosedPaidBatchJournal(_ chunkId: String) -> Bool {
+    func appendChunkIdToClosedPaidBatchJournal(_ chunkId: String, paidAttemptID: UUID? = nil) -> Bool {
         guard activePendingBatch == nil, let address = closedPaidBatchJournalAddress else { return false }
         guard let onDisk = Self.loadPendingBatch(), address.matches(onDisk),
               onDisk.lifecycleVersion == PendingBatch.currentLifecycleVersion else { return false }
@@ -1476,6 +1422,7 @@ extension OCRProcessor {
         guard !onDisk.effectiveChunkIds.contains(chunkId) else { return true }
         var appended = onDisk
         appended.submittedChunkIds.append(chunkId)
+        if let paidAttemptID { appended.paidRequestLinks = [chunkId: paidAttemptID] }
         return Self.savePendingBatch(appended) != nil
     }
 
@@ -1533,7 +1480,7 @@ extension OCRProcessor {
         "A paid batch job was created just as Stop landed. Its server ID was added to the recovery journal, so Resume can still reach it. Submission stopped; nothing was removed."
 
     @discardableResult
-    func recordSubmittedBatchChunk(_ chunkId: String) -> Bool {
+    func recordSubmittedBatchChunk(_ chunkId: String, paidAttemptID: UUID? = nil) -> Bool {
         let normalized = chunkId.trimmingCharacters(in: .whitespacesAndNewlines)
         // Tally FIRST, and before the validation guard (W16.bat3-fu2). This is called once per server-side
         // job the provider has already created, so it is the earliest — and, once Stop has nil'd
@@ -1551,7 +1498,7 @@ extension OCRProcessor {
         // ID into the file rather than losing it. Returning `false` regardless is deliberate and load-bearing:
         // it is what makes the submit loop throw and stop creating more paid jobs after a Stop. The ID is
         // recovered; the run is still over.
-        if appendChunkIdToClosedPaidBatchJournal(normalized) {
+        if appendChunkIdToClosedPaidBatchJournal(normalized, paidAttemptID: paidAttemptID) {
             // `cancelRun: false` for the same reason the missing-journal guard below uses it: post-Stop,
             // `processingTask` is nil or a NEWER run's — see `reportInterruptedPaidBatch`'s doc.
             reportInterruptedPaidBatch(Self.pendingBatchChunkRecordedAfterStopMessage, cancelRun: false)
@@ -1559,7 +1506,10 @@ extension OCRProcessor {
         }
         return persistPendingBatchMutation(
             failureMessage: "A paid batch chunk was created, but its server ID could not be saved. Submission stopped."
-        ) { $0.submittedChunkIds.append(normalized) }
+        ) { pending in
+            pending.submittedChunkIds.append(normalized)
+            if let paidAttemptID { pending.paidRequestLinks = [normalized: paidAttemptID] }
+        }
     }
 
     @discardableResult
@@ -1776,8 +1726,7 @@ extension OCRProcessor {
     /// the fifth, `guard markBatchSubmissionComplete()`, only started reporting itself in W16.bat3-fu).
     /// Pinned headlessly by `BatchInterruptTailContract` (W16.bat4).
     func finishInterruptedBatchPoll() {
-        // The job goes on at the provider and is billed whether or not it is resumed (W46.settings-ledger-more).
-        recordUnfinishedRunSpend(wholeRun: true)
+        activeRunHistory = nil
         activeBatch = nil
         activePendingBatch = nil
         isProcessing = false
@@ -1809,13 +1758,7 @@ extension OCRProcessor {
         do {
             let lease = try ProcessorCatalogueRun.Lease(journal: Self.pendingCatalogueURL)
             defer { withExtendedLifetime(lease) {} }
-            let batch = Self.loadPendingBatch()
             if try !setAsideCatalogueRecovery(requestedJournal: Self.pendingBatchURL) { Self.deletePendingBatch() }
-            if let batch {
-                let config = makePendingBatchResumeConfig(batch, apiKey: "")
-                Self.recordLedgerSpend(RunHistorySnapshot(resuming: batch, rotationMode: config.rotationMode,
-                                                          imageScale: config.imageScale), jobs: [], wholeRun: true)
-            }
             activePendingBatch = nil
             checkForPendingBatch()
         } catch {
@@ -1897,7 +1840,8 @@ extension OCRProcessor {
         // Ignore a torn/tampered manifest rather than misapply it (Tier-2 rule e).
         guard let pending = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(pending) else { return }
 
-        await OpenRouterDataPolicy.$denyDataCollection.withValue(OpenRouterDataPolicy.deny(pending.resolvedSettings?.values)) {
+        let paid = processPaidRequests(runID: pending.resolvedSettings?.runID, outputDirectory: pending.outputDirectory)
+        await paid.run(denyDataCollection: OpenRouterDataPolicy.deny(pending.resolvedSettings?.values)) {
             await resumeBatch(pending, apiKey: apiKey)
         }
     }
@@ -1940,6 +1884,7 @@ extension OCRProcessor {
         }
 
         isProcessing = true
+        paidRequestScope = PaidRequests.context
         pendingBatchInfo = nil
         failedFiles = []
         clearOutputWarnings()
@@ -2016,11 +1961,6 @@ extension OCRProcessor {
         activeRunHistory?.sidecars = true
 
         beginMonthlySpend(outputDirectory: pending.outputDirectory)
-        if monthlySpend != nil, let history = activeRunHistory, history.ledgerRunID != nil {
-            // If the app crashed, reconcile what was already bought under the original run ID.
-            // The whole-batch ledger estimate already includes its expected rotation and tagging work.
-            Self.recordLedgerSpend(history, jobs: jobs, wholeRun: true)
-        }
 
         activeBatch = BatchContext(
             batchId: pending.batchId, apiKey: apiKey,
@@ -2028,6 +1968,19 @@ extension OCRProcessor {
             provider: pending.provider
         )
         activePendingBatch = pending
+
+        if let links = pending.paidRequestLinks, let paidRequestScope {
+            do {
+                for (jobID, attemptID) in links {
+                    try paidRequestScope.store.linkPaidBatch(attemptID: attemptID, provider: pending.provider,
+                                                              jobID: jobID, runID: paidRequestScope.runID)
+                }
+            } catch {
+                statusMessage = "The paid request journal could not be updated. The provider batch was kept for Resume."
+                finishInterruptedBatchPoll()
+                return
+            }
+        }
 
         await pollBatchUntilComplete(
             batchId: pending.batchId, provider: pending.provider,
@@ -2126,7 +2079,7 @@ extension OCRProcessor {
             }
         }
 
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { return }
 
         // Collection segmentation (after tagging)
         if pending.enableCollectionSegmentation {
@@ -2145,7 +2098,7 @@ extension OCRProcessor {
             applyBoxFolderLabelTags(enableTagging: pending.enableTagging, runConfig: runConfig)
         }
 
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { return }
 
         // Dual output: write each original image beside its PDF (same base + tags) BEFORE merge repoints
         // outputURLMap and before organization moves files — exactly as startProcessing does. Skipped
@@ -2230,7 +2183,8 @@ extension OCRProcessor {
         // stale manifest can never cross-contaminate a different job.
         guard let pending = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(pending) else { return }
 
-        await OpenRouterDataPolicy.$denyDataCollection.withValue(OpenRouterDataPolicy.deny(pending.resolvedSettings?.values)) {
+        let paid = processPaidRequests(runID: pending.resolvedSettings?.runID, outputDirectory: pending.outputDirectory)
+        await paid.run(denyDataCollection: OpenRouterDataPolicy.deny(pending.resolvedSettings?.values)) {
             await resumeRun(pending, apiKey: apiKey, readWithoutClusterText: readWithoutClusterText)
         }
     }
@@ -2272,6 +2226,7 @@ extension OCRProcessor {
         defer { catalogueRunLease = nil }
 
         isProcessing = true
+        paidRequestScope = PaidRequests.context
         pendingRunInfo = nil
         failedFiles = []
         clearOutputWarnings()
@@ -2457,10 +2412,6 @@ extension OCRProcessor {
             statusMessage = "Restored \(completedCount)/\(total). Resuming OCR…"
         }
 
-        if monthlySpend != nil, let history = activeRunHistory, history.ledgerRunID != nil {
-            // Journaled results survive a crash that happened before the normal Stop/finish ledger update.
-            Self.recordLedgerSpend(history, jobs: jobs, wholeRun: false)
-        }
 
         // Run OCR only on files that were NOT already completed — the anti-double-cost guarantee: a file
         // whose result is cached in the manifest is never re-OCR'd (Tier-2 rule a). Its output PDF is
@@ -2599,7 +2550,7 @@ extension OCRProcessor {
             }
         }
 
-        guard !Task.isCancelled else { cleanupTempFiles(); return }
+        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { cleanupTempFiles(); return }
 
         // Collection segmentation (after tagging)
         if pending.enableCollectionSegmentation {
@@ -2618,7 +2569,7 @@ extension OCRProcessor {
             applyBoxFolderLabelTags(enableTagging: pending.enableTagging, runConfig: runConfig)
         }
 
-        guard !Task.isCancelled else { cleanupTempFiles(); return }
+        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { cleanupTempFiles(); return }
 
         // Dual output: write each original image beside its PDF BEFORE merge repoints outputURLMap and
         // before organization moves files — exactly as startProcessing does. No-op unless exportOriginals
@@ -2752,6 +2703,7 @@ extension OCRProcessor {
                     guard !Task.isCancelled else { group.cancelAll(); return }
                     if result.errorCode == OpenRouterRoute.unavailableModelCode,
                        stopForUnavailableOpenRouterModel(provider: provider, model: model, knownUnavailable: true) { continue }
+                    if monthlyStopMessage != nil, result.text == nil { continue }
                     guard await handleOCRResult(
                         result, index: index, jobID: jobID, url: fileURLs[index], model: model,
                         outputDirectory: outputDirectory, runConfig: runConfig) else {
@@ -2850,7 +2802,7 @@ extension OCRProcessor {
 
                 // A page that Stop cut short (a call cancelled, or one waiting for the Claude plan's window) is not recorded, so
                 // Resume reads it in its main pass instead of taking it as already tried (W41.app-claude-plan-reading).
-                if Task.isCancelled && result.text == nil { return }
+                if (Task.isCancelled || monthlyStopMessage != nil) && result.text == nil { return }
                 if result.errorCode == OpenRouterRoute.unavailableModelCode,
                    stopForUnavailableOpenRouterModel(provider: provider, model: model, knownUnavailable: true) { return }
                 guard await handleOCRResult(
@@ -2882,6 +2834,7 @@ extension OCRProcessor {
         /// `{ _ in true }` — would keep every check green while reporting a paid job as cancelled and
         /// deleting the recovery journal that was the only way back to it.
         let clientTypeName: String
+        var confirmChunk: (@MainActor (String) async -> Bool)? = nil
     }
 
     /// The durable file a confirmed cancellation is allowed to remove. There is exactly one — the
@@ -2904,6 +2857,7 @@ extension OCRProcessor {
     /// when the returned closure is invoked, which is why a driver can safely ask for one.
     static func liveBatchChunkCanceller(for batch: BatchContext) -> BatchChunkCanceller {
         let cancelChunk: @MainActor (String) async -> Bool
+        let confirmChunk: (@MainActor (String) async -> Bool)?
         // Read off the client that was actually constructed, never typed in — that is the whole point (see
         // `clientTypeName`): it is what a check compares against the provider whose rule will be applied.
         let clientTypeName: String
@@ -2911,24 +2865,29 @@ extension OCRProcessor {
         case .anthropic:
             let client = AnthropicBatchClient(apiKey: batch.apiKey, model: batch.model, thinkingLevel: batch.thinkingLevel)
             cancelChunk = { await client.cancelBatch(batchId: $0) }
+            confirmChunk = { await client.confirmCancellation(batchId: $0) }
             clientTypeName = String(describing: type(of: client))
         case .mistral:
             let client = MistralBatchClient(apiKey: batch.apiKey, model: batch.model)
             cancelChunk = { await client.cancelBatch(batchId: $0) }
+            confirmChunk = { await client.confirmCancellation(batchId: $0) }
             clientTypeName = String(describing: type(of: client))
         case .gemini:
             let client = GeminiBatchClient(apiKey: batch.apiKey, model: batch.model, thinkingLevel: batch.thinkingLevel)
             cancelChunk = { await client.cancelBatch(batchName: $0) }
+            confirmChunk = { await client.confirmCancellation(batchName: $0) }
             clientTypeName = String(describing: type(of: client))
         case .openai:
             cancelChunk = { _ in false }   // never called; OpenAI has no batch path in v1.
             clientTypeName = "none"
+            confirmChunk = nil
         case .appleVision, .openrouter:
             cancelChunk = { _ in false }   // neither has a server-side batch path.
             clientTypeName = "none"
+            confirmChunk = nil
         }
         return BatchChunkCanceller(provider: batch.provider, cancelChunk: cancelChunk,
-                                   clientTypeName: clientTypeName)
+                                   clientTypeName: clientTypeName, confirmChunk: confirmChunk)
     }
 
     /// Which server-side jobs `cancel()` will try to cancel: the journal's acknowledged chunk IDs when
@@ -3070,7 +3029,8 @@ extension OCRProcessor {
     ) async -> BatchCancellationOutcome {
         let cancelChunk = canceller.cancelChunk
         var attempted: [String] = []
-        let confirmed: Bool
+        var confirmed: Bool
+        var acknowledged: [String] = []
         switch canceller.provider {
         case .anthropic, .mistral:
             // Both clients cancel exactly one server-side job. A batch split into several chunks has no
@@ -3078,6 +3038,7 @@ extension OCRProcessor {
             if chunkIds.count == 1 {
                 attempted = chunkIds
                 confirmed = await cancelChunk(chunkIds[0])
+                if confirmed { acknowledged = chunkIds }
             } else {
                 confirmed = false
             }
@@ -3088,13 +3049,19 @@ extension OCRProcessor {
                 attempted.append(chunkId)
                 // Deliberately no early exit: a later chunk is still worth cancelling after an earlier
                 // one failed — leaving it running is exactly what costs money.
-                if !(await cancelChunk(chunkId)) { allConfirmed = false }
+                if await cancelChunk(chunkId) { acknowledged.append(chunkId) }
+                else { allConfirmed = false }
             }
             confirmed = allConfirmed
         case .openai:
             confirmed = false   // OpenAI has no batch path in v1 (`supportsBatch == false`).
         case .appleVision, .openrouter:
             confirmed = false   // neither has a server-side batch path.
+        }
+        if let confirmChunk = canceller.confirmChunk {
+            for chunkID in acknowledged {
+                if !(await confirmChunk(chunkID)) { confirmed = false }
+            }
         }
         // Keep-on-doubt, and the doubt outranks confirmation. An unfinished submission means the chunk
         // list may be short; a materialization in flight means a just-written PDF may not yet have a
@@ -3248,12 +3215,10 @@ extension OCRProcessor {
         let quitting = quitWhenPagesSaved
         let run = processingTask
         // A quit is not a Stop: the jobs stay with the provider and the journal on disk. Without the batch context
-        // `cancel()` neither cancels them nor closes the journal (W49.proc-quit-waits-batch-submit). They will be
-        // billed, so the run's whole estimate goes into the ledger now, as for a cancellation the provider did not
-        // confirm. A Stop asked before the quit still cancels them, and the quit waits for that.
+        // `cancel()` neither cancels them nor closes the journal. A Stop asked before the quit still cancels them.
         let keepJobs = quitting && kind == .batchSubmission && !stopWhenPagesSaved
         if keepJobs {
-            recordUnfinishedRunSpend(wholeRun: true)
+            activeRunHistory = nil
             activeBatch = nil
         }
         let modelBecameUnavailable = unavailableOpenRouterRunMessage != nil
@@ -3297,19 +3262,7 @@ extension OCRProcessor {
         let interruptedRun = processingTask
         processingTask?.cancel()
         processingTask = nil
-        // What the stopped run has read so far goes into the ledger (W46.settings-ledger-more); a batch job's whole
-        // estimate is added below if the provider does not confirm its cancellation.
-        let unfinishedRun = activeRunHistory
-        let unfinishedJobs = jobs
-        recordUnfinishedRunSpend(wholeRun: collectingPaidBatchLater)
-        if let unfinishedRun, let interruptedRun {
-            Task {
-                await interruptedRun.value
-                // The stopped run may finish an already-bought region while unwinding. Use only its captured
-                // snapshot and rows: Clear or a newer run cannot lend this update another run's identity.
-                Self.recordLedgerSpend(unfinishedRun, jobs: unfinishedJobs, wholeRun: collectingPaidBatchLater)
-            }
-        }
+        activeRunHistory = nil
         if activePendingMixedPDF != nil, interruptedRun != nil {
             mixedPDFCancellationUnwinding = true
             Task {
@@ -3385,9 +3338,6 @@ extension OCRProcessor {
                     canceller: canceller, chunkIds: chunkIds,
                     submissionInFlight: submissionInFlight,
                     materializationInFlight: materializationInFlight, deleteJournal: deleteJournal)
-                if !outcome.confirmed, let unfinishedRun {
-                    Self.recordLedgerSpend(unfinishedRun, jobs: [], wholeRun: true)
-                }
                 // The cancelled run is still unwinding, and it writes `statusMessage` too: a poll whose
                 // status check was in flight when Stop landed still reports "Batch processing… n/m" or
                 // "Error checking batch… Retrying…" once that request resolves. Wait for it to finish
@@ -3768,7 +3718,9 @@ extension OCRProcessor {
         activeRunToRecord = resumingMixedPDF == nil
             ? PendingCollectionRecord(snapshot: frozen, outputDirectory: outputDirectory, fileCount: files.count) : nil
 
-        await OpenRouterDataPolicy.$denyDataCollection.withValue(OpenRouterDataPolicy.deny(frozen.values)) {
+        let paid = processPaidRequests(runID: frozen.runID, outputDirectory: outputDirectory)
+        paidRequestScope = paid
+        await paid.run(denyDataCollection: OpenRouterDataPolicy.deny(frozen.values)) {
             if autoReOCR {
                 recordActiveRunInCollection(kind: mixedReOCR ? "mixed" : "reOCR")
                 // --- PDF subset: pure render/OCR/rebuild, with no tagging or segmentation. ---
@@ -3789,7 +3741,7 @@ extension OCRProcessor {
                 )
                 guard !Task.isCancelled, isProcessing, !stopIfMonthlyReadDeclined() else { cleanupTempFiles(); return }
                 guard pdfIndices.allSatisfy({ jobs[$0].status == .succeeded || jobs[$0].status == .failed }) else {
-                    recordUnfinishedRunSpend()
+                    activeRunHistory = nil
                     isProcessing = false
                     checkForPendingBatch()
                     return
@@ -3797,14 +3749,14 @@ extension OCRProcessor {
                 if mixedReOCR {
                     guard let pending = activePendingMixedPDF,
                           Self.mixedPDFOutputsMatchJournal(pending) else {
-                        recordUnfinishedRunSpend()
+                        activeRunHistory = nil
                         isProcessing = false
                         statusMessage = "A rebuilt PDF changed before image processing. The recovery record was kept for review."
                         checkForPendingBatch()
                         return
                     }
                     guard let outcomes = captureMixedPDFOutcomes(indices: pdfIndices) else {
-                        recordUnfinishedRunSpend()
+                        activeRunHistory = nil
                         isProcessing = false
                         statusMessage = "The rebuilt PDF results could not be recorded safely. No images were processed."
                         return
@@ -3933,7 +3885,7 @@ extension OCRProcessor {
                     pendingRun.resolvedSettings = activeResolvedSettings
                     guard let fingerprint = Self.pendingRunFingerprintV2(pendingRun) else {
                         cleanupTempFiles()
-                        recordUnfinishedRunSpend()
+                        activeRunHistory = nil
                         isProcessing = false
                         statusMessage = "Could not create a safe resume snapshot. No OCR requests were sent."
                         return
@@ -3941,7 +3893,7 @@ extension OCRProcessor {
                     pendingRun.runFingerprint = fingerprint
                     guard Self.pendingRunIsSelfConsistent(pendingRun) else {
                         cleanupTempFiles()
-                        recordUnfinishedRunSpend()
+                        activeRunHistory = nil
                         isProcessing = false
                         statusMessage = "The run settings could not be captured safely. No OCR requests were sent."
                         return
@@ -3950,7 +3902,7 @@ extension OCRProcessor {
                     guard Self.savePendingRun(pendingRun) else {
                         cleanupTempFiles()
                         activePendingRun = nil
-                        recordUnfinishedRunSpend()
+                        activeRunHistory = nil
                         isProcessing = false
                         statusMessage = "Could not save the resume snapshot. No OCR requests were sent."
                         return
@@ -4081,7 +4033,7 @@ extension OCRProcessor {
                     guard !Task.isCancelled else { cleanupTempFiles(); return }
                 }
 
-                guard !Task.isCancelled else { cleanupTempFiles(); return }
+                guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { cleanupTempFiles(); return }
 
                 // Phase 3: Collection Segmentation + name review (after tagging review, last step before completion)
                 if enableCollectionSegmentation {
@@ -4101,7 +4053,7 @@ extension OCRProcessor {
                     applyBoxFolderLabelTags(enableTagging: enableTagging, runConfig: runConfig)
                 }
 
-                guard !Task.isCancelled else { cleanupTempFiles(); return }
+                guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { cleanupTempFiles(); return }
 
                 // Page 2's Classification: every review is done, and merge copies these pages next
                 // (W40.fix-processor-review-classification-stale).
@@ -4305,7 +4257,10 @@ extension OCRProcessor {
                 checkForPendingBatch()
             }
         }
-        let succeeded = await OpenRouterDataPolicy.$denyDataCollection.withValue(denyDataCollection) {
+        let paid = PaidRequests.context ?? processPaidRequests(runID: activeResolvedSettings?.runID,
+                                                               outputDirectory: outputDirectory)
+        if standalone { paidRequestScope = paid }
+        let succeeded = await paid.run(denyDataCollection: denyDataCollection) {
             let ocrURL = imageURL ?? PDFToImageConverter.imageURL(for: source)
             defer {
                 if imageURL == nil, ocrURL != source { try? FileManager.default.removeItem(at: ocrURL) }
@@ -4355,12 +4310,23 @@ extension OCRProcessor {
                 to: result, previousText: nil, customPrompt: effectiveRunConfig.customOCRPrompt,
                 configuration: effectiveRunConfig.provider == .appleVision
                     ? effectiveRunConfig.visionTextLLM : nil)
+            if monthlyStopMessage != nil, result.text == nil {
+                if jobs.indices.contains(index), jobs[index].id == jobID { jobs[index].status = previousStatus }
+                return false
+            }
             let persisted = await handleOCRResult(
                 result, index: index, jobID: jobID, url: ocrURL, model: effectiveRunConfig.model,
                 outputDirectory: outputDirectory, runConfig: effectiveRunConfig)
             return persisted && result.text != nil
         }
         guard standalone else { return succeeded }
+        if let message = monthlyStopMessage {
+            monthlyStopMessage = nil
+            if !succeeded {
+                statusMessage = message
+                return false
+            }
+        }
         guard !Task.isCancelled, isProcessing else {
             outputURLMap[source] = previousOutput
             return false

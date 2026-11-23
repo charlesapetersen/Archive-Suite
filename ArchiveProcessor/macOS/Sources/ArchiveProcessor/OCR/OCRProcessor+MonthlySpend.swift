@@ -1,10 +1,9 @@
 import Foundation
 
-/// Admission against the same estimate that feeds the ledger. Reservations include work in flight, so
-/// parallel workers cannot each spend the same balance while they wait for their results.
+/// Preliminary checks for a page or stage. The paid request ledger reserves the individual
+/// transport attempts, including those in flight.
 struct ProcessFilesMonthlySpend {
     let limit: Double
-    var reserved = 0.0
     var pricedImages = 0
 
     struct ReadingDeclined: LocalizedError {
@@ -47,30 +46,40 @@ extension OCRProcessor {
         }
     }
 
-    func reserveMonthlySpend(_ estimate: Double?, for work: String, whileReading: Bool = false) -> Bool {
-        guard var spend = monthlySpend else { return true }
-        guard monthlyStopMessage == nil, !Task.isCancelled else { return false }
-        let otherReservations = Self.processorsStillRunning.filter { $0 !== self }.compactMap(\.monthlySpend)
-            .reduce(0) { $0 + $1.reserved }
-        let remaining = ProcessFilesMonthlySpend.remaining(limit: spend.limit,
-            spent: SettingsLayerStore.shared.spentThisMonthUSD() + spend.reserved + otherReservations)
-        if let estimate, ProcessFilesMonthlySpend.fits(estimate, remaining: remaining) {
-            spend.reserved += max(0, estimate)
-            monthlySpend = spend
-            return true
+    func processPaidRequests(runID: UUID?, outputDirectory: URL) -> PaidRequests {
+        let scopeID = UUID()
+        let store = SettingsLayerStore.shared
+        let scope = PaidRequests(id: scopeID, runID: runID ?? UUID(), outputDirectory: outputDirectory,
+                                 limit: store.resolver(at: outputDirectory).monthlyLimitUSD) { [weak self] estimate in
+            guard let self, self.isProcessing, self.paidRequestScope?.id == scopeID else { return }
+            self.noteMonthlySpendDecline(estimate, for: "the next paid request",
+                                         remaining: ProcessFilesMonthlySpend.remaining(limit: self.paidRequestScope?.limit ?? 0,
+                                                                                         spent: store.spentThisMonthUSD()))
         }
+        return scope
+    }
+
+    func reserveMonthlySpend(_ estimate: Double?, for work: String, whileReading: Bool = false) -> Bool {
+        guard let spend = monthlySpend else { return true }
+        guard monthlyStopMessage == nil, !Task.isCancelled else { return false }
+        let remaining = ProcessFilesMonthlySpend.remaining(limit: spend.limit,
+            spent: SettingsLayerStore.shared.spentThisMonthUSD())
+        if let estimate, ProcessFilesMonthlySpend.fits(estimate, remaining: remaining) { return true }
+        noteMonthlySpendDecline(estimate, for: work, remaining: remaining)
+        if !ocrPhaseActive, !whileReading { cancel() }
+        return false
+    }
+
+    private func noteMonthlySpendDecline(_ estimate: Double?, for work: String, remaining: Double) {
         if let estimate, estimate.isFinite {
             monthlyStopMessage = "Stopped at the monthly spending limit. There is about \(CostEstimate.money(remaining)) left, and \(work) needs about \(CostEstimate.money(estimate))."
         } else {
             monthlyStopMessage = "Stopped at the monthly spending limit. The price of \(work) is unknown."
         }
         if ocrPhaseActive {
-            // Let already admitted pages finish and save. Unstarted pages stay unread in the recovery record.
+            // Let already admitted pages finish and save. Unstarted pages stay unread in recovery.
             stopWhenPagesSaved = true
-        } else if !whileReading {
-            cancel()
         }
-        return false
     }
 
     func reserveMonthlyImage(_ image: URL, runConfig: SessionProcessingConfig?, retry: Bool = false) -> Bool {

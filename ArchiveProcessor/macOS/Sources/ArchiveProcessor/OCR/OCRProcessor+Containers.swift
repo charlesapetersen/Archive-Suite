@@ -63,14 +63,9 @@ extension OCRProcessor {
         var fallbacks = 0
         var dollars = 0.0
         var modelUnavailable = false
-        // The month's ledger gets the calls as a line of their own, Stop or not: a run's own line takes a top-up only
-        // above a cent's fraction, which one label's charge may be under.
         defer {
-            if !Task.isCancelled { monthlySpend?.reserved -= estimate }
             containerLabelSpendNote = ContainerLabelCapture.spendNote(
                 calls: calls, successfulReads: successfulReads, dollars: dollars)
-            SettingsLayerStore.shared.recordSpend(usd: dollars, runID: UUID(), outputDirectory: outputDirectory,
-                                                  files: calls)
         }
         for label in labels {
             guard !Task.isCancelled else { return nil }
@@ -80,7 +75,7 @@ extension OCRProcessor {
                 if r.gatewayCalled { dollars += r.dollars; calls += 1 }
                 return nil
             }
-            // W47.ct-label-cost: the call is real money: the history's cost counts it, and the ledger (above).
+            // W47.ct-label-cost: the call is real money: the history also estimates it for the summary.
             if r.gatewayCalled {
                 modelUnavailable = modelUnavailable || r.modelUnavailable
                 calls += 1
@@ -104,7 +99,9 @@ extension OCRProcessor {
             : nil
         let fallbackNote = fallbacks == 0 ? nil
             : "No model supplied suggestions for \(fallbacks) box or folder label\(fallbacks == 1 ? "" : "s"). Check the proposals in Archive Reader."
-        let lines = [unavailableNote, fallbackNote, problem, skippedNote].compactMap { $0 }
+        let limitNote = monthlyStopMessage == nil ? nil
+            : "The monthly spending limit stopped model suggestions for some box and folder labels."
+        let lines = [limitNote, unavailableNote, fallbackNote, problem, skippedNote].compactMap { $0 }
         return lines.isEmpty ? nil : lines.joined(separator: " ")
     }
 }

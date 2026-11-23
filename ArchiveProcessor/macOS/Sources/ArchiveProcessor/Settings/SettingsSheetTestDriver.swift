@@ -392,7 +392,7 @@ enum SettingsSheetTestDriver {
               "\(pmCeiling?.value ?? "") [\(pmCeiling?.source ?? "")]")
         let pmMonth = pm.limits.first { $0.id == "month" }
         check("3b the month's spending is shown against its limit",
-              pmMonth?.value == "$12.00 of $20.00, from 2 batches", pmMonth?.value ?? "none")
+              pmMonth?.value == "about $12.00 of $20.00, from 2 batches", pmMonth?.value ?? "none")
         let spentOut = sheet("per-month-spent", general: monthly,
                              month: SettingsMonthSpend(usd: 25, entries: spentLines))
         check("3b a spent month leaves free choices only",

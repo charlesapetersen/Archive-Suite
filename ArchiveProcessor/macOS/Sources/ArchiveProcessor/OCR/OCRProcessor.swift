@@ -8,7 +8,10 @@ class OCRProcessor: ObservableObject {
     @Published var jobs: [OCRJob] = []
     @Published var isProcessing = false {
         didSet {
-            if !isProcessing { monthlySpend = nil }
+            if !isProcessing {
+                monthlySpend = nil
+                paidRequestScope = nil
+            }
             updateRunActivity()
         }
     }
@@ -26,6 +29,7 @@ class OCRProcessor: ObservableObject {
     var unavailableOpenRouterRunMessage: String?
     var monthlySpend: ProcessFilesMonthlySpend?
     var monthlyStopMessage: String?
+    var paidRequestScope: PaidRequests?
     /// Either wait: the OCR loops start no new page while it holds.
     var drainingPages: Bool { quitWhenPagesSaved || stopWhenPagesSaved }
     /// Whether the run is in its main OCR pass, the one stage a quit or Stop can wait on (`performOCRPhase`, its resume
@@ -527,6 +531,8 @@ class OCRProcessor: ObservableObject {
         var segmentationAnswers: [String: SavedGapAnswer]? = nil
         /// True after the poll ended and every OCR result and output path was recorded.
         var resultsCollected: Bool? = nil
+        /// Links that could not be saved in the paid ledger when the provider returned the job ID.
+        var paidRequestLinks: [String: UUID]? = nil
 
         var usesWindowSegmentation: Bool {
             guard enableTagging,
@@ -610,6 +616,7 @@ class OCRProcessor: ObservableObject {
             segmentationWindows = try c.decodeIfPresent([WindowKey: WindowAnswer].self, forKey: .segmentationWindows)
             segmentationAnswers = try c.decodeIfPresent([String: SavedGapAnswer].self, forKey: .segmentationAnswers)
             resultsCollected = try c.decodeIfPresent(Bool.self, forKey: .resultsCollected)
+            paidRequestLinks = try c.decodeIfPresent([String: UUID].self, forKey: .paidRequestLinks)
             newspaperManifest = try c.decodeIfPresent(NewspaperBatch.Manifest.self, forKey: .newspaperManifest)
             newspaperParts = try c.decodeIfPresent([String: OCRResult].self, forKey: .newspaperParts)
             cascade = try c.decodeIfPresent(OCRCascade.self, forKey: .cascade)

@@ -80,7 +80,7 @@ extension OCRProcessor {
         case .some(let p): proposals = p
         case .none: return .stopped
         }
-        guard !Task.isCancelled else { return .stopped }
+        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { return .stopped }
 
         // The flagged pass.
         let rotations = pages.fileIndices.map { jobs[$0].result?.rotationDegrees ?? 0 }
@@ -243,15 +243,6 @@ extension OCRProcessor {
             estimatedSpend = 0
         }
         guard reserveMonthlySpend(estimatedSpend, for: "document segmentation") else { return nil }
-        let ledgerOutputFolder = activeRunConfig?.outputDirectory
-        defer {
-            if let estimatedSpend, estimatedSpend > 0 {
-                // A stage may have spent its estimate before an interruption. Keep that charge when a run resumes.
-                SettingsLayerStore.shared.recordSpend(usd: estimatedSpend, runID: nil,
-                                                      outputDirectory: ledgerOutputFolder, files: 0)
-                if !Task.isCancelled { monthlySpend?.reserved -= estimatedSpend }
-            }
-        }
         do {
             // A model on this Mac reads one window at a time (one model, one GPU), as the local OCR route reads pages.
             let onThisMac = spec.voters.allSatisfy { $0.provider == .local }
@@ -312,7 +303,7 @@ extension OCRProcessor {
                                 title: String = WindowStopPrompt.defaultTitle) async -> [GapProposal]? {
         // A Stop pressed during the last suspension has already released the continuations: arming a new one
         // now would show a stale prompt and leak it.
-        guard !Task.isCancelled else { return nil }
+        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { return nil }
         let canResume = activePendingRun != nil || activePendingBatch?.usesWindowSegmentation == true
         windowStopPrompt = WindowStopPrompt(message: message, canResumeLater: canResume, title: title)
         let choice = await withCheckedContinuation { continuation in
@@ -425,8 +416,7 @@ extension OCRProcessor {
         // a success tail that only those guards stop), and no completion is recorded.
         processingTask?.cancel()
         processingTask = nil
-        // The OCR it stops after was paid for (W46.settings-ledger-more); a resume that finishes the run adds the rest.
-        recordUnfinishedRunSpend()
+        activeRunHistory = nil
         activePendingRun = nil
         activePendingBatch = nil
         isProcessing = false

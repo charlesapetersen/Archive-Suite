@@ -574,11 +574,11 @@ enum SettingsLayersTestDriver {
         let month = store.monthSpend(now: day, calendar: cal)
         eq("the month counts only its own batches", month.usd, 1.75)
         eq("the month's batches, newest first", month.entries.map(\.usd), [0.25, 1.5])
-        eq("the month in words", month.summary, "$1.75 by 2 batches")
+        eq("the month in words", month.summary, "about $1.75 by 2 batches")
         eq("the month before is its own", store.monthSpend(now: lastMonth, calendar: cal).usd, 9)
         eq("an empty month", SettingsMonthSpend().summary, "nothing yet")
         eq("an empty month against its limit", SettingsMonthSpend().summary(of: 20), "$0.00 of $20.00, no batches yet")
-        eq("the month against its limit", month.summary(of: 20), "$1.75 of $20.00, from 2 batches")
+        eq("the month against its limit", month.summary(of: 20), "about $1.75 of $20.00, from 2 batches")
         eq("spentThisMonthUSD is the month's total", store.spentThisMonthUSD(now: day, calendar: cal), 1.75)
 
         store.recordSpend(usd: 2, runID: UUID(), outputDirectory: nil, files: 5, now: day.addingTimeInterval(120))

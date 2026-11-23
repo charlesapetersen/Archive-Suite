@@ -159,8 +159,7 @@ struct GeneralInterviewView: View {
             LabeledContent("Spent this month", value: month.summary)
             if !month.entries.isEmpty {
                 Text(String(format: "$%.2f", left) + " left of " + String(format: "$%.2f", max(0, answers.monthCeilingUSD))
-                     + " for the rest of the month. The settings sheet chooses within what is left; Process Files"
-                     + " does not yet stop a batch at the limit.")
+                     + " for the rest of the month. Process Files checks the balance before each paid request.")
                     .font(.caption).foregroundStyle(.secondary)
                 ForEach(Array(month.entries.prefix(Self.ledgerLines).enumerated()), id: \.offset) { _, e in
                     Text(Self.ledgerLine(e)).font(.caption).foregroundStyle(.secondary)
@@ -169,8 +168,8 @@ struct GeneralInterviewView: View {
                     Text("and \(month.batches - Self.ledgerLines) earlier this month").font(.caption).foregroundStyle(.secondary)
                 }
             }
-            Text("Each batch counts at the list prices the app estimates: when it finishes, or for the pages it read when it"
-                 + " stops early; a Live Capture session counts at Finalize. A provider's bill may differ a little.")
+            Text("Process Files and Live Capture count requests as they are sent. The app uses provider charges when available"
+                 + " and labels estimates and requests whose charges are still unknown.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .accessibilityIdentifier("ap.interview.monthLedger")
@@ -184,7 +183,9 @@ struct GeneralInterviewView: View {
         f.setLocalizedDateFormatFromTemplate("d MMM")
         var what = e.collectionName ?? "a batch"
         if let n = e.files { what += ", \(n) \(n == 1 ? "file" : "files")" }
-        return f.string(from: e.date) + " · " + what + " · " + String(format: "$%.2f", e.usd)
+        let amount = e.request?.basis == .unresolved && e.request?.estimate == nil && e.usd == 0
+            ? "amount unknown" : CostEstimate.money(e.usd) + (e.paymentNote.map { " (\($0))" } ?? "")
+        return f.string(from: e.date) + " · " + what + " · " + amount
     }
 
     // MARK: The questions

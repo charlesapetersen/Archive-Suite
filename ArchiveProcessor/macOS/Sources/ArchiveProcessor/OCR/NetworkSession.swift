@@ -215,7 +215,9 @@ enum NetworkSession {
                || testTransportIsEnabled(
                 flag: ProcessInfo.processInfo.environment[PageReaderTestDriver.envKey])
                || testTransportIsEnabled(
-                flag: ProcessInfo.processInfo.environment[ProcessFilesTestDriver.meterEnvKey]))
+                flag: ProcessInfo.processInfo.environment[ProcessFilesTestDriver.meterEnvKey])
+               || testTransportIsEnabled(
+                flag: ProcessInfo.processInfo.environment["NETWORKSESSION_TEST"]))
         else { return nil }
         return stub
 #else
@@ -232,26 +234,69 @@ enum NetworkSession {
                         newRequest request: URLRequest) async -> URLRequest? { nil }
     }
 
+    struct PaidBatch: Sendable {
+        let provider: LLMProvider
+        let estimate: Double
+        let count: Int
+        let parseID: @Sendable (Data) -> String?
+    }
+
     /// Perform a data request through the global limiter, retrying transient transport errors
-    /// and rate-limit/overload responses with exponential backoff + jitter (honoring
-    /// `Retry-After` when present).
+    /// and rate-limit/overload responses with exponential backoff + jitter (honoring Retry-After).
     static func data(
         for request: URLRequest,
         policy: NetworkRetryPolicy,
         maxRetries: Int = 4,
-        followRedirects: Bool = true
+        followRedirects: Bool = true,
+        billing: PaidRequests.Billing? = nil,
+        paidBatch: PaidBatch? = nil
     ) async throws -> (Data, URLResponse) {
         try await withRequestSlot(request) {
-            // W16.bat7-fu — the production call is the one with no `transport:` argument. The seam adds a
-            // branch, so a build without `activeTestTransport` cannot reach a stub.
-            if let stub = activeTestTransport {
-                return try await performWithRetry(request, policy: policy, maxRetries: maxRetries, transport: stub)
+            let transport: Transport
+            if let stub = activeTestTransport { transport = stub }
+            else if followRedirects { transport = { try await shared.data(for: $0) } }
+            else { transport = { try await shared.data(for: $0, delegate: NoRedirects()) } }
+            guard let context = PaidRequests.context, request.httpMethod == "POST" else {
+                return try await performWithRetry(request, policy: policy, maxRetries: maxRetries, transport: transport)
             }
-            if followRedirects {
-                return try await performWithRetry(request, policy: policy, maxRetries: maxRetries)
+            if let paidBatch {
+                return try await performWithRetry(request, policy: policy, maxRetries: maxRetries, transport: { req in
+                    let attempt = try await context.admit(provider: paidBatch.provider, estimate: paidBatch.estimate,
+                                                          count: paidBatch.count)
+                    let (data, response) = try await transport(req)
+                    if let http = response as? HTTPURLResponse {
+                        if (200..<300).contains(http.statusCode), let id = paidBatch.parseID(data) {
+                            let jobID = id.trimmingCharacters(in: .whitespacesAndNewlines)
+                            do {
+                                try await context.store.linkPaidBatch(attemptID: attempt.id, provider: paidBatch.provider,
+                                                                     jobID: jobID, runID: context.runID)
+                            } catch {
+                                // The provider's ID belongs in the run recovery record even if this write failed.
+                                throw PaidRequests.BatchLinkFailure(attemptID: attempt.id, jobID: jobID)
+                            }
+                        } else if http.statusCode == 429
+                                    || definiteBatchCreateRefusal(data: data, statusCode: http.statusCode) != nil {
+                            await attempt.settle(.declined, amount: 0)
+                        }
+                    }
+                    return (data, response)
+                })
             }
-            return try await performWithRetry(request, policy: policy, maxRetries: maxRetries,
-                                              transport: { try await shared.data(for: $0, delegate: NoRedirects()) })
+
+            let json = PaidRequests.jsonObject(request.httpBody)
+            var route = billing
+            if route == nil { route = await PaidRequests.billing(for: request) }
+            guard let route else {
+                return try await performWithRetry(request, policy: policy, maxRetries: maxRetries, transport: transport)
+            }
+            let estimate = route.fallback ?? route.price?.estimate(forJSON: json)
+            return try await performWithRetry(request, policy: policy, maxRetries: maxRetries, transport: { req in
+                let attempt = try await context.admit(provider: route.provider, estimate: estimate)
+                let (data, response) = try await transport(req)
+                let (basis, amount) = PaidRequests.responseAmount(data: data, response: response, billing: route)
+                await attempt.settle(basis, amount: amount)
+                return (data, response)
+            })
         }
     }
 

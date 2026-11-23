@@ -269,11 +269,16 @@ struct LocalAgentWindowTransport: WindowTransport {
                 throw WindowTransportError.fatal("Claude Code billing changed. Check its sign-in before resuming segmentation.")
             }
         }
+        let paidAttempt = try await PaidRequests.admitClaudeCLI(billing: billing, modelID: r.voter.modelID,
+                                                                prompt: r.prompt, imageCount: r.images.count)
         let run = await LocalAgentClient.runAsync(binaryPath: binaryPath, args: Self.arguments(model: r.voter.modelID),
                                                   stdinText: r.prompt, timeout: timeout, currentDirectory: dir,
                                                   unsetEnvironment: Self.apiCredentialVariables)
-        if run.cancelled { throw CancellationError() }
         let stream = ClaudeStreamOutput.parse(run.stdout)
+        let apiKey = stream.billedByAPIKey(billing)
+        await PaidRequests.settleClaudeCLI(paidAttempt, usageUSD: stream.notionalUSD, byAPIKey: apiKey,
+            byPlan: !apiKey && (billing != .unknown || stream.hasPlanEvidence), spawnFailed: run.spawnFailed)
+        if run.cancelled { throw CancellationError() }
         let result = Result { try Self.classify(run, stream: stream, now: Date()) }
         if stream.billedByAPIKey(billing) {
             await ClaudeCLIUsage.shared.reportAPIUsage(stream.notionalUSD, binary: binaryPath)

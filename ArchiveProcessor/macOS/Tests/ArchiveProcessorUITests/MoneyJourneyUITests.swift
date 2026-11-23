@@ -250,6 +250,17 @@ final class MoneyJourneyUITests: XCTestCase {
         let final = try requestRecords()
         XCTAssertEqual(final.count, 5)
         XCTAssertEqual(Set(final.map(\.digest)).count, 5)
+
+        let settings = app.showSettingsWindow()
+        XCTAssertTrue(app.showSettingsPanel("General"))
+        settings.buttons["Answer the setup questions…"].click()
+        let sheet = settings.sheets.firstMatch
+        XCTAssertTrue(sheet.waitForExistence(timeout: 10))
+        let ledger = text(containing: "Process Files and Live Capture count requests as they are sent.")
+        XCTAssertTrue(ledger.waitForExistence(timeout: 10))
+        reveal(ledger, in: sheet.scrollViews.firstMatch)
+        XCTAssertTrue(text(containing: "list-price estimate").exists)
+        shot("monthly-paid-request-ledger")
     }
 
     func testMonthlyLimitRefusesProviderBatchBeforeSubmission() throws {

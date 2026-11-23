@@ -88,12 +88,17 @@ For models that support low/high thinking, include a dropdown: Low / High.
   (W49.proc-fix-s041): the trace call on every backend, the image pass on 32% of documents (all, with the Dates card's
   image switch on), and the item fields by the page, at the bench's measured gateway figures. Neither is batched.
   Process Files' Cost Estimate box shows them as "Dating" and "Item fields", Settings as "· Dating" and "· Item fields";
-  the run history and Live Capture's ledger entry count them the same way
+  the run history also includes these estimates.
 - **Names** adds one interactive text call per expected eligible correspondence document when Automatic tagging
   and JSON sidecars are on and the collection ranks Names. It uses the text route's prices and estimates the
   correspondence share from the mixed item-field bench (157 of 299 documents). Overrides for either type of
-  correspondence remove its share. Standard and batch totals, run history and Live Capture's ledger include it
+  correspondence remove its share. Standard and batch totals and the run history include the estimate
   (W49.proc-fix-s044).
+- The monthly ledger follows requests from Process Files and Live Capture (W49.proc-ledger-track-paid).
+  It records the estimate at admission and updates the amount from the provider response. A provider's
+  dollar figure takes precedence over usage at list rates. A batch uses its provider job and result IDs
+  to reconcile partial completion when the user cancels or resumes. Where a timeout or incomplete
+  provider reply leaves billing uncertain, the entry retains its estimate or marks the amount unknown.
 
 ### Batch Processing
 - Toggle button to enable batch mode
@@ -392,8 +397,9 @@ Settings/                      W46.settings-solver: the settings layer's solver;
                                (`SettingsKey`, with source and reset); `SettingsResolver` reads them live, nearest
                                first, into the solver's resources and answers; `ResolvedSettingsSnapshot` is the
                                frozen record. Replaced the UserDefaults processing profiles (no migration).
-  SettingsLayerStore.swift     Tier-2 (writes beside the output). The general layer, projects and ledger in
-                               Application Support `settings-general.json`; the collection's document in
+  SettingsLayerStore.swift     Tier-2 (writes beside the output). General, project and older spend rows in
+                               Application Support `settings-general.json`; paid request attempts in
+                               `paid-requests.sqlite` (PaidRequestJournal.swift). The collection's document in
                                `<output>/.archivesuite/collection-settings.json` and one file per run in its `runs/`
                                (`SPEC/collection-settings.md`): atomic, never through a link, never over a run record,
                                an unreadable document set aside, a newer or unopenable one left alone. `snapshot` at

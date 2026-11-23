@@ -1162,8 +1162,14 @@ extension OCRProcessor {
                     .value.bool ?? false
                 // The card starts this in a SwiftUI task, outside the suspended Process Files task.
                 let denyDataCollection = OpenRouterDataPolicy.deny(activeResolvedSettings?.values)
-                decision = await OpenRouterDataPolicy.$denyDataCollection.withValue(denyDataCollection) {
-                    await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument)
+                if let paidRequestScope {
+                    decision = await paidRequestScope.run(denyDataCollection: denyDataCollection) {
+                        await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument)
+                    }
+                } else {
+                    decision = await OpenRouterDataPolicy.$denyDataCollection.withValue(denyDataCollection) {
+                        await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument)
+                    }
                 }
             }
             guard !Task.isCancelled else { return }

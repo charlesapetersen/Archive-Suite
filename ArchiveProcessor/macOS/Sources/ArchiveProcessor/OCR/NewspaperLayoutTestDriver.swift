@@ -423,44 +423,28 @@ enum NewspaperLayoutTestDriver {
                 imageScale: 1, rotationMode: .off, fileCount: 1)
             var snapshot = syncHistory
             snapshot.newspaperSpend = partialSpend
-            check("the unfinished-run ledger prices completed regions without a completed file",
+            check("the unfinished run estimate prices completed regions without a completed file",
                   abs(snapshot.spentSoFar(readSources: []) - 0.02) < 1e-9)
             snapshot.newspaperSpend = completeSpend
             check("completed page history does not add its runtime costs again",
                   abs(snapshot.makeRun(succeeded: 1, layouts: [read.detail.newspaperLayout!]).cost
                       - snapshot.estimatedCost - 0.02) < 1e-9)
-            snapshot.newspaperSpend = NewspaperReadingSpend()
             let ledger = SettingsLayerStore(directory: dir.appendingPathComponent("ledger"))
-            snapshot.ledgerRunID = UUID()
-            snapshot.newspaperSpend = partialSpend
-            let stoppedCost = snapshot.spentSoFar(readSources: [])
-            OCRProcessor.recordNewspaperAdjustedSpend(snapshot, jobs: [], usd: stoppedCost, files: 0,
-                                                       baseSources: [], store: ledger)
-            let reloadedLedger = SettingsLayerStore(directory: ledger.directory)
-            check("abandoned region charges survive reopening the scratch ledger",
-                  abs(reloadedLedger.monthSpend().usd - stoppedCost) < 1e-9)
-            // A fresh resumed snapshot has no runtime accumulator and the same persisted run identity.
-            var resumed = syncHistory
-            resumed.ledgerRunID = snapshot.ledgerRunID
-            let resumedCost = resumed.makeRun(succeeded: 1).cost
-            OCRProcessor.recordNewspaperAdjustedSpend(resumed, jobs: [], usd: resumedCost, files: 1,
-                                                       baseSources: nil, store: reloadedLedger)
-            check("Stop then Resume adds abandoned regions to the resumed run instead of absorbing them",
-                  abs(reloadedLedger.monthSpend().usd - stoppedCost - resumedCost) < 1e-9)
-            // A late result with the same attempt ID can arrive from a kept batch journal after Stop.
-            let lateIDs = Array(partialSpend.unreportedCharges(layouts: [], baseSources: []).keys)
-            let lateNote = NewspaperLayoutRecord(regions: 2, requests: 2, coverage: 1, filled: false,
-                                                 fallback: nil, estimatedExtraCost: 0.01, spendIDs: lateIDs)
-            var lateJob = OCRJob(sourceURL: source)
-            lateJob.result = OCRResult(text: "late result", classification: nil, errorMessage: nil,
-                                       errorCode: nil, newspaperLayout: lateNote)
-            let lateLedger = SettingsLayerStore(directory: dir.appendingPathComponent("late-ledger"))
-            OCRProcessor.recordNewspaperAdjustedSpend(snapshot, jobs: [], usd: stoppedCost, files: 0,
-                                                       baseSources: [], store: lateLedger)
-            OCRProcessor.recordNewspaperAdjustedSpend(resumed, jobs: [lateJob], usd: 0.03, files: 1,
-                                                       baseSources: nil, store: lateLedger)
-            check("a late collected result never charges its already-ledgered attempt twice",
-                  abs(lateLedger.monthSpend().usd - 0.03) < 1e-9)
+            let runID = UUID()
+            let scope = PaidRequests(runID: runID, outputDirectory: dir, store: ledger)
+            let region = try scope.admit(provider: .gemini, estimate: 0.02)
+            let reopened = SettingsLayerStore(directory: ledger.directory)
+            check("an abandoned region remains charged on reopening the scratch ledger",
+                  abs(reopened.monthSpend().usd - 0.02) < 1e-9)
+            let resumed = PaidRequests(runID: runID, outputDirectory: dir, store: reopened)
+            let resumedRegion = try resumed.admit(provider: .gemini, estimate: 0.03)
+            resumedRegion.settle(.estimate, amount: 0.03)
+            check("Stop then Resume adds the resumed request to the abandoned one",
+                  abs(reopened.monthSpend().usd - 0.05) < 1e-9)
+            region.settle(.estimate, amount: 0.01)
+            region.settle(.estimate, amount: 0.01)
+            check("a late region response updates its attempt even after Resume",
+                  abs(reopened.monthSpend().usd - 0.04) < 1e-9 && reopened.paidRequestsThisMonth().count == 2)
             let standardSpend = NewspaperReadingSpend()
             snapshot = RunHistorySnapshot(resuming: pending, rotationMode: .off, imageScale: 1)
             let standardID = UUID()
