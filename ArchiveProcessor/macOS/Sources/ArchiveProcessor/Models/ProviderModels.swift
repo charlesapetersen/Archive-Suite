@@ -852,9 +852,10 @@ struct OCRResult: Codable {
     let readingCodes: [String]?
     /// Gemini returned a server error and neither the cascade nor the refusal fallback had a second reader.
     var noSecondReaderAvailable: Bool? = nil
-    /// W46.rotation-default — the agreement rule left this page as it is: Vision and PP-LCNet disagreed, or Vision
-    /// found no text, and no cloud route was set. `nil` = rotation was settled (or not checked).
+    /// Rotation needs checking, even if a fallback supplied a correction. Manual rotation clears this flag.
     var rotationUnsure: Bool? = nil
+    /// The selected comparative mode received no usable vote and fell back to Apple Vision.
+    var comparativeRotationFailed: Bool? = nil
     /// The fixed newspaper layout stage, including a visible whole-page fallback reason.
     var newspaperLayout: NewspaperLayoutRecord? = nil
     /// W46.post-read-quality-flag — this page probably read poorly (`ReadQualityFlag`): Apple Vision read it with low
@@ -921,6 +922,7 @@ struct OCRResult: Codable {
                   readPoorly: readPoorly, imageCorrectionApplied: imageCorrectionApplied)
         copy.noSecondReaderAvailable = noSecondReaderAvailable
         copy.rotationUnsure = rotationUnsure
+        copy.comparativeRotationFailed = comparativeRotationFailed
         copy.newspaperLayout = newspaperLayout
         return copy
     }

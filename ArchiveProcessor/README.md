@@ -65,7 +65,7 @@ or **OpenAI** key (an OpenRouter key is pasted straight into Settings):
 
 Each input image produces a two-page PDF:
 
-- **Page 1:** The original image, correctly oriented (rotation detected and applied automatically)
+- **Page 1:** The original image with any detected rotation applied
 - **Page 2:** Extracted OCR text with provider, model, and date metadata. Page height adjusts dynamically — text never overflows to a third page.
 
 ### Multi-Page Document Merging
@@ -74,7 +74,7 @@ When enabled, continuation pages are merged into a single PDF with their documen
 
 ### Image Orientation Correction
 
-Archive Processor checks whether each page is upright. In the recommended mode, two models on this Mac check the page first. If they cannot settle it, a remote gateway or OpenRouter can ask Gemini 3.7 Flash. The run estimate includes those calls. For folder photographs, the app uses the folder tab to judge orientation. In Settings you can choose a comparative model check on every page, use only the Mac's Vision detector, or turn rotation checks off.
+Archive Processor checks whether each page is upright. In the recommended mode, two models on this Mac check the page first. If they cannot settle it, a remote gateway or OpenRouter can ask Gemini 3.7 Flash. The run estimate includes those calls. For folder photographs, the app uses the folder tab to judge orientation. In Settings you can choose a comparative model check on every page, use only the Mac's Vision detector, or turn rotation checks off. If a comparative check gets no usable vote, the app falls back to Apple Vision and reports the failed check and any pages left unturned in the run summary. The optional run log names the affected files.
 
 To check rotation by hand, turn on **Review rotation** in Settings (it needs a detection mode). It is its own short pass, before the segmentation review: radio buttons for 0°, 90°, 180°, 270° with live thumbnail preview, and `[`/`]` rotate the focused image in 90° increments.
 

@@ -129,7 +129,7 @@ private struct ProcessingHistoryRow: View {
                 Text("· \(n) gateway label \(n == 1 ? "request" : "requests")")
             }
             if let n = run.rotationUnsurePages, n > 0 {
-                Text("· \(n) left unturned, rotation unsure")
+                Text("· Rotation unsure on \(n) \(n == 1 ? "page" : "pages")")
             }
             if let n = run.readPoorlyPages, n > 0 {
                 Text("· \(n) may have read poorly (Apple Vision was unsure, or read the page differently)")

@@ -228,6 +228,22 @@ enum RotationRuleTestDriver {
         let coded = try? JSONDecoder().decode(OCRResult.self, from: JSONEncoder().encode(unsure))
         check("5 the mark persists with the run's results", coded?.rotationUnsure == true)
 
+        let abstained = OCRProcessor.mergeRotation(into: read, verdict: V(correction: nil, unsure: true, comparativeVoteFailed: true))
+        check("5 a failed vote and Vision abstention preserve the OCR rotation and mark it",
+              abstained.rotationDegrees == 90 && abstained.rotationUnsure == true && abstained.comparativeRotationFailed == true)
+        let turned = OCRProcessor.mergeRotation(into: read, verdict: V(correction: 270, unsure: true, comparativeVoteFailed: true))
+        check("5 a failed vote uses Vision's correction and records the failure",
+              turned.rotationDegrees == 270 && turned.rotationUnsure == true && turned.comparativeRotationFailed == true)
+        let reclassified = turned.with(classification: .documentContinuation, rotationDegrees: turned.rotationDegrees)
+        let saved = try? JSONDecoder().decode(OCRResult.self, from: JSONEncoder().encode(reclassified))
+        check("5 the failed vote survives reclassification and saved run results", saved?.comparativeRotationFailed == true)
+        await wire.set(status: 500, letter: "")
+        let localOnly = await OCRProcessor.detectRotation(imageURL: blankPage, provider: .mistral, apiKey: "",
+                                                          mode: .llmSingle, gatewayConfig: nil)
+        let localOnlyRequests = await wire.seen()
+        check("5 a backend without comparative rotation uses Vision without reporting a failed vote",
+              localOnly == V(correction: nil) && localOnlyRequests.isEmpty)
+
         let model = remote.asLLMModel()
         let snapshot = RunHistorySnapshot(
             startedAt: Date(), provider: .anthropic, gatewayConfig: nil, localAgent: nil, imageTokenProvider: nil,

@@ -111,33 +111,45 @@ final class MessageJourneyUITests: XCTestCase {
         print("[s018] \(times.count) CLI call and \(Int(secondsRemaining))s remained at completion.\n\(log)")
     }
 
-    func testComparativeVoteFailureLeavesSidewaysPageWithoutWarning() throws {
-        var markerBounds: [CGRect] = []
-        for mode in ["rotation-ok", "rotation-fail"] {
-            try prepare()
-            // A text-free portrait page, scanned clockwise. The bar at the right is the turned top border.
-            try makePhoto("in/sideways.jpg", width: 640, height: 320)
-            launch(mode, extra: ["-useGateway", "YES", "-gatewayBaseURL", "https://api.openai.com/v1",
-                                 "-gatewayModelID", "scratch-transcription", "-rotationModeRaw", "llmSingle"])
-            start()
-            waitForDone(succeeded: 1)
-            let rotations = try calls().filter { ($0["images"] as? Int) == 4 }
-            XCTAssertFalse(rotations.isEmpty)
-            let expected = mode == "rotation-ok" ? 200 : 500
-            XCTAssertTrue(rotations.allSatisfy { ($0["status"] as? Int) == expected })
-            let pdf = try XCTUnwrap(PDFDocument(url: root.appendingPathComponent("out/sideways.pdf")))
-            let page = try XCTUnwrap(pdf.page(at: 0))
-            let bounds = try boundsOfBlueMarker(in: page, name: "s029-\(mode)-pdf")
-            markerBounds.append(bounds)
-            XCTAssertFalse(text("rotation unsure").exists, app.debugDescription)
-            XCTAssertFalse(text("rotation check failed").exists, app.debugDescription)
-            XCTAssertFalse(try runLog().localizedCaseInsensitiveContains("rotation"))
-            shot("s029-\(mode)")
-            print("[s029] \(mode) \(rotations.count) vote request(s) at HTTP \(expected), rendered blue marker \(bounds.size)")
-            app.terminate()
+    func testComparativeRotationReportsFailedVotesAndPagesLeftUnturned() throws {
+        for (rotationMode, voteCount) in [("llmSingle", 1), ("llmMajority", 3)] {
+            var markerBounds: [CGRect] = []
+            for failedVote in [false, true] {
+                let mode = failedVote ? "rotation-fail" : "rotation-ok"
+                let name = "s029-\(rotationMode)-\(mode)"
+                try prepare()
+                // A text-free portrait page, scanned clockwise. The blue bar marks its top edge.
+                try makePhoto("in/sideways.jpg", width: 640, height: 320)
+                launch(mode, extra: ["-useGateway", "YES", "-gatewayBaseURL", "https://api.openai.com/v1",
+                                     "-gatewayModelID", "scratch-transcription", "-rotationModeRaw", rotationMode])
+                start()
+                waitForDone(succeeded: 1)
+                let rotations = try calls().filter { ($0["images"] as? Int) == 4 }
+                XCTAssertEqual(rotations.count, voteCount)
+                let expected = failedVote ? 500 : 200
+                XCTAssertTrue(rotations.allSatisfy { ($0["status"] as? Int) == expected })
+                let pdf = try XCTUnwrap(PDFDocument(url: root.appendingPathComponent("out/sideways.pdf")))
+                let page = try XCTUnwrap(pdf.page(at: 0))
+                let bounds = try boundsOfBlueMarker(in: page, name: "\(name)-pdf")
+                markerBounds.append(bounds)
+                let log = try runLog()
+                if failedVote {
+                    XCTAssertTrue(text("Comparative rotation check failed on 1 page").exists, app.debugDescription)
+                    XCTAssertTrue(text("1 page left unturned, rotation unsure.").exists, app.debugDescription)
+                    XCTAssertTrue(log.contains("• sideways.jpg: Comparative rotation check failed."), log)
+                    XCTAssertTrue(log.contains("Apple Vision checked rotation instead. Left unturned, rotation unsure."), log)
+                } else {
+                    XCTAssertFalse(text("rotation unsure").exists, app.debugDescription)
+                    XCTAssertFalse(text("rotation check failed").exists, app.debugDescription)
+                    XCTAssertFalse(log.contains("Rotation warnings:"), log)
+                }
+                shot(name)
+                print("[s029] \(name) \(rotations.count) vote request(s) at HTTP \(expected), rendered blue marker \(bounds.size)")
+                app.terminate()
+            }
+            XCTAssertGreaterThan(markerBounds[0].width, markerBounds[0].height, "a usable comparative reply turns the page")
+            XCTAssertLessThan(markerBounds[1].width, markerBounds[1].height, "with no vote or Vision answer, the page stays sideways")
         }
-        XCTAssertGreaterThan(markerBounds[0].width, markerBounds[0].height, "a usable comparative reply turns the page")
-        XCTAssertLessThan(markerBounds[1].width, markerBounds[1].height, "the failed vote silently leaves it sideways")
     }
 
     func testRunLogLosesOneOfTwoSameNamedFailures() throws {

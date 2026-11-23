@@ -61,9 +61,12 @@ See W49.proc-fix-s024 and the [original VM reproduction](../verification/evidenc
 
 - Codex reported a known reset, but the app ended the page after one invocation and said it would pace and retry. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md). (queued: W49.proc-fix-s018)
 
-## Comparative rotation can leave scans sideways without a warning (S-029)
+## FIXED (2026-11-23) — Comparative rotation could leave scans sideways without a warning (S-029)
 
-- A failed comparative vote left a sideways scan in the PDF. The app reported OCR success and gave no rotation warning. A successful vote on the same image turned it upright. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md). (queued: W49.proc-fix-s029)
+Both comparative modes report a failed check in the completion summary and the optional run log.
+Apple Vision still checks the page locally. The summary distinguishes pages left unturned from pages
+that were turned but still need checking. See W49.proc-fix-s029 and the
+[original VM reproduction](../verification/evidence/processor/W49.proc-suspects-messages-check.md).
 
 ## Process Files counts two same-named failed files as one (S-030)
 

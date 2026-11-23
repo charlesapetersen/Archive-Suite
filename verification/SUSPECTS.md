@@ -788,7 +788,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a run of rotated synthetic scans with LLM rotation set and the key removed: check page 1
   orientation and whether anything reports the fallback.
 - **Would clear it:** the fallback is reported, or the pages come out upright.
-- **Status:** `reproduced` — independently confirmed and queued as W49.proc-fix-s029. [Independent VM evidence](evidence/processor/W49.proc-suspects-messages-check.md).
+- **Status:** `cleared` — fixed by W49.proc-fix-s029. [Independent VM evidence](evidence/processor/W49.proc-suspects-messages-check.md).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
@@ -798,6 +798,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     a failed cloud call, the help measures Vision wrong on 3 of 119 (not about 60%), and README documents the fallback;
     the silence is undocumented. A fix keeps the fallback and reports it.
   - 2026-11-21 W49.proc-suspects-messages-check (Codex gpt-6.2-sol, baseline `8e89c29b`) — A failed comparative vote left a sideways scan in the PDF. The app reported OCR success and gave no rotation warning. A successful vote on the same image turned it upright.
+  - 2026-11-23 W49.proc-fix-s029 — both comparative modes report the fallback and which pages were left unturned.
 
 ### S-030 · The run log can give one failed file another's reason
 

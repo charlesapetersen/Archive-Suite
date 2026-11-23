@@ -2212,10 +2212,11 @@ extension OCRProcessor {
         return await ReadQualityDisagreement.addingFlag(to: merged, route: route, imageURL: imageURL)
     }
     /// What rotation detection decided for a page: the clockwise correction (nil = keep the OCR model's own guess),
-    /// and whether the agreement rule left the page as it is because its detectors did not settle it.
+    /// and whether the selected checks could settle its orientation.
     struct RotationVerdict: Sendable, Equatable {
         var correction: Int?
         var unsure = false
+        var comparativeVoteFailed = false
     }
 
     /// Detect the clockwise correction for an image per the run's rotation mode, with LLM
@@ -2250,17 +2251,20 @@ extension OCRProcessor {
             return await agreementVerdict(vision: v, lcnet: p, cloud: cloud, lcnetLoaded: RotationLCNet.isAvailable)
         case .llmSingle, .llmMajority:
             // Backends with no multi-image comparative-rotation path skip straight to local Vision.
-            if LLMRotationDetector.hasRoute(
-                   provider: provider, usesGateway: gatewayConfig != nil, usesLocalAgent: localAgent != nil,
-                   gatewayIsLocal: gatewayConfig?.isLocalModel == true),
-               let c = await LLMRotationDetector.detectCorrection(
-                   imageURL: imageURL, provider: provider, apiKey: apiKey,
-                   orderings: mode.orderings, gatewayConfig: gatewayConfig
-               ) {
+            guard LLMRotationDetector.hasRoute(
+                provider: provider, usesGateway: gatewayConfig != nil, usesLocalAgent: localAgent != nil,
+                gatewayIsLocal: gatewayConfig?.isLocalModel == true
+            ) else {
+                return RotationVerdict(correction: await RotationDetector.detectCorrection(imageURL: imageURL))
+            }
+            if let c = await LLMRotationDetector.detectCorrection(
+                imageURL: imageURL, provider: provider, apiKey: apiKey,
+                orderings: mode.orderings, gatewayConfig: gatewayConfig
+            ) {
                 return RotationVerdict(correction: c)
             }
-            // Fall back to local Vision if the LLM path is unavailable or fails.
-            return RotationVerdict(correction: await RotationDetector.detectCorrection(imageURL: imageURL))
+            let fallback = await RotationDetector.detectCorrection(imageURL: imageURL)
+            return RotationVerdict(correction: fallback, unsure: true, comparativeVoteFailed: true)
         }
     }
 
@@ -2284,12 +2288,15 @@ extension OCRProcessor {
         return RotationVerdict(correction: 0, unsure: true)
     }
 
-    /// Replace a result's rotation with the detected correction when the result has text and
-    /// a correction was found; otherwise return the result unchanged. An unsure verdict is recorded on the page.
+    /// Record the verdict on a successful read, keeping the OCR rotation when detection abstains.
     nonisolated static func mergeRotation(into result: OCRResult, verdict: RotationVerdict) -> OCRResult {
-        guard result.text != nil, let rot = verdict.correction else { return result }
-        var merged = result.with(classification: result.classification, rotationDegrees: rot)
+        guard result.text != nil else { return result }
+        var merged = result
+        if let correction = verdict.correction {
+            merged = result.with(classification: result.classification, rotationDegrees: correction)
+        }
         merged.rotationUnsure = verdict.unsure ? true : nil
+        merged.comparativeRotationFailed = verdict.comparativeVoteFailed ? true : nil
         return merged
     }
     private func isRetryableError(_ result: OCRResult?) -> Bool {

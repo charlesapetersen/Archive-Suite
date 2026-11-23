@@ -576,27 +576,30 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 
 ### P-25 · Rotation detected and corrected
 
-- **Promise:** sideways or upside-down images are detected (locally by Vision, or by the LLM) and output PDFs always
-  show them upright; folder photos orient by the folder tab.
+- **Promise:** the app checks orientation and applies any detected turn to its output PDFs. If a comparative
+  check fails and the app falls back to Apple Vision, the completion summary reports the failure and any pages
+  left unturned. Folder photos orient by the folder tab.
 - **Promised in:** `README.md` §Image Orientation Correction; `CLAUDE.md` Impl Map `RotationDetector`,
   `LLMRotationDetector`; `TESTING.md` §2.7.
 - **Reached by:** ⌘, → Detect rotation (`Views/SettingsView.swift:853`) → `Views/OCRView.swift:1306` →
   `detectRotation` (`OCR/OCRProcessor+OCR.swift:1732`, defined `:1827`) → `RotationDetector` or
   `LLMRotationDetector` → `mergeRotation` (`:1856`) → `PDFGenerator.makeImagePage`. Folder-tab rule in the prompt
   (`OCR/OCRPrompt.swift:42`). The manual rotation pass: P-32.
-- **Real-path test:** the manual pass only: `ReviewDialogsJourneyUITests` (W40.d2, VM).
+- **Real-path tests:** `ReviewDialogsJourneyUITests` (manual pass) and
+  `MessageJourneyUITests.testComparativeRotationReportsFailedVotesAndPagesLeftUnturned` (automatic checks).
 - **Runtime evidence:** W40.d2, 2026-11-19: the Review rotation pass, 90° clicked on one photo, is baked into its
   PDF's page 1. In that run, all photos were proposed 0°. [Manual review evidence](evidence/processor/W40.d2-review-dialogs.md).
   On 2026-11-21, `MessageJourneyUITests.testComparativeVoteFailureLeavesSidewaysPageWithoutWarning`
   rendered a sideways image without a warning after a synthetic HTTP 500 in single-vote comparative mode.
   A usable synthetic vote turned the same image upright. [Independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md).
-- **Status:** `broken` — W49.proc-fix-s029 for S-029.
+- **Status:** `verified` for comparative success and fallback reporting in both modes (W49.proc-fix-s029).
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-19 W40.d2 — stays `unproven`: the manual pass works by click; detection is unproven.
   - 2026-11-21 W49.proc-suspects-messages-check — S-029, see runtime evidence.
-- **Notes:** The default agreement mode reports a failed cloud check when it needs a vote. Both comparative modes
-  can fall back silently.
+  - 2026-11-23 W49.proc-fix-s029 — the off-screen regression checks the completion summary, run log and
+    [rendered PDF comparison](evidence/processor/W49.proc-suspects-messages-check.md#s-029-fix--both-comparative-modes).
+- **Notes:** The default agreement mode has its own rule for marking uncertain rotation.
 
 ### P-26 · Run log and on-screen errors
 

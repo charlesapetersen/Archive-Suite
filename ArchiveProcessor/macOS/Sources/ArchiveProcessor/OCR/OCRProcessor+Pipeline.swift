@@ -1033,11 +1033,17 @@ extension OCRProcessor {
     func runDoneMessage(succeeded: Int, failed: Int) -> String {
         let secondRead = jobs.filter { $0.result?.secondReader != nil }.count
         let routed = jobs.filter { $0.result?.pageReader?.isRouted == true }.count
-        let unsure = jobs.filter { $0.result?.rotationUnsure == true }.count
+        let rotations = jobs.filter { $0.status == .succeeded }.compactMap(\.result)
+        let failedVotes = rotations.filter { $0.comparativeRotationFailed == true }.count
+        let unsure = rotations.filter { $0.rotationUnsure == true }
+        let leftUnturned = unsure.filter { $0.rotationDegrees % 360 == 0 }.count
+        let turned = unsure.count - leftUnturned
         return "Done. \(succeeded) succeeded, \(failed) failed."
             + (secondRead == 0 ? "" : " \(secondRead) \(secondRead == 1 ? "page" : "pages") read by a second reader.")
             + (routed == 0 ? "" : " \(routed) \(routed == 1 ? "page" : "pages") read by the reader \(routed == 1 ? "its" : "their") kind chose.")
-            + (unsure == 0 ? "" : " \(unsure) \(unsure == 1 ? "page" : "pages") left unturned, rotation unsure.")
+            + (failedVotes == 0 ? "" : " Comparative rotation check failed on \(failedVotes) \(failedVotes == 1 ? "page" : "pages"). Apple Vision checked rotation instead.")
+            + (leftUnturned == 0 ? "" : " \(leftUnturned) \(leftUnturned == 1 ? "page" : "pages") left unturned, rotation unsure.")
+            + (turned == 0 ? "" : " \(turned) \(turned == 1 ? "page was" : "pages were") turned, rotation unsure.")
             + Self.readPoorlyClause(readPoorlyPages)
     }
 
@@ -4433,6 +4439,21 @@ extension OCRProcessor {
                        + " (the source image was not touched):")
             for name in placeholderOutputs { lines.append("  \u{2022} \(name)") }
         }
+        let rotationRows = jobs.compactMap { job -> String? in
+            guard job.status == .succeeded, let result = job.result else { return nil }
+            var notes: [String] = []
+            if result.comparativeRotationFailed == true {
+                notes.append("Comparative rotation check failed. Apple Vision checked rotation instead.")
+            }
+            if result.rotationUnsure == true {
+                notes.append(result.rotationDegrees % 360 == 0
+                    ? "Left unturned, rotation unsure." : "Turned \(result.rotationDegrees)°, rotation unsure.")
+            }
+            guard !notes.isEmpty else { return nil }
+            return "  \u{2022} \(job.sourceURL.lastPathComponent): " + notes.joined(separator: " ")
+        }
+        if !rotationRows.isEmpty { lines += ["", "Rotation warnings:"] + rotationRows }
+
         lines += Self.taggingFailureLogLines(taggingFailureNames)
         if !textPageOnlyOutputs.isEmpty {
             lines.append("")

@@ -18265,3 +18265,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   [Regression evidence](verification/evidence/processor/W49.proc-suspects-money-check.md#s-027-fix-verification).
   No paid provider calls or bench cache.
   <!-- /W49.proc-fix-s027 -->
+
+- [x] **W49.proc-fix-s029 — Report failed comparative rotation votes and pages left unturned [S · S3]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build,vm) — S-029. Keep the local fallback and tell the user when the comparative vote fails. Verify both comparative modes and retain the portrait and sideways PDF comparison. [VM evidence and reproducer](verification/evidence/processor/W49.proc-suspects-messages-check.md).
+  Both comparative modes now warn when no usable vote comes back. Apple Vision still supplies the local fallback.
+  The completion summary counts uncertain pages left unturned separately from uncertain pages that were turned.
+  The optional log names the affected files. The scratch VM verified one and three votes, with successful and
+  failed replies in each mode. [Rendered PDF comparison](verification/evidence/processor/W49.proc-suspects-messages-check.md#s-029-fix--both-comparative-modes).
+  No paid calls or bench cache.
+  <!-- /W49.proc-fix-s029 -->
