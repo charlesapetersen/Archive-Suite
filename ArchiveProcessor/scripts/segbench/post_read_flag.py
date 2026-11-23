@@ -2,6 +2,7 @@
 """W46.post-read-quality-flag: a "this photo read poorly" flag after processing, fitted for few false alarms.
 
   uv run --with rapidfuzz --with regex --with 'sacrebleu==2.5.1' python post_read_flag.py report
+  python3 post_read_flag.py report --from-scores
   python3 post_read_flag.py self-test
 
 THE QUESTION. After a page is read, can the app tell the owner "this page probably read poorly" while rarely saying
@@ -12,8 +13,8 @@ THE LABELS. A reading is poor when its NES against the 96's adjudicated truth is
 line). A false alarm is a flag on a reading at 70 or above; the false-alarm rate is over those good readings. The
 ceiling is CEILING (5% of good readings). Beside it, the share of flags on readings under 90.
 
-THE SIGNALS, each a risk (higher = more likely poor). A reading that failed (a cap, an error or an empty reply) is
-always flagged: the app already knows it failed, and it is poor by construction. Over answered readings:
+THE SIGNALS, each a risk (higher = more likely poor). Count caps, errors and empty replies as failed readings.
+Fit and score the flag on answered readings. The app handles failures through its refusal and retry paths.
   * conf: the reader's own mean token log-probability, negated (W46.ocr-logprob's per-page CSV: the two Mac mlx
     routes on the 96, the two Sherlock vLLM routes on the 440, 455 and 96). Apple Vision's own confidence is the
     character-weighted mean of its line confidences (it takes the values 1, 0.5 and 0.3), negated.
@@ -54,6 +55,8 @@ GOOD_HI = 0.90
 CEILING = 0.05
 FOLDS, SEEDS = 5, 20
 FAILED = float('inf')
+# These rules are deployed pending the separate removal in W46.p17-flag-unflag-five.
+DEPLOYED_WITHOUT_HITS = {'gemini3.8-flash', 'gemini3.1-pro', 'gemini3.5-flash-lite', 'qwen3.8-flash', 'qwen3.6-27b'}
 
 
 # --- statistics (pure; self-tested) ---------------------------------------------------------------------------
@@ -79,22 +82,29 @@ def auc(risk, poor):
 
 def fit_cut(risk, poor, ceiling=CEILING):
     """The lowest cut c (flag when risk >= c) whose false alarms among good readings stay within the ceiling.
-    Failed readings (risk inf) are always flagged and never count against it. inf if no finite cut fits."""
-    good = sorted((r for r, y in zip(risk, poor) if not y), reverse=True)
+    Return inf if no finite cut fits."""
+    good = [r for r, y in zip(risk, poor) if not y]
     allowed = math.floor(ceiling * len(good) + 1e-9)
     cands = sorted({r for r in risk if r != FAILED}, reverse=True)
     best = FAILED
     for c in cands:
-        if sum(1 for g in good if g >= c) <= allowed:
+        if sum(1 for g in good if g != FAILED and g >= c) <= allowed:
             best = c
         else:
             break
     return best
 
 
-def counts(risk, poor, nes, cut):
-    flag = [r >= cut for r in risk]
-    return {'n': len(risk), 'poor': sum(poor), 'good': len(risk) - sum(poor), 'flagged': sum(flag),
+def counts(risk, poor, nes, cut, *, answered=None):
+    # Newspaper analyses call this with their own row selection and failure policy.
+    extra = {}
+    if answered is not None:
+        extra['failed'] = len(answered) - sum(answered)
+        risk, poor, nes = ([value for value, ok in zip(values, answered) if ok] for values in (risk, poor, nes))
+        flag = [r != FAILED and r >= cut for r in risk]
+    else:
+        flag = [r >= cut for r in risk]
+    return {'n': len(risk), **extra, 'poor': sum(poor), 'good': len(risk) - sum(poor), 'flagged': sum(flag),
             'hits': sum(1 for f, y in zip(flag, poor) if f and y),
             'false_alarms': sum(1 for f, y in zip(flag, poor) if f and not y),
             'flags_under_90': sum(1 for f, e in zip(flag, nes) if f and e < GOOD_HI)}
@@ -119,12 +129,13 @@ def fit_cut_each(risk, poor, sets, ceiling=CEILING):
     """The lowest cut whose false alarms stay within the ceiling on every set at once (sets: one label per row).
     False alarms only fall as the cut rises, so it is the highest of the sets' own cuts."""
     return max(fit_cut([r for r, s in zip(risk, sets) if s == x], [y for y, s in zip(poor, sets) if s == x], ceiling)
-               for x in set(sets))
+               for x in set(sets)) if sets else FAILED
 
 
-def crossval(risk, poor, nes, groups=None, folds=FOLDS, seeds=SEEDS, sets=None):
+def crossval(risk, poor, nes, groups=None, folds=FOLDS, seeds=SEEDS, sets=None, *, answered=None):
     """Repeated k-fold: the cut fitted on the other folds, applied to the held-out one; counts pooled over seeds.
-    groups: one key per row; rows sharing a key (a page's images) stay in one fold. sets: fit with fit_cut_each."""
+    groups: one key per row; rows sharing a key (a page's images) stay in one fold. sets: fit with fit_cut_each.
+    With an answered mask, keep the original fold assignments and tally failed readings separately."""
     keys = sorted(set(groups)) if groups else list(range(len(risk)))
     gidx = groups or list(range(len(risk)))
     tot = {}
@@ -133,11 +144,13 @@ def crossval(risk, poor, nes, groups=None, folds=FOLDS, seeds=SEEDS, sets=None):
         random.Random(1000 + s).shuffle(order)
         fold_of = {k: i % folds for i, k in enumerate(order)}
         for f in range(folds):
-            tr = [i for i in range(len(risk)) if fold_of[gidx[i]] != f]
+            tr = [i for i in range(len(risk)) if fold_of[gidx[i]] != f and (answered is None or answered[i])]
             te = [i for i in range(len(risk)) if fold_of[gidx[i]] == f]
             cut = fit_cut_each([risk[i] for i in tr], [poor[i] for i in tr], [sets[i] for i in tr]) if sets \
                 else fit_cut([risk[i] for i in tr], [poor[i] for i in tr])
-            tot = add(tot, counts([risk[i] for i in te], [poor[i] for i in te], [nes[i] for i in te], cut))
+            te_answered = [answered[i] for i in te] if answered is not None else None
+            tot = add(tot, counts([risk[i] for i in te], [poor[i] for i in te], [nes[i] for i in te], cut,
+                                  answered=te_answered))
     return tot
 
 
@@ -250,13 +263,23 @@ LABEL = {'lightonocr-3-4b-mlx8': 'LightOnOCR-3 4B (Mac mlx 8-bit)', 'qwen3.5-9b-
          **{k: v[0] + (' (Mac mlx 4-bit)' if v[1] == 'local' else '') for k, v in APP_ROUTES.items()
             if k != 'qwen3.5-9b'}}
 
+PAIRS_96 = {
+    'lightonocr-3-4b-mlx8': ['qwen3.5-9b-mlx4', 'vision'],
+    'qwen3.5-9b-mlx4': ['lightonocr-3-4b-mlx8', 'vision'],
+    'gemini3.7-flash': ['vision', 'qwen3.5-9b-mlx4'],
+    'vision': ['gemini3.7-flash', 'qwen3.5-9b-mlx4'],
+}
+PAIRS_LADDER = {'gemini3.7-flash': ['vision'], 'vision': ['gemini3.7-flash']}
 
 
 def rows_for(read, truth_of, kind_of, pairs):
     """One row per reader and image: nes, poor, and every signal's risk."""
+    from ocr_panel_score import normal
+
     rows = []
     for reader, partners in pairs.items():
         for key, (text, ok, conf) in read[reader].items():
+            ok = ok and bool(normal(text))
             nes = _score(truth_of(key), text) if ok else 0.
             sig = {}
             if conf is not None or reader in ('lightonocr-3-4b-mlx8', 'qwen3.5-9b-mlx4', 'vision'):
@@ -273,7 +296,7 @@ def rows_for(read, truth_of, kind_of, pairs):
                         else FAILED
             rows.append({'reader': reader, 'key': key, 'page': key if isinstance(key, str) else key[1],
                          'variant': 'raw' if isinstance(key, str) else key[0], 'kind': kind_of(key),
-                         'nes': nes, 'poor': nes < POOR, 'risk': sig})
+                         'nes': nes, 'poor': nes < POOR, 'answered': ok, 'risk': sig})
     return rows
 
 
@@ -289,30 +312,41 @@ def csv_rows():
             risk = {'conf': -float(r['mean']) if ok and r['mean'] else FAILED,
                     'vs pair': (1 - float(r['agreement'])) if ok and r['agreement'] != '' else FAILED}
             out.append({'reader': r['route'], 'set': r['set'], 'page': r['page'], 'kind': r['kind'], 'nes': nes,
-                        'poor': nes < POOR, 'risk': risk})
+                        'poor': nes < POOR, 'answered': ok, 'risk': risk})
     return out
 
 
 # --- the analysis ------------------------------------------------------------------------------------------------
 
-def evaluate(rows, sig, groups=False):
+def row_counts(rows, sig, cut):
+    return counts([r['risk'][sig] for r in rows], [r['poor'] for r in rows], [r['nes'] for r in rows], cut,
+                  answered=[r['answered'] for r in rows])
+
+
+def evaluate(rows, sig, groups=False, sets=None):
     risk = [r['risk'][sig] for r in rows]
     poor = [r['poor'] for r in rows]
     nes = [r['nes'] for r in rows]
-    cut = fit_cut(risk, poor)
-    return {'auc': auc([min(x, 1e9) for x in risk], poor), 'cut': None if cut == FAILED else cut,
-            'in_sample': rates(counts(risk, poor, nes, cut)),
-            'crossval': rates(crossval(risk, poor, nes, [r['page'] for r in rows] if groups else None))}
+    answered = [r['answered'] for r in rows]
+    answered_risk = [r for r, ok in zip(risk, answered) if ok]
+    answered_poor = [y for y, ok in zip(poor, answered) if ok]
+    cut = (fit_cut_each(answered_risk, answered_poor, [s for s, ok in zip(sets, answered) if ok]) if sets is not None
+           else fit_cut(answered_risk, answered_poor))
+    # An unavailable signal on an otherwise answered reading cannot flag it.
+    scored_risk = [-math.inf if r == FAILED else r for r in answered_risk]
+    return {'auc': auc(scored_risk, answered_poor), 'cut': None if cut == FAILED else cut,
+            'in_sample': rates(counts(risk, poor, nes, cut, answered=answered)),
+            'crossval': rates(crossval(risk, poor, nes, [r['page'] for r in rows] if groups else None,
+                                      sets=sets, answered=answered))}
 
 
 def transfer(fit_rows, test_rows, sig):
-    cut = fit_cut([r['risk'][sig] for r in fit_rows], [r['poor'] for r in fit_rows])
-    return {'cut': None if cut == FAILED else cut,
-            **rates(counts([r['risk'][sig] for r in test_rows], [r['poor'] for r in test_rows],
-                           [r['nes'] for r in test_rows], cut))}
+    answered = [r for r in fit_rows if r['answered']]
+    cut = fit_cut([r['risk'][sig] for r in answered], [r['poor'] for r in answered])
+    return {'cut': None if cut == FAILED else cut, **rates(row_counts(test_rows, sig, cut))}
 
 
-def analyse():
+def scored_rows():
     pages, r96 = readings_96()
     kind = {p: r['kind'] for p, r in pages.items()}
     sys.path.insert(0, str(HERE))
@@ -321,18 +355,45 @@ def analyse():
     rows96 = rows_for(r96, lambda k: truth[k], lambda k: kind[k], PAIRS_96)
     lad = readings_ladder()
     rowsl = rows_for(lad, lambda k: truth[k[1]], lambda k: kind[k[1]], PAIRS_LADDER)
+    read = {'vision': r96['vision']}
+    for key in APP_ROUTES:
+        read[key] = {p: (*route_text(key, p), None) for p in pages}
+    rows_routes = rows_for(read, lambda k: truth[k], lambda k: kind[k], {k: ['vision'] for k in APP_ROUTES})
+    return rows96 + rows_routes, rowsl
+
+
+def published_scores():
+    """Replay the committed per-page scores after the original Vision text cache has been retired."""
+    rows_by_set = {'96': [], 'ladder': []}
+    with OUT_CSV.open(newline='') as f:
+        records = list(csv.DictReader(f))
+    signals = {}
+    for r in records:
+        key = (r['set'], r['reader'])
+        signals.setdefault(key, set()).update(s for s, value in r.items() if value and (s == 'conf' or s.startswith('vs ')))
+    for r in records:
+        risk = {s: float(r[s]) if r[s] else FAILED for s in sorted(signals[r['set'], r['reader']])}
+        # Legacy score exports left the primary signal blank for failed replies.
+        primary = 'conf' if r['reader'] == 'vision' else 'vs vision'
+        answered = r['answered'] == 'True' if 'answered' in r else risk[primary] != FAILED
+        nes = float(r['nes'])
+        rows_by_set[r['set']].append({**r, 'risk': risk, 'answered': answered, 'nes': nes, 'poor': nes < POOR})
+    return rows_by_set['96'], rows_by_set['ladder']
+
+
+def analyse(rows96, rowsl):
     out = {'item': 'W46.post-read-quality-flag', 'poor_below': POOR, 'ceiling': CEILING, 'folds': FOLDS,
            'seeds': SEEDS, 'sets': {}}
     for name, rows, groups in (('96', rows96, False), ('ladder', rowsl, True)):
         res = {}
-        for reader in sorted({r['reader'] for r in rows}):
+        readers = PAIRS_96 if name == '96' else PAIRS_LADDER
+        for reader in sorted(readers):
             rr = [r for r in rows if r['reader'] == reader]
             res[reader] = {s: evaluate(rr, s, groups) for s in rr[0]['risk']}
         out['sets'][name] = res
     # the 96 and the ladder's plain images are the same photographs: the ladder's defect images are the test
     tr = {}
     for reader in PAIRS_LADDER:
-        a = [r for r in rows96 if r['reader'] == reader and r['page'] in {x['page'] for x in rowsl}]
         b = [r for r in rowsl if r['reader'] == reader and r['variant'] != 'raw']
         a_all = [r for r in rows96 if r['reader'] == reader]
         for s in b[0]['risk']:
@@ -351,7 +412,7 @@ def analyse():
     out['sets']['sherlock'] = res
     out['transfer'] = tr
     # the app's rule: Apple Vision's own confidence, the cut fitted on the 96, applied once to the ladder's defects
-    v96 = [r for r in rows96 if r['reader'] == 'vision']
+    v96 = [r for r in rows96 if r['reader'] == 'vision' and r['answered']]
     cut = fit_cut([r['risk']['conf'] for r in v96], [r['poor'] for r in v96])
     above = min((-r['risk']['conf'] for r in v96 if r['risk']['conf'] != FAILED and -r['risk']['conf'] > -cut),
                 default=1.)
@@ -360,10 +421,7 @@ def analyse():
                        '96': out['sets']['96']['vision']['conf']['in_sample'],
                        '96_crossval': out['sets']['96']['vision']['conf']['crossval'],
                        'ladder_defects': tr['vision|conf|96->ladder defects']}
-    out['app_readers'], rows_routes = app_readers(pages, r96, rows96, rowsl, truth, kind)
-    out['pages'] = [{'set': n, 'reader': r['reader'], 'page': r['page'], 'variant': r['variant'], 'kind': r['kind'],
-                     'nes': round(r['nes'], 4), **{k: (None if v == FAILED else round(v, 5)) for k, v in r['risk'].items()}}
-                    for n, rows in (('96', rows96 + rows_routes), ('ladder', rowsl)) for r in rows]
+    out['app_readers'] = app_readers(rows96, rowsl)
     return out
 
 
@@ -374,16 +432,12 @@ def flag_at(rows, sig, cut):
     return round((cut + max(below)) / 2, 4) if below else cut
 
 
-def app_readers(pages, r96, rows96, rowsl, truth, kind):
+def app_readers(rows96, rowsl):
     """W47.wh-read-flag-readers: each reader's own 'vs vision' cut for the app, under the same ceiling. The 96 for
     every reader; Gemini 3.7 Flash, the one reader with ladder readings, gets the lowest cut that holds the ceiling on
     the 96 and on the ladder's 480 defect images each (fit_cut_each; cross-validation keeps a page's images in one
-    fold). A reader ships when its cut holds and catches some poor reading cross-validated; a cut that catches none
-    would only add false alarms, so that reader is left to the owner (call 13)."""
-    read = {'vision': r96['vision']}
-    for key in APP_ROUTES:
-        read[key] = {p: (*route_text(key, p), None) for p in pages}
-    rows_routes = rows_for(read, lambda k: truth[k], lambda k: kind[k], {k: ['vision'] for k in APP_ROUTES})
+    fold). Recommend a cut when it holds and catches a poor answered reading in cross-validation.
+    Track the evidence separately from the rules currently deployed in the app."""
     sig = 'vs vision'
     out = {}
     fits = {k: ([r for r in rows96 if r['reader'] == k], '96 plain photographs, read on this Mac')
@@ -392,32 +446,29 @@ def app_readers(pages, r96, rows96, rowsl, truth, kind):
     gemlad = [r for r in rowsl if r['reader'] == 'gemini3.7-flash' and r['variant'] != 'raw']
     fits['gemini3.7-flash'] = (gem96 + gemlad, '96 plain photographs and 480 damaged copies of 48 of them')
     for k in APP_ROUTES:
-        fits[k] = ([r for r in rows_routes if r['reader'] == k],
+        fits[k] = ([r for r in rows96 if r['reader'] == k],
                    '96 plain photographs' + (', read on this Mac' if APP_ROUTES[k][1] == 'local' else ''))
     for k, (rows, measured_on) in fits.items():
         if k == 'gemini3.7-flash':
-            risk, poor, nes = [r['risk'][sig] for r in rows], [r['poor'] for r in rows], [r['nes'] for r in rows]
-            sets = ['96' if r in gem96 else 'ladder' for r in rows]
-            c = fit_cut_each(risk, poor, sets)
-            ev = {'auc': auc([min(x, 1e9) for x in risk], poor), 'cut': None if c == FAILED else c,
-                  'in_sample': rates(counts(risk, poor, nes, c)),
-                  'crossval': rates(crossval(risk, poor, nes, [r['page'] for r in rows], sets=sets))}
+            sets = ['96'] * len(gem96) + ['ladder'] * len(gemlad)
+            ev = evaluate(rows, sig, groups=True, sets=sets)
         else:
             ev = evaluate(rows, sig)
         cut = ev['cut']
         e = {'label': (APP_ROUTES.get(k) or APP_ROUTES_KNOWN[k])[0],
              'route': list((APP_ROUTES.get(k) or APP_ROUTES_KNOWN[k])[1:3]), 'measured_on': measured_on,
              'signal': sig, 'auc': ev['auc'], 'cut': cut, 'flag_at': None if cut is None else flag_at(rows, sig, cut),
-             'in_sample': ev['in_sample'], 'crossval': ev['crossval'],
-             'ships': cut is not None and ev['in_sample']['fa_rate'] <= CEILING and ev['crossval']['hits'] > 0}
+             'in_sample': ev['in_sample'], 'crossval': ev['crossval']}
+        fitted_sets = [e['in_sample']]
         if k == 'gemini3.7-flash' and cut is not None:
-            e['on_96'] = rates(counts([r['risk'][sig] for r in gem96], [r['poor'] for r in gem96],
-                                      [r['nes'] for r in gem96], cut))
-            e['on_ladder_defects'] = rates(counts([r['risk'][sig] for r in gemlad], [r['poor'] for r in gemlad],
-                                                  [r['nes'] for r in gemlad], cut))
-            e['ships'] = e['ships'] and e['on_96']['fa_rate'] <= CEILING and e['on_ladder_defects']['fa_rate'] <= CEILING
+            e['on_96'] = rates(row_counts(gem96, sig, cut))
+            e['on_ladder_defects'] = rates(row_counts(gemlad, sig, cut))
+            fitted_sets = [e['on_96'], e['on_ladder_defects']]
+        e['ships'] = cut is not None and ev['crossval']['hits'] > 0 and all(
+            r['fa_rate'] is not None and r['fa_rate'] <= CEILING for r in fitted_sets)
+        e['in_app'] = e['ships'] or k in DEPLOYED_WITHOUT_HITS
         out[k] = e
-    return out, rows_routes
+    return out
 
 
 # --- the report --------------------------------------------------------------------------------------------------
@@ -431,12 +482,12 @@ def _ci(ci):
 
 
 def _cell(r):
-    return (f"{r['hits']}/{r['poor']} {_pct(r['hit_rate'])}{_ci(r['hit_ci'])} | "
-            f"{r['false_alarms']}/{r['good']} {_pct(r['fa_rate'])}{_ci(r['fa_ci'])} | {_pct(r['under_90_of_flags'])}")
+    return f"{_cv(r)} | {_pct(r['under_90_of_flags'])} | {r['failed']}"
 
 
 def _cv(r):
-    return f"{_pct(r['hit_rate'])}{_ci(r['hit_ci'])} | {_pct(r['fa_rate'])}{_ci(r['fa_ci'])}"
+    return (f"{r['hits']}/{r['poor']} {_pct(r['hit_rate'])}{_ci(r['hit_ci'])} | "
+            f"{r['false_alarms']}/{r['good']} {_pct(r['fa_rate'])}{_ci(r['fa_ci'])}")
 
 
 def _cutf(c):
@@ -445,57 +496,62 @@ def _cutf(c):
 
 def render(out):
     L = [HEAD.strip(), '']
-    hdr = ('| reader | signal | AUC | cut | in-sample hits | false alarms | flags under 90 | cross-validated hits | '
-           'cross-validated false alarms |')
-    sep = '|---|---|---:|---:|---|---|---:|---|---|'
+    if out['score_source'] == 'published per-page scores':
+        L += ['Replayed from the published scores (NES to four decimals, risks to five). The original Vision text',
+              'cache is no longer present. Very close risks can tie after rounding.', '']
+    hdr = ('| reader | signal | AUC | cut | in-sample hits | false alarms | flags under 90 | failed | '
+           'cross-validated hits | cross-validated false alarms | held-out failures |')
+    sep = '|---|---|---:|---:|---|---|---:|---:|---|---|---:|'
     for name, title in (('96', 'The 96, each reader on the plain photograph'),
                         ('ladder', "The capture ladder's 48 Gemini pages: the plain photograph and ten defect images "
                                    "(528 images; cross-validation keeps a page's images in one fold)")):
         L += [f'## {title}', '', hdr, sep]
         for reader, sigs in out['sets'][name].items():
             for s, e in sigs.items():
-                L.append(f"| {LABEL[reader]} | {s} | {e['auc']:.3f} | {_cutf(e['cut'])} | {_cell(e['in_sample'])} | "
-                         f"{_cv(e['crossval'])} |")
+                L.append(f"| {LABEL[reader]} | {s} | {_cutf(e['auc'])} | {_cutf(e['cut'])} | {_cell(e['in_sample'])} | "
+                         f"{_cv(e['crossval'])} | {e['crossval']['failed']} |")
         L.append('')
     L += ['## The Sherlock routes on the public sets and the 96 (W46.ocr-logprob\'s CSV; "vs pair" is the other '
           'Sherlock route)', '', hdr.replace('| reader |', '| reader, set |'), sep]
     for key, sigs in out['sets']['sherlock'].items():
         reader, st = key.split('|')
         for s, e in sigs.items():
-            L.append(f"| {LABEL[reader]}, {st} | {s} | {e['auc']:.3f} | {_cutf(e['cut'])} | {_cell(e['in_sample'])} | "
-                     f"{_cv(e['crossval'])} |")
+            L.append(f"| {LABEL[reader]}, {st} | {s} | {_cutf(e['auc'])} | {_cutf(e['cut'])} | {_cell(e['in_sample'])} | "
+                     f"{_cv(e['crossval'])} | {e['crossval']['failed']} |")
     L += ['', '## A cut fitted on one set, applied once to another', '',
-          '| reader | signal | fitted on, applied to | cut | hits | false alarms | flags under 90 |',
-          '|---|---|---|---:|---|---|---:|']
+          '| reader | signal | fitted on, applied to | cut | hits | false alarms | flags under 90 | failed |',
+          '|---|---|---|---:|---|---|---:|---:|']
     for key, r in out['transfer'].items():
         reader, s, how = key.split('|')
         L.append(f"| {LABEL[reader]} | {s} | {how} | {_cutf(r['cut'])} | {_cell(r)} |")
     a = out['app_rule']
     L += ['', '## The rule the app ships', '',
           f"Apple Vision's reading is flagged when its character-weighted mean line confidence is under "
-          f"{a['flag_below']} (the cut fitted on the 96, between the confidences on either side of it), or when it "
-          "returned no text. On the 96, and applied once to the ladder's 480 defect images:", '',
-          '| set | hits | false alarms | flags under 90 |', '|---|---|---|---:|',
+          f"{a['flag_below']} (the cut fitted on the 96, between the confidences on either side of it). "
+          "On the 96, and applied once to the ladder's 480 defect images:", '',
+          '| set | hits | false alarms | flags under 90 | failed |', '|---|---|---|---:|---:|',
           f"| the 96, in-sample | {_cell(a['96'])} |",
-          f"| the 96, cross-validated | {_cv(a['96_crossval'])} | – |",
+          f"| the 96, cross-validated | {_cell(a['96_crossval'])} |",
           f"| ladder defect images, applied once | {_cell(a['ladder_defects'])} |"]
     L += ['', '## Each reader\'s own cut, for the app (W47.wh-read-flag-readers, 2026-11-19)', '',
           "Owner, 2026-11-19 (call 15): every reader the bench has read gets the disagreement-with-Vision flag at its "
           "own cut under the same 5% ceiling. Signal: vs vision, every page (the app does not know a page is "
           "handwritten before it is read). Gemini 3.7 Flash's cut is the lowest that holds the ceiling on the 96 and "
           "on the ladder's 480 defect images each. \"flag at\" is the app's threshold, midway between the cut and the "
-          "next lower disagreement seen. A reader ships when its cut holds and catches a poor reading cross-validated.",
+          "next lower disagreement seen. A cut qualifies when it holds the ceiling in the fit and catches at least "
+          "one poor answer in cross-validation.",
           '', '| reader | app route | measured on | AUC | cut | flag at | in-sample hits | false alarms | flags under 90 '
-          '| cross-validated hits | cross-validated false alarms | ships |',
-          '|---|---|---|---:|---:|---:|---|---|---:|---|---|---|']
-    for k, e in out['app_readers'].items():
-        L.append(f"| {e['label']} | {' '.join(e['route'])} | {e['measured_on']} | {e['auc']:.3f} | {_cutf(e['cut'])} | "
+          '| failed | cross-validated hits | cross-validated false alarms | held-out failures | qualifies | in app |',
+          '|---|---|---|---:|---:|---:|---|---|---:|---:|---|---|---:|---|---|']
+    for e in out['app_readers'].values():
+        L.append(f"| {e['label']} | {' '.join(e['route'])} | {e['measured_on']} | {_cutf(e['auc'])} | {_cutf(e['cut'])} | "
                  f"{'–' if e['flag_at'] is None else format(e['flag_at'], '.4f')} | {_cell(e['in_sample'])} | "
-                 f"{_cv(e['crossval'])} | {'yes' if e['ships'] else 'no, asked'} |")
+                 f"{_cv(e['crossval'])} | {e['crossval']['failed']} | "
+                 f"{'yes' if e['ships'] else 'no'} | {'yes' if e['in_app'] else 'no'} |")
     g = out['app_readers'].get('gemini3.7-flash', {})
     if 'on_96' in g:
         L += ['', f"Gemini 3.7 Flash at its cut: on the 96 {_cell(g['on_96'])}; on the ladder's defect images "
-                  f"{_cell(g['on_ladder_defects'])} (hits | false alarms | flags under 90)."]
+                  f"{_cell(g['on_ladder_defects'])} (hits | false alarms | flags under 90 | failed)."]
     L += ['', FINDINGS.strip(), '', FINDINGS_READERS.strip(), '', CARD.strip(), '']
     return '\n'.join(L)
 
@@ -507,8 +563,8 @@ def check_swift(out):
     have = {m.group(2): float(m.group(1)) for m in re.finditer(
         r'flagAtOrAbove: ([0-9.]+),\s*measuredOn: "[^"]*",\s*benchKey: "([^"]+)"', src)}
     have.update({m.group(2): float(m.group(1)) for m in re.finditer(r'plain\("[^"]+", ([0-9.]+), "([^"]+)"\)', src)})
-    want = {k: e['flag_at'] for k, e in out['app_readers'].items() if e['ships']}
-    bad = sorted(set(have) ^ set(want)) + sorted(k for k in set(have) & set(want) if abs(have[k] - want[k]) > 1e-9)
+    want = {k: e['flag_at'] for k, e in out['app_readers'].items() if e['in_app']}
+    bad = sorted(set(have) ^ set(want)) + sorted(k for k in set(have) & set(want) if have[k] != want[k])
     if bad:
         raise SystemExit(f'ReadQualityDisagreement.swift does not match app_readers: {bad} (have {have}, want {want})')
     return want
@@ -517,59 +573,54 @@ def check_swift(out):
 HEAD = """
 # W46.post-read-quality-flag: a "this photo read poorly" flag, fitted for few false alarms
 
-Generated by `scripts/segbench/post_read_flag.py report` (the method is its docstring). Per-image risks, no text:
+Generated by `scripts/segbench/post_read_flag.py report` (add `--from-scores` to replay). Per-image risks, no text:
 `post-read-flag-pages.csv`; every figure: `post-read-flag.json`. No money: every reading is cached.
 
 A reading is poor under 70 NES; a false alarm is a flag on a reading at 70 or above, counted over those good
-readings; the ceiling is 5% of them. A failed reading (cap, error, empty) is always flagged. The cut is the lowest
+readings; the ceiling is 5% of them. Hits, false alarms and AUC use answered readings. Failed readings (cap,
+refusal, error or empty reply) appear in their own counts. The cut is the lowest
 whose in-sample false alarms stay within the ceiling (flag at risk >= cut; for "vs" signals the risk is 1 minus the
 NES against the partner's text, for "conf" the negated mean log-probability, or for Apple Vision its negated
 character-weighted line confidence). Cells: hits / poor readings, false alarms / good readings, with Wilson 95%
-intervals; "flags under 90" is the share of flags on readings under 90 NES. Cross-validated: repeated 5-fold, 20 seeds,
-counts pooled (so its intervals are narrower than the sample warrants; read them as a guide).
+intervals; "flags under 90" is the share of flags on readings under 90 NES. Cross-validation uses the original
+folds and pools counts over 20 five-fold splits, so each failed reading appears 20 times under "held-out failures".
+The pooled intervals are narrower than the sample warrants; read them as a guide.
 """
 
 FINDINGS = """
-## Findings (2026-11-18)
+## Findings from the original photo sets
 
-- **Apple Vision's own confidence is the one flag near a 5% false-alarm rate on plain and damaged photographs
-  alike.** Fitted on the 96 (flag under 0.9815), it catches 10 of Vision's 21 poor readings with 3 false alarms in 75
+- **Apple Vision's confidence cut transfers from plain photographs to damaged ones.** Fitted on the 96 (flag under 0.9815), it catches 10 of Vision's 21 poor readings with 3 false alarms in 75
   in-sample (4%, the fit itself); cross-validated, the honest estimate for new pages (repeated 5-fold, pooled over the
   repeats), it catches 193 of 420 (46%) with 87 false alarms in 1,500 (5.8%, 4.7-7.1), a little over the ceiling it
-  was fitted to. Applied once to the ladder's defect images it catches 179 of 231 with 7 false alarms in 249 (3%).
-  The cut fitted on the ladder lands within 0.006 of it. Its misses on the 96 are confident failures (several poor pages at confidence 1.0, mostly printed pages Vision misreads), so it says "check this" on about half
-  of Vision's poor plain-photo readings and on most damaged ones. This is the rule the app ships, for pages Vision
-  reads (the no-key route).
-- **Two-reader disagreement with Apple Vision ranks a reader's errors well on plain photographs** (AUC 0.89-0.98), and
-  leaving handwritten pages out helps every reader but Qwen3.5-9B. For LightOnOCR-3 4B on the Mac it catches 82% of
-  poor typed-page readings at 5% false alarms, cross-validated; for Qwen3.5-9B on the Mac 33-36%; Gemini 3.7 Flash
-  reads only 3 of the 96 poorly, so it has little to catch there.
-- **But that cut does not survive a damaged photograph.** Vision loses far more to blur than the other readers
-  (capture-ladder.md), so on the ladder it disagrees with Gemini's good readings: the cut fitted on the 96 flags 21%
-  of Gemini's good defect-image readings (16% with handwriting left out), four times the ceiling. The cut that holds
-  the ceiling on the ladder (disagreement 0.95-0.97, near-total) catches 37-41% of Gemini's poor defect readings and
-  none of its 3 poor plain readings, and one cut strict enough for every measured reader and set (0.968) catches
-  0 or 1 poor reading per reader on the 96. Weighting the disagreement by Vision's confidence (AUC 0.52 on the
-  ladder) or gating it on Vision having read half the words (0.42-0.47) does not rescue it.
-- **Log-probabilities rank, but the app has none.** Qwen3.5-9B's mean log-probability catches 34% at 5% on the 96
-  (cross-validated) and 67% on the public 455; LightOnOCR's catches 1% on the 96 at that ceiling. No Swift
-  route requests log-probabilities today. Disagreement between the two Sherlock routes catches 75-96% of Qwen3.5-9B's
-  poor public readings at 5%, but a cut fitted on the 455 flags 5 of 90 good readings on the 96 (6%): it travels
-  roughly, not exactly.
-- **For the app:** ship Vision's confidence flag, UI only (the run summary and the history), and no flag for the other
-  readers yet: no rule measured here holds the ceiling for them across capture conditions. A reader-specific Vision
-  disagreement cut for the Mac's open readers needs their ladder readings (not on this Mac), and real captures
-  (W46.capture-warning) before it can be trusted; filed as W46.post-read-flag-readers.
+  was fitted to. Applied once to the ladder's defect images it catches 155 of 207 poor answers with 7 false alarms in 249 (3%).
+  Another 24 images produced no answer. The cut fitted on the ladder lands within 0.006 of it. The misses on the 96
+  include poor answers at confidence 1.0, mostly printed pages Vision misreads.
+- **Two-reader disagreement with Apple Vision ranks poor answers on plain photographs.** On the original
+  three readers, AUC is 0.89–0.96, and leaving handwritten pages unflagged improves it for two of the three.
+  At around 5% false alarms, cross-validation catches 82% of LightOnOCR-3's poor answers with handwriting
+  unflagged and 25–28% of the Mac Qwen3.5-9B's across the Vision signals. Gemini 3.7 Flash gives three poor answers.
+- **Gemini's plain-photo disagreement cut flags too many good answers on damaged images.** Vision loses far
+  more to blur than Gemini (capture-ladder.md). The cut fitted on the 96 flags 21% of Gemini's good defect-image
+  answers, or 16% with handwriting unflagged. The cuts fitted on the damaged images catch 38–42% of Gemini's
+  poor damaged answers there. Weighting disagreement by Vision's confidence gives an AUC of 0.52 on the ladder.
+- **Log-probabilities rank errors.** Qwen3.5-9B's mean log-probability catches about 25% of poor answers at
+  5% false alarms on the 96 and 38% on the public 455 for the Sherlock build. LightOnOCR's catches around 1% or
+  less on the 96. No Swift route requests log-probabilities today. Disagreement between the Sherlock routes
+  catches 53% and 89% of Qwen3.5-9B's poor answers on the public sets. The cut fitted on the 455 flags 5 of 90
+  good answers on the 96 (6%).
+- **Real phone captures:** the reader-specific cuts below were measured on these benchmark images. Their
+  performance on real phone captures remains unmeasured (W46.capture-warning).
 """
 
 CARD = """
 ## Measurement card
 
-- **Truth:** the 96's adjudicated truth (`ocr_truth`), the same for every image of a page. Gemini 3.8 Flash, a
-  relative of the scored Gemini 3.7 Flash, drafted it with Claude Opus 5.5, so Gemini's own readings look closer to
-  truth than they are; that can only make its poor readings rarer here, not change which signal ranks them. The
-  owner's blind check found the typed-page truth fit for ranking (measurement audit, 2026-10-30). The public 440 and
-  455 use their datasets' own truth.
+- **Truth:** the 96's adjudicated truth (`ocr_truth`), the same for every image of a page. Gemini 3.8 Flash is
+  both a drafter and a scored reader. Its co-drafter Claude Opus 5.5 is in the same family as the scored Claude
+  Sonnet 5.5. This can favour their readings and affect which pages score below 70. The owner's blind check
+  found the typed-page truth fit for ranking (measurement audit, 2026-10-30). The public 440 and 455 use their
+  datasets' own truth.
 - **Selection:** all 96 scored pages; the ladder's 48 are every other page of the 96 in a seeded order, chosen
   before any reading (W46.capture-ladder-paid). Every page where Apple Vision (26.6) read fewer than 20 words was
   replaced at the 96's draw, so the 96 hold no page Vision reads as empty: Vision's disagreement is measured on pages
@@ -577,8 +628,8 @@ CARD = """
 - **Comparison:** every signal is scored on the same readings and labels; each reader's text is the one its own
   report scored (W46.ocr-logprob for the Mac routes, the cloud panel for Gemini's plain image, W46.enh-dewarp's
   macOS 27.2 Vision for Vision's). On the ladder both readers read the same defect image.
-- **Noise:** 96 pages hold 4 to 27 poor readings per reader, so a hit rate moves by several points with one page
-  and a 5% ceiling is 4 of about 85 good readings: a cut is fitted on a handful of pages. The cross-validated rows are
+- **Noise:** Most app readers give fewer than 10 poor answers on the 96, so one page can move a hit rate by
+  10 points or more. A 5% ceiling allows about four false alarms per reader. The cross-validated rows are
   the honest estimate; the in-sample rows are the fit. A rerun of a reader moves its NES by up to 0.24 points
   (W46.ocr-rerun-noise, Gemini), far below the 70 line.
 - **Scope:** synthetic defects on the ladder, one at a time; no real phone captures (W46.capture-warning), the
@@ -588,44 +639,42 @@ CARD = """
 
 
 FINDINGS_READERS = """
-## Findings for the other readers (2026-11-19, W47.wh-read-flag-readers; supersedes the last bullet above)
+## Findings for the other readers (W46.p17-flag-answered-hits)
 
-- **The owner released the flag for every reader (call 15), so each reader with cached readings now has its own
-  disagreement-with-Vision cut.** Fourteen of sixteen ship. On the 96, cross-validated, they catch 25-67% of their
-  own poor readings at 4-5% false alarms (LightOnOCR-3 on the Mac 62%, Qwen3-VL 8B on the Mac 63%, Gemini 3.5 Flash
-  67%, Qwen3.5 9B through OpenRouter 51%, Gemini 3.8 Flash 40%, GPT-5.4 mini 40%). Most readers have 4 to 9 poor
-  readings in 96, so each rate moves by 10-25 points with one page; the intervals in the table say how far.
-- **Gemini 3.7 Flash gets a cut that holds on damaged photographs too.** The lowest cut that keeps false alarms within
-  5% on the 96 and on the ladder's 480 defect images each is a disagreement of 0.980 (near-total). It flags none of
-  Gemini's good plain readings and none of its 3 poor ones; on the defect images it catches 20 of 53 poor readings
-  with 21 false alarms in 427 (5%). A cut fitted on the two sets pooled (0.952) flags 6% of good defect readings, over
-  the ceiling. Every other reader was measured on plain photographs only: its cut is untested on damaged captures,
-  where Vision reads worse and the cut may flag more (Gemini's 96 cut flagged 21% there), and the run summary names
-  what each reader's check was measured on.
-- **Claude Sonnet 5.5 and Mistral OCR are left to the owner.** Their cuts hold the ceiling (4 false alarms in 94 and
-  in 89) but caught none of their poor readings, in-sample or cross-validated (0 of 2 and 0 of 7): a flag would be
-  only false alarms. Asked as W47.wh-read-flag-cm-owner-ok; until he answers, neither reader is flagged.
-- **What the app ships.** After a reader's page, Apple Vision reads the same image with the settings the cuts were
-  fitted with, and the page is flagged when 1 minus the bench's NES of the reader's text against Vision's reaches
-  the reader's threshold ("flag at"); Vision finding no text counts as total disagreement, as in the fit. A measured
-  model through OpenRouter on its maker's endpoint (the route the bench read it on) and the same model called
-  directly share its cut. Not checked: a page another route read instead (a refusal or escalation), an imported
-  page, a newspaper page read in regions, a page the app turned, a blank reading, a page Vision failed on, batch
-  runs, the Local Agent, and a model the bench has not read (LightOnOCR and the Mac Qwens only on a server on this Mac).
+- Nine of sixteen cuts qualify on answered readings. Five deployed cuts catch zero poor answers at their fitted
+  thresholds or in cross-validation: Gemini 3.8 Flash (0/3), Gemini 3.1 Pro (0/2), Gemini 3.5 Flash Lite (0/3),
+  Qwen3.8 Flash (0/3), and Qwen3.6 27B (0/3). Each flags four good plain-photo answers in the fit. Their earlier
+  reported hits came from failed requests. Gemini 3.8 Flash's AUC falls from 0.897 to about 0.83. The removal of
+  those five cuts is tracked in W46.p17-flag-unflag-five, following the owner's call 24. Claude Sonnet 5.5 and
+  Mistral OCR also catch zero poor answers (0/2 and 0/7) and have no app rule (call 17).
+- Four readers catch one poor answer each at their fitted cuts: Gemini 3.1 Flash Lite (1/5), GPT-5.4 mini (1/4),
+  Qwen3.5 9B through OpenRouter (1/5), and Qwen3-VL 8B on the Mac (1/3).
+- Gemini 3.7 Flash is the only reader with a disagreement cut fitted on both plain and damaged photographs.
+  Its cut is near-total disagreement. The table above gives its plain and damaged results separately.
+- The check compares the reader's text with Apple Vision's. A completed Vision pass with no text is total
+  disagreement. Region-ordered newspaper text, failed reader replies and failed Vision passes are outside
+  the check. The run summary names the images each reader's threshold was measured on.
 """
 
 
-def report():
-    out = analyse()
-    pages = out.pop('pages')
-    cols = ['set', 'reader', 'page', 'variant', 'kind', 'nes', *sorted({k for r in pages for k in r} - {
-        'set', 'reader', 'page', 'variant', 'kind', 'nes'})]
-    with open(OUT_CSV, 'w', newline='') as f:
-        w = csv.DictWriter(f, cols); w.writeheader(); w.writerows(pages)
-    OUT_JSON.write_text(json.dumps(out, indent=1, default=lambda x: None) + '\n')
+def report(from_scores=False):
+    rows96, rowsl = published_scores() if from_scores else scored_rows()
+    out = analyse(rows96, rowsl)
+    out['score_source'] = 'published per-page scores' if from_scores else 'cached reader replies'
+    matched = check_swift(out)
+    base = ['set', 'reader', 'page', 'variant', 'kind', 'answered', 'nes']
+    pages = [{'set': name, **{key: r[key] for key in base[1:-1]}, 'nes': round(r['nes'], 4),
+              **{k: (None if v == FAILED else round(v, 5)) for k, v in r['risk'].items()}}
+             for name, rows in (('96', rows96), ('ladder', rowsl)) for r in rows]
+    cols = base + sorted({k for r in pages for k in r} - set(base))
+    with OUT_CSV.open('w', newline='') as f:
+        w = csv.DictWriter(f, cols, lineterminator='\n')
+        w.writeheader()
+        w.writerows(pages)
+    OUT_JSON.write_text(json.dumps(out, indent=1, allow_nan=False) + '\n')
     OUT_MD.write_text(render(out))
     print(OUT_MD.read_text())
-    print('Swift rules match:', check_swift(out))   # exits non-zero, after writing, when they do not
+    print('Swift rules match:', matched)
 
 
 def self_test():
@@ -633,7 +682,7 @@ def self_test():
     lo, hi = wilson(5, 10); assert 0.23 < lo < 0.24 and 0.76 < hi < 0.77
     assert auc([3, 2, 1], [True, False, False]) == 1.0
     assert auc([1, 1], [True, False]) == 0.5
-    # 20 good readings at risk 0..19, three poor at 30, 31 and 5, one failed: ceiling 5% of 20 = 1 false alarm
+    # 20 good readings at risk 0..19, three poor at 30, 31 and 5, one failed: ceiling 5% of 20 = 1 false alarm.
     risk = [float(i) for i in range(20)] + [30., 31., 5., FAILED]
     poor = [False] * 20 + [True, True, True, True]
     cut = fit_cut(risk, poor)
@@ -643,6 +692,20 @@ def self_test():
     assert fit_cut([FAILED, 1.], [True, False]) == FAILED       # no finite cut fits: only failures flagged
     cv = crossval(risk, poor, [0.9] * 24)
     assert cv['n'] == 24 * SEEDS and cv['poor'] == 4 * SEEDS
+    answered = [True] * 23 + [False]
+    nes = [0.95] * 20 + [0.5] * 4
+    c = counts(risk, poor, nes, cut, answered=answered)
+    assert c == {'n': 23, 'failed': 1, 'poor': 3, 'good': 20, 'flagged': 3, 'hits': 2,
+                 'false_alarms': 1, 'flags_under_90': 2}, c
+    cv = crossval(risk, poor, nes, answered=answered)
+    assert cv['n'] == 23 * SEEDS and cv['poor'] == 3 * SEEDS and cv['failed'] == SEEDS
+    # With no poor answer caught, the failed reading raises neither AUC nor the held-out hit count.
+    rows = [{'risk': {'s': r}, 'poor': y, 'nes': e, 'answered': ok}
+            for r, y, e, ok in zip([1., 0., FAILED], [False, True, True], [.95, .5, 0.], [True, True, False])]
+    ev = evaluate(rows, 's')
+    assert ev['auc'] == 0 and ev['in_sample']['hits'] == ev['crossval']['hits'] == 0
+    assert ev['in_sample']['failed'] == 1 and ev['crossval']['failed'] == SEEDS
+    assert counts([FAILED], [True], [0.], FAILED, answered=[False])['flagged'] == 0
     # two sets: the second's good readings sit higher, so the cut that holds on both is the second's
     sets = ['a'] * 24 + ['b'] * 21
     both = fit_cut_each(risk + [float(i) + 10 for i in range(20)] + [40.], poor + [False] * 20 + [True], sets)
@@ -672,8 +735,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('cmd', choices=['report', 'self-test', 'parity'])
     ap.add_argument('path', nargs='?')
+    ap.add_argument('--from-scores', action='store_true', help='replay the published per-page scores')
     a = ap.parse_args()
-    report() if a.cmd == 'report' else parity(a.path) if a.cmd == 'parity' else self_test()
+    report(a.from_scores) if a.cmd == 'report' else parity(a.path) if a.cmd == 'parity' else self_test()
 
 
 if __name__ == '__main__':

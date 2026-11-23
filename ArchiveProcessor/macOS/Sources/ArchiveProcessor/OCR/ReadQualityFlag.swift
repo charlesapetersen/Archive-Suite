@@ -6,7 +6,8 @@ import Foundation
 /// * a page Apple Vision read: Vision's own confidence, the mean of its line confidences, each line weighted by its
 ///   characters, fitted on the owner's 96 (in-sample 10 of 21 poor readings caught with 3 false alarms in 75;
 ///   cross-validated, the estimate for new pages, 46% caught at 5.8% false alarms, 87 in 1,500 pooled over repeats;
-///   on the capture ladder's damaged photographs 179 of 231 with 7 in 249);
+///   on the capture ladder's damaged photographs 155 of 207 poor answers with 7 false alarms in 249 good answers;
+///   24 images produced no answer);
 /// * W47.wh-read-flag-readers (owner, 2026-11-19, call 15): a page another reader read, its disagreement with Apple
 ///   Vision's reading of the same image, at that reader's own cut (`ReadQualityDisagreement`). A reader with no
 ///   measured cut is not flagged.

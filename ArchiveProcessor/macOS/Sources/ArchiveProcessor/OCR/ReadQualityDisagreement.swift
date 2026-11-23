@@ -6,11 +6,12 @@ import VisionOCRKit
 /// compared as the bench scores a reading against truth (`similarity`, the bench's NES). A page whose disagreement
 /// reaches the reader's own cut is flagged. Each cut was fitted by `scripts/segbench/post_read_flag.py report`
 /// (`app_readers` in `segbench-results/post-read-flag.json`) for at most 5% false alarms among that reader's readings
-/// at 70 NES or above, on the sets named in `measuredOn`; a reader the bench has not read, or whose cut no set held
-/// the ceiling for, has no rule and is not flagged.
+/// at 70 NES or above, on the sets named in `measuredOn`. The bench counts hits and false alarms on answered
+/// readings and requires a held-out poor answer caught to recommend a cut. Five deployed cuts precede this
+/// correction (W46.p17-flag-answered-hits); their removal is tracked in W46.p17-flag-unflag-five.
 ///
-/// Region-ordered newspaper text, blank readings, and Vision failures have no comparable reading. Vision
-/// returning no text is distinct from failure and counts as total disagreement, as in the fit.
+/// The check skips failed or blank reader replies, region-ordered newspaper text, and failed Vision passes.
+/// A completed Vision pass with no text counts as total disagreement, as in the fit.
 enum ReadQualityDisagreement {
     /// The route a page was read by, as far as a rule needs it.
     struct Route: Equatable, Sendable {

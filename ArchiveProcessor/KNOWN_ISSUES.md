@@ -273,6 +273,9 @@ download row is under "Read handwriting on typed pages" in Settings › Reading.
 - Claude Sonnet 5.5 and Mistral OCR pages are never flagged: their cuts hold the 5% ceiling but caught none of their
   poor readings on the 96 (0 of 2, 0 of 7) (accepted: owner, 2026-11-19 walkthrough, call 17: a flag would only be
   false alarms; W47.wh-read-flag-cm declined).
+- Five deployed cuts caught no poor answers in the plain-photo sample or in cross-validation. Each flagged four
+  good answers in the fit. Earlier hit rates counted failed requests, which the app handles separately. The owner
+  chose to remove the five cuts, with the implementation tracked separately (queued: W46.p17-flag-unflag-five).
 - Batch results and second reads use the cutoff for the model that supplied the text. Vision compares against the
   corrected image when the app turns a page. Imports from the official Qwen3.6 27B FP8 checkpoint use the hosted FP8
   cutoff, supported by similar readings on the 96 benchmark pages. Routes without an applicable cutoff and pages

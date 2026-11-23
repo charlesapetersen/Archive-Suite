@@ -1016,7 +1016,7 @@ def postread():
     d = json.loads(POSTREAD.read_text())
     names = {"lightonocr-3-4b-mlx8": "LightOnOCR-3 4B, Mac 8-bit", "qwen3.5-9b-mlx4": "Qwen3.5-9B, Mac 4-bit",
              "gemini3.7-flash": "Gemini 3.7 Flash, gateway", "vision": "Apple Vision"}
-    shown = {"conf": "own confidence", "vs vision, typed": "against Vision"}
+    shown = {"conf": "own confidence", "vs vision, typed": "against Vision, handwriting skipped"}
     sets = {"96": "the 96, plain", "ladder": "ladder, 528"}
     rows = []
     for s, readers in d["sets"].items():
@@ -1027,20 +1027,25 @@ def postread():
                 if g in shown:
                     cv = e["crossval"]
                     rows.append({"reader": names[k], "set": sets[s], "signal": shown[g], "auc": e["auc"],
-                                 "poor": e["in_sample"]["poor"], "hit_rate": cv["hit_rate"], "fa_rate": cv["fa_rate"]})
+                                 "poor": e["in_sample"]["poor"], "good": e["in_sample"]["good"],
+                                 "failed": e["in_sample"]["failed"], "hit_rate": cv["hit_rate"], "fa_rate": cv["fa_rate"]})
     a = d["app_rule"]
     rule = {"flag_below": a["flag_below"], "hits_96": a["96"]["hits"], "poor_96": a["96"]["poor"],
             "fa_96": a["96"]["false_alarms"], "good_96": a["96"]["good"], "hits_lad": a["ladder_defects"]["hits"],
             "poor_lad": a["ladder_defects"]["poor"], "fa_lad": a["ladder_defects"]["false_alarms"],
             "good_lad": a["ladder_defects"]["good"]}
-    # W47.wh-read-flag-readers: each reader's own cut against Vision, every page, as the app ships it
-    for k, e in (d.get("app_readers") or {}).items():
+    app_readers = list(d["app_readers"].values())
+    for e in app_readers:
         cv = e["crossval"]
+        status = "the app's cut" if e["in_app"] else "candidate cut"
+        if e["in_app"] and not e["ships"]:
+            status += ", zero held-out hits"
         rows.append({"reader": e["label"] + (", Mac" if e["route"][0] == "local" else ", OpenRouter"
                                              if e["route"][0] == "openrouter" else ""),
                      "set": "the 96 + ladder defects" if "damaged" in e["measured_on"] else "the 96, plain",
-                     "signal": "against Vision, the app's cut" + ("" if e["ships"] else " (not shipped)"),
-                     "auc": e["auc"], "poor": e["in_sample"]["poor"], "hit_rate": cv["hit_rate"], "fa_rate": cv["fa_rate"]})
+                     "signal": "against Vision, " + status, "auc": e["auc"],
+                     "poor": e["in_sample"]["poor"], "good": e["in_sample"]["good"],
+                     "failed": e["in_sample"]["failed"], "hit_rate": cv["hit_rate"], "fa_rate": cv["fa_rate"]})
     newspapers = {}
     # W49.proc-read-flag-newspaper: newspaper pages read in regions, every region reader pooled
     if POSTREAD_NEWS.exists():
@@ -1070,9 +1075,9 @@ def postread():
                          "set": "15 L9 scans, whole-page answers", "signal": label + " (refitted)", "auc": e["auc"],
                          "poor": e["in_sample"]["poor"], "hit_rate": e["crossval"]["hit_rate"],
                          "fa_rate": e["crossval"]["fa_rate"]})
-    shipped = [e for e in (d.get("app_readers") or {}).values() if e["ships"]]
-    rule["readers_shipped"] = len(shipped)
-    rule["readers_fitted"] = len(d.get("app_readers") or {})
+    rule["readers_shipped"] = sum(e["in_app"] for e in app_readers)
+    rule["readers_qualifying"] = sum(e["ships"] for e in app_readers)
+    rule["readers_fitted"] = len(app_readers)
     return {"rows": rows, "app_rule": rule, "newspapers": newspapers}
 
 
