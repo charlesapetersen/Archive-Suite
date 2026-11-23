@@ -2,6 +2,12 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## FIXED (2026-11-23) — Processor PDF write and iOS relay gate checks
+
+The Processor write lint pins the catalogue-aware PDF writers and the recovery test's scratch fixture write.
+Its mutation proof checks that changing the fixture's destination fails the lint. The standalone iOS relay test
+compiles the app's queue-status type alongside the Mac client. See gate-fix.
+
 ## FIXED (2026-11-22) — interrupted filing could drop saved OCR state
 
 Process Files verifies the PDF and catalogue companion before retiring the journals for saved readings.

@@ -270,8 +270,7 @@ struct PDFGenerator {
             return ("the compressed page is not the image's size", nil)
         }
         do {
-            try SearchableArchival.write([page], pageHeaders: [header], to: url, budget: budget,
-                                         catalogueIdentity: catalogueIdentity)
+            try SearchableArchival.write([page], pageHeaders: [header], to: url, budget: budget, catalogueIdentity: catalogueIdentity)
         } catch {
             return (error.localizedDescription, nil)
         }

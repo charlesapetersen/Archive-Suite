@@ -3,7 +3,7 @@
 #
 # Processor's `MacOSTagger` is deliberately only a fresh-write adapter over ArchiveCore's audited
 # `CoordinatedTagWriter`; a direct setResourceValue/setxattr call here would bypass its coordinated
-# read/verify path. Direct calls to the PDF/A-2b writers are pinned to the audited PDFGenerator lines
+# read/verify path. Direct calls to the PDF/A-2b writers are pinned to audited lines
 # because later callers decide whether a source may be retired. PDFDocument.write is forbidden.
 #
 # Run before Processor commits. It and its scratch-only mutation proof are health-gate steps, so this is a
@@ -21,8 +21,11 @@ SEP=$'\x1f'
 ALLOW=(
   # W42.int-s5: generated pages use the Quartz PDF/A writer or the stream-preserving writer for a compressed
   # searchable page. Merges assemble PDF/A bytes in memory through archivalData or SearchableArchival.data.
-  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try Self.writeArchival(pdfDocument, to: outputURL, pageHeaders: pageHeaders)"
-  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try SearchableArchival.write([page], pageHeaders: [header], to: url, budget: budget)"
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try Self.writeArchival(pdfDocument, to: outputURL, pageHeaders: pageHeaders, catalogueIdentity: catalogueIdentity)"
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/OCR/PDFGenerator.swift${SEP}try SearchableArchival.write([page], pageHeaders: [header], to: url, budget: budget, catalogueIdentity: catalogueIdentity)"
+  # W49.storage-processor: the DEBUG recovery driver stages a synthetic PDF carrying the companion's
+  # catalogue identity. All calls write under its UUID-named test directory with isolated backup enabled.
+  "pdfwrite${SEP}macOS/Sources/ArchiveProcessor/Capture/LiveCaptureRecoveryTestDriver.swift${SEP}try? PDFGenerator.writeArchival(document, to: pdf, catalogueIdentity: identity)"
   # W44.reocr-processor: the Improve OCR publication test (DEBUG only) puts a custom attribute and a resource fork on
   # its scratch fixtures, so it can prove publication keeps them. Tags and label go through CoordinatedTagWriter.
   "tagwrite${SEP}macOS/Sources/ArchiveProcessor/ReOCR/ReOCRFileWriterTestDriver.swift${SEP}let rc = value.withUnsafeBytes { setxattr(url.path, name, \$0.baseAddress, \$0.count, 0, XATTR_NOFOLLOW) }"
@@ -157,7 +160,7 @@ scan_stream pdfwrite \
   'SearchableArchival.write outside its audited output sites:' \
   < <(searchable_write_hits)
 scan_stream pdfwrite \
-  'PDFGenerator.writeArchival outside its audited PDFGenerator output site (or an allowed line changed):' \
+  'PDFGenerator.writeArchival outside its audited output sites (or an allowed line changed):' \
   < <(archival_write_hits)
 
 if [ "$FAIL" -eq 0 ]; then
