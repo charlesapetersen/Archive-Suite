@@ -57,6 +57,7 @@ struct SessionProcessingConfig: Sendable {
     /// Process Files only. Frozen for the manual date cards and interrupted runs.
     var dateLocalImage = false
     var macItemFields = true
+    var keepPreservationCopies = true
 
     /// The backend for all post-transcription text work. For ordinary runs this is the OCR backend;
     /// for the Vision hybrid it is the separately-selected direct LLM.

@@ -1,6 +1,8 @@
 #if DEBUG
 import ArchiveCore
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 import PDFKit
 
 extension TextLayerTestDriver {
@@ -20,14 +22,109 @@ extension TextLayerTestDriver {
             return
         }
         do {
+            try preservationFilingChecks(dir: dir, jpeg: image, pdf: multipagePDF)
             try await copiedSourceFacts(dir: dir, image: image)
             try await cachedCatalogueResume(dir: dir, image: image)
             try await mixedCatalogueResume(dir: dir, image: image, pdf: multipagePDF)
             try await frozenCatalogueResume(dir: dir, images: [image, multipagePDF], fixture: multipagePDF)
-            try damagedCatalogueDismiss(dir: dir, image: image)
+            try await damagedCatalogueDismiss(dir: dir, image: image)
             try await batchCatalogueFiling(dir: dir, image: image)
         } catch {
             check("10 catalogue recovery fixtures", false, "\(error)")
+        }
+    }
+
+    private static func preservationFilingChecks(dir: URL, jpeg: URL, pdf: URL) throws {
+        let fm = FileManager.default
+        let output = dir.appendingPathComponent("preservation filing", isDirectory: true)
+        try fm.createDirectory(at: output, withIntermediateDirectories: false)
+        let source = CGImageSourceCreateWithURL(jpeg as CFURL, nil)
+        guard let source, let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        func imageFile(_ type: UTType, named name: String) throws -> URL {
+            let url = dir.appendingPathComponent(name)
+            guard let destination = CGImageDestinationCreateWithURL(url as CFURL, type.identifier as CFString, 1, nil)
+            else { throw CocoaError(.fileWriteUnknown) }
+            CGImageDestinationAddImage(destination, image, nil)
+            guard CGImageDestinationFinalize(destination) else { throw CocoaError(.fileWriteUnknown) }
+            return url
+        }
+        let heic = try imageFile(.heic, named: "same.heic")
+        let tiff = try imageFile(.tiff, named: "same.tiff")
+        let namesakeFolder = dir.appendingPathComponent("different intake", isDirectory: true)
+        try fm.createDirectory(at: namesakeFolder, withIntermediateDirectories: false)
+        let namesake = namesakeFolder.appendingPathComponent(jpeg.lastPathComponent)
+        // A different byte stream with the same image data and intake name.
+        try (Data(contentsOf: jpeg) + Data([0])).write(to: namesake)
+
+        let ordered: [(URL, Int)] = [(namesake, 0), (heic, 0), (pdf, 0), (jpeg, 0), (tiff, 0), (pdf, 1)]
+        let identity = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+        let document = ProcessorCatalogueRecord.Document(id: UUID(), ownerFileID: identity.fileID,
+                                                         fields: .init(), enclosedWith: nil)
+        let pages = ordered.map { _ in ProcessorCatalogueRecord.SourcePage(roles: ["image", "text"]) }
+        let inputs = try ordered.map { input, index in
+            ProcessorPreservationFiling.LogicalPage(source: try .init(url: input), originalPageIndex: index)
+        }
+        let preservation = try ProcessorPreservationFiling(fileID: identity.fileID, pages: pages, inputs: inputs)
+        let catalogue = try ProcessorCatalogueRecord(identity: identity, sourcePages: pages, document: document,
+                                                       fileFields: .init(),
+                                                       preservationManifestSHA256: preservation.manifest.digest()).encoded()
+        let prepared = output.appendingPathComponent("working.derivative")
+        try PDFGenerator().mergeDocumentPDFs(sourcePDFs: pages.map { _ in pdf }, outputURL: prepared,
+                                             catalogueIdentity: identity)
+        let target = output.appendingPathComponent("Reading.pdf")
+        let instance = UUID()
+        let filing = try ProcessorCatalogueFiling(operationID: identity.fileID, root: output,
+                                                   rootInstanceID: instance, destination: target)
+        let base = output.appendingPathComponent(PreservationCopy.directoryName)
+        try fm.createSymbolicLink(at: base, withDestinationURL: namesakeFolder)
+        let receiptURL = output.appendingPathComponent(".archivesuite-pair-\(identity.fileID.uuidString.lowercased()).receipt")
+        do {
+            _ = try filing.file(preparedPDF: prepared, record: catalogue, preservation: preservation)
+            check("10 a linked Preservation directory withholds the filing receipt", false)
+        } catch {
+            check("10 a linked Preservation directory withholds the filing receipt",
+                  !fm.fileExists(atPath: receiptURL.path) && fm.fileExists(atPath: namesake.path)
+                    && (try? fm.contentsOfDirectory(atPath: namesakeFolder.path)) == [namesake.lastPathComponent])
+        }
+        try fm.removeItem(at: base)
+
+        let heicBytes = try Data(contentsOf: heic)
+        try Data(repeating: 0, count: heicBytes.count).write(to: heic)
+        do {
+            _ = try filing.file(preparedPDF: prepared, record: catalogue, preservation: preservation)
+            check("10 altered intake after the first staged source withholds the receipt", false)
+        } catch {
+            check("10 altered intake after the first staged source withholds the receipt", !fm.fileExists(atPath: receiptURL.path))
+        }
+        try heicBytes.write(to: heic)
+        let held = namesakeFolder.appendingPathComponent("Held.jpg")
+        try fm.moveItem(at: namesake, to: held)
+        defer {
+            if fm.fileExists(atPath: held.path) { try? fm.moveItem(at: held, to: namesake) }
+        }
+
+        let receipt = try filing.file(preparedPDF: prepared, record: catalogue, preservation: preservation)
+        let reopened = try filing.file(preparedPDF: prepared, record: catalogue, preservation: preservation)
+        try fm.moveItem(at: held, to: namesake)
+        let reader = try CatalogueReader(grantedRoot: output, rootInstanceID: instance, mode: .adopted,
+                                         identifyPDF: CataloguePDFIdentity.identify)
+        let occurrence = CatalogueAssociation.Occurrence(rootInstanceID: instance, relativePath: receipt.pdfRelativePath)
+        var exact = true
+        for (index, input) in ordered.enumerated() {
+            let first = try PreservationCopy.open(in: reader, at: occurrence, physicalPageIndex: index * 2)
+            let second = try PreservationCopy.open(in: reader, at: occurrence, physicalPageIndex: index * 2 + 1)
+            let sourceBytes = try Data(contentsOf: input.0)
+            exact = exact && first.bytes == sourceBytes && second.bytes == sourceBytes
+                && first.selection.originalPageIndex == input.1
+                && first.selection.source.name == input.0.lastPathComponent
+        }
+        check("10 retry preserves exact JPEG, HEIC, TIFF and whole PDF bytes and correct page order",
+              exact && reopened == receipt && preservation.sources.count == 5 && fm.fileExists(atPath: receiptURL.path))
+        if let keep = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_KEEP"] {
+            let copy = URL(fileURLWithPath: keep).appendingPathComponent("preservation-reading.pdf")
+            try fm.copyItem(at: target, to: copy)
         }
     }
 
@@ -65,7 +162,7 @@ extension TextLayerTestDriver {
         let builder = OCRProcessor()
         builder.taggingMode = .none
         builder.rotationMode = .off
-        guard builder.beginCatalogueRun(outputRoot: output, sources: [image]), let catalogue = builder.catalogueRun else {
+        guard await builder.beginCatalogueRun(outputRoot: output, sources: [image]), let catalogue = builder.catalogueRun else {
             throw CocoaError(.fileWriteUnknown)
         }
         let cachedText = "The resumed PDF keeps this exact cached OCR reading."
@@ -110,7 +207,7 @@ extension TextLayerTestDriver {
         var config = SessionProcessingConfig.fromProcessFilesRunStart()
         config.visionTextLLM = nil
         let context = SegmentationContext()
-        guard builder.beginCatalogueRun(outputRoot: output, sources: files), let catalogue = builder.catalogueRun,
+        guard await builder.beginCatalogueRun(outputRoot: output, sources: files), let catalogue = builder.catalogueRun,
               builder.beginMixedPDFJournal(originalFiles: files, pdfIndices: [1], outputDirectory: output,
                                            provider: .appleVision, model: model, thinkingLevel: nil, batchMode: false,
                                            enableTagging: false, enableSegmentJSON: false, enableCollectionSegmentation: false,
@@ -138,6 +235,18 @@ extension TextLayerTestDriver {
               resumed.statusMessage)
         await resumed.resumeMixedPDF(apiKey: "", keyProvider: .appleVision)
         let rebuilt = resumed.outputURLMap[pdf]
+        var exactMixed = false
+        if let rebuilt {
+            let instance = UUID()
+            let reader = try CatalogueReader(grantedRoot: output, rootInstanceID: instance, mode: .adopted,
+                                             identifyPDF: CataloguePDFIdentity.identify)
+            let occurrence = CatalogueAssociation.Occurrence(rootInstanceID: instance, relativePath: rebuilt.lastPathComponent)
+            let first = try PreservationCopy.open(in: reader, at: occurrence, physicalPageIndex: 0)
+            let last = try PreservationCopy.open(in: reader, at: occurrence, physicalPageIndex: 3)
+            exactMixed = first.bytes == originalPDF && last.bytes == originalPDF
+                && first.selection.originalPageIndex == 0 && last.selection.originalPageIndex == 1
+        }
+        check("10 actual mixed Process Files resume ties both PDF pages to one exact original", exactMixed)
         let pdfText = rebuilt.flatMap { PDFDocument(url: $0)?.string }
         check("10 mixed resume files both source types and reuses the saved PDF page readings",
               catalogueRecord(at: resumed.outputURLMap[image]) != nil
@@ -154,7 +263,7 @@ extension TextLayerTestDriver {
         let output = dir.appendingPathComponent("frozen resume", isDirectory: true)
         try fm.createDirectory(at: output, withIntermediateDirectories: false)
         let builder = OCRProcessor()
-        guard builder.beginCatalogueRun(outputRoot: output, sources: images), var plan = builder.catalogueRun else {
+        guard await builder.beginCatalogueRun(outputRoot: output, sources: images), var plan = builder.catalogueRun else {
             throw CocoaError(.fileWriteUnknown)
         }
 
@@ -235,12 +344,12 @@ extension TextLayerTestDriver {
               reopened.statusMessage)
     }
 
-    private static func damagedCatalogueDismiss(dir: URL, image: URL) throws {
+    private static func damagedCatalogueDismiss(dir: URL, image: URL) async throws {
         let fm = FileManager.default
         let output = dir.appendingPathComponent("damaged recovery", isDirectory: true)
         try fm.createDirectory(at: output, withIntermediateDirectories: false)
         let builder = OCRProcessor()
-        guard builder.beginCatalogueRun(outputRoot: output, sources: [image]), let run = builder.catalogueRun else {
+        guard await builder.beginCatalogueRun(outputRoot: output, sources: [image]), let run = builder.catalogueRun else {
             throw CocoaError(.fileWriteUnknown)
         }
         builder.catalogueRunLease = nil

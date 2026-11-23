@@ -24,6 +24,13 @@ struct CollectionFinalizeSheet: View {
             Text("Confirm a name for each collection, or add it to an existing folder (new photos continue that folder's numbering).")
                 .font(.caption).foregroundStyle(.primary)
                 .padding(.horizontal, 20).padding(.bottom, 10)
+            if let bytes = liveProc.preservationBytesForFinish {
+                let size = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+                Text("Preservation copies add \(size) for the originals being filed.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .padding(.horizontal, 20).padding(.bottom, 8)
+                    .help("\(bytes.formatted()) bytes. A PDF-only share leaves these files behind.")
+            }
             if !liveProc.failedGroupIds.isEmpty {
                 Label("\(liveProc.failedGroupIds.count) segment(s) failed to process and are NOT filed — kept in the Backup Folder. Retry them from the Live Capture panel before finalizing.",
                       systemImage: "exclamationmark.triangle.fill")

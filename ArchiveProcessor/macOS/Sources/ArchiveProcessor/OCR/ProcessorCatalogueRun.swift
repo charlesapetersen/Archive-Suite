@@ -36,6 +36,7 @@ struct ProcessorCatalogueRun: Codable, Sendable {
         let record: Data
         let filing: ProcessorCatalogueFiling
         let exports: [Export]
+        var preservation: ProcessorPreservationFiling? = nil
     }
 
     let outputRoot: URL
@@ -43,6 +44,7 @@ struct ProcessorCatalogueRun: Codable, Sendable {
     private let workingDirectory: DirectoryIdentity?
     let openedAt: Date
     let sources: [URL]
+    var preservationIntake: [URL: ProcessorPreservationFiling.Intake]?
     var files: [File]?
     var inputJournalDigests: [String: String]?
 
@@ -69,14 +71,15 @@ struct ProcessorCatalogueRun: Codable, Sendable {
         let digest: Data
     }
 
-    static func create(outputRoot: URL, sources: [URL], journal: URL) throws -> Self {
+    static func create(outputRoot: URL, sources: [URL], journal: URL,
+                       preservationIntake: [URL: ProcessorPreservationFiling.Intake]?) throws -> Self {
         let working = journal.deletingLastPathComponent()
             .appendingPathComponent("catalogue-work-" + UUID().uuidString.lowercased(), isDirectory: true)
         try FileManager.default.createDirectory(at: working, withIntermediateDirectories: false,
                                                 attributes: [.posixPermissions: 0o700])
         guard let identity = DirectoryIdentity(working) else { throw CocoaError(.fileWriteNoPermission) }
         let run = Self(outputRoot: outputRoot.standardizedFileURL, workingRoot: working, workingDirectory: identity,
-                       openedAt: Date(), sources: sources)
+                       openedAt: Date(), sources: sources, preservationIntake: preservationIntake)
         do {
             try run.save(to: journal, new: true)
             return run
@@ -162,11 +165,21 @@ struct ProcessorCatalogueRun: Codable, Sendable {
         copied = true
     }
 
+    private struct PreservationFilingError: LocalizedError {
+        let filename: String
+        let underlying: Error
+        var errorDescription: String? { "Could not file “\(filename)” with its originals. \(underlying.localizedDescription)" }
+    }
+
     func fileOutputs() throws -> [URL] {
         guard hasWorkingDirectory, let files else { throw CocoaError(.fileReadCorruptFile) }
         for file in files {
             try Task.checkCancellation()
-            _ = try file.filing.file(preparedPDF: file.prepared, record: file.record)
+            do {
+                _ = try file.filing.file(preparedPDF: file.prepared, record: file.record, preservation: file.preservation)
+            } catch where file.preservation != nil {
+                throw PreservationFilingError(filename: file.destination.lastPathComponent, underlying: error)
+            }
         }
         var unfiled: [URL] = []
         for file in files {

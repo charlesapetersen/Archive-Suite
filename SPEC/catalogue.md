@@ -94,6 +94,39 @@ unknown data at any depth. The writer patches individual fields, preserving unto
 revalidating the resulting record. If a change would discard an unfamiliar value extension or overwrite a
 field with an unknown origin, it is refused. Record decoding is pure.
 
+## Preservation copies
+
+When Processor keeps originals, the companion also carries `preservationManifestSHA256`. It is the
+base64-encoded SHA-256 of the exact `pages.json` bytes. The map and originals live under
+`Preservation/<document UUID>/<file UUID>/` beside the reading PDF. The document and file directories use
+lowercase UUIDs. A document filed as several reading PDFs can share a document directory when the PDFs
+share a parent. Moving the entire containing folder or changing the matched PDF and companion names
+does not change the association.
+
+The map contains `fileID`, `sources`, and `pages`. Each source has its original intake `name`,
+native `format`, and a `fingerprint` with `byteCount` and base64 `sha256`. The exclusive storage names
+are `source-1.jpeg`, `source-2.pdf`, and so on, using the format token and the source's one-based
+position. These are exact intake file bytes. Each map page uses the reading record's stable source-page
+`id`, zero-based `sourceIndex` and zero-based `originalPageIndex`. Both halves of an image and OCR pair
+share one source page. Several derivative pages that came from a single native PDF share one copy and
+carry their original physical page indices. A legitimate metadata edit can keep the map by leaving
+the source-page IDs and digest intact.
+
+Reader checks the map against the verified PDF and companion inside the archive grant. An explicit
+view verifies and uses the same source bytes. Discovery skips the preservation document directories.
+The copies supply no extra search rows. No automatic download is requested. A companion with a
+digest can report a missing map or source. Where no verified association was recorded, Reader
+reports **Not recorded**. A PDF-only transfer leaves the originals behind.
+
+Initial filing verifies the preserved files and their map under the same pinned directory lock
+before publishing the PDF and companion. A receipt requires this verification on every attempt. A retry reuses prepared payloads
+that match the map and refuses conflicting names. Live Capture retains staged originals until the
+verified receipt and its own filed-group record are durable. A hard interruption during a copy can
+leave an unfinished hidden temporary file beside the pending directory. It never substitutes for a
+verified source. Process Files leaves the intake originals in place. The reading PDF stays PDF/A-2b.
+A portable preservation transfer includes the PDF, its companion, and the corresponding
+`Preservation` directory. Cloud-provider behavior requires a separate round-trip verification.
+
 ## Scoped reads and refresh
 
 `CatalogueReader` runs while the caller holds a successfully resolved, non-stale grant for one

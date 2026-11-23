@@ -42,6 +42,12 @@ final class LiveCaptureProcessor: ObservableObject {
         }
     }
 
+    var preservationBytesForFinish: Int64? {
+        let sources = staged.filter { $0.pagesComplete != false }
+            .compactMap(\.preservationCopies).flatMap { $0 }.flatMap(\.sources)
+        return sources.isEmpty ? nil : sources.reduce(0) { $0 + $1.source.fingerprint.byteCount }
+    }
+
     /// A staged, fully-processed segment awaiting end-of-session finalization (this is the manifest).
     struct StagedSegment: Codable {
         let groupId: String
@@ -75,6 +81,7 @@ final class LiveCaptureProcessor: ObservableObject {
         var unreadImageOnlyPageCount: Int? = nil
         /// Validated initial records, in PDF order, frozen before the initial filing attempt.
         var catalogueRecords: [Data]? = nil
+        var preservationCopies: [ProcessorPreservationFiling]? = nil
         var catalogueDestination: CatalogueDestination? = nil
 
         var numberedSlots: Int {
@@ -1408,10 +1415,22 @@ final class LiveCaptureProcessor: ObservableObject {
         let untaggedContainer = humanOnly && group.type != .document
 
         // Snapshot Sendable per-page work for the off-main file writes.
-        let pages: [PageWork] = group.photos.enumerated().map { (i, p) in
+        let keepPreservationCopies = config.keepPreservationCopies
+        let stagedPages: [PageWork] = group.photos.enumerated().map { (i, p) in
             let quality = untaggedContainer ? nil : Self.pageQuality(card: mac?.quality, phone: p.quality)
-            return PageWork(sourceURL: p.url, result: results[i], quality: quality)
+            let intake = keepPreservationCopies ? p.preservationFingerprint.map {
+                ProcessorPreservationFiling.Intake(capturedJPEG: p.url, fingerprint: $0)
+            } : nil
+            return PageWork(sourceURL: p.url, result: results[i], quality: quality, preservation: intake)
         }
+        let pages = keepPreservationCopies ? await PDFGenerator.runWorker(priority: .utility) {
+            stagedPages.map { page in
+                guard page.preservation == nil else { return page }
+                var verified = page
+                verified.preservation = try? ProcessorPreservationFiling.Intake(url: page.sourceURL)
+                return verified
+            }
+        } : stagedPages
         let gType = group.type, gOrder = group.order
         let baseTags = untaggedContainer ? [] : tags.allTags
         let doMerge = config.mergeDocuments && gType == .document && pages.count > 1
@@ -1457,7 +1476,8 @@ final class LiveCaptureProcessor: ObservableObject {
                                    exportedImageMB: exportedImageMB, textColumns: textColumns,
                                    taggingMode: taggingMode,
                                    stampUnread: stampUnread, textLayer: textLayer,
-                                   dateIsUserSet: dateIsUserSet, subjectsAreUserSet: subjectsAreUserSet)
+                                   dateIsUserSet: dateIsUserSet, subjectsAreUserSet: subjectsAreUserSet,
+                                   keepPreservationCopies: keepPreservationCopies)
         }.value
 
         // B8: the off-main write itself can straddle a Clear. If the session was cleared while it ran, do NOT
@@ -1492,7 +1512,8 @@ final class LiveCaptureProcessor: ObservableObject {
             taggingMode: taggingMode,
             stampUnread: stampUnread, textLayer: textLayer,
             routeDating: routeDating, preDatingTags: routeDating == nil ? nil : preDatingTags,
-            dateIsUserSet: dateIsUserSet, subjectsAreUserSet: subjectsAreUserSet)
+            dateIsUserSet: dateIsUserSet, subjectsAreUserSet: subjectsAreUserSet,
+            keepPreservationCopies: keepPreservationCopies)
         persistManifest()
         if let containerRead {
             session.setContainerRead(groupId: groupId, read: containerRead.fields, fallback: containerRead.fallback)
@@ -1789,6 +1810,7 @@ final class LiveCaptureProcessor: ObservableObject {
         let sourceURL: URL
         let result: OCRResult
         let quality: String?
+        var preservation: ProcessorPreservationFiling.Intake? = nil
     }
 
     /// All inputs to `writeSegmentFiles` for one finalized segment, retained so the end-of-session
@@ -1844,6 +1866,7 @@ final class LiveCaptureProcessor: ObservableObject {
         var preDatingTags: GeneratedTags?
         var dateIsUserSet: Bool?
         let subjectsAreUserSet: Bool?
+        let keepPreservationCopies: Bool?
 
         // Memberwise init (matches the synthesized one the callers already use).
         init(groupId: String, type: CaptureGroupType, order: Int,
@@ -1856,7 +1879,7 @@ final class LiveCaptureProcessor: ObservableObject {
              taggingMode: TaggingMode,
              stampUnread: Bool, textLayer: PDFGenerator.TextLayerOptions? = nil,
              routeDating: DateRoute.Decision? = nil, preDatingTags: GeneratedTags? = nil,
-             dateIsUserSet: Bool? = nil, subjectsAreUserSet: Bool? = nil) {
+             dateIsUserSet: Bool? = nil, subjectsAreUserSet: Bool? = nil, keepPreservationCopies: Bool? = nil) {
             self.groupId = groupId; self.type = type; self.order = order
             self.pages = pages; self.baseTags = baseTags; self.doMerge = doMerge; self.model = model
             self.gatewayName = gatewayName
@@ -1871,6 +1894,7 @@ final class LiveCaptureProcessor: ObservableObject {
             self.routeDating = routeDating; self.preDatingTags = preDatingTags
             self.dateIsUserSet = dateIsUserSet
             self.subjectsAreUserSet = subjectsAreUserSet
+            self.keepPreservationCopies = keepPreservationCopies
         }
     }
 
@@ -1886,7 +1910,7 @@ final class LiveCaptureProcessor: ObservableObject {
         taggingMode: TaggingMode,
         stampUnread: Bool,
         textLayer: PDFGenerator.TextLayerOptions = .standard,
-        dateIsUserSet: Bool = false, subjectsAreUserSet: Bool = false,
+        dateIsUserSet: Bool = false, subjectsAreUserSet: Bool = false, keepPreservationCopies: Bool = false,
         tagWriter: @Sendable ([String], URL, String?, Bool) -> Bool = tagStagedArtifact
     ) -> StagedSegment {
         let fm = FileManager.default
@@ -1897,7 +1921,8 @@ final class LiveCaptureProcessor: ObservableObject {
         var untaggedOutputs: [URL] = []
         var layerNotes: [String] = []
         var unreadImageOnlyPages = 0
-        var cataloguePages: [(CataloguePDFIdentity, ProcessorCatalogueRecord.SourcePage, Bool, String?)] = []
+        var cataloguePages: [(identity: CataloguePDFIdentity, page: ProcessorCatalogueRecord.SourcePage,
+                              failed: Bool, quality: String?, intake: ProcessorPreservationFiling.Intake?)] = []
         // W3.cap-r1 — the app's OWN colour for this segment (the user's colour for a box/folder, if any;
         // nil for a document or no colour chosen — W40.suite-item-types),
         // passed to every tag write below so a *subject* string is never mistaken for one. See
@@ -1942,7 +1967,7 @@ final class LiveCaptureProcessor: ObservableObject {
             pdfURLs.append(stagedPDF)
             let sourcePage = ProcessorCatalogueRecord.SourcePage(
                 roles: output.form == .searchable ? ["searchable"] : ["image", "text"])
-            cataloguePages.append((identity, sourcePage, ocrFailed(page.result), page.quality))
+            cataloguePages.append((identity, sourcePage, ocrFailed(page.result), page.quality, page.preservation))
 
             // Two-file output: a .jpg next to its PDF, sized to the exported-image target + identical tags.
             if outputImageFile {
@@ -2001,29 +2026,52 @@ final class LiveCaptureProcessor: ObservableObject {
         }
 
         var catalogueRecords: [Data]? = nil
+        var preservationCopies: [ProcessorPreservationFiling]? = nil
         if let first = cataloguePages.first {
             let logicalID = UUID()
-            let owner = merged ? mergedIdentity.fileID : first.0.fileID
+            let owner = merged ? mergedIdentity.fileID : first.identity.fileID
             let facts = ProcessorCatalogueRecord.documentFields(
                 tags: jsonTags, type: type.itemType, dateIsUserSet: dateIsUserSet, subjectsAreUserSet: subjectsAreUserSet,
                 dating: dating, itemFields: itemFields, entities: entities)
-            func record(_ identity: CataloguePDFIdentity, _ sourcePages: [ProcessorCatalogueRecord.SourcePage],
-                        failed: Bool, quality: String?) throws -> Data {
+            func record(_ identity: CataloguePDFIdentity, _ indices: Range<Int>, quality: String?)
+                throws -> (Data, ProcessorPreservationFiling?) {
                 let document = ProcessorCatalogueRecord.Document(id: logicalID, ownerFileID: owner,
                                                                 fields: identity.fileID == owner ? facts : nil)
+                let pages = cataloguePages[indices]
                 let fileFields = ProcessorCatalogueRecord.fileFields(tags: jsonTags, quality: quality,
-                                                                     unread: stampUnread, failed: failed)
-                return try ProcessorCatalogueRecord(identity: identity, sourcePages: sourcePages,
-                                                    document: document, fileFields: fileFields).encoded()
-            }
-            if merged {
-                let quality = pages.first(where: { $0.quality == "Q3" })?.quality ?? pages.first?.quality
-                catalogueRecords = try? [record(mergedIdentity, cataloguePages.map(\.1),
-                                                failed: cataloguePages.contains { $0.2 }, quality: quality)]
-            } else {
-                catalogueRecords = try? cataloguePages.map {
-                    try record($0.0, [$0.1], failed: $0.2, quality: $0.3)
+                                                                     unread: stampUnread, failed: pages.contains { $0.failed })
+                let sourcePages = pages.map(\.page)
+                let keep: ProcessorPreservationFiling?
+                if keepPreservationCopies {
+                    let inputs: [ProcessorPreservationFiling.LogicalPage] = try pages.map { page in
+                        guard let intake = page.intake else { throw PreservationCopy.Failure.unverified }
+                        return .init(source: intake, originalPageIndex: 0)
+                    }
+                    keep = try ProcessorPreservationFiling(fileID: identity.fileID, pages: sourcePages, inputs: inputs)
+                } else {
+                    keep = nil
                 }
+                let data = try ProcessorCatalogueRecord(identity: identity, sourcePages: sourcePages,
+                                                        document: document, fileFields: fileFields,
+                                                        preservationManifestSHA256: keep?.manifest.digest()).encoded()
+                return (data, keep)
+            }
+            do {
+                let records: [(Data, ProcessorPreservationFiling?)]
+                if merged {
+                    let quality = pages.first(where: { $0.quality == "Q3" })?.quality ?? pages.first?.quality
+                    records = try [record(mergedIdentity, cataloguePages.indices, quality: quality)]
+                } else {
+                    records = try cataloguePages.indices.map { index in
+                        let page = cataloguePages[index]
+                        return try record(page.identity, index..<(index + 1), quality: page.quality)
+                    }
+                }
+                catalogueRecords = records.map { $0.0 }
+                if keepPreservationCopies { preservationCopies = records.compactMap { $0.1 } }
+            } catch {
+                NSLog("Live Capture could not prepare preservation or catalogue filing for %@: %@", groupId,
+                      String(describing: error))
             }
         }
         return StagedSegment(groupId: groupId, type: type.rawValue, collectionKey: collectionKey, order: order,
@@ -2033,7 +2081,7 @@ final class LiveCaptureProcessor: ObservableObject {
                              untaggedOutputs: untaggedOutputs,
                              pdfLayerLogNotes: layerNotes.isEmpty ? nil : layerNotes,
                              unreadImageOnlyPageCount: unreadImageOnlyPages > 0 ? unreadImageOnlyPages : nil,
-                             catalogueRecords: catalogueRecords)
+                             catalogueRecords: catalogueRecords, preservationCopies: preservationCopies)
     }
 
     /// A page's Quality input: a saved card's decision, else the phone's. The card's 0 becomes the internal
@@ -2476,7 +2524,7 @@ final class LiveCaptureProcessor: ObservableObject {
             seg.pages[page.pageIndex] = PageWork(
                 sourceURL: pw.sourceURL,
                 result: pw.result.with(classification: pw.result.classification, rotationDegrees: new),
-                quality: pw.quality)
+                quality: pw.quality, preservation: pw.preservation)
             retained[page.groupId] = seg
             changedGroups.insert(page.groupId)
             if page.pageIndex < DateRoute.imagePages { changedDatingImages.insert(page.groupId) }
@@ -2538,7 +2586,8 @@ final class LiveCaptureProcessor: ObservableObject {
                                            taggingMode: seg.taggingMode,
                                            stampUnread: seg.stampUnread, textLayer: seg.textLayer ?? .standard,
                                            dateIsUserSet: seg.dateIsUserSet ?? false,
-                                           subjectsAreUserSet: seg.subjectsAreUserSet ?? false)
+                                           subjectsAreUserSet: seg.subjectsAreUserSet ?? false,
+                                           keepPreservationCopies: seg.keepPreservationCopies ?? false)
                 }
             }.value
             for outcome in regenerated {
@@ -3243,7 +3292,8 @@ final class LiveCaptureProcessor: ObservableObject {
                 let catalogue = seg.catalogueDestination
                 if requireCatalogue {
                     guard let catalogue, catalogue.pdfs.count == seg.pdfURLs.count,
-                          seg.catalogueRecords?.count == seg.pdfURLs.count else {
+                          seg.catalogueRecords?.count == seg.pdfURLs.count,
+                          seg.preservationCopies.map({ $0.count == seg.pdfURLs.count }) ?? true else {
                         if !seg.pdfURLs.isEmpty { failedMoves += 1 }
                         continue
                     }
@@ -3262,7 +3312,8 @@ final class LiveCaptureProcessor: ObservableObject {
                         guard let operation = catalogue?.pdfs[pdfExpected],
                               let record = seg.catalogueRecords?[pdfExpected] else { return }
                         do {
-                            let receipt = try operation.file(preparedPDF: source, record: record)
+                            let receipt = try operation.file(preparedPDF: source, record: record,
+                                                             preservation: seg.preservationCopies?[pdfExpected])
                             let filename = operation.root.appendingPathComponent(receipt.pdfRelativePath).lastPathComponent
                             movedFiles += 1
                             filedNames[plan.folder.standardizedFileURL.path, default: []].insert(filename)
@@ -3494,7 +3545,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Test-only: pair the staged PDFs with the result an older classifier would have accepted.
     func _recoveryTestPersistPreviousReading(_ result: OCRResult, groupId: String) -> Bool {
         guard var segment = retained[groupId] else { return false }
-        segment.pages = segment.pages.map { PageWork(sourceURL: $0.sourceURL, result: result, quality: $0.quality) }
+        segment.pages = segment.pages.map { PageWork(sourceURL: $0.sourceURL, result: result, quality: $0.quality, preservation: $0.preservation) }
         var previousRetained = retained
         previousRetained[groupId] = segment
         return persistManifest(retained: previousRetained)

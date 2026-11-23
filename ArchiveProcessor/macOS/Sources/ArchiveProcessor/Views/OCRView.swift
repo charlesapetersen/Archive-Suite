@@ -143,6 +143,7 @@ struct OCRView: View {
 
     // Transient
     @State private var droppedFiles: [URL] = []
+    @State private var preservationSelectionSize: (bytes: Int64, known: Int)?
     /// W47.ct-processor-intake: for each file from a folder read as a tree, its folder below the output folder.
     @State private var droppedSubfolders: [URL: String] = [:]
     @State private var foldersBeyondDepth: [URL] = []
@@ -505,6 +506,9 @@ struct OCRView: View {
             droppedHasMultiPagePDF = !pageCounts.isEmpty
             droppedPDFFileCount = pageCounts.count
             droppedPDFPageCount = pageCounts.reduce(0, +)
+            let sourceFiles = Set(files)
+            let sizes = sourceFiles.compactMap { try? $0.resourceValues(forKeys: [.fileSizeKey]).fileSize }
+            preservationSelectionSize = (sizes.reduce(0) { $0 + Int64($1) }, sizes.count)
             if pageKindsActive { pageKinds.update(files) }
         }
         .onChange(of: pageKindsActive) { _, active in
@@ -816,6 +820,16 @@ struct OCRView: View {
                     .accessibilityIdentifier("ap.ocr.segmentationPanel")
                 }
 
+
+                if settingsStore.keepsPreservationCopies, !droppedFiles.isEmpty, let estimate = preservationSelectionSize {
+                    let size = ByteCountFormatter.string(fromByteCount: estimate.bytes, countStyle: .file)
+                    Text(estimate.known == 0 ? "Preservation copy size is unavailable for these originals."
+                         : estimate.known == Set(droppedFiles).count
+                           ? "Preservation copies add \(size) for the selected originals."
+                           : "Preservation copies add \(size) for the originals with known sizes.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .help("\(estimate.bytes.formatted()) bytes of original files with known sizes. A PDF-only share leaves these files behind.")
+                }
 
                 // Cost estimate
                 if let warning = unavailableOpenRouterSelection, !droppedFiles.isEmpty {

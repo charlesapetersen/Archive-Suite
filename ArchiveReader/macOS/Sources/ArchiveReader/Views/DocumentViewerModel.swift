@@ -23,11 +23,15 @@ final class DocumentViewerModel: ObservableObject {
     @Published private(set) var contentRevision = 0
     private var replacedObserver: AnyCancellable?
     @Published private(set) var current: PDFDocument? {
-        didSet { pagePairs = DocumentPagePairs(document: current) }
+        didSet {
+            pagePairs = DocumentPagePairs(document: current)
+            preservationIdentity = current?.documentRef.flatMap(CataloguePDFIdentity.identity(in:))
+        }
     }
     /// Which page of `current` is which (`DocumentPagePairs`): read once per document, from its XMP when it has
     /// searchable pages (W42.int-s5-searchable), so a searchable page is never shown as another page's text.
     private(set) var pagePairs = DocumentPagePairs.empty
+    private(set) var preservationIdentity: CataloguePDFIdentity?
     @Published private(set) var loadError: String?
 
     enum CloudState: Equatable { case awaitingConsent, downloading, downloadFailed }
@@ -1096,7 +1100,7 @@ final class DocumentViewerModel: ObservableObject {
         }
     }
 
-    private var currentURL: URL? { urls.indices.contains(index) ? urls[index] : nil }
+    var currentURL: URL? { urls.indices.contains(index) ? urls[index] : nil }
 
     // MARK: Opening the files either side ahead (W40.fix-reader-viewer-switch)
 

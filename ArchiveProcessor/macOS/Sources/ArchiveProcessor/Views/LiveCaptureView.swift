@@ -224,6 +224,18 @@ struct LiveCaptureView: View {
                     .help("Open the Live Capture backup folder in Finder (~/Pictures/Archive Processor Live Capture). Every photo received from the phone is stored there until this run's output is fully written — so you can recover and copy the originals if anything fails.")
                 }
 
+                if session.config?.keepPreservationCopies ?? SettingsLayerStore.shared.keepsPreservationCopies,
+                   !session.photos.isEmpty {
+                    let sizes = session.photos.compactMap { $0.preservationFingerprint?.byteCount }
+                    let bytes = sizes.reduce(0, +)
+                    let size = ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+                    Text(sizes.count == session.photos.count
+                         ? "Preservation originals received · \(size)"
+                         : "Preservation originals with known sizes · \(size)")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .help("\(bytes.formatted()) bytes of received originals with known sizes.")
+                }
+
                 LiveTrainingNotice(liveProc: liveProc)
 
                 GroupBox("Connection") {

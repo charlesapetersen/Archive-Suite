@@ -104,6 +104,10 @@ struct CorpusWatchRequest: Sendable, Equatable {
                 continue
             }
 
+            let baseLength = rootPath.utf8.count
+            let relative = String(decoding: path.utf8.dropFirst(baseLength), as: UTF8.self)
+            if PreservationCopy.isPayloadPath(relative) { continue }
+
             if has(eventFlags, FSEventStreamEventFlags(kFSEventStreamEventFlagMustScanSubDirs)) {
                 guard !isAtomicWriteTemporarySibling(path) else { continue }
                 if same(path, rootPath) { request.fullRescan = true }

@@ -1,4 +1,5 @@
 import CoreGraphics
+import CryptoKit
 import SQLite3
 import XCTest
 
@@ -143,6 +144,67 @@ final class CatalogueRepairUITests: XCTestCase {
             (try? String(contentsOf: companion, encoding: .utf8))?.contains("Corrected title") == true
         }
         XCTAssertEqual(try Data(contentsOf: pdf), originalPDFBytes)
+    }
+
+    func testPreservationShowsTheExactAssociatedOriginalOnlyOnRequest() throws {
+        continueAfterFailure = false
+        let root = try makeScratchRoot()
+        let fm = FileManager.default
+        defer { try? fm.removeItem(at: root) }
+        let pdf = root.appendingPathComponent("Letter.pdf")
+        let fileID = UUID(), contentID = UUID(), documentID = UUID(), sourceID = UUID()
+        try makePDF(at: pdf, fileID: fileID, contentID: contentID)
+        let folder = root.appendingPathComponent("Preservation", isDirectory: true)
+            .appendingPathComponent(documentID.uuidString.lowercased(), isDirectory: true)
+            .appendingPathComponent(fileID.uuidString.lowercased(), isDirectory: true)
+        try fm.createDirectory(at: folder, withIntermediateDirectories: true)
+        let intake = folder.appendingPathComponent("source-1.pdf")
+        try makePDF(at: intake, fileID: UUID(), contentID: UUID())
+        let bytes = try Data(contentsOf: intake)
+        let hash = Data(SHA256.hash(data: bytes)).base64EncodedString()
+        let map = Data("""
+            {"fileID":"\(fileID)","sources":[{"name":"Original scan.pdf","format":"pdf",
+              "fingerprint":{"byteCount":\(bytes.count),"sha256":"\(hash)"}}],
+             "pages":[{"id":"\(sourceID)","sourceIndex":0,"originalPageIndex":0}]}
+            """.utf8)
+        let mapHash = Data(SHA256.hash(data: map)).base64EncodedString()
+        try map.write(to: folder.appendingPathComponent("pages.json"))
+        try Data("""
+            {"schema":1,"fileID":"\(fileID)","contentRevision":"\(contentID)","revision":"\(UUID())",
+             "parents":[],"pages":[{"id":"\(UUID())","physicalIndex":0,"sourcePageID":"\(sourceID)",
+             "documentID":"\(documentID)","role":"searchable"}],"preservationManifestSHA256":"\(mapHash)",
+             "documents":[{"id":"\(documentID)","ownerFileID":"\(fileID)","fields":{}}],"fileFields":{}}
+            """.utf8).write(to: pdf.appendingPathExtension("archivesuite.json"))
+
+        let app = XCUIApplication.archiveUITestApp()
+        app.launchArguments += ["-ARUITestRootPath", root.path, "-ARUITestCatalogue", "YES"]
+        defer { app.terminate() }
+        app.launch()
+        app.activate()
+        let rows = app.tables["ar.table"].tableRows
+        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 20))
+        XCTAssertEqual(rows.count, 1, "The source PDF must stay out of discovery.")
+        rows.firstMatch.doubleClick()
+
+        let open = app.buttons["ar.doc.preservation.open"]
+        XCTAssertTrue(open.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.buttons["Show in Finder"].exists)
+        open.click()
+        XCTAssertTrue(app.buttons["Show in Finder"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["Original orientation · page 1"].exists)
+        _ = captureScreenshot("preservation-original")
+        app.buttons["Done"].click()
+
+        try Data(repeating: 0, count: bytes.count).write(to: intake)
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        open.click()
+        XCTAssertTrue(app.staticTexts["ar.doc.preservation.status"].waitForExistence(timeout: 10))
+        let check = app.buttons["ar.doc.preservation.check"]
+        XCTAssertTrue(check.waitForExistence(timeout: 10), "A same-size change must fail digest verification.")
+        try bytes.write(to: intake)
+        check.click()
+        XCTAssertTrue(open.waitForExistence(timeout: 10))
+        XCTAssertEqual(try Data(contentsOf: intake), bytes)
     }
 
     private func makeScratchRoot() throws -> URL {

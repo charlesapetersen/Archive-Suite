@@ -353,6 +353,9 @@ final class SettingsLayerStore: ObservableObject {
     }
 
     var general: SettingsLayer { file.general }
+    var keepsPreservationCopies: Bool {
+        SettingsResolver(general: general).resolve(.keepPreservationCopies).value.bool ?? true
+    }
     var projects: [SettingsLayer] { file.projects }
 
     func project(_ id: UUID?) -> SettingsLayer? {

@@ -597,7 +597,11 @@ final class ArchiveLibrary: ObservableObject {
         // `NavigationModel` is the same comparison on the write path and had to move with this one.)
         guard root != nil, let rootPath = rootDiscoveryPrefix else { return }
         let warm = snapshot.entries.values
-            .filter { LibraryIndexPath($0.path).isContained(in: rootPath) }
+            .filter { entry in
+                guard LibraryIndexPath(entry.path).isContained(in: rootPath) else { return false }
+                let relative = String(decoding: entry.path.utf8.dropFirst(rootPath.value.utf8.count), as: UTF8.self)
+                return !PreservationCopy.isPayloadPath(relative)
+            }
             .filter(\.tracked)
             .map { Self.row($0, provenance: .cache(asOf: snapshot.asOf)) }
             .sorted { $0.url.path.localizedStandardCompare($1.url.path) == .orderedAscending }

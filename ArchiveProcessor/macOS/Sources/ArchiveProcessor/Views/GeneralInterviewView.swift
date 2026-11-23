@@ -41,6 +41,12 @@ struct GeneralInterviewView: View {
             .padding(20)
             Divider()
             Form {
+                Section("Preservation copies") {
+                    Toggle("Keep full-resolution originals", isOn: bind(\.keepPreservationCopies, .keepPreservationCopies))
+                        .accessibilityIdentifier("ap.generalInterview.keepPreservationCopies")
+                    Text("Archive Processor saves the exact originals in a Preservation folder beside your reading PDFs. This uses extra space. Archive Reader can show the originals. When you share only a PDF, the originals stay behind.")
+                        .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
                 foundSection
                 startingPointSection
                 questionsSection

@@ -194,6 +194,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     static let plans = SettingsKey(rawValue: "plans")
     static let cluster = SettingsKey(rawValue: "cluster")
     static let gpusPerJob = SettingsKey(rawValue: "gpusPerJob")
+    static let keepPreservationCopies = SettingsKey(rawValue: "keepPreservationCopies")
     static let downloadsAllowed = SettingsKey(rawValue: "downloadsAllowed")
     static let moneyHabit = SettingsKey(rawValue: "moneyHabit")
     static let monthCeilingUSD = SettingsKey(rawValue: "monthCeilingUSD")
@@ -245,7 +246,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     }
 
     static let generalOnly: [SettingsKey] = [
-        .keys, .plans, .cluster, .gpusPerJob, .downloadsAllowed, .moneyHabit, .monthCeilingUSD, .fineTuning, .trainingOff,
+        .keys, .plans, .cluster, .gpusPerJob, .downloadsAllowed, .moneyHabit, .monthCeilingUSD, .fineTuning, .trainingOff, .keepPreservationCopies,
     ]
     static let anyLayer: [SettingsKey] = [
         .batchCeilingUSD, .hours, .excludedModelFamilies, .mix, .strata, .period, .languages, .scripts,
@@ -270,7 +271,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
         case .keys, .plans, .trainingOff, .excludedModelFamilies, .languages, .scripts: return .strings([])
         case .cluster: return .bool(false)
         case .gpusPerJob: return .int(1)
-        case .downloadsAllowed: return .bool(true)
+        case .downloadsAllowed, .keepPreservationCopies: return .bool(true)
         case .moneyHabit: return .string(MoneyHabit.none.rawValue)
         case .monthCeilingUSD: return .double(0)
         case .fineTuning: return .string(FineTuningAnswer.no.rawValue)
@@ -315,6 +316,7 @@ extension SettingsKey {
         case .cluster: return "A computing cluster"
         case .gpusPerJob: return "Graphics cards a cluster job may use"
         case .downloadsAllowed: return "Models may be downloaded to this Mac"
+        case .keepPreservationCopies: return "Keep full-resolution originals"
         case .moneyHabit: return "Spending"
         case .monthCeilingUSD: return "Most to spend in a month"
         case .fineTuning: return "Training a model on your corrections"

@@ -125,6 +125,7 @@ struct GeneralInterviewAnswers: Equatable, Sendable {
     var hours: Double = 8
     var fineTuning: FineTuningAnswer = .no
     var downloadsAllowed = true
+    var keepPreservationCopies = true
     /// Whether pages may leave this Mac at all; the collection interview's switch can still keep one collection here.
     var staysOnMac = true
     /// Whether the user set "pages may leave this Mac" themselves; until then choosing to spend money lets them leave.
@@ -149,6 +150,7 @@ struct GeneralInterviewAnswers: Equatable, Sendable {
         hours = r.resolve(.hours).value.double ?? hours
         fineTuning = r.resolve(.fineTuning).value.string.flatMap(FineTuningAnswer.init(rawValue:)) ?? fineTuning
         downloadsAllowed = r.resolve(.downloadsAllowed).value.bool ?? downloadsAllowed
+        keepPreservationCopies = r.resolve(.keepPreservationCopies).value.bool ?? keepPreservationCopies
         staysOnMac = r.resolve(.staysOnMac).value.bool ?? staysOnMac
         if let e = layer.entry(.staysOnMac), case .follows = e.source {} else { staysOnMacChosen = layer.entry(.staysOnMac) != nil }
         preference = r.resolve(.preference).value.string.flatMap(SettingsPreference.init(rawValue:)) ?? preference
@@ -199,6 +201,7 @@ struct GeneralInterviewAnswers: Equatable, Sendable {
         put(.hours, .double(max(1, hours)))
         put(.fineTuning, .string(fineTuning.rawValue))
         put(.downloadsAllowed, .bool(downloadsAllowed))
+        put(.keepPreservationCopies, .bool(keepPreservationCopies))
         if staysOnMacChosen || filled.contains(SettingsKey.staysOnMac.rawValue) { put(.staysOnMac, .bool(staysOnMac)) }
         else { layer.set(.staysOnMac, .bool(staysOnMac), source: .follows(SettingsKey.moneyHabit.label, now)) }
         put(.preference, .string(preference.rawValue))
@@ -209,7 +212,7 @@ struct GeneralInterviewAnswers: Equatable, Sendable {
 
     /// The general values this interview answers; a skip clears these and nothing else.
     static let keys: [SettingsKey] = [.cluster, .gpusPerJob, .moneyHabit, .batchCeilingUSD, .monthCeilingUSD, .hours,
-                                      .fineTuning, .downloadsAllowed, .staysOnMac, .preference, .trainingOff]
+                                      .fineTuning, .downloadsAllowed, .staysOnMac, .preference, .trainingOff, .keepPreservationCopies]
 
     /// What a skipped interview writes: only what was found on the Mac, so the sheet can list it. Every answer an
     /// earlier run gave is removed, so every other value is the built-in "Free, on this Mac" and nothing is spent

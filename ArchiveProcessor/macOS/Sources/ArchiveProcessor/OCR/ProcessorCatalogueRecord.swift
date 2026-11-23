@@ -84,8 +84,10 @@ struct ProcessorCatalogueRecord: Encodable, Sendable {
     let pages: [Page]
     let documents: [Document]
     let fileFields: FileFields
+    let preservationManifestSHA256: Data?
 
-    init(identity: CataloguePDFIdentity, sourcePages: [SourcePage], document: Document, fileFields: FileFields) {
+    init(identity: CataloguePDFIdentity, sourcePages: [SourcePage], document: Document, fileFields: FileFields,
+         preservationManifestSHA256: Data? = nil) {
         fileID = identity.fileID
         contentRevision = identity.contentRevision
         pages = sourcePages.flatMap { source in source.roles.map { (source.id, $0) } }.enumerated().map { index, page in
@@ -93,6 +95,7 @@ struct ProcessorCatalogueRecord: Encodable, Sendable {
         }
         documents = [document]
         self.fileFields = fileFields
+        self.preservationManifestSHA256 = preservationManifestSHA256
     }
 
     func encoded() throws -> Data {

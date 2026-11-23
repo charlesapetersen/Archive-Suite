@@ -3479,7 +3479,7 @@ enum LiveCaptureRecoveryTestDriver {
                 outputDirectory: uwOut,
                 customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: false, tagVocabulary: [],
                 gateway: nil, outputImageFile: false, pdfImageMB: 2.0, exportedImageMB: 3.0,
-                textColumns: 1)
+                textColumns: 1, keepPreservationCopies: false)
             uwSession._recoveryTestBeginLive(config: uwConfig, stagingDir: uwStaging)
             var uwProc = uwSession.liveProcessor
             func uwRecoverWithMissingSources() {
@@ -3715,6 +3715,59 @@ enum LiveCaptureRecoveryTestDriver {
             ])
 
             uwGate.open()
+            LiveCaptureProcessor._recoveryTestOCRGate = nil
+
+            // A required original changes the verdict for an otherwise complete derivative.
+            // Restore the exact intake file and finish the original pinned operation.
+            var preserveConfig = uwConfig
+            preserveConfig.keepPreservationCopies = true
+            uwSession = CaptureSession()
+            uwSession._recoveryTestBeginLive(config: preserveConfig, stagingDir: uwStaging)
+            uwProc = uwSession.liveProcessor
+            let preserveDestination = uwOut.appendingPathComponent("Preserve receipt", isDirectory: true)
+            try? fm.createDirectory(at: preserveDestination, withIntermediateDirectories: true)
+            uwSend("U4", 2)
+            uwProc.segmentResolved(groupId: "U4")
+            let preserveStaged = await uwSettle { uwProc.staged.contains { $0.groupId == "U4" } }
+            if let source = uwSession.photos.first(where: { $0.groupId == "U4" })?.url, preserveStaged {
+                let held = uwOut.appendingPathComponent("held-preservation-original.jpg")
+                do {
+                    try fm.moveItem(at: source, to: held)
+                    defer {
+                        if fm.fileExists(atPath: held.path) { try? fm.moveItem(at: held, to: source) }
+                    }
+                    func finishPreservation() {
+                        uwProc.requestFinish()
+                        uwProc.finalize([LiveCaptureProcessor.CollectionDraft(
+                            id: uwProc.drafts.first?.id ?? "__unfiled__", finalName: preserveDestination.lastPathComponent,
+                            existingFolders: [], suggestedFolders: [], chosenExisting: preserveDestination,
+                            segmentCount: 1, photoCount: 1)])
+                    }
+                    finishPreservation()
+                    let refused = await uwSettle {
+                        !uwProc.isFinalizing && uwProc.staged.first(where: { $0.groupId == "U4" })?.catalogueDestination != nil
+                    }
+                    let contents = try fm.contentsOfDirectory(at: preserveDestination, includingPropertiesForKeys: nil)
+                    check("a missing required original keeps Live Capture staging and withholds the reading PDF",
+                          refused && !uwSession.filedGroupIds.contains("U4")
+                              && !contents.contains { $0.pathExtension == "pdf" }
+                              && (try? Data(contentsOf: held)) == uwJPEG)
+
+                    try fm.moveItem(at: held, to: source)
+                    finishPreservation()
+                    let recovered = await uwSettle { !uwProc.isFinalizing && uwProc.staged.isEmpty }
+                    let sourceDirectory = preserveDestination.appendingPathComponent(PreservationCopy.directoryName)
+                    let stored = (fm.enumerator(at: sourceDirectory, includingPropertiesForKeys: nil)?.allObjects ?? [])
+                        .compactMap { $0 as? URL }.first { $0.pathExtension == "jpeg" }
+                    let exact = stored.flatMap { try? Data(contentsOf: $0) } == uwJPEG
+                    check("Live Capture retries the pinned filing and keeps the exact restored original before retiring staging",
+                          recovered && exact && !fm.fileExists(atPath: source.path))
+                } catch {
+                    check("Live Capture preservation recovery fixture could be exercised", false)
+                }
+            } else {
+                check("Live Capture preservation recovery fixture stages a real derivative", false)
+            }
             if let uwPriorReview {
                 UserDefaults.standard.set(uwPriorReview, forKey: DefaultsKeys.reviewRotation)
             } else {

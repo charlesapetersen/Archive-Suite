@@ -74,17 +74,20 @@ public struct CataloguePairFiler: Sendable {
     /// Start or retry initial filing. An existing journal takes precedence over new staging.
     /// For interruption before the journal exists, retry with the same record and staged PDF.
     /// If provided and staging is absent, copy the prepared working PDF under the destination lock.
+    /// A record with a preservation digest requires the caller's verifier for every attempt, under
+    /// the same pinned parent and before a completed receipt is durably issued.
     public func filePair(operationID: UUID, at occurrence: CatalogueAssociation.Occurrence,
                          record: CatalogueRecord, preparedPDF: URL? = nil,
-                         destination: Destination? = nil) throws -> Receipt {
+                         destination: Destination? = nil,
+                         verifyPreservation: ((Int32) throws -> Void)? = nil) throws -> Receipt {
         try run(operationID: operationID, at: occurrence, initialRecord: record,
-                preparedPDF: preparedPDF, destination: destination)
+                preparedPDF: preparedPDF, destination: destination, verifyPreservation: verifyPreservation)
     }
 
     /// Resume a journaled operation, or reverify its completed receipt after relaunch. Missing,
     /// changed or obstructed files withhold a receipt and keep every available artifact in place.
     public func recoverPair(operationID: UUID, at occurrence: CatalogueAssociation.Occurrence) throws -> Receipt {
-        try run(operationID: operationID, at: occurrence, initialRecord: nil, preparedPDF: nil, destination: nil)
+        try run(operationID: operationID, at: occurrence, initialRecord: nil, preparedPDF: nil, destination: nil, verifyPreservation: nil)
     }
 
     private typealias Directory = CatalogueReadDirectory
@@ -126,6 +129,7 @@ public struct CataloguePairFiler: Sendable {
         let parent: Directory.Identity
         let pdf: Member
         let companion: Member
+        let requiresPreservation: Bool?
     }
 
     private struct Scope {
@@ -153,8 +157,12 @@ public struct CataloguePairFiler: Sendable {
     }
 
     private func run(operationID: UUID, at occurrence: CatalogueAssociation.Occurrence,
-                     initialRecord: CatalogueRecord?, preparedPDF: URL?, destination: Destination?) throws -> Receipt {
-        try reader.withOccurrence(occurrence) { root, parent, filename in
+                     initialRecord: CatalogueRecord?, preparedPDF: URL?, destination: Destination?,
+                     verifyPreservation: ((Int32) throws -> Void)?) throws -> Receipt {
+        if let initialRecord, (initialRecord.preservationManifestSHA256 != nil) != (verifyPreservation != nil) {
+            throw Failure.operationMismatch
+        }
+        return try reader.withOccurrence(occurrence) { root, parent, filename in
             let paths = Paths(operationID: operationID, occurrence: occurrence, filename: filename)
             guard paths.finalCompanion.utf8.count <= NAME_MAX,
                   paths.companionRelativePath.utf8.count < MAXPATHLEN else {
@@ -182,12 +190,14 @@ public struct CataloguePairFiler: Sendable {
                     }
                 }
                 let (journal, stamp) = try readJournal(journalName, in: scope)
-                if let initialRecord, Self.digest(initialRecord.originalJSON) != journal.companion.digest {
+                guard (journal.requiresPreservation == true) == (verifyPreservation != nil),
+                      initialRecord.map({ Self.digest($0.originalJSON) == journal.companion.digest }) ?? true else {
                     throw Failure.operationMismatch
                 }
                 // Also flush on recovery, in case the prior process stopped before its flush returned.
                 try writer.sync(parent.descriptor, operation: "flush filing journal name")
-                return try finish(journal, stamp: stamp, journalName: journalName, in: scope)
+                return try finish(journal, stamp: stamp, journalName: journalName, in: scope,
+                                  verifyPreservation: verifyPreservation)
             }
         }
     }
@@ -221,7 +231,8 @@ public struct CataloguePairFiler: Sendable {
         let journal = Journal(operationID: scope.operationID, paths: paths,
                               rootInstanceID: scope.occurrence.rootInstanceID,
                               root: .init(scope.root.info), parent: .init(scope.parent.info),
-                              pdf: pdf, companion: companion)
+                              pdf: pdf, companion: companion,
+                              requiresPreservation: record.preservationManifestSHA256 != nil ? true : nil)
         try create(JSONEncoder().encode(journal), as: scope.pendingJournal, in: scope)
         try writer.sync(scope.parent.descriptor, operation: "flush filing journal")
         try boundary(.journalFlushed)
@@ -269,9 +280,13 @@ public struct CataloguePairFiler: Sendable {
     }
 
     private func finish(_ journal: Journal, stamp: Directory.FileVersion, journalName: String,
-                        in scope: Scope) throws -> Receipt {
+                        in scope: Scope, verifyPreservation: ((Int32) throws -> Void)?) throws -> Receipt {
         let paths = scope.paths
         var (pdf, companion) = try inspect(journal, in: scope)
+        if let verifyPreservation {
+            try validate([pdf, companion], journal: journalName, stamp: stamp, in: scope)
+            try verifyPreservation(scope.parent.descriptor)
+        }
         if journalName == scope.pendingJournal {
             if !pdf.isFinal {
                 try validate([pdf, companion], journal: journalName, stamp: stamp, in: scope)
@@ -300,7 +315,8 @@ public struct CataloguePairFiler: Sendable {
         // The rename can change ctime. Re-open the receipt and confirm it is the original journal.
         let (receipt, receiptStamp) = try readJournal(scope.completedJournal, in: scope)
         guard receiptStamp.identity == stamp.identity, receipt.pdf == journal.pdf,
-              receipt.companion == journal.companion else { throw Failure.journalInvalid }
+              receipt.companion == journal.companion,
+              receipt.requiresPreservation == journal.requiresPreservation else { throw Failure.journalInvalid }
         try validate(pair, journal: scope.completedJournal, stamp: receiptStamp, in: scope)
         return Receipt(operationID: scope.operationID, pdfRelativePath: paths.pdfRelativePath,
                        companionRelativePath: paths.companionRelativePath)

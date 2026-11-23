@@ -41,6 +41,86 @@ struct CatalogueReaderTests {
         }
     }
 
+    @Test func preservationRequiresAVerifiedPageAssociationAndExactBytes() throws {
+        try withRoot { root in
+            let path = "Reading.pdf"
+            try writePDF(owner, named: path, in: root)
+            let adopted = try reader(root)
+            let occurrence = CatalogueAssociation.Occurrence(rootInstanceID: rootID, relativePath: path)
+            func status() throws -> PreservationCopy.Selection {
+                try PreservationCopy.status(in: adopted, at: occurrence, physicalPageIndex: 0)
+            }
+            #expect(throws: PreservationCopy.Failure.notRecorded) { try status() }
+
+            var facts = try #require(JSONSerialization.jsonObject(with: record(for: owner, owner: owner)) as? [String: Any])
+            var pages = try #require(facts["pages"] as? [[String: Any]])
+            pages[0]["sourcePageID"] = page.uuidString
+            facts["pages"] = pages
+
+            let folder = PreservationCopy.folderComponents(documentID: document, fileID: owner.file)
+                .reduce(root) { $0.appendingPathComponent($1, isDirectory: true) }
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let bytes = Data("exact intake payload".utf8)
+            let sourceURL = folder.appendingPathComponent("source-1.pdf")
+            try bytes.write(to: sourceURL)
+            let input = try FileHandle(forReadingFrom: sourceURL)
+            defer { try? input.close() }
+            let fingerprint = try PreservationCopy.Fingerprint(reading: input.fileDescriptor)
+            let source = PreservationCopy.Source(name: "Intake.pdf", format: .pdf, fingerprint: fingerprint)
+            let map = folder.appendingPathComponent(PreservationCopy.manifestName)
+            let manifest = PreservationCopy.Manifest(fileID: owner.file, sources: [source],
+                                                       pages: [.init(id: page, sourceIndex: 0, originalPageIndex: 3)])
+            facts["preservationManifestSHA256"] = try manifest.digest().base64EncodedString()
+            try JSONSerialization.data(withJSONObject: facts).write(to: companion(path, in: root))
+            #expect(throws: PreservationCopy.Failure.missing) { try status() }
+            try manifest.encoded().write(to: map)
+
+            #expect(try status().originalPageIndex == 3)
+            #expect(try PreservationCopy.open(in: adopted, at: occurrence, physicalPageIndex: 0).bytes == bytes)
+            #expect(adopted.discover().inventory.relativePDFPaths == [path])
+
+            // A changed page map is refused even when it still names the right source file and IDs.
+            let altered = PreservationCopy.Manifest(fileID: owner.file, sources: [source],
+                                                      pages: [.init(id: page, sourceIndex: 0, originalPageIndex: 2)])
+            try altered.encoded().write(to: map)
+            #expect(throws: PreservationCopy.Failure.unverified) { try status() }
+            try manifest.encoded().write(to: map)
+
+            var stub = stat()
+            try #require(lstat(sourceURL.path, &stub) == 0)
+            let inode = stub.st_ino
+            let offline = try CatalogueReader(grantedRoot: root, rootInstanceID: rootID, mode: .adopted,
+                                              isDataless: { $0.st_ino == inode }, identifyPDF: Self.identify)
+            #expect(throws: PreservationCopy.Failure.offline) {
+                try PreservationCopy.status(in: offline, at: occurrence, physicalPageIndex: 0)
+            }
+
+            try Data(repeating: 0, count: bytes.count).write(to: sourceURL)
+            #expect(throws: PreservationCopy.Failure.unverified) {
+                try PreservationCopy.open(in: adopted, at: occurrence, physicalPageIndex: 0)
+            }
+            try FileManager.default.removeItem(at: sourceURL)
+            try FileManager.default.createSymbolicLink(at: sourceURL, withDestinationURL: root.appendingPathComponent(path))
+            #expect(throws: PreservationCopy.Failure.unverified) { try status() }
+
+            let fm = FileManager.default
+            try fm.removeItem(at: sourceURL)
+            try bytes.write(to: sourceURL)
+            let moved = root.appendingPathComponent("Moved")
+            try fm.createDirectory(at: moved, withIntermediateDirectories: false)
+            for name in [path, companion(path, in: root).lastPathComponent, PreservationCopy.directoryName] {
+                try fm.moveItem(at: root.appendingPathComponent(name), to: moved.appendingPathComponent(name))
+            }
+            let movedOccurrence = CatalogueAssociation.Occurrence(rootInstanceID: rootID, relativePath: "Moved/" + path)
+            #expect(try PreservationCopy.open(in: adopted, at: movedOccurrence, physicalPageIndex: 0).bytes == bytes)
+            try fm.copyItem(at: moved.appendingPathComponent(path), to: root.appendingPathComponent("Detached.pdf"))
+            let detached = CatalogueAssociation.Occurrence(rootInstanceID: rootID, relativePath: "Detached.pdf")
+            #expect(throws: PreservationCopy.Failure.notRecorded) {
+                try PreservationCopy.status(in: adopted, at: detached, physicalPageIndex: 0)
+            }
+        }
+    }
+
     @Test func splitDocumentReadsOnlyItsUniqueOwnerInTheGrantedRoot() throws {
         try withRoot { root in
             let adopted = try reader(root)

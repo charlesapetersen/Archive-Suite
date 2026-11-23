@@ -56,6 +56,26 @@ struct CataloguePairFilerTests {
         #expect(try discovered.facts(at: receipt.pdfRelativePath).file.get().revision.facts == fixture.record.revision)
     }
 
+    @Test func unavailablePreservationWithholdsTheReceiptAndRecoveryCannotBypassIt() throws {
+        let fixture = try Fixture(preservation: true)
+        defer { fixture.cleanUp() }
+        let filer = CataloguePairFiler(reader: try fixture.reader())
+        #expect(throws: POSIXError(.ENOSPC)) {
+            try filer.filePair(operationID: fixture.id, at: fixture.occurrence, record: fixture.record) { _ in
+                throw POSIXError(.ENOSPC)
+            }
+        }
+        #expect(FileManager.default.fileExists(atPath: fixture.journal.path))
+        #expect(!FileManager.default.fileExists(atPath: fixture.receipt.path))
+        #expect(!FileManager.default.fileExists(atPath: fixture.finalPDF.path))
+        #expect(!FileManager.default.fileExists(atPath: fixture.finalCompanion.path))
+        #expect(throws: CataloguePairFiler.Failure.operationMismatch) { try fixture.recover() }
+        #expect(try Data(contentsOf: fixture.input) == fixture.pdfBytes)
+        let receipt = try filer.filePair(operationID: fixture.id, at: fixture.occurrence, record: fixture.record) { _ in }
+        #expect(receipt.operationID == fixture.id)
+        #expect(FileManager.default.fileExists(atPath: fixture.receipt.path))
+    }
+
     @Test func missingCompanionWithholdsReceiptBeforeAndAfterCompletion() throws {
         for completed in [false, true] {
             let fixture = try Fixture()
@@ -281,17 +301,19 @@ struct CataloguePairFilerTests {
         var journal: URL { parent.appendingPathComponent(prefix + ".journal") }
         var receipt: URL { parent.appendingPathComponent(prefix + ".receipt") }
 
-        init(filename: String = "Letter.PDF") throws {
+        init(filename: String = "Letter.PDF", preservation: Bool = false) throws {
             self.filename = filename
             occurrence = CatalogueAssociation.Occurrence(rootInstanceID: UUID(), relativePath: "Box/" + filename)
             root = FileManager.default.temporaryDirectory.appendingPathComponent("catalogue-pair-\(UUID())")
             let file = UUID()
             let content = UUID()
             let document = UUID()
+            let preservationField = preservation
+                ? ",\"preservationManifestSHA256\":\"\(Data(repeating: 0, count: 32).base64EncodedString())\"" : ""
             record = try CatalogueRecord(json: Data("""
                 {"schema":1,"fileID":"\(file)","contentRevision":"\(content)","revision":"\(UUID())","parents":[],
                  "pages":[{"id":"\(UUID())","physicalIndex":0,"documentID":"\(document)","role":"searchable"}],
-                 "documents":[{"id":"\(document)","ownerFileID":"\(file)","fields":{}}],"fileFields":{}}
+                 "documents":[{"id":"\(document)","ownerFileID":"\(file)","fields":{}}],"fileFields":{}\(preservationField)}
                 """.utf8))
             try FileManager.default.createDirectory(at: root.appendingPathComponent("Box"),
                                                     withIntermediateDirectories: true)

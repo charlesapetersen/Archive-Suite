@@ -253,7 +253,8 @@ final class CaptureSession: ObservableObject {
             return
         }
         if liveModeEnabled {
-            let cfg = SessionProcessingConfig.fromDefaults()
+            var cfg = SessionProcessingConfig.fromDefaults()
+            cfg.keepPreservationCopies = SettingsLayerStore.shared.keepsPreservationCopies
             config = cfg
             processingMode = .live
             // W46.settings-layers: the processing settings as this session took them, for the record finalize writes
@@ -323,7 +324,10 @@ final class CaptureSession: ObservableObject {
     /// Also used when the operator asks to read Settings again before approving the first external call.
     @discardableResult
     func refreshLiveSettings() -> SessionProcessingConfig {
-        let cfg = recoveryTestSettings ?? SessionProcessingConfig.fromDefaults()
+        var cfg = recoveryTestSettings ?? SessionProcessingConfig.fromDefaults()
+        if recoveryTestSettings == nil, let previous = config {
+            cfg.keepPreservationCopies = previous.keepPreservationCopies
+        }
         config = cfg
         liveProcessor.adoptSettingsSnapshot(cfg)
         if recoveryTestSettings == nil {
@@ -766,7 +770,8 @@ final class CaptureSession: ObservableObject {
             return nil
         }
         let photo = CapturedPhoto(url: finalURL, groupId: groupId, seq: seq, type: type,
-                                  quality: quality, year: year, month: month)
+                                  quality: quality, year: year, month: month,
+                                  preservationFingerprint: .init(bytes: jpeg))
         // Idempotent re-upload (phone resume after a crash): replace an existing same-group+seq
         // photo instead of duplicating it. Otherwise keep the list ordered by seq.
         if let existing = photos.firstIndex(where: { $0.groupId == groupId && $0.seq == seq }) {
@@ -1178,6 +1183,7 @@ final class CaptureSession: ObservableObject {
         let quality: String?
         let year: Int?
         let month: Int?
+        var preservationFingerprint: PreservationCopy.Fingerprint? = nil
     }
 
     /// The on-disk manifest: the per-photo entries PLUS the set of document groups the phone signalled
@@ -1219,7 +1225,8 @@ final class CaptureSession: ObservableObject {
                                preserveClearMarker: Bool = true) -> Bool {
         let entries = (photoOverride ?? photos).map {
             ManifestEntry(name: $0.url.lastPathComponent, groupId: $0.groupId, seq: $0.seq,
-                          type: $0.type.rawValue, quality: $0.quality, year: $0.year, month: $0.month)
+                          type: $0.type.rawValue, quality: $0.quality, year: $0.year, month: $0.month,
+                          preservationFingerprint: $0.preservationFingerprint)
         }
         let markerPhase = preserveClearMarker ? (clearPhase ?? self.clearPhase) : clearPhase
         let markerToken = preserveClearMarker ? (clearToken ?? self.clearToken) : clearToken
@@ -1278,7 +1285,8 @@ final class CaptureSession: ObservableObject {
                 restored.append(CapturedPhoto(
                     url: url, groupId: e.groupId, seq: e.seq,
                     type: CaptureGroupType(rawValue: e.type) ?? .document,
-                    quality: e.quality, year: e.year, month: e.month))
+                    quality: e.quality, year: e.year, month: e.month,
+                    preservationFingerprint: e.preservationFingerprint))
             }
             // With no surviving sources, the durable ledger still marks this as the active session. Restore
             // its epoch so a late phone retry is checked against the same set after relaunch.

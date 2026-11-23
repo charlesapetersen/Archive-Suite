@@ -1968,7 +1968,10 @@ extension OCRProcessor {
         for (segIdx, segment) in multiPageSegments.enumerated() {
             guard !Task.isCancelled else { return }
             // Collect the individual output PDFs for this segment
-            let sourcePDFs = segment.pdfURLs.compactMap { outputURLMap[$0] }
+            let mergeInputs: [CatalogueMergeInput] = segment.pdfURLs.compactMap { intake in
+                outputURLMap[intake].map { CatalogueMergeInput(intake: intake, derivative: $0) }
+            }
+            let sourcePDFs = mergeInputs.map(\.derivative)
             guard sourcePDFs.count > 1 else { continue }
 
             // Name the merged PDF after the first page's OUTPUT (dedup'd) name, not the raw
@@ -2062,9 +2065,10 @@ extension OCRProcessor {
                     }
                 }
 
-                // Update outputURLMap: point all source URLs in this segment to the merged PDF
-                for sourceURL in segment.pdfURLs {
-                    outputURLMap[sourceURL] = mergedURL
+                // Only constituents that actually reached the merge have a page in the result.
+                if catalogueRun != nil { catalogueMergeInputs[mergedURL] = mergeInputs }
+                for contribution in mergeInputs {
+                    outputURLMap[contribution.intake] = mergedURL
                 }
 
                 statusMessage = "Merged document \(segIdx + 1)/\(multiPageSegments.count): \(baseName) (\(sourcePDFs.count) pages)"

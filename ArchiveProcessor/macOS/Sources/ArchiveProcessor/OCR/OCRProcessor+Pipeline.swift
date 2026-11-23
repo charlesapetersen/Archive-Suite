@@ -1905,7 +1905,7 @@ extension OCRProcessor {
     private func resumeBatch(_ savedBatch: PendingBatch, apiKey: String) async {
         var pending = savedBatch
         guard SearchableArchival.isAvailable,
-              beginCatalogueRun(outputRoot: pending.outputDirectory,
+              await beginCatalogueRun(outputRoot: pending.outputDirectory,
                                 sources: Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes) ?? pending.fileURLs,
                                 resuming: true, confirmResume: {
             guard let current = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(current) else { return false }
@@ -2262,7 +2262,7 @@ extension OCRProcessor {
         }
         institutionalComputeResumePrompt = nil
         guard SearchableArchival.isAvailable,
-              beginCatalogueRun(outputRoot: pending.outputDirectory,
+              await beginCatalogueRun(outputRoot: pending.outputDirectory,
                                 sources: Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes) ?? pending.fileURLs,
                                 resuming: true, confirmResume: {
             guard let current = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(current) else { return false }
@@ -3585,7 +3585,7 @@ extension OCRProcessor {
             statusMessage = "Process Files needs the PDF preparation tool. The original files are intact."
             return
         }
-        guard beginCatalogueRun(outputRoot: outputDirectory, sources: files, resuming: resumingMixedPDF != nil, confirmResume: {
+        guard await beginCatalogueRun(outputRoot: outputDirectory, sources: files, resuming: resumingMixedPDF != nil, confirmResume: {
             guard let resumingMixedPDF else { return true }
             return Self.loadPendingMixedPDF()?.integrity == resumingMixedPDF.integrity
         }) else { return }
@@ -4295,7 +4295,7 @@ extension OCRProcessor {
                 statusMessage = "Retry needs the PDF preparation tool. The existing files are intact."
                 return false
             }
-            guard beginCatalogueRun(outputRoot: outputDirectory, sources: [source]) else { return false }
+            guard await beginCatalogueRun(outputRoot: outputDirectory, sources: [source]) else { return false }
             isProcessing = true
         }
         defer {

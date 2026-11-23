@@ -148,6 +148,7 @@ public struct CatalogueRecord: Sendable {
         let pages: [Page]
         let documents: [Document]
         let fileFields: FileFields
+        let preservationManifestSHA256: Data?
     }
 
     private let payload: Payload
@@ -160,6 +161,7 @@ public struct CatalogueRecord: Sendable {
     public var pages: [Page] { payload.pages }
     public var documents: [Document] { payload.documents }
     public var fileFields: FileFields { payload.fileFields }
+    public var preservationManifestSHA256: Data? { payload.preservationManifestSHA256 }
 
     public static func companionFilename(forPDFFilename filename: String) -> String {
         filename + ".archivesuite.json"
@@ -182,7 +184,7 @@ public struct CatalogueRecord: Sendable {
                   document.enclosedWith?.documentID != document.id else { throw Invalid.inconsistentRecord }
         }
         let pageCount = payload.pages.count
-        guard pageCount > 0,
+        guard pageCount > 0, payload.preservationManifestSHA256.map({ $0.count == 32 }) ?? true,
               Set(payload.pages.map(\.id)).count == pageCount,
               Set(payload.pages.map(\.physicalIndex)).count == pageCount,
               Set(payload.pages.map(\.documentID)) == Set(documentsByID.keys),

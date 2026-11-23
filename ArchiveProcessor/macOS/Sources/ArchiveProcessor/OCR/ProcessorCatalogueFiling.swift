@@ -28,10 +28,18 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
         self.destination = try filer.destination(at: occurrence)
     }
 
-    func file(preparedPDF: URL, record data: Data) throws -> CataloguePairFiler.Receipt {
+    func file(preparedPDF: URL, record data: Data, preservation: ProcessorPreservationFiling? = nil)
+        throws -> CataloguePairFiler.Receipt {
+        let record = try CatalogueRecord(json: data)
+        guard try preservation?.manifest.digest() == record.preservationManifestSHA256 else {
+            throw PreservationCopy.Failure.unverified
+        }
+        let verify: ((Int32) throws -> Void)? = preservation.map { preservation in
+            { parent in try preservation.file(in: parent, record: record) }
+        }
         let filer = try Self.filer(root: root, instance: rootInstanceID)
-        return try filer.filePair(operationID: operationID, at: occurrence, record: CatalogueRecord(json: data),
-                                  preparedPDF: preparedPDF, destination: destination)
+        return try filer.filePair(operationID: operationID, at: occurrence, record: record,
+                                  preparedPDF: preparedPDF, destination: destination, verifyPreservation: verify)
     }
 
     private static func filer(root: URL, instance: UUID) throws -> CataloguePairFiler {

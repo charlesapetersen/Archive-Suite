@@ -119,6 +119,9 @@ enum SettingsInterviewsTestDriver {
         eq("answers are the user's", layer.entry(.hours)?.source, .setByUser(day))
 
         var a = GeneralInterviewAnswers()
+        check("the built-in and interview choices keep preservation copies",
+              a.keepPreservationCopies && SettingsKey.keepPreservationCopies.defaultValue.bool == true)
+        a.keepPreservationCopies = false
         a.setMoneyHabit(.perBatch)
         check("choosing to spend lets pages leave the Mac", !a.staysOnMac)
         a.setMoneyHabit(.none)
@@ -147,6 +150,7 @@ enum SettingsInterviewsTestDriver {
         check("no ceiling writes no ceiling value", layer.entry(.batchCeilingUSD) == nil && layer.entry(.monthCeilingUSD) == nil)
 
         let back = GeneralInterviewAnswers(from: layer)
+        check("an explicit preservation opt-out survives reopening the interview", !back.keepPreservationCopies)
         check("running the interview again starts from the last answers",
               back.moneyHabit == .noCeiling && back.cluster && back.gpusPerJob == 2 && !back.staysOnMac)
         check("a first run has not chosen whether pages leave", !GeneralInterviewAnswers().staysOnMacChosen)

@@ -55,6 +55,9 @@ folder that macOS identifies as cloud-managed.
   OCR pages included, each file's heading on its first tile and the file on view tinted; the same item, now **Hide Thumbnails** (⌥⌘2 again), returns to the page alone. Click a
   thumbnail or tile to read it. Both are also toolbar buttons, and draw from the on-disk thumbnail cache. Window tabbing is disabled to keep pages and
   windows distinct.
+- **Preservation copy** in the document window opens the full-resolution original behind the focused
+  page when a verified copy is available. Search, notes and links continue to use the reading PDF.
+  If the original is downloaded in Finder or restored from a backup, choose **Check again**.
 - **Options** (⌘,): link format, copy behavior, viewer defaults, and more.
 - Fully keyboard-operable.
 

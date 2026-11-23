@@ -295,6 +295,7 @@ class OCRProcessor: ObservableObject {
     var outputURLMap: [URL: URL] = [:]
     var catalogueRun: ProcessorCatalogueRun?
     var catalogueRunLease: ProcessorCatalogueRun.Lease?
+    var catalogueMergeInputs: [URL: [CatalogueMergeInput]] = [:]
     var catalogueDocumentFields: [URL: ProcessorCatalogueRecord.DocumentFields] = [:]
     var catalogueFilingWarning = ""
     /// W37.dual-date — the `GeneratedTags` last applied to each source page this run (every page of a

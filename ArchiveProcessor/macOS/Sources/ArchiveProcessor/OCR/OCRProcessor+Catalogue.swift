@@ -12,9 +12,7 @@ extension OCRProcessor {
     }
 
     func beginCatalogueRun(outputRoot: URL, sources: [URL], resuming: Bool = false,
-                           confirmResume: () -> Bool = { true }) -> Bool {
-        catalogueDocumentFields = [:]
-        catalogueFilingWarning = ""
+                           confirmResume: () -> Bool = { true }) async -> Bool {
         do {
             let lease = try ProcessorCatalogueRun.Lease(journal: Self.pendingCatalogueURL)
             guard confirmResume() else {
@@ -22,6 +20,9 @@ extension OCRProcessor {
                 statusMessage = "The saved run changed before it could be resumed. Check the interrupted-run controls again."
                 return false
             }
+            catalogueDocumentFields = [:]
+            catalogueMergeInputs = [:]
+            catalogueFilingWarning = ""
             if let saved = Self.savedCatalogueRun() {
                 let originalPaths = saved.sources.map { $0.standardizedFileURL.path }
                 guard resuming, saved.files == nil, saved.outputRoot.path == outputRoot.standardizedFileURL.path,
@@ -42,8 +43,24 @@ extension OCRProcessor {
                 statusMessage = "An interrupted run is still saved. Resume it before starting another run."
                 return false
             }
+            let intake = SettingsLayerStore.shared.keepsPreservationCopies
+                ? try await PDFGenerator.runWorker(priority: .utility) {
+                    var verified: [URL: ProcessorPreservationFiling.Intake] = [:]
+                    for source in Set(sources) {
+                        try Task.checkCancellation()
+                        do {
+                            verified[source] = try ProcessorPreservationFiling.Intake(url: source, resolveSelectedLink: true)
+                        } catch is CancellationError {
+                            throw CancellationError()
+                        } catch {
+                            throw PreservationIntakeFailure(filename: source.lastPathComponent)
+                        }
+                    }
+                    try Task.checkCancellation()
+                    return verified
+                } : nil
             catalogueRun = try ProcessorCatalogueRun.create(outputRoot: outputRoot, sources: sources,
-                                                            journal: Self.pendingCatalogueURL)
+                                                            journal: Self.pendingCatalogueURL, preservationIntake: intake)
             catalogueRunLease = lease
             return true
         } catch {
@@ -51,6 +68,11 @@ extension OCRProcessor {
             statusMessage = "Could not save the catalogue filing state: \(error.localizedDescription)"
             return false
         }
+    }
+
+    private struct PreservationIntakeFailure: LocalizedError {
+        let filename: String
+        var errorDescription: String? { "Could not verify the full-resolution original for “\(filename)”. Check that the source is available, then try again." }
     }
 
     func rememberCatalogueFields(_ tags: GeneratedTags, segment: DocumentSegment,
@@ -74,6 +96,8 @@ extension OCRProcessor {
         let fileFields: ProcessorCatalogueRecord.FileFields
         let exports: [ProcessorCatalogueRun.Export]
         let preOCRed: Bool
+        let mergeInputs: [CatalogueMergeInput]?
+        let preservationIntake: [URL: ProcessorPreservationFiling.Intake]?
     }
 
     /// Reserve final destinations and prepare derivative copies after review, then freeze the whole plan
@@ -267,7 +291,8 @@ extension OCRProcessor {
             }
             guard exports.allSatisfy({ run.contains($0.prepared) }) else { throw CocoaError(.fileWriteInvalidFileName) }
             return DraftFile(pdf: pdf, sources: sources, destination: destination, identity: identity,
-                             document: document, fileFields: fileFields, exports: exports, preOCRed: preOCRed)
+                             document: document, fileFields: fileFields, exports: exports, preOCRed: preOCRed,
+                             mergeInputs: catalogueMergeInputs[pdf], preservationIntake: run.preservationIntake)
         }
     }
 
@@ -284,6 +309,44 @@ extension OCRProcessor {
             if !outputsOutsideTheirTree.contains(path) { outputsOutsideTheirTree.append(path) }
             return root
         }
+    }
+
+    struct CatalogueMergeInput: Sendable {
+        let intake: URL
+        let derivative: URL
+    }
+
+    nonisolated private static func preservationPages(for draft: DraftFile,
+                                                       pages: [ProcessorCatalogueRecord.SourcePage],
+                                                       intake: [URL: ProcessorPreservationFiling.Intake])
+        throws -> [ProcessorPreservationFiling.LogicalPage] {
+        func pagesForSource(_ url: URL, range: ArraySlice<ProcessorCatalogueRecord.SourcePage>)
+            throws -> [ProcessorPreservationFiling.LogicalPage] {
+            guard let original = intake[url] else { throw PreservationCopy.Failure.unverified }
+            var physical = 0
+            return range.enumerated().map { index, page in
+                let originalIndex = original.source.format != .pdf ? 0 : draft.preOCRed ? physical : index
+                physical += page.roles.count
+                return .init(source: original, originalPageIndex: originalIndex)
+            }
+        }
+
+        if let merge = draft.mergeInputs {
+            var offset = 0
+            let result = try merge.flatMap { contribution in
+                guard let part = PDFDocument(url: contribution.derivative) else {
+                    throw PDFError.sourceUnreadable(contribution.derivative)
+                }
+                let count = PDFPageRole.roles(of: part).filter { $0 != .text }.count
+                guard count > 0, count <= pages.count - offset else { throw PreservationCopy.Failure.unverified }
+                defer { offset += count }
+                return try pagesForSource(contribution.intake, range: pages[offset..<(offset + count)])
+            }
+            guard offset == pages.count else { throw PreservationCopy.Failure.unverified }
+            return result
+        }
+        guard draft.sources.count == 1, let source = draft.sources.first else { throw PreservationCopy.Failure.unverified }
+        return try pagesForSource(source, range: pages[...])
     }
 
     nonisolated private static func prepareCatalogueFiles(_ drafts: [DraftFile], workingRoot: URL,
@@ -310,8 +373,13 @@ extension OCRProcessor {
             guard sourcePages.reduce(0, { $0 + $1.roles.count }) == pdf.pageCount else {
                 throw PDFError.sourceUnreadable(draft.pdf)
             }
-            let record = ProcessorCatalogueRecord(identity: draft.identity, sourcePages: sourcePages,
-                                                  document: draft.document, fileFields: draft.fileFields)
+            let preservation = try draft.preservationIntake.map { intake in
+                let inputs = try Self.preservationPages(for: draft, pages: sourcePages, intake: intake)
+                return try ProcessorPreservationFiling(fileID: draft.identity.fileID, pages: sourcePages, inputs: inputs)
+            }
+            let data = try ProcessorCatalogueRecord(identity: draft.identity, sourcePages: sourcePages,
+                                                      document: draft.document, fileFields: draft.fileFields,
+                                                      preservationManifestSHA256: preservation?.manifest.digest()).encoded()
             let prepared = workingRoot.appendingPathComponent(draft.identity.fileID.uuidString + ".prepared.pdf")
             let bytes = try SearchableArchival.catalogueCopy(of: draft.pdf, identity: draft.identity)
             try bytes.write(to: prepared, options: .withoutOverwriting)
@@ -320,8 +388,8 @@ extension OCRProcessor {
             let filing = try ProcessorCatalogueFiling(operationID: draft.identity.fileID, root: outputRoot,
                                                       rootInstanceID: rootInstance, destination: draft.destination)
             return ProcessorCatalogueRun.File(workingPDF: draft.pdf, prepared: prepared, sources: draft.sources,
-                                              destination: draft.destination, record: try record.encoded(),
-                                              filing: filing, exports: draft.exports)
+                                              destination: draft.destination, record: data, filing: filing, exports: draft.exports,
+                                              preservation: preservation)
         }
     }
 }

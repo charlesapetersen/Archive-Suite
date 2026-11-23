@@ -526,6 +526,10 @@ public enum CorpusWalker {
         while let entry = enumerator.nextObject() {
             if isCancelled() { cancelled = true; break }
             guard let url = entry as? URL else { continue }
+            if PreservationCopy.isDocumentFolder(url) {
+                enumerator.skipDescendants()
+                continue
+            }
 
             switch FileStat.capture(url) {
             case .vanished:
@@ -646,6 +650,10 @@ public enum CorpusWalker {
             while let object = enumerator.nextObject() {
                 if isCancelled() { cancelled = true; break }
                 guard let url = object as? URL else { continue }
+                if PreservationCopy.isDocumentFolder(url) {
+                    enumerator.skipDescendants()
+                    continue
+                }
                 switch FileStat.capture(url, followSymlinks: followFileSymlinks) {
                 case .vanished:
                     vanished += 1

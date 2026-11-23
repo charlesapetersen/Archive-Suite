@@ -36,6 +36,7 @@ struct CapturedPhoto: Identifiable, Equatable {
     var quality: String?
     var year: Int?
     var month: Int?
+    var preservationFingerprint: PreservationCopy.Fingerprint? = nil
 
     static func == (lhs: CapturedPhoto, rhs: CapturedPhoto) -> Bool { lhs.id == rhs.id }
 }

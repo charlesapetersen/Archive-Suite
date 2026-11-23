@@ -982,6 +982,9 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Found on this Mac"].exists, "it must show what it found on this Mac")
         let fill = app.buttons["Fill in"].firstMatch
         XCTAssertTrue(fill.exists, "the starting points must be offered")
+        let preservation = element("ap.generalInterview.keepPreservationCopies")
+        XCTAssertTrue(preservation.exists, "The preservation choice must be prominent at setup.")
+        XCTAssertEqual((preservation.value as? NSNumber)?.intValue ?? Int(preservation.value as? String ?? ""), 1)
         attachScreenshot("processor-general-interview")
         let skip = app.buttons["Skip: free, on this Mac"]
         XCTAssertTrue(skip.exists, "the interview must offer a skip that stays free")

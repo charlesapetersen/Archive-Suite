@@ -20,6 +20,34 @@ import ArchiveCore
 
 final class DocumentRenderGuardTests: XCTestCase {
 
+    @MainActor
+    func testVerifiedPreservationRasterAndSelectedPDFPageRender() async throws {
+        let raster = try XCTUnwrap(RenderProbe.jpegData(from: solidCGImage(gray: 0.75, topHalfGray: 0.20)))
+        let fixture = try makeTwoPagePDF()
+        let sourcePDF = try Data(contentsOf: fixture)
+        let original = try XCTUnwrap(PDFDocument(data: sourcePDF))
+        let second = try XCTUnwrap(original.page(at: 1))
+        let cases: [(Data, PreservationCopy.Format, Int)] = [(raster, .jpeg, 0), (sourcePDF, .pdf, 1)]
+        for (bytes, format, index) in cases {
+            let page = try XCTUnwrap(PreservationOriginalPage.make(bytes: bytes, format: format, index: index))
+            if format == .pdf { XCTAssertEqual(page.string, second.string) }
+            let document = PDFDocument()
+            document.insert(page, at: 0)
+            let dir = makeTempDir("preservation-render")
+            let path = dir.appendingPathComponent("page.pdf")
+            XCTAssertTrue(document.write(to: path))
+            let thumbnailer = PDFThumbnailer(cacheDirectory: dir)
+            let rendered = await thumbnailer.png(fileURL: path, page: 1, linkKey: format.rawValue, mtime: Date())
+            let png = try XCTUnwrap(rendered)
+            let attachment = XCTAttachment(data: png, uniformTypeIdentifier: "public.png")
+            attachment.name = "preservation-\(format.rawValue).png"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            let cg = try XCTUnwrap(RenderProbe.cgImage(fromPNG: png))
+            _ = assertRendersNonBlank(cg, "preservation \(format.rawValue)")
+        }
+    }
+
     // MARK: copied Reader page links carry pixels end to end
 
     @MainActor

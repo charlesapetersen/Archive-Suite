@@ -51,6 +51,11 @@ struct DocumentWindowView: View {
                 content
                 Divider()
                 statusBar
+                if let rootStore = router.nav?.rootStore, let file = model.currentURL, model.current != nil,
+                   file.pathExtension.lowercased() == "pdf" {
+                    DocumentPreservationRow(rootStore: rootStore, file: file, identity: model.preservationIdentity,
+                                            pageIndex: model.focusedPageNumber - 1)
+                }
             }
             if model.showingTagEditor {
                 PanelDivider(width: $infoWidth, panelOnLeft: false, range: 340...480,

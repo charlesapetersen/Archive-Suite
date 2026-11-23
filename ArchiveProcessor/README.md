@@ -304,6 +304,17 @@ If filing stops after preparation, **Resume Run** can finish the saved pairs loc
 after filing creates a new pair alongside the earlier pair. In Live Capture, Finish verifies the
 pairs before releasing the saved source photos.
 
+### Preservation copies
+
+The initial setup interview keeps full-resolution originals by default. You can turn this off in
+**Settings → General → Answer the setup questions**. Keeping them adds the size of the intake files
+to your archive. Processor shows the known size before filing. Live Capture keeps the exact bytes
+the Mac received from the phone, and Process Files keeps the native files you admitted.
+
+Archive Reader can show the original behind a reading page. To transfer an archive with its originals,
+include the reading PDFs, their catalogue companions and the matching **Preservation** folder. Sharing
+only a PDF leaves the originals behind. [Preservation format](../SPEC/catalogue.md#preservation-copies)
+
 ### Pre-OCRed PDF Input
 
 Process PDFs that already contain OCR text (e.g., from a previous run):

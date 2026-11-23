@@ -18098,3 +18098,17 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   marking, duplicate names, conflicting types, reclassification and warning retention. No paid OCR
   or rehearsal cache changes.
   <!-- /W40.fix-processor-copy-label-tags -->
+- [x] **W49.preservation-copies-build — offer full-resolution originals in a visible Preservation folder [L · Tier-2]** · §W49 (lane: suite) (uses: build,vm) (blocked-on: W49.preservation-copies-owner-ok) — Owner call 31: make this an explicit, prominent question in the initial Processor interview, on by default with an opt-out. Explain storage and PDF-only sharing. Use [the preservation format](SPEC/catalogue.md#preservation-copies). Split the chosen route into Processor exact-source filing, a shared page association, and Reader access. Verify scratch recovery and PDF/A. W49.proc-pair-compress-hands still owns the reading-quality decision. SHIPPED 2026-11-23 (this commit).
+  The setup interview defaults to keeping originals and explains added storage and PDF-only sharing.
+  Process Files and Live Capture file the exact native bytes and a checked page map in a visible
+  Preservation folder. Reader opens the selected page's original on request. Its search and links
+  continue to use the reading PDF. The Mac assigns the source filename for phone captures.
+  Scratch verification covered matching same-name inputs, mixed and multi-page originals, missing or
+  changed files, symlinks, an interrupted copy, retry and a simulated full disk. The Android-to-Mac
+  round-trip matched each of three reading PDFs to its original JPEG, 400,816 bytes in total, and
+  the Mac retired its staging only after filing. The local recovery suite also verified that a
+  missing required original withholds publication and that restoring it completes the pinned
+  filing. veraPDF validated the preserved document's derivative as PDF/A-2b. Both focused
+  off-screen UI tests, the Reader render guards and the two-image Processor smoke passed.
+  The two Gemini fixture runs cost an estimated total below $0.10. No rehearsal-cache data was used.
+  <!-- /W49.preservation-copies-build -->
