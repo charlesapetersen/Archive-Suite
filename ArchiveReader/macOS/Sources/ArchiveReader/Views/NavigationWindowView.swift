@@ -359,7 +359,8 @@ struct NavigationWindowView: View {
                 ContentUnavailableView("No archive folder chosen", systemImage: "folder.badge.questionmark",
                                        description: Text("Choose a folder in the toolbar to browse its tagged PDFs."))
             case .scanning:
-                ContentUnavailableView("Looking for tagged documents…", systemImage: "magnifyingglass",
+                ContentUnavailableView(model.library.usesCatalogue ? "Looking for PDFs…" : "Looking for tagged documents…",
+                                       systemImage: "magnifyingglass",
                                        description: Text("Scanning \(model.library.scopeDescription)."))
             case let .couldNotLook(failure):
                 ContentUnavailableView(failure.message, systemImage: "exclamationmark.triangle.fill",
@@ -371,9 +372,11 @@ struct NavigationWindowView: View {
             case let .nothingTagged(scanned):
                 VStack(spacing: 0) {
                     ContentUnavailableView(
-                        "No tagged documents", systemImage: "tray",
-                        description: Text("Scanned \(scanned) file\(scanned == 1 ? "" : "s") in this folder; "
-                                          + "none carry a Read or Unread tag. The list shows only documents that do."))
+                        model.library.usesCatalogue ? "No PDFs found" : "No tagged documents", systemImage: "tray",
+                        description: Text(model.library.usesCatalogue
+                                          ? "Scanned \(scanned) files in this folder."
+                                          : "Scanned \(scanned) file\(scanned == 1 ? "" : "s") in this folder; "
+                                            + "none carry a Read or Unread tag. The list shows only documents that do."))
                         .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("ar.empty.nothingTagged")
                     chooseFolderButton.padding(.bottom, 16)

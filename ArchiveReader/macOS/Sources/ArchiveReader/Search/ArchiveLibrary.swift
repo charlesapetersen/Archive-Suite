@@ -6,6 +6,7 @@ import ArchiveCore
 struct ResolvedLibraryRoot: Sendable {
     let url: URL
     let markerGUID: UUID?
+    var catalogueInstance: UUID? = nil
 }
 
 enum JPEGPartnerScanStatus: Equatable {
@@ -86,6 +87,10 @@ final class ArchiveLibrary: ObservableObject {
 
     /// The root being walked, so `rescan()` needs no argument.
     private var root: URL?
+    private var catalogueInstance: UUID?
+    var usesCatalogue: Bool { catalogueInstance != nil }
+    private(set) var catalogueReader: CatalogueReader?
+    private(set) var catalogueSnapshot: CatalogueReader.Snapshot?
 
     /// `root` spelled the way the walker reports paths under it — the only spelling a *discovered*
     /// path may be compared against. Derived from `root` here rather than read off `RootFolderStore`
@@ -278,7 +283,7 @@ final class ArchiveLibrary: ObservableObject {
     /// branch set `NSMetadataQueryLocalComputerScope` and was documented "future use" — dead code that
     /// only a Spotlight index could have served, and walking the whole Mac is not something this app
     /// should ever do.
-    func start(scope: URL?, markerGUID: UUID? = nil) {
+    func start(scope: URL?, markerGUID: UUID? = nil, catalogueInstance: UUID? = nil) {
         jpegScanCancellation?.cancel()
         jpegScanCancellation = nil
         jpegScanGeneration &+= 1
@@ -304,6 +309,9 @@ final class ArchiveLibrary: ObservableObject {
         // `currentScan` during that gap and could publish old-root rows into the new root.
         clock &+= 1
         currentScan = clock
+        self.catalogueInstance = scope == nil ? nil : catalogueInstance
+        catalogueReader = nil
+        catalogueSnapshot = nil
         replaceFiles([])
         verifiedWrites.removeAll()      // no override may leak across roots
         lastSettled = nil
@@ -352,6 +360,7 @@ final class ArchiveLibrary: ObservableObject {
     /// way a fixture root can reach a persisted cache: `fixtureIndexOverride` is true only when the
     /// launch named a scratch database, which the initialiser has already substituted for the real one.
     private var usesPersistedIndex: Bool {
+        guard !usesCatalogue else { return false }
 #if DEBUG
         if isFixtureRoot, !fixtureIndexOverride { return false }
 #endif
@@ -621,6 +630,12 @@ final class ArchiveLibrary: ObservableObject {
         inFlight = token
         lastRootScanStartedAt = Date()
 
+        if let catalogueInstance {
+            beginCatalogueScan(root: root, instance: catalogueInstance, generation: generation,
+                               rootGeneration: rootGeneration, token: token)
+            return
+        }
+
 #if DEBUG
         // A fixture root scans SYNCHRONOUSLY — same walker, same predicate, same failure accounting;
         // only the delivery thread differs. That distinction is the whole point: pre-W26 this key
@@ -663,6 +678,33 @@ final class ArchiveLibrary: ObservableObject {
 #endif
         startAsyncPass(root: root, cached: cached, indexScan: indexScan,
                        generation: generation, rootGeneration: rootGeneration, token: token)
+    }
+
+    private func beginCatalogueScan(root: URL, instance: UUID, generation: UInt64,
+                                    rootGeneration: UInt64, token: ScanCancellation) {
+        armScanStallDeadline(generation: generation)
+        let thread = Thread { [weak self] in
+            let pass = ReaderCatalogueScan.run(root: root, instance: instance,
+                                               isCancelled: { token.isCancelled },
+                                               onProgress: { [weak self] seen in
+                DispatchQueue.main.async { [weak self] in
+                    self?.reportProgress(generation: generation, found: 0, seen: seen)
+                }
+            })
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !token.isCancelled,
+                      self.rootGeneration == rootGeneration, self.currentScan == generation else { return }
+                self.cancelScanStallDeadline()
+                self.catalogueReader = pass.reader
+                self.catalogueSnapshot = pass.snapshot
+                let phase = DiscoveryHealth.phase(after: pass.health, root: pass.rootStability,
+                                                  finishedAt: Date(), lastSettled: self.lastSettled)
+                self.publishFinishedPass(pass.rows, next: phase, generation: generation)
+            }
+        }
+        thread.name = "ArchiveReader.CatalogueScan"
+        thread.qualityOfService = .utility
+        thread.start()
     }
 
     /// Hand a pass to another thread. Split out of `beginScan` so the DEBUG stall hook above can defer
@@ -1042,9 +1084,19 @@ final class ArchiveLibrary: ObservableObject {
             inFlight?.cancel()
             let resolved = rootResolver?()
             if rootResolver != nil {
-                start(scope: resolved?.url, markerGUID: resolved?.markerGUID)
+                start(scope: resolved?.url, markerGUID: resolved?.markerGUID,
+                      catalogueInstance: resolved?.catalogueInstance)
             }
             else { requestRootRescan(urgent: true) }   // standalone/test library: safest fallback
+            return
+        }
+        if usesCatalogue {
+            if let root, requestTouchesJPEGPartnerTree(request, root: root) {
+                refreshJPEGPartnerIndex(scope: root)
+            }
+            // A companion may supply fields to other rows in different folders. Refresh against
+            // the entire owner inventory so that moving or removing an owner invalidates its members.
+            if !request.isEmpty { requestRootRescan(urgent: false) }
             return
         }
         if let root, requestTouchesJPEGPartnerTree(request, root: root) {

@@ -345,7 +345,7 @@ final class NavigationModel: ObservableObject {
             ?? (defaults === UserDefaults.standard ? .shared : ExcludedFoldersStore(defaults: defaults))
         library.setRootResolver { [weak self] in
             guard let self, let url = self.rootStore.reResolveSavedRoot() else { return nil }
-            return ResolvedLibraryRoot(url: url, markerGUID: self.rootStore.rootMarker?.guid)
+            return self.resolvedLibraryRoot(url)
         }
         library.onExternalTagChanges = { [weak self] in self?.folderDateRecordsSeeExternal($0) }   // W49…fu2
         filter.read = AppSettings.defaultReadFilter
@@ -505,7 +505,7 @@ final class NavigationModel: ObservableObject {
             } }
             .store(in: &cancellables)
         if let root = rootStore.root {
-            library.start(scope: root, markerGUID: rootStore.rootMarker?.guid)
+            startLibrary(root)
             // A root granted before the question existed is asked once too, after launch; never under a
             // test host or a fixture root, where nobody is there to answer.
             if !ArchiveTestHost.isUnitTestHost, !ProcessInfo.processInfo.arguments.contains("-ARUITestRootPath") {
@@ -553,7 +553,7 @@ final class NavigationModel: ObservableObject {
     func applicationDidBecomeActive(now: Date = Date()) {
         if rootStore.root == nil, rootStore.hasSavedBookmark {
             if let restored = rootStore.reResolveSavedRoot() {
-                library.start(scope: restored, markerGUID: rootStore.rootMarker?.guid)
+                startLibrary(restored)
             }
             return
         }
@@ -2431,7 +2431,7 @@ final class NavigationModel: ObservableObject {
         // Asked before the scan, so the first rows are read through the answer.
         askItemTypeColoursIfNeeded()
         applyItemTypePreferences()
-        library.start(scope: adopted, markerGUID: rootStore.rootMarker?.guid)
+        startLibrary(adopted)
     }
 
     /// Re-walk the granted archive folder (File ▸ Rescan Archive Folder, ⌘⌥R).

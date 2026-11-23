@@ -49,10 +49,14 @@ struct ArchiveFile: Identifiable, Sendable {
         let provenance: ArchiveFileProvenance
         let dateAmbiguities: [DateAmbiguity]
         let subjectKeys: Set<String>
+        let isCatalogue: Bool
+        let catalogueFacts: ItemFacts?
+        let catalogueDocuments: [ItemFacts]
 
         init(url: URL, path: String, name: String, fileType: String, tags: DocumentTags,
              contentModified: Date?, contentIdentity: ContentIdentity?, isDataless: Bool,
-             provenance: ArchiveFileProvenance) {
+             provenance: ArchiveFileProvenance, isCatalogue: Bool,
+             catalogueFacts: ItemFacts?, catalogueDocuments: [ItemFacts]) {
             self.url = url
             self.path = path
             self.pathHash = UTF8Key(path).hashValue
@@ -64,7 +68,12 @@ struct ArchiveFile: Identifiable, Sendable {
             self.isDataless = isDataless
             self.provenance = provenance
             self.dateAmbiguities = tags.dateAmbiguities
-            self.subjectKeys = Set(tags.subjects.map(tagKey))
+            self.subjectKeys = Set((tags.subjects + catalogueDocuments.flatMap {
+                (try? $0.document.get())?.document.fields?.subjects?.readerValue ?? []
+            }).map(tagKey))
+            self.isCatalogue = isCatalogue
+            self.catalogueFacts = catalogueFacts
+            self.catalogueDocuments = catalogueDocuments
         }
     }
     private let fields: Fields
@@ -80,6 +89,10 @@ struct ArchiveFile: Identifiable, Sendable {
     var name: String { fields.name }
     var fileType: String { fields.fileType }        // short label, e.g. "PDF"
     var tags: DocumentTags { fields.tags }
+    var isCatalogue: Bool { fields.isCatalogue }
+    var catalogueFacts: ItemFacts? { fields.catalogueFacts }
+    /// One physical page per logical document, resolving fields through the owning PDF.
+    var catalogueDocuments: [ItemFacts] { fields.catalogueDocuments }
     var contentModified: Date? { fields.contentModified }
     /// The inode and size discovery saw, beside the date in the content index's freshness key
     /// (W44.reocr-reader-freshness). Nil for a row built without a `stat(2)` (synthetic test rows).
@@ -98,7 +111,8 @@ struct ArchiveFile: Identifiable, Sendable {
 
     init(url: URL, name: String, fileType: String, tags: DocumentTags,
          contentModified: Date?, contentIdentity: ContentIdentity? = nil, isDataless: Bool = false,
-         provenance: ArchiveFileProvenance = .disk(readAt: Date())) {
+         provenance: ArchiveFileProvenance = .disk(readAt: Date()), isCatalogue: Bool = false,
+         catalogueFacts: ItemFacts? = nil, catalogueDocuments: [ItemFacts] = []) {
         // Native UTF-8, made once here: a bridged string (what the walk and URL hand over) is copied
         // to UTF-8 on every byte-hash, which made each sort's 116k key lookups slower, not faster.
         var path = url.path, name = name
@@ -106,7 +120,8 @@ struct ArchiveFile: Identifiable, Sendable {
         name.makeContiguousUTF8()
         fields = Fields(url: url, path: path, name: name, fileType: fileType, tags: tags,
                         contentModified: contentModified, contentIdentity: contentIdentity,
-                        isDataless: isDataless, provenance: provenance)
+                        isDataless: isDataless, provenance: provenance, isCatalogue: isCatalogue,
+                        catalogueFacts: catalogueFacts, catalogueDocuments: catalogueDocuments)
     }
 
     /// Discovery and index reconstruction build URLs from filesystem representations; URL equality
@@ -141,7 +156,10 @@ struct ArchiveFile: Identifiable, Sendable {
     }
     var readState: ReadState? { tags.readState }
     var quality: Int? { tags.quality }
-    var subjects: [String] { tags.subjects }
+    var subjects: [String] {
+        guard catalogueDocuments.count > 1 else { return tags.subjects }
+        return catalogueDocuments.flatMap { (try? $0.document.get())?.document.fields?.subjects?.readerValue ?? [] }
+    }
     /// Whether the file carries `tag` in any case (W40.fix-tags-case-insensitive).
     func hasSubject(_ tag: String) -> Bool { subjectKeys.contains(tagKey(tag)) }
     /// W40.suite-item-types: Box or Folder, from the token or the root's older-material colours.
@@ -158,7 +176,10 @@ extension ArchiveFile: Hashable {
             || (lhs.url == rhs.url && lhs.name == rhs.name && lhs.fileType == rhs.fileType
                 && lhs.tags == rhs.tags && lhs.contentModified == rhs.contentModified
                 && lhs.contentIdentity == rhs.contentIdentity
-                && lhs.isDataless == rhs.isDataless && lhs.provenance == rhs.provenance)
+                && lhs.isDataless == rhs.isDataless && lhs.provenance == rhs.provenance
+                && lhs.isCatalogue == rhs.isCatalogue
+                && lhs.catalogueFacts?.revision == rhs.catalogueFacts?.revision
+                && lhs.catalogueDocuments.map(\.revision) == rhs.catalogueDocuments.map(\.revision))
     }
     // url-only hash stays valid: value-equal files share a url, so they share a hash (collisions OK).
     func hash(into hasher: inout Hasher) { hasher.combine(url) }
