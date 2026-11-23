@@ -165,8 +165,8 @@ classification edit. [Independent VM evidence](../verification/evidence/processo
   same whole-run review before tagging. Neither adds a per-collection review. The help implies the switch
   controls the pre-tagging pause. Reproduced in the VM at `d1b38279` and traced to `startProcessing` and
   `performPreOCRedProcessing`. The [verification record](../verification/evidence/processor/W49.proc-s046-verify.md)
-  links the test and independent check. Owner call 31 sets fresh review on by default and lets the user
-  switch it off. The fix waits for independent reproduction. (queued: W49.proc-s046-review-toggle)
+  includes the separate Codex confirmation at `df7f295d`. Owner call 31 sets fresh review on by default and lets
+  the user switch it off. (queued: W49.proc-s046-review-toggle)
 
 ## Live Capture files a document silently after Automatic tagging gets HTTP 500 (S-045)
 

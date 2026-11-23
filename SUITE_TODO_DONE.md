@@ -18246,3 +18246,6 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   tagged both synthetic inputs and wrote both PDFs. Tier-2 review by Codex (gpt-6.2-sol) caught the wrapped-filename
   edge case, now covered by a parser regression. No bench cache was used.
   <!-- /W49.proc-straighten-record -->
+
+- [x] **W49.proc-s046-check — Independently reproduce S-046 [S]** · §Known limits are queued, accepted or asked (lane: processor) (uses: build,vm) (agent: codex) (blocked-on: W49.proc-s046-verify) — SHIPPED 2026-11-23 (this commit). Owner override 2026-11-23. In a separate scratch VM run on `df7f295d`, Codex gpt-6.2-sol confirmed that On and Off both open the whole-run pre-tagging review, box/folder confirmation, final tag review and collection name confirmation. Both finished with six succeeded, zero failed and one collection organized, without a per-collection review. [Evidence and reproduction command](verification/evidence/processor/W49.proc-s046-verify.md#separate-verification). $0. The local VM log and screenshots were retained as evidence.
+  <!-- /W49.proc-s046-check -->
