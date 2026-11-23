@@ -65,6 +65,7 @@ enum TextLayerTestDriver {
                 return
             }
             await catalogueChecks(dir: dir, jpeg: jpeg, reading: reading)
+            await freshCatalogueChecks(dir: dir, inputs: [jpeg, png])
             return
         }
         await childProcessChecks(dir, jpeg: jpeg)
@@ -330,6 +331,75 @@ enum TextLayerTestDriver {
         check("8 Process Files refuses a pre-OCR symlink without touching its target",
               processor.jobs.first?.status == .failed && processor.outputURLMap[alias] == nil
                 && (try? Data(contentsOf: source)) == original, processor.statusMessage)
+    }
+
+    private static func freshCatalogueChecks(dir: URL, inputs: [URL]) async {
+        let fm = FileManager.default
+        guard let scratchState = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_STATE"],
+              OCRProcessor.pendingCatalogueURL.deletingLastPathComponent().path == scratchState else {
+            check("9 fresh Process Files uses an isolated journal", false)
+            return
+        }
+        func record(at url: URL?) -> CatalogueRecord? {
+            guard let url, let pdf = PDFDocument(url: url),
+                  let identity = pdf.documentRef.flatMap(CataloguePDFIdentity.identity(in:)),
+                  let data = try? Data(contentsOf: url.appendingPathExtension("archivesuite.json")),
+                  let record = try? CatalogueRecord(json: data), record.fileID == identity.fileID,
+                  record.contentRevision == identity.contentRevision, pdf.pageCount == record.pages.count else { return nil }
+            return record
+        }
+        let originals = inputs.map { try? Data(contentsOf: $0) }
+        let model = LLMModel.appleVisionModels[0]
+        let processor = OCRProcessor()
+        processor.taggingMode = .none
+        processor.rotationMode = .off
+        processor.reviewRotation = false
+        let autoAccept = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(50))
+                if processor.awaitingRetryDecision { processor.continueWithoutRetry() }
+            }
+        }
+        defer { autoAccept.cancel() }
+        for merge in [false, true] {
+            let out = dir.appendingPathComponent(merge ? "fresh merged" : "fresh split", isDirectory: true)
+            try? fm.createDirectory(at: out, withIntermediateDirectories: true)
+            processor.mergeDocuments = merge
+            processor.preGroupedBoundaries = [true, false]
+            processor.preGroupedTypes = [.document, .document]
+            await processor.startProcessing(files: inputs, provider: .appleVision, model: model, thinkingLevel: nil,
+                                            apiKey: "", outputDirectory: out, batchMode: false,
+                                            enableTagging: false, enableSegmentJSON: false, segmentationContext: .init())
+            let urls = inputs.compactMap { processor.outputURLMap[$0] }
+            let records = urls.compactMap { record(at: $0) }
+            let expectedFiles = merge ? 1 : 2
+            check("9 fresh Process Files publishes \(merge ? "merged" : "split") output pairs",
+                  urls.count == 2 && Set(urls).count == expectedFiles && records.count == 2
+                    && processor.jobs.allSatisfy { $0.status == .succeeded }
+                    && !fm.fileExists(atPath: OCRProcessor.pendingCatalogueURL.path)
+                    && !fm.fileExists(atPath: OCRProcessor.pendingRunURL.path),
+                  processor.statusMessage)
+            check("9 \(merge ? "merged" : "split") records preserve a shared document owner and page grouping",
+                  records.count == 2 && records[0].documents.first?.id == records[1].documents.first?.id
+                    && records[0].documents.first?.ownerFileID == records[0].fileID
+                    && records[1].documents.first?.ownerFileID == records[0].fileID
+                    && records.allSatisfy {
+                        Set($0.pages.map(\.sourcePageID)).count == (merge ? 2 : 1)
+                    }, processor.statusMessage)
+            if !merge, let previous = urls.first, let first = inputs.first {
+                let baseline = try? Data(contentsOf: previous)
+                let previousRecord = try? Data(contentsOf: previous.appendingPathExtension("archivesuite.json"))
+                let retried = await processor.retryOne(index: 0, outputDirectory: out)
+                let next = processor.outputURLMap[first]
+                let succeeded = retried && next != previous && record(at: next) != nil
+                check("9 post-run retry files a new verified pair and preserves the existing pair",
+                      succeeded && baseline == (try? Data(contentsOf: previous))
+                        && previousRecord == (try? Data(contentsOf: previous.appendingPathExtension("archivesuite.json"))),
+                      processor.statusMessage)
+            }
+        }
+        check("9 fresh, split, merge and retry leave all original bytes intact",
+              originals == inputs.map { try? Data(contentsOf: $0) })
     }
 
     private static func searchableChecks(dir: URL, jpeg: URL, reading: String) async {

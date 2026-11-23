@@ -11,13 +11,21 @@ extension OCRProcessor {
         try? ProcessorCatalogueRun.load(from: pendingCatalogueURL)
     }
 
-    func beginCatalogueRun(outputRoot: URL, sources: [URL], resuming: Bool = false) -> Bool {
+    func beginCatalogueRun(outputRoot: URL, sources: [URL], resuming: Bool = false,
+                           confirmResume: () -> Bool = { true }) -> Bool {
         catalogueDocumentFields = [:]
         catalogueFilingWarning = ""
         do {
             let lease = try ProcessorCatalogueRun.Lease(journal: Self.pendingCatalogueURL)
+            guard confirmResume() else {
+                checkForPendingBatch()
+                statusMessage = "The saved run changed before it could be resumed. Check the interrupted-run controls again."
+                return false
+            }
             if let saved = Self.savedCatalogueRun() {
-                guard resuming, saved.outputRoot.path == outputRoot.standardizedFileURL.path else {
+                let originalPaths = Set(saved.sources.map { $0.standardizedFileURL.path })
+                guard resuming, saved.files == nil, saved.outputRoot.path == outputRoot.standardizedFileURL.path,
+                      sources.allSatisfy({ originalPaths.contains($0.standardizedFileURL.path) }) else {
                     checkForPendingBatch()
                     statusMessage = "A Process Files working copy is still saved. Resume it before starting another run."
                     return false
@@ -67,6 +75,7 @@ extension OCRProcessor {
         guard var run = catalogueRun else { return [:] }
         do {
             if run.files == nil {
+                run.inputJournalDigests = try catalogueInputJournalDigests(for: run)
                 let drafts = try catalogueDrafts(run: run, organizing: organizing, preOCRed: preOCRed,
                                                  exportingImages: exportingImages, stampsUnread: stampsUnread)
                 let workingRoot = run.workingRoot
@@ -89,7 +98,15 @@ extension OCRProcessor {
     func completeCatalogueRun(_ run: ProcessorCatalogueRun) async throws -> [URL: URL] {
         let unfiled = try await PDFGenerator.runWorker(priority: .utility) { try run.fileOutputs() }
         try Task.checkCancellation()
+        try retireCatalogueInputJournals(for: run)
         try FileManager.default.removeItem(at: Self.pendingCatalogueURL)
+        activePendingRun = nil
+        activePendingBatch = nil
+        activePendingMixedPDF = nil
+        pendingRunInfo = nil
+        pendingRunBackend = nil
+        pendingBatchInfo = nil
+        pendingMixedPDFInfo = nil
         let files = run.files ?? []
         let moves = Dictionary(uniqueKeysWithValues: files.map { ($0.workingPDF, $0.destination) })
         for file in files {
@@ -102,19 +119,55 @@ extension OCRProcessor {
         return moves
     }
 
+    nonisolated static func catalogueWorkingRun(outputRoot: URL, sources: [URL]) -> ProcessorCatalogueRun? {
+        guard let run = savedCatalogueRun(), run.outputRoot.path == outputRoot.standardizedFileURL.path else { return nil }
+        let originals = Set(run.sources.map { $0.standardizedFileURL.path })
+        return sources.allSatisfy { originals.contains($0.standardizedFileURL.path) } ? run : nil
+    }
+
+    nonisolated static func workingOutputOccupied(_ url: URL) -> Bool {
+        FileManager.default.fileExists(atPath: url.path)
+            || (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil
+    }
+
+    /// Older interrupted runs can still supply derived bytes. Keep their files where they were,
+    /// and associate a new private working copy before tagging or replacing anything.
+    func catalogueResumeOutput(_ previous: URL, for source: URL, in outputRoot: URL) -> URL {
+        guard let run = catalogueRun, !run.contains(previous) else { return previous }
+        let filename = previous.deletingPathExtension().lastPathComponent
+        let working = uniqueOutputURL(baseName: filename, ext: "pdf", in: outputRoot, for: source)
+        if !OutputFileSafety.isSameFile(previous, source), !OutputFileSafety.hasCatalogueIdentity(at: previous) {
+            do {
+                try run.copyPreOCRSource(previous, to: working)
+                guard let copied = PDFDocument(url: working), copied.pageCount > 0 else {
+                    try FileManager.default.removeItem(at: working)
+                    return working
+                }
+            } catch {
+                NSLog("[ArchiveProcessor] Saved working PDF copy could not be restored: %@", error.localizedDescription)
+            }
+        }
+        return working
+    }
+
     private func catalogueDrafts(run: ProcessorCatalogueRun, organizing: Bool, preOCRed: Bool,
                                  exportingImages: Bool, stampsUnread: Bool) throws -> [DraftFile] {
-        let work = outputURLMap.filter { run.contains($0.value) }
+        let allowedSources = Set(run.sources)
+        let work = outputURLMap.filter { allowedSources.contains($0.key) && run.contains($0.value) }
         var sourcesByPDF: [URL: [URL]] = [:]
         for job in jobs {
             if let pdf = work[job.sourceURL] { sourcesByPDF[pdf, default: []].append(job.sourceURL) }
         }
         var seen = Set<URL>()
         let distinct = jobs.compactMap { work[$0.sourceURL] }.filter { seen.insert($0).inserted }
+        let finalSegments = segments.isEmpty && run.sources.count == jobs.count
+            ? currentSegments(files: jobs.map(\.sourceURL)) : segments
         let jobBySource = Dictionary(jobs.map { ($0.sourceURL, $0) }, uniquingKeysWith: { first, _ in first })
         var segmentBySource: [URL: Int] = [:]
-        for (index, segment) in segments.enumerated() {
-            for source in segment.pdfURLs { segmentBySource[source] = index }
+        for (index, segment) in finalSegments.enumerated() {
+            for source in segment.pdfURLs where !reOCRSourceURLs.contains(source) {
+                segmentBySource[source] = index
+            }
         }
         var planned: [URL: [OutputFileSafety.ArtifactMove]] = [:]
         if organizing && !collectionSegments.isEmpty {
@@ -132,7 +185,7 @@ extension OCRProcessor {
         var owners: [URL: (UUID, UUID)] = [:]
         for pdf in distinct {
             guard let source = sourcesByPDF[pdf]?.first, let fileID = identities[pdf]?.fileID else { continue }
-            let key = segmentBySource[source].flatMap { segments[$0].pdfURLs.first } ?? source
+            let key = segmentBySource[source].flatMap { finalSegments[$0].pdfURLs.first } ?? source
             if owners[key] == nil { owners[key] = (UUID(), fileID) }
         }
         var reserved = Set<String>()
@@ -141,19 +194,25 @@ extension OCRProcessor {
                 return nil
             }
             let segmentIndex = segmentBySource[first]
-            let segment = segmentIndex.map { segments[$0] }
+            let segment = segmentIndex.map { finalSegments[$0] }
             let key = segment?.pdfURLs.first ?? first
             guard let (documentID, ownerID) = owners[key] else { return nil }
             let tags = appliedGeneratedTags[first] ?? GeneratedTags()
             let type: ItemType? = segment?.isBox == true ? .box : segment?.isFolder == true ? .folder : nil
-            let fields = catalogueDocumentFields[first]
+            var fields = catalogueDocumentFields[first]
                 ?? ProcessorCatalogueRecord.documentFields(tags: tags, type: type, dateIsUserSet: false,
                                                            subjectsAreUserSet: false, dating: nil, itemFields: nil, entities: nil)
+            if let segment {
+                fields.itemType = type.map { .init($0.rawValue, origin: "user") }
+                if segment.isBox || segment.isFolder {
+                    fields.sentWith = nil
+                }
+            }
             let belongsToOwner = identity.fileID == ownerID
             let cover: ProcessorCatalogueRecord.DocumentReference? = belongsToOwner
                 && enclosureDateReviews[first]?.manual?.rejectedCover != true
-                ? segmentIndex.flatMap { Self.validCoverIndex(of: $0, in: segments) }
-                    .flatMap { segments[$0].pdfURLs.first }
+                ? segmentIndex.flatMap { Self.validCoverIndex(of: $0, in: finalSegments) }
+                    .flatMap { finalSegments[$0].pdfURLs.first }
                     .flatMap { owners[$0] }
                     .map { .init(documentID: $0.0, ownerFileID: $0.1) }
                 : nil
@@ -173,21 +232,42 @@ extension OCRProcessor {
             } else {
                 let json = pdf.deletingPathExtension().appendingPathExtension("json")
                 let hasJSON = FileManager.default.fileExists(atPath: json.path)
-                let desired = outputFolder(for: first, in: run.outputRoot).appendingPathComponent(pdf.lastPathComponent)
+                let desired = try catalogueOutputFolder(for: first, in: run.outputRoot)
+                    .appendingPathComponent(pdf.lastPathComponent)
                 destination = OutputFileSafety.reserveUniqueDestination(preferred: desired, reservedPaths: &reserved,
                                                                         companionExtension: hasJSON ? "json" : nil,
                                                                         reserveCatalogueCompanion: true)
-                var outputs = [URL]()
-                if hasJSON { outputs.append(json) }
-                outputs += sources.compactMap { exportedImageMap[$0] }
-                exports = outputs.filter { run.contains($0) }.map { prepared in
-                    let target = destination.deletingPathExtension().appendingPathExtension(prepared.pathExtension)
-                    return .init(prepared: prepared, destination: target)
+                let images = sources.compactMap { exportedImageMap[$0] }
+                let base = destination.deletingPathExtension()
+                var optional: [ProcessorCatalogueRun.Export] = hasJSON
+                    ? [.init(prepared: json, destination: base.appendingPathExtension("json"))] : []
+                for (index, image) in images.enumerated() {
+                    let stem = images.count == 1 ? base.lastPathComponent : "\(base.lastPathComponent)-\(index + 1)"
+                    let desiredImage = base.deletingLastPathComponent()
+                        .appendingPathComponent(stem).appendingPathExtension(image.pathExtension)
+                    let target = OutputFileSafety.reserveUniqueDestination(preferred: desiredImage, reservedPaths: &reserved)
+                    optional.append(.init(prepared: image, destination: target))
                 }
+                exports = optional
             }
             guard exports.allSatisfy({ run.contains($0.prepared) }) else { throw CocoaError(.fileWriteInvalidFileName) }
             return DraftFile(pdf: pdf, sources: sources, destination: destination, identity: identity,
                              document: document, fileFields: fileFields, exports: exports, preOCRed: preOCRed)
+        }
+    }
+
+    private func catalogueOutputFolder(for source: URL, in root: URL) throws -> URL {
+        let path = source.standardizedFileURL.path
+        guard let relative = outputSubfolders[path],
+              let components = ContainerTree.components(ofRelativePath: relative) else { return root }
+        let target = components.reduce(root) { $0.appendingPathComponent($1, isDirectory: true) }
+        do {
+            try ProcessorCatalogueFiling.prepareDirectory(target, in: root)
+            return target
+        } catch let error as POSIXError where error.code == .ENOTDIR || error.code == .ELOOP {
+            try ProcessorCatalogueFiling.prepareDirectory(root, in: root)
+            if !outputsOutsideTheirTree.contains(path) { outputsOutsideTheirTree.append(path) }
+            return root
         }
     }
 
@@ -211,6 +291,9 @@ extension OCRProcessor {
                     }
                     sourcePages.append(.init(roles: rolesForSource))
                 }
+            }
+            guard sourcePages.reduce(0, { $0 + $1.roles.count }) == pdf.pageCount else {
+                throw PDFError.sourceUnreadable(draft.pdf)
             }
             let record = ProcessorCatalogueRecord(identity: draft.identity, sourcePages: sourcePages,
                                                   document: draft.document, fileFields: draft.fileFields)

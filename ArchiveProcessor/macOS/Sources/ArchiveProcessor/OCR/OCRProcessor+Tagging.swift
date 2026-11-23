@@ -1246,6 +1246,8 @@ extension OCRProcessor {
         let gateway = currentGateway
         let localAgent = currentLocalAgent
         let maxConcurrent = min(6, total)
+        let wantsCatalogueFacts = catalogueRun != nil && activeRunHistory?.preOCRedInput != true
+        let wantsNameAndFieldReads = enableSegmentJSON || wantsCatalogueFacts
         // W46.ent-feature: what the names policy reads that is known before a tagging reply gives its `format`.
         let entityBase: [EntityRunPolicy.Inputs] = snapshot.map {
             entityInputs(for: $0, runConfig: runConfig, provider: provider, model: model, gateway: gateway,
@@ -1257,7 +1259,7 @@ extension OCRProcessor {
         // an in-place input PDF whose existing text layer could be ABBYY.
         let localNameEligible = snapshot.indices.map { i in
             let segment = snapshot[i]
-            guard activeRunHistory?.preOCRedInput != true, enableSegmentJSON,
+            guard activeRunHistory?.preOCRedInput != true, wantsNameAndFieldReads,
                   entityBase[i].lowConfidenceNames, !segment.isBox, !segment.isFolder,
                   let source = segment.pdfURLs.first, let output = outputURLMap[source] else { return false }
             return !OutputFileSafety.isSameFile(output, source) && FileManager.default.fileExists(atPath: output.path)
@@ -1279,7 +1281,7 @@ extension OCRProcessor {
             datingInputs[i] == nil ? nil : confirmedFolderDate(for: snapshot[i], runsByFolder: &runsByFolder)
         }
         let itemFieldRoute = ItemFieldPolicy.route(gateway: gateway, localAgent: localAgent,
-                                                   sidecars: enableSegmentJSON,
+                                                   sidecars: wantsNameAndFieldReads,
                                                    macEnabled: runConfig?.macItemFields ?? true)
         let itemFieldInputs = snapshot.map { segment in
             itemFieldRoute.flatMap { route in
@@ -1335,8 +1337,7 @@ extension OCRProcessor {
             }
             var inputs = entityBase[i]
             inputs.format = tags.format
-            // The sidecar is the names' only output, so with sidecars off the call would be spent for nothing.
-            guard enableSegmentJSON, !Task.isCancelled, case .run(let run) = EntityRunPolicy.decide(inputs),
+            guard wantsNameAndFieldReads, !Task.isCancelled, case .run(let run) = EntityRunPolicy.decide(inputs),
                   run.localMode == nil || (localNameEligible[i]
                       && !snapshot[i].combinedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) else {
                 return (i, tags, nil, dating, fields)
@@ -1702,7 +1703,8 @@ extension OCRProcessor {
             let coverTags = coverSource.flatMap { appliedGeneratedTags[$0] }
             for source in seg.pdfURLs {
                 guard let j = jobIndexBySource[source], !jobs[j].appliedTags.isEmpty,
-                      let outputURL = outputURLMap[source] else { continue }
+                      let outputURL = outputURLMap[source],
+                      !OutputFileSafety.hasCatalogueIdentity(at: outputURL) else { continue }
                 var review = enclosureDateReviews[source]
                 let coverName = review?.manual?.rejectedCover == true ? nil : coverSource?.lastPathComponent
                 let cover = coverName == nil ? nil : coverTags
@@ -1744,11 +1746,20 @@ extension OCRProcessor {
                     jobs[j].appliedTags = updated
                 }
                 if appliedGeneratedTags[source] != nil { appliedGeneratedTags[source] = tags }
+                if catalogueRunLease != nil, var fields = catalogueDocumentFields[source] {
+                    let updatedFacts = ProcessorCatalogueRecord.documentFields(
+                        tags: tags, type: nil, dateIsUserSet: false,
+                        subjectsAreUserSet: false, dating: dateChange?.after ?? review?.decision,
+                        itemFields: nil, entities: nil)
+                    fields.sentWith = updatedFacts.sentWith
+                    if dateChange != nil { fields.documentDate = updatedFacts.documentDate }
+                    catalogueDocumentFields[source] = fields
+                }
                 if let dateChange {
                     review?.decision = dateChange.after
                     if review?.pendingSidecarDecision == nil { review?.pendingSidecarDecision = dateChange.before }
                 }
-                if dateChange != nil || sentWithChanged,
+                if catalogueRunLease == nil, dateChange != nil || sentWithChanged,
                    let work = classificationHeaderWork(forJobAt: j, includePlaceholders: true),
                    !OutputFileSafety.isSameFile(work.outputPDF, work.source),
                    let data = try? Data(contentsOf: work.outputPDF) {
@@ -2021,16 +2032,22 @@ extension OCRProcessor {
                 // transaction copy-verifies and removes the source only after the destination is durable;
                 // any error falls into the recovery path with every component and mapping still intact.
                 if hasJSON {
-                    try OutputFileSafety.relocateArtifactSet([
-                        .init(source: originalJSONURL, destination: mergedJSONURL)
-                    ])
+                    if let catalogueRun {
+                        try catalogueRun.copyPreOCRSource(originalJSONURL, to: mergedJSONURL)
+                    } else {
+                        try OutputFileSafety.relocateArtifactSet([
+                            .init(source: originalJSONURL, destination: mergedJSONURL)
+                        ])
+                    }
                 }
 
                 // Retire component PDFs ONLY after tag transfer returned successfully. A read/write/
                 // verification failure leaves both the components and merged recovery copy in place,
                 // and the unchanged outputURLMap keeps the run retryable instead of silently losing tags.
-                for pdfURL in sourcePDFs {
-                    try? FileManager.default.removeItem(at: pdfURL)
+                if catalogueRun == nil {
+                    for pdfURL in sourcePDFs {
+                        try? FileManager.default.removeItem(at: pdfURL)
+                    }
                 }
 
                 // W23.m5 — every page of this segment is now covered by ONE merged PDF, and the tag

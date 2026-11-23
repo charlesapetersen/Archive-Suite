@@ -576,7 +576,9 @@ struct OCRView: View {
         .sheet(item: $fileRotationRetryTarget) { target in
             RotationRetrySheet(
                 title: "Rotate & re-run",
-                subtitle: "Re-run OCR for this file; the old output is replaced.",
+                subtitle: processor.isProcessing
+                    ? "Re-run OCR for this file before it is filed."
+                    : "Re-run OCR and file a new PDF alongside the existing output.",
                 backendDescription: processor.retryBackendDescription,
                 initialRotation: processor.jobs.indices.contains(target.jobIndex)
                     ? (processor.jobs[target.jobIndex].result?.rotationDegrees ?? 0) : 0,

@@ -43,6 +43,7 @@ struct ProcessorCatalogueRun: Codable, Sendable {
     let openedAt: Date
     let sources: [URL]
     var files: [File]?
+    var inputJournalDigests: [String: String]?
 
     private struct Envelope: Codable {
         let contents: Data
@@ -117,15 +118,21 @@ struct ProcessorCatalogueRun: Codable, Sendable {
         }
         let copy = open(working.path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
         guard copy >= 0 else { throw CocoaError(.fileWriteUnknown) }
-        defer { close(copy) }
+        var copied = false
+        defer {
+            close(copy)
+            if !copied { unlink(working.path) }
+        }
         var after = stat(), written = stat()
         guard fcopyfile(input, copy, nil, copyfile_flags_t(COPYFILE_ALL)) == 0,
               fstat(input, &after) == 0, fstat(copy, &written) == 0,
               before.st_size == after.st_size, after.st_size == written.st_size,
               before.st_ctimespec.tv_sec == after.st_ctimespec.tv_sec,
-              before.st_ctimespec.tv_nsec == after.st_ctimespec.tv_nsec else {
+              before.st_ctimespec.tv_nsec == after.st_ctimespec.tv_nsec,
+              fcntl(copy, F_FULLFSYNC) == 0 else {
             throw CocoaError(.fileWriteUnknown)
         }
+        copied = true
     }
 
     func fileOutputs() throws -> [URL] {

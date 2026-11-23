@@ -48,6 +48,10 @@ struct ProcessorCatalogueFiling: Codable, Sendable {
         return Array(path.dropFirst(base.count))
     }
 
+    static func prepareDirectory(_ folder: URL, in root: URL) throws {
+        try withDirectory(folder, in: root) { _ in }
+    }
+
     /// Create/open directories under the selected root without following links inside it.
     private static func withDirectory<T>(_ folder: URL, in root: URL, body: (Int32) throws -> T) throws -> T {
         let components = try relativeComponents(folder, in: root)

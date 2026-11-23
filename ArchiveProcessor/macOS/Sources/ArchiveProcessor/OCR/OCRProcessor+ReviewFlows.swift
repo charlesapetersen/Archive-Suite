@@ -328,6 +328,8 @@ extension OCRProcessor {
     ) {
         guard jobs.indices.contains(index),
               !reOCRSourceURLs.contains(jobs[index].sourceURL) else { return }
+        let currentOutput = outputURLMap[jobs[index].sourceURL]
+        let filed = currentOutput.map(OutputFileSafety.hasCatalogueIdentity(at:)) ?? false
         let oldClassification = Self.taggedClassification(of: jobs[index])
         jobs[index].classification = newClassification
         if let existingResult = jobs[index].result {
@@ -336,6 +338,7 @@ extension OCRProcessor {
                 rotationDegrees: existingResult.rotationDegrees
             )
         }
+        if filed { return }
         // Page 2's Classification follows the edit (W40.fix-processor-review-classification-stale).
         if rewriteHeader, oldClassification != newClassification {
             writeClassificationHeader(forJobAt: index, runConfig: runConfig)

@@ -75,7 +75,8 @@ extension OCRProcessor {
         let count = pending.originalFiles.count
         let pdfSet = Set(pending.pdfIndices)
         let outputRoot = pending.outputDirectory.standardizedFileURL.path
-        guard count > pending.pdfIndices.count, !pdfSet.isEmpty,
+        let working = catalogueWorkingRun(outputRoot: pending.outputDirectory, sources: pending.originalFiles)
+        guard count >= pending.pdfIndices.count, !pdfSet.isEmpty,
               pdfSet.count == pending.pdfIndices.count,
               pdfSet.allSatisfy({ (0..<count).contains($0) }),
               (0.01...1).contains(pending.imageScale), pending.imageScale.isFinite,
@@ -108,7 +109,7 @@ extension OCRProcessor {
                   let url = URL(fileURLWithPath: path).standardizedFileURL
                   return NSString(string: path).isAbsolutePath
                       && url.pathExtension.lowercased() == "pdf"
-                      && url.deletingLastPathComponent().path == outputRoot
+                      && (url.deletingLastPathComponent().path == outputRoot || working?.contains(url) == true)
               }),
               pending.outputDigests.keys.allSatisfy({ pending.reservedOutputPaths[$0] != nil }),
               pending.outputDigests.values.allSatisfy({ $0.count == 64 && $0.allSatisfy(\.isHexDigit) })

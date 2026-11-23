@@ -539,6 +539,7 @@ extension OCRProcessor {
         guard let pdfs else { return true }
         guard !pdfs.isEmpty, mixedInputURLs(images: images, pdfs: pdfs) != nil else { return false }
         let outputRoot = outputDirectory.standardizedFileURL.path
+        let working = catalogueWorkingRun(outputRoot: outputDirectory, sources: images + pdfs.map(\.sourceURL))
         let pdfOutputPaths = pdfs.compactMap { $0.outputURL.map(OutputFileSafety.pathKey) }
         let normalizedImagePaths = imageOutputPaths.map {
             OutputFileSafety.pathKey(URL(fileURLWithPath: $0))
@@ -551,7 +552,7 @@ extension OCRProcessor {
             guard let output = pdf.outputURL else { return true }
             let url = output.standardizedFileURL
             return url.pathExtension.lowercased() == "pdf"
-                && url.deletingLastPathComponent().path == outputRoot
+                && (url.deletingLastPathComponent().path == outputRoot || working?.contains(url) == true)
                 && url.path != pdf.sourceURL.standardizedFileURL.path
         }
     }
@@ -577,10 +578,17 @@ extension OCRProcessor {
         reOCRSourceURLs = Set((outcomes ?? []).map(\.sourceURL))
         for pdf in outcomes ?? [] {
             if let output = pdf.outputURL {
-                _takenOutputPaths.insert(OutputFileSafety.pathKey(output))
                 if FileManager.default.fileExists(atPath: output.path) {
-                    outputURLMap[pdf.sourceURL] = output
-                } else if !failedFiles.contains(pdf.sourceURL.lastPathComponent) {
+                    let working = catalogueRun.map {
+                        catalogueResumeOutput(output, for: pdf.sourceURL, in: $0.outputRoot)
+                    } ?? output
+                    if FileManager.default.fileExists(atPath: working.path) {
+                        _takenOutputPaths.insert(OutputFileSafety.pathKey(working))
+                        outputURLMap[pdf.sourceURL] = working
+                        continue
+                    }
+                }
+                if !failedFiles.contains(pdf.sourceURL.lastPathComponent) {
                     failedFiles.append(pdf.sourceURL.lastPathComponent)
                 }
             } else if !failedFiles.contains(pdf.sourceURL.lastPathComponent) {
@@ -621,13 +629,15 @@ extension OCRProcessor {
                 return key == String(index) && index >= 0 && index < run.fileURLs.count
             }
             let outputPaths = run.completedOutputPaths ?? [:]
+            let working = catalogueWorkingRun(outputRoot: run.outputDirectory, sources: run.fileURLs)
             let validOutputPaths = Set(outputPaths.keys) == Set(run.completedResults.keys)
                 && outputPaths.allSatisfy { key, path in
                 guard run.completedResults[key] != nil else { return false }
                 let url = URL(fileURLWithPath: path).standardizedFileURL
                 return NSString(string: path).isAbsolutePath
                     && url.pathExtension.lowercased() == "pdf"
-                    && url.deletingLastPathComponent().path == run.outputDirectory.standardizedFileURL.path
+                    && (url.deletingLastPathComponent().path == run.outputDirectory.standardizedFileURL.path
+                        || working?.contains(url) == true)
             }
             guard pendingRunRuntimeConfigIsValid(
                 config, fileCount: run.fileURLs.count, enableTagging: run.enableTagging,
@@ -701,11 +711,13 @@ extension OCRProcessor {
         guard resultKeysAreValid else { return false }
         let outputPaths = batch.completedOutputPaths ?? [:]
         let outputRoot = batch.outputDirectory.standardizedFileURL
+        let working = catalogueWorkingRun(outputRoot: outputRoot, sources: batch.fileURLs)
         let outputPathsAreValid = Set(outputPaths.keys) == Set(batch.completedResults.keys)
             && outputPaths.allSatisfy { key, path in
                 guard let index = Int(key), NSString(string: path).isAbsolutePath else { return false }
                 let url = URL(fileURLWithPath: path).standardizedFileURL
                 guard url.pathExtension.lowercased() == "pdf" else { return false }
+                if working?.contains(url) == true { return true }
                 let parent = url.deletingLastPathComponent()
                 // The tree writer may fall back to the output root. Otherwise the parent must be
                 // this source's exact assigned tree folder, with no link redirecting it elsewhere.
@@ -912,6 +924,50 @@ extension OCRProcessor {
     }
     private static func deletePendingRun() {
         try? FileManager.default.removeItem(at: pendingRunURL)
+    }
+
+    /// Bind the frozen plan to the exact journals it supersedes. Each has its own consistency checks.
+    func catalogueInputJournalDigests(for run: ProcessorCatalogueRun) throws -> [String: String] {
+        func sameRun(_ root: URL, _ sources: [URL]?) -> Bool {
+            root.standardizedFileURL.path == run.outputRoot.path
+                && sources?.map { $0.standardizedFileURL.path } == run.sources.map { $0.standardizedFileURL.path }
+        }
+        var digests: [String: String] = [:]
+        for url in [Self.pendingRunURL, Self.pendingBatchURL, Self.pendingMixedPDFURL] where Self.workingOutputOccupied(url) {
+            let verified: Bool
+            switch url {
+            case Self.pendingRunURL:
+                verified = Self.loadPendingRun().map {
+                    Self.pendingRunIsSelfConsistent($0)
+                        && sameRun($0.outputDirectory, Self.mixedInputURLs(images: $0.fileURLs, pdfs: $0.mixedPDFOutcomes))
+                } == true
+            case Self.pendingBatchURL:
+                verified = !batchPollInterrupted && Self.loadPendingBatch().map {
+                    Self.pendingBatchIsSelfConsistent($0) && $0.submissionComplete
+                        && sameRun($0.outputDirectory, Self.mixedInputURLs(images: $0.fileURLs, pdfs: $0.mixedPDFOutcomes))
+                } == true
+            default:
+                verified = Self.loadPendingMixedPDF().map {
+                    Self.pendingMixedPDFIsSelfConsistent($0) && sameRun($0.outputDirectory, $0.originalFiles)
+                        && $0.inFlightPage == nil && $0.completedOutcomes.count == $0.pdfIndices.count
+                        && Self.mixedPDFOutputsMatchJournal($0)
+                } == true
+            }
+            guard verified, let digest = Self.mixedPDFSourceDigest(url) else { throw CocoaError(.fileReadCorruptFile) }
+            digests[url.lastPathComponent] = digest
+        }
+        return digests
+    }
+
+    func retireCatalogueInputJournals(for run: ProcessorCatalogueRun) throws {
+        let journals = [Self.pendingRunURL, Self.pendingBatchURL, Self.pendingMixedPDFURL]
+            .filter(Self.workingOutputOccupied)
+        for journal in journals {
+            guard let expected = run.inputJournalDigests?[journal.lastPathComponent],
+                  Self.mixedPDFSourceDigest(journal) == expected else { throw CocoaError(.fileReadCorruptFile) }
+        }
+        for journal in journals { try FileManager.default.removeItem(at: journal) }
+        try ProcessorCatalogueRun.flushFileAndParent(Self.pendingCatalogueURL)
     }
 
     // MARK: - Processing history (cost + run log)
@@ -1562,16 +1618,25 @@ extension OCRProcessor {
         }
         return key
     }
+    nonisolated static func sameJournalPayload<T: Encodable>(_ lhs: T, _ rhs: T) -> Bool {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        guard let original = try? encoder.encode(lhs) else { return false }
+        return (try? encoder.encode(rhs)) == original
+    }
+
     /// Check for persisted pending batch or run on launch.
     func checkForPendingBatch() {
         if let run = Self.savedCatalogueRun(), let files = run.files {
             pendingBatchInfo = nil
+            pendingMixedPDFInfo = nil
             pendingRunInfo = "\(files.count) prepared PDF\(files.count == 1 ? "" : "s") are waiting to finish catalogue filing."
             pendingRunBackend = .appleVision
             return
         }
         if FileManager.default.fileExists(atPath: Self.pendingCatalogueURL.path),
-           Self.loadPendingRun() == nil, !FileManager.default.fileExists(atPath: Self.pendingBatchURL.path) {
+           !Self.workingOutputOccupied(Self.pendingRunURL), !Self.workingOutputOccupied(Self.pendingBatchURL),
+           !Self.workingOutputOccupied(Self.pendingMixedPDFURL) {
             pendingBatchInfo = nil
             pendingRunInfo = "Process Files kept a working copy before it could prepare the catalogue filing. Set it aside with Dismiss before starting the run again."
             pendingRunBackend = nil
@@ -1635,6 +1700,7 @@ extension OCRProcessor {
         // Prefer the validated image journal once it contains this exact completed PDF set. An empty
         // batch journal could still be waiting on its first create, so keep the mixed copy until a job
         // ID is saved. The batch journal takes priority while the create outcome is unresolved.
+        var mixedTransferred = false
         if let mixed = Self.loadPendingMixedPDF(), Self.pendingMixedPDFIsSelfConsistent(mixed),
            mixed.completedOutcomes.count == mixed.pdfIndices.count {
             let transferred: [MixedPDFOutcome]?
@@ -1650,14 +1716,13 @@ extension OCRProcessor {
             } else {
                 transferred = nil
             }
-            if let transferred,
-               let expected = try? JSONEncoder().encode(mixed.completedOutcomes),
-               let actual = try? JSONEncoder().encode(transferred), expected == actual {
+            mixedTransferred = transferred.map { Self.sameJournalPayload($0, mixed.completedOutcomes) } ?? false
+            if mixedTransferred, Self.savedCatalogueRun() == nil {
                 Self.deletePendingMixedPDF()
                 activePendingMixedPDF = nil
             }
         }
-        if !FileManager.default.fileExists(atPath: Self.pendingBatchURL.path),
+        if !mixedTransferred, !FileManager.default.fileExists(atPath: Self.pendingBatchURL.path),
            FileManager.default.fileExists(atPath: Self.pendingMixedPDFURL.path) {
             if let pending = Self.loadPendingMixedPDF(), Self.pendingMixedPDFIsSelfConsistent(pending) {
                 let completed = pending.completedOutcomes.count
@@ -1713,6 +1778,7 @@ extension OCRProcessor {
     /// the surrounding function needs a paid submission to reach, so nothing could call it before.
     /// Behaviour is unchanged — same condition, same two statements, same order.
     func retirePaidBatchJournalIfPollCompleted() {
+        guard catalogueRun == nil else { return }
         guard !batchPollInterrupted else { return }
         Self.deletePendingBatch()
         activePendingBatch = nil
@@ -1777,6 +1843,14 @@ extension OCRProcessor {
 
     private func resumeBatch(_ savedBatch: PendingBatch, apiKey: String) async {
         var pending = savedBatch
+        guard SearchableArchival.isAvailable,
+              beginCatalogueRun(outputRoot: pending.outputDirectory,
+                                sources: Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes) ?? pending.fileURLs,
+                                resuming: true, confirmResume: {
+            guard let current = Self.loadPendingBatch() else { return false }
+            return Self.sameJournalPayload(current, savedBatch)
+        }) else { return }
+        defer { catalogueRunLease = nil }
 
         // A journal can be internally valid even if an operator later removed one of its output PDFs.
         // Re-open all consumed chunks in that case, retain the still-present per-file associations, and
@@ -1857,7 +1931,14 @@ extension OCRProcessor {
                 let name = jobs[index].sourceURL.lastPathComponent
                 if !failedFiles.contains(name) { failedFiles.append(name) }
             }
-            if let outputURL = restoredOutputs[index], FileManager.default.fileExists(atPath: outputURL.path) {
+            if let previous = restoredOutputs[index], FileManager.default.fileExists(atPath: previous.path) {
+                let outputURL = catalogueResumeOutput(previous, for: jobs[index].sourceURL, in: pending.outputDirectory)
+                guard FileManager.default.fileExists(atPath: outputURL.path) else {
+                    isProcessing = false
+                    checkForPendingBatch()
+                    statusMessage = "A saved batch output could not be copied to working storage. The batch record is preserved."
+                    return
+                }
                 outputURLMap[jobs[index].sourceURL] = outputURL
                 _takenOutputPaths.insert(outputURL.standardizedFileURL.path.lowercased())
             }
@@ -1868,6 +1949,7 @@ extension OCRProcessor {
         // History snapshot for the resumed batch (see RunHistorySnapshot.init(resuming batch:…)).
         activeRunHistory = RunHistorySnapshot(
             resuming: pending, rotationMode: runConfig.rotationMode, imageScale: runConfig.imageScale)
+        activeRunHistory?.sidecars = true
 
         beginMonthlySpend(outputDirectory: pending.outputDirectory)
         if monthlySpend != nil, let history = activeRunHistory, history.ledgerRunID != nil {
@@ -2018,35 +2100,18 @@ extension OCRProcessor {
 
         guard !Task.isCancelled else { return }
 
-        // Organize into collection folders (after merge so merged PDFs get moved)
-        var organizedMoves: [URL: URL] = [:]
-        if pending.enableCollectionSegmentation && !collectionSegments.isEmpty {
-            let segmenter = CollectionSegmenter()
-            statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
-            do {
-                organizedMoves = try segmenter.organizeOutput(
-                    collections: collectionsOutsideTrees,
-                    outputDirectory: pending.outputDirectory,
-                    outputURLMap: outputURLMapOutsideTrees,
-                    moveSiblingImages: runOutputSettings.exportOriginals,
-                    exportedImageMap: exportedImageMap
-                )
-                statusMessage = "Collections organized into \(collectionSegments.count) folders."
-            } catch {
-                statusMessage = "Error organizing collections: \(error.localizedDescription)"
-            }
-        }
-
         cleanupTempFiles()
 
-        guard !Task.isCancelled else { return }
-        let containerProblem = await recordContainerLabels(   // W47.ct-processor-capture
-            moves: organizedMoves, outputDirectory: pending.outputDirectory, preOCRedInput: false)   // a batch run never has pre-OCRed input
         guard !Task.isCancelled else { return }
         restoreMixedPDFJobs(pending.mixedPDFOutcomes)
         restoredFullJobs = true
         progressRange = nil
-        if activePendingBatch != nil { retirePaidBatchJournalIfPollCompleted() }
+        guard let organizedMoves = await finishCatalogueRun(organizing: pending.enableCollectionSegmentation, preOCRed: false,
+                                                        exportingImages: runOutputSettings.exportOriginals,
+                                                        stampsUnread: runOutputSettings.stampUnread) else { return }
+        let containerProblem = await recordContainerLabels(   // W47.ct-processor-capture
+            moves: organizedMoves, outputDirectory: pending.outputDirectory, preOCRedInput: false)   // a batch run never has pre-OCRed input
+        guard !Task.isCancelled else { return }
         writeLogFile(outputDirectory: pending.outputDirectory)
         isProcessing = false
         progress = 1.0
@@ -2058,6 +2123,7 @@ extension OCRProcessor {
         // there and looks processed, but tag search will not find it / the scan is missing.
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
         statusMessage += treeFallbackSuffix   // W47.ct-processor-intake
+        statusMessage += catalogueFilingWarning
         if let note = containerLabelSpendNote { statusMessage += " " + note }   // W47.ct-label-cost
         if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
         if pending.enableTagging && !passSourceTags {
@@ -2131,6 +2197,14 @@ extension OCRProcessor {
             return
         }
         institutionalComputeResumePrompt = nil
+        guard SearchableArchival.isAvailable,
+              beginCatalogueRun(outputRoot: pending.outputDirectory,
+                                sources: Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes) ?? pending.fileURLs,
+                                resuming: true, confirmResume: {
+            guard let current = Self.loadPendingRun() else { return false }
+            return Self.sameJournalPayload(current, pending)
+        }) else { return }
+        defer { catalogueRunLease = nil }
 
         isProcessing = true
         pendingRunInfo = nil
@@ -2198,6 +2272,7 @@ extension OCRProcessor {
             resuming: pending, taggingMode: taggingMode, rotationMode: rotationMode,
             imageScale: resumeImageScale,
             imageTokenProvider: resumeGatewayUpstream)
+        activeRunHistory?.sidecars = pending.enableSegmentJSON || !pending.preOCRedInput
 
         beginMonthlySpend(outputDirectory: pending.outputDirectory, pricedImages: pending.completedResults.count)
         let pricedModel = activeRunHistory?.visionTextModel ?? pending.model
@@ -2243,8 +2318,9 @@ extension OCRProcessor {
                 alreadyTaken: _takenOutputPaths)
             for (key, result) in pending.completedResults.sorted(by: { (Int($0.key) ?? 0) < (Int($1.key) ?? 0) }) {
                 guard let index = Int(key), index < jobs.count, index < imageURLs.count,
-                      let outputURL = resolvedOutputs[index] else { continue }
+                      let previous = resolvedOutputs[index] else { continue }
                 let sourceURL = jobs[index].sourceURL
+                let outputURL = catalogueResumeOutput(previous, for: sourceURL, in: pending.outputDirectory)
                 restores.append((index, result, sourceURL, outputURL))
                 if !fm.fileExists(atPath: outputURL.path) {
                     toGenerate.append((imageURLs[index], outputURL, sourceURL.lastPathComponent, result))
@@ -2349,8 +2425,10 @@ extension OCRProcessor {
                 )
                 // Pre-OCRed path handles its own post-processing; skip to finalization
                 guard !Task.isCancelled, isProcessing else { return }
+                guard await finishCatalogueRun(organizing: pending.enableCollectionSegmentation, preOCRed: true,
+                                               exportingImages: false,
+                                               stampsUnread: runOutputSettings.stampUnread) != nil else { return }
                 activePendingRun = nil
-                Self.deletePendingRun()
                 pendingRunInfo = nil
                 writeLogFile(outputDirectory: pending.outputDirectory)
                 isProcessing = false
@@ -2494,39 +2572,20 @@ extension OCRProcessor {
 
         guard !Task.isCancelled else { return }
 
-        // Organize into collection folders (after merge so merged PDFs get moved)
-        var organizedMoves: [URL: URL] = [:]
-        if pending.enableCollectionSegmentation && !collectionSegments.isEmpty {
-            let segmenter = CollectionSegmenter()
-            statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
-            do {
-                organizedMoves = try segmenter.organizeOutput(
-                    collections: collectionsOutsideTrees,
-                    outputDirectory: pending.outputDirectory,
-                    outputURLMap: outputURLMapOutsideTrees,
-                    moveSiblingImages: runOutputSettings.exportOriginals,
-                    exportedImageMap: exportedImageMap
-                )
-                statusMessage = "Collections organized into \(collectionSegments.count) folders."
-            } catch {
-                statusMessage = "Error organizing collections: \(error.localizedDescription)"
-            }
-        }
-
         cleanupTempFiles()
 
         guard !Task.isCancelled else { return }
+        restoreMixedPDFJobs(pending.mixedPDFOutcomes)
+        restoredFullJobs = true
+        progressRange = nil
+        guard let organizedMoves = await finishCatalogueRun(organizing: pending.enableCollectionSegmentation,
+                                                        preOCRed: pending.preOCRedInput,
+                                                        exportingImages: runOutputSettings.exportOriginals,
+                                                        stampsUnread: runOutputSettings.stampUnread) else { return }
         let containerProblem = await recordContainerLabels(   // W47.ct-processor-capture
             moves: organizedMoves, outputDirectory: pending.outputDirectory, preOCRedInput: pending.preOCRedInput)
         guard !Task.isCancelled else { return }
 
-        activePendingRun = nil
-        Self.deletePendingRun()
-        pendingRunInfo = nil
-
-        restoreMixedPDFJobs(pending.mixedPDFOutcomes)
-        restoredFullJobs = true
-        progressRange = nil
         writeLogFile(outputDirectory: pending.outputDirectory)
         isProcessing = false
         progress = 1.0
@@ -2538,6 +2597,7 @@ extension OCRProcessor {
         // there and looks processed, but tag search will not find it / the scan is missing.
         statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
         statusMessage += treeFallbackSuffix   // W47.ct-processor-intake
+        statusMessage += catalogueFilingWarning
         if let note = containerLabelSpendNote { statusMessage += " " + note }   // W47.ct-label-cost
         if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
         if pending.enableTagging && !passSourceTags {
@@ -3409,7 +3469,7 @@ extension OCRProcessor {
             && !enableCollectionSegmentation && !mergeDocuments {
             let decision = Self.incrementalPartition(files, outputDirectory: outputDirectory,
                                                      subfolders: preOCRedInput ? [:] : plannedSubfolders,
-                                                     requiresCatalogue: preOCRedInput)
+                                                     requiresCatalogue: true)
             incrementalSkipped = decision.skipped.count
             files = decision.toProcess
             guard !files.isEmpty else {
@@ -3456,19 +3516,15 @@ extension OCRProcessor {
             }
         }
 
-        if preOCRedInput {
-            guard SearchableArchival.isAvailable else {
-                statusMessage = "Pre-OCR processing needs the PDF preparation tool. The original PDFs are intact."
-                return
-            }
-            guard beginCatalogueRun(outputRoot: outputDirectory, sources: files) else { return }
-        }
-        defer { if preOCRedInput { catalogueRunLease = nil } }
-        if !preOCRedInput, FileManager.default.fileExists(atPath: Self.pendingCatalogueURL.path) {
-            checkForPendingBatch()
-            statusMessage = "A Process Files working copy is still saved. Resume it or set it aside before starting another run."
+        guard SearchableArchival.isAvailable else {
+            statusMessage = "Process Files needs the PDF preparation tool. The original files are intact."
             return
         }
+        guard beginCatalogueRun(outputRoot: outputDirectory, sources: files, resuming: resumingMixedPDF != nil, confirmResume: {
+            guard let resumingMixedPDF else { return true }
+            return Self.loadPendingMixedPDF()?.integrity == resumingMixedPDF.integrity
+        }) else { return }
+        defer { catalogueRunLease = nil }
         isProcessing = true
         failedFiles = []
         clearOutputWarnings()
@@ -3559,13 +3615,13 @@ extension OCRProcessor {
                 && segmentationContext.customPrompt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
             gateway: gatewayConfig, localAgent: localAgent, outputDirectory: outputDirectory, frozen: frozen.values)
         if let resumingMixedPDF {
-            guard mixedReOCR && pdfIndices == resumingMixedPDF.pdfIndices else {
+            guard autoReOCR && pdfIndices == resumingMixedPDF.pdfIndices else {
                 isProcessing = false
                 statusMessage = "The PDF inputs changed since the recovery record was saved. No paid request was sent."
                 checkForPendingBatch()
                 return
             }
-        } else if mixedReOCR {
+        } else if autoReOCR {
             guard beginMixedPDFJournal(
                 originalFiles: files, pdfIndices: pdfIndices, outputDirectory: outputDirectory,
                 provider: provider, model: model, thinkingLevel: thinkingLevel,
@@ -3630,7 +3686,7 @@ extension OCRProcessor {
         activeRunHistory?.ledgerRunID = frozen.runID
         activeRunHistory?.dateImageEveryDocument = frozen.values[SettingsKey.dateImageEveryDocument.rawValue]?
             .value.bool ?? false
-        activeRunHistory?.sidecars = enableSegmentJSON
+        activeRunHistory?.sidecars = enableSegmentJSON || !preOCRedInput
         activeRunHistory?.classifyPreOCRedInput = (enableTagging && !passSourceTags) || enableCollectionSegmentation
         activeRunHistory?.setNamesEstimate(taggingMode: taggingMode) { frozen.values[$0.rawValue]?.value }
         activeRunHistory?.outputDirectory = outputDirectory
@@ -3836,7 +3892,7 @@ extension OCRProcessor {
                     }
                     recordActiveRunInCollection(kind: "processFiles")
                     if activePendingMixedPDF != nil {
-                        Self.deletePendingMixedPDF()
+                        if catalogueRun == nil { Self.deletePendingMixedPDF() }
                         activePendingMixedPDF = nil
                         pendingMixedPDFInfo = nil
                     }
@@ -4008,32 +4064,10 @@ extension OCRProcessor {
 
                 guard !Task.isCancelled else { return }
 
-                // Phase 5: Organize into collection folders (after merge so merged PDFs get moved)
-                if enableCollectionSegmentation && !collectionSegments.isEmpty {
-                    let segmenter2 = CollectionSegmenter()
-                    statusMessage = "Organizing \(collectionSegments.count) collections into folders…"
-                    do {
-                        organizedMoves = try segmenter2.organizeOutput(
-                            collections: collectionsOutsideTrees,
-                            outputDirectory: outputDirectory,
-                            outputURLMap: outputURLMapOutsideTrees,
-                            moveSiblingImages: runOutputSettings.exportOriginals,
-                            exportedImageMap: exportedImageMap
-                        )
-                        statusMessage = "Collections organized into \(collectionSegments.count) folders."
-                    } catch {
-                        statusMessage = "Error organizing collections: \(error.localizedDescription)"
-                    }
-                }
-
                 cleanupTempFiles()
             }
 
             guard !Task.isCancelled else { return }
-            let containerProblem = await recordContainerLabels(   // W47.ct-processor-capture
-                moves: organizedMoves, outputDirectory: outputDirectory, preOCRedInput: preOCRedInput)
-            guard !Task.isCancelled else { return }
-
             if editingImageSubset, let fullJobsAfterPDF {
                 var restored = fullJobsAfterPDF
                 for (subsetIndex, originalIndex) in imageIndices.enumerated() {
@@ -4043,13 +4077,16 @@ extension OCRProcessor {
                 editingImageSubset = false
                 progressRange = nil
             }
+            if !preOCRedInput {
+                guard let filed = await finishCatalogueRun(organizing: enableCollectionSegmentation, preOCRed: false,
+                                                            exportingImages: runOutputSettings.exportOriginals,
+                                                            stampsUnread: runOutputSettings.stampUnread) else { return }
+                organizedMoves = filed
+            }
+            let containerProblem = await recordContainerLabels(   // W47.ct-processor-capture
+                moves: organizedMoves, outputDirectory: outputDirectory, preOCRedInput: preOCRedInput)
+            guard !Task.isCancelled else { return }
 
-            // Clear pending run on successful completion
-            activePendingRun = nil
-            Self.deletePendingRun()
-            pendingRunInfo = nil
-
-            if activePendingBatch != nil { retirePaidBatchJournalIfPollCompleted() }
             writeLogFile(outputDirectory: outputDirectory)
             isProcessing = false
             progress = 1.0   // fill the bar on completion (later phases don't drive the 0.7→1.0 band)
@@ -4184,8 +4221,30 @@ extension OCRProcessor {
             return false
         }
         let denyDataCollection = OpenRouterDataPolicy.deny(activeResolvedSettings?.values)
-        return await OpenRouterDataPolicy.$denyDataCollection.withValue(denyDataCollection) {
-            let ocrURL = imageURL ?? jobs[index].sourceURL
+        let standalone = catalogueRunLease == nil
+        let source = jobs[index].sourceURL
+        let previousOutput = outputURLMap[source]
+        if standalone {
+            guard !isProcessing else { return false }
+            guard SearchableArchival.isAvailable else {
+                statusMessage = "Retry needs the PDF preparation tool. The existing files are intact."
+                return false
+            }
+            guard beginCatalogueRun(outputRoot: outputDirectory, sources: [source]) else { return false }
+            isProcessing = true
+        }
+        defer {
+            if standalone {
+                catalogueRunLease = nil
+                isProcessing = false
+                checkForPendingBatch()
+            }
+        }
+        let succeeded = await OpenRouterDataPolicy.$denyDataCollection.withValue(denyDataCollection) {
+            let ocrURL = imageURL ?? PDFToImageConverter.imageURL(for: source)
+            defer {
+                if imageURL == nil, ocrURL != source { try? FileManager.default.removeItem(at: ocrURL) }
+            }
             guard reserveMonthlyImage(ocrURL, runConfig: effectiveRunConfig, retry: true) else { return false }
             let previousStatus = jobs[index].status
             jobs[index].status = .processing
@@ -4236,6 +4295,19 @@ extension OCRProcessor {
                 outputDirectory: outputDirectory, runConfig: effectiveRunConfig)
             return persisted && result.text != nil
         }
+        guard standalone else { return succeeded }
+        guard !Task.isCancelled, isProcessing else {
+            outputURLMap[source] = previousOutput
+            return false
+        }
+        let stampsUnread = lateRunOutputSettings(for: effectiveRunConfig).stampUnread
+        guard await finishCatalogueRun(organizing: false, preOCRed: false, exportingImages: false,
+                                       stampsUnread: stampsUnread) != nil else {
+            outputURLMap[source] = previousOutput
+            return false
+        }
+        statusMessage = (succeeded ? "Retry filed a new PDF." : "Retry did not return OCR text.") + catalogueFilingWarning
+        return succeeded
     }
     /// Resolve the stage once for the run. A resume honours both the original policy and any tighter current policy.
     private static func makePostCorrection(

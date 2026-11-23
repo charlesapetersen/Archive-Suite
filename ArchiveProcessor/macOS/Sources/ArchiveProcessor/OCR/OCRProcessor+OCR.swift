@@ -359,7 +359,25 @@ extension OCRProcessor {
                 jobs[index].classification = saved.result.classification
                 jobs[index].status = saved.succeeded ? .succeeded : .failed
                 jobs[index].pdfLayerLogNotes = saved.pdfLayerLogNotes
-                if let output = saved.outputURL {
+                if let previous = saved.outputURL {
+                    let output = catalogueResumeOutput(previous, for: pdfURL, in: outputDirectory)
+                    if output != previous {
+                        let key = String(index)
+                        guard Self.mixedPDFSourceDigest(output) == activePendingMixedPDF?.outputDigests[key],
+                              persistMixedPDFMutation({ pending in
+                                  pending.reservedOutputPaths[key] = output.path
+                                  let revised = MixedPDFOutcome(originalIndex: index, sourceURL: pdfURL, result: saved.result,
+                                                                succeeded: true, outputURL: output,
+                                                                pdfLayerLogNotes: saved.pdfLayerLogNotes)
+                                  pending.completedOutcomes.removeAll { $0.originalIndex == index }
+                                  pending.completedOutcomes.append(revised)
+                              }) else {
+                            jobs[index].status = .processing
+                            statusMessage = "A saved rebuilt PDF could not be verified in working storage. Its recovery record is kept."
+                            cleanupTempFiles()
+                            return
+                        }
+                    }
                     outputURLMap[pdfURL] = output
                     _takenOutputPaths.insert(OutputFileSafety.pathKey(output))
                 } else if !failedFiles.contains(pdfURL.lastPathComponent) {
@@ -498,14 +516,16 @@ extension OCRProcessor {
             //    the input PDF or another output from this run.
             let baseName = pdfURL.deletingPathExtension().lastPathComponent
             let outputURL: URL
-            if let reserved = activePendingMixedPDF?.reservedOutputPaths[String(index)] {
-                outputURL = URL(fileURLWithPath: reserved)
+            let reserved = activePendingMixedPDF?.reservedOutputPaths[String(index)].map { URL(fileURLWithPath: $0) }
+            let reservedOccupied = reserved.map(Self.workingOutputOccupied) ?? false
+            if let reserved, reservedOccupied, catalogueRun?.contains(reserved) != true {
+                statusMessage = "A PDF output exists at the reserved path, but its completion was not recorded. Review it before resuming."
+                for u in pageImages { try? FileManager.default.removeItem(at: u) }
+                cleanupTempFiles(); return
+            }
+            if let reserved, !reservedOccupied, catalogueRun?.contains(reserved) != false {
+                outputURL = reserved
                 _takenOutputPaths.insert(OutputFileSafety.pathKey(outputURL))
-                if FileManager.default.fileExists(atPath: outputURL.path) {
-                    statusMessage = "A PDF output exists at the reserved path, but its completion was not recorded. Review it before resuming."
-                    for u in pageImages { try? FileManager.default.removeItem(at: u) }
-                    cleanupTempFiles(); return
-                }
             } else {
                 outputURL = uniqueOutputURL(baseName: baseName, ext: "pdf", in: outputDirectory, for: pdfURL)
                 if activePendingMixedPDF != nil &&
@@ -514,7 +534,7 @@ extension OCRProcessor {
                     cleanupTempFiles(); return
                 }
             }
-            if FileManager.default.fileExists(atPath: outputURL.path) {
+            if Self.workingOutputOccupied(outputURL) {
                 statusMessage = "The reserved PDF destination is now occupied. The saved page results were kept; review the path before resuming."
                 for u in pageImages { try? FileManager.default.removeItem(at: u) }
                 cleanupTempFiles(); return
@@ -972,7 +992,7 @@ extension OCRProcessor {
             return
         }
         if activePendingMixedPDF != nil {
-            Self.deletePendingMixedPDF()
+            if catalogueRun == nil { Self.deletePendingMixedPDF() }
             activePendingMixedPDF = nil
             pendingMixedPDFInfo = nil
         }

@@ -358,8 +358,9 @@ class CollectionSegmenter {
                 if moveSiblingImages {
                     let pageSources = pdfToSources[pdfURL] ?? []
                     if pageSources.count > 1 {
-                        let pageImages = try pageSources.map { source -> URL in
+                        let pageImages = try pageSources.map { source -> URL? in
                             guard let image = exportedImageMap[source], fm.fileExists(atPath: image.path) else {
+                                if planMoves != nil { return nil }
                                 throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey:
                                     exportedImageMap[source]?.path ?? source.path])
                             }
@@ -376,6 +377,7 @@ class CollectionSegmenter {
                         while true {
                             var taken = false
                             for (offset, image) in pageImages.enumerated() {
+                                guard let image else { continue }
                                 let number = firstNumber + offset
                                 let base = "\(CollectionNumbering.format(number)) \(collection.collectionName)"
                                 let ext = image.pathExtension.isEmpty ? "jpg" : image.pathExtension
@@ -392,7 +394,8 @@ class CollectionSegmenter {
                             firstNumber += 1
                         }
 
-                        var artifactMoves: [OutputFileSafety.ArtifactMove] = pageImages.enumerated().map { offset, image in
+                        var artifactMoves: [OutputFileSafety.ArtifactMove] = pageImages.enumerated().compactMap { offset, image in
+                            guard let image else { return nil }
                             let number = firstNumber + offset
                             let base = "\(CollectionNumbering.format(number)) \(collection.collectionName)"
                             let ext = image.pathExtension.isEmpty ? "jpg" : image.pathExtension
@@ -421,10 +424,10 @@ class CollectionSegmenter {
                 var imageURL: URL?
                 if moveSiblingImages {
                     if let tracked = exportedImageMap[sourceURL] {
-                        guard fm.fileExists(atPath: tracked.path) else {
+                        if fm.fileExists(atPath: tracked.path) { imageURL = tracked }
+                        else if planMoves == nil {
                             throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: tracked.path])
                         }
-                        imageURL = tracked
                     } else {
                         let imgBase = pdfURL.deletingPathExtension().lastPathComponent
                         imageURL = ImageEncoding.acceptedImageExtensions.lazy
