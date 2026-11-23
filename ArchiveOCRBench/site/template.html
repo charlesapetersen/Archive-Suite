@@ -558,6 +558,12 @@ footer p { font-size: 13px; }
     <div class="head"><h2 id="container-labels-heading">Reading archive labels with Gemma on a Mac</h2><span class="meta">Gemma 3 12B, 4-bit MLX · $0</span></div>
     <p class="note">Accuracy is the share of eligible label fields that matched the reference. Gaps are in percentage points, paired on the same photos. The held-out run used the Processor’s 1,600 px JPEG encoder. The 60-photo pilot used Pillow to approximate the encoding.</p>
     <div class="tbl"><table><thead><tr><th scope="col">Cohort</th><th scope="col">Field</th><th scope="col">Eligible cells</th><th scope="col">Gemma through the server</th><th scope="col">Gemma in-process</th><th scope="col">Vision + parser</th><th scope="col">Server less in-process (95% interval)</th><th scope="col">Server less Vision (95% interval)</th></tr></thead><tbody id="container-labels-rows"></tbody></table></div>
+    <details id="container-number-controls" hidden>
+      <summary>JPEG and message-order controls for collection number</summary>
+      <p class="note">All 60 held-out photos with a number and 15 sampled blanks. Each comparison changes either the JPEG the server saw or the position of the image relative to the text prompt. The app JPEG/image-first row comes from the held-out run.</p>
+      <div class="tbl"><table><thead><tr><th scope="col">JPEG</th><th scope="col">Chat content order</th><th scope="col">Correct where present</th><th scope="col">Filled where absent</th><th scope="col">Unparsed replies</th></tr></thead><tbody id="container-number-control-rows"></tbody></table></div>
+      <div class="tbl"><table><thead><tr><th scope="col">Change on the 60 photos with a number</th><th scope="col">Gap in points (95% paired interval)</th></tr></thead><tbody id="container-number-contrast-rows"></tbody></table></div>
+    </details>
     <p class="note">The reference comes from owner answers, rules and cases where three readers agreed, including Google’s Gemini 3.7 Flash. The scope is the external mlx-vlm route. Source and measurement card <code>ArchiveProcessor/segbench-results/ct-gemma-route-fields.md</code>.</p>
   </section>
 
@@ -1628,12 +1634,21 @@ if (DU) {
 
 const labelResults = DATA.container_labels;
 if (labelResults) {
-  const body = document.getElementById('container-labels-rows');
-  for (const [name, rows] of [['135 held out', labelResults.held_out], ['60 pilot', labelResults.pilot]]) {
+  const renderLabelRows = (id, rows) => {
+    const body = document.getElementById(id);
     for (const row of rows) {
       const tr = body.insertRow();
-      for (const value of [name, ...row]) tr.insertCell().textContent = value;
+      for (const value of row) tr.insertCell().textContent = value;
     }
+  };
+  renderLabelRows('container-labels-rows', [
+    ...labelResults.held_out.map(row => ['135 held out', ...row]),
+    ...labelResults.pilot.map(row => ['60 pilot', ...row]),
+  ]);
+  if (labelResults.number_controls) {
+    renderLabelRows('container-number-control-rows', labelResults.number_controls);
+    renderLabelRows('container-number-contrast-rows', labelResults.number_contrasts);
+    document.getElementById('container-number-controls').hidden = false;
   }
   document.getElementById('container-labels').hidden = false;
 }

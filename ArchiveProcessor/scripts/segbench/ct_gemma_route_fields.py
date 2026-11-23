@@ -351,11 +351,82 @@ def interpretation(holdout, pairs):
             "This models field precedence with the benchmark parser. Folder proposals omit collection number.", ""]
 
 
+def diagnostic_report(holdout, diagnosis):
+    indices, repeats = diagnostic_selection(holdout)
+    if not diagnosis:
+        return []
+    if len(diagnosis) != len(indices):
+        raise RuntimeError("Complete the paired controls before reporting them")
+
+    present, absent, present_boxes = [], [], []
+    repeat_matches = repeat_present = 0
+    for index, outcomes in zip(indices, diagnosis, strict=True):
+        photo = holdout[index]
+        cell = photo["cells"][NUMBER]
+        if index in repeats:
+            repeat = outcomes["app_image_first"]
+            repeat_matches += (repeat["right"], repeat["filled"]) == (cell["right"][0], cell["filled"][0])
+            repeat_present += cell["truth_filled"]
+        app = {"right": cell["right"][0], "filled": cell["filled"][0], "parsed": photo["parsed"]}
+        evidence = {**outcomes, "app_image_first": app, "in_process": {"right": cell["right"][1]}}
+        (present if cell["truth_filled"] else absent).append(evidence)
+        if cell["truth_filled"] and not photo["folder"]:
+            present_boxes.append((evidence, cell["right"][2]))
+
+    arms = (("App JPEG", "Image first", "app_image_first"),
+            ("App JPEG", "Text first", "app_text_first"),
+            ("Source JPEG", "Image first", "source_image_first"),
+            ("Source JPEG", "Text first", "source_text_first"))
+    accuracy = [[jpeg, order, f"{sum(c[k]['right'] for c in present)}/{len(present)}",
+                 f"{sum(c[k]['filled'] for c in absent)}/{len(absent)}",
+                 f"{sum(not c[k]['parsed'] for c in present + absent)}/{len(indices)}"]
+                for jpeg, order, k in arms]
+    contrasts = (("Text first less image first, app JPEG", "app_text_first", "app_image_first"),
+                 ("Text first less image first, source JPEG", "source_text_first", "source_image_first"),
+                 ("Source less app JPEG, image first", "source_image_first", "app_image_first"),
+                 ("Source JPEG/text first less app JPEG/image first", "source_text_first", "app_image_first"),
+                 ("Source less app JPEG, text first", "source_text_first", "app_text_first"),
+                 ("Server source JPEG/text first less frozen in-process", "source_text_first", "in_process"))
+    contrast_rows = [[name, gap_text(paired_interval([(c[a]["right"], c[b]["right"]) for c in present], 0, 1))]
+                     for name, a, b in contrasts]
+    interaction = [(c["source_text_first"]["right"] + c["app_image_first"]["right"],
+                    c["source_image_first"]["right"] + c["app_text_first"]["right"]) for c in present]
+    contrast_rows.insert(5, ["Text-first gain on source less its gain on app JPEG",
+                             gap_text(paired_interval(interaction, 0, 1))])
+    box_counts = [sum(row[key]["right"] if row[key]["filled"] else parser for row, parser in present_boxes)
+                  for key in ("app_image_first", "source_text_first")]
+    return [
+        "## Collection-number controls", "",
+        "All 60 eligible held-out photos with a collection number and a seeded draw of 15 of the 74 eligible "
+        "blanks. The same mlx-vlm server received either the app JPEG or the source benchmark JPEG, and the "
+        "same image and prompt in either order. Text first puts the image token after the prompt, as in the "
+        "in-process benchmark. The other request settings were fixed. Variant order was shuffled within each photo.", "",
+        *table(("JPEG", "Chat content order", "Correct where present", "Filled where absent", "Unparsed replies"), accuracy), "",
+        "The app JPEG/image-first row comes from the held-out run. On the 12 same-setting repeats "
+        f"({repeat_present} with a number), "
+        f"the number correctness and value-presence flags agreed with the held-out reads on {repeat_matches}/12. "
+        "The other three arms ran in the same diagnostic session.", "",
+        *table(("Change on the 60 photos with a number", "Gap in points (95% paired interval)"), contrast_rows), "",
+        "On the source JPEG, putting text first improved number accuracy. With text first, the source JPEG improved "
+        "accuracy over the app JPEG. Each single change from the shipped setting had an interval containing zero. "
+        "Together the changes recovered the same number correctness as frozen in-process Gemma on the 60 written "
+        "numbers. The interaction interval reaches zero, so the data leave open how the two effects combine.", "",
+        f"Among the {len(present_boxes)} box marks with a number, the modeled Gemma-first policy with the same "
+        f"benchmark parser fallback got {box_counts[0]} right with the shipped settings and {box_counts[1]} with the "
+        "combined variant. This describes the box subset with an answer in the truth. The diagnostics sampled only "
+        "some of the blank cells.", "",
+        "The JPEG comparison covers resizing and re-encoding together. The last comparison can also reflect "
+        "differences in the server and in-process execution paths. The 15 blank photos give a limited check for "
+        "false fills. Title, repository and date were outside these controls, as were the managed reader and "
+        "other servers.", "",
+    ]
+
+
 HEADINGS = ("Field", "Eligible cells", "Gemma through the server", "Gemma in-process", "Vision + parser",
             "Server less in-process (95% interval)", "Server less Vision (95% interval)")
 
 
-def report(pilot, holdout):
+def report(pilot, holdout, diagnosis):
     paired = field_pairs(holdout)
     times = [c["wall_s"] for c in holdout]
     parsed = sum(c["parsed"] for c in holdout)
@@ -383,6 +454,7 @@ def report(pilot, holdout):
         "encoder itself. These tables describe the two cohorts separately.", "",
         *table(HEADINGS, [[field.replace("_", " ").capitalize(), *comparison(values)]
                           for field, values in field_pairs(pilot, pilot=True).items()]), "",
+        *diagnostic_report(holdout, diagnosis),
         "## Measurement card", "",
         "- **Truth.** The frozen W47.ct-truth-final label set. The owner’s answers and notes, rule-settled cells, "
         "and otherwise three unanimous drafts. Gemini 3.7 Flash, from Google like Gemma, was one of those drafters, "
@@ -432,7 +504,7 @@ def main():
     if args.report:
         if len(record["holdout"]) != TOTAL - BASELINE:
             raise RuntimeError("Run all 135 held-out photos before publishing a report")
-        REPORT.write_text(report(pilot, record["holdout"]), encoding="utf-8")
+        REPORT.write_text(report(pilot, record["holdout"], record.get("diagnosis")), encoding="utf-8")
         print(REPORT)
     elif args.diagnose:
         diagnose(rows, ids[BASELINE:], record, cache, args.port)

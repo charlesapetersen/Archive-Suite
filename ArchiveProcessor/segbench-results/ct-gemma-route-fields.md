@@ -62,6 +62,35 @@ The pilot used Pillow to approximate the app’s 1,600 px JPEG encoding. The hel
 | Collection number | 60 | 44/60 (73.3%) | 49/60 (81.7%) | 44/60 (73.3%) | -8.3 (-16.7 to -1.7) | +0.0 (-11.7 to +11.7) |
 | Date | 60 | 46/60 (76.7%) | 45/60 (75.0%) | 46/60 (76.7%) | +1.7 (-8.3 to +11.7) | +0.0 (-11.7 to +11.7) |
 
+## Collection-number controls
+
+All 60 eligible held-out photos with a collection number and a seeded draw of 15 of the 74 eligible blanks. The same mlx-vlm server received either the app JPEG or the source benchmark JPEG, and the same image and prompt in either order. Text first puts the image token after the prompt, as in the in-process benchmark. The other request settings were fixed. Variant order was shuffled within each photo.
+
+| JPEG | Chat content order | Correct where present | Filled where absent | Unparsed replies |
+| --- | --- | --- | --- | --- |
+| App JPEG | Image first | 22/60 | 0/15 | 0/75 |
+| App JPEG | Text first | 30/60 | 0/15 | 0/75 |
+| Source JPEG | Image first | 24/60 | 0/15 | 0/75 |
+| Source JPEG | Text first | 38/60 | 0/15 | 0/75 |
+
+The app JPEG/image-first row comes from the held-out run. On the 12 same-setting repeats (9 with a number), the number correctness and value-presence flags agreed with the held-out reads on 12/12. The other three arms ran in the same diagnostic session.
+
+| Change on the 60 photos with a number | Gap in points (95% paired interval) |
+| --- | --- |
+| Text first less image first, app JPEG | +13.3 (-1.7 to +26.7) |
+| Text first less image first, source JPEG | +23.3 (+8.3 to +36.7) |
+| Source less app JPEG, image first | +3.3 (-5.0 to +11.7) |
+| Source JPEG/text first less app JPEG/image first | +26.7 (+13.3 to +40.0) |
+| Source less app JPEG, text first | +13.3 (+5.0 to +21.7) |
+| Text-first gain on source less its gain on app JPEG | +10.0 (+0.0 to +20.0) |
+| Server source JPEG/text first less frozen in-process | +0.0 (+0.0 to +0.0) |
+
+On the source JPEG, putting text first improved number accuracy. With text first, the source JPEG improved accuracy over the app JPEG. Each single change from the shipped setting had an interval containing zero. Together the changes recovered the same number correctness as frozen in-process Gemma on the 60 written numbers. The interaction interval reaches zero, so the data leave open how the two effects combine.
+
+Among the 45 box marks with a number, the modeled Gemma-first policy with the same benchmark parser fallback got 24 right with the shipped settings and 37 with the combined variant. This describes the box subset with an answer in the truth. The diagnostics sampled only some of the blank cells.
+
+The JPEG comparison covers resizing and re-encoding together. The last comparison can also reflect differences in the server and in-process execution paths. The 15 blank photos give a limited check for false fills. Title, repository and date were outside these controls, as were the managed reader and other servers.
+
 ## Measurement card
 
 - **Truth.** The frozen W47.ct-truth-final label set. The owner’s answers and notes, rule-settled cells, and otherwise three unanimous drafts. Gemini 3.7 Flash, from Google like Gemma, was one of those drafters, alongside two Qwen readers. Gemma itself drafted none of the truth. The common scorer excludes carried, illegible, cut-off, and unresolved cells.

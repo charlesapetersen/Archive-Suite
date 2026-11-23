@@ -1727,6 +1727,9 @@ def main():
         label_md = label_report.read_text()
         container_labels = {"held_out": table_after(label_md, "## Held-out 135 photos"),
                             "pilot": table_after(label_md, "## Original 60-photo pilot")}
+        if "\n## Collection-number controls\n" in label_md:
+            container_labels["number_controls"] = table_after(label_md, "## Collection-number controls")
+            container_labels["number_contrasts"] = table_after(label_md, "## Collection-number controls", nth=1)
     built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(op), "handwriting": handwriting(), "r6_spot": json.loads(R6_SPOT.read_text()),
              "farmshare": farmshare(op, own["routes"]), "difficulty": diff, "headline": headline(routes), "rerun_noise": rerun_noise(),
              "regions_orderfree": regions_orderfree(), "public_segmentation": public_segmentation(),
