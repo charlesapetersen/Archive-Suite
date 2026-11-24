@@ -15,6 +15,8 @@ enum ProcessorUITestConfiguration {
     /// W49.proc-s044-check: a dummy credential for the guest loopback gateway, headless Keychain stays untouched.
     static var usesStandInGateway: Bool { isActive && arguments.contains("-APUITestStandInGateway") }
 
+    static var offersCollectionInterview: Bool { arguments.contains("-APUITestCollectionInterview") }
+
     static var inputDirectory: URL? { urlValue(after: "-APUITestInputDirectory") }
     static var outputDirectory: URL? { urlValue(after: "-APUITestOutputDirectory") }
     /// Every UI-test launch gets an app-owned scratch backup, including Live Capture paths. The test runner

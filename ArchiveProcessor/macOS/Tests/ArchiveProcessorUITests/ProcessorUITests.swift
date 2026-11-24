@@ -1006,6 +1006,114 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [gone], timeout: 5), .completed, "Skip must close the interview")
     }
 
+    func testCollectionInterviewWaitsForPickerIntake() throws {
+        let first = scratchRoot.appendingPathComponent("First collection", isDirectory: true)
+        let second = scratchRoot.appendingPathComponent("Second collection", isDirectory: true)
+        for folder in [first, second] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        let input = inputDirectory.appendingPathComponent("scratch.png")
+        let png = try XCTUnwrap(Data(base64Encoded:
+            "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAAAAAA6mKC9AAAAD0lEQVR4nGP4jwYYRrYAAID5/wEokJxdAAAAAElFTkSuQmCC"))
+        try png.write(to: input)
+        relaunch(extra: ["-APUITestCollectionInterview"])
+        let save = element("ap.collectionInterview.save")
+
+        chooseCollection(first)
+        XCTAssertTrue(app.staticTexts[first.lastPathComponent].waitForExistence(timeout: 5))
+        XCTAssertFalse(save.exists, "Choosing an empty destination must leave the file picker available.")
+
+        app.buttons["Add Files…"].click()
+        let cancel = app.buttons["Cancel"].firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        cancel.click()
+        XCTAssertTrue(cancel.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(element("ap.ocr.dropZone").exists)
+        XCTAssertFalse(save.exists, "Cancel must leave the destination eligible for the first successful intake.")
+
+        addCollectionInput(input)
+        XCTAssertTrue(app.staticTexts["About the collection “First collection”"].waitForExistence(timeout: 10))
+        attachScreenshot("processor-collection-picker-intake")
+        app.buttons["Skip"].click()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 5))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: first.appendingPathComponent(".archivesuite").path))
+
+        chooseCollection(second)
+        XCTAssertTrue(app.staticTexts["About the collection “Second collection”"].waitForExistence(timeout: 10),
+                      "The queued files are available to the new destination before Start.")
+        app.buttons["Skip"].click()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 5))
+
+        chooseCollection(first)
+        XCTAssertTrue(app.staticTexts[first.lastPathComponent].waitForExistence(timeout: 5))
+        addCollectionInput(input)
+        XCTAssertFalse(save.exists, "Additional files must respect Skip for this destination.")
+    }
+
+    func testCollectionInterviewUsesDroppedFilesAndKeepsSavedAnswers() throws {
+        // The scratch PDF enters through the DropReceiver's normal URL callback path.
+        let flags = ["-APUITestCollectionInterview", "-APUITestSyntheticMultiPagePDF",
+                     "-outputDirectory", outputDirectory.path]
+        relaunch(extra: flags)
+        let save = element("ap.collectionInterview.save")
+        XCTAssertTrue(save.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["About the collection “OUT”"].exists)
+        let limit = element("ap.collectionInterview.batchLimit")
+        scrollUntilHittable(limit, in: app.sheets.firstMatch)
+        limit.click()
+        let unlimited = app.menuItems["No limit"]
+        XCTAssertTrue(unlimited.waitForExistence(timeout: 5))
+        unlimited.click()
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: save)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 15), .completed)
+        save.click()
+        XCTAssertTrue(save.waitForNonExistence(timeout: 5))
+        let settings = outputDirectory.appendingPathComponent(".archivesuite/collection-settings.json")
+        let saved = try Data(contentsOf: settings)
+
+        relaunch(extra: flags)
+        XCTAssertTrue(element("ap.ocr.reOCRExplanation").waitForExistence(timeout: 10))
+        XCTAssertFalse(save.exists, "A later intake must keep the saved answers and suppress the automatic sheet.")
+        XCTAssertEqual(try Data(contentsOf: settings), saved)
+        openSettings("Collection")
+        let answer = app.buttons["Answer again…"]
+        XCTAssertTrue(answer.waitForExistence(timeout: 5))
+        answer.click()
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertEqual(limit.value as? String, "No limit")
+    }
+
+    private func chooseCollection(_ folder: URL) {
+        app.typeKey("o", modifierFlags: [.command, .shift])
+        selectPathInOpenPanel(folder, button: "Select Output Folder")
+    }
+
+    private func addCollectionInput(_ file: URL) {
+        app.buttons["Add Files…"].click()
+        selectPathInOpenPanel(file, button: "Open")
+    }
+
+    private func selectPathInOpenPanel(_ url: URL, button label: String) {
+        let button = app.buttons[label].firstMatch
+        XCTAssertTrue(button.waitForExistence(timeout: 5))
+        app.typeKey("g", modifierFlags: [.command, .shift])
+        app.typeText(url.deletingLastPathComponent().path)
+        app.typeKey(.return, modifierFlags: [])
+        let panel = app.dialogs["open-panel"]
+        let goToFolder = panel.sheets["GoToWindow"]
+        if !goToFolder.waitForNonExistence(timeout: 2) {
+            goToFolder.buttons["CloseButton"].click()
+        }
+        let item = panel.descendants(matching: .any).matching(NSPredicate(format: "label == %@ OR value == %@",
+            url.lastPathComponent, url.lastPathComponent)).firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 5), app.debugDescription)
+        item.click()
+        let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: button)
+        XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 5), .completed, app.debugDescription)
+        button.click()
+        XCTAssertTrue(button.waitForNonExistence(timeout: 5))
+    }
+
     /// W46.settings-interviews: Settings' collection section opens the collection interview, and Skip saves nothing.
     func testCollectionInterviewOpensFromSettings() throws {
         openSettings("Collection")

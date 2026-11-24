@@ -132,9 +132,9 @@ struct OCRView: View {
 
     @State private var hasConfiguredAPIKey = false
     @State private var outputDirectory: URL?
-    /// A newly chosen output folder with no settings of its own is a new collection: it is asked about its material
-    /// (W46.settings-interviews).
+    /// A new output collection is asked about its material once there are files to describe.
     @State private var collectionInterview: CollectionInterviewView.Target?
+    @State private var offeredCollectionInterviewPaths: Set<String> = []
     /// W44 Improve OCR: the files the dialog is open for.
     @State private var improveOCR: ImproveOCRSelection?
     @State private var improveOCRMessage: String?
@@ -699,6 +699,7 @@ struct OCRView: View {
         })
         .onChange(of: outputDirectory) { _, newDir in
             ModelSelectionStore.saveOutputDirectory(newDir)
+            offerCollectionInterviewForPendingIntake()
         }
     }
 
@@ -1211,7 +1212,7 @@ struct OCRView: View {
 
     /// Both Start and ⌘R use the same checks and the same explanation.
     private var canStartProcessing: Bool {
-        !processor.isProcessing && startBlockedReason == nil
+        !processor.isProcessing && collectionInterview == nil && startBlockedReason == nil
     }
 
     /// The first unmet Start condition. While a run is going, the Cancel control takes its place.
@@ -1717,6 +1718,7 @@ struct OCRView: View {
         flatDotFolders.merge(intake.flatDotFolders) { $1 }
         var seen = Set(foldersBeyondDepth)
         foldersBeyondDepth.append(contentsOf: intake.foldersBeyondDepth.filter { seen.insert($0).inserted })
+        if !intake.files.isEmpty { offerCollectionInterviewForPendingIntake() }
     }
 
     private func replaceFiles(with files: [URL]) {
@@ -1771,7 +1773,20 @@ struct OCRView: View {
         panel.prompt = "Select Output Folder"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         outputDirectory = url
-        if CollectionSettingsFile.read(in: url) == .missing { collectionInterview = .collection(url) }
+    }
+
+    private func offerCollectionInterviewForPendingIntake() {
+        #if DEBUG
+        // Other UI journeys use disposable output folders to test workflows after collection setup.
+        if ProcessorUITestConfiguration.isActive && !ProcessorUITestConfiguration.offersCollectionInterview { return }
+        #endif
+        guard showingPendingIntake, !droppedFiles.isEmpty, !processor.isProcessing, !isInReviewMode,
+              let folder = outputDirectory, collectionInterview == nil else { return }
+        let path = folder.standardizedFileURL.path
+        guard !offeredCollectionInterviewPaths.contains(path),
+              CollectionSettingsFile.read(in: folder) == .missing else { return }
+        offeredCollectionInterviewPaths.insert(path)
+        collectionInterview = .collection(folder)
     }
 
     private func isImageFile(_ url: URL) -> Bool {

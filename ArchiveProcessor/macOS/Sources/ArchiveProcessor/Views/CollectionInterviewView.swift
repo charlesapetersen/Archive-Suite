@@ -1,8 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// The collection interview (W46.settings-interviews, `12-settings-design.md` §3.2): asked when a collection or a
-/// project is created, and again from Settings. It measures the kinds of document on a sample of photos and PDF pages, asks
+/// The collection interview opens after the first file intake for a new output collection, when a
+/// project is created, or from Settings. It measures the kinds of document on a sample of photos and PDF pages, asks
 /// what the classifier cannot see, and writes the answers into the collection's own layer (its document in the output
 /// folder) or a project's. Skipping writes nothing, so the collection keeps reading its project and general settings.
 struct CollectionInterviewView: View {

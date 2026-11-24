@@ -4,9 +4,16 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ## Processor guided session 1 — November 23, 2026
 
-- Process Files shows About this collection when the destination is chosen, before any files are added. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-collection-prompt-intake)
 - Preservation uses generated folders and generic filenames, so the matching original is difficult to identify in Finder. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-preservation-names)
 - The Android Archive Capture launcher icon differs from the Mac Processor icon. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-android-launcher-icon)
+
+## FIXED (2026-11-24) — Collection interview opened before files were added
+
+- Process Files opens About the collection after it accepts files for a new output folder. Changing the
+  destination with files already queued offers the interview for the new collection. Saved answers stay
+  in place, and Settings › Collection can open the interview at any time.
+  [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
+  (accepted: fixed by W40.fix-processor-collection-prompt-intake)
 
 ## FIXED (2026-11-24) — Reading settings were hard to scan
 

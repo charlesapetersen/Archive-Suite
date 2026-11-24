@@ -340,6 +340,10 @@ Process PDFs that already contain OCR text (e.g., from a previous run):
   to add just the supported files directly in the selected folder.
 - Supported formats: JPEG, PNG, TIFF, HEIC, plus PDF (a multi-page PDF is read again page by page; with pre-OCRed input, PDFs only)
 
+**About the collection** opens before Start when the first files are added for a new output folder.
+If files are already queued when you change the output folder, the new collection can ask about those files.
+You can skip the interview or open it yourself in **Settings › Collection**.
+
 ### Other Features
 
 - **Cost estimator** — shows estimated cost before processing, updated dynamically as options change

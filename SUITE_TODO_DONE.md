@@ -18382,3 +18382,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   Verified Basic, Standard, and Advanced off-screen, including backend switching and the Range view.
   The headless settings render and launch smoke passed. No bench cache was created.
   <!-- /W40.fix-processor-reading-scan -->
+
+- [x] **W40.fix-processor-collection-prompt-intake — Show About this collection when files are added for processing [S · S3]** · §W40 verification phase · SHIPPED 2026-11-24 (this commit) (lane: processor) (uses: build,vm) — In Process Files, defer the first collection interview until the first successful file intake for the selected destination. Preserve the explicit collection settings entry point, existing saved answers, and access before Start. Cover files added by the picker and by drop, plus destination changes and Cancel. [Walkthrough evidence](verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
+  The first admitted files open the interview for a fresh destination. Cancel keeps it eligible, Skip leaves
+  the collection settings untouched, and changing to another fresh destination with files queued offers
+  the interview there before Start. Saved answers stay available in Settings › Collection.
+  [Verification](verification/evidence/processor/W40.fix-processor-collection-prompt-intake.md). No bench cache was created.
+  <!-- /W40.fix-processor-collection-prompt-intake -->
