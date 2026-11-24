@@ -2,6 +2,17 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
+## Processor guided session 1 — November 23, 2026
+
+- Live Capture can keep waiting at Finish after a wired document has already been fully staged. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-live-finish-settle)
+- The Mac requested the Keychain password four times on launch and twice when starting wired Live Capture. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-keychain-prompts)
+- The first-launch notice says “archive material”, which the owner found ambiguous. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-local-notice)
+- The help text in General settings reaches the bottom edge of the window. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-general-padding)
+- Reading settings present too much text for the owner to scan easily. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-reading-scan)
+- Process Files shows About this collection when the destination is chosen, before any files are added. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-collection-prompt-intake)
+- Preservation uses generated folders and generic filenames, so the matching original is difficult to identify in Finder. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-preservation-names)
+- The Android Archive Capture launcher icon differs from the Mac Processor icon. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-android-launcher-icon)
+
 ## FIXED (2026-11-23) — Imported cluster pages could stay sideways
 
 When rotation is enabled, matched pages use the on-device Vision check, including in comparative modes.
