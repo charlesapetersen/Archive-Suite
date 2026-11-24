@@ -24,7 +24,7 @@ final class CloudDriveWarningUITests: XCTestCase {
         app.launchEnvironment["ARCHIVE_CLOUD_WARNING_TEST_PATH"] = input.path
         app.launch()
 
-        let launchWarning = app.staticTexts["Keep archive material on this Mac"].firstMatch
+        let launchWarning = app.staticTexts["Keep files for this app stored locally"].firstMatch
         XCTAssertTrue(launchWarning.waitForExistence(timeout: 10), app.debugDescription)
         let shot = fm.temporaryDirectory.appendingPathComponent("processor-cloud-warning-\(UUID()).png")
         try app.screenshot().pngRepresentation.write(to: shot)
@@ -41,9 +41,16 @@ final class CloudDriveWarningUITests: XCTestCase {
             let open = app.buttons["Open"].firstMatch
             XCTAssertTrue(open.waitForExistence(timeout: 10))
             app.typeKey("g", modifierFlags: [.command, .shift])
-            app.typeText(file.path)
+            app.typeText(input.path)
             app.typeKey(.return, modifierFlags: [])
-            XCTAssertTrue(open.isEnabled)
+            // List view puts the fixture on screen even when the panel starts in column view.
+            app.typeKey("2", modifierFlags: .command)
+            let selectedFile = app.dialogs["open-panel"].descendants(matching: .any)
+                .matching(NSPredicate(format: "value == %@ OR label == %@", file.lastPathComponent, file.lastPathComponent))
+                .firstMatch
+            XCTAssertTrue(selectedFile.waitForExistence(timeout: 10), app.debugDescription)
+            selectedFile.click()
+            XCTAssertTrue(open.wait(for: \.isEnabled, toEqual: true, timeout: 5), app.debugDescription)
             open.click()
         }
         let warning = app.staticTexts["This selection is in a cloud drive"].firstMatch

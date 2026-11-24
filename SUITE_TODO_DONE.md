@@ -18363,3 +18363,9 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   the wrong warning style, reproduced on unchanged main at 7d23d5bb in the same test.
   The owner's installed build should confirm the launch and wired Start prompt counts in the queued guided rerun.
   <!-- /W40.fix-processor-keychain-prompts -->
+
+- [x] **W40.fix-processor-local-notice — Clarify the first-launch notice about local files [XS · S4]** · §W40 verification phase · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build,vm) — Use the owner's wording “Keep files for this app stored locally” in the Processor first-launch notice. In the shared `CloudDriveWarning`, retain the practical cloud-drive explanation and acknowledgement behavior. Verify first launch, acknowledgement, and relaunch. [Walkthrough evidence](verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
+  The off-screen Debug run verified the title, OK acknowledgement, and relaunch. It also checked that Cancel
+  leaves the scratch file out and Use Anyway adds it. The test selects its scratch file in list view so it can
+  reach the file even when the picker starts in column view. The Process Files launch smoke passed. No bench cache.
+  <!-- /W40.fix-processor-local-notice -->

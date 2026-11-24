@@ -4,12 +4,17 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ## Processor guided session 1 — November 23, 2026
 
-- The first-launch notice says “archive material”, which the owner found ambiguous. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-local-notice)
 - The help text in General settings reaches the bottom edge of the window. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-general-padding)
 - Reading settings present too much text for the owner to scan easily. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-reading-scan)
 - Process Files shows About this collection when the destination is chosen, before any files are added. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-collection-prompt-intake)
 - Preservation uses generated folders and generic filenames, so the matching original is difficult to identify in Finder. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-preservation-names)
 - The Android Archive Capture launcher icon differs from the Mac Processor icon. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-android-launcher-icon)
+
+## FIXED (2026-11-23) — Processor first-launch notice
+
+- The notice now says “Keep files for this app stored locally” and explains the risks of using cloud drives.
+  [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
+  (accepted: fixed by W40.fix-processor-local-notice)
 
 ## FIXED (2026-11-23) — Keychain prompts when opening Processor or starting wired capture
 

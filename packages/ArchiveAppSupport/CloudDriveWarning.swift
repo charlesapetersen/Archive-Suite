@@ -8,7 +8,10 @@ enum CloudDriveWarning {
     private static let seenKey = "hasSeenCloudDriveWarning"
     private static let risks = "Cloud drives may download many files at once, create conflicting copies, or lose Finder tags. Use a folder on this Mac outside any cloud drive."
 
-    static func showAtFirstLaunch(testLaunch: Bool) {
+    static func showAtFirstLaunch(
+        testLaunch: Bool,
+        title: String = "Keep archive material on this Mac"
+    ) {
         let defaults: UserDefaults
 #if DEBUG
         // UI tests can exercise the acknowledgement and relaunch with their own defaults.
@@ -26,7 +29,7 @@ enum CloudDriveWarning {
         guard !defaults.bool(forKey: seenKey) else { return }
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Keep archive material on this Mac"
+        alert.messageText = title
         alert.informativeText = "Keep the material you use with this app out of iCloud Drive, OneDrive, Google Drive, Dropbox, and other cloud drives. " + risks
         alert.addButton(withTitle: "OK")
         if alert.runModal() == .alertFirstButtonReturn {

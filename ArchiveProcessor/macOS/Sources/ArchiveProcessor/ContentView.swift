@@ -148,7 +148,10 @@ struct ContentView: View {
             SegmentationProofDriver.runIfRequested()         // PAID (cents) W36 one real folder through real models
 #endif
             Task { @MainActor in
-                CloudDriveWarning.showAtFirstLaunch(testLaunch: KeychainHelper.isHeadlessTestMode)
+                CloudDriveWarning.showAtFirstLaunch(
+                    testLaunch: KeychainHelper.isHeadlessTestMode,
+                    title: "Keep files for this app stored locally"
+                )
                 maybePresentKeyOnboarding()
             }
         }
