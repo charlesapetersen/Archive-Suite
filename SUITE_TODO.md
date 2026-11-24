@@ -624,6 +624,13 @@ since the solver, the sheet and the stage rules all read it.
 
 Every `W46.settings-*` item has shipped; their entries are in `SUITE_TODO_DONE.md`.
 
+### Processor settings and interface design review
+
+- [ ] **W49.proc-ui-design-review — Review Processor Settings and plan a simpler interface [M]** (lane: processor) (uses: build,vm) (agents: claude, codex) — Owner, 2026-11-23. Run the review on GPT-6.2 Astra or Claude Fable. Either provider is eligible. Verify `AGENT_MODEL` before starting. For Claude, also check the assistant model IDs in `$AGENT_WORKER_STATE/last-session.log` before reviewing and again before filing the plan or follow-ups. If the model cannot be confirmed or the session switches to another model, end the attempt with the item open for an eligible session and report the routing problem.
+  - Inspect the current macOS Processor in the off-screen GUI with scratch data. Start with the full Settings pane in Basic, Standard and Advanced, then sample first-run setup, Process Files, Live Capture and review screens for the same problems. Identify confusing groupings, hard-to-find controls, competing visual emphasis, excessive copy and inconsistent terms. Account for the General and Reading settings fixes from the November 23 guided session and other queued work on the same screens.
+  - Propose a clear hierarchy, grouping, labels and layout, with before-and-after examples for the worst screens. Each screen should show what users need to decide or do at that moment. Advanced can expose more controls while still reading cleanly. Put brief optional explanations behind accessible question-mark help or tooltips, and send longer explanations, comparisons and background to the handbook, help guide or website. Keep meaningful choices easy to find and consequential warnings visible when they matter.
+  - Write a prioritized implementation plan under `execution-plans/` with the reviewed baseline, specific changes by screen, sample copy, where each longer explanation belongs, dependencies and acceptance checks for all affected settings levels and workflows. Keep this review and planning separate from implementation. Before closing, file and verify the implementation item or ordered items in `SUITE_TODO.md` and the live WORK QUEUE, linking the plan and arranging for implementation to follow the review. Give those items default model routing with no agent, effort or model override.
+
 
 ## Archival containers — W47 (owner, 2026-10-21)
 
