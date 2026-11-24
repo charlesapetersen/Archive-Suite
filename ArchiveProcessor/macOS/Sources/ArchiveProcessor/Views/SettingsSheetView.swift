@@ -443,13 +443,14 @@ struct RuleStageBox: View {
     var setStrings: (SettingsKey, [String]) -> Void
     /// Where the stage is set, in the modal sheet (W47.settings-panels).
     var homeNote: String? = nil
+    var summary: String? = nil
 
     var body: some View {
         SheetBox {
             Text(stage.title).font(.headline)
         } content: {
             VStack(alignment: .leading, spacing: 6) {
-                Text(stage.text).fixedSize(horizontal: false, vertical: true)
+                Text(summary ?? stage.text).fixedSize(horizontal: false, vertical: true)
                 if let homeNote {
                     Text(homeNote).font(.caption2).foregroundStyle(.primary)
                         .accessibilityIdentifier("ap.sheet.home.\(stage.id)")
@@ -462,6 +463,9 @@ struct RuleStageBox: View {
                 }
                 SheetDisclosure("The rules in detail") {
                     VStack(alignment: .leading, spacing: 3) {
+                        if summary != nil {
+                            Text(stage.text).font(.callout).fixedSize(horizontal: false, vertical: true)
+                        }
                         ForEach(stage.rules) { r in
                             Text("• \(r.text)" + (r.source.map { " (\($0))" } ?? ""))
                                 .font(.caption).fixedSize(horizontal: false, vertical: true)
@@ -535,23 +539,33 @@ private struct SearchableFormatControls: View {
 /// action, which the audit fails now that the sheet's boxes sit in Settings.
 struct SheetDisclosure<Content: View>: View {
     let title: String
+    let identifier: String?
     @ViewBuilder var content: () -> Content
     @State private var expanded = false
 
-    init(_ title: String, @ViewBuilder content: @escaping () -> Content) {
+    init(_ title: String, identifier: String? = nil, @ViewBuilder content: @escaping () -> Content) {
         self.title = title
+        self.identifier = identifier
         self.content = content
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Button { expanded.toggle() } label: {
-                Label(title, systemImage: expanded ? "chevron.down" : "chevron.right")
+            if let identifier {
+                disclosureButton.accessibilityIdentifier(identifier)
+            } else {
+                disclosureButton
             }
-            .buttonStyle(.plain)
-            .accessibilityValue(expanded ? "expanded" : "collapsed")
             if expanded { content().padding(.leading, 18) }
         }
+    }
+
+    private var disclosureButton: some View {
+        Button { expanded.toggle() } label: {
+            Label(title, systemImage: expanded ? "chevron.down" : "chevron.right")
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(expanded ? "expanded" : "collapsed")
     }
 }
 
@@ -583,6 +597,8 @@ struct StageCardView: View {
     var seeRange: (() -> Void)? = nil
     /// Where the card's stage is set, in the modal sheet (W47.settings-panels).
     var homeNote: String? = nil
+    /// The Reading panel leads with the live reader and keeps the measured pick beneath it.
+    var activeReader: String? = nil
     /// W47.settings-level-switch: at Basic the card is the app's pick with its figures; choosing another route starts
     /// at Standard. A card already set by hand keeps its "Back to the app's pick" at every level.
     @AppStorage(DefaultsKeys.settingsLevel) private var levelRaw = SettingsLevel.defaultLevel.rawValue
@@ -590,149 +606,209 @@ struct StageCardView: View {
 
     var body: some View {
         SheetBox {
-            HStack {
-                Text(card.title).font(.headline)
-                Spacer()
-                Text(card.weight).font(.caption).foregroundStyle(.primary)
+            if activeReader != nil {
+                Text("Current reader in Process Files").font(.headline)
+            } else {
+                HStack {
+                    Text(card.title).font(.headline)
+                    Spacer()
+                    Text(card.weight).font(.caption).foregroundStyle(.primary)
+                }
             }
         } content: {
             VStack(alignment: .leading, spacing: 8) {
-                Text(card.about).font(.caption).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
-                if let homeNote {
-                    Text(homeNote).font(.caption2).foregroundStyle(.primary)
-                        .accessibilityIdentifier("ap.sheet.home.\(card.id)")
-                }
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(card.routeName).font(.title3.weight(.semibold))
+                if let activeReader {
+                    Text(activeReader).font(.title3.weight(.semibold))
                         .fixedSize(horizontal: false, vertical: true)
-                    chip(card.family)
-                    chip(card.isCustom ? "Custom" : "The app's pick", highlight: card.isCustom)
-                }
-                Text(card.why).fixedSize(horizontal: false, vertical: true)
-                    .help(card.evidence)
-                if let t = card.trainingCost {
-                    Label { Text(t).fixedSize(horizontal: false, vertical: true) } icon: {
-                        Image(systemName: "lock.shield").foregroundStyle(.orange)
+                        .accessibilityIdentifier("ap.settings.activeReader")
+                    if let now = card.apply == nil ? card.runsNow : card.readingWarning {
+                        currentStatus(now)
                     }
-                }
-
-                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 4) {
-                    ForEach(card.parts) { p in
-                        GridRow {
-                            Text(p.label).foregroundStyle(.primary)
+                    if let trainingCost = card.trainingCost {
+                        trainingNotice(trainingCost)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(card.isCustom ? "Your choice for this collection" : "The app’s pick for this collection")
+                            .font(.caption.weight(.semibold))
+                        Text(card.routeName).fixedSize(horizontal: false, vertical: true)
+                    }
+                    routeControls
+                    SheetDisclosure("Reading figures and route details", identifier: "ap.settings.readingDetails") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(card.about).fixedSize(horizontal: false, vertical: true)
+                            Text("\(card.family) · \(card.weight)").font(.caption.weight(.semibold))
                                 .fixedSize(horizontal: false, vertical: true)
-                                .frame(maxWidth: 250, alignment: .leading)
-                            VStack(alignment: .leading, spacing: 1) {
-                                let figure = Text(p.figure + (p.routeName.map { $0 != card.routeName ? " — \($0)" : "" } ?? ""))
-                                    .fixedSize(horizontal: false, vertical: true)
-                                if p.warning {
-                                    Label { figure } icon: {
-                                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                                    }
-                                } else {
-                                    figure
-                                }
-                                if let s = p.sample { Text(s).font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true) }
-                                if let l = p.label2 {
-                                    Text(l).font(.caption2).italic().foregroundStyle(.primary)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
+                            if card.apply != nil, let now = card.runsNow, now != card.readingWarning {
+                                Text(now).font(.caption).fixedSize(horizontal: false, vertical: true)
                             }
+                            Text(card.why).fixedSize(horizontal: false, vertical: true)
+                                .help(card.evidence)
+                            figures
+                            comparisons
+                            measurementNotes
                         }
                     }
-                }
-
-                Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 2) {
-                    GridRow { Text("Cost").foregroundStyle(.primary); Text(card.cost) }
-                    GridRow { Text("Time").foregroundStyle(.primary); Text(card.time) }
-                    GridRow { Text("Memory").foregroundStyle(.primary); Text(card.memory) }
-                }
-                .font(.callout)
-
-                ForEach(card.labels, id: \.self) { l in
-                    Label(l, systemImage: "info.circle").font(.caption).fixedSize(horizontal: false, vertical: true)
-                }
-
-                if let now = card.runsNow {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(now).font(.caption).fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("ap.sheet.current.\(card.id)")
-                        if let a = card.apply {
-                            Button(a.buttonTitle) { apply(a) }
-                                .controlSize(.small)
-                                .help("Changes what Process Files runs, for every collection.")
-                                .accessibilityIdentifier("ap.sheet.apply.\(card.id)")
+                    .font(.callout)
+                } else {
+                    Text(card.about).font(.caption).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
+                    if let homeNote {
+                        Text(homeNote).font(.caption2).foregroundStyle(.primary)
+                            .accessibilityIdentifier("ap.sheet.home.\(card.id)")
+                    }
+                    routeHeading
+                    Text(card.why).fixedSize(horizontal: false, vertical: true)
+                        .help(card.evidence)
+                    if let trainingCost = card.trainingCost { trainingNotice(trainingCost) }
+                    figures
+                    if let now = card.runsNow {
+                        HStack(alignment: .firstTextBaseline) {
+                            currentStatus(now)
+                            if let action = card.apply { applyButton(action) }
                         }
                     }
+                    comparisons
+                    routeControls
+                    SheetDisclosure("Notes from the measurements") { measurementNotes }
+                        .font(.caption)
                 }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("What a better figure would need").font(.caption.weight(.semibold))
-                    if card.better.isEmpty {
-                        Text("Nothing measured does better here.").font(.caption)
-                    }
-                    ForEach(card.better) { b in
-                        Text("\(Text(b.name).bold()) would give \(b.gain): \(b.reason).")
-                            .font(.caption).fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .padding(8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.08)))
-
-                if !card.alternatives.isEmpty && level >= SettingsLevels.Row.overrides.level {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Nearest alternatives you could use").font(.caption.weight(.semibold))
-                        ForEach(card.alternatives) { a in
-                            Text("\(a.name) (\(a.family)): \(a.figure), \(a.cost)")
-                                .font(.caption).fixedSize(horizontal: false, vertical: true)
-                        }
-                    }
-                }
-
-                HStack {
-                    if level >= SettingsLevels.Row.overrides.level {
-                        Menu("Use instead…") {
-                            ForEach(card.options.filter { $0.level <= level || $0.id == card.routeID }) { o in
-                                Button(o.blocked.map { "\(o.name) (\($0))" } ?? o.name) { choose(o.id) }
-                                    .disabled(o.blocked != nil || o.id == card.routeID)
-                            }
-                        }
-                        .fixedSize()
-                        .accessibilityIdentifier("ap.sheet.override.\(card.id)")
-                    }
-                    if let seeRange {
-                        Button("See the range") { seeRange() }
-                            .buttonStyle(.link)
-                            .help("Every measured route for this stage on one chart, with this card's pick marked.")
-                            .accessibilityIdentifier("ap.sheet.seeRange.\(card.id)")
-                    }
-                    if card.isCustom || card.hasOverride {
-                        Button(card.isCustom ? "Back to the app's pick" + (card.appPick.map { " (\($0))" } ?? "")
-                               : "Clear an old choice") { backToApp() }
-                            .help("Clears your choice for this card here and wherever it was set (a project or your general settings).")
-                            .accessibilityIdentifier("ap.sheet.reset.\(card.id)")
-                    }
-                }
-
-                SheetDisclosure("Notes from the measurements") {
-                    VStack(alignment: .leading, spacing: 3) {
-                        if !card.evidence.isEmpty {
-                            Text(card.evidence).font(.caption2).fixedSize(horizontal: false, vertical: true)
-                        }
-                        ForEach(card.caveats, id: \.self) {
-                            Text("• \($0)").font(.caption2).fixedSize(horizontal: false, vertical: true)
-                        }
-                        Text("Figures from: " + card.sources.joined(separator: ", "))
-                            .font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .font(.caption)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityIdentifier("ap.sheet.card.\(card.id)")
+    }
+
+    private func currentStatus(_ text: String) -> some View {
+        Text(text).font(.caption).fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("ap.sheet.current.\(card.id)")
+    }
+
+    private func applyButton(_ action: SettingsSheetModel.Apply) -> some View {
+        Button(action.buttonTitle) { apply(action) }
+            .controlSize(.small)
+            .help("Changes what Process Files runs, for every collection.")
+            .accessibilityIdentifier("ap.sheet.apply.\(card.id)")
+    }
+
+    private func trainingNotice(_ text: String) -> some View {
+        Label { Text(text).fixedSize(horizontal: false, vertical: true) } icon: {
+            Image(systemName: "lock.shield").foregroundStyle(.orange)
+        }
+    }
+
+    private var routeHeading: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text(card.routeName).font(.title3.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+            chip(card.family)
+            chip(card.isCustom ? "Custom" : "The app's pick", highlight: card.isCustom)
+        }
+    }
+
+    @ViewBuilder private var figures: some View {
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 4) {
+            ForEach(card.parts) { p in
+                GridRow {
+                    Text(p.label).foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: 250, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 1) {
+                        let figure = Text(p.figure + (p.routeName.map { $0 != card.routeName ? " — \($0)" : "" } ?? ""))
+                            .fixedSize(horizontal: false, vertical: true)
+                        if p.warning {
+                            Label { figure } icon: {
+                                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                            }
+                        } else {
+                            figure
+                        }
+                        if let s = p.sample { Text(s).font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true) }
+                        if let l = p.label2 {
+                            Text(l).font(.caption2).italic().foregroundStyle(.primary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
+            }
+        }
+
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 2) {
+            GridRow { Text("Cost").foregroundStyle(.primary); Text(card.cost) }
+            GridRow { Text("Time").foregroundStyle(.primary); Text(card.time) }
+            GridRow { Text("Memory").foregroundStyle(.primary); Text(card.memory) }
+        }
+        .font(.callout)
+
+        ForEach(card.labels, id: \.self) { l in
+            Label(l, systemImage: "info.circle").font(.caption).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    @ViewBuilder private var comparisons: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("What a better figure would need").font(.caption.weight(.semibold))
+            if card.better.isEmpty {
+                Text("Nothing measured does better here.").font(.caption)
+            }
+            ForEach(card.better) { b in
+                Text("\(Text(b.name).bold()) would give \(b.gain): \(b.reason).")
+                    .font(.caption).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.08)))
+
+        if !card.alternatives.isEmpty && level >= SettingsLevels.Row.overrides.level {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Nearest alternatives you could use").font(.caption.weight(.semibold))
+                ForEach(card.alternatives) { a in
+                    Text("\(a.name) (\(a.family)): \(a.figure), \(a.cost)")
+                        .font(.caption).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    private var routeControls: some View {
+        HStack {
+            if activeReader != nil, let action = card.apply { applyButton(action) }
+            if level >= SettingsLevels.Row.overrides.level {
+                Menu("Use instead…") {
+                    ForEach(card.options.filter { $0.level <= level || $0.id == card.routeID }) { o in
+                        Button(o.blocked.map { "\(o.name) (\($0))" } ?? o.name) { choose(o.id) }
+                            .disabled(o.blocked != nil || o.id == card.routeID)
+                    }
+                }
+                .fixedSize()
+                .accessibilityIdentifier("ap.sheet.override.\(card.id)")
+            }
+            if let seeRange {
+                Button("See the range") { seeRange() }
+                    .buttonStyle(.link)
+                    .help("Every measured route for this stage on one chart, with this card's pick marked.")
+                    .accessibilityIdentifier("ap.sheet.seeRange.\(card.id)")
+            }
+            if card.isCustom || card.hasOverride {
+                Button(card.isCustom ? "Back to the app's pick" + (card.appPick.map { " (\($0))" } ?? "")
+                       : "Clear an old choice") { backToApp() }
+                    .help("Clears your choice for this card here and wherever it was set (a project or your general settings).")
+                    .accessibilityIdentifier("ap.sheet.reset.\(card.id)")
+            }
+        }
+    }
+
+    private var measurementNotes: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if !card.evidence.isEmpty {
+                Text(card.evidence).font(.caption2).fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach(card.caveats, id: \.self) {
+                Text("• \($0)").font(.caption2).fixedSize(horizontal: false, vertical: true)
+            }
+            Text("Figures from: " + card.sources.joined(separator: ", "))
+                .font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func chip(_ text: String, highlight: Bool = false) -> some View {

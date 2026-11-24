@@ -90,14 +90,25 @@ final class SettingsLevelsUITests: XCTestCase {
     func testBasicShowsTheAppsPicksAndTheFewSwitchesANewUserNeeds() throws {
         // The guest keeps its defaults between runs, and an approach saved there (by another suite, or the app's
         // preselect) is rightly shown at Basic as a change; pin it to its default so this test sees the level alone.
-        guard let settings = launch(["-settingsLevel", "basic", "-segmentationApproach", "manual"]) else { return }
+        guard let settings = launch(["-settingsLevel", "basic", "-segmentationApproach", "manual",
+                                     "-visionLanguages", "fr-FR"]) else { return }
         expect(settings, panel: "General", shown: ["ap.settings.appearance", "ap.settings.level", "ap.settings.level.detail"],
                hidden: [], level: "Basic")
         shoot(settings, "settings-level-basic-general")
-        expect(settings, panel: "Reading", shown: ["ap.sheet.card.reading", "ap.sheet.seeRange.reading"],
+        expect(settings, panel: "Reading", shown: ["ap.settings.activeReader", "ap.settings.readingDetails", "ap.sheet.seeRange.reading"],
                hidden: ["ap.settings.backendPicker", "ap.settings.providerPicker", "ap.sheet.override.reading", "ap.settings.postCorrection"],
                level: "Basic")
+        let reader = element(settings, "ap.settings.activeReader")
+        let details = element(settings, "ap.settings.readingDetails")
+        XCTAssertLessThan(reader.frame.minY, details.frame.minY)
+        XCTAssertEqual(details.value as? String, "collapsed")
+        XCTAssertFalse(settings.staticTexts["OCR backend and model"].exists,
+                       "A saved setting for an inactive backend should not leave an empty section at Basic")
         shoot(settings, "settings-level-basic-reading")
+        details.click()
+        XCTAssertEqual(details.value as? String, "expanded")
+        XCTAssertTrue(settings.staticTexts["What a better figure would need"].waitForExistence(timeout: 5))
+        shoot(settings, "settings-level-basic-reading-expanded")
         expect(settings, panel: "Documents", shown: ["ap.sheet.card.segmentation"],
                hidden: ["ap.segmentation.picker", "ap.sheet.override.segmentation"], level: "Basic")
         shoot(settings, "settings-level-basic-documents")
@@ -116,6 +127,10 @@ final class SettingsLevelsUITests: XCTestCase {
         guard let settings = launch(["-settingsLevel", "standard"]) else { return }
         expect(settings, panel: "Reading", shown: ["ap.settings.backendPicker", "ap.sheet.override.reading"],
                hidden: ["ap.settings.level.why.custom-models", "ap.settings.postCorrection"], level: "Standard")
+        let reader = element(settings, "ap.settings.activeReader")
+        let backend = element(settings, "ap.settings.backendPicker")
+        XCTAssertLessThan(reader.frame.minY, backend.frame.minY)
+        XCTAssertTrue(settings.scrollViews.firstMatch.frame.contains(backend.frame))
         shoot(settings, "settings-level-standard-reading")
         expect(settings, panel: "Documents", shown: ["ap.segmentation.picker", "ap.sheet.override.segmentation"],
                hidden: ["ap.settings.level.why.custom-prompt"], level: "Standard")
@@ -152,8 +167,9 @@ final class SettingsLevelsUITests: XCTestCase {
         guard let settings = launch(["-settingsLevel", "advanced"]) else { return }
         expect(settings, panel: "Reading",
                shown: ["ap.settings.backendPicker", "ap.settings.level.why.custom-models",
-                       "ap.settings.postCorrection", "ap.settings.postCorrection.results"],
+                       "ap.settings.postCorrection", "ap.settings.postCorrection.details"],
                hidden: [], level: "Advanced")
+        shoot(settings, "settings-level-advanced-reading-overview")
         shootCorrection(settings, "settings-level-advanced-reading")
         expect(settings, panel: "Documents", shown: ["ap.settings.level.why.custom-prompt"], hidden: [], level: "Advanced")
         let localNamesID = "ap.sheet.switch.entities.low_confidence_on_mac"
@@ -219,7 +235,15 @@ final class SettingsLevelsUITests: XCTestCase {
 
     private func shootCorrection(_ settings: XCUIElement, _ name: String) {
         let form = settings.scrollViews.firstMatch
+        let details = element(settings, "ap.settings.postCorrection.details")
+        for _ in 0..<15 where !form.frame.contains(details.frame) {
+            form.scroll(byDeltaX: 0, deltaY: -110)
+        }
+        XCTAssertEqual(details.value as? String, "collapsed")
         let results = element(settings, "ap.settings.postCorrection.results")
+        XCTAssertFalse(results.exists)
+        details.click()
+        XCTAssertTrue(results.waitForExistence(timeout: 5))
         for _ in 0..<15 where !form.frame.contains(results.frame) {
             form.scroll(byDeltaX: 0, deltaY: -110)
         }

@@ -103,32 +103,60 @@ struct SettingsReadingPanel: View {
     var body: some View {
         Form {
             Section {
-                SettingsStageCards(cards: ["reading"])
-            } header: { Text("The app's pick") }
-            SettingsLevelSection(Self.providerRows) { providerSection }
-            SettingsLevelSection([.postCorrection]) {
-                Section("After reading") {
-                    SettingsLevelRows(.postCorrection) {
-                        Toggle("Correct OCR against the page image", isOn: $ocrPostCorrection)
-                            .accessibilityIdentifier("ap.settings.postCorrection")
-                        Text("Adds one paid request per eligible page. Sends the page image and its reading to Qwen3.6 27B via OpenRouter (Chutes), using your OpenRouter key. Available for standard Process Files runs with a direct API or Apple Vision. Batch jobs, gateway and CLI reads, imported text, multi-page PDF rebuilds, custom OCR prompts, and pages read in regions are excluded. The output collection’s sharing settings can block this step.")
-                        Text("In tests on middle-accuracy readings, correction tied re-reading with the same model on the 96-page set (−0.42 accuracy points, 95% interval −1.47 to +0.64). It gained 1.47 points on 120 public readings (95% interval +0.55 to +2.63). Compared with the starting text, correction worsened 4 of 57 and 10 of 120 readings. The tests used the Sherlock FP8 model.")
-                            .accessibilityIdentifier("ap.settings.postCorrection.results")
-                        if ocrPostCorrection && openrouterKey.isEmpty {
-                            Text("Save an OpenRouter key in Settings › Accounts to use this stage.")
-                        }
-                    }
-                    .font(.callout)
-                }
+                SettingsStageCards(cards: ["reading"], showsActiveReader: true)
             }
-            Section {
-                SettingsStageCards(rules: ["ocr-input", "layout"])
-            } header: { Text("The image read and the reading order") }
+            SettingsLevelSection(backendRows, changed: showsChangedCustomModels) { providerSection }
+            if useAppleVision && !useGateway && !useLocalAgent {
+                Section("Apple Vision controls") { appleVisionControls }
+            }
+            SettingsLevelSection([.postCorrection]) { postCorrectionSection }
+            Section("Page images and reading order") {
+                SettingsStageCards(rules: ["ocr-input", "layout"], ruleSummaries: [
+                    "ocr-input": "Reads the image as captured, with marks intact.",
+                    "layout": "Most pages are read whole. A downloaded helper can read newspapers in regions.",
+                ])
+            }
         }
         .formStyle(.grouped)
         .onAppear { reloadKeys() }
         .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in reloadKeys() }
         .sheet(isPresented: $showManageModels) { ManageModelsView() }
+    }
+
+    private var postCorrectionSection: some View {
+        Section("After reading") {
+            SettingsLevelRows(.postCorrection) {
+                Toggle("Correct OCR against the page image", isOn: $ocrPostCorrection)
+                    .accessibilityIdentifier("ap.settings.postCorrection")
+                Text("One extra paid OpenRouter request per eligible page. It sends the image and its reading.")
+                    .fixedSize(horizontal: false, vertical: true)
+                if ocrPostCorrection && openrouterKey.isEmpty {
+                    Text("Save an OpenRouter key in Settings › Accounts to use this stage.")
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                SheetDisclosure("When correction runs and how well it worked", identifier: "ap.settings.postCorrection.details") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Which pages qualify").fontWeight(.semibold)
+                        Text("Uses Qwen3.6 27B via OpenRouter (Chutes) with your OpenRouter key. "
+                             + "Available in standard Process Files runs with a direct API or Apple Vision. "
+                             + "Batch jobs, gateway and CLI reads, imported text, multi-page PDF rebuilds, "
+                             + "custom OCR prompts, and pages read in regions are excluded. "
+                             + "The output collection’s sharing settings can block this step.")
+                        Text("Measured accuracy").fontWeight(.semibold)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("96-page set: tied re-reading with the same model (−0.42 points, 95% interval −1.47 to +0.64).")
+                            Text("120 public readings: gained 1.47 points (95% interval +0.55 to +2.63).")
+                            Text("Compared with the starting text, correction worsened 4 of 57 and 10 of 120 readings. "
+                                 + "These tests used middle-accuracy readings and the Sherlock FP8 model.")
+                        }
+                        .accessibilityElement(children: .contain)
+                        .accessibilityIdentifier("ap.settings.postCorrection.results")
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .font(.callout)
+        }
     }
 
     private var visionLocalAutoDate: Bool {
@@ -171,14 +199,22 @@ struct SettingsReadingPanel: View {
         )
     }
 
-    /// The rows of Provider & Model, by level (W47.settings-level-switch): at Basic the reading card's pick is all.
-    private static let providerRows: [SettingsLevels.Row] = [
-        .backend, .providerModel, .thinking, .cascade, .cascadeDisagreement, .pageKind, .handwritingOnTyped,
-        .visionLanguages, .visionTuning, .visionJudgement, .gatewayLocal, .gatewayFields, .customModels,
-    ]
+    /// Only settings for the active backend can make this section appear at Basic.
+    private var backendRows: [SettingsLevels.Row] {
+        if useGateway { return [.backend, .gatewayLocal, .gatewayFields] }
+        if useLocalAgent || useAppleVision { return [.backend] }
+        var rows: [SettingsLevels.Row] = [.backend, .providerModel, .cascade, .pageKind, .handwritingOnTyped]
+        if unavailableOpenRouterSelection == nil, selectedModel.supportsThinking { rows.append(.thinking) }
+        if OCRCascade(routeID: ocrCascadeRoute).escalationModel != nil { rows.append(.cascadeDisagreement) }
+        return rows
+    }
+
+    private var showsChangedCustomModels: Bool {
+        !useGateway && !useLocalAgent && !useAppleVision && !customModelStore.allCustomModels.isEmpty
+    }
 
     @ViewBuilder private var providerSection: some View {
-        Section("Provider & Model") {
+        Section("OCR backend and model") {
             Picker(selection: backendMode) {
                 Text("Direct API").tag(OCRBackendMode.direct)
                 Text("API Gateway").tag(OCRBackendMode.gateway)
@@ -223,9 +259,7 @@ struct SettingsReadingPanel: View {
                 Text("The command-line agent, its model and its check are in Settings › Accounts.")
                     .font(.caption).foregroundStyle(.primary)
                     .accessibilityIdentifier("ap.settings.localAgentHome")
-            } else if useAppleVision {
-                appleVisionControls
-            } else {
+            } else if !useAppleVision {
                 SettingsLevelRows(.providerModel) {
                     // Plain `$selectedProvider`: the model follows automatically, because `selectedModel`
                     // reads the store keyed by whatever the provider currently is.
@@ -391,7 +425,7 @@ struct SettingsReadingPanel: View {
     /// Local Vision controls. The language, speed, confidence, and vocabulary knobs are intentionally
     /// exposed here rather than hidden as constants: they materially affect what on-device OCR returns.
     @ViewBuilder private var appleVisionControls: some View {
-        Text("Free on-device transcription with macOS Vision. It does not use an API key or send images over the network.")
+        Text("Apple Vision reads images on this Mac at no cost and without an API key.")
             .font(.caption).foregroundStyle(.primary)
         SettingsField("Languages") {
             TextField("Languages", text: $visionLanguages, prompt: Text("Auto-detect or enter en-US, fr-FR"))
@@ -416,8 +450,8 @@ struct SettingsReadingPanel: View {
                     }
                     .settingsLevel(.thinking)
                 }
-                Text("Vision performs every image read locally. Only its extracted text is sent to this LLM for classification, segmentation, dates, and tags. Add this provider's API key in Settings › Accounts.")
-                    .font(.caption2).foregroundStyle(.primary)
+                Text("Sends only extracted text for classification, segmentation, dates, and tags. Add the provider’s key in Accounts.")
+                    .font(.caption).fixedSize(horizontal: false, vertical: true)
             }
         }
         if !visionUseLLMJudgment {

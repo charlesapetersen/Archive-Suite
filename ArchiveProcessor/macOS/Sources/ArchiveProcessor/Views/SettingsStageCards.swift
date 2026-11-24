@@ -10,6 +10,8 @@ struct SettingsStageCards: View {
     var rules: [String] = []
     /// The limits and this batch's totals, above the cards (the Collection panel).
     var limits = false
+    var showsActiveReader = false
+    var ruleSummaries: [String: String] = [:]
 
     @State private var showingRange = false
     /// Read so a change of Process Files' folder redraws the cards for the new collection.
@@ -28,7 +30,8 @@ struct SettingsStageCards: View {
                         if let card = model.cards.first(where: { $0.id == id }) {
                             StageCardView(card: card, choose: { actions.choose(card.id, $0) },
                                           backToApp: { actions.choose(card.id, nil) }, apply: actions.apply,
-                                          seeRange: { showingRange = true })
+                                          seeRange: { showingRange = true },
+                                          activeReader: showsActiveReader ? model.activeReadingName : nil)
                             ForEach(model.stageSwitches[card.id] ?? []) { sw in
                                 SheetSwitchRow(row: sw, setSwitch: actions.setSwitch)
                             }
@@ -36,7 +39,8 @@ struct SettingsStageCards: View {
                     }
                     ForEach(rules, id: \.self) { id in
                         if let stage = model.ruleStages.first(where: { $0.id == id }) {
-                            RuleStageBox(stage: stage, setSwitch: actions.setSwitch, setStrings: actions.setStrings)
+                            RuleStageBox(stage: stage, setSwitch: actions.setSwitch, setStrings: actions.setStrings,
+                                         summary: ruleSummaries[id])
                         }
                     }
                     // Only this host's own problem: the store's is shown once, by the panel's other views or the sheet.

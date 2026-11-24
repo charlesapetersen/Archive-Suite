@@ -18375,3 +18375,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   The off-screen Debug run checked at least 16 points below the full help text without scrolling at the fixed
   window size: Basic, Standard and Advanced in light and dark. The Process Files launch smoke passed. No bench cache.
   <!-- /W40.fix-processor-general-padding -->
+
+- [x] **W40.fix-processor-reading-scan — Make the Reading settings easier to scan [S · S3]** · §W40 verification phase · SHIPPED 2026-11-24 (this commit) (lane: processor) (uses: build,vm) — Lead with the active reading choice and make OCR backend and local-reading controls easy to find. Condense the main copy and give measured comparisons and explanations a readable structure. Preserve the figures and route caveats in accessible detail. Verify Basic, Standard and Advanced. [Walkthrough evidence](verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
+  Reading leads with the reader in use and places the backend and Apple Vision controls near the top.
+  Expandable details retain the measured comparisons, route caveats, correction results, and layout rules.
+  Verified Basic, Standard, and Advanced off-screen, including backend switching and the Range view.
+  The headless settings render and launch smoke passed. No bench cache was created.
+  <!-- /W40.fix-processor-reading-scan -->

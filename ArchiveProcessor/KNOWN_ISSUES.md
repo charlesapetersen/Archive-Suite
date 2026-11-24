@@ -4,10 +4,16 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ## Processor guided session 1 — November 23, 2026
 
-- Reading settings present too much text for the owner to scan easily. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-reading-scan)
 - Process Files shows About this collection when the destination is chosen, before any files are added. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-collection-prompt-intake)
 - Preservation uses generated folders and generic filenames, so the matching original is difficult to identify in Finder. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-preservation-names)
 - The Android Archive Capture launcher icon differs from the Mac Processor icon. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-android-launcher-icon)
+
+## FIXED (2026-11-24) — Reading settings were hard to scan
+
+- Reading starts with the reader in use. The OCR backend picker and Apple Vision controls appear near the top,
+  and expanded details hold the longer explanations and measurements.
+  [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
+  (accepted: fixed by W40.fix-processor-reading-scan)
 
 ## FIXED (2026-11-23) — Help text at the bottom of General settings
 

@@ -104,6 +104,7 @@ struct SettingsSheetModel {
         let appPick: String?
         /// What Process Files runs now, when it is not the card's route.
         let runsNow: String?
+        let readingWarning: String?
         /// The run setting the card's route can be applied to, when it is not the one in use.
         let apply: Apply?
         let sources: [String]
@@ -218,6 +219,7 @@ struct SettingsSheetModel {
     }
 
     let table: SettingsRouteTable
+    let activeReadingName: String
     let answers: SettingsAnswers
     let resources: SettingsResources
     let solution: SettingsSolution
@@ -245,6 +247,7 @@ struct SettingsSheetModel {
     init(table: SettingsRouteTable, pairs: OCRPairMatrix?, resolver: SettingsResolver, macMemoryGB: Double,
          pages: Int, month: SettingsMonthSpend = .init(), running: Running, claudeBilling: ClaudeCLIBilling) {
         self.table = table
+        activeReadingName = running.unavailableModelWarning == nil ? running.readingName : "Reader unavailable"
         var resources = resolver.resources(macMemoryGB: macMemoryGB)
         if claudeBilling != .subscription { resources.plans.remove("claude") }
         let base = resolver.answers(pages: pages, spentThisMonthUSD: month.usd)
@@ -726,14 +729,18 @@ struct SettingsSheetModel {
             }
         default: break
         }
+        var readingWarning: String?
         if stage.id == "reading", let warning = running.unavailableModelWarning {
+            readingWarning = warning
             runsNow = warning
         }
         // W46.training-optout: the reader Process Files uses now may itself train on the pages.
         if stage.id == "reading", a.noTraining, let id = running.readingRouteID, id != route?.id,
            let now = stage.route(id), let rec = solver.trainingRisk(now) {
-            runsNow = (runsNow.map { $0 + " " } ?? "") + "What Process Files reads with now may train on your pages ("
+            let warning = "What Process Files reads with now may train on your pages ("
                 + rec.provider + ": " + rec.summary + "), which this collection's switch rules out."
+            readingWarning = warning
+            runsNow = (runsNow.map { $0 + " " } ?? "") + warning
         }
 
         var sources = [String]()
@@ -783,7 +790,7 @@ struct SettingsSheetModel {
             better: betterAll,
             trainingCost: Self.trainingCost(stage, app: app, solver: solver, answers: a, words: words),
             alternatives: Array(alternatives), options: options, appPick: appPick,
-            runsNow: runsNow, apply: apply, sources: sources)
+            runsNow: runsNow, readingWarning: readingWarning, apply: apply, sources: sources)
     }
 
     /// W46.training-optout: the best route the "must not train" switch hides on this card, the only thing keeping it

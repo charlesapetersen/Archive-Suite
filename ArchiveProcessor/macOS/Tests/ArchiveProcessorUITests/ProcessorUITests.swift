@@ -728,6 +728,12 @@ final class ProcessorUITests: XCTestCase {
         defer { chooseBackend("Direct API", in: settings) }
 
         chooseBackend("Apple Vision (on this Mac)", in: settings)
+        let reader = element("ap.settings.activeReader")
+        XCTAssertTrue(waitUntil { renderedText(of: reader).contains("Apple Vision") })
+        let languages = element("ap.settings.visionLanguages")
+        XCTAssertTrue(languages.exists)
+        XCTAssertTrue(settings.scrollViews.firstMatch.frame.contains(languages.frame),
+                      "Apple Vision languages should be visible without scrolling")
         let conflict = element("ap.settings.visionTaggingConflict")
         XCTAssertTrue(conflict.waitForExistence(timeout: 5), "an LLM Tagging mode must be named beside transcription-only")
         XCTAssertTrue(renderedText(of: element("ap.ocr.reOCRExplanation")).contains("only transcribes"),
