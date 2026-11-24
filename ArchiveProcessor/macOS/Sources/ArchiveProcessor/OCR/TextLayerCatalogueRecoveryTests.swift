@@ -15,7 +15,7 @@ extension TextLayerTestDriver {
         return record
     }
 
-    static func catalogueRecoveryChecks(dir: URL, image: URL, multipagePDF: URL) async {
+    static func catalogueRecoveryChecks(dir: URL, image: URL, multipagePDF: URL, preservationOnly: Bool) async {
         guard let scratchState = ProcessInfo.processInfo.environment["TEXTLAYER_TEST_STATE"],
               OCRProcessor.pendingCatalogueURL.deletingLastPathComponent().path == scratchState else {
             check("10 catalogue recovery uses an isolated journal", false)
@@ -23,6 +23,7 @@ extension TextLayerTestDriver {
         }
         do {
             try preservationFilingChecks(dir: dir, jpeg: image, pdf: multipagePDF)
+            if preservationOnly { return }
             try await copiedSourceFacts(dir: dir, image: image)
             try await cachedCatalogueResume(dir: dir, image: image)
             try await mixedCatalogueResume(dir: dir, image: image, pdf: multipagePDF)
@@ -66,14 +67,17 @@ extension TextLayerTestDriver {
         let inputs = try ordered.map { input, index in
             ProcessorPreservationFiling.LogicalPage(source: try .init(url: input), originalPageIndex: index)
         }
+        let target = output.appendingPathComponent("Reading.pdf")
         let preservation = try ProcessorPreservationFiling(fileID: identity.fileID, pages: pages, inputs: inputs)
+            .named(for: target)
+        let orderedNames = ["Reading - page 1.jpg", "Reading - page 2.heic", "Reading - page 3.pdf",
+                            "Reading - page 4.jpg", "Reading - page 5.tiff", "Reading - page 3.pdf"]
         let catalogue = try ProcessorCatalogueRecord(identity: identity, sourcePages: pages, document: document,
                                                        fileFields: .init(),
                                                        preservationManifestSHA256: preservation.manifest.digest()).encoded()
         let prepared = output.appendingPathComponent("working.derivative")
         try PDFGenerator().mergeDocumentPDFs(sourcePDFs: pages.map { _ in pdf }, outputURL: prepared,
                                              catalogueIdentity: identity)
-        let target = output.appendingPathComponent("Reading.pdf")
         let instance = UUID()
         let filing = try ProcessorCatalogueFiling(operationID: identity.fileID, root: output,
                                                    rootInstanceID: instance, destination: target)
@@ -99,6 +103,21 @@ extension TextLayerTestDriver {
             check("10 altered intake after the first staged source withholds the receipt", !fm.fileExists(atPath: receiptURL.path))
         }
         try heicBytes.write(to: heic)
+        let components = PreservationCopy.folderComponents(documentID: document.id, fileID: identity.fileID)
+        let pending = base.appendingPathComponent(components[1])
+            .appendingPathComponent(".archivesuite-preservation-" + components[2])
+        let collision = pending.appendingPathComponent(orderedNames[1])
+        let foreign = Data("occupied Preservation name".utf8)
+        try foreign.write(to: collision, options: .withoutOverwriting)
+        do {
+            _ = try filing.file(preparedPDF: prepared, record: catalogue, preservation: preservation)
+            check("10 an occupied PDF-based name withholds the filing receipt", false)
+        } catch {
+            check("10 an occupied PDF-based name withholds the filing receipt without overwrite",
+                  !fm.fileExists(atPath: receiptURL.path) && !fm.fileExists(atPath: target.path)
+                    && (try? Data(contentsOf: collision)) == foreign)
+        }
+        try fm.removeItem(at: collision)
         let held = namesakeFolder.appendingPathComponent("Held.jpg")
         try fm.moveItem(at: namesake, to: held)
         defer {
@@ -119,6 +138,8 @@ extension TextLayerTestDriver {
             exact = exact && first.bytes == sourceBytes && second.bytes == sourceBytes
                 && first.selection.originalPageIndex == input.1
                 && first.selection.source.name == input.0.lastPathComponent
+                && first.fileURL.lastPathComponent == orderedNames[index]
+                && second.fileURL == first.fileURL
         }
         check("10 retry preserves exact JPEG, HEIC, TIFF and whole PDF bytes and correct page order",
               exact && reopened == receipt && preservation.sources.count == 5 && fm.fileExists(atPath: receiptURL.path))
@@ -126,6 +147,17 @@ extension TextLayerTestDriver {
             let copy = URL(fileURLWithPath: keep).appendingPathComponent("preservation-reading.pdf")
             try fm.copyItem(at: target, to: copy)
         }
+        let renamed = output.appendingPathComponent("Renamed derivative.pdf")
+        try fm.moveItem(at: target, to: renamed)
+        try fm.moveItem(at: target.appendingPathExtension("archivesuite.json"),
+                        to: renamed.appendingPathExtension("archivesuite.json"))
+        let renamedOccurrence = CatalogueAssociation.Occurrence(rootInstanceID: instance,
+                                                                 relativePath: renamed.lastPathComponent)
+        let original = try PreservationCopy.open(in: reader, at: renamedOccurrence, physicalPageIndex: 0,
+                                                  expected: identity)
+        let originalBytes = try Data(contentsOf: namesake)
+        check("10 renaming the PDF and companion preserves lookup by identity and the original filename",
+              original.bytes == originalBytes && original.fileURL.lastPathComponent == orderedNames[0])
     }
 
     private static func copiedSourceFacts(dir: URL, image: URL) async throws {
@@ -245,6 +277,9 @@ extension TextLayerTestDriver {
             let last = try PreservationCopy.open(in: reader, at: occurrence, physicalPageIndex: 3)
             exactMixed = first.bytes == originalPDF && last.bytes == originalPDF
                 && first.selection.originalPageIndex == 0 && last.selection.originalPageIndex == 1
+                && first.fileURL == last.fileURL
+                && first.fileURL.lastPathComponent == rebuilt.deletingPathExtension()
+                    .appendingPathExtension(pdf.pathExtension).lastPathComponent
         }
         check("10 actual mixed Process Files resume ties both PDF pages to one exact original", exactMixed)
         let pdfText = rebuilt.flatMap { PDFDocument(url: $0)?.string }

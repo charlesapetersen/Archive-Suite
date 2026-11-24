@@ -407,6 +407,7 @@ extension OCRProcessor {
             let preservation = try draft.preservationIntake.map { intake in
                 let inputs = try Self.preservationPages(for: draft, pages: sourcePages, intake: intake)
                 return try ProcessorPreservationFiling(fileID: draft.identity.fileID, pages: sourcePages, inputs: inputs)
+                    .named(for: draft.destination)
             }
             let data = try ProcessorCatalogueRecord(identity: draft.identity, sourcePages: sourcePages,
                                                       document: draft.document, fileFields: draft.fileFields,

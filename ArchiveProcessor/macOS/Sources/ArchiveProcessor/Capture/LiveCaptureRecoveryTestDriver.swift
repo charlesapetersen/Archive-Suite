@@ -3758,10 +3758,15 @@ enum LiveCaptureRecoveryTestDriver {
                     let recovered = await uwSettle { !uwProc.isFinalizing && uwProc.staged.isEmpty }
                     let sourceDirectory = preserveDestination.appendingPathComponent(PreservationCopy.directoryName)
                     let stored = (fm.enumerator(at: sourceDirectory, includingPropertiesForKeys: nil)?.allObjects ?? [])
-                        .compactMap { $0 as? URL }.first { $0.pathExtension == "jpeg" }
+                        .compactMap { $0 as? URL }.first { $0.pathExtension == source.pathExtension }
+                    let filedPDF = try fm.contentsOfDirectory(at: preserveDestination, includingPropertiesForKeys: nil)
+                        .first { $0.pathExtension == "pdf" }
+                    let expectedName = filedPDF?.deletingPathExtension().appendingPathExtension(source.pathExtension)
+                        .lastPathComponent
                     let exact = stored.flatMap { try? Data(contentsOf: $0) } == uwJPEG
                     check("Live Capture retries the pinned filing and keeps the exact restored original before retiring staging",
-                          recovered && exact && !fm.fileExists(atPath: source.path))
+                          recovered && exact && stored?.lastPathComponent == expectedName
+                              && !fm.fileExists(atPath: source.path))
                 } catch {
                     check("Live Capture preservation recovery fixture could be exercised", false)
                 }

@@ -105,6 +105,18 @@ struct ProcessorCatalogueRecord: Encodable, Sendable {
         return record.originalJSON
     }
 
+    static func bindingPreservation(_ preservation: ProcessorPreservationFiling,
+                                    replacing previous: ProcessorPreservationFiling, in data: Data) throws -> Data {
+        let record = try CatalogueRecord(json: data)
+        guard try record.preservationManifestSHA256 == previous.manifest.digest(),
+              var fields = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw PreservationCopy.Failure.unverified
+        }
+        try preservation.manifest.validate(against: record)
+        fields["preservationManifestSHA256"] = try preservation.manifest.digest().base64EncodedString()
+        return try CatalogueRecord(json: JSONSerialization.data(withJSONObject: fields, options: .sortedKeys)).originalJSON
+    }
+
     static func fileFields(tags: GeneratedTags, quality: String?, unread: Bool, failed: Bool) -> FileFields {
         let rating = quality.flatMap { Int($0.dropFirst()) }
         return FileFields(

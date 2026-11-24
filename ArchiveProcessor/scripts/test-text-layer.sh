@@ -4,6 +4,7 @@
 # no network), and reads the PDFs back through PDFKit. Never the corpus, no window.
 #
 #   scripts/test-text-layer.sh        (TEXTLAYER_TEST_KEEP=<dir> keeps the layered PDFs there)
+#   TEXTLAYER_CATALOGUE_ONLY=preservation scripts/test-text-layer.sh  (only the scratch preservation filing checks)
 #
 # When veraPDF is installed (/opt/homebrew/bin/verapdf), every kept output is validated as PDF/A-2b too (W42.int-s5).
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox

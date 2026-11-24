@@ -79,6 +79,17 @@ struct CatalogueReaderTests {
             #expect(try PreservationCopy.open(in: adopted, at: occurrence, physicalPageIndex: 0).bytes == bytes)
             #expect(adopted.discover().inventory.relativePDFPaths == [path])
 
+            for names in [[], ["../Reading.pdf"], ["Reading.jpg"], [".hidden.pdf"], ["Reading.PDF"]] {
+                let invalid = PreservationCopy.Manifest(fileID: manifest.fileID, sources: manifest.sources,
+                                                        pages: manifest.pages, storedNames: names)
+                var invalidFacts = facts
+                invalidFacts["preservationManifestSHA256"] = try invalid.digest().base64EncodedString()
+                try JSONSerialization.data(withJSONObject: invalidFacts).write(to: companion(path, in: root))
+                try invalid.encoded().write(to: map)
+                #expect(throws: PreservationCopy.Failure.unverified) { try status() }
+            }
+            try JSONSerialization.data(withJSONObject: facts).write(to: companion(path, in: root))
+
             // A changed page map is refused even when it still names the right source file and IDs.
             let altered = PreservationCopy.Manifest(fileID: owner.file, sources: [source],
                                                       pages: [.init(id: page, sourceIndex: 0, originalPageIndex: 2)])

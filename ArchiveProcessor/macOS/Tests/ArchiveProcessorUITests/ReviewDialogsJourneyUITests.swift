@@ -163,6 +163,13 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
                 FileManager.default.fileExists(atPath: $0.appendingPathExtension("archivesuite.json").path)
             }
             XCTAssertEqual(readingCopies.count, 1, "the preservation copy is separate from the filed PDF")
+            let readingCopy = try XCTUnwrap(readingCopies.first)
+            let originalName = readingCopy.lastPathComponent
+            let preservationRoot = readingCopy.deletingLastPathComponent().appendingPathComponent("Preservation")
+            let candidate = FileManager.default.enumerator(at: preservationRoot, includingPropertiesForKeys: nil)?
+                .compactMap { $0 as? URL }.first { $0.lastPathComponent == originalName }
+            let original = try XCTUnwrap(candidate, "the preserved PDF has the filed PDF's name in Finder")
+            XCTAssertEqual(try Data(contentsOf: original), try Data(contentsOf: pdf))
             if !enabled {
                 let (settings, _, toggle) = try documentReviewSetting()
                 setDocumentReview(toggle, enabled: true)

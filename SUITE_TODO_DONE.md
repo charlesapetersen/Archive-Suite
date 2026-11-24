@@ -18389,3 +18389,19 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   the interview there before Start. Saved answers stay available in Settings › Collection.
   [Verification](verification/evidence/processor/W40.fix-processor-collection-prompt-intake.md). No bench cache was created.
   <!-- /W40.fix-processor-collection-prompt-intake -->
+
+- [x] **W40.fix-processor-preservation-names — Use recognizable PDF-based names for Preservation copies [M · S3 · Tier-2]** · §W40 verification phase · SHIPPED 2026-11-24 (this commit) (lane: processor) (uses: build,vm) — Make Preservation copies recognizable in Finder from the associated PDF name. Keep the original extension and bytes, and give multiple originals for one PDF unambiguous page suffixes. Preserve the durable identity and mapping used by Reader and Improve OCR. Verify both filing paths, PDF rename, collision and interrupted filing recovery on scratch copies. [Walkthrough evidence](verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
+  Both filing paths use the filed PDF stem and the original extension. For a PDF made from
+  several originals, the suffix gives the first logical page supplied by each original.
+  The digest-bound page map keeps Reader lookup working after a paired PDF and companion rename.
+  Existing maps still resolve, including for interrupted filing already pinned to the prior names.
+  The scratch Preservation checks passed exact multi-format bytes, collision refusal, partial
+  copy recovery and PDF rename. veraPDF confirmed PDF/A-2b. Process Files passed its off-screen
+  filename and byte checks with document review on and off. The local Android-to-Mac filing phase
+  matched all three numbered originals, 3,322,480 bytes. The later read-only phase found a green
+  check on the error banner and stopped before the stage-for-later phase. Live Capture recovery
+  passed 316 checks, including a retry with the same pinned filename. Improve OCR preservation,
+  ArchiveCore, Reader and Notes suites passed. The broad text-layer run had three handwriting
+  and straightening failures, and its full catalogue mode timed out. The dedicated Preservation
+  mode passed. Automatic approval review blocked the Gemini fixture uploads. Cost $0.
+  <!-- /W40.fix-processor-preservation-names -->

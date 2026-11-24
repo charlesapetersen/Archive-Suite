@@ -104,9 +104,13 @@ share a parent. Moving the entire containing folder or changing the matched PDF 
 does not change the association.
 
 The map contains `fileID`, `sources`, and `pages`. Each source has its original intake `name`,
-native `format`, and a `fingerprint` with `byteCount` and base64 `sha256`. The exclusive storage names
-are `source-1.jpeg`, `source-2.pdf`, and so on, using the format token and the source's one-based
-position. These are exact intake file bytes. Each map page uses the reading record's stable source-page
+native `format`, and a `fingerprint` with `byteCount` and base64 `sha256`. The map's `storedNames`
+array records one filename per source in source order. Processor uses the filed PDF's base name
+and preserves the original extension. For several originals it adds a suffix such as ` - page 3`,
+using the first reading page that comes from that original, counting document pages without their
+OCR text partners. The filing name stays in the map when the reading PDF and companion are renamed.
+Maps without `storedNames` use `source-1.jpeg`, `source-2.pdf`, and so on. All copies use the exact
+intake file bytes. Each map page uses the reading record's stable source-page
 `id`, zero-based `sourceIndex` and zero-based `originalPageIndex`. Both halves of an image and OCR pair
 share one source page. Several derivative pages that came from a single native PDF share one copy and
 carry their original physical page indices. A legitimate metadata edit can keep the map by leaving

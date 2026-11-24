@@ -58,15 +58,19 @@ enum TextLayerTestDriver {
             check("0 smoke pages drawn", false); return
         }
         let reading = memo.joined(separator: "\n")
-        if ProcessInfo.processInfo.environment["TEXTLAYER_CATALOGUE_ONLY"] == "1" {
+        let catalogueMode = ProcessInfo.processInfo.environment["TEXTLAYER_CATALOGUE_ONLY"]
+        if catalogueMode == "1" || catalogueMode == "preservation" {
             let legacy = dir.appendingPathComponent("jpeg.pdf")
             guard await write(jpeg, reading: reading, kind: .typewritten, rotation: 0, to: legacy) != nil else {
                 check("8 source PDF fixture written", false)
                 return
             }
-            await catalogueChecks(dir: dir, jpeg: jpeg, reading: reading)
-            await freshCatalogueChecks(dir: dir, inputs: [jpeg, png])
-            await catalogueRecoveryChecks(dir: dir, image: jpeg, multipagePDF: legacy)
+            if catalogueMode == "1" {
+                await catalogueChecks(dir: dir, jpeg: jpeg, reading: reading)
+                await freshCatalogueChecks(dir: dir, inputs: [jpeg, png])
+            }
+            await catalogueRecoveryChecks(dir: dir, image: jpeg, multipagePDF: legacy,
+                                          preservationOnly: catalogueMode == "preservation")
             return
         }
         await childProcessChecks(dir, jpeg: jpeg)

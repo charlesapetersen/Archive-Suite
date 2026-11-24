@@ -316,6 +316,8 @@ The initial setup interview keeps full-resolution originals by default. You can 
 **Settings → General → Answer the setup questions**. Keeping them adds the size of the intake files
 to your archive. Processor shows the known size before filing. Live Capture keeps the exact bytes
 the Mac received from the phone, and Process Files keeps the native files you admitted.
+In Finder, each new copy takes the filed PDF's base name and keeps its original extension.
+When several originals make up one PDF, each gets a page suffix such as ` - page 3`.
 
 Archive Reader can show the original behind a reading page. To transfer an archive with its originals,
 include the reading PDFs, their catalogue companions and the matching **Preservation** folder. Sharing

@@ -101,11 +101,18 @@ public enum PreservationCopy {
         public let fileID: UUID
         public let sources: [Source]
         public let pages: [Page]
+        public let storedNames: [String]?
 
-        public init(fileID: UUID, sources: [Source], pages: [Page]) {
+        public init(fileID: UUID, sources: [Source], pages: [Page], storedNames: [String]? = nil) {
             self.fileID = fileID
             self.sources = sources
             self.pages = pages
+            self.storedNames = storedNames
+        }
+
+        /// Call after validation when reading a decoded manifest.
+        public func storedName(at index: Int) -> String {
+            storedNames?[index] ?? sources[index].storedName(at: index)
         }
 
         public func encoded() throws -> Data {
@@ -130,6 +137,20 @@ public enum PreservationCopy {
                     && $0.originalPageIndex >= 0 && $0.originalPageIndex < Int.max
                     && (sources[$0.sourceIndex].format == .pdf || $0.originalPageIndex == 0) }) else {
                 throw Failure.unverified
+            }
+            if let storedNames {
+                let distinct = Set(storedNames.map {
+                    $0.folding(options: .caseInsensitive, locale: Locale(identifier: "en_US_POSIX"))
+                        .precomposedStringWithCanonicalMapping
+                })
+                guard storedNames.count == sources.count, distinct.count == sources.count,
+                      zip(storedNames, sources).allSatisfy({ name, source in
+                          let suffix = (name as NSString).pathExtension
+                          return !name.hasPrefix(".") && !name.utf8.contains(0)
+                              && !name.utf8.contains(UInt8(ascii: "/")) && name.utf8.count <= NAME_MAX
+                              && suffix.utf8.elementsEqual((source.name as NSString).pathExtension.utf8)
+                              && Format(extension: suffix) == source.format
+                      }) else { throw Failure.unverified }
             }
         }
     }
@@ -222,7 +243,7 @@ public enum PreservationCopy {
                         guard let page = manifest.pages.first(where: { $0.id == pageID }) else { throw Failure.unverified }
                         let source = manifest.sources[page.sourceIndex]
                         let selection = Selection(source: source, originalPageIndex: page.originalPageIndex)
-                        return try reader.directory.withFile(source.storedName(at: page.sourceIndex), in: folder,
+                        return try reader.directory.withFile(manifest.storedName(at: page.sourceIndex), in: folder,
                                                              artifact: .companion) { entry in
                             guard entry.info.st_size == source.fingerprint.byteCount else { throw Failure.unverified }
                             return try action(selection, entry)

@@ -3191,13 +3191,23 @@ final class LiveCaptureProcessor: ObservableObject {
                 }
                 let first = last + 1
                 last += segment.numberedSlots
+                var pinned = segment
+                if let copies = segment.preservationCopies, copies.count != records.count {
+                    throw PreservationCopy.Failure.unverified
+                }
                 let pdfs = try records.enumerated().map { index, data in
                     let record = try CatalogueRecord(json: data)
                     let filename = "\(CollectionNumbering.format(first + index)) \(plan.name).pdf"
+                    let destination = folder.appendingPathComponent(filename)
+                    if let previous = segment.preservationCopies?[index] {
+                        let preservation = previous.named(for: destination)
+                        pinned.catalogueRecords?[index] = try ProcessorCatalogueRecord.bindingPreservation(
+                            preservation, replacing: previous, in: data)
+                        pinned.preservationCopies?[index] = preservation
+                    }
                     return try ProcessorCatalogueFiling(operationID: record.fileID, root: root, rootInstanceID: rootInstance,
-                                                        destination: folder.appendingPathComponent(filename))
+                                                        destination: destination)
                 }
-                var pinned = segment
                 pinned.catalogueDestination = CatalogueDestination(root: root, folder: folder, name: plan.name,
                                                                   firstNumber: first, pdfs: pdfs)
                 return pinned

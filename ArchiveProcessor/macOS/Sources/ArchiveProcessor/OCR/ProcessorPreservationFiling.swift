@@ -75,6 +75,34 @@ struct ProcessorPreservationFiling: Codable, Sendable {
         manifest = .init(fileID: fileID, sources: sources.map(\.source), pages: mappings)
     }
 
+    private init(sources: [Intake], manifest: PreservationCopy.Manifest) {
+        self.sources = sources
+        self.manifest = manifest
+    }
+
+    /// Freeze names from the assigned reading PDF before the pair is journaled.
+    func named(for pdf: URL) -> Self {
+        let stem = pdf.deletingPathExtension().lastPathComponent
+        let visibleStem = stem.hasPrefix(".") ? "Original " + stem : stem
+        var firstPages: [Int: Int] = [:]
+        for (page, mapping) in manifest.pages.enumerated() where firstPages[mapping.sourceIndex] == nil {
+            firstPages[mapping.sourceIndex] = page + 1
+        }
+        let names = sources.enumerated().map { index, input in
+            let pageSuffix = sources.count > 1 ? " - page \(firstPages[index] ?? index + 1)" : ""
+            let suffix = pageSuffix + "." + (input.source.name as NSString).pathExtension
+            // Leave room for the suffix, including on volumes that decompose Unicode.
+            var budget = Int(NAME_MAX) - suffix.utf8.count
+            let prefix = visibleStem.prefix { character in
+                budget -= String(character).decomposedStringWithCanonicalMapping.utf8.count
+                return budget >= 0
+            }
+            return (prefix.isEmpty ? "Original" : String(prefix)) + suffix
+        }
+        return Self(sources: sources, manifest: .init(fileID: manifest.fileID, sources: manifest.sources,
+                                                     pages: manifest.pages, storedNames: names))
+    }
+
     /// Borrows the pinned destination parent under the existing catalogue lock.
     func file(in parent: Int32, record: CatalogueRecord) throws {
         try manifest.validate(against: record)
@@ -118,7 +146,7 @@ struct ProcessorPreservationFiling: Codable, Sendable {
             // file at a reserved name stops filing without being replaced.
             for (index, input) in sources.enumerated() {
                 try Task.checkCancellation()
-                let name = input.source.storedName(at: index)
+                let name = manifest.storedName(at: index)
                 if try Self.exists(name, in: folder) {
                     try Self.verifySource(name, fingerprint: input.source.fingerprint, in: folder)
                 } else {
@@ -156,7 +184,7 @@ struct ProcessorPreservationFiling: Codable, Sendable {
     private func verify(in folder: Int32) throws {
         try Self.verifyMap(manifest.encoded(), in: folder)
         for (index, input) in sources.enumerated() {
-            try Self.verifySource(input.source.storedName(at: index), fingerprint: input.source.fingerprint, in: folder)
+            try Self.verifySource(manifest.storedName(at: index), fingerprint: input.source.fingerprint, in: folder)
         }
     }
 

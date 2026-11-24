@@ -4,8 +4,15 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ## Processor guided session 1 — November 23, 2026
 
-- Preservation uses generated folders and generic filenames, so the matching original is difficult to identify in Finder. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-preservation-names)
 - The Android Archive Capture launcher icon differs from the Mac Processor icon. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-android-launcher-icon)
+
+## FIXED (2026-11-24) — Preservation filenames were hard to match to reading PDFs
+
+- New copies take the filed PDF's base name, with the original extension and a page suffix when
+  several originals made the PDF. The verified page map retains the filenames across paired PDF
+  and companion renames.
+  [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
+  (accepted: fixed by W40.fix-processor-preservation-names)
 
 ## FIXED (2026-11-24) — Collection interview opened before files were added
 

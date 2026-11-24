@@ -842,7 +842,6 @@ Order lives in the plan's `### TIER 7` block. The owner approved it on 2026-10-0
 never auto-picked; an `-owner-ok` line ticked `DECLINED` sends its dependant to the fallback in rule 11 of the
 daemon plan. Reproduced bugs this phase finds are filed here as `W40.fix-<slug>` with a severity (rule 8).
 
-- [ ] **W40.fix-processor-preservation-names — Use recognizable PDF-based names for Preservation copies [M · S3 · Tier-2]** (lane: processor) (uses: build,vm) — Make Preservation copies recognizable in Finder from the associated PDF name. Keep the original extension and bytes, and give multiple originals for one PDF unambiguous page suffixes. Preserve the durable identity and mapping used by Reader and Improve OCR. Verify both filing paths, PDF rename, collision and interrupted filing recovery on scratch copies. [Walkthrough evidence](verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
 - [ ] **W40.fix-android-launcher-icon — Match the Android Capture icon to the Mac Processor icon [S · S4]** (lane: processor) (uses: build) — Use the current Archive Processor Mac artwork for the Android Archive Capture launcher icon, including Android adaptive icon treatment. Check the installed icon on the emulator's launcher at standard sizes. [Walkthrough evidence](verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
 
 **Archive Processor's items wait for the integration (owner, 2026-10-14).** Vision OCR's engine is to be brought into
