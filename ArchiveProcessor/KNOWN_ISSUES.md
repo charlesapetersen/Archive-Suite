@@ -192,7 +192,8 @@ classification edit. [Independent VM evidence](../verification/evidence/processo
 
 - Fresh Process Files runs with model-proposed document boundaries pause before tagging by default.
   Turning **Review document segmentation** off skips that pause. Other confirmations still apply.
-  [Verification record](../verification/evidence/processor/W49.proc-s046-verify.md). (shipped: W49.proc-s046-review-toggle)
+  [Verification record](../verification/evidence/processor/W49.proc-s046-verify.md)
+  (accepted: fixed in W49.proc-s046-review-toggle, 3d07b226).
 
 ## Live Capture files a document silently after Automatic tagging gets HTTP 500 (S-045)
 
@@ -294,16 +295,19 @@ the status explains that the change applies to the working list and the PDF stil
 `OCR/ReadQualityDisagreement.swift`; figures in `segbench-results/post-read-flag.md` §"Each reader's own cut".
 - Every reader's cut but Gemini 3.7 Flash's was fitted on the 96 plain photographs only. On a damaged capture Vision
   reads worse, so the same cut may flag more good pages (Gemini's plain-photo cut flagged 21% of its good damaged
-  readings). The run summary names the benchmark images and the poor readings each flagged reader caught at its fitted cut.
+  readings). The run summary names the benchmark images and the poor readings each flagged reader caught at its fitted cut
+  (queued: W46.post-read-flag-readers).
 - Claude Sonnet 5.5 and Mistral OCR pages are never flagged: their cuts hold the 5% ceiling but caught none of their
   poor readings on the 96 (0 of 2, 0 of 7) (accepted: owner, 2026-11-19 walkthrough, call 17: a flag would only be
   false alarms; W47.wh-read-flag-cm declined).
 - Gemini 3.8 Flash, Gemini 3.1 Pro, Gemini 3.5 Flash Lite, Qwen3.8 Flash and Qwen3.6 27B have no
-  read-poorly cut (owner call 24, W46.p17-flag-unflag-five). Each former cut caught zero poor answers
-  and flagged four good answers in the plain-photo fit. Earlier hit rates counted failed requests.
+  read-poorly cut. Each former cut caught zero poor answers and flagged four good answers in the plain-photo fit.
+  Earlier hit rates counted failed requests (accepted: owner, 2026-11-20, call 24, remove the five cuts as
+  shipped in W46.p17-flag-unflag-five).
 - Batch results and second reads use the cutoff for the model that supplied the text, when enabled.
   The official Qwen3.6 27B FP8 import also has no cut. Vision compares against the corrected image when
-  the app turns a page. A failed Vision pass leaves the page unflagged.
+  the app turns a page. A failed Vision pass leaves the page unflagged (accepted: owner, 2026-11-19,
+  call 22, W49.proc-read-flag-wiring, with the FP8 cut removed under call 24 on 2026-11-20).
 - The plain-photo check skips region-ordered newspaper replies, including region-ordered cluster imports, so
   all 393 region answers on L9 were ineligible. The comparison using Vision on the same crops catches 20/58
   strict-poor answers and flags 5/335 good answers at the candidate 0.45 threshold. The 15 scans (14 from one
