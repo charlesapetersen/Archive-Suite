@@ -41,6 +41,54 @@ enum ProcessorUITestConfiguration {
         isActive && KeychainHelper.isHeadlessTestMode && arguments.contains("-APUITestLiveCaptureTrainingWarning")
     }
 
+    static var showsLiveCaptureFinishSettle: Bool {
+        isActive && KeychainHelper.isHeadlessTestMode && arguments.contains("-APUITestLiveCaptureFinishSettle")
+    }
+
+    /// Two distinct wired photos with a relay status snapshot, but no subsequent scan.
+    @MainActor static func receiveFinishSettlePhotos(in session: CaptureSession) {
+        guard showsLiveCaptureFinishSettle, session.config == nil, let outputDirectory else { return }
+        var config = SessionProcessingConfig.fromDefaults()
+        config.outputDirectory = outputDirectory
+        config.provider = .appleVision
+        config.model = LLMModel.appleVisionModels[0]
+        config.apiKey = ""
+        config.gateway = nil
+        config.localAgent = nil
+        config.visionTextLLM = nil
+        config.taggingMode = .none
+        config.rotationMode = .off
+        config.mergeDocuments = false
+        config.outputImageFile = false
+        config.keepPreservationCopies = true
+        config.cascade = .off
+
+        LiveCaptureProcessor._recoveryTestOCRStub = OCRResult(text: "Scratch transcription", classification: nil,
+                                                             errorMessage: nil, errorCode: nil)
+        session._recoveryTestBeginLive(config: config, stagingDir: LiveCaptureProcessor.stagingDir(for: session))
+        session.modelWiredReceiverWithDriveStartingForUITest()
+        let sender = UUID()
+        let scan = session.beginRelayScan()
+        if arguments.contains("-APUITestPreviouslyUsedRelay") {
+            session.updateRelayPhonePending(PhoneQueueStatus(sender: sender, revision: 1, pending: 1))
+        }
+        session.updateRelayPhonePending(PhoneQueueStatus(sender: sender, revision: 2, pending: 0))
+        session.endRelayScan(scan, receivedPhoto: false, checkedPhoneStatus: true)
+        session.relayReceiverDidFail("Scratch receiver unavailable")
+        for seq in 1...2 {
+            let image = NSImage(size: NSSize(width: 160, height: 200))
+            image.lockFocus()
+            (seq == 1 ? NSColor.white : NSColor.lightGray).setFill()
+            NSBezierPath(rect: NSRect(x: 0, y: 0, width: 160, height: 200)).fill()
+            image.unlockFocus()
+            guard let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff),
+                  let jpeg = bitmap.representation(using: .jpeg, properties: [:]),
+                  session.ingest(jpeg: jpeg, groupId: "scratch-wired", seq: seq, type: .document,
+                                 quality: nil, year: nil, month: nil, deviceName: "Wired phone") != nil else { return }
+        }
+        _ = session.markSegmentComplete(groupId: "scratch-wired", quality: nil, year: nil, month: nil)
+    }
+
     static var showsGemmaOffer: Bool { isActive && arguments.contains("-APUITestGemmaOffer") }
     static var showsLabelFallback: Bool { isActive && arguments.contains("-APUITestLabelFallback") }
 

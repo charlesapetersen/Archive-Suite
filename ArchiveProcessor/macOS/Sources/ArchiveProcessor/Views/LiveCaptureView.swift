@@ -481,28 +481,26 @@ struct LiveCaptureView: View {
     /// regeneration, and the modifier would be dead code asserting a reachability that does not exist.
     @ViewBuilder private var pendingFinishRow: some View {
         ProgressView().controlSize(.small)
-        if session.phonePendingActive {
+        if session.relayPhonePendingCount > 0 || liveProc.finishWaitingForRelayScan {
+            VStack(alignment: .leading, spacing: 2) {
+                if session.relayPhonePendingCount > 0 {
+                    Text("Waiting for the phone to send \(session.relayPhonePendingCount) more photo(s).")
+                } else {
+                    Text("Waiting for Drive to check for more photos.")
+                }
+                Text("If this continues, cancel Finish, check Drive sign-in, then restart the connection and try Finish again.")
+            }
+            .font(.caption).foregroundStyle(.primary)
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("live.finish-relay-wait")
+        } else if session.phonePendingActive {
             Text("Finishing — the phone still has \(session.phonePendingCount) photo(s) to send. Waiting for them to arrive…")
                 .font(.caption).foregroundStyle(.primary)
         } else if liveProc.processingCount > 0 {
             Text("Finishing when processing completes (\(liveProc.processingCount) left). Keep shooting to add another segment; tap Finish again to include one you didn't tag.")
                 .font(.caption).foregroundStyle(.primary)
         } else {
-            // W3.cap-r3-fu12's adversarial pass — the third branch, added because the count branch LIED here.
-            // `processingCount` excludes rows whose group has left the session, and `pendingFinish` is lowered
-            // only by a CALL to `proceedToFinishIfReady`. So delete the last page of the document a pending
-            // finish is waiting on (the ✕) and the count drops to 0 while the flag stays up: the row went on
-            // reading "Finishing when processing completes (0 left)" until the next re-evaluation.
-            //
-            // ⚠️ That window is the 5 s `startFinishWatchdog` tick, NOT the ≤1.5 s `perItemSheetGrace` tail an
-            // earlier draft of `processingCount`'s own comment claimed — `removePhoto` neither clears the flag
-            // nor re-enters the gate (the fact `W3.cap-r3-fu9-fu1` documents), so nothing sooner runs. Same
-            // window when a stale phone heartbeat lapses at its 20 s boundary, which is the case the watchdog
-            // exists for. So this is an ordinary operator-triggered path, not a rare sheet-teardown tail, and
-            // that is what turned "not worth a third branch" into "worth a third branch". Bounded, never a
-            // hang: every arming starts a watchdog and the watchdog lowers the flag unconditionally.
-            Text("Finishing — nothing left to process. Completing as soon as the session settles (a few seconds); Cancel finish if you'd rather not wait.")
-                .font(.caption).foregroundStyle(.primary)
+            Text("Finishing…").font(.caption).foregroundStyle(.primary)
         }
         Button("Cancel finish") { liveProc.cancelPendingFinish() }
             .accessibilityIdentifier("live.cancel-finish")

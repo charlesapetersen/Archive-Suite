@@ -91,7 +91,9 @@ final class CaptureSession: ObservableObject {
     }
 
     func updateRelayPhonePending(_ status: PhoneQueueStatus) {
-        hasSeenRelayTraffic = true
+        // An idle queue report can arrive even when all capture traffic used USB or Wi-Fi.
+        // Only a pending relay upload or a received relay photo makes Finish depend on another scan.
+        if status.pending > 0 { hasSeenRelayTraffic = true }
         let previous = relayPhonePendingCount
         recordPhoneStatus(status, viaRelay: true)
         let current = relayPhonePendingCount
@@ -772,6 +774,14 @@ final class CaptureSession: ObservableObject {
             FileHandle.standardError.write(Data(line.utf8))
         }
     }
+#if DEBUG
+    /// Show the wired listener and a pending Drive startup without starting either network receiver.
+    func modelWiredReceiverWithDriveStartingForUITest() {
+        serverRunning = true
+        relayScanExpected = true
+    }
+#endif
+
     func relayReceiverDidStop() { relayRunning = false }
     func relayReceiverDidFail(_ message: String) { relayRunning = false; statusMessage = "Relay error: \(message)" }
 

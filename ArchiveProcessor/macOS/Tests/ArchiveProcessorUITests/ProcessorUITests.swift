@@ -1106,6 +1106,75 @@ final class ProcessorUITests: XCTestCase {
                        "confirming must clear the session roster")
     }
 
+    func testLiveFinishWithDriveReceiverUnavailable() throws {
+        func files(in root: URL, endingIn suffixes: Set<String>) -> [URL] {
+            let entries = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
+            return entries?.compactMap { $0 as? URL }.filter { suffixes.contains($0.pathExtension) } ?? []
+        }
+
+        func stage(backup: URL, previouslyUsedRelay: Bool) throws -> Set<Data> {
+            try FileManager.default.createDirectory(at: backup, withIntermediateDirectories: true)
+            let extra = ["-APUITestLiveCaptureFinishSettle", "-reviewRotation", "NO"]
+                + (previouslyUsedRelay ? ["-APUITestPreviouslyUsedRelay"] : [])
+            relaunch(extra: extra, environment: [
+                "ARCHIVEPROC_TEST_BACKUP_ROOT": backup.path,
+                "LIVECAPTURE_TESTOUT": outputDirectory.path,
+                "LIVECAPTURE_DRIVE": "1"
+            ])
+            let save = app.buttons["Save ▸"]
+            XCTAssertTrue(save.waitForExistence(timeout: 15), "the wired segment offers its tag card")
+            save.click()
+
+            let finish = element("live.finish")
+            let staged = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '(1)' AND enabled == true"),
+                                                   object: finish)
+            XCTAssertEqual(XCTWaiter.wait(for: [staged], timeout: 30), .completed)
+            XCTAssertTrue(app.staticTexts["Drive starting…"].exists)
+            let originals = try Set(files(in: backup, endingIn: ["jpg", "jpeg"]).map { try Data(contentsOf: $0) })
+            XCTAssertEqual(originals.count, 2, "both distinct wired originals are in the scratch backup")
+            finish.click()
+            return originals
+        }
+
+        let wiredBackup = scratchRoot.appendingPathComponent("wired-backup")
+        let originals = try stage(backup: wiredBackup, previouslyUsedRelay: false)
+        let finalize = app.buttons["Finalize & move files"]
+        XCTAssertTrue(finalize.waitForExistence(timeout: 10), "an idle relay report must not hold wired Finish")
+        attachScreenshot("live-finish-wired-collection-naming")
+        app.sheets.firstMatch.buttons["Cancel"].click()
+        XCTAssertEqual(try Set(files(in: wiredBackup, endingIn: ["jpg", "jpeg"]).map { try Data(contentsOf: $0) }), originals)
+        element("live.finish").click()
+        XCTAssertTrue(finalize.waitForExistence(timeout: 10), "Finish can be retried after cancelling collection naming")
+        let name = app.textFields["Collection name"]
+        XCTAssertTrue(name.exists)
+        name.click()
+        name.typeKey("a", modifierFlags: .command)
+        name.typeText("Wired scratch collection")
+        finalize.click()
+        let deadline = Date().addingTimeInterval(30)
+        while files(in: outputDirectory, endingIn: ["pdf"]).count < 2, Date() < deadline {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        }
+        XCTAssertEqual(files(in: outputDirectory, endingIn: ["pdf"]).count, 2)
+        XCTAssertEqual(try Set(files(in: outputDirectory, endingIn: ["jpg", "jpeg"]).map { try Data(contentsOf: $0) }), originals,
+                       "filing after a retry preserves the exact bytes of both originals")
+
+        let relayBackup = scratchRoot.appendingPathComponent("relay-backup")
+        let kept = try stage(backup: relayBackup, previouslyUsedRelay: true)
+        let wait = element("live.finish-relay-wait")
+        XCTAssertTrue(wait.waitForExistence(timeout: 10), "a previously used relay still needs a successful scan")
+        let message = renderedText(of: wait)
+        XCTAssertTrue(message.contains("Waiting for Drive") && message.contains("restart the connection"), message)
+        XCTAssertFalse(finalize.exists)
+        attachScreenshot("live-finish-relay-recovery")
+        element("live.cancel-finish").click()
+        let cancelled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: wait)
+        XCTAssertEqual(XCTWaiter.wait(for: [cancelled], timeout: 5), .completed)
+        XCTAssertEqual(try Set(files(in: relayBackup, endingIn: ["jpg", "jpeg"]).map { try Data(contentsOf: $0) }), kept)
+        element("live.finish").click()
+        XCTAssertTrue(wait.waitForExistence(timeout: 10), "retry still waits until the receiver works")
+    }
+
     func testFileRelayQuarantinesEmptyGroupInVM() throws {
         let relayRoot = scratchRoot.appendingPathComponent("relay", isDirectory: true)
         let relayOut = scratchRoot.appendingPathComponent("relay-out", isDirectory: true)

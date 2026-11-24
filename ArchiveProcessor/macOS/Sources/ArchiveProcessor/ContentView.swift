@@ -13,6 +13,7 @@ struct ContentView: View {
         || ProcessorUITestConfiguration.showsLiveCaptureEmptyPaneClear
         || ProcessorUITestConfiguration.showsLiveCaptureTrainingWarning
         || ProcessorUITestConfiguration.showsLabelFallback
+        || ProcessorUITestConfiguration.showsLiveCaptureFinishSettle
     ) ? .live : .files
 #else
     @State private var mode: Mode =
@@ -64,6 +65,7 @@ struct ContentView: View {
             // flag: no receiver, OCR, Keychain, network, source, or output directory is touched.
             MoneyJourneyFixture.receiveScratchPhotosIfRequested(in: capture)
             ProcessorUITestConfiguration.receiveTrainingWarningPhotos(in: capture)
+            ProcessorUITestConfiguration.receiveFinishSettlePhotos(in: capture)
             ProcessorUITestConfiguration.receiveLabelFallback(in: capture)
             if ProcessorUITestConfiguration.showsGemmaOffer { gemma.showOfferForUITest() }
             if ProcessorUITestConfiguration.showsLiveCaptureFinishingScrim {

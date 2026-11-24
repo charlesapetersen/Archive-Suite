@@ -126,6 +126,7 @@ final class LiveCaptureProcessor: ObservableObject {
     @Published private(set) var pendingFinish = false
     private var finishNeedsOpenGroupCompletion = false
     private var finishAfterRelayScan: Int?
+    @Published private(set) var finishWaitingForRelayScan = false
     /// Segments still being processed (OCR or tagging) **that can still resolve** — the count behind the
     /// pending-finish row's "(N left)" and the capture panel's "Processing…" spinner.
     ///
@@ -2425,6 +2426,7 @@ final class LiveCaptureProcessor: ObservableObject {
     func cancelPendingFinish() {
         guard pendingFinish else { return }
         pendingFinish = false
+        finishWaitingForRelayScan = false
         session.statusMessage =
             "Finish cancelled — the session is still open. Tap Finish session again when you're ready."
     }
@@ -2437,8 +2439,11 @@ final class LiveCaptureProcessor: ObservableObject {
     /// Called after each segment stages and whenever a card is resolved, so a Finish requested mid-run
     /// waits for processing to complete instead of dropping unstaged segments from the review.
     private func proceedToFinishIfReady() {
-        guard !stagingManifestBlocked, pendingFinish, session.relayPhonePendingCount == 0 else { return }
-        if session.relayScanExpected, let scan = finishAfterRelayScan, session.relayScanFinished < scan { return }
+        guard !stagingManifestBlocked, pendingFinish else { return }
+        let waitingForScan = session.relayScanExpected
+            && finishAfterRelayScan.map { session.relayScanFinished < $0 } == true
+        if finishWaitingForRelayScan != waitingForScan { finishWaitingForRelayScan = waitingForScan }
+        guard !waitingForScan, session.relayPhonePendingCount == 0 else { return }
         if finishNeedsOpenGroupCompletion, !completeOpenGroupsForFinish() { return }
         // Only count segments that still EXIST — a status left at .ocr/.tagging for a group whose photos
         // were deleted (thumbnail X) or reclassified away (X-Replaces) can never resolve (no group → no tag
@@ -3143,6 +3148,7 @@ final class LiveCaptureProcessor: ObservableObject {
         rotationReviewPages.removeAll()
         currentCollectionKey = "__unfiled__"
         pendingFinish = false
+        finishWaitingForRelayScan = false
         entitySettings = nil
         // W3.cap-r3-fu9 — the per-item sheet targets are session state too, and they are now an INPUT to the
         // finish gate (`perItemSheetUp`), so a survivor is not merely a sheet over an empty pane: a target

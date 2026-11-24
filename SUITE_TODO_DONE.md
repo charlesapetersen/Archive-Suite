@@ -18342,3 +18342,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
 
 - [x] **W49.proc-import-rotation — imported cluster pages are turned upright by the free Vision check [S]** · §Known limits are queued, accepted or asked · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build) — Matched cluster pages use on-device Vision for rotation when enabled and keep their displayed orientation if Vision abstains. The PDF places the cluster's text using the corrected image. The scratch contract covers the clockwise turn, PDF word placement, Off, and request counts with and without classification.
   <!-- /W49.proc-import-rotation -->
+
+- [x] **W40.fix-live-finish-settle — Live Capture Finish advances after wired pages are staged [S · S2 · Tier-2]** · §W40 verification phase · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build,vm)
+  An idle Drive report could make Finish wait for a new relay scan even after the wired segment was staged. Actual relay activity still calls for a new scan, and a reported outstanding upload still holds Finish. A stalled receiver now shows steps to cancel, check Drive sign-in, and restart the connection.
+  The off-screen replay used two distinct scratch photos, saved the tag card, and saw collection naming within two seconds while Drive showed “starting”. After cancelling naming and retrying, it filed two PDFs and matched both preservation originals byte for byte. A second launch with a known relay history waited, showed the recovery steps, and kept both sources through Cancel Finish and retry.
+  The Android round trip filed all three fixtures with the expected text and years. The standard Processor smoke passed with two scratch PDFs. The delayed-relay regression timed out once with both originals still in backup, then passed twice, waiting about 31 seconds and filing both image sheets in each retry.
+  [Owner guided-session evidence](verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). The original run did not record the active hold. No bench cache was created.
+  <!-- /W40.fix-live-finish-settle -->

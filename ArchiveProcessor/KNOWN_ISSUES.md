@@ -4,7 +4,6 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ## Processor guided session 1 — November 23, 2026
 
-- Live Capture can keep waiting at Finish after a wired document has already been fully staged. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-live-finish-settle)
 - The Mac requested the Keychain password four times on launch and twice when starting wired Live Capture. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-keychain-prompts)
 - The first-launch notice says “archive material”, which the owner found ambiguous. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-local-notice)
 - The help text in General settings reaches the bottom edge of the window. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-general-padding)
@@ -12,6 +11,15 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 - Process Files shows About this collection when the destination is chosen, before any files are added. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-collection-prompt-intake)
 - Preservation uses generated folders and generic filenames, so the matching original is difficult to identify in Finder. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-preservation-names)
 - The Android Archive Capture launcher icon differs from the Mac Processor icon. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-android-launcher-icon)
+
+## FIXED (2026-11-23) — Live Capture Finish could wait on Drive after wired pages were staged
+
+- An idle Drive queue report no longer adds a relay scan to Finish. A session with actual relay activity still
+  waits for a scan or outstanding uploads as appropriate. A stalled scan now tells the operator how to cancel,
+  check Drive sign-in, and restart the connection. The scratch replay filed both wired PDFs after cancelling and
+  retrying Finish, and verified both preservation copies against the source bytes.
+  [Guided-session evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
+  (accepted: fixed by W40.fix-live-finish-settle)
 
 ## FIXED (2026-11-23) — Imported cluster pages could stay sideways
 

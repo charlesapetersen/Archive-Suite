@@ -206,9 +206,10 @@ Another phone's zero and an older relay report leave it in force. Older direct c
 
 The Mac retains active holds and the zeros that superseded them in its session's private backup
 folder. The hold persists across disconnects until the phone reconnects and reports a newer zero.
-Cancel Finish leaves the session open. Once the Mac sees relay traffic, Finish waits for a successful
-scan that starts after the tap while the relay receiver is enabled. The Mac can account for a page
-once its pending report reaches the relay.
+Cancel Finish leaves the session open. While the relay receiver is enabled, Finish waits for a successful
+scan that starts after the tap if the Mac has received a relay photo or a positive relay queue report in
+this session. An idle zero alone leaves wired and Wi-Fi sessions free to finish even if Drive is unavailable.
+The Mac can account for a pending page once its report reaches the relay.
 
 ## Write / delete ordering (D3)
 
