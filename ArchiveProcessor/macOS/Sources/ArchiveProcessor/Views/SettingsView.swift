@@ -67,7 +67,9 @@ private extension SettingsPanel {
     /// Each panel's height: General's few rows sit in a short window, the panels with a stage card get room for it.
     var height: CGFloat {
         switch self {
-        case .general: return 220
+        case .general:
+            // Leave room below the longest wrapped Settings shown explanation.
+            return 272
         case .capture, .accounts: return 560
         default: return 660
         }

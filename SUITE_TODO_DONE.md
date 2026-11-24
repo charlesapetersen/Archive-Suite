@@ -18369,3 +18369,9 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   leaves the scratch file out and Use Anyway adds it. The test selects its scratch file in list view so it can
   reach the file even when the picker starts in column view. The Process Files launch smoke passed. No bench cache.
   <!-- /W40.fix-processor-local-notice -->
+
+- [x] **W40.fix-processor-general-padding — Give the bottom of General settings room for its help text [XS · S4]** · §W40 verification phase · SHIPPED 2026-11-23 (this commit) (lane: processor) (uses: build,vm) — Keep Settings shown in General. In `SettingsView` and `SettingsGeneralPanel`, ensure the help text is fully visible with space below it at Basic, Standard and Advanced. Check the window in light and dark mode and at its minimum size. [Walkthrough evidence](verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
+  General has 52 more points of height for the full help text and the space below it.
+  The off-screen Debug run checked at least 16 points below the full help text without scrolling at the fixed
+  window size: Basic, Standard and Advanced in light and dark. The Process Files launch smoke passed. No bench cache.
+  <!-- /W40.fix-processor-general-padding -->

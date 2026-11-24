@@ -61,6 +61,32 @@ final class SettingsLevelsUITests: XCTestCase {
         }
     }
 
+    func testGeneralHelpHasBottomSpaceInLightAppearance() {
+        checkGeneralHelp(appearance: "light", arguments: LayoutGuard.lightModeArguments)
+    }
+
+    func testGeneralHelpHasBottomSpaceInDarkAppearance() {
+        checkGeneralHelp(appearance: "dark", arguments: LayoutGuard.darkModeArguments)
+    }
+
+    private func checkGeneralHelp(appearance: String, arguments: [String]) {
+        for level in ["basic", "standard", "advanced"] {
+            guard let settings = launch(["-settingsLevel", level] + arguments) else { return }
+            XCTAssertTrue(app.showSettingsPanel("General"))
+            let detail = element(settings, "ap.settings.level.detail")
+            let form = settings.scrollViews.firstMatch
+            XCTAssertTrue(detail.waitForExistence(timeout: 5))
+            XCTAssertTrue(form.exists)
+            LayoutGuard.waitUntilSettled(settings)
+            // General's panel sets a fixed window size, so this is also its minimum size.
+            XCTAssertTrue(form.frame.contains(detail.frame), "\(level) help should be visible without scrolling")
+            XCTAssertGreaterThanOrEqual(form.frame.maxY - detail.frame.maxY, 16,
+                                        "\(level) help needs room below it in \(appearance) appearance")
+            shoot(settings, "general-help-\(level)-\(appearance)")
+            app.terminate()
+        }
+    }
+
     func testBasicShowsTheAppsPicksAndTheFewSwitchesANewUserNeeds() throws {
         // The guest keeps its defaults between runs, and an approach saved there (by another suite, or the app's
         // preselect) is rightly shown at Basic as a change; pin it to its default so this test sees the level alone.
