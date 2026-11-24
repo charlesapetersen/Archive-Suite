@@ -1106,6 +1106,26 @@ final class ProcessorUITests: XCTestCase {
                        "confirming must clear the session roster")
     }
 
+    func testWiredStartWithDriveCredentialsUnavailable() {
+        let backup = scratchRoot.appendingPathComponent("wired-start")
+        relaunch(extra: ["-driveClientId", "test-client.apps.googleusercontent.com"],
+                 environment: ["ARCHIVEPROC_TEST_BACKUP_ROOT": backup.path])
+        let main = app.windows.containing(.any, identifier: "ap.mode.picker").firstMatch
+        guard let live = [main.radioButtons["Live Capture"], main.buttons["Live Capture"]].first(where: { $0.exists })
+        else { return XCTFail("Live Capture tab is missing") }
+        live.click()
+
+        let start = element("live.start")
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+        start.click()
+        XCTAssertTrue(app.staticTexts["Listening (Wi-Fi / USB)"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Drive off — check Settings › Capture"].exists)
+        XCTAssertFalse(app.staticTexts["Drive starting…"].exists)
+        attachScreenshot("live-wired-start-drive-unavailable")
+        app.buttons["Stop"].click()
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
+    }
+
     func testLiveFinishWithDriveReceiverUnavailable() throws {
         func files(in root: URL, endingIn suffixes: Set<String>) -> [URL] {
             let entries = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)

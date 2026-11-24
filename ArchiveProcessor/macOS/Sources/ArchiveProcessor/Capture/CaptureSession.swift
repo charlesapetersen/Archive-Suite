@@ -339,7 +339,7 @@ final class CaptureSession: ObservableObject {
 
     /// On first activity, fix the session's processing mode from Settings and — for live — snapshot
     /// the config so mid-session Settings changes don't affect the running session.
-    func activateProcessingIfNeeded() {
+    func activateProcessingIfNeeded(allowCredentialInteraction: Bool = true) {
         guard processingMode == .undecided else { return }
         if let dir = recoveryTestStagingDir, let cfg = recoveryTestSettings {
             if recoveryTestResumesStaging {   // test-armed relaunch only; see `_recoveryTestArmRelaunch`
@@ -352,7 +352,7 @@ final class CaptureSession: ObservableObject {
             return
         }
         if liveModeEnabled {
-            var cfg = SessionProcessingConfig.fromDefaults()
+            var cfg = SessionProcessingConfig.fromDefaults(allowCredentialInteraction: allowCredentialInteraction)
             cfg.keepPreservationCopies = SettingsLayerStore.shared.keepsPreservationCopies
             config = cfg
             processingMode = .live
@@ -402,7 +402,7 @@ final class CaptureSession: ObservableObject {
                   photos.allSatisfy({ staged.contains($0.groupId) || filedGroupIds.contains($0.groupId) })
             else { return }
         }
-        activateProcessingIfNeeded()
+        activateProcessingIfNeeded(allowCredentialInteraction: false)
         snapshotProvisional = processingMode == .live
     }
 
@@ -615,17 +615,34 @@ final class CaptureSession: ObservableObject {
         store: LocalDirectoryStore(dir: Self.relayDir(token: token)),
         processedURL: incomingFolder.appendingPathComponent("relay-processed.json"))
 
-    /// The Google Drive cloud relay: the SAME receiver loop, backed by a `DriveObjectStore` (behind
-    /// `DriveAuth`) instead of a local directory. Constructed lazily + side-effect-free (no network until a
-    /// scan runs); the owner configures the OAuth client + signs in before it can actually reach Drive.
-    private lazy var cloudRelay: FileRelayReceiver = {
-        let auth = DriveAuth(clientId: UserDefaults.standard.string(forKey: DefaultsKeys.driveClientId) ?? "",
-                             clientSecret: KeychainHelper.load(account: "DriveClientSecret") ?? "")
-        let client = DriveClient(token: { try auth.accessToken() })
-        return FileRelayReceiver(session: self, token: token, epoch: sessionId,
-                                 store: DriveObjectStore(client: client, token: token),
-                                 processedURL: incomingFolder.appendingPathComponent("relay-processed-cloud.json"))
-    }()
+    /// Created at Start from the credentials available for this session. Pairing and status redraws only
+    /// look at the published readiness flag, so the Keychain is never opened from the view body.
+    private var cloudRelay: FileRelayReceiver?
+    @Published private(set) var cloudRelayStarted = false
+
+    private func startCloudRelay(clientID: String, force: Bool = false) {
+        guard !cloudRelayStarted else { return }
+        let credentials = DriveAuth.RelayCredentials.read(clientID: clientID)
+        // Previously used cloud sessions still need a fresh drain check when the credentials are unavailable.
+        // A wired-only session gets no wait for Drive (see requestFinish).
+        guard force || credentials != nil else {
+            relayScanExpected = hasSeenRelayTraffic && !clientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return
+        }
+        // Retain the receiver's serial queue across Stop/Start so its previous scan can finish before another runs.
+        if cloudRelay == nil {
+            let auth = DriveAuth(clientId: credentials?.clientID ?? clientID,
+                                 clientSecret: credentials?.clientSecret ?? "",
+                                 initialRefreshToken: credentials?.refreshToken)
+            let client = DriveClient(token: { try auth.accessToken() })
+            cloudRelay = FileRelayReceiver(session: self, token: token, epoch: sessionId,
+                                           store: DriveObjectStore(client: client, token: token),
+                                           processedURL: incomingFolder.appendingPathComponent("relay-processed-cloud.json"))
+        }
+        relayScanExpected = true
+        cloudRelayStarted = true
+        cloudRelay?.start()
+    }
 
     /// CI/test-only transport override (`LIVECAPTURE_TRANSPORT`): forces exactly ONE offline receiver for
     /// the headless harness (`fileRelay`) or an isolated LAN/cloud run. **Not user-facing** — the Settings
@@ -634,18 +651,6 @@ final class CaptureSession: ObservableObject {
     private var forcedTestTransport: CaptureTransport? {
         ProcessInfo.processInfo.environment["LIVECAPTURE_TRANSPORT"].flatMap { CaptureTransport(rawValue: $0) }
     }
-
-    /// Signed into the Google Drive relay: a refresh token is in the Keychain AND a client id is configured.
-    /// Sign-in alone ENABLES the Drive watcher (it is gated to an active session in `start()`/`stop()` to
-    /// save Drive quota) — the operator never picks a "cloud mode". `LIVECAPTURE_DRIVE=1` forces it on for a
-    /// headless cloud test.
-    var isDriveSignedIn: Bool {
-        if ProcessInfo.processInfo.environment["LIVECAPTURE_DRIVE"] == "1" { return true }
-        return KeychainHelper.load(account: "DriveRefreshToken") != nil
-            && !(UserDefaults.standard.string(forKey: DefaultsKeys.driveClientId) ?? "").isEmpty
-    }
-    /// True while THIS session started the Drive watcher, so `stop()` tears down only what it started.
-    private var cloudRelayStarted = false
 
     /// The file-relay shared-directory root (`<root>/<token>/`), from Settings/env; defaults under the
     /// visible backup root. `LIVECAPTURE_RELAYDIR` overrides it for CI.
@@ -730,21 +735,18 @@ final class CaptureSession: ObservableObject {
     /// chooses Wired, Wi-Fi, OR Cloud with no mode to misconfigure. Under `LIVECAPTURE_TRANSPORT` (CI) it
     /// starts exactly the one forced receiver instead.
     func start() {
+        let clientID = UserDefaults.standard.string(forKey: DefaultsKeys.driveClientId) ?? ""
         resumeRecoveredSessionIfNeeded()            // a relaunched session's rows and Retry, before any ingest
         if let forced = forcedTestTransport {
             switch forced {
             case .lan: if !serverRunning { server.start() }
             case .fileRelay: relayScanExpected = true; fileRelay.start()
-            case .cloud: relayScanExpected = true; cloudRelay.start(); cloudRelayStarted = true
+            case .cloud: startCloudRelay(clientID: clientID, force: true)
             }
             return
         }
         if !serverRunning { server.start() }        // LAN: BYTE-IDENTICAL to the prior default behavior
-        if isDriveSignedIn {                        // Drive watcher auto-runs, gated to this active session
-            relayScanExpected = true
-            cloudRelay.start()
-            cloudRelayStarted = true
-        }
+        startCloudRelay(clientID: clientID, force: ProcessInfo.processInfo.environment["LIVECAPTURE_DRIVE"] == "1")
         startConnectionTimer()                      // arm the "phone still here?" freshness re-eval (B4-ii)
     }
 
@@ -753,12 +755,9 @@ final class CaptureSession: ObservableObject {
         relayScanExpected = false
         phoneConnected = false
         server.stop()
-        if let forced = forcedTestTransport {
-            switch forced { case .fileRelay: fileRelay.stop(); case .cloud: cloudRelay.stop(); case .lan: break }
-            cloudRelayStarted = false
-            return
-        }
-        if cloudRelayStarted { cloudRelay.stop(); cloudRelayStarted = false }
+        if forcedTestTransport == .fileRelay { fileRelay.stop() }
+        cloudRelay?.stop()
+        cloudRelayStarted = false
     }
 
     /// Relay receiver readiness (portless; called on the main actor). Mirrors the AUTOSTART READY line so
@@ -779,6 +778,7 @@ final class CaptureSession: ObservableObject {
     func modelWiredReceiverWithDriveStartingForUITest() {
         serverRunning = true
         relayScanExpected = true
+        cloudRelayStarted = true
     }
 #endif
 

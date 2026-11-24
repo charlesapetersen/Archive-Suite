@@ -1023,16 +1023,16 @@ struct GatewayConfig: Codable, Equatable {
 
     /// The gateway key from the Keychain. A local model always gets the placeholder: a saved key belongs to a remote
     /// gateway, and is never sent in plain http to whatever listens on this Mac's port.
-    static func storedKey(localModel: Bool) -> String {
+    static func storedKey(localModel: Bool, allowInteraction: Bool = true) -> String {
 #if DEBUG
         // The offscreen UI journey uses only this public dummy key; never reads the owner's Keychain.
         if !localModel, ProcessorUITestConfiguration.usesStandInGateway { return "s044-stand-in" }
 #endif
-        return localModel ? LocalModelRoute.placeholderKey : (KeychainHelper.load(account: "Gateway") ?? "")
+        return localModel ? LocalModelRoute.placeholderKey : (KeychainHelper.load(account: "Gateway", allowInteraction: allowInteraction) ?? "")
     }
 
-    static func storedKey(_ d: UserDefaults = .standard) -> String {
-        storedKey(localModel: d.bool(forKey: DefaultsKeys.gatewayLocalModel))
+    static func storedKey(_ d: UserDefaults = .standard, allowInteraction: Bool = true) -> String {
+        storedKey(localModel: d.bool(forKey: DefaultsKeys.gatewayLocalModel), allowInteraction: allowInteraction)
     }
 
     func asLLMModel() -> LLMModel {

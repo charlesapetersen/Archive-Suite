@@ -176,7 +176,10 @@ struct ContentView: View {
             DispatchQueue.main.async { NotificationCenter.default.post(name: .improveOCRHandoff, object: nil) }
         }
         .sheet(isPresented: $showKeyOnboarding) {
-            ProviderKeyWizard { showKeyOnboarding = false; hasSeenKeyOnboarding = true }
+            ProviderKeyWizard(allowCredentialInteraction: false) {
+                showKeyOnboarding = false
+                hasSeenKeyOnboarding = true
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .cycleProviderRequested)) { _ in
             // ⌘⌥P: cycle the provider app-wide (works from any tab), but stand down while a text field is

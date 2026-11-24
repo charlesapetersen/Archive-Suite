@@ -56,15 +56,16 @@ struct SegmentationRoutes: Equatable, Sendable {
     /// Reads the Keychain and looks for `claude`. Never call it from a view body.
     static func current(_ defaults: UserDefaults = .standard) -> SegmentationRoutes {
         // The path override belongs to whichever CLI the OCR backend uses; it names `claude` only when that is it.
+        let chatGPT = ChatGPTAuth.shared.store.load(allowInteraction: false)
         return SegmentationRoutes(
-            hasAnthropicKey: !(KeychainHelper.load(account: LLMProvider.anthropic.rawValue) ?? "").isEmpty,
-            hasGeminiKey: !(KeychainHelper.load(account: LLMProvider.gemini.rawValue) ?? "").isEmpty,
-            hasOpenAIKey: !(KeychainHelper.load(account: LLMProvider.openai.rawValue) ?? "").isEmpty,
-            hasOpenRouterKey: !(KeychainHelper.load(account: LLMProvider.openrouter.rawValue) ?? "").isEmpty,
+            hasAnthropicKey: KeychainHelper.exists(account: LLMProvider.anthropic.rawValue),
+            hasGeminiKey: KeychainHelper.exists(account: LLMProvider.gemini.rawValue),
+            hasOpenAIKey: KeychainHelper.exists(account: LLMProvider.openai.rawValue),
+            hasOpenRouterKey: KeychainHelper.exists(account: LLMProvider.openrouter.rawValue),
             hasClaudeCLI: ClaudeCLIBilling.binaryPath(defaults) != nil,
             claudeRoute: ClaudeRoute.stored(defaults),
-            chatGPTAccount: ChatGPTAuth.shared.signedInAccount(),
-            chatGPTStale: ChatGPTAuth.shared.hasStaleRegistration,
+            chatGPTAccount: chatGPT?.isUsable == true ? (chatGPT?.email ?? "ChatGPT account") : nil,
+            chatGPTStale: chatGPT?.isUsable == false,
             chatGPTRoute: ChatGPTRoute.stored(defaults),
             planCalibration: PlanCalibrationStore.load(defaults),
             localPartner: SegmentationApproach.storedLocalPartner(defaults))

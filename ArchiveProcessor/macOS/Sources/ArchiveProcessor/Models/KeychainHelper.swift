@@ -5,6 +5,7 @@ import Security
 /// Stores and retrieves API keys from the macOS Keychain.
 struct KeychainHelper {
     private static let service = "com.archiveprocessor.app"
+    private static let lock = NSLock()
 
     /// True when the app is launched in a headless test/driver mode. In that mode we NEVER touch the
     /// Keychain — so a test launch can't trigger the interactive "ArchiveProcessor wants to use the
@@ -29,7 +30,8 @@ struct KeychainHelper {
     static func save(account: String, password: String) -> Bool {
         if isHeadlessTestMode { return false }   // never write the real Keychain in a headless test
         guard let data = password.data(using: .utf8) else { return false }
-        if load(account: account) == password { return true }
+        lock.lock(); defer { lock.unlock() }
+        if read(account: account, allowInteraction: true) == password { return true }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -56,9 +58,13 @@ struct KeychainHelper {
         }
     }
 
-    static func load(account: String) -> String? {
-        if isHeadlessTestMode { return nil }   // no Keychain access at launch in a headless test → no prompt
-        let query: [String: Any] = [
+    static func load(account: String, allowInteraction: Bool = true) -> String? {
+        if isHeadlessTestMode { return nil }
+        return lock.withLock { read(account: account, allowInteraction: allowInteraction) }
+    }
+
+    private static func read(account: String, allowInteraction: Bool) -> String? {
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
@@ -66,9 +72,16 @@ struct KeychainHelper {
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
 
-        var result: AnyObject?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-              let data = result as? Data else { return nil }
+        let result: CFTypeRef?
+        if allowInteraction {
+            var item: CFTypeRef?
+            guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess else { return nil }
+            result = item
+        } else {
+            query[kSecUseAuthenticationContext as String] = quietContext()
+            result = ArchiveCopyKeychainItemQuietly(query as CFDictionary)
+        }
+        guard let data = result as? Data else { return nil }
         return String(data: data, encoding: .utf8)
     }
 
@@ -79,19 +92,21 @@ struct KeychainHelper {
     /// one that is not used.
     static func exists(account: String) -> Bool {
         if isHeadlessTestMode { return false }
-        let context = LAContext()
-        context.interactionNotAllowed = true
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
             kSecReturnAttributes as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
-            kSecUseAuthenticationContext as String: context
+            kSecUseAuthenticationContext as String: quietContext()
         ]
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-        return status == errSecSuccess
+        return lock.withLock { ArchiveCopyKeychainItemQuietly(query as CFDictionary) != nil }
+    }
+
+    private static func quietContext() -> LAContext {
+        let context = LAContext()
+        context.interactionNotAllowed = true
+        return context
     }
 
     static func delete(account: String) {
@@ -101,6 +116,6 @@ struct KeychainHelper {
             kSecAttrService as String: service,
             kSecAttrAccount as String: account
         ]
-        SecItemDelete(query as CFDictionary)
+        _ = lock.withLock { SecItemDelete(query as CFDictionary) }
     }
 }

@@ -83,12 +83,12 @@ enum PageKindRouting {
     /// Every built-in model of a provider the user has a key for, as candidates. Reads the Keychain: call it off a
     /// view body (once per refresh), never per render. Custom models are left out, as the cascade leaves them out:
     /// the guide names built-in ids, and a routed page needs a known price for the estimate.
-    static func keyedCandidates(key: (LLMProvider) -> String? = { KeychainHelper.load(account: $0.rawValue) })
+    static func keyedCandidates(hasKey: (LLMProvider) -> Bool = { KeychainHelper.exists(account: $0.rawValue) })
         -> Set<Candidate> {
         var keyed: [LLMProvider: Bool] = [:]
         var out = Set<Candidate>()
         for m in OCRCascade.candidates {
-            let has = keyed[m.provider] ?? { let k = key(m.provider); return k.map { !$0.isEmpty } ?? false }()
+            let has = keyed[m.provider] ?? hasKey(m.provider)
             keyed[m.provider] = has
             if has { out.insert(Candidate(provider: m.provider, modelID: m.id)) }
         }

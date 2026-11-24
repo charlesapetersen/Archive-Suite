@@ -130,8 +130,7 @@ struct OCRView: View {
     /// explicit provider instead.
     private var selectedModel: LLMModel { modelStore.model(for: selectedProvider) }
 
-    // Initialized from persisted state in init()
-    @State private var apiKey: String
+    @State private var hasConfiguredAPIKey = false
     @State private var outputDirectory: URL?
     /// A newly chosen output folder with no settings of its own is a new collection: it is asked about its material
     /// (W46.settings-interviews).
@@ -215,7 +214,6 @@ struct OCRView: View {
     init(processor: OCRProcessor, capture: CaptureSession) {
         _processor = ObservedObject(wrappedValue: processor)
         _capture = ObservedObject(wrappedValue: capture)
-        _apiKey = State(initialValue: "")
 #if DEBUG
         // The UI suite owns this temporary output directory. Never recover the operator's
         // last-selected folder, even though visual tests never start a paid run.
@@ -275,7 +273,7 @@ struct OCRView: View {
         useAppleVision && !visionUseLLMJudgment && !visionLocalAutoDate
             && taggingMode != .none && taggingMode != .copySource
     }
-    /// Whether this run needs the key `reloadAPIKey()` loads (W40.fix-processor-localagent-key). Apple Vision needs
+    /// Whether this run needs the key `readAPIKey()` loads (W40.fix-processor-localagent-key). Apple Vision needs
     /// it only for its LLM judgement. The Local Agent needs none: its CLI signs in with the subscription, and no
     /// route of a Local Agent run reaches the direct provider — the OCR call, classification and tagging take the
     /// CLI first; rotation, the cascade, the refusal fallback, page readers and the institutional import are all
@@ -284,38 +282,55 @@ struct OCRView: View {
         useAppleVision ? visionUseLLMJudgment : !useLocalAgent
     }
 
-    /// The provider whose key `reloadAPIKey()` put in the field, nil when it holds a gateway key or none.
+    private var apiKeyAccount: String? {
+        guard runNeedsAPIKey else { return nil }
+        if !useAppleVision && useGateway { return gatewayLocalModel ? nil : "Gateway" }
+        return selectedProvider.rawValue
+    }
+
+    /// Direct provider whose key this view can supply to a resumed run.
     private var apiKeyFieldProvider: LLMProvider? {
-        useAppleVision ? (visionUseLLMJudgment ? selectedProvider : nil) : (useGateway ? nil : selectedProvider)
+        apiKeyAccount == selectedProvider.rawValue ? selectedProvider : nil
     }
     private var pendingRunResumeBlockReason: String? {
-        processor.pendingRunResumeBlockReason(fieldKey: apiKey, fieldProvider: apiKeyFieldProvider)
+        processor.pendingRunResumeBlockReason(hasKey: hasConfiguredAPIKey, fieldProvider: apiKeyFieldProvider)
     }
     /// Worded by the interrupted run's own backend (W40.fix-processor-resume-run-key), not the one selected now.
     private var pendingRunResumeCaption: String {
         if let reason = pendingRunResumeBlockReason { return reason }
         switch processor.pendingRunBackend {
-        case .localAgent: return "Click Resume to continue with the CLI configured for this run."
+        case .localAgent: return "No API key is needed. Click Resume to continue with the CLI configured for this run."
         case .gateway: return "Click Resume to continue through the gateway with its saved key."
         case .appleVision: return "Click Resume to continue with Apple Vision."
         case .direct, nil: return "Click Resume to continue processing remaining files."
         }
     }
 
-    private func reloadAPIKey() {
+    private var standInAPIKey: String? {
 #if DEBUG
-        if MoneyJourneyFixture.isActive {
-            apiKey = MoneyJourneyFixture.dummyKey
-            return
-        }
-        if PaidBatchUITestFixture.isActive {
-            apiKey = PaidBatchUITestFixture.dummyKey
-            return
+        if MoneyJourneyFixture.isActive { return MoneyJourneyFixture.dummyKey }
+        if PaidBatchUITestFixture.isActive { return PaidBatchUITestFixture.dummyKey }
+        if apiKeyAccount == "Gateway", ProcessorUITestConfiguration.usesStandInGateway {
+            return GatewayConfig.storedKey(localModel: false)
         }
 #endif
-        apiKey = useAppleVision
-            ? (visionUseLLMJudgment ? (KeychainHelper.load(account: selectedProvider.rawValue) ?? "") : "")
-            : (useGateway ? GatewayConfig.storedKey() : (KeychainHelper.load(account: selectedProvider.rawValue) ?? ""))
+        if runNeedsAPIKey && !useAppleVision && useGateway && gatewayLocalModel {
+            return LocalModelRoute.placeholderKey
+        }
+        return nil
+    }
+
+    private func refreshKeyAvailability() {
+        hasConfiguredAPIKey = standInAPIKey != nil || (apiKeyAccount.map { KeychainHelper.exists(account: $0) } ?? false)
+    }
+
+    private func readAPIKey() -> String {
+        standInAPIKey ?? apiKeyAccount.flatMap { KeychainHelper.load(account: $0) } ?? ""
+    }
+
+    private func reportUnreadableAPIKey() {
+        let account = apiKeyAccount ?? selectedProvider.rawValue
+        processor.statusMessage = "Could not read the \(account) API key. Unlock the Keychain or check the key in Settings › Accounts, then try again."
     }
 
     /// Dropped files that go down the image path; multi-page PDFs are re-OCR'd page by page instead.
@@ -466,14 +481,12 @@ struct OCRView: View {
                 .padding()
         }
         .onAppear {
-            reloadAPIKey()
-            // Not before the Keychain explainer: each read can prompt, and the sheet says to click Always Allow.
+            refreshKeyAvailability()
             if keychainExplained { segmentationRoutes = SegmentationRoutes.currentPreselecting() }
             // W41.app-openrouter-unmeasured: with an OpenRouter key, read its prices and listing before an estimate
             // that picks an OpenRouter model shows ("Read with this", page-kind routing, Re-OCR's ranking), so the
             // estimate and the request's price ceiling are the listing's, not the guess before it.
-            if keychainExplained, selectedProvider == .openrouter
-                || !(KeychainHelper.load(account: LLMProvider.openrouter.rawValue) ?? "").isEmpty {
+            if keychainExplained, selectedProvider == .openrouter || segmentationRoutes.hasOpenRouterKey {
                 Task {
                     await OpenRouterListing.refreshAllIfStale()
                     openRouterListingRead += 1
@@ -555,13 +568,9 @@ struct OCRView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .apiKeyChanged)) { _ in
             segmentationRoutes = SegmentationRoutes.currentPreselecting()
-            reloadAPIKey()
+            refreshKeyAvailability()
         }
-        .onChange(of: selectedProvider) { _, _ in syncForProviderChange() }
-        .onChange(of: useAppleVision) { _, _ in syncForProviderChange() }
-        .onChange(of: gatewayLocalModel) { _, _ in reloadAPIKey() }   // W41.app-local-models: the stand-in key
-        .onChange(of: useGateway) { _, _ in reloadAPIKey() }
-        .onChange(of: visionUseLLMJudgment) { _, _ in syncForProviderChange() }
+        .onChange(of: [apiKeyAccount, standInAPIKey]) { _, _ in refreshKeyAvailability() }
         .onReceive(NotificationCenter.default.publisher(for: .startProcessingRequested)) { _ in
             // ⌘R: run the normal Start action, but only when it's actually allowed and no field is being
             // edited — the shortcut is guarded exactly like the Start button.
@@ -593,7 +602,7 @@ struct OCRView: View {
             // case this never did: Settings open *beside* this window, where a macOS `WindowGroup` sees no
             // scene-phase transition at all.)
             guard phase == .active else { return }
-            reloadAPIKey()
+            refreshKeyAvailability()
             if keychainExplained { segmentationRoutes = SegmentationRoutes.currentPreselecting() }
             if let path = UserDefaults.standard.string(forKey: DefaultsKeys.outputDirectory), FileManager.default.fileExists(atPath: path) {
                 outputDirectory = URL(fileURLWithPath: path)
@@ -688,10 +697,6 @@ struct OCRView: View {
             if mixedPDF { resumePendingMixedPDF(readWithoutClusterText: true) }
             else { resumePendingRun(readWithoutClusterText: true) }
         })
-        // No `onChange(of: apiKey)` writes the Keychain here (W47.gateway-key-rewrites): nothing in this view edits
-        // the key, only `reloadAPIKey()` fills it from the Keychain, so such a handler wrote each key back at launch
-        // and at every route switch (resetting the item's partition list) and deleted it when a read came back empty.
-        // Keys are edited in Settings and the key wizard.
         .onChange(of: outputDirectory) { _, newDir in
             ModelSelectionStore.saveOutputDirectory(newDir)
         }
@@ -712,13 +717,13 @@ struct OCRView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(info)
                                 .font(.caption)
-                            Text("Enter your API key above, then click Resume.")
+                            Text("Save your API key in Settings › Accounts, then click Resume.")
                                 .font(.caption2)
                                 .foregroundStyle(.primary)
                             HStack {
                                 Button("Resume Batch") { resumePendingBatch() }
                                     .prominentButtonStyle()
-                                    .disabled(apiKey.isEmpty || processor.isProcessing)
+                                    .disabled(!hasConfiguredAPIKey || processor.isProcessing)
                                 Button("Dismiss") { processor.dismissPendingBatch() }
                                     .buttonStyle(.bordered)
                             }
@@ -755,7 +760,7 @@ struct OCRView: View {
                     GroupBox("Interrupted Mixed PDF Run") {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(info).font(.caption)
-                            Text("Enter the API key above to resume saved PDF pages. If a page may have been billed without a saved result, review it before dismissing this record.")
+                            Text("Save the API key in Settings › Accounts to resume saved PDF pages. If a page may have been billed without a saved result, review it before dismissing this record.")
                                 .font(.caption2).foregroundStyle(.primary)
                             HStack {
                                 Button("Resume PDFs") { resumePendingMixedPDF() }
@@ -1233,7 +1238,7 @@ struct OCRView: View {
             return "Choose an available OpenRouter model in Settings › Reading before starting."
         }
         if let gatewaySetupIssue { return gatewaySetupIssue }
-        if runNeedsAPIKey && apiKey.isEmpty {
+        if runNeedsAPIKey && !hasConfiguredAPIKey {
             if useGateway && !useAppleVision { return "No gateway key is saved. Add it in Settings (⌘,)." }
             return "No \(selectedProvider.rawValue) API key is saved. Add one in Settings (⌘,)."
         }
@@ -1242,14 +1247,6 @@ struct OCRView: View {
         }
         if outputDirectory == nil { return "Choose an output folder." }
         return nil
-    }
-
-    /// Re-point the API-key field after `selectedProvider` changes from anywhere (the ⌘⌥P cycle
-    /// shortcut or a return from Settings), so a run never uses the wrong Keychain
-    /// account. The model needs no hook — `selectedModel` reads the store keyed by the *current*
-    /// provider, so it re-points on the same render.
-    private func syncForProviderChange() {
-        reloadAPIKey()
     }
 
     private var canAddFiles: Bool {
@@ -1649,7 +1646,7 @@ struct OCRView: View {
             }
             .padding(.horizontal, 8)
 
-            Text("macOS may ask you to allow Keychain access for each provider item. Click \"Always Allow\" for every prompt; Settings may read several keys at once.")
+            Text("macOS may ask for Keychain permission when you open a saved key in Settings or start a run that uses it. You can choose Always Allow for a key to avoid being asked again.")
                 .font(.caption)
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
@@ -1793,6 +1790,8 @@ struct OCRView: View {
     }
 
     private func resumePendingBatch() {
+        let apiKey = readAPIKey()
+        guard !apiKey.isEmpty else { reportUnreadableAPIKey(); return }
         if let urls = processor.pendingBatchFileURLs {
             replaceFilesForResume(urls)
         }
@@ -1812,6 +1811,14 @@ struct OCRView: View {
     }
 
     private func resumePendingRun(readWithoutClusterText: Bool = false) {
+        let apiKey: String
+        if case .direct = processor.pendingRunBackend {
+            guard pendingRunResumeBlockReason == nil else { return }
+            apiKey = readAPIKey()
+            guard !apiKey.isEmpty else { reportUnreadableAPIKey(); return }
+        } else {
+            apiKey = ""
+        }
         guard let key = processor.pendingRunResumeKey(fieldKey: apiKey) else { return }
         if let urls = processor.pendingRunFileURLs {
             replaceFilesForResume(urls)
@@ -1833,6 +1840,7 @@ struct OCRView: View {
 
     private func resumePendingMixedPDF(readWithoutClusterText: Bool = false) {
         if let urls = processor.pendingMixedPDFFileURLs { replaceFilesForResume(urls) }
+        let apiKey = standInAPIKey ?? "" // The resume record resolves its own provider's saved key.
         processor.processingTask = Task {
             await processor.resumeMixedPDF(apiKey: apiKey, keyProvider: effectiveProvider,
                                            readWithoutClusterText: readWithoutClusterText)
@@ -1979,6 +1987,12 @@ struct OCRView: View {
                 return
             }
         }
+        let apiKey = readAPIKey()
+        if runNeedsAPIKey && apiKey.isEmpty {
+            reportUnreadableAPIKey()
+            return
+        }
+
         intakeGeneration += 1   // a tree still being read is not added to a started run
         readingTree = false
         let trimmedPrompt = customOCRPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2022,7 +2036,6 @@ struct OCRView: View {
             .filter { !$0.isEmpty }
 
         let gateway = currentGatewayConfig
-
         processor.processingTask = Task {
             await processor.startProcessing(
                 files: droppedFiles,
@@ -2030,6 +2043,7 @@ struct OCRView: View {
                 model: model,
                 thinkingLevel: !useAppleVision && !useGateway && model.supportsThinking ? selectedThinking : nil,
                 apiKey: useAppleVision ? "" : apiKey,
+                visionTextAPIKey: useAppleVision && visionUseLLMJudgment ? apiKey : nil,
                 outputDirectory: outDir,
                 batchMode: useBatch,
                 enableTagging: enableTagging,

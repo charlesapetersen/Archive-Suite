@@ -286,7 +286,7 @@ struct LiveCaptureView: View {
                                 Circle().fill(session.driveWatching ? .green : .secondary).frame(width: 6, height: 6)
                                 Image(systemName: "cloud").font(.caption2).foregroundStyle(.secondary)
                                 Text(session.driveWatching ? "Watching Drive"
-                                     : (session.isDriveSignedIn ? "Drive starting…" : "Drive off — sign in (Settings ⌘,)"))
+                                     : (session.cloudRelayStarted ? "Drive starting…" : "Drive off — check Settings › Capture"))
                                     .font(.caption)
                             }
                         }
@@ -376,7 +376,9 @@ struct LiveCaptureView: View {
                                     .resizable()
                                     .frame(width: 200, height: 200)
                             }
-                            Text("Scan in Archive Capture — one code works over USB, Wi-Fi, or Cloud (Google Drive).")
+                            Text(session.cloudRelayStarted
+                                 ? "Scan in Archive Capture to pair over USB, Wi-Fi, or Cloud (Google Drive)."
+                                 : "Scan in Archive Capture to pair over USB or Wi-Fi.")
                                 .font(.caption).foregroundStyle(.primary)
                                 .fixedSize(horizontal: false, vertical: true)
                             let ips = Self.allIPv4Candidates()
@@ -385,7 +387,9 @@ struct LiveCaptureView: View {
                                     .font(.system(.caption, design: .monospaced))
                                     .textSelection(.enabled)
                             } else {
-                                Text("No network address: pair over the cable, or Cloud.")
+                                Text(session.cloudRelayStarted
+                                     ? "No network address. Pair over USB or Cloud."
+                                     : "No network address. Pair over USB.")
                                     .font(.caption).foregroundStyle(.primary)
                             }
                             if let cable = Self.cableLine(session.cableStatus) {
@@ -393,7 +397,7 @@ struct LiveCaptureView: View {
                             }
                             // When signed into Drive, the same QR also carries the relay code (additive `relay`
                             // key); a phone that picks Cloud reads it. Shown so it can be typed for manual entry.
-                            if session.isDriveSignedIn {
+                            if session.cloudRelayStarted {
                                 Text("Cloud relay code: \(session.token)")
                                     .font(.system(.caption2, design: .monospaced))
                                     .foregroundStyle(.primary).textSelection(.enabled)
@@ -446,7 +450,7 @@ struct LiveCaptureView: View {
             "token": session.lanToken,
             "name": Host.current().localizedName ?? "Mac"
         ]
-        if session.isDriveSignedIn { dict["relay"] = session.token }   // optional Cloud path (additive key)
+        if session.cloudRelayStarted { dict["relay"] = session.token }   // optional Cloud path (additive key)
         return (try? JSONSerialization.data(withJSONObject: dict)).flatMap { String(data: $0, encoding: .utf8) }
     }
 

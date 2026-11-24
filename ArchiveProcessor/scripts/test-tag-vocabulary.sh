@@ -57,7 +57,9 @@ grep -h 'archivecore-cache:' "$WORK/core.err" | sed 's/^/  /'
 
 # --- 2. The driver, compiled with the real Processor sources ------------------------------------
 echo "── building the driver against the real Processor sources…"
-if ! xcrun swiftc -swift-version 6 \
+if ! (xcrun clang -c "$SRC/Models/KeychainQuery.m" -o "$WORK/KeychainQuery.o" \
+      && xcrun swiftc -swift-version 6 \
+      -import-objc-header "$SRC/Models/KeychainQuery.h" "$WORK/KeychainQuery.o" \
       -I "$CORE" -L "$CORE" -lArchiveCore \
       "$SRC/Tagging/MacOSTagger.swift" \
       "$SRC/Tagging/SystemTagsProvider.swift" \
@@ -65,7 +67,7 @@ if ! xcrun swiftc -swift-version 6 \
       "$SRC/Models/DefaultsKeys.swift" \
       "$SRC/Models/KeychainHelper.swift" \
       "$REPO/scripts/tag-vocabulary-driver.swift" \
-      -o "$WORK/driver" 2>"$WORK/driver.err"; then
+      -o "$WORK/driver") 2>"$WORK/driver.err"; then
   echo "  [FAIL] driver build:"; head -40 "$WORK/driver.err"; exit 1
 fi
 

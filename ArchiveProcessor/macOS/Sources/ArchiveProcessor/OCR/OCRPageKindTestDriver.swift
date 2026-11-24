@@ -133,7 +133,7 @@ enum OCRPageKindTestDriver {
                                          choice: choose(.printed, hand: true), modelName: flash.displayName)
               == "Printed (90%) → \(flash.displayName), for its handwriting")
         check("3 keyed candidates: every built-in model of a keyed provider, none of an unkeyed one",
-              PageKindRouting.keyedCandidates(key: { $0 == .gemini ? "k" : ($0 == .openai ? "" : nil) })
+              PageKindRouting.keyedCandidates(hasKey: { $0 == .gemini })
               == Set(LLMModel.geminiModels.map(cand)))
 
         // 4. The file list's plan: per-page and per-batch choices; a PDF and a page not yet told are left out.

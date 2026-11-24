@@ -1571,16 +1571,14 @@ extension OCRProcessor {
         if let gateway = run.gatewayConfig { return .gateway(gateway) }
         return run.provider == .appleVision ? .appleVision : .direct(run.provider)
     }
-    /// Why Resume Run cannot start yet, or nil when it can. `fieldProvider` is the provider whose key the API
-    /// key field holds, nil when it holds a gateway key or none. Only a direct-provider run needs that field; the
-    /// Local Agent and Apple Vision need no key, and a gateway run reads its own saved key on resume.
-    func pendingRunResumeBlockReason(fieldKey: String, fieldProvider: LLMProvider?) -> String? {
+    /// Only a direct-provider resume needs the selected provider and a configured key.
+    func pendingRunResumeBlockReason(hasKey: Bool, fieldProvider: LLMProvider?) -> String? {
         guard let backend = pendingRunBackend else { return "This run's record could not be verified." }
         guard case .direct(let provider) = backend else { return nil }
-        if fieldProvider == provider && !fieldKey.isEmpty { return nil }
+        if fieldProvider == provider && hasKey { return nil }
         return fieldProvider == provider
-            ? "Enter your \(provider.rawValue) API key above, then click Resume."
-            : "Select \(provider.rawValue) and enter its API key above, then click Resume."
+            ? "Add your \(provider.rawValue) API key in Settings › Accounts, then click Resume."
+            : "Select \(provider.rawValue) in Settings › Reading and save its API key in Settings › Accounts, then click Resume."
     }
     /// The key `resumeRun` gets for the pending run's backend, or nil (with the reason in `statusMessage`) when a
     /// gateway run's saved key is missing. A direct run takes the field's key, which the button has already
@@ -3419,6 +3417,7 @@ extension OCRProcessor {
         model: LLMModel,
         thinkingLevel: ThinkingLevel?,
         apiKey: String,
+        visionTextAPIKey: String? = nil,
         outputDirectory: URL,
         batchMode: Bool,
         enableTagging: Bool,
@@ -3584,7 +3583,7 @@ extension OCRProcessor {
         // W47.ct-processor-intake: the pre-OCRed route tags its inputs where they are, so it has no tree.
         outputSubfolders = resumingMixedPDF.map { $0.runtimeConfig.outputSubfolders ?? [:] }
             ?? (preOCRedInput ? [:] : Self.keyedSubfolders(plannedSubfolders))
-        var runConfig = SessionProcessingConfig.fromProcessFilesRunStart()
+        var runConfig = SessionProcessingConfig.fromProcessFilesRunStart(primaryAPIKey: apiKey, visionTextAPIKey: visionTextAPIKey)
         // The Process Files controller/arguments are the authoritative run input (headless drivers
         // intentionally configure them without mutating UserDefaults), so every explicitly-threaded
         // consumer observes this exact start-time snapshot.

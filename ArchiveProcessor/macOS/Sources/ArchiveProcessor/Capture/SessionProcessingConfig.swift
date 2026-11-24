@@ -232,7 +232,10 @@ struct SessionProcessingConfig: Sendable {
     /// The five sizing/concurrency values come from `runSizing(_:)` — the same single normalization the
     /// Process Files run start uses (W16.cfg6-fu2). This matters because **Live Capture snapshots its
     /// whole session config here**, so this is the only clamp an out-of-range default meets on that path.
-    static func fromDefaults(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
+    static func fromDefaults(_ d: UserDefaults = .standard,
+                             allowCredentialInteraction: Bool = true,
+                             primaryAPIKey: String? = nil,
+                             visionTextAPIKey: String? = nil) -> SessionProcessingConfig {
         let sizing = runSizing(d)
         let useAppleVision = d.bool(forKey: DefaultsKeys.useAppleVision)
         let useVisionLLMJudgment = useAppleVision && d.bool(forKey: DefaultsKeys.visionUseLLMJudgment)
@@ -254,6 +257,7 @@ struct SessionProcessingConfig: Sendable {
 
         let useGateway = !useAppleVision && d.bool(forKey: DefaultsKeys.useGateway)
         let gateway = useAppleVision ? nil : GatewayConfig.fromDefaults(d)
+        let localAgent = useAppleVision ? nil : LocalAgentConfig.fromDefaults(d)
 
         let outURL: URL = {
             if let path = d.string(forKey: DefaultsKeys.outputDirectory), FileManager.default.fileExists(atPath: path) {
@@ -268,11 +272,12 @@ struct SessionProcessingConfig: Sendable {
         // back to the LIVECAPTURE_OCRKEY env var — this lets the LIVE phone-driven pipeline OCR headlessly.
         // The key stays in the environment only (never written to disk or logged). PROD: env unset (or a
         // real Keychain key present) → the Keychain value, exactly as before.
-        let apiKey: String = {
+        let apiKey: String = primaryAPIKey ?? {
             // A saved gateway key is only valid when the session has a gateway destination.
             guard !useGateway || gateway != nil else { return "" }
-            let keychainKey = useAppleVision ? ""
-                : (useGateway ? GatewayConfig.storedKey(d) : (KeychainHelper.load(account: provider.rawValue) ?? ""))
+            guard !useAppleVision, localAgent == nil else { return "" }
+            let keychainKey = useGateway ? GatewayConfig.storedKey(d, allowInteraction: allowCredentialInteraction)
+                : (KeychainHelper.load(account: provider.rawValue, allowInteraction: allowCredentialInteraction) ?? "")
             if !keychainKey.isEmpty { return keychainKey }
             let env = ProcessInfo.processInfo.environment
             if env["ARCHIVEPROC_HEADLESS"] != nil, let envKey = env["LIVECAPTURE_OCRKEY"], !envKey.isEmpty {
@@ -287,7 +292,8 @@ struct SessionProcessingConfig: Sendable {
                 thinkingLevel: visionTextModel.supportsThinking
                     ? (ThinkingLevel(rawValue: d.string(forKey: DefaultsKeys.selectedThinking) ?? "") ?? .low)
                     : nil,
-                apiKey: KeychainHelper.load(account: selectedProvider.rawValue) ?? "")
+                apiKey: visionTextAPIKey
+                    ?? KeychainHelper.load(account: selectedProvider.rawValue, allowInteraction: allowCredentialInteraction) ?? "")
             : nil
 
         let savedTaggingMode = TaggingMode(rawValue: d.string(forKey: DefaultsKeys.taggingModeRaw) ?? "") ?? .automatic
@@ -320,7 +326,7 @@ struct SessionProcessingConfig: Sendable {
             pdfImageMB: sizing.pdfImageMB,
             exportedImageMB: sizing.exportedImageMB,
             textColumns: sizing.textColumns,
-            localAgent: useAppleVision ? nil : LocalAgentConfig.fromDefaults(d),
+            localAgent: localAgent,
             visionSettings: VisionOCRSettings.fromDefaults(d),
             cascade: OCRCascade.fromDefaults(d),
             visionTextLLM: visionTextLLM,
@@ -334,13 +340,12 @@ struct SessionProcessingConfig: Sendable {
     /// `OCRProcessor.loadStandardImageMB()`. Fresh runs, resumes, and standalone diagnostics inject these
     /// values across OCR, PDF generation, review, tagging, export, and merge.
     ///
-    /// Retained as the *named* run-start seam its call sites read against, but since W16.cfg6-fu2 it is
-    /// exactly `fromDefaults(d)`: that builder now applies the same `runSizing(_:)` normalization, so
-    /// there is nothing left for a run start to correct. It used to re-apply the sizing on top —
-    /// necessary only because `fromDefaults()` clamped two of the five values more loosely, which is the
-    /// bug fu2 fixed. If run start ever needs to freeze something Live Capture must not, it goes here.
-    static func fromProcessFilesRunStart(_ d: UserDefaults = .standard) -> SessionProcessingConfig {
-        fromDefaults(d)
+    /// The view can supply credentials it has already read for Start, avoiding another Keychain read
+    /// when constructing the snapshot. Other callers still get the stored credentials.
+    static func fromProcessFilesRunStart(_ d: UserDefaults = .standard,
+                                         primaryAPIKey: String? = nil,
+                                         visionTextAPIKey: String? = nil) -> SessionProcessingConfig {
+        fromDefaults(d, primaryAPIKey: primaryAPIKey, visionTextAPIKey: visionTextAPIKey)
     }
 
     /// The backend name a retry may truthfully show. A Local Agent wins over a gateway for the same reason

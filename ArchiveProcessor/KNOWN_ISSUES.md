@@ -4,13 +4,22 @@ Tracked bugs we've chosen to come back to later. Each entry has enough context t
 
 ## Processor guided session 1 — November 23, 2026
 
-- The Mac requested the Keychain password four times on launch and twice when starting wired Live Capture. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-keychain-prompts)
 - The first-launch notice says “archive material”, which the owner found ambiguous. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-local-notice)
 - The help text in General settings reaches the bottom edge of the window. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-general-padding)
 - Reading settings present too much text for the owner to scan easily. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-reading-scan)
 - Process Files shows About this collection when the destination is chosen, before any files are added. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-collection-prompt-intake)
 - Preservation uses generated folders and generic filenames, so the matching original is difficult to identify in Finder. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-processor-preservation-names)
 - The Android Archive Capture launcher icon differs from the Mac Processor icon. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-android-launcher-icon)
+
+## FIXED (2026-11-23) — Keychain prompts when opening Processor or starting wired capture
+
+- Process Files checks for saved provider keys without opening them and reads the chosen credential when
+  the operator uses it. Live Capture checks Drive once at Start and uses the connection state for status
+  and pairing. If the stored Drive credentials require approval, USB and Wi-Fi still start and Settings ›
+  Capture remains the place to grant access. Sessions with recorded Drive traffic still wait for a drain
+  check when Drive is configured.
+  [Guided-session evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
+  (accepted: fixed by W40.fix-processor-keychain-prompts)
 
 ## FIXED (2026-11-23) — Live Capture Finish could wait on Drive after wired pages were staged
 

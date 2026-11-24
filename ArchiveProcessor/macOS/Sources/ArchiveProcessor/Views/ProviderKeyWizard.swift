@@ -8,12 +8,15 @@ import AppKit
 /// ArchiveCore later). Each provider is independent and skippable; the app works with any one key.
 struct ProviderKeyWizard: View {
     let specs: [ProviderKeySpec]
+    let allowCredentialInteraction: Bool
     var onClose: () -> Void
 
     @State private var selection: String
 
-    init(specs: [ProviderKeySpec] = ProviderKeySpec.onboardable, onClose: @escaping () -> Void = {}) {
+    init(specs: [ProviderKeySpec] = ProviderKeySpec.onboardable, allowCredentialInteraction: Bool = true,
+         onClose: @escaping () -> Void = {}) {
         self.specs = specs
+        self.allowCredentialInteraction = allowCredentialInteraction
         self.onClose = onClose
         _selection = State(initialValue: specs.first?.id ?? "")
     }
@@ -42,7 +45,8 @@ struct ProviderKeyWizard: View {
 
             ScrollView {
                 if let spec = selected {
-                    ProviderKeyStep(spec: spec).id(spec.id).padding([.horizontal, .bottom])
+                    ProviderKeyStep(spec: spec, allowCredentialInteraction: allowCredentialInteraction)
+                        .id(spec.id).padding([.horizontal, .bottom])
                 }
             }
         }
@@ -55,6 +59,7 @@ struct ProviderKeyWizard: View {
 /// One provider's guided step: explain → open the page → paste → validate (live) → plain-English status.
 private struct ProviderKeyStep: View {
     let spec: ProviderKeySpec
+    let allowCredentialInteraction: Bool
     @Environment(\.openURL) private var openURL
     @State private var key: String = ""
     @State private var reveal = false
@@ -181,7 +186,7 @@ private struct ProviderKeyStep: View {
             }
         }
         .onAppear {
-            key = KeychainHelper.load(account: spec.account) ?? ""
+            key = KeychainHelper.load(account: spec.account, allowInteraction: allowCredentialInteraction) ?? ""
             checkClipboard()
         }
         #if canImport(AppKit)

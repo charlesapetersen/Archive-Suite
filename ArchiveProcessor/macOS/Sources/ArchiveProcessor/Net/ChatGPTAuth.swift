@@ -39,16 +39,20 @@ struct ChatGPTCredentials: Codable, Equatable, Sendable {
 /// Where the credentials live: the Keychain in the app, memory in the headless test (which never touches the
 /// Keychain, see `KeychainHelper.isHeadlessTestMode`).
 protocol ChatGPTCredentialStore: Sendable {
-    func load() -> ChatGPTCredentials?
+    func load(allowInteraction: Bool) -> ChatGPTCredentials?
     @discardableResult func save(_ c: ChatGPTCredentials) -> Bool
     func delete()
+}
+
+extension ChatGPTCredentialStore {
+    func load() -> ChatGPTCredentials? { load(allowInteraction: true) }
 }
 
 struct KeychainChatGPTCredentialStore: ChatGPTCredentialStore {
     static let account = "ChatGPTPlanCredentials"
 
-    func load() -> ChatGPTCredentials? {
-        KeychainHelper.load(account: Self.account).flatMap { try? JSONDecoder().decode(ChatGPTCredentials.self, from: Data($0.utf8)) }
+    func load(allowInteraction: Bool) -> ChatGPTCredentials? {
+        KeychainHelper.load(account: Self.account, allowInteraction: allowInteraction).flatMap { try? JSONDecoder().decode(ChatGPTCredentials.self, from: Data($0.utf8)) }
     }
 
     func save(_ c: ChatGPTCredentials) -> Bool {
@@ -65,7 +69,7 @@ final class MemoryChatGPTCredentialStore: ChatGPTCredentialStore, @unchecked Sen
 
     init(_ value: ChatGPTCredentials? = nil) { self.value = value }
 
-    func load() -> ChatGPTCredentials? { lock.withLock { value } }
+    func load(allowInteraction: Bool) -> ChatGPTCredentials? { lock.withLock { value } }
     @discardableResult func save(_ c: ChatGPTCredentials) -> Bool { lock.withLock { value = c }; return true }
     func delete() { lock.withLock { value = nil } }
 }

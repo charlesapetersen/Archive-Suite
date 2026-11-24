@@ -7,7 +7,9 @@
 set -uo pipefail
 . "$(dirname "$0")/../../ops/autonomous/heavy-enter.sh"
 cd "$(dirname "$0")/.."
-REPO="$PWD"; W=$(mktemp -d); NET="$REPO/macOS/Sources/ArchiveProcessor/Net"
+REPO="$PWD"; W=$(mktemp -d) || exit 1
+NET="$REPO/macOS/Sources/ArchiveProcessor/Net"
+MODELS="$REPO/macOS/Sources/ArchiveProcessor/Models"
 cat > "$W/main.swift" <<'SWIFT'
 import Foundation
 
@@ -150,9 +152,57 @@ mock.injectDup("dup__9.json", rev: "2", media: "NEW")
 check("dup: newest rev survives (no stale revert)", store.readData("dup__9.json") == Data("NEW".utf8))
 check("dup: listed exactly once (older reaped)", (try! store.listNames()).filter { $0 == "dup__9.json" }.count == 1)
 
+// A wired start with no Drive configuration must never ask for a secret. A configured
+// installation reads the refresh token first, so a missing/denied token cannot trigger a second read.
+var lookedUp: [String] = []
+func testCredential(_ account: String) -> String? {
+    lookedUp.append(account)
+    switch account {
+    case DriveAuth.refreshTokenAccount: return "test-refresh"
+    case DriveAuth.clientSecretAccount: return "test-secret"
+    default: return nil
+    }
+}
+check("blank client ID skips the Keychain", DriveAuth.RelayCredentials.read(clientID: " ", load: testCredential) == nil
+      && lookedUp.isEmpty)
+let unavailable = DriveAuth.RelayCredentials.read(clientID: "test-client") {
+    lookedUp.append($0)
+    return nil
+}
+check("unavailable token skips the client secret", unavailable == nil && lookedUp == [DriveAuth.refreshTokenAccount])
+lookedUp.removeAll()
+let credentials = DriveAuth.RelayCredentials.read(clientID: " test-client ", load: testCredential)
+check("configured Drive reads each needed test credential once",
+      lookedUp == [DriveAuth.refreshTokenAccount, DriveAuth.clientSecretAccount])
+
+struct MockOAuth: HTTPExecuting {
+    func execute(method: String, url: String, headers: [String: String], body: Data?) throws
+        -> (status: Int, data: Data, headers: [String: String]) {
+        let form = Set(String(decoding: body ?? Data(), as: UTF8.self).split(separator: "&"))
+        guard method == "POST", url == "https://oauth2.googleapis.com/token",
+              form == ["client_id=test%2Dclient", "client_secret=test%2Dsecret",
+                       "refresh_token=test%2Drefresh", "grant_type=refresh%5Ftoken"]
+        else { return (400, Data(), [:]) }
+        return (200, Data(#"{"access_token":"test-access"}"#.utf8), [:])
+    }
+}
+if let credentials {
+    let auth = DriveAuth(clientId: credentials.clientID, clientSecret: credentials.clientSecret,
+                         initialRefreshToken: credentials.refreshToken, http: MockOAuth())
+    check("configured Drive exchanges the test refresh token", (try? auth.accessToken()) == "test-access")
+    check("Drive reuses its access token", (try? auth.accessToken()) == "test-access")
+    auth.signOut()
+    check("sign-out clears the access token", (try? auth.accessToken()) == nil)
+} else {
+    check("configured Drive produced relay credentials", false)
+}
+
 print(pass ? "DRIVE STORE (mock): PASS" : "DRIVE STORE (mock): FAIL")
 exit(pass ? 0 : 1)
 SWIFT
-if swiftc "$NET/RelayObjectFormat.swift" "$NET/DriveClient.swift" "$NET/DriveObjectStore.swift" "$W/main.swift" -o "$W/ds" 2>"$W/err"; then
-  "$W/ds"
-else echo "  [FAIL] swiftc:"; head -25 "$W/err"; exit 1; fi
+if clang -c "$MODELS/KeychainQuery.m" -o "$W/KeychainQuery.o" \
+  && swiftc -import-objc-header "$MODELS/KeychainQuery.h" "$W/KeychainQuery.o" \
+      "$MODELS/KeychainHelper.swift" "$NET/RelayObjectFormat.swift" "$NET/DriveClient.swift" \
+      "$NET/DriveAuth.swift" "$NET/DriveObjectStore.swift" "$W/main.swift" -o "$W/ds" 2>"$W/err"; then
+  ARCHIVEPROC_HEADLESS=1 "$W/ds"
+else echo "  [FAIL] compile:"; head -25 "$W/err"; exit 1; fi

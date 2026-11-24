@@ -15,30 +15,60 @@ final class DriveAuth: @unchecked Sendable {
     static let scope = "https://www.googleapis.com/auth/drive.file"
     private static let tokenURL = "https://oauth2.googleapis.com/token"
     private static let authURL = "https://accounts.google.com/o/oauth2/v2/auth"
-    private static let keychainAccount = "DriveRefreshToken"
+    static let refreshTokenAccount = "DriveRefreshToken"
+    static let clientSecretAccount = "DriveClientSecret"
+
+    struct RelayCredentials {
+        let clientID: String
+        let clientSecret: String
+        let refreshToken: String
+
+        static func read(clientID: String, load: (String) -> String? = {
+            KeychainHelper.load(account: $0, allowInteraction: false)
+        }) -> Self? {
+            let id = clientID.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !id.isEmpty,
+                  let token = load(DriveAuth.refreshTokenAccount), !token.isEmpty,
+                  let secret = load(DriveAuth.clientSecretAccount),
+                  !secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+            return Self(clientID: id, clientSecret: secret, refreshToken: token)
+        }
+    }
 
     private let clientId: String
     private let clientSecret: String
     private let http: HTTPExecuting
     private let lock = NSLock()
+    private var initialRefreshToken: String?
     private var cached: (token: String, expiry: Date)?
 
-    init(clientId: String, clientSecret: String, http: HTTPExecuting = URLSessionHTTP()) {
+    init(clientId: String, clientSecret: String, initialRefreshToken: String? = nil,
+         http: HTTPExecuting = URLSessionHTTP()) {
         // Trim whitespace/newlines: a pasted client id/secret very often carries a trailing space or
         // newline, which Google rejects as `invalid_client` ("client secret is invalid"). Trimming here
         // covers BOTH the interactive sign-in exchange and the autonomous relay-refresh path.
         self.clientId = clientId.trimmingCharacters(in: .whitespacesAndNewlines)
         self.clientSecret = clientSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.initialRefreshToken = initialRefreshToken
         self.http = http
     }
 
-    func signOut() { KeychainHelper.delete(account: Self.keychainAccount); lock.lock(); cached = nil; lock.unlock() }
+    func signOut() {
+        KeychainHelper.delete(account: Self.refreshTokenAccount)
+        lock.withLock {
+            cached = nil
+            initialRefreshToken = nil
+        }
+    }
 
     /// A valid access token, refreshed as needed. Throws `.notSignedIn` if there's no stored refresh token.
     func accessToken() throws -> String {
         lock.lock(); defer { lock.unlock() }
         if let c = cached, c.expiry > Date().addingTimeInterval(60) { return c.token }
-        guard let stored = KeychainHelper.load(account: Self.keychainAccount) else { throw DriveError.notSignedIn }
+        let refreshToken = initialRefreshToken
+            ?? KeychainHelper.load(account: Self.refreshTokenAccount, allowInteraction: false)
+        initialRefreshToken = nil
+        guard let stored = refreshToken else { throw DriveError.notSignedIn }
         let (token, expiry) = try refreshedToken(using: stored)
         cached = (token, expiry)
         return token
@@ -78,7 +108,7 @@ final class DriveAuth: @unchecked Sendable {
                 do {
                     let tokens = try self.exchange(code: code, verifier: verifier, redirect: "http://127.0.0.1:\(listener.port)")
                     if let refresh = tokens["refresh_token"] as? String {
-                        _ = KeychainHelper.save(account: Self.keychainAccount, password: refresh)
+                        _ = KeychainHelper.save(account: Self.refreshTokenAccount, password: refresh)
                     }
                     completion(.success(()))
                 } catch { completion(.failure(error)) }

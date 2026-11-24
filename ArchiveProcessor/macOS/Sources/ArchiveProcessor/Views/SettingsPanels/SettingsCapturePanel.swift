@@ -98,7 +98,7 @@ struct SettingsCapturePanel: View {
                 SecureField("Client secret", text: $driveClientSecret, prompt: Text("GOCSPX-…"))
                     .labelsHidden()
                     .textFieldStyle(.roundedBorder)
-                    .onChange(of: driveClientSecret) { _, v in _ = KeychainHelper.save(account: "DriveClientSecret", password: v) }
+                    .onChange(of: driveClientSecret) { _, v in _ = KeychainHelper.save(account: DriveAuth.clientSecretAccount, password: v) }
                 HStack(spacing: 10) {
                     Button(driveSignedIn ? "Re-sign in" : "Sign in to Google Drive") { signInToDrive() }
                         .disabled(driveClientId.isEmpty || driveClientSecret.isEmpty || signingIn)
@@ -124,15 +124,15 @@ struct SettingsCapturePanel: View {
     }
 
     private func loadDriveState() {
-        driveClientSecret = KeychainHelper.load(account: "DriveClientSecret") ?? ""
-        driveSignedIn = KeychainHelper.load(account: "DriveRefreshToken") != nil
+        driveClientSecret = KeychainHelper.load(account: DriveAuth.clientSecretAccount) ?? ""
+        driveSignedIn = KeychainHelper.load(account: DriveAuth.refreshTokenAccount) != nil
     }
 
     /// Owner-gated interactive Google sign-in for the Drive relay: opens the browser + loopback flow, then
     /// stores the refresh token in the Keychain (via `DriveAuth`). The secret is persisted first so the
     /// running `CaptureSession.cloudRelay` reads the same credentials.
     private func signInToDrive() {
-        _ = KeychainHelper.save(account: "DriveClientSecret", password: driveClientSecret)
+        _ = KeychainHelper.save(account: DriveAuth.clientSecretAccount, password: driveClientSecret)
         signingIn = true
         driveStatus = "Opening Google sign-in in your browser — approve access, then return here."
         let auth = DriveAuth(clientId: driveClientId.trimmingCharacters(in: .whitespaces), clientSecret: driveClientSecret)

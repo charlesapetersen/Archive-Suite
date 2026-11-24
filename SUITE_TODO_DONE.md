@@ -18349,3 +18349,17 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   The Android round trip filed all three fixtures with the expected text and years. The standard Processor smoke passed with two scratch PDFs. The delayed-relay regression timed out once with both originals still in backup, then passed twice, waiting about 31 seconds and filing both image sheets in each retry.
   [Owner guided-session evidence](verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). The original run did not record the active hold. No bench cache was created.
   <!-- /W40.fix-live-finish-settle -->
+
+- [x] **W40.fix-processor-keychain-prompts — Avoid repeated Keychain prompts at startup and wired Live Capture Start [S · S3]** · §W40 verification phase · SHIPPED 2026-11-23 (this commit).
+  The owner entered the Keychain password four times on launch and twice at wired Start. Trace when `KeychainHelper` accesses stored keys and which Drive startup calls trigger prompts. Avoid unneeded credential reads and repeated prompts on offline and wired paths while preserving configured provider and Drive sign-in. Verify the fix with test credentials and report any check that needs the owner's Mac. [Walkthrough evidence](verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
+  Process Files checks provider availability using Keychain attributes and reads the chosen key at Start or Resume.
+  Live Capture reads Drive credentials silently once at Start and updates the pairing UI from the relay state.
+  USB/Wi-Fi can start when Drive needs permission, and previous Drive traffic still gates Finish when configured.
+  Six focused VM tests and four final-build VM tests passed, including Start and Resume with a mock OCR provider.
+  A scratch macOS Keychain returned the test key while unlocked, returned quietly while locked, and restored
+  the previous interaction setting. All 15 mock Drive checks and the tag-vocabulary gate passed.
+  The Android-to-Mac journey received and filed
+  three live scratch photos with the expected tags. Its read-only destination phase kept the originals but showed
+  the wrong warning style, reproduced on unchanged main at 7d23d5bb in the same test.
+  The owner's installed build should confirm the launch and wired Start prompt counts in the queued guided rerun.
+  <!-- /W40.fix-processor-keychain-prompts -->
