@@ -223,7 +223,11 @@ classification edit. [Independent VM evidence](../verification/evidence/processo
   goes straight from saved classifications to Automatic tagging review under the Full manual approach.
   The whole-run page review and box/folder confirmation are omitted even with review enabled and no
   review answered. The saved document review switch controls only the later per-collection review on this
-  path. [VM evidence](../verification/evidence/processor/W49.proc-s050-verify.md). (queued: W49.proc-s050-check)
+  path. [VM evidence](../verification/evidence/processor/W49.proc-s050-verify.md). (queued: W40.fix-processor-resume-reviews)
+- **Independently confirmed 2026-11-24 (Claude Opus 5.5, `1d4a91e1`).** A fresh guest run showed the same
+  sequence in both cases: no whole-run page review or box/folder confirmation after Resume Run, final tagging
+  review shown, the later per-collection review only with the saved setting on, and six OCR calls in all.
+  (queued: W40.fix-processor-resume-reviews)
 
 ## Adding the same photo twice can send two OCR requests (S-048)
 

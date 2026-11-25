@@ -1286,14 +1286,16 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a real Process Files run under Automatic, interrupted at its first review and resumed
   through the app after relaunch. Compare the visible stages with the document review setting saved on and off.
 - **Would clear it:** Resume presents each applicable review unless the user explicitly skipped it (owner call 30).
-- **Status:** `reproduced` — independent Claude check queued as `W49.proc-s050-check`.
-  [VM evidence](evidence/processor/W49.proc-s050-verify.md).
+- **Status:** `confirmed` — independently reproduced by W49.proc-s050-check; fix queued as
+  `W40.fix-processor-resume-reviews`. [VM evidence](evidence/processor/W49.proc-s050-verify.md).
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
   - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s050-verify`; Resume should omit only explicitly skipped reviews (also S-035).
   - 2026-11-21 W49.proc-s050-verify — Codex gpt-6.2-sol reproduced at `5cd1bd29`. Both resumed runs bypassed
     the whole-run page review and label confirmation, then opened final tagging review. Only a saved On opened
     the later per-collection review, even when the live setting had been changed. Both reused all six OCR results.
+  - 2026-11-24 W49.proc-s050-check — Claude Opus 5.5 independently reproduced at `1d4a91e1` on a fresh guest
+    run, with the same review sequence and six OCR calls in both cases; ordinary Resume joins the S-035 fix.
 
 
 ### S-051 · A batch create refused outright is reported as an uncertain submission
