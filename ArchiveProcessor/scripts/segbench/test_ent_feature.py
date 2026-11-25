@@ -25,12 +25,12 @@ def swift_source():
 def swift_prompt():
     """EntityExtractor.prompt(text:)'s literal with Swift's indentation rule applied, {text} for its interpolation."""
     src = swift_source()
-    body = src[src.index("static func prompt(text: String) -> String {"):]
+    body = src[src.index("static func prompt(text: String, cap: Int = textCap) -> String {"):]
     start = body.index('"""\n') + 4
     end = body.index('\n        """', start)
     lines = body[start:end].split("\n")
     assert all(not l or l.startswith("        ") for l in lines)
-    text = "\n".join(l[8:] for l in lines).replace(r"\(sent(text))", "{text}", 1)
+    text = "\n".join(l[8:] for l in lines).replace(r"\(sent(text, cap: cap))", "{text}", 1)
     assert "\\(" not in text, "an interpolation this test does not know about"
     return text
 
@@ -42,12 +42,14 @@ class Prompt(unittest.TestCase):
     def test_is_the_measured_entity3k_place_prompt(self):
         text = "Dear Sir,\nThank you.\nYours, A. Green"
         self.assertEqual(F.prompt(text), P.with_rules(P.ENTITY_PROMPT.format(text=text), {"sending_place": R.ENTITY_PLACE}))
-        self.assertEqual(F.prompt("a" * 3100), F.TEMPLATE.format(text="a" * 3000))
+        self.assertEqual(F.prompt("a" * 8100), F.TEMPLATE.format(text="a" * 8000))
+        self.assertEqual(F.prompt("a" * 3100, cap=F.MAC_TEXT_CAP), F.TEMPLATE.format(text="a" * 3000))
         self.assertNotIn("Nearby documents", F.prompt(text))
 
     def test_caps_match_swift(self):
         src = swift_source()
         self.assertIn(f"static let textCap = {F.TEXT_CAP}", src)
+        self.assertIn(f"static let macTextCap = {F.MAC_TEXT_CAP}", src)
         self.assertIn(f"static let nearLetters = {F.NEAR_LETTERS}", src)
         self.assertIn(f"static let nearDistance = {F.NEAR_DISTANCE}", src)
 
@@ -63,7 +65,7 @@ class Evidence(unittest.TestCase):
         self.assertGreaterEqual(len(cases), 10)
         for c in cases:
             text = "x" * c.get("pad", 0) + c["text"]
-            ev, d, why = F.evidence(c["quote"], text)
+            ev, d, why = F.evidence(c["quote"], text, c.get("cap", F.TEXT_CAP))
             with self.subTest(c["id"]):
                 self.assertEqual(ev, c["evidence"])
                 if ev == "quoted":

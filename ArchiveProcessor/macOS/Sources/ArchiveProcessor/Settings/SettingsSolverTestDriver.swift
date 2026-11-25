@@ -516,9 +516,9 @@ enum SettingsSolverTestDriver {
               e.blockers("segmentation", "qwen3.5-27b-teacher").contains { $0.contains("not as a voter alone") })
         var clKey = cl
         clKey.keys = ["openrouter"]
-        // W46.ent-local-shipped-prompt: the 27B is now 0.66 on sender, against the feature's 0.69.
-        // No paired comparison with the feature is reported, so use the unpaired 0.05 tie rule.
-        // ent-local-shipped.md pairs with Gemini's tagging prompt. Cluster: $0; feature: $2.37/1,000.
+        // W46.ent-local-shipped-prompt: the 27B is 0.66 on sender. W47.wh-ent-8k-apply: the feature at 8,000 characters
+        // is 0.81 (ent-8k-paired.md), 0.15 ahead, outside the unpaired 0.05 tie rule, so a key buys the feature
+        // ($4.39/1,000) over the free cluster. At 3,000 characters (0.69) the two tied and the cluster won on cost.
         for key in ["openrouter", "gemini"] {
             var keyed = clKey
             keyed.keys = [key]
@@ -531,15 +531,15 @@ enum SettingsSolverTestDriver {
             check("E with a \(key) key: the entity feature is usable",
                   ek.blockers("entities", "gemini-entity-feature").isEmpty)
             for kind in ["correspondence-typed", "correspondence-handwritten"] {
-                eq("E with a \(key) key: names tie on sender, so the free cluster (\(kind))",
-                   pick(ek, "entities", kind), "qwen3.6-27b")
+                eq("E with a \(key) key: the feature leads the cluster on sender, so it is picked (\(kind))",
+                   pick(ek, "entities", kind), "gemini-entity-feature")
             }
             let names = ek.pick("entities", "correspondence-typed")
-            check("E with a \(key) key: the reason names the tied feature and the lower cost",
-                  names?.reason.contains("gemini-entity-feature") == true
-                    && names?.reason.contains("ties") == true && names?.reason.contains("cheaper") == true,
+            check("E with a \(key) key: the reason names the feature and its sender figure, not a tie",
+                  names?.reason.contains("gemini-entity-feature") == true && names?.reason.contains("0.81") == true
+                    && names?.reason.contains("ties") == false,
                   names?.reason ?? "missing")
-            check("E with a \(key) key: names cost no money", names?.usd == 0, "\(names?.usd ?? -1)")
+            check("E with a \(key) key: names cost money", (names?.usd ?? 0) > 0, "\(names?.usd ?? -1)")
         }
         clKey.excludedModelFamilies = ["gemini"]
         let ek = solve("E-key-nogemini", clKey, ea)

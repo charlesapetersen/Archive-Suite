@@ -1,6 +1,6 @@
 {
- "built": "2026-11-23",
- "table_built": "2026-11-23",
+ "built": "2026-11-24",
+ "table_built": "2026-11-24",
  "noise": {
   "ocr_tie": "on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 a pick takes the stratum's leader (the interval across 0 makes no tie there either, W46.pairs-redecide; it decides only a stratum row's admission); NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3",
   "seg_rerun_pages_exact_points": "a paired 95% interval of test-box pages exact holding 0, the two routes compared page by page on the same windows (offset 0) and the truth's documents resampled; each pair's entry in the stage's pairs (seg-pair-ties.json). Replaces twice the larger window-offset range (owner review of the pipeline doc, 2026-11-17, W46.seg-truth-audit); in gap accuracy the paired interval decides as before",
@@ -2837,7 +2837,7 @@
  "ent": [
   {
    "id": "gemini-entity-feature",
-   "name": "Gemini, the entity feature's own request (3,000 characters)",
+   "name": "Gemini, the entity feature's own request (8,000 characters)",
    "family": "cloud",
    "needs": {
     "key": [
@@ -2845,17 +2845,17 @@
      "openrouter"
     ]
    },
-   "usd_1000": 2.37,
+   "usd_1000": 4.39,
    "usd_1000_batch": null,
-   "s_doc": 5.1,
+   "s_doc": 5.9,
    "s_est": false,
    "peak_gb": 0,
-   "note": "measured with Gemini 3.7 Flash on Vision text; the app's 3.8 not run on this prompt (ent-feature.md Scope); a tie with the tagging call carrying both November rules on every field (tagging-place minus entity3k-place: sender +0.04 [-0.00, +0.08], recipient -0.06 [-0.13, +0.00], place -0.07 [-0.17, +0.02], city +0.00; ent-place-rule.md); rerun floor on 40: sender +0.00, recipient +0.01, place -0.03",
+   "note": "the first 8,000 characters on a cloud route (W47.wh-ent-8k-apply, owner call 18); a model served on this Mac and Apple's name tagger keep the first 3,000 (EntityExtractor.macTextCap), since 8,000 is unmeasured there (ent-8k-paired.md Scope); measured with Gemini 3.8 Flash on Apple Vision text, where the app withholds the sender (rule ent-vision-hands, owner call 11): the sender gain reaches users only on text a model read. No model-read text of the 138 is cached; on the owner's 96 pages the readers' text runs 1.01 to 1.05 times Vision's length, so about the same letters run past 3,000 (a proxy on other pages, W47.wh-ent-8k-apply)",
    "source": "settings-routes.json, stage entities, row gemini-entity-feature",
    "f1": {
-    "sender": 0.69,
-    "recipient": 0.88,
-    "place": 0.8
+    "sender": 0.81,
+    "recipient": 0.89,
+    "place": 0.82
    },
    "n": 138
   },
@@ -2880,30 +2880,6 @@
     "sender": 0.73,
     "recipient": 0.82,
     "place": 0.72
-   },
-   "n": 138
-  },
-  {
-   "id": "gemini-entity8k",
-   "name": "Gemini, a dedicated entity prompt (8,000 characters)",
-   "family": "cloud",
-   "needs": {
-    "key": [
-     "gemini",
-     "openrouter"
-    ]
-   },
-   "usd_1000": 3.0,
-   "usd_1000_batch": null,
-   "s_doc": 3.0,
-   "s_est": true,
-   "peak_gb": 0,
-   "note": "not run against the shipped prompt; its 3,000-character twin with the place rule ties it on every field (tagging-place minus entity3k-place: sender +0.04 [-0.00, +0.08], recipient -0.06 [-0.13, +0.00], place -0.07 [-0.17, +0.02], city +0.00; ent-place-rule.md); length adds +0.087 [+0.022, +0.170] on the sender over entity3k on the built truth (ent-score-paid.md); 88 of 138 calls answered from the gateway cache: on short documents the 8k pair equals the 3k by construction (P10-8, ent-score-paid.md card)",
-   "source": "settings-routes.json, stage entities, row gemini-entity8k",
-   "f1": {
-    "sender": 0.76,
-    "recipient": 0.88,
-    "place": 0.84
    },
    "n": 138
   },

@@ -99,10 +99,10 @@ final class NamesEstimateJourneyUITests: XCTestCase {
         let after = estimateText()
         print("[s044] estimate after names: \(after)")
         let names = try XCTUnwrap(after.firstIndex(of: "Names:"))
-        XCTAssertEqual(after.dropFirst(names + 1).first, "$0.0015",
-                       "one estimated document × 157/299 × (925 input at $2 and 100 output at $10 per million)")
-        XCTAssertTrue(after.contains("$0.0325"), "the standard total includes the names call")
-        XCTAssertEqual(after.filter { !["Names:", "$0.0015", "$0.0325"].contains($0) },
+        XCTAssertEqual(after.dropFirst(names + 1).first, "$0.0017",
+                       "one estimated document × 157/299 × (1,134 input at $2 and 100 output at $10 per million)")
+        XCTAssertTrue(after.contains("$0.0327"), "the standard total includes the names call")
+        XCTAssertEqual(after.filter { !["Names:", "$0.0017", "$0.0327"].contains($0) },
                        before.filter { $0 != "$0.0310" }, "ranking Names changes just its row and the total")
         shot("s044-after-names")
         let start = app.descendants(matching: .any)["ap.ocr.start"]

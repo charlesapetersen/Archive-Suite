@@ -290,7 +290,7 @@ which `test_ent_feature.py` compares with the Swift).
 You are extracting correspondence metadata from one document in a historical archive: a letter, memo or telegram. The text below was read from a photograph by machine OCR and may contain recognition errors.
 
 ---
-{document text, first 3,000 characters}
+{document text, first 8,000 characters on a cloud route; first 3,000 on a model served on this Mac}
 ---
 
 Respond with ONLY a JSON object of this shape:

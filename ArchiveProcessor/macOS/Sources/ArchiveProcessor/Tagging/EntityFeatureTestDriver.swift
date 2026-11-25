@@ -78,7 +78,8 @@ enum EntityFeatureTestDriver {
         for c in cases {
             let id = c["id"] as? String ?? "?"
             let text = String(repeating: "x", count: c["pad"] as? Int ?? 0) + (c["text"] as? String ?? "")
-            let got = EntityExtractor.evidence(quote: c["quote"] as? String, in: text)
+            let cap = c["cap"] as? Int ?? EntityExtractor.textCap
+            let got = EntityExtractor.evidence(quote: c["quote"] as? String, in: text, cap: cap)
             let want: EntityExtractor.Evidence = c["evidence"] as? String == "quoted"
                 ? .quoted(distance: c["distance"] as? Int ?? -1) : .inferred(why: c["why"] as? String ?? "")
             check("1 \(id)", got == want, "got \(got) want \(want)")
@@ -118,10 +119,20 @@ enum EntityFeatureTestDriver {
         check("2 null and empty fields are empty",
               EntityExtractor.parse(#"{"sender": null, "recipient": [], "sending_place": [""]}"#, documentText: text)
               == EntityExtractor.Fields())
-        let prompt = EntityExtractor.prompt(text: String(repeating: "a", count: 3100) + "TAIL")
-        check("2 the prompt carries the first 3,000 characters only",
-              prompt.contains(String(repeating: "a", count: 3000)) && !prompt.contains("TAIL")
-              && !prompt.contains("Nearby documents"))
+        let prompt = EntityExtractor.prompt(text: String(repeating: "a", count: 8100) + "TAIL")
+        check("2 the prompt carries the first 8,000 characters only",
+              prompt.contains(String(repeating: "a", count: 8000)) && !prompt.contains(String(repeating: "a", count: 8001))
+              && !prompt.contains("TAIL") && !prompt.contains("Nearby documents"))
+        let macPrompt = EntityExtractor.prompt(text: String(repeating: "a", count: 3100) + "TAIL",
+                                               cap: EntityExtractor.macTextCap)
+        check("2 a model on this Mac is sent the first 3,000 characters only",
+              macPrompt.contains(String(repeating: "a", count: 3000))
+              && !macPrompt.contains(String(repeating: "a", count: 3001)) && !macPrompt.contains("TAIL"))
+        let local = GatewayConfig(baseURL: "http://127.0.0.1:8080/v1", modelID: "m", displayName: "m", localModel: true)
+        let hosted = GatewayConfig(baseURL: "https://aiapi-prod.stanford.edu/v1", modelID: "m", displayName: "m")
+        check("2 the window is 3,000 on a model served on this Mac and 8,000 on every other route",
+              EntityExtractor.cap(gatewayConfig: local) == 3000 && EntityExtractor.cap(gatewayConfig: hosted) == 8000
+              && EntityExtractor.cap(gatewayConfig: nil) == 8000)
     }
 
     // MARK: 3. The run policy
@@ -178,7 +189,7 @@ enum EntityFeatureTestDriver {
                                    sidecars: sidecars, namesCallShare: share)
         }
         let base = estimate(share: 0)
-        let expected = 100 * (157.0 / 299) * 0.00285
+        let expected = 100 * (157.0 / 299) * 0.003268   // (1,134 in × $2 + 100 out × $10) per million
         let ranked = estimate(share: share())
         check("3 names estimate: one priced text call per expected correspondence document",
               abs(ranked.namesCost - expected) < 1e-9)
@@ -190,7 +201,7 @@ enum EntityFeatureTestDriver {
         check("3 names estimate: Auto date and subscription are zero", share(mode: .autoDate) == 0 && share(plan: true) == 0)
         check("3 names estimate: Vision supplies no page kind for the names policy", share(vision: true) == 0)
         let mistral = LLMModel.mistralModels[0]
-        let mistralText = 100 * (157.0 / 299) * (925 * 0.15 + 100 * 0.60) / 1_000_000
+        let mistralText = 100 * (157.0 / 299) * (1134 * 0.15 + 100 * 0.60) / 1_000_000
         check("3 names estimate: Mistral Small text prices are separate from Mistral OCR",
               abs(estimate(share: share(), model: mistral).namesCost - mistralText) < 1e-9)
         let vision = LLMProvider.appleVision.models.first!

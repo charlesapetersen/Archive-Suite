@@ -45,7 +45,9 @@ CACHE = os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/ent-feature")
 RESULTS = os.path.join(HERE, "..", "..", "segbench-results", "ent-feature.md")
 SWIFT = os.path.join(HERE, "..", "..", "macOS", "Sources", "ArchiveProcessor", "Tagging", "EntityExtractor.swift")
 CAP = 1.00                # this item's spend, under the owner's $7 a piece of work
-TEXT_CAP = 3000
+TEXT_CAP = 8000           # a cloud route's window (EntityExtractor.textCap; W47.wh-ent-8k-apply, owner call 18)
+MAC_TEXT_CAP = 3000       # a model served on this Mac (EntityExtractor.macTextCap): 8,000 is unmeasured there
+MEASURED_CAP = 3000       # the window this script's own run and report (ent-feature.md) measured, kept so a rerun hits its cache
 NEAR_LETTERS = 5          # a quote of this many letters or more may be found at edit distance 2
 NEAR_DISTANCE = 2
 TEMPLATE = P.with_rules(P.ENTITY_PROMPT, {"sending_place": R.ENTITY_PLACE})
@@ -54,9 +56,9 @@ CORRESPONDENCE = ("letter", "memo", "memorandum", "telegram", "cable", "cablegra
 UNKNOWN = ("", "null", "none", "unknown", "n/a")
 
 
-def prompt(text):
-    """EntityExtractor.prompt(text:)."""
-    return TEMPLATE.format(text=text[:TEXT_CAP])
+def prompt(text, cap=TEXT_CAP):
+    """EntityExtractor.prompt(text:cap:)."""
+    return TEMPLATE.format(text=text[:cap])
 
 
 # --- the evidence check (EntityExtractor.evidence) ---------------------------------------------------
@@ -84,13 +86,13 @@ def best_distance(q, t, cap=NEAR_DISTANCE + 1):
     return min(min(prev), cap)
 
 
-def evidence(quote, text):
+def evidence(quote, text, cap=TEXT_CAP):
     """(evidence, distance, why): ("quoted", 0|1|2, None) or ("inferred", None, "no quote" | "quote not in the
     text")."""
     q = norm(quote)
     if not q:
         return "inferred", None, "no quote"
-    t = norm(text[:TEXT_CAP])
+    t = norm(text[:cap])
     if q in t:
         return "quoted", 0, None
     if letters(q) >= NEAR_LETTERS:
@@ -196,7 +198,7 @@ def cmd_run_noncorr(_a):
     def calls(d):
         t = vision_text(d)
         P.call("tagging", d["id"], P.tagging_prompt_before(t, P.context_of(d["prompt"])), CACHE, CAP)
-        P.call("entity", d["id"], prompt(t), CACHE, CAP)
+        P.call("entity", d["id"], prompt(t, MEASURED_CAP), CACHE, CAP)
     with ThreadPoolExecutor(P.WORKERS) as ex:
         list(ex.map(calls, docs))
     print(f"{len(docs)} documents; ${P.spent(CACHE):.4f} spent of ${CAP}")
@@ -207,7 +209,7 @@ def cmd_run_noncorr(_a):
 def inside_address(text, place_quote, recipient_quotes):
     """True when the place's quote sits in the recipient's inside address: after a recipient's quote and before the
     salutation (or within 200 characters of the recipient's quote when no salutation follows)."""
-    t = norm(text[:TEXT_CAP])
+    t = norm(text[:MEASURED_CAP])
     pq = norm(place_quote)
     if not pq or pq not in t:
         return False
@@ -230,7 +232,7 @@ def cmd_report(_a):
     rows = P.rows()
     # The app's prompt is the measured one, document by document.
     for _r, d in rows:
-        assert prompt(P.vision_text(d)) == R.prompt_entity(d), d["id"]
+        assert prompt(P.vision_text(d), MEASURED_CAP) == R.prompt_entity(d), d["id"]
     P.check_replies(R.ENT, R.CACHE, R.prompt_entity)
     P.check_replies("tagging", P.CACHE, lambda d: P.label_prompt("tagging", d))
     texts = {r["id"]: P.vision_text(d) for r, d in rows}
@@ -258,7 +260,7 @@ def cmd_report(_a):
         for i, p in pr.items():
             tr = truth[i].get(f) or []
             for e in p[f]:
-                ev, dist, why = evidence(e["quote"], texts[i])
+                ev, dist, why = evidence(e["quote"], texts[i], MEASURED_CAP)
                 grp = f"read, distance {dist}" if ev == "quoted" else f"inferred: {why}"
                 if any(ET.match(e["name"], x["name"], "ed2", x.get("alternates", ())) for x in tr
                        if x.get("class") == "named"):
@@ -275,7 +277,7 @@ def cmd_report(_a):
         rq = [e["quote"] for e in p["recipient"] if e["quote"]]
         for e in p["sending_place"]:
             ia["places_written"] += 1
-            if evidence(e["quote"], texts[i])[0] == "quoted":
+            if evidence(e["quote"], texts[i], MEASURED_CAP)[0] == "quoted":
                 ia["quoted"] += 1
             if e["quote"] and inside_address(texts[i], e["quote"], rq):
                 ia["inside_address"] += 1
@@ -290,14 +292,14 @@ def cmd_report(_a):
             and os.path.exists(P.reply_path("tagging", d["id"], CACHE))]
     if have:
         for d in have:
-            P.cached(P.reply_path("entity", d["id"], CACHE), prompt(vision_text(d)), P.request_settings())
+            P.cached(P.reply_path("entity", d["id"], CACHE), prompt(vision_text(d), MEASURED_CAP), P.request_settings())
         nf = {d["id"]: tagging_format(json.load(open(P.reply_path("tagging", d["id"], CACHE))).get("raw"))
               for d in have}
         ent = {d["id"]: names_all(json.load(open(P.reply_path("entity", d["id"], CACHE))).get("raw")) for d in have}
         leak = [i for i, f in nf.items() if f in CORRESPONDENCE]
         filled = lambda ids, f: sum(bool(ent[i] and ent[i][f]) for i in ids)  # noqa: E731
         quoted = lambda ids, f: sum(1 for i in ids if ent[i] for e in ent[i][f]  # noqa: E731
-                                    if evidence(e["quote"], vision_text(next(x for x in have if x["id"] == i)))[0]
+                                    if evidence(e["quote"], vision_text(next(x for x in have if x["id"] == i)), MEASURED_CAP)[0]
                                     == "quoted")
         s["noncorr"] = {
             "docs": len(nc), "answered": len(have), "formats": dict(collections.Counter(nf.values()).most_common()),

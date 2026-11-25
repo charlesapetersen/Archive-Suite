@@ -11,7 +11,9 @@
  {"id": "a short quote one edit away", "quote": "Ann", "text": "Dear Amn,", "evidence": "inferred", "why": "quote not in the text"},
  {"id": "no quote", "quote": null, "text": "Dear Mr. President,", "evidence": "inferred", "why": "no quote"},
  {"id": "a blank quote", "quote": "  \n ", "text": "Dear Mr. President,", "evidence": "inferred", "why": "no quote"},
- {"id": "only past the 3,000 characters sent", "quote": "Mary Jones", "pad": 3000, "text": " Mary Jones", "evidence": "inferred", "why": "quote not in the text"},
+ {"id": "only past the 8,000 characters sent", "quote": "Mary Jones", "pad": 8000, "text": " Mary Jones", "evidence": "inferred", "why": "quote not in the text"},
+ {"id": "past 3,000 is read on a cloud route", "quote": "Mary Jones", "pad": 3000, "text": " Mary Jones", "evidence": "quoted", "distance": 0},
+ {"id": "only past the 3,000 characters a model on this Mac is sent", "quote": "Mary Jones", "pad": 3000, "cap": 3000, "text": " Mary Jones", "evidence": "inferred", "why": "quote not in the text"},
  {"id": "a neighbour's name", "quote": "Robert White", "text": "Dear Dr. Brown, thank you. Yours, Alice Green", "evidence": "inferred", "why": "quote not in the text"},
  {"id": "a place", "quote": "Washington, D. C.", "text": "WASHINGTON, D. C.\nMarch 3, 1958", "evidence": "quoted", "distance": 0}
 ]

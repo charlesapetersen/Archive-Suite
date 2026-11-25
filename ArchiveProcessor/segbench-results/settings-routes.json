@@ -1,6 +1,6 @@
 {
  "version": 1,
- "built": "2026-11-23",
+ "built": "2026-11-24",
  "item": "W46.settings-routes-table",
  "method": "ArchiveProcessor/scripts/segbench/settings_routes.py",
  "schema": "execution-plans/processing-review/13-stage-rules/00-index.md §The table schema",
@@ -14681,7 +14681,7 @@
    "routes": [
     {
      "id": "gemini-entity-feature",
-     "name": "Gemini, the entity feature's own request (3,000 characters)",
+     "name": "Gemini, the entity feature's own request (8,000 characters)",
      "family": "cloud",
      "app_route": "gemini|gemini-3.8-flash",
      "status": "shipped",
@@ -14699,80 +14699,91 @@
      },
      "figures": {
       "sender": {
-       "value": 0.69,
+       "value": 0.81,
        "n": 138,
        "truth": "ent-owner-rule",
        "source": {
-        "file": "ent-feature.md",
-        "route": "entity prompt",
-        "attribute": "sender",
-        "value": "0.69"
+        "file": "ent-8k-paired.md",
+        "route": "8k",
+        "attribute": "sender F1",
+        "value": "0.811"
        }
       },
       "recipient": {
-       "value": 0.88,
+       "value": 0.89,
        "n": 138,
        "truth": "ent-owner-rule",
        "source": {
-        "file": "ent-feature.md",
-        "route": "entity prompt",
-        "attribute": "recipient",
-        "value": "0.88"
+        "file": "ent-8k-paired.md",
+        "route": "8k",
+        "attribute": "recipient F1",
+        "value": "0.892"
        }
       },
       "sending_place": {
-       "value": 0.8,
+       "value": 0.82,
        "n": 138,
        "truth": "ent-owner-rule",
        "source": {
-        "file": "ent-feature.md",
-        "route": "entity prompt",
+        "file": "ent-8k-paired.md",
+        "route": "8k",
         "attribute": "place P / R / F1",
-        "value": "0.83 / 0.76 / 0.80"
+        "value": "0.86 / 0.78 / 0.818"
        }
       },
       "place_city": {
-       "value": 0.88,
+       "value": 0.89,
        "n": 138,
        "truth": "ent-owner-rule",
        "source": {
-        "file": "ent-feature.md",
-        "route": "entity prompt",
+        "file": "ent-8k-paired.md",
+        "route": "8k",
         "attribute": "place by city",
-        "value": "0.88"
+        "value": "0.891"
+       }
+      },
+      "quote_precision_sender": {
+       "value": 0.82,
+       "n": 130,
+       "truth": "ent-owner-rule",
+       "source": {
+        "file": "ent-8k-paired.md",
+        "route": "8k",
+        "attribute": "sender, quote in text",
+        "value": "107/130 (0.82)"
        }
       }
      },
      "cost": {
-      "usd_1000_list": 2.37,
+      "usd_1000_list": 4.39,
       "usd_1000_batch": null,
       "price_read": null,
       "source": {
-       "file": "ent-feature.md",
-       "route": "entity prompt",
-       "attribute": "one more call per correspondence document, Gemini 3.7 Flash list price, the 138 calls' metered tokens",
-       "value": "$2.37 per 1,000"
+       "file": "ent-8k-paired.md",
+       "route": "8k prompt",
+       "attribute": "one more call per correspondence document, Gemini 3.8 Flash's price to 31 December, metered tokens of the 138 calls",
+       "value": "$4.39 per 1,000"
       }
      },
      "time": {
-      "per_unit_s": 5.1,
+      "per_unit_s": 5.9,
       "measured": true,
-      "measured_on": "the Stanford gateway, median of the 138 calls",
+      "measured_on": "AI Studio with the personal key, median of the 138 calls",
       "source": {
-       "file": "ent-feature.md",
-       "route": "entity prompt",
-       "attribute": "median through the gateway",
-       "value": "median 5.1 s"
+       "file": "ent-8k-paired.md",
+       "route": "8k prompt",
+       "attribute": "median a call",
+       "value": "Median 5.9 s"
       }
      },
      "memory": null,
      "caveats": [
-      "measured with Gemini 3.7 Flash on Vision text; the app's 3.8 not run on this prompt (ent-feature.md Scope)",
-      "a tie with the tagging call carrying both November rules on every field (tagging-place minus entity3k-place: sender +0.04 [-0.00, +0.08], recipient -0.06 [-0.13, +0.00], place -0.07 [-0.17, +0.02], city +0.00; ent-place-rule.md); rerun floor on 40: sender +0.00, recipient +0.01, place -0.03",
-      "behind the app's correspondence gate (the tagging reply's format) 134 of 138 pass and the scores move by at most 0.01 (sender 0.69, recipient 0.87, place 0.79); the gate lets 4 of 21 non-correspondence documents through (ent-feature.md)",
-      "every name came with a quote found exactly in the text; a quote proves the words are on the page, not the role: read senders right 85 of 112 (ent-feature.md)",
-      "first 3,000 characters only: 78 of 138 named senders in that span of Vision text, 90 in 8,000 (ent-score-paid.md)",
-      "one extra call after the tagging call, about 58% of its $4.07; owner call 11's 'extracted always on a cloud route' was made when names came with the tagging call at no cost (ent-feature.md)",
+      "the first 8,000 characters on a cloud route (W47.wh-ent-8k-apply, owner call 18); a model served on this Mac and Apple's name tagger keep the first 3,000 (EntityExtractor.macTextCap), since 8,000 is unmeasured there (ent-8k-paired.md Scope)",
+      "measured with Gemini 3.8 Flash on Apple Vision text, where the app withholds the sender (rule ent-vision-hands, owner call 11): the sender gain reaches users only on text a model read. No model-read text of the 138 is cached; on the owner's 96 pages the readers' text runs 1.01 to 1.05 times Vision's length, so about the same letters run past 3,000 (a proxy on other pages, W47.wh-ent-8k-apply)",
+      "paired and run twice against the 3,000-character call it replaced: sender +0.107 [+0.038, +0.189] and +0.108 [+0.034, +0.194] against a rerun drift of -0.013 and -0.012, all on the 48 letters past 3,000 characters (0.46 against 0.80); recipient, place and city tie (ent-8k-paired.md)",
+      "behind the app's correspondence gate (the tagging reply's format) 134 of 138 pass; the gate lets 4 of 21 non-correspondence documents through (ent-feature.md, measured at 3,000 characters)",
+      "every quoted name was found in the text it was sent; a quote proves the words are on the page, not the role: read senders right 107 of 130 (ent-8k-paired.md)",
+      "one extra call after the tagging call, +$0.55 per 1,000 over the 3,000-character call ($3.84); both double from 1 January 2027 (ent-8k-paired.md)",
       "the sender convention is the truth's: a person, or the issuing organisation when no person is named (owner call 10)"
      ],
      "kind_rules": [
@@ -14893,111 +14904,6 @@
      "fallback": "none",
      "conditions": [
       "not offered by the app: the tagging prompt was reverted to its pre-November name lines (owner call 10) and the app reads names with gemini-entity-feature; kept as measured history"
-     ]
-    },
-    {
-     "id": "gemini-entity8k",
-     "name": "Gemini, a dedicated entity prompt (8,000 characters)",
-     "family": "cloud",
-     "app_route": null,
-     "status": "measured",
-     "needs": {
-      "key": [
-       "gemini",
-       "openrouter"
-      ],
-      "plan": [],
-      "cluster": false,
-      "gpus": null,
-      "mac": false,
-      "mac_gb": null,
-      "built_in": false
-     },
-     "figures": {
-      "sender": {
-       "value": 0.76,
-       "n": 138,
-       "truth": "ent-owner-rule",
-       "source": {
-        "file": "ent-truth-owner.md",
-        "route": "gemini-3.7 entity8k, Vision",
-        "attribute": "sender built -> owner",
-        "value": "0.76 -> 0.76"
-       }
-      },
-      "recipient": {
-       "value": 0.88,
-       "n": 138,
-       "truth": "ent-owner-rule",
-       "source": {
-        "file": "ent-truth-owner.md",
-        "route": "gemini-3.7 entity8k, Vision",
-        "attribute": "recipient built -> owner",
-        "value": "0.88 -> 0.88"
-       }
-      },
-      "sending_place": {
-       "value": 0.84,
-       "n": 138,
-       "truth": "ent-owner-rule",
-       "source": {
-        "file": "ent-truth-owner.md",
-        "route": "gemini-3.7 entity8k, Vision",
-        "attribute": "owner+rule P / R / F1",
-        "value": "0.86 / 0.82 / 0.84"
-       }
-      },
-      "place_city": {
-       "value": 0.89,
-       "n": 138,
-       "truth": "ent-owner-rule",
-       "source": {
-        "file": "ent-truth-owner.md",
-        "route": "gemini-3.7 entity8k, Vision",
-        "attribute": "owner+rule city",
-        "value": "0.89"
-       }
-      },
-      "quote_precision_sender": {
-       "value": 0.79,
-       "n": 128,
-       "truth": "ent-built",
-       "source": {
-        "file": "ent-score-paid.md",
-        "route": "entity8k",
-        "attribute": "sender, quote in text",
-        "value": "101/128 (0.79)"
-       }
-      }
-     },
-     "cost": {
-      "usd_1000_list": 3.0,
-      "usd_1000_batch": null,
-      "price_read": null,
-      "source": null,
-      "measured": false,
-      "estimate": "hand-entered in the 2026-11-04 settings prototype (build_figures.py, gemini-entity8k: 3.0, estimated from the tagging call's size [?]); no measuring file"
-     },
-     "time": {
-      "per_unit_s": 3.0,
-      "measured": false,
-      "measured_on": "estimate",
-      "source": null,
-      "estimate": "hand-entered in the 2026-11-04 settings prototype (build_figures.py, gemini-entity8k: 3.0); no measuring file"
-     },
-     "memory": null,
-     "caveats": [
-      "not run against the shipped prompt; its 3,000-character twin with the place rule ties it on every field (tagging-place minus entity3k-place: sender +0.04 [-0.00, +0.08], recipient -0.06 [-0.13, +0.00], place -0.07 [-0.17, +0.02], city +0.00; ent-place-rule.md); length adds +0.087 [+0.022, +0.170] on the sender over entity3k on the built truth (ent-score-paid.md)",
-      "88 of 138 calls answered from the gateway cache: on short documents the 8k pair equals the 3k by construction (P10-8, ent-score-paid.md card)",
-      "15 of 27 wrong senders are the organisation fallback its rule asks for (ent-score-paid.md)",
-      "rerun drift one-signed: sender +0.044, place -0.155, city -0.032 on 40 (P6-5, P7-7)"
-     ],
-     "kind_rules": [
-      "non-correspondence: do not show"
-     ],
-     "fallback": "none",
-     "conditions": [
-      "not offered by the app; the entity feature's own prompt starts from ENTITY_PROMPT and ENTITY_PLACE (ent-place-rule.md)"
      ]
     },
     {

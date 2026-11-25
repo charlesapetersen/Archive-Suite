@@ -17,8 +17,12 @@ class Prompts(unittest.TestCase):
 
     def test_shipped_is_the_feature_prompt(self):
         t = "x" * 5000
-        self.assertEqual(self.prompt("shipped", t), F.prompt(t))
-        self.assertEqual(self.prompt("shipped-b", t), F.prompt(t))
+        self.assertEqual(self.prompt("shipped", t), F.prompt(t, cap=E.SHIPPED_CAP))
+        self.assertEqual(self.prompt("shipped-b", t), F.prompt(t, cap=E.SHIPPED_CAP))
+
+    def test_8k_is_the_app_call_since_the_apply(self):
+        t = "x" * 9000
+        self.assertEqual(self.prompt("8k", t), F.prompt(t))
 
     def test_8k_differs_only_past_3000(self):
         short, long_ = "Dear Sir, " * 100, "Dear Sir, " * 700

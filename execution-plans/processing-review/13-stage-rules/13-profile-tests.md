@@ -82,15 +82,15 @@ of `gemini3.8-flash` (87.4%, 84.6-89.8% over three window offsets, $3.61; 25.3 c
 after checking; prompt g2, every figure Gemini 3.7's g2 answers, W46.seg-magazine-rule-app, W46.seg-g2-offsets), which
 the user may choose, with the card showing Gemini 3.7's figures labelled as 3.7's (owner call 8). Dating step 1 `gemini3.8-flash-oneshot`, step 2 `gemini3.7-flash-image`
 on documents with no year in the text ($2.75 per 1,000, 5.3 s), step 4 `gemini3.7-flash-trace-neigh`. Entities
-`gemini-entity-feature`, the entity feature's own prompt (owner call 10; sender 0.69, $2.37 per 1,000, 5.1 s,
-`ent-feature.md`), extracted always, shown when ranked; `gemini-tagging-place` and `gemini-entity8k` are not offered. Cascade: picked only if a cascade row beats `gemini3.8-flash` within the limits (none does at this ceiling).
+`gemini-entity-feature`, the entity feature's own prompt on the first 8,000 characters (owner calls 10 and 18; sender
+0.81, $4.39 per 1,000, 5.9 s, `ent-8k-paired.md`), extracted always, shown when ranked; `gemini-tagging-place` is not offered. Cascade: picked only if a cascade row beats `gemini3.8-flash` within the limits (none does at this ceiling).
 
 **D2. A Gemini key, ceiling $1 for 1,000 pages, hours 24 (batch prices).** Reading `gemini3.8-flash` at the batch price
 ($1.61) is over the ceiling; two Gemini rows fit, `gemini3.5-flash-lite` ($0.79 batch; 95.17 answered) and
 `gemini3.1-flash-lite` ($0.58; 94.59). The best feasible is `gemini3.5-flash-lite`; `gemini3.1-flash-lite` minus it is
 −0.56 [−2.77, +1.09] (n 92, owner96/all/answered; strict −1.57 [−4.67, +0.78], n 95), over the 0.49 floor, so no tie
 and `gemini3.5-flash-lite` is picked. The card's "What a better figure would need" names `gemini3.8-flash` (96.47) and
-the $0.61 shortfall. Segmentation the 2B or `manual`. Entities: `gemini-entity-feature` ($2.37) does not fit
+the $0.61 shortfall. Segmentation the 2B or `manual`. Entities: `gemini-entity-feature` ($4.39) does not fit
 what the ceiling leaves, so names fall to `qwen3-vl-8b-mac` on typed correspondence and `none` on handwriting.
 
 **D3. The Claude plan only.** Reading `claude-sonnet5.5` (96.48, no money, the plan's window share by `usage.md`; read
@@ -125,9 +125,9 @@ image g2 route (+1.5 [−4.0, +7.7]).
   teacher as partner.
 - Dating: steps 1 and 4 `qwen3.6-27b-trace-neigh-vision` (56.5 not in text, 93.3 in text), step 2 `qwen3.6-27b-image`.
 - Entities: `qwen3.6-27b` (sender 0.66 on Vision text, `ent-local-shipped.md`) on correspondence; never from Vision
-  text on handwriting. With a Gemini or OpenRouter key as well, still `qwen3.6-27b`: the feature's 0.69 is only
-  0.03 ahead on sender, inside the unpaired 0.05 tie rule, so $0 on the cluster wins over $2.37 per 1,000 documents
-  (note 09 §9 profile 4). With Gemini excluded, also `qwen3.6-27b`.
+  text on handwriting. With a Gemini or OpenRouter key as well, `gemini-entity-feature`: at 8,000 characters
+  its 0.81 is 0.15 ahead on sender, outside the unpaired 0.05 tie rule, so the key buys it at $4.39 per 1,000 documents
+  (note 09 §9 profile 4; W47.wh-ent-8k-apply; at 3,000 characters the 0.69 tied and the cluster's $0 won). With Gemini excluded, also `qwen3.6-27b`.
 - Placement: the hand line detector setting visible (owner section 2, placement); PP-OCRv6 det offered as the
   cluster-side detector.
 

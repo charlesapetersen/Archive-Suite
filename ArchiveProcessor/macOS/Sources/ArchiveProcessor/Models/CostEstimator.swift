@@ -109,9 +109,10 @@ struct CostEstimator {
     /// documents of 627 pages (`segbench-results/item-fields-retruth.md`, "Spend"), so it is priced by the page.
     static let gatewayItemFieldPageCost = 1.00 / 627
 
-    // One names call on the run's text route. W46's 3,000-character prompt averaged 924 input tokens on
-    // Gemini 3.8 Flash, whose reasoning averaged 820 tokens (ent-8k-paired.md). Allow 100 for the JSON reply.
-    static let estimatedNamesInputTokens = 925.0
+    // One names call on the run's text route. The 8,000-character prompt a cloud route sends (W47.wh-ent-8k-apply)
+    // averaged 1,134 input tokens on Gemini 3.8 Flash (924 at 3,000), whose reasoning averaged 870 tokens there (770
+    // at 3,000; ent-8k-paired.md). Allow 100 for the JSON reply.
+    static let estimatedNamesInputTokens = 1134.0
     static let estimatedNamesOutputTokens = 100.0
 
     // Collection segmentation: text-only calls (~500 input + 50 output per box, plus one clustering call)
@@ -236,7 +237,7 @@ struct CostEstimator {
                         + (tagOutput / 1_000_000) * model.outputCostPer1M
             if sidecars, namesCallShare > 0 {
                 let namesCalls = estimatedSegments * namesCallShare
-                let reasoning = model.measuredModel.id == "gemini-3.8-flash" ? 820.0 : 0
+                let reasoning = model.measuredModel.id == "gemini-3.8-flash" ? 870.0 : 0
                 let rates = model.provider == .mistral
                     ? LLMTextClient.mistralTextRates : (input: model.inputCostPer1M, output: model.outputCostPer1M)
                 namesCost = namesCalls * (estimatedNamesInputTokens * rates.input

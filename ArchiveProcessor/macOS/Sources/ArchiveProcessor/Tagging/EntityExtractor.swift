@@ -11,24 +11,34 @@ import ArchiveCore
 /// (`segbench-results/ent-feature.md`). It carries only the document's own text: no neighbouring documents, so a
 /// name cannot be lifted from them, and the evidence check reads that same text.
 enum EntityExtractor {
-    /// The characters of the document the call sends, as the tagging call does.
-    static let textCap = 3000
+    /// The characters of the document a cloud route sends (W47.wh-ent-8k-apply, owner call 18, 2026-11-19): paired
+    /// on Gemini 3.8 Flash, the first 8,000 lift the sender +0.107 over the first 3,000, all on the letters that run
+    /// past 3,000 (`segbench-results/ent-8k-paired.md`).
+    static let textCap = 8000
+    /// The characters a model on this Mac, and Apple's name tagger, read: the 8,000 were measured on a cloud model
+    /// only (`ent-8k-paired.md`, Scope), so this Mac keeps the window it was measured with.
+    static let macTextCap = 3000
     /// A quote with this many letters or more may be found at edit distance `nearDistance`.
     static let nearLetters = 5
     static let nearDistance = 2
 
-    /// The part of the document the call sends and the check reads: the first `textCap` Unicode scalars, as the bench
-    /// cuts Python strings (a CR LF or an accented letter is one Swift Character but two scalars).
-    static func sent(_ text: String) -> String {
-        String(String.UnicodeScalarView(text.unicodeScalars.prefix(textCap)))
+    /// The window for a route: `macTextCap` for a model served on this Mac, `textCap` otherwise.
+    static func cap(gatewayConfig: GatewayConfig?) -> Int {
+        gatewayConfig?.isLocalModel == true ? macTextCap : textCap
     }
 
-    static func prompt(text: String) -> String {
+    /// The part of the document the call sends and the check reads: the first `cap` Unicode scalars, as the bench
+    /// cuts Python strings (a CR LF or an accented letter is one Swift Character but two scalars).
+    static func sent(_ text: String, cap: Int = textCap) -> String {
+        String(String.UnicodeScalarView(text.unicodeScalars.prefix(cap)))
+    }
+
+    static func prompt(text: String, cap: Int = textCap) -> String {
         """
         You are extracting correspondence metadata from one document in a historical archive: a letter, memo or telegram. The text below was read from a photograph by machine OCR and may contain recognition errors.
 
         ---
-        \(sent(text))
+        \(sent(text, cap: cap))
         ---
 
         Respond with ONLY a JSON object of this shape:
@@ -58,10 +68,10 @@ enum EntityExtractor {
 
     /// Whether `quote` is in the document's text (the part the call sent): whitespace folded, case ignored, exactly,
     /// or at edit distance 2 when the quote has five letters or more. `ent_feature.evidence` is the same rule.
-    static func evidence(quote: String?, in text: String) -> Evidence {
+    static func evidence(quote: String?, in text: String, cap: Int = textCap) -> Evidence {
         let q = fold(quote ?? "")
         guard !q.isEmpty else { return .inferred(why: noQuote) }
-        let t = fold(sent(text))
+        let t = fold(sent(text, cap: cap))
         let d = bestDistance(Array(q.unicodeScalars), in: Array(t.unicodeScalars), cap: nearDistance + 1)
         if d == 0 { return .quoted(distance: 0) }
         if letterCount(q) >= nearLetters, d <= nearDistance { return .quoted(distance: d) }
@@ -125,7 +135,7 @@ enum EntityExtractor {
     /// The reply's three fields with each name checked against `text`, or nil when the reply is not a JSON object.
     /// A field may come as a list of `{name, quote}`, a list of strings or one string; empty and "Unknown"-like names
     /// are dropped and a repeated name kept once (`ent_feature.names`).
-    static func parse(_ raw: String, documentText text: String) -> Fields? {
+    static func parse(_ raw: String, documentText text: String, cap: Int = textCap) -> Fields? {
         var s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if let start = s.firstIndex(of: "{"), let end = s.lastIndex(of: "}"), start <= end {
             s = String(s[start...end])
@@ -152,7 +162,7 @@ enum EntityExtractor {
                 let key = n.lowercased()
                 guard !unknownWords.contains(key), !seen.contains(key) else { continue }
                 seen.insert(key)
-                out.append(Name(name: n, quote: quote, evidence: evidence(quote: quote, in: text)))
+                out.append(Name(name: n, quote: quote, evidence: evidence(quote: quote, in: text, cap: cap)))
             }
             return out
         }
@@ -174,15 +184,16 @@ enum EntityExtractor {
             let fields = LocalNameFinder.extract(text, mode: mode)
             return EntityResult(decision: decision, outcome: .extracted(fields))
         }
+        let window = cap(gatewayConfig: gatewayConfig)
         let raw: String
         do {
-            raw = try await LLMTextClient.complete(prompt: prompt(text: text), provider: provider, model: model,
+            raw = try await LLMTextClient.complete(prompt: prompt(text: text, cap: window), provider: provider, model: model,
                                                    thinkingLevel: nil, apiKey: apiKey, gatewayConfig: gatewayConfig,
                                                    localAgent: nil, maxTokens: maxTokens, timeout: timeout)
         } catch {
             return EntityResult(decision: decision, outcome: .failed("the call failed"))
         }
-        guard let fields = parse(raw, documentText: text) else {
+        guard let fields = parse(raw, documentText: text, cap: window) else {
             return EntityResult(decision: decision, outcome: .failed("the reply was not a JSON object"))
         }
         return EntityResult(decision: decision, outcome: .extracted(fields))

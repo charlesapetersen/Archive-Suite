@@ -11,7 +11,7 @@ enum LocalNameFinder {
     }
 
     static func extract(_ document: String, mode: EntityRunPolicy.LocalMode) -> EntityExtractor.Fields {
-        let text = EntityExtractor.sent(document)
+        let text = EntityExtractor.sent(document, cap: EntityExtractor.macTextCap)
         guard !text.isEmpty else { return .init() }
         let tagger = NLTagger(tagSchemes: [.nameType])
         tagger.string = text
