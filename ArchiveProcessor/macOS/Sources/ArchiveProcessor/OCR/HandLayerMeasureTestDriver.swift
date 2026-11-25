@@ -99,7 +99,7 @@ enum HandLayerMeasureTestDriver {
             let written = await Task.detached { () -> PDFGenerator.Output? in
                 try? PDFGenerator().generateOutput(imageURL: image, result: result, model: model, outputURL: out,
                                                    originalFileName: image.lastPathComponent, pdfImageMB: 2.0,
-                                                   pageKind: .handwritten, textLayer: .standard)
+                                                   pageKind: .handwritten, textLayer: .init(placeHandOnImage: true))
             }.value
             let seconds = Date().timeIntervalSince(start)
             guard let written, let doc = PDFDocument(url: out) else { check("\(name) written", false); continue }

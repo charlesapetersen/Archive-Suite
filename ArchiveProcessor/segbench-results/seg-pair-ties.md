@@ -1,5 +1,10 @@
 # W46.seg-truth-audit — the segmentation tie as paired comparisons at fixed windows
 
+> **The tie rule in force changed on 2026-11-24** (owner, `W49.proc-pipeline-prune-ok` 4): a pair ties when its gap is
+> under the practical floor of 2.0 points of pages exact; the interval is shown and makes no tie. The settings table
+> applies it (`settings_routes.py` `SEG_TIE_FLOOR`, 17 of 55 pairs tie); the "tie (in force)" column below is the
+> former interval rule's.
+
 Offline from cached answers; $0, no model call or upload. Each route's pages in an exact document, no checking, on the two test boxes' 325 common-support document pages (142 truth documents, Stanton and RG165, window offset 0), at its own frozen rule and level. Every pair is compared page by page on the same windows; the 95% interval resamples the truth's documents (10,000 rounds, seed 46). **A pair ties when its interval holds 0**; the settings solver then takes the cheaper route. This replaces the floor of twice the larger window-offset range (5.0 points, or 10.4 for a pair with g2; owner review of the pipeline doc, 2026-11-17).
 
 **The rerun floor (W46.p16-seg-tie-floor, reported only: the owner kept the interval-only rule, 2026-11-18).** The interval does not cover a rerun. Byte-identical vLLM reruns of the self-hosted students moved a box's pages exact by 1.4 to 3.2 points (SEG-10; the 2B on Stanton 75.3, 76.1 and 78.6%, seg-window-modality.md; seg-kit-gate.md §Reading). The column *with the floor* calls a pair different only when its interval clears 0 and its near end also clears the larger recorded floor of its two routes (seg-qwen3.5-2b-8bit 3.2, seg-qwen3.5-2b-bf16-cluster 3.2, seg-qwen3.5-4b-cluster 3.2, qwen3.5-27b-teacher 3.2 points; a cloud route has none recorded, so 0).

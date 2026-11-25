@@ -70,7 +70,8 @@ it rests on. A guess with no evidence is never written."
    *Month and day* (W46.date-full-date, 2026-11-18): an explicit year (steps 1 and 2) also carries the month and day
    of the dated form it rests on: the reply's own quote when it cites the document and passes the check, else the
    rule's dated form of that year; from the image, the quoted date the year rests on. A numeric date reads
-   month-first when its first part can be a month; a day the month does not have is dropped. The tagging call's day
+   month-first when its first part can be a month, or day-first when the collection's `numericDatesDayFirst` is on
+   (owner, 2026-11-24, `W49.proc-pipeline-prune-ok` 5; a part over 12 is the day either way); a day the month does not have is dropped. The tagging call's day
    stays only for the same year and month. Inherited and estimated years carry neither. Where the strict forms give
    the explicit year no month, or its dated form no day, the route reads that year's dated forms as Vision damages
    them (W46.date-full-date-ocr-forms): a spaced day, a bullet for a full stop, Cyrillic look-alikes, a misread month

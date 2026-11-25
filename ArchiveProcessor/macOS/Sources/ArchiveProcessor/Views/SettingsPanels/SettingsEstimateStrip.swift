@@ -165,7 +165,7 @@ struct SettingsEstimateStrip: View {
                     sequentialOCR: contextCharCount > 0, enableTagging: tagging,
                     enableCollectionSegmentation: enableCollectionSegmentation,
                     preOCRedInput: preOCRedInput, useGateway: useGateway, ocrWorkers: ocrWorkerCount,
-                    gatewayRotation: gatewayRotation)
+                    gatewayRotation: gatewayRotation, usesLocalAgent: useLocalAgent)
 
                 Divider().padding(.vertical, 2)
                 Text("COST").font(.caption2).fontWeight(.bold).foregroundStyle(.primary)

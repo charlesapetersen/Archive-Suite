@@ -37,7 +37,7 @@ range" link to the Range view.
 |---|---|
 | General | Appearance; the level (section 3); the setup interview; the starting points |
 | Collection | the output folder as the collection; project; the collection interview; held values with their source and Reset; this batch's limits and totals |
-| Reading | the reading card (pick, figures, override); backend, provider and model; kind routing and the handwriting-on-typed switch; the cascade; Apple Vision's options; the layout card for newspapers and its downloads |
+| Reading | the reading card (pick, figures, override); backend, provider and model; kind routing (the two-way split); the cascade; Apple Vision's options; the layout card for newspapers and its downloads |
 | Documents | the segmentation card and its routes; tagging mode, vocabulary, colours; collection ID and filing; merge; review pauses |
 | Dates and names | the dating card and its switches; the entities card |
 | Pages and output | straightening; rotation; the text page, columns and searchable-page choices; image and PDF sizes; separate image export; skip processed files; pre-OCRed input; the hand placer download |
@@ -87,8 +87,8 @@ Advanced; under call 13 they were listed for the owner, who moved all twelve gro
 | Thinking level (Reading) | A, moves to A | no bench figure for Low against High |
 | Escalate failed pages to (Reading) | S | a measured cascade row (call 5) |
 | Also escalate on Vision word-count disagreement (Reading) | A, moves to A | opt-in, no measured gain (call 5; W47.wh-cascade-disagree waits) |
-| Choose each page's reader by its kind (Reading) | S | |
-| Read handwriting on typed pages (Reading) | S | measured time and cost on the row (W46.mixed-route-setting) |
+| Send handwritten pages to a handwriting reader (Reading; the two-way split, owner 2026-11-24) | S | |
+| Read handwriting on typed pages (Reading) | removed 2026-11-24 | `W49.proc-pipeline-prune-ok` 2: unmeasured on mixed pages; waits for 2.0 (W46.kinds-mixed-truth) |
 | Vision languages (Reading) | S | |
 | Vision fast recognition; minimum confidence; custom vocabulary (Reading) | A, moves to A | none measured on the bench |
 | Vision with an LLM for text-only judgement (Reading) | S | |
@@ -117,7 +117,8 @@ Advanced; under call 13 they were listed for the owner, who moved all twelve gro
 | Segmentation approach and its pay route (Documents) | S | the card shows the pick at B |
 | Local segmenter server, model, partner (Documents) | A, moves to A | raw fields |
 | Search the page image on every document, about $1.93 more per 1,000 (Dates and names) | S | measured: finds stamp dates |
-| Put handwritten text on the image where it fits (Pages and output) | S | call 12 |
+| Numeric dates are written day first, DD/MM/YYYY (Dates and names) | S | owner, 2026-11-24 (`W49.proc-pipeline-prune-ok` 5): off is month first |
+| Put handwritten text on the image where it fits (Pages and output) | A, moved 2026-11-24 | `W49.proc-pipeline-prune-ok` 1: off by default; about 7.5 s a handwritten page and up to 8.5 GB, for a layer kept on 9 of 20 test pages |
 | Searchable page with no text page, per kind (Pages and output) | S | |
 | Hand placer and newspaper layout downloads (Pages and output; Reading) | S | |
 | Live processing mode; read box and folder labels (Capture) | B | |
@@ -133,7 +134,7 @@ That is 12 groups moved to Advanced, about 23 controls. "No bench figure" means 
 | Read-poorly flag for readers other than Vision (W47.wh-read-flag-readers) | none: a flag on the result | every level | LightOnOCR: 8 of 11 poor readings caught, 4 of 85 false alarms on the 96 |
 | DocLayout-YOLO for scanned newspapers (W47.wh-yolo-scans) | Reading, layout card | S | +4.6 (1.1 to 8.0) over PP-DocLayoutV3 on 15 scans, 14 from one collection; not measured on photographs |
 | Whole-page reading of newspapers for large readers (W47.wh-whole-page-large) | Reading, layout card | B as a solver row | 27B whole 0.967 against regions 0.965 on 15 pages |
-| ATRIUM as the mixed-page pre-flag (W47.wh-mixed-preflag) | Reading, under the handwriting-on-typed switch | S | recall 51-60% at 69.8% precision (bounds 18-95%), against 12-14% for the shipped classifier |
+| ATRIUM as the mixed-page pre-flag (W47.wh-mixed-preflag; removed with its switch 2026-11-24) | none | — | recall 51-60% at 69.8% precision (bounds 18-95%), against 12-14% for the shipped classifier |
 | Trained segmentation models under the kit gate's minimums (W47.wh-kit-minimums) | Documents | A, rule (c) | labelled "small held-out set" |
 | Image-grounded post-correction (W47.wh-post-correction) | Reading | A, rule (b) | a tie on the 96 (-0.42, -1.47 to +0.64); +1.47 (+0.55 to +2.63) on 120 public readings; worsens 4 of 57 and 10 of 120 |
 | The readers that scored below what ships (W47.wh-readers-lost) | Reading card and Range view | A, rule (a) | Apple's on-device model 42.4 against Vision's 83.1 on the 96; Azure 89.6, Textract 86.6, Transkribus 82.5 against Mistral 4.1's 92.5 on 25 pages; the fifteen dominated routes with their rows |

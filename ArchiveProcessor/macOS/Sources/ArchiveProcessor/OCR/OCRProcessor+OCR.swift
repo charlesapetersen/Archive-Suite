@@ -1473,7 +1473,7 @@ extension OCRProcessor {
                                 visionSettings: ocrRun.visionSettings)
                             let verdict = await Self.detectRotation(
                                 imageURL: entry.url, provider: model.provider, apiKey: apiKey,
-                                mode: rotationMode, gatewayConfig: gateway, localAgent: localAgent
+                                mode: rotationMode, gatewayConfig: gateway, localAgent: localAgent, ocrModel: model
                             )
                             // A Stop cancels the routes mid-read, so "every second reader failed" is not true: never
                             // persist that verdict; the kept journal brings the page back on resume. Since
@@ -2097,7 +2097,7 @@ extension OCRProcessor {
         async let rotationCorrection = detectRotation(
             imageURL: imageURL, provider: provider, apiKey: apiKey,
             mode: rotationMode,
-            gatewayConfig: gatewayConfig, localAgent: localAgent
+            gatewayConfig: gatewayConfig, localAgent: localAgent, ocrModel: model
         )
 
         // The incoming `imageScale` is the size-target slider fraction; convert to a per-file
@@ -2194,7 +2194,8 @@ extension OCRProcessor {
         apiKey: String,
         mode: RotationMode,
         gatewayConfig: GatewayConfig?,
-        localAgent: LocalAgentConfig? = nil
+        localAgent: LocalAgentConfig? = nil,
+        ocrModel: LLMModel? = nil
     ) async -> RotationVerdict {
         switch mode {
         case .off:
@@ -2204,14 +2205,17 @@ extension OCRProcessor {
         case .agreement:
             async let vision = RotationDetector.detectCorrection(imageURL: imageURL)
             async let lcnet = RotationLCNet.detectCorrection(imageURL: imageURL)
-            let measured = LLMRotationDetector.hasMeasuredRoute(
+            // Owner, 2026-11-24 (W49.proc-pipeline-prune-ok 6): a disagreement goes to the measured route on a remote
+            // gateway or OpenRouter, and to the run's own OCR model on a direct Gemini, Claude or OpenAI key.
+            let escalates = LLMRotationDetector.agreementEscalates(
                 provider: provider, usesGateway: gatewayConfig != nil, usesLocalAgent: localAgent != nil,
-                gatewayIsLocal: gatewayConfig?.isLocalModel == true)
+                gatewayIsLocal: gatewayConfig?.isLocalModel == true, ocrModel: ocrModel)
             var cloud: (@Sendable () async -> Int?)?
-            if measured {
+            if escalates {
                 cloud = {
                     await LLMRotationDetector.detectCorrection(
-                        imageURL: imageURL, provider: provider, apiKey: apiKey, orderings: 1, gatewayConfig: gatewayConfig)
+                        imageURL: imageURL, provider: provider, apiKey: apiKey, orderings: 1, gatewayConfig: gatewayConfig,
+                        ocrModel: ocrModel)
                 }
             }
             let (v, p) = await (vision, lcnet)
@@ -2226,7 +2230,7 @@ extension OCRProcessor {
             }
             if let c = await LLMRotationDetector.detectCorrection(
                 imageURL: imageURL, provider: provider, apiKey: apiKey,
-                orderings: mode.orderings, gatewayConfig: gatewayConfig
+                orderings: mode.orderings, gatewayConfig: gatewayConfig, ocrModel: ocrModel
             ) {
                 return RotationVerdict(correction: c)
             }

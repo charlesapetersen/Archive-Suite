@@ -1,5 +1,13 @@
 # 10. Page kinds, mixed pages, the cascade and routing by kind (draft rule note)
 
+> **Superseded in part on 2026-11-24** (owner, `W49.proc-pipeline-prune-ok` 2; `14-owner-calls.md` §3). Routing by
+> kind is one two-way split: a handwritten (or mixed) page goes to the best measured handwriting reader the user can
+> run, and typed, printed and form pages (newspapers, clippings and registers with them) keep the run's model. The
+> per-kind matrix is gone, and the mixed switch ("Read handwriting on typed pages") and its ATRIUM pre-flag left the
+> app for 2.0 (`W46.kinds-mixed-truth`). The app built the split for direct cloud runs (`W49.proc-pipeline-prune-apply`);
+> the free Mac half, Apple Vision with a local handwriting reader, is `W49.proc-kind-split-mac`. The sections below are
+> the rule as decided before.
+
 ## 1. Stage and question
 
 The stage labels each page's kind on the Mac before it is read, measures the collection's mix from a sample, and sends

@@ -378,15 +378,16 @@ struct PDFGenerator {
     // MARK: - Searchable layer (W42.int-s5)
 
     /// What the run tells the image page: the placement switch (`placeHandOnImage`, `05-placement.md` §2) and the
-    /// straightening switch (`straightenReadingCopy`, `01-reading-copy.md` §3). Both on by default.
+    /// straightening switch (`straightenReadingCopy`, `01-reading-copy.md` §3). Placement is off by default (owner,
+    /// 2026-11-24, W49.proc-pipeline-prune-ok 1), straightening on.
     struct TextLayerOptions: Codable, Sendable, Equatable {
-        var placeHandOnImage = true
+        var placeHandOnImage = false
         var straighten = true
         /// W42.int-s5-searchable: the `format/kind` pairs written in the searchable form (`OutputForm.form`).
         var searchableFor: [String] = []
         static let standard = TextLayerOptions()
 
-        init(placeHandOnImage: Bool = true, straighten: Bool = true, searchableFor: [String] = []) {
+        init(placeHandOnImage: Bool = false, straighten: Bool = true, searchableFor: [String] = []) {
             self.placeHandOnImage = placeHandOnImage
             self.straighten = straighten
             self.searchableFor = searchableFor
@@ -394,7 +395,7 @@ struct PDFGenerator {
 
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
-            placeHandOnImage = try c.decodeIfPresent(Bool.self, forKey: .placeHandOnImage) ?? true
+            placeHandOnImage = try c.decodeIfPresent(Bool.self, forKey: .placeHandOnImage) ?? false
             straighten = try c.decodeIfPresent(Bool.self, forKey: .straighten) ?? true
             searchableFor = try c.decodeIfPresent([String].self, forKey: .searchableFor) ?? []
         }
@@ -402,7 +403,7 @@ struct PDFGenerator {
         /// The switches as a run's frozen settings hold them (`ResolvedSettingsSnapshot.values`); a key absent
         /// (no settings snapshot) is its built-in default.
         static func from(_ values: [String: ResolvedSetting]) -> TextLayerOptions {
-            func flag(_ key: SettingsKey) -> Bool { values[key.rawValue]?.value.bool ?? key.defaultValue.bool ?? true }
+            func flag(_ key: SettingsKey) -> Bool { values[key.rawValue]?.value.bool ?? key.defaultValue.bool ?? false }
             let searchable: [String]
             if case .strings(let list)? = values[SettingsKey.searchableFor.rawValue]?.value { searchable = list }
             else if case .strings(let list) = SettingsKey.searchableFor.defaultValue { searchable = list }

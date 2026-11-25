@@ -128,7 +128,9 @@ Owner, 2026-10-31: a dated folder dates the otherwise undated documents inside i
   starts at a document); a folder photo is never dated as a document.
 - **Reading the value.** A year (`1953`), a range (`1965-1967`, `1966-70`, `1965 to 1967`; a two-digit end before the
   start is the start year alone), a decade (`1960s`), a month and year (`Feb. 1970`, `February 12, 1970`) or a numeric
-  date, month first (`6/2/61`, `2/1970`; a two-digit year only with a day, so `6/12` dates nothing). Anything else
+  date, month first (`6/2/61`, `2/1970`; a two-digit year only with a day, so `6/12` dates nothing), or in the
+  Processor day first when the collection's `numericDatesDayFirst` is on (`SPEC/collection-settings.md`; `6/2/61` is then
+  February; the Reader's confirmation still reads month first, queued as `W49.reader-folder-date-day-first`). Anything else
   dates nothing. Years 1800 to 2030.
 - **What a document takes**, by the span in years, inclusive: one year as it is, with its month (never a day), and no
   `Date Uncertain`; 2 to 7 years the mid-point year (an even span the earlier middle year) with `Date Uncertain`;

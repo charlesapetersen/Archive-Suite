@@ -158,13 +158,18 @@ enum SettingsSolverTestDriver {
            "lightonocr-3-4b-mlx8")
         eq("B1 downloads declined: handwriting flagged, never read at 60",
            pick(solve("B1-nodl", mac(16, downloads: false)), "reading", "handwritten"), "flag: needs a download or a key")
-        check("B1 the free cascade waits for a Mac escalation stage",
-              b1.blockers("reading", "casc-free-fail").contains { $0.hasPrefix("waits for:") })
-        skip("B1 cascade casc-free-fail", "pending the cascade rows' Mac memory per tier (note 10 §8)")
+        // Owner, 2026-11-24 (W49.proc-pipeline-prune-ok 3): the app's table holds only the rows the Processor runs, so the
+        // free cascade, which waits for a Mac escalation stage OCRCascade does not have, is a bench row.
+        check("B1 the free cascade is not in the app's table until a Mac escalation stage is built",
+              table.stage("reading")?.route("casc-free-fail") == nil)
+        skip("B1 cascade casc-free-fail", "pending a Mac escalation stage and the cascade rows' Mac memory per tier (note 10 §8)")
         skip("B1 layout regions on newspapers only", "a rule, not a pick: the sheet's rules tab (W46.settings-sheet)")
         eq("B1 segmentation: the 2B", pick(b1, "segmentation"), "seg-qwen3.5-2b-8bit")
-        eq("B1 dating step 1: the Vision 2B chooser", pick(b1, "dating", "step 1"), "vision-2b-chooser-t3")
-        eq("B1 dating step 4: the Vision 2B chooser", pick(b1, "dating", "step 4"), "vision-2b-chooser-t3")
+        // The Vision 2B chooser is a bench route the app does not run (W49.proc-pipeline-prune-ok 3): Vision's rules.
+        check("B1 dating: the Vision 2B chooser is not in the app's table",
+              table.stage("dating")?.route("vision-2b-chooser-t3") == nil)
+        eq("B1 dating step 1: Vision rules, the route the app runs", pick(b1, "dating", "step 1"), "vision-rules-t3")
+        eq("B1 dating step 4: Vision rules", pick(b1, "dating", "step 4"), "vision-rules-t3")
         eq("B1 dating step 2: no image pass (the 8B's quotes add no year, W46.date-route-pipeline-8b)",
            pick(b1, "dating", "step 2"), "flag: no image pass; the document goes on to step 4")
         eq("B1 names ranked: typed correspondence the 8B", pick(b1, "entities", "correspondence-typed"), "qwen3-vl-8b-mac")
@@ -242,7 +247,10 @@ enum SettingsSolverTestDriver {
         check("T a Gemini key's route is hidden (its free tier trains)", trains(t, "reading", "gemini3.8-flash"),
               t.blockers("reading", "gemini3.8-flash").joined(separator: "; "))
         check("T Qwen3.6 27B on Chutes is hidden", trains(t, "reading", "qwen3.6-27b"))
-        check("T an OpenRouter model the app does not pin is hidden", trains(t, "reading", "qwen3.5-397b"))
+        // An OpenRouter model the app does not pin has no app route, so it is not in the app's table at all
+        // (W49.proc-pipeline-prune-ok 3); every OpenRouter row left is one the app pins.
+        check("T an OpenRouter model the app does not pin is not in the app's table",
+              ["qwen3.5-397b", "mistral-large4", "gemma4-31b"].allSatisfy { table.stage("reading")?.route($0) == nil })
         check("T a cascade through Qwen3.6 27B on Chutes is hidden", trains(t, "reading", "casc-2-fail"))
         check("T the Claude plan's Sonnet row is hidden", trains(t, "segmentation", "claude-sonnet5.5"))
         check("T Qwen3-VL 235B on DeepInfra stays", !trains(t, "reading", "qwen3-vl-235b"))
@@ -262,8 +270,8 @@ enum SettingsSolverTestDriver {
               tOR.blockers("reading", "gemini3.8-flash").joined(separator: "; "))
         check("T a cascade of Qwen3.8 Flash and Gemini, both through OpenRouter, stays", !trains(tOR, "reading", "casc-1-fail"),
               tOR.blockers("reading", "casc-1-fail").joined(separator: "; "))
-        check("T an unpinned Mistral row through OpenRouter is hidden (open weights, any upstream)",
-              trains(tOR, "reading", "mistral-large4"))
+        check("T no OpenRouter pick is a route that may train",
+              tOR.picks.allSatisfy { p in p.route.map { !trains(tOR, p.stage, $0.id) } ?? true })
         check("T a names row is not pinned by the reading row of the same id", trains(tOR, "entities", "qwen3.6-27b"))
         var apiKey = mac(16)
         apiKey.keys = ["anthropic"]
@@ -280,7 +288,7 @@ enum SettingsSolverTestDriver {
         check("T2 the Claude plan with training off stays", !trains(t2, "segmentation", "claude-sonnet5.5"),
               t2.blockers("segmentation", "claude-sonnet5.5").joined(separator: "; "))
         check("T2 Chutes stays hidden whatever the answers", trains(t2, "reading", "qwen3.6-27b"))
-        check("T2 an unpinned OpenRouter row stays hidden", trains(t2, "reading", "qwen3.5-397b"))
+        check("T2 no pick is a route that may train", t2.picks.allSatisfy { p in p.route.map { !trains(t2, p.stage, $0.id) } ?? true })
         var otherPlan = many
         otherPlan.trainingOff = [SettingsTraining.planWay("chatgpt")]
         check("T2 another plan's answer does not lift the Claude plan",
@@ -313,7 +321,10 @@ enum SettingsSolverTestDriver {
         check("C strict cites its pair", cs.pick("reading", "all")?.gap?.citation == "−0.37 [−2.16, +1.92], n 95, owner96/all/strict",
               cs.pick("reading", "all")?.gap?.citation ?? "no pair")
         eq("C handwritten: Qwen3.6 27B (Mistral Large 4 ties, dearer)", pick(c, "reading", "handwritten"), "qwen3.6-27b")
-        eq("C segmentation on 16 GB: the 2B ties GLM and is free", pick(c, "segmentation"), "seg-qwen3.5-2b-8bit")
+        // Owner, 2026-11-24 (W49.proc-pipeline-prune-ok 4): GLM's 3.4 points over the 2B clear the 2.0-point floor, so no
+        // tie, though the paired interval (+3.4 [−5.7, +12.0]) holds 0.
+        eq("C segmentation on 16 GB: GLM-5.3 Flash, over the 2B by more than the 2-point floor", pick(c, "segmentation"),
+           "glm5.3-flash")
         var or8 = orKey
         or8.macMemoryGB = 8
         let c8 = solve("C-8", or8)
@@ -337,8 +348,8 @@ enum SettingsSolverTestDriver {
         let cn = solve("C-strict-gemini", orAll, strict)
         check("An unbuilt cascade is not picked", !["casc-2-vision-hands", "casc-disagree-0.5"].contains(pick(cn, "reading")),
               pick(cn, "reading"))
-        check("An unbuilt cascade says what it waits for",
-              cn.blockers("reading", "casc-2-vision-hands").contains { $0.hasPrefix("waits for: not built") })
+        check("An unbuilt cascade is not in the app's table (W49.proc-pipeline-prune-ok 3)",
+              ["casc-2-vision-hands", "casc-disagree-0.5"].allSatisfy { table.stage("reading")?.route($0) == nil })
 
         // G6. A kind with no figure for the chosen route: forms on an OpenRouter-only key.
         var forms = SettingsAnswers()
@@ -359,11 +370,12 @@ enum SettingsSolverTestDriver {
         // Text alone is 8.3 points ahead of the 2B, +8.3 [+2.6, +15.0] paired (seg-pair-ties.md): no tie.
         eq("D1 segmentation: Gemini text beats the Mac 2B on the paired comparison", pick(d1, "segmentation"),
            "gemini3.8-flash-text")
-        // Text alone 285 of 325 exact, GLM 269: +4.9 [-4.0, +14.4] paired, a tie, and GLM is cheaper.
+        // Text alone 285 of 325 exact, GLM 269: +4.9 [-4.0, +14.4] paired, over the 2-point floor, so no tie
+        // (W49.proc-pipeline-prune-ok 4; the interval held 0 and GLM won on cost before).
         var gemOR = mac(16)
         gemOR.keys = ["gemini", "openrouter"]
-        eq("D1 Gemini and OpenRouter keys: GLM ties text alone on the paired comparison and is cheaper",
-           pick(solve("D1-openrouter", gemOR), "segmentation"), "glm5.3-flash")
+        eq("D1 Gemini and OpenRouter keys: text alone, 4.9 points over GLM, beyond the floor",
+           pick(solve("D1-openrouter", gemOR), "segmentation"), "gemini3.8-flash-text")
         var gem8 = mac(8)
         gem8.keys = ["gemini"]
         let d1s = solve("D1-8GB", gem8)
@@ -381,8 +393,8 @@ enum SettingsSolverTestDriver {
            "gemini3.8-flash")
         eq("D1 names: the entity feature's own prompt", pick(d1, "entities", "correspondence-typed"),
            "gemini-entity-feature")
-        check("D1 names: the tagging call's rows are history, not offered",
-              !d1.blockers("entities", "gemini-tagging-place").isEmpty)
+        check("D1 names: the tagging call's rows are history, not in the app's table",
+              table.stage("entities")?.route("gemini-tagging-place") == nil)
         // W46.ent-feature-owner-calls: the cloud call too runs only when names are ranked (walkthrough 2026-11-13).
         let d1NoNames = solve("D1-nonames", gem, noNames)
         eq("D1 names not ranked: none on a cloud route too", pick(d1NoNames, "entities", "correspondence-typed"), "none")
@@ -425,7 +437,7 @@ enum SettingsSolverTestDriver {
         check("D3 by an Anthropic key the row is money", keySolver.usdPer1000(claudeRow, stage: "reading") > 0,
               "\(keySolver.usdPer1000(claudeRow, stage: "reading"))")
         eq("D3 segmentation: Claude Sonnet 5.5", pick(d3, "segmentation"), "claude-sonnet5.5")
-        eq("D3 dating: no plan row, the Mac route", pick(d3, "dating", "step 1"), "vision-2b-chooser-t3")
+        eq("D3 dating: no plan row, the Mac route", pick(d3, "dating", "step 1"), "vision-rules-t3")
         eq("D3 names: no plan row, the Mac route", pick(d3, "entities", "correspondence-typed"), "qwen3-vl-8b-mac")
         check("D3 no money", d3.usd == 0, "\(d3.usd)")
 
@@ -441,6 +453,12 @@ enum SettingsSolverTestDriver {
         // wins on cost.
         eq("D4 both plans: segmentation Claude alone ties the mix", pick(solve("D4-both", both), "segmentation"),
            "claude-sonnet5.5")
+        // Anthropic, OpenAI and OpenRouter keys, no Gemini: ChatGPT's 90.2 is 7.4 points over GLM's 82.8, beyond the
+        // 2-point floor (W49.proc-pipeline-prune-ok 4; the interval +7.4 [−1.0, +16.9] tied them and GLM won on cost).
+        var noGemini = mac(16)
+        noGemini.keys = ["anthropic", "openai", "openrouter"]
+        eq("D4 keys, no Gemini: segmentation ChatGPT, 7.4 points over GLM", pick(solve("D4-keys", noGemini), "segmentation"),
+           "chatgpt-gpt6.1-sol")
 
         // D5. A Claude plan and a Gemini key, cheapest within a point.
         var d5r = claude
@@ -454,34 +472,34 @@ enum SettingsSolverTestDriver {
         // W41.app-claude-plan-reading: the plan's reading costs no money, so it is the cheapest within a point.
         eq("D5 reading: Claude Sonnet 5.5 on the plan", pick(d5, "reading"), "claude-sonnet5.5")
         let seg = table.stage("segmentation")!
-        let g2 = seg.route("gemini3.8-flash")!, g1 = seg.route("gemini3.7-flash-gateway")!
+        let g2 = seg.route("gemini3.8-flash")!, g1 = seg.route("claude-sonnet5.5")!   // the gateway row is bench-only now
         let text = seg.route("gemini3.8-flash-text")!, local = seg.route("seg-qwen3.5-2b-8bit")!
         let gpt = seg.route("chatgpt-gpt6.1-sol")!, glm = seg.route("glm5.3-flash")!, manual = seg.route("manual")!
-        // W46.seg-truth-audit (owner review of the pipeline doc, 2026-11-17): the tie is each pair's paired interval
-        // in test-box pages exact on the same windows (seg-pair-ties.md), not twice the larger offset range.
+        // Owner, 2026-11-24 (W49.proc-pipeline-prune-ok 4): the tie is a paired gap under the 2.0-point practical
+        // floor in test-box pages exact (seg-pair-ties.md); the paired interval is shown and makes no tie, so ChatGPT
+        // 7.38 ahead of GLM [−1.03, +16.88] now differs where the interval alone tied it.
         let ranked = seg.routes.filter { $0.figure("test-boxes") != nil }
         check("segmentation every ranked pair is measured", ranked.allSatisfy { a in
             ranked.allSatisfy { b in a.id == b.id || seg.pair(a.id, b.id) != nil } }, "\(ranked.count) rows")
         for (name, a, b, tie) in [("text against the 2B", text, local, false), ("g2 against the 2B", g2, local, false),
-                                  ("g1 against g2", g1, g2, true), ("ChatGPT against GLM", gpt, glm, true)] {
+                                  ("Claude against g2", g1, g2, true), ("ChatGPT against GLM", gpt, glm, false)] {
             let p = SettingsSolver.segmentationPair(seg, a, b), q = SettingsSolver.segmentationPair(seg, b, a)
             check("segmentation pair: \(name) \(tie ? "ties" : "differs")", p?.tie == tie, p?.citation ?? "not measured")
             check("segmentation pair read either way: \(name)", p != nil && q != nil && p!.tie == q!.tie
                   && abs(p!.delta + q!.delta) < 1e-9 && abs(p!.lo + q!.hi) < 1e-9 && abs(p!.hi + q!.lo) < 1e-9)
-            // The flag is decided on the unrounded interval; an end stored as 0.00 may sit either side of 0.
-            check("segmentation pair interval holds 0 exactly when it ties: \(name)",
-                  p.map { abs($0.lo) < 0.01 || abs($0.hi) < 0.01 || ($0.lo <= 0 && 0 <= $0.hi) == $0.tie } == true)
+            check("segmentation pair ties exactly when its gap is under the 2-point floor: \(name)",
+                  p.map { (abs($0.delta) < SettingsSolver.segmentationFloor) == $0.tie } == true)
             check("segmentation pair figures match the rows: \(name)", p.map {
                 abs($0.delta - (a.figure("test-boxes")! - b.figure("test-boxes")!)) < 0.06 } == true, p?.citation ?? "")
         }
         check("segmentation a route with no test-boxes figure has no pair", SettingsSolver.segmentationPair(seg, manual, text) == nil)
-        // The sheet reads the same rule: a differing pair is no tie at any gap over a point, a tied one at any gap.
+        // The sheet reads the same rule: a gap under the 2-point floor ties, a measured tie at any gap.
         check("segmentation sheet: text against the 2B is no tie",
               !SettingsSheetModel.isTie(seg, text, local, gap: 8.3, answers: SettingsAnswers()))
-        check("segmentation sheet: g1 against g2 ties", SettingsSheetModel.isTie(seg, g1, g2, gap: 1.5, answers: SettingsAnswers()))
-        check("segmentation sheet: an unmeasured pair ties only within the user's point",
-              SettingsSheetModel.isTie(seg, manual, text, gap: 0.5, answers: cheap)
-              && !SettingsSheetModel.isTie(seg, manual, text, gap: 0.5, answers: SettingsAnswers()))
+        check("segmentation sheet: Claude against g2 ties", SettingsSheetModel.isTie(seg, g1, g2, gap: 1.54, answers: SettingsAnswers()))
+        check("segmentation sheet: an unmeasured pair ties only under the 2-point floor",
+              SettingsSheetModel.isTie(seg, manual, text, gap: 1.9, answers: SettingsAnswers())
+              && !SettingsSheetModel.isTie(seg, manual, text, gap: 2.1, answers: cheap))
         var imagePair = SettingsAnswers()
         imagePair.onlyRoutes["segmentation"] = [g2.id, local.id]
         let imageTie = solve("D1-image-local", gem, imagePair)
@@ -507,13 +525,19 @@ enum SettingsSolverTestDriver {
         for s in ["L5", "L6", "L7", "L8", "N1", "N3", "N4"] {
             eq("E \(s): CHURRO 3B", pick(e, "reading", s), "churro-3b-farmshare")
         }
-        eq("E segmentation: the cluster 2B, fastest of three ties", pick(e, "segmentation"), "seg-qwen3.5-2b-bf16-cluster")
-        eq("E dating step 1: the 27B trace", pick(e, "dating", "step 1"), "qwen3.6-27b-trace-neigh-vision")
-        eq("E dating step 4: the 27B trace", pick(e, "dating", "step 4"), "qwen3.6-27b-trace-neigh-vision")
-        eq("E dating step 2: the 27B image pass", pick(e, "dating", "step 2"), "qwen3.6-27b-image")
+        // Owner, 2026-11-24 (W49.proc-pipeline-prune-ok 3): the app brings a cluster's reading in (the institutional
+        // computing import) but runs no segmentation or dating there, so those rows are the bench's, and with nothing
+        // downloaded to the Mac this profile segments by hand and dates by Vision's rules.
+        check("E the cluster segmentation and dating rows are not in the app's table",
+              ["seg-qwen3.5-2b-bf16-cluster", "seg-qwen3.5-4b-cluster", "qwen3.5-27b-teacher"]
+                .allSatisfy { table.stage("segmentation")?.route($0) == nil }
+                && ["qwen3.6-27b-trace-neigh-vision", "qwen3.6-27b-image", "qwen3.6-27b-route"]
+                .allSatisfy { table.stage("dating")?.route($0) == nil })
+        eq("E segmentation: by hand, nothing downloaded to the Mac", pick(e, "segmentation"), "manual")
+        eq("E dating step 1: Vision rules", pick(e, "dating", "step 1"), "vision-rules-t3")
+        eq("E dating step 4: Vision rules", pick(e, "dating", "step 4"), "vision-rules-t3")
+        eq("E dating step 2: no image pass", pick(e, "dating", "step 2"), "flag: no image pass; the document goes on to step 4")
         eq("E names: Qwen3.6 27B", pick(e, "entities", "correspondence-typed"), "qwen3.6-27b")
-        check("E the teacher is a partner, not a voter alone",
-              e.blockers("segmentation", "qwen3.5-27b-teacher").contains { $0.contains("not as a voter alone") })
         var clKey = cl
         clKey.keys = ["openrouter"]
         // W46.ent-local-shipped-prompt: the 27B is 0.66 on sender. W47.wh-ent-8k-apply: the feature at 8,000 characters
@@ -524,9 +548,9 @@ enum SettingsSolverTestDriver {
             keyed.keys = [key]
             let ek = solve("E-\(key)", keyed, ea)
             if key == "gemini" {
-                // W46.seg-common-support: the cluster 4B (269 of 325) ties text alone (285) inside 5.0 and costs nothing.
-                eq("E with a gemini key: segmentation the cluster 4B, tied with text alone and free",
-                   pick(ek, "segmentation"), "seg-qwen3.5-4b-cluster")
+                // The cluster 4B is a bench row (W49.proc-pipeline-prune-ok 3): text alone on the key.
+                eq("E with a gemini key: segmentation Gemini 3.8 Flash on the text alone",
+                   pick(ek, "segmentation"), "gemini3.8-flash-text")
             }
             check("E with a \(key) key: the entity feature is usable",
                   ek.blockers("entities", "gemini-entity-feature").isEmpty)
@@ -558,7 +582,9 @@ enum SettingsSolverTestDriver {
         krakenOnly.onlyRoutes["reading"] = ["apple-vision", "ppocrv6-kraken-blla"]
         krakenOnly.fineTuning = .codingAgent
         let fk = solve("F-kraken", mac(16), krakenOnly)
-        eq("F hands on kraken (a restricted table)", pick(fk, "reading", "handwritten"), "ppocrv6-kraken-blla")
+        // The kraken reader is a bench row (W49.proc-pipeline-prune-ok 3), so a table restricted to it reads hands with nothing.
+        eq("F hands restricted to kraken, which the app does not run: flagged", pick(fk, "reading", "handwritten"),
+           "flag: needs a download or a key")
         // The handwriting fine-tune does not ship (owner, 2026-11-17; W46.kit-hands-retire): no reading row at all.
         eq("F coding agent on kraken: only the Mac LoRA, as not offered", fk.afterTraining.map(\.id), ["kit-seg-lora-mac"])
         var agent = SettingsAnswers()
@@ -601,22 +627,27 @@ enum SettingsSolverTestDriver {
         check("G4 the 2B's card names the hours",
               g4.pick("segmentation", "all")?.better.first { $0.id == "seg-qwen3.5-2b-8bit" }?.isLimit == true)
 
-        // G5. A tie chain: judged against the best usable route only, never chained.
+        // G5. A tie chain: judged against the best usable route only, never chained. Gemini 3.1 Flash-Lite minus Qwen3-VL
+        // 235B is +0.19 and Qwen3-VL 235B minus Qwen3.5 9B +0.47, both under the 0.5 floor, but Gemini 3.1 Flash-Lite minus
+        // Qwen3.5 9B is +0.90 (owner96/all/answered). Qwen3.5 397B, the former chain's head, is not in the app's table.
         var chain = SettingsAnswers()
-        chain.onlyRoutes["reading"] = ["qwen3.5-397b", "qwen3-vl-235b", "qwen3.5-9b"]
+        chain.onlyRoutes["reading"] = ["gemini3.1-flash-lite", "qwen3-vl-235b", "qwen3.5-9b"]
+        var chainKeys = SettingsResources(macMemoryGB: 16)
+        chainKeys.keys = ["gemini", "openrouter"]
         var orOnly = SettingsResources(macMemoryGB: 16)
         orOnly.keys = ["openrouter"]
-        eq("G5 the tie chain picks Qwen3-VL 235B, never Qwen3.5 9B", pick(solve("G5", orOnly, chain), "reading"),
-           "qwen3-vl-235b")
+        eq("G5 the tie chain picks Gemini 3.1 Flash-Lite, the best and the cheaper of its tie, never Qwen3.5 9B",
+           pick(solve("G5", chainKeys, chain), "reading"), "gemini3.1-flash-lite")
 
         // G6. W47.wh-readers-lost (owner call 15): a lower-scoring reader is never the pick, with every key, plan and
         // a cluster, at any batch size; chosen on its card, it is what the stage reads with.
         let lowerIDs = Set(table.stage("reading")?.routes.filter(\.lowerScoring).map(\.id) ?? [])
-        // W47.wh-readers-lost-vendors-read: Azure and Textract on all 96 are the seventeenth and eighteenth.
-        check("G6 the eighteen lower-scoring readers are rows",
-              lowerIDs.count == 18 && lowerIDs.contains("apple-fm-27") && lowerIDs.contains("qwen3-vl-8b")
-                && lowerIDs.contains("ppocrv6-medium-farmshare") && lowerIDs.contains("azure-di-layout")
-                && lowerIDs.contains("textract-layout"), lowerIDs.sorted().joined(separator: ", "))
+        // W47.wh-readers-lost-vendors-read measured Azure and Textract on all 96; they are not offered, so they stay on the
+        // bench and out of the app's table (W49.proc-pipeline-prune-ok 3), leaving sixteen of the eighteen.
+        check("G6 the sixteen lower-scoring readers the app offers are rows",
+              lowerIDs.count == 16 && lowerIDs.contains("apple-fm-27") && lowerIDs.contains("qwen3-vl-8b")
+                && lowerIDs.contains("ppocrv6-medium-farmshare") && !lowerIDs.contains("azure-di-layout")
+                && !lowerIDs.contains("textract-layout"), lowerIDs.sorted().joined(separator: ", "))
         var everything = SettingsResources(macMemoryGB: 128)
         everything.keys = ["gemini", "openrouter", "openai", "mistral", "anthropic", "gateway"]
         everything.plans = ["claude", "chatgpt"]

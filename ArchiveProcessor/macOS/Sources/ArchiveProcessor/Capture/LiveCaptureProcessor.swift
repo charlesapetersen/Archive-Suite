@@ -1693,7 +1693,8 @@ final class LiveCaptureProcessor: ObservableObject {
         let backend = DateRoute.Backend(provider: config.textProvider, model: config.textModel, apiKey: config.textAPIKey,
                                         gateway: config.textGateway, localAgent: config.textLocalAgent)
         return await DateRoute.run(DateRoute.Input(text: DateRoute.ownText(segment), near: [], pages: Array(pages)),
-                                   backend: backend, imageEveryDocument: imageEveryDocument)
+                                   backend: backend, imageEveryDocument: imageEveryDocument,
+                                   dayFirst: DateRoute.dayFirstSetting(liveSettings(config)))
     }
 
     /// W47.ct-folder-date-live — the confirmed date of the folder run a Live document is in, by the rule Process Files
@@ -1706,7 +1707,10 @@ final class LiveCaptureProcessor: ObservableObject {
               let marker = session.groups.filter({ $0.type != .document && $0.order < doc.order })
                 .max(by: { $0.order < $1.order }),
               marker.type == .folder, let fields = session.containerFields[marker.id] else { return nil }
-        return ContainerFolderDate.confirmed(at: "", in: [ContainerRun(start: "", level: .folder, fields: fields)])
+        // The collection's numeric date order, from the session's settings (no session config: month first).
+        return ContainerFolderDate.$dayFirst.withValue(DateRoute.dayFirstSetting(config.map(liveSettings))) {
+            ContainerFolderDate.confirmed(at: "", in: [ContainerRun(start: "", level: .folder, fields: fields)])
+        }
     }
 
     /// A document's tags with its date: the dating decision over the tags before any dating, then the phone's
@@ -1780,7 +1784,11 @@ final class LiveCaptureProcessor: ObservableObject {
         }
         let input = DateRoute.Input(text: seg.texts.prefix(DateRoute.docPages).joined(separator: "\n\n"),
                                     near: [], pages: pages)
-        guard let refreshed = await DateRoute.refreshLiveImage(previous, input: input, gateway: gateway) else {
+        // The collection's numeric date order, as the first dating read it (W49.proc-pipeline-prune-apply).
+        let dayFirst = DateRoute.dayFirstSetting(config.map(liveSettings))
+        guard let refreshed = await DateRoute.$dayFirst.withValue(dayFirst, operation: {
+            await DateRoute.refreshLiveImage(previous, input: input, gateway: gateway)
+        }) else {
             return seg
         }
         var updated = seg

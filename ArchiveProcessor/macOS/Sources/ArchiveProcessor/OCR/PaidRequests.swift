@@ -265,9 +265,6 @@ struct PaidRequests: Sendable {
         case ContainerLabelCapture.gatewayModel:
             return Price(input: ContainerLabelCapture.gatewayInputPer1M, output: ContainerLabelCapture.gatewayOutputPer1M,
                          imageProvider: .openai)
-        case "gemini-2.5-flash-lite":
-            let rates = CostEstimator.rotationModelCost(for: .gemini)
-            return rates.map { Price(input: $0.0, output: $0.1, imageProvider: .gemini) }
         default: return nil
         }
     }

@@ -30,7 +30,11 @@ unsure of, or where two models disagree, are shown to you to check; checking eve
   pages), `after_checking` and `unflagged_per_500`, and moves the shown figure from no-checking toward after-checking
   by the share of checks the user's minutes cover (12-settings-design.md §3.3). Figure keys are `<kind>` for pages
   exact and `<kind>.<attribute>` for the others.
-- **Tie rule.** Two routes tie when the paired 95% interval of their difference in pooled test-box pages exact holds
+- **Tie rule (owner, 2026-11-24, `W49.proc-pipeline-prune-ok` 4; `14-owner-calls.md` §3).** Two routes tie when their
+  paired gap in pooled test-box pages exact is under the practical floor of 2.0 points, and the cheaper route wins; the
+  paired interval below is shown and makes no tie (`settings_routes.py` `SEG_TIE_FLOOR`; 17 of 55 pairs tie, where the
+  interval tied 39). The rest of this bullet is the rule it replaced.
+- **Former tie rule.** Two routes tie when the paired 95% interval of their difference in pooled test-box pages exact holds
   0, and the cheaper route wins (owner review of the pipeline doc, 2026-11-17; W46.seg-truth-audit, seg-pair-ties.md).
   Both routes are compared page by page on the same windows (offset 0, the cached answers every figure is), each at its
   own frozen rule and level, and the interval resamples the truth's 142 common-support documents (10,000 rounds). The

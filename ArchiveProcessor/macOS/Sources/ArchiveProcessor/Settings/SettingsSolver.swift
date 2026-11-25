@@ -180,14 +180,16 @@ struct SettingsSolver {
     static let weights: [Double] = [45, 30, 15, 10]
     static let stageOrder = ["reading", "segmentation", "dating", "entities"]
 
-    /// Ties in points of the stage metric. Reading reads its tie from the pair matrix (floor 0.49 hosted, 0 between
-    /// Mac routes, 0.60 for hands) and falls back to these floors where a pair has no per-page scores.
-    static let readingHostedFloor = 0.49
-    static let readingHandsFloor = 0.60
-    /// Segmentation: two routes tie when their paired 95% interval in test-box pages exact holds 0, the routes compared
-    /// page by page on the same windows and the truth's documents resampled (owner review of the pipeline doc,
-    /// 2026-11-17, W46.seg-truth-audit; `seg-pair-ties.md`). It replaced twice the larger window-offset range (5.0 or
-    /// 10.4 points). Nil when the pair was not measured (a route with no test-boxes figure).
+    /// Ties in points of the stage metric: the practical floor alone (owner, 2026-11-24, W49.proc-pipeline-prune-ok 4).
+    /// Reading: a gap under 0.5 NES points, for cloud and Mac routes alike; the pair matrix's `under_floor` carries it,
+    /// and a pair with no per-page scores compares the figures against the same floor. The paired 95% interval is shown
+    /// and makes no tie, so an underpowered interval never hands a pick to the weaker route.
+    static let readingFloor = 0.5
+    /// Segmentation: a gap under 2.0 points of test-box pages exact (the stage's pairs carry the tie, the paired
+    /// interval shown beside it). It replaced the interval holding 0 (2026-11-17, W46.seg-truth-audit).
+    static let segmentationFloor = 2.0
+    /// The measured pair of two segmentation routes (`seg-pair-ties.md`). Nil when the pair was not measured (a route
+    /// with no test-boxes figure).
     static func segmentationPair(_ stage: SettingsRouteTable.Stage?, _ a: SettingsRouteTable.Route?,
                                  _ b: SettingsRouteTable.Route?) -> SettingsRouteTable.Stage.Pair? {
         guard let a, let b else { return nil }
@@ -561,9 +563,7 @@ struct SettingsSolver {
                 return (g.underFloor || abs(g.delta) < withinPoint, g)
             }
             // No per-page scores: the floor alone ("pair not measured").
-            let bothMac = x.route.family == .mac && best.route.family == .mac
-            let floor = bothMac ? 0 : (hands ? Self.readingHandsFloor : Self.readingHostedFloor)
-            return (abs(x.value - best.value) < max(floor, withinPoint), nil)
+            return (abs(x.value - best.value) < max(Self.readingFloor, withinPoint), nil)
         }
 
         var out: [SettingsPick] = []
@@ -595,12 +595,12 @@ struct SettingsSolver {
             // A measured cascade is a route, picked when it beats the single pick by more than the floor (no per-page
             // scores, so the floor alone).
             let cc = cascades.compactMap { r in r.figure("overall").map { cand(r, stage: "reading", value: $0, units: pages) } }
-                .filter { $0.blockers.isEmpty && state.fits($0) && $0.value > ch.best.value + Self.readingHostedFloor }
+                .filter { $0.blockers.isEmpty && state.fits($0) && $0.value > ch.best.value + Self.readingFloor }
             if let top = cc.max(by: { $0.value < $1.value }) {
                 chosen = Choice(pick: top, best: top, pool: [top], overLimits: false)
                 mainGap = nil
                 mainReason = "\(top.route.name) (\(top.id)), a measured cascade, beats the best single route "
-                    + "\(ch.best.id) by more than the \(Self.num(Self.readingHostedFloor)) floor: "
+                    + "\(ch.best.id) by more than the \(Self.num(Self.readingFloor)) floor: "
                     + "\(Self.num(top.value)) against \(Self.num(ch.best.value))."
             }
             main = chosen.pick
@@ -733,7 +733,8 @@ struct SettingsSolver {
         let cands = stage.routes.filter { !$0.afterTraining }
             .compactMap { r in segmentationFigure(r).map { cand(r, stage: "segmentation", value: $0, units: pages) } }
         guard let ch = choose(cands, state, tie: {
-            abs($0.value - $1.value) < withinPoint || Self.segmentationPair(stage, $0.route, $1.route)?.tie == true
+            abs($0.value - $1.value) < max(withinPoint, Self.segmentationFloor)
+                || Self.segmentationPair(stage, $0.route, $1.route)?.tie == true
         }, prefer: { a, b in
             if abs(a.usd - b.usd) > 1e-9 || a.hours != b.hours { return defaultPrefer(a, b) }
             if a.value != b.value { return a.value > b.value }
@@ -748,8 +749,9 @@ struct SettingsSolver {
                              reason: explain(ch, metric: "test-boxes pages exact", unit: "pages", gap: nil,
                                              tieText: "test-boxes \(Self.num(ch.pick.value)) against "
                                                 + "\(Self.num(ch.best.value)), "
-                                                + (pair.map { "paired \($0.citation), an interval holding 0" }
-                                                   ?? "within a point")),
+                                                + (pair.map { "paired \($0.citation), under the "
+                                                       + "\(Self.num(Self.segmentationFloor))-point floor" }
+                                                   ?? "under the \(Self.num(Self.segmentationFloor))-point floor")),
                              gap: nil, better: betterRoutes(cands, than: ch, pickValue: ch.pick.value, state: before),
                              fallbackRouteID: nil, shown: true, usd: ch.pick.usd, hours: ch.pick.hours)]
     }

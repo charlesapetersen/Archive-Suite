@@ -63,9 +63,9 @@ enum SettingsLevels {
 
     static let rows: [Row] = [
         .appearance, .level, .setupQuestions, .collection, .keys, .skipProcessed, .straighten, .taggingMode, .capture,
-        .overrides, .backend, .providerModel, .cascade, .pageKind, .handwritingOnTyped, .visionLanguages,
+        .overrides, .backend, .providerModel, .cascade, .pageKind, .visionLanguages,
         .visionJudgement, .gatewayLocal, .cliAgent, .preOCRed, .batch, .outputSizes, .rotation, .vocabularyColours,
-        .collectionID, .segmentationReview, .segmentationApproach, .dateImage, .scanNewspapers, .placeHand, .searchable, .downloads,
+        .collectionID, .segmentationReview, .segmentationApproach, .dateImage, .dateOrder, .scanNewspapers, .placeHand, .searchable, .downloads,
         .driveRelay, .dateLocalImage, .lowConfidenceNames, .thinking, .cascadeDisagreement, .postCorrection, .visionTuning, .gatewayFields, .cliFields, .customModels,
         .imageSize, .workers, .logFile, .previousImage, .customPrompt, .localSegmenter,
     ]
@@ -111,8 +111,8 @@ enum SettingsLevels {
              DefaultsKeys.mergeDocuments, DefaultsKeys.sendPreviousImage,
              DefaultsKeys.writeLogFile, DefaultsKeys.enableSegmentJSON:
             return false
-        case DefaultsKeys.outputImageFile, DefaultsKeys.ocrHandwritingOnTyped,
-             DefaultsKeys.macItemFields, DefaultsKeys.reviewDocumentSegmentation: return true
+        case DefaultsKeys.outputImageFile, DefaultsKeys.macItemFields,
+             DefaultsKeys.reviewDocumentSegmentation: return true
         case DefaultsKeys.visionMinimumConfidence: return 0.0
         case DefaultsKeys.gatewayInputCost, DefaultsKeys.gatewayOutputCost: return -1.0
         case DefaultsKeys.imageResolutionPercent: return 100.0
@@ -208,7 +208,6 @@ extension SettingsLevels.Row {
          + LLMProvider.allCases.map { ModelSelectionStore.modelKey(for: $0) })
     static let cascade = Self("cascade", .standard, [DefaultsKeys.ocrCascadeRoute])
     static let pageKind = Self("page-kind", .standard, [DefaultsKeys.ocrPageKindRouting])
-    static let handwritingOnTyped = Self("handwriting-on-typed", .standard, [DefaultsKeys.ocrHandwritingOnTyped])
     static let visionLanguages = Self("vision-languages", .standard, [DefaultsKeys.visionLanguages])
     static let visionJudgement = Self("vision-judgement", .standard, [DefaultsKeys.visionUseLLMJudgment])
     static let gatewayLocal = Self("gateway-local", .standard, [DefaultsKeys.gatewayLocalModel, DefaultsKeys.gatewayLocalEscalates])
@@ -228,8 +227,10 @@ extension SettingsLevels.Row {
     static let segmentationApproach = Self("segmentation-approach", .standard,
                                            [DefaultsKeys.segmentationApproach, DefaultsKeys.segmentationClaudeRoute])
     static let dateImage = Self("date-image", .standard, [SettingsKey.dateImageEveryDocument.rawValue])
+    static let dateOrder = Self("date-order", .standard, [SettingsKey.numericDatesDayFirst.rawValue])
     static let scanNewspapers = Self("scan-newspapers", .standard, [SettingsKey.scanNewspapersDocLayoutYOLO.rawValue])
-    static let placeHand = Self("place-hand", .standard, [SettingsKey.placeHandOnImage.rawValue])
+    static let placeHand = Self("place-hand", .advanced, [SettingsKey.placeHandOnImage.rawValue],
+                                why: "about 7.5 seconds a handwritten page and up to 8.5 GB of memory, for a layer kept on 9 of 20 test pages")
     static let searchable = Self("searchable", .standard, [SettingsKey.searchableFor.rawValue])
     static let downloads = Self("downloads", .standard, [])
     static let driveRelay = Self("drive-relay", .standard, [DefaultsKeys.driveClientId, "keychain:DriveClientSecret"])

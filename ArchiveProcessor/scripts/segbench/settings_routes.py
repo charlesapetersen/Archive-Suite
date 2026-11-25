@@ -494,6 +494,7 @@ HEADERS = {
     {"id": "steps", "text": "Steps in order: explicit from the text; explicit from the image on documents with no year candidate in the text; inherited from a cover or a dated folder; estimated from neighbours with checked evidence, always Date Uncertain.", "source": "date-image.md", "switch": None},
     {"id": "local-image", "text": "Advanced opt-in for Apple Vision without LLM judgment in Process Files. The local 8B image pass showed no measured gain and stays out of automatic route selection.", "source": "date-8b-local.md", "switch": {"id": "dating.local_image", "label": "Search page images for dates on this Mac (no measured gain)", "default": False}},
     {"id": "image-every-document", "text": "The image pass on documents whose text already has a year is the user's option, off by default; on, it adds stamp dates as second-role dates, about $1.93 more per 1,000 documents (owner, 2026-11-12).", "source": "date-route-pipeline.md", "switch": {"id": "dating.image_every_document", "label": "Search the page image for dates on every document", "default": False}},
+    {"id": "numeric-order", "text": "A numeric date reads month first (04/07/1962 is 7 April) unless the collection says its numeric dates are day first (4 July); a first part over 12 is a day either way (owner, 2026-11-24, W49.proc-pipeline-prune-ok 5).", "source": "14-owner-calls.md §3. Pipeline pruning & simplification", "switch": {"id": "dating.day_first", "label": "Numeric dates are written day first (DD/MM/YYYY)", "default": False}},
     {"id": "uncertain-by-evidence", "text": "Date Uncertain is set by the evidence class; the model's own flag may only add it to an explicit text year, never remove it (owner, 2026-11-12).", "source": "date-truth.md", "switch": None},
     {"id": "no-untraceable-guess", "text": "A reply whose evidence fails is not written as a date and not shown as a suggestion.", "source": "date-traceable.md", "switch": None},
     {"id": "no-typeface-dating", "text": "Typeface or paper dating and look-alike retrieval are not steps.", "source": "date-image-typeface.md", "switch": None},
@@ -507,7 +508,7 @@ HEADERS = {
     {"id": "classifier-shipped", "text": "The shipped classifier (Vision signals and the feature print) labels each page's kind on the Mac and measures the collection's mix from a sample.", "source": "kind-atrium.md §Verdict", "switch": None},
     {"id": "low-confidence-keeps-model", "text": "A page whose top class is under 0.8 keeps the run's model.", "source": "K-kinds.md", "switch": None},
     {"id": "mixed-to-handwritten", "text": "Mixed pages have no class: they go to the handwritten pick.", "source": "kind-classifier.md", "switch": None},
-    {"id": "mixed-route", "text": "Read handwriting on typed pages (signatures, dates, notes in the margin). Measured level on typed pages, not measured on mixed pages.", "source": "mixed-route-bands.md", "switch": {"id": "mixed-route", "label": "Read handwriting on typed pages (signatures, dates, notes in the margin)", "default": True}},
+    {"id": "two-way-split", "text": "Routing by kind is a two-way split: typed, printed and form pages keep the run's model, handwritten pages go to the best measured handwriting reader the user can run. The former per-kind matrix and \"Read handwriting on typed pages\" are gone; the latter waits for 2.0 (W46.kinds-mixed-truth).", "source": "14-owner-calls.md §3. Pipeline pruning & simplification", "switch": None},
     {"id": "cascade-breaker", "text": "Escalation is capped after 20 pages at 25% of the run's pages; never on a remote gateway, the Local Agent or Apple Vision as first reader.", "source": "10-kinds-and-routing.md §3. The rule for the settings layer", "switch": None}],
    "fallback": "the run's model (weights fail to load)"},
  "training-kit": {"id": "training-kit", "name": "Training on the user's own material", "unit": "gaps / lines", "choice": True,
@@ -526,10 +527,10 @@ NOISE = {
  "reading-copy": {"metric": "rotation_pages_wrong", "tie": "Wilson page intervals that overlap; a gap of a few turns is a tie", "source": "rotation-routes.md §Noise"},
  "ocr-input": {"metric": "nes", "tie": "paired 95% interval across 0, or a gap under 0.49 NES points", "source": "enh-ocr-input.md §Measurement card"},
  "layout": {"metric": "nes_strict", "tie": "paired 95% page-bootstrap interval across 0, NES points; per-kind groups under 20 pages are descriptive", "source": "layout-photo.md §Measurement card"},
- "reading": {"metric": "nes", "tie": "on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 a pick takes the stratum's leader (the interval across 0 makes no tie there either, W46.pairs-redecide; it decides only a stratum row's admission); NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3", "source": "ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair"},
+ "reading": {"metric": "nes", "tie": "a paired gap under the practical floor of 0.5 NES points, the same for cloud, plan, cluster and Mac routes, every kind and both sets (owner, 2026-11-24, W49.proc-pipeline-prune-ok 4: practical floor only; the paired 95% interval is shown and makes no tie, so an underpowered interval never hands a pick to the weaker route; it replaced the 2026-11-11 rerun-range floors, hosted 0.49, local greedy 0.00); each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3", "source": "14-owner-calls.md §3. Pipeline pruning & simplification; ocr-pair-matrix.md §The tie per pair"},
  "placement": {"metric": "line_pass_strict", "tie": "paired page-bootstrap 95% interval holding 0; about 2 points on 20 owner hand pages, about 10 on 14 Bentham pages", "source": "place-print.md §Measurement card"},
  "marks": {"metric": "marks_read_nes08", "tie": "a gap inside the page-bootstrap interval, about 20 marks-read points", "source": "marks-read.md §Measurement card"},
- "segmentation": {"metric": "pages_exact", "tie": "a paired 95% interval of test-box pages exact holding 0, the two routes compared page by page on the same windows (offset 0) and the truth's documents resampled; each pair's entry in the stage's pairs (seg-pair-ties.json). Replaces twice the larger window-offset range (owner review of the pipeline doc, 2026-11-17, W46.seg-truth-audit); in gap accuracy the paired interval decides as before", "source": "seg-pair-ties.md §Every pair, a minus b, in points of pages exact; seg-boxes-score.md §Paired differences"},
+ "segmentation": {"metric": "pages_exact", "tie": "a paired gap of test-box pages exact under the practical floor of 2.0 points (owner, 2026-11-24, W49.proc-pipeline-prune-ok 4: practical floor only); the paired 95% interval, the two routes compared page by page on the same windows (offset 0) and the truth's documents resampled, is shown in each pair's entry (seg-pair-ties.json) and makes no tie. It replaced the interval holding 0 (2026-11-17, W46.seg-truth-audit)", "source": "14-owner-calls.md §3. Pipeline pruning & simplification; seg-pair-ties.md §Every pair, a minus b, in points of pages exact"},
  "dating": {"metric": "not_in_text", "tie": "the rerun floor, same year 94% (85/90), or no paired sign-test difference", "source": "date-undated.md §Rerun"},
  "entities": {"metric": "sender_ed2_f1", "tie": "paired 95% bootstrap interval containing zero, or inside the rerun floor", "source": "ent-place-rule.md §Paired differences in ed2 F1, b minus a (95% bootstrap interval)"},
  "kinds": {"metric": "pages_right", "tie": "paired bootstrap intervals that overlap", "source": "kind-atrium.md §3. The 96: the hand, and what routing by each costs"},
@@ -626,11 +627,17 @@ def norm_row(r):
     return out
 
 
+# The segmentation tie: a paired gap under 2.0 points of test-box pages exact (owner, 2026-11-24,
+# W49.proc-pipeline-prune-ok 4: practical floor only; the interval is shown and makes no tie).
+SEG_TIE_FLOOR = 2.0
+
+
 def seg_pairs():
     """seg-pair-ties.json's pairs as the solver reads them: a minus b in points of test-box pages exact, its paired
-    95% interval, and whether the interval holds 0 (the tie)."""
+    95% interval (shown), and whether the gap is under the practical floor (the tie)."""
     m = json.load(open(os.path.join(R, "ArchiveProcessor/segbench-results/seg-pair-ties.json")))
-    return [{k: p[k] for k in ("a", "b", "delta", "lo", "hi", "documents", "tie")} for p in m["pairs"]]
+    return [{k: p[k] for k in ("a", "b", "delta", "lo", "hi", "documents")} | {"tie": abs(p["delta"]) < SEG_TIE_FLOOR}
+            for p in m["pairs"]]
 
 
 def check_seg_pairs(table):
@@ -917,9 +924,88 @@ def check(table):
     return 1 if bad else 0
 
 
+# The app's copy (owner, 2026-11-24, W49.proc-pipeline-prune-ok 3): the Processor bundles only the rows it can run or
+# use, directly, through the gateway, as a model on this Mac, as a measured cascade, through the institutional import
+# (reading on a cluster), as a training kit or as a built-in; every row stays in OUT, the bench's record. A row is kept
+# when it is offered and built and has an app route, a built-in, a manual or kit family, or a cluster reading route, or
+# when it is in APP_ALLOW: the rows the app runs by another path than `app_route` (each one's code in the comment).
+APP_OUT = "ArchiveProcessor/segbench-results/settings-routes-app.json"
+APP_ALLOW = {
+    ("reading-copy", "rotation.vision"), ("reading-copy", "rotation.agree-else-flag"),      # RotationDetector, RotationLCNet
+    ("reading-copy", "rotation.agree-else-llmsingle-gw"), ("reading-copy", "rotation.llmsingle-gw"),  # LLMRotationDetector
+    ("layout", "pp-doclayoutv3"), ("layout", "doclayout-yolo-scans"), ("layout", "whole-page"),  # NewspaperLayout downloads
+    ("placement", "vision-lines-aligned"), ("placement", "vision-own"), ("placement", "hand-blla-ctc"),
+    ("placement", "text-page"),                                                            # TextLayerRule, HandPlacer
+    ("kinds", "kind-vision-lr"),                                                           # PageKindClassifier
+    ("reading", "qwen3.5-9b-mlx4"), ("reading", "qwen3-vl-8b-mlx4"),                       # LocalModelRoute picks
+    ("reading", "lightonocr-3-4b-mlx8"),                 # a model on this Mac behind the gateway field; ReadQualityDisagreement
+    ("reading", "gemini3.7-flash-gw"),                                                     # the remote gateway
+    ("reading", "casc-1-fail"), ("reading", "casc-2-fail"), ("reading", "casc-5-fail"),    # OCRCascade, failure trigger
+    ("dating", "gemini3.7-flash-oneshot-vision"), ("dating", "gemini3.7-flash-trace-neigh"),
+    ("dating", "gemini3.7-flash-image"), ("dating", "gemini3.7-flash-route"),              # DateRoute's measured route
+    ("dating", "qwen3-vl-8b-image-mac"), ("dating", "vision-rules-t3"),                    # DateRoute.runLocal, the rule
+    ("entities", "qwen3-vl-8b-mac"), ("entities", "nltagger"), ("entities", "qwen3.6-27b"),  # EntityExtractor, LocalNameFinder
+    ("training-kit", "kit-seg-lora-mac"),                                                  # SettingsSolver's kit rows
+}
+
+
+def app_runs(stage, r):
+    """Whether the Processor can run or use the row (APP_OUT keeps it)."""
+    if (stage, r["id"]) in APP_ALLOW:
+        return True
+    conds = r.get("conditions") or []
+    if any(c.startswith(("not offered", "never offered", "not built")) for c in conds):
+        return False
+    return bool(r.get("app_route") or r.get("family") in ("manual", "kit") or (r.get("needs") or {}).get("built_in")
+                or (r.get("family") == "cluster" and stage == "reading"))
+
+
+def app_table(t):
+    """OUT with only the rows the app runs, and only the pairs between them; the rest of each stage unchanged."""
+    out = dict(t)
+    out["app_subset"] = ("the Processor's copy: only the rows it can run or use (owner, 2026-11-24, "
+                         "W49.proc-pipeline-prune-ok 3); every row is in settings-routes.json and on ArchiveOCRBench")
+    stages = []
+    for st in t["stages"]:
+        st = dict(st)
+        st["routes"] = [r for r in st["routes"] if app_runs(st["id"], r)]
+        if "pairs" in st:
+            kept = {r["id"] for r in st["routes"]}
+            st["pairs"] = [p for p in st["pairs"] if p["a"] in kept and p["b"] in kept]
+        stages.append(st)
+    out["stages"] = stages
+    return out
+
+
+def check_app(table):
+    """The app's copy is what OUT gives, a subset of it, and holds every row id the app's code names."""
+    path = os.path.join(R, APP_OUT)
+    if not os.path.isfile(path):
+        print(f"FAIL {APP_OUT} is missing; run settings_routes.py")
+        return 1
+    app = json.load(open(path))
+    bad = 0
+    if app != app_table(table):
+        print(f"FAIL {APP_OUT} is not what {OUT} gives; run settings_routes.py"); bad += 1
+    full = {(st["id"], r["id"]) for st in table["stages"] for r in st["routes"]}
+    have = {(st["id"], r["id"]) for st in app["stages"] for r in st["routes"]}
+    named = {("reading", "apple-vision"), ("reading", "apple-fm-27"), ("entities", "nltagger"), ("entities", "none"),
+             ("dating", "none"), ("segmentation", "manual"), ("segmentation", "seg-qwen3.5-2b-8bit"),
+             ("training-kit", "kit-seg-lora-mac"), ("training-kit", "kit-seg-student-tags"),
+             ("training-kit", "seg-2b-lora-k200"), ("segmentation", "seg-2b-lora-k200")}
+    if not have <= full:
+        print(f"FAIL {APP_OUT} holds rows {OUT} does not: {sorted(have - full)}"); bad += 1
+    if not named <= have:
+        print(f"FAIL {APP_OUT} lacks rows the app's code names: {sorted(named - have)}"); bad += 1
+    if not bad:
+        print(f"PASS app copy: {len(have)} of {len(full)} rows, every one the app names")
+    return bad
+
+
 def main():
     if "--check" in sys.argv[1:]:
-        sys.exit(check(json.load(open(os.path.join(R, OUT)))))
+        t = json.load(open(os.path.join(R, OUT)))
+        sys.exit(check(t) or check_app(t))
     built = datetime.date.today().isoformat()
     path = os.path.join(R, OUT)
     if os.path.isfile(path):  # keep the date when nothing else changed, so a rebuild is a no-op
@@ -932,6 +1018,11 @@ def main():
         f.write("\n")
     n = sum(len(s["routes"]) for s in t["stages"])
     print(f"wrote {OUT}: {len(t['stages'])} stages, {n} rows")
+    app = app_table(t)
+    with open(os.path.join(R, APP_OUT), "w") as f:
+        json.dump(app, f, indent=1, ensure_ascii=False)
+        f.write("\n")
+    print(f"wrote {APP_OUT}: {sum(len(s['routes']) for s in app['stages'])} rows the app runs")
 
 
 if __name__ == "__main__":

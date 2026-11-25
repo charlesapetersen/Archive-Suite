@@ -1,5 +1,10 @@
 # Paired intervals for every reading route pair (W46.ocr-pair-matrix, W46.pair-matrix-cover)
 
+> **The tie rule in force changed on 2026-11-24** (owner, `W49.proc-pipeline-prune-ok` 4): a gap is a tie only when it
+> is under the practical floor of 0.5 NES points, every family, group and set; the interval makes no tie.
+> `ocr-pair-matrix.json` carries it (`ocr_pair_matrix.py --retie`, the intervals unchanged); the tie lists and floors
+> in the tables below are the former rule's.
+
 Every pair of reading routes in the settings table (`settings-routes.json`, stage `reading`) that has per-page scores,
 compared page by page: on the owner's 96 (p081 apart, so 95 pages) strict and answered, over all pages and within
 each kind; and on the public 895 within each stratum, over the three handwritten strata pooled (`L1-L3`) and over the

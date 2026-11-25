@@ -198,6 +198,24 @@ enum DateRouteTestDriver {
         noLeap = DateRoute.monthDay(DateRoute.datedIn("12/4/58", year: 1958))
         check("2 full date: a numeric date is month-first (12/4/58 is 4 December), 31 April has no day",
               leap.month == 4 && leap.day == nil && noLeap.month == 12 && noLeap.day == 4)
+        // Owner, 2026-11-24 (W49.proc-pipeline-prune-ok 5): a collection whose numeric dates are day first.
+        let us = DateRoute.monthDay(DateRoute.datedIn("Sent 04/07/1962.", year: 1962))
+        let intl = DateRoute.$dayFirst.withValue(true) { DateRoute.monthDay(DateRoute.datedIn("Sent 04/07/1962.", year: 1962)) }
+        let intlDay = DateRoute.$dayFirst.withValue(true) { DateRoute.monthDay(DateRoute.datedIn("Sent 25/12/1950.", year: 1950)) }
+        let intlUS = DateRoute.$dayFirst.withValue(true) { DateRoute.monthDay(DateRoute.datedIn("Sent 12/25/1950.", year: 1950)) }
+        check("2 numeric order: 04/07/1962 is 7 April month first and 4 July day first, a part over 12 the day either way",
+              us.month == 4 && us.day == 7 && intl.month == 7 && intl.day == 4 && intlDay.month == 12 && intlDay.day == 25
+                && intlUS.month == 12 && intlUS.day == 25, "\(us) \(intl) \(intlDay) \(intlUS)")
+        let ocrIntl = DateRoute.$dayFirst.withValue(true) { DateRoute.ocrDated("dated 4 - 7 - 62", year: 1962) }
+        check("2 numeric order: the OCR-damaged form follows it too", ocrIntl?.month == 7 && ocrIntl?.day == 4,
+              "\(String(describing: ocrIntl))")
+        check("2 numeric order: the image prompt says so only when day first",
+              DateRoute.imagePromptForOrder == DateRoute.imagePrompt
+                && DateRoute.$dayFirst.withValue(true) { DateRoute.imagePromptForOrder.contains("day first (DD/MM/YYYY)") })
+        let orderValues = [SettingsKey.numericDatesDayFirst.rawValue: ResolvedSetting(value: .bool(true), layer: .collection)]
+        check("2 numeric order: month first unless a layer sets day first",
+              !DateRoute.dayFirstSetting(nil) && DateRoute.dayFirstSetting(orderValues)
+                && SettingsKey.numericDatesDayFirst.allowed(in: .collection))
         let o = explicit.with(measured: true).sidecarObject()
         check("2 sidecar, explicit: class, step, the quote and its line", o["class"] as? String == "text"
               && o["step"] as? Int == 1 && o["quote"] as? String == "March 3, 1947" && o["line"] as? Int == 2
@@ -729,6 +747,12 @@ enum DateRouteTestDriver {
         guard NetworkSession.testTransportIsActive else { check("local image stub installed", false); return }
         let text = await DateRoute.runLocal(.init(text: "June 7, 1950", near: [prior], pages: pages))
         check("local image skips documents with a text year", text.year == 1950 && text.imageNote == DateRoute.imageNotNeeded)
+        // The order the callers hand in (Process Files' and Live Capture's `run(…, dayFirst:)`) reaches the whole route.
+        let dayFirst = await DateRoute.runLocal(.init(text: "Sent 04/07/1962.", near: [prior], pages: pages), dayFirst: true)
+        let monthFirst = await DateRoute.runLocal(.init(text: "Sent 04/07/1962.", near: [prior], pages: pages), dayFirst: false)
+        check("local route: a day-first collection dates 04/07/1962 4 July, a month-first one 7 April",
+              dayFirst.year == 1962 && dayFirst.month == 7 && dayFirst.day == 4
+                && monthFirst.year == 1962 && monthFirst.month == 4 && monthFirst.day == 7 && !DateRoute.dayFirst)
         let read = await DateRoute.runLocal(.init(text: "Nothing printed", near: [prior], pages: pages))
         check("local image requests two resized pages and accepts the only quoted year",
               read.year == 1961 && read.month == 6 && read.day == 9 && read.evidenceClass == .image

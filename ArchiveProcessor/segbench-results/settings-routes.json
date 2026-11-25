@@ -1,6 +1,6 @@
 {
  "version": 1,
- "built": "2026-11-24",
+ "built": "2026-11-25",
  "item": "W46.settings-routes-table",
  "method": "ArchiveProcessor/scripts/segbench/settings_routes.py",
  "schema": "execution-plans/processing-review/13-stage-rules/00-index.md §The table schema",
@@ -22,8 +22,8 @@
   },
   "reading": {
    "metric": "nes",
-   "tie": "on the 96 a paired gap under the floor only (owner, 2026-11-11: hosted 0.49, local greedy 0.00, per kind hosted typewritten 0.42, printed 0.24, handwritten 0.60; each floor twice a rerun range; the paired 95% interval is shown, makes no tie); on the 895 a pick takes the stratum's leader (the interval across 0 makes no tie there either, W46.pairs-redecide; it decides only a stratum row's admission); NES points; each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3",
-   "source": "ocr-rerun-noise.md §The tie rule; ocr-pair-matrix.md §The tie per pair"
+   "tie": "a paired gap under the practical floor of 0.5 NES points, the same for cloud, plan, cluster and Mac routes, every kind and both sets (owner, 2026-11-24, W49.proc-pipeline-prune-ok 4: practical floor only; the paired 95% interval is shown and makes no tie, so an underpowered interval never hands a pick to the weaker route; it replaced the 2026-11-11 rerun-range floors, hosted 0.49, local greedy 0.00); each pair's entry in ocr-pair-matrix.json, per kind, hands16 and L1-L3",
+   "source": "14-owner-calls.md §3. Pipeline pruning & simplification; ocr-pair-matrix.md §The tie per pair"
   },
   "placement": {
    "metric": "line_pass_strict",
@@ -37,8 +37,8 @@
   },
   "segmentation": {
    "metric": "pages_exact",
-   "tie": "a paired 95% interval of test-box pages exact holding 0, the two routes compared page by page on the same windows (offset 0) and the truth's documents resampled; each pair's entry in the stage's pairs (seg-pair-ties.json). Replaces twice the larger window-offset range (owner review of the pipeline doc, 2026-11-17, W46.seg-truth-audit); in gap accuracy the paired interval decides as before",
-   "source": "seg-pair-ties.md §Every pair, a minus b, in points of pages exact; seg-boxes-score.md §Paired differences"
+   "tie": "a paired gap of test-box pages exact under the practical floor of 2.0 points (owner, 2026-11-24, W49.proc-pipeline-prune-ok 4: practical floor only); the paired 95% interval, the two routes compared page by page on the same windows (offset 0) and the truth's documents resampled, is shown in each pair's entry (seg-pair-ties.json) and makes no tie. It replaced the interval holding 0 (2026-11-17, W46.seg-truth-audit)",
+   "source": "14-owner-calls.md §3. Pipeline pruning & simplification; seg-pair-ties.md §Every pair, a minus b, in points of pages exact"
   },
   "dating": {
    "metric": "not_in_text",
@@ -5233,7 +5233,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: Qwen3.8 Flash (OpenRouter) scored 1.32 points higher on the 90 benchmark pages both readers answered. It tied (0.24 points higher, within 0.49 points) on 95 pages with failures scored as zero. Benchmark prices per 1,000 pages were $0.60 for that reader and $1.49 for this route; offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.8 Flash (OpenRouter) scored 1.32 points higher on the 90 benchmark pages both readers answered. It tied (0.24 points higher, within 0.5 points) on 95 pages with failures scored as zero. Benchmark prices per 1,000 pages were $0.60 for that reader and $1.49 for this route; offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -7724,7 +7724,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: Qwen3.5 9B (Sherlock) tied (0.23 points lower, within 0.49 points) on the 93 benchmark pages both readers answered. It scored 1.54 points lower on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 729.4 pages per hour per GPU (four NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.5 9B (Sherlock) tied (0.23 points lower, within 0.5 points) on the 93 benchmark pages both readers answered. It scored 1.54 points lower on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 729.4 pages per hour per GPU (four NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -7952,7 +7952,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: Qwen3.5 9B (Sherlock) tied (0.05 points higher, within 0.49 points) on the 93 benchmark pages both readers answered. It scored 0.69 points lower on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 76.6 pages per hour per GPU (four NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.5 9B (Sherlock) tied (0.05 points higher, within 0.5 points) on the 93 benchmark pages both readers answered. It scored 0.69 points lower on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 76.6 pages per hour per GPU (four NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -8405,7 +8405,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: Qwen3.5 9B (Sherlock) tied (0.38 points higher, within 0.49 points) on the 93 benchmark pages both readers answered. It tied (0.35 points lower, within 0.49 points) on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 2,886.8 pages per hour per GPU (one 48 or 80 GB GPU, Stanford Sherlock); offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.5 9B (Sherlock) tied (0.38 points higher, within 0.5 points) on the 93 benchmark pages both readers answered. It tied (0.35 points lower, within 0.5 points) on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 2,886.8 pages per hour per GPU (one 48 or 80 GB GPU, Stanford Sherlock); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -8512,7 +8512,7 @@
      "kind_rules": [],
      "fallback": null,
      "conditions": [
-      "lower-scoring: Qwen3.5 9B (Sherlock) tied (0.41 points higher, within 0.49 points) on the 93 benchmark pages both readers answered. It tied (0.04 points lower, within 0.49 points) on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 1,063.2 pages per hour per GPU (one NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
+      "lower-scoring: Qwen3.5 9B (Sherlock) tied (0.41 points higher, within 0.5 points) on the 93 benchmark pages both readers answered. It tied (0.04 points lower, within 0.5 points) on 95 pages with failures scored as zero. In their respective runs, Qwen3.5 9B (Sherlock) processed 3,898.9 pages per hour per GPU (one GPU, Stanford Sherlock) and this reader processed 1,063.2 pages per hour per GPU (one NVIDIA L40S, Stanford FarmShare); offered at the Advanced level only, never the app's pick (owner call 15)"
      ]
     },
     {
@@ -10655,7 +10655,7 @@
      "switch": {
       "id": "place.hand_on_image",
       "label": "Also place handwritten text on the page image where the aligner is sure (every hand page keeps a text page)",
-      "default": true
+      "default": false
      }
     },
     {
@@ -12779,7 +12779,7 @@
      "lo": -2.57,
      "hi": 7.88,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "chatgpt-gpt6.1-sol",
@@ -12788,7 +12788,7 @@
      "lo": -1.69,
      "hi": 7.84,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "chatgpt-gpt6.1-sol",
@@ -12797,7 +12797,7 @@
      "lo": -1.03,
      "hi": 16.88,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "chatgpt-gpt6.1-sol",
@@ -12806,7 +12806,7 @@
      "lo": -1.31,
      "hi": 16.56,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "chatgpt-gpt6.1-sol",
@@ -12860,7 +12860,7 @@
      "lo": -2.57,
      "hi": 7.88,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "mix-claude-chatgpt",
@@ -12869,7 +12869,7 @@
      "lo": -1.69,
      "hi": 7.84,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "mix-claude-chatgpt",
@@ -12878,7 +12878,7 @@
      "lo": -1.03,
      "hi": 16.88,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "mix-claude-chatgpt",
@@ -12887,7 +12887,7 @@
      "lo": -1.31,
      "hi": 16.56,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "mix-claude-chatgpt",
@@ -12950,7 +12950,7 @@
      "lo": 0.0,
      "hi": 14.37,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "claude-sonnet5.5",
@@ -12959,7 +12959,7 @@
      "lo": -0.64,
      "hi": 13.92,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "claude-sonnet5.5",
@@ -13013,7 +13013,7 @@
      "lo": -1.39,
      "hi": 14.78,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "gemini3.7-flash-gateway",
@@ -13022,7 +13022,7 @@
      "lo": -1.22,
      "hi": 14.2,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "gemini3.7-flash-gateway",
@@ -13067,7 +13067,7 @@
      "lo": -4.0,
      "hi": 14.43,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "gemini3.8-flash-text",
@@ -13076,7 +13076,7 @@
      "lo": -3.54,
      "hi": 13.76,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "gemini3.8-flash-text",
@@ -13085,7 +13085,7 @@
      "lo": 0.0,
      "hi": 14.0,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "gemini3.8-flash-text",
@@ -13112,7 +13112,7 @@
      "lo": -3.48,
      "hi": 13.62,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "gemini3.8-flash",
@@ -13121,7 +13121,7 @@
      "lo": -3.44,
      "hi": 12.96,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "gemini3.8-flash",
@@ -13130,7 +13130,7 @@
      "lo": -0.33,
      "hi": 13.64,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "gemini3.8-flash",
@@ -13175,7 +13175,7 @@
      "lo": -5.73,
      "hi": 11.97,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "glm5.3-flash",
@@ -13184,7 +13184,7 @@
      "lo": -5.73,
      "hi": 11.97,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "seg-qwen3.5-4b-cluster",
@@ -13202,7 +13202,7 @@
      "lo": -4.08,
      "hi": 10.6,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "seg-qwen3.5-4b-cluster",
@@ -13211,7 +13211,7 @@
      "lo": -4.08,
      "hi": 10.6,
      "documents": 142,
-     "tie": true
+     "tie": false
     },
     {
      "a": "qwen3.5-27b-teacher",
@@ -13285,6 +13285,16 @@
      "switch": {
       "id": "dating.image_every_document",
       "label": "Search the page image for dates on every document",
+      "default": false
+     }
+    },
+    {
+     "id": "numeric-order",
+     "text": "A numeric date reads month first (04/07/1962 is 7 April) unless the collection says its numeric dates are day first (4 July); a first part over 12 is a day either way (owner, 2026-11-24, W49.proc-pipeline-prune-ok 5).",
+     "source": "14-owner-calls.md §3. Pipeline pruning & simplification",
+     "switch": {
+      "id": "dating.day_first",
+      "label": "Numeric dates are written day first (DD/MM/YYYY)",
       "default": false
      }
     },
@@ -15486,14 +15496,10 @@
      "switch": null
     },
     {
-     "id": "mixed-route",
-     "text": "Read handwriting on typed pages (signatures, dates, notes in the margin). Measured level on typed pages, not measured on mixed pages.",
-     "source": "mixed-route-bands.md",
-     "switch": {
-      "id": "mixed-route",
-      "label": "Read handwriting on typed pages (signatures, dates, notes in the margin)",
-      "default": true
-     }
+     "id": "two-way-split",
+     "text": "Routing by kind is a two-way split: typed, printed and form pages keep the run's model, handwritten pages go to the best measured handwriting reader the user can run. The former per-kind matrix and \"Read handwriting on typed pages\" are gone; the latter waits for 2.0 (W46.kinds-mixed-truth).",
+     "source": "14-owner-calls.md §3. Pipeline pruning & simplification",
+     "switch": null
     },
     {
      "id": "cascade-breaker",

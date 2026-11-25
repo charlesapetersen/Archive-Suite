@@ -143,7 +143,7 @@ enum RotationRuleTestDriver {
                                               gatewayConfig: local)
         _ = await OCRProcessor.detectRotation(imageURL: page, provider: .gemini, apiKey: "k", mode: .agreement,
                                               gatewayConfig: nil)
-        check("3 the rule never calls out from a model on this Mac or a direct key", await wire.seen().isEmpty)
+        check("3 the rule never calls out from a model on this Mac, or a direct key with no OCR model", await wire.seen().isEmpty)
         _ = await OCRProcessor.detectRotation(imageURL: page, provider: .gemini, apiKey: "k", mode: .agreement,
                                               gatewayConfig: remote)
         let escalated = await wire.seen().count
@@ -186,6 +186,35 @@ enum RotationRuleTestDriver {
         check("3 OpenRouter majority sends three orderings and also denies data collection",
               majorityRequests.count == 3 && majority == V(correction: 270)
                 && (majorityBody?["provider"] as? [String: Any])?["data_collection"] as? String == "deny")
+        // Owner, 2026-11-24 (W49.proc-pipeline-prune-ok 6): a direct key asks the run's own OCR model, never a
+        // separate rotation model.
+        let geminiOCR = LLMModel.geminiModels[0]
+        await wire.set(status: 200, letter: "D")
+        _ = await OCRProcessor.detectRotation(imageURL: blankPage, provider: .gemini, apiKey: "k", mode: .agreement,
+                                              gatewayConfig: nil, ocrModel: geminiOCR)
+        let direct = await wire.seen()
+        check("3 a direct Gemini key's disagreement asks the run's OCR model once",
+              direct.count == 1 && direct.first?.url?.absoluteString.contains("/models/\(geminiOCR.id):generateContent") == true)
+        let claudeOCR = LLMModel.anthropicModels[0]
+        await wire.set(status: 200, letter: "D")   // each check reads only its own requests
+        _ = await OCRProcessor.detectRotation(imageURL: page, provider: .anthropic, apiKey: "k", mode: .llmSingle,
+                                              gatewayConfig: nil, ocrModel: claudeOCR)
+        let claudeBody = await wire.seen().first?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        check("3 a direct Claude key's comparison asks the run's OCR model", claudeBody?["model"] as? String == claudeOCR.id)
+        let openAIOCR = LLMModel.openaiModels[0]
+        await wire.set(status: 200, letter: "D")
+        _ = await OCRProcessor.detectRotation(imageURL: page, provider: .openai, apiKey: "k", mode: .llmSingle,
+                                              gatewayConfig: nil, ocrModel: openAIOCR)
+        let openAIBody = await wire.seen().first?.httpBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        check("3 a direct OpenAI key's comparison asks the run's OCR model with its family's parameters",
+              openAIBody?["model"] as? String == openAIOCR.id
+                && (openAIOCR.supportsThinking ? openAIBody?["max_completion_tokens"] as? Int == LLMRotationDetector.openAIReasoningCeiling
+                    : openAIBody?["max_tokens"] as? Int == 8))
+        await wire.set(status: 200, letter: "D")
+        _ = await OCRProcessor.detectRotation(imageURL: page, provider: .openai, apiKey: "k", mode: .llmSingle,
+                                              gatewayConfig: nil, ocrModel: geminiOCR)
+        check("3 another provider's model is never sent to a direct key", await wire.seen().isEmpty)
+
         await wire.set(status: 404, letter: "D")
         let fallback = await OCRProcessor.detectRotation(imageURL: blankPage, provider: .openrouter, apiKey: "rotation-test",
                                                          mode: .agreement, gatewayConfig: nil)
@@ -265,10 +294,39 @@ enum RotationRuleTestDriver {
         check("6 the rule on the gateway costs the escalated share of a call",
               abs(cost(.agreement, gateway: true) - 1000 * 45.0 / 476.0 * 0.0037) < 1e-9)
         check("6 llmSingle on the gateway costs one call a page", abs(cost(.llmSingle, gateway: true) - 3.7) < 1e-9)
-        check("6 the rule costs nothing off the gateway", cost(.agreement, gateway: false) == 0)
+        check("6 the rule costs nothing off the gateway with an unpriced model", cost(.agreement, gateway: false) == 0)
+        let geminiModel = LLMModel.geminiModels[0]
+        let perCall = (4 * CostEstimator.estimatedRotationCandidateTokens(for: .gemini) + CostEstimator.estimatedRotationPromptTokens)
+            / 1_000_000 * geminiModel.inputCostPer1M
+            + (CostEstimator.estimatedRotationOutputTokens
+               + (geminiModel.supportsThinking ? Double(LLMRotationDetector.directThinkingTokens) : 0))
+              / 1_000_000 * geminiModel.outputCostPer1M
+        let directAgreement = CostEstimator.estimate(fileCount: 1000, model: geminiModel, enableTagging: false,
+                                                     sendPreviousImage: false, contextCharCount: 0,
+                                                     rotationMode: .agreement).rotationCost
+        check("6 a direct key's rule prices the escalated share at its OCR model's rates",
+              perCall > 0 && abs(directAgreement - 1000 * 45.0 / 476.0 * perCall) < 1e-9)
         let time = TimeEstimator.estimate(fileCount: 100, model: model, rotationMode: .llmSingle, enableTagging: false,
                                           useGateway: true, gatewayRotation: true)
         check("6 the time estimate counts the gateway's calls", time.rotationSeconds > 0)
+        // A direct OpenAI reasoning model is priced at its whole completion ceiling (no thinking budget to hold it to).
+        if let reasoning = LLMModel.openaiModels.first(where: \.supportsThinking) {
+            let openAICall = (4 * CostEstimator.estimatedRotationCandidateTokens(for: .openai) + CostEstimator.estimatedRotationPromptTokens)
+                / 1_000_000 * reasoning.inputCostPer1M
+                + (CostEstimator.estimatedRotationOutputTokens + Double(LLMRotationDetector.openAIReasoningCeiling))
+                  / 1_000_000 * reasoning.outputCostPer1M
+            let single = CostEstimator.estimate(fileCount: 1000, model: reasoning, enableTagging: false, sendPreviousImage: false,
+                                                contextCharCount: 0, rotationMode: .llmSingle).rotationCost
+            check("6 a direct OpenAI reasoning model's comparison is priced at its completion ceiling",
+                  abs(single - 1000 * openAICall) < 1e-9)
+        } else {
+            results.append("SKIP: 6 OpenAI reasoning pricing: no OpenAI model supports thinking")
+        }
+        let agent = TimeEstimator.estimate(fileCount: 100, model: geminiModel, rotationMode: .agreement, enableTagging: false,
+                                           usesLocalAgent: true)
+        let directTime = TimeEstimator.estimate(fileCount: 100, model: geminiModel, rotationMode: .agreement, enableTagging: false)
+        check("6 the Local Agent makes no rotation call, so its time adds none; a direct key's rule does",
+              agent.rotationSeconds == 0 && directTime.rotationSeconds > 0)
 
         let routerModel = OpenRouterRoute.catalog[0].model
         func openRouterCost(_ mode: RotationMode, preOCRed: Bool = false, useGateway: Bool = false) -> Double {

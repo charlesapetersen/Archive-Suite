@@ -459,14 +459,13 @@ struct SettingsSheetModel {
     }
 
     /// Whether a gain of `gap` between two routes is a tie, as the solver reads it (`SettingsSolver`): under the
-    /// stage's floor, or for segmentation a paired interval holding 0 (or under a point when the user trades one).
+    /// stage's practical floor (owner, 2026-11-24: 0.5 points for reading, 2.0 for segmentation).
     static func isTie(_ stage: SettingsRouteTable.Stage?, _ a: SettingsRouteTable.Route?, _ b: SettingsRouteTable.Route?,
                       gap: Double, answers: SettingsAnswers) -> Bool {
         switch stage?.id {
-        case "reading": return gap < SettingsSolver.readingHostedFloor
+        case "reading": return gap < SettingsSolver.readingFloor
         case "segmentation":
-            return gap < (answers.preference == .bestMeasured ? 0 : 1)
-                || SettingsSolver.segmentationPair(stage, a, b)?.tie == true
+            return gap < SettingsSolver.segmentationFloor || SettingsSolver.segmentationPair(stage, a, b)?.tie == true
         case "dating": return gap < SettingsSolver.datingTie
         default: return gap < SettingsSolver.entitiesTie
         }
@@ -540,16 +539,19 @@ struct SettingsSheetModel {
                           + "archives and has never seen yours, so the owner's figures are not a forecast for your collection.")
             if r.kindRules.contains(where: { $0.hasPrefix("manuscripts: warning") }),
                let m = r.figure("manuscripts-public") ?? stage.route("seg-qwen3.5-2b-8bit")?.figure("manuscripts-public") {
-                // Every online route measured there (seg-lincoln-cloud.md: 86.2-90.4%), shipped or lent its figures.
+                // Every online route in the app's table measured there (seg-lincoln-cloud.md: Claude Sonnet 5.5's 90.4%;
+                // the gateway's 86.2% is a bench row, W49.proc-pipeline-prune-ok 3), shipped or lent its figures.
                 let online = stage.routes.filter { [.cloud, .plan].contains($0.family) }
                     .compactMap { $0.figure("manuscripts-public") }
                 let span = online.min().map { lo in
                     let hi = online.max() ?? lo
-                    return hi - lo < 0.5 ? String(format: "%.0f%%", lo) : String(format: "%.0f to %.0f%%", lo, hi)
+                    return online.count == 1 ? String(format: "%.0f%% for the online model measured there", lo)
+                        : hi - lo < 0.5 ? String(format: "%.0f%% for the online models", lo)
+                        : String(format: "%.0f to %.0f%% for the online models", lo, hi)
                 }
                 labels.append(String(format: "On handwritten manuscripts (a published set of 19th-century letters) it put "
                                      + "%.1f%% of pages in the right document", m)
-                              + (span.map { ", against \($0) for the online models" } ?? "")
+                              + (span.map { ", against \($0)" } ?? "")
                               + ": for handwritten material, choose an online model where you can.")
             }
             if r.family == .mac {
@@ -1131,6 +1133,8 @@ struct SettingsSheetModel {
         case .scanNewspapersDocLayoutYOLO:
             return "On scanned newspapers, find the columns with DocLayout-YOLO (newspaper-ocr's route) instead of "
                 + "PP-DocLayoutV3"
+        case .numericDatesDayFirst:
+            return "Numeric dates are written day first (DD/MM/YYYY, as outside the US): 04/07/1962 is 4 July, not 7 April"
         default: return nil
         }
     }
@@ -1143,6 +1147,7 @@ struct SettingsSheetModel {
         case "entities.low_confidence_on_mac": return .lowConfidenceNames
         case "dating.local_image": return .dateLocalImage
         case "dating.image_every_document": return .dateImageEveryDocument
+        case "dating.day_first": return .numericDatesDayFirst
         case "layout.scan_newspapers_yolo": return .scanNewspapersDocLayoutYOLO
         default: return nil
         }

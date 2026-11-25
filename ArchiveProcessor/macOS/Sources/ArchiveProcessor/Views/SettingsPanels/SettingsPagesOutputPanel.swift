@@ -43,6 +43,11 @@ struct SettingsPagesOutputPanel: View {
             gatewayIsLocal: gatewayLocalModel)
     }
 
+    /// A direct Gemini, Claude or OpenAI key: rotation calls ask the run's own OCR model (owner, 2026-11-24).
+    private var asksOCRModelForRotation: Bool {
+        !useAppleVision && !useGateway && !useLocalAgent && [.gemini, .anthropic, .openai].contains(selectedProvider)
+    }
+
     var body: some View {
         Form {
             Section {
@@ -213,7 +218,7 @@ struct SettingsPagesOutputPanel: View {
                 } label: {
                     HStack {
                         Text("Detect rotation")
-                        HelpButton(text: "\(rotationMode.detail)\n\nThe local checks make no API calls. In the recommended mode, a remote gateway or OpenRouter can make one call on about 1 page in 10. LLM comparative makes one call per page alongside OCR. LLM comparative ×3 makes three calls per page and can take longer than OCR.")
+                        HelpButton(text: "\(rotationMode.detail)\n\nThe local checks make no API calls. In the recommended mode, a remote gateway, OpenRouter or a direct Gemini, Claude or OpenAI key (which asks your OCR model) can make one call on about 1 page in 10. LLM comparative makes one call per page alongside OCR. LLM comparative ×3 makes three calls per page and can take longer than OCR.")
                     }
                 }
                 .disabled(preOCRedInput)
@@ -225,7 +230,7 @@ struct SettingsPagesOutputPanel: View {
                         .font(.caption).foregroundStyle(.primary)
                         .accessibilityIdentifier("ap.settings.rotationFallback")
                 }
-                if rotationMode == .agreement, !preOCRedInput, !hasMeasuredRotation {
+                if rotationMode == .agreement, !preOCRedInput, !hasMeasuredRotation, !asksOCRModelForRotation {
                     Text("A page the two local checks disagree on is left as it is and counted in the run’s summary.")
                         .font(.caption).foregroundStyle(.primary)
                         .accessibilityIdentifier("ap.settings.rotationUnsure")
@@ -235,6 +240,11 @@ struct SettingsPagesOutputPanel: View {
                     Text("Cloud rotation checks use Gemini 3.7 Flash through OpenRouter. The run estimate includes these calls.")
                         .font(.caption).foregroundStyle(.primary)
                         .accessibilityIdentifier("ap.settings.openRouterRotation")
+                }
+                if !preOCRedInput, asksOCRModelForRotation, rotationMode == .agreement || rotationMode.orderings > 0 {
+                    Text("Cloud rotation checks ask your OCR model. The run estimate includes these calls.")
+                        .font(.caption).foregroundStyle(.primary)
+                        .accessibilityIdentifier("ap.settings.ocrModelRotation")
                 }
                 Toggle(isOn: $reviewRotation) {
                     HStack {

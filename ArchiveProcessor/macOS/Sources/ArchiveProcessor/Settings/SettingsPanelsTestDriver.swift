@@ -155,12 +155,14 @@ enum SettingsPanelsTestDriver {
 
         // 7. Advanced groups, each with its reason (levels.md §4 and §5).
         let advanced = rows.filter { $0.level == .advanced }
-        check("7 fifteen groups at Advanced", advanced.count == 15,
+        // Sixteen since the owner's 2026-11-24 call (W49.proc-pipeline-prune-ok 1) moved handwriting placement to Advanced.
+        check("7 sixteen groups at Advanced", advanced.count == 16,
               "\(advanced.count): " + advanced.map(\.id).joined(separator: ", "))
         check("7 every Advanced row says why", advanced.allSatisfy { !($0.why ?? "").isEmpty })
         check("7 no row below Advanced carries a reason", rows.filter { $0.level != .advanced }.allSatisfy { $0.why == nil })
         let expected: [(String, SettingsLevel)] = [
             (SettingsKey.lowConfidenceNames.rawValue, .advanced), (SettingsKey.dateLocalImage.rawValue, .advanced),
+            (SettingsKey.placeHandOnImage.rawValue, .advanced), (SettingsKey.numericDatesDayFirst.rawValue, .standard),
             (DefaultsKeys.ocrPostCorrection, .advanced), (DefaultsKeys.selectedThinking, .advanced), (DefaultsKeys.ocrCascadeOnDisagreement, .advanced),
             (DefaultsKeys.visionMinimumConfidence, .advanced), (DefaultsKeys.gatewayBaseURL, .advanced),
             (DefaultsKeys.localAgentBinaryPath, .advanced), (DefaultsKeys.standardImageSizeMB, .advanced),

@@ -281,10 +281,8 @@ struct ReOCRRanking: Sendable {
             let text = OCRPairMatrixGapText(g)
             return g.underFloor ? .tied(text) : (g.delta > 0 ? .ahead(text) : .behind(text))
         }
-        // No per-page scores for this pair: the solver's floors alone (0 between two routes on this Mac).
-        let bothMac = row.provider == .appleVision && lead.provider == .appleVision
-        let floor = bothMac ? 0 : (kind == .handwritten ? SettingsSolver.readingHandsFloor : SettingsSolver.readingHostedFloor)
-        if abs(leadFigure - f) < floor { return .tied(nil) }
+        // No per-page scores for this pair: the solver's practical floor alone (owner, 2026-11-24).
+        if abs(leadFigure - f) < SettingsSolver.readingFloor { return .tied(nil) }
         return f > leadFigure ? .ahead(nil) : .behind(nil)
     }
 

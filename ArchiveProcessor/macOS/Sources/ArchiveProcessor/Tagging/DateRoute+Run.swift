@@ -54,6 +54,10 @@ extension DateRoute {
 
     /// One document through the route: the trace call, then the image pass where step 2 runs (or on every document
     /// when the user turned that on, for its second-role dates). Never throws: a failed call reads as no reply.
+    static func run(_ input: Input, backend: Backend, imageEveryDocument: Bool, dayFirst: Bool) async -> Decision {
+        await DateRoute.$dayFirst.withValue(dayFirst) { await run(input, backend: backend, imageEveryDocument: imageEveryDocument) }
+    }
+
     static func run(_ input: Input, backend: Backend, imageEveryDocument: Bool) async -> Decision {
         let (raw, measured) = await trace(tracePrompt(text: input.text, near: input.near), backend: backend)
         let hasCandidate = !candidates(input.text).isEmpty
@@ -111,6 +115,10 @@ extension DateRoute {
 
     /// Apple Vision Auto Date without LLM judgment. The text rule goes first. The image supplies a quoted year
     /// before the nearest earlier document's rule pick (up to three back in order), and sends no OCR text.
+    static func runLocal(_ input: Input, dayFirst: Bool) async -> Decision {
+        await DateRoute.$dayFirst.withValue(dayFirst) { await runLocal(input) }
+    }
+
     static func runLocal(_ input: Input) async -> Decision {
         var note = imageNotNeeded
         var image: ImageReading?
@@ -162,7 +170,7 @@ extension DateRoute {
         var content: [[String: Any]] = jpegs.map {
             ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64," + $0.base64EncodedString()]]
         }
-        content.append(["type": "text", "text": imagePrompt])
+        content.append(["type": "text", "text": imagePromptForOrder])
         let body: [String: Any] = [
             "model": LocalModelRoute.qwen3VL8B4.modelID(for: server), "temperature": 0, "max_tokens": 700,
             "messages": [["role": "user", "content": content]],
@@ -243,7 +251,7 @@ extension DateRoute {
         var content: [[String: Any]] = jpegs.map {
             ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64," + $0.base64EncodedString()]]
         }
-        content.append(["type": "text", "text": imagePrompt])
+        content.append(["type": "text", "text": imagePromptForOrder])
         return await chat(content: content, gateway: gateway)
     }
 

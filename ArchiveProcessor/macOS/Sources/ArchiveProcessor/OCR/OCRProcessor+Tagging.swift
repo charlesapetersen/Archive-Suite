@@ -713,6 +713,7 @@ extension OCRProcessor {
                                         localAgent: currentLocalAgent)
         let imageEveryDocument = activeResolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
             .value.bool ?? false
+        let dayFirst = DateRoute.dayFirstSetting(activeResolvedSettings?.values)
         let cardBySegment = Dictionary(uniqueKeysWithValues: manualTagSegments.indices.map {
             (manualTagSegments[$0].segmentIndex, $0)
         })
@@ -723,8 +724,9 @@ extension OCRProcessor {
         // A document with no text can still use the opt-in local image pass.
         let task: @Sendable ((idx: Int, input: DateRoute.Input?)) async -> (Int, DateRoute.Decision?) = { w in
             guard let input = w.input else { return (w.idx, nil) }
-            if localImage { return (w.idx, await DateRoute.runLocal(input)) }
-            return (w.idx, await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument))
+            if localImage { return (w.idx, await DateRoute.runLocal(input, dayFirst: dayFirst)) }
+            return (w.idx, await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument,
+                                               dayFirst: dayFirst))
         }
 
         // Date concurrently (bounded) and apply each result on the main actor as it arrives (only filling fields
@@ -784,8 +786,10 @@ extension OCRProcessor {
            !manualTagSegments[index].dateEdited, !manualTagSegments[index].dateTextUnreadable {
             // With no usable OCR, or when Finish arrives before prefetch, the cover is still evidence.
             // Check the text rule for an own year first and make no further request.
-            var base = DateRoute.decide(text: DateRoute.ownText(segments[segment]), near: [], traceRaw: nil,
-                                       image: nil, imageNote: "not sent: no prefetched image reading")
+            var base = DateRoute.$dayFirst.withValue(DateRoute.dayFirstSetting(activeResolvedSettings?.values)) {
+                DateRoute.decide(text: DateRoute.ownText(segments[segment]), near: [], traceRaw: nil,
+                                 image: nil, imageNote: "not sent: no prefetched image reading")
+            }
             base.route = "OCR text and covering letter"
             var runsByFolder: [URL: [ContainerRun]] = [:]
             manualTagSegments[index].dateInheritance = .init(
@@ -1173,21 +1177,24 @@ extension OCRProcessor {
             let input = DateRoute.Input(text: DateRoute.ownText(segment), near: near,
                                         pages: Array(pages.prefix(DateRoute.imagePages)))
             if localImage {
-                decision = await DateRoute.runLocal(input)
+                decision = await DateRoute.runLocal(input, dayFirst: DateRoute.dayFirstSetting(activeResolvedSettings?.values))
             } else {
                 let backend = DateRoute.Backend(provider: manualSegProvider, model: model, apiKey: manualSegApiKey,
                                                 gateway: currentGateway, localAgent: currentLocalAgent)
                 let imageEveryDocument = activeResolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
                     .value.bool ?? false
+                let dayFirst = DateRoute.dayFirstSetting(activeResolvedSettings?.values)
                 // The card starts this in a SwiftUI task, outside the suspended Process Files task.
                 let denyDataCollection = OpenRouterDataPolicy.deny(activeResolvedSettings?.values)
                 if let paidRequestScope {
                     decision = await paidRequestScope.run(denyDataCollection: denyDataCollection) {
-                        await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument)
+                        await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument,
+                                            dayFirst: dayFirst)
                     }
                 } else {
                     decision = await OpenRouterDataPolicy.$denyDataCollection.withValue(denyDataCollection) {
-                        await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument)
+                        await DateRoute.run(input, backend: backend, imageEveryDocument: imageEveryDocument,
+                                            dayFirst: dayFirst)
                     }
                 }
             }
@@ -1247,7 +1254,9 @@ extension OCRProcessor {
         let folder = output.deletingLastPathComponent().standardizedFileURL
         let runs = runsByFolder[folder] ?? ContainerFileStore.load(directory: folder).document?.runs ?? []
         runsByFolder[folder] = runs
-        return ContainerFolderDate.confirmed(at: output.lastPathComponent, in: runs)
+        return ContainerFolderDate.$dayFirst.withValue(DateRoute.dayFirstSetting(activeResolvedSettings?.values)) {
+            ContainerFolderDate.confirmed(at: output.lastPathComponent, in: runs)
+        }
     }
     func performTaggingPhase(
         provider: LLMProvider,
@@ -1292,6 +1301,7 @@ extension OCRProcessor {
                                               localAgent: localAgent)
         let imageEveryDocument = activeResolvedSettings?.values[SettingsKey.dateImageEveryDocument.rawValue]?
             .value.bool ?? false
+        let dayFirst = DateRoute.dayFirstSetting(activeResolvedSettings?.values)
         let jobBySource = Dictionary(jobs.indices.map { (jobs[$0].sourceURL, $0) }, uniquingKeysWith: { first, _ in first })
         let datingInputs: [DateRoute.Input?] = (0..<total).map {
             datingInput(for: $0, in: snapshot, jobBySource: jobBySource)
@@ -1359,7 +1369,8 @@ extension OCRProcessor {
             if let failure { await MainActor.run { self.recordTaggingCallFailure(failure, segment: snapshot[i]) } }
             var dating: DateRoute.Decision? = nil
             if let input = datingInputs[i], !tags.ocrFailed, !Task.isCancelled {
-                dating = await DateRoute.run(input, backend: datingBackend, imageEveryDocument: imageEveryDocument)
+                dating = await DateRoute.run(input, backend: datingBackend, imageEveryDocument: imageEveryDocument,
+                                             dayFirst: dayFirst)
             }
             var fields: ItemFieldResult? = nil
             if let input = itemFieldInputs[i], let itemFieldRoute, !tags.ocrFailed, !Task.isCancelled {

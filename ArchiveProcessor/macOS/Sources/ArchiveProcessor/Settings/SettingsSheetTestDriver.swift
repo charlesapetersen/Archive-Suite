@@ -79,14 +79,14 @@ enum SettingsSheetTestDriver {
         check("layout detector evidence describes the benchmark and current app in both places",
               [scanRule, scanNote].allSatisfy { note in scanEvidence.allSatisfy { note.contains($0) } })
         let readingRoutes = table.stage("reading")?.routes ?? []
-        let vendorRows = readingRoutes.filter { ["azure-di-layout", "textract-layout"].contains($0.id) }
+        // Owner, 2026-11-24 (W49.proc-pipeline-prune-ok 3): the vendor measurements stay on the bench (settings-routes.json
+        // and ArchiveOCRBench), not in the app's table, so they are never Processor choices.
         check("vendor measurements remain in the benchmark without Processor choices",
-              vendorRows.count == 2 && vendorRows.allSatisfy { !$0.offered && $0.lowerScoring }
-              && !readingRoutes.contains { $0.id.contains("transkribus") })
+              !readingRoutes.contains { ["azure-di-layout", "textract-layout"].contains($0.id) || $0.id.contains("transkribus") })
         // E: placement's hand line setting visible.
         let place = free.ruleStages.first { $0.id == "placement" }
-        check("E placement: the handwriting placement switch is visible, on by default",
-              place?.switches.first?.key == .placeHandOnImage && place?.switches.first?.isOn == true)
+        check("E placement: the handwriting placement switch is visible, off by default (owner, 2026-11-24)",
+              place?.switches.first?.key == .placeHandOnImage && place?.switches.first?.isOn == false)
         check("1 straighten switch on by default", free.ruleStages.first { $0.id == "reading-copy" }?.switches.first?.isOn == true)
         let off = sheet("straighten-off", general: SettingsLayer(kind: .general, name: "General"),
                         collection: layer(.collection, [(.straightenReadingCopy, .bool(false))]))
@@ -150,7 +150,8 @@ enum SettingsSheetTestDriver {
                 check("2 the 2B's card: zero-shot, the owner's figures not a forecast",
                       s.labels.contains { $0.contains("zero-shot") && $0.contains("not a forecast") }, s.labels.joined(separator: " | "))
                 check("2 the 2B's card: the manuscript warning against the online models' range",
-                      s.labels.contains { $0.contains("35.6%") && $0.contains("86 to 90%") }, s.labels.joined(separator: " | "))
+                      s.labels.contains { $0.contains("35.6%") && $0.contains("against 90% for the online model measured there") },
+                      s.labels.joined(separator: " | "))
                 check("2 the 2B's card: checking against an online model, only where the two disagree",
                       s.labels.contains { $0.contains("Check it against") && $0.contains("disagree") })
             } else {
@@ -527,13 +528,14 @@ enum SettingsSheetTestDriver {
         kitAnswers.onlyRoutes["reading"] = ["apple-vision", "ppocrv6-kraken-blla"]
         let kitSolution = SettingsSolver(table: table, pairs: pairs, resources: agent.resources, answers: kitAnswers).solve()
         let kitWords = SettingsSheetWords(table: table, answers: kitAnswers, resources: agent.resources)
-        if kitSolution.pick("reading", "handwritten")?.routeID == "ppocrv6-kraken-blla" {
-            let charts = SettingsSheetModel.ranges(table: table, solution: kitSolution, app: kitSolution, answers: kitAnswers,
-                                                   cards: agent.cards, words: kitWords)
-            let readingKit = charts.first { $0.id == "reading" }?.kit ?? []
-            check("8 F coding agent on kraken: no handwriting fine-tune on the reading chart", readingKit.isEmpty,
-                  readingKit.map(\.id).joined(separator: ","))
-        } else { lines.append("SKIP 8 F kraken: kraken does not read the handwriting on this Mac") }
+        // kraken is a bench row the app does not run (W49.proc-pipeline-prune-ok 3), so the restricted table reads the
+        // handwriting with nothing; the chart has no after-training point all the same.
+        let kitCharts = SettingsSheetModel.ranges(table: table, solution: kitSolution, app: kitSolution, answers: kitAnswers,
+                                                  cards: agent.cards, words: kitWords)
+        let readingKit = kitCharts.first { $0.id == "reading" }?.kit ?? []
+        check("8 F coding agent, reading restricted to kraken: no handwriting fine-tune on the reading chart",
+              readingKit.isEmpty && kitSolution.pick("reading", "handwritten")?.routeID != "ppocrv6-kraken-blla",
+              readingKit.map(\.id).joined(separator: ","))
         check("8 F: the table has no handwriting fine-tune row", table.stage("training-kit")?.route("kit-hands-ppocrv6-ft") == nil)
         for (name, m) in [("free", free), ("gemini", paid), ("custom", custom), ("small", small), ("stays-on-mac", onMac),
                           ("kit-cluster", clusterKit), ("over-ceiling", over), ("overnight", night)] {
@@ -620,7 +622,7 @@ enum SettingsSheetTestDriver {
                                pages: 100, running: running, claudeBilling: .unknown)
         }
         let w = SettingsSheetWriter(store: store, folder: folder)
-        var out = w.set(key, .string("xiaomi-ocr-0-bf16"), doc: nil)
+        var out = w.set(key, .string("qwen3.5-9b-mlx4"), doc: nil)
         check("4b an override is written into the collection", out.ok && out.doc?.collection.entry(key) != nil)
         check("4b the collection's file holds it", {
             if case .document(let d) = CollectionSettingsFile.read(in: folder) { return d.collection.entry(key) != nil }

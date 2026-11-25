@@ -24,14 +24,6 @@ final class PageKindStore: ObservableObject {
     @Published var overrides: [String: Pick] = [:]
     /// The user's reader for every page of the batch; nil = by kind.
     @Published var batchOverride: Pick?
-    /// "Read handwriting on typed pages" (W46.mixed-route-setting), mirrored from its setting by the OCR view. Turning
-    /// it on has the mixed-page pre-flag read the typed and printed pages already told, when it is downloaded.
-    @Published var handwritingOnTyped = false {
-        didSet { if handwritingOnTyped, !oldValue { update(Array(told)) } }
-    }
-    /// The mixed-page pre-flag's call on each typed or printed page it read (W47.wh-mixed-preflag), by standardized
-    /// path; absent = not read (no pre-flag, the switch off when the page was told, or the read failed).
-    @Published private(set) var mixedFlags: [String: Bool] = [:]
     /// Pages still waiting to be classified.
     @Published private(set) var pending = 0
     /// Every built-in model the user has a key for, refreshed with the file list (one Keychain read per provider).
@@ -41,50 +33,17 @@ final class PageKindStore: ObservableObject {
     nonisolated(unsafe) static var classifyOverride: (@Sendable (URL) async -> PageKind?)?
     /// Test seam: replaces the Keychain for `available`. nil in production.
     nonisolated(unsafe) static var availableOverride: Set<PageKindRouting.Candidate>?
-    /// Test seam: replaces the mixed-page pre-flag (nil result = it could not read the page). nil in production.
-    nonisolated(unsafe) static var flagOverride: (@Sendable (URL) async -> Bool?)?
 
     private var worker: Task<Void, Never>?
     private var queue: [URL] = []
-    /// Every image file the list has shown, for the pre-flag to read when the switch is turned on.
-    private var told: Set<URL> = []
-
-    /// Whether the pre-flag's model is in place, checked when the list changes and when its download finishes (not
-    /// on every row render).
-    private var preflagInstalled = MixedPagePreflag.isInstalled()
-    /// Posted when the pre-flag's download installs, so the pages already in the list are read.
-    static let preflagInstalledNotification = Notification.Name("ArchiveProcessor.mixedPreflagInstalled")
-    private var installObserver: NSObjectProtocol?
-
-    init() {
-        installObserver = NotificationCenter.default.addObserver(forName: Self.preflagInstalledNotification, object: nil,
-                                                                 queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { guard let self else { return }; self.update(Array(self.told)) }
-        }
-    }
-
-    /// Whether the pre-flag reads pages now: the switch on and its model downloaded (or the test seam set).
-    private var flagging: Bool {
-        handwritingOnTyped && (Self.flagOverride != nil || preflagInstalled)
-    }
-
-    /// A told typed or printed page the pre-flag has not read yet, while it reads pages.
-    private func wantsFlag(_ url: URL) -> Bool {
-        guard flagging, mixedFlags[PageReaderPlan.key(url)] == nil,
-              let told = kind(for: url), let k = told else { return false }
-        return PageKindRouting.typedKinds.contains(k.routingKind)
-    }
 
     /// Classify the image files among `urls` that have not been classified yet, and refresh `available`. PDFs are
     /// left out: their pages are drawn to images only during the run, so they keep the run's model.
     func update(_ urls: [URL]) {
         available = Self.availableOverride ?? PageKindRouting.keyedCandidates()
-        preflagInstalled = MixedPagePreflag.isInstalled()
         let wanted = Set(urls.map(PageReaderPlan.key))
         overrides = overrides.filter { wanted.contains($0.key) }
-        told = Set(urls.filter { !Self.isPDF($0) })
-        let fresh = urls.filter { !Self.isPDF($0) && (kinds[PageReaderPlan.key($0)] == nil || wantsFlag($0))
-            && !queue.contains($0) }
+        let fresh = urls.filter { !Self.isPDF($0) && kinds[PageReaderPlan.key($0)] == nil && !queue.contains($0) }
         queue.append(contentsOf: fresh)
         pending = queue.count
         guard worker == nil, !queue.isEmpty else { return }
@@ -92,19 +51,11 @@ final class PageKindStore: ObservableObject {
             while let self, let url = self.queue.first {
                 let key = PageReaderPlan.key(url)
                 if self.kinds[key] == nil { self.kinds[key] = .some(await Self.classify(url)) }
-                // The pre-flag reads a typed or printed page once its kind is told; a failed read leaves no flag, so
-                // the switch acts on the page as it does without the pre-flag.
-                if self.wantsFlag(url), let flag = await Self.flag(url) { self.mixedFlags[key] = flag }
                 self.queue.removeFirst()
                 self.pending = self.queue.count
             }
             self?.worker = nil
         }
-    }
-
-    nonisolated private static func flag(_ url: URL) async -> Bool? {
-        if let o = flagOverride { return await o(url) }
-        return await Task.detached(priority: .utility) { try? MixedPagePreflag.read(url: url).flagged }.value
     }
 
     nonisolated private static func classify(_ url: URL) async -> PageKind? {
@@ -120,12 +71,8 @@ final class PageKindStore: ObservableObject {
     func choice(for url: URL, guidance: OCRPageGuidance?, runDefault: PageKindRouting.Candidate) -> PageKindRouting.Choice? {
         guard let told = kind(for: url) else { return nil }   // not classified yet
         return PageKindRouting.choose(kind: told, guidance: guidance, available: available, runDefault: runDefault,
-                                      override: (overrides[PageReaderPlan.key(url)] ?? batchOverride)?.resolve(runDefault),
-                                      handwritingOnTyped: handwritingOnTyped, mixedFlag: mixedFlag(for: url))
+                                      override: (overrides[PageReaderPlan.key(url)] ?? batchOverride)?.resolve(runDefault))
     }
-
-    /// The pre-flag's call on the page, while the pre-flag reads pages; nil otherwise.
-    func mixedFlag(for url: URL) -> Bool? { flagging ? mixedFlags[PageReaderPlan.key(url)] : nil }
 
     /// The run's plan: every classified image file among `urls`. A page still waiting is left out (the run's model).
     func plan(_ urls: [URL], guidance: OCRPageGuidance?, runDefault: PageKindRouting.Candidate) -> PageReaderPlan {
@@ -133,7 +80,7 @@ final class PageKindStore: ObservableObject {
         for url in urls {
             guard let told = kind(for: url), let c = choice(for: url, guidance: guidance, runDefault: runDefault)
             else { continue }
-            plan.pages[PageReaderPlan.key(url)] = .init(kind: told, choice: c, mixedFlag: mixedFlag(for: url))
+            plan.pages[PageReaderPlan.key(url)] = .init(kind: told, choice: c)
         }
         return plan
     }
@@ -170,7 +117,7 @@ struct PageKindRowLine: View {
         else { return nil }
         let name = PageKindRouting.model(.init(provider: c.provider, modelID: c.modelID))?.displayName ?? runModel.displayName
         let routed = c.reason.routes && c != runDefaultChoice(c.reason)
-        return (PageKindRouting.summary(kind: told, choice: c, modelName: name, mixedFlag: store.mixedFlag(for: url)), routed)
+        return (PageKindRouting.summary(kind: told, choice: c, modelName: name), routed)
     }
 
     private func runDefaultChoice(_ r: PageKindRouting.Reason) -> PageKindRouting.Choice {
@@ -189,7 +136,7 @@ struct PageKindRowLine: View {
     var body: some View {
         if let label {
             Menu {
-                Button("By its kind") { store.overrides[PageReaderPlan.key(url)] = nil }
+                Button("By its kind (handwriting to a handwriting reader)") { store.overrides[PageReaderPlan.key(url)] = nil }
                 Button("The run's model (now \(runModel.displayName))") { store.overrides[PageReaderPlan.key(url)] = .run }
                 Divider()
                 ForEach(store.menuCandidates, id: \.0) { cand, m in
@@ -235,7 +182,7 @@ struct PageKindBatchControl: View {
             .fixedSize()
             .accessibilityIdentifier("ap.ocr.pageKindBatch")
             // W47.settings-panels: these menus choose for this batch only and store nothing; say where the stored switch is.
-            Text("For this batch only. Choosing each page's reader by its kind is set in Settings › Reading.")
+            Text("For this batch only. Sending handwritten pages to a handwriting reader is set in Settings › Reading.")
                 .font(.caption2).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
             let routed = plan.routedCounts(runModel: runModel)

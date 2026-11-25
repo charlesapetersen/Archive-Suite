@@ -109,7 +109,8 @@ final class ImproveOCRController: ObservableObject {
         let model = ReOCRDialogModel(selectedPairs: selectedPairs, table: prepared.table, pairs: prepared.pairs,
                                      resources: prepared.resources, staysOnMac: prepared.switches.staysOnMac,
                                      trainingProtectedFiles: prepared.switches.trainingProtectedFiles,
-                                     scanDetectors: prepared.switches.scanDetectors)
+                                     scanDetectors: prepared.switches.scanDetectors,
+                                     placeHandFiles: prepared.switches.placeHandFiles)
         await model.loadFiles(files) { loadedFileCount = $0 }
         guard !Task.isCancelled else { return }
         self.model = model
@@ -119,6 +120,7 @@ final class ImproveOCRController: ObservableObject {
         var staysOnMac = false
         var trainingProtectedFiles: Set<URL> = []
         var scanDetectors: [URL: NewspaperDetector] = [:]
+        var placeHandFiles: Set<URL> = []
     }
 
     @concurrent
@@ -162,10 +164,11 @@ final class ImproveOCRController: ObservableObject {
     /// above it holding a collection's settings, resolved with its project and the general layer. Either is on when it
     /// is on for any file's collection. W47.wh-yolo-scans-reocr: `scanDetectors` is each file's own collection's choice
     /// for scanned newspapers, as Process Files and Live Capture take it from the output folder's layers.
+    /// `placeHandFiles`: each file's collection's handwriting-placement switch (W49.proc-pipeline-prune-apply).
     @concurrent
     static func collectionSwitches(for files: [URL], settings: GeneralSettingsFile) async -> CollectionSwitches {
         var switches = CollectionSwitches()
-        var byFolder: [String: (detector: NewspaperDetector, noTraining: Bool)] = [:]
+        var byFolder: [String: (detector: NewspaperDetector, noTraining: Bool, placeHand: Bool)] = [:]
         for url in files {
             if Task.isCancelled { break }
             var dir = url.deletingLastPathComponent().standardizedFileURL
@@ -179,15 +182,18 @@ final class ImproveOCRController: ObservableObject {
             if let known = byFolder[dir.path] {
                 switches.scanDetectors[url] = known.detector
                 if known.noTraining { switches.trainingProtectedFiles.insert(url) }
+                if known.placeHand { switches.placeHandFiles.insert(url) }
                 continue
             }
             let project = settings.projects.first { $0.id == doc?.projectID }
             let r = SettingsResolver(general: settings.general, project: project, collection: doc?.collection)
             let detector = NewspaperDetector.scans(r.resolveAll())
             let noTraining = r.resolve(.noTraining).value.bool == true
-            byFolder[dir.path] = (detector, noTraining)
+            let placeHand = r.resolve(.placeHandOnImage).value.bool == true
+            byFolder[dir.path] = (detector, noTraining, placeHand)
             switches.scanDetectors[url] = detector
             if noTraining { switches.trainingProtectedFiles.insert(url) }
+            if placeHand { switches.placeHandFiles.insert(url) }
             // With no collection anywhere above, the general layer answers. "Stays on this Mac" counts only where a
             // layer set it: its built-in value is the skipped interview's, which would hide every online reader from
             // a user who never answered, where the dialog offered them before.

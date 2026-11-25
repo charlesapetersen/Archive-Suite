@@ -80,6 +80,10 @@ public struct ContainerFolderDate: Equatable, Sendable {
         return (1..<m.numberOfRanges).map { m.range(at: $0).location == NSNotFound ? "" : ns.substring(with: m.range(at: $0)) }
     }
 
+    /// The collection's numeric date order for this task (the Processor's `numericDatesDayFirst`, owner 2026-11-24):
+    /// false, a numeric date is month first ("6/2/61" is June); true, day first (February). Reader and Notes keep false.
+    @TaskLocal public static var dayFirst = false
+
     /// The value read as a date, or nil when it is none of: a year ("1953"), a range ("1965-1967", "1966-70",
     /// "1939- 78", "1965 to 1967"), a decade ("1960s"), a month and year ("Feb. 1970", "February 12, 1970"), or a
     /// numeric date, month first ("6/2/61", "2/1970"; a two-digit year only with a day, so "6/12" dates nothing). As `folder_date.parse_range`, which the figures were measured
@@ -98,8 +102,11 @@ public struct ContainerFolderDate: Equatable, Sendable {
         }
         if let g = groups(decade, s), let lo = Int(g[0]) { return make(lo, lo + 9) }
         if let g = groups(year, s), let y = Int(g[0]) { return make(y, y) }
-        if let g = groups(numeric, s), let m = Int(g[0]), var y = Int(g[2]) {
+        if let g = groups(numeric, s), let a = Int(g[0]), let b = Int(g[1]), var y = Int(g[2]) {
             if g[2].count == 2 { y += 1900 }
+            // Day first, a second part that cannot be a month is the day ("2/13/61" is February), as the dating rule
+            // reads it; month first is unchanged, as `folder_date.parse_range` measured it.
+            let m = dayFirst ? ((1...12).contains(b) ? b : a) : a
             return make(y, y, (1...12).contains(m) ? m : nil)
         }
         // A month and a four-digit year only: "6/12" is a day, not June 1912.

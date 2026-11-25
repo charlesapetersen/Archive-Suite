@@ -151,10 +151,11 @@ enum TextLayerTestDriver {
                                  to: dir.appendingPathComponent("skewed-hand.pdf"))
             check("4 a page with no layer is straightened too", o4?.straightenedDegrees != nil && o4?.layer.route == .textPage)
         } else { check("4 skewed pages drawn", false) }
-        check("4 no settings: both switches on", PDFGenerator.TextLayerOptions.from([:]) == .standard)
+        check("4 no settings: placement off, straightening on (owner, 2026-11-24)", PDFGenerator.TextLayerOptions.from([:]) == .standard
+              && !PDFGenerator.TextLayerOptions.standard.placeHandOnImage && PDFGenerator.TextLayerOptions.standard.straighten)
         let offValues = [SettingsKey.straightenReadingCopy.rawValue: ResolvedSetting(value: .bool(false), layer: .collection)]
         check("4 a collection's straighten off is read", PDFGenerator.TextLayerOptions.from(offValues).straighten == false
-              && PDFGenerator.TextLayerOptions.from(offValues).placeHandOnImage)
+              && !PDFGenerator.TextLayerOptions.from(offValues).placeHandOnImage)
         check("4 straightening is no longer pending on the sheet", !SettingsSheetModel.switchPending.contains(.straightenReadingCopy))
 
         // 3. No layer: the rule says so, or none was asked for.
@@ -533,7 +534,8 @@ enum TextLayerTestDriver {
                         ResolvedSetting(value: .strings(["jpeg/typewritten"]), layer: .collection)]
         check("7 the setting is read from a run's settings",
               PDFGenerator.TextLayerOptions.from(values).searchableFor == ["jpeg/typewritten"])
-        let options = PDFGenerator.TextLayerOptions(searchableFor: ["jpeg/typewritten", "jpeg/handwritten", "jpeg/printed"])
+        let options = PDFGenerator.TextLayerOptions(placeHandOnImage: true,
+                                                    searchableFor: ["jpeg/typewritten", "jpeg/handwritten", "jpeg/printed"])
         let model = LLMModel.appleVisionModels[0]
         func write(_ text: String, kind: OCRPageKind?, name: String, to out: URL,
                    classification: DocumentClassification? = nil) async -> PDFGenerator.Output? {

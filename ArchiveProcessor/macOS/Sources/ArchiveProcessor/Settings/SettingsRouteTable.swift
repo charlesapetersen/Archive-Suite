@@ -43,7 +43,9 @@ enum JSONValue: Decodable, Equatable, Sendable {
 /// schema is `execution-plans/processing-review/13-stage-rules/00-index.md` §"The table schema".
 struct SettingsRouteTable: Decodable, Sendable {
     static let supportedVersions: Set<Int> = [1]
-    static let resourceName = "settings-routes"
+    /// The app's copy (`settings_routes.py` `APP_OUT`): only the rows the Processor can run or use; every measured row
+    /// stays in `settings-routes.json` and on ArchiveOCRBench (owner, 2026-11-24, W49.proc-pipeline-prune-ok 3).
+    static let resourceName = "settings-routes-app"
 
     let version: Int
     let built: String

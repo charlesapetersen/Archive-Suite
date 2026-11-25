@@ -360,7 +360,7 @@ Each is a table default or a filed item, reversible without app work; the figure
 
 ## 3. Pipeline pruning & simplification (`W49.proc-pipeline-prune-ok`, owner 2026-11-24)
 
-Walked interactively against `execution-plans/processor-pipeline-prune.md`; applied by `W49.proc-pipeline-prune-apply`:
+Walked interactively against the decision pack `execution-plans/processor-pipeline-prune.md` (deleted when `W49.proc-pipeline-prune-apply` shipped, 2026-11-25; git keeps it); applied by `W49.proc-pipeline-prune-apply`:
 1. **Handwriting text placement (`hand-blla-ctc`):** Option B — keep as an opt-in Advanced on-demand download, **default OFF** (clean text page is default in 1.0).
 2. **Per-kind OCR routing & mixed-page switch:** Option A1 — simplify to one clean **2-way split (Typed/Printed vs. Handwriting)** for both Mac and Cloud cost-saving; drop the 4-way per-kind matrix; defer the mixed-page switch to 2.0 (`W46.kinds-mixed-truth`).
 3. **Unwired (`app_route: null`) routes:** Option A — bundle only runnable/supported app routes in the app's runtime `settings-routes.json`; keep all 119 rows on ArchiveOCRBench.

@@ -11,12 +11,9 @@ import CoreGraphics
 /// unsupported (the caller then falls back to local Vision).
 enum LLMRotationDetector {
 
-    /// Cheap, fast Gemini model used for rotation regardless of the OCR model.
-    static let cheapGeminiModel = "gemini-2.5-flash-lite"
-    /// Cheap OpenAI model used for rotation regardless of the OCR model. GPT-5.4 mini supports reasoning,
-    /// but defaults to `none`; this path pins that effort and bounds total completion tokens. Verified
-    /// against OpenAI's live model docs 2026-09-26: https://developers.openai.com/api/docs/models/gpt-5.4-mini
-    static let cheapOpenAIModel = "gpt-5.4-mini"
+    // A direct Gemini, Claude or OpenAI key asks the run's own OCR model (owner, 2026-11-24,
+    // W49.proc-pipeline-prune-ok 6): the separate, never-measured direct-key list (gemini-2.5-flash-lite,
+    // gpt-5.4-mini, claude-sonnet-4-6) is retired with W46.rotation-direct-keys.
     /// The model a remote gateway is asked for rotation, whatever its OCR model: the one W46.rotation-routes
     /// measured (Gemini 3.7 Flash through the Stanford gateway, temperature 0, minimal reasoning), so a gateway
     /// run's rotation is the measured route (W46.rotation-default, P9-3). A gateway without it answers an error,
@@ -52,11 +49,20 @@ enum LLMRotationDetector {
     }
 
     /// The agreement rule can ask the model W46.rotation-routes measured on the gateway.
-    /// OpenRouter uses that same model. The other direct keys use different rotation models.
+    /// OpenRouter uses that same model. The other direct keys ask the run's own OCR model, which is not measured.
     static func hasMeasuredRoute(provider: LLMProvider, usesGateway: Bool, usesLocalAgent: Bool,
                                  gatewayIsLocal: Bool) -> Bool {
         guard !usesLocalAgent else { return false }
         return usesGateway ? !gatewayIsLocal : provider == .openrouter
+    }
+
+    /// Whether the agreement rule's disagreement call is made: the measured route, or a direct key's own OCR model.
+    static func agreementEscalates(provider: LLMProvider, usesGateway: Bool, usesLocalAgent: Bool,
+                                   gatewayIsLocal: Bool, ocrModel: LLMModel?) -> Bool {
+        if hasMeasuredRoute(provider: provider, usesGateway: usesGateway, usesLocalAgent: usesLocalAgent,
+                            gatewayIsLocal: gatewayIsLocal) { return true }
+        return hasRoute(provider: provider, usesGateway: usesGateway, usesLocalAgent: usesLocalAgent,
+                        gatewayIsLocal: gatewayIsLocal) && ocrModel?.provider == provider
     }
 
     /// Whether a run in `mode` sends rotation calls to the gateway's model, as `OCRProcessor.detectRotation` decides:
@@ -70,10 +76,13 @@ enum LLMRotationDetector {
         provider: LLMProvider,
         apiKey: String,
         orderings: Int,
-        gatewayConfig: GatewayConfig?
+        gatewayConfig: GatewayConfig?,
+        ocrModel: LLMModel? = nil
     ) async -> Int? {
         guard hasRoute(provider: provider, usesGateway: gatewayConfig != nil, usesLocalAgent: false,
                        gatewayIsLocal: gatewayConfig?.isLocalModel == true) else { return nil }
+        // A direct key asks the run's OCR model, so without that model (or with another provider's) there is no call.
+        if gatewayConfig == nil, provider != .openrouter, ocrModel?.provider != provider { return nil }
 
         guard let candidates = renderCandidates(imageURL: imageURL) else { return nil }
 
@@ -81,7 +90,7 @@ enum LLMRotationDetector {
         var votes: [Int] = []
         for order in orderList {
             if let correction = await ask(order: order, candidates: candidates, provider: provider, apiKey: apiKey,
-                                          gateway: gatewayConfig) {
+                                          gateway: gatewayConfig, ocrModel: ocrModel) {
                 votes.append(correction)
             }
         }
@@ -102,7 +111,7 @@ enum LLMRotationDetector {
     // MARK: - One comparative call
 
     private static func ask(order: [Int], candidates: [Int: String], provider: LLMProvider, apiKey: String,
-                            gateway: GatewayConfig?) async -> Int? {
+                            gateway: GatewayConfig?, ocrModel: LLMModel?) async -> Int? {
         let labels = ["A", "B", "C", "D"]
         let images: [(label: String, base64: String)] = order.enumerated().compactMap { (i, corr) in
             guard let b64 = candidates[corr] else { return nil }
@@ -113,14 +122,17 @@ enum LLMRotationDetector {
         let letter: String?
         if let gateway {
             letter = await askGateway(images: images, gateway: gateway)
-        } else {
+        } else if provider == .openrouter {
+            letter = await askOpenRouter(images: images, apiKey: apiKey)
+        } else if let ocrModel, ocrModel.provider == provider {
             switch provider {
-            case .gemini: letter = await askGemini(images: images, apiKey: apiKey)
-            case .anthropic: letter = await askAnthropic(images: images, apiKey: apiKey)
-            case .openai: letter = await askOpenAI(images: images, apiKey: apiKey)
-            case .openrouter: letter = await askOpenRouter(images: images, apiKey: apiKey)
-            case .mistral, .appleVision: letter = nil
+            case .gemini: letter = await askGemini(images: images, apiKey: apiKey, model: ocrModel)
+            case .anthropic: letter = await askAnthropic(images: images, apiKey: apiKey, modelID: ocrModel.id)
+            case .openai: letter = await askOpenAI(images: images, apiKey: apiKey, model: ocrModel)
+            case .openrouter, .mistral, .appleVision: letter = nil
             }
+        } else {
+            letter = nil
         }
         guard let label = letter.flatMap(parseLabel), let idx = labels.firstIndex(of: label) else { return nil }
         return order[idx]
@@ -136,17 +148,28 @@ enum LLMRotationDetector {
         return ["A", "B", "C", "D"].contains(t) ? t : nil
     }
 
-    private static func askGemini(images: [(label: String, base64: String)], apiKey: String) async -> String? {
+    /// Thinking tokens a direct key's thinking model may spend on one comparison: the classification budget at Low,
+    /// what `GeminiClient` sends for a Low classification, and what the estimate allows for each such call.
+    static let directThinkingTokens = ThinkingLevel.low.budgetTokens(for: .classification)
+    /// An OpenAI reasoning model's completion ceiling for one comparison: room to think at low effort before its letter.
+    /// OpenAI takes no thinking budget, so the estimate prices the whole ceiling.
+    static let openAIReasoningCeiling = 2048
+
+    private static func askGemini(images: [(label: String, base64: String)], apiKey: String,
+                                  model: LLMModel) async -> String? {
         var parts: [[String: Any]] = [["text": prompt]]
         for img in images {
             parts.append(["text": "\nImage \(img.label):"])
             parts.append(["inlineData": ["mimeType": "image/jpeg", "data": img.base64]])
         }
+        // The run's OCR model; a thinking model is held to the Low classification budget, as the OCR client sends it.
+        var generation: [String: Any] = ["temperature": 0]
+        if model.supportsThinking { generation["thinkingConfig"] = ["thinkingBudget": directThinkingTokens] }
         let body: [String: Any] = [
             "contents": [["parts": parts]],
-            "generationConfig": ["temperature": 0]
+            "generationConfig": generation
         ]
-        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/\(cheapGeminiModel):generateContent?key=\(apiKey)"
+        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/\(model.id):generateContent?key=\(apiKey)"
         guard let url = URL(string: urlString),
               let data = try? JSONSerialization.data(withJSONObject: body) else { return nil }
         var request = URLRequest(url: url, timeoutInterval: 90)
@@ -162,14 +185,15 @@ enum LLMRotationDetector {
         return parts.compactMap { $0["text"] as? String }.joined().trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private static func askAnthropic(images: [(label: String, base64: String)], apiKey: String) async -> String? {
+    private static func askAnthropic(images: [(label: String, base64: String)], apiKey: String,
+                                     modelID: String) async -> String? {
         var content: [[String: Any]] = [["type": "text", "text": prompt]]
         for img in images {
             content.append(["type": "text", "text": "\nImage \(img.label):"])
             content.append(["type": "image", "source": ["type": "base64", "media_type": "image/jpeg", "data": img.base64]])
         }
         let body: [String: Any] = [
-            "model": "claude-sonnet-4-6",
+            "model": modelID,
             "max_tokens": 8,
             "messages": [["role": "user", "content": content]]
         ]
@@ -256,21 +280,24 @@ enum LLMRotationDetector {
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private static func askOpenAI(images: [(label: String, base64: String)], apiKey: String) async -> String? {
+    private static func askOpenAI(images: [(label: String, base64: String)], apiKey: String,
+                                  model: LLMModel) async -> String? {
         var content: [[String: Any]] = [["type": "text", "text": prompt]]
         for img in images {
             content.append(["type": "text", "text": "\nImage \(img.label):"])
             content.append(["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(img.base64)"]])
         }
-        // Keep rotation cheap and deterministic: effort `none`, an eight-token total completion ceiling,
-        // and temperature zero. OpenAI's current API accepts temperature at effort `none`.
-        let body: [String: Any] = [
-            "model": cheapOpenAIModel,
-            "max_completion_tokens": 8,
-            "reasoning_effort": "none",
-            "temperature": 0,
-            "messages": [["role": "user", "content": content]]
-        ]
+        // The run's OCR model, with the parameters its family takes (as `OpenAICompatibleClient.openAI`): a
+        // reasoning model gets `max_completion_tokens` with room to think before its letter and low effort; any
+        // other model an eight-token ceiling at temperature zero.
+        var body: [String: Any] = ["model": model.id, "messages": [["role": "user", "content": content]]]
+        if model.supportsThinking {
+            body["max_completion_tokens"] = openAIReasoningCeiling
+            body["reasoning_effort"] = ThinkingLevel.low.openAIReasoningEffort
+        } else {
+            body["max_tokens"] = 8
+            body["temperature"] = 0
+        }
         guard let url = URL(string: "\(OpenAICompatibleClient.openAIBaseURL)/chat/completions"),
               let data = try? JSONSerialization.data(withJSONObject: body) else { return nil }
         var request = URLRequest(url: url, timeoutInterval: 90)

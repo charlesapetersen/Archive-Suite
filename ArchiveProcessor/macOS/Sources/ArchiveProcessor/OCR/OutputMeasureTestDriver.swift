@@ -53,7 +53,8 @@ enum OutputMeasureTestDriver {
         }
         let model = LLMModel.appleVisionModels[0]
         let forms: [(name: String, options: PDFGenerator.TextLayerOptions?)] = [
-            ("layer", .standard), ("layer-unstraightened", .init(placeHandOnImage: true, straighten: false)), ("plain", nil),
+            ("layer", .init(placeHandOnImage: true)), ("layer-unstraightened", .init(placeHandOnImage: true, straighten: false)),
+            ("plain", nil),
             ("searchable", .init(searchableFor: ["*/*"])),
         ]
         lines.append("MEASURE\tinput\tform\tbytes\tseconds\tlayer\tlines\tstraightened\tinput bytes")

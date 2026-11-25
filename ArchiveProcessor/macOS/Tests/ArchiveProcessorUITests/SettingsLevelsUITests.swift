@@ -143,24 +143,18 @@ final class SettingsLevelsUITests: XCTestCase {
                hidden: ["ap.settings.level.why.cli-fields"], level: "Standard")
     }
 
-    func testHandwritingSwitchHelpShowsEligibleReplay() throws {
+    /// Owner, 2026-11-24 (W49.proc-pipeline-prune-ok 2): routing by kind is the two-way split, and "Read handwriting on
+    /// typed pages" with its pre-flag download is gone until 2.0.
+    func testPageKindRoutingIsTheTwoWaySplit() throws {
         guard let settings = launch(["-settingsLevel", "advanced", "-ocrPageKindRouting", "YES",
                                      "-useGateway", "NO", "-useLocalAgent", "NO", "-useAppleVision", "NO"]) else { return }
         XCTAssertTrue(app.showSettingsPanel("Reading"))
-        let help = settings.buttons["ap.settings.handwritingOnTyped.help"]
-        XCTAssertTrue(help.waitForExistence(timeout: 5))
-        let form = settings.scrollViews.firstMatch
-        for _ in 0..<15 where !form.frame.contains(help.frame) {
-            form.scroll(byDeltaX: 0, deltaY: -110)
-        }
-        XCTAssertTrue(form.frame.contains(help.frame))
-        help.click()
-        let explanation = settings.popovers.firstMatch.staticTexts.firstMatch
-        XCTAssertTrue(explanation.waitForExistence(timeout: 5))
-        let text = try XCTUnwrap(explanation.value as? String)
-        XCTAssertTrue(text.contains("412 were eligible and flagged"))
-        XCTAssertTrue(text.contains("12% to 95%"))
-        shoot(XCUIScreen.main.screenshot(), "settings-handwriting-switch-help")
+        let routing = settings.descendants(matching: .any)["ap.settings.pageKindRouting"]
+        XCTAssertTrue(routing.waitForExistence(timeout: 5))
+        XCTAssertFalse(settings.descendants(matching: .any)["ap.settings.handwritingOnTyped"].exists)
+        XCTAssertFalse(settings.buttons["ap.settings.handwritingOnTyped.help"].exists)
+        XCTAssertFalse(settings.descendants(matching: .any)["ap.settings.mixedPreflagDownload"].exists)
+        shoot(XCUIScreen.main.screenshot(), "settings-page-kind-two-way")
     }
 
     func testAdvancedShowsTheControlsAndTheirReasons() throws {

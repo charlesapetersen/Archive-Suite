@@ -26,7 +26,6 @@ struct SettingsReadingPanel: View {
     @AppStorage(DefaultsKeys.ocrCascadeRoute) private var ocrCascadeRoute: String = ""
     @AppStorage(DefaultsKeys.ocrCascadeOnDisagreement) private var ocrCascadeOnDisagreement: Bool = false
     @AppStorage(DefaultsKeys.ocrPageKindRouting) private var ocrPageKindRouting: Bool = false
-    @AppStorage(DefaultsKeys.ocrHandwritingOnTyped) private var ocrHandwritingOnTyped: Bool = true
     @AppStorage(DefaultsKeys.batchMode) private var batchMode: Bool = false
     @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
     @AppStorage(DefaultsKeys.outputDirectory) private var outputPath: String = ""
@@ -203,7 +202,7 @@ struct SettingsReadingPanel: View {
     private var backendRows: [SettingsLevels.Row] {
         if useGateway { return [.backend, .gatewayLocal, .gatewayFields] }
         if useLocalAgent || useAppleVision { return [.backend] }
-        var rows: [SettingsLevels.Row] = [.backend, .providerModel, .cascade, .pageKind, .handwritingOnTyped]
+        var rows: [SettingsLevels.Row] = [.backend, .providerModel, .cascade, .pageKind]
         if unavailableOpenRouterSelection == nil, selectedModel.supportsThinking { rows.append(.thinking) }
         if OCRCascade(routeID: ocrCascadeRoute).escalationModel != nil { rows.append(.cascadeDisagreement) }
         return rows
@@ -373,41 +372,18 @@ struct SettingsReadingPanel: View {
         }
     }
 
-    /// W41.app-page-kind — tell each page's kind on this Mac and preselect its reader from the bench's guidance (`OCRPageGuidance`). Off by default.
+    /// W41.app-page-kind — tell each page's kind on this Mac, and send handwritten pages to the best measured handwriting
+    /// reader you can run (`OCRPageGuidance`): the two-way split (owner, 2026-11-24, W49.proc-pipeline-prune-ok 2).
+    /// Off by default.
     @ViewBuilder private var pageKindControls: some View {
         Toggle(isOn: $ocrPageKindRouting) {
             HStack {
-                Text("Choose each page's reader by its kind")
-                HelpButton(text: "Before a run, this Mac tells each dropped photo's kind (handwritten, typewritten, printed, or a form or table) with Apple Vision, free, and the file list preselects the best measured model for that kind that you have a key for (the settings sheet’s reading card shows the figures). A page whose kind it is not sure of, or whose pick you have no key for, keeps the model above. You can change the reader for one page, or for the whole batch, in the file list, and the cost estimate follows. On the owner's bench pages it told the kind right on 137 of 141 (about 0.6 s a page), and routing by its calls read 1 NES point below choosing by the true kinds. Each page records its kind and the model that read it. Not for batch runs, the gateway, the Local Agent or Apple Vision, and PDFs keep the model above. Needs macOS 26.")
+                Text("Send handwritten pages to a handwriting reader")
+                HelpButton(text: "Before a run, this Mac tells each dropped photo's kind with Apple Vision, free (about 0.6 s a page; right on 137 of the owner's 141 bench pages). Typed, printed and form pages keep the model above; a handwritten page goes to the best measured handwriting reader you have a key or a download for (the settings sheet’s reading card shows the figures), so a cheap or local reader can take the typed pages and a stronger one the handwriting. A page whose kind it is not sure of, or with no handwriting reader you can run, keeps the model above. You can change the reader for one page, or for the whole batch, in the file list, and the cost estimate follows. Each page records its kind and the model that read it. Not for batch runs, the gateway, the Local Agent or Apple Vision, and PDFs keep the model above. Needs macOS 26.")
             }
         }
         .accessibilityIdentifier("ap.settings.pageKindRouting")
         .settingsLevel(.pageKind)
-        // W46.mixed-route-setting: one switch on every typed or printed page; on by default, with or without the
-        // pre-flag (W47.wh-mixed-preflag-default, owner call 24, replacing call 3's off).
-        Toggle(isOn: $ocrHandwritingOnTyped) {
-            HStack {
-                Text("Read handwriting on typed pages (signatures, dates, notes in the margin)")
-                HelpButton(text: """
-                With “Choose each page's reader by its kind” on, a handwriting reader can take over a confidently classified typed or printed page. Your reader choice for a page or the whole file list takes priority.
-
-                With the mixed-page pre-flag installed, a page it checks and leaves unflagged keeps its usual reader. If the pre-flag is missing or could not check the page, the switch can still send it to the handwriting reader.
-
-                In a replay of 2,000 bench pages, 412 were eligible and flagged. The owner’s checks estimate that 72% of those had handwriting on typed or printed text, including signatures. The unchecked pages give a wide possible range of 12% to 95%. Actual reader choices depend on your settings and available readers.
-
-                On the two mixed pages tested, handwriting readers read the typed text worse than Apple Vision. Hosted handwriting reading took about 9–22 seconds and cost $0.002–0.004 per page on the bench. The Mac handwriting reader took about 25 seconds per typed page on an M3 Pro with 18 GB. The switch is on by default.
-                """)
-                .accessibilityIdentifier("ap.settings.handwritingOnTyped.help")
-            }
-        }
-        .disabled(!ocrPageKindRouting)
-        .padding(.leading, 18)
-        .accessibilityIdentifier("ap.settings.handwritingOnTyped")
-        .settingsLevel(.handwritingOnTyped)
-        // W47.wh-mixed-preflag: ATRIUM as the switch's pre-flag, an optional download with its licence (calls 12, 15).
-        MixedPagePreflagDownloadRow()
-            .padding(.leading, 36)
-            .settingsLevel(.downloads)
     }
 
     /// The key field's current value for a provider (loaded from the Keychain once, with the fields above).

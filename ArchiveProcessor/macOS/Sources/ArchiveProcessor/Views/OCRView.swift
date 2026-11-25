@@ -113,7 +113,6 @@ struct OCRView: View {
     @AppStorage(DefaultsKeys.ocrCascadeRoute) private var ocrCascadeRoute: String = ""
     @AppStorage(DefaultsKeys.ocrCascadeOnDisagreement) private var ocrCascadeOnDisagreement: Bool = false
     @AppStorage(DefaultsKeys.ocrPageKindRouting) private var ocrPageKindRouting: Bool = false
-    @AppStorage(DefaultsKeys.ocrHandwritingOnTyped) private var ocrHandwritingOnTyped: Bool = true
     /// W41.app-page-kind — each dropped image's kind and the reader it chose.
     @StateObject private var pageKinds = PageKindStore()
     /// W41.app-institutional-compute — the institutional-computing bulk folder the next run takes text from; chosen per run.
@@ -434,7 +433,7 @@ struct OCRView: View {
             preOCRedInput: preOCRedInput, useGateway: useGateway || useAppleVision, ocrWorkers: ocrWorkerCount,
             localSecondsPerPage: currentGatewayConfig.flatMap {
                 $0.isLocalModel ? LocalModelRoute.secondsPerPage(modelID: $0.modelID) : nil },
-            gatewayRotation: gatewayRotation)
+            gatewayRotation: gatewayRotation, usesLocalAgent: useLocalAgent)
     }
 
     /// The run's rotation calls go to the remote gateway's model (W46.rotation-default), as `detectRotation` decides.
@@ -536,7 +535,6 @@ struct OCRView: View {
         .onChange(of: pageKindsActive) { _, active in
             if active { pageKinds.update(droppedFiles) }
         }
-        .onChange(of: ocrHandwritingOnTyped, initial: true) { _, on in pageKinds.handwritingOnTyped = on }
         .onChange(of: processor.stagedCaptureFiles) { _, staged in
             guard !staged.isEmpty else { return }
             // Live Capture handed off pre-grouped photos → load them as the input files.

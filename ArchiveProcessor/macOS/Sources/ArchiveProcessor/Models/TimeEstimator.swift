@@ -68,7 +68,8 @@ struct TimeEstimator {
         useGateway: Bool = false,
         ocrWorkers: Int = 4,
         localSecondsPerPage: Double? = nil,
-        gatewayRotation: Bool = false
+        gatewayRotation: Bool = false,
+        usesLocalAgent: Bool = false
     ) -> TimeEstimate {
         let n = Double(fileCount)
         let speed = speedFactor(for: model)
@@ -92,12 +93,13 @@ struct TimeEstimator {
 
         // Rotation — concurrent with each page's OCR (per image: `orderings` sequential comparisons).
         var rotation = 0.0
-        let rotCalls = rotationMode.orderings
+        let llmRotation = rotationMode != .off && rotationMode != .localVision
         if !preOCRedInput, gatewayRotation || (!useGateway && model.provider == .openrouter) {
             rotation = ceil(n / w) * CostEstimator.gemini37RotationCalls(rotationMode) * gemini37RotationAskSeconds
-        } else if rotCalls > 0, !preOCRedInput, !useGateway, CostEstimator.rotationModelCost(for: model.provider) != nil {
-            let rotSpeed = model.provider == .anthropic ? 1.6 : 1.0   // gemini rotation uses flash-lite
-            rotation = ceil(n / w) * Double(rotCalls) * (rotationAskSeconds * rotSpeed)
+        } else if llmRotation, !preOCRedInput, !useGateway, !usesLocalAgent, CostEstimator.rotationModelCost(for: model) != nil {
+            // A direct key asks the run's own OCR model, which is not timed: the one comparison's measured seconds. The
+            // Local Agent makes no rotation call (`LLMRotationDetector.hasRoute`).
+            rotation = ceil(n / w) * CostEstimator.gemini37RotationCalls(rotationMode) * rotationAskSeconds
         }
 
         // Tagging (text → JSON), 6-wide, ~1 call per 3 files.

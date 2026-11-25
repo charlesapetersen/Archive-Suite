@@ -98,7 +98,7 @@ struct ReOCRJob {
     /// Kind by the same index (absent: the header's own).
     /// `pageModels` names, by text page, the model a page's reader is (for its header) when it is not `model`.
     func start(file: URL, root: Root, textPages: Set<Int>? = nil, kinds: [Int: OCRPageKind] = [:], model: LLMModel,
-               pageModels: [Int: LLMModel] = [:],
+               pageModels: [Int: LLMModel] = [:], placeHandOnImage: Bool = false,
                gatewayDisplayName: String? = nil, localAgentDisplayName: String? = nil, localAgentModelName: String? = nil,
                read: Reader) async throws -> Review {
         try flags.checkSuitable()
@@ -168,7 +168,7 @@ struct ReOCRJob {
                     let hasLayer = existingLayers.contains(pair.imageIndex)
                     let layoutKind = TextLayerRule.kind(explicit: kind, result: reading)
                     let placementKind = TextLayerRule.placementKind(layoutKind, result: reading)
-                    let placement = TextLayerRule.decide(kind: placementKind, reading: text, placeHandOnImage: true,
+                    let placement = TextLayerRule.decide(kind: placementKind, reading: text, placeHandOnImage: placeHandOnImage,
                                                          handPlacerInstalled: HandPlacer.isInstalled())
                     layers[pair.imageIndex] = try await ReOCRLayer.make(from: original, pageIndex: pair.imageIndex,
                                                                        reading: text, required: pair.isSearchable || hasLayer,

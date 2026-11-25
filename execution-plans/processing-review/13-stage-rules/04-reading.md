@@ -32,7 +32,10 @@ because a failed page then goes on to another reader; with no fallback a failed 
 solver ranks on strict NES [I, from the owner's framing of 2026-10-15 in `difficulty.md` and the OCR-2 fix]. Per kind
 the bench has strict figures only (`charts.<kind>`), and the hand figure is `ocr-hands-rescore.md`'s "after" column.
 
-**Tie rule.** A gap is a tie only when the paired gap is under twice the larger rerun range of the two routes
+**Tie rule (owner, 2026-11-24, `W49.proc-pipeline-prune-ok` 4; `14-owner-calls.md` §3).** A gap is a tie only when
+it is under the practical floor of 0.5 NES points, for cloud, plan, cluster and Mac routes alike, every kind and both
+sets; the paired 95% interval is shown and makes no tie (`ocr-pair-matrix.json` `under_floor`, re-applied by
+`ocr_pair_matrix.py --retie`). The rest of this paragraph is the rule it replaced. **Former tie rule.** A gap is a tie only when the paired gap is under twice the larger rerun range of the two routes
 (`ocr-rerun-noise.md`, "The tie rule"); the paired 95% interval is shown beside the figure but makes no tie (the
 owner, walkthrough 2026-11-11, W46.pairs-redecide-owner-ok: floor only, as `12-settings-design.md` §3.3 reads). Floors, each already twice a measured range: a hosted
 route 0.49 points (twice Gemini 3.7 Flash's rerun range of 0.24, lent to every hosted route without its own rerun); a

@@ -25,6 +25,13 @@ final class ContainerFolderDateTests: XCTestCase {
         XCTAssertEqual(parsed("10/11/1904"), [1904, 1904, 10])
         XCTAssertEqual(parsed("6/2/61"), [1961, 1961, 6])
         XCTAssertEqual(parsed("13/2/61"), [1961, 1961, nil], "no 13th month")
+        // A collection whose numeric dates are day first (the Processor's numericDatesDayFirst, owner 2026-11-24).
+        ContainerFolderDate.$dayFirst.withValue(true) {
+            XCTAssertEqual(parsed("6/2/61"), [1961, 1961, 2], "day first: 6 February")
+            XCTAssertEqual(parsed("13/2/61"), [1961, 1961, 2], "day first: the 13th of February")
+            XCTAssertEqual(parsed("2/13/61"), [1961, 1961, 2], "day first: a second part over 12 is the day")
+            XCTAssertEqual(parsed("2/1970"), [1970, 1970, 2], "a month and year is unchanged")
+        }
     }
 
     func testAnythingElseDatesNothing() {

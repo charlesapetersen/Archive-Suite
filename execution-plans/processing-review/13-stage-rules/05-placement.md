@@ -10,7 +10,8 @@ handwriting the owner's switch decides between the placed layer (with a per-page
 
 No route choice for the user. The routes below are rules the solver applies by kind; the one switch is
 `place.hand_on_image`, label "Place handwritten text on the page image (pages the aligner is unsure of get a text
-page)", default on. The owner's 2026-10-20 decision prefers text placed on the image unless a text page is necessary
+page)", default off since the owner's 2026-11-24 call (`W49.proc-pipeline-prune-ok` 1: an opt-in Advanced setting
+with an on-demand download; the clean text page is the 1.0 default). Before it, the owner's 2026-10-20 decision prefers text placed on the image unless a text page is necessary
 (`00-plan.md`), and the measured hand route passes 42.9% of owner hand lines where a text page passes none on the image
 [M] (`place-hands-lines.md`, non-drafter Qwen3.6-27B reading). Off gives every handwritten page a text page only.
 
@@ -63,7 +64,7 @@ not a level, so the field is kept and the schema needs it or the level.
  "metric":{"id":"line_pass_strict","label":"strict line pass rate, PDFKit drag","higher_is_better":true},
  "kinds":["typewritten","printed","handwritten"],
  "rules":[{"id":"place-print-aligned","text":"Print: Vision's line geometry with the reader's words aligned onto it, one run per line.","source":"place-print.md §Verdict","switch":null},
-  {"id":"place-hands","text":"Handwriting keeps a text page. The image also gets a layer when the reading keeps at least 70% of the detected lines and the ordered alignment confidence is 0.9 or more, with all words kept in order.","source":"place-hands-lines.md §Verdict","switch":{"id":"place.hand_on_image","label":"Also place handwritten text on the page image where the aligner is sure (every hand page keeps a text page)","default":true}},
+  {"id":"place-hands","text":"Handwriting keeps a text page. The image also gets a layer when the reading keeps at least 70% of the detected lines and the ordered alignment confidence is 0.9 or more, with all words kept in order.","source":"place-hands-lines.md §Verdict","switch":{"id":"place.hand_on_image","label":"Also place handwritten text on the page image where the aligner is sure (every hand page keeps a text page)","default":false}},
   {"id":"place-text-only-scripts","text":"Text page only for RTL scripts, CJK and Thai, model-normalised readings and mark transcripts.","source":"F-placement.md §6","switch":null}],
  "fallback":"text-page"}
 ```
@@ -216,7 +217,8 @@ Switch off, every profile: `text-page` on handwritten pages. A page in an RTL or
 ## Owner's calls (2026-11-06)
 
 From `14-owner-calls.md` §1 call 6 and §2 "Placement". Section 3's rule and the stage object carry them.
-- Aligned lines on handwriting, switch `place.hand_on_image` default on (call 1).
+- Aligned lines on handwriting, switch `place.hand_on_image` default on (call 1). Superseded 2026-11-24: default off,
+  Advanced, on-demand download (`W49.proc-pipeline-prune-ok` 1).
 - The gate stays at 0.67, as filed (call 1, option a).
 - The hand line detector is a visible setting on the cluster profile only (call 3); its peak memory and alignment
   time are measured by W46.place-hands-cost before any 16 GB claim is made (measured 2026-11-12: it fits 16 GB by the

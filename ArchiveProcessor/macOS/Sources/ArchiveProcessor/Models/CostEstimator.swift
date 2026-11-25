@@ -145,14 +145,12 @@ struct CostEstimator {
         default: return 600
         }
     }
-    /// (inputCostPer1M, outputCostPer1M) of the fixed model used for rotation, or nil if rotation
-    /// is free/unavailable for this provider.
-    static func rotationModelCost(for provider: LLMProvider) -> (Double, Double)? {
-        switch provider {
-        case .gemini: return (0.0375, 0.15)     // gemini-2.5-flash-lite
-        case .anthropic: return (3.0, 15.0)     // claude-sonnet-4-6
+    /// (inputCostPer1M, outputCostPer1M) of the model a direct key's rotation call asks, the run's own OCR model
+    /// (owner, 2026-11-24, W49.proc-pipeline-prune-ok 6), or nil if rotation is free/unavailable for this provider.
+    static func rotationModelCost(for model: LLMModel) -> (Double, Double)? {
+        switch model.provider {
+        case .gemini, .anthropic, .openai: return (model.inputCostPer1M, model.outputCostPer1M)
         case .mistral: return nil               // no LLM rotation path → local Vision (free)
-        case .openai: return (0.75, 4.50)       // gpt-5.4-mini; verified 2026-09-26 against OpenAI's model page.
         case .appleVision: return nil
         case .openrouter: return nil            // priced per Gemini 3.7 Flash call below
         }
@@ -266,17 +264,23 @@ struct CostEstimator {
                            + ((boxOutput + clusterOutput) / 1_000_000) * model.outputCostPer1M
         }
 
-        // Comparative rotation costs apply to image reads on supported cloud backends.
+        // Comparative rotation costs apply to image reads on supported cloud backends; a direct key's calls (the LLM
+        // modes' orderings, the agreement rule's escalated share) are priced at its own OCR model's rates.
         var rotationCost: Double = 0
-        let rotCalls = rotationMode.orderings
+        let llmRotation = rotationMode != .off && rotationMode != .localVision
         if !preOCRedInput, !visionTextOnly, gatewayRotation || (!useGateway && model.provider == .openrouter) {
             rotationCost = Double(fileCount) * gemini37RotationCalls(rotationMode) * gemini37RotationCallCost
-        } else if rotCalls > 0, !preOCRedInput, !visionTextOnly, !useGateway,
-           let (rIn, rOut) = rotationModelCost(for: model.provider) {
+        } else if llmRotation, !preOCRedInput, !visionTextOnly, !useGateway,
+           let (rIn, rOut) = rotationModelCost(for: model) {
             let inputPerCall = 4 * estimatedRotationCandidateTokens(for: model.provider) + estimatedRotationPromptTokens
-            let calls = Double(fileCount) * Double(rotCalls)
+            let calls = Double(fileCount) * gemini37RotationCalls(rotationMode)
+            // A thinking model on a Gemini or OpenAI key may think before its letter: Gemini is held to its Low budget,
+            // an OpenAI reasoning model to the completion ceiling, each priced in full (the most a call can spend).
+            let thinking: Double = !model.supportsThinking ? 0
+                : model.provider == .gemini ? Double(LLMRotationDetector.directThinkingTokens)
+                : model.provider == .openai ? Double(LLMRotationDetector.openAIReasoningCeiling) : 0
             rotationCost = (calls * inputPerCall / 1_000_000) * rIn
-                         + (calls * estimatedRotationOutputTokens / 1_000_000) * rOut
+                         + (calls * (estimatedRotationOutputTokens + thinking) / 1_000_000) * rOut
         }
 
         return CostEstimate(

@@ -63,7 +63,7 @@ enum SettingsPanelOwnership {
             DefaultsKeys.visionUseLLMJudgment, DefaultsKeys.visionLanguages, DefaultsKeys.visionFastRecognition,
             DefaultsKeys.visionMinimumConfidence, DefaultsKeys.visionCustomVocabulary,
             DefaultsKeys.ocrCascadeRoute, DefaultsKeys.ocrCascadeOnDisagreement, DefaultsKeys.ocrPostCorrection,
-            DefaultsKeys.ocrPageKindRouting, DefaultsKeys.ocrHandwritingOnTyped,
+            DefaultsKeys.ocrPageKindRouting,
             SettingsSheetModel.overrideKey("reading").rawValue, SettingsKey.scanNewspapersDocLayoutYOLO.rawValue,
         ] + LLMProvider.allCases.map { ModelSelectionStore.modelKey(for: $0) })
         add(.documents, [
@@ -78,6 +78,7 @@ enum SettingsPanelOwnership {
         ])
         add(.datesAndNames, [
             SettingsKey.dateImageEveryDocument.rawValue, SettingsKey.dateLocalImage.rawValue, SettingsKey.lowConfidenceNames.rawValue,
+            SettingsKey.numericDatesDayFirst.rawValue,
             SettingsSheetModel.overrideKey("dating").rawValue, SettingsSheetModel.overrideKey("entities").rawValue,
         ])
         add(.pagesAndOutput, [
@@ -102,7 +103,7 @@ enum SettingsPanelOwnership {
 
     /// The sheet's switches (its rules tab and the dating card), each owned by the panel that holds its stage.
     static let sheetSwitches: [SettingsKey] = [.straightenReadingCopy, .placeHandOnImage, .dateImageEveryDocument, .dateLocalImage, .lowConfidenceNames,
-                                               .scanNewspapersDocLayoutYOLO, .searchableFor]
+                                               .scanNewspapersDocLayoutYOLO, .searchableFor, .numericDatesDayFirst]
 
     /// Which panel holds each settings-sheet stage: the four cards and the rule stages (`SettingsSheetModel`).
     static let stagePanels: [String: SettingsPanel] = [
@@ -121,6 +122,7 @@ enum SettingsPanelOwnership {
         ("Settings sheet › each card's Use instead…", SettingsSheetModel.overrideKey("entities").rawValue),
         ("Settings sheet › the Dates card", SettingsKey.dateImageEveryDocument.rawValue),
         ("Settings sheet › the Dates card", SettingsKey.dateLocalImage.rawValue),
+        ("Settings sheet › the Dates card", SettingsKey.numericDatesDayFirst.rawValue),
         ("Settings sheet › the Names card", SettingsKey.lowConfidenceNames.rawValue),
         ("Settings sheet › Rules", SettingsKey.straightenReadingCopy.rawValue),
         ("Settings sheet › Rules", SettingsKey.placeHandOnImage.rawValue),

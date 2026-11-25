@@ -12,12 +12,13 @@ comparison is the mean NES difference a minus b in points and its 95% bootstrap 
 ArchiveOCRBench/build.py's `bootstrap` draws it (seed 0, the same rounds), so a pair with Qwen3.6 27B reproduces the
 headline's `vs_baseline`.
 
-The tie rule. On the 96 a gap is a tie only when it is under the pair's floor, twice the larger rerun range of the two
-routes (the owner, 2026-11-11, W46.pairs-redecide-owner-ok: "floor only", as 12-settings-design §3.3 reads; the
-paired interval is shown beside the figure but makes no tie). A hosted route (family cloud or plan) is held to Gemini
-3.7 Flash's 0.49; a Mac route is local greedy, 0.00; a cluster route has no rerun and is not one machine's greedy
-decoding, so it is held to the hosted 0.49. On the 895 the floor makes no tie: the interval alone decides (R-3). Each
-entry keeps both tests, `under_floor` and `interval_holds_0`, and `tie` is the one its set uses.
+The tie rule (owner, 2026-11-24, W49.proc-pipeline-prune-ok 4: "practical-floor-only"). A gap is a tie only when it is
+under the practical floor of 0.5 NES points, the same for every route family (cloud, plan, cluster and the Mac), every
+group and both sets. The paired interval is shown beside the figure but never makes a tie, so an underpowered interval
+cannot hand a pick to the weaker route. It replaced the 2026-11-11 rule (W46.pairs-redecide-owner-ok): twice the larger
+rerun range on the 96 (0.49 hosted, 0.00 between Mac routes, per kind 0.42 / 0.24 / 0.60) and the interval alone on the
+895 (R-3). Each entry keeps both tests, `under_floor` and `interval_holds_0`; `tie` is `under_floor`. `--retie`
+re-applies the rule to the committed file without drawing the intervals again (they do not change with it).
 
 W46.pair-matrix-cover added the groups the solver ranks on. On the 96, beside `all`: each kind of ocr-pages.csv
 (typewritten 50 pages, printed 27 with p081 apart, handwritten 16), strict and answered, and `hands16`, the 16 hand
@@ -40,13 +41,12 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE.parent.parent / 'segbench-results'
 UNCORRECTABLE = 'p081'  # reported apart on the bench page (ArchiveOCRBench/build.py)
-FLOOR = {'cloud': 0.49, 'plan': 0.49, 'cluster': 0.49, 'mac': 0.0}
-# per group on the 96, the hosted floor (a Mac pair stays 0.00): twice Gemini 3.7 Flash's rerun range of the kind
-KIND_FLOOR = {'all': 0.49, 'typewritten': 0.42, 'printed': 0.24, 'handwritten': 0.60, 'hands16': 0.60}
+# The practical floor in NES points, every family, group and set (owner, 2026-11-24, W49.proc-pipeline-prune-ok 4).
+FLOOR = 0.5
 KINDS = ('typewritten', 'printed', 'handwritten')
 HANDS_GROUP = 'hands16'
 POOLED = {'L1-L3': ('L1', 'L2', 'L3')}
-SOURCE = 'ocr-rerun-noise.md §The tie rule'
+SOURCE = 'execution-plans/processing-review/13-stage-rules/14-owner-calls.md §3. Pipeline pruning & simplification'
 
 
 def interval(d, rounds, seed=0):
@@ -126,7 +126,11 @@ def main():
     ap.add_argument('--workers', type=int, default=4)
     ap.add_argument('--out', type=Path, default=RESULTS / 'ocr-pair-matrix.json')
     ap.add_argument('--report', action='store_true', help='print the result note\'s tables')
+    ap.add_argument('--retie', action='store_true', help='apply the tie rule to the committed file and stop')
     a = ap.parse_args()
+    if a.retie:
+        retie(a.out)
+        return
     routes = table_routes()
     owner, kind = load_owner()
     public, stratum = load_public()
@@ -173,17 +177,13 @@ def main():
 
     pairs = []
     for (st, g, ra, rb), (strict, answered) in zip(keys, res):
-        hosted = fam[ra] != 'mac' or fam[rb] != 'mac'
-        floor = KIND_FLOOR[g] if st == 'owner96' and hosted else 0.0
-        e = {'set': st, 'group': g, 'a': ra, 'b': rb, 'floor': floor}
+        e = {'set': st, 'group': g, 'a': ra, 'b': rb, 'floor': FLOOR}
         for mode, v in (('strict', strict), ('answered', answered)):
             if v is None:
                 e[mode] = None
                 continue
             n, d, lo, hi = v
-            under, holds0 = abs(d) < floor, lo <= 0 <= hi
-            e[mode] = {'n': n, 'delta': d, 'lo': lo, 'hi': hi, 'tie': under if st == 'owner96' else holds0,
-                       'under_floor': under, 'interval_holds_0': holds0}
+            e[mode] = tie_entry(n, d, lo, hi)
         pairs.append(e)
     out = {'item': 'W46.ocr-pair-matrix', 'script': 'ArchiveProcessor/scripts/segbench/ocr_pair_matrix.py',
            'sources': ['ArchiveProcessor/segbench-results/settings-routes.json (reading routes)',
@@ -192,21 +192,54 @@ def main():
            'method': {'metric': 'NES points, a minus b', 'interval': f'95% paired bootstrap, {a.rounds} rounds, seed 0 per pair '
                       '(ArchiveOCRBench/build.py bootstrap)', 'strict': 'every shared page, a failure as 0',
                       'answered': 'pages both routes answered', 'owner96_pages': 'the 95, p081 apart',
-                      'tie': 'on the 96 |delta| under the floor (owner, 2026-11-11: floor only); on the 895 the interval '
-                             'holds 0 (no floor, R-3)', 'floors': FLOOR,
-                      'kind_floors': KIND_FLOOR, 'tie_source': SOURCE,
+                      'tie': METHOD_TIE, 'floor': FLOOR, 'tie_source': SOURCE,
                       'groups': {'owner96': list(o_groups) + [HANDS_GROUP], 'public895': sorted(groups, key=group_order)},
                       'hands16': 'ocr-hands-pages.csv, the 16 hand pages on the corrected truth; strict only'},
            'routes': {'owner96': o_ids, 'public895': [r['id'] for r in p_ids], HANDS_GROUP: [r['id'] for r in h_rows]},
            'public_twin': {r['id']: f"{r['twin'][0]} ({r['twin'][1]})" for r in p_ids},
            'hands_twin': {r['id']: r['hand'] for r in h_rows},
            'pairs': pairs}
-    body = json.dumps({k: v for k, v in out.items() if k != 'pairs'}, indent=1)[:-2]
-    a.out.write_text(body + ',\n "pairs": [\n' + ',\n'.join(json.dumps(e) for e in pairs) + '\n ]\n}\n')
+    write(a.out, out)
     print(f"{len(o_ids)} routes on the 96 ({len(h_rows)} with hands16), {len(p_ids)} on the 895; "
           f"{len(pairs)} pair-groups -> {a.out}")
     if a.report:
         report(out, owner, kind, hands)
+
+
+METHOD_TIE = ('|delta| under the practical floor of 0.5 points, every family, group and set (owner, 2026-11-24, '
+              'W49.proc-pipeline-prune-ok 4: practical floor only; the interval is shown and makes no tie)')
+
+
+def tie_entry(n, d, lo, hi):
+    under, holds0 = abs(d) < FLOOR, lo <= 0 <= hi
+    return {'n': n, 'delta': d, 'lo': lo, 'hi': hi, 'tie': under, 'under_floor': under, 'interval_holds_0': holds0}
+
+
+def write(path, out):
+    body = json.dumps({k: v for k, v in out.items() if k != 'pairs'}, indent=1)[:-2]
+    path.write_text(body + ',\n "pairs": [\n' + ',\n'.join(json.dumps(e) for e in out['pairs']) + '\n ]\n}\n')
+
+
+def retie(path):
+    """The committed matrix with today's tie rule applied to its stored gaps: the intervals are kept as drawn."""
+    out = json.loads(path.read_text())
+    m = out['method']
+    for k in ('floors', 'kind_floors'):
+        m.pop(k, None)
+    rebuilt = {}
+    for k, v in m.items():
+        if k == 'tie':
+            rebuilt.update({'tie': METHOD_TIE, 'floor': FLOOR, 'tie_source': SOURCE})
+        elif k not in ('floor', 'tie_source'):
+            rebuilt[k] = v
+    out['method'] = rebuilt
+    for e in out['pairs']:
+        e['floor'] = FLOOR
+        for mode in ('strict', 'answered'):
+            v = e.get(mode)
+            if v:
+                e[mode] = tie_entry(v['n'], v['delta'], v['lo'], v['hi'])
+    write(path, out)
 
 
 def group_order(g):
@@ -239,7 +272,7 @@ def report(out, owner, kind, hands):
             for i in out['routes']['owner96']:
                 v = [x[1] for p, x in owner[i].items() if p != UNCORRECTABLE and kind[p] == g]
                 mean[i] = 100 * sum(v) / len(v)
-        leader_table(f'The 96, {g}, strict (floor {KIND_FLOOR[g]:.2f} hosted, 0.00 Mac pairs)', mean,
+        leader_table(f'The 96, {g}, strict (floor {FLOOR:.2f})', mean,
                      [e for e in pairs if e['set'] == 'owner96' and e['group'] == g])
     print('\n### The 895, per stratum\n\n| group | pairs (strict) | ties strict | ties answered |\n|---|---|---|---|')
     groups = sorted({e['group'] for e in pairs if e['set'] == 'public895'}, key=group_order)
@@ -256,7 +289,7 @@ def report(out, owner, kind, hands):
             v = [x[1] for p, x in public[(name, fam.rstrip(')'))].items() if stratum[p] in parts]
             if v:
                 mean[i] = 100 * sum(v) / len(v)
-        leader_table(f'The 895, {g} pooled, strict (no floor)', mean,
+        leader_table(f'The 895, {g} pooled, strict (floor {FLOOR:.2f})', mean,
                      [e for e in pairs if e['set'] == 'public895' and e['group'] == g])
 
 

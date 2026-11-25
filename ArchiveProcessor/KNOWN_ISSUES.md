@@ -361,19 +361,29 @@ Rules → Columns and reading order, off by default.
   for the layout processing, against PP-DocLayoutV3's 0.19 s on other pages; the whole Processor's peak footprint was
   636 MB over the 15 pages (`scan-layout-parity.md`) (accepted: the measured cost of the detector the owner released).
 
-## ⚠️ LIMITATION (W47.wh-mixed-preflag, 2026-11-20): what the mixed-page pre-flag does not do
+## ⚠️ LIMITATION (W47.wh-mixed-preflag, 2026-11-20; removed from the app 2026-11-24): the mixed-page pre-flag
 
-VisionOCRKit `MixedPagePreflag` (ATRIUM v4.3 as Core ML), `Views/OCRView+PageKind.swift` (`PageKindStore`); the
-download row is under "Read handwriting on typed pages" in Settings › Reading.
-- **A checked page that the pre-flag leaves unflagged keeps its kind’s reader.** The saved bulk replay found 412 flag
-  positives among 1,449 eligible typed and printed pages. The owner’s checks estimate 72% of the eligible pages it flagged
-  had handwriting on typed or printed text and that the flag found 62% of the mixed pages among eligibles. Across
-  unchecked pages the possible ranges are 12–95% and 5–99%, respectively. See `segbench-results/mixed-switch-score.md`
-  for the replay’s scope and the standalone detector figures (accepted: owner, 2026-11-19, call 15, "release with a label").
-- **An absent or failed pre-flag lets the switch act on any eligible page.** It applies to typed and printed pages
-  at the app’s routing confidence floor when kind-based reading is enabled, a handwriting reader is available, and
-  there is no manual reader override. The switch is on by default (accepted: owner, 2026-11-20, call 24, "on by
-  default, whether or not the pre-flag is downloaded").
+- **"Read handwriting on typed pages" and its pre-flag download are gone from the app** (owner, 2026-11-24,
+  `W49.proc-pipeline-prune-ok` 2: the switch was unmeasured on mixed pages, n = 2, and slowed Mac reading about 140
+  times). Routing by kind is the two-way split, so a typed or printed page with a signature or margin note is read by
+  the run's model and its handwriting may be missed. VisionOCRKit keeps `MixedPagePreflag` and its parity check for
+  2.0 (queued: W46.kinds-mixed-truth).
+
+## ⚠️ LIMITATION (W49.proc-pipeline-prune-apply, 2026-11-25): what the owner's pipeline simplifications leave open
+
+- **The two-way kind split covers direct cloud runs only.** Owner call 2 (`W49.proc-pipeline-prune-ok`, 2026-11-24)
+  asks for the split on the Mac too, but routing by kind still never applies to an Apple Vision run, so a free Mac run
+  cannot yet send its handwritten pages to a downloaded local reader (queued: W49.proc-kind-split-mac).
+- **A collection's day-first date order reaches the Processor only.** The Reader confirms a folder date month first,
+  so in a day-first collection a folder labelled `6/2/61` gives June there and February in Process Files (queued:
+  W49.reader-folder-date-day-first). The trace and tagging calls are not told the order: where the route finds a year
+  but no dated form, the tagging call's month and day can still be a month-first reading (queued:
+  W49.proc-metadata-unified-apply, which puts the order into the one metadata call).
+- **A direct key's rotation estimate leaves out a Gemini model's unbudgeted thinking.** Rotation on a direct Gemini,
+  Claude or OpenAI key asks the run's own OCR model (owner call 6). A Gemini model the catalog marks as not thinking
+  (Gemini 3.1 Pro, Gemini 3 Flash Preview) is sent no thinking budget, so whatever it thinks is not in the estimate;
+  a thinking Gemini model is held to its Low budget and an OpenAI reasoning model priced at its 2,048-token ceiling
+  (queued: W49.proc-rotation-thinking-price).
 
 ## FIXED (W40.fix-processor-merged-classification-stale, 2026-11-23) — The Files pane left merged PDF classifications stale
 
@@ -1159,15 +1169,15 @@ local run's escalated pages are priced in the pre-run cascade line, but the esti
 
 ## ⚠️ LIMITATION (W41.app-page-kind, 2026-10-16): what choosing each page's reader by its kind does not yet cover
 
-Settings → **Choose each page's reader by its kind** (off by default; `PageKindRouting`) classifies dropped photos
-before a run and preselects the guide's pick. Open: the **0.8 confidence floor is a choice, not a measurement** — the
+Settings → **Send handwritten pages to a handwriting reader** (off by default; `PageKindRouting`) classifies dropped
+photos before a run and splits them two ways (owner, 2026-11-24, `W49.proc-pipeline-prune-ok` 2): typed, printed and
+form pages keep the run's model, handwritten and mixed pages take the guide's first runnable handwriting pick. Open: the **0.8 confidence floor is a choice, not a measurement** — the
 bench's probabilities come from weights fitted on the pages they were scored on, so there is no held-out calibration
 yet; **PDFs are not classified** (their pages become images only during the run) and keep the run's model, as does
 a page **Rotate-and-rerun** re-reads (its temporary image is not in the plan); it applies only to a direct, non-batch
-run, never a paid batch, the gateway, the Local Agent or **Apple Vision**; a routed page that its reader **refuses or
+run, never a paid batch, the gateway, the Local Agent or **Apple Vision** (the Mac half of the split is W49.proc-kind-split-mac); a routed page that its reader **refuses or
 fails** can buy a second read (the refusal readers, the cascade), and the pre-run second-reader and cascade lines are
-still worded for the run's model only; the guide's forms/printed pick **Qwen3.6 27B** was measured on the bench's
-local run, while the app reads it on OpenRouter's pinned provider; there is **no
+still worded for the run's model only; there is **no
 low-resolution kind** (the bench found no signal that catches it), so the guide's low-resolution pick is never
 chosen; classification needs **macOS 26** (Vision's document request and feature-print revision) and keeps the run's
 model elsewhere; the weights come from 144 pages of one corpus, so refit as labelled pages grow
@@ -1176,19 +1186,13 @@ model elsewhere; the weights come from 144 pages of one corpus, so refit as labe
 
 **The one list of kinds** (W42.int-s3, `OCR/PageKinds.swift`; `segbench-results/page-kinds.md`). A whole newspaper page
 is told by the engine's own banded Vision reading, only on a page the classifier calls printed (30 of 32 whole pages,
-no false call on 147 other pages and the owner's 144; about 1.3-1.7 s a page more, up to 14 s), and routed to print's
-pick, through the fixed PP region stage above (`W46.layout-newspapers`). **Clippings, registers and mixed pages
+no false call on 147 other pages and the owner's 144; about 1.3-1.7 s a page more, up to 14 s), and read as print by the
+run's model, through the fixed PP region stage above (`W46.layout-newspapers`). **Clippings, registers and mixed pages
 are not detected**: they come from a Finder tag (Clippings) or the collection interview. **A Finder tag overrides the
 classifier and passes the 0.8 floor**, as Phase 4 decided; on the owner's 144 labelled pages the tags changed 17 calls and
 sent 7 pages to another pick than their label's (Statistics on 4 pages labelled not a form; Clippings on 2 typewritten
 pages and 1 form), against none untagged (in-sample). The PDF header's `Kind:` keeps its four values: a newspaper or a
 clipping is written `printed`. The photographed axis is carried on each page's kind but nothing reads it yet.
-
-**Read handwriting on typed pages** (W46.mixed-route-setting, beneath it) shares every limit above, since it acts only on
-the kinds told there: a PDF's pages, an unsure page and every run it does not apply to keep their reader. Its typed-text
-figure is measured on typed and printed pages only; on **mixed pages it is not measured** (2 pages scored), and its
-**Mac time is pending** `W46.ocr-time-like-for-like` (the app's readers are hosted today, so the switch's cost shows in
-the estimate and its time does not).
 
 ## ⚠️ LIMITATION (W41.app-institutional-compute, 2026-10-18): what the institutional computing import leaves open
 

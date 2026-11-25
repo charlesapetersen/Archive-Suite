@@ -133,8 +133,30 @@ enum DateRoute {
         return s.isEmpty ? nil : n
     }
 
+    /// The collection's numeric date order for the dating in this task (owner, 2026-11-24, W49.proc-pipeline-prune-ok 5;
+    /// `SettingsKey.numericDatesDayFirst`): false, a numeric date reads month first (US); true, day first.
+    @TaskLocal static var dayFirst = false
+
+    /// The month and day of a numeric date whose parts are `a` then `b`, either order valid: month first unless the
+    /// collection's dates are day first (`dayFirst`), and a part that cannot be a month is the day either way.
+    static func numericMonthDay(_ a: Int, _ b: Int) -> (month: Int, day: Int) {
+        if dayFirst { return (1...12).contains(b) ? (b, a) : (a, b) }
+        return (1...12).contains(a) ? (a, b) : (b, a)
+    }
+
+    /// The collection's switch as `resolver` resolves it.
+    static func dayFirstSetting(_ resolver: SettingsResolver) -> Bool {
+        resolver.resolve(.numericDatesDayFirst).value.bool ?? false
+    }
+
+    /// The switch as a run's frozen settings hold it.
+    static func dayFirstSetting(_ values: [String: ResolvedSetting]?) -> Bool {
+        values?[SettingsKey.numericDatesDayFirst.rawValue]?.value.bool ?? false
+    }
+
     /// Every date printed in the first `limit` characters, in text order. A two-digit numeric year is read as 19YY;
-    /// years outside 1800-2030 are dropped. A numeric date is month-first when its first part can be a month.
+    /// years outside 1800-2030 are dropped. A numeric date is month-first when its first part can be a month, or
+    /// day-first when the collection says so (`dayFirst`).
     static func candidates(_ text: String, limit: Int = textChars) -> [Candidate] {
         var out: [Candidate] = []
         for (n, line) in splitLines(scalarPrefix(text, limit)).enumerated() {
@@ -164,7 +186,7 @@ enum DateRoute {
                         if !((1...12).contains(a) && (1...31).contains(b) || (1...12).contains(b) && (1...31).contains(a)) {
                             continue
                         }
-                        (month, day) = (1...12).contains(a) ? (a, b) : (b, a)
+                        (month, day) = numericMonthDay(a, b)
                     case "month":
                         guard let yy = pyInt(g[1]) else { continue }
                         month = monthOf(g[0]); year = yy
@@ -282,7 +304,7 @@ enum DateRoute {
                         guard let a = pyInt(g[0]), let b = pyInt(g[2]),
                               (1...12).contains(a) && (1...31).contains(b) || (1...12).contains(b) && (1...31).contains(a)
                         else { continue }
-                        (month, day) = (1...12).contains(a) ? (a, b) : (b, a)
+                        (month, day) = numericMonthDay(a, b)
                     default:
                         guard let mo = ocrMonth(g[0], near: false) else { continue }
                         month = mo
@@ -631,6 +653,12 @@ enum DateRoute {
     }
 
     // MARK: The image pass (date_image.PROMPT, read; date_undated.own_date)
+
+    /// The image prompt for this task's dating: `imagePrompt`, plus the numeric order when the collection's dates are day
+    /// first, so the model's month follows it (the default prompt stays the bench's, byte for byte).
+    static var imagePromptForOrder: String {
+        dayFirst ? imagePrompt + "\nNumeric dates on these pages are written day first (DD/MM/YYYY): 04/07/1962 is 4 July 1962." : imagePrompt
+    }
 
     /// `date_image.PROMPT`, byte for byte.
     static let imagePrompt = "These are the first pages of one archival document, in order (page 1, then page 2 if given). Find every date "

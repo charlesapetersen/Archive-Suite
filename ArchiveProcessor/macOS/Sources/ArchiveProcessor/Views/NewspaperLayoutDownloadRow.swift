@@ -11,11 +11,6 @@ final class NewspaperLayoutDownload: ObservableObject {
     /// W47.wh-yolo-scans: the scanned-newspaper detector (`ScanNewspaperLayout`), its own download.
     static let scans = NewspaperLayoutDownload(isInstalled: { ScanNewspaperLayout.isInstalled() },
                                                fetch: { try await ScanNewspaperLayout.download(progress: $0) })
-    /// W47.wh-mixed-preflag: ATRIUM's page classifier as the mixed-page pre-flag (`MixedPagePreflag`), its own download.
-    static let mixedPreflag = NewspaperLayoutDownload(isInstalled: { MixedPagePreflag.isInstalled() },
-                                                      fetch: { try await MixedPagePreflag.download(progress: $0) },
-                                                      installed: { NotificationCenter.default.post(
-                                                          name: PageKindStore.preflagInstalledNotification, object: nil) })
 
     enum State: Equatable {
         case idle
@@ -122,38 +117,5 @@ struct ScanNewspaperLayoutDownloadRow: View {
                 .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityIdentifier("ap.sheet.scanNewspaperLayoutDownload")
-    }
-}
-
-/// W47.wh-mixed-preflag — under "Read handwriting on typed pages": the mixed-page pre-flag's download. Its weights'
-/// licence is shown before anything is fetched (owner, call 12): a CC BY-NC model is offered only as a separate download.
-struct MixedPagePreflagDownloadRow: View {
-    @ObservedObject private var download = NewspaperLayoutDownload.mixedPreflag
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 8) {
-                switch download.state {
-                case .idle:
-                    Button("Download the mixed-page pre-flag (\(MixedPagePreflag.downloadMB) MB)") { download.start() }
-                case .fetching(let share):
-                    ProgressView(value: share).frame(width: 160)
-                    Text("\(Int(share * 100))%").font(.caption).monospacedDigit()
-                    Button("Cancel") { download.cancel() }
-                case .failed(let why):
-                    Text("The download failed: \(why).").font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Button("Try Again") { download.start() }
-                case .installed:
-                    Text("The pre-flag is downloaded. A page it checks and leaves unflagged keeps its usual reader.")
-                        .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Text("Licence: ATRIUM's page classifier (ufal/vit-historical-page, Charles University) is MIT, but it is "
-                 + "fine-tuned from Meta's SWAG RegNetY-16GF weights, which are CC BY-NC 4.0: non-commercial use only. "
-                 + "It is downloaded separately and is not part of the app.")
-                .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-        }
-        .accessibilityIdentifier("ap.settings.mixedPreflagDownload")
     }
 }

@@ -232,6 +232,9 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
     static let lowConfidenceNames = SettingsKey(rawValue: "lowConfidenceNames")
     static let dateLocalImage = SettingsKey(rawValue: "dateLocalImage")
     static let dateImageEveryDocument = SettingsKey(rawValue: "dateImageEveryDocument")
+    /// The collection's numeric date order (owner, 2026-11-24, W49.proc-pipeline-prune-ok 5): off, a numeric date reads
+    /// month first (US, 04/07/1962 is 7 April); on, day first (International, 4 July). `DateRoute.dayFirst`.
+    static let numericDatesDayFirst = SettingsKey(rawValue: "numericDatesDayFirst")
     /// Layout's one switch (owner, 2026-11-19, call 15; W47.wh-yolo-scans): scanned newspapers' regions from
     /// DocLayout-YOLO through newspaper-ocr's route instead of PP-DocLayoutV3. Photographed newspapers keep PP-DocLayoutV3.
     static let scanNewspapersDocLayoutYOLO = SettingsKey(rawValue: "scanNewspapersDocLayoutYOLO")
@@ -252,6 +255,7 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
         .batchCeilingUSD, .hours, .excludedModelFamilies, .mix, .strata, .period, .languages, .scripts,
         .preference, .priorities, .weights, .staysOnMac, .noTraining, .readingFallback, .checkingMinutes, .straightenReadingCopy,
         .placeHandOnImage, .dateLocalImage, .dateImageEveryDocument, .scanNewspapersDocLayoutYOLO, .searchableFor, .lowConfidenceNames,
+        .numericDatesDayFirst,
     ]
     static let catalog: [SettingsKey] = generalOnly + anyLayer
 
@@ -289,10 +293,11 @@ struct SettingsKey: Hashable, Sendable, RawRepresentable {
         case .checkingMinutes: return .double(skipped.checkingMinutes)
         // Owner call 6: straightening on by default, switchable off.
         case .straightenReadingCopy: return .bool(true)
-        case .placeHandOnImage: return .bool(true)   // the table's default (05-placement.md)
+        case .placeHandOnImage: return .bool(false)   // owner, 2026-11-24 (W49.proc-pipeline-prune-ok 1): opt-in, the text page is the default
         case .lowConfidenceNames: return .bool(false)
         case .dateLocalImage: return .bool(false)
         case .dateImageEveryDocument: return .bool(false)   // owner, 2026-11-12: off unless the user turns it on
+        case .numericDatesDayFirst: return .bool(false)     // owner, 2026-11-24: month first (US) unless set
         case .scanNewspapersDocLayoutYOLO: return .bool(false)   // call 15: PP-DocLayoutV3 stays the default
         // The suite's contract until a user picks the other form: every page keeps its text page.
         case .searchableFor: return .strings([])
@@ -341,6 +346,7 @@ extension SettingsKey {
         case .lowConfidenceNames: return "Find names on this Mac (low confidence)"
         case .dateLocalImage: return "Search page images for dates on this Mac (no measured gain)"
         case .dateImageEveryDocument: return "Search the page image for dates on every document"
+        case .numericDatesDayFirst: return "Numeric dates are written day first (DD/MM/YYYY)"
         case .scanNewspapersDocLayoutYOLO: return "Scanned newspapers' columns found by DocLayout-YOLO"
         case .searchableFor: return "Pages written as one searchable page, with no text page"
         default: return rawValue

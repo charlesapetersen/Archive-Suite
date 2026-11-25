@@ -322,7 +322,7 @@ final class MoneyJourneyUITests: XCTestCase {
             "-outputImageFile", "NO", "-mergeDocuments", "NO", "-sendPreviousImage", "NO",
             "-useInstitutionalComputeImport", "NO", "-skipAlreadyProcessed", "NO", "-preOCRedInput", "NO",
             "-useAppleVision", "NO", "-useLocalAgent", "NO", "-useGateway", "NO",
-            "-ocrHandwritingOnTyped", "NO", "-imageResolutionPercent", "100", "-standardImageSizeMB", "3",
+            "-imageResolutionPercent", "100", "-standardImageSizeMB", "3",
             "-liveProcessingMode", "stageForLater"
         ] + (staged ? [] : ["-APUITestInputImages", root.appendingPathComponent("in").path]) + extra)
         app.launchEnvironment = [

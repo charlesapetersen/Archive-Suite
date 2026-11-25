@@ -43,12 +43,14 @@ final class ReOCRDialogModel {
     private let trainingProtectedFiles: Set<URL>
     private let selectedPairs: [URL: [Int]]
     private let scanDetectors: [URL: NewspaperDetector]
+    /// The files whose collection turned on placing handwritten text on the image (off by default, owner 2026-11-24).
+    private let placeHandFiles: Set<URL>
 
     /// `selectedPairs` keeps, for a file the Reader named pairs for, only those pairs (0-based); a pair past the end of
     /// the file is ignored.
     init(selectedPairs: [URL: [Int]] = [:], table: SettingsRouteTable, pairs: OCRPairMatrix?,
          resources: SettingsResources, staysOnMac: Bool, trainingProtectedFiles: Set<URL> = [],
-         scanDetectors: [URL: NewspaperDetector] = [:]) {
+         scanDetectors: [URL: NewspaperDetector] = [:], placeHandFiles: Set<URL> = []) {
         self.selectedPairs = selectedPairs
         self.table = table
         self.pairs = pairs
@@ -56,6 +58,7 @@ final class ReOCRDialogModel {
         self.staysOnMac = staysOnMac
         self.trainingProtectedFiles = trainingProtectedFiles
         self.scanDetectors = scanDetectors
+        self.placeHandFiles = placeHandFiles
     }
 
     func loadFiles(_ urls: [URL], progress: (Int) -> Void = { _ in }) async {
@@ -230,7 +233,8 @@ final class ReOCRDialogModel {
                 let review = try await OpenRouterDataPolicy.$denyDataCollection.withValue(denyDataCollection) {
                     try await NewspaperPageReader.$scanDetector.withValue(file.scanDetector) {
                         try await job.start(file: file.url, root: root, textPages: Set(mine.map(\.pairIndex)),
-                                            kinds: kinds, model: model, pageModels: pageModels, read: routed)
+                                            kinds: kinds, model: model, pageModels: pageModels,
+                                            placeHandOnImage: placeHandFiles.contains(file.url), read: routed)
                     }
                 }
                 out.append(FileRun(fileID: file.id, outcome: .success(review), error: nil))

@@ -74,7 +74,8 @@ enum OCRPageKindTestDriver {
               PageKind.decide(hand: [0.1, 0.85, 0.05], form: [0.3, 0.7], handClasses: hc)
               == PageKind(kind: .forms, confidence: 0.7))
 
-        // 3. Routing from the kind to the guide's pick.
+        // 3. Routing from the kind: the two-way split (owner, 2026-11-24, W49.proc-pipeline-prune-ok 2). A handwritten page
+        // goes to the guide's handwritten pick; every other kind keeps the run's model.
         guard let guide = OCRPageGuidance.loadBundled() else {
             finish(results + ["FAIL: the bundled ocr-page-guidance.json is missing"])
             return
@@ -90,48 +91,29 @@ enum OCRPageKindTestDriver {
         let runDefault = cand(claude)
         let all: Set = [cand(claude), cand(flash), cand(qwen)]
         func choose(_ kind: PageKindName?, _ conf: Double = 0.95, available: Set<PageKindRouting.Candidate> = all,
-                    run: PageKindRouting.Candidate = runDefault, override: PageKindRouting.Candidate? = nil,
-                    hand: Bool = false) -> PageKindRouting.Choice {
+                    run: PageKindRouting.Candidate = runDefault, override: PageKindRouting.Candidate? = nil)
+            -> PageKindRouting.Choice {
             PageKindRouting.choose(kind: kind.map { PageKind(kind: $0, confidence: conf) }, guidance: guide,
-                                   available: available, runDefault: run, override: override, handwritingOnTyped: hand)
+                                   available: available, runDefault: run, override: override)
         }
-        check("3 a sure typewritten page goes to the guide's first pick, Gemini 3.8 Flash",
-              choose(.typewritten) == .init(provider: .gemini, modelID: flash.id, reason: .kind))
-        check("3 a sure handwritten page too", choose(.handwritten).modelID == flash.id)
-        check("3 a form goes to Qwen3.6 27B", choose(.forms) == .init(provider: .openrouter, modelID: qwen.id, reason: .kind))
-        check("3 printed: Claude Sonnet 5.5 is not in the app, so the next pick, Qwen3.6 27B",
-              choose(.printed).modelID == qwen.id)
-        check("3 a pick with no key is passed over; none runnable keeps the run's model (no_pick)",
-              choose(.printed, available: [cand(claude)]) == .init(provider: .anthropic, modelID: claude.id, reason: .noPick))
+        check("3 a sure handwritten page goes to the guide's first handwritten pick, Gemini 3.8 Flash",
+              choose(.handwritten) == .init(provider: .gemini, modelID: flash.id, reason: .kind))
+        check("3 a mixed page takes the handwritten pick too", choose(.mixed).modelID == flash.id)
+        let typedKinds: [PageKindName] = [.typewritten, .printed, .forms, .newspapers, .clippings, .registers]
+        check("3 typed, printed, form, newspaper, clipping and register pages keep the run's model",
+              typedKinds.allSatisfy { choose($0) == .init(provider: .anthropic, modelID: claude.id, reason: .same) })
+        check("3 a handwritten pick with no key is passed over; none runnable keeps the run's model (no_pick)",
+              choose(.handwritten, available: [cand(claude)]) == .init(provider: .anthropic, modelID: claude.id, reason: .noPick))
         check("3 the guide's pick being the run's model reads as same",
-              choose(.typewritten, run: cand(flash)).reason == .same)
+              choose(.handwritten, run: cand(flash)).reason == .same)
         check("3 a page under \(PageKindRouting.minimumConfidence) keeps the run's model (uncertain)",
-              choose(.typewritten, 0.79) == .init(provider: .anthropic, modelID: claude.id, reason: .uncertain)
-              && choose(.typewritten, PageKindRouting.minimumConfidence).reason == .kind)
+              choose(.handwritten, 0.79) == .init(provider: .anthropic, modelID: claude.id, reason: .uncertain)
+              && choose(.handwritten, PageKindRouting.minimumConfidence).reason == .kind)
         check("3 a page with no kind keeps the run's model (unknown)", choose(nil).reason == .unknown)
         check("3 the user's choice wins over the kind, and over uncertainty",
               choose(.typewritten, 0.3, override: cand(qwen)) == .init(provider: .openrouter, modelID: qwen.id, reason: .override))
-        // W46.mixed-route-setting: "Read handwriting on typed pages" sends typed and printed pages to the handwritten pick.
-        check("3 handwriting on typed pages: a printed page goes to the handwritten pick, Gemini 3.8 Flash, not Qwen",
-              choose(.printed, hand: true) == .init(provider: .gemini, modelID: flash.id, reason: .handwriting))
-        check("3 handwriting on typed pages: a typewritten page too, recorded as the switch's",
-              choose(.typewritten, hand: true) == .init(provider: .gemini, modelID: flash.id, reason: .handwriting))
-        check("3 handwriting on typed pages leaves handwritten pages and forms on their own kind's pick",
-              choose(.handwritten, hand: true).reason == .kind
-              && choose(.forms, hand: true) == .init(provider: .openrouter, modelID: qwen.id, reason: .kind))
-        check("3 handwriting on typed pages: no runnable handwritten pick routes the page by its own kind",
-              choose(.printed, available: [cand(claude), cand(qwen)], hand: true)
-              == .init(provider: .openrouter, modelID: qwen.id, reason: .kind))
-        check("3 handwriting on typed pages: the handwritten pick being the run's model reads as same",
-              choose(.printed, run: cand(flash), hand: true).reason == .same)
-        check("3 handwriting on typed pages leaves an unsure page and the user's choice alone",
-              choose(.printed, 0.79, hand: true).reason == .uncertain
-              && choose(.printed, override: cand(claude), hand: true).reason == .override)
-        check("3 the switch's reason reroutes and reads in the file list",
-              PageKindRouting.Reason.handwriting.routes && !PageKindRouting.Reason.same.routes
-              && PageKindRouting.summary(kind: PageKind(kind: .printed, confidence: 0.9),
-                                         choice: choose(.printed, hand: true), modelName: flash.displayName)
-              == "Printed (90%) → \(flash.displayName), for its handwriting")
+        check("3 the former switch's reason still reroutes, so an older run's record reads",
+              PageKindRouting.Reason.handwriting.routes && !PageKindRouting.Reason.same.routes)
         check("3 keyed candidates: every built-in model of a keyed provider, none of an unkeyed one",
               PageKindRouting.keyedCandidates(hasKey: { $0 == .gemini })
               == Set(LLMModel.geminiModels.map(cand)))
@@ -140,7 +122,7 @@ enum OCRPageKindTestDriver {
         let a = root.appendingPathComponent("a.jpg"), b = root.appendingPathComponent("b.jpg")
         let c = root.appendingPathComponent("c.jpg"), pdf = root.appendingPathComponent("d.pdf")
         let told: [String: PageKind] = [PageReaderPlan.key(a): PageKind(kind: .typewritten, confidence: 0.97),
-                                        PageReaderPlan.key(b): PageKind(kind: .forms, confidence: 0.9),
+                                        PageReaderPlan.key(b): PageKind(kind: .handwritten, confidence: 0.9),
                                         PageReaderPlan.key(c): PageKind(kind: .printed, confidence: 0.5)]
         PageKindStore.classifyOverride = { told[PageReaderPlan.key($0)] }
         PageKindStore.availableOverride = all
@@ -152,13 +134,13 @@ enum OCRPageKindTestDriver {
         check("4 every image page is told and planned; the PDF is not", store.pending == 0 && plan.pages.count == 3
               && plan.entry(for: pdf) == nil && store.kind(for: pdf) == nil)
         check("4 the plan carries each page's kind and reader",
-              plan.entry(for: a)?.choice.modelID == flash.id && plan.entry(for: b)?.choice.modelID == qwen.id
+              plan.entry(for: a)?.choice.reason == .same && plan.entry(for: b)?.choice.modelID == flash.id
               && plan.entry(for: c)?.choice.reason == .uncertain && plan.entry(for: a)?.kind?.confidence == 0.97)
         store.overrides[PageReaderPlan.key(a)] = .run
         plan = store.plan([a, b, c], guidance: guide, runDefault: runDefault)
         check("4 a per-page choice of the run's model keeps that page on it",
               plan.entry(for: a)?.choice == .init(provider: .anthropic, modelID: claude.id, reason: .override))
-        plan = store.plan([a], guidance: guide, runDefault: cand(qwen))
+        plan = store.plan([a], guidance: guide, runDefault: cand(qwen))   // a keeps its own choice of the run's model
         check("4 \"the run's model\" follows a later change of the run's model",
               plan.entry(for: a)?.choice.modelID == qwen.id)
         store.batchOverride = .model(cand(flash))
@@ -169,13 +151,6 @@ enum OCRPageKindTestDriver {
         store.update([b])
         check("4 a page removed from the list loses its own choice", store.overrides.isEmpty)
         store.batchOverride = nil
-        store.handwritingOnTyped = true
-        let handPlan = store.plan([a, b], guidance: guide, runDefault: cand(qwen))
-        check("4 with handwriting on typed pages the store plans the typed page on the handwritten pick",
-              handPlan.entry(for: a)?.choice == .init(provider: .gemini, modelID: flash.id, reason: .handwriting)
-              && handPlan.entry(for: b)?.choice.reason == .same
-              && handPlan.routedCounts(runModel: qwen).map { "\($0.0.id) \($0.1)" } == ["\(flash.id) 1"])
-        store.handwritingOnTyped = false
         store.overrides[PageReaderPlan.key(a)] = .run
         if let data = try? JSONEncoder().encode(plan), let back = try? JSONDecoder().decode(PageReaderPlan.self, from: data) {
             check("4 the plan round-trips through the run record's Codable", back == plan)
@@ -185,17 +160,17 @@ enum OCRPageKindTestDriver {
         let pClaude = CostEstimator.secondReaderPageCost(model: claude, imageScale: 1)
         let pFlash = CostEstimator.secondReaderPageCost(model: flash, imageScale: 1)
         let pQwen = CostEstimator.secondReaderPageCost(model: qwen, imageScale: 1)
-        plan = store.plan([a, b, c], guidance: guide, runDefault: runDefault)   // a: Claude (own), b: Qwen, c: Claude
+        plan = store.plan([a, b, c], guidance: guide, runDefault: runDefault)   // a: Claude (own), b: Flash, c: Claude
         let delta = plan.ocrCostDelta(runModel: claude, imageScale: 1)
-        check("5 the plan adds each routed page's price less the run model's", pQwen > 0 && pClaude > 0
-              && abs(delta - (pQwen - pClaude)) < 1e-12, "delta \(delta) want \(pQwen - pClaude)")
+        check("5 the plan adds each routed page's price less the run model's", pQwen > 0 && pClaude > 0 && pFlash > 0
+              && abs(delta - (pFlash - pClaude)) < 1e-12, "delta \(delta) want \(pFlash - pClaude)")
         let est = CostEstimator.estimate(fileCount: 3, model: claude, enableTagging: false, sendPreviousImage: false,
                                          contextCharCount: 0, imageScale: 1)
         let adjusted = est.addingOCR(delta)
         check("5 the shown estimate moves by exactly that; the batch rate does not",
               abs(adjusted.totalStandard - (est.totalStandard + delta)) < 1e-12 && adjusted.batchOcrCost == est.batchOcrCost)
         check("5 the caption counts pages by reader", plan.routedCounts(runModel: claude).map { "\($0.0.id) \($0.1)" }
-              == ["\(qwen.id) 1"])
+              == ["\(flash.id) 1"])
         check("5 an empty plan adds nothing", PageReaderPlan.empty.ocrCostDelta(runModel: claude, imageScale: 1) == 0)
 
         // 6. The real performOCRCall: a planned page reaches its chosen provider and records it.
@@ -336,7 +311,7 @@ enum OCRPageKindTestDriver {
         // 8. Render guard: the row line and the batch control draw.
         store.update([a, b, c])
         let row = PageKindRowLine(store: store, url: b, guidance: guide, runDefault: runDefault, runModel: claude)
-        let want = "Form or table (90%) → \(qwen.displayName)"
+        let want = "\(PageKind(kind: .handwritten, confidence: 0.9).summary) → \(flash.displayName)"
         check("8 the row line reads the kind, how sure, and the reader", row.label?.text == want && row.label?.routed == true,
               "\(String(describing: row.label))")
         let uncertain = PageKindRowLine(store: store, url: c, guidance: guide, runDefault: runDefault, runModel: claude)
@@ -412,19 +387,14 @@ enum OCRPageKindTestDriver {
               PageKind.readsForNewspaper(PageKind(kind: .printed, confidence: 0.5))
               && !PageKind.readsForNewspaper(typed) && !PageKind.readsForNewspaper(PageKind(kind: .forms, confidence: 0.9))
               && !PageKind.readsForNewspaper(nil))
-        check("10 routing: newspapers and clippings take print's pick, a register the form's, mixed the hand's",
+        check("10 routing: newspapers and clippings read as print, a register as a form, mixed as the hand",
               choose(.newspapers) == choose(.printed) && choose(.clippings) == choose(.printed)
               && choose(.registers) == choose(.forms) && choose(.mixed) == choose(.handwritten))
-        check("10 'Read handwriting on typed pages' acts on a newspaper and a clipping too (they are print)",
-              choose(.newspapers, hand: true).reason == .handwriting && choose(.clippings, hand: true).reason == .handwriting
-              && choose(.registers, hand: true).reason == .kind)
         check("10 the header's Kind keeps the four ranked kinds; mixed and registers leave it absent",
               PageKindName.allCases.map(\.headerKind) == [.handwritten, .typewritten, .printed, .forms,
                                                           .printed, .printed, nil, nil])
-        func route(_ k: PageKind?, hand: Bool = false, override: PageKindRouting.Candidate? = nil)
-            -> PageKindRouting.Choice {
-            PageKindRouting.choose(kind: k, guidance: guide, available: all, runDefault: runDefault,
-                                   override: override, handwritingOnTyped: hand)
+        func route(_ k: PageKind?, override: PageKindRouting.Candidate? = nil) -> PageKindRouting.Choice {
+            PageKindRouting.choose(kind: k, guidance: guide, available: all, runDefault: runDefault, override: override)
         }
         for tag in ["Statistics", "Handwritten"] {
             for confidence in [0.79, 0.8, 0.95] {
@@ -442,7 +412,7 @@ enum OCRPageKindTestDriver {
                                   tags: [tag], photographed: false)
                   == PageKind(kind: .newspapers, confidence: 1, source: .layout))
         }
-        // Distinct picks expose a forms/print mix-up even while the bundled guide gives both the same reader.
+        // Distinct picks: only the handwritten kind's is used (the two-way split); every other hand keeps the run's model.
         let distinctModels = [flash, claude, LLMModel.mistralModels[0], qwen]
         let distinctGuide = OCRPageGuidance(measured: "fixture", footnote: "", kinds:
             zip(PageKindName.classifierKinds, distinctModels).map { kind, model in
@@ -457,8 +427,9 @@ enum OCRPageKindTestDriver {
                                            tags: ["Clippings"], photographed: false)
             let pick = PageKindRouting.choose(kind: clipping, guidance: distinctGuide, available: distinctAvailable,
                                               runDefault: runDefault)
-            check("10 clipping \(hand.rawValue) reaches its distinct fixture reader",
-                  pick.provider == expected.provider && pick.modelID == expected.id)
+            let want = hand == .handwritten ? cand(expected) : runDefault
+            check("10 clipping \(hand.rawValue) reaches \(hand == .handwritten ? "its distinct fixture reader" : "the run's model")",
+                  pick.provider == want.provider && pick.modelID == want.modelID)
         }
         // Scratch JPEG -> real OCR seam -> Codable record -> generated two-page PDF. The semantic kind stays
         // clippings for layout and sidecars; every classifier hand keeps its own reader and four-kind header.
@@ -471,8 +442,7 @@ enum OCRPageKindTestDriver {
             let choice = route(clipping)
             check("10 a tagged clipping classified \(hand.rawValue) takes that reader and header",
                   clipping?.kind == .clippings && clipping?.routingKind == hand
-                  && clipping?.headerKind == hand.headerKind && choice == route(classified)
-                  && route(clipping, hand: true) == route(classified, hand: true))
+                  && clipping?.headerKind == hand.headerKind && choice == route(classified))
             var plan = PageReaderPlan()
             plan.pages[PageReaderPlan.key(image)] = .init(kind: clipping, choice: choice)
             let planBack = (try? JSONEncoder().encode(plan)).flatMap { try? JSONDecoder().decode(PageReaderPlan.self, from: $0) }
@@ -576,91 +546,8 @@ enum OCRPageKindTestDriver {
             check("11 kind pages measured (\(outRows.count))", !outRows.isEmpty)
         }
 
-        // 12. The mixed-page pre-flag (W47.wh-mixed-preflag): with it, the switch sends only the pages it flags.
-        check("12 a page the pre-flag does not flag keeps its own kind's pick; a flagged page goes for its hand",
-              route(PageKind(kind: .typewritten, confidence: 0.95), hand: true) == choose(.typewritten, hand: true)
-              && PageKindRouting.choose(kind: PageKind(kind: .typewritten, confidence: 0.95), guidance: guide,
-                                        available: all, runDefault: runDefault, handwritingOnTyped: true,
-                                        mixedFlag: false) == choose(.typewritten)
-              && PageKindRouting.choose(kind: PageKind(kind: .printed, confidence: 0.95), guidance: guide,
-                                        available: all, runDefault: runDefault, handwritingOnTyped: true,
-                                        mixedFlag: true).reason == .handwriting
-              && PageKindRouting.choose(kind: PageKind(kind: .typewritten, confidence: 0.95), guidance: guide,
-                                        available: all, runDefault: runDefault, handwritingOnTyped: false,
-                                        mixedFlag: true) == choose(.typewritten))
-        check("12 the flag never moves a handwritten page, a form, an unsure page or a user's choice",
-              PageKindRouting.choose(kind: PageKind(kind: .handwritten, confidence: 0.95), guidance: guide, available: all,
-                                     runDefault: runDefault, handwritingOnTyped: true, mixedFlag: false) == choose(.handwritten)
-              && PageKindRouting.choose(kind: PageKind(kind: .forms, confidence: 0.95), guidance: guide, available: all,
-                                        runDefault: runDefault, handwritingOnTyped: true, mixedFlag: true) == choose(.forms)
-              && PageKindRouting.choose(kind: PageKind(kind: .typewritten, confidence: 0.5), guidance: guide, available: all,
-                                        runDefault: runDefault, handwritingOnTyped: true, mixedFlag: true).reason == .uncertain
-              && PageKindRouting.choose(kind: PageKind(kind: .typewritten, confidence: 0.95), guidance: guide, available: all,
-                                        runDefault: runDefault, override: cand(qwen), handwritingOnTyped: true,
-                                        mixedFlag: true).reason == .override)
-        do {
-            let p = root.appendingPathComponent("p.jpg"), q = root.appendingPathComponent("q.jpg")
-            let r = root.appendingPathComponent("r.jpg"), hw = root.appendingPathComponent("h.jpg")
-            let kinds: [String: PageKind] = [PageReaderPlan.key(p): PageKind(kind: .typewritten, confidence: 0.95),
-                                             PageReaderPlan.key(q): PageKind(kind: .printed, confidence: 0.95),
-                                             PageReaderPlan.key(r): PageKind(kind: .typewritten, confidence: 0.95),
-                                             PageReaderPlan.key(hw): PageKind(kind: .handwritten, confidence: 0.95)]
-            let flags: [String: Bool] = [PageReaderPlan.key(p): true, PageReaderPlan.key(q): false]   // r: the read fails
-            final class Asked: @unchecked Sendable { let lock = NSLock(); var urls: [String] = [] }
-            let asked = Asked()
-            PageKindStore.classifyOverride = { kinds[PageReaderPlan.key($0)] }
-            PageKindStore.availableOverride = all
-            PageKindStore.flagOverride = { url in
-                asked.lock.withLock { asked.urls.append(url.lastPathComponent) }
-                return flags[PageReaderPlan.key(url)]
-            }
-            defer { PageKindStore.classifyOverride = nil; PageKindStore.availableOverride = nil; PageKindStore.flagOverride = nil }
-            let s = PageKindStore()
-            s.update([p, q, r, hw])
-            for _ in 0..<200 where s.pending > 0 { try? await Task.sleep(nanoseconds: 10_000_000) }
-            check("12 with the switch off the pre-flag reads nothing", asked.urls.isEmpty && s.mixedFlags.isEmpty)
-            s.handwritingOnTyped = true
-            for _ in 0..<200 where s.pending > 0 { try? await Task.sleep(nanoseconds: 10_000_000) }
-            check("12 turning the switch on has the pre-flag read the typed and printed pages already told, not the hand",
-                  asked.urls.sorted() == ["p.jpg", "q.jpg", "r.jpg"]
-                  && s.mixedFlags == [PageReaderPlan.key(p): true, PageReaderPlan.key(q): false], "\(asked.urls)")
-            let planned = s.plan([p, q, r, hw], guidance: guide, runDefault: runDefault)
-            check("12 the plan sends the flagged page and the page it could not read for their hand; the unflagged keeps its kind",
-                  planned.entry(for: p)?.choice.reason == .handwriting && planned.entry(for: p)?.mixedFlag == true
-                  && planned.entry(for: q)?.choice == choose(.printed) && planned.entry(for: q)?.mixedFlag == false
-                  && planned.entry(for: r)?.choice.reason == .handwriting && planned.entry(for: r)?.mixedFlag == nil
-                  && planned.entry(for: hw)?.choice == choose(.handwritten))
-            s.update([p, q, r, hw])
-            for _ in 0..<200 where s.pending > 0 { try? await Task.sleep(nanoseconds: 10_000_000) }
-            check("12 a page the pre-flag read is not read again; one it failed on is tried once more",
-                  asked.urls.sorted() == ["p.jpg", "q.jpg", "r.jpg", "r.jpg"], "\(asked.urls)")
-            check("12 the row line says a page was flagged",
-                  PageKindRowLine(store: s, url: p, guidance: guide, runDefault: runDefault, runModel: claude)
-                    .label?.text.contains("flagged mixed") == true
-                  && PageKindRowLine(store: s, url: q, guidance: guide, runDefault: runDefault, runModel: claude)
-                    .label?.text.contains("flagged") == false)
-            // The pre-flag's download finishing has the pages already listed read, with the switch already on.
-            let late = PageKindStore()
-            PageKindStore.flagOverride = nil
-            late.handwritingOnTyped = true
-            late.update([p, q])
-            for _ in 0..<200 where late.pending > 0 { try? await Task.sleep(nanoseconds: 10_000_000) }
-            let before = late.mixedFlags.isEmpty
-            PageKindStore.flagOverride = { flags[PageReaderPlan.key($0)] }
-            NotificationCenter.default.post(name: PageKindStore.preflagInstalledNotification, object: nil)
-            for _ in 0..<200 where late.mixedFlags.count < 2 { try? await Task.sleep(nanoseconds: 10_000_000) }
-            check("12 when the pre-flag installs, the pages already in the list are read",
-                  before && late.mixedFlags == [PageReaderPlan.key(p): true, PageReaderPlan.key(q): false])
-            s.handwritingOnTyped = false
-            check("12 with the switch off again the flags are not used",
-                  s.plan([p, q], guidance: guide, runDefault: runDefault).entry(for: p)?.choice == choose(.typewritten)
-                  && s.mixedFlag(for: p) == nil)
-            if let data = try? JSONEncoder().encode(planned), let back = try? JSONDecoder().decode(PageReaderPlan.self, from: data),
-               let old = try? JSONDecoder().decode(PageReaderPlan.Entry.self,
-                                                   from: Data(#"{"choice":{"provider":"Anthropic","modelID":"x","reason":"kind"}}"#.utf8)) {
-                check("12 the flag round-trips in the run record, and an entry without one decodes", back == planned && old.mixedFlag == nil)
-            } else { check("12 the flag round-trips in the run record, and an entry without one decodes", false) }
-        }
+        // 12. The mixed-page pre-flag (W47.wh-mixed-preflag) stays in VisionOCRKit for 2.0 (W46.kinds-mixed-truth): its
+        // switch is gone from the app (owner, 2026-11-24), so only its resize and bench parity are checked here.
         let ramp = (0..<(40 * 30)).map { UInt8(($0 % 40) * 6) }
         let flat = [UInt8](repeating: 77, count: 500 * 300)
         check("12 Pillow's bicubic: same size is the input, a flat page stays flat when squeezed, a ramp stays in range",

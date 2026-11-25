@@ -112,6 +112,25 @@ final class SettingsPanelsUITests: XCTestCase {
         XCTAssertEqual(printed.value.map { String(describing: $0) }, "1")
     }
 
+    /// Owner, 2026-11-24 (W49.proc-pipeline-prune-ok 6): on a direct Gemini key the agreement rule's disagreements ask
+    /// the run's own OCR model, so the panel says so and no longer says the page is left as it is.
+    func testDirectKeyRotationAsksTheOCRModel() {
+        app.terminate()
+        app.launchArguments += ["-selectedProvider", "Gemini", "-useAppleVision", "NO",
+                                "-useGateway", "NO", "-useLocalAgent", "NO", "-preOCRedInput", "NO",
+                                "-rotationModeRaw", "agreement"]
+        app.launch()
+        let settings = app.showSettingsWindow()
+        XCTAssertTrue(app.showSettingsPanel("Pages and output"))
+        let note = settings.staticTexts["ap.settings.ocrModelRotation"]
+        XCTAssertTrue(note.waitForExistence(timeout: 5))
+        let wording = (note.value as? String).flatMap { $0.isEmpty ? nil : $0 } ?? note.label
+        XCTAssertTrue(wording.contains("ask your OCR model"), wording)
+        XCTAssertFalse(settings.staticTexts["ap.settings.rotationUnsure"].exists)
+        XCTAssertFalse(settings.staticTexts["ap.settings.openRouterRotation"].exists)
+        shoot(settings, "settings-direct-key-rotation")
+    }
+
     func testOpenRouterRotationExplainsCloudCallsAndKeepsBatchUnavailable() {
         app.terminate()
         app.launchArguments += ["-selectedProvider", "OpenRouter", "-useAppleVision", "NO",

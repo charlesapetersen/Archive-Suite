@@ -52,10 +52,9 @@ enum DefaultsKeys {
     // W41.app-ocr-cascade (`OCRCascade`)
     static let ocrCascadeRoute = "ocrCascadeRoute"                 // "<provider>|<model id>"; empty = off
     static let ocrCascadeOnDisagreement = "ocrCascadeOnDisagreement"
-    // W41.app-page-kind (`PageKindRouting`): tell each page's kind and preselect its reader; off by default
+    // W41.app-page-kind (`PageKindRouting`): tell each page's kind, and send handwritten pages to a handwriting
+    // reader (the two-way split, owner 2026-11-24); off by default
     static let ocrPageKindRouting = "ocrPageKindRouting"
-    // W46.mixed-route-setting: typed and printed pages go to the handwritten kind's pick; off by default
-    static let ocrHandwritingOnTyped = "ocrHandwritingOnTyped"
 
     // Input & processing
     static let batchMode = "batchMode"

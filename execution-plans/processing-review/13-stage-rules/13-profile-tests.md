@@ -1,7 +1,9 @@
 # 13. The solver's profile test cases
 
 The plan's five user profiles (`00-plan.md` §"The user profiles") are not written up as recommendations; they are the
-test cases the settings solver must pass when run on `settings-routes.json` with each profile's interview answers
+test cases the settings solver must pass when run on the app's table, `settings-routes-app.json` (only the rows the
+Processor can run or use; every measured row stays in `settings-routes.json` and on ArchiveOCRBench, owner 2026-11-24,
+`W49.proc-pipeline-prune-ok` 3), with each profile's interview answers
 (owner, 2026-11-06). Each stage note's section 9 gives the per-stage expectations with the row and figure that decide
 them; this file collects the cross-stage cases, applies the owner's calls of 2026-11-06 (`14-owner-calls.md`), and adds
 the router cases the integration plan's stage 4 asked for. `W46.settings-solver` turns each case into a test; a case
@@ -11,9 +13,11 @@ Conventions: answers are the general and collection interviews' (`12-settings-de
 owner's 96 (typewritten 50, printed 28, handwritten 16) unless named; ceiling none, hours 8, preference "best
 measured", priorities reading, finding documents, dates, names unless named; ties under each stage's `noise.tie` go to
 the cheaper route, judged against the best feasible route only, faster wins among equal cost, no chaining (note 04 call
-7.7). For reading the tie is the floor alone (owner, 2026-11-11): the pair's paired gap in `ocr-pair-matrix.json` under
-its floor (0.49 hosted or cluster, 0.00 between Mac routes, per kind 0.42, 0.24, 0.60), the interval shown but making
-no tie; on the 895 a pick takes the stratum's leader. A pick names the row id in the stage note's section 4; a reading
+7.7). The tie is the practical floor alone (owner, 2026-11-24, `W49.proc-pipeline-prune-ok` 4): for reading the pair's
+paired gap in `ocr-pair-matrix.json` under 0.5 NES points, for every route family, kind and set; for segmentation a
+paired gap of test-box pages exact under 2.0 points. The paired interval is shown and makes no tie, so an underpowered
+interval never hands a pick to the weaker route. (Before: reading 0.49 hosted, 0.00 between Mac routes, per kind 0.42,
+0.24, 0.60, and the 895's stratum leader; segmentation the interval holding 0.) A pick names the row id in the stage note's section 4; a reading
 pick also names its pair entry (W46.pairs-redecide).
 
 ## A. Skipped interviews (owner call 3)
@@ -23,7 +27,7 @@ detected; detected keys and plans listed on the sheet, none spent. Picks: as cas
 switch off; straighten on; the reading-copy and OCR-input rules of notes 01 and 02; no entity extraction on the Mac
 until names are ranked.
 
-Segmentation figures below were rescored by W46.seg-common-support on the same 325 of 330 document pages. Checking cost retains all 363 photographed pages and flagged unknown gaps; bounds on all document pages are separate in options.md. The profiles below keep their picks. Two untested profiles move, both on one 16-page gap: on the 325 pages text alone has 285 exact and GLM-5.3 Flash and the cluster 4B 269 each, 4.9 points against a 5.0 floor (twice g1's 8-page spread, rounded 2.5), where on 330 pages the same 16 pages read 4.85 against 4.8. So a Gemini plus OpenRouter key now picks `glm5.3-flash` ($1.16) over `gemini3.8-flash-text` ($1.68), and a cluster plus a Gemini key picks `seg-qwen3.5-4b-cluster` ($0); SettingsSolverTestDriver asserts both. The move follows the denominator and the owner's tie construction, not a measured change in either route. Since W46.seg-truth-audit (2026-11-18) the tie is each pair's paired interval, and both picks stand: text alone against GLM +4.9 [−4.0, +14.4], against the 4B +4.9 [−3.5, +13.8] (seg-pair-ties.md).
+Segmentation figures below were rescored by W46.seg-common-support on the same 325 of 330 document pages. Checking cost retains all 363 photographed pages and flagged unknown gaps; bounds on all document pages are separate in options.md. The profiles below keep their picks. Two untested profiles move, both on one 16-page gap: on the 325 pages text alone has 285 exact and GLM-5.3 Flash and the cluster 4B 269 each, 4.9 points against a 5.0 floor (twice g1's 8-page spread, rounded 2.5), where on 330 pages the same 16 pages read 4.85 against 4.8. So a Gemini plus OpenRouter key picked `glm5.3-flash` ($1.16) over `gemini3.8-flash-text` ($1.68), and a cluster plus a Gemini key picked `seg-qwen3.5-4b-cluster` ($0). The move followed the denominator and the owner's tie construction, not a measured change in either route. Since the 2-point floor (owner, 2026-11-24) neither stands: text alone is +4.9 over GLM ([−4.0, +14.4], seg-pair-ties.md), beyond the floor, so the Gemini plus OpenRouter key picks `gemini3.8-flash-text`; the cluster 4B is a bench row (the app runs no segmentation on a cluster), so the cluster plus a Gemini key picks `gemini3.8-flash-text` too. SettingsSolverTestDriver asserts both.
 
 ## B. A laptop only, open weights
 
@@ -33,18 +37,21 @@ Segmentation figures below were rescored by W46.seg-common-support on the same 3
   Vision returns empty for is flagged. With downloads declined: handwritten pages flagged "needs a download or a key",
   never read at 60.
 - Cascade: `casc-free-fail` only once a Mac escalation stage exists (pending the cascade rows' Mac memory per tier,
-  note 10 §8); until then no cascade pick.
+  note 10 §8); until then it is a bench row, not in the app's table, and there is no cascade pick.
 - Layout (note 03): `pp-doclayoutv3` regions on newspapers only (794 MB RSS); whole page elsewhere; never on
   handwriting or registers.
 - Segmentation (note 07 §9): `seg-qwen3.5-2b-8bit` (79.4% pages exact unchecked, 78.8 checks per 100 pages, 4.4 GB
   peak), zero-shot card and the manuscript warning; review by its own level (no partner).
-- Dating (note 08 §9): steps 1 and 4 `vision-2b-chooser-t3` (47.3 not in text, 89.9 in text), every propagated year
-  Date Uncertain with its source document; no step 2 (`qwen3-vl-8b-image-mac` is not offered: its quotes add no year on the
+- Dating (note 08 §9): steps 1 and 4 `vision-rules-t3` (48.1 not in text, 85.7 in text), the route the app runs: the
+  Vision 2B chooser `vision-2b-chooser-t3` (47.3, 89.9) is a bench row the app does not run (owner 2026-11-24, call 3).
+  Every propagated year Date Uncertain with its source document; no step 2 (the solver picks the 8B image pass here
+  today, a defect queued as `W49.proc-fix-solver-b1-image-pass`) (`qwen3-vl-8b-image-mac` is not offered: its quotes add no year on the
   traces, W46.date-route-pipeline-8b, nor on this route, W46.date-8b-local-baseline).
 - Entities (note 09 §9, owner call 11): nothing unless names are ranked; when ranked, `qwen3-vl-8b-mac` on typed and
   printed correspondence over Vision text, sender hidden; `none` on handwriting and non-correspondence.
-- Placement (note 05): Vision's own lines on print; on handwriting kraken blla lines with alignment, gate 0.67, text
-  page fallback; the hand route fits 16 GB (8.51 GB measured plus the headroom, `place-hands-cost.md`) and not 8 GB.
+- Placement (note 05): Vision's own lines on print; on handwriting the text page, since the hand layer is an Advanced
+  opt-in, off by default (owner 2026-11-24, `W49.proc-pipeline-prune-ok` 1; when on: kraken blla lines with alignment,
+  gate 0.90, text page fallback); the hand route fits 16 GB (8.51 GB measured plus the headroom, `place-hands-cost.md`) and not 8 GB.
 - Kit (note 12): no row.
 
 **B2. 32 GB and 64 GB.** Identical picks to B1 until `W46.ocr-mac-27b`, `W46.date-mac-27b` and
@@ -59,13 +66,13 @@ hollow with the reason "stays on the Mac"; picks as B1.
 
 ## C. Cheap API: an OpenRouter key, no Gemini key
 
-- Reading: `qwen3.8-flash` ($0.60; 95.11 answered) over `qwen3.6-27b` (95.38, $1.94), a tie by the 0.49 floor
+- Reading: `qwen3.8-flash` ($0.60; 95.11 answered) over `qwen3.6-27b` (95.38, $1.94), a tie by the 0.5 floor
   (−0.08 [−1.62, +1.64], n 91, owner96/all/answered), cheaper wins; its 3 refusals go to the cascade row that escalates
-  to `qwen3.6-27b`. Handwritten: `qwen3.6-27b` (hands16 92.61); `mistral-large4` ties it (−0.42 [−1.45, +0.68], n 16,
-  owner96/hands16/strict, floor 0.60) at $2.69, dearer, and every other OpenRouter route without Gemini trails beyond
-  the floor (note 04 §9 profile 2). Not pending: every OpenRouter route has a hands16 figure.
-- Segmentation: `glm5.3-flash` (82.8%, $1.16) ties the 2B (79.4%; +3.4 [−5.7, +12.0] paired, 07 §3) and the 2B wins on cost
-  when the Mac has 16 GB; GLM when it does not.
+  to `qwen3.6-27b`. Handwritten: `qwen3.6-27b` (hands16 92.61); `mistral-large4`, which tied it (−0.42 [−1.45, +0.68], n 16,
+  owner96/hands16/strict) at $2.69, is a bench row (no pinned OpenRouter route), and every other OpenRouter route
+  without Gemini trails beyond the floor (note 04 §9 profile 2). Not pending: every OpenRouter route has a hands16 figure.
+- Segmentation: `glm5.3-flash` (82.8%, $1.16) on both 16 GB and 8 GB Macs: its 3.4 points over the 2B (79.4%) clear
+  the 2-point floor (+3.4 [−5.7, +12.0] paired, 07 §3), where the interval tied them and the free 2B won on a 16 GB Mac.
 - Dating: steps 1 and 4 `gemini3.7-flash-trace-neigh` only if the key reaches Gemini, else the Mac route of B1 (no
   trace row for an OpenRouter-only model; pending `W46.date-route-pipeline`).
 - Entities: `qwen3.6-27b` (sender 0.62) on correspondence, extracted always on a cloud route, shown when names rank;
@@ -83,7 +90,7 @@ after checking; prompt g2, every figure Gemini 3.7's g2 answers, W46.seg-magazin
 the user may choose, with the card showing Gemini 3.7's figures labelled as 3.7's (owner call 8). Dating step 1 `gemini3.8-flash-oneshot`, step 2 `gemini3.7-flash-image`
 on documents with no year in the text ($2.75 per 1,000, 5.3 s), step 4 `gemini3.7-flash-trace-neigh`. Entities
 `gemini-entity-feature`, the entity feature's own prompt on the first 8,000 characters (owner calls 10 and 18; sender
-0.81, $4.39 per 1,000, 5.9 s, `ent-8k-paired.md`), extracted always, shown when ranked; `gemini-tagging-place` is not offered. Cascade: picked only if a cascade row beats `gemini3.8-flash` within the limits (none does at this ceiling).
+0.81, $4.39 per 1,000, 5.9 s, `ent-8k-paired.md`), extracted always, shown when ranked; `gemini-tagging-place` is a bench row, not in the app's table. Cascade: picked only if a cascade row beats `gemini3.8-flash` within the limits (none does at this ceiling).
 
 **D2. A Gemini key, ceiling $1 for 1,000 pages, hours 24 (batch prices).** Reading `gemini3.8-flash` at the batch price
 ($1.61) is over the ceiling; two Gemini rows fit, `gemini3.5-flash-lite` ($0.79 batch; 95.17 answered) and
@@ -101,9 +108,9 @@ no plan rows (the Claude arms were dropped, owner 2026-10-30), so the Mac route 
 **D4. The ChatGPT plan only.** Reading: no measured row; the sheet says so and falls to B1. Segmentation
 `chatgpt-only` as the app's table carries it. **Both plans:** segmentation `claude-sonnet5.5` (88.9%, 10.2 checks): the mix's 90.2% is 1.2 points over it
 (+1.2 [−4.2, +6.3] paired), a tie, and the one plan wins on cost.
-With Anthropic, OpenAI and OpenRouter keys but no Gemini key, GLM-5.3 Flash (82.8%, $1.16) is picked: ChatGPT's 90.2 is
-7.4 points ahead, but their paired interval holds 0 (+7.4 [−1.0, +16.9]; sign test on the 9 documents only one has
-right, 7 to 2, p 0.18), so the cheaper route wins the tie (W46.seg-truth-audit; ChatGPT under the old 5.0 floor).
+With Anthropic, OpenAI and OpenRouter keys but no Gemini key, GLM-5.3 Flash (82.8%, $1.16) is no longer picked:
+ChatGPT's 90.2 is 7.4 points ahead (+7.4 [−1.0, +16.9]), beyond the 2-point floor, where the interval tied them
+(W46.seg-truth-audit) and GLM won on cost; the pick is `chatgpt-gpt6.1-sol` (90.2%).
 
 **D5. A Claude plan and a Gemini key, preference "cheapest within a point".** Reading: `claude-sonnet5.5` on the
 plan, at no money (W41.app-claude-plan-reading). Segmentation: `claude-sonnet5.5`
@@ -121,15 +128,16 @@ image g2 route (+1.5 [−4.0, +7.7]).
   `pp-doclayoutv3` regions for small readers (kind rule), whole page for 27B-class readers. Forms
   `qwen3.5-27b-farmshare` (L4 69.98, the leader of public895/L4; its rivals' intervals hold 0, which makes no tie).
   N6 `xiaomi-ocr-0-sherlock`; L5-L8, N1, N3, N4 `churro-3b-farmshare` (note 04 §9 profile 4).
-- Segmentation: `seg-qwen3.5-2b-bf16-cluster` (79.4%; the fastest of three ties, the 4B 82.8% and the teacher 81.2%); review rule disagreement with the
-  teacher as partner.
-- Dating: steps 1 and 4 `qwen3.6-27b-trace-neigh-vision` (56.5 not in text, 93.3 in text), step 2 `qwen3.6-27b-image`.
+- Segmentation: `manual`. The app brings a cluster's reading in (the institutional computing import) but runs no
+  segmentation or dating there, so the cluster rows (`seg-qwen3.5-2b-bf16-cluster` 79.4%, the 4B 82.8%, the teacher
+  81.2%) are bench rows (owner 2026-11-24, call 3), and with nothing downloaded to the Mac the 2B is out too.
+- Dating: steps 1 and 4 `vision-rules-t3`, no step 2; the cluster rows `qwen3.6-27b-trace-neigh-vision` (56.5 not in
+  text, 93.3 in text) and `qwen3.6-27b-image` are bench rows for the same reason.
 - Entities: `qwen3.6-27b` (sender 0.66 on Vision text, `ent-local-shipped.md`) on correspondence; never from Vision
   text on handwriting. With a Gemini or OpenRouter key as well, `gemini-entity-feature`: at 8,000 characters
   its 0.81 is 0.15 ahead on sender, outside the unpaired 0.05 tie rule, so the key buys it at $4.39 per 1,000 documents
   (note 09 §9 profile 4; W47.wh-ent-8k-apply; at 3,000 characters the 0.69 tied and the cluster's $0 won). With Gemini excluded, also `qwen3.6-27b`.
-- Placement: the hand line detector setting visible (owner section 2, placement); PP-OCRv6 det offered as the
-  cluster-side detector.
+- Placement: the hand line detector is a bench row (`hand-ppocrv6-ctc`; the app has no cluster-side detector setting).
 
 ## F. Any profile plus a coding agent (fine-tuning answer)
 
@@ -151,10 +159,12 @@ image g2 route (+1.5 [−4.0, +7.7]).
 4. **Hours that nothing meets** (a 10,000-page batch on a 16 GB Mac in 1 hour): the sheet falls back to the cheapest
    feasible per stage and says which limit to relax and by how much (the prototype's fallback; `12-settings-design.md`
    §3.3).
-5. **A tie chain:** the rows restricted to `qwen3.5-397b` (94.06, $2.02), `qwen3-vl-235b` (94.01, $1.22) and
-   `qwen3.5-9b` (93.38, $0.25), all answered. Qwen3.5 397B minus Qwen3-VL 235B is +0.05 and Qwen3-VL 235B minus
-   Qwen3.5 9B +0.47, both under the 0.49 floor, but Qwen3.5 397B minus Qwen3.5 9B is +0.53 (owner96/all/answered):
-   judged against the best feasible route only, the pick is `qwen3-vl-235b`, never `qwen3.5-9b`. (The earlier chain,
+5. **A tie chain:** a Gemini and an OpenRouter key, the rows restricted to `gemini3.1-flash-lite` (94.59, $1.17),
+   `qwen3-vl-235b` (94.01, $1.22) and `qwen3.5-9b` (93.38, $0.25), all answered. Gemini 3.1 Flash-Lite minus Qwen3-VL
+   235B is +0.19 and Qwen3-VL 235B minus Qwen3.5 9B +0.47, both under the 0.5 floor, but Gemini 3.1 Flash-Lite minus
+   Qwen3.5 9B is +0.90 (owner96/all/answered): judged against the best feasible route only, the pick is
+   `gemini3.1-flash-lite` (the cheaper of its tie), never `qwen3.5-9b`. (The 2026-11-11 chain, `qwen3.5-397b` to
+   `qwen3-vl-235b` to `qwen3.5-9b`, lost its head when the 397B, unpinned on OpenRouter, left the app's table.) (The earlier chain,
    Gemini 3.8 Flash through Qwen3.6 27B to Qwen3.8 Flash, is not a chain under the matrix: Gemini 3.8 Flash minus
    Qwen3.6 27B is +1.00 [−1.26, +2.95], and Qwen3.8 Flash minus Gemini 3.8 Flash −1.11 [−3.08, +1.13], both over the
    floor.)

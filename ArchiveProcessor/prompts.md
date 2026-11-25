@@ -322,6 +322,9 @@ when that year is written in a date it quoted, and stamp dates go to the sidecar
 the bench's own, byte for byte (`segbench/date_traceable.TRACE` "neigh", `segbench/date_image.PROMPT`), checked by
 `scripts/test-date-route.sh` on the cases `segbench/date_route_cases.py` writes. Measured:
 `segbench-results/date-route-pipeline.md`.
+A collection whose numeric dates are day first (`numericDatesDayFirst`, owner 2026-11-24) gets one more line after the
+image prompt, `Numeric dates on these pages are written day first (DD/MM/YYYY): 04/07/1962 is 4 July 1962.`
+(`DateRoute.imagePromptForOrder`); the default prompt is unchanged.
 
 Trace prompt:
 
