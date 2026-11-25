@@ -290,9 +290,11 @@ on the standard route and the mixed-PDF route (W49.proc-stop-saves-inflight), an
 - **A crash loses the pages in flight**, at most one per OCR worker (Settings › Parallel OCR workers, default 4);
   a resume reads them again. (accepted: a request whose process dies has no answer to save, and the count is the
   user's own worker setting)
-- **A crash or quit during tagging, segmentation or collection review starts that step again.** Its OCR is not
-  repeated, but automatic tagging's text calls are bought again (a window segmenter's answers are kept). (queued:
-  W49.proc-unified-pipeline-1)
+- **A crash or quit during segmentation review, tagging or collection review starts that step again.** Its OCR is
+  not repeated, and a standard run's automatic tagging answers are kept and reused (W49.proc-unified-pipeline-1,
+  `PendingRun.taggingProgress`), as a window segmenter's are. Still bought again: collection identification's calls,
+  Auto-date's date prefetches and a resumed paid batch's tagging calls (its journal is retired before tagging); review
+  and manual-tagging answers are asked again. (queued: W49.proc-resume-later-steps)
 
 ## ⚠️ LIMITATION (W47.wh-whole-page-large, 2026-11-20): Qwen3.6 27B reads newspapers whole on a tie measured elsewhere
 

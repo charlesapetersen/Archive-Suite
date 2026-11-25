@@ -50,6 +50,8 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
   has exited before the next loads; none over 10 GB), with Live-Capture-aware keep-alive and `withStage` for a stage
   that reads many pages with one model. Never start a Python/MLX process elsewhere: `scripts/check-local-model-seam.sh`
   fails on it. Contract: the `S` lines of `scripts/test-local-models.sh`.
+- **One post-OCR tail** (W49.proc-unified-pipeline-1): every Process Files route ends through
+  `OCR/OCRProcessor+PostOCRFinalizer.swift`; `scripts/check-pipeline-seam.sh` fails a copied stage.
 - **The macOS 27 on-device model** (`OCR/OnDeviceModelClient.swift`, W47.wh-readers-lost-clients) is the second
   Apple Vision model (`apple-fm-27`), chosen only on the reading card (lower-scoring, owner call 15); its loop stop
   fails a page whose reply starts repeating, as a page at the token cap fails on every client.

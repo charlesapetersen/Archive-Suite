@@ -132,9 +132,9 @@ safety, verdict) is in audit run `wf_4373722d-e70`.
   shared text-completion client; `TagGenerator` + `CollectionSegmenter` both delegate to it, each keeping its own
   maxTokens so request bodies stay byte-identical (the Mistral-signature drift was reconciled, not blind-merged).
   This shipped BEFORE the 2026-07-15 promotion re-listed it in error; SUITE_TODO reconciled `[x]` 2026-07-16.
-- **Shared finalize/organize helpers** (queued: W49.proc-finalize-helpers behind nice-to-have, 2026-11-20). startProcessing / resumeRun / resumeBatch each duplicate the
-  "organize into collection folders" + run-completion blocks verbatim. Extract `organizeCollectionFolders` +
-  `finalizeRun`. Touches the Tier-2 file-move path → adversarial-review before shipping.
+- ✅ **Shared finalize/organize helpers — SHIPPED by W49.proc-unified-pipeline-1 (2026-11-25).** Every Process Files
+  route's post-OCR tail is `runPostOCRStages` + `completeRun` (`OCR/OCRProcessor+PostOCRFinalizer.swift`);
+  `scripts/check-pipeline-seam.sh` fails a copy.
 - **Unify the box/folder color-retag logic** — closed (owner, 2026-11-20, call 28): the drift is fixed (one shared rule). across applyReviewEdits / updateClassification /
   applyDocumentReviewEdits (three copies that have slightly drifted — confirm the intended behavior first).
 - ◐ **Smaller de-dups — PARTIALLY SHIPPED `f1d2263` (suite-v1.2.0).** — shipped (owner, 2026-11-20, call 28): the remainder shipped 2026-09-26. Already done in f1d2263 (do NOT redo):

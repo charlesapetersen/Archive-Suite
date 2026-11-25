@@ -801,6 +801,10 @@ class OCRProcessor: ObservableObject {
         /// The settings layers as they resolved when the run started (W46.settings-layers): a record of what
         /// produced it, read by nothing that decides how the run goes, so outside the fingerprint. A resume keeps it.
         var resolvedSettings: ResolvedSettingsSnapshot? = nil
+        /// W49.proc-unified-pipeline-1: each automatically tagged segment's answers so far, keyed by
+        /// `taggingProgressKey`, so a crash or quit during tagging does not buy them again. Outside the fingerprint for
+        /// the reason the window answers are: the run's own progress after OCR, rewritten as it goes.
+        var taggingProgress: [String: SavedSegmentTags]? = nil
     }
 
 

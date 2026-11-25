@@ -1108,6 +1108,30 @@ extension OCRProcessor {
         return true
     }
 
+    // W49.proc-unified-pipeline-1 (absorbing W49.proc-resume-tagging-progress): `taggingProgressKey` is in
+    // OCRProcessor+PostOCRFinalizer.swift; these write the pending run, so they live beside its private save.
+    /// The answers a resumed run already paid for, keyed by `taggingProgressKey`; empty outside a resumable run.
+    var savedTaggingProgress: [String: SavedSegmentTags] { activePendingRun?.taggingProgress ?? [:] }
+
+    /// Keep one segment's answers in the run's manifest as they land, so a crash or quit during tagging does not buy
+    /// them again. A failed save costs only that: the run goes on, and a resume asks again.
+    func persistTaggingProgress(_ saved: SavedSegmentTags, key: String, sources: [URL]) {
+        // Only into the manifest of the run whose pages these are.
+        guard !Task.isCancelled, var run = activePendingRun, !sources.isEmpty,
+              Set(run.fileURLs).isSuperset(of: sources) else { return }
+        run.taggingProgress = (run.taggingProgress ?? [:]).merging([key: saved]) { $1 }
+        activePendingRun = run
+        if let save = pendingRunSaveOverride { save(run) } else { Self.savePendingRun(run) }
+    }
+
+    /// A Redo asks every tagging call again, so the answers kept for a resume go with it.
+    func forgetTaggingProgress() {
+        guard var run = activePendingRun, run.taggingProgress != nil else { return }
+        run.taggingProgress = nil
+        activePendingRun = run
+        if let save = pendingRunSaveOverride { save(run) } else { Self.savePendingRun(run) }
+    }
+
     /// Save a completed OCR result to the pending run on disk, along with the EXACT output-PDF path that
     /// was assigned to this index in the original pass. Persisting the assigned path (not just the result)
     /// is what lets resume reuse the same source→output association verbatim instead of re-deriving it in
@@ -2044,140 +2068,30 @@ extension OCRProcessor {
 
         guard !Task.isCancelled else { return }
 
-        // Tagging (before collection segmentation, matching main workflow order).
-        // Switch on the persisted taggingMode so a batch submitted in Human / Auto-date / manual-seg
-        // mode isn't silently downgraded to automatic tagging after a relaunch (and .none/.copySource
-        // correctly skip LLM tagging).
-        if pending.enableTagging && !passSourceTags {
-            // W36.seg-opt-review: a window approach runs its stage (and its review) here too, reusing the
-            // answers the manifest kept; otherwise the stored per-page classifications segment, as before.
-            let plan = segmentationPlan(tagging: runOutputSettings.taggingMode, runConfig: runConfig)
-            let preGrouped = !pending.usesWindowSegmentation
-                && preGroupedBoundaries.count == pending.fileURLs.count && !pending.fileURLs.isEmpty
-            if case .windows(let approach) = plan, !preGrouped {
-                guard await runWindowSegmentationStage(files: pending.fileURLs, approach: approach,
-                                                       runConfig: runConfig, outputDirectory: pending.outputDirectory,
-                                                       settings: pending.resolvedSettings) == .done else {
-                    cleanupTempFiles(); return
-                }
-            } else {
-                statusMessage = "Segmenting documents…"
-                rebuildSegments(files: pending.fileURLs)
-            }
-            if monthlySpend == nil, activePendingBatch?.usesWindowSegmentation == true {
-                retirePaidBatchJournalIfPollCompleted()
-            }
-            statusMessage = "Found \(segments.count) segments. Generating tags…"
-
-            switch runOutputSettings.taggingMode {
-            case .automatic:
-                // Batch resume intentionally uses performTaggingPhase (NOT performAutomaticTaggingWithReview):
-                // a resumed batch has no interactive session to drive the redo-review loop, so it tags straight
-                // through. (The interactive run path uses the review loop; this divergence is deliberate.)
-                await performTaggingPhase(
-                    provider: pending.provider, model: pending.model,
-                    apiKey: apiKey,
-                    outputDirectory: pending.outputDirectory,
-                    enableSegmentJSON: pending.enableSegmentJSON,
-                    runConfig: runConfig
-                )
-            case .autoDate, .human:
-                if let autoDate = plan.combinedWindow(tagging: runOutputSettings.taggingMode, preGrouped: preGrouped) {
-                    await performManualSegmentAndTag(
-                        autoDate: autoDate,
-                        provider: pending.provider, model: pending.model, thinkingLevel: pending.thinkingLevel,
-                        apiKey: apiKey, outputDirectory: pending.outputDirectory,
-                        enableSegmentJSON: pending.enableSegmentJSON, preOCRed: false, files: pending.fileURLs,
-                        runConfig: runConfig
-                    )
-                } else {
-                    await performManualTaggingPhase(
-                        mode: runOutputSettings.taggingMode, provider: pending.provider, model: pending.model,
-                        thinkingLevel: pending.thinkingLevel, apiKey: apiKey,
-                        outputDirectory: pending.outputDirectory, enableSegmentJSON: pending.enableSegmentJSON,
-                        runConfig: runConfig
-                    )
-                }
-            case .none, .copySource:
-                break
-            }
-        }
-
-        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { return }
-
-        // Collection segmentation (after tagging)
-        if pending.enableCollectionSegmentation {
-            await performCollectionSegmentation(
-                files: pending.fileURLs,
-                provider: pending.provider,
-                model: pending.model,
-                thinkingLevel: pending.thinkingLevel,
-                apiKey: apiKey,
-                outputDirectory: pending.outputDirectory,
-                confirmBeforeOrganizing: pending.confirmCollectionIDs,
-                reviewDocumentSegmentation: pending.reviewDocumentSegmentation,
-                runConfig: runConfig
-            )
-
-            applyBoxFolderLabelTags(enableTagging: pending.enableTagging, runConfig: runConfig)
-        }
-
-        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { return }
-
-        // Dual output: write each original image beside its PDF (same base + tags) BEFORE merge repoints
-        // outputURLMap and before organization moves files — exactly as startProcessing does. Skipped
-        // unless exportOriginals is set (restored above), so the non-dual-output path is unchanged.
-        await exportOriginalImages(runConfig: runConfig)
-
-        await recordLocalNameMentions(runConfig: runConfig, mode: runOutputSettings.taggingMode,
-                                      merging: runOutputSettings.mergeDocuments ? pending.fileURLs : nil)
-        guard !Task.isCancelled else { return }
-
-        if runOutputSettings.mergeDocuments {
-            await performDocumentMerging(
-                files: pending.fileURLs, outputDirectory: pending.outputDirectory,
-                runConfig: runConfig)
-        }
-
-        guard !Task.isCancelled else { return }
-
-        cleanupTempFiles()
+        // The shared stages after OCR (W49.proc-unified-pipeline-1), in the batch's persisted tagging mode, so a batch
+        // submitted in Human / Auto-date / manual-seg mode isn't silently downgraded to automatic tagging after a
+        // relaunch (and .none/.copySource correctly skip LLM tagging).
+        let plan = PostOCRPlan(
+            origin: .resumedBatch, files: pending.fileURLs, outputDirectory: pending.outputDirectory,
+            runConfig: runConfig, settings: pending.resolvedSettings,
+            text: .init(provider: pending.provider, model: pending.model, thinkingLevel: pending.thinkingLevel,
+                        apiKey: apiKey),
+            enableTagging: pending.enableTagging, enableSegmentJSON: pending.enableSegmentJSON,
+            enableCollectionSegmentation: pending.enableCollectionSegmentation,
+            confirmCollectionIDs: pending.confirmCollectionIDs,
+            collectionReviewsDocuments: pending.reviewDocumentSegmentation, reviewWholeRun: true, reviewRotation: false,
+            segmentationReviews: false, phoneGroupsApply: !pending.usesWindowSegmentation, taggingReview: false)
+        guard await runPostOCRStages(plan) else { return }
 
         guard !Task.isCancelled else { return }
         restoreMixedPDFJobs(pending.mixedPDFOutcomes)
         restoredFullJobs = true
         progressRange = nil
-        guard let organizedMoves = await finishCatalogueRun(organizing: pending.enableCollectionSegmentation, preOCRed: false,
-                                                        exportingImages: runOutputSettings.exportOriginals,
-                                                        stampsUnread: runOutputSettings.stampUnread) else { return }
-        let containerProblem = await recordContainerLabels(   // W47.ct-processor-capture
-            moves: organizedMoves, outputDirectory: pending.outputDirectory, preOCRedInput: false)   // a batch run never has pre-OCRed input
-        guard !Task.isCancelled else { return }
-        writeLogFile(outputDirectory: pending.outputDirectory)
-        isProcessing = false
-        progress = 1.0
-        let succeeded = jobs.filter { $0.status == .succeeded }.count
-        recordRunHistory(succeeded: succeeded)
-        statusMessage = runDoneMessage(succeeded: succeeded, failed: failedFiles.count)
-        // W23.m5 / W23.h5-fu — say so when a written output went out untagged, or with a
-        // placeholder instead of the scan. Both are silent failures otherwise: the file is
-        // there and looks processed, but tag search will not find it / the scan is missing.
-        statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
-        statusMessage += treeFallbackSuffix   // W47.ct-processor-intake
-        statusMessage += catalogueFilingWarning
-        if let note = containerLabelSpendNote { statusMessage += " " + note }   // W47.ct-label-cost
-        if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
-        if pending.enableTagging && !passSourceTags {
-            statusMessage += Self.taggedSegmentsSuffix(segments: segments.count, failures: taggingFailureNames)
-            if let checks = segmentationCheckSummary { statusMessage += " \(checks)."; segmentationCheckSummary = nil }
-        }
-        if passSourceTags {
-            statusMessage += " Source tags copied."
-        }
-        if pending.enableCollectionSegmentation && !collectionSegments.isEmpty {
-            statusMessage += " \(collectionSegments.count) collections organized."
-        }
-        postCompletionNotification()
+        await completeRun(RunCompletion(
+            outputDirectory: pending.outputDirectory, enableTagging: pending.enableTagging,
+            enableCollectionSegmentation: pending.enableCollectionSegmentation,
+            preOCRed: false,   // a batch run never has pre-OCRed input
+            exportingImages: runOutputSettings.exportOriginals, stampsUnread: runOutputSettings.stampUnread))
     }
     /// Resume an interrupted non-batch run.
     /// `readWithoutClusterText` is the operator's answer to `institutionalComputeResumePrompt`: read the pages of a
@@ -2475,23 +2389,10 @@ extension OCRProcessor {
                 )
                 // Pre-OCRed path handles its own post-processing; skip to finalization
                 guard !Task.isCancelled, isProcessing else { return }
-                guard await finishCatalogueRun(organizing: pending.enableCollectionSegmentation, preOCRed: true,
-                                               exportingImages: false,
-                                               stampsUnread: runOutputSettings.stampUnread) != nil else { return }
-                activePendingRun = nil
-                pendingRunInfo = nil
-                writeLogFile(outputDirectory: pending.outputDirectory)
-                isProcessing = false
-                progress = 1.0
-                let succeeded = jobs.filter { $0.status == .succeeded }.count
-                recordRunHistory(succeeded: succeeded)
-                statusMessage = runDoneMessage(succeeded: succeeded, failed: failedFiles.count)
-                // W23.m5 / W23.h5-fu — say so when a written output went out untagged, or with a
-                // placeholder instead of the scan. Both are silent failures otherwise: the file is
-                // there and looks processed, but tag search will not find it / the scan is missing.
-                statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
-                statusMessage += treeFallbackSuffix   // W47.ct-processor-intake
-                postCompletionNotification()
+                await completeRun(RunCompletion(
+                    outputDirectory: pending.outputDirectory, enableTagging: pending.enableTagging,
+                    enableCollectionSegmentation: pending.enableCollectionSegmentation, preOCRed: true,
+                    exportingImages: false, stampsUnread: runOutputSettings.stampUnread, clearsPendingRun: true))
                 return
             }
 
@@ -2535,132 +2436,27 @@ extension OCRProcessor {
 
         guard !Task.isCancelled, isProcessing else { cleanupTempFiles(); return }
 
-        // Tagging (mode-dependent), matching the main workflow — not always automatic.
-        if pending.enableTagging && !passSourceTags {
-            // W36.seg-opt-review: a window approach runs its stage (and its review) here too, reusing the
-            // answers the manifest kept; otherwise the stored per-page classifications segment, as before.
-            let plan = segmentationPlan(tagging: runOutputSettings.taggingMode, runConfig: runConfig)
-            let preGrouped = preGroupedBoundaries.count == pending.fileURLs.count && !pending.fileURLs.isEmpty
-            if case .windows(let approach) = plan, !preGrouped {
-                guard await runWindowSegmentationStage(files: pending.fileURLs, approach: approach,
-                                                       runConfig: runConfig, outputDirectory: pending.outputDirectory,
-                                                       settings: pending.resolvedSettings) == .done else {
-                    cleanupTempFiles(); return
-                }
-            } else {
-                statusMessage = "Segmenting documents…"
-                rebuildSegments(files: pending.fileURLs)
-            }
-            statusMessage = "Found \(segments.count) segments. Tagging…"
-
-            switch runOutputSettings.taggingMode {
-            case .automatic:
-                await performAutomaticTaggingWithReview(
-                    provider: textProvider, model: textModel, thinkingLevel: textThinkingLevel,
-                    apiKey: textAPIKey, outputDirectory: pending.outputDirectory,
-                    enableSegmentJSON: pending.enableSegmentJSON, files: pending.fileURLs,
-                    runConfig: runConfig
-                )
-            case .autoDate, .human:
-                if let autoDate = plan.combinedWindow(tagging: runOutputSettings.taggingMode, preGrouped: preGrouped) {
-                    await performManualSegmentAndTag(
-                        autoDate: autoDate,
-                        provider: textProvider, model: textModel, thinkingLevel: textThinkingLevel,
-                        apiKey: textAPIKey, outputDirectory: pending.outputDirectory,
-                        enableSegmentJSON: pending.enableSegmentJSON,
-                        preOCRed: pending.preOCRedInput, files: pending.fileURLs,
-                        runConfig: runConfig
-                    )
-                } else {
-                    await performManualTaggingPhase(
-                        mode: runOutputSettings.taggingMode, provider: textProvider, model: textModel,
-                        thinkingLevel: textThinkingLevel, apiKey: textAPIKey,
-                        outputDirectory: pending.outputDirectory, enableSegmentJSON: pending.enableSegmentJSON,
-                        runConfig: runConfig
-                    )
-                }
-            case .none, .copySource:
-                break
-            }
-        }
-
-        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { cleanupTempFiles(); return }
-
-        // Collection segmentation (after tagging)
-        if pending.enableCollectionSegmentation {
-            await performCollectionSegmentation(
-                files: pending.fileURLs,
-                provider: textProvider,
-                model: textModel,
-                thinkingLevel: textThinkingLevel,
-                apiKey: textAPIKey,
-                outputDirectory: pending.outputDirectory,
-                confirmBeforeOrganizing: pending.confirmCollectionIDs,
-                reviewDocumentSegmentation: pending.reviewDocumentSegmentation,
-                runConfig: runConfig
-            )
-
-            applyBoxFolderLabelTags(enableTagging: pending.enableTagging, runConfig: runConfig)
-        }
-
-        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { cleanupTempFiles(); return }
-
-        // Dual output: write each original image beside its PDF BEFORE merge repoints outputURLMap and
-        // before organization moves files — exactly as startProcessing does. No-op unless exportOriginals
-        // is set (restored above), so the non-dual-output path is unchanged.
-        await exportOriginalImages(runConfig: runConfig)
-
-        await recordLocalNameMentions(runConfig: runConfig, mode: runOutputSettings.taggingMode,
-                                      merging: runOutputSettings.mergeDocuments ? pending.fileURLs : nil)
-        guard !Task.isCancelled else { return }
-
-        if runOutputSettings.mergeDocuments {
-            await performDocumentMerging(
-                files: pending.fileURLs, outputDirectory: pending.outputDirectory,
-                runConfig: runConfig)
-        }
-
-        guard !Task.isCancelled else { return }
-
-        cleanupTempFiles()
+        // The shared stages after OCR (W49.proc-unified-pipeline-1), in the run's own tagging mode — not always
+        // automatic. Tagging answers the manifest kept are reused (`taggingProgress`).
+        let plan = PostOCRPlan(
+            origin: .resumedRun, files: pending.fileURLs, outputDirectory: pending.outputDirectory,
+            runConfig: runConfig, settings: pending.resolvedSettings,
+            text: .init(provider: textProvider, model: textModel, thinkingLevel: textThinkingLevel, apiKey: textAPIKey),
+            enableTagging: pending.enableTagging, enableSegmentJSON: pending.enableSegmentJSON,
+            enableCollectionSegmentation: pending.enableCollectionSegmentation,
+            confirmCollectionIDs: pending.confirmCollectionIDs,
+            collectionReviewsDocuments: pending.reviewDocumentSegmentation, reviewWholeRun: true, reviewRotation: false,
+            segmentationReviews: false, phoneGroupsApply: true, taggingReview: true)
+        guard await runPostOCRStages(plan) else { return }
 
         guard !Task.isCancelled else { return }
         restoreMixedPDFJobs(pending.mixedPDFOutcomes)
         restoredFullJobs = true
         progressRange = nil
-        guard let organizedMoves = await finishCatalogueRun(organizing: pending.enableCollectionSegmentation,
-                                                        preOCRed: pending.preOCRedInput,
-                                                        exportingImages: runOutputSettings.exportOriginals,
-                                                        stampsUnread: runOutputSettings.stampUnread) else { return }
-        let containerProblem = await recordContainerLabels(   // W47.ct-processor-capture
-            moves: organizedMoves, outputDirectory: pending.outputDirectory, preOCRedInput: pending.preOCRedInput)
-        guard !Task.isCancelled else { return }
-
-        writeLogFile(outputDirectory: pending.outputDirectory)
-        isProcessing = false
-        progress = 1.0
-        let succeeded = jobs.filter { $0.status == .succeeded }.count
-        recordRunHistory(succeeded: succeeded)
-        statusMessage = runDoneMessage(succeeded: succeeded, failed: failedFiles.count)
-        // W23.m5 / W23.h5-fu — say so when a written output went out untagged, or with a
-        // placeholder instead of the scan. Both are silent failures otherwise: the file is
-        // there and looks processed, but tag search will not find it / the scan is missing.
-        statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
-        statusMessage += treeFallbackSuffix   // W47.ct-processor-intake
-        statusMessage += catalogueFilingWarning
-        if let note = containerLabelSpendNote { statusMessage += " " + note }   // W47.ct-label-cost
-        if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
-        if pending.enableTagging && !passSourceTags {
-            statusMessage += Self.taggedSegmentsSuffix(segments: segments.count, failures: taggingFailureNames)
-            if let checks = segmentationCheckSummary { statusMessage += " \(checks)."; segmentationCheckSummary = nil }
-        }
-        if passSourceTags {
-            statusMessage += " Source tags copied."
-        }
-        if pending.enableCollectionSegmentation && !collectionSegments.isEmpty {
-            statusMessage += " \(collectionSegments.count) collections organized."
-        }
-        postCompletionNotification()
+        await completeRun(RunCompletion(
+            outputDirectory: pending.outputDirectory, enableTagging: pending.enableTagging,
+            enableCollectionSegmentation: pending.enableCollectionSegmentation, preOCRed: pending.preOCRedInput,
+            exportingImages: runOutputSettings.exportOriginals, stampsUnread: runOutputSettings.stampUnread))
     }
     /// OCR only specific file indices (for resuming interrupted runs).
     private func performOCRPhaseForIndices(
@@ -3833,7 +3629,6 @@ extension OCRProcessor {
                     }
                 }
             }
-            var organizedMoves: [URL: URL] = [:]   // W47.ct-processor-capture: where organisation moved each PDF
             if preOCRedInput {
                 // --- Pre-OCRed PDF path: extract text, classify, skip PDF generation ---
                 // A Vision-hybrid selection has no image work on this route either. Reuse its text
@@ -3858,10 +3653,6 @@ extension OCRProcessor {
                     settings: activeResolvedSettings
                 )
                 guard !Task.isCancelled, isProcessing else { return }
-                guard let filed = await finishCatalogueRun(organizing: enableCollectionSegmentation, preOCRed: true,
-                                                            exportingImages: false,
-                                                            stampsUnread: runOutputSettings.stampUnread) else { return }
-                organizedMoves = filed
             } else if !autoReOCR || mixedReOCR {
                 // --- Standard path: all inputs except the multi-page PDFs already rebuilt above. ---
                 let files = mixedReOCR ? imageIndices.map { files[$0] } : files
@@ -3999,141 +3790,19 @@ extension OCRProcessor {
 
                 guard !Task.isCancelled, isProcessing else { cleanupTempFiles(); return }
 
-                // Dedicated rotation review (opt-in) — a fast, standalone pass, separate from and BEFORE
-                // the segmentation/tagging review, and run in EVERY tagging mode. It bakes the corrected
-                // rotation into each output PDF; the exported JPG then picks up the same value.
-                if reviewRotation && rotationMode != .off {
-                    await showRotationReview(files: files, runConfig: runConfig)
-                    guard !Task.isCancelled else { cleanupTempFiles(); return }
-                }
-
-                // Segmentation: pre-grouped from Live Capture, else the window segmenter and its review, else the
-                // per-page review (W36.seg-opt-review: `SegmentationPlan`).
-                let plan = segmentationPlan(tagging: runOutputSettings.taggingMode, runConfig: runConfig)
-                let preGrouped = preGroupedBoundaries.count == files.count && !files.isEmpty
-                if preGrouped {
-                    // Groups were defined on the phone — apply them directly, skip LLM segmentation.
-                    applyPreGroupedClassifications(files: files)
-                    rebuildSegments(files: files)
-                } else if case .windows(let approach) = plan {
-                    guard await runWindowSegmentationStage(files: files, approach: approach,
-                                                           runConfig: runConfig, outputDirectory: outputDirectory,
-                                                           settings: activeResolvedSettings,
-                                                           reviewWholeRun: reviewWholeRun) == .done else {
-                        cleanupTempFiles(); return
-                    }
-                } else if case .manualWindow = plan {
-                    // Manual modes: the combined segment+tag window owns rotation, box/folder, and
-                    // segmentation, so skip the separate review here (it rebuilds segments itself).
-                } else if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
-                    if reviewWholeRun || plan == .noTagging {
-                        await showFullSegmentationReview(files: files, runConfig: runConfig)
-                        guard !Task.isCancelled else { cleanupTempFiles(); return }
-                    }
-
-                    // Final confirmation of box/folder identifications
-                    await showBoxFolderConfirmation(files: files, runConfig: runConfig)
-                    guard !Task.isCancelled else { cleanupTempFiles(); return }
-
-                    // Rebuild segments from user-confirmed classifications (excluding removed files)
-                    rebuildSegments(files: files)
-                }
-
-                guard !Task.isCancelled else { cleanupTempFiles(); return }
-
-                if monthlySpend == nil, activePendingBatch?.usesWindowSegmentation == true {
-                    retirePaidBatchJournalIfPollCompleted()
-                }
-
-                // Phase 2: Tagging (mode-dependent)
-                if enableTagging && !passSourceTags {
-                    // This branch is reached only after OCR. `text*` resolves to the separately selected
-                    // LLM in a Vision hybrid and is intentionally NOT passed to any image-OCR function.
-                    let textProvider = runConfig.textProvider
-                    let textModel = runConfig.textModel
-                    let textThinkingLevel = runConfig.textThinkingLevel
-                    let textAPIKey = runConfig.textAPIKey
-                    switch runOutputSettings.taggingMode {
-                    case .automatic:
-                        await performAutomaticTaggingWithReview(
-                            provider: textProvider, model: textModel, thinkingLevel: textThinkingLevel,
-                            apiKey: textAPIKey, outputDirectory: outputDirectory,
-                            enableSegmentJSON: enableSegmentJSON, files: files,
-                            runConfig: runConfig
-                        )
-                    case .autoDate, .human:
-                        if let autoDate = plan.combinedWindow(tagging: runOutputSettings.taggingMode, preGrouped: preGrouped) {
-                            await performManualSegmentAndTag(
-                                autoDate: autoDate,
-                                provider: textProvider, model: textModel, thinkingLevel: textThinkingLevel, apiKey: textAPIKey,
-                                outputDirectory: outputDirectory,
-                                enableSegmentJSON: enableSegmentJSON, preOCRed: false, files: files,
-                                runConfig: runConfig
-                            )
-                        } else {
-                            // The window segmenter (or Live Capture) segmented: the user tags each document.
-                            await performManualTaggingPhase(
-                                mode: runOutputSettings.taggingMode, provider: textProvider, model: textModel,
-                                thinkingLevel: textThinkingLevel, apiKey: textAPIKey,
-                                outputDirectory: outputDirectory, enableSegmentJSON: enableSegmentJSON,
-                                runConfig: runConfig
-                            )
-                        }
-                    case .none, .copySource:
-                        break
-                    }
-                    guard !Task.isCancelled else { cleanupTempFiles(); return }
-                }
-
-                guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { cleanupTempFiles(); return }
-
-                // Phase 3: Collection Segmentation + name review (after tagging review, last step before completion)
-                if enableCollectionSegmentation {
-                    // Collection identification is another text-only LLM path; keep Vision on the OCR side.
-                    await performCollectionSegmentation(
-                        files: files,
-                        provider: runConfig.textProvider,
-                        model: runConfig.textModel,
-                        thinkingLevel: runConfig.textThinkingLevel,
-                        apiKey: runConfig.textAPIKey,
-                        outputDirectory: outputDirectory,
-                        confirmBeforeOrganizing: confirmCollectionIDs,
-                        reviewDocumentSegmentation: false,
-                        runConfig: runConfig
-                    )
-
-                    applyBoxFolderLabelTags(enableTagging: enableTagging, runConfig: runConfig)
-                }
-
-                guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { cleanupTempFiles(); return }
-
-                // Page 2's Classification: every review is done, and merge copies these pages next
-                // (W40.fix-processor-review-classification-stale).
-                await writeClassificationHeaders(runConfig: runConfig)
-                guard !Task.isCancelled else { cleanupTempFiles(); return }
-
-                // Live Capture: layer per-page phone Quality on top now that box/folder Red/Purple is
-                // final, and before merge folds appliedTags into merged PDFs. The companion wire already
-                // carries only canonical Q tokens, with an omitted field for Unrated.
-                applyCaptureQualityTags(runConfig: runConfig)
-
-                // Live Capture dual output: write each original image next to its PDF (same base + tags),
-                // before merge repoints outputURLMap and before organization moves files.
-                await exportOriginalImages(runConfig: runConfig)
-
-                await recordLocalNameMentions(runConfig: runConfig, mode: runOutputSettings.taggingMode,
-                                              merging: runOutputSettings.mergeDocuments ? files : nil)
-                guard !Task.isCancelled else { cleanupTempFiles(); return }
-
-                // Phase 4: Merge multi-page documents (before collection organization moves files)
-                if runOutputSettings.mergeDocuments {
-                    await performDocumentMerging(
-                        files: files, outputDirectory: outputDirectory, runConfig: runConfig)
-                }
-
-                guard !Task.isCancelled else { return }
-
-                cleanupTempFiles()
+                // The shared stages after OCR (W49.proc-unified-pipeline-1): reviews, segmentation, tagging,
+                // collections, the late header and quality writes, the dual-output images and merge.
+                let plan = PostOCRPlan(
+                    origin: .fresh, files: files, outputDirectory: outputDirectory, runConfig: runConfig,
+                    settings: activeResolvedSettings,
+                    text: .init(provider: runConfig.textProvider, model: runConfig.textModel,
+                                thinkingLevel: runConfig.textThinkingLevel, apiKey: runConfig.textAPIKey),
+                    enableTagging: enableTagging, enableSegmentJSON: enableSegmentJSON,
+                    enableCollectionSegmentation: enableCollectionSegmentation,
+                    confirmCollectionIDs: confirmCollectionIDs, collectionReviewsDocuments: false,
+                    reviewWholeRun: reviewWholeRun, reviewRotation: reviewRotation && rotationMode != .off,
+                    segmentationReviews: true, phoneGroupsApply: true, taggingReview: true)
+                guard await runPostOCRStages(plan) else { return }
             }
 
             guard !Task.isCancelled else { return }
@@ -4146,44 +3815,11 @@ extension OCRProcessor {
                 editingImageSubset = false
                 progressRange = nil
             }
-            if !preOCRedInput {
-                guard let filed = await finishCatalogueRun(organizing: enableCollectionSegmentation, preOCRed: false,
-                                                            exportingImages: runOutputSettings.exportOriginals,
-                                                            stampsUnread: runOutputSettings.stampUnread) else { return }
-                organizedMoves = filed
-            }
-            let containerProblem = await recordContainerLabels(   // W47.ct-processor-capture
-                moves: organizedMoves, outputDirectory: outputDirectory, preOCRedInput: preOCRedInput)
-            guard !Task.isCancelled else { return }
-
-            writeLogFile(outputDirectory: outputDirectory)
-            isProcessing = false
-            progress = 1.0   // fill the bar on completion (later phases don't drive the 0.7→1.0 band)
-            let succeeded = jobs.filter { $0.status == .succeeded }.count
-            recordRunHistory(succeeded: succeeded)
-            statusMessage = runDoneMessage(succeeded: succeeded, failed: failedFiles.count)
-            // W23.m5 / W23.h5-fu — say so when a written output went out untagged, or with a
-            // placeholder instead of the scan. Both are silent failures otherwise: the file is
-            // there and looks processed, but tag search will not find it / the scan is missing.
-            statusMessage += Self.outputWarningSuffix(untagged: untaggedOutputs, placeholders: placeholderOutputs)
-            statusMessage += treeFallbackSuffix   // W47.ct-processor-intake
-            statusMessage += catalogueFilingWarning
-            if let note = containerLabelSpendNote { statusMessage += " " + note }   // W47.ct-label-cost
-            if let containerProblem { statusMessage += " ⚠️ " + containerProblem }
-            if incrementalSkipped > 0 {
-                statusMessage += " \(incrementalSkipped) already-processed skipped."
-            }
-            if enableTagging && !passSourceTags {
-                statusMessage += Self.taggedSegmentsSuffix(segments: segments.count, failures: taggingFailureNames)
-                if let checks = segmentationCheckSummary { statusMessage += " \(checks)."; segmentationCheckSummary = nil }
-            }
-            if passSourceTags {
-                statusMessage += " Source tags copied."
-            }
-            if enableCollectionSegmentation && !collectionSegments.isEmpty {
-                statusMessage += " \(collectionSegments.count) collections organized."
-            }
-            postCompletionNotification()
+            await completeRun(RunCompletion(
+                outputDirectory: outputDirectory, enableTagging: enableTagging,
+                enableCollectionSegmentation: enableCollectionSegmentation, preOCRed: preOCRedInput,
+                exportingImages: preOCRedInput ? false : runOutputSettings.exportOriginals,
+                stampsUnread: runOutputSettings.stampUnread, incrementalSkipped: incrementalSkipped))
         }
     }
     /// Called by UI when the operator chooses to replay the failed files on the run's locked backend.
@@ -4413,7 +4049,7 @@ extension OCRProcessor {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
     /// Post a local notification summarizing the completed run.
-    private func postCompletionNotification() {
+    func postCompletionNotification() {
 #if DEBUG
         if ProcessInfo.processInfo.environment["TEXTLAYER_TEST"] == "1" { return }
 #endif

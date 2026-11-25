@@ -335,6 +335,9 @@ Models/                        UI-free settings, pricing, keys, shared enums:
 OCR/                           OCR pipeline + provider clients:
   OCRProcessor.swift           @MainActor Process-Files pipeline controller — stored state here; methods
                                in +Pipeline/+OCR/+Tagging/+ReviewFlows, types in +Types (see god-file note).
+                               +PostOCRFinalizer (W49.proc-unified-pipeline-1): `runPostOCRStages(PostOCRPlan)` and
+                               `completeRun(RunCompletion)`, every route's tail after OCR; automatic tagging's answers
+                               are kept per segment in `PendingRun.taggingProgress` (`taggingProgressKey`) for a resume.
   AnthropicClient·GeminiClient·MistralClient.swift   Single-shot OCR client per provider.
   OpenAICompatibleClient.swift OCR via any OpenAI-compatible gateway endpoint; also native OpenAI and the pinned
                                OpenRouter provider (`openRouter`; routes in ProviderModels `OpenRouterRoute`).

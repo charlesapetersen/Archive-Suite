@@ -97,7 +97,7 @@ extension OCRProcessor {
         confirmCollectionIDs: Bool = false,
         reviewWholeRun: Bool = true,
         customPrompt: String? = nil,
-        runConfig: SessionProcessingConfig? = nil,
+        runConfig: SessionProcessingConfig,
         settings: ResolvedSettingsSnapshot?
     ) async {
         let total = files.count
@@ -190,95 +190,17 @@ extension OCRProcessor {
         guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { return }
         progress = 0.5
 
-        // Interactive Review: document segmentation (rotation + classification) review. Manual
-        // modes skip it — the combined segment+tag window owns rotation, box/folder, and segmentation.
-        let plan = segmentationPlan(tagging: runOutputSettings.taggingMode, runConfig: runConfig)
-        if case .windows(let approach) = plan {
-            // W36.seg-opt-review: the window segmenter proposes, the user checks the flagged gaps, then skims.
-            guard await runWindowSegmentationStage(files: files, approach: approach,
-                                                   runConfig: runConfig, outputDirectory: outputDirectory,
-                                                   settings: settings,
-                                                   reviewWholeRun: reviewWholeRun) == .done else { return }
-        } else if case .manualWindow = plan {
-            // no-op: handled in the combined manual window
-        } else if (enableTagging && !passSourceTags) || enableCollectionSegmentation {
-            if reviewWholeRun || plan == .noTagging {
-                await showFullSegmentationReview(files: files, runConfig: runConfig)
-                guard !Task.isCancelled else { return }
-            }
-
-            // Final confirmation of box/folder identifications
-            await showBoxFolderConfirmation(files: files, runConfig: runConfig)
-            guard !Task.isCancelled else { return }
-
-            // Rebuild segments from user-confirmed classifications (excluding removed files)
-            rebuildSegments(files: files)
-        }
-
-        guard !Task.isCancelled else { return }
-
-        // Step 3: Tagging (mode-dependent)
-        if enableTagging && !passSourceTags {
-            switch runOutputSettings.taggingMode {
-            case .automatic:
-                await performAutomaticTaggingWithReview(
-                    provider: provider, model: model, thinkingLevel: thinkingLevel,
-                    apiKey: apiKey, outputDirectory: outputDirectory,
-                    enableSegmentJSON: enableSegmentJSON, files: files,
-                    runConfig: runConfig
-                )
-            case .autoDate, .human:
-                if case .manualWindow(let autoDate) = plan {
-                    await performManualSegmentAndTag(
-                        autoDate: autoDate,
-                        provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey,
-                        outputDirectory: outputDirectory,
-                        enableSegmentJSON: enableSegmentJSON, preOCRed: true, files: files,
-                        runConfig: runConfig
-                    )
-                } else {
-                    await performManualTaggingPhase(
-                        mode: runOutputSettings.taggingMode, provider: provider, model: model,
-                        thinkingLevel: thinkingLevel, apiKey: apiKey,
-                        outputDirectory: outputDirectory, enableSegmentJSON: enableSegmentJSON,
-                        runConfig: runConfig
-                    )
-                }
-            case .none, .copySource:
-                break
-            }
-        } else if passSourceTags {
-            // For pre-OCRed input, source tags are on the input PDFs themselves
-            for (index, url) in files.enumerated() {
-                guard let sourceTags = try? MacOSTagger.readTags(from: url), !sourceTags.isEmpty,
-                      let outputURL = outputURLMap[url] else { continue }
-                // Copy-source pass-through: write the source's tags VERBATIM and leave the Finder
-                // label untouched. `false` is unconditional here, not `taggingMode.stampsUnread` —
-                // `passSourceTags` implies `.copySource` (OCRView.swift:27), so they agree today, but
-                // the verbatim semantics are what this path requires regardless of the run's mode.
-                tagOutput(sourceTags, at: outputURL, source: url, stampUnread: false)
-                jobs[index].appliedTags = sourceTags
-            }
-        }
-
-        guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { return }
-
-        // Step 4: Collection Segmentation + name review (last step before completion)
-        if enableCollectionSegmentation {
-            await performCollectionSegmentation(
-                files: files,
-                provider: provider,
-                model: model,
-                thinkingLevel: thinkingLevel,
-                apiKey: apiKey,
-                outputDirectory: outputDirectory,
-                confirmBeforeOrganizing: confirmCollectionIDs,
-                reviewDocumentSegmentation: false,
-                runConfig: runConfig
-            )
-
-            applyBoxFolderLabelTags(enableTagging: enableTagging, runConfig: runConfig)
-        }
+        // Reviews, segmentation, tagging (or the source tags copied) and collection segmentation: the shared stages
+        // after OCR (W49.proc-unified-pipeline-1). An input PDF gets none of the generated-output writes.
+        let plan = PostOCRPlan(
+            origin: .preOCRed, files: files, outputDirectory: outputDirectory, runConfig: runConfig,
+            settings: settings,
+            text: .init(provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey),
+            enableTagging: enableTagging, enableSegmentJSON: enableSegmentJSON,
+            enableCollectionSegmentation: enableCollectionSegmentation, confirmCollectionIDs: confirmCollectionIDs,
+            collectionReviewsDocuments: false, reviewWholeRun: reviewWholeRun, reviewRotation: false,
+            segmentationReviews: true, phoneGroupsApply: false, taggingReview: true)
+        guard await runPostOCRStages(plan) else { return }
 
         // Organize into collection folders (after all processing)
         if catalogueRun == nil && enableCollectionSegmentation && !collectionSegments.isEmpty {
@@ -295,6 +217,19 @@ extension OCRProcessor {
             } catch {
                 statusMessage = "Error organizing collections: \(error.localizedDescription)"
             }
+        }
+    }
+
+    /// Copy-source pass-through on the pre-OCRed route: an input PDF's own tags are written to its output VERBATIM and
+    /// the Finder label is left untouched. `false` is unconditional here, not `taggingMode.stampsUnread` —
+    /// `passSourceTags` implies `.copySource` (OCRView.swift), so they agree today, but the verbatim semantics are what
+    /// this path requires regardless of the run's mode.
+    func copySourceTagsFromInputPDFs(_ files: [URL]) {
+        for (index, url) in files.enumerated() {
+            guard let sourceTags = try? MacOSTagger.readTags(from: url), !sourceTags.isEmpty,
+                  let outputURL = outputURLMap[url] else { continue }
+            tagOutput(sourceTags, at: outputURL, source: url, stampUnread: false)
+            jobs[index].appliedTags = sourceTags
         }
     }
 

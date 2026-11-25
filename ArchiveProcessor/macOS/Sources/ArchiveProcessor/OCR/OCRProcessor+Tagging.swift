@@ -532,6 +532,7 @@ extension OCRProcessor {
             case .complete:
                 shouldRedoTagging = false
             case .redoTagging:
+                forgetTaggingProgress()   // Redo asks every call again
                 rebuildSegments(files: files)
                 enclosureDateReviews = [:]
                 for i in jobs.indices { jobs[i].appliedTags = [] }
@@ -1309,6 +1310,14 @@ extension OCRProcessor {
                   fileIdx < preGroupedSubjects.count else { return [] }
             return preGroupedSubjects[fileIdx]
         }
+        // W49.proc-unified-pipeline-1: a resumed run reuses the answers its manifest kept for an unchanged segment
+        // (`taggingProgressKey`), and keeps each new one as it lands.
+        let progressKeys: [String] = (0..<total).map { i in
+            let context = nearbyBySeg[i].map(\.combinedText) + (datingInputs[i]?.near.map(\.text) ?? [])
+            return Self.taggingProgressKey(segment: snapshot[i], context: context, provider: provider, model: model)
+        }
+        let saved = savedTaggingProgress
+        let reused: [SavedSegmentTags?] = progressKeys.map { saved[$0] }
 
         // W37.dual-date — an enclosure's `Sent With` date is its covering letter's FINAL own date, which
         // only exists once that cover's result has been applied. Results arrive out of order, so an
@@ -1325,6 +1334,7 @@ extension OCRProcessor {
             if !macSubjectsBySeg[i].isEmpty {
                 return (i, GeneratedTags(subjectTags: macSubjectsBySeg[i]), nil, nil, nil)   // Mac-tagged → no LLM
             }
+            if let kept = reused[i] { return (i, kept.tags, kept.entities, kept.dating, kept.fields) }   // already bought
             let (tags, failure) = await generator.generateTagsReporting(
                 for: snapshot[i], nearbySegments: nearbyBySeg[i],
                 provider: provider, model: model, thinkingLevel: nil,
@@ -1366,6 +1376,14 @@ extension OCRProcessor {
             }
             for await (i, rawTags, names, dating, fields) in group {
                 if Task.isCancelled { break }
+                // Kept only when every call answered, so a resume asks a failed one again (the names, item-field
+                // and dating calls report a failure as a value); a Mac-tagged segment made no call.
+                if reused[i] == nil, macSubjectsBySeg[i].isEmpty, !rawTags.ocrFailed,
+                   !taggingCallFailures.contains(where: { $0.source == snapshot[i].pdfURLs.first }),
+                   Self.answeredForResume(names: names, dating: dating, fields: fields) {
+                    persistTaggingProgress(SavedSegmentTags(tags: rawTags, entities: names, dating: dating, fields: fields),
+                                           key: progressKeys[i], sources: snapshot[i].pdfURLs)
+                }
                 if Self.validCoverIndex(of: i, in: snapshot) != nil {
                     deferredEnclosures.append((i, rawTags, names, dating, fields))
                 } else {
@@ -1402,6 +1420,16 @@ extension OCRProcessor {
                                                    entities: names, dating: dating, folderDate: folderDates[i],
                                                    itemFields: fields, taggingSenderWithheld: senderWithheld[i])
         }
+    }
+    /// W49.proc-unified-pipeline-1 — whether a segment's names, dating and item-field results are answers worth keeping
+    /// for a resume: none is a failed call (the dating route reads a failed trace call as an unparsed reply, and a failed
+    /// image pass by its note).
+    nonisolated static func answeredForResume(names: EntityResult?, dating: DateRoute.Decision?,
+                                              fields: ItemFieldResult?) -> Bool {
+        if case .failed = names?.outcome { return false }
+        if case .failed = fields?.outcome { return false }
+        if let dating, !dating.trace.parsed || dating.imageNote == DateRoute.imageFailed { return false }
+        return true
     }
     /// W49.proc-fix-s042 — one failed tagging call, named by the document's first input page.
     func recordTaggingCallFailure(_ reason: String, segment: DocumentSegment) {

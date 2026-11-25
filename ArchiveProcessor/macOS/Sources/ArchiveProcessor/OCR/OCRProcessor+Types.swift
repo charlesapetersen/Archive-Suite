@@ -2,6 +2,67 @@ import Foundation
 import ArchiveCore
 import UserNotifications
 
+// MARK: - After OCR (W49.proc-unified-pipeline-1)
+
+/// What one Process Files route does after its pages are read (`OCRProcessor.runPostOCRStages`). Each route sets the
+/// fields where it differs; everything else is the same code.
+struct PostOCRPlan {
+    enum Origin { case fresh, resumedRun, resumedBatch, preOCRed }
+    /// The text-only backend for tagging and collection identification.
+    struct TextBackend {
+        let provider: LLMProvider
+        let model: LLMModel
+        let thinkingLevel: ThinkingLevel?
+        let apiKey: String
+    }
+    let origin: Origin
+    /// The inputs the stages work on (a mixed run's image subset).
+    let files: [URL]
+    let outputDirectory: URL
+    let runConfig: SessionProcessingConfig
+    let settings: ResolvedSettingsSnapshot?
+    let text: TextBackend
+    let enableTagging: Bool
+    let enableSegmentJSON: Bool
+    let enableCollectionSegmentation: Bool
+    let confirmCollectionIDs: Bool
+    /// Collection segmentation's own document review (a resume's stored choice; the interactive routes have
+    /// already reviewed the documents).
+    let collectionReviewsDocuments: Bool
+    let reviewWholeRun: Bool
+    /// The dedicated rotation review runs (fresh runs only, when it is on and rotation is not off).
+    let reviewRotation: Bool
+    /// The per-page review and the box/folder confirmation run. False on a resume
+    /// (W40.fix-processor-resume-reviews decides which it restores).
+    let segmentationReviews: Bool
+    /// Live Capture's phone groups can stand for segmentation.
+    let phoneGroupsApply: Bool
+    /// Automatic tagging pauses for the final review and its Redo (false only on a resumed batch).
+    let taggingReview: Bool
+}
+
+/// How a route's run is filed and summed up (`OCRProcessor.completeRun`).
+struct RunCompletion {
+    let outputDirectory: URL
+    let enableTagging: Bool
+    let enableCollectionSegmentation: Bool
+    let preOCRed: Bool
+    let exportingImages: Bool
+    let stampsUnread: Bool
+    var incrementalSkipped = 0
+    /// A legacy pre-OCRed resume clears its pending run itself (a catalogue run's filing clears it otherwise).
+    var clearsPendingRun = false
+}
+
+/// One segment's tagging answers, kept in the pending run so a resume reuses them
+/// (W49.proc-resume-tagging-progress, absorbed into W49.proc-unified-pipeline-1).
+struct SavedSegmentTags: Codable, Sendable {
+    let tags: GeneratedTags
+    let entities: EntityResult?
+    let dating: DateRoute.Decision?
+    let fields: ItemFieldResult?
+}
+
 struct ProcessFileFailure: Equatable {
     let reason: String
     var code: String? = nil

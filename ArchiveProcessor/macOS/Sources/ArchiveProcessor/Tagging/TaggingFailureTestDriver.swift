@@ -40,6 +40,8 @@ enum TaggingFailureTestDriver {
         let lock = NSLock()
         var asked: [String: Int] = [:]
         var failing = true
+        /// The dating route's reply: "no" is not a reply it can read, as a failed call is.
+        var datingReply = "no"
     }
 
     nonisolated private static let markers = ["DOCA", "DOCB", "DOCC", "DOCD", "DOCE"]
@@ -54,7 +56,9 @@ enum TaggingFailureTestDriver {
                 (try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": content]]]]),
                  HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
             }
-            guard prompt.contains("You are a metadata tagging assistant") else { return try ok("no") }   // dating
+            guard prompt.contains("You are a metadata tagging assistant") else {   // dating
+                return try ok(wire.lock.withLock { wire.datingReply })
+            }
             let marker = markers.compactMap { m in prompt.range(of: m).map { (m, $0.lowerBound) } }
                 .min { $0.1 < $1.1 }?.0 ?? ""
             let failing: Bool = wire.lock.withLock {
@@ -202,6 +206,72 @@ enum TaggingFailureTestDriver {
         check("5 ...and the status line is the plain count",
               OCRProcessor.taggedSegmentsSuffix(segments: p.segments.count, failures: p.taggingFailureNames)
               == " 5 segments tagged.")
+
+        // 6. W49.proc-unified-pipeline-1: a run's tagging answers are kept in its pending run as they land, and a
+        //    resume reuses them, asking only the calls that failed.
+        let runtime = p.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil)
+        let pending = OCRProcessor.PendingRun(
+            provider: .gemini, model: route.model, thinkingLevel: nil, fileURLs: files, outputDirectory: outDir,
+            enableTagging: true, enableSegmentJSON: false, enableCollectionSegmentation: false,
+            confirmCollectionIDs: false, reviewDocumentSegmentation: false, preOCRedInput: false,
+            previousTextCharCount: 0, sendPreviousImage: false, customPrompt: nil,
+            startedAt: Date(timeIntervalSince1970: 1_800_000_000), gatewayConfig: nil, completedResults: [:],
+            runtimeConfig: runtime)
+        var saves: [OCRProcessor.PendingRun] = []
+        p.pendingRunSaveOverride = { saves.append($0) }
+        defer { p.pendingRunSaveOverride = nil; p.activePendingRun = nil }
+        p.activePendingRun = pending
+        wire.lock.withLock { wire.failing = false; wire.asked = [:] }
+        await p.performTaggingPhase(provider: .gemini, model: route.model, apiKey: "", outputDirectory: outDir,
+                                    enableSegmentJSON: false)
+        check("6 a segment whose dating call got no readable reply is not kept, though its tags came back",
+              saves.isEmpty && p.activePendingRun?.taggingProgress == nil, "\(saves.count) saves")
+        wire.lock.withLock { wire.failing = true; wire.asked = [:]; wire.datingReply = #"{"year": 1918, "date_uncertain": false}"# }
+        await p.performTaggingPhase(provider: .gemini, model: route.model, apiKey: "", outputDirectory: outDir,
+                                    enableSegmentJSON: false)
+        let kept = saves.last?.taggingProgress ?? [:]
+        check("6 the answer that came back is kept, the four failed calls are not", kept.count == 1 && saves.count == 1,
+              "\(kept.count) kept in \(saves.count) saves")
+        check("6 the kept answer is A's", kept.values.first?.tags.subjectTags.contains("War Department") == true)
+        let print0 = OCRProcessor.pendingRunFingerprintV2(pending)
+        check("6 the kept answers leave the run's fingerprint alone",
+              print0 != nil && OCRProcessor.pendingRunFingerprintV2(saves.last ?? pending) == print0)
+        let decoded = (try? JSONEncoder().encode(saves.last ?? pending))
+            .flatMap { try? JSONDecoder().decode(OCRProcessor.PendingRun.self, from: $0) }
+        check("6 they survive the manifest's JSON", decoded?.taggingProgress?.keys.sorted() == kept.keys.sorted())
+
+        // The resume: the manifest as read back, the calls answering now.
+        p.activePendingRun = decoded
+        for m in markers { if let u = outputs[m] { _ = try? MacOSTagger.applyTags([], to: u, stampUnread: false) } }
+        wire.lock.withLock { wire.failing = false; wire.asked = [:] }
+        await p.performTaggingPhase(provider: .gemini, model: route.model, apiKey: "", outputDirectory: outDir,
+                                    enableSegmentJSON: false)
+        let resumedAsks = wire.lock.withLock { wire.asked }
+        check("6 a resume does not ask A's tagging call again", resumedAsks["DOCA"] == nil, "\(resumedAsks)")
+        check("6 ...and asks each failed call once",
+              ["DOCB", "DOCC", "DOCD", "DOCE"].allSatisfy { resumedAsks[$0] == 1 }, "\(resumedAsks)")
+        check("6 ...and files every document with its subjects, A's from the kept answer",
+              markers.allSatisfy { tagsOf($0).contains("War Department") }, "\(markers.map(tagsOf))")
+        check("6 ...and keeps all five now", saves.last?.taggingProgress?.count == 5,
+              "\(saves.last?.taggingProgress?.count ?? 0)")
+
+        // A segment whose text changed since is asked again: its key no longer matches.
+        p.jobs[0].result = OCRResult(text: "DOCA MEMORANDUM\nTo: Files\nMarch 13, 1918", classification: .documentStart,
+                                     errorMessage: nil, errorCode: nil)
+        p.rebuildSegments(files: files)
+        wire.lock.withLock { wire.asked = [:] }
+        await p.performTaggingPhase(provider: .gemini, model: route.model, apiKey: "", outputDirectory: outDir,
+                                    enableSegmentJSON: false)
+        let changedAsks = wire.lock.withLock { wire.asked }
+        check("6 a segment whose text changed is asked again", changedAsks["DOCA"] == 1, "\(changedAsks)")
+        check("6 ...with B-D, whose calls read its text as a neighbour; E, beyond their reach, is not",
+              ["DOCB", "DOCC", "DOCD"].allSatisfy { changedAsks[$0] == 1 } && changedAsks["DOCE"] == nil,
+              "\(changedAsks)")
+
+        // Redo asks every call again, so the kept answers go.
+        p.forgetTaggingProgress()
+        check("6 Redo forgets the kept answers", p.activePendingRun?.taggingProgress == nil
+              && saves.last?.taggingProgress == nil)
     }
 }
 #endif

@@ -3,7 +3,9 @@
 # performTaggingPhase on four documents whose tagging calls get an answer, a provider 500, a timeout and a reply that
 # is not the tag JSON, every request answered by the injected test transport. It checks that the three failed calls
 # are named in the status line and the run log, are not counted as tagged, are asked once each, and that a Redo whose
-# calls answer clears them. No real network, no Keychain read, no window, never the corpus: scratch only.
+# calls answer clears them, and (W49.proc-unified-pipeline-1) that a resume reuses the answers its pending run kept and
+# asks only the failed or changed calls; then the pipeline seam lint (check-pipeline-seam.sh). No real network, no
+# Keychain read, no window, never the corpus: scratch only.
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -36,3 +38,4 @@ fi
 
 cat "$report"
 grep -q '^ALL PASS$' "$report"
+"$PWD/scripts/check-pipeline-seam.sh"
