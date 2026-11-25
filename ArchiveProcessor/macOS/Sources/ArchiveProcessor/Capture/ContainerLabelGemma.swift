@@ -146,12 +146,13 @@ enum ContainerLabelGemma {
     /// A failed external request suppresses that address for the rest of the lookup window.
     /// The app-managed reader keeps the re-encoded photo under either style.
     static func read(photo: URL, rotation: Int, gateway: GatewayConfig?) async -> [ContainerField: String]? {
-        guard let jpeg = ImageEncoding.uprightJPEG(url: photo, rotationDegrees: rotation, longEdge: imageLongSide) else {
-            return nil
-        }
+        let style = style
+        let source = style == .revised
+            ? ImageEncoding.sourceJPEGIfUpright(url: photo, rotationDegrees: rotation, longEdge: imageLongSide) : nil
+        var encoded = source == nil
+            ? ImageEncoding.uprightJPEG(url: photo, rotationDegrees: rotation, longEdge: imageLongSide) : nil
+        guard let sent = source ?? encoded else { return nil }
         if let server = await find(gateway: gateway) {
-            let style = style
-            let sent = style == .revised ? image(photo: photo, rotation: rotation, style: style) ?? jpeg : jpeg
             if let answer = await readExternal(jpeg: sent, server: server, gateway: gateway, style: style) {
                 let fields = ContainerLabelReader.localModelFields(fromReply: answer)
                 if !fields.isEmpty { return fields }
@@ -159,7 +160,10 @@ enum ContainerLabelGemma {
         } else {
             await ManagedGemma.shared.offerIfNeeded()
         }
-        guard !Task.isCancelled, let answer = await ManagedGemma.shared.read(jpeg: jpeg) else { return nil }
+        if encoded == nil {
+            encoded = ImageEncoding.uprightJPEG(url: photo, rotationDegrees: rotation, longEdge: imageLongSide)
+        }
+        guard !Task.isCancelled, let encoded, let answer = await ManagedGemma.shared.read(jpeg: encoded) else { return nil }
         let fields = ContainerLabelReader.localModelFields(fromReply: answer)
         return fields.isEmpty ? nil : fields
     }

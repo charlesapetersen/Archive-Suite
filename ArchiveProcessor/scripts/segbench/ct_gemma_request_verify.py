@@ -41,7 +41,8 @@ IMAGES = SCRATCH / "image-checks.json"
 UNAVAILABLE = SCRATCH / "unavailable.jsonl"
 REPORT = Path(__file__).resolve().parents[2] / "segbench-results/ct-gemma-request-verify.md"
 APP = Path(__file__).resolve().parents[2] / "macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
-SAMPLE = Path(R.CT.POOL) / "sample.jsonl"
+# The turn that made each bench page: final's re-turns, else rev2's (pool-jpeg/sample.jsonl holds the first pass).
+SAMPLES = (Path(R.CT.POOL) / "final/sample.jsonl", Path(R.CT.POOL) / "rev2/sample.jsonl")
 SCORED = ("repository", "collection_title", "collection_number", "date")
 CORRECTIONS = (0, 90, 180, 270)
 SIZES = ("bench", "original")
@@ -98,7 +99,14 @@ def prepare(_args):
         raise RuntimeError("jpegtran and exiftool are needed (brew install jpeg exiftool)")
     cells = holdout()
     picked = choose(cells)
-    sample = {json.loads(line)["id"]: json.loads(line) for line in open(SAMPLE, encoding="utf-8")}
+    rows = {r["id"]: r for r in R.truth()}
+    for mid in picked:
+        # The panel is stored by position: check it still lines up with the truth on the stratifying field.
+        if bool(rows[mid]["fields"].get("collection_number")) != cells[mid]["cells"]["collection_number"]["truth_filled"]:
+            raise RuntimeError(f"{mid}: the stored panel no longer matches the truth")
+    sample = {}
+    for path in reversed(SAMPLES):
+        sample.update({json.loads(line)["id"]: json.loads(line) for line in open(path, encoding="utf-8")})
     PHOTOS.mkdir(parents=True, exist_ok=True)
     SENT.mkdir(parents=True, exist_ok=True)
     entries, labels = [], []
@@ -186,10 +194,10 @@ def run(args):
         return check_images()
     with F.server(PORT, with_pid=True) as (base, pid):
         footprint = F.footprint_reader(pid)
-        # Warm the model outside the measured reads, as the paired validation did.
-        warm = Path(todo[0]["photo"]).read_bytes() if todo[0]["rotation"] == 0 else None
-        if warm is not None:
-            F.read_server(base, warm, True)
+        # Warm the model outside the measured reads with both orders, as the paired validation did.
+        warm = next(Path(e["photo"]).read_bytes() for e in entries if e["rotation"] == 0 and "/bench/" in e["key"])
+        for text_first in (False, True):
+            F.read_server(base, warm, text_first)
         stop = threading.Event()
 
         def sample():
@@ -405,7 +413,7 @@ def report(_args):
     fallback_numbers = {}
     for style in STYLES:
         n = sum(1 for k, v in complete.items() if (v[style]["fields"].get("collection_number") or {}).get("reader")
-                not in (None, GEMMA))
+                not in (None, "", GEMMA))
         fallback_numbers[style] = n
 
     L = ["# Gemma label request through the Processor: current against revised (W49.proc-gemma-request-verify)", "",

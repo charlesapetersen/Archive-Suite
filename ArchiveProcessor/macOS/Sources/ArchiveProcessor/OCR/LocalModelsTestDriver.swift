@@ -362,20 +362,30 @@ enum LocalModelsTestDriver {
         eq("8 local gateway: its own server asked first", asked.asked, ["http://127.0.0.1:9999/v1"])
         eq("8 local gateway: titles from Gemma there", set[.repository]?.reader, "gemma-3-12b")
 
-        // W49.proc-gemma-request-verify: the revised request through the same read, behind its override.
+        // W49.proc-gemma-request-verify: the revised request through the same read, behind its override, on an
+        // upright JPEG copy of the photo, so the file's own bytes must reach the wire.
+        let savedStyle = ContainerLabelGemma.styleOverride
+        let uprightJPEG = image.deletingLastPathComponent().appendingPathComponent("gemma-upright-label.jpg")
+        if let src = CGImageSourceCreateWithURL(image as CFURL, nil),
+           let drawn = CGImageSourceCreateImageAtIndex(src, 0, nil),
+           let dest = CGImageDestinationCreateWithURL(uprightJPEG as CFURL, "public.jpeg" as CFString, 1, nil) {
+            CGImageDestinationAddImage(dest, drawn, nil)
+            _ = CGImageDestinationFinalize(dest)
+        }
         ContainerLabelGemma.styleOverride = .revised
         asked.reset([mlx: ["mlx-community/gemma-3-12b-it-4bit"]])
         wire.reset(["127.0.0.1": reply(answer, "stop")])
-        set = await read(nil)
-        ContainerLabelGemma.styleOverride = nil
+        await ContainerLabelGemma.forget()
+        set = await ContainerLabelCapture.read(type: .box, text: "BOX NO. 17", photo: uprightJPEG, rotation: 0, gateway: nil)
+        ContainerLabelGemma.styleOverride = savedStyle
         let revisedContent = wire.requests.first.flatMap(jsonBody).flatMap {
             ($0["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]
         } ?? []
         let sentURL = (revisedContent.last?["image_url"] as? [String: Any])?["url"] as? String
-        let expected = ContainerLabelGemma.image(photo: image, rotation: 0, style: .revised)
-        check("8 revised: one request, prompt first, the photo the revised style prepares",
+        let fileBytes = try? Data(contentsOf: uprightJPEG)
+        check("8 revised: one request, prompt first, the upright JPEG file itself",
               wire.requests.count == 1 && revisedContent.first?["text"] as? String == ContainerLabelReader.localModelPrompt
-              && expected != nil && sentURL == "data:image/jpeg;base64," + (expected?.base64EncodedString() ?? ""),
+              && fileBytes != nil && sentURL == "data:image/jpeg;base64," + (fileBytes?.base64EncodedString() ?? ""),
               "\(wire.requests.count) requests")
         eq("8 revised: titles from Gemma", set[.repository]?.reader, "gemma-3-12b")
 
