@@ -44,6 +44,8 @@ public struct CollectionSettingsRecord: Equatable, Sendable {
         public let processing: [Setting]
         /// The run is of a newer `schemaVersion` than this build reads; only its date and kind are shown.
         public let isNewer: Bool
+        /// Every layered value as the run resolved it, by key (`values` in the run record).
+        public var values: [String: CollectionSettingValue] = [:]
 
         public var kindLabel: String { CollectionSettingsVocabulary.runKindLabel(kind) }
 
@@ -81,6 +83,29 @@ public struct CollectionSettingsRecord: Equatable, Sendable {
     public let documentUnreadable: Bool
 
     public var latestRun: Run? { runs.first }
+    /// The collection layer's own values, by key, as the Processor reads them (general-only keys left out).
+    public var ownValues: [String: CollectionSettingValue] = [:]
+
+    /// The collection's numeric date order (`numericDatesDayFirst`, W49.reader-folder-date-day-first), for the Reader's
+    /// folder dates: the collection's own value; else the newest readable run's, which also saw the Processor's
+    /// general and project layers this file does not hold; else month first, the Processor's default.
+    public var numericDatesDayFirst: Bool {
+        let key = "numericDatesDayFirst"
+        if case let .bool(own)? = ownValues[key] { return own }
+        for run in runs where !run.isNewer {
+            if case let .bool(value)? = run.values[key] { return value }
+        }
+        return false
+    }
+
+    /// `numericDatesDayFirst` of the collection holding `directory`, the nearest record from it upward within `root`
+    /// (inclusive); month first where there is none. Never writes.
+    public static func numericDatesDayFirst(directory: URL, within root: URL) -> Bool {
+        guard let folder = locate(from: directory.appendingPathComponent("_"), within: root) else {
+            return false
+        }
+        return load(collectionFolder: folder)?.numericDatesDayFirst ?? false
+    }
 
     // MARK: Finding and loading
 
@@ -150,7 +175,7 @@ public struct CollectionSettingsRecord: Equatable, Sendable {
                     let head = try? decoder.decode(RunHeadDTO.self, from: data)
                     runs.append(Run(id: head?.id ?? name, startedAt: head?.startedAt, kind: head?.kind ?? "",
                                     fileCount: nil, projectName: nil, macMemoryGB: nil, settings: [], processing: [],
-                                    isNewer: true))
+                                    isNewer: true, values: [:]))
                 } else if let r = try? decoder.decode(RunDTO.self, from: data) {
                     runs.append(r.run)
                 } else {
@@ -175,7 +200,9 @@ public struct CollectionSettingsRecord: Equatable, Sendable {
             collectionFolder: folder, collectionName: doc?.collection?.name, collectionID: doc?.collection?.id,
             createdAt: doc?.createdAt, projectName: doc?.projectName ?? runs.first?.projectName, ownSettings: own,
             runs: runs, runFileCount: runFiles.count, unreadableRunCount: unreadable, documentIsNewer: docNewer,
-            documentUnreadable: docUnreadable)
+            documentUnreadable: docUnreadable,
+            ownValues: ownEntries.compactMapValues { $0.value?.value }
+                .filter { !CollectionSettingsVocabulary.generalOnlyKeys.contains($0.key) })
     }
 
     /// `lstat`'s file type, or nil when there is nothing there. A link reports `S_IFLNK`, so it is never followed.
@@ -416,7 +443,8 @@ private struct RunDTO: Decodable {
         }.sorted { $0.key < $1.key }
         return .init(id: id, startedAt: startedAt, kind: kind, fileCount: fileCount,
                      projectName: self.settings?.projectName, macMemoryGB: self.settings?.macMemoryGB,
-                     settings: settings, processing: processing, isNewer: false)
+                     settings: settings, processing: processing, isNewer: false,
+                     values: (self.settings?.values ?? [:]).mapValues(\.value))
     }
 }
 

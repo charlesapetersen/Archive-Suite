@@ -146,4 +146,41 @@ import Testing
         // A folder with no record loads nothing.
         #expect(CollectionSettingsRecord.load(collectionFolder: root) == nil)
     }
+
+    /// W49.reader-folder-date-day-first: the order the Reader reads a folder's numeric date in.
+    @Test func numericDateOrderFromTheCollectionOrItsNewestRun() throws {
+        func layer(_ entries: String) -> String {
+            """
+            {"collection":{"entries":{\(entries)},"id":"C","kind":"collection","name":"Letters"},"schemaVersion":1}
+            """
+        }
+        let order = #""numericDatesDayFirst":{"source":{"setByUser":{"_0":"2026-11-24T10:00:00Z"}},"value":{"type":"bool","value":true}}"#
+        func runRecord(_ id: String, at date: String, dayFirst: Bool?) -> String {
+            let value = dayFirst.map { #","values":{"numericDatesDayFirst":{"layer":"general","value":{"type":"bool","value":\#($0)}}}"# } ?? ""
+            return #"{"id":"\#(id)","kind":"processFiles","schemaVersion":1,"startedAt":"\#(date)","settings":{"schemaVersion":1\#(value)}}"#
+        }
+        let root = try scratch()
+        let collection = root.appendingPathComponent("Letters", isDirectory: true)
+        let folder = collection.appendingPathComponent("Box 1/Folder 2", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let dir = collection.appendingPathComponent(".archivesuite")
+
+        // No record anywhere: month first.
+        #expect(!CollectionSettingsRecord.numericDatesDayFirst(directory: folder, within: root))
+        // The collection's own value, found from a folder below it.
+        try write(layer(order), to: dir.appendingPathComponent("collection-settings.json"))
+        #expect(CollectionSettingsRecord.numericDatesDayFirst(directory: folder, within: root))
+        // Without its own value, the newest run that resolved one: here the older run said day first, the newer one
+        // (from the general layer) month first, and a run with no value is passed over.
+        try write(layer(""), to: dir.appendingPathComponent("collection-settings.json"))
+        try write(runRecord("A", at: "2026-11-20T10:00:00Z", dayFirst: true), to: dir.appendingPathComponent("runs/20261120-100000-A.json"))
+        #expect(CollectionSettingsRecord.numericDatesDayFirst(directory: folder, within: root))
+        try write(runRecord("B", at: "2026-11-21T10:00:00Z", dayFirst: false), to: dir.appendingPathComponent("runs/20261121-100000-B.json"))
+        try write(runRecord("C", at: "2026-11-22T10:00:00Z", dayFirst: nil), to: dir.appendingPathComponent("runs/20261122-100000-C.json"))
+        #expect(!CollectionSettingsRecord.numericDatesDayFirst(directory: folder, within: root))
+        // The collection's own value wins over its runs; a record outside the root is not read.
+        try write(layer(order), to: dir.appendingPathComponent("collection-settings.json"))
+        #expect(CollectionSettingsRecord.numericDatesDayFirst(directory: folder, within: root))
+        #expect(!CollectionSettingsRecord.numericDatesDayFirst(directory: folder, within: folder))
+    }
 }

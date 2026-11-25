@@ -416,7 +416,8 @@ extension NavigationModel {
     }
 
     /// The first of `names` in each run of `after` where a file's confirmed folder date differs from `before`'s, and
-    /// whether a date that dates documents was confirmed there before. One pass over each (`lastLiveRuns`).
+    /// whether a date that dates documents was confirmed there before. One pass over each (`lastLiveRuns`). A date is
+    /// compared with its text, so the collection's numeric date order (`folderDateRuns`) cannot change the answer.
     nonisolated static func datedRunsChanged(_ names: [String], before: [ContainerRun],
                                              after: [ContainerRun]) -> [(name: String, datedBefore: Bool)] {
         let sorted = names.sorted(by: ContainerOrder.precedes)
@@ -570,7 +571,9 @@ extension NavigationModel {
 
     /// `folderDateRun` for several files of one folder at once, in their order (W49.reader-set-selection-date-offer):
     /// the container file and the folder are read once, and each file's run found in one pass, so a selection that made
-    /// thousands of runs costs about as much as one. Read only.
+    /// thousands of runs costs about as much as one. A numeric date reads in the collection's order, as Process Files
+    /// and Live Capture read it (`numericDatesDayFirst`, W49.reader-folder-date-day-first): the record of the
+    /// collection holding the folder, within the tree. Read only.
     nonisolated static func folderDateRuns(tree: URL, components: [String], editedNames: [String]) -> [FolderDatingRun]? {
         guard let directory = try? containerDirectoryURL(tree, components) else { return nil }
         let runs: [ContainerRun]
@@ -585,6 +588,7 @@ extension NavigationModel {
         func key(_ run: ContainerRun?) -> String { run.map { "\($0.level.rawValue)/\($0.start)" } ?? "" }
         var keyOf: [String: String] = [:], liveAt: [String: ContainerRun] = [:], byRun: [String: [String]] = [:]
         let onDisk = Set(all)
+        let dayFirst = CollectionSettingsRecord.numericDatesDayFirst(directory: directory, within: tree)
         for (name, run) in zip(names, live) {
             keyOf[name] = key(run)
             liveAt[name] = run
@@ -592,8 +596,9 @@ extension NavigationModel {
         }
         return editedNames.map { edited in
             let run = liveAt[edited]
-            let date = run.flatMap { ContainerFolderDate.confirmed(at: edited, in: [$0]) }
-                .flatMap { $0.inherited == nil ? nil : $0 }
+            let date = ContainerFolderDate.$dayFirst.withValue(dayFirst) {
+                run.flatMap { ContainerFolderDate.confirmed(at: edited, in: [$0]) }
+            }.flatMap { $0.inherited == nil ? nil : $0 }
             return FolderDatingRun(date: date, directory: directory, names: byRun[keyOf[edited] ?? ""] ?? [])
         }
     }

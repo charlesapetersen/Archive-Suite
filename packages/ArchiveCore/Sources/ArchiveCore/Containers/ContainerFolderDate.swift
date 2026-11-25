@@ -81,7 +81,8 @@ public struct ContainerFolderDate: Equatable, Sendable {
     }
 
     /// The collection's numeric date order for this task (the Processor's `numericDatesDayFirst`, owner 2026-11-24):
-    /// false, a numeric date is month first ("6/2/61" is June); true, day first (February). Reader and Notes keep false.
+    /// false, a numeric date is month first ("6/2/61" is June); true, day first (February). The Reader sets it from the
+    /// collection's record (`CollectionSettingsRecord.numericDatesDayFirst`) where it reads a folder date.
     @TaskLocal public static var dayFirst = false
 
     /// The value read as a date, or nil when it is none of: a year ("1953"), a range ("1965-1967", "1966-70",

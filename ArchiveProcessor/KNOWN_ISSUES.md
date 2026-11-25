@@ -374,11 +374,14 @@ Rules → Columns and reading order, off by default.
 - **The two-way kind split covers direct cloud runs only.** Owner call 2 (`W49.proc-pipeline-prune-ok`, 2026-11-24)
   asks for the split on the Mac too, but routing by kind still never applies to an Apple Vision run, so a free Mac run
   cannot yet send its handwritten pages to a downloaded local reader (queued: W49.proc-kind-split-mac).
-- **A collection's day-first date order reaches the Processor only.** The Reader confirms a folder date month first,
-  so in a day-first collection a folder labelled `6/2/61` gives June there and February in Process Files (queued:
-  W49.reader-folder-date-day-first). The trace and tagging calls are not told the order: where the route finds a year
+- **A collection's day-first date order does not reach the trace and tagging calls.** (The Reader's folder-date
+  confirmation reads it since W49.reader-folder-date-day-first.) Where the route finds a year
   but no dated form, the tagging call's month and day can still be a month-first reading (queued:
   W49.proc-metadata-unified-apply, which puts the order into the one metadata call).
+- **Live Capture dates folders in its output root's order but records each collection's own.** Its folder and document
+  dates read `numericDatesDayFirst` from the session's output root, while Finish writes each collection subfolder's run
+  record from that subfolder's settings, which the Reader reads. With day first set on the root only, a Live folder
+  `6/2/61` is February in Live's tags and June in the Reader's offer (queued: W49.proc-live-date-order-per-collection).
 - **A direct key's rotation estimate leaves out a Gemini model's unbudgeted thinking.** Rotation on a direct Gemini,
   Claude or OpenAI key asks the run's own OCR model (owner call 6). A Gemini model the catalog marks as not thinking
   (Gemini 3.1 Pro, Gemini 3 Flash Preview) is sent no thinking budget, so whatever it thinks is not in the estimate;

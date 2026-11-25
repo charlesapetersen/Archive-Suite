@@ -154,6 +154,30 @@ final class FolderDatingTests: XCTestCase {
         }
     }
 
+    /// W49.reader-folder-date-day-first: a numeric folder date reads in the collection's order, as Process Files and
+    /// Live Capture read it: "6/2/61" is June month first, February where the collection's record says day first.
+    func testANumericFolderDateReadsInTheCollectionsOrder() throws {
+        try makeFolder(date: "6/2/61")
+        func month() throws -> Int? {
+            let run = try XCTUnwrap(NavigationModel.folderDatingRun(tree: root, components: ["Box 3"], editedName: "0002.pdf"))
+            guard case let .year(1961, month, uncertain: false)? = run.date?.inherited else { return nil }
+            return month
+        }
+        XCTAssertEqual(try month(), 6, "no collection record: month first")
+        let record = root.appendingPathComponent(".archivesuite/collection-settings.json")
+        try FileManager.default.createDirectory(at: record.deletingLastPathComponent(), withIntermediateDirectories: true)
+        func order(_ dayFirst: Bool) throws {
+            try Data(("""
+            {"collection":{"entries":{"numericDatesDayFirst":{"source":{"setByUser":{"_0":"2026-11-24T10:00:00Z"}},\
+            "value":{"type":"bool","value":\(dayFirst)}}},"id":"C","kind":"collection","name":"Letters"},"schemaVersion":1}
+            """).utf8).write(to: record)
+        }
+        try order(true)
+        XCTAssertEqual(try month(), 2, "the collection's numeric dates are day first")
+        try order(false)
+        XCTAssertEqual(try month(), 6)
+    }
+
     func testAnUnconfirmedOrUnusableDateOffersNothing() throws {
         try makeFolder(date: "1965-1967", source: .label)
         XCTAssertNil(NavigationModel.folderDatingRun(tree: root, components: ["Box 3"], editedName: "0002.pdf"),
