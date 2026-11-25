@@ -18417,3 +18417,12 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   for that reason and was removed. Filed `W49.proc-fix-s048`. VM class run: see the commit body. Logs and shots in
   `old/W49.proc-s048-check/`. No bench cache used; guest scratch only. $0, no real corpus or external upload.
   <!-- /W49.proc-s048-check -->
+- [x] **W49.proc-s047-check — Independently reproduce S-047 [S]** · §Known limits are queued, accepted or asked (lane: processor) · SHIPPED 2026-11-24 (this commit)
+  Phase rule 5a(4): `W49.proc-s047-verify` (Codex gpt-6.2-sol, `d1ec616d`) showed that windows splitting the OCR's
+  two-page letter leave the marked enclosure with no cover and so no Sent With. Independently confirmed on Claude
+  Opus 5.5 at `732f5920`: fresh Debug build (existing VisionOCRKit/AppIntents diagnostics only);
+  `test-segmentation-review.sh` ALL PASS with 9a `page-4 enclosureOf 1` and 9b cover none; `test-dual-date.sh` ALL
+  PASS. Separate code trace: the provisional cover (page 3) fails the `[page-2, page-3]` OCR baseline in
+  `DocumentSegmenter.segment`, and every Sent With path reads `validCoverIndex`. Filed owner call 33 as
+  `W49.proc-s047-cover-select`. No bench cache used; driver scratch only. $0, no real corpus or upload.
+  <!-- /W49.proc-s047-check -->

@@ -236,7 +236,7 @@ classification edit. [Independent VM evidence](../verification/evidence/processo
 - When a window splits the OCR's two-page letter, the marked enclosure remains a separate document.
   The exact-cover check drops the proposed relation, so Automatic tagging has no verified cover from
   which to derive Sent With. Owner call 33 chooses optional explicit cover selection in review.
-  Implementation follows independent reproduction. [Scratch evidence](../verification/evidence/processor/W49.proc-s047-verify.md). (queued: W49.proc-s047-check)
+  Independently confirmed 2026-11-24 (Claude Opus 5.5, `732f5920`). [Scratch evidence](../verification/evidence/processor/W49.proc-s047-verify.md). (queued: W49.proc-s047-cover-select)
 
 ## FIXED (S-046, 2026-11-23) — the Documents switch controls the fresh whole-run review
 
