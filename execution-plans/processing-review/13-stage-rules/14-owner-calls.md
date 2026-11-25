@@ -357,3 +357,13 @@ Each is a table default or a filed item, reversible without app work; the figure
   cluster rows.
 - **Design (12-settings-design.md):** figures shown as points with sample size and the tie rule, as the design session
   decided; the solver's memory headroom stays 5 GB over the measured peak until a measurement says otherwise.
+
+## 3. Pipeline pruning & simplification (`W49.proc-pipeline-prune-ok`, owner 2026-11-24)
+
+Walked interactively against `execution-plans/processor-pipeline-prune.md`; applied by `W49.proc-pipeline-prune-apply`:
+1. **Handwriting text placement (`hand-blla-ctc`):** Option B — keep as an opt-in Advanced on-demand download, **default OFF** (clean text page is default in 1.0).
+2. **Per-kind OCR routing & mixed-page switch:** Option A1 — simplify to one clean **2-way split (Typed/Printed vs. Handwriting)** for both Mac and Cloud cost-saving; drop the 4-way per-kind matrix; defer the mixed-page switch to 2.0 (`W46.kinds-mixed-truth`).
+3. **Unwired (`app_route: null`) routes:** Option A — bundle only runnable/supported app routes in the app's runtime `settings-routes.json`; keep all 119 rows on ArchiveOCRBench.
+4. **Solver tie rules:** Option A1 — **practical-floor-only** across both Reading (`0.5` NES pts for both cloud and local) and Segmentation (`2.0` pts); display 95% CIs honestly without letting underpowered CIs force ties onto weaker models.
+5. **Numeric date order & owner-corpus prompts:** Option A — add a collection-level numeric date-order setting (`MM/DD` US default vs. `DD/MM` International) and neutralize owner-specific prompt examples in `ArchiveProcessor/prompts.md` during `W49.proc-metadata-consolidate`.
+6. **Newspaper read-poorly flags & direct-key rotation:** Option A — defer `W49.proc-read-flag-newspaper-app` and `W49.proc-read-flag-newspaper-whole-app` to 1.1 (`W46.nice-to-have`); keep Vision + PP-LCNet local agreement for rotation with fallback to the user's configured OCR model, retiring `W46.rotation-direct-keys`.
