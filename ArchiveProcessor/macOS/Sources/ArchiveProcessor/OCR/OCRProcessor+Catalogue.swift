@@ -219,6 +219,7 @@ extension OCRProcessor {
         let finalSegments = segments.isEmpty && run.sources.count == jobs.count
             ? currentSegments(files: jobs.map(\.sourceURL)) : segments
         let jobBySource = Dictionary(jobs.map { ($0.sourceURL, $0) }, uniquingKeysWith: { first, _ in first })
+        let jobIndexBySource = Dictionary(jobs.indices.map { (jobs[$0].sourceURL, $0) }, uniquingKeysWith: { first, _ in first })
         var segmentBySource: [URL: Int] = [:]
         for (index, segment) in finalSegments.enumerated() {
             for source in segment.pdfURLs where !reOCRSourceURLs.contains(source) {
@@ -275,7 +276,7 @@ extension OCRProcessor {
             let segmentJobs = sources.compactMap { jobBySource[$0] }
             let manualQuality = (taggingMode == .human || taggingMode == .autoDate) && appliedGeneratedTags[first] != nil
             let quality = manualQuality ? DocumentTags.qualityTag(for: tags.quality) ?? "Q0"
-                : segmentJobs.flatMap(\.appliedTags).first(where: DocumentTags.isRatingToken)
+                : catalogueQuality(of: sources, jobIndex: jobIndexBySource)
             let failed = segmentJobs.contains { $0.status == .failed }
             var fileFields = ProcessorCatalogueRecord.fileFields(tags: tags, quality: quality, unread: stampsUnread, failed: failed)
             if passSourceTags {
@@ -315,6 +316,28 @@ extension OCRProcessor {
                              document: document, fileFields: fileFields, exports: exports, preOCRed: preOCRed,
                              mergeInputs: catalogueMergeInputs[pdf], preservationIntake: run.preservationIntake)
         }
+    }
+
+    /// The rating a non-manual run gives a file, read from the run's own typed fields rather than from the
+    /// Finder tag list: the first source, in page order, that has one. A page's phone rating (Live Capture,
+    /// or a capture import's `Q` intent) wins over its generated tags, and `Q0` clears that page's rating,
+    /// as `applyCaptureQualityTags` does for the Finder copy. A no-tagging run applies no phone rating there,
+    /// so it carries none here either. Copy Source Tags still reads the source's own tags afterwards.
+    func catalogueQuality(of sources: [URL], jobIndex: [URL: Int]? = nil) -> String? {
+        let jobIndex = jobIndex ?? Dictionary(jobs.indices.map { (jobs[$0].sourceURL, $0) },
+                                              uniquingKeysWith: { first, _ in first })
+        for source in sources {
+            if taggingMode != .none, let index = jobIndex[source], index < preGroupedQualities.count,
+               let raw = preGroupedQualities[index]?.trimmingCharacters(in: .whitespaces),
+               ["Q0", "Q1", "Q2", "Q3"].contains(raw) {
+                if raw != "Q0" { return raw }
+                continue
+            }
+            if let generated = appliedGeneratedTags[source].flatMap({ DocumentTags.qualityTag(for: $0.quality) }) {
+                return generated
+            }
+        }
+        return nil
     }
 
     private func catalogueOutputFolder(for source: URL, in root: URL) throws -> URL {

@@ -478,6 +478,37 @@ enum ProcessFilesTagWarningTestDriver {
               tagsOf(manualSegPDF).contains("Manual")
               && !tagsOf(manualSegPDF).contains(where: DocumentTags.isRatingToken))
 
+        // W49.proc-catalogue-cutover: the catalogue record's rating comes from the run's typed fields (the phone
+        // intent, then the generated tags), not from scraping `job.appliedTags`, and follows the Finder rules above.
+        func ratingProcessor(_ names: [String], phone: [String?], mode: TaggingMode = .automatic,
+                             generated: [Int] = []) -> (OCRProcessor, [URL]) {
+            let sources = names.map { colourDir.appendingPathComponent($0) }
+            let p = OCRProcessor()
+            p.taggingMode = mode
+            p.jobs = sources.map { OCRJob(sourceURL: $0) }
+            p.preGroupedQualities = phone
+            for (source, quality) in zip(sources, generated) {
+                p.appliedGeneratedTags[source] = GeneratedTags(subjectTags: ["Rated"], quality: quality)
+            }
+            return (p, sources)
+        }
+        let (phoneRated, phoneSources) = ratingProcessor(["IMG_7101.jpg"], phone: ["Q3"])
+        phoneRated.jobs[0].appliedTags = ["History", "Q1"]
+        check("the catalogue rating is the phone's Q3, not a stale rating left in the job's tag list",
+              phoneRated.catalogueQuality(of: phoneSources) == "Q3")
+        let (cleared, clearedSources) = ratingProcessor(["IMG_7102.jpg"], phone: ["Q0"], generated: [2])
+        check("a phone Q0 clears the catalogue rating, as it clears the Finder one",
+              cleared.catalogueQuality(of: clearedSources) == nil)
+        let (generatedOnly, generatedSources) = ratingProcessor(["IMG_7103.jpg"], phone: [], generated: [2])
+        check("with no phone rating the catalogue takes the generated tags' Q2",
+              generatedOnly.catalogueQuality(of: generatedSources) == "Q2")
+        let (noTagRating, noTagSources) = ratingProcessor(["IMG_7104.jpg"], phone: ["Q3"], mode: .none)
+        check("a no-tagging run carries no phone rating into the catalogue",
+              noTagRating.catalogueQuality(of: noTagSources) == nil)
+        let (multi, multiSources) = ratingProcessor(["IMG_7105.jpg", "IMG_7106.jpg"], phone: ["Q0", "Q1"])
+        check("a merged document takes the first page, in order, that has a rating",
+              multi.catalogueQuality(of: multiSources) == "Q1")
+
         // Fresh Processor re-tags do not contain a quality because OCR never emits one; retain the
         // existing user setting rather than silently dropping it as an unknown subject.
         let retagPDF = colourDir.appendingPathComponent("retag-quality.pdf")
