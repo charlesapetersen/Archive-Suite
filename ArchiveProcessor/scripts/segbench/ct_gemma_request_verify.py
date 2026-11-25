@@ -4,6 +4,7 @@
     python3 ct_gemma_request_verify.py prepare        # scratch label copies at four corrections + the manifest
     heavy-run.py run -- <lab venv>/bin/python ct_gemma_request_verify.py run [--pairs N]   # mlx-vlm on :8080 + the app driver
     heavy-run.py run -- <lab venv>/bin/python ct_gemma_request_verify.py unavailable       # no server: the Vision fallback
+    heavy-run.py run -- <lab venv>/bin/python ct_gemma_request_verify.py journeys          # Process Files + Live Capture
     python3 ct_gemma_request_verify.py --report       # segbench-results/ct-gemma-request-verify.md
 
 The app's own label path reads every photo (`LabelGemmaVerifyTestDriver`, which calls
@@ -150,17 +151,19 @@ def done_keys(path):
     return {json.loads(line)["key"] for line in path.read_text().splitlines() if line.strip()}
 
 
-def run_app(manifest, out, timeout):
-    """The app driver over `manifest`, until it writes `<out>.done`. Returns its exit state."""
+def run_app(manifest, out, timeout, *, extra=None, args=(), done=None):
+    """The app driver over `manifest`, until it writes `<out>.done` (or `done`)."""
     if not APP.exists():
         raise RuntimeError("Build the Processor Debug app in this worktree first")
-    done = Path(str(out) + ".done")
+    done = Path(done or str(out) + ".done")
     done.unlink(missing_ok=True)
     work = Path(tempfile.mkdtemp(prefix="gemma-verify-app-"))
-    env = dict(os.environ, ARCHIVEPROC_HEADLESS="1", ARCHIVEPROC_TEST_BACKUP_ROOT=str(work / "backup"),
-               LABELGEMMA_VERIFY=str(manifest), LABELGEMMA_VERIFY_OUT=str(out))
+    env = dict(os.environ, ARCHIVEPROC_HEADLESS="1", ARCHIVEPROC_TEST_BACKUP_ROOT=str(work / "backup"))
+    if manifest is not None:
+        env.update(LABELGEMMA_VERIFY=str(manifest), LABELGEMMA_VERIFY_OUT=str(out))
+    env.update(extra or {})
     with open(work / "app.log", "w") as log:
-        child = subprocess.Popen([str(APP)], env=env, stdout=log, stderr=subprocess.STDOUT)
+        child = subprocess.Popen([str(APP), *args], env=env, stdout=log, stderr=subprocess.STDOUT)
     deadline = time.monotonic() + timeout
     try:
         while not done.exists():
@@ -241,6 +244,66 @@ def unavailable(_args):
     finally:
         os.unlink(handle.name)
     print(f"{len(done_keys(UNAVAILABLE))} reads with no server")
+
+
+def sha(path):
+    import hashlib
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def gemma_runs(folder):
+    """Per container file under `folder`: each run's level and the readers of its fields (no values)."""
+    out = []
+    for path in sorted(Path(folder).rglob(".archivesuite/containers.json")):
+        for run_ in json.loads(path.read_text()).get("runs", []):
+            readers = sorted({v.get("reader") or "" for v in (run_.get("fields") or {}).values()})
+            out.append(dict(level=run_.get("level"), readers=readers))
+    return out
+
+
+def journeys(_args):
+    """Process Files' label stage and a Live Capture session (Apple Vision pages, no tagging), each under both styles
+    chosen by the launch argument, with Gemma on the preset port."""
+    import ct_gemma_route_fields as F
+    entries = json.loads(MANIFEST.read_text())
+    labels = json.loads((SCRATCH / "labels.json").read_text())
+    box = next(l["id"] for l in labels if not l["folder"])
+    folder = next(l["id"] for l in labels if l["folder"])
+
+    def entry(mid, size, correction):
+        return next(e for e in entries if e["key"].startswith(f"{mid}/{size}/c{correction}/"))
+    pf = [entry(box, "bench", 0), entry(folder, "bench", 90), entry(box, "original", 180), entry(folder, "original", 0)]
+    lc = [("box", entry(box, "bench", 0)["photo"]), ("folder", entry(folder, "original", 0)["photo"])]
+    photos = [e["photo"] for e in pf] + [p for _, p in lc]
+    before = {p: sha(p) for p in photos}
+    root = SCRATCH / "journeys"
+    if root.exists():
+        raise RuntimeError(f"{root} exists: move it to the Trash before a fresh journey run")
+    result = {}
+    with F.server(PORT, with_pid=True):
+        for style in STYLES:
+            args = ("-containerLabelGemmaRequest", style)
+            out = root / f"processfiles-{style}"
+            with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+                json.dump(pf, handle)
+            try:
+                run_app(Path(handle.name), None, 120 * len(pf) + 120, args=args, done=out / "DONE",
+                        extra=dict(LABELGEMMA_PROCESSFILES_OUT=str(out)))
+            finally:
+                os.unlink(handle.name)
+            result[f"processfiles/{style}"] = dict(note=(out / "NOTE.txt").read_text().strip(), runs=gemma_runs(out))
+            out = root / f"livecapture-{style}"
+            out.mkdir(parents=True)
+            run_app(None, None, 600, args=args, done=out / "TEST_DONE.txt", extra=dict(
+                LIVECAPTURE_TESTMODE="1", LIVECAPTURE_TESTKEY="", LIVECAPTURE_TESTOUT=str(out),
+                LIVECAPTURE_TESTDONE=str(out / "TEST_DONE.txt"), LIVECAPTURE_TESTPROVIDER="Apple Vision",
+                LIVECAPTURE_TESTIMAGES=";".join(f"{t}:{p}" for t, p in lc)))
+            result[f"livecapture/{style}"] = dict(note=(out / "TEST_DONE.txt").read_text().strip()[:300],
+                                                  runs=gemma_runs(out))
+    result["sources_intact"] = sum(sha(p) == before[p] for p in photos)
+    result["sources"] = len(photos)
+    (SCRATCH / "journeys.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
+    print(json.dumps(result, indent=1))
 
 
 def check_images():
@@ -473,6 +536,26 @@ def report(_args):
                  f"were unchanged.")
     else:
         L.append("Not run.")
+    L += ["", "## Process Files and Live Capture", ""]
+    journeys_path = SCRATCH / "journeys.json"
+    if journeys_path.exists():
+        j = json.loads(journeys_path.read_text())
+        L += ["Each style chosen by the launch argument (`-containerLabelGemmaRequest`), with Gemma on the preset port. "
+              "Process Files: its label stage (`recordContainerLabels`) on four finished-run labels (box and folder, "
+              "bench and full size, corrections 0, 90, 180 and 0). Live Capture: a headless session (Apple Vision pages, "
+              "no tagging, so nothing leaves the Mac) with a box and a folder label, finished into a scratch folder.", "",
+              "| Journey | Request | Container runs written | Runs with a Gemma value | Summary note |",
+              "| --- | --- | --- | --- | --- |"]
+        for key in ("processfiles/current", "processfiles/revised", "livecapture/current", "livecapture/revised"):
+            if key not in j:
+                continue
+            runs = j[key]["runs"]
+            note = j[key]["note"].replace("\n", " ").replace("|", "/")
+            L.append(f"| {key.split('/')[0]} | {key.split('/')[1]} | {len(runs)} | "
+                     f"{sum(GEMMA in r['readers'] for r in runs)} | {note[:160]} |")
+        L += ["", f"Source photos unchanged after both journeys: {j['sources_intact']}/{j['sources']}."]
+    else:
+        L.append("Not run.")
     L += ["", "## Measurement card", "",
           "- **Truth.** The ct-read truth (three-reader drafts, owner sheet rulings) as the earlier route reports "
           "scored it; the same eligibility per cell. Neither request drafted it.",
@@ -493,13 +576,14 @@ def report(_args):
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("step", nargs="?", choices=("prepare", "run", "unavailable", "images"))
+    p.add_argument("step", nargs="?", choices=("prepare", "run", "unavailable", "journeys", "images"))
     p.add_argument("--pairs", type=int)
     p.add_argument("--report", action="store_true")
     a = p.parse_args()
     if a.report:
         return report(a)
-    {"prepare": prepare, "run": run, "unavailable": unavailable, "images": lambda _a: check_images()}[a.step](a)
+    {"prepare": prepare, "run": run, "unavailable": unavailable, "journeys": journeys,
+     "images": lambda _a: check_images()}[a.step](a)
 
 
 if __name__ == "__main__":

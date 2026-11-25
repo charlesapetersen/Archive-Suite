@@ -11,7 +11,8 @@ import ArchiveCore
 /// `LABELGEMMA_VERIFY=<manifest.json>`: `[{"key", "photo", "rotation", "type": "Box"|"Folder", "style":
 /// "current"|"revised", "imageOut"?}]`. `LABELGEMMA_VERIFY_OUT=<results.jsonl>`: keys already there are skipped, so a
 /// rerun resumes. `<out>.done` is written at the end. Photos must be scratch copies; each file's SHA-256 is recorded
-/// before and after its read.
+/// before and after its read. With `LABELGEMMA_PROCESSFILES_OUT=<dir>` the manifest's photos instead go through
+/// Process Files' label stage (`processFiles`), under the style the defaults select.
 @MainActor
 enum LabelGemmaVerifyTestDriver {
     private static var didRun = false
@@ -27,9 +28,50 @@ enum LabelGemmaVerifyTestDriver {
 
     static func runIfRequested() {
         let env = ProcessInfo.processInfo.environment
-        guard !didRun, let manifest = env["LABELGEMMA_VERIFY"], let out = env["LABELGEMMA_VERIFY_OUT"] else { return }
+        guard !didRun, let manifest = env["LABELGEMMA_VERIFY"] else { return }
+        // A long headless run has no window, so macOS may quit the app under memory pressure: it did after 156 reads.
+        ProcessInfo.processInfo.disableAutomaticTermination("label verification run")
+        ProcessInfo.processInfo.disableSuddenTermination()
+        if let folder = env["LABELGEMMA_PROCESSFILES_OUT"] {
+            didRun = true
+            Task { @MainActor in await processFiles(manifest: URL(fileURLWithPath: manifest),
+                                                    out: URL(fileURLWithPath: folder, isDirectory: true)) }
+            return
+        }
+        guard let out = env["LABELGEMMA_VERIFY_OUT"] else { return }
         didRun = true
         Task { @MainActor in await run(manifest: URL(fileURLWithPath: manifest), out: URL(fileURLWithPath: out)) }
+    }
+
+    /// Process Files' label stage (`recordContainerLabels`) on the manifest's photos as a finished run's box and folder
+    /// labels, each with the manifest's correction as the run's rotation, under the style the defaults select. Each
+    /// output is a scratch stand-in PDF in `out`; the stage writes `out/.archivesuite/containers.json`. The summary note
+    /// goes to `out/NOTE.txt`, then `out/DONE`.
+    private static func processFiles(manifest: URL, out: URL) async {
+        let fm = FileManager.default
+        defer { fm.createFile(atPath: out.appendingPathComponent("DONE").path, contents: Data()) }
+        guard let data = try? Data(contentsOf: manifest),
+              let entries = try? JSONDecoder().decode([Entry].self, from: data) else { return }
+        try? fm.createDirectory(at: out, withIntermediateDirectories: true)
+        let processor = OCRProcessor()
+        var jobs: [OCRJob] = []
+        for (n, entry) in entries.enumerated() {
+            guard let type = ItemType(rawValue: entry.type) else { continue }
+            let source = URL(fileURLWithPath: entry.photo)
+            let output = out.appendingPathComponent(String(format: "%05d", n + 1) + ".pdf")
+            fm.createFile(atPath: output.path, contents: Data("scratch stand-in".utf8))
+            var job = OCRJob(sourceURL: source)
+            job.status = .succeeded
+            job.classification = type == .box ? .boxLabel : .folderLabel
+            job.result = OCRResult(text: "", classification: job.classification, errorMessage: nil, errorCode: nil)
+                .with(classification: job.classification, rotationDegrees: entry.rotation)
+            jobs.append(job)
+            processor.outputURLMap[source] = output
+        }
+        processor.jobs = jobs
+        let note = await processor.recordContainerLabels(moves: [:], outputDirectory: out, preOCRedInput: false)
+        try? ("style \(ContainerLabelGemma.style.rawValue)\n" + (note ?? "")).write(
+            to: out.appendingPathComponent("NOTE.txt"), atomically: true, encoding: .utf8)
     }
 
     nonisolated private static func sha(_ url: URL) -> String? {

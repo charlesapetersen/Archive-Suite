@@ -42,9 +42,12 @@ enum LiveCaptureTestDriver {
         // rotation .off for the headless run: macOS Vision (local-Vision rotation) hangs without a
         // window-server/GUI session. Rotation is a separate, already-working component; not what
         // this streaming verification is exercising.
+        // W49.proc-gemma-request-verify: `LIVECAPTURE_TESTPROVIDER=Apple Vision` reads pages on this Mac with no
+        // tagging, so a label journey sends nothing off the Mac (its label read still asks a server on this Mac).
+        let vision = env["LIVECAPTURE_TESTPROVIDER"] == LLMProvider.appleVision.rawValue
         let config = SessionProcessingConfig(
-            provider: .gemini, model: model, thinkingLevel: .low, apiKey: key,
-            taggingMode: .automatic, rotationMode: .off, mergeDocuments: false,
+            provider: vision ? .appleVision : .gemini, model: model, thinkingLevel: .low, apiKey: key,
+            taggingMode: vision ? .none : .automatic, rotationMode: .off, mergeDocuments: false,
             outputDirectory: outDir,
             customOCRPrompt: "", imageScale: 1.0, enableSegmentJSON: true, tagVocabulary: [], gateway: nil,
             outputImageFile: true, pdfImageMB: 2.0, exportedImageMB: 3.0, textColumns: 1)
