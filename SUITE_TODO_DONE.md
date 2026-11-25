@@ -18453,3 +18453,6 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   <!-- /W49.proc-resume-tagging-progress -->
 - [x] **W49.proc-enclosure-other-routes — enclosure proposals from every reading route, with a letter check · §Known limits are queued, accepted or asked · ABSORBED 2026-11-24** — Folded into `W49.proc-metadata-consolidate` (owner, 2026-11-24: holistic Processor pipeline plan).
   <!-- /W49.proc-enclosure-other-routes -->
+
+- [x] **W49.proc-pipeline-prune — Decision pack on negative-ROI pipeline stages, tie rules and US-only priors · §Archive Processor — pipeline simplification, unification & architecture · DONE 2026-11-24** — Wrote plain-language 6-decision pack at `execution-plans/processor-pipeline-prune.md` (verified `settings-routes.json` counts: 119 total, 37 shipped, 28 with `app_route`, 91 `null`, 35 unmeasured time) covering kraken `hand-blla-ctc`, cloud per-kind routing & mixed switch, unwired solver rows, contradictory Reading vs. Segmentation tie rules, US-only date/prompt priors, and `n=15` newspaper flags / direct-key rotation. Awaits owner call on `W49.proc-pipeline-prune-ok` (Call 13 respected; nothing silently removed).
+  <!-- /W49.proc-pipeline-prune -->
