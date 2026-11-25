@@ -18446,3 +18446,10 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   headless `ap_test36` emulator (Pixel 6, API 36) and the app drawer screenshotted at 420 and 280 dpi: the icon reads as
   the Mac Processor icon under the circular mask. No bench cache; $0.
   <!-- /W40.fix-android-launcher-icon -->
+
+- [x] **W49.proc-finalize-helpers — one shared finalize and organize step for fresh runs, resumed runs and resumed batches · §Known limits are queued, accepted or asked · ABSORBED 2026-11-24** — Absorbed into `W49.proc-unified-pipeline-1` (owner, 2026-11-24: holistic Processor pipeline plan).
+  <!-- /W49.proc-finalize-helpers -->
+- [x] **W49.proc-resume-tagging-progress — a resumed run keeps the tags already bought · §Known limits are queued, accepted or asked · ABSORBED 2026-11-24** — Absorbed into `W49.proc-unified-pipeline-1` (owner, 2026-11-24: holistic Processor pipeline plan).
+  <!-- /W49.proc-resume-tagging-progress -->
+- [x] **W49.proc-enclosure-other-routes — enclosure proposals from every reading route, with a letter check · §Known limits are queued, accepted or asked · ABSORBED 2026-11-24** — Folded into `W49.proc-metadata-consolidate` (owner, 2026-11-24: holistic Processor pipeline plan).
+  <!-- /W49.proc-enclosure-other-routes -->

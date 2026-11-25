@@ -282,7 +282,7 @@ on the standard route and the mixed-PDF route (W49.proc-stop-saves-inflight), an
   user's own worker setting)
 - **A crash or quit during tagging, segmentation or collection review starts that step again.** Its OCR is not
   repeated, but automatic tagging's text calls are bought again (a window segmenter's answers are kept). (queued:
-  W49.proc-resume-tagging-progress)
+  W49.proc-unified-pipeline-1)
 
 ## ⚠️ LIMITATION (W47.wh-whole-page-large, 2026-11-20): Qwen3.6 27B reads newspapers whole on a tie measured elsewhere
 
@@ -1287,7 +1287,7 @@ Runtime evidence and the final unattended rerun are under `verification/evidence
 
 - **Enclosure proposals come only from the OCR prompt's `[enclosure]` marker**, so Mistral, Apple Vision and
   pre-OCRed classification-only runs propose none; the owner can still type a sent-with date in the manual
-  tag sheet. Nothing checks that the covering unit is actually a letter. (queued: W49.proc-enclosure-other-routes)
+  tag sheet. Nothing checks that the covering unit is actually a letter. (queued: W49.proc-metadata-consolidate)
 - **The manual sheet can clear a proposed relation or type a date, but cannot re-point it** at another letter. (queued: W49.proc-manual-repoint-relation)
 - The OCR prompt gained one optional instruction (the marker), so it is in every paid OCR call. (accepted: one optional instruction in the OCR prompt is the price of the marker)
 
