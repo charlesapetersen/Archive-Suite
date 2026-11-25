@@ -9,11 +9,11 @@ Reproduce: `ocr_mac_local.py collect --model gemma3-12b-mlx4` (the 96) and `ocr_
 | set | pages | read | completed | failed: loop stop | failed: token cap | failed: reply format | NES strict % | NES answered % | NES lenient % |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | the owner's 96 | 96 | 96 | 73 | 23 | 0 | 0 | 52.5 | 69.0 | 62.7 |
-| the 895 public pages | 895 | 8 | 0 | 4 | 0 | 0 | – | – | – |
+| the 895 public pages | 895 | 233 | 120 | 110 | 3 | 0 | 29.4 | 57.1 | 34.2 |
 
 **Loop stop.** A greedy reading that falls into a loop runs to the 8,192-token cap, about nine minutes a page here, which made the full run impractical (the pilot's third page did exactly that). So a reading stops once its last 1,024 tokens repeat, token for token, a cycle of at most 256 tokens (`ocr_mac_local.loop_period`), and counts as failed, as it would at the cap. Over the 907 finished readings of the other Mac-local readers (granite-docling apart) the rule never fires, so it does not end a reading that would have finished. **Lenient** scores a looped page on what it read before the loop and a format-broken reply on its text after `TEXT:`, which is what an app with this stop would keep; **strict** counts both as 0, as every other route on the bench is counted.
 
-**Incomplete on the 895 public pages: 8 of 895 pages read.** Figures cover those only.
+**Incomplete on the 895 public pages: 233 of 895 pages read.** Figures cover those only.
 
 ## Paired with other routes on the owner's 96
 
@@ -44,11 +44,32 @@ Gemma less the other route, NES points on the pages both have; failures count 0 
 
 | route | pages | completed (other) | other NES % | Gemma NES % | Gemma − other | 95% interval | p |
 |---|---:|---:|---:|---:|---:|---:|---:|
+| Apple Vision (Mac) | 78 | 73 | 42.8 | 18.7 | -24.17 | -29.51 to -19.27 | 0.000 |
+| Qwen3-VL 8B bf16 (FarmShare) | 233 | 170 | 55.0 | 29.4 | -25.55 | -29.80 to -21.39 | 0.000 |
+| LightOnOCR-3 4B bf16 (FarmShare) | 233 | 212 | 63.7 | 29.4 | -34.32 | -38.16 to -30.61 | 0.000 |
+| PaddleOCR-VL 1.6 (Sherlock) | 233 | 176 | 47.2 | 29.4 | -17.84 | -21.05 to -14.56 | 0.000 |
+| Xiaomi-OCR-0 (Sherlock) | 233 | 233 | 63.3 | 29.4 | -33.87 | -37.29 to -30.50 | 0.000 |
+| Gemini 3.7 Flash (gateway, cloud) | 233 | 229 | 77.4 | 29.4 | -48.00 | -52.11 to -43.85 | 0.000 |
 
 By stratum (NES %, strict; a route shown only where it has every page of the group):
 
-| group | n | Gemma completed | Gemma |  |
-|---|---:|---:|---:|
+| group | n | Gemma completed | Gemma | Apple Vision | Qwen3-VL 8B bf16 | LightOnOCR-3 4B bf16 | PaddleOCR-VL 1.6 | Xiaomi-OCR-0 | Gemini 3.7 Flash |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| L1 (btp, Latn) | 17 | 16 | 55.8 | – | 80.8 | 88.5 | 75.7 | 82.9 | 89.6 |
+| L2 (bentham, Latn; btp, Latn) | 17 | 12 | 37.8 | – | 57.7 | 80.4 | 56.9 | 77.8 | 79.7 |
+| L3 (btp, Latn; tapus, Latn) | 28 | 28 | 84.5 | – | 94.6 | 92.4 | 94.5 | 91.4 | 96.5 |
+| L4 (si, Latn) | 20 | 13 | 25.4 | – | 58.0 | 57.2 | 42.8 | 53.1 | 82.1 |
+| L5 (castilian, Latn; iforal, Latn; voc, Latn) | 17 | 0 | 0.0 | 36.5 | 49.0 | 55.2 | 31.0 | 54.7 | 59.8 |
+| L6 (kurrent, Latn; read2017, Latn) | 14 | 3 | 6.8 | 27.0 | 23.3 | 55.0 | 27.5 | 47.5 | 87.4 |
+| L7 (koenigsfelden, Latn) | 20 | 1 | 0.7 | 11.9 | 28.1 | 40.3 | 14.2 | 37.2 | 55.1 |
+| L8 (ocrd, Latn) | 27 | 20 | 49.9 | 78.0 | 88.1 | 89.5 | 82.7 | 89.5 | 89.0 |
+| L9 (newsbench, Latn) | 3 | 0 | 0.0 | – | 92.8 | 94.8 | 0.0 | 93.6 | 97.7 |
+| N1 (muharaf, Arab) | 9 | 1 | 0.8 | – | 14.2 | 43.6 | 16.3 | 25.0 | 78.1 |
+| N2 (peter, Cyrl) | 17 | 6 | 5.0 | – | 14.4 | 8.3 | 6.0 | 28.6 | 26.5 |
+| N3 (eparchos, Grek) | 15 | 5 | 7.3 | – | 3.0 | 47.1 | 14.0 | 41.1 | 93.0 |
+| N4 (biblia, Hebr) | 4 | 0 | 0.0 | – | 7.0 | 6.4 | 0.0 | 10.6 | 66.0 |
+| N5 (omnidoc, Hans; omnidoc, Hant) | 13 | 4 | 19.0 | – | 78.9 | 73.4 | 56.7 | 78.7 | 85.3 |
+| N6 (devanagari, Deva) | 12 | 11 | 39.9 | – | 66.2 | 67.6 | 52.3 | 80.0 | 71.3 |
 
 ## Speed and memory on the owner's 96
 
@@ -72,21 +93,26 @@ Memory guard whole-process rows for these runs (date, exit, seconds, peak RSS MB
 
 ## Speed and memory on the 895 public pages
 
-8 pages, one at a time, on an Apple M3 Pro with 18 GB (mlx-vlm 0.7.4; 4 s median model load). Total reading time 0.1 h.
+233 pages, one at a time, on an Apple M3 Pro with 18 GB (mlx-vlm 0.7.4; 4 s median model load). Total reading time 3.9 h.
 
 | measure | median | 90th percentile | max |
 |---|---:|---:|---:|
-| seconds a page (prompt + generation) | 44.4 | 63.3 | 65.4 |
+| seconds a page (prompt + generation) | 56.1 | 75.2 | 2114.6 |
 | seconds to first token (image encoding + prefill) | 3.9 | – | – |
-| generation tokens/s | 17.9 | – | – |
+| generation tokens/s | 17.7 | – | – |
 | input tokens (image + prompt) | 626 | – | – |
-| output tokens | 720 | 1056 | – |
-| MLX peak memory, GB | 7.86 | – | 7.86 |
+| output tokens | 929 | 1248 | – |
+| MLX peak memory, GB | 7.86 | – | 8.03 |
+
+Memory guard whole-process rows for these runs (date, exit, seconds, peak RSS MB, peak physical footprint MB, swap growth MB, worst pressure level):
+
+- 2026-11-25T06:33:54 · 0 · 13979 · 1072 · 9388 · 456 · 2
 
 
 ## Is it a candidate for the app's on-computer page OCR?
 
 - Against Apple Vision on the owner's 96 (96 pages): Gemma 52.5 against 83.1, -30.58 points (worse).
+- Against Apple Vision on the 895 public pages (78 pages): Gemma 18.7 against 42.8, -24.17 points (worse).
 - Against the best Mac-local reader on the 96, Qwen3.5-9B 4-bit (Mac): Gemma 52.5 against 91.9, -39.43 points.
 - Speed: a median 24 s a page on the 96, so 102k pages would be about 28 days of continuous reading; Apple Vision reads a page in about a second.
 
