@@ -572,6 +572,12 @@ footer p { font-size: 13px; }
       <div class="tbl"><table><thead><tr><th scope="col">Request</th><th scope="col">Parseable</th><th scope="col">Capped</th><th scope="col">JPEG MB (median / p95)</th><th scope="col">Request s (median / p95)</th><th scope="col">With JPEG preparation s (median / p95)</th><th scope="col">Server peak GiB (median / p95)</th><th scope="col">Highest sampled GiB</th></tr></thead><tbody id="container-validation-resources"></tbody></table></div>
       <p class="note">Memory is the sampled physical footprint of the warm server. Timing covers serial label requests. The app continues to use its current request and collection-number fallback.</p>
     </details>
+    <details id="container-app-path" hidden>
+      <summary>Both requests through the Processor, on turned and full-size photos</summary>
+      <p class="note">16 held-out labels, each at bench size and as its full-size original, stored turned so the app had to apply a 0, 90, 180 or 270 degree correction: 128 pairs read through the app's own label path, with the Vision fallback. Proposals the user gets. Small n, one read per pair, no intervals. Source <code>ArchiveProcessor/segbench-results/ct-gemma-request-verify.md</code>.</p>
+      <div class="tbl"><table><thead><tr><th scope="col">Photos</th><th scope="col">Field</th><th scope="col">Eligible</th><th scope="col">Current correct</th><th scope="col">Revised correct</th><th scope="col">Current where written</th><th scope="col">Revised where written</th><th scope="col">Current false fills</th><th scope="col">Revised false fills</th></tr></thead><tbody id="container-app-path-rows"></tbody></table></div>
+      <div class="tbl"><table><thead><tr><th scope="col">Size</th><th scope="col">Request</th><th scope="col">Reads</th><th scope="col">Gemma answered</th><th scope="col">File sent as is</th><th scope="col">Image MB (median / p95)</th><th scope="col">Read s (median / p95)</th><th scope="col">Server GiB (median / highest)</th></tr></thead><tbody id="container-app-path-resources"></tbody></table></div>
+    </details>
     <p class="note">The reference comes from owner answers, rules and cases where three readers agreed, including Google’s Gemini 3.7 Flash. The scope is the external mlx-vlm route. Source and measurement card <code>ArchiveProcessor/segbench-results/ct-gemma-route-fields.md</code>.</p>
   </section>
 
@@ -1663,6 +1669,11 @@ if (labelResults) {
     renderLabelRows('container-validation-presence', labelResults.validation_presence);
     renderLabelRows('container-validation-resources', labelResults.validation_resources);
     document.getElementById('container-route-validation').hidden = false;
+  }
+  if (labelResults.app_path) {
+    renderLabelRows('container-app-path-rows', labelResults.app_path);
+    renderLabelRows('container-app-path-resources', labelResults.app_path_resources);
+    document.getElementById('container-app-path').hidden = false;
   }
   document.getElementById('container-labels').hidden = false;
 }

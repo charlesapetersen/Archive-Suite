@@ -572,6 +572,12 @@ footer p { font-size: 13px; }
       <div class="tbl"><table><thead><tr><th scope="col">Request</th><th scope="col">Parseable</th><th scope="col">Capped</th><th scope="col">JPEG MB (median / p95)</th><th scope="col">Request s (median / p95)</th><th scope="col">With JPEG preparation s (median / p95)</th><th scope="col">Server peak GiB (median / p95)</th><th scope="col">Highest sampled GiB</th></tr></thead><tbody id="container-validation-resources"></tbody></table></div>
       <p class="note">Memory is the sampled physical footprint of the warm server. Timing covers serial label requests. The app continues to use its current request and collection-number fallback.</p>
     </details>
+    <details id="container-app-path" hidden>
+      <summary>Both requests through the Processor, on turned and full-size photos</summary>
+      <p class="note">16 held-out labels, each at bench size and as its full-size original, stored turned so the app had to apply a 0, 90, 180 or 270 degree correction: 128 pairs read through the app's own label path, with the Vision fallback. Proposals the user gets. Small n, one read per pair, no intervals. Source <code>ArchiveProcessor/segbench-results/ct-gemma-request-verify.md</code>.</p>
+      <div class="tbl"><table><thead><tr><th scope="col">Photos</th><th scope="col">Field</th><th scope="col">Eligible</th><th scope="col">Current correct</th><th scope="col">Revised correct</th><th scope="col">Current where written</th><th scope="col">Revised where written</th><th scope="col">Current false fills</th><th scope="col">Revised false fills</th></tr></thead><tbody id="container-app-path-rows"></tbody></table></div>
+      <div class="tbl"><table><thead><tr><th scope="col">Size</th><th scope="col">Request</th><th scope="col">Reads</th><th scope="col">Gemma answered</th><th scope="col">File sent as is</th><th scope="col">Image MB (median / p95)</th><th scope="col">Read s (median / p95)</th><th scope="col">Server GiB (median / highest)</th></tr></thead><tbody id="container-app-path-resources"></tbody></table></div>
+    </details>
     <p class="note">The reference comes from owner answers, rules and cases where three readers agreed, including Google’s Gemini 3.7 Flash. The scope is the external mlx-vlm route. Source and measurement card <code>ArchiveProcessor/segbench-results/ct-gemma-route-fields.md</code>.</p>
   </section>
 
@@ -49483,6 +49489,138 @@ true,
 "9.56 / 9.85",
 "9.85"
 ]
+],
+"app_path":[
+[
+"Bench size",
+"Repository",
+"60",
+"48/60",
+"48/60",
+"16/28",
+"16/28",
+"0/32",
+"0/32"
+],
+[
+"Bench size",
+"Collection title",
+"64",
+"40/64",
+"49/64",
+"12/36",
+"21/36",
+"0/28",
+"0/28"
+],
+[
+"Bench size",
+"Collection number",
+"64",
+"37/64",
+"48/64",
+"5/32",
+"16/32",
+"0/32",
+"0/32"
+],
+[
+"Bench size",
+"Date",
+"64",
+"56/64",
+"60/64",
+"20/24",
+"20/24",
+"4/40",
+"0/40"
+],
+[
+"Full size",
+"Repository",
+"60",
+"48/60",
+"48/60",
+"16/28",
+"16/28",
+"0/32",
+"0/32"
+],
+[
+"Full size",
+"Collection title",
+"64",
+"41/64",
+"51/64",
+"13/36",
+"23/36",
+"0/28",
+"0/28"
+],
+[
+"Full size",
+"Collection number",
+"64",
+"40/64",
+"46/64",
+"8/32",
+"16/32",
+"0/32",
+"2/32"
+],
+[
+"Full size",
+"Date",
+"64",
+"58/64",
+"62/64",
+"20/24",
+"22/24",
+"2/40",
+"0/40"
+]
+],
+"app_path_resources":[
+[
+"bench",
+"current",
+"64",
+"55/64",
+"0",
+"0.27 / 0.46",
+"14.63 / 19.23",
+"9.83 / 9.86"
+],
+[
+"bench",
+"revised",
+"64",
+"48/64",
+"16",
+"0.26 / 0.45",
+"15.44 / 18.68",
+"9.83 / 9.86"
+],
+[
+"original",
+"current",
+"64",
+"54/64",
+"0",
+"0.53 / 0.80",
+"15.03 / 48.21",
+"9.84 / 9.86"
+],
+[
+"original",
+"revised",
+"64",
+"48/64",
+"0",
+"0.53 / 0.80",
+"14.72 / 17.13",
+"9.83 / 9.86"
+]
 ]
 },
 "vision_language_auto":{
@@ -74856,6 +74994,11 @@ if (labelResults) {
     renderLabelRows('container-validation-presence', labelResults.validation_presence);
     renderLabelRows('container-validation-resources', labelResults.validation_resources);
     document.getElementById('container-route-validation').hidden = false;
+  }
+  if (labelResults.app_path) {
+    renderLabelRows('container-app-path-rows', labelResults.app_path);
+    renderLabelRows('container-app-path-resources', labelResults.app_path_resources);
+    document.getElementById('container-app-path').hidden = false;
   }
   document.getElementById('container-labels').hidden = false;
 }

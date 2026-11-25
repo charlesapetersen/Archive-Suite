@@ -1737,6 +1737,14 @@ def main():
             container_labels["validation_accuracy"] = table_after(label_md, validation_heading)
             container_labels["validation_presence"] = table_after(label_md, validation_heading, nth=1)
             container_labels["validation_resources"] = table_after(label_md, validation_heading, nth=2)
+        app_report = RESULTS / "ct-gemma-request-verify.md"   # W49.proc-gemma-request-verify: through the app
+        if app_report.exists():
+            app_md = app_report.read_text()
+            heading = "## Accuracy by field, the proposals the user gets"
+            container_labels["app_path"] = (
+                [["Bench size", *r] for r in table_after(app_md, heading)]
+                + [["Full size", *r] for r in table_after(app_md, heading, nth=1)])
+            container_labels["app_path_resources"] = table_after(app_md, "## Time and memory")
     built = {"routes": routes, "table_only": extra, "charts": charts, "segmentation": segmentation(op), "handwriting": handwriting(), "r6_spot": json.loads(R6_SPOT.read_text()),
              "farmshare": farmshare(op, own["routes"]), "difficulty": diff, "headline": headline(routes), "rerun_noise": rerun_noise(),
              "regions_orderfree": regions_orderfree(), "public_segmentation": public_segmentation(),

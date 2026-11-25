@@ -473,6 +473,22 @@ def report(_args):
     bench0 = sum(1 for k in complete if k[1] == "bench" and k[2] == "c0")
     other_through = sum(1 for k, v in complete.items() if not (k[1] == "bench" and k[2] == "c0")
                         and v["revised"]["passThrough"])
+    cached = SCRATCH / "identical.json"   # the sent photos are rebuildable scratch; the count outlives them
+    if SENT.exists():
+        identical = sum(1 for k in complete if not (k[1] == "bench" and k[2] == "c0")
+                        and all((SENT / f"{k[0]}-{k[1]}-{k[2]}-{st}.jpg").exists() for st in STYLES)
+                        and (SENT / f"{k[0]}-{k[1]}-{k[2]}-current.jpg").read_bytes()
+                        == (SENT / f"{k[0]}-{k[1]}-{k[2]}-revised.jpg").read_bytes())
+        cached.write_text(json.dumps(identical))
+    else:
+        identical = json.loads(cached.read_text())
+    others = sum(1 for k in complete if not (k[1] == "bench" and k[2] == "c0"))
+    slow = sorted((r["key"], round(r["seconds"])) for v in complete.values() for r in v.values() if r["seconds"] > 40)
+    silent = {style: [0, 0] for style in STYLES}
+    for k, v in complete.items():
+        for style in STYLES:
+            if not v[style]["modelAnswered"]:
+                silent[style][any(labels[k[0]]["truth_filled"].values())] += 1
     fallback_numbers = {}
     for style in STYLES:
         n = sum(1 for k, v in complete.items() if (v[style]["fields"].get("collection_number") or {}).get("reader")
@@ -508,7 +524,9 @@ def report(_args):
         L.append(f"| {size} | {c[0]}/{c[1]} | {r[0]}/{r[1]} |")
     L += ["", "## Photo handling", "",
           f"- The revised request sent the file itself for {through0}/{bench0} bench-size photos needing no correction "
-          f"and for {other_through} of the others (it must turn or scale those).",
+          f"and for {other_through} of the others (it must turn or scale those). For {identical}/{others} of those "
+          f"others both requests carried byte-identical photos, so there the requests differ only in putting the "
+          f"prompt first.",
           f"- Every sent image was checked against the upright bench page at four turns: "
           f"{len(images) - len(upright_bad)}/{len(images)} were upright." + (f" Not upright: {upright_bad}." if upright_bad else ""),
           (f"- Turned bench-size photos, re-encoded upright: PSNR against the lossless upright crop median "
@@ -521,7 +539,14 @@ def report(_args):
           f"revised {fallback_numbers['revised']} reads.", "",
           "## Time and memory", "",
           "Seconds are the whole label read in the app (Vision OCR, preparing the photo, the request and parsing). "
-          "Server memory is mlx-vlm's physical footprint, sampled every 100 ms across the run, highest during each read.", "",
+          "Server memory is mlx-vlm's physical footprint, sampled every 100 ms across the run, highest during each read. "
+          "Gemma answered counts reads where Gemma gave at least one field; otherwise the app records the Vision "
+          "fallback. " + " ".join(
+              f"With the {style} request, {silent[style][0]} reads with no Gemma field were of labels blank in all four "
+              f"scored fields and {silent[style][1]} of labels with a written value." for style in STYLES) + " "
+          + (f"Reads over 40 s: " + ", ".join(f"{k.replace('/', ' ')} {t} s" for k, t in slow)
+             + ". The run does not record reply length, so whether these replies ran long is not known. macOS quit "
+             "the headless app once, after 156 reads; the run resumed from its saved reads." if slow else ""), "",
           "| Size | Request | Reads | Gemma answered | File sent as is | Image MB (median / p95) | Read s (median / p95) | "
           "Server GiB (median / highest) |", "| --- | --- | --- | --- | --- | --- | --- | --- |"]
     L += resource_rows()
