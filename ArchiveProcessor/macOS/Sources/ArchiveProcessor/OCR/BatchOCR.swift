@@ -20,6 +20,16 @@ struct BatchOCRRequest: Sendable {
                  previousImageURL: sendPreviousImage && i > 0 ? urls[i - 1] : nil)
         }
     }
+
+    /// W49.proc-fix-s026 (S-026): the slider is a size target in batch, as in the direct path. Each file is scaled by
+    /// `OCRProcessor.targetDimensionScale` toward the run's standard size, so a large scan is reduced rather than sent
+    /// at the slider's raw dimension fraction. The encoder's 2,048 px cap still applies.
+    static func jpeg(_ url: URL, sizeFraction: Double, standardImageMB: Double) -> Data? {
+        ImageEncoding.loadImageAsJPEG(
+            url: url,
+            scale: OCRProcessor.targetDimensionScale(
+                forFileAt: url, sizeFraction: sizeFraction, standardImageMB: standardImageMB))
+    }
 }
 
 /// Shared HTTP error-body → message parsing for the batch clients. Checks a top-level `message`
@@ -163,7 +173,7 @@ struct AnthropicBatchClient: Sendable {
 
     /// Submit a batch of OCR requests. Returns the batch ID.
     func submitBatch(fileURLs: [URL], sendPreviousImage: Bool, customPrompt: String? = nil, imageScale: Double = 1.0,
-                     preparedRequests: [BatchOCRRequest]? = nil) async throws -> String {
+                     standardImageMB: Double, preparedRequests: [BatchOCRRequest]? = nil) async throws -> String {
         // M5 perf fix: serialize each request to JSON Data immediately and append to the
         // body buffer, so only ONE image's base64 lives in the dict tree at a time. The old
         // approach held ALL base64 strings in the `requests` array simultaneously, then
@@ -179,7 +189,7 @@ struct AnthropicBatchClient: Sendable {
 
         for (index, item) in requests.enumerated() {
             try Task.checkCancellation()
-            guard let jpegData = ImageEncoding.loadImageAsJPEG(url: item.imageURL, scale: imageScale) else { continue }
+            guard let jpegData = BatchOCRRequest.jpeg(item.imageURL, sizeFraction: imageScale, standardImageMB: standardImageMB) else { continue }
             let base64 = jpegData.base64EncodedString()
             let context: Data?
             if preparedRequests == nil {
@@ -187,7 +197,7 @@ struct AnthropicBatchClient: Sendable {
             } else if sendPreviousImage, let previousURL = item.previousImageURL {
                 if previousURL != previousOriginalURL {
                     previousOriginalURL = previousURL
-                    previousOriginalJPEG = ImageEncoding.loadImageAsJPEG(url: previousURL, scale: imageScale)
+                    previousOriginalJPEG = BatchOCRRequest.jpeg(previousURL, sizeFraction: imageScale, standardImageMB: standardImageMB)
                 }
                 context = previousOriginalJPEG
             } else { context = nil }
@@ -474,6 +484,7 @@ struct GeminiBatchClient: Sendable {
         sendPreviousImage: Bool,
         customPrompt: String? = nil,
         imageScale: Double = 1.0,
+        standardImageMB: Double,
         preparedRequests: [BatchOCRRequest]? = nil,
         onJobCreated: (@Sendable (String) async throws -> Void)? = nil
     ) async throws -> String {
@@ -488,7 +499,7 @@ struct GeminiBatchClient: Sendable {
 
         for (index, item) in requests.enumerated() {
             try Task.checkCancellation()
-            guard let jpegData = ImageEncoding.loadImageAsJPEG(url: item.imageURL, scale: imageScale) else { continue }
+            guard let jpegData = BatchOCRRequest.jpeg(item.imageURL, sizeFraction: imageScale, standardImageMB: standardImageMB) else { continue }
             let base64 = jpegData.base64EncodedString()
             let context: Data?
             if preparedRequests == nil {
@@ -496,7 +507,7 @@ struct GeminiBatchClient: Sendable {
             } else if sendPreviousImage, let previousURL = item.previousImageURL {
                 if previousURL != previousOriginalURL {
                     previousOriginalURL = previousURL
-                    previousOriginalJPEG = ImageEncoding.loadImageAsJPEG(url: previousURL, scale: imageScale)
+                    previousOriginalJPEG = BatchOCRRequest.jpeg(previousURL, sizeFraction: imageScale, standardImageMB: standardImageMB)
                 }
                 context = previousOriginalJPEG
             } else { context = nil }
@@ -1041,14 +1052,14 @@ struct MistralBatchClient: Sendable {
 
     /// Submit a batch of OCR requests. Uploads a JSONL file then creates a batch job. Returns the batch job ID.
     func submitBatch(fileURLs: [URL], imageScale: Double = 1.0,
-                     preparedRequests: [BatchOCRRequest]? = nil) async throws -> String {
+                     standardImageMB: Double, preparedRequests: [BatchOCRRequest]? = nil) async throws -> String {
         // Build JSONL content — one request per line
         var jsonlLines: [String] = []
 
         let requests = preparedRequests ?? BatchOCRRequest.originals(fileURLs, sendPreviousImage: false)
         for item in requests {
             try Task.checkCancellation()
-            guard let jpegData = ImageEncoding.loadImageAsJPEG(url: item.imageURL, scale: imageScale) else { continue }
+            guard let jpegData = BatchOCRRequest.jpeg(item.imageURL, sizeFraction: imageScale, standardImageMB: standardImageMB) else { continue }
             let base64 = jpegData.base64EncodedString()
             let dataURI = "data:image/jpeg;base64,\(base64)"
 

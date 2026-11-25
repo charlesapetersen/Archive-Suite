@@ -721,7 +721,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Where:** `P-17`, `P-19`.
 - **Would confirm it:** encode one oversized JPEG through both paths at 100% and compare the bytes sent.
 - **Would clear it:** both paths send the same size.
-- **Status:** `reproduced` — independently confirmed; fix queued as `W49.proc-fix-s026`. [VM evidence](evidence/processor/W49.proc-suspects-money-check.md).
+- **Status:** `fixed` — W49.proc-fix-s026. [Scratch VM verification](evidence/processor/W49.proc-suspects-money-check.md#s-026-fix-verification).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-money` under phase rule 5a.
@@ -731,6 +731,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     itself in batch; a 6000×4000 scan at 1606×1071 direct and 2048×1365 in batch. Both paths cap at 2,048 px, so a scan
     goes up whole only when it is already within the cap. Nothing calls it deliberate.
   - 2026-11-21 W49.proc-suspects-money-check (Codex gpt-6.2-sol at `f2b51e98`, original Claude Opus 5.5 in `325a3455`) — At 100% and the 3 MB standard size, direct Gemini sent 602,467 B at 985×739. Batch sent the original 12,349,513 B at 2000×1500. Both routes retain the 2,048-pixel cap.
+  - 2026-11-24 W49.proc-fix-s026 (Claude Opus 5.5) — fixed: the three batch builders scale by `targetDimensionScale` with the run's standard size. Direct and batch sent the same 985×739, 602,467 B JPEG; a flat 4000×3000 batch image went up at 2048×1536.
 
 ### S-027 · Batch mode is offered for providers with no batch, and still changes the run
 

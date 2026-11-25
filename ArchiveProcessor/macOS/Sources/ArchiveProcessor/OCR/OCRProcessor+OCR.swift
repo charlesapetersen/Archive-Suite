@@ -940,18 +940,20 @@ extension OCRProcessor {
         var submitPassOpen = true
         defer { if submitPassOpen { abandonDrainablePass(submitPass) } }
 
+        // W49.proc-fix-s026: the run's own size target, as the direct path's `performOCRCall` uses (W16.cfg6).
+        let batchStandardImageMB = Self.ocrCallValues(for: runConfig).standardImageMB
         let batchId: String
         do {
             switch provider {
             case .anthropic:
                 let client = AnthropicBatchClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
-                batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage, customPrompt: customPrompt, imageScale: imageScale, preparedRequests: preparedRequests)
+                batchId = try await client.submitBatch(fileURLs: fileURLs, sendPreviousImage: sendPreviousImage, customPrompt: customPrompt, imageScale: imageScale, standardImageMB: batchStandardImageMB, preparedRequests: preparedRequests)
                 guard recordSubmittedBatchChunk(batchId) else {
                     throw OCRError.networkError("Could not persist the submitted Anthropic batch ID")
                 }
             case .mistral:
                 let client = MistralBatchClient(apiKey: apiKey, model: model)
-                batchId = try await client.submitBatch(fileURLs: fileURLs, imageScale: imageScale, preparedRequests: preparedRequests)
+                batchId = try await client.submitBatch(fileURLs: fileURLs, imageScale: imageScale, standardImageMB: batchStandardImageMB, preparedRequests: preparedRequests)
                 guard recordSubmittedBatchChunk(batchId) else {
                     throw OCRError.networkError("Could not persist the submitted Mistral batch ID")
                 }
@@ -959,7 +961,8 @@ extension OCRProcessor {
                 let client = GeminiBatchClient(apiKey: apiKey, model: model, thinkingLevel: thinkingLevel)
                 batchId = try await client.submitBatch(
                     fileURLs: fileURLs, sendPreviousImage: sendPreviousImage,
-                    customPrompt: customPrompt, imageScale: imageScale, preparedRequests: preparedRequests
+                    customPrompt: customPrompt, imageScale: imageScale, standardImageMB: batchStandardImageMB,
+                    preparedRequests: preparedRequests
                 ) { [weak self] chunkId in
                     guard let self else {
                         throw OCRError.networkError("Batch owner was released during submission")

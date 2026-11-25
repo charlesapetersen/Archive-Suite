@@ -141,7 +141,9 @@ final class MoneyJourneyUITests: XCTestCase {
         XCTAssertTrue(try requestRecords().isEmpty)
     }
 
-    func testGeminiDirectAndBatchSendDifferentImageSizes() throws {
+    /// W49.proc-fix-s026 (S-026): batch scales by the same file-size target as the direct path, so a dense scan over
+    /// the standard size goes up reduced in both, not as the original file in batch.
+    func testGeminiDirectAndBatchSendTheSameImageSize() throws {
         let directInput = try preparePhotos(count: 1, width: 2000, height: 1500)
         launch(provider: "Gemini")
         start()
@@ -152,6 +154,26 @@ final class MoneyJourneyUITests: XCTestCase {
 
         let batchInput = try preparePhotos(count: 1, width: 2000, height: 1500)
         XCTAssertEqual(batchInput, directInput, "both runs start from the same JPEG bytes")
+        let batch = try batchRequest()
+        XCTAssertEqual(batch.model, direct.model)
+        XCTAssertEqual(batch.pixels, direct.pixels)
+        XCTAssertNotEqual(batch.digest, SHA256.hash(data: directInput).map { String(format: "%02x", $0) }.joined())
+        XCTAssertLessThan(batch.bytes, directInput.count)
+        let batchWidth = try XCTUnwrap(batch.pixels.split(separator: "x").first.flatMap { Int($0) })
+        XCTAssertLessThan(batchWidth, 2000)
+        print("[s026] source \(directInput.count) B, direct \(direct), batch \(batch)")
+    }
+
+    /// W49.proc-fix-s026: a large photo already under the size target is left at full scale and still capped at
+    /// 2,048 px on its long edge in batch.
+    func testGeminiBatchKeepsTheLongEdgeCap() throws {
+        _ = try preparePhotos(count: 1, width: 4000, height: 3000, noise: false)
+        let batch = try batchRequest()
+        XCTAssertEqual(batch.pixels, "2048x1536")
+        print("[s026] cap: batch \(batch)")
+    }
+
+    private func batchRequest() throws -> RequestRecord {
         launch(provider: "Gemini", batch: true)
         XCTAssertTrue(element("ap.ocr.batchTotal").waitForExistence(timeout: 10))
         XCTAssertFalse(element("ap.ocr.institutionalComputeChoose").exists)
@@ -162,14 +184,7 @@ final class MoneyJourneyUITests: XCTestCase {
         }
         let batch = try XCTUnwrap(try requestRecords().only)
         XCTAssertEqual(batch.route, "gemini-batch")
-        XCTAssertEqual(batch.model, direct.model)
-        XCTAssertEqual(batch.pixels, "2000x1500")
-        XCTAssertEqual(batch.bytes, directInput.count)
-        XCTAssertEqual(batch.digest, SHA256.hash(data: directInput).map { String(format: "%02x", $0) }.joined())
-        XCTAssertLessThan(direct.bytes, batch.bytes)
-        let directWidth = try XCTUnwrap(direct.pixels.split(separator: "x").first.flatMap { Int($0) })
-        XCTAssertLessThan(directWidth, 2000)
-        print("[s026] source \(directInput.count) B, direct \(direct), batch \(batch)")
+        return batch
     }
 
     func testStoredBatchFlagOnOpenAIUsesStandardEstimateAndPageReaders() throws {
@@ -381,7 +396,7 @@ final class MoneyJourneyUITests: XCTestCase {
     }
 
     @discardableResult
-    private func preparePhotos(count: Int, width: Int = 240, height: Int = 320) throws -> Data {
+    private func preparePhotos(count: Int, width: Int = 240, height: Int = 320, noise: Bool = true) throws -> Data {
         root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         for child in ["in", "out", "backup", "calls", "state"] {
             try FileManager.default.createDirectory(at: root.appendingPathComponent(child), withIntermediateDirectories: true)
@@ -393,7 +408,8 @@ final class MoneyJourneyUITests: XCTestCase {
                                                         isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
             let pixels = try XCTUnwrap(bitmap.bitmapData)
             var value = UInt32(index)
-            for offset in 0..<(bitmap.bytesPerRow * height) {
+            if !noise { memset(pixels, 200, bitmap.bytesPerRow * height) }
+            for offset in 0..<(noise ? bitmap.bytesPerRow * height : 0) {
                 value = value &* 1_664_525 &+ 1_013_904_223
                 pixels[offset] = UInt8(value >> 24)
             }

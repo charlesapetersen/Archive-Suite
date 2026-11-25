@@ -173,9 +173,12 @@ that were turned but still need checking. See W49.proc-fix-s029 and the
 
 - Start checks the selected document segmentation route and explains which credential is missing. The Start button and shortcut are blocked before reading pages. Manual segmentation, pre-grouped photo runs and runs without tagging can start without the unused credential. [Original VM reproduction](../verification/evidence/processor/W49.proc-suspects-money-check.md). (accepted: fixed by W49.proc-fix-s032)
 
-## Gemini batch OCR bypasses the file-size target (S-026)
+## FIXED (S-026, 2026-11-24) — Batch OCR bypassed the file-size target
 
-- At 100% and the 3 MB standard size, direct Gemini sent 602,467 B at 985×739. Batch sent the original 12,349,513 B at 2000×1500. Both routes retain the 2,048-pixel cap. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-money-check.md). (queued: W49.proc-fix-s026)
+- Anthropic, Gemini and Mistral batch requests now scale each image toward the run's standard size, as direct OCR
+  does. At 100% and 3 MB, a 12.3 MB 2000×1500 scan goes up at 985×739 (602,467 B) by both routes, byte for byte.
+  The 2,048-pixel cap still applies. (accepted: fixed by W49.proc-fix-s026)
+  [Scratch VM verification](../verification/evidence/processor/W49.proc-suspects-money-check.md#s-026-fix-verification).
 
 ## FIXED (S-027, 2026-11-23) — A stored Batch flag affected standard OpenAI runs
 
