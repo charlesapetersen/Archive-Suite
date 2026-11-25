@@ -1300,7 +1300,7 @@ Runtime evidence and the final unattended rerun are under `verification/evidence
 
 - **Enclosure proposals come only from the OCR prompt's `[enclosure]` marker**, so Mistral, Apple Vision and
   pre-OCRed classification-only runs propose none; the owner can still type a sent-with date in the manual
-  tag sheet. Nothing checks that the covering unit is actually a letter. (queued: W49.proc-metadata-consolidate)
+  tag sheet. Nothing checks that the covering unit is actually a letter. W49.proc-metadata-consolidate (2026-11-24) measured a text-only enclosure proposal inside one unified metadata call on Gemini 3.8 Flash: 29 of 299 documents announce an enclosure and 4 are proposed as sent with the document before them, every quote in the text (`segbench-results/metadata-unified.md`). (queued: W49.proc-metadata-unified-apply, behind W49.proc-metadata-consolidate-lead)
 - **The manual sheet can clear a proposed relation or type a date, but cannot re-point it** at another letter. (queued: W49.proc-manual-repoint-relation)
 - The OCR prompt gained one optional instruction (the marker), so it is in every paid OCR call. (accepted: one optional instruction in the OCR prompt is the price of the marker)
 

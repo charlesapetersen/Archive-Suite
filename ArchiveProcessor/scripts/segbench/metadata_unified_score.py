@@ -698,6 +698,39 @@ def report(o):
             L.append(f"Spent on the {o['arms'][arm]['name']} arm: ${v['spent_usd']:.4f} (the personal key's total to "
                      f"1 Dec now ${v['key_spent_usd']:.4f} of $5).")
     L.append("")
+    L.append("## What it says")
+    L.append("")
+    L.append("- **One text-only call holds the correspondence fields and the date.** Sender and recipient tie with the "
+             "dedicated entity call (intervals over zero); the sending place loses only its normalised form, which a "
+             "format rule in the prompt supplies. The year ties the tagging call's and every neighbour-sourced year "
+             "carries Date Uncertain, with a quote that passes the dating route's evidence check on most documents.")
+    L.append("- **It does not hold the printed pieces' title, byline and publication date against the image-reading "
+             "item-field call**, which sees the masthead and the margin that Vision's text often lacks. A unified call "
+             "that replaces the item-field call has to carry the page images too (the item-field call already sends "
+             "them at 1,600 px, about 1,100 image tokens a document).")
+    L.append("- **Enclosure proposals from text alone are conservative and quoted**: a few documents in ten announce one, "
+             "about one in seventy is proposed as sent with the document before it, and the quotes are in the text.")
+    L.append("- **Cost and time fall to about a third and a fifth.** One call's prompt is longer than any of the four, but "
+             "the four repeat the document's opening three times and the entity call's default thinking alone costs more "
+             "than the whole unified reply at thinking low.")
+    L.append("- **Open:** the lead cloud models (the gateway, 1 December), the open model (the Sherlock 27B pack), and an "
+             "image-carrying arm. Filed as W49.proc-metadata-consolidate-lead; the implementation behind it as "
+             "W49.proc-metadata-unified-apply.")
+    L.append("")
+    L.append("## The image pass under a VLM reader")
+    L.append("")
+    L.append("The dating route's image pass (prompts.md §9, 2,400 px) is sent where the document's own text has no year "
+             "candidate, which under Apple Vision is 32% of the owner's mix (date-route-pipeline.md). Whether it still adds "
+             "anything when Stage 04 reads with a VLM is not measured here: the cache holds no VLM OCR text for the "
+             "documents whose year is on the page but not in the text (W46.date-image's 122). What the cache does say: on "
+             "those 122, the image pass found the document's own date on 56 pages (date-image.md), of which 23 were typed, "
+             "18 printed, 10 handwritten and 5 stamped. A VLM reader transcribes typed and printed dates into the text as a "
+             "matter of course, so the pass's remaining yield under a VLM reader is bounded by the handwritten and stamped "
+             "dates, 15 of the 56 (about 12% of the 122, or 4% of the owner's mix), plus whatever typed dates the VLM "
+             "itself misses. The direct test, filed with W49.proc-metadata-consolidate-lead: the gateway's Gemini OCR of "
+             "those 122 documents' first two pages (about $0.40), counting the owner's years the VLM text carries that "
+             "Vision's lacks, against the pass's 56.")
+    L.append("")
     L.append("## Measurement card")
     L.append("")
     L.append("- **Truth.** Entities: W46.fix-ent-truth's 138, drafted by two frontier families and ruled by a third, with "
