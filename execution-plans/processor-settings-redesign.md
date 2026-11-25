@@ -1,7 +1,7 @@
 # Archive Processor — Settings Redesign Proposal (`W49.proc-ui-design-review`)
 
 **Date:** 2026-11-25 · **Baseline:** `main` @ `6d367a1e`  
-**Owner Gate:** `W49.proc-settings-design-ok` (HOLD QUEUE — no Settings code is written until approved)  
+**Owner Gate:** `W49.proc-settings-design-ok` — **APPROVED 2026-11-25: Option B** (Preset-First 5-Tab Settings + Unified `ResolvedRunConfig` + Optional Advanced Advisor)  
 **Scope:** Archive Processor macOS Settings (`⌘,`) and its single underlying run-configuration model (`ResolvedRunConfig`). Process Files, Live Capture, and review dialogs stay out of scope except where duplicate settings controls are removed and both runners read from `ResolvedRunConfig`.
 
 ---
@@ -443,3 +443,10 @@ W40.g3 (Processor & Live Capture guided walkthrough)
 4. **Non-default Advanced safety:** Setting any control in `Advanced` shows the `"N Advanced overrides active"` pill on `Processing` with working View and Reset actions.
 5. **Off-screen Tart VM visual & accessibility verification:** Screenshots of all 5 tabs + Advisor sheet in Light and Dark mode, checked by eye for zero clipped text, consistent window geometry, high contrast, and passing `AccessibilityAuditUITests`.
 6. **Zero regressions on existing contracts:** `test-settings-layers.sh`, `test-settings-routes.sh`, `test-settings-solver.sh`, `test-local-models.sh`, `test-date-route.sh`, `test-live-capture.sh`, and `ArchiveReader/scripts/lint-write-surface.sh` all pass.
+
+---
+
+## 8. Locked Owner Decision (2026-11-25 — `W49.proc-settings-design-ok`)
+
+- **Approved option:** **Option B** — Preset-first 5-tab native macOS Settings (`Processing`, `Output`, `Capture`, `Accounts`, `Advanced`) + one unified `ResolvedRunConfig` (replacing `SessionProcessingConfig`, `PendingRunRuntimeConfig`, and `ResolvedSettingsSnapshot.processing` + ad-hoc `SettingsLayerStore` lookups) + optional `Compare routes & trade-offs…` Advisor sheet over pruned runnable routes.
+- **Unblocked items:** `W49.proc-settings-config-unify` (still waits on `W49.proc-pipeline-prune-apply`), `W49.proc-settings-redesign-core`, `W49.proc-settings-advisor-advanced`, `W49.proc-settings-docs-tests-cleanup`, and `W47.settings-trained-label`.
