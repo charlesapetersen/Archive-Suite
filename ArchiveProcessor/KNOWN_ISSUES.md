@@ -278,6 +278,21 @@ With Automatic tagging, ranked Names and JSON sidecars, the estimate prices the 
 run's text route. The Names row contributes to both the standard and batch totals. The same term is included
 in run history and Live Capture's spend estimate (W49.proc-fix-s044).
 
+## ⚠️ LIMITATION (W49.proc-catalogue-cutover, 2026-11-25): segment JSON sidecars are off by default
+
+`DefaultsKeys.enableSegmentJSON` now defaults to false, so a new output has no `.json` sidecar unless the user turns on
+"Export segment JSON metadata". The catalogue record keeps the dates, names, item fields and rating that tagging runs
+find either way (Process Files always files through a catalogue run; Live Capture's entity and item-field calls never
+read the setting). What only the sidecar held:
+- **The low-confidence name mentions of an OCR-only or copy-source run** (`recordLocalNameMentions`) are written to the
+  sidecar alone, so with the default they are not kept. (queued: W49.proc-local-names-catalogue)
+- **Notes' Copy / Add to Zotero reads a source's names from its sidecar** (`ZoteroSource.gather`), so for new output it
+  finds none there; the catalogue record has them. (queued: W49.storage-notes-zotero)
+- **A pre-OCRed run reads names and item fields only for the sidecar** (`wantsNameAndFieldReads`), because its text
+  layer may be ABBYY's. (accepted: owner, 2026-10-30, no ABBYY text as input)
+- The default itself is the owner's call. (accepted: owner, 2026-11-24, W49.proc-catalogue-cutover; Settings redesign
+  places the switch under Advanced)
+
 ## ⚠️ LIMITATION (W49.proc-unified-pipeline-2, 2026-11-25): filing still adds the catalogue identity in a copy
 
 `OCRProcessor.materializeDeferredOutputs`; contract `scripts/test-deferred-output.sh`. A standard Process Files run now

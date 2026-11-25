@@ -108,11 +108,11 @@ enum SettingsLevels {
              DefaultsKeys.ocrCascadeOnDisagreement, DefaultsKeys.ocrPageKindRouting, DefaultsKeys.ocrPostCorrection,
              DefaultsKeys.preOCRedInput, DefaultsKeys.batchMode, DefaultsKeys.reviewRotation,
              DefaultsKeys.enableCollectionSegmentation, DefaultsKeys.confirmCollectionIDs,
-             DefaultsKeys.reviewDocumentSegmentation, DefaultsKeys.mergeDocuments, DefaultsKeys.sendPreviousImage,
-             DefaultsKeys.writeLogFile:
+             DefaultsKeys.mergeDocuments, DefaultsKeys.sendPreviousImage,
+             DefaultsKeys.writeLogFile, DefaultsKeys.enableSegmentJSON:
             return false
-        case DefaultsKeys.outputImageFile, DefaultsKeys.enableSegmentJSON, DefaultsKeys.ocrHandwritingOnTyped,
-             DefaultsKeys.macItemFields: return true
+        case DefaultsKeys.outputImageFile, DefaultsKeys.ocrHandwritingOnTyped,
+             DefaultsKeys.macItemFields, DefaultsKeys.reviewDocumentSegmentation: return true
         case DefaultsKeys.visionMinimumConfidence: return 0.0
         case DefaultsKeys.gatewayInputCost, DefaultsKeys.gatewayOutputCost: return -1.0
         case DefaultsKeys.imageResolutionPercent: return 100.0

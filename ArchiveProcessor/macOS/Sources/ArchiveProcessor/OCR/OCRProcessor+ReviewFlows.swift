@@ -55,12 +55,7 @@ extension OCRProcessor {
         for i in files.indices where i < jobs.count {
             let type = i < preGroupedTypes.count ? preGroupedTypes[i] : .document
             let isStart = i < preGroupedBoundaries.count ? preGroupedBoundaries[i] : true
-            let cls: DocumentClassification
-            switch type {
-            case .box: cls = .boxLabel
-            case .folder: cls = .folderLabel
-            case .document: cls = isStart ? .documentStart : .documentContinuation
-            }
+            let cls = type.classification(isStart: isStart)
             jobs[i].classification = cls
             if let r = jobs[i].result {
                 jobs[i].result = r.with(classification: cls, rotationDegrees: r.rotationDegrees)

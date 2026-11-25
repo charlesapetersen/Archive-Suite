@@ -372,6 +372,11 @@ Image straightened: <magnitude> degrees <direction>  ← OPTIONAL, after all oth
 - **Classification may be ABSENT.** It is written only when the Processor knows it; consumers **must
   degrade gracefully** (fall back to filename-sequence order + manual grouping). Never build a core
   behavior that assumes it exists.
+- **Both routes write the same header (W49.proc-catalogue-cutover).** A page the phone grouped carries the class
+  that grouping settles (`Box`, `Folder`, `Document Start` on a document's first page, `Continuation` after it),
+  whether Live Capture's Finish files it or a Process Files run of the same capture does
+  (`CaptureGroupType.classification(isStart:)`), never the reader's own guess; provenance, Kind and the rest of the
+  header are built by the one `PDFGenerator.headerBlock`. `scripts/test-header-parity.sh` compares the two.
 - **Classification is read from the header only** (W40.fix-core-classification-from-body): page 2 must start
   `Extracted text.`, and the line must directly follow the provider line, before any source-date line. A
   `Classification:` line in the OCR body (an archival security marking), on another page or in the file name
@@ -420,9 +425,11 @@ Image straightened: <magnitude> degrees <direction>  ← OPTIONAL, after all oth
 - **Source-date lines (W37.dual-date).** `Document date:` / `Sent with:` are the SOURCE document's dates
   (`ArchiveDate.display` form), distinct from the processing date. They are output-time snapshots;
   fresh Finder tags remain authoritative. Exact case-sensitive prefixes, after Classification/Kind,
-  consumed only within the same ordered header block. Live Capture writes the known dates at render time.
-  Process Files adds the resolved document and covering-letter dates to each generated page in the same
-  verified rewrite as the evidence and item fields, before merging. For a searchable output the fields are
+  consumed only within the same ordered header block. Catalogue-filed output (every Live Capture Finish and
+  every standard Process Files run) carries none of these lines: its catalogue record holds the dates
+  (W49.storage-processor). For an output filed without a catalogue run, Process Files adds the resolved document
+  and covering-letter dates to each generated page in the same verified rewrite as the evidence and item fields,
+  before merging. For a searchable output the fields are
   in the page's XMP header. A reclassification that changes enclosure dating also updates the affected lines
   on outputs eligible for the rewrite.
 - **Date evidence (W46.date-route-header; owner call 9, 2026-11-06).** The evidence behind a NON-explicit document
@@ -469,11 +476,11 @@ Image straightened: <magnitude> degrees <direction>  ← OPTIONAL, after all oth
   date printed with the piece; it is shown and exported apart from the document's date tags and never written over
   them. An output-time snapshot: the sidecar's `item_fields` object carries the same fields with the quotes they were
   read from and, under `not_filled`, the fields read but left empty and why (never their values). Process Files writes
-  the lines in the date-evidence rewrite (one pass for both); Live Capture at render time, on the same documents'
-  pages as the source dates; Improve OCR keeps them, and refuses a page that would lose them. No migration is written
+  the lines in the date-evidence rewrite (one pass for both) on output filed without a catalogue run; catalogue-filed
+  output of either route carries none, its catalogue record holding the fields; Improve OCR keeps them, and refuses a page that would lose them. No migration is written
   because there is nothing to migrate.
-  **Mac item fields (W47.wh-item-fields-mac-fill, owner 2026-11-19, call 23).** For automatic tagging with segment
-  JSON on, a Mac model or Local Agent run uses the two 4-bit MLX models on the Mac by default. Qwen3-VL 8B reads the
+  **Mac item fields (W47.wh-item-fields-mac-fill, owner 2026-11-19, call 23).** For automatic tagging (catalogue-filed
+  output or segment JSON on; not pre-OCRed input), a Mac model or Local Agent run uses the two 4-bit MLX models on the Mac by default. Qwen3-VL 8B reads the
   same prompt with upright images at up to 1,280 px and Vision text. Its kind can fill and its byline fills on its
   own published kinds. Qwen3.5 4B reads Vision text with the text-only opening. Its publication date fills on its
   own published kinds. Title, publication and recipient place stay empty on this route. The two calls run at

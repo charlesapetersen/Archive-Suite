@@ -110,7 +110,7 @@ struct SettingsDocumentsPanel: View {
             Toggle(isOn: $enableSegmentJSON) {
                 HStack {
                     Text("Export segment JSON metadata")
-                    HelpButton(text: "Off unless you need it: the catalogue record keeps each file's metadata either way. Turn this on to also write a .json file beside the PDF for other tools. It also controls whether low-confidence name mentions are saved during OCR-only runs.")
+                    HelpButton(text: "Off unless you need it: the catalogue record keeps the dates, names and item fields a tagging run finds either way. Turn this on to also write a .json file beside the PDF for other tools. Only this file holds the low-confidence name mentions an OCR-only run finds, and a pre-OCRed run reads names and item fields only for it.")
                 }
             }
             .settingsLevel(.segmentationReview)

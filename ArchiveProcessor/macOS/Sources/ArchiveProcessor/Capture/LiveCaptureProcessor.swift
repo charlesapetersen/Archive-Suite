@@ -1938,7 +1938,7 @@ final class LiveCaptureProcessor: ObservableObject {
         // passed to every tag write below so a *subject* string is never mistaken for one. See
         // `tagStagedArtifact`.
         let appColor = jsonTags.colorTag
-        for page in pages {
+        for (position, page) in pages.enumerated() {
             // W40.fix-processor-failed-ocr-filed-image-only — a document page whose OCR FAILED (`ocrFailed`:
             // the request got no reading) produces no output, exactly like a page whose PDF did not write. Its
             // PDF would hold the scan and no text, and a document of such pages was filed as "image-only" with
@@ -1950,8 +1950,12 @@ final class LiveCaptureProcessor: ObservableObject {
             let base = page.sourceURL.deletingPathExtension().lastPathComponent
             let stagedPDF = stagingDir.appendingPathComponent(base + ".pdf")
             let identity = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+            // Page 2 names the class the phone's grouping settled, as a Process Files run of the same pages does,
+            // not the reader's own guess (W49.proc-catalogue-cutover).
+            let settled = page.result.with(classification: type.classification(isStart: position == 0),
+                                           rotationDegrees: page.result.rotationDegrees)
             guard let output = try? pdfGen.generateOutput(
-                imageURL: page.sourceURL, result: page.result, model: model, outputURL: stagedPDF,
+                imageURL: page.sourceURL, result: settled, model: model, outputURL: stagedPDF,
                 originalFileName: page.sourceURL.lastPathComponent, gatewayDisplayName: gatewayName,
                 localAgentDisplayName: localAgentDisplayName, localAgentModelName: localAgentModelName,
                 pdfImageMB: pdfImageMB, textColumns: textColumns, textLayer: textLayer,
@@ -3483,6 +3487,7 @@ final class LiveCaptureProcessor: ObservableObject {
         pageQuality: String? = nil, jsonTags: GeneratedTags = GeneratedTags(),
         stampUnread: Bool = false, taggingMode: TaggingMode? = nil, doMerge: Bool = false,
         outputImageFile: Bool = false, pageQualities: [String?]? = nil,
+        readerClassification: DocumentClassification? = nil,
         tagWriter: @Sendable ([String], URL, String?, Bool) -> Bool = tagStagedArtifact
     ) -> (pdfCount: Int, pagesComplete: Bool?, placeholderSources: [URL],
           untaggedOutputs: [URL], pdfURLs: [URL], imageURLs: [URL]) {
@@ -3494,7 +3499,8 @@ final class LiveCaptureProcessor: ObservableObject {
                 quality = pageQuality
             }
             return PageWork(sourceURL: source,
-                            result: OCRResult(text: "text", classification: nil, errorMessage: nil, errorCode: nil),
+                            result: OCRResult(text: "text", classification: readerClassification, errorMessage: nil,
+                                              errorCode: nil),
                             quality: quality)
         }
         let effectiveTaggingMode = taggingMode ?? (stampUnread ? .automatic : .copySource)

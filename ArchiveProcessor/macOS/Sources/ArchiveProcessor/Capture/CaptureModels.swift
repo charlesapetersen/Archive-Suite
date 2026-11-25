@@ -19,6 +19,17 @@ enum CaptureGroupType: String, Codable, CaseIterable {
 
     /// The Finder colour the user chose for this type, if any (W40.suite-item-types; none by default).
     var colorTag: String? { itemType.flatMap(ItemTypeColourSetting.colorTag(for:)) }
+
+    /// The settled class of a page the phone grouped: a box or folder photo is its label, a document's first
+    /// page starts it and the rest continue it. Process Files (`applyPreGroupedClassifications`) and Live
+    /// Capture (`writeSegmentFiles`) both use it, so the two write the same Classification line on page 2.
+    func classification(isStart: Bool) -> DocumentClassification {
+        switch self {
+        case .box: .boxLabel
+        case .folder: .folderLabel
+        case .document: isStart ? .documentStart : .documentContinuation
+        }
+    }
 }
 
 /// One photo received from the phone during a live-capture session, already written to the

@@ -3532,7 +3532,19 @@ extension OCRProcessor {
         reOCRSourceURLs = Set(pdfIndices.map { files[$0] })
         var mixedPDFOutcomes: [MixedPDFOutcome]?
         var fullJobsAfterPDF: [OCRJob]?
+        var fullQualitiesAfterPDF: [String?]?
         var editingImageSubset = false
+        /// The phone ratings follow the rows back, so the catalogue's rating (`catalogueQuality`, read by row
+        /// index) stays aligned with the full run (W49.proc-catalogue-cutover). A rating the subset changed
+        /// (a manual Quality intent) is kept.
+        func restoredQualities() -> [String?]? {
+            guard var full = fullQualitiesAfterPDF else { return nil }
+            for (subsetIndex, originalIndex) in imageIndices.enumerated()
+            where subsetIndex < preGroupedQualities.count && originalIndex < full.count {
+                full[originalIndex] = preGroupedQualities[subsetIndex]
+            }
+            return full
+        }
         defer {
             // Also restore original row order after an early return or cancellation in the image path.
             if editingImageSubset, let fullJobsAfterPDF {
@@ -3541,6 +3553,7 @@ extension OCRProcessor {
                     restored[originalIndex] = jobs[subsetIndex]
                 }
                 jobs = restored
+                if let qualities = restoredQualities() { preGroupedQualities = qualities }
             }
             progressRange = nil
         }
@@ -3655,7 +3668,10 @@ extension OCRProcessor {
                     if !preGroupedBoundaries.isEmpty {
                         preGroupedBoundaries = imageIndices.map { preGroupedBoundaries[$0] }
                         preGroupedTypes = imageIndices.map { preGroupedTypes[$0] }
-                        if !preGroupedQualities.isEmpty { preGroupedQualities = imageIndices.map { preGroupedQualities[$0] } }
+                        if !preGroupedQualities.isEmpty {
+                            fullQualitiesAfterPDF = preGroupedQualities
+                            preGroupedQualities = imageIndices.map { preGroupedQualities[$0] }
+                        }
                         if !preGroupedYears.isEmpty { preGroupedYears = imageIndices.map { preGroupedYears[$0] } }
                         if !preGroupedMonths.isEmpty { preGroupedMonths = imageIndices.map { preGroupedMonths[$0] } }
                         if !preGroupedSubjects.isEmpty { preGroupedSubjects = imageIndices.map { preGroupedSubjects[$0] } }
@@ -3850,6 +3866,7 @@ extension OCRProcessor {
                     restored[originalIndex] = jobs[subsetIndex]
                 }
                 jobs = restored
+                if let qualities = restoredQualities() { preGroupedQualities = qualities }
                 editingImageSubset = false
                 progressRange = nil
             }
