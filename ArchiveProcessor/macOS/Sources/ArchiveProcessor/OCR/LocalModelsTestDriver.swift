@@ -28,6 +28,8 @@ import ArchiveCore
 ///      tokens, the stand-in key); only its four fields are taken, and a remote gateway never asks for it.
 ///   9. (W47.ct-label-cost) A label's Luna call is counted at the gateway's own figure, else its tokens at Luna's price,
 ///      else the per-label estimate; a refused call costs nothing; the run's history adds it, its ledger share does not.
+///  10. (W49.proc-local-model-supervisor, `S` lines) One app-managed model in memory at a time, a stage keeps its
+///      model, keep-alive follows Live Capture, memory pressure and stopping unload: `LocalModelSupervisorContract`.
 @MainActor
 enum LocalModelsTestDriver {
     nonisolated static let envKey = "LOCALMODELS_TEST"
@@ -87,16 +89,22 @@ enum LocalModelsTestDriver {
     static func run() async {
         defer { finish() }
         memoryChecks()
+        for (name, ok, detail) in await LocalModelSupervisorContract.run() { check(name, ok, detail) }
         replyGuardChecks()
         settingsChecks()
 
         if let path = ProcessInfo.processInfo.environment["LOCALMODELS_SCRATCH_GEMMA_ROOT"] {
             let scratch = URL(fileURLWithPath: path, isDirectory: true)
             let photo = scratch.appending(path: "synthetic-label.jpg")
-            if let jpeg = try? Data(contentsOf: photo), let answer = await ManagedGemma.testRead(jpeg: jpeg, scratch: scratch) {
-                let fields = ContainerLabelReader.localModelFields(fromReply: answer)
+            if let jpeg = try? Data(contentsOf: photo), let answer = await LocalModelSupervisorContract.realRead(jpeg: jpeg, scratch: scratch) {
+                let fields = ContainerLabelReader.localModelFields(fromReply: answer.text)
                 check("W49 managed worker returns the expected fields through the app",
-                      fields[.collectionTitle] == "Doe Papers" && fields[.date] == "1968", answer)
+                      fields[.collectionTitle] == "Doe Papers" && fields[.date] == "1968", answer.text)
+                // W49.proc-local-model-supervisor: the worker's lifetime peak, GPU memory included.
+                let gb = Double(answer.peakBytes) / 1_073_741_824
+                lines.append(String(format: "NOTE managed worker peak %.2f GB", gb))
+                check("W49 managed worker peaks under the supervisor's 10 GB ceiling",
+                      answer.peakBytes > 0 && gb < LocalModelSupervisor.memoryCeilingGB, "\(gb) GB")
             } else {
                 check("W49 managed worker starts and answers through the app", false)
             }

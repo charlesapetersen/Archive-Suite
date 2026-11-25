@@ -10,6 +10,7 @@ final class ProcessorAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         ManagedGemma.shared.stop()
+        LocalModelSupervisor.shared.stopAll()
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

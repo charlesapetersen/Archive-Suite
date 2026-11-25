@@ -737,6 +737,7 @@ final class CaptureSession: ObservableObject {
     func start() {
         let clientID = UserDefaults.standard.string(forKey: DefaultsKeys.driveClientId) ?? ""
         resumeRecoveredSessionIfNeeded()            // a relaunched session's rows and Retry, before any ingest
+        LocalModelSupervisor.shared.liveCaptureBegan(self)  // a loaded label reader stays between labels
         if let forced = forcedTestTransport {
             switch forced {
             case .lan: if !serverRunning { server.start() }
@@ -751,6 +752,7 @@ final class CaptureSession: ObservableObject {
     }
 
     func stop() {
+        LocalModelSupervisor.shared.liveCaptureEnded(self)
         stopConnectionTimer()
         relayScanExpected = false
         phoneConnected = false

@@ -67,32 +67,43 @@ extension OCRProcessor {
             containerLabelSpendNote = ContainerLabelCapture.spendNote(
                 calls: calls, successfulReads: successfulReads, dollars: dollars)
         }
-        for label in labels {
-            guard !Task.isCancelled else { return nil }
-            let r = await ContainerLabelCapture.readLabel(type: label.type, text: label.text, photo: label.source,
-                                                          rotation: label.rotation, gateway: gateway)
-            guard !Task.isCancelled else {
-                if r.gatewayCalled { dollars += r.dollars; calls += 1 }
-                return nil
-            }
-            // W47.ct-label-cost: the call is real money: the history also estimates it for the summary.
-            if r.gatewayCalled {
-                modelUnavailable = modelUnavailable || r.modelUnavailable
-                calls += 1
-                // A parsed reply can still leave all proposals to the local reader.
-                if r.fields.values.values.contains(where: { $0.reader == ContainerLabelCapture.gatewayReader }) {
-                    successfulReads += 1
+        var cancelled = false
+        let readLabels = { [self] () async -> Void in
+            for label in labels {
+                guard !Task.isCancelled else { cancelled = true; return }
+                let r = await ContainerLabelCapture.readLabel(type: label.type, text: label.text, photo: label.source,
+                                                              rotation: label.rotation, gateway: gateway)
+                guard !Task.isCancelled else {
+                    if r.gatewayCalled { dollars += r.dollars; calls += 1 }
+                    cancelled = true
+                    return
                 }
-                dollars += r.dollars
-                activeRunHistory?.labelCalls += 1
-                activeRunHistory?.labelDollars += r.dollars
+                // W47.ct-label-cost: the call is real money: the history also estimates it for the summary.
+                if r.gatewayCalled {
+                    modelUnavailable = modelUnavailable || r.modelUnavailable
+                    calls += 1
+                    // A parsed reply can still leave all proposals to the local reader.
+                    if r.fields.values.values.contains(where: { $0.reader == ContainerLabelCapture.gatewayReader }) {
+                        successfulReads += 1
+                    }
+                    dollars += r.dollars
+                    activeRunHistory?.labelCalls += 1
+                    activeRunHistory?.labelDollars += r.dollars
+                }
+                if r.fallback != nil { fallbacks += 1 }
+                markers.append(ContainerLabelCapture.FiledMarker(folder: label.output.deletingLastPathComponent(),
+                                                                 fileName: label.output.lastPathComponent, type: label.type,
+                                                                 fields: r.fields, text: label.text, startedByUser: false))
             }
-            if r.fallback != nil { fallbacks += 1 }
-            markers.append(ContainerLabelCapture.FiledMarker(folder: label.output.deletingLastPathComponent(),
-                                                             fileName: label.output.lastPathComponent, type: label.type,
-                                                             fields: r.fields, text: label.text, startedByUser: false))
         }
-        guard !Task.isCancelled else { return nil }
+        // W49.proc-local-model-supervisor: on this Mac the labels are one stage, so the label reader stays loaded
+        // from the first label to the last and no other app-managed model is loaded between them.
+        if gateway == nil || gateway?.isLocalModel == true {
+            do { try await LocalModelSupervisor.shared.withStage(ManagedGemma.model, readLabels) } catch { cancelled = true }
+        } else {
+            await readLabels()
+        }
+        guard !cancelled, !Task.isCancelled else { return nil }
         let problem = await Task.detached(operation: { ContainerLabelCapture.record(markers) }).value
         let unavailableNote = modelUnavailable
             ? "The configured gateway reported that GPT 5.6 Luna was unavailable for box and folder label reading."

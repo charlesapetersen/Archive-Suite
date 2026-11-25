@@ -45,6 +45,11 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 - **One way to read a page** (W42.int-s2): every client is a VisionOCRKit `PageReader`, and `PageReaders.reader`
   (`OCR/PageReaders.swift`) is the only place that picks one (Local Agent, then gateway, then provider). Never call a
   client's `ocr` elsewhere: `scripts/check-page-reader-seam.sh` fails on it, and on a provider with no reader.
+- **One owner of app-managed local models** (W49.proc-local-model-supervisor): `LocalModels/LocalModelSupervisor.swift`
+  installs the one uv/Python/mlx-vlm runtime and runs `LocalModelWorker.py`, one model resident at a time (the old one
+  has exited before the next loads; none over 10 GB), with Live-Capture-aware keep-alive and `withStage` for a stage
+  that reads many pages with one model. Never start a Python/MLX process elsewhere: `scripts/check-local-model-seam.sh`
+  fails on it. Contract: the `S` lines of `scripts/test-local-models.sh`.
 - **The macOS 27 on-device model** (`OCR/OnDeviceModelClient.swift`, W47.wh-readers-lost-clients) is the second
   Apple Vision model (`apple-fm-27`), chosen only on the reading card (lower-scoring, owner call 15); its loop stop
   fails a page whose reply starts repeating, as a page at the token cap fails on every client.

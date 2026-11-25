@@ -908,7 +908,7 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(size.exists)
         let requirements = renderedText(of: size)
         XCTAssertTrue(requirements.contains("8 GB to download"), requirements)
-        XCTAssertTrue(requirements.contains("8 GB of memory"), requirements)
+        XCTAssertTrue(requirements.contains("9 GB of memory"), requirements)
         app.buttons["ap.gemma.dismiss"].click()
         XCTAssertFalse(app.buttons["ap.gemma.download"].exists)
     }

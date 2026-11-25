@@ -428,8 +428,11 @@ the status explains that the change applies to the working list and the PDF stil
 When label reading needs Gemma, the Processor checks the existing local servers first. If none lists it,
   the app offers its own Gemma 3 12B download once on a supported Mac (W49.proc-gemma-offer-download). Settings
   → Capture can start or retry the download. The app-managed reader uses about 10 GB of disk space including its
-  software, and about 8 GB of memory while reading. It handles one label at a time and stops after 20 seconds
-  idle, when label reading is turned off, or when the app quits. The label card describes the parser fallback
+  software, and about 9 GB of memory while reading (8.95 and 9.00 GB peaks measured through the app,
+  W49.proc-local-model-supervisor). `LocalModelSupervisor` runs it, one label at a time and never beside another
+  app-managed model; it stays loaded 5 minutes after a label while Live Capture is receiving and 30 seconds otherwise,
+  through a whole Process Files label stage, and stops on memory pressure when idle, when label reading is turned
+  off, or when the app quits. The label card describes the parser fallback
   when no model supplied fields. The field provenance stays `gemma-3-12b` for either local route.
 
 - **Gemma beside a local OCR model swaps models.** With a local model as the gateway, Gemma (about 8 GB) is asked on

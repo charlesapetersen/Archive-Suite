@@ -36,8 +36,9 @@ targets:
     platform: macOS
     sources:
       - path: Sources/ArchiveProcessor
-        excludes: [Capture/ManagedGemmaWorker.py]
-      - path: Sources/ArchiveProcessor/Capture/ManagedGemmaWorker.py
+        excludes: [LocalModels/LocalModelWorker.py]
+      # The app-managed models' worker; only LocalModelSupervisor starts it (scripts/check-local-model-seam.sh).
+      - path: Sources/ArchiveProcessor/LocalModels/LocalModelWorker.py
         buildPhase: resources
       - path: ../../packages/ArchiveAppSupport/CloudDriveWarning.swift
       - path: ../../packages/UITestSupport/App   # W40.e9 appearance seam, W40.e13 transient recorder (DEBUG)

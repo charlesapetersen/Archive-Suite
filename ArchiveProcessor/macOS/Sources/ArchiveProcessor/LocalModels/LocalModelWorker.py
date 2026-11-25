@@ -1,4 +1,8 @@
-"""Private mlx-vlm worker for Archive Processor's local box and folder label reader."""
+"""Private mlx-vlm worker for Archive Processor's app-managed local models.
+
+LocalModelSupervisor.swift is the only thing that starts it, one model at a time: the model and its pinned revision
+arrive in ARCHIVE_MODEL_REPO and ARCHIVE_MODEL_REVISION, the per-launch secret in ARCHIVE_MODEL_SECRET.
+"""
 import base64
 import hmac
 import io
@@ -8,9 +12,10 @@ import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-MODEL = "mlx-community/gemma-3-12b-it-4bit"
-REVISION = "86cc6a8dedbc456dd0e4af01a9d09f396f77e558"
-MAX_TOKENS = 640
+MODEL = os.environ["ARCHIVE_MODEL_REPO"]
+REVISION = os.environ["ARCHIVE_MODEL_REVISION"]
+# The request names its own cap (a label reply is one short JSON object); this bounds what it may ask for.
+MAX_TOKENS_CEILING = 8192
 
 
 def download():
@@ -30,6 +35,7 @@ def snapshot(local_only=False):
 
 
 def serve(secret):
+    # No SIGTERM handler: the supervisor's stop at app quit relies on SIGTERM's default action (and stdin closing).
     # The parent keeps stdin open. EOF lets an idle worker exit cleanly and bounds
     # the lifetime of a worker still loading or generating after a forced quit.
     parent_gone = threading.Event()
@@ -64,16 +70,20 @@ def serve(secret):
                     self.send_error(413)
                     return
                 data = json.loads(self.rfile.read(size))
+                max_tokens = int(data.get("max_tokens", 640))
+                if not 0 < max_tokens <= MAX_TOKENS_CEILING:
+                    self.send_error(400)
+                    return
                 with Image.open(io.BytesIO(base64.b64decode(data["image"], validate=True))) as photo:
                     chat = apply_chat_template(processor, model.config, data["prompt"], num_images=1)
                     parts, tokens = [], 0
                     for part in stream_generate(
                         model, processor, chat, image=[photo.convert("RGB")],
-                        max_tokens=MAX_TOKENS, temperature=0.0,
+                        max_tokens=max_tokens, temperature=0.0,
                     ):
                         parts.append(part.text)
                         tokens = part.generation_tokens
-                body = json.dumps({"text": "".join(parts) if tokens < MAX_TOKENS else ""}).encode()
+                body = json.dumps({"text": "".join(parts) if tokens < max_tokens else ""}).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
@@ -95,7 +105,7 @@ def serve(secret):
 
     # The OS assigns an unused port. Only this app knows the per-launch secret.
     with Server(("127.0.0.1", 0), Handler) as server:
-        print(f"ARCHIVE_GEMMA_PORT {server.server_port}", flush=True)
+        print(f"ARCHIVE_MODEL_PORT {server.server_port}", flush=True)
         server.timeout = 0.25
         while not parent_gone.is_set():
             server.handle_request()
@@ -106,4 +116,4 @@ if __name__ == "__main__":
     if sys.argv[1] == "download":
         download()
     elif sys.argv[1] == "serve":
-        serve(os.environ.pop("ARCHIVE_GEMMA_SECRET"))
+        serve(os.environ.pop("ARCHIVE_MODEL_SECRET"))
