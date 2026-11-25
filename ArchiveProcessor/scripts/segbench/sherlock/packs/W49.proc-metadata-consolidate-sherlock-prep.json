@@ -1,0 +1,21 @@
+{
+  "tag": "W49.proc-metadata-consolidate-sherlock-prep",
+  "pack": "metadata-unified-27b-20261124",
+  "mac": "artifacts/metadata-unified-27b-20261124",
+  "submit": "support/job/submit.sh",
+  "jobs": 2,
+  "gpu_hours": 0.5,
+  "review": "execution-plans/items/W49.proc-metadata-consolidate-sherlock-prep.md",
+  "imports": [
+    {"modules": ["vllm"]}
+  ],
+  "creates": [
+    "$FS_ROOT/metadata-unified-27b-20261124",
+    "$GROUP_HOME/$USER/archive-suite/sherlock-results/metadata-unified-27b-20261124"
+  ],
+  "provenance": [],
+  "requires": [],
+  "results": "$GROUP_HOME/$USER/archive-suite/sherlock-results/metadata-unified-27b-20261124",
+  "collect": ["$FS_ROOT/metadata-unified-27b-20261124/jobs.tsv", "$FS_ROOT/metadata-unified-27b-20261124/logs"],
+  "release": "unified/out collected into the Mac artifact; the engine runs metadata_unified.py collect, then closes the item (W49.proc-metadata-consolidate scores it)"
+}
