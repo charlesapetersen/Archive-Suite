@@ -25,7 +25,7 @@ struct SessionProcessingConfig: Sendable {
     var outputImageFile: Bool         // two files (PDF + separate image) vs one file (PDF only)
     // 0 still means "full resolution" to the writers (`PDFGenerator`, `ImageEncoding`), but NEITHER
     // builder below can produce it: a defaults read of 0 (or of anything out of range) resolves to the
-    // 2 MB / 3 MB fallback. Only a direct memberwise construction can pass the 0 sentinel through.
+    // 1.5 MB / 3 MB fallback. Only a direct memberwise construction can pass the 0 sentinel through.
     var pdfImageMB: Double            // target MB for the image embedded in the PDF (0 = full resolution)
     var exportedImageMB: Double       // target MB for the separately-exported image (0 = full resolution)
     var textColumns: Int              // number of text columns on the OCR text page (1 = single-column)
@@ -78,6 +78,12 @@ struct SessionProcessingConfig: Sendable {
         static let ocrWorkers: ClosedRange<Int> = 1...12
         static let textColumns: ClosedRange<Int> = 1...4
     }
+
+    /// The built-in target for the image embedded in an output PDF. 1.5 MB, owner's call of 2026-11-24
+    /// (W49.proc-pair-compress-hands): on 21 of the owner's hand and mixed pages it saved 8% against 2.0 MB and kept a
+    /// median 98% of the long edge, with the image readback inside the noise. The searchable form's compression
+    /// starts from the same sized image.
+    static let defaultPDFImageMB = 1.5
 
     /// Preserve the Process Files run-start normalization now used by every fresh and resumed production
     /// path. W16.cfg6 only removes the remaining compatibility statics and optional fallbacks.
@@ -162,7 +168,7 @@ struct SessionProcessingConfig: Sendable {
                 d.double(forKey: DefaultsKeys.standardImageSizeMB), fallback: 3.0),
             ocrWorkerCount: ocrWorkerCount(from: d),
             pdfImageMB: normalizedImageMB(
-                d.double(forKey: DefaultsKeys.pdfImageSizeMB), fallback: 2.0),
+                d.double(forKey: DefaultsKeys.pdfImageSizeMB), fallback: defaultPDFImageMB),
             textColumns: clampTextColumns(d.integer(forKey: DefaultsKeys.textColumns)),
             exportedImageMB: normalizedImageMB(
                 d.double(forKey: DefaultsKeys.exportedImageSizeMB), fallback: 3.0)

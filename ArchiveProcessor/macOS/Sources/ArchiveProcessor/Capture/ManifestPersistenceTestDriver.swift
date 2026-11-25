@@ -249,7 +249,7 @@ enum ManifestPersistenceTestDriver {
         defer { fu2Defaults.removePersistentDomain(forName: fu2Suite) }
         let unsetConfig = SessionProcessingConfig.fromDefaults(fu2Defaults)
         check("W16.cfg6-fu2: an unset sizing default still yields the documented fallback, not the floor",
-              unsetConfig.pdfImageMB == 2.0 && unsetConfig.exportedImageMB == 3.0
+              unsetConfig.pdfImageMB == SessionProcessingConfig.defaultPDFImageMB && unsetConfig.exportedImageMB == 3.0
               && unsetConfig.standardImageMB == 3.0 && unsetConfig.ocrWorkerCount == 4
               && unsetConfig.textColumns == 1)
         // The sub-floor case the old closures let through untouched: `0.25 > 0`, so it was kept verbatim.
@@ -267,10 +267,10 @@ enum ManifestPersistenceTestDriver {
         let nonFiniteConfig = SessionProcessingConfig.fromDefaults(fu2Defaults)
         check("W16.cfg6-fu2: an infinite or NaN image size falls back rather than reaching a live session",
               fu2Defaults.double(forKey: DefaultsKeys.pdfImageSizeMB).isInfinite   // the input really is ∞
-              && nonFiniteConfig.pdfImageMB == 2.0 && nonFiniteConfig.exportedImageMB == 3.0)
+              && nonFiniteConfig.pdfImageMB == SessionProcessingConfig.defaultPDFImageMB && nonFiniteConfig.exportedImageMB == 3.0)
         fu2Defaults.set(-3.0, forKey: DefaultsKeys.pdfImageSizeMB)
         check("W16.cfg6-fu2: a negative image size falls back rather than being floored to 0.5",
-              SessionProcessingConfig.fromDefaults(fu2Defaults).pdfImageMB == 2.0)
+              SessionProcessingConfig.fromDefaults(fu2Defaults).pdfImageMB == SessionProcessingConfig.defaultPDFImageMB)
 
         // --- W16.cfg6-fu3: the WRITERS are bounded too, so what Settings shows is what a run uses. ---
         // fu2 made every defaults READ clamp, so nothing out of range can reach a run. What was left is

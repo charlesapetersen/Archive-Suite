@@ -117,7 +117,7 @@ enum SettingsLevels {
         case DefaultsKeys.gatewayInputCost, DefaultsKeys.gatewayOutputCost: return -1.0
         case DefaultsKeys.imageResolutionPercent: return 100.0
         case DefaultsKeys.standardImageSizeMB, DefaultsKeys.exportedImageSizeMB: return 3.0
-        case DefaultsKeys.pdfImageSizeMB: return 2.0
+        case DefaultsKeys.pdfImageSizeMB: return SessionProcessingConfig.defaultPDFImageMB
         case DefaultsKeys.ocrWorkerCount: return 4.0
         case DefaultsKeys.textColumns: return 1.0
         case DefaultsKeys.itemTypeColourBox, DefaultsKeys.itemTypeColourFolder: return 0.0

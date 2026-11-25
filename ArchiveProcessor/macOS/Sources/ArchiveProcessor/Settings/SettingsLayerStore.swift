@@ -777,7 +777,7 @@ enum ProcessingSettingsCapture {
         .init(key: DefaultsKeys.ocrWorkerCount, def: .int(4)),
         .init(key: DefaultsKeys.imageResolutionPercent, def: .double(100)),
         .init(key: DefaultsKeys.standardImageSizeMB, def: .double(3.0)),
-        .init(key: DefaultsKeys.pdfImageSizeMB, def: .double(2.0)),
+        .init(key: DefaultsKeys.pdfImageSizeMB, def: .double(SessionProcessingConfig.defaultPDFImageMB)),
         .init(key: DefaultsKeys.textColumns, def: .int(1)),
         .init(key: DefaultsKeys.exportedImageSizeMB, def: .double(3.0)),
         .init(key: DefaultsKeys.outputImageFile, def: .bool(true)),

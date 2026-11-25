@@ -15,7 +15,7 @@ struct SettingsPagesOutputPanel: View {
     @AppStorage(DefaultsKeys.imageResolutionPercent) private var imageScale: Double = 100
     @AppStorage(DefaultsKeys.standardImageSizeMB) private var standardImageSizeMB: Double = 3.0
     @AppStorage(DefaultsKeys.outputImageFile) private var outputImageFile: Bool = true
-    @AppStorage(DefaultsKeys.pdfImageSizeMB) private var pdfImageSizeMB: Double = 2.0
+    @AppStorage(DefaultsKeys.pdfImageSizeMB) private var pdfImageSizeMB: Double = SessionProcessingConfig.defaultPDFImageMB
     @AppStorage(DefaultsKeys.exportedImageSizeMB) private var exportedImageSizeMB: Double = 3.0
     @AppStorage(DefaultsKeys.textColumns) private var textColumns: Int = 1
     @AppStorage(DefaultsKeys.writeLogFile) private var writeLogEnabled: Bool = false
@@ -133,7 +133,7 @@ struct SettingsPagesOutputPanel: View {
                 .disabled(preOCRedInput)
                 HStack {
                     Text("PDF image size")
-                    HelpButton(text: "Target size for the image embedded in each output PDF (default 2 MB). Independent of both the image sent to the LLM and the source resolution — larger images are downscaled toward this target, while smaller ones are embedded as-is. Not used for pre-OCRed input.")
+                    HelpButton(text: "Target size for the image embedded in each output PDF (default 1.5 MB). Independent of both the image sent to the LLM and the source resolution — larger images are downscaled toward this target, while smaller ones are embedded as-is. Not used for pre-OCRed input.")
                     Spacer()
                     TextField("", value: $pdfImageSizeMB, format: .number.precision(.fractionLength(0...1)))
                         .textFieldStyle(.roundedBorder).frame(width: 52).multilineTextAlignment(.trailing)

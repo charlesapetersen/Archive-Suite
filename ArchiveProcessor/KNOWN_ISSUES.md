@@ -600,7 +600,7 @@ written where the `searchableFor` setting names the input's format and the page'
   PATENTS notice. No Homebrew is needed on the build tools' architecture (arm64 on this build Mac). The universal
   app still runs on Intel, but arm64-only bundled tools are ignored there: install native `jbig2enc` and `qpdf` for
   compression. Debug also uses installed tools. Lookup is Resources, then /opt/homebrew/bin, /usr/local/bin,
-  /opt/local/bin, then the login shell's PATH. Without runnable tools the embedded JPEG remains (about 2 MB a
+  /opt/local/bin, then the login shell's PATH. Without runnable tools the embedded JPEG remains (about 1.5 MB a
   photographed page), and the run log says "written uncompressed: jbig2 and qpdf not found" (queued: W49.proc-intel-compression).
 - **Compressing costs time**: 3 s the drawn memo, 10 s UIUC 00233, about 67 s each UIUC 00149 and 00156 (the engine's
   rebuild and MRC layering, every page in the app's process; measured 2026-11-14, Debug build). An unplaced page also
@@ -669,7 +669,7 @@ layer on 9 of 20 owner hand pages (`place-hands-lines.md`, Qwen3.6-27B). Open:
   3-5 s, every page in a fresh process; the first page of a launch 64 s, torch imported cold), physical footprint 4.6-6.8 GB a page; the placer's cap is 10 GB (`HandPlacer.memoryGB`) and
   it holds every model-reader slot, so hand pages run one at a time and never beside a model reader. A 16 GB Mac, not
   an 8 GB one (`place-hands-cost.md`) (accepted: the measured cost; hand pages run one at a time by design).
-- **The gate reads the reading copy, not the camera original.** The placer runs on the image page as written (the 2 MB
+- **The gate reads the reading copy, not the camera original.** The placer runs on the image page as written (the 1.5 MB
   JPEG copy, straightened when it slopes), where the bench measured the originals: on 5 of 21 owner pages the
   confidence rose (p031 0.70 to 0.89, p096 0.57 to 0.72), and p096 is placed where the bench gated it (20 of 21 on the
   same side). The 0.9 gate was read off the originals' line-pass table; its refit waits on more hand truth
@@ -686,10 +686,12 @@ W49.proc-straighten-record records the applied turn in each PDF page's header an
 switch at staging for each Live Capture document. Exact originals can be kept independently of the exported
 image with [preservation copies](../SPEC/catalogue.md#preservation-copies).
 Quartz draws the media box of the app's generated pages, which carry no crop box or annotations. Open:
-- **Image-plus-text is 2.6 to 17 times Vision OCR's size** (measured 2026-11-13, `scripts/measure-output.sh` on three
-  UIUC pages and the drawn memo): 2.1-2.3 MB a photographed page against Vision OCR 1.16.0's 0.12-0.87 MB, because
-  the image page is the 2 MB JPEG copy. The searchable form is compressed as Vision OCR compresses
-  (W42.int-s5-compress); the pair is not (queued: W49.proc-pair-compress-hands).
+- **Image-plus-text is larger than Vision OCR's output** (measured 2026-11-13, `scripts/measure-output.sh` on three
+  UIUC pages and the drawn memo, at the then 2 MB target: 2.1-2.3 MB a photographed page against Vision OCR 1.16.0's
+  0.12-0.87 MB), because the image page is a JPEG copy, now targeted at 1.5 MB (W49.proc-pair-compress-hands: 8% smaller
+  than 2 MB on 21 of the owner's hand and mixed pages, a median 98% of the long edge kept, readback within noise). The
+  searchable form is compressed as Vision OCR compresses (W42.int-s5-compress); the pair stays a JPEG for handwriting
+  (accepted: owner's call 2026-11-24 walkthrough, W49.proc-pair-compress-hands-owner-ok, chose 1.5 MB over 1.0 and 0.5 MB).
 - **The Reader indexes the text twice** (the layer and the text page, `ExtractedContent.fullBody`); on a page where the
   reading did not align, the layer is Vision's own words, so Vision's misreads are searchable there (accepted: both are the file's text, and the text page carries the reading).
 - **Time:** at output the engine's Vision pass runs once more per print page (seconds a page), and straightening reads
