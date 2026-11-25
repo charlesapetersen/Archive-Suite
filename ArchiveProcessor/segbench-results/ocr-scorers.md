@@ -103,7 +103,7 @@ Every route over the pages its run covered (the reference routes and Vision were
 | ppocrv6-medium | FarmShare pipeline | 893/895 | 38.7 (38.8) | 23.5 | 25.6 | 58.7 | 38.6 | 37.2 | -1.4 | 67.0 | 89 | 84 | 0.05 | 0.135 (403) |
 | fs-fanar | FarmShare native | 32/40 | 35.7 (44.6) | 28.6 | 52.1 | 52.2 | – | – | – | – | – | – | – | 0.400 (1) |
 | nemotron-parse-2 | Sherlock native | 605/895 | 33.1 (48.9) | 14.4 | 27.0 | 47.7 | 33.3 | 30.9 | -2.4 | 62.9 | 89 | 84 | 0.17 | 0.102 (296) |
-| gemma3-12b-mlx4 | Mac local | 120/233 | 29.4 (57.1) | 8.2 | 17.5 | 36.9 | 37.1 | 36.9 | -0.2 | 47.2 | 60 | 88 | -0.30 | 0.106 (73) |
+| gemma3-12b-mlx4 | Mac local | 147/280 | 30.3 (57.8) | 8.1 | 19.7 | 36.4 | 37.9 | 37.2 | -0.7 | 50.1 | 57 | 88 | -0.19 | 0.118 (91) |
 | fs-qari | FarmShare native | 17/40 | 8.6 (20.2) | 1.0 | 11.0 | 79.0 | – | – | – | – | – | – | – | 0.000 (1) |
 
 ### Order by stratum (OmniDocBench reading-order edit; pages scored)
@@ -139,7 +139,7 @@ Every route over the pages its run covered (the reference routes and Vision were
 | ppocrv6-medium | 0.09 (37) | 0.04 (35) | 0.02 (62) | 0.21 (76) | 0.16 (28) | 0.23 (17) | 0.03 (31) | 0.06 (75) | 0.58 (12) | 0.00 (3) | 0.50 (2) |  |  | 0.46 (25) |  |
 | fs-fanar |  |  |  |  |  |  |  |  |  | 0.40 (1) |  |  |  |  |  |
 | nemotron-parse-2 | 0.03 (39) | 0.10 (20) | 0.02 (57) | 0.16 (48) | 0.25 (46) | 0.18 (10) | 0.11 (9) | 0.04 (56) | 0.00 (4) |  | 0.67 (1) |  |  | 0.11 (6) |  |
-| gemma3-12b-mlx4 | 0.07 (9) | 0.06 (7) | 0.05 (24) | 0.41 (13) |  | 0.00 (1) | 0.00 (1) | 0.01 (17) |  |  |  |  |  | 0.00 (1) |  |
+| gemma3-12b-mlx4 | 0.11 (12) | 0.06 (9) | 0.04 (28) | 0.44 (17) |  | 0.00 (1) | 0.00 (1) | 0.01 (21) | 0.00 (1) |  |  |  |  | 0.00 (1) |  |
 | fs-qari |  |  |  |  |  |  |  |  |  | 0.00 (1) |  |  |  |  |  |
 
 ### Long s and Fraktur ligatures (2510.06743's preservation checks)
@@ -213,7 +213,7 @@ On the strata whose strict score keeps them (L2, L5-L8). **kept**: of the truth'
 | unlimited-ocr | L8 | 3066 (77) | 0.0 | 0.0 |
 | xiaomi-ocr-0 | L6 | 888 (27) | 0.0 | 0.0 |
 | xiaomi-ocr-0 | L8 | 3079 (78) | 0.0 | 0.0 |
-| gemma3-12b-mlx4 | L8 | 569 (19) | 5.8 | 0.0 |
+| gemma3-12b-mlx4 | L8 | 722 (24) | 4.6 | 0.0 |
 
 ### Markup-aware diagnostic
 
