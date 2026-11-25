@@ -99,6 +99,21 @@ page. The candidate must keep the scan's boxes, rotation, annotations, and origi
 comparison. A layer that cannot be edited safely or a candidate that fails verification disables acceptance. The receipt
 lists the physical page indices of the separate text pages or directly edited pages. The Reader re-extracts the whole file.
 
+**The image each page is read from (W49.proc-reocr-preservation, owner call 34, 2026-11-22).** When the file's
+catalogue companion maps an image page to a [Preservation Copy](catalogue.md#preservation-copies), the reader gets
+that exact intake original, or the mapped page of a multi-page PDF original, instead of the reading PDF's image. The
+Processor opens it with `PreservationCopy.open`, checked against the identity embedded in the snapshot it reads, so
+the bytes are the ones the map's digest names; it never downloads an offline copy and never writes in the
+Preservation folder. The original is turned to match the reading page, which the reader reads with rotation off: an
+upright JPEG keeps its compressed image data, anything else goes as an upright JPEG decoded at most 12,000 px on
+its long side; neither carries the original's location (GPS) metadata. The whole original is sent, since the Processor
+files one reading page per intake image. The
+turn comes from searching small grey renditions of the original at each quarter turn for the reading page; no clear
+winner is a fallback. The same reader runs either way, with its size target and the collection's sharing switches.
+A page with no recorded copy, or one that is missing, offline, unverified, unreadable or unmatched, is read from the
+reading PDF's image as before, and the review names, for every page, the Preservation Copy it read or why it read the
+reading PDF (`ReOCRImageInput`).
+
 ## 6. Why it is built this way (design record)
 
 Folded from the design plan when the Reader side shipped (W44.reocr-plan, 2026-11-07; the plan is in git history).

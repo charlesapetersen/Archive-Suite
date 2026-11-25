@@ -273,6 +273,11 @@ final class ProcessorUITests: XCTestCase {
         let layer = element("ap.reocr.imageLayer.1")
         XCTAssertTrue(layer.exists, "the review names the image page's searchable text before acceptance")
         XCTAssertTrue(renderedText(of: layer).contains("image page 1"))
+        // W49.proc-reocr-preservation: each page says which image it was read from; the synthetic pair has no record.
+        let input = element("ap.reocr.input.1")
+        XCTAssertTrue(input.exists, "the review names the image each page was read from")
+        XCTAssertTrue(renderedText(of: input).contains("Read from the reading PDF: no Preservation Copy is recorded"),
+                      renderedText(of: input))
         let reviewScroll = element("ap.reocr.dialog").scrollViews.firstMatch
         for _ in 0..<8 where !reviewScroll.frame.contains(layer.frame) {
             reviewScroll.scroll(byDeltaX: 0, deltaY: -250)

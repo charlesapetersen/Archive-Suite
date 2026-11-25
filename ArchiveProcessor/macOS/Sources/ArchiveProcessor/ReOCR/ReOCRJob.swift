@@ -16,8 +16,10 @@ import VisionOCRKit
 ///    before anything is read. Everything after works from that copy's bytes, so the candidate is built on exactly
 ///    the snapshot `accept` later checks the live file against.
 /// 2. Each selected pair's image page goes to the reader as a private JPEG in `scratch` (0700, files 0600, each removed
-///    after its reading): the page's own JPEG bytes when that is exactly what the page shows (`embeddedJPEG`), else a
-///    300 dpi rendering. The old text pages are never read. A failure after `prepare` records the operation rejected.
+///    after its reading): the page's verified full-resolution Preservation Copy when the catalogue maps the page to one
+///    (`ReOCRImageInput`, W49.proc-reocr-preservation), else the page's own JPEG bytes when that is exactly what the page
+///    shows (`embeddedJPEG`), else a 300 dpi rendering; each result says which. The old text pages are never read. A
+///    failure after `prepare` records the operation rejected.
 /// 3. The new text pages and invisible layers go through `ReOCRIncrementalWriter`, which proves the candidate
 ///    kept the scan's presentation and the rest of the file. One failed replacement prevents acceptance.
 /// 4. `accept` publishes through `ReOCRFileWriter`, then writes the content receipt for the Reader and clears only
@@ -52,6 +54,8 @@ struct ReOCRJob {
         let kind: OCRPageKind?
         /// The new text, or why there is none.
         let outcome: Result<String, ReOCRPairs.Refusal>
+        /// The image the reader was given: the Preservation Copy, or the reading PDF and why.
+        let input: ReOCRImageInput.Source
     }
 
     struct Review: Sendable {
@@ -131,6 +135,9 @@ struct ReOCRJob {
             try Self.makePrivateDirectory(scratch)
             let oldDoc = PDFDocument(data: original)
             let existingLayers = try ReOCRIncrementalWriter.hiddenTextPages(original, indexes: selected.map(\.imageIndex))
+            let originals = ReOCRImageInput.Lookup(
+                root: root.url, relativePath: ReOCRImageInput.storedPath(of: file, in: root.url) ?? key.relativePath,
+                snapshot: original)
             for pair in selected {
                 try Task.checkCancellation()
                 let kind = kinds[pair.textIndex] ?? pair.header?.kind
@@ -138,9 +145,9 @@ struct ReOCRJob {
                     pair.isSearchable ? ($0.string ?? "") : PDFHeaderParser.parse($0).body
                 } ?? ""
                 let image = scratch.appendingPathComponent("\(op.journal.operationID.uuidString)-p\(pair.imageIndex + 1).jpg")
-                guard Self.writeImageInput(original, pageIndex: pair.imageIndex, to: image) else {
-                    throw Failure.imageNotExtracted(page: pair.imageIndex)
-                }
+                guard let input = try ReOCRImageInput.write(original, pageIndex: pair.imageIndex, lookup: originals, to: image)
+                else { throw Failure.imageNotExtracted(page: pair.imageIndex) }
+                try Task.checkCancellation()
                 let reading = await read(image, pair, kind)
                 try? FileManager.default.removeItem(at: image)   // a page of the archive; not kept past its reading
                 try Task.checkCancellation()
@@ -167,9 +174,10 @@ struct ReOCRJob {
                                                                        reading: text, required: pair.isSearchable || hasLayer,
                                                                        scratch: scratch, placement: placement)
                     try Task.checkCancellation()
-                    results.append(PairResult(pair: pair, oldText: oldText, kind: written, outcome: .success(text)))
+                    results.append(PairResult(pair: pair, oldText: oldText, kind: written, outcome: .success(text),
+                                              input: input))
                 } catch let r as ReOCRPairs.Refusal {
-                    results.append(PairResult(pair: pair, oldText: oldText, kind: kind, outcome: .failure(r)))
+                    results.append(PairResult(pair: pair, oldText: oldText, kind: kind, outcome: .failure(r), input: input))
                 }
             }
         } catch {

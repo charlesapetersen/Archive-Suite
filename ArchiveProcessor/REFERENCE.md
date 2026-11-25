@@ -465,6 +465,8 @@ ReOCR/                         W44 Improve OCR (Tier-2: it replaces archive PDFs
   ReOCRFileWriter.swift        The only content writer: backup, journal, coordinated RENAME_SWAP publish, recover.
   ReOCRJob.swift               One file: start (prepare, read image pages, candidate), accept (receipt, reviewed-flag
                                clear), reject, restore, recover; `reader(for:)` the chosen route only.
+  ReOCRImageInput.swift        The image a page is read from: its verified Preservation Copy, turned to match the
+                               page, else the reading PDF's image and why (W49.proc-reocr-preservation; job §18).
   ReOCRRanking.swift           Ranked readers per Kind over the settings route table (+ ReOCRGrouping).
   ReOCRDialogModel.swift       The dialog's state without views (Kinds, groups, choice, estimate, run).
   ReOCRHistory·FlaggedFinder   Kept versions (restore/remove); PDFs flagged OCR Poor under a folder.

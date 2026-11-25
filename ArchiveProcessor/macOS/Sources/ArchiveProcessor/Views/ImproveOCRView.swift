@@ -721,6 +721,9 @@ struct ImproveOCRView: View {
                                     Text(message)
                                         .accessibilityIdentifier("ap.reocr.imageLayer.\(page)")
                                 }
+                                Text(r.input.summary)
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .accessibilityIdentifier("ap.reocr.input.\(r.pair.imageIndex + 1)")
                                 HStack(alignment: .top, spacing: 12) {
                                     textColumn("Before", r.oldText)
                                     textColumn("After", (try? r.outcome.get()) ?? ((r.outcome.failureDescription) ?? ""))

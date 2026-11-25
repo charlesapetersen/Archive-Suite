@@ -121,6 +121,8 @@ view verifies and uses the same source bytes. Discovery skips the preservation d
 The copies supply no extra search rows. No automatic download is requested. A companion with a
 digest can report a missing map or source. Where no verified association was recorded, Reader
 reports **Not recorded**. A PDF-only transfer leaves the originals behind.
+The Processor's Improve OCR reads a page's verified copy the same way, read-only, as the image it sends to the
+reader, and falls back to the reading PDF's image with the reason shown ([Improve OCR](improve-ocr.md) §5).
 
 Initial filing verifies the preserved files and their map under the same pinned directory lock
 before publishing the PDF and companion. A receipt requires this verification on every attempt. A retry reuses prepared payloads

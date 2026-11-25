@@ -33,6 +33,8 @@ import PDFKit
 ///   13. The dialog's model: Kind groups, a Kind change re-ranks, the estimate, Run's blocker, per-Kind readers and models.
 ///   12. A real reader on this Mac (Apple Vision, $0) through the row factory reads the page and is named in the header.
 ///   11. The saved support connection resolves, follows a moved folder, refuses a different store, forgets on disconnect.
+///   18. A page's verified Preservation Copy is what the reader gets, upright, else the reading PDF and why
+///       (`ReOCRImageInputTestDriver`).
 ///   10. Restore puts the original back with later tag edits kept and the flag re-added; refused on a changed file or
 ///       a second time; no re-flag after a later flag action or when the original was not flagged.
 @MainActor
@@ -255,6 +257,8 @@ enum ReOCRJobTestDriver {
 
             try await testEncryptedAndRawScan()
             try await testRawScanWithVisibleText()
+            // 18. Preservation Copies as the input (W49.proc-reocr-preservation).
+            await ReOCRImageInputTestDriver.run(in: root) { check($0, $1, $2) }
 
             // 6. Changed between run and accept.
             do {
