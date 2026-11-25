@@ -68,6 +68,32 @@ def metas():
     return {'owner96': own, 'public895': pub}
 
 
+def reading_file(which, page):
+    return (M.out_dir(KEY) / f'{page}-original.json') if which == 'owner96' else (G.OUT / f'{page}.json')
+
+
+def lenient(which, scores):
+    """{page: NES} as an app with this loop stop would read: a looped page scored on what it read before the loop, a
+    page whose reply broke the format on its text after `TEXT:`, every other page as scored."""
+    if which == 'owner96':
+        truth = lambda p: (P.TRUTH / 'truth' / f'{p}.txt').read_text()
+    else:
+        R.MANIFEST = R.RESULTS / 'manifest.jsonl'
+        by = {R.job_id(r): r for r in R.frozen()}
+        truth = lambda p: Path(by[p]['truth']).read_text()
+    out = {}
+    for p, (nes, ok, stratum) in scores.items():
+        f = reading_file(which, p)
+        got = json.loads(f.read_text()) if f.exists() else {}
+        text = None
+        if not ok and got.get('before_loop'):
+            text = got['before_loop']['text']
+        elif not ok and got.get('meta', {}).get('finish') == 'stop':
+            text = M.lenient_text(f)
+        out[p] = S.score(truth(p), text, stratum)['nes'] if text else nes
+    return out
+
+
 def groups(which):
     """{page: group label}: the 96's page kinds, the 895's strata with their sources and scripts."""
     if which == 'owner96':
@@ -103,10 +129,11 @@ def summarise(scores, meta, which):
     fails = collections.Counter()
     for m in meta.values():
         if m.get('status') != 'ok':
-            fails['token cap (runaway)' if m.get('finish') == 'length' else 'reply format'] += 1
+            fails[{'length': 'token cap', 'loop': 'loop stop'}.get(m.get('finish'), 'reply format')] += 1
     rows = list(g.values())
     s = {'pages': n_pages, 'read': len(meta), 'ok': sum(ok for _, ok, _ in rows), 'failures': dict(fails),
-         'strict': mean([v for v, _, _ in rows]), 'answered': mean([v for v, ok, _ in rows if ok])}
+         'strict': mean([v for v, _, _ in rows]), 'answered': mean([v for v, ok, _ in rows if ok]),
+         'lenient': mean(list(lenient(which, g).values()))}
     wall = [m['wall_s'] for m in meta.values()]
     if wall:
         s['speed'] = {'wall_median': statistics.median(wall), 'wall_p90': pct(wall, .9), 'wall_max': max(wall),
@@ -183,11 +210,20 @@ def main():
          'gemma3-12b-mlx4` with and without `--merge-set public895`, and `ocr_gemma3_report.py`. Raw text stays in the '
          'private cache.', '',
          '## Accuracy and completion', '',
-         '| set | pages | read | completed | failed: token cap | failed: reply format | NES strict % | NES answered % |',
-         '|---|---:|---:|---:|---:|---:|---:|---:|']
+         '| set | pages | read | completed | failed: loop stop | failed: token cap | failed: reply format | NES strict % | '
+         'NES answered % | NES lenient % |', '|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
     for w, s in (('owner96', o), ('public895', u)):
-        L.append(f"| {SET_NAME[w]} | {s['pages']} | {s['read']} | {s['ok']} | {s['failures'].get('token cap (runaway)', 0)} | "
-                 f"{s['failures'].get('reply format', 0)} | {f1(s['strict'])} | {f1(s['answered'])} |")
+        f = s['failures']
+        L.append(f"| {SET_NAME[w]} | {s['pages']} | {s['read']} | {s['ok']} | {f.get('loop stop', 0)} | {f.get('token cap', 0)} | "
+                 f"{f.get('reply format', 0)} | {f1(s['strict'])} | {f1(s['answered'])} | {f1(s['lenient'])} |")
+    L += ['', '**Loop stop.** A greedy reading that falls into a loop runs to the 8,192-token cap, about nine minutes a '
+          'page here, which made the full run impractical (the pilot\'s third page did exactly that). So a reading stops '
+          'once its last 1,024 tokens repeat, token for token, a cycle of at most 256 tokens '
+          '(`ocr_mac_local.loop_period`), and counts as failed, as it would at the cap. Over the 907 finished readings '
+          'of the other Mac-local readers (granite-docling apart) the rule never fires, so it does not end a reading '
+          'that would have finished. **Lenient** scores a looped page on what it read before the loop and a '
+          'format-broken reply on its text after `TEXT:`, which is what an app with this stop would keep; '
+          '**strict** counts both as 0, as every other route on the bench is counted.']
     for w, s in (('owner96', o), ('public895', u)):
         if s['read'] < s['pages']:
             L += ['', f"**Incomplete on {SET_NAME[w]}: {s['read']} of {s['pages']} pages read.** Figures cover those only."]
@@ -221,7 +257,8 @@ def main():
         'drafted by any scored route, not checked by the owner.',
         'All 96 accuracy pages and all 895 frozen public pages, one reading each; none chosen by a route\'s reading or '
         'by ABBYY text. ' + DRAW_96,
-        'The same request on both sets: the pinned build, the panel prompt, 8,192 tokens, temperature 0 and the same '
+        'The same request on both sets: the pinned build, the panel prompt, 8,192 tokens, temperature 0, the loop stop '
+        'above and the same '
         '2,400 px JPEGs every route on the bench read (the 455 public images remade by the same encoder). Every route '
         'is scored by the one scorer; failures count 0 on both sides of a pair. Apple Vision has 320 of the 895 '
         '(its Latin strata), so its pairs there are on those. Speed and memory are one M3 Pro with 18 GB, one page '

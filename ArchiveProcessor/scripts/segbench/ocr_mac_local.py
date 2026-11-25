@@ -34,6 +34,7 @@ REPORT = P.RESULTS / 'ocr-mac-local.md'
 HW_REPORT = P.RESULTS / 'ocr-mac-local-hw.md'
 GROUPS = P.RESULTS / 'ocr-mac-local-groups.csv'  # aggregates by kind, read by ArchiveOCRBench/build.py
 
+LOOP_WINDOW = 1024   # tokens a verbatim cycle must fill before the loop stop ends a reading (loop_period)
 # W41.mac-local-hw: the Vision OCR lab's handwriting pick and runner-up, as the lab ran them (its read-mlx.py),
 # except that Qwen3.5-9B's thinking is switched off to match the hosted route's reasoning: off.
 HW = {
@@ -92,12 +93,27 @@ HW = {
     # ocr_gemma3_public.py reads the 895 public pages with this same entry.
     'gemma3-12b-mlx4': {
         'name': 'Gemma 3 12B 4-bit', 'hosted': None, 'reply': 'panel', 'prompt': None, 'max_side': None,
-        'max_tokens': None, 'template': {},
+        'max_tokens': None, 'template': {}, 'loop_stop': LOOP_WINDOW,
         'repo': model_store.snapshot('mlx-community/gemma-3-12b-it-4bit', '86cc6a8dedbc456dd0e4af01a9d09f396f77e558')},
 }
 # docling-core for the DocTags reply, installed apart from the lab venv (`uv pip install --target DIR
 # docling-core==2.105.0`) and put after its site-packages, so nothing mlx-vlm imported is replaced.
 DOCLING = Path(os.environ.get('DOCLING_CORE_PATH', P.CACHE.parent / 'W46.ocr-new-open-boxes' / 'docling-core-2.105.0'))
+
+
+def loop_period(ids, window=None):
+    """The cycle length when the last `window` tokens repeat, token for token, the `window` tokens one cycle earlier
+    (a cycle of at most 256 tokens), else None. W46.ocr-gemma3-12b's loop stop: its pilot page ran 8,192 tokens of
+    `[illegible] [illegible]` (9 minutes), and this fires there at 1,744. Over the 907 finished readings of every
+    other Mac-local reader except granite-docling (whose DocTags loops sometimes end before the cap) it never fires."""
+    window = window or LOOP_WINDOW
+    if len(ids) < window + 1:
+        return None
+    tail = ids[-window:]
+    for p in range(1, 257):
+        if len(ids) >= window + p and ids[-window - p:-p] == tail:
+            return p
+    return None
 
 
 def out_dir(key):
@@ -185,27 +201,35 @@ def collect(limit=None, key=KEY, pages=None, out=None, image_of=None, minutes=No
             im = Image.open(image); im.thumbnail((spec['max_side'], spec['max_side']), Image.LANCZOS)
             image = Path(tmp) / (job['id'] + '.png'); im.save(image)
         mx.reset_peak_memory()
-        start = time.time(); first = None; text = []; last = None
+        start = time.time(); first = None; text = []; last = None; ids = []; looped = None
         for r in stream_generate(model, processor, chat, image=[str(image)], max_tokens=max_tokens, temperature=0.0,
                                  **spec.get('generate', {})):
             if first is None:
                 first = time.time()
             text.append(r.text); last = r
+            if spec.get('loop_stop') and r.token is not None:
+                ids.append(int(r.token))
+                if len(ids) % 16 == 0 and (looped := loop_period(ids, spec['loop_stop'])):
+                    break
         wall = time.time() - start
         raw = ''.join(text)
-        got = parse(spec, raw, image)
+        # A looped reading fails, as one cut off at the cap does; what it read before the loop is kept apart.
+        got = None if looped else parse(spec, raw, image)
+        lenient = parse(spec, ''.join(text[:-spec['loop_stop']]), image) if looped else None
         if spec['max_side']:
             image.unlink()
-        finish = 'length' if last is not None and last.generation_tokens >= max_tokens else 'stop'
+        finish = 'loop' if looped else 'length' if last is not None and last.generation_tokens >= max_tokens else 'stop'
         meta = {'key': key, 'job': job['id'], 'page': job.get('page'), 'scale': job.get('scale', 'original'), 'model': str(spec['repo']).replace(str(Path.home()), '~'),
                 'runtime': 'mlx-vlm ' + mlx_vlm.__version__, 'status': 'ok' if got and finish == 'stop' else 'failed',
                 'finish': finish, 'cost': 0, 'wall_s': round(wall, 2),
                 'first_token_s': round((first or start + wall) - start, 2),
                 'prompt_tokens': getattr(last, 'prompt_tokens', 0), 'completion_tokens': getattr(last, 'generation_tokens', 0),
                 'prompt_tps': round(getattr(last, 'prompt_tps', 0.0), 1), 'gen_tps': round(getattr(last, 'generation_tps', 0.0), 1),
-                'mlx_peak_gb': round(mx.get_peak_memory() / 2**30, 2), 'load_s': round(load_s, 1), 't': time.time()}
+                'mlx_peak_gb': round(mx.get_peak_memory() / 2**30, 2), 'load_s': round(load_s, 1), 't': time.time(),
+                **({'loop_period': looped} if looped else {})}
         P.save(out / (job['id'] + '.raw.json'), {'text': raw})
-        P.save(out / (job['id'] + '.json'), {'meta': meta, 'parsed': got if meta['status'] == 'ok' else None})
+        P.save(out / (job['id'] + '.json'), {'meta': meta, 'parsed': got if meta['status'] == 'ok' else None,
+                                             **({'before_loop': lenient} if looped else {})})
         print(f"[{k}/{len(todo)}] {job['id']} {meta['status']} {meta['wall_s']}s "
               f"{meta['prompt_tokens']}+{meta['completion_tokens']} tok peak {meta['mlx_peak_gb']} GB", flush=True)
 
