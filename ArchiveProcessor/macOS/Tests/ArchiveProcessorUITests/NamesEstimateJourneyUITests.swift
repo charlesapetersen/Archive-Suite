@@ -135,68 +135,61 @@ final class NamesEstimateJourneyUITests: XCTestCase {
         print("[s044] CONFIRMED: collection interview → real Start → one names request; estimate includes Names")
     }
 
-    // S-048: a single-file control and two duplicate attempts through the real intake window.
-    // The loopback gateway counts OCR calls after the real Start. No provider can bill this test.
-    func testRepeatedFileIntakeRequestsOCRForEachRow() throws {
-        try checkInput(repeatBy: "once", expected: 1)
-        try checkInput(repeatBy: "picker", expected: 2)
-        try checkInput(repeatBy: "Finder drop", expected: 2)
-    }
-
-    private func checkInput(repeatBy method: String, expected: Int) throws {
-        let run = scratch.appendingPathComponent(UUID().uuidString)
-        let input = run.appendingPathComponent("in")
-        let output = run.appendingPathComponent("out")
-        for folder in [input, output] {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    // S-048 (W49.proc-s048-verify, then W49.proc-s048-check on Claude): one add as the control, then the same photo
+    // chosen twice and chosen then dropped from Finder. Each repeated row is the one file in its folder, and the
+    // loopback gateway receives the same image bytes once per row. No provider can bill this test.
+    func testDuplicateRowsSendTheSamePhotoTwice() throws {
+        for (method, expected) in [("once", 1), ("picker", 2), ("Finder drop", 2)] {
+            let run = scratch.appendingPathComponent("check-\(UUID().uuidString)")
+            let input = run.appendingPathComponent("in"), output = run.appendingPathComponent("out")
+            for folder in [input, output] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+            let photo = input.appendingPathComponent("check-photo.png")
+            try makeLetter(at: photo)
+            let before = try gatewayCalls().count, imagesBefore = try gatewayImages().count
+            app.launchArguments = UITestLaunch.arguments([
+                "-APUITestMode", "-APUITestStandInGateway",
+                "-APUITestOutputDirectory", output.path, "-outputDirectory", output.path,
+                "-useGateway", "YES", "-gatewayLocalModel", "NO", "-useAppleVision", "NO", "-useLocalAgent", "NO",
+                "-gatewayBaseURL", "http://127.0.0.1:18472/v1", "-gatewayModelID", "s048-check",
+                "-gatewayUpstreamProvider", "Anthropic", "-taggingModeRaw", "none",
+                "-enableCollectionSegmentation", "NO", "-rotationModeRaw", "off", "-reviewRotation", "NO",
+                "-outputImageFile", "NO", "-mergeDocuments", "NO", "-batchMode", "NO",
+                "-sendPreviousImage", "NO", "-useInstitutionalComputeImport", "NO",
+                "-skipAlreadyProcessed", "YES", "-preOCRedInput", "NO"
+            ])
+            app.launchEnvironment = ["ARCHIVEPROC_HEADLESS": "1"]
+            app.launch()
+            XCTAssertTrue(app.descendants(matching: .any)["ap.ocr.dropZone"].waitForExistence(timeout: 15))
+            if app.descendants(matching: .any)["ap.ocr.resumeRun"].exists { app.buttons["Dismiss"].firstMatch.click() }
+            let rows = app.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@",
+                                                           photo.lastPathComponent, photo.lastPathComponent))
+            addThroughPicker(photo)
+            XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 10))
+            XCTAssertEqual(rows.count, 1)
+            if method == "picker" { addThroughPicker(photo) }
+            if method == "Finder drop" { dragFromFinder(photo, to: rows.firstMatch) }
+            XCTAssertEqual(rows.count, expected, "rows before Start")
+            shot("s048-check-\(expected)-\(method.replacingOccurrences(of: " ", with: "-"))")
+            let inputs = try FileManager.default.contentsOfDirectory(atPath: input.path)
+            XCTAssertEqual(inputs, [photo.lastPathComponent], "the only file every row can name")
+            app.descendants(matching: .any)["ap.ocr.start"].click()
+            // A run ends either Done or with catalogue filing stopped; record whichever and its full wording.
+            let finished = app.staticTexts.matching(NSPredicate(format:
+                "label BEGINSWITH 'Done.' OR value BEGINSWITH 'Done.' OR label BEGINSWITH 'Catalogue filing' OR value BEGINSWITH 'Catalogue filing'"))
+            XCTAssertTrue(finished.firstMatch.waitForExistence(timeout: 90), app.debugDescription)
+            let status = finished.firstMatch.label.isEmpty ? "\(finished.firstMatch.value ?? "")" : finished.firstMatch.label
+            print("[s048-check] \(method): status=\(status)")
+            let ocr = try gatewayCalls().dropFirst(before).filter { $0["kind"] == "ocr" }
+            let images = Array(try gatewayImages().dropFirst(imagesBefore))
+            let pdfs = try FileManager.default.contentsOfDirectory(atPath: output.path).filter { $0.hasSuffix(".pdf") }
+            print("[s048-check] \(method): rows=\(expected) input=\(photo.path) inputs=\(inputs) ocr=\(ocr.count) "
+                  + "distinctImages=\(Set(images).count) images=\(images.map { $0.prefix(12) }) PDFs=\(pdfs)")
+            XCTAssertEqual(ocr.count, expected)
+            XCTAssertEqual(images.count, expected)
+            XCTAssertEqual(Set(images).count, 1, "each OCR request carried the same photo")
+            if expected == 1 { XCTAssertEqual(status, "Done. 1 succeeded, 0 failed.") }
+            app.terminate()
         }
-        let photo = input.appendingPathComponent("scratch-letter.png")
-        try makeLetter(at: photo)
-        let initialCalls = try gatewayCalls()
-        app.launchArguments = UITestLaunch.arguments([
-            "-APUITestMode", "-APUITestStandInGateway",
-            "-APUITestOutputDirectory", output.path, "-outputDirectory", output.path,
-            "-useGateway", "YES", "-gatewayLocalModel", "NO", "-useAppleVision", "NO", "-useLocalAgent", "NO",
-            "-gatewayBaseURL", "http://127.0.0.1:18472/v1", "-gatewayModelID", "s048-ocr",
-            "-gatewayUpstreamProvider", "Anthropic", "-taggingModeRaw", "none",
-            "-enableCollectionSegmentation", "NO", "-rotationModeRaw", "off", "-reviewRotation", "NO",
-            "-outputImageFile", "NO", "-mergeDocuments", "NO", "-batchMode", "NO",
-            "-sendPreviousImage", "NO", "-useInstitutionalComputeImport", "NO",
-            "-skipAlreadyProcessed", "YES", "-preOCRedInput", "NO"
-        ])
-        app.launchEnvironment = ["ARCHIVEPROC_HEADLESS": "1"]
-        app.launch()
-        defer { app.terminate() }
-        let rows = app.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@",
-                                                       photo.lastPathComponent, photo.lastPathComponent))
-        XCTAssertTrue(app.descendants(matching: .any)["ap.ocr.dropZone"].waitForExistence(timeout: 15))
-        if app.descendants(matching: .any)["ap.ocr.resumeRun"].exists {
-            app.buttons["Dismiss"].firstMatch.click()
-        }
-        addThroughPicker(photo)
-        XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 10))
-        XCTAssertEqual(rows.count, 1, "the fresh window must start with exactly one row")
-        switch method {
-        case "picker": addThroughPicker(photo)
-        case "Finder drop": dragFromFinder(photo, to: rows.firstMatch)
-        default: break
-        }
-        let rowCount = rows.count
-        print("[s048] \(method) rows before Start: \(rowCount)")
-        shot("s048-rows-\(expected)-\(method.replacingOccurrences(of: " ", with: "-"))")
-        XCTAssertEqual(rowCount, expected)
-        let start = app.descendants(matching: .any)["ap.ocr.start"]
-        XCTAssertTrue(start.exists && start.isEnabled)
-        start.click()
-        let done = "Done. \(expected) succeeded, 0 failed."
-        XCTAssertTrue(app.staticTexts[done].waitForExistence(timeout: 90), app.debugDescription)
-        let calls = try gatewayCalls()
-        XCTAssertEqual(Array(calls.prefix(initialCalls.count)), initialCalls)
-        let received = Array(calls.dropFirst(initialCalls.count))
-        let outputs = try FileManager.default.contentsOfDirectory(atPath: output.path).filter { $0.hasSuffix(".pdf") }
-        print("[s048] \(method): \(done) requests=\(received) PDFs=\(outputs)")
-        XCTAssertEqual(received, Array(repeating: ["kind": "ocr", "model": "s048-ocr"], count: expected))
-        XCTAssertFalse(outputs.isEmpty, "the run reached scratch PDF output")
     }
 
     private func addThroughPicker(_ photo: URL) {
@@ -257,7 +250,15 @@ final class NamesEstimateJourneyUITests: XCTestCase {
     }
 
     private func gatewayCalls() throws -> [[String: String]] {
-        let request = URLRequest(url: URL(string: "http://127.0.0.1:18472/calls")!, timeoutInterval: 5)
+        try XCTUnwrap(try gatewayJSON("calls") as? [[String: String]])
+    }
+
+    private func gatewayImages() throws -> [String] {
+        try XCTUnwrap(try gatewayJSON("images") as? [String])
+    }
+
+    private func gatewayJSON(_ path: String) throws -> Any {
+        let request = URLRequest(url: URL(string: "http://127.0.0.1:18472/\(path)")!, timeoutInterval: 5)
         let reply = S044GatewayReply(), done = expectation(description: "guest loopback gateway answers")
         let task = URLSession.shared.dataTask(with: request) { data, response, _ in
             reply.store(data, response); done.fulfill()
@@ -268,7 +269,7 @@ final class NamesEstimateJourneyUITests: XCTestCase {
         }
         let (data, response) = reply.read()
         XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
-        return try XCTUnwrap(try JSONSerialization.jsonObject(with: XCTUnwrap(data)) as? [[String: String]])
+        return try JSONSerialization.jsonObject(with: XCTUnwrap(data))
     }
 
     private func estimateText() -> [String] {

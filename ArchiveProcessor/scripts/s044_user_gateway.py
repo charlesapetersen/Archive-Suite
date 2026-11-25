@@ -2,14 +2,17 @@
 """Independent S-044 UI check: deterministic letters, $0, guest loopback only.
 
 No imports from the earlier reproduction. GET /calls exposes request kinds to the
-UI test; no request bodies, image bytes or credentials are retained.
+UI test, and GET /images a SHA-256 of each OCR request's image parts (W49.proc-s048-check);
+no request bodies, image bytes or credentials are retained.
 """
+import hashlib
 import json
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 calls = []
+images = []
 lock = threading.Lock()
 
 
@@ -26,10 +29,10 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        if self.path != '/calls':
+        if self.path not in ('/calls', '/images'):
             return self.send_json({}, 404)
         with lock:
-            self.send_json(calls)
+            self.send_json(calls if self.path == '/calls' else images)
 
     def do_POST(self):
         if self.path != '/v1/chat/completions' or self.headers.get('Authorization') != 'Bearer s044-stand-in':
@@ -57,8 +60,16 @@ class Handler(BaseHTTPRequestHandler):
             kind, reply = 'item-fields', '{}'
         else:
             kind, reply = 'other', 'ok'
+        digest = hashlib.sha256()
+        for message in body.get('messages', []):
+            for part in message.get('content', []) if isinstance(message.get('content'), list) else []:
+                if isinstance(part, dict) and part.get('type') == 'image_url':
+                    url = part.get('image_url')
+                    digest.update(str(url.get('url', '') if isinstance(url, dict) else url).encode())
         with lock:
             calls.append({'kind': kind, 'model': body.get('model')})
+            if kind == 'ocr':
+                images.append(digest.hexdigest())
         self.send_json({'id': 's044', 'object': 'chat.completion', 'model': body.get('model'),
                         'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': reply}, 'finish_reason': 'stop'}],
                         'usage': {'prompt_tokens': 1000, 'completion_tokens': 500, 'total_tokens': 1500}})

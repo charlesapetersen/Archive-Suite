@@ -519,6 +519,8 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   seam. S-048 drove the actual Add Files panel and Finder drop with a synthetic PNG and ran Start.
 - **Runtime evidence:** 2026-11-21 · `1f5cc337` · [S-048 scratch run](evidence/processor/W49.proc-s048-verify.md).
   Both intake routes accepted the PNG. Adding it twice created two rows and sent two OCR requests.
+  2026-11-24 · `0a954a3e` · W49.proc-s048-check (Claude): confirmed, with identical image digests per pair; the
+  duplicate run now stops at catalogue filing with no PDF.
 - **Status:** `unproven`
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.

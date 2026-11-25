@@ -18405,3 +18405,15 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   and straightening failures, and its full catalogue mode timed out. The dedicated Preservation
   mode passed. Automatic approval review blocked the Gemini fixture uploads. Cost $0.
   <!-- /W40.fix-processor-preservation-names -->
+- [x] **W49.proc-s048-check — Independently reproduce S-048 [S]** · §Known limits are queued, accepted or asked (lane: processor) · SHIPPED 2026-11-24 (this commit)
+  Phase rule 5a(4): `W49.proc-s048-verify` (Codex gpt-6.2-sol, `1f5cc337`) showed two rows and two OCR requests when the
+  same photo is chosen twice or chosen then dropped from Finder. Independently confirmed on Claude Opus 5.5 at `0a954a3e`
+  in the macOS 27.2 Tart VM through the real Add Files panel, a guest Finder drop and Start, against the loopback stand-in
+  gateway. New case `NamesEstimateJourneyUITests.testDuplicateRowsSendTheSamePhotoTwice`: once → 1 row, 1 request,
+  Done, 1 PDF; picker twice and Finder drop → 2 rows of the single file in the input folder, 2 OCR requests with the
+  same image SHA-256 (new `GET /images` in `scripts/s044_user_gateway.py`). Changed since the first run: the duplicate
+  runs now stop at catalogue filing ("The preservation copy could not be verified"), no PDF, after both requests;
+  inferred, not bisected, to follow `33a6afeb`. The superseded `testRepeatedFileIntakeRequestsOCRForEachRow` failed
+  for that reason and was removed. Filed `W49.proc-fix-s048`. VM class run: see the commit body. Logs and shots in
+  `old/W49.proc-s048-check/`. No bench cache used; guest scratch only. $0, no real corpus or external upload.
+  <!-- /W49.proc-s048-check -->

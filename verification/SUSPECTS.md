@@ -1240,7 +1240,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** in the VM, add the same scratch photo twice through the real window and count the rows (or
   the run's outputs).
 - **Would clear it:** one row, or a de-duplication before the run starts.
-- **Status:** `reproduced` — independent Claude check queued as `W49.proc-s048-check`.
+- **Status:** `reproduced` — independently confirmed by `W49.proc-s048-check`; fix queued as `W49.proc-fix-s048`.
   [Scratch evidence](evidence/processor/W49.proc-s048-verify.md).
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
@@ -1248,6 +1248,9 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   - 2026-11-21 W49.proc-s048-verify — Codex gpt-6.2-sol reproduced at `1f5cc337`. Choosing twice or choosing
     then dropping the same photo produced two rows and two OCR requests. One add produced one request.
     Each run left one PDF and used only the guest loopback gateway.
+  - 2026-11-24 W49.proc-s048-check — Claude Opus 5.5 confirmed at `0a954a3e`: both routes gave two rows of the one
+    file in the folder and two OCR requests with identical image digests; one add gave one. The duplicate runs now
+    stop at catalogue filing ("The preservation copy could not be verified") with no PDF. Fix: `W49.proc-fix-s048`.
 
 ### S-049 · The Processor README says a chosen folder is read only at its top level
 
