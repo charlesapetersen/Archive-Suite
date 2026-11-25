@@ -362,6 +362,23 @@ enum LocalModelsTestDriver {
         eq("8 local gateway: its own server asked first", asked.asked, ["http://127.0.0.1:9999/v1"])
         eq("8 local gateway: titles from Gemma there", set[.repository]?.reader, "gemma-3-12b")
 
+        // W49.proc-gemma-request-verify: the revised request through the same read, behind its override.
+        ContainerLabelGemma.styleOverride = .revised
+        asked.reset([mlx: ["mlx-community/gemma-3-12b-it-4bit"]])
+        wire.reset(["127.0.0.1": reply(answer, "stop")])
+        set = await read(nil)
+        ContainerLabelGemma.styleOverride = nil
+        let revisedContent = wire.requests.first.flatMap(jsonBody).flatMap {
+            ($0["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]
+        } ?? []
+        let sentURL = (revisedContent.last?["image_url"] as? [String: Any])?["url"] as? String
+        let expected = ContainerLabelGemma.image(photo: image, rotation: 0, style: .revised)
+        check("8 revised: one request, prompt first, the photo the revised style prepares",
+              wire.requests.count == 1 && revisedContent.first?["text"] as? String == ContainerLabelReader.localModelPrompt
+              && expected != nil && sentURL == "data:image/jpeg;base64," + (expected?.base64EncodedString() ?? ""),
+              "\(wire.requests.count) requests")
+        eq("8 revised: titles from Gemma", set[.repository]?.reader, "gemma-3-12b")
+
         // Nothing lists it: no call, the parser's values.
         asked.reset([:])
         wire.reset([:])
@@ -463,6 +480,64 @@ enum LocalModelsTestDriver {
         let noText = await ContainerLabelCapture.readLabel(type: .box, text: "", photo: unreadable,
                                                            rotation: 90, gateway: nil)
         check("10 a missing photo with no text discloses an unread label", noText.fallback == .unread)
+        revisedRequestChecks(upright: upright, turnedPhoto: photo, in: directory)
+    }
+
+    /// 11. W49.proc-gemma-request-verify: the revised request sends the prompt first, and the photo file itself only
+    /// when it is already the upright JPEG the encoder would draw.
+    private static func revisedRequestChecks(upright: CGImage, turnedPhoto: URL, in directory: URL) {
+        let saved = ContainerLabelGemma.styleOverride
+        defer { ContainerLabelGemma.styleOverride = saved }
+        ContainerLabelGemma.styleOverride = .revised
+        eq("11 the override selects the revised request", ContainerLabelGemma.style, .revised)
+        let server = ContainerLabelGemma.Server(baseURL: "http://127.0.0.1:8080/v1", modelID: "gemma3:12b")
+        func order(_ style: ContainerLabelGemma.RequestStyle) -> [String] {
+            guard let request = ContainerLabelGemma.request(jpeg: Data([1, 2]), server: server, style: style),
+                  let body = jsonBody(request),
+                  let content = (body["messages"] as? [[String: Any]])?.first?["content"] as? [[String: Any]]
+            else { return [] }
+            return content.compactMap { $0["type"] as? String }
+        }
+        eq("11 current request: photo, then prompt", order(.current), ["image_url", "text"])
+        eq("11 revised request: prompt, then photo", order(.revised), ["text", "image_url"])
+
+        func save(_ image: CGImage, as name: String, type: String = "public.jpeg") -> URL? {
+            let url = directory.appendingPathComponent(name)
+            guard let dest = CGImageDestinationCreateWithURL(url as CFURL, type as CFString, 1, nil) else { return nil }
+            CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: 0.9] as CFDictionary)
+            return CGImageDestinationFinalize(dest) ? url : nil
+        }
+        guard let plain = save(upright, as: "upright-label.jpg"),
+              let png = save(upright, as: "upright-label.png", type: "public.png"),
+              let turned = ImageEncoding.rotate(upright, byDegreesClockwise: 270),
+              let turnedPlain = save(turned, as: "turned-label.jpg") else {
+            check("11 save scratch label photos", false)
+            return
+        }
+        let source = try? Data(contentsOf: plain)
+        let long = ContainerLabelGemma.imageLongSide
+        eq("11 an upright JPEG within the cap is sent as the file itself",
+           ContainerLabelGemma.image(photo: plain, rotation: 0, style: .revised), source)
+        eq("11 the current request re-encodes it",
+           ContainerLabelGemma.image(photo: plain, rotation: 0, style: .current),
+           ImageEncoding.uprightJPEG(url: plain, rotationDegrees: 0, longEdge: long))
+        check("11 a full turn counts as none",
+              ImageEncoding.sourceJPEGIfUpright(url: plain, rotationDegrees: 360, longEdge: long) == source)
+        check("11 a photo over the cap is scaled, not sent as is",
+              ImageEncoding.sourceJPEGIfUpright(url: plain, rotationDegrees: 0, longEdge: 400) == nil)
+        check("11 a PNG is encoded, not sent as is",
+              ImageEncoding.sourceJPEGIfUpright(url: png, rotationDegrees: 0, longEdge: long) == nil)
+        check("11 an EXIF turn is drawn, not sent as is",
+              ImageEncoding.sourceJPEGIfUpright(url: turnedPhoto, rotationDegrees: 0, longEdge: long) == nil)
+        // A correction from the run: the revised request turns the pixels exactly as the current one does.
+        let sent = ContainerLabelGemma.image(photo: turnedPlain, rotation: 90, style: .revised)
+        check("11 a correction from the run is drawn upright, as the current request draws it",
+              sent != nil && sent != (try? Data(contentsOf: turnedPlain))
+              && sent == ImageEncoding.uprightJPEG(url: turnedPlain, rotationDegrees: 90, longEdge: long))
+        if let sent, let src = CGImageSourceCreateWithData(sent as CFData, nil),
+           let drawn = CGImageSourceCreateImageAtIndex(src, 0, nil) {
+            eq("11 the drawn photo has the upright shape", [drawn.width, drawn.height], [upright.width, upright.height])
+        } else { check("11 decode the drawn photo", false) }
     }
 
     /// 9. W47.ct-label-cost: what a label's gateway call is counted at, and where it goes.

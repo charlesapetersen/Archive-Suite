@@ -117,6 +117,7 @@ struct ContentView: View {
             OutputMeasureTestDriver.runIfRequested()          // $0 W42 the output forms measured on a scratch smoke set
             ProviderErrorTestDriver.runIfRequested()         // $0 W40 a 402 reads as credit/billing, not a rate limit
             LocalModelsTestDriver.runIfRequested()           // $0 W41 local open-weight model route, no wire
+            LabelGemmaVerifyTestDriver.runIfRequested()      // $0 W49 Gemma label requests on a server on this Mac, scratch only
             OCRPageGuidanceTestDriver.runIfRequested()       // $0 W41 picker note: which model reads which pages
             OCRPageKindTestDriver.runIfRequested()           // $0 W41 page kind → its reader, no wire
             RotationRuleTestDriver.runIfRequested()          // $0 W46 rotation agreement rule + gateway route, no wire

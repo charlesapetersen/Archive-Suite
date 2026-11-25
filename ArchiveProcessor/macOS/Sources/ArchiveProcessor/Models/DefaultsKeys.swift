@@ -109,6 +109,8 @@ enum DefaultsKeys {
     static let confirmCollectionIDs = "confirmCollectionIDs"
     /// W47.ct-processor-capture — read box and folder label photos into container fields at capture. Absent ⇒ on.
     static let readContainerLabels = "readContainerLabels"
+    /// W49.proc-gemma-request-verify — `ContainerLabelGemma.RequestStyle` rawValue, no UI. Absent ⇒ `current`.
+    static let containerLabelGemmaRequest = "containerLabelGemmaRequest"
     static let reviewDocumentSegmentation = "reviewDocumentSegmentation"
     static let enableSegmentJSON = "enableSegmentJSON"
     static let macItemFields = "macItemFields"

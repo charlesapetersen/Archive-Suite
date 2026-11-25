@@ -213,6 +213,25 @@ enum ImageEncoding {
         return encodeJPEGData(small, quality: 0.9)
     }
 
+    /// W49.proc-gemma-request-verify — the file's own bytes when they are already what `uprightJPEG` would draw: a
+    /// single-image RGB or grey JPEG with no EXIF turn, no correction from the run and a long edge within `longEdge`.
+    /// nil otherwise, so the caller encodes instead. Checked on the bytes read, not the path, so a file replaced
+    /// between the check and the read is never sent unchecked.
+    static func sourceJPEGIfUpright(url: URL, rotationDegrees: Int, longEdge: Int) -> Data? {
+        guard ((rotationDegrees % 360) + 360) % 360 == 0,
+              let data = try? Data(contentsOf: url),
+              let src = CGImageSourceCreateWithData(data as CFData, nil),
+              CGImageSourceGetType(src) as String? == "public.jpeg", CGImageSourceGetCount(src) == 1,
+              let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+              (props[kCGImagePropertyOrientation] as? Int ?? 1) == 1,
+              let w = props[kCGImagePropertyPixelWidth] as? Int, let h = props[kCGImagePropertyPixelHeight] as? Int,
+              w > 0, h > 0, max(w, h) <= longEdge else { return nil }
+        let model = props[kCGImagePropertyColorModel] as? String
+        guard model == kCGImagePropertyColorModelRGB as String || model == kCGImagePropertyColorModelGray as String
+        else { return nil }
+        return data
+    }
+
     /// Downscale a CGImage so its long edge is `longEdge` px (never upscales).
     private static func scaled(_ image: CGImage, longEdge: Int) -> CGImage? {
         let w = image.width, h = image.height

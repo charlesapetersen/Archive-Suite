@@ -94,14 +94,35 @@ enum ContainerLabelGemma {
     /// Forgets the server found, for the contract's cases.
     static func forget() async { await memory.clear() }
 
+    /// W49.proc-gemma-request-verify — the external request. `current` (the default) sends the photo re-encoded and
+    /// before the prompt. `revised` sends the prompt first and the photo file itself when it needs no turn or scaling,
+    /// else the same re-encoding: the change `ct-gemma-route-fields.md` measured on already upright photos. Kept behind
+    /// a defaults key (`-containerLabelGemmaRequest revised` at launch) while it is verified; the owner sets the default.
+    enum RequestStyle: String, Sendable { case current, revised }
+    /// For the verification driver, which compares both in one process.
+    nonisolated(unsafe) static var styleOverride: RequestStyle?
+    static var style: RequestStyle {
+        styleOverride ?? UserDefaults.standard.string(forKey: DefaultsKeys.containerLabelGemmaRequest)
+            .flatMap(RequestStyle.init(rawValue:)) ?? .current
+    }
+
+    /// The upright photo the external request carries.
+    static func image(photo: URL, rotation: Int, style: RequestStyle) -> Data? {
+        if style == .revised,
+           let source = ImageEncoding.sourceJPEGIfUpright(url: photo, rotationDegrees: rotation, longEdge: imageLongSide) {
+            return source
+        }
+        return ImageEncoding.uprightJPEG(url: photo, rotationDegrees: rotation, longEdge: imageLongSide)
+    }
+
     /// The chat request for one upright label photo.
-    static func request(jpeg: Data, server: Server) -> URLRequest? {
+    static func request(jpeg: Data, server: Server, style: RequestStyle = .current) -> URLRequest? {
+        let image: [String: Any] = ["type": "image_url",
+                                    "image_url": ["url": "data:image/jpeg;base64," + jpeg.base64EncodedString()]]
+        let text: [String: Any] = ["type": "text", "text": ContainerLabelReader.localModelPrompt]
         var body: [String: Any] = [
             "model": server.modelID, "temperature": 0, "max_tokens": maxTokens, "stream": false,
-            "messages": [["role": "user", "content": [
-                ["type": "image_url", "image_url": ["url": "data:image/jpeg;base64," + jpeg.base64EncodedString()]],
-                ["type": "text", "text": ContainerLabelReader.localModelPrompt],
-            ] as [[String: Any]]]],
+            "messages": [["role": "user", "content": style == .revised ? [text, image] : [image, text]]],
         ]
         LocalModelRoute.applyReasoningOff(&body)
         guard let url = URL(string: "\(server.baseURL)/chat/completions"),
@@ -123,12 +144,15 @@ enum ContainerLabelGemma {
     }
 
     /// A failed external request suppresses that address for the rest of the lookup window.
+    /// The app-managed reader keeps the re-encoded photo under either style.
     static func read(photo: URL, rotation: Int, gateway: GatewayConfig?) async -> [ContainerField: String]? {
         guard let jpeg = ImageEncoding.uprightJPEG(url: photo, rotationDegrees: rotation, longEdge: imageLongSide) else {
             return nil
         }
         if let server = await find(gateway: gateway) {
-            if let answer = await readExternal(jpeg: jpeg, server: server, gateway: gateway) {
+            let style = style
+            let sent = style == .revised ? image(photo: photo, rotation: rotation, style: style) ?? jpeg : jpeg
+            if let answer = await readExternal(jpeg: sent, server: server, gateway: gateway, style: style) {
                 let fields = ContainerLabelReader.localModelFields(fromReply: answer)
                 if !fields.isEmpty { return fields }
             }
@@ -140,8 +164,9 @@ enum ContainerLabelGemma {
         return fields.isEmpty ? nil : fields
     }
 
-    private static func readExternal(jpeg: Data, server: Server, gateway: GatewayConfig?) async -> String? {
-        guard let request = request(jpeg: jpeg, server: server) else { return nil }
+    private static func readExternal(jpeg: Data, server: Server, gateway: GatewayConfig?,
+                                     style: RequestStyle) async -> String? {
+        guard let request = request(jpeg: jpeg, server: server, style: style) else { return nil }
         guard let (data, response) = try? await NetworkSession.data(for: request, policy: .nonIdempotent, maxRetries: 0),
               (response as? HTTPURLResponse)?.statusCode == 200 else {
             if !Task.isCancelled { await memory.failed(candidates(gateway: gateway), now: Date()) }
