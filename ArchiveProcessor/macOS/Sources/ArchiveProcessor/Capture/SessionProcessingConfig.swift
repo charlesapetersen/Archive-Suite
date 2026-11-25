@@ -322,7 +322,7 @@ struct SessionProcessingConfig: Sendable {
             imageScale: (d.object(forKey: DefaultsKeys.imageResolutionPercent) as? Double ?? 100) / 100.0,
             standardImageMB: sizing.standardImageMB,
             ocrWorkerCount: sizing.ocrWorkerCount,
-            enableSegmentJSON: d.object(forKey: DefaultsKeys.enableSegmentJSON) as? Bool ?? true,
+            enableSegmentJSON: d.bool(forKey: DefaultsKeys.enableSegmentJSON),
             tagVocabulary: (d.string(forKey: DefaultsKeys.tagVocabulary) ?? "")
                 .components(separatedBy: .newlines)
                 .map { $0.trimmingCharacters(in: .whitespaces) }

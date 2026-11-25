@@ -94,7 +94,7 @@ enum ResumeReviewGatesProbe {
         var batch = OCRProcessor.PendingBatch(
             batchId: "batches/probe-0", provider: .gemini, model: model, thinkingLevel: nil, fileURLs: files,
             outputDirectory: output, enableTagging: true, sendPreviousImage: false, submittedAt: Date(),
-            taggingMode: .automatic,
+            enableSegmentJSON: true, taggingMode: .automatic,
             runFingerprint: OCRProcessor.runFingerprint(files: files, outputDirectory: output, taggingMode: .automatic,
                                                         enableTagging: true, batchMode: true, preserveInputOrder: true),
             lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,

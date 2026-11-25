@@ -321,7 +321,7 @@ enum MultiPageReOCRTestDriver {
                     let journal = OCRProcessor.PendingBatch(
                         batchId: "", provider: .gemini, model: model, thinkingLevel: nil,
                         fileURLs: [recoveryImage], outputDirectory: recoveryOut,
-                        enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
+                        enableTagging: false, sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true,
                         taggingMode: TaggingMode.none, runFingerprint: fingerprint,
                         lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
                         submittedChunkIds: [], submissionComplete: false,

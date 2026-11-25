@@ -557,7 +557,7 @@ class OCRProcessor: ObservableObject {
         init(batchId: String, provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel?,
              fileURLs: [URL], outputDirectory: URL, enableTagging: Bool,
              enableCollectionSegmentation: Bool = false, sendPreviousImage: Bool, submittedAt: Date,
-             enableSegmentJSON: Bool = true, confirmCollectionIDs: Bool = false,
+             enableSegmentJSON: Bool, confirmCollectionIDs: Bool = false,
              reviewDocumentSegmentation: Bool = false, customPrompt: String? = nil,
              taggingMode: TaggingMode = .automatic, fingerprintVersion: Int? = 2,
              runFingerprint: String? = nil,
@@ -605,7 +605,7 @@ class OCRProcessor: ObservableObject {
             enableCollectionSegmentation = try c.decodeIfPresent(Bool.self, forKey: .enableCollectionSegmentation) ?? false
             sendPreviousImage = try c.decode(Bool.self, forKey: .sendPreviousImage)
             submittedAt = try c.decode(Date.self, forKey: .submittedAt)
-            enableSegmentJSON = try c.decodeIfPresent(Bool.self, forKey: .enableSegmentJSON) ?? true
+            enableSegmentJSON = try c.decodeIfPresent(Bool.self, forKey: .enableSegmentJSON) ?? false
             confirmCollectionIDs = try c.decodeIfPresent(Bool.self, forKey: .confirmCollectionIDs) ?? false
             reviewDocumentSegmentation = try c.decodeIfPresent(Bool.self, forKey: .reviewDocumentSegmentation) ?? false
             customPrompt = try c.decodeIfPresent(String.self, forKey: .customPrompt)

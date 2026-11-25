@@ -79,7 +79,7 @@ struct OCRView: View {
     }
     private var isPDFOnlyReOCR: Bool { droppedHasMultiPagePDF && !preOCRedInput && !hasMixedReOCR }
     @AppStorage(DefaultsKeys.reviewDocumentSegmentation) private var reviewDocumentSegmentation: Bool = true
-    @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = true
+    @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = false
     @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
     @AppStorage(DefaultsKeys.tagVocabulary) private var tagVocabulary: String = ""
     @AppStorage(DefaultsKeys.contextCharCount) private var contextCharCount: Double = 0   // context slider removed; kept 0 (parallel OCR)

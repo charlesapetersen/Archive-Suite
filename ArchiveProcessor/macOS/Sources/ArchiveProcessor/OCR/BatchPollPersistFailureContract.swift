@@ -191,7 +191,7 @@ enum BatchPollPersistFailureContract {
                 OCRProcessor.PendingBatch(
                     batchId: chunkId, provider: provider, model: model(provider), thinkingLevel: .low,
                     fileURLs: sources, outputDirectory: outDir, enableTagging: false,
-                    sendPreviousImage: false, submittedAt: Date(), taggingMode: TaggingMode.none,
+                    sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true, taggingMode: TaggingMode.none,
                     // Spelled `TaggingMode.none` on purpose: the parameter is `TaggingMode?`, so a bare
                     // `.none` is Optional's nil — a DIFFERENT fingerprint from the journal's own mode above.
                     runFingerprint: OCRProcessor.runFingerprint(
@@ -414,7 +414,7 @@ enum BatchPollPersistFailureContract {
             OCRProcessor.PendingBatch(
                 batchId: "batches/poll-persist", provider: .gemini, model: model(), thinkingLevel: .low,
                 fileURLs: [source], outputDirectory: outDir, enableTagging: false, sendPreviousImage: false,
-                submittedAt: Date(),
+                submittedAt: Date(), enableSegmentJSON: true,
                 lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
                 submittedChunkIds: ["batches/poll-persist"]))
         let journalExisted = saved != nil && fm.fileExists(atPath: OCRProcessor.pendingBatchURL.path)

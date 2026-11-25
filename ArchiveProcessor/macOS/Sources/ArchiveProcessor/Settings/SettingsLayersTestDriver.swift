@@ -481,7 +481,7 @@ enum SettingsLayersTestDriver {
         var batch = OCRProcessor.PendingBatch(
             batchId: "batches/settings-layers", provider: .gemini, model: model, thinkingLevel: nil,
             fileURLs: [dir.appendingPathComponent("a.jpg")], outputDirectory: dir, enableTagging: false,
-            sendPreviousImage: false, submittedAt: day, taggingMode: .none,
+            sendPreviousImage: false, submittedAt: day, enableSegmentJSON: true, taggingMode: .none,
             lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
             submittedChunkIds: ["batches/settings-layers"])
         let bare = OCRProcessor.pendingBatchLifecycleFingerprint(batch)

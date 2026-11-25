@@ -1254,7 +1254,7 @@ extension OCRProcessor {
         model: LLMModel,
         apiKey: String,
         outputDirectory: URL,
-        enableSegmentJSON: Bool = true,
+        enableSegmentJSON: Bool,
         runConfig: SessionProcessingConfig? = nil
     ) async {
         let generator = TagGenerator()

@@ -85,7 +85,7 @@ enum BatchMutationReportContract {
             batchId: chunkIds.first ?? "", provider: .gemini, model: model(), thinkingLevel: .low,
             fileURLs: [URL(fileURLWithPath: "/tmp/mutation-report/scan-0.jpg")],
             outputDirectory: URL(fileURLWithPath: "/tmp/mutation-report", isDirectory: true),
-            enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
+            enableTagging: false, sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true,
             lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
             submittedChunkIds: chunkIds, submissionComplete: false)
     }

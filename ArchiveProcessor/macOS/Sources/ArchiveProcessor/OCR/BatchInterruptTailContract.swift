@@ -173,7 +173,7 @@ enum BatchInterruptTailContract {
             processor.activePendingBatch = OCRProcessor.PendingBatch(
                 batchId: "batches/interrupted", provider: .gemini, model: model(), thinkingLevel: .low,
                 fileURLs: sources, outputDirectory: dir, enableTagging: false, sendPreviousImage: false,
-                submittedAt: Date(),
+                submittedAt: Date(), enableSegmentJSON: true,
                 lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
                 submittedChunkIds: ["batches/interrupted"])
         }
@@ -309,7 +309,7 @@ enum BatchInterruptTailContract {
         let batchSaved = OCRProcessor.savePendingBatch(OCRProcessor.PendingBatch(
             batchId: "batches/banner-fixture", provider: provider, model: fixtureModel,
             thinkingLevel: .low, fileURLs: [source], outputDirectory: dir,
-            enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
+            enableTagging: false, sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true,
             taggingMode: taggingMode,
             runFingerprint: OCRProcessor.runFingerprint(
                 files: [source], outputDirectory: dir, taggingMode: taggingMode,

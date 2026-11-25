@@ -52,7 +52,7 @@ enum BatchDismissedRunContract {
         let batch = OCRProcessor.PendingBatch(
             batchId: "batches/w16-bat8", provider: .gemini, model: model, thinkingLevel: nil,
             fileURLs: [source], outputDirectory: outDir, enableTagging: false,
-            sendPreviousImage: false, submittedAt: Date(), taggingMode: .none,
+            sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true, taggingMode: .none,
             lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
             submittedChunkIds: ["batches/w16-bat8"])
 

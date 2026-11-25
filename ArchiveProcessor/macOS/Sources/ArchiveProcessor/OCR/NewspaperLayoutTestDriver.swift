@@ -401,7 +401,7 @@ enum NewspaperLayoutTestDriver {
             check("replayed parts reuse a journaled whole fallback", NewspaperBatch.aggregate(manifest: manifest, parts: parts)["file-0"]?.text == "whole fallback")
             var pending = OCRProcessor.PendingBatch(batchId: "test-job", provider: .gemini, model: LLMModel.geminiModels[0],
                 thinkingLevel: nil, fileURLs: [source], outputDirectory: dir, enableTagging: false,
-                sendPreviousImage: false, submittedAt: Date(), taggingMode: .none,
+                sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true, taggingMode: .none,
                 lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion, submittedChunkIds: ["test-job"],
                 submissionComplete: true)
             pending.newspaperManifest = manifest

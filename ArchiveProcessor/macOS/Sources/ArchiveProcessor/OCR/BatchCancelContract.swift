@@ -332,7 +332,7 @@ enum BatchCancelContract {
                             supportsThinking: false, returnsMd: false,
                             inputCostPer1M: 0, outputCostPer1M: 0, batchDiscount: 0),
             thinkingLevel: nil, fileURLs: [], outputDirectory: FileManager.default.temporaryDirectory,
-            enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
+            enableTagging: false, sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true,
             lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
             submittedChunkIds: chunkIds)
     }

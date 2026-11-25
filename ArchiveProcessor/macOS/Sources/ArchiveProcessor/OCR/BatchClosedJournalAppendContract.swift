@@ -82,7 +82,7 @@ enum BatchClosedJournalAppendContract {
             batchId: chunkIds.first ?? "", provider: .gemini, model: model(), thinkingLevel: .low,
             fileURLs: [URL(fileURLWithPath: "/tmp/closed-append/scan-0.jpg")],
             outputDirectory: URL(fileURLWithPath: "/tmp/closed-append", isDirectory: true),
-            enableTagging: false, sendPreviousImage: false, submittedAt: submittedAt,
+            enableTagging: false, sendPreviousImage: false, submittedAt: submittedAt, enableSegmentJSON: true,
             runFingerprint: fingerprint,
             lifecycleVersion: lifecycleVersion,
             submittedChunkIds: chunkIds, submissionComplete: submissionComplete)

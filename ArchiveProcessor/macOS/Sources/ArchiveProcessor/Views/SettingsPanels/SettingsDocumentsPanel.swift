@@ -13,7 +13,7 @@ struct SettingsDocumentsPanel: View {
     @AppStorage(DefaultsKeys.enableCollectionSegmentation) private var enableCollectionSegmentation: Bool = false
     @AppStorage(DefaultsKeys.confirmCollectionIDs) private var confirmCollectionIDs: Bool = false
     @AppStorage(DefaultsKeys.reviewDocumentSegmentation) private var reviewDocumentSegmentation: Bool = true
-    @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = true
+    @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = false
     @AppStorage(DefaultsKeys.macItemFields) private var macItemFields = true
     @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
     @AppStorage(DefaultsKeys.tagVocabulary) private var tagVocabulary: String = ""
@@ -110,7 +110,7 @@ struct SettingsDocumentsPanel: View {
             Toggle(isOn: $enableSegmentJSON) {
                 HStack {
                     Text("Export segment JSON metadata")
-                    HelpButton(text: "Write a .json file beside the PDF when the run collects metadata. This also controls whether low-confidence name mentions are saved during OCR-only runs.")
+                    HelpButton(text: "Off unless you need it: the catalogue record keeps each file's metadata either way. Turn this on to also write a .json file beside the PDF for other tools. It also controls whether low-confidence name mentions are saved during OCR-only runs.")
                 }
             }
             .settingsLevel(.segmentationReview)
@@ -118,12 +118,11 @@ struct SettingsDocumentsPanel: View {
                 Toggle(isOn: $macItemFields) {
                     HStack {
                         Text("Fill item fields on this Mac")
-                        HelpButton(text: "With a Mac model or Local Agent and segment JSON on, suggest a kind, byline and "
+                        HelpButton(text: "With a Mac model or Local Agent, suggest a kind, byline and "
                                    + "publication date for the Reader to check. " + ItemFieldExtractor.macSetup
                                    + "\n\n" + ItemFieldExtractor.macCost + ". " + ItemFieldExtractor.macTimingNote)
                     }
                 }
-                .disabled(!enableSegmentJSON)
                 .settingsLevel(.segmentationReview)
             }
             if taggingMode.enablesTagging && taggingMode != .copySource {

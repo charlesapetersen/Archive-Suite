@@ -520,7 +520,8 @@ enum CollectionOrganizeTestDriver {
             // Seed distinct tag replies without calling a provider, then let the normal tagging path write them.
             processor.preGroupedSubjects = [["Apricot"], [], ["Cedar"]]
             let model = LLMModel.geminiModels[0]
-            await processor.performTaggingPhase(provider: .gemini, model: model, apiKey: "", outputDirectory: out)
+            await processor.performTaggingPhase(provider: .gemini, model: model, apiKey: "", outputDirectory: out,
+                                              enableSegmentJSON: true)
             func tags(at pdf: URL) -> [String] { (try? MacOSTagger.readTags(from: pdf)) ?? [] }
             check("tree: separate PDFs carry only their folder's subject",
                   tags(at: outputs[1]).contains("Apricot") && !tags(at: outputs[1]).contains("Cedar")

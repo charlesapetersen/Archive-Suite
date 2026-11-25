@@ -380,7 +380,7 @@ enum BatchJournalPathContract {
             batchId: chunkIds.joined(separator: ","), provider: .gemini, model: model(),
             thinkingLevel: .high, fileURLs: files,
             outputDirectory: FileManager.default.temporaryDirectory,
-            enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
+            enableTagging: false, sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true,
             lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
             submittedChunkIds: chunkIds)
     }

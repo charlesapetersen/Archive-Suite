@@ -355,7 +355,8 @@ enum RunQuitResumeContract {
             let run = Task {
                 await processor.performBatchOCR(
                     fileURLs: [image], originalFiles: [image], provider: .gemini, model: model, thinkingLevel: nil,
-                    apiKey: "test-key", outputDirectory: out, sendPreviousImage: false, enableTagging: false)
+                    apiKey: "test-key", outputDirectory: out, sendPreviousImage: false, enableTagging: false,
+                    enableSegmentJSON: true)
             }
             processor.processingTask = run
             let sent = await waitFor { await !server.sent().isEmpty }

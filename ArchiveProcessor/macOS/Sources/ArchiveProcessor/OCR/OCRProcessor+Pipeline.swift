@@ -3263,7 +3263,7 @@ extension OCRProcessor {
         outputDirectory: URL,
         batchMode: Bool,
         enableTagging: Bool,
-        enableSegmentJSON: Bool = true,
+        enableSegmentJSON: Bool,
         enableCollectionSegmentation: Bool = false,
         confirmCollectionIDs: Bool = false,
         reviewDocumentSegmentation: Bool = false,

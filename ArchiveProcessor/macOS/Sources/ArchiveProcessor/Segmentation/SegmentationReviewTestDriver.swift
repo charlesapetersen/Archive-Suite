@@ -119,7 +119,7 @@ enum SegmentationReviewTestDriver {
         var batch = OCRProcessor.PendingBatch(
             batchId: id, provider: .gemini, model: model,
             thinkingLevel: nil, fileURLs: urls, outputDirectory: directory, enableTagging: true,
-            sendPreviousImage: false, submittedAt: Date(),
+            sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true,
             runFingerprint: OCRProcessor.runFingerprint(
                 files: urls, outputDirectory: directory, taggingMode: .automatic,
                 enableTagging: true, batchMode: true, preserveInputOrder: true),

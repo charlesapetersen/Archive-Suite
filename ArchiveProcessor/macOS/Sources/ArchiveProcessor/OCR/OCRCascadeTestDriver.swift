@@ -521,7 +521,7 @@ enum OCRCascadeTestDriver {
             var pending = OCRProcessor.PendingBatch(
                 batchId: "b", provider: .gemini, model: flash, thinkingLevel: nil, fileURLs: [],
                 outputDirectory: URL(fileURLWithPath: "/tmp"), enableTagging: false, sendPreviousImage: false,
-                submittedAt: Date())
+                submittedAt: Date(), enableSegmentJSON: true)
             let legacy = OCRProcessor().makePendingBatchResumeConfig(pending, apiKey: "k", defaults: d)
             pending.cascade = withCheck
             let resumed = OCRProcessor().makePendingBatchResumeConfig(pending, apiKey: "k", defaults: d)

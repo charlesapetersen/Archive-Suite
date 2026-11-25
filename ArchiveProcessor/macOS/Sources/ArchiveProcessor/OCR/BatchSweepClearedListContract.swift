@@ -278,7 +278,7 @@ enum BatchSweepClearedListContract {
             OCRProcessor.PendingBatch(
                 batchId: "batches/sweep-cleared", provider: .gemini, model: model(), thinkingLevel: .low,
                 fileURLs: sources, outputDirectory: outDir, enableTagging: false, sendPreviousImage: false,
-                submittedAt: Date(),
+                submittedAt: Date(), enableSegmentJSON: true,
                 lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
                 submittedChunkIds: ["batches/sweep-cleared"]))
         let journalExisted = saved != nil && fm.fileExists(atPath: OCRProcessor.pendingBatchURL.path)

@@ -31,7 +31,7 @@ struct SettingsEstimateStrip: View {
     @AppStorage(DefaultsKeys.taggingModeRaw) private var taggingModeRaw: String = TaggingMode.automatic.rawValue
     @AppStorage(DefaultsKeys.enableCollectionSegmentation) private var enableCollectionSegmentation: Bool = false
     @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
-    @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = true
+    @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = false
     @AppStorage(DefaultsKeys.contextCharCount) private var contextCharCount: Double = 0   // context slider removed; kept 0 (parallel OCR)
     @AppStorage(DefaultsKeys.outputDirectory) private var outputPath: String = ""
     @ObservedObject private var modelStore = ModelSelectionStore.shared

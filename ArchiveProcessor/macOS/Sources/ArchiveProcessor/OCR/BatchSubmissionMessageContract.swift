@@ -68,7 +68,7 @@ enum BatchSubmissionMessageContract {
             batchId: chunkIds.first ?? "", provider: .gemini, model: model(), thinkingLevel: .low,
             fileURLs: [URL(fileURLWithPath: "/tmp/submission-message/scan-0.jpg")],
             outputDirectory: URL(fileURLWithPath: "/tmp/submission-message", isDirectory: true),
-            enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
+            enableTagging: false, sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true,
             lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
             submittedChunkIds: chunkIds, submissionComplete: false)
     }

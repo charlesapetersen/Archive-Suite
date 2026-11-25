@@ -259,7 +259,7 @@ enum StaleRunResultIdentityContract {
                 OCRProcessor.PendingBatch(
                     batchId: "batches/stale-identity", provider: .gemini, model: model(),
                     thinkingLevel: .low, fileURLs: newRunSources, outputDirectory: outDir,
-                    enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
+                    enableTagging: false, sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true,
                     lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
                     submittedChunkIds: ["batches/stale-identity"]))
             processor.activePendingBatch = saved

@@ -229,7 +229,7 @@ enum BatchPollCancelContract {
             OCRProcessor.PendingBatch(
                 batchId: "batches/resume-0", provider: .gemini, model: model(.gemini),
                 thinkingLevel: .low, fileURLs: [source], outputDirectory: outDir,
-                enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
+                enableTagging: false, sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true,
                 taggingMode: .automatic,
                 runFingerprint: OCRProcessor.runFingerprint(
                     files: [source], outputDirectory: outDir, taggingMode: .automatic,
@@ -377,7 +377,7 @@ enum BatchPollCancelContract {
             batchId: chunkIds.joined(separator: ","), provider: .gemini, model: model(.gemini),
             thinkingLevel: .low, fileURLs: files,
             outputDirectory: FileManager.default.temporaryDirectory,
-            enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
+            enableTagging: false, sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true,
             lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
             submittedChunkIds: chunkIds)
     }

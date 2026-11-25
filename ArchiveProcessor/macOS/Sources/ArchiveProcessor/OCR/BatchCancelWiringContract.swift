@@ -148,7 +148,7 @@ enum BatchCancelWiringContract {
         OCRProcessor.PendingBatch(
             batchId: batchId, provider: provider, model: model(provider), thinkingLevel: .high,
             fileURLs: [], outputDirectory: FileManager.default.temporaryDirectory,
-            enableTagging: false, sendPreviousImage: false, submittedAt: Date(),
+            enableTagging: false, sendPreviousImage: false, submittedAt: Date(), enableSegmentJSON: true,
             lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
             submittedChunkIds: chunkIds, submissionComplete: submissionComplete)
     }
