@@ -801,6 +801,7 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   - 2026-11-21 W49.proc-s045-verify — in Live Capture an injected HTTP 500 filed a PDF with OCR and the phone
     date but no model subjects. The row and Finish summary showed success without a warning.
     [Evidence](evidence/processor/W49.proc-s045-verify.md). Independent check queued as `W49.proc-s045-check`.
+  - 2026-11-24 W49.proc-s045-check — confirmed independently (Claude Opus 5.5, `645c7845`); fix queued as `W49.proc-fix-s045`.
 - **Notes:** "never an estimated month" and "2-6 subjects" are prompt rules only (`Tagging/TagGenerator.swift:61`,
   `:64`); code enforces only the cap of 6 (`Tagging/ControlledVocabulary.swift:14`). Suspect `S-033`.
 

@@ -249,8 +249,8 @@ classification edit. [Independent VM evidence](../verification/evidence/processo
 
 - A refused tagging request leaves the filed PDF with its OCR text and phone-entered date but without model
   subjects. The Processing row shows success, and Finish gives no warning. Reproduced on scratch PDFs at
-  `7252c39b` in `LiveCaptureProcessor.computeTags`; independent confirmation is queued before a fix.
-  [Evidence](../verification/evidence/processor/W49.proc-s045-verify.md). (queued: W49.proc-s045-check)
+  `7252c39b` in `LiveCaptureProcessor.computeTags` and independently confirmed at `645c7845` (W49.proc-s045-check).
+  [Evidence](../verification/evidence/processor/W49.proc-s045-verify.md). (queued: W49.proc-fix-s045)
 
 ## FIXED (S-049, 2026-11-21) — the README describes the folder intake prompt
 

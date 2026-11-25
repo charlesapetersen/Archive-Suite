@@ -1165,7 +1165,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** the Live Capture recovery driver's injected transport answering one segment's tagging call
   with a 500: the staged document has no subject tags and no status line or row names it.
 - **Would clear it:** the session names the document, or a failed call holds the segment for retry.
-- **Status:** `reproduced` — [scratch Live Capture run](evidence/processor/W49.proc-s045-verify.md), independent Claude check queued as `W49.proc-s045-check`.
+- **Status:** `reproduced` — [scratch Live Capture run](evidence/processor/W49.proc-s045-verify.md), independently confirmed by `W49.proc-s045-check`; fix queued as `W49.proc-fix-s045`.
 - **History:**
   - 2026-11-20 W49.proc-fix-s042 — raised.
   - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s045-verify`; standing authorization for all bug suspects, phase rule 5a retained.
@@ -1173,6 +1173,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     HTTP 500 and one successful control, both PDFs filed with OCR text. The refused one kept its date and
     Unread tags and had no model subjects. The Processing row showed success and no error. Finish said
     “Finalized 1 collection · 2 files moved.” without a warning.
+  - 2026-11-24 W49.proc-s045-check — Claude Opus 5.5 confirmed it at `645c7845`. The refused PDF's Finder tags,
+    read with `xattr`, were 1918 / 3 March / Unread, its OCR text was intact and no record noted the failure. Filed `W49.proc-fix-s045`.
 
 
 ### S-046 · "Review document segmentation" changes nothing on a fresh Process Files run

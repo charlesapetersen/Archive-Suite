@@ -18426,3 +18426,11 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   `DocumentSegmenter.segment`, and every Sent With path reads `validCoverIndex`. Filed owner call 33 as
   `W49.proc-s047-cover-select`. No bench cache used; driver scratch only. $0, no real corpus or upload.
   <!-- /W49.proc-s047-check -->
+- [x] **W49.proc-s045-check — Independently reproduce S-045 [S]** · §Known limits are queued, accepted or asked (lane: processor) · SHIPPED 2026-11-24 (this commit)
+  Phase rule 5a(4): `W49.proc-s045-verify` (Codex gpt-6.2-sol, `7252c39b`) showed a Live Capture document whose tagging
+  call got HTTP 500 filed silently. Independently confirmed on Claude Opus 5.5 at `645c7845`. `computeTags` still drops
+  `generateTagsReporting`'s failure. The probe passed 5 of 5 warm runs, and the first two after the build timed out on
+  cold launch. Read with `xattr` and `pdftotext` outside the app, the refused PDF keeps its OCR text with tags
+  1918 / 3 March / Unread, while the control also has its two subjects. Neither its sidecar nor the run record notes the
+  failure. Filed `W49.proc-fix-s045`. Scratch only, removed afterwards; no bench cache; $0.
+  <!-- /W49.proc-s045-check -->
