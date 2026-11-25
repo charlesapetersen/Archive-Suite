@@ -3128,6 +3128,14 @@ extension OCRProcessor {
             }
         }
         isProcessing = false
+        // W49.proc-unified-pipeline-2: a stopped run writes none of the outputs it held back (their readings are in
+        // the journal, and its resume writes them), so no row may go on pointing at one or take an edit for it.
+        for (url, held) in deferredOutputs where outputURLMap[held.request.source] == url
+            && !FileManager.default.fileExists(atPath: url.path) {
+            outputURLMap[held.request.source] = nil
+        }
+        deferredOutputs = [:]
+        defersOutputWrites = false
         awaitingFinalReview = false
         awaitingDocumentReview = false
         awaitingCollectionConfirmation = false

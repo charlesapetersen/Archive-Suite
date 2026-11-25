@@ -198,6 +198,19 @@ enum DeferredOutputContract {
         check("a write with no journal before it is made at once",
               e.outputURLMap[pages[0]].map { fm.fileExists(atPath: $0.path) } == true && e.deferredOutputs.isEmpty)
 
+        // A Stop before the write unmaps what it held: no row points at, or takes an edit for, a file never written.
+        let stopOut = eagerOut.appendingPathComponent("held-at-stop.pdf")
+        let c = OCRProcessor()
+        c.jobs = [OCRJob(sourceURL: pages[0])]
+        c.defersOutputWrites = true
+        c.outputURLMap[pages[0]] = stopOut
+        c.deferredOutputs[stopOut] = DeferredOutput(request: c.outputWriteRequest(
+            imageURL: pages[0], source: pages[0], outputURL: stopOut, result: reading(0), model: model, runConfig: config))
+        c.cancel()
+        check("a Stop before the write unmaps the outputs it held",
+              c.outputURLMap[pages[0]] == nil && c.deferredOutputs.isEmpty && !c.defersOutputWrites
+                && !fm.fileExists(atPath: stopOut.path))
+
         // A retry's own converted page is deleted when the retry returns, so its output is written at once.
         let retryOut = root.appendingPathComponent("retry", isDirectory: true)
         try? fm.createDirectory(at: retryOut, withIntermediateDirectories: true)
