@@ -436,8 +436,10 @@ extension OCRProcessor {
                 rotationDegrees: newRot
             )
             jobs[item.fileIndex].result?.rotationUnsure = nil   // the user turned it: settled (W46.rotation-default)
+            journalHeldRotation(at: item.fileIndex)   // W49.proc-unified-pipeline-2: kept across a Stop and resume
+            // An output not written yet takes the new rotation when it is (W49.proc-unified-pipeline-2).
             if let result = jobs[item.fileIndex].result,
-               let outputURL = outputURLMap[jobs[item.fileIndex].sourceURL],
+               let outputURL = outputURLMap[jobs[item.fileIndex].sourceURL], deferredOutputs[outputURL] == nil,
                let model = currentModel {
                 let pdfGen = PDFGenerator()
                 let pdfSettings = lateRunOutputSettings(for: runConfig)

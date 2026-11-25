@@ -1826,73 +1826,23 @@ extension OCRProcessor {
         if readingSavedBeforeWrite, !saveResultToPendingRun(index: index, result: result, outputURL: outputURL) {
             return false
         }
+        let request = outputWriteRequest(imageURL: url, source: sourceURL, outputURL: outputURL, result: result,
+                                         model: model, runConfig: runConfig)
+        // W49.proc-unified-pipeline-2 — the reading is in the journal, so the PDF waits for the reviews: the rotation,
+        // the class and the tags they write are settled first, and `materializeDeferredOutputs` writes it once. A
+        // resume rebuilds an unwritten output from the same reading, so holding it back costs no second read.
+        // Only an image that lasts until then: the source, or this run's own page of a PDF input (a retry's own
+        // converted page is deleted when the retry returns, so its output is written now).
+        // A reading that lands while its output is being written is held too, and written after.
+        if readingSavedBeforeWrite, defersOutputWrites || deferredOutputs[outputURL] != nil, catalogueRun != nil,
+           url == sourceURL || pdfToImageMap[sourceURL] == url {
+            outputURLMap[sourceURL] = outputURL
+            deferredOutputs[outputURL] = DeferredOutput(request: request, tags: deferredOutputs[outputURL]?.tags)
+            return true
+        }
         // Move heavy PDF generation + tag I/O off the main actor (M3 perf fix). The MainActor
         // suspends at the await but is free to service UI events while the work runs on .utility.
-        let originalFileName = sourceURL.lastPathComponent
-        // A retry carries the immutable run snapshot through to this durable-output boundary. Its
-        // provenance must describe the backend that made this OCR result, not mutable Settings that may
-        // have changed since the run began (or the retry was requested). In particular, a direct retry
-        // must not inherit a stale gateway label merely because the snapshot's gateway is nil.
-        let gatewayName: String?
-        let localAgentDisplayName: String?
-        let localAgentModelName: String?
-        if let runConfig {
-            gatewayName = runConfig.gateway?.displayName
-            localAgentDisplayName = runConfig.localAgent?.provenanceDisplayName
-            localAgentModelName = runConfig.localAgent?.provenanceModelName
-        } else {
-            gatewayName = currentGateway?.displayName
-            localAgentDisplayName = currentLocalAgent?.provenanceDisplayName
-            localAgentModelName = currentLocalAgent?.provenanceModelName
-        }
-        let pdfSettings = Self.pdfGenerationSettings(for: runConfig)
-        let pdfMB = pdfSettings.imageMB
-        let txtCols = pdfSettings.textColumns
-        let shouldPassTags = passSourceTags
-        // W23.m5 / W23.h5-fu — the detached worker also reports whether the tag write landed and
-        // whether the PDF's image page holds the real scan, so the main actor can record both instead
-        // of the old "didn't throw ⇒ everything worked".
-        // `tagWriteOK` is OPTIONAL on purpose: nil means no tag write was ATTEMPTED here (every mode but
-        // copy-source tags later, in the tagging phase). Recording those as successes would let a post-run
-        // `retryOne` — which regenerates the PDF and does not re-tag it — silently clear a real warning.
-        let layerOptions = textLayerOptions
-        let pdfResult: (success: Bool, tags: [String]?, tagWriteOK: Bool?,
-                        imagePage: PDFGenerator.ImagePageOutcome?, layer: TextLayerOutcome?, formFallback: String?,
-                        compression: String?, compressedNote: String?)
-            = await PDFGenerator.runWorker(priority: .utility) {
-            let pdfGen = PDFGenerator()
-            do {
-                let output = try pdfGen.generateOutput(imageURL: url, result: result, model: model,
-                                                    outputURL: outputURL,
-                                                    originalFileName: originalFileName,
-                                                    gatewayDisplayName: gatewayName,
-                                                    localAgentDisplayName: localAgentDisplayName,
-                                                    localAgentModelName: localAgentModelName,
-                                                    pdfImageMB: pdfMB, textColumns: txtCols, textLayer: layerOptions,
-                                                    sourceFormat: OutputForm.format(ofExtension: sourceURL.pathExtension),
-                                                    // W42.stroke-weight-processor — judged on the source:
-                                                    // `url` may be a converted copy without its camera tags.
-                                                    photographed: CompressedPage.isCameraPhoto(sourceURL))
-                var appliedTags: [String]? = nil
-                var tagWriteOK: Bool? = nil
-                if shouldPassTags {
-                    if let sourceTags = try? MacOSTagger.readTags(from: sourceURL), !sourceTags.isEmpty {
-                        // Copy-source pass-through (verbatim, label untouched) — see the note at the
-                        // sibling pre-OCRed site. `shouldPassTags` implies `.copySource`.
-                        tagWriteOK = OCRProcessor.writeOutputTags(sourceTags, to: outputURL,
-                                                                  stampUnread: false)
-                        appliedTags = sourceTags
-                    }
-                }
-                return (true, appliedTags, tagWriteOK, output.imagePage, output.layer, output.formFallback,
-                        output.compression, output.compressedNote)
-            } catch {
-                if error is CancellationError { return (false, nil, nil, nil, nil, nil, nil, nil) }
-                os_log(.error, "PDF write failed for %{public}@: %{public}@",
-                       originalFileName, error.localizedDescription)
-                return (false, nil, nil, nil, nil, nil, nil, nil)
-            }
-        }
+        let written = await PDFGenerator.runWorker(priority: .utility) { Self.writeOutput(request) }
         // W16.bat9 — the same window as the sweep's loop, one frame down. The detached write above is the
         // longest suspension in this function (seconds, for a real page), and `jobs` can be emptied or
         // replaced across it: Stop re-enables **Clear**, whose action is `jobs = []`. The entry guard was
@@ -1900,7 +1850,7 @@ extension OCRProcessor {
         // the app, and an in-range slot now holding a DIFFERENT file (cleared, then re-dropped) would take
         // this file's result and status, silently, over that file's own.
         //
-        // What is guarded is exactly the three `jobs[index]` writes, and NOTHING else: `jobs` is the on-screen
+        // What is guarded is exactly the `jobs[index]` writes, and NOTHING else: `jobs` is the on-screen
         // list, while the output PDF is already on disk and the journal below is what a resume reads. Bailing
         // out with `false` here instead — the first shape of this fix — would have skipped
         // `saveResultToPendingRun`, and on the non-batch path that record is the only thing stopping a resume
@@ -1909,31 +1859,109 @@ extension OCRProcessor {
         // the job id is strictly stronger, because a list cleared and re-dropped with the SAME file at the
         // same index compares equal by source and unequal by id.
         let slotIsStillOurs = index < jobs.count && jobs[index].id == jobID
-        if Task.isCancelled && !pdfResult.success { return readingSavedBeforeWrite }
-        if pdfResult.success {
+        if Task.isCancelled && !written.success { return readingSavedBeforeWrite }
+        recordOutputWrite(written, request: request, jobIndex: slotIsStillOurs ? index : nil)
+        // The paid-batch journal advances only after materialization. Non-batch recovery already has
+        // the reading and its assigned path, including when this write failed.
+        return readingSavedBeforeWrite || saveResultToPendingRun(index: index, result: result, outputURL: outputURL)
+    }
+
+    /// The write `handleOCRResult` makes, as values: the provenance is the run snapshot's when there is one, so a
+    /// retry's header names the backend that made its reading, not Settings changed since the run began (or the
+    /// retry was requested). In particular, a direct retry must not inherit a stale gateway label merely because
+    /// the snapshot's gateway is nil.
+    func outputWriteRequest(imageURL: URL, source: URL, outputURL: URL, result: OCRResult, model: LLMModel,
+                            runConfig: SessionProcessingConfig?) -> OutputWriteRequest {
+        let pdfSettings = Self.pdfGenerationSettings(for: runConfig)
+        return OutputWriteRequest(
+            imageURL: imageURL, source: source, outputURL: outputURL, result: result, model: model,
+            gatewayName: runConfig.map { $0.gateway?.displayName } ?? currentGateway?.displayName,
+            localAgentDisplayName: runConfig.map { $0.localAgent?.provenanceDisplayName }
+                ?? currentLocalAgent?.provenanceDisplayName,
+            localAgentModelName: runConfig.map { $0.localAgent?.provenanceModelName }
+                ?? currentLocalAgent?.provenanceModelName,
+            pdfImageMB: pdfSettings.imageMB, textColumns: pdfSettings.textColumns, textLayer: textLayerOptions,
+            copySourceTags: passSourceTags)
+    }
+
+    /// Write one output PDF (and, copying source tags, its tags). Off the main actor.
+    /// W23.m5 / W23.h5-fu — it also reports whether the tag write landed and whether the PDF's image page holds
+    /// the real scan, so the main actor can record both instead of the old "didn't throw ⇒ everything worked".
+    /// `tagWriteOK` is OPTIONAL on purpose: nil means no tag write was ATTEMPTED here (every mode but copy-source
+    /// tags later, in the tagging phase). Recording those as successes would let a post-run `retryOne` — which
+    /// regenerates the PDF and does not re-tag it — silently clear a real warning.
+    nonisolated static func writeOutput(_ r: OutputWriteRequest) -> OutputWriteOutcome {
+        let originalFileName = r.source.lastPathComponent
+        do {
+            let output = try PDFGenerator().generateOutput(imageURL: r.imageURL, result: r.result, model: r.model,
+                                                          outputURL: r.outputURL,
+                                                          originalFileName: originalFileName,
+                                                          gatewayDisplayName: r.gatewayName,
+                                                          localAgentDisplayName: r.localAgentDisplayName,
+                                                          localAgentModelName: r.localAgentModelName,
+                                                          pdfImageMB: r.pdfImageMB, textColumns: r.textColumns,
+                                                          textLayer: r.textLayer,
+                                                          sourceFormat: OutputForm.format(ofExtension: r.source.pathExtension),
+                                                          // W42.stroke-weight-processor — judged on the source:
+                                                          // `imageURL` may be a converted copy without its camera tags.
+                                                          photographed: CompressedPage.isCameraPhoto(r.source))
+            var outcome = OutputWriteOutcome(success: true, imagePage: output.imagePage, layer: output.layer,
+                                             formFallback: output.formFallback, compression: output.compression,
+                                             compressedNote: output.compressedNote)
+            if r.copySourceTags, let sourceTags = try? MacOSTagger.readTags(from: r.source), !sourceTags.isEmpty {
+                // Copy-source pass-through (verbatim, label untouched) — see the note at the
+                // sibling pre-OCRed site. `copySourceTags` implies `.copySource`.
+                outcome.tagWriteOK = OCRProcessor.writeOutputTags(sourceTags, to: r.outputURL, stampUnread: false)
+                outcome.tags = sourceTags
+            }
+            return outcome
+        } catch {
+            if error is CancellationError { return OutputWriteOutcome() }
+            os_log(.error, "PDF write failed for %{public}@: %{public}@",
+                   originalFileName, error.localizedDescription)
+            return OutputWriteOutcome()
+        }
+    }
+
+    /// Record one output write on the main actor. `jobIndex` is the row the write is for, or nil when that row is
+    /// no longer the one it was dispatched for (its status and text are then left alone).
+    func recordOutputWrite(_ written: OutputWriteOutcome, request r: OutputWriteRequest, jobIndex: Int?) {
+        let sourceURL = r.source
+        if written.success {
             // Map by original source URL so tagging/collection segmentation can find it.
             // Only set when the PDF was actually written — a failed write must not leave a
             // phantom entry pointing downstream consumers at a nonexistent file (M1 fix).
-            outputURLMap[sourceURL] = outputURL
-            if let tags = pdfResult.tags, slotIsStillOurs {
-                jobs[index].appliedTags = tags
+            outputURLMap[sourceURL] = r.outputURL
+            // Written: tags go straight onto it from here on, starting with the last one a review held for it.
+            let held = deferredOutputs.removeValue(forKey: r.outputURL)?.tags
+            if let tags = written.tags, let jobIndex {
+                jobs[jobIndex].appliedTags = tags
             }
-            if let tagWriteOK = pdfResult.tagWriteOK {
+            if let tagWriteOK = written.tagWriteOK {
                 recordTagWrite(succeeded: tagWriteOK, forSource: sourceURL)
             }
-            if let imagePage = pdfResult.imagePage { recordImagePage(imagePage, forSource: sourceURL) }
-            if let layer = pdfResult.layer {
-                recordTextLayer(layer, formFallback: pdfResult.formFallback, compression: pdfResult.compression,
-                                compressedNote: pdfResult.compressedNote, forSource: sourceURL)
+            if let imagePage = written.imagePage { recordImagePage(imagePage, forSource: sourceURL) }
+            if let layer = written.layer {
+                recordTextLayer(layer, formFallback: written.formFallback, compression: written.compression,
+                                compressedNote: written.compressedNote, forSource: sourceURL)
+            }
+            if let held {
+                tagOutput(held.tags, at: r.outputURL, source: sourceURL, appColor: held.appColor,
+                          colorIsAuthoritative: held.colorIsAuthoritative, stampUnread: held.stampUnread)
             }
         } else {
+            // A held-back output's reserved path was mapped before its write; a failed write maps nothing.
+            if outputURLMap[sourceURL] == r.outputURL, !FileManager.default.fileExists(atPath: r.outputURL.path) {
+                outputURLMap[sourceURL] = nil
+            }
             // The OCR itself SUCCEEDED here — only `PDFGenerator.generate` threw (it throws solely on
             // `PDFDocument.write(to:)` returning false; a bad image yields a placeholder page instead).
             // Previously the reason went only to `os_log`, leaving `result.errorMessage` nil, which the UI
             // renders as "No OCR text" — blaming the model for a failed output WRITE. Keep the OCR text and
             // `rotationDegrees` (all `OCRResult` fields are `let`, so this must be rebuilt, not mutated —
             // dropping rotationDegrees here would silently lose the detected rotation) and add the reason.
-            if slotIsStillOurs {
+            if let jobIndex {
+                let result = r.result
                 let failure = OCRResult(
                     text: result.text,
                     classification: result.classification,
@@ -1942,14 +1970,11 @@ extension OCRProcessor {
                                 + "output folder exists and is writable, and that there is free disk space.",
                     errorCode: "pdf_write_failed", secondReader: result.secondReader, pageReader: result.pageReader, imported: result.imported,
                     newspaperLayout: result.newspaperLayout)
-                jobs[index].result = failure
-                jobs[index].status = .failed
+                jobs[jobIndex].result = failure
+                jobs[jobIndex].status = .failed
                 recordFileFailure(for: sourceURL, result: failure)
             }
         }
-        // The paid-batch journal advances only after materialization. Non-batch recovery already has
-        // the reading and its assigned path, including when this write failed.
-        return readingSavedBeforeWrite || saveResultToPendingRun(index: index, result: result, outputURL: outputURL)
     }
     private func markBatchJobsWithoutResults(reason: String) {
         for index in jobs.indices where jobs[index].status == .processing {

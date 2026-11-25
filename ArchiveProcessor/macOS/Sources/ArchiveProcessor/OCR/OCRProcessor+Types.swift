@@ -35,6 +35,52 @@ struct PostOCRPlan {
     let phoneGroupsApply: Bool
 }
 
+/// One output PDF's write: what `handleOCRResult` writes at once on a route that keeps no reading before its write (a
+/// paid batch, a standalone retry), and what `materializeDeferredOutputs` writes after the reviews otherwise.
+struct OutputWriteRequest: Sendable {
+    let imageURL: URL          // the OCR input: the source, or a converted page of a PDF input
+    let source: URL
+    let outputURL: URL
+    var result: OCRResult
+    let model: LLMModel
+    let gatewayName: String?
+    let localAgentDisplayName: String?
+    let localAgentModelName: String?
+    let pdfImageMB: Double
+    let textColumns: Int
+    let textLayer: PDFGenerator.TextLayerOptions?
+    let copySourceTags: Bool
+}
+
+/// What one output write came to, carried back to the main actor.
+struct OutputWriteOutcome: Sendable {
+    var success = false
+    var tags: [String]?
+    /// nil: no tag write was attempted here (every mode but copy-source tags them later).
+    var tagWriteOK: Bool?
+    var imagePage: PDFGenerator.ImagePageOutcome?
+    var layer: TextLayerOutcome?
+    var formFallback: String?
+    var compression: String?
+    var compressedNote: String?
+}
+
+/// W49.proc-unified-pipeline-2 — an output held back until the reviews are done, and the last Finder-tag write a
+/// review aimed at it (each write is the whole list, so the last one is the file's tags).
+struct DeferredOutput: Sendable {
+    struct Tags: Sendable {
+        let tags: [String]
+        let appColor: String?
+        let colorIsAuthoritative: Bool
+        let stampUnread: Bool
+    }
+    var request: OutputWriteRequest
+    var tags: Tags?
+    /// Which held reading this is: a Retry that lands while the output is being written holds a newer one, and the
+    /// older write is then not recorded.
+    var generation = UUID()
+}
+
 /// How a route's run is filed and summed up (`OCRProcessor.completeRun`).
 struct RunCompletion {
     let outputDirectory: URL

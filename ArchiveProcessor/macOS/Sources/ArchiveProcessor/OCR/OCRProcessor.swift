@@ -300,6 +300,12 @@ class OCRProcessor: ObservableObject {
 
     /// Maps source image URL → output PDF URL (for tagging the output, not the source)
     var outputURLMap: [URL: URL] = [:]
+    /// W49.proc-unified-pipeline-2 — outputs whose reading is saved in `pending_run.json` and whose PDF is not written
+    /// yet, by reserved output path. `materializeDeferredOutputs` writes each one once, after the reviews.
+    var deferredOutputs: [URL: DeferredOutput] = [:]
+    /// Set by a route whose readings are journaled before its post-OCR stages run (a standard run and its resume);
+    /// `handleOCRResult` then holds the PDF back. Cleared when the outputs are written.
+    var defersOutputWrites = false
     var catalogueRun: ProcessorCatalogueRun?
     var catalogueRunLease: ProcessorCatalogueRun.Lease?
     var catalogueMergeInputs: [URL: [CatalogueMergeInput]] = [:]

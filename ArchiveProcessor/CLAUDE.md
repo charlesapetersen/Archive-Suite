@@ -51,7 +51,10 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
   that reads many pages with one model. Never start a Python/MLX process elsewhere: `scripts/check-local-model-seam.sh`
   fails on it. Contract: the `S` lines of `scripts/test-local-models.sh`.
 - **One post-OCR tail** (W49.proc-unified-pipeline-1): every Process Files route ends through
-  `OCR/OCRProcessor+PostOCRFinalizer.swift`; `scripts/check-pipeline-seam.sh` fails a copied stage.
+  `OCR/OCRProcessor+PostOCRFinalizer.swift`; `scripts/check-pipeline-seam.sh` fails a copied stage. A run that journals
+  each reading first (a standard run, its resume) writes each output PDF once there, after the reviews
+  (`materializeDeferredOutputs`, W49.proc-unified-pipeline-2); a paid batch and a retry after the run write at once.
+  Contract: `scripts/test-deferred-output.sh`.
 - **The macOS 27 on-device model** (`OCR/OnDeviceModelClient.swift`, W47.wh-readers-lost-clients) is the second
   Apple Vision model (`apple-fm-27`), chosen only on the reading card (lower-scoring, owner call 15); its loop stop
   fails a page whose reply starts repeating, as a page at the token cap fails on every client.

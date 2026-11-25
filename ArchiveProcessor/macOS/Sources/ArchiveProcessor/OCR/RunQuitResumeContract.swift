@@ -217,8 +217,10 @@ enum RunQuitResumeContract {
         let recordedPaths = Set(afterSecond?.completedOutputPaths?.values.map {
             URL(fileURLWithPath: $0).lastPathComponent
         } ?? [])
-        check("each saved page has one private PDF and quit exposes no incomplete output",
-              pdfs.count == secondKeys.count && Set(pdfs) == recordedPaths && published.isEmpty,
+        // W49.proc-unified-pipeline-2: a page's PDF waits for the reviews, so a quit while reading leaves only the
+        // journaled readings and their reserved paths; the resume that finishes writes each one once.
+        check("each saved page has its reserved path, and a quit writes and exposes no output",
+              pdfs.isEmpty && recordedPaths.count == secondKeys.count && published.isEmpty,
               "working \(pdfs.sorted()), published \(published.sorted())")
         OCRProcessor.quitApproved = false
 

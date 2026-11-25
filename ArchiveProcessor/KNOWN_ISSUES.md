@@ -278,6 +278,16 @@ With Automatic tagging, ranked Names and JSON sidecars, the estimate prices the 
 run's text route. The Names row contributes to both the standard and batch totals. The same term is included
 in run history and Live Capture's spend estimate (W49.proc-fix-s044).
 
+## ⚠️ LIMITATION (W49.proc-unified-pipeline-2, 2026-11-25): filing still adds the catalogue identity in a copy
+
+`OCRProcessor.materializeDeferredOutputs`; contract `scripts/test-deferred-output.sh`. A standard Process Files run now
+writes each output PDF once, after the reviews (no write during OCR, no regeneration for a turn or a class edit).
+- **The catalogue identity is still added at filing, by `SearchableArchival.catalogueCopy`**: qpdf copies the written
+  file with the identity in its XMP, keeping every stream as it is (no image is encoded again), and a merged document is
+  a second file of its own. The working PDFs carry no identity because `OutputFileSafety` refuses to remove or rewrite
+  an identified PDF, and the steps after the write (a page removed in the tagging review, the Classification pass,
+  merge) still need to. Writing the identity in the one write moves those steps before it. (queued: W49.proc-identity-at-write)
+
 ## ⚠️ LIMITATION (W49.proc-resume-standard-runs, 2026-11-20): what an interrupted standard run can still lose
 
 `ProcessorAppDelegate.applicationShouldTerminate`, `OCRProcessor.requestStop` / `finishPageDrainIfAsked`,

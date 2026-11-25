@@ -171,6 +171,13 @@ extension OCRProcessor {
     func tagOutput(_ tags: [String], at url: URL, source: URL,
                    appColor: String? = nil, colorIsAuthoritative: Bool = false,
                    stampUnread: Bool) -> Bool {
+        // W49.proc-unified-pipeline-2 — an output not written yet takes its tags when it is
+        // (`materializeDeferredOutputs`). Each write is the whole list, so the last one held is the file's.
+        if deferredOutputs[url] != nil {
+            deferredOutputs[url]?.tags = .init(tags: tags, appColor: appColor,
+                                               colorIsAuthoritative: colorIsAuthoritative, stampUnread: stampUnread)
+            return true
+        }
         let ok = Self.writeOutputTags(tags, to: url, appColor: appColor,
                                       colorIsAuthoritative: colorIsAuthoritative,
                                       stampUnread: stampUnread)
@@ -402,6 +409,7 @@ extension OCRProcessor {
         do {
             try OutputFileSafety.removeGeneratedOutput(outputURL, for: sourceURL)
             outputURLMap[sourceURL] = nil
+            deferredOutputs[outputURL] = nil   // a held-back output is now never written
             // W23.m5 — the output is gone; drop any warning that would name it at the end of the run.
             forgetOutputWarnings(forSources: [sourceURL])
             return true
@@ -910,7 +918,10 @@ extension OCRProcessor {
                                         readPoorly: existing.readPoorly,
                                         imageCorrectionApplied: existing.imageCorrectionApplied)
                 jobs[fileIndex].result = updated
-                if let outputURL = outputURLMap[jobs[fileIndex].sourceURL] {
+                // An output not written yet takes the new rotation when it is, and the journal keeps it for a resume
+                // (W49.proc-unified-pipeline-2).
+                journalHeldRotation(at: fileIndex)
+                if let outputURL = outputURLMap[jobs[fileIndex].sourceURL], deferredOutputs[outputURL] == nil {
                     let imageURL = pdfToImageMap[img.url] ?? img.url
                     let source = jobs[fileIndex].sourceURL
                     do {
@@ -972,6 +983,11 @@ extension OCRProcessor {
                                                    imageCorrectionApplied: r.imageCorrectionApplied)
             }
         }
+
+        // The window settled each page's rotation and class: write the outputs held back for it, once, before
+        // the tags below go onto them (W49.proc-unified-pipeline-2).
+        await materializeDeferredOutputs()
+        guard !Task.isCancelled else { return }
 
         // (d) Rebuild segments from the corrected classifications; apply box/folder color tags.
         rebuildSegments(files: files)
@@ -1666,7 +1682,9 @@ extension OCRProcessor {
         guard jobs.indices.contains(index), jobs[index].status != .removed,
               let result = jobs[index].result, includePlaceholders || result.text?.isEmpty == false else { return nil }
         let source = jobs[index].sourceURL
-        guard let outputPDF = outputURLMap[source], !reOCRSourceURLs.contains(source) else { return nil }
+        // An output not written yet is written with the job's class (W49.proc-unified-pipeline-2): nothing to rewrite.
+        guard let outputPDF = outputURLMap[source], !reOCRSourceURLs.contains(source),
+              deferredOutputs[outputPDF] == nil else { return nil }
         return ClassificationHeaderWork(outputPDF: outputPDF, source: source,
                                         classification: result.classification?.displayName, text: PDFGenerator.textPageBody(result))
     }

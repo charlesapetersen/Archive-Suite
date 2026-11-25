@@ -1942,6 +1942,8 @@ extension OCRProcessor {
         enclosureDateReviews = [:]
         collectionSegments = []
         outputURLMap = [:]
+        deferredOutputs = [:]
+        defersOutputWrites = false
         _takenOutputPaths = []
         exportedImageMap = [:]
         outputSubfolders = pending.outputSubfolders ?? [:]   // W47.ct-processor-intake
@@ -2185,6 +2187,8 @@ extension OCRProcessor {
         enclosureDateReviews = [:]
         collectionSegments = []
         outputURLMap = [:]
+        deferredOutputs = [:]
+        defersOutputWrites = false
         _takenOutputPaths = []
         exportedImageMap = [:]
         pdfToImageMap = [:]
@@ -2236,6 +2240,8 @@ extension OCRProcessor {
 
         // Restore the pending run tracker for incremental saves
         activePendingRun = pending
+        // As on a fresh run, the outputs wait for the reviews (W49.proc-unified-pipeline-2). A pre-OCRed run has none.
+        defersOutputWrites = !pending.preOCRedInput
 
         // History uses the same restored values as the resumed pipeline (legacy runs use the fallback above).
         activeRunHistory = RunHistorySnapshot(
@@ -2299,7 +2305,21 @@ extension OCRProcessor {
             // Regenerate only missing PDFs, off the main thread. Track failures so we don't
             // populate outputURLMap with phantom entries pointing at nonexistent files (M2 fix).
             var failedRegenURLs = Set<URL>()
-            if !toGenerate.isEmpty {
+            if defersOutputWrites {
+                // Held back like the readings still to come, and written once after the reviews.
+                let pdfSettings = Self.pdfGenerationSettings(for: runConfig)
+                let missing = Dictionary(toGenerate.map { ($0.outputURL, $0.imageURL) }, uniquingKeysWith: { first, _ in first })
+                for r in restores {
+                    guard let imageURL = missing[r.outputURL] else { continue }
+                    deferredOutputs[r.outputURL] = DeferredOutput(request: OutputWriteRequest(
+                        imageURL: imageURL, source: r.sourceURL, outputURL: r.outputURL, result: r.result,
+                        model: pending.model, gatewayName: currentGateway?.displayName,
+                        localAgentDisplayName: currentLocalAgent?.provenanceDisplayName,
+                        localAgentModelName: currentLocalAgent?.provenanceModelName,
+                        pdfImageMB: pdfSettings.imageMB, textColumns: pdfSettings.textColumns,
+                        textLayer: textLayerOptions, copySourceTags: passSourceTags))
+                }
+            } else if !toGenerate.isEmpty {
                 let model = pending.model
                 let gatewayName = currentGateway?.displayName
                 let localAgentDisplayName = currentLocalAgent?.provenanceDisplayName
@@ -3397,6 +3417,8 @@ extension OCRProcessor {
         enclosureDateReviews = [:]
         collectionSegments = []
         outputURLMap = [:]
+        deferredOutputs = [:]
+        defersOutputWrites = false
         _takenOutputPaths = []
         exportedImageMap = [:]
         pdfToImageMap = [:]
@@ -3753,6 +3775,9 @@ extension OCRProcessor {
                         return
                     }
                     recordActiveRunInCollection(kind: "processFiles")
+                    // Each reading is journaled before its write, so the PDFs wait for the reviews
+                    // (W49.proc-unified-pipeline-2, `materializeDeferredOutputs`).
+                    defersOutputWrites = true
                     if activePendingMixedPDF != nil {
                         if catalogueRun == nil { Self.deletePendingMixedPDF() }
                         activePendingMixedPDF = nil
@@ -3942,6 +3967,7 @@ extension OCRProcessor {
             }
             guard await beginCatalogueRun(outputRoot: outputDirectory, sources: [source]) else { return false }
             isProcessing = true
+            defersOutputWrites = false   // a retry after the run files its output itself, at once
         }
         defer {
             if standalone {

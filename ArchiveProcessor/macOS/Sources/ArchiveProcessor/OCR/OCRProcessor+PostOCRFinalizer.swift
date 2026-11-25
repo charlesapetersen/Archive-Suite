@@ -67,6 +67,16 @@ extension OCRProcessor {
             retirePaidBatchJournalIfPollCompleted()
         }
 
+        // W49.proc-unified-pipeline-2 — the reviews above settled each page's rotation and class: write the outputs
+        // held back since OCR, each once, before tagging writes their tags. Segment & Tag settles both in its own
+        // window and writes them there.
+        let combinedWindow = tagging && (mode == .autoDate || mode == .human)
+            && segPlan.combinedWindow(tagging: mode, preGrouped: preGrouped) != nil
+        if !combinedWindow {
+            await materializeDeferredOutputs()
+            guard !Task.isCancelled else { return stop() }
+        }
+
         // Tagging (mode-dependent). The text backend is the run's separately selected LLM in a Vision hybrid and is
         // never passed to an image-OCR function.
         if tagging {
@@ -103,6 +113,9 @@ extension OCRProcessor {
         }
 
         guard !Task.isCancelled, !stopIfMonthlyReadDeclined() else { return stop() }
+        // Anything Segment & Tag did not reach (it returns early with nothing to show).
+        await materializeDeferredOutputs()
+        guard !Task.isCancelled else { return stop() }
 
         // Collection segmentation + name review (after the tagging review, the last step before completion).
         // Collection identification is another text-only LLM path; keep Vision on the OCR side.
@@ -191,6 +204,97 @@ extension OCRProcessor {
             statusMessage += " \(collectionSegments.count) collections organized."
         }
         postCompletionNotification()
+    }
+
+    // MARK: - The one output write (W49.proc-unified-pipeline-2)
+
+    /// Write every output held back since OCR (`handleOCRResult`), once, with the page's settled rotation and class
+    /// (its job's current reading), then the last tags a review aimed at it. Called after the reviews and before
+    /// tagging; a no-op when nothing is held. A stopped run leaves the rest unwritten: their readings are in the
+    /// journal, and its resume holds them back again.
+    func materializeDeferredOutputs() async {
+        defersOutputWrites = false
+        // A Retry that lands during a pass is held again (`handleOCRResult`), so pass until nothing new is held.
+        var passes = 0
+        while !deferredOutputs.isEmpty, !Task.isCancelled, passes < 3 {
+            passes += 1
+            await writeHeldOutputs()
+        }
+        guard !Task.isCancelled else { return }
+        // Backstop: an output still held now is never written, so nothing may point at it.
+        for (url, held) in deferredOutputs where outputURLMap[held.request.source] == url
+            && !FileManager.default.fileExists(atPath: url.path) {
+            outputURLMap[held.request.source] = nil
+        }
+        deferredOutputs = [:]
+    }
+
+    /// One pass of `materializeDeferredOutputs`.
+    private func writeHeldOutputs() async {
+        // In job order, each still mapped from its own source.
+        var work: [(output: URL, jobID: OCRJob.ID)] = []
+        for job in jobs where job.status != .removed {
+            guard let output = outputURLMap[job.sourceURL], deferredOutputs[output]?.request.source == job.sourceURL
+            else { continue }
+            work.append((output, job.id))
+        }
+        // A held output no job maps any more (a page removed in a review) is never written.
+        let wanted = Set(work.map(\.output))
+        for url in deferredOutputs.keys where !wanted.contains(url) { deferredOutputs[url] = nil }
+        guard !work.isEmpty else { return }
+        statusMessage = "Writing \(work.count) PDF\(work.count == 1 ? "" : "s")…"
+        // Taken as each write starts, not before the first. The reading is the one held (a review rebuilds some
+        // fields it does not keep), with the rotation and class the reviews settled.
+        func request(_ w: (output: URL, jobID: OCRJob.ID)) -> (OutputWriteRequest, UUID)? {
+            guard let held = deferredOutputs[w.output], let job = jobs.first(where: { $0.id == w.jobID }),
+                  job.status != .removed, outputURLMap[job.sourceURL] == w.output else { return nil }
+            var request = held.request
+            if let current = job.result {
+                request.result = request.result.with(classification: current.classification,
+                                                     rotationDegrees: current.rotationDegrees)
+            }
+            return (request, held.generation)
+        }
+        // A few at a time, as the OCR workers wrote them: each page's layer and compression are CPU-bound.
+        let lanes = max(1, min(3, ProcessInfo.processInfo.activeProcessorCount / 2))
+        await withTaskGroup(of: (OutputWriteRequest, UUID, OutputWriteOutcome).self) { group in
+            var next = 0
+            var running = 0
+            while true {
+                while running < lanes, next < work.count, !Task.isCancelled {
+                    let w = work[next]
+                    next += 1
+                    guard let (r, generation) = request(w) else { continue }
+                    group.addTask {
+                        (r, generation, await PDFGenerator.runWorker(priority: .utility) { Self.writeOutput(r) })
+                    }
+                    running += 1
+                }
+                guard running > 0, let (request, generation, written) = await group.next() else { break }
+                running -= 1
+                // Stopped mid-write: nothing is recorded, and the reading stays in the journal for the resume.
+                if Task.isCancelled && !written.success { continue }
+                // A newer reading was held meanwhile: the next pass writes it over this one.
+                guard deferredOutputs[request.outputURL]?.generation == generation else { continue }
+                let jobIndex = jobs.firstIndex { $0.sourceURL == request.source && outputURLMap[$0.sourceURL] == request.outputURL }
+                // Clears the held entry and puts on the tags a review held for it.
+                recordOutputWrite(written, request: request, jobIndex: jobIndex)
+                deferredOutputs[request.outputURL] = nil   // a failed write is not tried again
+            }
+        }
+    }
+
+    /// A review turned a page whose output is held back: journal the turned reading now, so a Stop before the write
+    /// and the resume after it (which shows no rotation review) still write the page as the user turned it.
+    func journalHeldRotation(at index: Int) {
+        guard jobs.indices.contains(index), let rotation = jobs[index].result?.rotationDegrees, activePendingRun != nil,
+              let output = outputURLMap[jobs[index].sourceURL], let held = deferredOutputs[output]?.request.result
+        else { return }
+        // The held reading with only its rotation changed: a review rebuilds some fields it does not keep.
+        var turned = held.with(classification: held.classification, rotationDegrees: rotation)
+        turned.rotationUnsure = jobs[index].result?.rotationUnsure   // the user turned it: settled
+        deferredOutputs[output]?.request.result = turned
+        _ = saveResultToPendingRun(index: index, result: turned, outputURL: output)
     }
 
     // MARK: - Tagging progress (W49.proc-resume-tagging-progress, absorbed here)
