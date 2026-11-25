@@ -1571,6 +1571,23 @@ extension OCRProcessor {
         if let gateway = run.gatewayConfig { return .gateway(gateway) }
         return run.provider == .appleVision ? .appleVision : .direct(run.provider)
     }
+    /// What read the interrupted run, for the Interrupted Run box, in `pendingRunBackend`'s precedence. A Local Agent
+    /// or gateway run's stored provider and model are only the UI selection at the time, so they are not named
+    /// (W40.fix-processor-pending-run-caption).
+    nonisolated static func pendingRunRouteLabel(of run: PendingRun) -> String {
+        switch pendingRunBackend(of: run) {
+        case .localAgent:
+            guard let agent = run.localAgent else { return "the Local Agent" }
+            return "the Local Agent (\(agent.tool.displayName), \(agent.provenanceModelName))"
+        case .gateway(let gateway):
+            return gateway.isLocalModel ? "a model on this Mac (\(gateway.displayName))" : "the gateway (\(gateway.displayName))"
+        case .appleVision:
+            return "Apple Vision"
+        case .direct(let provider):
+            let model = run.model.displayName
+            return model.hasPrefix(provider.rawValue) ? model : "\(provider.rawValue) \(model)"
+        }
+    }
     /// Only a direct-provider resume needs the selected provider and a configured key.
     func pendingRunResumeBlockReason(hasKey: Bool, fieldProvider: LLMProvider?) -> String? {
         guard let backend = pendingRunBackend else { return "This run's record could not be verified." }
@@ -1653,7 +1670,7 @@ extension OCRProcessor {
                 let dateStr = formatter.string(from: pending.startedAt)
                 let completed = pending.completedResults.count
                 let total = pending.fileURLs.count
-                pendingRunInfo = "Interrupted run from \(dateStr): \(completed)/\(total) files completed via \(pending.provider.rawValue) \(pending.model.displayName)."
+                pendingRunInfo = "Interrupted run from \(dateStr): \(completed)/\(total) files completed via \(Self.pendingRunRouteLabel(of: pending))."
                     + Self.pendingRunMissingNote(pending)
                 pendingRunBackend = Self.pendingRunBackend(of: pending)
             } else {

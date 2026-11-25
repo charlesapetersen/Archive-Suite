@@ -123,6 +123,31 @@ enum RunQuitResumeContract {
         box.checkForPendingBatch()
         check("the note is part of the box's text", box.pendingRunInfo?.hasSuffix(note) == true,
               box.pendingRunInfo ?? "nil")
+        // W40.fix-processor-pending-run-caption: the box names the backend that read the run, never the stored
+        // provider and model of a Local Agent or gateway run.
+        check("a direct run's box names its provider and model once",
+              box.pendingRunInfo?.contains("via \(model.displayName).") == true, box.pendingRunInfo ?? "nil")
+        func routed(gateway: GatewayConfig?, agent: LocalAgentConfig?, provider: LLMProvider = .gemini) -> String {
+            OCRProcessor.pendingRunRouteLabel(of: OCRProcessor.PendingRun(
+                provider: provider, model: model, thinkingLevel: nil, fileURLs: pages, outputDirectory: output,
+                enableTagging: false, enableSegmentJSON: false, enableCollectionSegmentation: false,
+                confirmCollectionIDs: false, reviewDocumentSegmentation: false, preOCRedInput: false,
+                previousTextCharCount: 0, sendPreviousImage: false, customPrompt: nil, startedAt: Date(),
+                gatewayConfig: gateway, completedResults: [:], localAgent: agent))
+        }
+        let gateway = GatewayConfig(baseURL: "https://gw.invalid/v1", modelID: "m", displayName: "GW Model",
+                                    inputCostPer1M: nil, outputCostPer1M: nil)
+        var onMac = gateway
+        onMac.localModel = true
+        let agentLabel = routed(gateway: gateway, agent: LocalAgentConfig(tool: .claude))
+        check("a Local Agent run's box names the Local Agent and its CLI, not the stored provider",
+              agentLabel == "the Local Agent (Claude Code, CLI default)", agentLabel)
+        let gatewayLabel = routed(gateway: gateway, agent: nil)
+        check("a gateway run's box names the gateway and its model", gatewayLabel == "the gateway (GW Model)", gatewayLabel)
+        let onMacLabel = routed(gateway: onMac, agent: nil)
+        check("a local-model run's box names the model on this Mac", onMacLabel == "a model on this Mac (GW Model)", onMacLabel)
+        let visionLabel = routed(gateway: nil, agent: nil, provider: .appleVision)
+        check("an Apple Vision run's box names Apple Vision", visionLabel == "Apple Vision", visionLabel)
         let missing = await OCRProcessor.performOCRCall(
             imageURL: pages[pages.count - 1], provider: .gemini, model: model, thinkingLevel: nil, apiKey: "test-key",
             previousText: nil, previousImageURL: nil, rotationMode: .off, standardImageMB: 3, cascade: .off)
