@@ -1,0 +1,212 @@
+{
+ "owner96": {
+  "pages": 96,
+  "read": 96,
+  "ok": 73,
+  "failures": {
+   "loop stop": 23
+  },
+  "strict": 0.52495653125,
+  "answered": 0.6903537945205479,
+  "lenient": 0.6268319745222838,
+  "speed": {
+   "wall_median": 23.96,
+   "wall_p90": 97.5,
+   "wall_max": 203.39,
+   "wall_total_h": 1.1164583333333333,
+   "first_token_median": 3.93,
+   "gen_tps_median": 17.95,
+   "prompt_tokens_median": 626.0,
+   "completion_median": 359.0,
+   "completion_p90": 1648,
+   "mlx_peak_median": 7.86,
+   "mlx_peak_max": 7.86,
+   "load_s_median": 3.6,
+   "runtime": "mlx-vlm 0.7.4"
+  },
+  "compare": [
+   {
+    "route": "apple-vision",
+    "name": "Apple Vision (Mac)",
+    "n": 96,
+    "gemma": 0.52495653125,
+    "other": 0.8307230104166666,
+    "other_ok": 96,
+    "gemma_ok": 73,
+    "delta": -0.30576647916666666,
+    "lo": -0.3777790729166666,
+    "hi": -0.23759301041666667,
+    "p": 9.999000099990002e-05
+   },
+   {
+    "route": "qwen3-vl-8b-mlx4",
+    "name": "Qwen3-VL 8B 4-bit (Mac)",
+    "n": 96,
+    "gemma": 0.52495653125,
+    "other": 0.8967281354166667,
+    "other_ok": 92,
+    "gemma_ok": 73,
+    "delta": -0.3717716041666667,
+    "lo": -0.44481316666666665,
+    "hi": -0.29860414583333333,
+    "p": 9.999000099990002e-05
+   },
+   {
+    "route": "qwen3.5-9b-mlx4",
+    "name": "Qwen3.5-9B 4-bit (Mac)",
+    "n": 96,
+    "gemma": 0.52495653125,
+    "other": 0.9192872708333333,
+    "other_ok": 95,
+    "gemma_ok": 73,
+    "delta": -0.3943307395833333,
+    "lo": -0.46690944791666666,
+    "hi": -0.3236558333333333,
+    "p": 9.999000099990002e-05
+   },
+   {
+    "route": "lightonocr-3-4b-mlx8",
+    "name": "LightOnOCR-3 4B 8-bit (Mac)",
+    "n": 96,
+    "gemma": 0.52495653125,
+    "other": 0.8916893125,
+    "other_ok": 96,
+    "gemma_ok": 73,
+    "delta": -0.36673278125000003,
+    "lo": -0.440219875,
+    "hi": -0.2950755,
+    "p": 9.999000099990002e-05
+   },
+   {
+    "route": "paddleocr-vl1.6-bf16",
+    "name": "PaddleOCR-VL 1.6 bf16 (Mac)",
+    "n": 96,
+    "gemma": 0.52495653125,
+    "other": 0.88813975,
+    "other_ok": 94,
+    "gemma_ok": 73,
+    "delta": -0.36318321875,
+    "lo": -0.43759946875,
+    "hi": -0.28939571875,
+    "p": 9.999000099990002e-05
+   },
+   {
+    "route": "xiaomi-ocr-0-bf16",
+    "name": "Xiaomi-OCR-0 bf16 (Mac)",
+    "n": 96,
+    "gemma": 0.52495653125,
+    "other": 0.8869642083333332,
+    "other_ok": 96,
+    "gemma_ok": 73,
+    "delta": -0.36200767708333337,
+    "lo": -0.4329144166666667,
+    "hi": -0.2935908541666667,
+    "p": 9.999000099990002e-05
+   },
+   {
+    "route": "gemini3.7-flash-gw",
+    "name": "Gemini 3.7 Flash (gateway, cloud)",
+    "n": 96,
+    "gemma": 0.52495653125,
+    "other": 0.9672819375,
+    "other_ok": 96,
+    "gemma_ok": 73,
+    "delta": -0.44232540625,
+    "lo": -0.5109506979166667,
+    "hi": -0.3767558958333333,
+    "p": 9.999000099990002e-05
+   }
+  ],
+  "groups": [
+   {
+    "group": "handwritten",
+    "n": 16,
+    "ok": 15,
+    "gemma": 0.594716375,
+    "apple-vision": 0.6058418125,
+    "qwen3-vl-8b-mlx4": 0.8924411875,
+    "qwen3.5-9b-mlx4": 0.8806148125,
+    "lightonocr-3-4b-mlx8": 0.899101875,
+    "paddleocr-vl1.6-bf16": 0.803709,
+    "xiaomi-ocr-0-bf16": 0.86038675,
+    "gemini3.7-flash-gw": 0.9505354375
+   },
+   {
+    "group": "mixed",
+    "n": 2,
+    "ok": 2,
+    "gemma": 0.5793010000000001,
+    "apple-vision": 0.708433,
+    "qwen3-vl-8b-mlx4": 0.168412,
+    "qwen3.5-9b-mlx4": 0.7621525,
+    "lightonocr-3-4b-mlx8": 0.5871715,
+    "paddleocr-vl1.6-bf16": 0.754928,
+    "xiaomi-ocr-0-bf16": 0.6483194999999999,
+    "gemini3.7-flash-gw": 0.8384469999999999
+   },
+   {
+    "group": "printed",
+    "n": 28,
+    "ok": 17,
+    "gemma": 0.3788681428571428,
+    "apple-vision": 0.8053768928571429,
+    "qwen3-vl-8b-mlx4": 0.9169136071428571,
+    "qwen3.5-9b-mlx4": 0.9278135357142857,
+    "lightonocr-3-4b-mlx8": 0.8798197142857143,
+    "paddleocr-vl1.6-bf16": 0.8588528571428571,
+    "xiaomi-ocr-0-bf16": 0.8596726071428572,
+    "gemini3.7-flash-gw": 0.9491250714285714
+   },
+   {
+    "group": "typewritten",
+    "n": 50,
+    "ok": 39,
+    "gemma": 0.5822691,
+    "apple-vision": 0.92177042,
+    "qwen3-vl-8b-mlx4": 0.9159287399999999,
+    "qwen3.5-9b-mlx4": 0.93317314,
+    "lightonocr-3-4b-mlx8": 0.90814498,
+    "paddleocr-vl1.6-bf16": 0.93688672,
+    "xiaomi-ocr-0-bf16": 0.92029808,
+    "gemini3.7-flash-gw": 0.98796206
+   }
+  ]
+ },
+ "public895": {
+  "pages": 895,
+  "read": 8,
+  "ok": 0,
+  "failures": {
+   "loop stop": 4
+  },
+  "strict": NaN,
+  "answered": NaN,
+  "lenient": NaN,
+  "speed": {
+   "wall_median": 44.44,
+   "wall_p90": 63.3,
+   "wall_max": 65.44,
+   "wall_total_h": 0.0883,
+   "first_token_median": 3.925,
+   "gen_tps_median": 17.9,
+   "prompt_tokens_median": 626.0,
+   "completion_median": 720.5,
+   "completion_p90": 1056,
+   "mlx_peak_median": 7.86,
+   "mlx_peak_max": 7.86,
+   "load_s_median": 3.7,
+   "runtime": "mlx-vlm 0.7.4"
+  },
+  "compare": [],
+  "groups": []
+ },
+ "build": {
+  "repo": "mlx-community/gemma-3-12b-it-4bit",
+  "revision": "86cc6a8dedbc456dd0e4af01a9d09f396f77e558",
+  "prompt": "the OCR panel prompt (ocr_panel.PROMPT)",
+  "max_tokens": 8192,
+  "temperature": 0,
+  "image": "2400 px JPEG q90, resized by the model processor",
+  "machine": "Apple M3 Pro, 18 GB"
+ }
+}
