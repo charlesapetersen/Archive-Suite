@@ -149,6 +149,8 @@ struct OCRView: View {
     @State private var foldersBeyondDepth: [URL] = []
     @State private var flatDotFolders: [URL: String] = [:]
     @State private var showingPendingIntake = false
+    /// S-048: which files the last addition left out because the list already held them.
+    @State private var repeatedIntakeNote: String?
     /// The level map offered at Start for a tree, and why saving it was refused.
     @State private var containerLevels: ContainerLevelsDraft?
     @State private var containerLevelsError: String?
@@ -1282,6 +1284,11 @@ struct OCRView: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .accessibilityIdentifier("ap.files.treeNote")
             }
+            if let repeatedIntakeNote, !droppedFiles.isEmpty {
+                Text(repeatedIntakeNote)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .accessibilityIdentifier("ap.files.repeatNote")
+            }
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     if droppedFiles.isEmpty {
@@ -1711,7 +1718,10 @@ struct OCRView: View {
         add(ProcessFilesTree.collect(urls, accept: isImageFile, sortAll: sortAll, readSubfolders: false))
     }
 
-    private func add(_ intake: ProcessFilesTree.Intake) {
+    private func add(_ given: ProcessFilesTree.Intake) {
+        // S-048: a file already in the list, however it is named, is not listed or read a second time.
+        let (intake, repeated) = ProcessFilesTree.withoutRepeats(given, listed: droppedFiles)
+        repeatedIntakeNote = repeated.isEmpty ? nil : Self.repeatedIntakeNote(repeated)
         showingPendingIntake = true
         droppedFiles.append(contentsOf: intake.files)
         droppedSubfolders.merge(intake.subfolders) { $1 }
@@ -1721,6 +1731,12 @@ struct OCRView: View {
         if !intake.files.isEmpty { offerCollectionInterviewForPendingIntake() }
     }
 
+    private static func repeatedIntakeNote(_ repeated: [URL]) -> String {
+        let first = repeated[0].lastPathComponent
+        return repeated.count == 1 ? "Already listed, not added again: \(first)."
+            : "\(repeated.count) files already listed, not added again, the first \(first)."
+    }
+
     private func replaceFiles(with files: [URL]) {
         droppedFiles = files
         stagedSelection = []
@@ -1728,6 +1744,7 @@ struct OCRView: View {
         flatDotFolders = [:]
         foldersBeyondDepth = []
         processor.treeIntakeWarnings = []
+        repeatedIntakeNote = nil
         showingPendingIntake = false
         intakeGeneration += 1
         readingTree = false

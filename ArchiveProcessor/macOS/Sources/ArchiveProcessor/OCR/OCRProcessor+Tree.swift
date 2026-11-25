@@ -131,6 +131,37 @@ enum ProcessFilesTree {
         var flatDotFolders: [URL: String] = [:]
     }
 
+    /// S-048: what makes two URLs one file. The device and inode when the file can be read, so `/var` and
+    /// `/private/var`, a symlink, a hard link or a different letter case all name the same file; otherwise the
+    /// resolved path.
+    nonisolated static func fileIdentity(_ url: URL) -> String {
+        var info = stat()
+        if stat(url.path, &info) == 0 { return "\(info.st_dev):\(info.st_ino)" }
+        return url.resolvingSymlinksInPath().standardizedFileURL.path
+    }
+
+    /// The first file in `files` that an earlier entry already names, if any (S-048).
+    nonisolated static func firstRepeat(in files: [URL]) -> URL? {
+        var seen = Set<String>()
+        return files.first { !seen.insert(fileIdentity($0)).inserted }
+    }
+
+    /// `intake` without the files that `listed`, or an earlier file of the intake, already name, and the files left
+    /// out (S-048), so each file is listed once.
+    nonisolated static func withoutRepeats(_ intake: Intake, listed: [URL]) -> (intake: Intake, repeated: [URL]) {
+        var seen = Set(listed.map(fileIdentity))
+        var kept = intake, repeated: [URL] = []
+        kept.files = intake.files.filter { file in
+            if seen.insert(fileIdentity(file)).inserted { return true }
+            repeated.append(file)
+            return false
+        }
+        let keptFiles = Set(kept.files)
+        kept.subfolders = intake.subfolders.filter { keptFiles.contains($0.key) }
+        kept.flatDotFolders = intake.flatDotFolders.filter { keptFiles.contains($0.key) }
+        return (kept, repeated)
+    }
+
     static func depthWarning(_ folders: [URL]) -> String? {
         guard let first = folders.first else { return nil }
         let count = folders.count

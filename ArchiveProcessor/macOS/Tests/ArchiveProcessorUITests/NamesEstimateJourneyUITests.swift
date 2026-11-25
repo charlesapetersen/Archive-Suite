@@ -135,14 +135,16 @@ final class NamesEstimateJourneyUITests: XCTestCase {
         print("[s044] CONFIRMED: collection interview → real Start → one names request; estimate includes Names")
     }
 
-    // S-048 (W49.proc-s048-verify, then W49.proc-s048-check on Claude): one add as the control, then the same photo
-    // chosen twice and chosen then dropped from Finder. Each repeated row is the one file in its folder, and the
-    // loopback gateway receives the same image bytes once per row. No provider can bill this test.
-    func testDuplicateRowsSendTheSamePhotoTwice() throws {
-        for (method, expected) in [("once", 1), ("picker", 2), ("Finder drop", 2)] {
+    // S-048 regression (W49.proc-fix-s048; the repro was W49.proc-s048-verify, then W49.proc-s048-check on Claude): the
+    // same photo added once, chosen twice, chosen again by another name (its `/private` name, or through a linked
+    // folder: the Open panel cannot select a linked file itself), and chosen then dropped from Finder. Each route lists one row and sends one OCR request, and the run writes one PDF.
+    // The loopback gateway records the image bytes, so a second read cannot hide. No provider can bill this test.
+    func testRepeatedAddListsThePhotoOnce() throws {
+        for method in ["once", "picker", "other name", "Finder drop"] {
             let run = scratch.appendingPathComponent("check-\(UUID().uuidString)")
             let input = run.appendingPathComponent("in"), output = run.appendingPathComponent("out")
-            for folder in [input, output] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+            let links = run.appendingPathComponent("links")
+            for folder in [input, output, links] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
             let photo = input.appendingPathComponent("check-photo.png")
             try makeLetter(at: photo)
             let before = try gatewayCalls().count, imagesBefore = try gatewayImages().count
@@ -161,33 +163,50 @@ final class NamesEstimateJourneyUITests: XCTestCase {
             app.launch()
             XCTAssertTrue(app.descendants(matching: .any)["ap.ocr.dropZone"].waitForExistence(timeout: 15))
             if app.descendants(matching: .any)["ap.ocr.resumeRun"].exists { app.buttons["Dismiss"].firstMatch.click() }
-            let rows = app.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@",
-                                                           photo.lastPathComponent, photo.lastPathComponent))
+            let rows = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'check-photo' OR value BEGINSWITH 'check-photo'"))
             addThroughPicker(photo)
             XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 10))
             XCTAssertEqual(rows.count, 1)
-            if method == "picker" { addThroughPicker(photo) }
-            if method == "Finder drop" { dragFromFinder(photo, to: rows.firstMatch) }
-            XCTAssertEqual(rows.count, expected, "rows before Start")
-            shot("s048-check-\(expected)-\(method.replacingOccurrences(of: " ", with: "-"))")
+            switch method {
+            case "picker": addThroughPicker(photo)
+            case "other name":
+                // The other name of a temporary folder, or, where the runner's folder has none, a linked folder.
+                let path = photo.path
+                var other = path.hasPrefix("/private/var/") ? String(path.dropFirst("/private".count))
+                    : path.hasPrefix("/var/") ? "/private" + path : ""
+                if other.isEmpty {
+                    let folder = links.appendingPathComponent("in-link")
+                    try FileManager.default.createSymbolicLink(at: folder, withDestinationURL: input)
+                    other = folder.appendingPathComponent(photo.lastPathComponent).path
+                }
+                XCTAssertTrue(FileManager.default.fileExists(atPath: other), "\(other) names the same file")
+                print("[s048-fix] other name: adding \(other) after \(path)")
+                addThroughPicker(URL(fileURLWithPath: other))
+            case "Finder drop": dragFromFinder(photo, to: rows.firstMatch)
+            default: break
+            }
+            if method != "once" {
+                let note = app.staticTexts["ap.files.repeatNote"]
+                XCTAssertTrue(note.waitForExistence(timeout: 10), "the repeat is named, not silently dropped")
+                print("[s048-fix] \(method): note=\(note.value ?? note.label)")
+            }
+            XCTAssertEqual(rows.count, 1, "rows before Start")
+            shot("s048-fix-\(method.replacingOccurrences(of: " ", with: "-"))")
             let inputs = try FileManager.default.contentsOfDirectory(atPath: input.path)
-            XCTAssertEqual(inputs, [photo.lastPathComponent], "the only file every row can name")
+            XCTAssertEqual(inputs, [photo.lastPathComponent], "the only file every add can name")
             app.descendants(matching: .any)["ap.ocr.start"].click()
-            // A run ends either Done or with catalogue filing stopped; record whichever and its full wording.
             let finished = app.staticTexts.matching(NSPredicate(format:
                 "label BEGINSWITH 'Done.' OR value BEGINSWITH 'Done.' OR label BEGINSWITH 'Catalogue filing' OR value BEGINSWITH 'Catalogue filing'"))
             XCTAssertTrue(finished.firstMatch.waitForExistence(timeout: 90), app.debugDescription)
             let status = finished.firstMatch.label.isEmpty ? "\(finished.firstMatch.value ?? "")" : finished.firstMatch.label
-            print("[s048-check] \(method): status=\(status)")
             let ocr = try gatewayCalls().dropFirst(before).filter { $0["kind"] == "ocr" }
             let images = Array(try gatewayImages().dropFirst(imagesBefore))
             let pdfs = try FileManager.default.contentsOfDirectory(atPath: output.path).filter { $0.hasSuffix(".pdf") }
-            print("[s048-check] \(method): rows=\(expected) input=\(photo.path) inputs=\(inputs) ocr=\(ocr.count) "
-                  + "distinctImages=\(Set(images).count) images=\(images.map { $0.prefix(12) }) PDFs=\(pdfs)")
-            XCTAssertEqual(ocr.count, expected)
-            XCTAssertEqual(images.count, expected)
-            XCTAssertEqual(Set(images).count, 1, "each OCR request carried the same photo")
-            if expected == 1 { XCTAssertEqual(status, "Done. 1 succeeded, 0 failed.") }
+            print("[s048-fix] \(method): status=\(status) rows=\(rows.count) ocr=\(ocr.count) images=\(images.count) PDFs=\(pdfs)")
+            XCTAssertEqual(status, "Done. 1 succeeded, 0 failed.")
+            XCTAssertEqual(ocr.count, 1)
+            XCTAssertEqual(images.count, 1)
+            XCTAssertEqual(pdfs, ["check-photo.pdf"])
             app.terminate()
         }
     }

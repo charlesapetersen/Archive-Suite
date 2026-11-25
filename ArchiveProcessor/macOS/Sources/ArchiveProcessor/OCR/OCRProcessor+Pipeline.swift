@@ -3469,6 +3469,12 @@ extension OCRProcessor {
         let plannedSubfolders = plannedOutputSubfolders   // W47.ct-processor-intake
         plannedOutputSubfolders = [:]
         guard !files.isEmpty else { return }
+        // S-048: Process Files lists a file once, but Live Capture and the test seams fill the list without it. Two
+        // jobs for one source would read it twice and then collide at filing, so refuse before any request.
+        if let repeated = ProcessFilesTree.firstRepeat(in: files) {
+            statusMessage = "\(repeated.lastPathComponent) is listed more than once. Remove the repeat and start again; no request was sent."
+            return
+        }
         if provider == .openrouter, gatewayConfig == nil, localAgent == nil,
            let warning = OpenRouterRoute.unavailableSelection(model.id) {
             statusMessage = warning + (resumingMixedPDF == nil ? "" : Self.unavailableModelRecoveryNote)

@@ -235,16 +235,15 @@ classification edit. [Independent VM evidence](../verification/evidence/processo
   review shown, the later per-collection review only with the saved setting on, and six OCR calls in all.
   (queued: W40.fix-processor-resume-reviews)
 
-## Adding the same photo twice can send two OCR requests (S-048)
+## FIXED (S-048, 2026-11-24) — a file added again is listed and read once
 
-- **Reproduced 2026-11-21 (Codex gpt-6.2-sol, `1f5cc337`).** Process Files shows two rows and
-  requests OCR twice when the same photo is chosen twice or chosen and then dropped from Finder.
-  The scratch run showed two successes but only one PDF. Skip already processed was enabled.
-  (queued: W49.proc-fix-s048)
-- **Independently confirmed 2026-11-24 (Claude Opus 5.5, `0a954a3e`).** The same photo's bytes go out twice.
-  At this baseline the duplicate run then stops at catalogue filing ("The preservation copy could not be
-  verified"), leaving no PDF and an interrupted run, after both OCR requests were made.
-  [VM evidence](../verification/evidence/processor/W49.proc-s048-verify.md). (queued: W49.proc-fix-s048)
+- Process Files leaves out a file already in the list, however it is named (device and inode), and says so;
+  the run refuses a repeated source before any request. Regression `NamesEstimateJourneyUITests.testRepeatedAddListsThePhotoOnce`
+  in the VM: one row, one request and one PDF for each route. [Verification record](../verification/evidence/processor/W49.proc-s048-verify.md)
+  (accepted: fixed history, W49.proc-fix-s048)
+- Was: the same photo chosen twice, or chosen and then dropped from Finder, gave two rows and two OCR requests
+  (reproduced 2026-11-21, Codex gpt-6.2-sol, `1f5cc337`); the run then stopped at catalogue filing with no PDF
+  (independently confirmed 2026-11-24, Claude Opus 5.5, `0a954a3e`). (accepted: fixed history)
 
 ## A window split can drop the enclosure's covering-letter date (S-047)
 
