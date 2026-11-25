@@ -230,6 +230,7 @@ classification edit. [Independent VM evidence](../verification/evidence/processo
 - **Reproduced 2026-11-21 (Codex gpt-6.2-sol, `1f5cc337`).** Process Files shows two rows and
   requests OCR twice when the same photo is chosen twice or chosen and then dropped from Finder.
   The scratch run showed two successes but only one PDF. Skip already processed was enabled.
+  (queued: W49.proc-fix-s048)
 - **Independently confirmed 2026-11-24 (Claude Opus 5.5, `0a954a3e`).** The same photo's bytes go out twice.
   At this baseline the duplicate run then stops at catalogue filing ("The preservation copy could not be
   verified"), leaving no PDF and an interrupted run, after both OCR requests were made.
