@@ -19,6 +19,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.normpath(os.path.join(HERE, "..", "autonomous"))
@@ -260,8 +261,22 @@ def half_recorded(gate, rows):
 # Standing gates (owner, 2026-11-18: "let's not show things in the menubar that I don't actually need to make
 # decisions about"). A gate the owner keeps closed on purpose is not a question: it is listed as a permanent hold,
 # never notified, and the walkthrough does not ask it. Opening it is his to raise. W46.nice-to-have: the end-of-project
-# gate (owner, 2026-10-22), kept closed at every walkthrough since.
-STANDING_GATES = {"W46.nice-to-have"}
+# gate (owner, 2026-10-22), kept closed at every walkthrough since. W50.v2-release: the 2.0 release gate (owner,
+# 2026-11-24), which comes after 1.1 (owner, 2026-11-25: not shown as "needs you" while we are not at the gate).
+STANDING_GATES = {"W46.nice-to-have", "W50.v2-release"}
+# A dated gate (owner, 2026-11-25): `(not-before: YYYY-MM-DD)` on its HOLD QUEUE line keeps it a permanent hold
+# until that local date, so a gate that can only be answered on a set day (the gateway budget reset on 1 Dec) is
+# not listed, notified or asked before then. A malformed date is ignored, so the gate shows rather than hides.
+NOT_BEFORE = re.compile(r"\(not-before:\s*(\d{4}-\d\d-\d\d)\s*\)")
+
+
+def date_reached(text, today=None):
+    """False while any (not-before: DATE) on TEXT is still in the future."""
+    today = today or time.strftime("%Y-%m-%d")
+    valid = re.compile(r"\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])")
+    return all(d <= today for d in NOT_BEFORE.findall(text) if valid.fullmatch(d))
+
+
 LEAD_DATE = re.compile(r"^\d{4}-\d\d-\d\d(?:\s+[~\d:]+)?\s*[\u2014-]+\s*")
 
 
@@ -330,7 +345,7 @@ def holds():
             continue
         seen.add(tag)
         ready = (tag in pending and own_prerequisites_met(line, states) and not cluster_submitted(tag, line)
-                 and tag not in STANDING_GATES)
+                 and tag not in STANDING_GATES and date_reached(line))
         text = clean(line[m.end():])
         half = half_recorded(tag, rows)
         if half:

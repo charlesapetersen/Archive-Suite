@@ -557,6 +557,25 @@ class Holds(Fixture):
         self.assertTrue(by["W46.nice-to-have"]["permanent"])
         self.assertFalse(by["H.ok"]["permanent"])
 
+    def test_the_v2_release_gate_is_standing(self):
+        # Owner, 2026-11-25: the 2.0 gate is not "needs you" while we are not at it.
+        plan = PLAN.replace("- [ ] **A.four", "- [ ] **A.v2 — later** (blocked-on: W50.v2-release)\n- [ ] **A.four")
+        plan = plan.replace("- [ ] **H.ok — owner says yes**",
+                            "- [ ] **H.ok — owner says yes**\n- [ ] **W50.v2-release — OWNER GATE (2.0 release)**")
+        self.write(".maintenance/AUTONOMOUS_PLAN.md", plan)
+        by = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
+        self.assertTrue(by["W50.v2-release"]["permanent"])
+        self.assertFalse(by["H.ok"]["permanent"])
+
+    def test_a_dated_gate_waits_for_its_date(self):
+        # Owner, 2026-11-25: a gate answerable only on a set day is a permanent hold until that day.
+        for date, permanent in (("2999-01-01", True), ("2000-01-01", False), ("2026-13-45", False)):
+            plan = PLAN.replace("- [ ] **H.ok — owner says yes**",
+                                "- [ ] **H.ok — owner says yes** (not-before: %s)" % date)
+            self.write(".maintenance/AUTONOMOUS_PLAN.md", plan)
+            by = {d["key"]: d for d in self.jsonl(self.hook("holds").stdout)}
+            self.assertEqual(by["H.ok"]["permanent"], permanent, date)
+
     def test_a_report_entry_finds_its_owner_ok_gate_past_a_leading_date(self):
         # 2026-11-18: "W46.owner-set-grow — …" asked the question its gate W46.owner-set-grow-owner-ok asks, and
         # "2026-11-18 — W46.ocr-cells-l4-more — needs you" stayed a decision after its gate was ticked.
