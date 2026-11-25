@@ -120,7 +120,8 @@ final class MessageJourneyUITests: XCTestCase {
         XCTAssertTrue(read["reasoning_effort"] is NSNull)
     }
 
-    func testCodexEndsPageBeforeThePromisedRetry() throws {
+    /// S-018: the unverified Codex adapter does not wait for the window, so its message must not promise it.
+    func testCodexLimitMessageSaysThePageWasNotRead() throws {
         try prepare()
         try makePhoto("in/one.jpg")
         let cli = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "fake_messages_codex", withExtension: "sh"))
@@ -138,7 +139,8 @@ final class MessageJourneyUITests: XCTestCase {
         let secondsRemaining = try XCTUnwrap(Double(reset)) - Date().timeIntervalSince1970
         XCTAssertEqual(times.count, 1)
         XCTAssertGreaterThan(secondsRemaining, 0)
-        XCTAssertTrue(log.contains("The app paces to your subscription window and retries."), log)
+        XCTAssertTrue(log.contains("This page was not read; retry it after the reset."), log)
+        XCTAssertFalse(log.contains("paces to your subscription window"), log)
         print("[s018] \(times.count) CLI call and \(Int(secondsRemaining))s remained at completion.\n\(log)")
     }
 

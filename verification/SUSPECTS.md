@@ -534,7 +534,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
   with a reset time. Confirmed if the run does not wait for that time before retrying. Kept until then (a
   promised feature, so not deleted); the Processor ledger (`W40.b3`) should carry it as a row.
 - **Would clear it:** the run waits for the reset.
-- **Status:** `reproduced` — independently confirmed and queued as W49.proc-fix-s018. [Independent VM evidence](evidence/processor/W49.proc-suspects-messages-check.md).
+- **Status:** `fixed` — W49.proc-fix-s018: the Codex and Gemini message no longer promises pacing. [Independent VM evidence](evidence/processor/W49.proc-suspects-messages-check.md).
 - **History:**
   - 2026-10-16 W40.e5 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-messages` under phase rule 5a.
@@ -544,6 +544,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     retries." No wait and no retry. The Gemini CLI takes the same branch (code). `lastUsageWindowResetAt` is still never
     read.
   - 2026-11-21 W49.proc-suspects-messages-check (Codex gpt-6.2-sol, baseline `8e89c29b`) — Codex reported a known reset, but the app ended the page after one invocation and said it would pace and retry.
+  - 2026-11-24 W49.proc-fix-s018 — fixed by the message: the unverified adapters keep failing the page without waiting (W41.app-claude-plan-reading's design), and now say the page was not read and to retry after the reset. Claude's wait is unchanged.
 
 ### S-019 · Typing `-->` after an unclosed Notes block header may drop the lines before it
 

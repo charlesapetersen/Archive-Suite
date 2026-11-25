@@ -262,9 +262,9 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   real `LocalAgentClient` and resume. `scripts/test-processing-history.sh` checks the PDF header and history name
   `Local CLI Agent (claude)` at $0. A real signed-in CLI and Detect & Verify remain open.
 - **Runtime evidence:** [Independent VM reproduction](evidence/processor/W49.proc-suspects-messages-check.md) via
-  `MessageJourneyUITests.testCodexEndsPageBeforeThePromisedRetry`. Process Files Start, with a Codex stub
-  reporting a future reset, made one invocation and ended before that reset with the log saying it would
-  pace and retry.
+  `MessageJourneyUITests.testCodexLimitMessageSaysThePageWasNotRead`. Process Files Start, with a Codex stub
+  reporting a future reset, makes one invocation and ends the page before that reset; since W49.proc-fix-s018
+  the log says the page was not read and to retry it after the reset (it had said the app would pace and retry).
   See also the [earlier VM provider check](evidence/processor/W40.d3-providers.md).
 - **Status:** `unverifiable-here` (needs a signed-in `claude` CLI beside a running app: the owner's guided session)
 - **History:**

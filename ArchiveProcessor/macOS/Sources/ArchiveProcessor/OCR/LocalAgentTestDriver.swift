@@ -204,6 +204,9 @@ enum LocalAgentTestDriver {
             let gem = try? await LocalAgentClient(config: LocalAgentConfig(tool: .gemini, binaryPath: fakeCLI), pacing: slow.pacing)
                 .ocr(imageURL: imageURL)
             check("gemini: a limit fails the page, no wait", gem?.errorCode == "cli_rate_limited")
+            check("gemini: the message says the page was not read and promises no wait (S-018)",
+                  gem?.errorMessage?.contains("This page was not read") == true
+                  && gem?.errorMessage?.contains("paces") == false)
 
             // 5g. The status line's words, and the caption draws.
             let box = UsageWindowPause()

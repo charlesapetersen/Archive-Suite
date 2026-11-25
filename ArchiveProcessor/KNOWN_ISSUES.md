@@ -129,9 +129,12 @@ requests to the public OpenAI gateway use `max_completion_tokens`. Other compati
 addresses use `max_tokens`. No OpenAI key was available to capture a live reply.
 See W49.proc-fix-s025 and the [VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md#s-025-fix--openai-preset-help-and-request).
 
-## Codex OCR stops before the usage window resets (S-018)
+## FIXED (2026-11-24) — Codex and Gemini usage-limit messages promised a retry (S-018)
 
-- Codex reported a known reset, but the app ended the page after one invocation and said it would pace and retry. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md). (queued: W49.proc-fix-s018)
+Only the Claude CLI waits for the usage window and reads the page again. The unverified Codex and Gemini
+adapters fail the page on a usage limit, and their message now says the page was not read and gives the
+reset when the CLI printed one; it no longer says the app paces and retries. See W49.proc-fix-s018 and the
+[VM evidence](../verification/evidence/processor/W49.proc-suspects-messages-check.md#s-018-fix--codex-limit-message).
 
 ## FIXED (2026-11-23) — Comparative rotation could leave scans sideways without a warning (S-029)
 

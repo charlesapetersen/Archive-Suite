@@ -424,11 +424,12 @@ struct LocalAgentClient: Sendable {
                    "entitlement (a Gemini Code Assist/API license, or Claude Code enabled on your seat) — " +
                    "ask your admin, or use a personal subscription."
         case "cli_rate_limited":
+            // Only `claude` waits for the window (`invoke`); the unverified adapters fail the page here (S-018).
             let now = Date()
             if let reset = parseUsageWindowReset(fromStderr: stderr, now: now) {
-                return "\(tool.displayName) usage limit reached — resets \(usageWindowHint(for: reset, now: now)). The app paces to your subscription window and retries."
+                return "\(tool.displayName) usage limit reached — resets \(usageWindowHint(for: reset, now: now)). This page was not read; retry it after the reset."
             }
-            return "\(tool.displayName) usage limit reached. The app paces to your subscription window and retries."
+            return "\(tool.displayName) usage limit reached. This page was not read; retry it once the limit resets."
         default:
             return "The \(tool.displayName) CLI failed (exit \(exitCode))."
         }
