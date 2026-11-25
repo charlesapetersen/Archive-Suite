@@ -87,6 +87,13 @@ HW = {
         'template': {},
         'prompt': 'Transcribe all the text in this document image in reading order. Output only the text.',
         'repo': model_store.snapshot('mlx-community/FastVLM-0.5B-bf16', '81ffe929046666c43de53691147b1669ba0f3a4c')},
+    # W46.ocr-gemma3-12b: the Processor's box and folder label reader (ManagedGemmaWorker.py: this repo and revision,
+    # mlx-vlm, temperature 0), asked for whole pages with the panel's prompt and token cap, as Qwen3-VL 8B was.
+    # ocr_gemma3_public.py reads the 895 public pages with this same entry.
+    'gemma3-12b-mlx4': {
+        'name': 'Gemma 3 12B 4-bit', 'hosted': None, 'reply': 'panel', 'prompt': None, 'max_side': None,
+        'max_tokens': None, 'template': {},
+        'repo': model_store.snapshot('mlx-community/gemma-3-12b-it-4bit', '86cc6a8dedbc456dd0e4af01a9d09f396f77e558')},
 }
 # docling-core for the DocTags reply, installed apart from the lab venv (`uv pip install --target DIR
 # docling-core==2.105.0`) and put after its site-packages, so nothing mlx-vlm imported is replaced.
@@ -131,7 +138,9 @@ def parse(spec, raw, image=None):
     return P.T.parse_draft(raw)
 
 
-def collect(limit=None, key=KEY):
+def collect(limit=None, key=KEY, pages=None, out=None, image_of=None, minutes=None):
+    """Read the 99 originals (or `pages`, jobs with an id and sha256, into `out`, each image at `image_of(job)`),
+    skipping any page with a saved reading. `minutes` stops before a new page once that long has passed."""
     import tempfile
     import mlx.core as mx
     import mlx_vlm
@@ -141,8 +150,9 @@ def collect(limit=None, key=KEY):
     spec = HW.get(key) or {'reply': 'panel', 'prompt': None, 'max_side': None, 'max_tokens': None, 'template': {}, 'repo': REPO}
     prompt = P.PROMPT if spec['prompt'] is None else spec['prompt']
     max_tokens = spec['max_tokens'] or P.MAX_TOKENS
-    out = out_dir(key)
-    todo = [j for j in jobs() if not (out / (j['id'] + '.json')).exists()][: limit or None]
+    out = out or out_dir(key)
+    image_of = image_of or (lambda job: P.CACHE / 'images' / (job['id'] + '.jpg'))
+    todo = [j for j in (pages or jobs()) if not (out / (j['id'] + '.json')).exists()][: limit or None]
     print(f'{key}: {len(todo)} pages to read', flush=True)
     if not todo:
         return
@@ -163,7 +173,10 @@ def collect(limit=None, key=KEY):
     chat = apply_chat_template(processor, model.config, prompt, num_images=1, **spec['template'])
     tmp = tempfile.mkdtemp(prefix='mac-local-shrunk-')
     for k, job in enumerate(todo, 1):
-        image = P.CACHE / 'images' / (job['id'] + '.jpg')
+        if minutes and time.time() - t0 > 60 * minutes:
+            print(f'stopping after {minutes} min: {len(todo) - k + 1} pages left', flush=True)
+            break
+        image = image_of(job)
         if P.digest(image.read_bytes()) != job['sha256']:
             raise SystemExit('image changed: ' + job['id'])
         if spec['max_side']:
@@ -184,7 +197,7 @@ def collect(limit=None, key=KEY):
         if spec['max_side']:
             image.unlink()
         finish = 'length' if last is not None and last.generation_tokens >= max_tokens else 'stop'
-        meta = {'key': key, 'job': job['id'], 'page': job['page'], 'scale': job['scale'], 'model': str(spec['repo']).replace(str(Path.home()), '~'),
+        meta = {'key': key, 'job': job['id'], 'page': job.get('page'), 'scale': job.get('scale', 'original'), 'model': str(spec['repo']).replace(str(Path.home()), '~'),
                 'runtime': 'mlx-vlm ' + mlx_vlm.__version__, 'status': 'ok' if got and finish == 'stop' else 'failed',
                 'finish': finish, 'cost': 0, 'wall_s': round(wall, 2),
                 'first_token_s': round((first or start + wall) - start, 2),
@@ -531,8 +544,9 @@ def main():
     ap.add_argument('command', choices=['collect', 'report'])
     ap.add_argument('--limit', type=int)
     ap.add_argument('--model', default=KEY, choices=[KEY, *HW])
+    ap.add_argument('--minutes', type=float, help='stop before a new page once this long has passed')
     a = ap.parse_args()
-    collect(a.limit, a.model) if a.command == 'collect' else report()
+    collect(a.limit, a.model, minutes=a.minutes) if a.command == 'collect' else report()
 
 
 if __name__ == '__main__':
