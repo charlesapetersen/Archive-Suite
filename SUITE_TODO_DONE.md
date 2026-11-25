@@ -18434,3 +18434,15 @@ Files: `DocumentWindowView`/`DocumentViewerModel`/`PDFPaneView`/`AppSettings`/`A
   1918 / 3 March / Unread, while the control also has its two subjects. Neither its sidecar nor the run record notes the
   failure. Filed `W49.proc-fix-s045`. Scratch only, removed afterwards; no bench cache; $0.
   <!-- /W49.proc-s045-check -->
+- [x] **W40.fix-android-launcher-icon — Match the Android Capture icon to the Mac Processor icon [S · S4]** · §W40 — verification phase (lane: processor) — SHIPPED 2026-11-24.
+  Owner's November 23 Processor guided session. `release/make-app-icons.swift` gained an `android [repo]` subcommand:
+  set B's Processor glyph (page, scan beam, viewfinder brackets) is factored out of the Mac tile and reused as the
+  adaptive foreground, scaled so the bracket corners sit inside the 66-dp safe circle; the background layer is the Mac
+  tile's blue gradient and sheen, full bleed, with the gradient spanning the visible 72 dp. It writes
+  `ic_launcher_background/foreground.png` (108 dp) and the legacy square/round `ic_launcher*.png` (48 dp) for mdpi to
+  xxxhdpi; both adaptive XMLs now use the bitmap background, and the unused white `ic_launcher_background` colour
+  (the only entry in `values/colors.xml`) is removed. Re-running `install B` leaves the Mac catalogues byte-identical,
+  so the refactor did not change them. `./gradlew --offline assembleDebug testDebugUnitTest` green; installed on the
+  headless `ap_test36` emulator (Pixel 6, API 36) and the app drawer screenshotted at 420 and 280 dpi: the icon reads as
+  the Mac Processor icon under the circular mask. No bench cache; $0.
+  <!-- /W40.fix-android-launcher-icon -->

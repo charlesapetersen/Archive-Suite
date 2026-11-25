@@ -3,6 +3,7 @@
 // Usage:
 //   swift release/make-app-icons.swift sheet <out.png>          candidate sheet: every set, big and at Dock size
 //   swift release/make-app-icons.swift install <A|B|C> [repo]   write the chosen set into all three AppIcon.appiconsets
+//   swift release/make-app-icons.swift android [repo]           write set B's Processor icon into Android Capture's mipmaps
 // Offscreen CoreGraphics + ImageIO only: it opens no window, so it is safe unattended.
 // Each set is one family (same tile, same cream archival paper) told apart by hue and one glyph:
 // Processor = capture/OCR/tag (blue), Reader = find/read (amber), Notes = write from a source (green).
@@ -173,28 +174,37 @@ func setA(_ c: CGContext, _ app: App) {
     }
 }
 
+/// Set B's Processor glyph (a page under a scan beam, in viewfinder brackets), without the tile, so the
+/// Android launcher icon can reuse it as its adaptive foreground. Its box, brackets included, is
+/// `processorGlyphBounds`.
+func processorGlyphB(_ c: CGContext, _ p: Palette) {
+    let page = CGRect(x: 322, y: 222, width: 380, height: 520)
+    sheet(c, page, lines: 7)
+    // scan beam across the page
+    c.saveGState(); c.addPath(rr(page, 19)); c.clip()
+    let g = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
+                       colors: [p.accent.copy(alpha: 0)!, p.accent.copy(alpha: 0.75)!, p.accent.copy(alpha: 0)!] as CFArray,
+                       locations: [0, 0.5, 1])!
+    c.drawLinearGradient(g, start: CGPoint(x: 0, y: 420), end: CGPoint(x: 0, y: 540), options: [])
+    c.restoreGState()
+    stroke(c, line([CGPoint(x: 290, y: 480), CGPoint(x: 734, y: 480)]), p.accent, 10)
+    // viewfinder brackets
+    let b: CGFloat = 92, m: CGFloat = 50
+    let fr = page.insetBy(dx: -m, dy: -m)
+    for (x, y, dx, dy) in [(fr.minX, fr.minY, 1.0, 1.0), (fr.maxX, fr.minY, -1.0, 1.0), (fr.minX, fr.maxY, 1.0, -1.0), (fr.maxX, fr.maxY, -1.0, -1.0)] {
+        stroke(c, line([CGPoint(x: x, y: y + dy * b), CGPoint(x: x, y: y), CGPoint(x: x + dx * b, y: y)]), rgb(0xFFFFFF), 30)
+    }
+}
+/// The page inset by the bracket margin (50) and half the bracket stroke (15).
+let processorGlyphBounds = CGRect(x: 322, y: 222, width: 380, height: 520).insetBy(dx: -65, dy: -65)
+
 /// B — one page per app, the glyph built into the page: a scanned page, an open book, a page being written.
 func setB(_ c: CGContext, _ app: App) {
     let p = palette(app)
     tile(c, p)
     switch app {
     case .processor:
-        let page = CGRect(x: 322, y: 222, width: 380, height: 520)
-        sheet(c, page, lines: 7)
-        // scan beam across the page
-        c.saveGState(); c.addPath(rr(page, 19)); c.clip()
-        let g = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB),
-                           colors: [p.accent.copy(alpha: 0)!, p.accent.copy(alpha: 0.75)!, p.accent.copy(alpha: 0)!] as CFArray,
-                           locations: [0, 0.5, 1])!
-        c.drawLinearGradient(g, start: CGPoint(x: 0, y: 420), end: CGPoint(x: 0, y: 540), options: [])
-        c.restoreGState()
-        stroke(c, line([CGPoint(x: 290, y: 480), CGPoint(x: 734, y: 480)]), p.accent, 10)
-        // viewfinder brackets
-        let b: CGFloat = 92, m: CGFloat = 50
-        let fr = page.insetBy(dx: -m, dy: -m)
-        for (x, y, dx, dy) in [(fr.minX, fr.minY, 1.0, 1.0), (fr.maxX, fr.minY, -1.0, 1.0), (fr.minX, fr.maxY, 1.0, -1.0), (fr.maxX, fr.maxY, -1.0, -1.0)] {
-            stroke(c, line([CGPoint(x: x, y: y + dy * b), CGPoint(x: x, y: y), CGPoint(x: x + dx * b, y: y)]), rgb(0xFFFFFF), 30)
-        }
+        processorGlyphB(c, p)
     case .reader:
         // open book: two pages meeting at a spine, slightly fanned
         let left = CGMutablePath()
@@ -279,6 +289,72 @@ func render(_ set: String, _ app: App, px: Int) -> CGImage {
     return small.makeImage()!
 }
 
+// MARK: Android launcher icon (W40.fix-android-launcher-icon)
+// An adaptive icon is two 108-dp layers; the launcher masks them to its own shape and shows only the inner
+// 72 dp, and only a 66-dp circle is safe from every mask. Here the 1024 canvas is the 108-dp layer.
+
+let androidVisible = S * 72 / 108          // what any mask shows, centred
+let androidSafeRadius = S * 33 / 108       // the circle no mask cuts into
+
+/// Background layer: the Processor tile's gradient and sheen, full bleed, with the gradient spanning the
+/// visible 72 dp so the launcher shows the same top-to-bottom blue as the Mac tile.
+func androidBackground(_ c: CGContext) {
+    let p = palette(.processor), lo = (S - androidVisible) / 2
+    let g = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: [p.top, p.bottom] as CFArray, locations: [0, 1])!
+    c.drawLinearGradient(g, start: CGPoint(x: S / 2, y: lo), end: CGPoint(x: S / 2, y: lo + androidVisible),
+                         options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
+    // the sheen, scaled from the 824-pt Mac tile onto the visible area
+    let k = androidVisible / 824, sheen = CGRect(x: -180, y: -620, width: 1184, height: 900)
+    fill(c, CGPath(ellipseIn: CGRect(x: lo + sheen.minX * k, y: lo + sheen.minY * k,
+                                     width: sheen.width * k, height: sheen.height * k), transform: nil), rgb(0xFFFFFF, 0.10))
+}
+
+/// Foreground layer: the Mac glyph, centred and scaled so its bracket corners stay inside the safe circle.
+func androidForeground(_ c: CGContext) {
+    let b = processorGlyphBounds
+    let k = androidSafeRadius / hypot(b.width / 2, b.height / 2)
+    c.saveGState()
+    c.translateBy(x: S / 2, y: S / 2); c.scaleBy(x: k, y: k); c.translateBy(x: -b.midX, y: -b.midY)
+    processorGlyphB(c, palette(.processor))
+    c.restoreGState()
+}
+
+/// Draw one layer (or both, masked) into a 1024 flipped canvas, then scale to `px`.
+func androidRender(px: Int, _ body: (CGContext) -> Void) -> CGImage {
+    let big = context(1024, 1024)
+    big.translateBy(x: 0, y: 1024); big.scaleBy(x: 1, y: -1)
+    body(big)
+    let full = big.makeImage()!
+    let small = context(px, px); small.interpolationQuality = .high
+    small.draw(full, in: CGRect(x: 0, y: 0, width: px, height: px))
+    return small.makeImage()!
+}
+
+/// The legacy icon: both layers, the visible 72 dp blown up to the whole image, clipped to `shape`.
+func androidLegacy(px: Int, round: Bool) -> CGImage {
+    androidRender(px: px) { c in
+        let r = CGRect(x: 0, y: 0, width: S, height: S)
+        c.addPath(round ? CGPath(ellipseIn: r, transform: nil) : rr(r, S * 186 / 824)); c.clip()
+        let z = S / androidVisible
+        c.translateBy(x: S / 2, y: S / 2); c.scaleBy(x: z, y: z); c.translateBy(x: -S / 2, y: -S / 2)
+        androidBackground(c); androidForeground(c)
+    }
+}
+
+func installAndroid(_ repo: URL) {
+    let res = repo.appendingPathComponent("ArchiveProcessor/ArchiveCapture/app/src/main/res")
+    for (dpi, scale) in [("mdpi", 1.0), ("hdpi", 1.5), ("xhdpi", 2.0), ("xxhdpi", 3.0), ("xxxhdpi", 4.0)] {
+        let dir = res.appendingPathComponent("mipmap-\(dpi)")
+        guard FileManager.default.fileExists(atPath: dir.path) else { fatalError("no mipmap folder at \(dir.path)") }
+        let layer = Int(108 * scale), legacy = Int(48 * scale)
+        writePNG(androidRender(px: layer, androidBackground), dir.appendingPathComponent("ic_launcher_background.png"))
+        writePNG(androidRender(px: layer, androidForeground), dir.appendingPathComponent("ic_launcher_foreground.png"))
+        writePNG(androidLegacy(px: legacy, round: false), dir.appendingPathComponent("ic_launcher.png"))
+        writePNG(androidLegacy(px: legacy, round: true), dir.appendingPathComponent("ic_launcher_round.png"))
+    }
+    print("wrote the Processor launcher icon into \(res.path)")
+}
+
 func writePNG(_ img: CGImage, _ url: URL) {
     let d = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
     CGImageDestinationAddImage(d, img, nil)
@@ -336,7 +412,9 @@ case "install" where args.count >= 3 && sets[args[2]] != nil:
         }
         print("wrote set \(args[2]) into \(dir.path)")
     }
+case "android" where args.count <= 3:
+    installAndroid(URL(fileURLWithPath: args.count > 2 ? args[2] : FileManager.default.currentDirectoryPath))
 default:
-    FileHandle.standardError.write("usage: make-app-icons.swift sheet <out.png> | install <A|B|C> [repo]\n".data(using: .utf8)!)
+    FileHandle.standardError.write("usage: make-app-icons.swift sheet <out.png> | install <A|B|C> [repo] | android [repo]\n".data(using: .utf8)!)
     exit(2)
 }

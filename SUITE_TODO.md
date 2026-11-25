@@ -844,8 +844,6 @@ Order lives in the plan's `### TIER 7` block. The owner approved it on 2026-10-0
 never auto-picked; an `-owner-ok` line ticked `DECLINED` sends its dependant to the fallback in rule 11 of the
 daemon plan. Reproduced bugs this phase finds are filed here as `W40.fix-<slug>` with a severity (rule 8).
 
-- [ ] **W40.fix-android-launcher-icon — Match the Android Capture icon to the Mac Processor icon [S · S4]** (lane: processor) (uses: build) — Use the current Archive Processor Mac artwork for the Android Archive Capture launcher icon, including Android adaptive icon treatment. Check the installed icon on the emulator's launcher at standard sizes. [Walkthrough evidence](verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
-
 **Archive Processor's items wait for the integration (owner, 2026-10-14).** Vision OCR's engine is to be brought into
 Archive Processor (plan: `execution-plans/integration/00-plan.md`), so Archive Processor is verified once, on the
 integrated app. Its items (a5, b3, b4, d1-d5, e8, e12, g3, i1-i5) are `(blocked-on: W42.int-done)`, a HOLD QUEUE gate

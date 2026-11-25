@@ -2,9 +2,13 @@
 
 Tracked bugs we've chosen to come back to later. Each entry has enough context to resume cold.
 
-## Processor guided session 1 — November 23, 2026
+## FIXED (2026-11-24) — The Android launcher icon differed from the Mac Processor icon
 
-- The Android Archive Capture launcher icon differs from the Mac Processor icon. [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md). (queued: W40.fix-android-launcher-icon)
+Raised in the owner's November 23 Processor guided session
+([evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md)). Archive Capture's launcher
+icon is now drawn from the Mac Processor icon's artwork by `release/make-app-icons.swift android`, as an adaptive
+icon (blue gradient background layer, page-and-scan-beam foreground inside the safe circle), and was checked on the
+emulator's launcher at two densities. (accepted: fixed history, W40.fix-android-launcher-icon)
 
 ## FIXED (2026-11-24) — Preservation filenames were hard to match to reading PDFs
 
