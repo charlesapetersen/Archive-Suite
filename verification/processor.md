@@ -762,20 +762,21 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   W40.fix-processor-review-keys, 2026-11-20: the window is now focusable and focused on open, and a click in a row
   gives the keys back; in the VM 1-4, X, ↑/↓, ←/→, [ ], Escape and Return all acted, the footer counting each change.
   Paid-batch Resume skipped the whole-run page review and showed only the later per-collection page review. [Independent VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
-- **Status:** `broken` — `W40.fix-processor-resume-reviews` (S2)
+- **Status:** `works` — W40.fix-processor-resume-reviews fixed the Resume path (2026-11-25)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-19 W40.d2 — `unproven` → `broken`: the promised keys do nothing; the clicks work.
   - 2026-11-20 W40.fix-processor-review-keys — `broken` → `works`: the keys reach the review (focus fix), journey-tested.
   - 2026-11-21 W49.proc-suspects-filing-check — `works` → `broken` on this path.
+  - 2026-11-25 W40.fix-processor-resume-reviews — `broken` → `works`: both Resume routes show this review again (VM journeys).
 - **Notes:** **Drift.** The rotation radios and `[`/`]` are not in this dialog: they appear only in the separate,
   opt-in Review rotation pass (`rotationOnly`, `:15-16`, `:201-213`; enabled by `reviewRotation` with rotation on,
   `OCR/OCRProcessor+Pipeline.swift:3084`). Keys 1 and 2 work only when document classes are shown (`:171-181`). The
   Documents switch defaults on and controls the whole-run review on fresh runs with model-proposed boundaries
   (W49.proc-s046-review-toggle). The fresh pipeline still skips the later per-collection review. S-046
   [documents the earlier mismatch and its verification](evidence/processor/W49.proc-s046-verify.md).
-  Ordinary Resume bypasses the whole-run review with either saved setting. A saved On opens the per-collection
-  review after tagging ([S-050 VM evidence](evidence/processor/W49.proc-s050-verify.md)).
+  Resume (ordinary and paid batch) shows the whole-run review unless it was turned off at Start, and no
+  per-collection review after tagging (W40.fix-processor-resume-reviews; [S-050 VM evidence](evidence/processor/W49.proc-s050-verify.md)).
 
 ### P-33 · Generated tags
 
@@ -890,15 +891,15 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Runtime evidence:** W40.d2, 2026-11-19: the review shows each file's class, rotation and tags and the segment list;
   Complete finishes the run ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)). Redo and the double-click edit sheet were not driven.
   Automatic paid-batch Resume filed tagged PDFs without displaying final tagging review. [Independent VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
-- **Status:** `broken` — `W40.fix-processor-resume-reviews` (S2)
+- **Status:** `works` — W40.fix-processor-resume-reviews fixed the Resume path (2026-11-25)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-19 W40.d2 — stays `unproven`: Complete works; Redo and the edit sheet unproven.
   - 2026-11-21 W49.proc-suspects-filing-check — `unproven` → `broken` on this path.
+  - 2026-11-25 W40.fix-processor-resume-reviews — `broken` → `works` on Resume: paid-batch Resume shows final tagging review again; Redo and the edit sheet stay undriven.
 - **Notes:** the button is "Redo Segmentation & Tagging"; it rebuilds segments from the edited classifications
-  (`OCR/OCRProcessor+Tagging.swift:493-497`). This review applies to Automatic. Call 30 requires it on paid-batch
-  Resume unless explicitly skipped (S-035). Ordinary Resume still opens the final
-  tagging review ([S-050 VM evidence](evidence/processor/W49.proc-s050-verify.md)).
+  (`OCR/OCRProcessor+Tagging.swift:493-497`). This review applies to Automatic, on fresh runs and on both Resume
+  routes (S-035 fixed by W40.fix-processor-resume-reviews).
 
 ### P-38 · Manual per-segment tagging
 
@@ -957,16 +958,16 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
 - **Runtime evidence:** W40.d2, 2026-11-19: two photos marked Box in the review arrive as Box; the second, turned to
   Folder by its radio, carries `Folder` and no `Box` ([`evidence/processor/W40.d2-review-dialogs.md`](evidence/processor/W40.d2-review-dialogs.md)). Page 2 does not follow (P-23).
   Paid-batch Resume omitted the label confirmation with both a box and a folder in the saved batch. [Independent VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
-- **Status:** `broken` — `W40.fix-processor-resume-reviews` (S2)
+- **Status:** `works` — W40.fix-processor-resume-reviews fixed the Resume path (2026-11-25)
 - **History:**
   - 2026-10-21 W40.b3 — row written, `unproven`.
   - 2026-11-18 W40.d1 — stays `unproven`: the headless driver answers the gate with no sheet drawn; `W40.d2` drives the dialogs.
   - 2026-11-19 W40.d2 — `unproven` → `works` on the per-page path (tags; page 2 is P-23's defect).
   - 2026-11-21 W49.proc-suspects-filing-check — `works` → `broken` on this path.
+  - 2026-11-25 W40.fix-processor-resume-reviews — `broken` → `works`: both Resume routes show this review again (VM journeys).
 - **Notes:** it lists only pages already classed box or folder, so a box photo misread as a document is caught only
-  by the per-page dialog. Skipped in the manual window, for Live Capture pre-grouped runs and in a resumed batch
-  (S-035). A resumed ordinary Automatic + Full manual run also skips it, even with both label types
-  saved ([S-050 VM evidence](evidence/processor/W49.proc-s050-verify.md)).
+  by the per-page dialog. Skipped in the manual window and for Live Capture pre-grouped runs. Both Resume routes
+  show it since W40.fix-processor-resume-reviews (S-035, S-050).
 
 ## Tools
 

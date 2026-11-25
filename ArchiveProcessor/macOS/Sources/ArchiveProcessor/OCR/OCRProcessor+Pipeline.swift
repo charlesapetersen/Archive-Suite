@@ -2079,8 +2079,9 @@ extension OCRProcessor {
             enableTagging: pending.enableTagging, enableSegmentJSON: pending.enableSegmentJSON,
             enableCollectionSegmentation: pending.enableCollectionSegmentation,
             confirmCollectionIDs: pending.confirmCollectionIDs,
-            collectionReviewsDocuments: pending.reviewDocumentSegmentation, reviewWholeRun: true, reviewRotation: false,
-            segmentationReviews: false, phoneGroupsApply: !pending.usesWindowSegmentation, taggingReview: false)
+            reviewWholeRun: pending.reviewWholeRun ?? true, reviewRotation: false,
+            // A batch journal keeps no phone groups, so groups still in memory belong to another run.
+            phoneGroupsApply: false)
         guard await runPostOCRStages(plan) else { return }
 
         guard !Task.isCancelled else { return }
@@ -2383,6 +2384,7 @@ extension OCRProcessor {
                     enableSegmentJSON: pending.enableSegmentJSON,
                     enableCollectionSegmentation: pending.enableCollectionSegmentation,
                     confirmCollectionIDs: pending.confirmCollectionIDs,
+                    reviewWholeRun: pending.reviewWholeRun ?? true,
                     customPrompt: pending.customPrompt,
                     runConfig: runConfig,
                     settings: pending.resolvedSettings
@@ -2445,8 +2447,7 @@ extension OCRProcessor {
             enableTagging: pending.enableTagging, enableSegmentJSON: pending.enableSegmentJSON,
             enableCollectionSegmentation: pending.enableCollectionSegmentation,
             confirmCollectionIDs: pending.confirmCollectionIDs,
-            collectionReviewsDocuments: pending.reviewDocumentSegmentation, reviewWholeRun: true, reviewRotation: false,
-            segmentationReviews: false, phoneGroupsApply: true, taggingReview: true)
+            reviewWholeRun: pending.reviewWholeRun ?? true, reviewRotation: false, phoneGroupsApply: true)
         guard await runPostOCRStages(plan) else { return }
 
         guard !Task.isCancelled else { return }
@@ -3247,8 +3248,9 @@ extension OCRProcessor {
         resumingMixedPDF: PendingMixedPDF? = nil,
         postCorrectionRequested: Bool = false
     ) async {
-        // A mixed PDF resume keeps its existing review flow. The fresh switch controls only Start.
-        let reviewWholeRun = resumingMixedPDF != nil || reviewFreshDocumentSegmentation
+        // A mixed PDF resume keeps the choice its record saved at Start (owner call 30: Resume skips only a review the
+        // user turned off; W40.fix-processor-resume-reviews). An older record without it reads as on.
+        let reviewWholeRun = resumingMixedPDF.map { $0.reviewWholeRun ?? true } ?? reviewFreshDocumentSegmentation
         let localAgent = requestedLocalAgent.map { config in
             var config = config
             config.requiresSubscription = SettingsLayerStore.shared.resolver(at: outputDirectory).monthlyLimitUSD != nil
@@ -3491,7 +3493,8 @@ extension OCRProcessor {
                 confirmCollectionIDs: confirmCollectionIDs,
                 reviewDocumentSegmentation: reviewDocumentSegmentation,
                 segmentationContext: segmentationContext, gatewayConfig: gatewayConfig,
-                localAgent: localAgent, runConfig: runConfig, ledgerRunID: runID) else {
+                localAgent: localAgent, runConfig: runConfig, ledgerRunID: runID,
+                reviewWholeRun: reviewWholeRun) else {
                 isProcessing = false
                 return
             }
@@ -3677,6 +3680,7 @@ extension OCRProcessor {
                         enableSegmentJSON: enableSegmentJSON,
                         confirmCollectionIDs: confirmCollectionIDs,
                         reviewDocumentSegmentation: reviewDocumentSegmentation,
+                        reviewWholeRun: reviewWholeRun,
                         customPrompt: segmentationContext.customPrompt,
                         imageScale: segmentationContext.imageScale,
                         runConfig: runConfig,
@@ -3723,6 +3727,7 @@ extension OCRProcessor {
                     )
                     pendingRun.mixedPDFOutcomes = mixedPDFOutcomes
                     pendingRun.resolvedSettings = activeResolvedSettings
+                    pendingRun.reviewWholeRun = reviewWholeRun
                     guard let fingerprint = Self.pendingRunFingerprintV2(pendingRun) else {
                         cleanupTempFiles()
                         activeRunHistory = nil
@@ -3799,9 +3804,9 @@ extension OCRProcessor {
                                 thinkingLevel: runConfig.textThinkingLevel, apiKey: runConfig.textAPIKey),
                     enableTagging: enableTagging, enableSegmentJSON: enableSegmentJSON,
                     enableCollectionSegmentation: enableCollectionSegmentation,
-                    confirmCollectionIDs: confirmCollectionIDs, collectionReviewsDocuments: false,
+                    confirmCollectionIDs: confirmCollectionIDs,
                     reviewWholeRun: reviewWholeRun, reviewRotation: reviewRotation && rotationMode != .off,
-                    segmentationReviews: true, phoneGroupsApply: true, taggingReview: true)
+                    phoneGroupsApply: true)
                 guard await runPostOCRStages(plan) else { return }
             }
 

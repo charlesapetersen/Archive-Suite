@@ -26,19 +26,13 @@ struct PostOCRPlan {
     let enableSegmentJSON: Bool
     let enableCollectionSegmentation: Bool
     let confirmCollectionIDs: Bool
-    /// Collection segmentation's own document review (a resume's stored choice; the interactive routes have
-    /// already reviewed the documents).
-    let collectionReviewsDocuments: Bool
+    /// The whole-run page review before tagging. A resume passes the run's saved choice, so it skips this review
+    /// only when the user turned it off before Start (owner call 30, W40.fix-processor-resume-reviews).
     let reviewWholeRun: Bool
     /// The dedicated rotation review runs (fresh runs only, when it is on and rotation is not off).
     let reviewRotation: Bool
-    /// The per-page review and the box/folder confirmation run. False on a resume
-    /// (W40.fix-processor-resume-reviews decides which it restores).
-    let segmentationReviews: Bool
     /// Live Capture's phone groups can stand for segmentation.
     let phoneGroupsApply: Bool
-    /// Automatic tagging pauses for the final review and its Redo (false only on a resumed batch).
-    let taggingReview: Bool
 }
 
 /// How a route's run is filed and summed up (`OCRProcessor.completeRun`).

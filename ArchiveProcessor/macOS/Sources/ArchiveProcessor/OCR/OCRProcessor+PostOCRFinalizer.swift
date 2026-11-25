@@ -31,49 +31,35 @@ extension OCRProcessor {
         }
 
         // Segmentation: pre-grouped from Live Capture, else the window segmenter and its review, else the per-page
-        // review (W36.seg-opt-review: `SegmentationPlan`). A resume skips the per-page and box/folder reviews
-        // (W40.fix-processor-resume-reviews decides which it restores) and segments only when it tags.
+        // review (W36.seg-opt-review: `SegmentationPlan`). Every route, a resume included, shows the reviews that
+        // apply: Resume skips only the whole-run review the user turned off (owner call 30,
+        // W40.fix-processor-resume-reviews). A window approach reuses the answers a resumed manifest kept.
         let segPlan = segmentationPlan(tagging: mode, runConfig: runConfig)
         let preGrouped = plan.phoneGroupsApply && preGroupedBoundaries.count == files.count && !files.isEmpty
-        if plan.segmentationReviews {
-            if preGrouped {
-                // Groups were defined on the phone — apply them directly, skip LLM segmentation.
-                applyPreGroupedClassifications(files: files)
-                rebuildSegments(files: files)
-            } else if case .windows(let approach) = segPlan {
-                guard await runWindowSegmentationStage(files: files, approach: approach,
-                                                       runConfig: runConfig, outputDirectory: plan.outputDirectory,
-                                                       settings: plan.settings,
-                                                       reviewWholeRun: plan.reviewWholeRun) == .done else {
-                    return stop()
-                }
-            } else if case .manualWindow = segPlan {
-                // Manual modes: the combined segment+tag window owns rotation, box/folder, and segmentation, so
-                // skip the separate review here (it rebuilds segments itself).
-            } else if tagging || plan.enableCollectionSegmentation {
-                if plan.reviewWholeRun || segPlan == .noTagging {
-                    await showFullSegmentationReview(files: files, runConfig: runConfig)
-                    guard !Task.isCancelled else { return stop() }
-                }
-                // Final confirmation of box/folder identifications
-                await showBoxFolderConfirmation(files: files, runConfig: runConfig)
+        if preGrouped {
+            // Groups were defined on the phone — apply them directly, skip LLM segmentation.
+            applyPreGroupedClassifications(files: files)
+            rebuildSegments(files: files)
+        } else if case .windows(let approach) = segPlan {
+            guard await runWindowSegmentationStage(files: files, approach: approach,
+                                                   runConfig: runConfig, outputDirectory: plan.outputDirectory,
+                                                   settings: plan.settings,
+                                                   reviewWholeRun: plan.reviewWholeRun) == .done else {
+                return stop()
+            }
+        } else if case .manualWindow = segPlan {
+            // Manual modes: the combined segment+tag window owns rotation, box/folder, and segmentation, so
+            // skip the separate review here (it rebuilds segments itself).
+        } else if tagging || plan.enableCollectionSegmentation {
+            if plan.reviewWholeRun || segPlan == .noTagging {
+                await showFullSegmentationReview(files: files, runConfig: runConfig)
                 guard !Task.isCancelled else { return stop() }
-                // Rebuild segments from user-confirmed classifications (excluding removed files)
-                rebuildSegments(files: files)
             }
-        } else if tagging {
-            // A resume reuses the answers its manifest kept for a window approach; otherwise the stored per-page
-            // classifications segment, as before.
-            if case .windows(let approach) = segPlan, !preGrouped {
-                guard await runWindowSegmentationStage(files: files, approach: approach,
-                                                       runConfig: runConfig, outputDirectory: plan.outputDirectory,
-                                                       settings: plan.settings) == .done else {
-                    return stop()
-                }
-            } else {
-                statusMessage = "Segmenting documents…"
-                rebuildSegments(files: files)
-            }
+            // Final confirmation of box/folder identifications
+            await showBoxFolderConfirmation(files: files, runConfig: runConfig)
+            guard !Task.isCancelled else { return stop() }
+            // Rebuild segments from user-confirmed classifications (excluding removed files)
+            rebuildSegments(files: files)
         }
         guard !Task.isCancelled else { return stop() }
 
@@ -88,19 +74,10 @@ extension OCRProcessor {
             statusMessage = "Found \(segments.count) segments. Tagging…"
             switch mode {
             case .automatic:
-                if plan.taggingReview {
-                    await performAutomaticTaggingWithReview(
-                        provider: text.provider, model: text.model, thinkingLevel: text.thinkingLevel,
-                        apiKey: text.apiKey, outputDirectory: plan.outputDirectory,
-                        enableSegmentJSON: plan.enableSegmentJSON, files: files, runConfig: runConfig)
-                } else {
-                    // A resumed batch tags straight through: it has no interactive session to drive the redo-review
-                    // loop (a deliberate divergence from the interactive routes).
-                    await performTaggingPhase(
-                        provider: text.provider, model: text.model, apiKey: text.apiKey,
-                        outputDirectory: plan.outputDirectory, enableSegmentJSON: plan.enableSegmentJSON,
-                        runConfig: runConfig)
-                }
+                await performAutomaticTaggingWithReview(
+                    provider: text.provider, model: text.model, thinkingLevel: text.thinkingLevel,
+                    apiKey: text.apiKey, outputDirectory: plan.outputDirectory,
+                    enableSegmentJSON: plan.enableSegmentJSON, files: files, runConfig: runConfig)
             case .autoDate, .human:
                 if let autoDate = segPlan.combinedWindow(tagging: mode, preGrouped: preGrouped) {
                     await performManualSegmentAndTag(
@@ -135,7 +112,6 @@ extension OCRProcessor {
                 provider: plan.text.provider, model: plan.text.model, thinkingLevel: plan.text.thinkingLevel,
                 apiKey: plan.text.apiKey, outputDirectory: plan.outputDirectory,
                 confirmBeforeOrganizing: plan.confirmCollectionIDs,
-                reviewDocumentSegmentation: plan.collectionReviewsDocuments,
                 runConfig: runConfig)
             applyBoxFolderLabelTags(enableTagging: plan.enableTagging, runConfig: runConfig)
         }

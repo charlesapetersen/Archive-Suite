@@ -179,6 +179,8 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
     }
 
     /// S-050: quit with real OCR results saved, relaunch, click Resume Run, and record the gates that open.
+    /// W40.fix-processor-resume-reviews (owner call 30): Resume shows every review that applies and skips only the
+    /// whole-run page review the user turned off before Start; the documents are not reviewed a second time later.
     func testOrdinaryResumeReviewGates() throws {
         for enabled in [true, false] {
             let name = enabled ? "s050-review-on" : "s050-review-off"
@@ -237,6 +239,8 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.3))
             }
             XCTAssertTrue(complete.exists, "the resumed run reaches final tagging review")
+            XCTAssertEqual(sawPageReview, enabled, "Resume shows the whole-run page review unless it was turned off")
+            XCTAssertTrue(sawBoxReview, "Resume shows the box/folder confirmation")
             print("[s050] \(name): whole-run page review=\(sawPageReview), box/folder confirmation=\(sawBoxReview), final tagging review=\(complete.exists)")
             shot("\(name)-final-tagging-review")
             complete.click()
@@ -259,7 +263,7 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
             }
             XCTAssertTrue(text(of: done).hasPrefix("Done. 6 succeeded, 0 failed."),
                           "the resumed run finishes all six files after its remaining reviews")
-            XCTAssertEqual(sawCollectionReview, enabled, "the collection-stage review follows the saved setting")
+            XCTAssertFalse(sawCollectionReview, "as on a fresh run, the documents are not reviewed again after tagging")
             XCTAssertEqual(try ocrCallCount(name), 6, "Resume reuses the original six saved readings")
             print("[s050] \(name): per-collection page review=\(sawCollectionReview); \(text(of: done)); OCR calls=6")
         }
@@ -382,6 +386,8 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
     }
 
     /// Relaunch with a completed paid batch on disk and press the actual Resume Batch button.
+    /// W40.fix-processor-resume-reviews (owner call 30): the journal kept the whole-run review on, so Resume Batch
+    /// shows the reviews a fresh run shows, in the same order.
     func testPaidBatchResumeReviewGates() throws {
         let args = [
             "-APUITestPaidBatch", "-taggingModeRaw", "automatic", "-segmentationApproach", "manual",
@@ -434,7 +440,7 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
         print("[s035] paid Resume: \(reviews); \(text(of: done))")
         if !done.exists { dump(app, "paid Resume did not finish") }
         XCTAssertTrue(text(of: done).hasPrefix("Done. 6 succeeded, 0 failed."))
-        XCTAssertEqual(reviews, ["collection names", "per-collection pages"])
+        XCTAssertEqual(reviews, ["whole-run pages", "box and folder labels", "final tagging", "collection names"])
         shot("s035-paid-done")
         for (pdf, original) in legacy {
             XCTAssertEqual(try Data(contentsOf: pdf), original)

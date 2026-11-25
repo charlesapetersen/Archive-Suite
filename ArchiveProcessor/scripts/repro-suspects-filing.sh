@@ -132,15 +132,16 @@ for c in "${cases[@]}"; do
         docs=$(show_pdfs "$WORK/$c" | grep -v "'Box'\|'Folder'" | grep -c ' pdf ')
         unc=$(show_pdfs "$WORK/$c" | grep -v "'Box'\|'Folder'" | grep -c "Date Uncertain")
         verdict "$c" "$unc of $docs document PDF(s) carry Date Uncertain";;
-    s035-resume)       # S-035: a finished paid batch resumed under Automatic — which review gates does it raise?
+    s035-resume)       # S-035: a finished paid batch resumed under Automatic, saved with the whole-run review on and
+                       # off — which review gates does it raise? (W40.fix-processor-resume-reviews: the probe checks them)
         mkdir -p "$WORK/$c"
         ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$WORK/backup" \
             RESUME_GATES_TEST=1 RESUME_GATES_TEST_OUT="$WORK/$c/result.txt" \
             processor_test_start pid "$BIN" >"$WORK/$c/app.log" 2>&1
-        for _ in $(seq 1 200); do [ -f "$WORK/$c/result.txt" ] && break; sleep 1; done
+        for _ in $(seq 1 400); do [ -f "$WORK/$c/result.txt" ] && break; sleep 1; done
         processor_test_stop "$pid"
         echo "── $c"; sed 's/^/  /' "$WORK/$c/result.txt" 2>/dev/null
-        verdict "$c" "$(grep '^gates' "$WORK/$c/result.txt" 2>/dev/null | cut -f2- || echo '(timed out)')";;
+        verdict "$c" "$(grep -E '^(PASS|FAIL|ALL PASS|[0-9]+ FAILED)' "$WORK/$c/result.txt" 2>/dev/null | tr '\n' ' ' || echo '(timed out)')";;
     s031-window)       # S-031: an OCR-marked enclosure through the window stage (SegmentationReviewTestDriver §9)
         mkdir -p "$WORK/$c"
         ARCHIVEPROC_HEADLESS=1 ARCHIVEPROC_TEST_BACKUP_ROOT="$WORK/backup" \

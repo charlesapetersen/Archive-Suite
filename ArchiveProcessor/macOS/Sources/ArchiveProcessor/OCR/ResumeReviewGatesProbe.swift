@@ -8,6 +8,10 @@ import Foundation
 /// calls get a fixed tag JSON; nothing else is expected). An autopilot answers every review gate the way Process Files'
 /// sheets would and records it. Gated by `RESUME_GATES_TEST=1`; $0, no network, scratch only. Writes the gates, the
 /// requests and the run's status to `RESUME_GATES_TEST_OUT`.
+///
+/// W40.fix-processor-resume-reviews (owner call 30): Resume skips only a review the user turned off. The probe runs
+/// the journal twice, saved with the whole-run review on (an older journal's nil) and turned off, and checks the gates:
+/// the whole-run review only when on, the box/folder confirmation and the final tagging review in both.
 @MainActor
 enum ResumeReviewGatesProbe {
     nonisolated static let envKey = "RESUME_GATES_TEST"
@@ -29,6 +33,23 @@ enum ResumeReviewGatesProbe {
     }
 
     static func run() async {
+        var out: [String] = []
+        var failures = 0
+        for (label, saved) in [("saved-on", nil), ("saved-off", false)] as [(String, Bool?)] {
+            guard let lines = await runCase(reviewWholeRun: saved) else { return }
+            out += lines.map { "\(label)\t\($0)" }
+            let gates = lines.first { $0.hasPrefix("gates\t") }.map { String($0.dropFirst(6)) } ?? ""
+            let want = (saved ?? true ? ["documentReview"] : []) + ["boxFolderConfirmation", "finalReview"]
+            let ok = gates == want.joined(separator: ",")
+            if !ok { failures += 1 }
+            out.append("\(ok ? "PASS" : "FAIL") \(label): gates \(gates), want \(want.joined(separator: ","))")
+        }
+        out.append(failures == 0 ? "ALL PASS" : "\(failures) FAILED")
+        finish(out)
+    }
+
+    /// One resumed batch; nil after a fixture failure (already reported).
+    private static func runCase(reviewWholeRun: Bool?) async -> [String]? {
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appendingPathComponent("APResumeGates-\(UUID().uuidString)", isDirectory: true)
         defer { try? fm.removeItem(at: root) }
@@ -43,7 +64,7 @@ enum ResumeReviewGatesProbe {
         guard OCRProcessor.pendingBatchURL.deletingLastPathComponent().standardizedFileURL
                 == stateRoot.standardizedFileURL else {
             finish(["FAIL: the batch journal is not redirected into scratch — \(OCRProcessor.pendingBatchURL.path)"])
-            return
+            return nil
         }
         try? fm.createDirectory(at: stateRoot, withIntermediateDirectories: true)
 
@@ -62,7 +83,7 @@ enum ResumeReviewGatesProbe {
             let pdf = output.appendingPathComponent(String(format: "p%02d.pdf", i + 1))
             guard writeJPEG(photo, shade: 0.15 * Double(i + 1)), writeFixturePDF(pdf) else {
                 finish(["FAIL: fixture files could not be written"])
-                return
+                return nil
             }
             files.append(photo)
             results[String(i)] = OCRResult(text: "Probe page \(i + 1) text.", classification: cls,
@@ -70,7 +91,7 @@ enum ResumeReviewGatesProbe {
             paths[String(i)] = pdf.path
         }
         let model = LLMProvider.gemini.models[0]
-        let journal = OCRProcessor.savePendingBatch(OCRProcessor.PendingBatch(
+        var batch = OCRProcessor.PendingBatch(
             batchId: "batches/probe-0", provider: .gemini, model: model, thinkingLevel: nil, fileURLs: files,
             outputDirectory: output, enableTagging: true, sendPreviousImage: false, submittedAt: Date(),
             taggingMode: .automatic,
@@ -78,10 +99,14 @@ enum ResumeReviewGatesProbe {
                                                         enableTagging: true, batchMode: true, preserveInputOrder: true),
             lifecycleVersion: OCRProcessor.PendingBatch.currentLifecycleVersion,
             submittedChunkIds: ["batches/probe-0"], consumedChunkIds: ["batches/probe-0"],
-            completedResults: results, completedOutputPaths: paths))
-        guard let journal, OCRProcessor.pendingBatchIsSelfConsistent(journal) else {
-            finish(["FAIL: the finished journal is not one resumeBatch accepts"])
-            return
+            completedResults: results, completedOutputPaths: paths)
+        batch.reviewWholeRun = reviewWholeRun
+        let journal = OCRProcessor.savePendingBatch(batch)
+        guard let journal, OCRProcessor.pendingBatchIsSelfConsistent(journal),
+              OCRProcessor._testReadPendingBatch(from: OCRProcessor.pendingBatchURL)?.reviewWholeRun == reviewWholeRun
+        else {
+            finish(["FAIL: the finished journal is not one resumeBatch accepts, or lost its review choice"])
+            return nil
         }
 
         let requests = Requests()
@@ -133,8 +158,7 @@ enum ResumeReviewGatesProbe {
         out.append("requests\t\(requests.urls.isEmpty ? "(none)" : requests.urls.joined(separator: "; "))")
         out.append("status\t\(processor.statusMessage)")
         OCRProcessor.deletePendingBatch()
-        out.append("DONE")
-        finish(out)
+        return out
     }
 
     private static func writeJPEG(_ url: URL, shade: Double) -> Bool {

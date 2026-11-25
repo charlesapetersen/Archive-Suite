@@ -923,7 +923,7 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** `scripts/test-batch-resume.sh`-style resume of a finished batch under Automatic + Manual:
   record which review gates are raised.
 - **Would clear it:** the dialog and confirmation are raised, or the skip is a recorded decision.
-- **Status:** `reproduced` — independently confirmed; fix queued as `W40.fix-processor-resume-reviews`. [VM evidence](evidence/processor/W49.proc-suspects-filing-check.md).
+- **Status:** `fixed` — W40.fix-processor-resume-reviews: Resume Batch shows the whole-run page review (unless turned off at Start), the box/folder confirmation and the final tagging review. [VM evidence](evidence/processor/W49.proc-suspects-filing-check.md#fix-verification-w40fix-processor-resume-reviews).
 - **History:**
   - 2026-10-21 W40.b3 — raised.
   - 2026-11-20 owner, Backlog sheet (call 28) — queued as `W49.proc-suspects-filing` under phase rule 5a.
@@ -937,6 +937,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     interactive session"); nothing records the other two, yet the same resume does raise the collection-name sheet and
     the per-collection review when they are on. Asked, as the comment's reason could be meant to cover them.
   - 2026-11-21 W49.proc-suspects-filing-check (Codex gpt-6.2-sol at `bdfe3274`, original Claude Opus 5.5 in `d8fb1269`) — After reopening a persisted, fully read Gemini scratch batch, Resume Batch opened neither pre-tagging review nor final tagging review. It opened collection names and the later per-collection page review, then filed all six tagged PDFs. Owner call 30 requires every applicable review except where the user already explicitly skipped it.
+  - 2026-11-25 W40.fix-processor-resume-reviews — fixed; the paid-batch journey now sees the whole-run page review,
+    the box/folder confirmation and the final tagging review, then collection names.
 
 ### S-036 · An edited collection name is used as typed when the user clicks Confirm
 
@@ -1288,8 +1290,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Would confirm it:** a real Process Files run under Automatic, interrupted at its first review and resumed
   through the app after relaunch. Compare the visible stages with the document review setting saved on and off.
 - **Would clear it:** Resume presents each applicable review unless the user explicitly skipped it (owner call 30).
-- **Status:** `confirmed` — independently reproduced by W49.proc-s050-check; fix queued as
-  `W40.fix-processor-resume-reviews`. [VM evidence](evidence/processor/W49.proc-s050-verify.md).
+- **Status:** `fixed` — W40.fix-processor-resume-reviews: Resume Run shows the whole-run page review unless it was
+  turned off at Start, and the box/folder confirmation. [VM evidence](evidence/processor/W49.proc-s050-verify.md#fix-verification-w40fix-processor-resume-reviews).
 - **History:**
   - 2026-11-20 W49.proc-suspects-filing — raised.
   - 2026-11-21 owner walkthrough (call 30) — verification queued as `W49.proc-s050-verify`; Resume should omit only explicitly skipped reviews (also S-035).
@@ -1298,6 +1300,8 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     the later per-collection review, even when the live setting had been changed. Both reused all six OCR results.
   - 2026-11-24 W49.proc-s050-check — Claude Opus 5.5 independently reproduced at `1d4a91e1` on a fresh guest
     run, with the same review sequence and six OCR calls in both cases; ordinary Resume joins the S-035 fix.
+  - 2026-11-25 W40.fix-processor-resume-reviews — fixed with S-035 in the shared post-OCR stages; the journey now
+    asserts the call 30 sequence (saved on: page review, labels, final review; saved off: labels, final review).
 
 
 ### S-051 · A batch create refused outright is reported as an uncertain submission

@@ -338,6 +338,8 @@ OCR/                           OCR pipeline + provider clients:
                                +PostOCRFinalizer (W49.proc-unified-pipeline-1): `runPostOCRStages(PostOCRPlan)` and
                                `completeRun(RunCompletion)`, every route's tail after OCR; automatic tagging's answers
                                are kept per segment in `PendingRun.taggingProgress` (`taggingProgressKey`) for a resume.
+                               Every route shows the same reviews; a resume skips the whole-run review only when its
+                               record's `reviewWholeRun` says it was off at Start (W40.fix-processor-resume-reviews).
   AnthropicClient·GeminiClient·MistralClient.swift   Single-shot OCR client per provider.
   OpenAICompatibleClient.swift OCR via any OpenAI-compatible gateway endpoint; also native OpenAI and the pinned
                                OpenRouter provider (`openRouter`; routes in ProviderModels `OpenRouterRoute`).

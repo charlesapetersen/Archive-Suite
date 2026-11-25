@@ -215,25 +215,25 @@ preserves every copied tag on label and document PDFs, including copied type and
 classification edit. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-filing-check.md).
 (accepted: fixed by W40.fix-processor-copy-label-tags)
 
-## Paid-batch Resume bypasses three reviews (S-035)
+## FIXED (S-035, 2026-11-25) — Paid-batch Resume bypassed three reviews
 
-- After reopening a persisted, fully read Gemini scratch batch, Resume Batch opened neither pre-tagging review nor final tagging review. It opened collection names and the later per-collection page review, then filed all six tagged PDFs. Owner call 30 requires every applicable review except where the user already explicitly skipped it. [Independent VM evidence](../verification/evidence/processor/W49.proc-suspects-filing-check.md). (queued: W40.fix-processor-resume-reviews)
+- Resume Batch now shows the reviews a fresh run shows: the whole-run page review (unless the Documents switch was off
+  at Start, which the journal keeps), the box/folder confirmation and the final tagging review, then collection names.
+  Regression `ReviewDialogsJourneyUITests.testPaidBatchResumeReviewGates` and the headless `ResumeReviewGatesProbe`
+  (saved on and off). [Original independent VM evidence](../verification/evidence/processor/W49.proc-suspects-filing-check.md).
+  (accepted: fixed by W40.fix-processor-resume-reviews)
 
 ## FIXED (S-036, 2026-11-23) — Collection names could file PDFs outside the selected folder
 
 - Review Collection Names requires a single folder name before confirmation. Filing refuses invalid collection names and linked collection or segment-JSON directories. [Original independent VM evidence](../verification/evidence/processor/W49.proc-suspects-filing-check.md). (accepted: fixed by W40.fix-processor-collection-name-filing)
 
-## Ordinary Resume bypasses two reviews before tagging (S-050)
+## FIXED (S-050, 2026-11-25) — Ordinary Resume bypassed two reviews before tagging
 
-- **Reproduced 2026-11-21 (Codex gpt-6.2-sol, `5cd1bd29`).** After relaunch, `OCRProcessor.resumeRun`
-  goes straight from saved classifications to Automatic tagging review under the Full manual approach.
-  The whole-run page review and box/folder confirmation are omitted even with review enabled and no
-  review answered. The saved document review switch controls only the later per-collection review on this
-  path. [VM evidence](../verification/evidence/processor/W49.proc-s050-verify.md). (queued: W40.fix-processor-resume-reviews)
-- **Independently confirmed 2026-11-24 (Claude Opus 5.5, `1d4a91e1`).** A fresh guest run showed the same
-  sequence in both cases: no whole-run page review or box/folder confirmation after Resume Run, final tagging
-  review shown, the later per-collection review only with the saved setting on, and six OCR calls in all.
-  (queued: W40.fix-processor-resume-reviews)
+- Resume Run shows the whole-run page review unless the user turned it off before Start (the pending run keeps that
+  choice), then the box/folder confirmation and the final tagging review. As on a fresh run, the documents are not
+  reviewed a second time after tagging. A resumed mixed-PDF run keeps its saved choice too. Regression
+  `ReviewDialogsJourneyUITests.testOrdinaryResumeReviewGates` (saved on and off). [Original VM
+  evidence](../verification/evidence/processor/W49.proc-s050-verify.md). (accepted: fixed by W40.fix-processor-resume-reviews)
 
 ## FIXED (S-048, 2026-11-24) — a file added again is listed and read once
 

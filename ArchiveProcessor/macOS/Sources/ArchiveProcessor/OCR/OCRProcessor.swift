@@ -535,6 +535,10 @@ class OCRProcessor: ObservableObject {
         var resultsCollected: Bool? = nil
         /// Links that could not be saved in the paid ledger when the provider returned the job ID.
         var paidRequestLinks: [String: UUID]? = nil
+        /// Whether the run showed the whole-run page review (the Documents switch at Start), so Resume Batch skips it
+        /// only when the user turned it off (owner call 30, W40.fix-processor-resume-reviews). Nil reads as on. A
+        /// review choice, not run identity: outside both fingerprints.
+        var reviewWholeRun: Bool? = nil
 
         var usesWindowSegmentation: Bool {
             guard enableTagging,
@@ -619,6 +623,7 @@ class OCRProcessor: ObservableObject {
             segmentationAnswers = try c.decodeIfPresent([String: SavedGapAnswer].self, forKey: .segmentationAnswers)
             resultsCollected = try c.decodeIfPresent(Bool.self, forKey: .resultsCollected)
             paidRequestLinks = try c.decodeIfPresent([String: UUID].self, forKey: .paidRequestLinks)
+            reviewWholeRun = try c.decodeIfPresent(Bool.self, forKey: .reviewWholeRun)
             newspaperManifest = try c.decodeIfPresent(NewspaperBatch.Manifest.self, forKey: .newspaperManifest)
             newspaperParts = try c.decodeIfPresent([String: OCRResult].self, forKey: .newspaperParts)
             cascade = try c.decodeIfPresent(OCRCascade.self, forKey: .cascade)
@@ -805,6 +810,10 @@ class OCRProcessor: ObservableObject {
         /// `taggingProgressKey`, so a crash or quit during tagging does not buy them again. Outside the fingerprint for
         /// the reason the window answers are: the run's own progress after OCR, rewritten as it goes.
         var taggingProgress: [String: SavedSegmentTags]? = nil
+        /// Whether the run showed the whole-run page review (the Documents switch at Start), so Resume skips it only
+        /// when the user turned it off (owner call 30, W40.fix-processor-resume-reviews). Nil reads as on. A review
+        /// choice, not run identity: outside the fingerprint.
+        var reviewWholeRun: Bool? = nil
     }
 
 

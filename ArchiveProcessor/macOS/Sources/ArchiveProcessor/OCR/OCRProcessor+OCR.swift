@@ -198,8 +198,7 @@ extension OCRProcessor {
             text: .init(provider: provider, model: model, thinkingLevel: thinkingLevel, apiKey: apiKey),
             enableTagging: enableTagging, enableSegmentJSON: enableSegmentJSON,
             enableCollectionSegmentation: enableCollectionSegmentation, confirmCollectionIDs: confirmCollectionIDs,
-            collectionReviewsDocuments: false, reviewWholeRun: reviewWholeRun, reviewRotation: false,
-            segmentationReviews: true, phoneGroupsApply: false, taggingReview: true)
+            reviewWholeRun: reviewWholeRun, reviewRotation: false, phoneGroupsApply: false)
         guard await runPostOCRStages(plan) else { return }
 
         // Organize into collection folders (after all processing)
@@ -761,6 +760,7 @@ extension OCRProcessor {
         enableSegmentJSON: Bool = true,
         confirmCollectionIDs: Bool = false,
         reviewDocumentSegmentation: Bool = false,
+        reviewWholeRun: Bool = true,
         customPrompt: String? = nil,
         imageScale: Double = 1.0,
         runConfig: SessionProcessingConfig? = nil,
@@ -852,6 +852,7 @@ extension OCRProcessor {
         initialPendingBatch.cascade = Self.ocrCallValues(for: runConfig).cascade
         initialPendingBatch.outputSubfolders = outputSubfolders.isEmpty ? nil : outputSubfolders   // W47.ct-processor-intake
         initialPendingBatch.resolvedSettings = activeResolvedSettings
+        initialPendingBatch.reviewWholeRun = reviewWholeRun
         guard let persistedInitialBatch = Self.savePendingBatch(initialPendingBatch) else {
             statusMessage = "Could not create a safe paid-batch journal. No batch requests were sent."
             batchPollInterrupted = true
