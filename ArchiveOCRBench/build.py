@@ -41,7 +41,8 @@ HYDROGEN_ROUTES = {"gemini4-hydrogen"}  # read after the cascades were built, so
 # W46.ocr-new-open's Mac readers and W46.ocr-new-open-boxes's granite-docling, added after the difficulty fit was built:
 # on the headline and speed tables, not in the fit.
 LATE_MAC_ROUTES = {"xiaomi-ocr-0-bf16", "paddleocr-vl1.6-bf16", "granite-docling-258m-mlx", "apple-fm-27",
-                   "hunyuanocr-1.5-bf16", "fastvlm-0.5b-bf16"}  # the last two: W46.licence-freed-sweep
+                   "hunyuanocr-1.5-bf16", "fastvlm-0.5b-bf16",  # these two: W46.licence-freed-sweep
+                   "gemma3-12b-mlx4"}  # W46.ocr-gemma3-12b
 MAC_MD = RESULTS / "ocr-mac-local.md"
 MAC_CSV = RESULTS / "ocr-mac-local-groups.csv"
 FOUNDATION = RESULTS / "r1-foundation.json"  # W46.r1-foundation: fm_foundation.py report, Apple's on-device model
@@ -709,6 +710,7 @@ PUBLIC_TWIN = {
     "infinity-parser2-pro-sherlock": ("infinity-parser2-pro", "Sherlock native"),  # W46.ocr-new-open-sherlock
     "qwen3.5-9b-sherlock": ("qwen3.5-9b", "Sherlock logprob"),  # W46.ocr-logprob's run read both sets
     "gemini3.7-flash-gw": ("gemini3.7-flash-gw", "gateway"),  # W46.ocr-gemini37-895-paid
+    "gemma3-12b-mlx4": ("gemma3-12b-mlx4", "Mac local"),  # W46.ocr-gemma3-12b, the same Mac build on both sets
 }
 LOGPROB_PAGES = RESULTS / "ocr-logprob-pages.csv"
 
