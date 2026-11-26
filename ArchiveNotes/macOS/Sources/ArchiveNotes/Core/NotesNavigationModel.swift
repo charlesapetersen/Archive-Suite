@@ -320,6 +320,13 @@ final class NotesNavigationModel: ObservableObject {
         selection = id.map { [$0] } ?? []
     }
 
+    /// Bumped to move the keyboard into the note's editor: a double-click on a row away from its title, Date or
+    /// Tags cell, or the row menu's Open (W49.notes-polish-small). `NoteEditorPane` takes focus once the selected
+    /// note's body is loaded.
+    @Published private(set) var editorFocusRequest = 0
+
+    func requestEditorFocus() { editorFocusRequest &+= 1 }
+
     // MARK: Metadata edits (front-matter date + front-matter-backed Quality mirror)
 
     /// Set the date + precision for `id`, forwarding to the shared model (§16.1). The metadata inspector

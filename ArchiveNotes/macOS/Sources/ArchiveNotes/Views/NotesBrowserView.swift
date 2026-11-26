@@ -140,6 +140,7 @@ struct NotesBrowserView: View {
             selected: { nav.exportableSelection }, listed: { nav.exportableListed }))
         .focusedSceneValue(\.deleteItemAction, nav.deletableSelection.isEmpty ? nil : DeleteItemAction(
             count: nav.deletableSelection.count, perform: { nav.requestDeleteItems(nav.deletableSelection) }))
+        .focusedSceneValue(\.duplicateItemAction, duplicateAction)
         .sheet(item: $nav.advancedSearchRequest) { request in
             NotesAdvancedSearchSheet(nav: nav, request: request)
         }
@@ -262,6 +263,15 @@ struct NotesBrowserView: View {
             .help(showingInspector ? "Hide Inspector (⌥⌘I)" : "Show Inspector (⌥⌘I)")
             .accessibilityLabel(showingInspector ? "Hide Inspector" : "Show Inspector")
             .accessibilityIdentifier("an.inspector.toggle")
+        }
+    }
+
+    /// Edit ▸ Duplicate Note: one selected note in the list (W49.notes-polish-small).
+    private var duplicateAction: DuplicateItemAction? {
+        guard nav.paneMode == .notes, nav.selection.count == 1, let id = nav.selection.first,
+              model.allItems.contains(where: { $0.id == id }) else { return nil }
+        return DuplicateItemAction { [nav, flushRegistry] in
+            Task { await DuplicateNoteFlow.duplicate(id, nav: nav, flushing: flushRegistry) }
         }
     }
 
@@ -516,7 +526,7 @@ private struct ItemListPane: View {
                     NotesTableView(
                         model: nav,
                         selection: $nav.selection,
-                        onDoubleClick: { /* focus/open in detail — dedicated editor window is a future step */ },
+                        onDoubleClick: { nav.requestEditorFocus() },
                         buildContextMenu: { selection in
                             NotesItemContextMenu.make(nav: nav, selection: selection, flushing: flushRegistry,
                                                       archiveRoots: { [previewState] in previewState.grantedArchiveFolders })

@@ -232,6 +232,13 @@ struct NoteEditorPane: View {
         .onReceive(nav.model.$itemsGeneration) { _ in
             refreshZoteroAutoFillReference(for: nav.selectedItemID)
         }
+        // A double-click on a row or Open (W49.notes-polish-small): re-arm the one-shot focus request; it lands
+        // now if the body is loaded, or when `requestInitialEditorFocusIfReady` sees it load.
+        .onReceive(nav.$editorFocusRequest.dropFirst()) { _ in
+            initialEditorFocusCompleted = false
+            initialEditorFocusRequested = true
+            editorFocusToken &+= 1
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             if initialEditorFocusRequested && !initialEditorFocusCompleted { editorFocusToken &+= 1 }
         }

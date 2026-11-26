@@ -191,6 +191,29 @@ actor NoteStore {
         return try result.get()
     }
 
+    /// Duplicate Note (W49.notes-polish-small): the note's fields and body under a fresh id, titled "<title> copy". Its
+    /// `assets/` is copied before the copy's .md is written, as a recovered draft's is, so every relative image
+    /// reference in the copy resolves in its own folder. The original is only read.
+    func duplicate(_ id: UUID) throws -> ItemTransaction {
+        var copy = try load(id)
+        copy.id = UUID()
+        copy.title = Self.copyTitle(copy.title)
+        copy.created = Date()
+        copy.modified = copy.created
+        let sourceAssets = assetsDir(id)
+        try FileManager.default.createDirectory(at: itemDir(copy.id), withIntermediateDirectories: true)
+        if FileManager.default.fileExists(atPath: sourceAssets.path) {
+            try copyRecoveryAssets(from: sourceAssets, to: assetsDir(copy.id),
+                                   itemRoot: itemDir(id).resolvingSymlinksInPath())
+        }
+        let ref = try create(copy)
+        return ItemTransaction(ownedDateFacetTokens: [], item: copy, ref: ref)
+    }
+
+    nonisolated static func copyTitle(_ title: String) -> String {
+        "\(title.isEmpty ? "Untitled" : title) copy"
+    }
+
     /// Materialize contained symlinks: an absolute link back into the original item would otherwise
     /// stop resolving under the recovery item's containment boundary. Escaping links stay links (and
     /// stay blocked by AssetPathResolver); never follow one into the corpus or another item.

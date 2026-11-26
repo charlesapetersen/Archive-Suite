@@ -30,7 +30,7 @@ enum NotesItemContextMenu {
         if selection.count == 1, let id = selection.first {
             let summary = model.allItems.first { $0.id == id }
             let open = NSMenuItem(title: "Open", action: #selector(NotesMenuAction.fire), keyEquivalent: "")
-            let openAction = NotesMenuAction { nav.select(id) }
+            let openAction = NotesMenuAction { nav.select(id); nav.requestEditorFocus() }
             open.target = openAction
             open.representedObject = openAction
             menu.addItem(open)
@@ -46,6 +46,16 @@ enum NotesItemContextMenu {
             copyLink.target = action
             copyLink.representedObject = action
             menu.addItem(copyLink)
+
+            let duplicate = NSMenuItem(title: "Duplicate", action: #selector(NotesMenuAction.fire), keyEquivalent: "d")
+            duplicate.keyEquivalentModifierMask = .command   // shows ⌘D, Edit ▸ Duplicate Note's key
+            let duplicateAction = NotesMenuAction {
+                Task { await DuplicateNoteFlow.duplicate(id, nav: nav, flushing: registry) }
+            }
+            duplicate.target = duplicateAction
+            duplicate.representedObject = duplicateAction
+            duplicate.setAccessibilityIdentifier("an.list.menu.duplicate")
+            menu.addItem(duplicate)
 
             if let summary {
                 let offered = model.templates(matching: summary.kind)

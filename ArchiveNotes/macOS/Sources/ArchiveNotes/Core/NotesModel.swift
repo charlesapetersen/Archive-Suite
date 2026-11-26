@@ -1019,34 +1019,62 @@ final class NotesModel: ObservableObject {
                                                     : OrganizationStore.inboxFolderId)
         do {
             let ref = try await noteStore.create(item)
-            var created = ItemTransaction(ownedDateFacetTokens: [], item: item, ref: ref)
-            // A template's tags are subjects like any note's: mirror them as the tag bar does, through the same
-            // journalled transaction, so the new note's Finder tags match its front matter from the start
-            // (W40.fix-notes-template-fields). A failed mirror keeps the journal; the next tag edit retries it.
-            // Its own catch: the note is already written, so a failure here must not leave it unfiled and unindexed.
-            if !item.tags.isEmpty {
-                let action = "mirror the template's tags to the new note in Finder (edit its tags to retry)"
-                do {
-                    created = try await noteStore.withItem(item.id, projectSubjects: Self.projectSubjectTags) { _ in }
-                    if let failure = created.subjectProjectionError {
-                        report(NoteStore.StoreError.writeFailed(failure), action)
-                    }
-                } catch { report(error, action) }
-            }
-            let tx = try await reconcileFacetProjection(from: created, noteStore: noteStore)
-            try await organization.addMembership(item: item.id, folder: target)
-            // W9.e2-zotero: upsert the new row inline, as createExtract does. Nothing watches the store,
-            // so without it the new note stayed out of every list until the next launch's index build.
-            // Non-fatal: the note is already written and filed, so still select it if only the cache fails.
-            if let index {
-                do { try await index.upsertBatch([NoteIndexRow(item: tx.item, mtime: tx.ref.mtime)]) }
-                catch { report(error, "index the new note") }
-            }
-            await reloadItems()
-            rebuild()
-            adoptMirrorFailure()
+            try await file(ItemTransaction(ownedDateFacetTokens: [], item: item, ref: ref), into: [target],
+                           noteStore: noteStore, tagSource: "the template's")
             return item.id
         } catch { report(error, "create the note"); return nil }
+    }
+
+    /// Duplicate Note (W49.notes-polish-small): a copy titled "<title> copy" with the note's fields, body and
+    /// images, filed in the same folders as the original (the kind's default folder when it is in none).
+    /// Returns the copy's id (nil on failure / no store).
+    @discardableResult
+    func duplicateNote(_ id: UUID) async -> UUID? {
+        guard let noteStore else { return nil }
+        guard !refuseWhileFoldersReadOnly("duplicate the note") else { return nil }
+        guard let summary = allItems.first(where: { $0.id == id }) else { return nil }
+        let folders = organization.memberships.filter { $0.itemId == id }.map(\.folderId)
+        let targets = folders.isEmpty
+            ? [summary.kind == .extract ? organization.extractsHomeFolderId : OrganizationStore.inboxFolderId]
+            : folders
+        do {
+            let created = try await noteStore.duplicate(id)
+            try await file(created, into: targets, noteStore: noteStore, tagSource: "the original's")
+            return created.item.id
+        } catch { report(error, "duplicate the note"); return nil }
+    }
+
+    /// File a note just written to the store: mirror its subject tags to Finder, project its date facets, add it
+    /// to `folders` and index it, then refresh the lists. Shared by New and Duplicate.
+    private func file(_ written: ItemTransaction, into folders: [UUID], noteStore: NoteStore,
+                      tagSource: String) async throws {
+        let item = written.item
+        var created = written
+        // A template's tags are subjects like any note's: mirror them as the tag bar does, through the same
+        // journalled transaction, so the new note's Finder tags match its front matter from the start
+        // (W40.fix-notes-template-fields). A failed mirror keeps the journal; the next tag edit retries it.
+        // Its own catch: the note is already written, so a failure here must not leave it unfiled and unindexed.
+        if !item.tags.isEmpty {
+            let action = "mirror \(tagSource) tags to the new note in Finder (edit its tags to retry)"
+            do {
+                created = try await noteStore.withItem(item.id, projectSubjects: Self.projectSubjectTags) { _ in }
+                if let failure = created.subjectProjectionError {
+                    report(NoteStore.StoreError.writeFailed(failure), action)
+                }
+            } catch { report(error, action) }
+        }
+        let tx = try await reconcileFacetProjection(from: created, noteStore: noteStore)
+        for folder in folders { try await organization.addMembership(item: item.id, folder: folder) }
+        // W9.e2-zotero: upsert the new row inline, as createExtract does. Nothing watches the store,
+        // so without it the new note stayed out of every list until the next launch's index build.
+        // Non-fatal: the note is already written and filed, so still select it if only the cache fails.
+        if let index {
+            do { try await index.upsertBatch([NoteIndexRow(item: tx.item, mtime: tx.ref.mtime)]) }
+            catch { report(error, "index the new note") }
+        }
+        await reloadItems()
+        rebuild()
+        adoptMirrorFailure()
     }
 
     /// A fresh, empty item shell (schema 1) — a blank new item or a new template.
@@ -1396,6 +1424,14 @@ final class NotesModel: ObservableObject {
             let item = try await noteStore.load(id)
             return BlockParser.serialize(leadingText: item.trailingBodyRaw, blocks: item.blocks)
         } catch { report(error, "load the note body"); return nil }
+    }
+
+    /// The saved body's word and character count for the inspector (W49.notes-polish-small). Quiet: a note that
+    /// cannot be read shows no count rather than an error over the window.
+    func loadTextCounts(for id: UUID) async -> NoteTextStats.Counts? {
+        guard let noteStore, let item = try? await noteStore.load(id) else { return nil }
+        return NoteTextStats.counts(markdown: BlockParser.serialize(leadingText: item.trailingBodyRaw,
+                                                                    blocks: item.blocks))
     }
 
     /// The items File ▸ Export… and Print… read, in `ids` order (W49.notes-export-print). Read-only: each is loaded

@@ -40,9 +40,17 @@ struct NotesSettingsView: View {
                     .foregroundStyle(.primary)
             }
 
-            Section("Advanced") {
+            Section {
                 TextField("Host", text: $host, prompt: Text(ZoteroSettings.defaultHost))
                 TextField("Port", value: $port, format: .number.grouping(.never))
+            } header: {
+                Text("Advanced")
+            } footer: {
+                // The Zotero client is made once, at launch, from these (W49.notes-polish-small).
+                Text("A change to Host or Port takes effect the next time you open Archive Notes.")
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+                    .accessibilityIdentifier("an.settings.zotero.relaunchHint")
             }
             .disabled(!enabled)
 
@@ -62,7 +70,7 @@ struct NotesSettingsView: View {
         }
         .formStyle(.grouped)
         // Tall enough that the Dates footer, the last section, shows whole (W40.fix-notes-visual-polish), with
-        // the Appearance row above Zotero (W48.appearance-notes).
-        .frame(width: 460, height: 570)
+        // the Appearance row above Zotero (W48.appearance-notes) and the Host/Port note (W49.notes-polish-small).
+        .frame(width: 460, height: 610)
     }
 }

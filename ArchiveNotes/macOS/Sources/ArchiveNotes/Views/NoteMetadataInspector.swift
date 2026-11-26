@@ -47,6 +47,8 @@ struct NoteMetadataInspector: View {
     /// Whether the Sent-with fields are unfolded: open for an item that has a sent-with date, folded otherwise
     /// (W40.suite-date-design), re-decided when the selection changes.
     @State private var showsSentWith = false
+    /// The saved body's counts, with the note they were read for, so a switch never shows another note's.
+    @State private var textCounts: (id: UUID, counts: NoteTextStats.Counts)?
 
     private enum DateRole: Hashable { case own, sentWith }
 
@@ -97,6 +99,8 @@ struct NoteMetadataInspector: View {
             Divider()
             NoteZoteroInspector(model: nav.model, itemID: item.id)
                 .id(item.id)
+            Divider()
+            NoteInfoSection(item: item, counts: textCounts?.id == item.id ? textCounts?.counts : nil)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -121,6 +125,12 @@ struct NoteMetadataInspector: View {
             if old == .sentWith { applySentWith() }
         }
         .onDisappear { applyDates() }
+        // Re-counted on every save, which changes the note's modification time.
+        .task(id: SourceLoadKey(id: item.id, mtime: item.mtime)) {
+            let id = item.id
+            guard let counts = await nav.model.loadTextCounts(for: id), !Task.isCancelled else { return }
+            textCounts = (id, counts)
+        }
         .task(id: SourceLoadKey(id: item.id, mtime: item.mtime)) {
             extractSources = nil
             extractSourcesFailed = false
@@ -490,5 +500,44 @@ struct NoteMetadataInspector: View {
     private var uncertainBinding: Binding<Bool> {
         Binding(get: { item.dateUncertain },
                 set: { v in let id = item.id; Task { await nav.setDateUncertain(v, for: id) } })
+    }
+}
+
+/// The inspector's last section (W49.notes-polish-small): how long the note is, as of its last save, and when it was
+/// made and last changed.
+struct NoteInfoSection: View {
+    let item: ItemSummary
+    let counts: NoteTextStats.Counts?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Info").font(.subheadline.bold())
+            Text(countsText)
+                .accessibilityIdentifier("an.inspector.info.counts")
+            Text("Modified \(Self.timestamp(item.modified))")
+                .accessibilityIdentifier("an.inspector.info.modified")
+            Text("Created \(Self.timestamp(item.created))")
+                .accessibilityIdentifier("an.inspector.info.created")
+        }
+        .font(.callout)
+        .foregroundStyle(.primary)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("an.inspector.info")
+    }
+
+    var countsText: String {
+        guard let counts else { return "Counting\u{2026}" }
+        return Self.countsText(counts)
+    }
+
+    static func countsText(_ counts: NoteTextStats.Counts) -> String {
+        let words = counts.words.formatted(), characters = counts.characters.formatted()
+        return "\(words) \(counts.words == 1 ? "word" : "words") · "
+            + "\(characters) \(counts.characters == 1 ? "character" : "characters")"
+    }
+
+    static func timestamp(_ date: Date) -> String {
+        date.formatted(date: .abbreviated, time: .shortened)
     }
 }

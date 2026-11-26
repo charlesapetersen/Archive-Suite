@@ -261,6 +261,22 @@ enum NewItemFlow {
     }
 }
 
+/// Duplicate Note (Edit ▸ Duplicate Note, ⌘D, and the row menu; W49.notes-polish-small). Every open editor is saved
+/// first, so the copy has what the user sees; a note whose last save failed is not copied, because the copy would
+/// be made from the older text on disk.
+@MainActor
+enum DuplicateNoteFlow {
+    static func duplicate(_ id: UUID, nav: NotesNavigationModel, flushing registry: EditorFlushRegistry) async {
+        if !(await registry.flushAll()), registry.unsavedDrafts().contains(where: { $0.itemID == id }) {
+            nav.model.statusMessage = "This note's last changes aren't saved yet, so it can't be duplicated."
+            return
+        }
+        guard let copy = await nav.model.duplicateNote(id) else { return }
+        nav.showingTemplates = false
+        nav.select(copy)
+    }
+}
+
 /// File ▸ Export…, Export Listed…, Page Setup… and Print… (⌘P) (W49.notes-export-print). Export and Print act on
 /// the focused window's selected rows; Export Listed on every row its list shows, which is the selected folder
 /// after the filters. `NoteExportFlow` asks where and how, and writes only new files outside the library.
@@ -350,15 +366,20 @@ extension FocusedValues {
     }
 }
 
+/// Edit ▸ Duplicate Note (⌘D) copies the one selected note (`DuplicateNoteFlow`).
 /// Edit ▸ Delete Note… (⌘⌫, as in Finder; W40.fix-notes-delete-redo, notes-2 row 16): the selected rows (Delete N
 /// Notes… for several, one prompt for them all; W49.notes-multiselect-actions), through
 /// the same confirmation as the row menu's Delete…. The menu sees ⌘⌫ before a text view does, so in the editor or a
 /// text field the key keeps its own meaning, deleting to the start of the line; outside the note list it does nothing.
 struct DeleteCommands: Commands {
     @FocusedValue(\.deleteItemAction) private var deleteItem
+    @FocusedValue(\.duplicateItemAction) private var duplicateItem
 
     var body: some Commands {
         CommandGroup(after: .pasteboard) {
+            Button("Duplicate Note") { duplicateItem?.perform() }
+                .keyboardShortcut("d", modifiers: .command)
+                .disabled(duplicateItem == nil)
             Button((deleteItem?.count ?? 1) > 1 ? "Delete \(deleteItem?.count ?? 0) Notes\u{2026}" : "Delete Note\u{2026}") {
                 perform()
             }
@@ -556,3 +577,18 @@ struct DebugBlockCommands: Commands {
     }
 }
 #endif
+
+struct DuplicateItemAction {
+    let perform: @MainActor () -> Void
+}
+
+struct DuplicateItemActionKey: FocusedValueKey {
+    typealias Value = DuplicateItemAction
+}
+
+extension FocusedValues {
+    var duplicateItemAction: DuplicateItemAction? {
+        get { self[DuplicateItemActionKey.self] }
+        set { self[DuplicateItemActionKey.self] = newValue }
+    }
+}

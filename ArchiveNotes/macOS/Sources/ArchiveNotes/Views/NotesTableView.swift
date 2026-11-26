@@ -542,7 +542,8 @@ struct NotesTableView: NSViewRepresentable {
 
         @objc func tableViewDoubleClicked(_ sender: Any?) {
             guard let tableView, tableView.clickedRow >= 0 else { return }
-            // A double-click on the Date or Tags cell edits it there (W40.notes-detail-layout); elsewhere it renames.
+            // A double-click on the Date or Tags cell edits it there (W40.notes-detail-layout), on the title renames
+            // it, and anywhere else on the row opens the note for typing (W49.notes-polish-small).
             if tableView.clickedColumn >= 0, currentSnapshotIDs.indices.contains(tableView.clickedRow) {
                 let id = currentSnapshotIDs[tableView.clickedRow]
                 switch tableView.tableColumns[tableView.clickedColumn].identifier.rawValue {
@@ -550,10 +551,12 @@ struct NotesTableView: NSViewRepresentable {
                 // keyboard again as the double-click finished (VM run 2).
                 case "date": DispatchQueue.main.async { [weak self] in self?.beginDateEdit(id) }; return
                 case "tags": DispatchQueue.main.async { [weak self] in self?.beginTagsEdit(id) }; return
+                case NotesTableView.titleColumnID: if renameSelection() { return }
                 default: break
                 }
             }
-            if !renameSelection() { parent.onDoubleClick() }
+            // On the next turn, for the same reason: the table keeps the keyboard until its click handling ends.
+            DispatchQueue.main.async { [weak self] in self?.parent.onDoubleClick() }
         }
 
         func renameSelection() -> Bool {
