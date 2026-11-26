@@ -168,7 +168,7 @@ expect 2 'a changed audited writeArchival line is stale and flagged as a new sit
 
 fresh_tree
 /usr/bin/perl -0pi -e 's/try\? PDFGenerator\.writeArchival\(document, to: pdf,/try? PDFGenerator.writeArchival(document, to: changedURL,/' \
-  "$SCRATCH/$SRC/Capture/LiveCaptureRecoveryTestDriver.swift"
+  "$SCRATCH/$SRC/Capture/LiveCaptureRecoveryFinalizeTests.swift"
 expect 2 'a changed recovery fixture PDF write is stale and flagged as a new site' 'STALE write allowance'
 
 fresh_tree
