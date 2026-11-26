@@ -308,14 +308,16 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
         // A quit that skipped `willTerminate` (a crash, a force quit) can end inside a write's debounce:
         // SQLite has the change and the mirror does not. Catch the mirror up on the next launch, and
         // leave a file that already matches alone (W49.notes-org-export-async).
-        if !shouldExportOrganization, !mirrorMatchesGraph(at: storeRoot) { shouldExportOrganization = true }
+        if !shouldExportOrganization, await !mirrorMatchesGraph(at: storeRoot) { shouldExportOrganization = true }
         if shouldExportOrganization { exportOrganization() }
     }
 
     /// Whether `organization.json` at `storeRoot` holds the graph now in memory. Dates are left out:
     /// they round-trip through the file's seconds-since-1970 encoding and need not compare equal.
-    private func mirrorMatchesGraph(at storeRoot: URL) -> Bool {
-        guard let file = OrganizationFile.load(from: storeRoot) else { return false }
+    /// The file is read and decoded off the main actor.
+    private func mirrorMatchesGraph(at storeRoot: URL) async -> Bool {
+        let read = Task.detached(priority: .utility) { OrganizationFile.load(from: storeRoot) }
+        guard let file = await read.value else { return false }
         func byId(_ f: [VFolder]) -> [VFolder] { f.sorted { $0.id.uuidString < $1.id.uuidString } }
         func edges(_ m: [Membership]) -> [String] { m.map { "\($0.folderId)/\($0.itemId)" }.sorted() }
         func links(_ a: [TemplateAssignment]) -> [String] { a.map { "\($0.folderId)/\($0.templateId)" }.sorted() }

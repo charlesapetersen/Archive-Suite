@@ -98,7 +98,7 @@ Rules for anyone changing this code. The file map is in REFERENCE.md §Implement
   discards the handle. Tier-2 in Notes also covers the tag projector, org/replication transactions and the
   hard-delete path. Multi-row org transactions are whole methods, never an exposed BEGIN/COMMIT — no
   suspension between BEGIN and COMMIT (W23.m13). `OrganizationStore`'s `deleteFolder`, `moveMembership` and
-  `deleteTemplate` move in-memory state ONLY after the DB transaction commits, and `moveMembership` inserts before it deletes so an item is never member-less. Both
+  `deleteTemplate` move in-memory state ONLY after the DB transaction commits, and `moveMembership` inserts before it deletes so an item is never member-less. The `organization.json` mirror is written off the main actor, coalesced over a 250 ms debounce and flushed synchronously on `willTerminate`; tests await `flushPendingMirror()` before reading it or `mirrorFailure` (W49.notes-org-export-async). Both
   membership minting seams refuse an item whose confirmed hard delete is in flight (W23.h3-fu); removing the last
   instance asks first and re-checks fresh at confirm; `trashItems`
   holds OrganizationStore's hard-delete window for the whole call (W23.h3-fu) and drops an index row only once `NoteStore.itemExists` says the note is gone. The indexer never prunes on an
