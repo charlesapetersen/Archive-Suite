@@ -8,6 +8,11 @@ struct SettingsAccountsTab: View {
     @AppStorage(DefaultsKeys.localAgentBinaryPath) private var localAgentBinaryPath = ""
     @AppStorage(DefaultsKeys.localAgentModel) private var localAgentModel = ""
     @ObservedObject private var gemma = ManagedGemma.shared
+    @ObservedObject private var managedOCR = ManagedLocalOCR.shared
+    @AppStorage(DefaultsKeys.useGateway) private var useGateway = false
+    @AppStorage(DefaultsKeys.gatewayManagedModel) private var gatewayManagedModel = ""
+    @State private var confirmOCRDownload: ManagedOCRModel?
+    @State private var confirmOCRRemove: ManagedOCRModel?
     @ObservedObject private var claudeUsage = ClaudeCLIUsage.shared
     @State private var anthropicKey = ""
     @State private var geminiKey = ""
@@ -41,6 +46,77 @@ struct SettingsAccountsTab: View {
         } message: {
             Text(ManagedGemma.sizeNote)
         }
+        .confirmationDialog("Download \(confirmOCRDownload?.model.name ?? "the model")?",
+                            isPresented: Binding(get: { confirmOCRDownload != nil }, set: { if !$0 { confirmOCRDownload = nil } }),
+                            titleVisibility: .visible, presenting: confirmOCRDownload) { m in
+            Button("Download") { managedOCR.download(m) }
+        } message: { m in
+            Text(m.sizeNote + " It comes from Hugging Face under the Apache 2.0 licence. Apple Vision stays available.")
+        }
+        .confirmationDialog("Remove \(confirmOCRRemove?.model.name ?? "the model")?",
+                            isPresented: Binding(get: { confirmOCRRemove != nil }, set: { if !$0 { confirmOCRRemove = nil } }),
+                            titleVisibility: .visible, presenting: confirmOCRRemove) { m in
+            Button("Remove", role: .destructive) { Task { await managedOCR.remove(m) } }
+        } message: { m in
+            Text("Deletes its files (up to \(Int(m.model.downloadGB.rounded())) GB) from this Mac. If it is the Reader, Apple Vision becomes the Reader. You can download it again later.")
+        }
+    }
+
+    // MARK: Managed page readers (W49.proc-managed-local-ocr)
+
+    @ViewBuilder private func managedOCRRow(_ m: ManagedOCRModel, recommended: Bool) -> some View {
+        let state = managedOCR.state(m)
+        VStack(alignment: .leading, spacing: 4) {
+            LabeledContent("\(m.pick.name), \(m.pick.precision) (page reader\(recommended ? ", recommended" : ""))") {
+                HStack(spacing: 8) {
+                    switch state {
+                    case .notInstalled, .failed:
+                        Button(state == .notInstalled ? "Download…" : "Try Again…") { confirmOCRDownload = m }
+                            .accessibilityIdentifier("ap.managedOCR.download.\(m.shortID)")
+                        if managedOCR.partial.contains(m) {
+                            Button("Remove…") { confirmOCRRemove = m }
+                                .accessibilityIdentifier("ap.managedOCR.remove.\(m.shortID)")
+                        }
+                    case .removing:
+                        ProgressView().controlSize(.small)
+                    case .installing(_, let share):
+                        if let share {
+                            ProgressView(value: share).frame(width: 120)
+                            Text("\(Int(share * 100))%").font(.caption).monospacedDigit()
+                        } else {
+                            ProgressView().controlSize(.small)
+                        }
+                        Button("Cancel") { managedOCR.cancel(m) }
+                            .accessibilityIdentifier("ap.managedOCR.cancel.\(m.shortID)")
+                    case .installed:
+                        if useGateway && gatewayManagedModel == m.rawValue {
+                            Text("The Reader").foregroundStyle(.primary)
+                        } else {
+                            Button("Use as Reader") { managedOCR.use(m) }
+                                .accessibilityIdentifier("ap.managedOCR.use.\(m.shortID)")
+                        }
+                        Button("Remove…") { confirmOCRRemove = m }
+                            .accessibilityIdentifier("ap.managedOCR.remove.\(m.shortID)")
+                    }
+                }
+            }
+            Group {
+                switch state {
+                case .installing(let status, _): Text(status)
+                case .failed(let why): Text(why)
+                case .removing: Text("Removing…")
+                case .notInstalled: Text(managedOCR.partial.contains(m)
+                                         ? m.sizeNote + " Part of a download is on this Mac; Download resumes it."
+                                         : m.sizeNote)
+                case .installed: EmptyView()
+                }
+                Text(m.pick.summary)
+            }
+            .font(.caption).foregroundStyle(.primary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("ap.managedOCR.\(m.shortID)")
     }
 
     /// Reload the key fields from the Keychain: on appear, and whenever a key changes (the guided wizard saves one).
@@ -60,6 +136,13 @@ struct SettingsAccountsTab: View {
         Section {
             LabeledContent("Apple Vision (built in)") {
                 Text("Ready · typed and printed pages").foregroundStyle(.primary)
+            }
+            let offered = ManagedOCRModel.offered()
+            ForEach(offered) { m in managedOCRRow(m, recommended: m == offered.first) }
+            if offered.isEmpty {
+                Text("Page readers to download need an Apple silicon Mac with at least 16 GB of memory. Apple Vision reads pages on this Mac.")
+                    .font(.caption).foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             VStack(alignment: .leading, spacing: 4) {
                 LabeledContent("Gemma 3 12B (box and folder labels)") {

@@ -10,6 +10,7 @@ struct SettingsEstimateFooter: View {
     @AppStorage(DefaultsKeys.useGateway) private var useGateway: Bool = false
     @AppStorage(DefaultsKeys.gatewayBaseURL) private var gatewayBaseURL: String = ""
     @AppStorage(DefaultsKeys.gatewayModelID) private var gatewayModelID: String = ""
+    @AppStorage(DefaultsKeys.gatewayManagedModel) private var gatewayManagedModel = ""
     @AppStorage(DefaultsKeys.gatewayDisplayName) private var gatewayDisplayName: String = ""
     @AppStorage(DefaultsKeys.gatewayInputCost) private var gatewayInputCost: Double = -1
     @AppStorage(DefaultsKeys.gatewayOutputCost) private var gatewayOutputCost: Double = -1
@@ -83,6 +84,7 @@ struct SettingsEstimateFooter: View {
     private var figures: Figures? {
         guard unavailableOpenRouterSelection == nil, !useAppleVision, !useLocalAgent,
               !(!useGateway && selectedProvider == .openrouter && openRouterPricesRead >= 0 && OpenRouterRoute.isUnpriced(selectedModel)),
+              !(useGateway && !gatewayManagedModel.isEmpty),
               let model = useGateway ? gatewayModel : selectedModel else { return nil }
         let tagging = taggingMode.llmTags
         let gateway = GatewayConfig.fromDefaults()
@@ -168,6 +170,17 @@ struct SettingsEstimateFooter: View {
         }
         if !useGateway, selectedProvider == .openrouter, openRouterPricesRead >= 0, OpenRouterRoute.isUnpriced(selectedModel) {
             return OpenRouterRoute.unpricedEstimateMessage
+        }
+        if useGateway, let m = ManagedOCRModel(rawValue: gatewayManagedModel) {
+            // W49.proc-managed-local-ocr: free, one page at a time at the bench's pace for that model.
+            let time = TimeEstimator.estimate(
+                fileCount: 1000, model: GatewayConfig(baseURL: ManagedOCRModel.baseURL, modelID: m.rawValue,
+                                                      displayName: m.pick.displayName).asLLMModel(),
+                rotationMode: rotationMode, sequentialOCR: false, enableTagging: taggingMode.llmTags,
+                enableCollectionSegmentation: enableCollectionSegmentation, preOCRedInput: preOCRedInput,
+                useGateway: true, ocrWorkers: ocrWorkerCount, localSecondsPerPage: m.pick.secondsPerPage,
+                gatewayRotation: false, usesLocalAgent: false)
+            return "1,000 pages: free — \(m.model.name) reads on this Mac and sends nothing off it · " + time.totalFormatted
         }
         guard let f = figures else { return "Enter the gateway model's prices in Settings › Advanced to estimate its cost." }
         var line = "1,000 pages: about " + CostEstimate.money(f.est.totalStandard + f.segmentation)

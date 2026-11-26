@@ -20,6 +20,9 @@ struct OpenAICompatibleClient: Sendable {
     /// timeout, reasoning text stripped and a looping reply failed. false for every other caller.
     var localModel = false
     var paidGateway: GatewayConfig? = nil
+    /// W49.proc-managed-local-ocr: a model the app runs itself. Its requests go to that model's worker through
+    /// `LocalModelSupervisor.withEndpoint` (one model loaded, one request at a time), not to `baseURL`.
+    var managed: LocalModelSupervisor.Model? = nil
 
     /// The client for the user's gateway, local or remote.
     static func gateway(_ config: GatewayConfig) -> OpenAICompatibleClient {
@@ -27,7 +30,8 @@ struct OpenAICompatibleClient: Sendable {
         let usesPublicOpenAI = !config.isLocalModel && baseURL == openAIBaseURL
         return OpenAICompatibleClient(baseURL: baseURL, apiKey: config.apiKey, modelID: config.modelID,
                                       maxTokensParam: usesPublicOpenAI ? "max_completion_tokens" : "max_tokens",
-                                      localModel: config.isLocalModel, paidGateway: config.isLocalModel ? nil : config)
+                                      localModel: config.isLocalModel, paidGateway: config.isLocalModel ? nil : config,
+                                      managed: config.managedOCR?.model)
     }
 
     private var requestTimeout: TimeInterval { localModel ? LocalModelRoute.requestTimeout : 120 }
@@ -207,15 +211,43 @@ struct OpenAICompatibleClient: Sendable {
         var body = body
         body["stream"] = true
         let request = try makeRequest(body: body, timeoutInterval: requestTimeout)
-        var reply = LocalModelRoute.StreamedReply()
-        let response: URLResponse, stopped: Bool
         do {
-            (response, stopped) = try await NetworkSession.streamLines(for: request) { reply.take($0) }
+            guard let managed else { return try await stream(request) }
+            return try await LocalModelSupervisor.serving.withEndpoint(managed) { url, secret in
+                try await stream(Self.pointed(request, at: url, secret: secret))
+            }
         } catch let error as URLError where error.code == .timedOut {
             // A bigger local model can run past the timeout before reaching the cap, or before its loop is long
             // enough to see. Same failure as a cut reply: not read again (another 10 minutes), escalated when allowed.
             return LocalModelRoute.timedOutReply
+        } catch let error as LocalModelSupervisor.Failure {
+            return Self.managedFailure(error)
         }
+    }
+
+    /// The request sent to an app-managed model's worker instead: its endpoint, and its secret for the key.
+    private static func pointed(_ request: URLRequest, at url: URL, secret: String) -> URLRequest {
+        var request = request
+        request.url = url
+        request.setValue(secret, forHTTPHeaderField: "Authorization")
+        return request
+    }
+
+    /// An app-managed model that could not read: a failed page (503, which the run's retry passes take), never a crash
+    /// of the run. Stopped means the app is quitting or the model was removed.
+    static func managedFailure(_ failure: LocalModelSupervisor.Failure) -> OCRResult {
+        let why = switch failure {
+        case .stopped: "The model on this Mac was stopped before it finished the page (the app quit, or the model was removed)"
+        case .tooLarge: "The model needs more memory than the app allows a model on this Mac"
+        case .runtime: "The model on this Mac is not installed; download it again in Settings › Accounts"
+        default: "The model on this Mac could not start or answer; check its download in Settings › Accounts"
+        }
+        return OCRResult(text: nil, classification: nil, errorMessage: why, errorCode: "503")
+    }
+
+    private func stream(_ request: URLRequest) async throws -> OCRResult {
+        var reply = LocalModelRoute.StreamedReply()
+        let (response, stopped) = try await NetworkSession.streamLines(for: request) { reply.take($0) }
         guard let http = response as? HTTPURLResponse else { throw OCRError.networkError("No HTTP response") }
         if http.statusCode != 200 {
             return OCRResult(text: nil, classification: nil,
@@ -298,8 +330,14 @@ struct OpenAICompatibleClient: Sendable {
         } else {
             billing = nil
         }
-        return try await NetworkSession.data(for: makeRequest(body: body, timeoutInterval: timeoutInterval),
-                                             policy: .nonIdempotent, billing: billing)
+        let request = try makeRequest(body: body, timeoutInterval: timeoutInterval)
+        if let managed {
+            return try await LocalModelSupervisor.serving.withEndpoint(managed) { url, secret in
+                try await NetworkSession.data(for: Self.pointed(request, at: url, secret: secret), policy: .nonIdempotent,
+                                              maxRetries: 0, followRedirects: false)
+            }
+        }
+        return try await NetworkSession.data(for: request, policy: .nonIdempotent, billing: billing)
     }
 
     private func makeRequest(body: [String: Any], timeoutInterval: TimeInterval) throws -> URLRequest {

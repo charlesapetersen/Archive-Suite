@@ -49,7 +49,7 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
   installs the one uv/Python/mlx-vlm runtime and runs `LocalModelWorker.py`, one model resident at a time (the old one
   has exited before the next loads; none over 10 GB), with Live-Capture-aware keep-alive and `withStage` for a stage
   that reads many pages with one model. Never start a Python/MLX process elsewhere: `scripts/check-local-model-seam.sh`
-  fails on it. Contract: the `S` lines of `scripts/test-local-models.sh`.
+  fails on it. Contract: the `S` and `M` lines of `scripts/test-local-models.sh` (`M`: its page readers, on the local route's limits).
 - **One post-OCR tail** (W49.proc-unified-pipeline-1): every Process Files route ends through
   `OCR/OCRProcessor+PostOCRFinalizer.swift`; `scripts/check-pipeline-seam.sh` fails a copied stage. A run that journals
   each reading first (a standard run, its resume) writes each output PDF once there, after the reviews

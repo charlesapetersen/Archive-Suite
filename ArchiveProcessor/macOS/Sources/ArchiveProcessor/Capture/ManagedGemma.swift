@@ -12,8 +12,13 @@ final class ManagedGemma: ObservableObject {
     static let sizeNote = "About 8 GB to download, 10 GB of disk space with its software, and 9 GB of memory while reading."
     static let requirements = "The app's download needs an Apple silicon Mac with at least 16 GB of memory."
     static var supported: Bool {
+        supportedArchitecture && ProcessInfo.processInfo.physicalMemory >= 16 * 1024 * 1024 * 1024
+    }
+
+    /// The app's managed runtime is built for Apple silicon only.
+    nonisolated static var supportedArchitecture: Bool {
 #if arch(arm64)
-        ProcessInfo.processInfo.physicalMemory >= 16 * 1024 * 1024 * 1024
+        true
 #else
         false
 #endif
@@ -62,10 +67,11 @@ final class ManagedGemma: ObservableObject {
         installation = Task {
             defer { installation = nil }
             do {
-                try await supervisor.install(Self.model) { [weak self] step in
-                    self?.installStatus = switch step {
+                try await supervisor.install(Self.model) { step in
+                    self.installStatus = switch step {
+                    case .waiting: "Waiting for another model’s download to finish…"
                     case .software: "Installing the local reader’s software…"
-                    case .model: "Downloading Gemma 3 12B (about 8 GB)…"
+                    case .model(let share): "Downloading Gemma 3 12B (about 8 GB), \(Int(share * 100))%…"
                     }
                 }
                 installing = false

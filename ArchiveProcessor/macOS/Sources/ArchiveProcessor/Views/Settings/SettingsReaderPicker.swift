@@ -1,13 +1,16 @@
 import SwiftUI
 
 /// The one reader a run uses (W49.proc-settings-redesign-core, §5.1): Apple Vision or the macOS on-device model on this
-/// Mac, the command-line agent on its own sign-in, the configured gateway, or a provider's model by API key. It stands
-/// for the four mutually exclusive backend flags and the per-provider model, so no code path can see two at once.
+/// Mac, the command-line agent on its own sign-in, the configured gateway, a model the app runs itself, or a provider's
+/// model by API key. It stands for the four mutually exclusive backend flags and the per-provider model, so no code path
+/// can see two at once. A managed model is the gateway flag with `DefaultsKeys.gatewayManagedModel` set
+/// (W49.proc-managed-local-ocr); the user's own gateway fields stay as they were, for when they choose it again.
 enum ReaderChoice: Hashable {
     case appleVision
     case onDevice
     case localAgent
     case gateway
+    case managed(ManagedOCRModel)
     case direct(LLMProvider, String)
 
     var tag: String {
@@ -16,6 +19,7 @@ enum ReaderChoice: Hashable {
         case .onDevice: return "onDevice"
         case .localAgent: return "localAgent"
         case .gateway: return "gateway"
+        case .managed(let m): return "managed|\(m.rawValue)"
         case .direct(let p, let id): return "direct|\(p.rawValue)|\(id)"
         }
     }
@@ -26,6 +30,9 @@ enum ReaderChoice: Hashable {
         case "onDevice": self = .onDevice
         case "localAgent": self = .localAgent
         case "gateway": self = .gateway
+        case let t where t.hasPrefix("managed|"):
+            guard let m = ManagedOCRModel(rawValue: String(t.dropFirst("managed|".count))) else { return nil }
+            self = .managed(m)
         default:
             let parts = tag.split(separator: "|", maxSplits: 2).map(String.init)
             guard parts.count == 3, parts[0] == "direct", let p = LLMProvider(rawValue: parts[1]) else { return nil }
@@ -39,7 +46,7 @@ enum ReaderChoice: Hashable {
             return store.model(for: .appleVision).id == OnDeviceModelClient.modelID ? .onDevice : .appleVision
         }
         if d.bool(forKey: DefaultsKeys.useLocalAgent) { return .localAgent }
-        if d.bool(forKey: DefaultsKeys.useGateway) { return .gateway }
+        if d.bool(forKey: DefaultsKeys.useGateway) { return ManagedOCRModel.stored(d).map { .managed($0) } ?? .gateway }
         let provider = LLMProvider(rawValue: d.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
         let p = provider == .appleVision ? .gemini : provider
         // The store's fallback keeps the id a member of the menu; only an OpenRouter model that has left the listing
@@ -56,6 +63,7 @@ enum ReaderChoice: Hashable {
             d.set(vision, forKey: DefaultsKeys.useAppleVision)
             d.set(agent, forKey: DefaultsKeys.useLocalAgent)
             d.set(gateway, forKey: DefaultsKeys.useGateway)
+            d.set("", forKey: DefaultsKeys.gatewayManagedModel)
         }
         switch self {
         case .appleVision, .onDevice:
@@ -67,6 +75,10 @@ enum ReaderChoice: Hashable {
             flags(vision: false, agent: true, gateway: false)
         case .gateway:
             flags(vision: false, agent: false, gateway: true)
+        case .managed(let m):
+            flags(vision: false, agent: false, gateway: true)
+            d.set(m.rawValue, forKey: DefaultsKeys.gatewayManagedModel)
+            d.set(false, forKey: DefaultsKeys.batchMode)
         case .direct(let p, let id):
             flags(vision: false, agent: false, gateway: false)
             d.set(p.rawValue, forKey: DefaultsKeys.selectedProvider)
@@ -82,6 +94,8 @@ struct SettingsReaderPicker: View {
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent = false
     @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
     @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalModel = false
+    @AppStorage(DefaultsKeys.gatewayManagedModel) private var gatewayManagedModel = ""
+    @ObservedObject private var managedOCR = ManagedLocalOCR.shared
     @AppStorage(DefaultsKeys.gatewayDisplayName) private var gatewayDisplayName = ""
     @AppStorage(DefaultsKeys.gatewayBaseURL) private var gatewayBaseURL = ""
     @AppStorage(DefaultsKeys.gatewayModelID) private var gatewayModelID = ""
@@ -95,7 +109,7 @@ struct SettingsReaderPicker: View {
     @State private var openRouterPricesRead = 0
 
     private var choice: ReaderChoice {
-        _ = (useAppleVision, useGateway, useLocalAgent, selectedProvider)
+        _ = (useAppleVision, useGateway, useLocalAgent, selectedProvider, gatewayManagedModel)
         return ReaderChoice.current(store: modelStore)
     }
 
@@ -121,6 +135,12 @@ struct SettingsReaderPicker: View {
                 Text("Apple Vision (on this Mac)").tag(ReaderChoice.appleVision.tag)
                 if offerExperimental || choice == .onDevice {
                     Text("macOS on-device model (experimental)").tag(ReaderChoice.onDevice.tag)
+                }
+                ForEach(ManagedOCRModel.allCases) { m in
+                    if managedOCR.state(m) == .installed || choice == .managed(m) {
+                        Text(managedOCR.state(m) == .installed ? m.pick.displayName : "\(m.pick.displayName) — not downloaded")
+                            .tag(ReaderChoice.managed(m).tag)
+                    }
                 }
                 if gatewayLocalModel { Text(gatewayName).tag(ReaderChoice.gateway.tag) }
             }
@@ -157,6 +177,13 @@ struct SettingsReaderPicker: View {
                 .font(.caption).foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("ap.settings.gatewayHome")
+        } else if case .managed(let m) = choice {
+            Text(managedOCR.state(m) == .installed
+                 ? "Read on this Mac by the app itself, one page at a time, with no key and no charge. Its download and removal are in Settings › Accounts."
+                 : "\(m.model.name) is not downloaded: download it in Settings › Accounts, or choose Apple Vision.")
+                .font(.caption).foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("ap.settings.managedOCRHome")
         } else if choice == .localAgent {
             Text("The command-line agent, its sign-in and its check are in Settings › Accounts.")
                 .font(.caption).foregroundStyle(.primary)

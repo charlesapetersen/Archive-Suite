@@ -24,12 +24,15 @@ final class LocalModelSupervisor {
         let revision: String
         /// The peak memory measured while it reads, in GB.
         let peakGB: Double
+        /// What its pinned weights take to download, in GB (the download's progress is measured against it).
+        let downloadGB: Double
     }
 
     /// The box and folder label reader (W47.ct-capture-gemma): 8.95 and 9.00 GB lifetime peak footprint through this
     /// supervisor on the 18 GB M3 Pro, one synthetic label each (8.04 GB in `segbench-results/ct-read.md`, outside the app).
     static let gemma3_12b = Model(name: "Gemma 3 12B", repo: "mlx-community/gemma-3-12b-it-4bit",
-                                  revision: "86cc6a8dedbc456dd0e4af01a9d09f396f77e558", peakGB: 9.0)
+                                  revision: "86cc6a8dedbc456dd0e4af01a9d09f396f77e558", peakGB: 9.0,
+                                  downloadGB: 8.0)
 
     /// No model may need more. The Agent Manager stops a session past 65% of this 18 GB Mac (11.7 GB) under memory
     /// pressure, and the app itself needs some of what is left.
@@ -39,14 +42,24 @@ final class LocalModelSupervisor {
     /// A first read also loads the model (about 8 GB from disk).
     static let loadTimeout: Duration = .seconds(90)
 
-    static let shared = LocalModelSupervisor(root: URL.applicationSupportDirectory.appending(
-        path: "ArchiveProcessor/Local Models/v1", directoryHint: .isDirectory))
+    nonisolated static let defaultRoot = URL.applicationSupportDirectory.appending(
+        path: "ArchiveProcessor/Local Models/v1", directoryHint: .isDirectory)
+    static let shared = LocalModelSupervisor(root: defaultRoot)
+
+#if DEBUG
+    /// A contract's own supervisor, used in place of `shared` by the clients that read through one.
+    static var testOverride: LocalModelSupervisor?
+    static var serving: LocalModelSupervisor { testOverride ?? shared }
+#else
+    static var serving: LocalModelSupervisor { shared }
+#endif
 
     enum Failure: Error, Equatable {
-        case runtime, installer, software, model, tooLarge, unload, start, reader, stopped
+        case runtime, installer, software, model, tooLarge, unload, start, reader, stopped, installing
     }
 
-    enum InstallStep: Sendable { case software, model }
+    /// Which part of an install is running; the model's download says how much of it has arrived (0 to 1).
+    enum InstallStep: Sendable, Equatable { case waiting, software, model(Double) }
 
     private static let uvURL = URL(string: "https://github.com/astral-sh/uv/releases/download/0.11.21/uv-aarch64-apple-darwin.tar.gz")!
     private static let uvDigest = "1f921d491ba5ffeea774eb04d6681ecee379101341cbb1500394993b541bf3f4"
@@ -84,6 +97,10 @@ final class LocalModelSupervisor {
     private var liveCaptures: Set<ObjectIdentifier> = []
     private var idle: Task<Void, Never>?
     private var generation = 0
+    /// One install at a time: two would write the shared runtime together.
+    private var installingModel: Model?
+    /// A removal is deleting files: installs and reads wait for it.
+    private var removing = false
 
     private final class NoRedirects: NSObject, URLSessionTaskDelegate {
         func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
@@ -123,20 +140,59 @@ final class LocalModelSupervisor {
             "HF_HUB_DISABLE_IMPLICIT_TOKEN": "1",
             "HF_HUB_DISABLE_TELEMETRY": "1",
             "HF_HUB_DISABLE_PROGRESS_BARS": "1",
+            // Plain downloads into the model's own folder: the progress shown is measured there, and Xet's chunk cache
+            // would hold a second copy of the weights on disk.
+            "HF_HUB_DISABLE_XET": "1",
             "ARCHIVE_MODEL_REPO": model.repo, "ARCHIVE_MODEL_REVISION": model.revision,
         ]
     }
 
-    private func marker(_ model: Model) -> URL {
+    nonisolated private static func marker(_ model: Model, root: URL) -> URL {
         root.appending(path: "installed/\(model.repo.replacingOccurrences(of: "/", with: "--"))@\(model.revision)")
     }
 
-    func isInstalled(_ model: Model) -> Bool { FileManager.default.fileExists(atPath: marker(model).path) }
+    private func marker(_ model: Model) -> URL { Self.marker(model, root: root) }
 
-    /// Installs the shared runtime if it is missing, then the model's pinned weights. `step` says which part is running.
-    func install(_ model: Model, step: (InstallStep) -> Void) async throws {
+    func isInstalled(_ model: Model) -> Bool { Self.isInstalled(model, root: root) }
+
+    /// Whether the model's install finished under `root`; readable off the main actor, for the settings a run is built from.
+    nonisolated static func isInstalled(_ model: Model, root: URL = defaultRoot) -> Bool {
+        FileManager.default.fileExists(atPath: marker(model, root: root).path)
+    }
+
+    /// The model's own folder in the download store (Hugging Face's layout: its blobs and the snapshot pointing at them).
+    private func store(_ model: Model) -> URL {
+        root.appending(path: "model-store/hub/models--\(model.repo.replacingOccurrences(of: "/", with: "--"))")
+    }
+
+    /// The bytes of the model's weights on disk so far, partial files included.
+    func downloadedBytes(_ model: Model) -> UInt64 {
+        guard let files = FileManager.default.enumerator(at: store(model),
+                                                         includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey]) else {
+            return 0
+        }
+        var total: UInt64 = 0
+        for case let file as URL in files {
+            // The snapshot's entries are links to the blobs: counted once, as blobs.
+            guard let values = try? file.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+                  values.isRegularFile == true else { continue }
+            total += UInt64(values.fileSize ?? 0)
+        }
+        return total
+    }
+
+    /// Installs the shared runtime if it is missing, then the model's pinned weights. `step` says which part is running
+    /// and how far the download has come. One install runs at a time; another waits (`.waiting`) until it ends.
+    func install(_ model: Model, step: @escaping (InstallStep) -> Void) async throws {
         guard model.peakGB <= Self.memoryCeilingGB else { throw Failure.tooLarge }
         guard let script else { throw Failure.runtime }
+        if installingModel != nil || removing { step(.waiting) }
+        while installingModel != nil || removing { try await wait() }
+        installingModel = model
+        defer {
+            installingModel = nil
+            wakeAll()
+        }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let uv = root.appending(path: "uv-aarch64-apple-darwin/uv")
         if !FileManager.default.isExecutableFile(atPath: uv.path) {
@@ -160,12 +216,50 @@ final class LocalModelSupervisor {
                            "--python", python.path, "--only-binary", ":all:",
                            "--exclude-newer", "2026-11-22T17:00:00Z", "mlx-vlm==0.7.4"],
                       model: model, timeout: 1200, failure: .software)
-        step(.model)
+        step(.model(0))
+        let share = { [weak self] in
+            min(0.99, Double(self?.downloadedBytes(model) ?? 0) / max(1, model.downloadGB * 1_000_000_000))
+        }
+        let progress = Task { @MainActor in
+            while !Task.isCancelled {
+                step(.model(share()))
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
+        defer { progress.cancel() }
         try await run(python, ["-I", script.path, "download"], model: model, timeout: 7200, failure: .model)
         try Task.checkCancellation()
         try FileManager.default.createDirectory(at: marker(model).deletingLastPathComponent(),
                                                 withIntermediateDirectories: true)
         try Data().write(to: marker(model), options: .atomic)
+    }
+
+    /// Removes the model's weights and its install marker, stopping it first if it is loaded. With no other model left
+    /// installed and no install running, the shared runtime goes too, so nothing of the app's models stays on disk.
+    /// Refused while this model is being installed.
+    /// It takes the supervisor's turn first: no read or stage runs while it deletes, no install starts, and a read
+    /// waiting for the model afterwards finds it not installed. Another model's install may go on meanwhile.
+    func remove(_ model: Model) async throws {
+        guard installingModel != model else { throw Failure.installing }
+        evict(model)
+        while busy || removing || stage != nil { try await wait() }
+        guard installingModel != model else { throw Failure.installing }
+        busy = true
+        removing = true
+        defer {
+            removing = false
+            release()
+        }
+        // A read queued before the removal may have loaded it again meanwhile.
+        evict(model)
+        try await drainRetiring()
+        let fm = FileManager.default
+        if fm.fileExists(atPath: marker(model).path) { try fm.removeItem(at: marker(model)) }
+        if fm.fileExists(atPath: store(model).path) { try fm.removeItem(at: store(model)) }
+        let others = (try? fm.contentsOfDirectory(atPath: root.appending(path: "installed").path)) ?? []
+        if others.isEmpty, installingModel == nil, resident == nil, fm.fileExists(atPath: root.path) {
+            try fm.removeItem(at: root)
+        }
     }
 
     private func run(_ binary: URL, _ arguments: [String], model: Model, timeout: TimeInterval,
@@ -185,6 +279,46 @@ final class LocalModelSupervisor {
     /// is loaded (the caller's reader may have been turned off meanwhile); false fails the read as `stopped`.
     func read(_ model: Model, image: Data, prompt: String, maxTokens: Int, timeout: TimeInterval,
               proceed: @escaping () -> Bool = { true }) async throws -> String {
+        try await withWorker(model, proceed: proceed) { child, wanted in
+            guard let port = child.port else { throw Failure.reader }
+            var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/read")!, timeoutInterval: timeout)
+            request.httpMethod = "POST"
+            request.setValue(child.secret, forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "image": image.base64EncodedString(), "prompt": prompt, "max_tokens": maxTokens,
+            ])
+            let (data, response) = try await session.data(for: request)
+            guard wanted() else { throw Failure.stopped }
+            guard (response as? HTTPURLResponse)?.statusCode == 200, resident === child,
+                  let text = (try JSONSerialization.jsonObject(with: data) as? [String: String])?["text"] else {
+                throw Failure.reader
+            }
+            return text
+        }
+    }
+
+    /// The model's worker as an OpenAI-compatible chat-completions server (W49.proc-managed-local-ocr), for the clients
+    /// that already speak that API to a model on this Mac: `body` gets the endpoint and the per-launch secret to send as
+    /// the Authorization header, and runs with the model loaded and the supervisor's turn held, so no other read starts
+    /// beside it. A transport failure (the worker died, or the request timed out with the worker still writing) stops
+    /// the worker, so the next request starts a fresh one.
+    func withEndpoint<T: Sendable>(_ model: Model, proceed: @escaping () -> Bool = { true },
+                                   _ body: @Sendable (URL, String) async throws -> T) async throws -> T {
+        // A model removed (or never installed) is not started: there is nothing on disk for it to load.
+        guard isInstalled(model) else { throw Failure.runtime }
+        return try await withWorker(model, proceed: { self.isInstalled(model) && proceed() }) { child, wanted in
+            guard let port = child.port else { throw Failure.reader }
+            let value = try await body(URL(string: "http://127.0.0.1:\(port)/v1/chat/completions")!, child.secret)
+            guard wanted() else { throw Failure.stopped }
+            return value
+        }
+    }
+
+    /// Takes the turn for `model`, loading it first (and stopping another) if needed, then runs `body` with its worker.
+    /// `wanted` is false once the read is no longer wanted (stopped, turned off, or `proceed` says so).
+    private func withWorker<T>(_ model: Model, proceed: @escaping () -> Bool,
+                               _ body: @MainActor (Worker, () -> Bool) async throws -> T) async throws -> T {
         let started = generation
         let evicted = evictions[model, default: 0]
         let wanted = { started == self.generation && evicted == self.evictions[model, default: 0] && proceed() }
@@ -201,21 +335,7 @@ final class LocalModelSupervisor {
         do {
             try Task.checkCancellation()
             guard wanted() else { throw Failure.stopped }
-            guard let port = child.port else { throw Failure.reader }
-            var request = URLRequest(url: URL(string: "http://127.0.0.1:\(port)/read")!, timeoutInterval: timeout)
-            request.httpMethod = "POST"
-            request.setValue(child.secret, forHTTPHeaderField: "Authorization")
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try JSONSerialization.data(withJSONObject: [
-                "image": image.base64EncodedString(), "prompt": prompt, "max_tokens": maxTokens,
-            ])
-            let (data, response) = try await session.data(for: request)
-            guard wanted() else { throw Failure.stopped }
-            guard (response as? HTTPURLResponse)?.statusCode == 200, resident === child,
-                  let text = (try JSONSerialization.jsonObject(with: data) as? [String: String])?["text"] else {
-                throw Failure.reader
-            }
-            return text
+            return try await body(child, wanted)
         } catch {
             if resident === child { try? await unload() }
             throw wanted() ? error : Failure.stopped
@@ -418,6 +538,11 @@ final class LocalModelSupervisor {
             resident = nil
             retire(child)
         }
+        try await drainRetiring()
+    }
+
+    /// Waits until no stopped worker's process is left.
+    private func drainRetiring() async throws {
         let deadline = ContinuousClock.now + .seconds(6)
         while retiring.contains(where: { $0.process.isRunning }), ContinuousClock.now < deadline {
             await Self.pause(milliseconds: 50)

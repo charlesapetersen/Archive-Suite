@@ -1177,6 +1177,32 @@ local run's escalated pages are priced in the pre-run cascade line, but the esti
 
 **How the route behaves, in full** (moved verbatim from `CLAUDE.md`, doc-fix 2026-10-21): **A model on this Mac (W41.app-local-models, `Models/LocalModelRoute.swift`, Settings › Advanced (`Views/Settings/SettingsAdvancedTab.swift`)):** in gateway mode, **A model on this Mac** (`@AppStorage` `gatewayLocalModel`, carried as `GatewayConfig.localModel`) marks the endpoint as an open-weight model served locally by LM Studio (`127.0.0.1:1234/v1`), Ollama (`:11434/v1`) or `mlx_vlm.server` (`:8080/v1`). Settings recommends a model by this Mac's memory (W43.app-guide-refresh, from the rule table's Mac rows and owner call 7.6: under 16 GB none, Apple Vision instead; from 16 GB Qwen3.5 9B 4-bit, then Qwen3-VL 8B 4-bit, at every size, since no 27B-class reader has been measured on a Mac), shows the measured figures for it (`segbench-results/settings-routes.json`), fills the gateway fields at $0, and **Check server** lists the server's models (`GET /models`). The local route differs from a gateway exactly where W41.mac-local-measure said it must: a **4,096-token cap** (a loop stops in about half the time and comes back `length`), a **repetition check** (`LocalModelRoute.isRepetitionLoop`, also `length`) run every 250 characters of the **streamed** reply (`stream: true`, `LocalModelRoute.StreamedReply`, `NetworkSession.streamLines`), which closes the request as soon as it fires (W41.app-local-models-fu1), and a looped or capped page **read once more** with a 1.05 repetition penalty before it fails, the reason saying so (`afterSecondReading`; a second reading that fails differently keeps the first's code, so it still escalates), a 600 s timeout that also fails as `length` (a bigger model can loop past it before the cap), a reply that is all `<think>` failing as `unparsable` and otherwise `<think>` stripped, temperature 0, **one page at a time** (`schedulingWorkerCount`), and always the stand-in bearer token `local` (never a saved gateway key, never saved to the Keychain). **Send pages it fails to the escalation model** (`gatewayLocalEscalates`, frozen as `GatewayConfig.localEscalates`, off by default, since a local model may have been chosen to keep pages on the Mac) lets the cascade read such a page in the cloud, naming the local model as first reader. Settings warns when the URL is not loopback. The time estimate uses the pick's seconds a page, like for like on an 18 GB M3 Pro (33.73 s for the 9B, 35.09 s for the 8B, `ocr-time-like-for-like.md`). Limits: `KNOWN_ISSUES.md`. Contract: `scripts/test-local-models.sh`.
 
+## ⚠️ LIMITATION (W49.proc-managed-local-ocr, 2026-11-26): what the app-managed page readers do not yet cover
+
+Settings › Accounts › Local models on this Mac downloads **Qwen3.5 9B** (recommended) or **Qwen3-VL 8B**, both 4-bit
+MLX at the revisions the bench read, and the Reader menu then offers them under "This Mac". `LocalModelSupervisor`
+installs and runs them like the label reader, one model loaded at a time; the app's client for a model on this Mac
+reads through the worker's chat endpoint (`withEndpoint`), so the local route's cap, loop stop, second reading,
+reasoning switch and escalation setting all apply unchanged. Measured through the app on the 18 GB M3 Pro
+(`test-local-models.sh` with `LOCALMODELS_SCRATCH_OCR_ROOT`): a fresh install into an empty folder took 43 s (uv,
+Python 3.12.13 and mlx-vlm 0.7.4 from the network; Qwen3-VL 8B's weights checked against the pinned revision from a
+hard-linked copy of the bench's snapshot), and a rendered four-line letter came back whole in 27 s, model load
+included, at a 7.71 GB peak. Open:
+- **Qwen3.5 9B has not been downloaded or read through the app.** The proof used Qwen3-VL 8B because its weights were
+  already on this Mac and the disk had 14 GB free; Qwen3.5 9B's 6 GB size is the Vision OCR lab's record and its
+  9.1 GB peak the bench's, outside the app (Gemma's in-app peak was 1 GB above its bench figure). (queued:
+  W49.proc-managed-ocr-9b-check)
+- **The optional page-image date search and the Mac item-field call still go to an mlx-vlm server at
+  127.0.0.1:8080** (`DateRoute+Run`, `ItemFieldExtractor`), not to the managed model, so with only the app's own model
+  they find no server and add nothing, as for any user without that server. (queued: W49.proc-managed-mac-image-calls)
+- **Live Capture labels with a managed page reader** go to the Gemma label reader, so the supervisor stops the page
+  model and loads Gemma for each label and back (about 9.5 s of switching a label, `segbench-results/ct-gemma-swap.md`);
+  never both in memory. Whether to keep that, read labels with Vision and the parser during such a session, or batch
+  them is the question already asked for a user's own server. (asked: W49.proc-gemma-external-switch-owner-ok)
+- **The Local HD preset** (Settings › Processing) looks only at the user's own local server: it does not show a
+  managed Reader as Local HD, and choosing it replaces the managed Reader with the server preset. (queued:
+  W49.proc-local-ocr-onboarding)
+
 ## ⚠️ LIMITATION (W41.app-page-kind, 2026-10-16): what choosing each page's reader by its kind does not yet cover
 
 Settings › Processing › Reading › **Send handwritten pages to a handwriting reader** (off by default; `PageKindRouting`) classifies dropped

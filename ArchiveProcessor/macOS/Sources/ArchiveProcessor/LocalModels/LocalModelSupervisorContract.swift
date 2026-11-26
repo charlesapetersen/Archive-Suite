@@ -9,9 +9,22 @@ import Foundation
 /// started. Loopback only, no model, no network, $0, never the corpus.
 @MainActor
 enum LocalModelSupervisorContract {
-    private static let stub = #"""
+    /// Also the stand-in for `ManagedLocalOCRContract`: `download` writes a megabyte of weights in four steps (and fails
+    /// for the repo `model-fail`), and `/v1/chat/completions` answers as the real worker's does, recording each request's
+    /// options in `chat.jsonl`. A prompt holding LOOP streams a reply that repeats itself until the client closes it
+    /// (recorded as `cut`), unless the request carries a repetition penalty.
+    static let stub = #"""
     import json, os, signal, sys, threading, time
     from http.server import BaseHTTPRequestHandler, HTTPServer
+    if sys.argv[-1] == "download":
+        repo = os.environ["ARCHIVE_MODEL_REPO"]
+        blobs = os.path.join(os.environ["HF_HOME"], "hub", "models--" + repo.replace("/", "--"), "blobs")
+        os.makedirs(blobs, exist_ok=True)
+        for i in range(4):
+            with open(os.path.join(blobs, "part%d" % i), "wb") as f:
+                f.write(b"x" * 250000)
+            time.sleep(0.5)
+        sys.exit(1 if repo == "model-fail" else 0)
     alive = os.path.join(os.environ["HOME"], "alive")
     os.makedirs(alive, exist_ok=True)
     others = len(os.listdir(alive))
@@ -32,6 +45,9 @@ enum LocalModelSupervisorContract {
             if self.headers.get("Authorization") != secret:
                 self.send_error(403); return
             data = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            if self.path == "/v1/chat/completions":
+                self.chat(data)
+                return
             if data["prompt"] == "SLOW":
                 time.sleep(2)
             text = "%s %d %d %d" % (os.environ["ARCHIVE_MODEL_REPO"], os.getpid(), others, data["max_tokens"])
@@ -40,6 +56,45 @@ enum LocalModelSupervisorContract {
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        def chat(self, data):
+            parts = [p for m in data["messages"] for p in (m["content"] if isinstance(m["content"], list) else [{"type": "text", "text": m["content"]}])]
+            prompt = " ".join(p.get("text", "") for p in parts if p["type"] == "text")
+            images = sum(1 for p in parts if p["type"] == "image_url")
+            options = {k: data.get(k) for k in ("max_tokens", "temperature", "enable_thinking", "stream", "repetition_penalty")}
+            options["images"] = images
+            options["pid"] = os.getpid()
+            options["others"] = others
+            log = os.path.join(os.environ["HOME"], "chat.jsonl")
+            with open(log, "a") as f:
+                f.write(json.dumps(options) + "\n")
+            looping = "LOOP" in prompt and data.get("repetition_penalty") is None
+            content = "Dear Sir, the stub read this page." if images else "STUB TEXT ANSWER"
+            if data.get("stream") is not True:
+                body = json.dumps({"choices": [{"index": 0, "finish_reason": "stop", "message": {"content": content}}]}).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            def event(payload):
+                self.wfile.write(b"data: " + json.dumps(payload).encode() + b"\n\n")
+                self.wfile.flush()
+            try:
+                if looping:
+                    for _ in range(4000):
+                        event({"choices": [{"index": 0, "delta": {"content": "The cat sat. "}}]})
+                        time.sleep(0.002)
+                else:
+                    event({"choices": [{"index": 0, "delta": {"content": content}}]})
+                event({"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]})
+                self.wfile.write(b"data: [DONE]\n\n")
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                with open(log, "a") as f:
+                    f.write(json.dumps({"cut": True}) + "\n")
         def log_message(self, *_):
             pass
     server = HTTPServer(("127.0.0.1", 0), H)
@@ -86,9 +141,9 @@ enum LocalModelSupervisorContract {
         try? Data(stub.utf8).write(to: script)
         let s = LocalModelSupervisor.forTest(root: root, interpreter: python, script: script)
         defer { s.stopAll() }
-        let a = LocalModelSupervisor.Model(name: "A", repo: "model-a", revision: "1", peakGB: 8)
-        let b = LocalModelSupervisor.Model(name: "B", repo: "model-b", revision: "1", peakGB: 8)
-        let huge = LocalModelSupervisor.Model(name: "Huge", repo: "model-huge", revision: "1", peakGB: 12)
+        let a = LocalModelSupervisor.Model(name: "A", repo: "model-a", revision: "1", peakGB: 8, downloadGB: 1)
+        let b = LocalModelSupervisor.Model(name: "B", repo: "model-b", revision: "1", peakGB: 8, downloadGB: 1)
+        let huge = LocalModelSupervisor.Model(name: "Huge", repo: "model-huge", revision: "1", peakGB: 12, downloadGB: 1)
         func read(_ m: LocalModelSupervisor.Model, _ prompt: String = "p", proceed: @escaping () -> Bool = { true })
             async -> Result<Reply?, Error> {
             do { return .success(parse(try await s.read(m, image: Data([1]), prompt: prompt, maxTokens: 640,

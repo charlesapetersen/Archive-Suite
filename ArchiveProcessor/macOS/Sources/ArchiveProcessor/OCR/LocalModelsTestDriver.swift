@@ -90,6 +90,14 @@ enum LocalModelsTestDriver {
         defer { finish() }
         memoryChecks()
         for (name, ok, detail) in await LocalModelSupervisorContract.run() { check(name, ok, detail) }
+        for (name, ok, detail) in await ManagedLocalOCRContract.run() { check(name, ok, detail) }
+        if let path = ProcessInfo.processInfo.environment["LOCALMODELS_SCRATCH_OCR_ROOT"] {
+            let store = ProcessInfo.processInfo.environment["LOCALMODELS_SCRATCH_OCR_STORE"].map { URL(fileURLWithPath: $0) }
+            for (name, ok, detail) in await ManagedLocalOCRContract.realInstallAndRead(
+                scratch: URL(fileURLWithPath: path, isDirectory: true), store: store) {
+                if name.hasPrefix("NOTE") { lines.append(name) } else { check(name, ok, detail) }
+            }
+        }
         replyGuardChecks()
         settingsChecks()
 

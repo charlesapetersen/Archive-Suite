@@ -890,6 +890,31 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertFalse(app.buttons["ap.gemma.download"].exists)
     }
 
+    /// W49.proc-managed-local-ocr: Settings › Accounts offers the measured page readers with their disk and memory
+    /// needs before any download, and asks before one starts. The guest has 6 GB, so the run says it has 18.
+    func testManagedPageReadersShowNeedsAndAskBeforeDownload() {
+        relaunch(extra: ["-APUITestManagedOCR"])
+        openSettings("Accounts")
+        let download = app.buttons["ap.managedOCR.download.qwen35-9b"]
+        XCTAssertTrue(download.waitForExistence(timeout: 10), "Accounts offers Qwen3.5 9B to download")
+        XCTAssertTrue(app.buttons["ap.managedOCR.download.qwen3vl-8b"].exists, "and Qwen3-VL 8B")
+        func shown(_ fragment: String) -> Bool {
+            app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@", fragment, fragment))
+                .firstMatch.exists
+        }
+        XCTAssertTrue(shown("page reader, recommended"), "the recommended reader is marked")
+        XCTAssertTrue(shown("About 6 GB to download"), "the download's size shows before it starts")
+        XCTAssertTrue(shown("9.1 GB of memory while reading"), "and the memory it needs")
+        XCTAssertTrue(shown("8.4 GB of memory while reading"), "for each model")
+        attachScreenshot("processor-managed-ocr-offer")
+        download.click()
+        let confirm = app.buttons["Download"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "a download asks first")
+        attachScreenshot("processor-managed-ocr-confirm")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(download.waitForExistence(timeout: 5), "cancelling the question starts nothing")
+    }
+
     func testLiveLabelCardExplainsAppleVisionFallback() {
         relaunch(extra: ["-APUITestLabelFallback"])
 

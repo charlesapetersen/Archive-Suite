@@ -991,8 +991,12 @@ struct GatewayConfig: Codable, Equatable {
     /// A local model's failed page may go to the cloud escalation model (`OCRCascade`). Off unless the user says so:
     /// someone who chose a local model may have chosen it to keep the pages on this Mac.
     var localEscalates: Bool? = nil
+    /// W49.proc-managed-local-ocr: a model the app downloads and runs itself (`ManagedOCRModel`'s raw value), read
+    /// through `LocalModelSupervisor` rather than at `baseURL`. Always a local model too.
+    var managedModel: String? = nil
 
     var isLocalModel: Bool { localModel == true }
+    var managedOCR: ManagedOCRModel? { managedModel.flatMap(ManagedOCRModel.init(rawValue:)) }
 
     /// The base URL the field wants (`https://…/v1`), from what the user typed or pasted. A pasted full endpoint
     /// (`…/v1/chat/completions`) had the path appended a second time and every call answered 404 (owner session
@@ -1032,7 +1036,22 @@ struct GatewayConfig: Codable, Equatable {
     }
 
     static func storedKey(_ d: UserDefaults = .standard, allowInteraction: Bool = true) -> String {
-        storedKey(localModel: d.bool(forKey: DefaultsKeys.gatewayLocalModel), allowInteraction: allowInteraction)
+        storedKey(localModel: readsOnThisMac(d), allowInteraction: allowInteraction)
+    }
+
+    /// Whether the stored gateway is a model on this Mac: the user's own server marked local, or an app-managed model.
+    static func readsOnThisMac(_ d: UserDefaults = .standard) -> Bool {
+        d.bool(forKey: DefaultsKeys.gatewayLocalModel) || ManagedOCRModel.stored(d) != nil
+    }
+
+    /// The gateway for an app-managed model: nil until its download has finished, so a run never starts on a model that
+    /// is not there (the Reader then asks for the download or Apple Vision).
+    static func managed(_ m: ManagedOCRModel, _ d: UserDefaults = .standard,
+                        root: URL = LocalModelSupervisor.defaultRoot) -> GatewayConfig? {
+        guard LocalModelSupervisor.isInstalled(m.model, root: root) else { return nil }
+        return GatewayConfig(baseURL: ManagedOCRModel.baseURL, modelID: m.rawValue, displayName: m.pick.displayName,
+                             localModel: true, localEscalates: d.bool(forKey: DefaultsKeys.gatewayLocalEscalates) ? true : nil,
+                             managedModel: m.rawValue)
     }
 
     func asLLMModel() -> LLMModel {
@@ -1052,8 +1071,10 @@ struct GatewayConfig: Codable, Equatable {
     /// fully configured. Single source of truth for the OCRView / ToolsView `currentGatewayConfig` and
     /// `SessionProcessingConfig.fromDefaults`, which previously each rebuilt this identically (the view
     /// `@AppStorage` keys + defaults match these UserDefaults reads exactly, so the result is unchanged).
-    static func fromDefaults(_ d: UserDefaults = .standard) -> GatewayConfig? {
+    static func fromDefaults(_ d: UserDefaults = .standard,
+                             managedRoot: URL = LocalModelSupervisor.defaultRoot) -> GatewayConfig? {
         guard d.bool(forKey: DefaultsKeys.useGateway) else { return nil }
+        if let m = ManagedOCRModel.stored(d) { return managed(m, d, root: managedRoot) }
         let baseURL = normalizedBaseURL(d.string(forKey: DefaultsKeys.gatewayBaseURL) ?? "")
         let modelID = d.string(forKey: DefaultsKeys.gatewayModelID) ?? ""
         guard !baseURL.isEmpty, !modelID.isEmpty else { return nil }

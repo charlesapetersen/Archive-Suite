@@ -45,7 +45,7 @@ enum SettingsTabOwnership {
         add(.processing, [
             AppAppearance.defaultsKey, DefaultsKeys.outputDirectory,
             DefaultsKeys.selectedProvider, DefaultsKeys.useGateway, DefaultsKeys.useLocalAgent, DefaultsKeys.useAppleVision,
-            DefaultsKeys.visionLanguages, DefaultsKeys.visionUseLLMJudgment, DefaultsKeys.ocrPageKindRouting,
+            DefaultsKeys.gatewayManagedModel, DefaultsKeys.visionLanguages, DefaultsKeys.visionUseLLMJudgment, DefaultsKeys.ocrPageKindRouting,
             DefaultsKeys.taggingModeRaw, DefaultsKeys.segmentationApproach, DefaultsKeys.segmentationClaudeRoute,
             DefaultsKeys.localSegmenterPartner, DefaultsKeys.reviewDocumentSegmentation, DefaultsKeys.mergeDocuments,
             DefaultsKeys.enableCollectionSegmentation, DefaultsKeys.confirmCollectionIDs, DefaultsKeys.macItemFields,

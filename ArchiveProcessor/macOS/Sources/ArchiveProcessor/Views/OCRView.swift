@@ -89,7 +89,10 @@ struct OCRView: View {
 
     // Gateway mode (persisted)
     @AppStorage(DefaultsKeys.useGateway) private var useGateway: Bool = false
-    @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalModel: Bool = false
+    @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalServer = false
+    @AppStorage(DefaultsKeys.gatewayManagedModel) private var gatewayManagedModel = ""
+    /// The gateway is a model on this Mac: the user's own server marked local, or one the app runs itself.
+    private var gatewayLocalModel: Bool { gatewayLocalServer || !gatewayManagedModel.isEmpty }
     @AppStorage(DefaultsKeys.gatewayBaseURL) private var gatewayBaseURL: String = ""
     @AppStorage(DefaultsKeys.gatewayModelID) private var gatewayModelID: String = ""
     @AppStorage(DefaultsKeys.gatewayDisplayName) private var gatewayDisplayName: String = ""
@@ -229,6 +232,9 @@ struct OCRView: View {
     }
     private var gatewaySetupIssue: String? {
         guard !useAppleVision, !useLocalAgent, useGateway, currentGatewayConfig == nil else { return nil }
+        if let m = ManagedOCRModel(rawValue: gatewayManagedModel) {
+            return "\(m.model.name) is not downloaded: download it in Settings › Accounts, or choose Apple Vision, before starting."
+        }
         return "Set the gateway URL and model in Settings › Advanced before starting."
     }
     private var currentLocalAgentConfig: LocalAgentConfig? {
@@ -441,8 +447,9 @@ struct OCRView: View {
                                                             usesLocalAgent: useLocalAgent)
     }
 
+    /// A model the app runs itself is free: its zero prices are its own, not the user's gateway fields.
     private var gatewayHasCosts: Bool {
-        gatewayInputCost >= 0 && gatewayOutputCost >= 0
+        !gatewayManagedModel.isEmpty || (gatewayInputCost >= 0 && gatewayOutputCost >= 0)
     }
 
     private var unavailableOpenRouterSelection: String? {

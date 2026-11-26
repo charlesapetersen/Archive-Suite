@@ -21,6 +21,7 @@ struct SettingsAdvancedTab: View {
     @AppStorage(DefaultsKeys.gatewayUpstreamProvider) private var gatewayUpstreamProvider: LLMProvider = .anthropic
     @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalModel = false
     @AppStorage(DefaultsKeys.gatewayLocalEscalates) private var gatewayLocalEscalates = false
+    @AppStorage(DefaultsKeys.gatewayManagedModel) private var gatewayManagedModel = ""
     @AppStorage(DefaultsKeys.localAgentBinaryPath) private var localAgentBinaryPath = ""
     @AppStorage(DefaultsKeys.localAgentModel) private var localAgentModel = ""
     @AppStorage(DefaultsKeys.customOCRPrompt) private var customOCRPrompt = ""
@@ -150,7 +151,9 @@ struct SettingsAdvancedTab: View {
 
     @ViewBuilder private var endpointsSection: some View {
         Section("Custom endpoints, local servers and the CLI") {
-            Text(useGateway ? "The Reader is this gateway now." : "Choose the gateway as the Reader in Settings › Processing to read with it.")
+            Text(useGateway && !gatewayManagedModel.isEmpty
+                 ? "The Reader is a model the app runs itself (Settings › Accounts). These fields are for your own server or gateway, kept for when you choose it again."
+                 : useGateway ? "The Reader is this gateway now." : "Choose the gateway as the Reader in Settings › Processing to read with it.")
                 .font(.caption).foregroundStyle(.primary)
             Toggle(isOn: $gatewayLocalModel) {
                 HelpLabel("The gateway is a model on this Mac", help: "An open-weight model served on this Mac by LM Studio, Ollama or mlx-vlm. Pages are read one at a time with no key and no charge. A reply is capped at \(LocalModelRoute.maxTokens) tokens, and one that starts repeating itself is stopped as it arrives. A looped or capped page is read once more with a repetition penalty; if that fails too, the page fails, and goes to a cloud escalation model only if you allow it.")

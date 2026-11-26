@@ -15,6 +15,9 @@ enum ProcessorUITestConfiguration {
     /// W49.proc-s044-check: a dummy credential for the guest loopback gateway, headless Keychain stays untouched.
     static var usesStandInGateway: Bool { isActive && arguments.contains("-APUITestStandInGateway") }
 
+    /// W49.proc-managed-local-ocr: the guest has too little memory for the managed page readers; this run says 18 GB.
+    static var managedOCRMemoryGB: Double? { isActive && arguments.contains("-APUITestManagedOCR") ? 18 : nil }
+
     static var offersCollectionInterview: Bool { arguments.contains("-APUITestCollectionInterview") }
 
     static var inputDirectory: URL? { urlValue(after: "-APUITestInputDirectory") }

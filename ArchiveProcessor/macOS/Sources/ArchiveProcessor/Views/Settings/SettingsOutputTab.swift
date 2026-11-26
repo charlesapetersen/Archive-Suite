@@ -9,7 +9,10 @@ struct SettingsOutputTab: View {
     @EnvironmentObject private var scope: SettingsScopeModel
     @AppStorage(DefaultsKeys.selectedProvider) private var selectedProvider: LLMProvider = .gemini
     @AppStorage(DefaultsKeys.useGateway) private var useGateway = false
-    @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalModel = false
+    @AppStorage(DefaultsKeys.gatewayLocalModel) private var gatewayLocalServer = false
+    @AppStorage(DefaultsKeys.gatewayManagedModel) private var gatewayManagedModel = ""
+    /// The gateway is a model on this Mac: the user's own server marked local, or one the app runs itself.
+    private var gatewayLocalModel: Bool { gatewayLocalServer || !gatewayManagedModel.isEmpty }
     @AppStorage(DefaultsKeys.useLocalAgent) private var useLocalAgent = false
     @AppStorage(DefaultsKeys.useAppleVision) private var useAppleVision = false
     @AppStorage(DefaultsKeys.preOCRedInput) private var preOCRedInput = false

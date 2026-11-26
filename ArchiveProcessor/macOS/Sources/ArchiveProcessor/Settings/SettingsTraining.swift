@@ -260,6 +260,8 @@ enum SettingsTraining {
 extension SettingsTraining {
     static func gatewayHasKnownTerms(_ gateway: GatewayConfig?) -> Bool {
         guard let gateway else { return true }
+        // A model the app runs itself (W49.proc-managed-local-ocr) never leaves this Mac.
+        if gateway.managedOCR != nil { return true }
         if gateway.isLocalModel && LocalModelRoute.isLoopback(gateway.baseURL) { return true }
         guard let host = URL(string: GatewayConfig.normalizedBaseURL(gateway.baseURL))?.host?.lowercased()
         else { return false }

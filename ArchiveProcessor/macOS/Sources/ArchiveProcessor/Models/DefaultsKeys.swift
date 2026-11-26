@@ -29,6 +29,9 @@ enum DefaultsKeys {
     static let gatewayUpstreamProvider = "gatewayUpstreamProvider"
     static let gatewayLocalModel = "gatewayLocalModel"   // W41.app-local-models: the gateway is a model on this Mac
     static let gatewayLocalEscalates = "gatewayLocalEscalates"   // …and its failed pages may go to the escalation model
+    /// W49.proc-managed-local-ocr: the gateway is a model the app downloads and runs itself (`ManagedOCRModel`'s raw
+    /// value, empty for none). The fields above, the user's own server, stay as they were.
+    static let gatewayManagedModel = "gatewayManagedModel"
 
     // Local Agent CLI backend (a locally installed, subscription-authenticated CLI — no API key).
     // Additive + opt-in; mutually exclusive with useGateway (the XOR is enforced in SettingsView).
