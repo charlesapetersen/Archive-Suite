@@ -22,8 +22,11 @@
 #              ad-hoc build writes it.
 # Journeys need their own environment: run `VM_COVERAGE=1 <APP>_JOURNEY=… vm-gui-runner.sh …` (or its wrapper
 # script with VM_COVERAGE=1 exported) and add the collected bundle with `coverage_gaps.py xcresult <bundle> <run>`.
-# The drivers left out need an API key or spend money (openrouter, segmentation-proof, smoke, tier2) — the same
-# list as ops/verify/sanitizer-runs.sh.
+# The list is every key-free script that runs the app's own driver (sanitizer-runs.sh's list, then the rest).
+# Left out: those that need an API key, an account or a device or spend money (openrouter, segmentation-proof,
+# local-segmentation-proof, smoke, tier2, drive-live, android/ios), and those that compile their own small host
+# rather than run the app (relay-*, rotation-axis/-deadlock/-lcnet, vision-ocr, ocr-prompt, thinking-budgets, …),
+# whose profile would not be the app's.
 set -uo pipefail
 . "$(dirname "$0")/../autonomous/heavy-enter.sh"
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -40,7 +43,13 @@ test-merge-safety.sh test-multipage-reocr.sh test-network-session.sh test-ocr-ca
 test-ocr-page-kind.sh test-ocr-refusal.sh test-processfiles-tagwarn.sh test-processing-history.sh test-recovery.sh
 test-retry-backend.sh test-segment-json.sh test-segmentation-chatgpt.sh test-segmentation-chooser.sh
 test-segmentation-engine.sh test-segmentation-plan.sh test-segmentation-review.sh test-vision-hybrid.sh
-test-usbmux-bridge.sh"
+test-usbmux-bridge.sh
+test-date-route.sh test-deferred-output.sh test-entity-feature.sh test-flagged-check-timing.sh test-header-parity.sh
+test-item-fields.sh test-newspaper-layout.sh test-page-reader.sh test-provider-errors.sh test-read-quality-flag.sh
+test-reocr-filewriter.sh test-reocr-job.sh test-reocr-pairs.sh test-reocr-preservation.sh test-reocr-ranking.sh
+test-reocr-request-store.sh test-reocr-writer.sh test-review-corrections.sh test-rotation-rule.sh
+test-run-quit-resume.sh test-settings-interviews.sh test-settings-layers.sh test-settings-sheet.sh
+test-settings-solver.sh test-settings-tabs.sh test-tagging-failure.sh test-text-layer.sh"
 
 worst=0
 extract() {  # $1 = xcresult, $2 = run name
