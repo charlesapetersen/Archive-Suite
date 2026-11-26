@@ -16,7 +16,7 @@ final class NotesPolishUITests: NotesFixtureUITestCase {
             XCTAssertTrue(kindCell.waitForExistence(timeout: 10), "the list shows the Kind column")
             revealRow(kindCell)
             kindCell.doubleClick()
-            pause(1)
+            wait(1)
             app.typeText("zqxpolish")
             XCTAssertTrue(pollUntil(timeout: 12) { (self.noteBody(uuid: id) ?? "").contains("zqxpolish") },
                           "typing after the double-click should reach the note body; focus: \(keyboardFocusDescription())")
@@ -56,6 +56,20 @@ final class NotesPolishUITests: NotesFixtureUITestCase {
             let copyCell = mainWindow.descendants(matching: .any)["an.cell.title.\(copy.uppercased())"]
             XCTAssertTrue(copyCell.waitForExistence(timeout: 10), "the copy is listed")
             shot("polish-duplicate")
+        }
+    }
+
+    private func wait(_ seconds: TimeInterval) {
+        RunLoop.current.run(until: Date().addingTimeInterval(seconds))
+    }
+
+    private func shot(_ name: String) {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("uitest-\(name).png")
+        do {
+            try mainWindow.screenshot().pngRepresentation.write(to: url, options: .atomic)
+            print("[shot] \(name): wrote \(url.path)")
+        } catch {
+            print("[shot] \(name): could not write \(url.path) — \(error)")
         }
     }
 }

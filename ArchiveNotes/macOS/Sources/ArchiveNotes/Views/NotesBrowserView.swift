@@ -526,7 +526,8 @@ private struct ItemListPane: View {
                     NotesTableView(
                         model: nav,
                         selection: $nav.selection,
-                        onDoubleClick: { nav.requestEditorFocus() },
+                        // Several rows show no editor; a request left pending would take the keyboard later.
+                        onDoubleClick: { if nav.selection.count == 1 { nav.requestEditorFocus() } },
                         buildContextMenu: { selection in
                             NotesItemContextMenu.make(nav: nav, selection: selection, flushing: flushRegistry,
                                                       archiveRoots: { [previewState] in previewState.grantedArchiveFolders })

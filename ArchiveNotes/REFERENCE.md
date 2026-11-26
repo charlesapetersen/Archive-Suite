@@ -172,6 +172,9 @@ macOS/Sources/ArchiveNotes/
     NotesSort.swift                NoteSortField (title/date/kind/quality/relevance) + NoteSortDescriptor
                                    + deterministic nil-last multi-level sort over ItemSummary (W6-S3;
                                    adapts Reader LibrarySort)
+    NoteTextStats.swift            Pure word/character count of a body's visible text (block headers,
+                                   images, link targets, Markdown markers left out) for the inspector's
+                                   Info section (W49.notes-polish-small)
     ItemSummaryDisplay.swift       Pure item-list cell rendering: displayDate (decade/year/month/day),
                                    qualityStars, displayTags (W6-S3);
                                    sourcesText (count for extracts, blank otherwise) (W7-S4);
@@ -432,7 +435,8 @@ macOS/Sources/ArchiveNotes/
                                    a token field over the cell with TagEntry autocompletion; Return or
                                    leaving saves to the item it began on, Escape writes nothing
     NotesContextMenu.swift         Item-row NSMenu builder (closure-trampoline): Add to Folder ▸ /
-                                   Open / Reveal / Copy Link (W9.b9) / New from Template / Set Quality +
+                                   Open (also focuses the editor) / Reveal / Copy Link (W9.b9) / Duplicate
+                                   (⌘D, DuplicateNoteFlow; W49.notes-polish-small) / New from Template / Set Quality +
                                    confirmed whole-item Delete; Export… / Print… of the clicked rows
     NoteExportFlow.swift           The folder panel (format pop-up, remembered), alerts and print panel around
                                    NoteExport; saves every open editor first (W49.notes-export-print)
