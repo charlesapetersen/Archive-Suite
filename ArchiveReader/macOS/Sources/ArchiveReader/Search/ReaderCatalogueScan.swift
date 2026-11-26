@@ -422,8 +422,8 @@ final class ReaderCatalogueCacheWriter: @unchecked Sendable {
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                 let encoder = PropertyListEncoder()
                 encoder.outputFormat = .binary
-                try encoder.encode(next).write(to: ReaderCatalogueCache.url(in: directory, instance: next.instance),
-                                               options: .atomic)
+                let url = ReaderCatalogueCache.url(in: directory, instance: next.instance)
+                try encoder.encode(next).write(to: url, options: .atomic)
             } catch {
                 NSLog("ReaderCatalogueCache: could not save: \(error)")
             }

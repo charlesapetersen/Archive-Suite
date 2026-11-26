@@ -137,6 +137,13 @@ ALLOW=(
   # added in the same item's completing commit rather than left for someone to discover.
   "destructive${SEP}packages/ArchiveCore/Sources/ArchiveCore/Tags/TagVocabulary.swift${SEP}try? data.write(to: fileURL, options: .atomic)"
 
+  # ReaderCatalogueCacheWriter (W49.reader-catalogue-scale): the catalogue list saved for the next launch's
+  # warm start, one binary plist per root instance, `<instance UUID>.plist` in `catalogue-cache-v1/` in the
+  # Reader's Application Support directory (beside the scratch library index in the fixture lane; none in the
+  # unit-test host or for other fixture roots). The directory is fixed when `ArchiveLibrary` is made and the name
+  # is a UUID, so no scanned corpus URL can reach it. A disposable cache: replaced whole, never read as truth.
+  "destructive${SEP}ArchiveReader/macOS/Sources/ArchiveReader/Search/ReaderCatalogueScan.swift${SEP}try encoder.encode(next).write(to: url, options: .atomic)"
+
   # AuditLedger (Safety §12, W40.audit-ledger): the Reader's append-only record of its own tag writes,
   # one JSON line per verified write. The file is `audit-ledger.jsonl` in the Reader's Application
   # Support directory (a per-process temp file under the unit-test host); its URL comes from
