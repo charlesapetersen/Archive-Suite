@@ -5,7 +5,8 @@
 #         ops/verify/coverage_gaps.py report            (union of every run in $COV_OUT; see that file)
 # ENV:    COV_OUT (default ~/Library/Caches/ArchiveSuiteRehearsal/W40.e4, so a later session adds runs to it),
 #         DRIVERS (Processor driver scripts, overriding the list below), VM_SELECT (override a vm-* selection) and VM_TAG (its
-#         run-name part, default "all", so a narrower re-run does not overwrite the full one)
+#         run-name part, default "all", so a narrower re-run does not overwrite the full one); VM_SPLIT (default 4; 0 runs
+#         the selection in one guest, which a list of single tests needs)
 # EXIT:   0 = every run produced coverage (failing tests are logged, not fatal: a failed test still executed
 #             code) · 2 = a run produced no coverage — never read as "nothing reached"
 #
@@ -109,8 +110,8 @@ run_vm() {  # $1 = reader | notes | processor
     processor) sel="ArchiveProcessorUITests" ;;
   esac
   touch "$stamp"
-  log "vm-$app: ${VM_SELECT:-$sel} with coverage in the VM (VM_SPLIT=4)…"
-  VM_COVERAGE=1 VM_SPLIT=4 ONLY_TESTING="${VM_SELECT:-$sel}" "$ROOT/ops/gui/vm-gui-runner.sh" "$app" xcuitest \
+  log "vm-$app: ${VM_SELECT:-$sel} with coverage in the VM (VM_SPLIT=${VM_SPLIT:-4})…"
+  VM_COVERAGE=1 VM_SPLIT="${VM_SPLIT:-4}" ONLY_TESTING="${VM_SELECT:-$sel}" "$ROOT/ops/gui/vm-gui-runner.sh" "$app" xcuitest \
     >"$OUT/vm-$app.log" 2>&1
   log "vm-$app: runner exit $? (log: $OUT/vm-$app.log)"
   n=0
