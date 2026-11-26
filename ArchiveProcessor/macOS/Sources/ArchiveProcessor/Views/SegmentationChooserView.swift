@@ -63,7 +63,7 @@ struct SegmentationChooserView: View {
             } label: {
                 HStack {
                     Text("Segmentation")
-                    HelpButton(text: "Who proposes where each document starts. Full manual proposes nothing: you group the pages yourself, as before. Every other choice is a first draft you review: the doubtful boundaries are put in front of you one at a time, and the rest stay visible for a skim. Nothing is filed unseen.\n\nWhat each choice gets right, what it costs and how long it takes, measured on real boxes and scaled to your pages, is on the settings sheet: “Figures and other choices…”.")
+                    HelpButton(text: "Who proposes where each document starts. Full manual proposes nothing: you group the pages yourself, as before. Every other choice is a first draft you review: the doubtful boundaries are put in front of you one at a time, and the rest stay visible for a skim. Nothing is filed unseen.\n\nWhat each choice gets right, what it costs and how long it takes, measured on real boxes and scaled to your pages, is on the Advisor: “Compare routes & trade-offs…”.")
                 }
             }
             .accessibilityIdentifier("ap.segmentation.picker")

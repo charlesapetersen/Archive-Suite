@@ -39,6 +39,10 @@ struct SettingsAdvisorSheet: View {
     @State private var draft = SettingsAdvisor.Draft(answers: CollectionInterviewAnswers(), pages: 1000)
     @State private var problem: String?
     @State private var applying = false
+    /// The Claude plan's sign-in check, still running after Apply saved; Cancel stops it before it switches the reader.
+    @State private var planTask: Task<Void, Never>?
+    /// Something was saved: Cancel no longer means nothing was.
+    @State private var saved = false
     @State private var measuring = false
     @State private var measuredCount = 0
     @State private var measureTotal = 0
@@ -116,6 +120,7 @@ struct SettingsAdvisorSheet: View {
         .onDisappear {
             pickedFiles = nil
             measureTask?.cancel()
+            planTask?.cancel()
         }
     }
 
@@ -162,7 +167,7 @@ struct SettingsAdvisorSheet: View {
 
     private func footer(_ m: SettingsSheetModel?) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            if let message = problem ?? store.lastProblem {
+            if let message = problem {
                 Text(message).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
             }
             HStack {
@@ -172,16 +177,19 @@ struct SettingsAdvisorSheet: View {
                     .help("ArchiveOCRBench: every route measured, including the ones the app does not run.")
                     .accessibilityIdentifier("ap.advisor.bench")
                 Spacer()
-                Button("Cancel") { measureTask?.cancel(); onDone() }
+                Button(saved ? "Close" : "Cancel") { measureTask?.cancel(); planTask?.cancel(); onDone() }
                     .keyboardShortcut(.cancelAction)
-                    .help("Saves nothing.")
+                    .help(saved ? "Your answers and choices are saved; the reader is unchanged." : "Saves nothing.")
                     .accessibilityIdentifier("ap.advisor.cancel")
+                // After a new collection's first files, Return saves the answers alone, as the interview it replaced did:
+                // Apply also switches this Mac's reader, which is a choice to make on purpose.
                 Button("Save answers") { saveAnswers() }
+                    .keyboardShortcut(files.isEmpty ? nil : .defaultAction)
                     .disabled(measuring || pickedFiles != nil || applying)
                     .help("Saves your answers about this material and leaves every reader and choice as it is.")
                     .accessibilityIdentifier("ap.advisor.save")
                 Button(SettingsAdvisor.applyTitle(target)) { if let m { apply(m) } }
-                    .keyboardShortcut(.defaultAction)
+                    .keyboardShortcut(files.isEmpty ? .defaultAction : nil)
                     .disabled(m == nil || measuring || pickedFiles != nil || applying)
                     .help("Saves your answers and the choices shown, and switches on what Process Files runs for them.")
                     .accessibilityIdentifier("ap.advisor.apply")
@@ -251,10 +259,14 @@ struct SettingsAdvisorSheet: View {
                     }
                     GridRow {
                         Text("Most to spend on a batch")
+                        if target == .general {
+                            Text(generalLimitWords).fixedSize(horizontal: false, vertical: true)
+                                .accessibilityIdentifier("ap.advisor.generalLimit")
+                        } else {
                         VStack(alignment: .leading, spacing: 2) {
                             HStack {
                                 Picker("Most to spend on a batch", selection: batchLimit) {
-                                    Text(target == .general ? "Use the default" : "Use inherited limit").tag(BatchLimit.inherited)
+                                    Text("Use inherited limit").tag(BatchLimit.inherited)
                                     Text("No limit").tag(BatchLimit.unlimited)
                                     Text("Set an amount").tag(BatchLimit.amount)
                                 }
@@ -271,6 +283,7 @@ struct SettingsAdvisorSheet: View {
                             if let note = limitNote {
                                 Text(note).font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
                             }
+                        }
                         }
                     }
                     GridRow {
@@ -302,6 +315,13 @@ struct SettingsAdvisorSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityIdentifier("ap.advisor.inputs")
+    }
+
+    /// The general layer's limit is Settings › Processing's spending limit; the Advisor only says what it is.
+    private var generalLimitWords: String {
+        let cap = base.batchSpendingCapUSD
+        let words = cap.map { $0 == 0 ? "nothing" : $0.formatted(.currency(code: "USD")) } ?? "no limit"
+        return "\(words.prefix(1).uppercased() + words.dropFirst()), set by the spending limit in Settings › Processing."
     }
 
     private var limitNote: String? {
@@ -514,6 +534,7 @@ struct SettingsAdvisorSheet: View {
         let out = SettingsAdvisor.save(draft, to: target, store: store, doc: doc, choices: true)
         doc = out.doc
         guard out.ok else { problem = out.problem; return }
+        saved = true
         var plan: String?
         for change in changes {
             if case .readingByPlan(let model) = change { plan = model } else { SettingsAdvisor.applyRun(change) }
@@ -522,9 +543,10 @@ struct SettingsAdvisorSheet: View {
         // The plan is switched on only once Claude Code's subscription sign-in is confirmed.
         applying = true
         let binary = claudeBinary
-        Task {
+        planTask = Task {
             let billing = await claudeUsage.refresh(binary: binary, force: true)
             applying = false
+            guard !Task.isCancelled else { return }
             guard binary == claudeBinary, billing == .subscription else {
                 problem = "Your answers and choices are saved, but Claude Code's subscription sign-in could not be confirmed, so the reader is unchanged. Check its sign-in in Settings › Accounts."
                 return

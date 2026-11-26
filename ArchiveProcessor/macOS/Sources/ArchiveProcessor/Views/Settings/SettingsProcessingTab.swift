@@ -331,7 +331,7 @@ struct SettingsProcessingTab: View {
     @ViewBuilder private var privacySection: some View {
         Section("Privacy, spending and the app") {
             LayeredToggle(key: .staysOnMac) {
-                HelpLabel("Keep pages on this Mac", help: "The app's picks and the settings sheet offer only readers that run on this Mac, so no page image or text leaves it. A cloud reader you choose yourself above still sends pages to its provider.")
+                HelpLabel("Keep pages on this Mac", help: "The app's picks and the Advisor (“Compare routes & trade-offs…”) offer only readers that run on this Mac, so no page image or text leaves it. A cloud reader you choose yourself above still sends pages to its provider.")
             }
             if scope.resolve(.staysOnMac).value.bool == true, !useAppleVision, !(useGateway && gatewayLocalModel) {
                 Text("Your Reader above is not on this Mac: pages go to it when you run.")

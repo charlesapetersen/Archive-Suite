@@ -74,7 +74,32 @@ final class AccessibilityAuditUITests: XCTestCase {
             if panel == "Accounts" { try checkValidatedBadge(in: settings, appearance: appearance) }
             sweep.audit(settings, screen: "settings, \(panel)", exempt: [AccessibilityAudit.groupedFormTextFieldOrphan])
         }
+        try auditAdvisor(settings, sweep: sweep, appearance: appearance)
         sweep.finish()
+    }
+
+    /// The Advisor sheet (W49.proc-settings-advisor-advanced), both its tabs, from Settings › Processing.
+    private func auditAdvisor(_ settings: XCUIElement, sweep: AccessibilityAudit, appearance: String) throws {
+        XCTAssertTrue(app.showSettingsPanel("Processing"))
+        let compare = settings.descendants(matching: .any)["ap.settings.compareRoutes"].firstMatch
+        XCTAssertTrue(compare.waitForExistence(timeout: 5), "Processing should offer Compare routes & trade-offs")
+        guard compare.exists else { return }
+        compare.click()
+        let advisor = app.sheets.firstMatch
+        XCTAssertTrue(advisor.descendants(matching: .any)["ap.advisor.stage.reading"].waitForExistence(timeout: 15),
+                      "the Advisor should appear with its stage rows")
+        guard advisor.exists else { return }
+        for tab in ["Advisor", "Range"] {
+            let button = advisor.radioButtons[tab]
+            if button.exists { button.click() }
+            LayoutGuard.waitUntilSettled(advisor)
+            sweep.audit(advisor, screen: "advisor, \(tab)", exempt: [AccessibilityAudit.groupedFormTextFieldOrphan])
+            let shot = scratchRoot.appendingPathComponent("uitest-advisor-\(tab.lowercased())-\(appearance).png")
+            try advisor.screenshot().pngRepresentation.write(to: shot)
+            print("[shot] advisor-\(tab.lowercased())-\(appearance): wrote \(shot.path)")
+        }
+        advisor.buttons["ap.advisor.cancel"].click()
+        XCTAssertTrue(advisor.waitForNonExistence(timeout: 5), "Cancel should close the Advisor")
     }
 
     private func checkValidatedBadge(in settings: XCUIElement, appearance: String) throws {

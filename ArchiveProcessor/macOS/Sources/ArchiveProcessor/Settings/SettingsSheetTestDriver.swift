@@ -731,6 +731,32 @@ enum SettingsSheetTestDriver {
               SettingsAdvisor.title(target, projectName: nil).contains("“Letters”")
                 && SettingsAdvisor.applyTitle(.general) == "Apply to General defaults")
 
+        // 9h. The general layer as the general interview leaves it: an answer the user did not change keeps its source
+        // ("follows your answer", which the money habit still moves), and the general batch ceiling is never written.
+        let g2root = root.appendingPathComponent("general2", isDirectory: true)
+        let g2 = SettingsLayerStore(directory: g2root)
+        _ = g2.setGeneral(.moneyHabit, .string(MoneyHabit.perBatch.rawValue), source: .setByUser(date))
+        _ = g2.setGeneral(.batchCeilingUSD, .double(5), source: .setByUser(date))
+        _ = g2.setGeneral(.staysOnMac, .bool(true), source: .follows("Spend nothing", date))
+        _ = g2.setGeneral(SettingsSheetModel.overrideKey("dating"), .string("vision-rules-t3"), source: .setByUser(date))
+        var gd = SettingsAdvisor.draft(.general, base: SettingsAdvisor.baseResolver(.general, store: g2, doc: nil), pages: 10)
+        gd.answers.hours = 3
+        gd.answers.touch(.hours)
+        gd.answers.noBatchCeiling = true
+        gd.answers.touch(.batchCeilingUSD)
+        gd.choices["dating"] = .appPick
+        out = SettingsAdvisor.save(gd, to: .general, store: g2, doc: nil, choices: false)
+        check("9h an untouched general answer keeps its source", out.ok
+              && g2.general.entry(.staysOnMac)?.source == .follows("Spend nothing", date),
+              String(describing: g2.general.entry(.staysOnMac)?.source))
+        check("9h the general batch ceiling is left to Processing's spending limit",
+              g2.general.entry(.batchCeilingUSD)?.value == .double(5) && SettingsResolver(general: g2.general).batchSpendingCapUSD == 5)
+        check("9h the touched answer is written", g2.general.entry(.hours)?.value == .double(3))
+        check("9h Save answers leaves a stage choice the draft would clear",
+              g2.general.entry(SettingsSheetModel.overrideKey("dating")) != nil)
+        out = SettingsAdvisor.save(gd, to: .general, store: g2, doc: nil, choices: true)
+        check("9h Apply clears it", out.ok && g2.general.entry(SettingsSheetModel.overrideKey("dating")) == nil)
+
         // 9e. The run settings Apply switches, on a scratch defaults domain. The paths that pick a provider's model go
         // through `ModelSelectionStore.shared`, which writes this app's own defaults, so only the ones that do not are
         // run here; those share `ReaderChoice.apply` with the Reader menu (test-settings-tabs.sh section 6).

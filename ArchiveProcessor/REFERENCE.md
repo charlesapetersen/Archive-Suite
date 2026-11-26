@@ -438,21 +438,30 @@ Settings/                      W46.settings-solver: the settings layer's solver;
                                classifier on up to 40 pages spread through a batch of photos and PDFs), and
                                `CollectionInterviewAnswers.mixAndStrata` (period, languages and scripts → the public
                                test sets; `SPEC/collection-settings.md`). Views: `Views/GeneralInterviewView.swift`
-                               (first start, Settings), `Views/CollectionInterviewView.swift` (a new output folder,
-                               "This collection", a new project). Self-test: `SettingsInterviewsTestDriver`,
+                               (first start, Settings); the collection's answers are the Advisor's inputs
+                               (`SettingsAdvisor.swift`). Self-test: `SettingsInterviewsTestDriver`,
                                `scripts/test-settings-interviews.sh`.
+  SettingsAdvisor.swift        The Advisor sheet, "Compare routes & trade-offs…" (W49.proc-settings-advisor-advanced,
+                               `execution-plans/processor-settings-redesign.md` §5.6): a target (general, a collection,
+                               a project), a draft (`CollectionInterviewAnswers`, stage choices, batch pages) previewed
+                               through an in-memory resolver, Save answers (the answers alone) and Apply (the answers
+                               and the stage choices into the target's layer; the app's pick again clears a choice in
+                               every layer; then the reader and segmentation approach a card offers, which are this
+                               Mac's run settings). View: `Views/Settings/SettingsAdvisorSheet.swift`, opened from the
+                               estimate footer, the Processing tab's collection and project questions, the
+                               segmentation chooser and after a new collection's first files. Self-test: section 9 of
+                               `SettingsSheetTestDriver`.
   SettingsSheetModel.swift     The settings sheet's content (`12-settings-design.md` §3.3, shape A), from the table,
                                the solver and the resolved layers: the limits and their sources, the batch totals,
                                one card per stage (the pick and its family, per-kind figures with sample and the
                                notes' labels, cost, time, memory, what a better figure would need, the nearest
                                alternatives, the override menu with the app's pick for the way back, what Process
-                               Files runs and whether the pick can be applied to it), and the rules tab (notes 01,
-                               02, 03, 05, 06, 11: the notes' sheet text, the owner's switches, the rules in detail).
+                               Files runs and whether the pick can be applied to it), and the rule stages (notes 01,
+                               02, 03, 05, 06, 11; no view since the Advisor: their switches are in the Settings tabs).
                                An override is `override.<stage>.all` in the nearest layer, read as the solver's
-                               `onlyRoutes`. View: `Views/SettingsSheetView.swift`, the batch summary opened from the
-                               segmentation chooser and from each Settings card's See the range; each box names its
-                               panel. `SettingsSheetHost` builds the model and writes for the sheet and the panels. Self-test: `SettingsSheetTestDriver`,
-                               `scripts/test-settings-sheet.sh` (words, labels, a no-bench-ids check, offscreen pages).
+                               `onlyRoutes`. Drawn by the Advisor's stage rows and Range tab (`SettingsAdvisorPage`).
+                               Self-test: `SettingsSheetTestDriver`, `scripts/test-settings-sheet.sh` (words, labels, a
+                               no-bench-ids check, offscreen pages).
   SettingsRangeModel.swift     The sheet's Range tab (§3.4): one chart per card stage from the same solution — list
                                price per 1,000 units (free band: this Mac, a plan or cluster the user has) against the
                                card's comparable figure; marks hollow with every blocker, faded when the route alone

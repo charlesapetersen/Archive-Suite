@@ -103,7 +103,7 @@ struct SettingsAdvancedTab: View {
     @ViewBuilder private var experimentalSection: some View {
         Section("Lower-scoring and experimental choices") {
             Toggle(isOn: $offerExperimental) {
-                HelpLabel("Offer lower-scoring and experimental choices", help: "Lists, in the Reader menu, the settings sheet and Re-OCR, the readers and routes that scored below what ships — such as the macOS on-device model (42.4 against Apple Vision's 83.1 on the 96 bench pages) — and the trained models checked on a small held-out set. Each says why it is lower. The app's own picks never use them.")
+                HelpLabel("Offer lower-scoring and experimental choices", help: "Lists, in the Reader menu, the Advisor (“Compare routes & trade-offs…”) and Re-OCR, the readers and routes that scored below what ships — such as the macOS on-device model (42.4 against Apple Vision's 83.1 on the 96 bench pages) — and the trained models checked on a small held-out set. Each says why it is lower. The app's own picks never use them.")
             }
             .accessibilityIdentifier("ap.settings.offerExperimental")
             why("experimental")

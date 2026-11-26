@@ -96,8 +96,21 @@ enum SettingsAdvisor {
     }
 
     /// Write the answers, and the stage choices when `choices` is true, into `layer`.
+    ///
+    /// An answer left as it was keeps its entry, and so its source: a starting point's, a measurement's, or the general
+    /// interview's "follows your answer" (whose `staysOnMac` the money habit still moves, `GeneralInterviewAnswers`).
+    /// Only a changed value becomes the user's. The general layer's batch ceiling is never written here: it belongs to
+    /// Settings › Processing's spending limit, and "no limit" is a project's or a collection's word only
+    /// (`ResolvedSetting.hasUnlimitedBatchSpending`).
     static func edit(_ layer: inout SettingsLayer, draft: Draft, choices: Bool = true, now: Date = Date()) {
+        let before = layer
         draft.answers.apply(to: &layer, now: now)
+        for key in CollectionInterviewAnswers.keys + CollectionInterviewAnswers.mixGroup + [.weights] {
+            if let old = before.entries[key.rawValue], layer.entries[key.rawValue]?.value == old.value {
+                layer.entries[key.rawValue] = old
+            }
+        }
+        if layer.kind == .general { layer.entries[SettingsKey.batchCeilingUSD.rawValue] = before.entries[SettingsKey.batchCeilingUSD.rawValue] }
         guard choices else { return }
         for (stage, choice) in draft.choices {
             let key = SettingsSheetModel.overrideKey(stage)
