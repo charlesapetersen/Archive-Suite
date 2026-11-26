@@ -994,8 +994,8 @@ extension OCRProcessor {
     /// The upstream provider family a gateway run bills against — drives the estimator's image-token math.
     /// Read from the SAME `@AppStorage` key the pre-run cost pane uses, so a recorded gateway run's cost
     /// matches what the operator saw. Only meaningful while a gateway is active.
-    static func gatewayUpstreamProviderFromDefaults() -> LLMProvider {
-        LLMProvider(rawValue: UserDefaults.standard.string(forKey: DefaultsKeys.gatewayUpstreamProvider) ?? "") ?? .anthropic
+    nonisolated static func gatewayUpstreamProviderFromDefaults(_ d: UserDefaults = .standard) -> LLMProvider {
+        LLMProvider(rawValue: d.string(forKey: DefaultsKeys.gatewayUpstreamProvider) ?? "") ?? .anthropic
     }
 
     /// Live image-size-target fraction (0–1) from the resolution `@AppStorage`, defaulting to full size
@@ -2148,8 +2148,9 @@ extension OCRProcessor {
             guard !Task.isCancelled else { return }
         }
 
-        runConfig.institutionalComputeImport?.classifyPages = (pending.enableTagging && runConfig.taggingMode != .copySource)
+        let resumeClassifies = (pending.enableTagging && runConfig.taggingMode != .copySource)
             || runConfig.mergeDocuments || pending.enableCollectionSegmentation
+        runConfig.institutionalComputeImport?.classifyPages = resumeClassifies
 
         // W40.fix-processor-instcompute-resume-silent: ask before changing the saved run.
         if !readWithoutClusterText, let prompt = Self.institutionalComputeResumePrompt(
@@ -3463,8 +3464,8 @@ extension OCRProcessor {
                                        reloadedImport: plannedImport)
             activePendingMixedPDF = resumingMixedPDF
         }
-        runConfig.institutionalComputeImport?.classifyPages = (enableTagging && !passSourceTags)
-            || runConfig.mergeDocuments || enableCollectionSegmentation
+        let startClassifies = (enableTagging && !passSourceTags) || runConfig.mergeDocuments || enableCollectionSegmentation
+        runConfig.institutionalComputeImport?.classifyPages = startClassifies
         let runOutputSettings = lateRunOutputSettings(for: runConfig)
         currentModel = model
         currentGateway = gatewayConfig

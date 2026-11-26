@@ -1,72 +1,92 @@
 import Foundation
 
-/// A snapshot of every processing setting for a live-capture session. Built from the app's shared
-/// settings stores when the operator confirms at session start, then **locked** once the first
-/// segment is processed so every segment in the session is handled identically.
+/// The settings a run reads plus the keys it needs (W49.proc-settings-config-unify). Every setting is in `config`, the
+/// one `ResolvedRunConfig` resolved at Start (Process Files) or at session start (Live Capture) and then locked; the
+/// keys are in `credentials`, which is never written anywhere. `provider`, `taggingMode` and the rest read and write
+/// `config` through the dynamic member lookup, so this type keeps no copy of any setting.
 ///
-/// It reads the same UserDefaults / `@AppStorage` keys the Files tab uses (plus the API key from the
-/// Keychain), so Live Capture and the Files tab share one source of truth.
+/// Beside them, what the run's file list gave it rather than Settings: the page readers and the institutional-computing
+/// text it imports.
+@dynamicMemberLookup
 struct SessionProcessingConfig: Sendable {
-    var provider: LLMProvider
-    var model: LLMModel
-    var thinkingLevel: ThinkingLevel
-    var apiKey: String
-    var taggingMode: TaggingMode
-    var rotationMode: RotationMode
-    var mergeDocuments: Bool
-    var outputDirectory: URL
-    var customOCRPrompt: String
-    var imageScale: Double            // 0…1 (fraction of full resolution)
-    var standardImageMB: Double = 3.0 // size target used to translate imageScale into dimensions
-    var ocrWorkerCount: Int = 4        // parallel Process Files workers (1…12)
-    var enableSegmentJSON: Bool
-    var tagVocabulary: [String]
-    var gateway: GatewayConfig?
-    var outputImageFile: Bool         // two files (PDF + separate image) vs one file (PDF only)
-    // 0 still means "full resolution" to the writers (`PDFGenerator`, `ImageEncoding`), but NEITHER
-    // builder below can produce it: a defaults read of 0 (or of anything out of range) resolves to the
-    // 1.5 MB / 3 MB fallback. Only a direct memberwise construction can pass the 0 sentinel through.
-    var pdfImageMB: Double            // target MB for the image embedded in the PDF (0 = full resolution)
-    var exportedImageMB: Double       // target MB for the separately-exported image (0 = full resolution)
-    var textColumns: Int              // number of text columns on the OCR text page (1 = single-column)
-    /// The Local Agent (subscription-auth CLI) backend for this live session, or nil when using an
-    /// API key / gateway. Threaded alongside `gateway` (Design decision 2 of the local-agent plan);
-    /// populated from settings + preferred at the construction sites in a later checkpoint. Default
-    /// nil keeps the existing `fromDefaults` memberwise-init call (which omits it) compiling unchanged.
-    var localAgent: LocalAgentConfig? = nil
-    /// Snapshot of the Apple Vision controls. Vision has no API key or request body, but its local
-    /// recognition options must remain stable across an interrupted run just like PDF sizing does.
-    var visionSettings: VisionOCRSettings = .default
-    /// The cheap-first OCR cascade (W41.app-ocr-cascade): where a page the run's model fails goes. Frozen with the
-    /// run so a settings change mid-run cannot send later pages to a different, dearer route.
-    var cascade: OCRCascade = .off
+    var config: ResolvedRunConfig
+    var credentials: RunCredentials
     /// The reader each page's kind chose (W41.app-page-kind), from the file list at Start. Empty = every page is read
     /// by the run's model. Frozen with the run, like the cascade, so a resumed run reads each page as it began.
     var pageReaders: PageReaderPlan = .empty
     /// An institutional-computing bulk run's text for this run's pages (W41.app-institutional-compute), set at Start where the page
     /// readers apply; nil = every page is read by the run. A resumed run reloads it from `institutionalComputeFolder`.
     var institutionalComputeImport: InstitutionalComputeImport? = nil
-    /// Optional direct LLM used only after Apple Vision has produced text. The image OCR provider
-    /// remains `.appleVision`; this value is deliberately never handed to `performOCRCall`.
-    var visionTextLLM: LLMTextConfiguration? = nil
-    /// Who proposes this run's boundaries (W36.seg-opt-engine). Read here so the run has one place to take it
-    /// from; nothing consumes it yet. W36.seg-opt-review wires the engine into the pipeline and adds it to
-    /// `PendingRunRuntimeConfig`, so a resumed run keeps its approach. Live Capture ignores it: the phone
-    /// gives the boundaries.
-    var segmentationApproach: SegmentationApproach = .manual
-    /// Process Files only. Frozen for the manual date cards and interrupted runs.
-    var dateLocalImage = false
-    var macItemFields = true
-    var keepPreservationCopies = true
+
+    init(config: ResolvedRunConfig, credentials: RunCredentials, pageReaders: PageReaderPlan = .empty,
+         institutionalComputeImport: InstitutionalComputeImport? = nil) {
+        self.config = config
+        self.credentials = credentials
+        self.pageReaders = pageReaders
+        self.institutionalComputeImport = institutionalComputeImport
+    }
+
+    /// Build one from its parts, for the test drivers that name each setting.
+    init(provider: LLMProvider, model: LLMModel, thinkingLevel: ThinkingLevel, apiKey: String,
+         taggingMode: TaggingMode, rotationMode: RotationMode, mergeDocuments: Bool, outputDirectory: URL,
+         customOCRPrompt: String, imageScale: Double, standardImageMB: Double = 3.0, ocrWorkerCount: Int = 4,
+         enableSegmentJSON: Bool, tagVocabulary: [String], gateway: GatewayConfig?, outputImageFile: Bool,
+         pdfImageMB: Double, exportedImageMB: Double, textColumns: Int, localAgent: LocalAgentConfig? = nil,
+         visionSettings: VisionOCRSettings = .default, cascade: OCRCascade = .off, pageReaders: PageReaderPlan = .empty,
+         institutionalComputeImport: InstitutionalComputeImport? = nil, visionTextLLM: LLMTextConfiguration? = nil,
+         segmentationApproach: SegmentationApproach = .manual, dateLocalImage: Bool = false, macItemFields: Bool = true,
+         keepPreservationCopies: Bool = true) {
+        self.init(
+            config: ResolvedRunConfig(
+                provider: provider, model: model, thinkingLevel: thinkingLevel, gateway: gateway,
+                localAgent: localAgent, visionSettings: visionSettings, cascade: cascade,
+                customOCRPrompt: customOCRPrompt, imageScale: imageScale, standardImageMB: standardImageMB,
+                ocrWorkerCount: ocrWorkerCount, taggingMode: taggingMode, segmentationApproach: segmentationApproach,
+                mergeDocuments: mergeDocuments, tagVocabulary: tagVocabulary, dateLocalImage: dateLocalImage,
+                macItemFields: macItemFields, outputDirectory: outputDirectory, rotationMode: rotationMode,
+                enableSegmentJSON: enableSegmentJSON, outputImageFile: outputImageFile, pdfImageMB: pdfImageMB,
+                exportedImageMB: exportedImageMB, textColumns: textColumns,
+                keepPreservationCopies: keepPreservationCopies),
+            credentials: RunCredentials(apiKey: apiKey),
+            pageReaders: pageReaders, institutionalComputeImport: institutionalComputeImport)
+        self.visionTextLLM = visionTextLLM
+    }
+
+    subscript<T>(dynamicMember keyPath: WritableKeyPath<ResolvedRunConfig, T>) -> T {
+        get { config[keyPath: keyPath] }
+        set { config[keyPath: keyPath] = newValue }
+    }
+
+    var apiKey: String {
+        get { credentials.apiKey }
+        set { credentials.apiKey = newValue }
+    }
+
+    /// Optional direct LLM used only after Apple Vision has produced text: the config's `visionText` with its key.
+    /// The image OCR provider remains `.appleVision`; this value is deliberately never handed to `performOCRCall`.
+    var visionTextLLM: LLMTextConfiguration? {
+        get {
+            config.visionText.map {
+                LLMTextConfiguration(provider: $0.provider, model: $0.model, thinkingLevel: $0.thinkingLevel,
+                                     apiKey: credentials.visionTextAPIKey)
+            }
+        }
+        set {
+            config.visionText = newValue.map {
+                .init(provider: $0.provider, model: $0.model, thinkingLevel: $0.thinkingLevel)
+            }
+            credentials.visionTextAPIKey = newValue?.apiKey ?? ""
+        }
+    }
 
     /// The backend for all post-transcription text work. For ordinary runs this is the OCR backend;
     /// for the Vision hybrid it is the separately-selected direct LLM.
-    var textProvider: LLMProvider { visionTextLLM?.provider ?? provider }
-    var textModel: LLMModel { visionTextLLM?.model ?? model }
-    var textThinkingLevel: ThinkingLevel? { visionTextLLM?.thinkingLevel ?? thinkingLevel }
-    var textAPIKey: String { visionTextLLM?.apiKey ?? apiKey }
-    var textGateway: GatewayConfig? { visionTextLLM == nil ? gateway : nil }
-    var textLocalAgent: LocalAgentConfig? { visionTextLLM == nil ? localAgent : nil }
+    var textProvider: LLMProvider { config.visionText?.provider ?? config.provider }
+    var textModel: LLMModel { config.visionText?.model ?? config.model }
+    var textThinkingLevel: ThinkingLevel? { config.visionText?.thinkingLevel ?? config.thinkingLevel }
+    var textAPIKey: String { config.visionText == nil ? credentials.apiKey : credentials.visionTextAPIKey }
+    var textGateway: GatewayConfig? { config.visionText == nil ? config.gateway : nil }
+    var textLocalAgent: LocalAgentConfig? { config.visionText == nil ? config.localAgent : nil }
 
     /// The one declaration of what each sizing/concurrency setting is allowed to be.
     ///
@@ -219,10 +239,7 @@ struct SessionProcessingConfig: Sendable {
     }
 
     /// This config's own sizing values, for comparing an injected snapshot against a defaults read.
-    var runSizing: RunSizing {
-        RunSizing(standardImageMB: standardImageMB, ocrWorkerCount: ocrWorkerCount,
-                  pdfImageMB: pdfImageMB, textColumns: textColumns, exportedImageMB: exportedImageMB)
-    }
+    var runSizing: RunSizing { config.runSizing }
 
     /// The rotation mode `fromDefaults()` would select, read on its own and without the Keychain.
     ///
@@ -233,7 +250,8 @@ struct SessionProcessingConfig: Sendable {
         RotationMode(rawValue: d.string(forKey: DefaultsKeys.rotationModeRaw) ?? "") ?? .standard
     }
 
-    /// Read the app's shared settings into a config snapshot.
+    /// Read the app's shared settings into a config snapshot: `ResolvedRunConfig.fromDefaults` for every setting, then
+    /// the keys that config's routes need.
     ///
     /// The five sizing/concurrency values come from `runSizing(_:)` — the same single normalization the
     /// Process Files run start uses (W16.cfg6-fu2). This matters because **Live Capture snapshots its
@@ -241,49 +259,30 @@ struct SessionProcessingConfig: Sendable {
     static func fromDefaults(_ d: UserDefaults = .standard,
                              allowCredentialInteraction: Bool = true,
                              primaryAPIKey: String? = nil,
-                             visionTextAPIKey: String? = nil) -> SessionProcessingConfig {
-        let sizing = runSizing(d)
-        let useAppleVision = d.bool(forKey: DefaultsKeys.useAppleVision)
-        let useVisionLLMJudgment = useAppleVision && d.bool(forKey: DefaultsKeys.visionUseLLMJudgment)
-        let selectedProvider = LLMProvider(rawValue: d.string(forKey: DefaultsKeys.selectedProvider) ?? "") ?? .gemini
-        let provider: LLMProvider = useAppleVision ? .appleVision : selectedProvider
-        // Ask `ModelSelectionStore` for the key rather than re-spelling `selectedModelId_<provider>` here —
-        // one drifted string would silently snapshot the wrong model for a whole live session. (The store
-        // is `@MainActor`, but `modelKey` is `nonisolated` precisely so this nonisolated reader can use it;
-        // resolution stays local because this function must also read a scratch `d`, not just `.standard`.)
-        let modelId = d.string(forKey: ModelSelectionStore.modelKey(for: provider)) ?? ""
-        // `provider.models` is ALREADY built-ins + that provider's custom models — concatenating the
-        // customs again listed every one of them twice. Harmless for this `.first(where:)`, but it read as
-        // a bug and would become one the moment anything counted or enumerated the array.
-        let candidates = provider.models
-        let model = candidates.first { $0.id == modelId } ?? candidates[0]
-        let textModelId = d.string(forKey: ModelSelectionStore.modelKey(for: selectedProvider)) ?? ""
-        let textCandidates = selectedProvider.models
-        let visionTextModel = textCandidates.first { $0.id == textModelId } ?? textCandidates[0]
+                             visionTextAPIKey: String? = nil,
+                             keepPreservationCopies: Bool = true) -> SessionProcessingConfig {
+        let config = ResolvedRunConfig.fromDefaults(d, keepPreservationCopies: keepPreservationCopies)
+        return SessionProcessingConfig(
+            config: config,
+            credentials: credentials(for: config, d, allowInteraction: allowCredentialInteraction,
+                                     primaryAPIKey: primaryAPIKey, visionTextAPIKey: visionTextAPIKey))
+    }
 
+    /// The keys `config` needs. API key: the Keychain in production. Headless test fallback (env-gated): a headless
+    /// CI/E2E host has no GUI Keychain, so when running under ARCHIVEPROC_HEADLESS and the Keychain has no key, fall
+    /// back to the LIVECAPTURE_OCRKEY env var — this lets the LIVE phone-driven pipeline OCR headlessly. The key stays
+    /// in the environment only (never written to disk or logged). PROD: env unset (or a real Keychain key present) →
+    /// the Keychain value, exactly as before.
+    static func credentials(for config: ResolvedRunConfig, _ d: UserDefaults = .standard, allowInteraction: Bool = true,
+                            primaryAPIKey: String? = nil, visionTextAPIKey: String? = nil) -> RunCredentials {
+        let useAppleVision = config.provider == .appleVision
         let useGateway = !useAppleVision && d.bool(forKey: DefaultsKeys.useGateway)
-        let gateway = useAppleVision ? nil : GatewayConfig.fromDefaults(d)
-        let localAgent = useAppleVision ? nil : LocalAgentConfig.fromDefaults(d)
-
-        let outURL: URL = {
-            if let path = d.string(forKey: DefaultsKeys.outputDirectory), FileManager.default.fileExists(atPath: path) {
-                return URL(fileURLWithPath: path)
-            }
-            return FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
-                ?? FileManager.default.homeDirectoryForCurrentUser
-        }()
-
-        // API key: the Keychain in production. Headless test fallback (env-gated): a headless CI/E2E host
-        // has no GUI Keychain, so when running under ARCHIVEPROC_HEADLESS and the Keychain has no key, fall
-        // back to the LIVECAPTURE_OCRKEY env var — this lets the LIVE phone-driven pipeline OCR headlessly.
-        // The key stays in the environment only (never written to disk or logged). PROD: env unset (or a
-        // real Keychain key present) → the Keychain value, exactly as before.
         let apiKey: String = primaryAPIKey ?? {
             // A saved gateway key is only valid when the session has a gateway destination.
-            guard !useGateway || gateway != nil else { return "" }
-            guard !useAppleVision, localAgent == nil else { return "" }
-            let keychainKey = useGateway ? GatewayConfig.storedKey(d, allowInteraction: allowCredentialInteraction)
-                : (KeychainHelper.load(account: provider.rawValue, allowInteraction: allowCredentialInteraction) ?? "")
+            guard !useGateway || config.gateway != nil else { return "" }
+            guard !useAppleVision, config.localAgent == nil else { return "" }
+            let keychainKey = useGateway ? GatewayConfig.storedKey(d, allowInteraction: allowInteraction)
+                : (KeychainHelper.load(account: config.provider.rawValue, allowInteraction: allowInteraction) ?? "")
             if !keychainKey.isEmpty { return keychainKey }
             let env = ProcessInfo.processInfo.environment
             if env["ARCHIVEPROC_HEADLESS"] != nil, let envKey = env["LIVECAPTURE_OCRKEY"], !envKey.isEmpty {
@@ -291,55 +290,10 @@ struct SessionProcessingConfig: Sendable {
             }
             return keychainKey
         }()
-        let visionTextLLM: LLMTextConfiguration? = useVisionLLMJudgment
-            ? LLMTextConfiguration(
-                provider: selectedProvider,
-                model: visionTextModel,
-                thinkingLevel: visionTextModel.supportsThinking
-                    ? (ThinkingLevel(rawValue: d.string(forKey: DefaultsKeys.selectedThinking) ?? "") ?? .low)
-                    : nil,
-                apiKey: visionTextAPIKey
-                    ?? KeychainHelper.load(account: selectedProvider.rawValue, allowInteraction: allowCredentialInteraction) ?? "")
-            : nil
-
-        let savedTaggingMode = TaggingMode(rawValue: d.string(forKey: DefaultsKeys.taggingModeRaw) ?? "") ?? .automatic
-        // Vision deliberately owns transcription only. Copying existing source tags remains local metadata
-        // work, but every mode that asks the selected backend to classify, date, segment, or generate tags
-        // must be turned off even when stale defaults bypass the Settings picker.
-        let taggingMode: TaggingMode = useAppleVision && !useVisionLLMJudgment && savedTaggingMode != .copySource
-            ? .none : savedTaggingMode
-
-        return SessionProcessingConfig(
-            provider: provider,
-            model: model,
-            thinkingLevel: ThinkingLevel(rawValue: d.string(forKey: DefaultsKeys.selectedThinking) ?? "") ?? .low,
-            apiKey: apiKey,
-            taggingMode: taggingMode,
-            rotationMode: defaultRotationMode(d),
-            mergeDocuments: d.bool(forKey: DefaultsKeys.mergeDocuments),
-            outputDirectory: outURL,
-            customOCRPrompt: d.string(forKey: DefaultsKeys.customOCRPrompt) ?? "",
-            imageScale: (d.object(forKey: DefaultsKeys.imageResolutionPercent) as? Double ?? 100) / 100.0,
-            standardImageMB: sizing.standardImageMB,
-            ocrWorkerCount: sizing.ocrWorkerCount,
-            enableSegmentJSON: d.bool(forKey: DefaultsKeys.enableSegmentJSON),
-            tagVocabulary: (d.string(forKey: DefaultsKeys.tagVocabulary) ?? "")
-                .components(separatedBy: .newlines)
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-                .filter { !$0.isEmpty },
-            gateway: gateway,
-            outputImageFile: (d.object(forKey: DefaultsKeys.outputImageFile) as? Bool) ?? true,
-            pdfImageMB: sizing.pdfImageMB,
-            exportedImageMB: sizing.exportedImageMB,
-            textColumns: sizing.textColumns,
-            localAgent: localAgent,
-            visionSettings: VisionOCRSettings.fromDefaults(d),
-            cascade: OCRCascade.fromDefaults(d),
-            visionTextLLM: visionTextLLM,
-            segmentationApproach: SegmentationApproach.stored(d),
-            macItemFields: d.object(forKey: DefaultsKeys.macItemFields) == nil
-                || d.bool(forKey: DefaultsKeys.macItemFields)
-        )
+        let textKey = config.visionText.map {
+            visionTextAPIKey ?? KeychainHelper.load(account: $0.provider.rawValue, allowInteraction: allowInteraction) ?? ""
+        } ?? ""
+        return RunCredentials(apiKey: apiKey, visionTextAPIKey: textKey)
     }
 
     /// Build the Process Files run snapshot with the exact normalization historically performed by
@@ -357,13 +311,13 @@ struct SessionProcessingConfig: Sendable {
     /// The backend name a retry may truthfully show. A Local Agent wins over a gateway for the same reason
     /// it wins at the client construction sites; the direct provider/model is only a fallback on that path.
     var retryBackendDescription: String {
-        if let localAgent {
+        if let localAgent = config.localAgent {
             return "\(localAgent.provenanceDisplayName) · \(localAgent.provenanceModelName)"
         }
-        if let gateway {
+        if let gateway = config.gateway {
             return "\(gateway.displayName) · \(gateway.modelID)"
         }
-        return "\(provider.rawValue) · \(model.displayName)"
+        return "\(config.provider.rawValue) · \(config.model.displayName)"
     }
 
     /// A short one-line summary for the control panel: the route this session's pages actually take (the
@@ -371,6 +325,6 @@ struct SessionProcessingConfig: Sendable {
     /// then the tagging mode. W40.fix-processor-live-settings-per-run: it used to name the provider even on
     /// the gateway route and omit the Local Agent, so a stale snapshot was not visible.
     var summary: String {
-        "\(retryBackendDescription) · \(taggingMode.displayName)"
+        "\(retryBackendDescription) · \(config.taggingMode.displayName)"
     }
 }
