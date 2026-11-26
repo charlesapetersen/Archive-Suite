@@ -341,6 +341,55 @@ final class ViewerUITests: FixtureUITestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.5))
     }
 
+    /// W49.reader-doc-window-parity: with a document window in front, Selection's five file commands are enabled for
+    /// its file, Copy Link(s) reports in the window's status line, and the toolbar's Inspector button shows and
+    /// hides the Inspector as the navigation window's does. Reveal in Finder and Zotero are only checked enabled.
+    func testSelectionMenuAndInspectorButtonFollowTheDocumentWindow() throws {
+        waitForRows(minimum: 1, timeout: 10)
+        clickRow(0)
+        pressKey("o", modifiers: .command)
+        RunLoop.current.run(until: Date().addingTimeInterval(2))
+        XCTAssertGreaterThanOrEqual(app.windows.count, 2, "precondition: the document window appeared")
+
+        for title in ["Reveal in Finder", "Copy Link(s)", "Copy Archive Link(s)", "Export to Zotero…", "Add to Zotero"] {
+            let item = selectionMenuItem(title)
+            XCTAssertTrue(item.exists, "\(title) should be in the Selection menu")
+            XCTAssertTrue(item.isEnabled, "\(title) should act on the document shown")
+            closeMenu()
+        }
+        selectionMenuItem("Copy Link(s)").click()
+        let status = app.staticTexts["ar.doc.tagStatus"]
+        XCTAssertTrue(status.waitForExistence(timeout: 5), "Copy Link(s) reports in the document window")
+        XCTAssertEqual(status.accessibilityText, "Copied 1 link.")
+
+        let divider = app.descendants(matching: .any)["ar.divider.info"]
+        let button = app.buttons["ar.doc.inspector"].firstMatch
+        XCTAssertTrue(button.waitForExistence(timeout: 5), "the document window's toolbar has the Inspector button")
+        if divider.exists {   // left showing by an earlier run: the button hides it first
+            button.click()
+            settle(0.5)
+        }
+        button.click()
+        XCTAssertTrue(divider.waitForExistence(timeout: 5), "the Inspector button shows the Inspector")
+        captureScreenshot("w49-doc-window-inspector-button")
+        button.click()
+        settle(0.5)
+        XCTAssertFalse(divider.exists, "a second click hides it")
+
+        pressKey("w", modifiers: .command)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+    }
+
+    private func selectionMenuItem(_ title: String) -> XCUIElement {
+        let bar = app.menuBars.element(boundBy: 0)
+        let selection = bar.menuBarItems["Selection"]
+        XCTAssertTrue(selection.waitForExistence(timeout: 5), "the Selection menu should exist")
+        selection.click()
+        let item = bar.menuItems[title]
+        _ = item.waitForExistence(timeout: 5)
+        return item
+    }
+
     /// W40.fix-reader-edit-menu-copy: ⌥⌘L copies the page link from the document window, through the key
     /// alone (the owner wanted a shortcut for it, and none of ⌘L / ⇧⌘L / ⌥⌘C may answer instead).
     func testCopyPageLinkShortcutInTheDocumentWindow() throws {
