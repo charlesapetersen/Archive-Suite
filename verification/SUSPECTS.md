@@ -1382,3 +1382,20 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
 - **Status:** `open` — verification queued as `W49.proc-s054-verify`.
 - **History:**
   - 2026-11-25 W49.proc-settings-redesign-core — raised; the same failure on the item's branch and on pristine main.
+
+### S-055 · Notes publishes a change from within a view update
+
+- **Raised:** 2026-11-26 · W40.d11 · seen in the VM's XCUITest logs (macOS 27.2 guest, Debug).
+- **Suspected behaviour:** SwiftUI logs "Publishing changes from within view updates is not allowed, this will cause
+  undefined behavior" while Notes runs `NotesPolishUITests.testDoubleClickOnARowFocusesTheEditor` and
+  `.testDuplicateFromTheRowMenuAndInfoSection` (the main-branch run of 2026-11-26 01:52) and
+  `IntegrationJourneyUITests.testD11_ProcessorOutputSourceBlock`. Some `@Published` property is set while a view's
+  body or an update is being computed. SwiftUI may then drop or repeat that change, so a selection, a focus or an
+  inspector value can show stale state. No wrong behaviour was seen in these tests; the warning is the only sign.
+- **Where:** not located. The three tests share a list-row selection and the editor taking focus.
+- **Would confirm it:** a breakpoint or `os_log` on SwiftUI's warning in a Notes Debug build in the VM (one of the
+  tests above), naming the property and the view update that sets it.
+- **Would clear it:** the warning comes from a system view or the test harness, not from Notes' own state.
+- **Status:** `open` — verification queued as `W49.notes-s055-verify`.
+- **History:**
+  - 2026-11-26 W40.d11 — raised; seen on main and on the item's branch, which changes only tests in Notes.

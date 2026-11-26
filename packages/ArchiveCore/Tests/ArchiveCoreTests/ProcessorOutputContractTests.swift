@@ -25,7 +25,7 @@ final class ProcessorOutputContractTests: XCTestCase {
         }
         struct Facets: Decodable {
             let year: Int?, month: Int?, day: Int?, decade: Int?, quality: Int?
-            let dateUncertain: Bool
+            let dateUncertain: Bool, sentWithUncertain: Bool
             let readState: String?, itemType: String?, sentWith: String?
             let subjects: [String]
         }
@@ -63,6 +63,7 @@ final class ProcessorOutputContractTests: XCTestCase {
             XCTAssertEqual(tags.itemType?.rawValue, f.itemType, "\(name): item type")
             XCTAssertEqual(tags.itemTypeToken, f.itemType, "\(name): the item type is the token, not a colour")
             XCTAssertEqual(tags.sentWith?.wireValue, f.sentWith, "\(name): sent with")
+            XCTAssertEqual(tags.sentWithUncertain, f.sentWithUncertain, "\(name): Sent With Date Uncertain")
             XCTAssertEqual(tags.subjects, f.subjects, "\(name): subjects")
             XCTAssertTrue(tags.dateAmbiguities.isEmpty, "\(name): no date facet is written twice")
 
@@ -89,6 +90,17 @@ final class ProcessorOutputContractTests: XCTestCase {
             XCTAssertEqual(fields.publication, h["Publication"] ?? nil, "\(name): Publication")
             XCTAssertEqual(fields.publicationDate, h["Publication date"] ?? nil, "\(name): Publication date")
             XCTAssertEqual(fields.recipientPlace, h["Recipient place"] ?? nil, "\(name): Recipient place")
+
+            // What Notes sends for the source (Add to Zotero, `ZoteroSource.gather`): the date from the tags.
+            let csl = try JSONSerialization.jsonObject(with: ZoteroExport.export([ZoteroSource.gather(pdf: url, lookup: nil)]))
+            let item = try XCTUnwrap((csl as? [[String: Any]])?.first, "\(name): one CSL item")
+            if let year = f.year {
+                let parts = ((item["issued"] as? [String: Any])?["date-parts"] as? [[Int]])?.first
+                XCTAssertEqual(parts, [year] + (f.month.map { [$0] + (f.day.map { [$0] } ?? []) } ?? []),
+                               "\(name): the exported date")
+            } else if f.decade == nil {
+                XCTAssertNil(item["issued"], "\(name): no date exported for an undated file")
+            }
             checked += 1
             if want.classification != nil { classified += 1 }
             if f.year != nil || f.decade != nil { dated += 1 }

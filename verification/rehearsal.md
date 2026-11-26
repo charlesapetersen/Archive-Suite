@@ -132,6 +132,11 @@ and a journey that writes needs its own copy. Per set:
   `ditto`s two sample folders (76 files) to the generated fixture path, checks every tag xattr against the share,
   writes the root marker last, and the runner then runs only `TriageJourneyUITests`. Folder names are spelled as
   on disk: one has a no-break space after its em dash.
+- **Across the apps** (`W40.d11`): `ops/verify/cross-app-contract.sh <run folder>` stages a Process Files run's
+  output (the W40.d1 journey's) on the share as `processor-output/` with its expectation JSON, then
+  `READER_JOURNEY=processed` copies it to the Reader's fixture path the same way and runs only
+  `ContractJourneyUITests`, and `W40D11_NOTES=1` puts one of its PDFs in the Notes fixture's `reader-corpus/`.
+  The staging is scratch: the run that needs it deletes it when done.
 
 On the host, the Notes store can be read by the app-hosted unit bundle (the Debug entitlements allow `/Users/`),
 which is how it was checked. Nothing may launch an app on the host screen to use it (`.claude/hooks/no-host-gui.sh`).

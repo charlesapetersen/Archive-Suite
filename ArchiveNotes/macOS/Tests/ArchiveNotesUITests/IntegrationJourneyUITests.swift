@@ -207,6 +207,79 @@ final class IntegrationJourneyUITests: NotesFixtureUITestCase {
         }
     }
 
+    /// W40.d11 — a source block made from a PDF the Processor wrote: its page link copied in the real Reader, pasted
+    /// into a note, the block naming the file, and its Reveal opening that file in the Reader. The Processor's
+    /// names carry an em dash and a no-break space, so the link has to carry them through its encoding.
+    /// Runs only when `ops/verify/cross-app-contract.sh` staged the PDF (`W40D11_NOTES=1`).
+    func testD11_ProcessorOutputSourceBlock() throws {
+        try requireIntegrationLane()
+        let marker = Self.fixturePath + "/.w40-d11-source.txt"
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: marker),
+                          "no Processor PDF staged (ops/verify/cross-app-contract.sh … notes)")
+        let fileName = try String(contentsOfFile: marker, encoding: .utf8)
+        let stem = (fileName as NSString).deletingPathExtension
+        try withFixture {
+            try requireCanonicalScratchFixtureForStoreWrites()
+            let reader = launchReader()
+            defer { reader.terminate() }
+
+            // Reader: the staged PDF is listed beside pages.pdf; filter to it by its number and open it.
+            let table = reader.tables["ar.table"]
+            XCTAssertTrue(pollUntil(timeout: 30) { table.tableRows.count >= 2 }, "Reader should list the staged PDF")
+            let filter = reader.textFields["ar.filter.name"]
+            XCTAssertTrue(filter.waitForExistence(timeout: 10), "Reader's name filter")
+            reader.activate()
+            filter.click()
+            filter.typeText(String(stem.prefix(5)))
+            XCTAssertTrue(pollUntil(timeout: 15) { table.tableRows.count == 1 }, "the filter should leave \(fileName)")
+            table.tableRows.element(boundBy: 0).click()
+            reader.typeKey("o", modifierFlags: .command)
+            let doc = reader.windows[fileName]
+            XCTAssertTrue(doc.waitForExistence(timeout: 15), "⌘O should open \(fileName)")
+            NSPasteboard.general.clearContents()
+            reader.menuBars.menuBarItems["Edit"].click()
+            reader.menuItems["Copy Archive Link to This Page"].click()
+            var copied = ""
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                copied = NSPasteboard.general.string(forType: .string) ?? ""
+                return copied.hasPrefix("archivereader://reveal")
+            }, "Reader should put the page's link on the pasteboard; got \(copied)")
+            print("[d11] Reader copied: \(copied)")
+            let rel = URLComponents(string: copied)?.queryItems?.first { $0.name == "rel" }?.value
+            XCTAssertEqual(rel, fileName, "the link should name the Processor's file exactly")
+            XCTAssertTrue(copied.contains("root=\(Self.corpusRootGUID)"))
+            RunLoop.current.run(until: Date().addingTimeInterval(2))   // the thumbnail rewrite lands a moment later
+            doc.buttons[XCUIIdentifierCloseWindow].click()
+            XCTAssertTrue(doc.waitForNonExistence(timeout: 8))
+
+            // Notes: paste it into the plain note as a source block.
+            _ = selectItem(uuid: Self.idPlain)
+            XCTAssertTrue(pollUntil(timeout: 10) { self.editorText.contains("A plain note with") })
+            editor.click()
+            editor.typeKey(.downArrow, modifierFlags: .command)
+            app.menuBars.menuBarItems["Edit"].click()
+            app.menuItems["Paste as Source Block(s)"].click()
+            var raw = ""
+            XCTAssertTrue(pollUntil(timeout: 10) {
+                raw = self.rawMarkdown(inItemDir: Self.idPlain) ?? ""
+                return raw.contains("archivereader://reveal") && raw.contains(String(stem.prefix(5)))
+            }, "the pasted link should be saved as a source block; got \(raw)")
+            print("[d11] note after paste:\n\(raw)")
+            XCTAssertTrue(raw.precomposedStringWithCanonicalMapping.contains(stem.precomposedStringWithCanonicalMapping),
+                          "the block should name the file (\(stem))")
+            shot(app.windows["Archive Notes"], "d11-processor-source-pasted")
+
+            // Notes → Reader: Reveal opens that file.
+            ensureStyled()
+            XCTAssertTrue(revealFirstSourceViaSeam(), "the reveal seam must be drivable")
+            XCTAssertTrue(reader.wait(for: .runningForeground, timeout: 15), "Reveal should bring Reader forward")
+            let revealed = reader.windows[fileName]
+            XCTAssertTrue(revealed.waitForExistence(timeout: 15),
+                          "Reveal should open \(fileName); Reader says \(readerStatus(reader))")
+            shot(revealed, "d11-processor-source-revealed")
+        }
+    }
+
     // MARK: - Links into Notes
 
     /// N-45 + N-46 — Copy Link, then the URL opened through the OS (Launch Services picks the app by its

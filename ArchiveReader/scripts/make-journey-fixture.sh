@@ -18,6 +18,8 @@
 # Env: AR_JOURNEY_SRC     — the sample's "Archival Photos" tree (default: on the rehearsal share)
 #      AR_JOURNEY_FOLDERS — newline-separated folders under it, relative, no ".." (default: the W40.d8 pick)
 #      AR_FIXTURE_DST     — where to build; must end in /AR-GUI-Fixture (default: the generated fixture path)
+#      AR_JOURNEY_EXPECTED — optional: a JSON file copied into the root as .w40-d11-expected.json (W40.d11: a
+#                           Processor output folder's expectation, ops/verify/cross_app_contract.py)
 set -euo pipefail
 
 SRC="${AR_JOURNEY_SRC:-/Volumes/My Shared Files/rehearsal/reader-sample/Archival Photos}"
@@ -28,6 +30,8 @@ DEFAULT_FOLDERS=$'Stanford University Archives/J.E. Wallace Sterling, President 
 FOLDERS="${AR_JOURNEY_FOLDERS:-$DEFAULT_FOLDERS}"
 
 die() { echo "error: $*" >&2; exit 1; }
+EXPECTED="${AR_JOURNEY_EXPECTED:-}"
+[ -z "$EXPECTED" ] || [ -f "$EXPECTED" ] || die "AR_JOURNEY_EXPECTED is not a file: $EXPECTED"
 [ -d "$SRC" ] || die "the rehearsal sample is not on the share: $SRC (build it: ArchiveReader/scripts/rehearsal-sample.py make)"
 
 # Guard the rm -rf below. The destination must be a fixture root by name, absolute, at least three
@@ -76,7 +80,8 @@ done < <(find "$DST/Archival Photos" -type f -print0)
 
 # Last, and only after the check: the marker the tag-writing UITests require (make-gui-fixture.sh writes the
 # same bytes; it names this scratch root, nothing in the corpus), and the journey's own note of what this is.
-printf 'W40.d8 journey root: %s folder(s) of the W40.c2 sample, copied from %s\n%s\n' "$n" "$SRC" "$FOLDERS" \
+[ -z "$EXPECTED" ] || cp "$EXPECTED" "$DST/.w40-d11-expected.json"
+printf 'Journey root (W40.d8/W40.d11): %s folder(s), copied from %s\n%s\n' "$n" "$SRC" "$FOLDERS" \
   > "$DST/.w40-journey-set.txt"
 cat > "$DST/.archive-suite-root.json" <<'JSON'
 {"guid":"a4f1c2d8-0e3b-4a71-9c55-6d8e1f2a3b40","name":"AR-GUI-Fixture","kind":"reader","createdAt":"2026-07-30T00:00:00Z"}

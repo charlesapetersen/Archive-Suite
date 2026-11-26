@@ -20,6 +20,8 @@
 # ENV overrides: VM_NAME, REPO_PATH, ART_DIR, VNCDOTOOL, ONLY_TESTING, TEST_ITERATIONS, AGENT_WAIT,
 #                CORRUPT_INDEX_FIXTURE=1 (Reader/Notes focused W23.m9-fu3 test),
 #                READER_JOURNEY=rehearsal (W40.d8 triage journey on the real-corpus sample).
+#                READER_JOURNEY=processed (W40.d11: the Reader reads a Processor output folder staged on the
+#                  rehearsal share as written; run it through ops/verify/cross-app-contract.sh).
 #                NOTES_JOURNEY=integrations (W40.d10: Notes with the real Zotero and Reader in the VM).
 #                PROCESSOR_JOURNEY=livecapture (W40.d5: hand-driven live capture against the real Android
 #                companion on a headless AVD on the host; xcuitest lane only).
@@ -203,8 +205,23 @@ if [ "${READER_JOURNEY:-}" = "rehearsal" ]; then
   if [ -n "${ONLY_TESTING:-}" ] && [ "$ONLY_TESTING" != "$CORRUPT_TEST_SELECTOR" ]; then
     die "READER_JOURNEY=rehearsal runs only ONLY_TESTING=$CORRUPT_TEST_SELECTOR (or ArchiveReaderUITests/ViewerSwitchUITests)"
   fi
+elif [ "${READER_JOURNEY:-}" = "processed" ]; then
+  # W40.d11: a Processor output folder (ops/verify/cross-app-contract.sh stages it on the share with the
+  # expectation JSON), copied onto the guest disk by the same builder, read-only from there on.
+  [ "$APP" = reader ] || die "READER_JOURNEY is supported only for reader."
+  [ -n "$CORRUPT_TEST_SELECTOR" ] && die "READER_JOURNEY and CORRUPT_INDEX_FIXTURE cannot be combined."
+  [ -f "$REHEARSAL/processor-output/expected.json" ] && [ -f "$REHEARSAL/processor-output/folder.txt" ] \
+    || die "no staged Processor output at $REHEARSAL/processor-output (ops/verify/cross-app-contract.sh)"
+  MKFIXTURE="AR_JOURNEY_SRC='/Volumes/My Shared Files/rehearsal/processor-output/Archival Photos' \
+AR_JOURNEY_FOLDERS='$(cat "$REHEARSAL/processor-output/folder.txt")' \
+AR_JOURNEY_EXPECTED='/Volumes/My Shared Files/rehearsal/processor-output/expected.json' \
+bash \"\$GR/ArchiveReader/scripts/make-journey-fixture.sh\""
+  CORRUPT_TEST_SELECTOR="ArchiveReaderUITests/ContractJourneyUITests"
+  if [ -n "${ONLY_TESTING:-}" ] && [ "$ONLY_TESTING" != "$CORRUPT_TEST_SELECTOR" ]; then
+    die "READER_JOURNEY=processed runs only ONLY_TESTING=$CORRUPT_TEST_SELECTOR"
+  fi
 elif [ -n "${READER_JOURNEY:-}" ]; then
-  die "unknown READER_JOURNEY '$READER_JOURNEY' (use: rehearsal)"
+  die "unknown READER_JOURNEY '$READER_JOURNEY' (use: rehearsal, processed)"
 fi
 # NOTES_JOURNEY=integrations (W40.d10): Notes against a REAL Zotero and the REAL Reader. The lane builds
 # Reader at this commit in the guest (so Launch Services routes archivereader:// to it), starts Zotero with
@@ -486,6 +503,21 @@ prepare_integrations() {
   # The journey class runs only where this marker is; the fixture restore copies it from the pristine copy.
   tart exec "$VM" bash -lc "touch '$GUEST_FIXTURE.pristine/.w40-d10-lane' '$GUEST_FIXTURE/.w40-d10-lane'" \
     || die "could not mark the fixture for the integration journey"
+  # W40.d11: one PDF the Processor wrote, into the fixture's Reader corpus (both copies), for the source-block
+  # test. ops/verify/cross-app-contract.sh stages it and names it in notes-source.txt; ditto keeps its tags.
+  if [ "${W40D11_NOTES:-0}" = 1 ]; then
+    local d11="$REHEARSAL/processor-output" name gsrc
+    [ -f "$d11/notes-source.txt" ] || die "W40D11_NOTES=1 but nothing is staged (ops/verify/cross-app-contract.sh)"
+    # Only its own test: the D10 tests are written against a corpus with pages.pdf alone tagged.
+    [ "${ONLY_TESTING:-}" = "ArchiveNotesUITests/IntegrationJourneyUITests/testD11_ProcessorOutputSourceBlock" ] \
+      || die "W40D11_NOTES=1 runs only ONLY_TESTING=ArchiveNotesUITests/IntegrationJourneyUITests/testD11_ProcessorOutputSourceBlock"
+    name="$(cat "$d11/notes-source.txt")"
+    gsrc="/Volumes/My Shared Files/rehearsal/processor-output/Archival Photos/$(cat "$d11/folder.txt")/$name"
+    tart exec "$VM" bash -lc "for d in '$GUEST_FIXTURE.pristine' '$GUEST_FIXTURE'; do
+        ditto '$gsrc' \"\$d/reader-corpus/$name\" && printf '%s' '$name' > \"\$d/.w40-d11-source.txt\" || exit 1
+      done" || die "could not stage the Processor's PDF into the Notes fixture"
+    log "W40.d11: $name staged in the fixture's reader-corpus"
+  fi
 }
 
 # --- the scratch GUI fixture, built INSIDE the guest (idempotent; persists on the VM disk) ---
@@ -512,7 +544,7 @@ ensure_fixture() {
   esac
   # A journey root is real-corpus sample material: never run the journey on a root whose copy check failed.
   # The builder writes its note last, after that check, so its absence is the verdict (W40.d8).
-  if [ "${READER_JOURNEY:-}" = "rehearsal" ]; then
+  if [ -n "${READER_JOURNEY:-}" ]; then
     tart exec "$VM" bash -lc "[ -f '$GUEST_FIXTURE/.w40-journey-set.txt' ]" >/dev/null 2>&1 \
       || die "the journey root was not built (make-journey-fixture.sh failed; output above) — not running the journey."
   fi

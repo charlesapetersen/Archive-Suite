@@ -1194,6 +1194,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 - **History:**
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d10 — runtime evidence with the real Reader; `works`. The plain ⌘V route and a multi-link paste are still untested.
+  - 2026-11-26 W40.d11 — stays `works`. A page link the real Reader copied from a PDF the Processor wrote (`00002 — RG 165.pdf`, em dash and no-break space in its name) pasted as one `reader-page` block naming the file, with its thumbnail (`IntegrationJourneyUITests/testD11_ProcessorOutputSourceBlock`). [`evidence/core/W40.d11-contract.md`](evidence/core/W40.d11-contract.md).
 - **Notes:** `W9.e2-paste`: `testG5_…` ran 24/24 VM-green (`TEST_ITERATIONS=3`), commit `7ae8f24` (checkpoint
   `0d3df02`). No test covers the plain-⌘V route or a Reader UTI payload pasted in the GUI. In an extract the
   paste is declined and the text goes in as plain text (`Editor/MarkdownEditorView.swift:601`, §D7). That is by
@@ -1246,6 +1247,7 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
   - 2026-10-12 W40.b2 — row written, `unproven`.
   - 2026-10-15 W40.d10 — Reveal reaches the real Reader at the page; stays `unproven`: Preview was not driven, and Reveal with Reader not running was not covered.
   - 2026-11-06 W40.g2-notes-2-ledger — `unproven` → `works`: the owner clicked the chip buttons himself. Reveal with the Reader not running was again not covered.
+  - 2026-11-26 W40.d11 — stays `works`. Reveal on the block made from the Processor's PDF opened that file in the real Reader (through the seam, as in W40.d10). [`evidence/core/W40.d11-contract.md`](evidence/core/W40.d11-contract.md).
 - **Notes:** W9.e2 had no Reveal result. Preview showing the PDF is part of
   `NotesE2PasteTests.testE2_MovedArchiveReGrantsFromThePreviewPopover` (`W9.e2-paste`). Clicking the chip buttons
   and a real Reader launch (G6) are left to the owner per §17. Notes only hands Reader the URL. Whether Reader

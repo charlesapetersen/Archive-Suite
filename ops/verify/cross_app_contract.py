@@ -27,6 +27,11 @@ MONTHS = ["January", "February", "March", "April", "May", "June", "July", "Augus
 HEADER_FIELDS = ["Classification", "Kind", "Document date", "Sent with", "Date evidence", "Document kind", "Title",
                  "Byline", "Publication", "Publication date", "Recipient place", "Image straightened"]
 CLASSIFICATIONS = {"Document Start", "Continuation", "Box", "Folder"}
+# Finder's label colours by number, as their tokens are spelled (SPEC "Color label"; Finder's own numbering).
+LABEL_NAMES = {1: "Gray", 2: "Green", 3: "Purple", 4: "Blue", 5: "Yellow", 6: "Red", 7: "Orange"}
+# The fields a `Checked <Field>` token may name (SPEC "Field check"); any other `Checked …` is a subject.
+CHECKABLE = {"date", "sent with", "document kind", "title", "byline", "publication", "publication date",
+             "recipient place", "sender", "recipient", "sending place"}
 
 
 def read_tags(pdf: Path):
@@ -42,10 +47,11 @@ def read_tags(pdf: Path):
     return entries
 
 
-def facets(names):
-    """The SPEC's facet grammar (§Tag facets): exact forms, last token wins, an earlier one is a subject."""
+def facets(names, label=0):
+    """The SPEC's facet grammar (§Tag facets): exact forms, last token wins, an earlier one is a subject.
+    `label` is the file's Finder label number: the colour-name token that matches it is the label's own token."""
     f = {"year": None, "month": None, "day": None, "decade": None, "dateUncertain": False, "quality": None,
-         "readState": None, "itemType": None, "sentWith": None, "subjects": []}
+         "readState": None, "itemType": None, "sentWith": None, "sentWithUncertain": False, "subjects": []}
     winner = {}   # facet → the raw token currently holding it
 
     def take(facet, value, token):
@@ -54,10 +60,11 @@ def facets(names):
         winner[facet] = token
         f[facet] = value
 
-    for t in names:
-        low = t.strip().lower()
+    for raw in names:
+        t = raw.strip()
+        low = t.lower()
         if low in ("read", "unread"):
-            take("readState", "Read" if low == "read" else "Unread", t)
+            f["readState"] = "Read" if low == "read" else "Unread"   # 0-1; a second one replaces it
         elif re.fullmatch(r"Q[123]", t):
             take("quality", int(t[1]), t)
         elif re.fullmatch(r"P(7|8|9|10)", t):
@@ -67,28 +74,30 @@ def facets(names):
             take("month", int(m[1]), t)
         elif (m := re.fullmatch(r"Day ([0-9]{1,2})", t)) and 1 <= int(m[1]) <= 31:
             take("day", int(m[1]), t)
-        elif re.fullmatch(r"[0-9]{3,4}", t) and not t.startswith("0"):
+        elif re.fullmatch(r"[0-9]{3,4}", t) and int(t) > 0:
             take("year", int(t), t)
         elif re.fullmatch(r"[1-9][0-9]{1,2}0s", t):
             take("decade", int(t[:-1]), t)
         elif low == "date uncertain":
             f["dateUncertain"] = True
-        elif t.startswith("Sent With ") and t != "Sent With Date Uncertain":
+        elif t == "Sent With Date Uncertain":
+            f["sentWithUncertain"] = True
+        elif t.startswith("Sent With "):
             take("sentWith", t[len("Sent With "):], t)
         elif t in ("Box", "Folder"):
             take("itemType", t, t)
-        elif low.startswith("checked "):
+        elif low.startswith("checked ") and low[len("checked "):] in CHECKABLE:
             pass   # a person's field check; the Processor never writes one
+        elif label and t == LABEL_NAMES.get(label):
+            pass   # the file's own Finder label (the subject-collision rule keeps it otherwise)
         else:
-            f["subjects"].append(t)
-    if f["year"] is not None:
-        f["decade"] = None   # a Year supersedes a Decade (SPEC, Decade row)
+            f["subjects"].append(raw)
     return f
 
 
 def display_date(f):
     """The Reader's Document date cell for a file with no Sent With (SPEC §Chronological sort key display)."""
-    if f["year"] is None:
+    if f["year"] is None:   # a Year supersedes a Decade (SPEC, Decade row)
         own = f"{f['decade']}s" if f["decade"] is not None else None
     elif f["month"] is None:
         own = str(f["year"])
@@ -141,13 +150,16 @@ def expect(folder: Path, out: Path):
             errors.append(f"{name}: page 2 does not start with the header sentinel")
             continue
         names = [n for n, _ in entries]
-        f = facets(names)
+        colours = [c for _, c in entries if c]
+        f = facets(names, colours[-1] if colours else 0)
+        if f["sentWith"] is not None:
+            errors.append(f"{name}: carries Sent With; its Document date cell is not computed here")
         cls = header.get("Classification")
         if cls is not None and cls not in CLASSIFICATIONS:
             errors.append(f"{name}: page 2 Classification {cls!r} is not one of the SPEC's four")
         files[name] = {
             "tags": names,
-            "colours": [c for _, c in entries if c],
+            "colours": colours,
             "facets": f,
             "dateCell": display_date(f),
             "readCell": f["readState"] or "—",
