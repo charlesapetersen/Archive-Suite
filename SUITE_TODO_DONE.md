@@ -18742,3 +18742,22 @@ the same three lines and landing them separately would silently revert part of t
   - **Left alone.** `OCRCascadeTestDriver.run()` (2.7 GB) shares state across its sections, and it compiles after the peak, so splitting it would not lower the figure. The next growth lever if the build climbs again; a function-size check on the test drivers would catch the pattern before it costs a session.
   - Bench cache: none used. Build products were in the worktree's `build/` and went with it.
   <!-- /W49.proc-build-memory -->
+- [x] **W49.proc-item-fields-rerun — Keep catalogue corrections through Improve OCR and restore [M · Tier-2]** · §Known limits are queued, accepted or asked (owner, 2026-11-19) (lane: processor) (uses: build) — Owner calls 24 and 32. SHIPPED 2026-11-25 (this commit; checkpoint 1 before it).
+  Accepting Improve OCR on a verified catalogue pair gives the PDF a new `contentRevision` of the same file (XMP
+  identity, `SearchableArchival.nextGeneration`, `CataloguePDFIdentity.replacing`), then moves the companion with
+  `CatalogueWriter.advanceContentRevision` (ArchiveCore), which changes only contentRevision, revision and parents, so
+  every correction, clear, check and evidence entry stays. Restore moves it back and keeps a correction made since
+  acceptance. A failed move is retried and reported by launch recovery, and History will not remove the operation
+  until it is settled. An unverifiable pair, or a candidate that cannot carry the new identity, is improved as before
+  and the review says why (`ReOCRCatalogue`; `SPEC/improve-ocr.md` §5). Improve OCR reads text only, so it adds no
+  field observation as evidence; the old text page's header lines stay as history.
+  Tests: ArchiveCore `CatalogueWriterTests` (advance through replace and Restore; refusals) and
+  `CataloguePDFIdentityTests`; Processor `scripts/test-reocr-job.sh` section 19 (corrections before the run, a
+  correction after it through Restore, a missing companion, a failed move recovered), ALL PASS.
+  Tier-2 review (Opus subagent) found no HIGH defect; fixed its two MEDIUM gaps (recovery outcome not shown; History
+  Remove could drop a pending move), the stamp-failure fallback and Restore's wording. Left as LOW: a PDF replaced by
+  another writer between staging and exchange leaves a staged file and retries each launch; the displaced record is
+  kept as an edit artifact the Reader's undo cannot reach, so undo of edits from before the run is refused (safe).
+  Session 1's memory stop (11.7 GB) was the cold Processor build before W49.proc-build-memory; this session built
+  once at a time through the heavy lock. No bench cache was used.
+  <!-- /W49.proc-item-fields-rerun -->

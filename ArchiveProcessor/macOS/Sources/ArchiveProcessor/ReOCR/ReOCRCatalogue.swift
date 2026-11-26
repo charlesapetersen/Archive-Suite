@@ -58,9 +58,9 @@ enum ReOCRCatalogue {
         var problem: String? {
             switch self {
             case .updated: nil
-            case .refused(let why): "Its catalogue record was not moved to the new text (\(why))."
+            case .refused(let why): "Its catalogue record was not moved to this version of the file (\(why))."
             case .failed(let why):
-                "Its catalogue record is not moved to the new text yet (\(why)); it will be retried at the next launch."
+                "Its catalogue record is not moved to this version of the file yet (\(why)); it will be retried at the next launch."
             }
         }
     }

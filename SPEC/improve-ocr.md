@@ -114,6 +114,20 @@ A page with no recorded copy, or one that is missing, offline, unverified, unrea
 reading PDF's image as before, and the review names, for every page, the Preservation Copy it read or why it read the
 reading PDF (`ReOCRImageInput`).
 
+**The catalogue record (W49.proc-item-fields-rerun, owner calls 24 and 32).** New text is a new content generation of
+the same file. When the snapshot's identity matches a verified [catalogue](catalogue.md) companion, the candidate's XMP
+identity names a new `contentRevision` of the same `fileID`, and the job's record keeps the step. After publication,
+and before the receipt, `CatalogueWriter.advanceContentRevision` moves the companion to that generation under its
+folder lock, once the PDF there proves it with the companion's page count. Only `contentRevision`, `revision` and
+`parents` change: every correction, clear, check and evidence entry, made before the run or since, is carried. Improve
+OCR reads text only, so it adds no field observation; the replaced text page's header lines are history. Restore puts
+back the old bytes, which carry the old generation, and moves the companion back the same way, keeping a correction
+made after acceptance. A move that fails is retried by launch recovery, which reports it, and History keeps the
+operation until the move is settled; a refused move is reported. A file whose pair cannot be verified (companion
+missing, offline, unreadable, newer or naming another generation), or a candidate that cannot carry the new identity,
+is improved as before: the PDF keeps its identity, the companion is untouched, and the review says why
+(`ReOCRCatalogue`).
+
 ## 6. Why it is built this way (design record)
 
 Folded from the design plan when the Reader side shipped (W44.reocr-plan, 2026-11-07; the plan is in git history).

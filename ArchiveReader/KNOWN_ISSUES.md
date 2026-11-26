@@ -155,8 +155,10 @@ What it does not do, deliberately or not yet:
   is in the page's text (accepted: the text page is the file's searchable OCR text, which the Reader never rewrites). A
   query of stop words alone keeps a snippet of the text without a mark when only a correction matched (accepted: such a
   query is read by a scan of the text, W40.fix-reader-fts-snippets, measured at up to a second a row with `snippet()`).
-  The Processor does not read corrections: a later run that rewrites page 2 leaves them beside the file, still shown
-  over the new page 2 (queued: W49.proc-item-fields-rerun, owner call 24).
+  In an adopted catalogue folder, Improve OCR and its Restore move the file's record to the new text and keep every
+  correction, clear and check (W49.proc-item-fields-rerun). In a legacy folder the Processor does not read corrections:
+  a later run that rewrites page 2 leaves them beside the file, still shown over the new page 2 (accepted: owner call
+  24, 2026-11-20, put corrections in the catalogue record; a legacy folder keeps them shown, not lost).
 - **Container fields have their own Inspector section** (W47.ct-reader-view), with the same badge and no check
   button: a container value is confirmed or corrected from its Edit menu (W47.ct-reader-edit). (accepted: by design, W47.ct-reader-edit; a container value is confirmed by being the user's own).
 - **A group selection counts the checked dates** and checks them all at once; item fields are listed one file at a

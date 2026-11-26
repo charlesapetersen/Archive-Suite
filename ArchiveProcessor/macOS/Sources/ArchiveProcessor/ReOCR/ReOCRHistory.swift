@@ -31,11 +31,14 @@ struct ReOCRHistory {
         let state: State
         /// Bytes this operation keeps (the copy of the file it replaced, and its records).
         let bytes: Int64
+        /// Its catalogue record's move (`ReOCRCatalogue`) is not settled yet: launch recovery still needs its record.
+        var catalogueUnsettled = false
 
         var canRestore: Bool { state == .accepted }
         /// A decided operation's kept copy may be removed; an undecided one belongs to a review still open.
         var canRemove: Bool {
-            switch state {
+            if catalogueUnsettled { return false }
+            return switch state {
             case .accepted, .restoredEarlier, .undone, .rejected, .unreadable, .undecided: true
             case .interrupted: false
             }
@@ -44,10 +47,13 @@ struct ReOCRHistory {
 
     enum Failure: Error, Equatable, CustomStringConvertible {
         case notRemovable
+        case catalogueUnsettled
         case removeFailed(String)
         var description: String {
             switch self {
             case .notRemovable: "this change was stopped during publication; relaunch the Processor to settle it first"
+            case .catalogueUnsettled:
+                "its catalogue record is not moved to this version of the file yet; relaunch the Processor to retry it first"
             case .removeFailed(let why): "the kept copy could not be removed (\(why))"
             }
         }
@@ -74,7 +80,9 @@ struct ReOCRHistory {
                 else if let by = record?.restoredBy { state = .undone(by: by) }
                 else { state = .accepted }
             }
-            return Entry(id: id, file: URL(fileURLWithPath: journal.targetPath), date: journal.created, state: state, bytes: size)
+            let unsettled = record.map { $0.catalogue != nil && $0.restoredBy == nil && $0.catalogueOutcome?.isSettled != true }
+            return Entry(id: id, file: URL(fileURLWithPath: journal.targetPath), date: journal.created, state: state, bytes: size,
+                         catalogueUnsettled: journal.phase == .published && unsettled == true)
         }
         .sorted { $0.date > $1.date }
     }
@@ -83,7 +91,9 @@ struct ReOCRHistory {
 
     /// Removes one decided operation's kept copy and records: after this its text can no longer be put back from here.
     func remove(_ id: UUID) throws {
-        guard let entry = entries().first(where: { $0.id == id }), entry.canRemove else { throw Failure.notRemovable }
+        guard let entry = entries().first(where: { $0.id == id }) else { throw Failure.notRemovable }
+        guard !entry.catalogueUnsettled else { throw Failure.catalogueUnsettled }
+        guard entry.canRemove else { throw Failure.notRemovable }
         if entry.state == .undecided, let journal = try? writer.read(id) {
             try? writer.reject(ReOCRFileWriter.Operation(journal: journal))
         }

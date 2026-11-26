@@ -151,7 +151,7 @@ final class ImproveOCRController: ObservableObject {
         ImproveOCRWork.recoverOnce(support: support, job: job(support)) { [weak self] done in
             let open = done.filter {
                 if case .conflict = $0.writer { return true }
-                return $0.flag?.isFailure == true || $0.receiptProblem != nil
+                return $0.flag?.isFailure == true || $0.receiptProblem != nil || $0.catalogue?.problem != nil
             }
             if !open.isEmpty { self?.recoveryNote = "\(open.count) earlier Improve OCR change\(open.count == 1 ? "" : "s") need a look." }
         }

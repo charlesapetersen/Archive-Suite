@@ -12,7 +12,8 @@ import PDFKit
 ///   19b. A correction made after acceptance survives Restore; Restore puts the original bytes back and moves the
 ///        companion back to the old generation.
 ///   19c. A file whose companion is missing is improved as before: the review says why, the PDF keeps its identity.
-///   19d. A companion move that fails after publication is retried by launch recovery.
+///   19d. A companion move that fails after publication is retried by launch recovery, which reports it; until then
+///        History keeps the operation's record.
 @MainActor
 enum ReOCRCatalogueTestDriver {
     typealias Check = ReOCRImageInputTestDriver.Check
@@ -134,8 +135,20 @@ enum ReOCRCatalogueTestDriver {
         let doneD = try d.job.accept(reviewD)
         let failed: Bool = { if case .failed? = doneD.catalogue { true } else { false } }()
         check("19d a move that cannot be made now is left for recovery", failed, "\(String(describing: doneD.catalogue))")
+        let history = ReOCRHistory(writer: d.job.writer)
+        let pending = history.entries().first { $0.id == doneD.journal.operationID }
+        check("19d History keeps the pending move's record", pending?.catalogueUnsettled == true && pending?.canRemove == false)
+        do { try history.remove(doneD.journal.operationID); check("19d Remove is refused while the move is pending", false) }
+        catch { check("19d Remove is refused while the move is pending",
+                      (error as? ReOCRHistory.Failure) == .catalogueUnsettled, "\(error)") }
         try fm.setAttributes([.posixPermissions: 0o644], ofItemAtPath: companion.path)
-        _ = d.job.recover()
+        let recoveries = d.job.recover()
+        check("19d recovery reports the move", recoveries.first { $0.operationID == doneD.journal.operationID }?.catalogue == .updated,
+              "\(recoveries.map(\.catalogue))")
+        check("19d a settled move can be removed from History",
+              history.entries().first { $0.id == doneD.journal.operationID }?.canRemove == true)
+        check("19d a second recovery does not try it again",
+              d.job.recover().first { $0.operationID == doneD.journal.operationID }?.catalogue == nil)
         let recovered = try facts(reader(d.dir)).pair.record
         check("19d launch recovery moves the record", identity(d.file)?.contentRevision == recovered.contentRevision
               && recovered.contentRevision != dIdentity?.contentRevision, "\(recovered.contentRevision)")

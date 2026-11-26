@@ -208,15 +208,19 @@ struct ReOCRJob {
         guard case .advance(let step) = catalogue else {
             return review(updated.bytes, updatedLayers: updated.layerPages, catalogue: catalogue)
         }
+        // A candidate that cannot carry the new generation is still offered, as before this step: it keeps the old
+        // identity, the companion is not touched, and the review says so.
+        guard let stamped = try? ReOCRCatalogue.stamp(updated.bytes, for: step) else {
+            return review(updated.bytes, updatedLayers: updated.layerPages,
+                          catalogue: .unresolved("the new text could not be given the record's new version"))
+        }
         do {
-            let stamped = try ReOCRCatalogue.stamp(updated.bytes, for: step)
             var planned = record
             planned.catalogue = step
             try writer.writeRecord(planned, named: Record.file, for: op.journal.operationID)
             return review(stamped, updatedLayers: updated.layerPages, catalogue: catalogue)
         } catch {
-            return review(problem: "The new text could not be given its catalogue record's new version: \(error)",
-                          catalogue: catalogue)
+            return review(problem: "The job's record could not keep the catalogue step: \(error)", catalogue: catalogue)
         }
     }
 
@@ -294,7 +298,7 @@ struct ReOCRJob {
                     nil)
         }
         // Before the receipt, so the Reader that re-reads the file finds the record at its new generation.
-        settleCatalogue(&record)
+        let triedCatalogue = settleCatalogue(&record)
         var receiptProblem: String?
         if !record.receiptWritten {
             do {
@@ -320,14 +324,18 @@ struct ReOCRJob {
         record.flag = flag
         var recordProblem: String?
         do { try writer.writeRecord(record, named: Record.file, for: id) } catch { recordProblem = "\(error)" }
-        return (receiptProblem, flag, recordProblem, record.catalogueOutcome)
+        return (receiptProblem, flag, recordProblem, triedCatalogue ? record.catalogueOutcome : nil)
     }
 
     /// The companion's move for a published operation, unless it is settled, or a restore has since put the old
-    /// generation back (that restore's own record moves the companion back).
-    private func settleCatalogue(_ record: inout Record) {
-        guard let step = record.catalogue, record.restoredBy == nil, record.catalogueOutcome?.isSettled != true else { return }
+    /// generation back (that restore's own record moves the companion back). True when the move was tried now.
+    @discardableResult
+    private func settleCatalogue(_ record: inout Record) -> Bool {
+        guard let step = record.catalogue, record.restoredBy == nil, record.catalogueOutcome?.isSettled != true else {
+            return false
+        }
         record.catalogueOutcome = ReOCRCatalogue.settle(step)
+        return true
     }
 
     /// The receipt for a published operation: `published` for an acceptance, `restored` for a restore. Before and after
@@ -345,6 +353,8 @@ struct ReOCRJob {
         /// For a published operation: whether its receipt is now written, and its flag's outcome.
         let receiptProblem: String?
         let flag: FlagOutcome?
+        /// The catalogue record's move when this recovery tried it (`ReOCRCatalogue`); nil when there was none to try.
+        var catalogue: ReOCRCatalogue.Outcome?
     }
 
     /// At launch, before any new work: settles every operation's journal (`ReOCRFileWriter.recover`) and, for each
@@ -361,7 +371,8 @@ struct ReOCRJob {
                 return Recovered(operationID: id, writer: r, receiptProblem: "the journal cannot be read", flag: nil)
             }
             let done = finish(journal)
-            return Recovered(operationID: id, writer: r, receiptProblem: done.receiptProblem, flag: done.flag)
+            return Recovered(operationID: id, writer: r, receiptProblem: done.receiptProblem, flag: done.flag,
+                             catalogue: done.catalogue)
         }
     }
 
