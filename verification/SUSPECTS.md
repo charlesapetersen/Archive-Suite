@@ -1365,3 +1365,20 @@ only once a failing test or a scripted run on scratch data reproduces it (phase 
     refused with HTTP 404 `model_not_found` and counted as failures without a diagnosis.
   - 2026-11-21 W49.proc-fix-s053 — Process Files explains the gateway's explicit model refusal once in
     the summary and keeps Vision proposals and the S-052 counts and charges.
+
+### S-054 · The segmentation chooser preselects a ChatGPT approach with no key
+
+- **Raised:** 2026-11-25 · W49.proc-settings-redesign-core · seen in a run of `scripts/test-segmentation-chooser.sh`.
+- **Suspected behaviour:** check 6 fails on pristine `origin/main` 9a79dd98 (built and run 2026-11-25, Claude Opus 5.5):
+  "no Gemini key, nothing saved: GLM-5.3 Flash got openai want glm". With no Gemini key and nothing saved, the
+  approach the app preselects is an OpenAI one where the measured table wants GLM-5.3 Flash, so a new user's first
+  run could be offered a route they cannot run, or a different one from the measured pick.
+- **Where:** `Segmentation/SegmentationChooser.swift` (`SegmentationRoutes.currentPreselecting`, `SegmentationApproach.preselect`)
+  and `Segmentation/SegmentationChooserTestDriver.swift` check 6.
+- **Would confirm it:** the same check on a fresh build of main, and the preselected approach read in a scratch
+  defaults domain with no Gemini key.
+- **Would clear it:** the check's expectation is stale (the measured table changed) and the preselection is the
+  intended one; the driver is updated to the table.
+- **Status:** `open` — verification queued as `W49.proc-s054-verify`.
+- **History:**
+  - 2026-11-25 W49.proc-settings-redesign-core — raised; the same failure on the item's branch and on pristine main.

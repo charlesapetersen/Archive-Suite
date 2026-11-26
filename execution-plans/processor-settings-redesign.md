@@ -413,7 +413,7 @@ W49.proc-settings-design-ok (OWNER GATE)
        │  One ResolvedRunConfig + RunCredentials; retire 3 overlapping config surfaces;
        │  update SPEC/collection-settings.md + ArchiveCore CollectionSettingsVocabulary
        ▼
-2. W49.proc-settings-redesign-core [M-L]
+2. W49.proc-settings-redesign-core [M-L] — SHIPPED 2026-11-25 (SUITE_TODO_DONE.md)
        │  Build approved 5-tab Settings UI (or Option A if chosen), delete 8 legacy panels,
        │  level gate, dual estimator, and stacked pickers; wire Process Files & Live Capture
        ▼
