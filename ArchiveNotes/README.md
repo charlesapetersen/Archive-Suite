@@ -116,5 +116,7 @@ XcodeGen build · sandboxed; the store is an `.archivenotes` library package the
 shared [`ArchiveCore`](../packages/ArchiveCore) package for tags, PDF parsing, durable links, and the
 suite marker. The store is a set of UUID-folder Markdown notes (`NoteStore`), indexed into a
 disposable FTS5 cache (`NotesIndex`); folders/memberships/templates live in an
-`OrganizationStore` graph; `NotesTagProjector` is the single audited Finder-tag write surface. Domain
+`OrganizationStore` graph; `NotesTagProjector` is the single audited Finder-tag write surface. The index is
+brought up to date from disk at launch and on File ▸ Reload Library, which also picks up notes and an
+`organization.json` changed outside the app (a sync service, another Mac) without a relaunch. Domain
 logic stays UI-free so the safety-critical write path is testable in isolation.

@@ -74,7 +74,8 @@ struct FormatCommands: Commands {
 /// a first launch), so a window's `onAppear` never ran and the library waited unasked (measured with the Release
 /// build in the VM, W49.notes-finder-open-check). The menu bar is built at launch whether or not a window is.
 ///
-/// Open Recent and Reveal Library in Finder (W49.notes-library-ux) sit with them.
+/// Open Recent and Reveal Library in Finder (W49.notes-library-ux) sit with them, and Reload Library
+/// (W49.notes-reload-library).
 struct ReaderRootCommands: Commands {
     let previewState: SourceBlockPreviewState
     let notesModel: NotesModel
@@ -105,6 +106,9 @@ struct ReaderRootCommands: Commands {
             }
             Button("Reveal Library in Finder") { notesModel.revealLibraryInFinder() }
                 .disabled(notesModel.libraryURL == nil)
+            // Notes and folders changed on disk outside the app (W49.notes-reload-library).
+            Button("Reload Library") { Task { await notesModel.reloadLibrary() } }
+                .disabled(notesModel.libraryURL == nil || notesModel.isReloadingLibrary)
         }
     }
 }

@@ -477,6 +477,101 @@ final class NotesModel: ObservableObject {
         adoptIndexFailure(indexer.failure)
     }
 
+    // MARK: File ▸ Reload Library (W49.notes-reload-library)
+
+    /// `true` while `reloadLibrary()` runs; the menu item is disabled meanwhile.
+    @Published private(set) var isReloadingLibrary = false
+
+    /// File ▸ Reload Library: pick up notes and folders changed on disk outside this app (another Mac
+    /// through a sync service, a Finder copy, a hand edit) without quitting.
+    ///
+    /// Three steps. `organization.json` is adopted when it changed outside the app
+    /// (`OrganizationStore.reloadFromMirrorIfChanged`, which never loads it over this session's own
+    /// changes). The index is brought up to date by the launch pass, mtime-skipped, so an unchanged note
+    /// costs one `stat`. Then index rows for notes no longer on disk are dropped: a row is dropped only when
+    /// the note is missing from a walk taken before the pass AND one taken after the index was read, and
+    /// `itemExists` still says so; an empty walk drops nothing (the indexer's two-emission rule, here with
+    /// both walks in one call); a note that is back on disk after the delete (an Undo or Put Back meanwhile)
+    /// is indexed again at once.
+    ///
+    /// Open editors are not touched. Each already rereads its own note from disk and keeps an unsaved draft
+    /// apart when the two conflict (`NoteBodyEditorModel.refreshFromDisk`, the checked save).
+    func reloadLibrary() async {
+        guard let indexer, let noteStore, let index, !isReloadingLibrary else { return }
+        isReloadingLibrary = true
+        defer { isReloadingLibrary = false }
+        let before = Dictionary(allItems.map { ($0.id, $0.mtime) }, uniquingKeysWith: { a, _ in a })
+
+        var folderLine: String?
+        do {
+            switch try await organization.reloadFromMirrorIfChanged() {
+            case .unchanged: break
+            case .adopted:
+                rebuild()
+                folderLine = "Folders were reloaded from organization.json."
+            case .keptLocal(let reason):
+                folderLine = reason
+            }
+        } catch {
+            NSLog("NotesModel: failed to reload organization.json: \(error)")
+            folderLine = "organization.json couldn't be read into the library, so the folders were left as they were."
+        }
+
+        let firstWalk = Set(await noteStore.allItemRefs().map(\.id))
+        await buildIndexFromDisk()
+        if !firstWalk.isEmpty, indexer.failure == nil {
+            let indexed = await index.allIndexedIDs()
+            let secondWalk = Set(await noteStore.allItemRefs().map(\.id))
+            var gone = indexed.subtracting(firstWalk).subtracting(secondWalk)
+            if !secondWalk.isEmpty, !gone.isEmpty {
+                for id in gone {
+                    if await noteStore.itemExists(id) { gone.remove(id) }
+                }
+                if !gone.isEmpty {
+                    do {
+                        try await index.deleteItems(Array(gone))
+                        // Undo or Put Back can bring a note home, and index it, between the check above
+                        // and the delete. A note back on disk now is indexed again by a second pass,
+                        // mtime-skipped for every other note.
+                        var back = false
+                        for id in gone where !back { back = await noteStore.itemExists(id) }
+                        if back { await buildIndexFromDisk() } else { await reloadItems() }
+                    } catch {
+                        NSLog("NotesModel: Reload Library couldn't drop \(gone.count) missing note(s): \(error)")
+                    }
+                }
+            }
+        }
+        await reloadTemplates()
+        await reloadTrash()
+        // An index failure has posted its own line through `adoptIndexFailure`.
+        guard indexFailure == nil else { return }
+        statusMessage = Self.reloadSummary(before: before, after: allItems, folderLine: folderLine)
+    }
+
+    /// The status line after File ▸ Reload Library: what changed among the notes, then the folders' line.
+    nonisolated static func reloadSummary(before: [UUID: Double], after: [ItemSummary],
+                                          folderLine: String?) -> String {
+        var added = 0, changed = 0
+        var seen = Set<UUID>()
+        for item in after where seen.insert(item.id).inserted {
+            if let mtime = before[item.id] {
+                if mtime != item.mtime { changed += 1 }
+            } else {
+                added += 1
+            }
+        }
+        let removed = before.keys.filter { !seen.contains($0) }.count
+        let notes = added + changed + removed == 0
+            ? "Library reloaded: no notes changed on disk."
+            : "Library reloaded: " + [
+                added > 0 ? "\(added) \(added == 1 ? "note" : "notes") added" : nil,
+                changed > 0 ? "\(changed) \(changed == 1 ? "note" : "notes") changed" : nil,
+                removed > 0 ? "\(removed) \(removed == 1 ? "note" : "notes") removed" : nil,
+              ].compactMap { $0 }.joined(separator: ", ") + "."
+        return [notes, folderLine].compactMap { $0 }.joined(separator: " ")
+    }
+
     /// Mirror the indexer's health onto the model and, when degraded, into the sidebar status line.
     /// Never clears a message it didn't set — `statusMessage` is shared with other degradations, so
     /// clearing one this model didn't post would swallow another subsystem's report.

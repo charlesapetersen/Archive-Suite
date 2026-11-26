@@ -1,5 +1,8 @@
 import Foundation
 
+/// The graph `OrganizationFile.load` reads.
+typealias OrganizationFileGraph = (folders: [VFolder], memberships: [Membership], assignments: [TemplateAssignment])
+
 /// Atomic export/import of the organizational graph to `organization.json` (§4).
 /// The JSON file is the durable mirror: it survives DB wipes and computer moves.
 /// Authoritative for folder/membership/assignment data (the DB is the disposable cache — §11).

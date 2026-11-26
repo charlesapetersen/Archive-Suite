@@ -914,7 +914,6 @@ Owner, 2026-11-13: eight points on the Reader, filed as given. The first is a bu
 
 ### Archive Notes — holistic pre-user-testing review (owner, 2026-11-25)
 
-- [ ] **W49.notes-reload-library — Add `File ▸ Reload Library` incremental rescan for external and cloud-synced edits [S]** (lane: notes) (uses: build) — Owner, 2026-11-25 pre-user-testing review. `NotesIndexer` only scans disk at launch (`bootstrap()`), so external edits or cloud-synced changes to a `.archivenotes` library do not appear until quit and relaunch. Add **File ▸ Reload Library** (incremental mtime rescan + `organization.json` reload, and optionally a lightweight check on app activation) without disturbing unsaved in-app drafts. Verify with unit/scratch tests.
 - [ ] **W49.notes-model-split — Split monolithic `NotesModel.swift` and `EditorTextView.swift` into focused files [S-M]** (lane: notes) (uses: build) (blocked-on: W46.nice-to-have) — Owner, 2026-11-25 pre-user-testing review (1.1 maintainability refactor, no behavior change). Split `NotesModel.swift` (2,249 lines) and `EditorTextView.swift` (1,634 lines) into domain-scoped extension/coordinator files; verify clean build and full unit suite.
 
 

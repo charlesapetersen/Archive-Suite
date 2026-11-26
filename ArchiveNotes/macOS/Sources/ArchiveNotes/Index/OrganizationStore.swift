@@ -318,6 +318,10 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     private func mirrorMatchesGraph(at storeRoot: URL) async -> Bool {
         let read = Task.detached(priority: .utility) { OrganizationFile.load(from: storeRoot) }
         guard let file = await read.value else { return false }
+        return graphMatches(file)
+    }
+
+    private func graphMatches(_ file: OrganizationFileGraph) -> Bool {
         func byId(_ f: [VFolder]) -> [VFolder] { f.sorted { $0.id.uuidString < $1.id.uuidString } }
         func edges(_ m: [Membership]) -> [String] { m.map { "\($0.folderId)/\($0.itemId)" }.sorted() }
         func links(_ a: [TemplateAssignment]) -> [String] { a.map { "\($0.folderId)/\($0.templateId)" }.sorted() }
@@ -357,6 +361,122 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     func reloadAfterIndexRecovery() async throws {
         guard isReadOnlyMirror, let root = readOnlyMirrorRoot else { return }
         try await load(storeRoot: root)
+    }
+
+    // MARK: - Reload Library (W49.notes-reload-library)
+
+    /// What `reloadFromMirrorIfChanged()` did with `organization.json`.
+    enum MirrorReloadOutcome: Equatable {
+        /// The file holds the graph already on show, or there is no file to read.
+        case unchanged
+        /// The file was edited outside this app (another Mac through a sync service, or by hand) and
+        /// its graph is now the one in the index and on show.
+        case adopted
+        /// The file differs but was not adopted, for the reason given; the graph on show is unchanged.
+        case keptLocal(String)
+    }
+
+    /// `true` while `reloadFromMirrorIfChanged()` is replacing the graph. Placement writes wait for it
+    /// (`beginPlacementWrite`), since they do not take the folder-graph lock.
+    private var isReloadingMirror = false
+    private var mirrorReloadWaiters: [CheckedContinuation<Void, Never>] = []
+    /// When this session's latest successful mirror write was applied, so the file it wrote is no newer.
+    private var lastMirrorWriteLanded: Date?
+    /// Placement writes (adds, moves and removals alike) between their first check and their publish.
+    private var placementWritesInFlight = 0
+
+    /// Every placement write opens with this, and balances it with `endPlacementWrite()` in a `defer`.
+    /// It returns without suspending unless a reload is replacing the graph, so it changes nothing for a
+    /// write outside File ▸ Reload Library.
+    private func beginPlacementWrite() async {
+        while isReloadingMirror {
+            await withCheckedContinuation { mirrorReloadWaiters.append($0) }
+        }
+        placementWritesInFlight += 1
+    }
+
+    private func endPlacementWrite() { placementWritesInFlight -= 1 }
+
+    /// File ▸ Reload Library: adopt an `organization.json` that changed on disk outside this app.
+    ///
+    /// The database is what `load` trusts at launch, so a mirror edited elsewhere was otherwise read only
+    /// after the index was lost. This first writes out every change of this session (so a difference left
+    /// afterwards is one made outside the app), then compares the file with the graph on show and, when
+    /// they differ, replaces the database and memory with the file's graph in one transaction, DB first.
+    ///
+    /// Nor does a file no newer than this session's last write: that is an earlier copy put back, and the
+    /// graph on show is written over it instead. The file never wins over the app's own unwritten state either: nothing is adopted while the mirror is known
+    /// stale (the file then lacks changes of this session, and adopting it would undo them), while a
+    /// confirmed delete or a folder delete is in flight, or while a placement write is part-way or landed
+    /// during the read. A missing
+    /// or unreadable file is left alone, never treated as an empty graph. Folder and template writes wait
+    /// on the folder-graph lock and placement writes in `beginPlacementWrite` until the swap is done.
+    func reloadFromMirrorIfChanged() async throws -> MirrorReloadOutcome {
+        guard didLoadGraph, !isReadOnlyMirror, let root = storeRoot else { return .unchanged }
+        await beginFolderGraphWrite()
+        defer { endFolderGraphWrite() }
+        await flushPendingMirror()
+        guard storeRoot == root else { return .unchanged }
+        if isMirrorStale {
+            return .keptLocal("Folder changes made here have not reached organization.json yet, so the "
+                              + "copy on disk was not loaded over them.")
+        }
+        // A placement that publishes while the file is read takes a new snapshot (or leaves one
+        // pending): the file read may then predate it, and adopting it would undo the placement.
+        let seqBeforeRead = mirrorWriteSeq
+        let read = Task.detached(priority: .utility) { () -> (file: OrganizationFileGraph?, modified: Date?) in
+            let url = root.appendingPathComponent("organization.json")
+            let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+            return (OrganizationFile.load(from: root), modified)
+        }
+        let (loaded, modified) = await read.value
+        guard let file = loaded, !graphMatches(file) else { return .unchanged }
+        // A file no newer than this session's last write is not an edit made after it: a sync service
+        // that restored an earlier copy, or a conflict resolved to the other Mac's older one. Adopting it
+        // would undo folder work already saved here, so it is written back over instead.
+        if let landed = lastMirrorWriteLanded, let modified, modified <= landed {
+            exportOrganization()
+            return .keptLocal("organization.json on disk is older than the folders saved here (a sync "
+                              + "service may have restored an earlier copy), so the folders here were kept "
+                              + "and written back to it.")
+        }
+        guard hardDeleting.isEmpty, deletingFolders.isEmpty, placementWritesInFlight == 0,
+              mirrorWriteSeq == seqBeforeRead, !isMirrorWritePending else {
+            return .keptLocal("A note or folder was being changed, so the folders were not reloaded. Try again.")
+        }
+
+        isReloadingMirror = true
+        defer {
+            isReloadingMirror = false
+            let waiters = mirrorReloadWaiters
+            mirrorReloadWaiters = []
+            for waiter in waiters { waiter.resume() }
+        }
+        // As `load` does: the system folders are restored by id first, then edges to undefined folders
+        // are dropped so the foreign keys accept the graph. A key repeated in a hand-edited file is kept
+        // once, the way the index's inserts keep it (a folder or assignment: the last; a placement: the
+        // first), so memory holds exactly what the database does.
+        func lastByKey<T, K: Hashable>(_ rows: [T], _ key: (T) -> K) -> [T] {
+            var seen = Set<K>()
+            return rows.reversed().filter { seen.insert(key($0)).inserted }.reversed()
+        }
+        let fileFolders = lastByKey(file.folders, \.id)
+        let newFolders = fileFolders + missingSystemFolders(in: fileFolders)
+        let live = Set(newFolders.map(\.id))
+        var seenPlacements = Set<String>()
+        let newMemberships = file.memberships.filter {
+            live.contains($0.folderId) && seenPlacements.insert("\($0.folderId)/\($0.itemId)").inserted
+        }
+        let newAssignments = lastByKey(file.assignments.filter { live.contains($0.folderId) }, \.folderId)
+        // A throw rolls the transaction back: the database and memory still hold the graph on show.
+        try await index.replaceOrganization(
+            folders: newFolders, memberships: newMemberships, assignments: newAssignments)
+        folders = newFolders
+        memberships = newMemberships
+        assignments = newAssignments
+        // The file differs from the adopted graph only if something was restored or dropped above.
+        if !graphMatches(file) { exportOrganization() }
+        return .adopted
     }
 
     private func refuseWhileReadOnly() throws {
@@ -541,6 +661,8 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// **Refuses an item whose confirmed hard delete is in flight (W23.h3-fu)** — see the hard-delete
     /// guard below.
     func addMembership(item: UUID, folder: UUID) async throws {
+        await beginPlacementWrite()
+        defer { endPlacementWrite() }
         try refuseWhileReadOnly()
         try requireFolderExists(folder)
         guard !memberships.contains(where: { $0.itemId == item && $0.folderId == folder }) else { return }
@@ -564,6 +686,8 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// what let a stale confirmation trash a live note (W23.h3). With the pair proven present,
     /// `count == 1` provably means *this* pair is the only one.
     func removeMembership(item: UUID, folder: UUID) async throws -> RemoveResult {
+        await beginPlacementWrite()
+        defer { endPlacementWrite() }
         try refuseWhileReadOnly()
         guard memberships.contains(where: { $0.itemId == item && $0.folderId == folder }) else {
             return .notPresent
@@ -587,6 +711,8 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// last-instance verdict is read from what survives, so a membership that appeared while the DB write
     /// was in flight counts too and downgrades the outcome to `.unlinkedNotLast` (keep the file).
     func removeConfirmedLastMembership(item: UUID, folder: UUID) async throws -> ConfirmedRemoveResult {
+        await beginPlacementWrite()
+        defer { endPlacementWrite() }
         try refuseWhileReadOnly()
         guard memberships.contains(where: { $0.itemId == item && $0.folderId == folder }) else {
             return .notPresent
@@ -601,6 +727,8 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// hard-delete window first, so a concurrent replicate or move cannot add a placement while this
     /// transaction runs or while the note is being sent to Trash. Database first, memory after commit.
     func removeAllMembershipsForConfirmedDelete(item: UUID) async throws {
+        await beginPlacementWrite()
+        defer { endPlacementWrite() }
         try refuseWhileReadOnly()
         try await drainMembershipWritesForConfirmedDelete(item: item)
         try await index.deleteMembershipsForItem(item)
@@ -632,6 +760,8 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// hard delete is in flight (W23.h3-fu). Nothing is lost by refusing: a guarded item is one the
     /// store just proved has zero memberships, so there is no `source` row to move.
     func moveMembership(item: UUID, from source: UUID, to target: UUID) async throws {
+        await beginPlacementWrite()
+        defer { endPlacementWrite() }
         try refuseWhileReadOnly()
         guard source != target else { return try await addMembership(item: item, folder: target) }
         try requireFolderExists(target)
@@ -1016,6 +1146,7 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
         guard seq > appliedMirrorSeq else { return }
         appliedMirrorSeq = seq
         mirrorFailure = outcome
+        if outcome == nil { lastMirrorWriteLanded = Date() }
         onMirrorOutcome?()
     }
 

@@ -102,7 +102,10 @@ Rules for anyone changing this code. The file map is in REFERENCE.md §Implement
   membership minting seams refuse an item whose confirmed hard delete is in flight (W23.h3-fu); removing the last
   instance asks first and re-checks fresh at confirm; `trashItems`
   holds OrganizationStore's hard-delete window for the whole call (W23.h3-fu) and drops an index row only once `NoteStore.itemExists` says the note is gone. The indexer never prunes on an
-  empty/unsettled snapshot (two-emission gate). `isIndexReady` means SETTLED, not healthy — health is
+  empty/unsettled snapshot (two-emission gate); File ▸ Reload Library (`NotesModel.reloadLibrary`) prunes only a
+  note missing from two walks and `itemExists`, and `reloadFromMirrorIfChanged` adopts an outside
+  `organization.json` only when it is newer than this session's last write and nothing of the session is unwritten
+  (placement writes wait for the swap in `beginPlacementWrite`; W49.notes-reload-library). `isIndexReady` means SETTLED, not healthy — health is
   `NotesIndexer.failure`. NoteStore's projection ledgers are never authority.
 - **Reader links.** There is NO synchronous full-walk API; `resolve` stays async-only so a main-actor archive
   walk cannot be reintroduced, and the basename walk runs off the main actor, cancellable and bounded. A search
