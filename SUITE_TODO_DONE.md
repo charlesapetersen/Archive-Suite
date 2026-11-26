@@ -18823,3 +18823,23 @@ the same three lines and landing them separately would silently revert part of t
   entity-feature's Live sidecars check, settings-solver B1 (W49.proc-fix-solver-b1-image-pass), and
   `check-pipeline-seam.sh` inside test-tagging-failure (its driver passes). No bench cache used. No money spent.
   <!-- /W49.proc-settings-config-unify -->
+- [x] **W49.reader-batch-writes-async — Move batch `TagWriter` loops off `@MainActor` with progress and cancellation [M · Tier-2]** · §Archive Reader — holistic pre-user-testing review (owner, 2026-11-25) (lane: reader) — SHIPPED 2026-11-25 (checkpoint a46966b8 + this commit).
+  Mark Read/Unread, the group editor, corpus-wide rename, and undo/redo looped over `TagWriter` on the main actor. A batch
+  of more than 8 files now runs in `Core/TagBatch.swift`: per-file lanes (members sharing a path or device/inode, or
+  lacking an inode, share one lane in order), at most 4 lanes at a time in a detached task group, the ledger context a
+  task-local (`AuditLedger.withBatchContext`; the intent is synchronized before any lane's first write and `actionDone`
+  follows the last record), Cancel before each lane's next file. Up to 8 files still run inline in one lane, as before.
+  The status bar shows "<action>: N of M" with a Cancel button (`NavigationModel+TagBatch`). While a batch runs, other
+  Reader tag writes, triage, folder dating, Flag as Poor OCR, Undo and Redo are refused with a reason on the status line.
+  A result a later write has overtaken is not shown on its row (each file judged by its last write). A cancelled undo
+  keeps the lines it never reached as the next undo step without spending a retry attempt (`keepForRetry` members with
+  `attempted: false`); a line sharing a failed newer line's fate is still dropped, never kept. `retryOf` now keeps the
+  first group through a chain of retries, so folder-date records follow a retried or cancelled undo. Rename captures
+  identities when it is confirmed. A quit cancels, waits up to 30 s for the lanes' current files, reports, and drains the
+  folder-date queue; a timeout is logged. No migration written because there is nothing to migrate.
+  Tier-2: two adversarial review passes (Opus); all MEDIUM and the cheap LOW findings fixed. Remaining LOW, not fixed:
+  Cancel can take up to the 10 s Poor-OCR flag-lock timeout per lane when another app holds that lock.
+  Tests: `TagBatchTests` (8, scratch files; 15 iterations clean), full Reader unit bundle green (1,098), and VM UITest
+  `NavigationUITests/testABulkMarkReadAndItsUndoRunOffTheMainActor` (12 files marked and undone; shot read).
+  No bench cache used. No money spent.
+  <!-- /W49.reader-batch-writes-async -->
