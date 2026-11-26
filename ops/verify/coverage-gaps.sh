@@ -30,7 +30,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 export PATH="/opt/homebrew/bin:$PATH"
 log() { printf '\033[36m[cov]\033[0m %s\n' "$*"; }
-OUT="${COV_OUT:-$HOME/Library/Caches/ArchiveSuiteRehearsal/W40.e4}"
+OUT="${COV_OUT:-$HOME/Library/Caches/ArchiveSuiteRehearsal/W40.e4}"; export COV_OUT="$OUT"
 mkdir -p "$OUT"
 PY="$HERE/coverage_gaps.py"
 
@@ -74,8 +74,12 @@ run_processor() {
   done
   log "processor: failed drivers: ${failed[*]:-none}"
   local bin="$dir/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
-  if ls "$pdir"/*.profraw >/dev/null 2>&1 \
-     && xcrun llvm-profdata merge -sparse "$pdir"/*.profraw -o "$pdir/merged.profdata" \
+  # A driver that kills the app leaves an empty profile; merge only the written ones.
+  # OPEN (2026-11-26): every written profile here was refused as "malformed … number of counters is zero",
+  # while the same tool reads the ArchiveCore test run's — see execution-plans/items/W40.e4.md.
+  local raws=(); while IFS= read -r -d '' f; do raws+=("$f"); done < <(find "$pdir" -name '*.profraw' -size +0 -print0)
+  if [ ${#raws[@]} -gt 0 ] \
+     && xcrun llvm-profdata merge -sparse --failure-mode=all "${raws[@]}" -o "$pdir/merged.profdata" \
      && xcrun llvm-cov export -format=text -skip-expansions -instr-profile "$pdir/merged.profdata" "$bin" \
         >"$pdir/export.json" \
      && python3 "$PY" llvm "$pdir/export.json" processor-drivers; then

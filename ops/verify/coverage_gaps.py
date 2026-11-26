@@ -19,7 +19,7 @@ import subprocess
 import sys
 from collections import defaultdict
 
-OUT = os.environ.get("COV_OUT", "/tmp/coverage-gaps")
+OUT = os.environ.get("COV_OUT", os.path.expanduser("~/Library/Caches/ArchiveSuiteRehearsal/W40.e4"))
 ROOTS = re.compile(r"/((?:ArchiveReader|ArchiveNotes|ArchiveProcessor|packages)/.*)$")
 SKIP_PATH = re.compile(r"/build/|DerivedData|/\.build/|/Tests/|UITests/|Tests\.swift$|/UITestSupport/|/Tools/")
 SKIP_NAME = re.compile(r"closure #|implicit closure|default argument|variable initialization expression|"
