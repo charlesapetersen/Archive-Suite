@@ -1610,6 +1610,42 @@ are `ArchiveNotesTests` (unit, app-hosted), `ArchiveNotesUITests` (XCUITest, VM 
 
 ---
 
+## Never-executed code (W40.e4)
+
+`W40.e4` ran the Notes unit and UI tests in the VM with code coverage, plus ArchiveCore's unit tests, and listed every Notes function no run executed: **97 of 1,787** (762 of 21,006 executable lines). Each group below is a question for this ledger, not a status change: **dead** (no caller: delete it?), **unreachable** (callers, but no path a user takes: wire it or drop it?), **untested** (a user reaches it, no test does: which test should?). Function lists, callers and the full question for each group: [`evidence/notes/W40.e4-never-reached.md`](evidence/notes/W40.e4-never-reached.md) (`.tsv` beside it); the run table: [`evidence/core/W40.e4-coverage.md`](evidence/core/W40.e4-coverage.md).
+
+Caveat: `ChooseStoreFolderUITests` did not run (it stalls in the coverage VM), so the store-folder chooser and library-open rows (16) may be reached by it. "Untested" means no run in the union executed the function, not that no test exists. 4 dead, 10 unreachable (9 DEBUG-only seams plus one `fatalError` stub), 83 untested.
+
+| Group | Class | Rows | Ledger row |
+|---|---|---|---|
+| App launch, quit and Finder open | untested | 2 | N-14, N-46 |
+| Library menu: new, open, recent library | untested | 4 | N-01, N-48 |
+| Store folder chooser and remembering the root | untested | 12 | N-48, N-01 |
+| Export and Print | untested | 6 | no row |
+| Delete, duplicate and the row context menu | untested | 1 | N-28, N-30, N-27 |
+| Windows, panes, stacked layout and window state | unreachable | 1 | N-07, N-49, N-50, N-51 |
+| Item list table: columns, sort, rename and cell editing | untested | 7 | N-08, N-09, N-16 |
+| Folder tree: drag, drop, reorder, menus | untested | 1 | N-25, N-26, N-27 |
+| Templates manager and template inspector | untested | 1 | N-29 |
+| Search, filter bar, Advanced Search, smart folders | dead | 1 | N-31, N-32, N-33 |
+| Search, filter bar, Advanced Search, smart folders | untested | 9 | N-31, N-32, N-33 |
+| Inspector: dates, sent-with and calendar | untested | 7 | N-19, N-20, N-23, N-24 |
+| Inspector: quality, tags and the multi-select inspector | untested | 1 | N-17, N-18 |
+| Inspector: info, extract sources, roundup, collection records | untested | 1 | N-22, N-42, N-37 |
+| Editor: formatting toolbar, menu commands and link insert | untested | 7 | N-12 |
+| Editor: layout, scrolling, key handling and write-back | untested | 4 | N-12, N-13, N-14 |
+| Editor: inline images and stray-image adoption | untested | 7 | N-15 |
+| Source blocks: chips, preview popover, Reveal and Jump | untested | 5 | N-34, N-35, N-36, N-41 |
+| Zotero: local API / Better BibTeX client | untested | 1 | N-43, N-44 |
+| Zotero: chips, attach, auto-fill sheet | dead | 1 | N-43, N-44 |
+| Zotero: chips, attach, auto-fill sheet | untested | 6 | N-43, N-44 |
+| Zotero: cache store (no production caller) | dead | 1 | no row |
+| Settings and display calendar | untested | 1 | N-47, N-52, N-23 |
+| Index and organization store | dead | 1 | N-05, N-25 |
+| DEBUG-only test seams, probes and harness gates | unreachable | 9 | no row |
+
+Export and Print has no ledger row; Reveal in Finder sits under N-30, which notes it has no test.
+
 ## Deferred — not rows
 
 From `00-overview.md` §17 (moved there from `09-gap-closure.md` by `W9.e4`), plus open questions §15:

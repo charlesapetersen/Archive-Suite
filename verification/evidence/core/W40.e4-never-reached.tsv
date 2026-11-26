@@ -34,29 +34,11 @@ ArchiveCore/PDF/ExtractedContent.swift	8	OCRPageKind.displayName.getter	untested
 ArchiveCore/PDF/ExtractedContent.swift	173	static PDFPageRole.roles(of:)	untested	Page roles of a CGPDFDocument
 ArchiveCore/Preservation/PreservationCopy.swift	29	static PreservationCopy.isDocumentFolder(_:in:)	untested	Preservation copy
 ArchiveCore/Preservation/PreservationCopy.swift	165	PreservationCopy.Failure.errorDescription.getter	untested	Preservation copy
-ArchiveCore/Search/AdvancedSearchRules.swift	30	DateRoleChoice.roles.getter	untested	Advanced search rule helpers
-ArchiveCore/Search/AdvancedSearchRules.swift	52	static AdvancedSearchText.ftsExpression(op:text:column:)	untested	Advanced search rule helpers
-ArchiveCore/Search/AdvancedSearchRules.swift	55	quoted #1 (_:) in static AdvancedSearchText.ftsExpression(op:text:column:)	untested	Advanced search rule helpers
-ArchiveCore/Search/AdvancedSearchRules.swift	74	static AdvancedSearchText.dateKeys(_:)	untested	Advanced search rule helpers
-ArchiveCore/Search/AdvancedSearchRules.swift	92	static AdvancedSearchText.dateBounds(op:from:to:)	untested	Advanced search rule helpers
-ArchiveCore/Search/AdvancedSearchRules.swift	113	static AdvancedSearchText.dateMatches(op:bounds:role:keys:)	untested	Advanced search rule helpers
-ArchiveCore/Tags/DateFieldEntry.swift	121	static DateFieldEntry.incompleteNote(yearText:month:dayText:calendar:)	untested	Dates and calendars in the editors
 ArchiveCore/Tags/DateFieldEntry.swift	312	static DateFieldEntry.sameDay(_:_:)	untested	Dates and calendars in the editors
-ArchiveCore/Tags/DateFieldEntry.swift	407	static DateFieldEntry.listSeed(storedDate:precision:active:)	untested	Dates and calendars in the editors
-ArchiveCore/Tags/DateFieldEntry.swift	413	static DateFieldEntry.listEdit(_:seed:calendar:storedDate:)	untested	Dates and calendars in the editors
 ArchiveCore/Tags/FieldStatus.swift	144	static FieldStatusPolicy.userItemField(pageValue:)	untested	Field status of a user-set item field
 ArchiveCore/Tags/ItemType.swift	72	ItemTypeColors.isNone.getter	untested	Container backfill (Processor)
 ArchiveCore/Tags/ItemType.swift	78	ItemTypeColors.setColour(_:for:)	untested	Container file round trip and item-type colours
 ArchiveCore/Tags/TagVocabulary.swift	105	TagVocabulary.spelling(of:)	untested	Tag spelling (Processor)
 ArchiveCoreUI/Collections/CollectionRecordView.swift	147	CollectionRecordContent.note(_:)	untested	Collection record in the Inspector
 ArchiveCoreUI/TagEntry/SubjectEntryField.swift	80	SubjectEntryField.Coordinator.tokenField(_:shouldAdd:at:)	untested	Subject entry field: comma, Tab and leaving the field
-ArchiveCoreUI/TagEntry/SubjectEntryField.swift	89	SubjectEntryField.Coordinator.controlTextDidEndEditing(_:)	untested	Subject entry field: comma, Tab and leaving the field
-ArchiveCoreUI/TagEntry/SubjectEntryField.swift	116	SubjectEntryField.Coordinator.harvest(_:)	untested	Subject entry field: comma, Tab and leaving the field
-ArchiveCoreUI/Tags/TagChip.swift	15	TagChip.init(_:font:removeIdentifier:onRemove:)	untested	Tag chips (Notes)
 ArchiveCoreUI/Tags/TagChip.swift	23	static TagChip.height(for:)	dead	Dead code
-ArchiveCoreUI/Tags/TagChip.swift	27	TagChip.body.getter	untested	Tag chips (Notes)
-ArchiveCoreUI/Tags/TagChips.swift	35	static TagChips.chipHeight(for:)	untested	Tag chips (Notes)
-ArchiveCoreUI/Tags/TagChipsView.swift	16	TagChipsView.isFlipped.getter	untested	Tag chips (Notes)
-ArchiveCoreUI/Tags/TagChipsView.swift	21	static TagChipsView.height(for:font:width:titleWidth:)	untested	Tag chips (Notes)
-ArchiveCoreUI/Tags/TagChipsView.swift	25	TagChipsView.draw(_:)	untested	Tag chips (Notes)
-ArchiveCoreUI/Tags/TagChipsView.swift	35	TagChipsView.setFrameSize(_:)	untested	Tag chips (Notes)

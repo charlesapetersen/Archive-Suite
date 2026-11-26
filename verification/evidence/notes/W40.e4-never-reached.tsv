@@ -1,0 +1,98 @@
+file	line	function	class	group	tested-by
+ArchiveNotesApp.swift	157	NotesAppDelegate.handleOpenDocuments(_:withReply:)	untested	App launch, quit and Finder open	
+ArchiveNotesApp.swift	176	NotesAppDelegate.deliverPendingLibrary()	untested	App launch, quit and Finder open	
+ArchiveNotesCommands.swift	87	ReaderRootCommands.openLibraryFromFinder(_:)	untested	Library menu: new, open, recent library	
+ArchiveNotesCommands.swift	142	static LibraryActions.newLibrary(model:previewState:)	untested	Library menu: new, open, recent library	
+ArchiveNotesCommands.swift	153	static LibraryActions.open(_:model:previewState:)	untested	Library menu: new, open, recent library	
+ArchiveNotesCommands.swift	161	static LibraryActions.openRecent(_:recents:model:previewState:)	untested	Library menu: new, open, recent library	
+Core/DisplayCalendarSettings.swift	20	static DisplayCalendarSettings.choices.getter	untested	Settings and display calendar	(feature-level) AppearanceSettingUITests (UI)
+Core/NoteExport.swift	27	NoteExportFormat.id.getter	untested	Export and Print	
+Core/NoteExport.swift	52	static NoteExportFormat.remembered(_:)	untested	Export and Print	
+Core/NoteExport.swift	115	static NoteExportComposer.kindLabel(_:)	untested	Export and Print	
+Core/NoteExport.swift	408	NoteExportWriter.ExportError.errorDescription.getter	untested	Export and Print	
+Core/NotesModel.swift	121	NotesModel.revealInFinder(_:)	untested	Delete, duplicate and the row context menu	(feature-level) NotesGUITests (UI); NotesE2NoteLifecycleTests (UI); NotesW7ChecksUITests (UI)
+Core/NotesModel.swift	273	NotesModel.revealLibraryInFinder()	untested	Store folder chooser and remembering the root	(feature-level) StoreFolderChooserTests (chunk4 unit)
+Core/NotesModel.swift	345	static NotesModel.isGeneratedNotesFixture(_:)	unreachable	DEBUG-only test seams, probes and harness gates	
+Core/NotesModel.swift	952	NotesModel.duplicateTemplate(_:)	untested	Templates manager and template inspector	(feature-level) NotesGUITests (UI); TemplatesUITests (UI); NewItemMenuUITests (UI)
+Core/NotesModel.swift	1775	NotesModel.ZoteroAutoFillSaveError.errorDescription.getter	untested	Zotero: chips, attach, auto-fill sheet	(feature-level) NotesGUITests (UI); IntegrationJourneyUITests (UI); ZoteroPasteTests (chunk4 unit)
+Core/NotesNavigationModel.swift	340	NotesNavigationModel.setDateUncertain(_:for:)	untested	Inspector: dates, sent-with and calendar	(feature-level) InspectorPanelUITests (UI); NotesGUITests (UI); NotesE2NoteLifecycleTests (UI)
+Core/NotesNavigationModel.swift	345	NotesNavigationModel.setDisplayCalendar(_:for:)	untested	Inspector: dates, sent-with and calendar	(feature-level) InspectorPanelUITests (UI); NotesGUITests (UI); NotesE2NoteLifecycleTests (UI)
+Core/NotesNavigationModel.swift	350	NotesNavigationModel.setSentWith(_:precision:for:)	untested	Inspector: dates, sent-with and calendar	(feature-level) InspectorPanelUITests (UI); NotesGUITests (UI); NotesE2NoteLifecycleTests (UI)
+Core/NotesNavigationModel.swift	355	NotesNavigationModel.setSentWithUncertain(_:for:)	untested	Inspector: dates, sent-with and calendar	(feature-level) InspectorPanelUITests (UI); NotesGUITests (UI); NotesE2NoteLifecycleTests (UI)
+Core/NotesNavigationModel.swift	517	NotesNavigationModel.currentUserFilter.getter	dead	Search, filter bar, Advanced Search, smart folders	
+Core/NotesNavigationModel.swift	815	NotesNavigationModel.exportableListed.getter	untested	Export and Print	
+Core/UITestRelaunchArguments.swift	27	static UITestRelaunchArguments.isHarnessLaunch.getter	unreachable	DEBUG-only test seams, probes and harness gates	UITestRelaunchArgumentsTests (chunk4 unit)
+Editor/BlockHeaderAttachment.swift	158	BlockHeaderViewProvider.attachmentBounds(for:location:textContainer:proposedLineFragment:position:)	untested	Source blocks: chips, preview popover, Reveal and Jump	BlockChipTests (unit, ran)
+Editor/BlockHeaderAttachment.swift	289	BlockHeaderChipView.__allocating_init(attachment:)	untested	Source blocks: chips, preview popover, Reveal and Jump	
+Editor/BlockHeaderAttachment.swift	457	BlockHeaderChipView.alertWindow.getter	untested	Source blocks: chips, preview popover, Reveal and Jump	
+Editor/BlockHeaderAttachment.swift	469	BlockHeaderChipView.copyForZotero()	untested	Zotero: chips, attach, auto-fill sheet	ChipAccessTests (unit, ran); SourceArchiveInfoTests (unit, ran)
+Editor/BlockHeaderAttachment.swift	484	BlockHeaderChipView.addToZotero()	untested	Zotero: chips, attach, auto-fill sheet	ChipAccessTests (unit, ran); SourceArchiveInfoTests (unit, ran)
+Editor/BlockHeaderAttachment.swift	500	BlockHeaderChipView.reportZoteroFailure(_:)	untested	Zotero: chips, attach, auto-fill sheet	(feature-level) NotesGUITests (UI); IntegrationJourneyUITests (UI); ZoteroPasteTests (chunk4 unit)
+Editor/BlockHeaderAttachment.swift	514	BlockHeaderChipView.reportCopyFailure(action:)	untested	Source blocks: chips, preview popover, Reveal and Jump	
+Editor/BlockHeaderAttachment.swift	524	BlockHeaderChipView.openInZotero()	untested	Zotero: chips, attach, auto-fill sheet	ChipAccessTests (unit, ran)
+Editor/EditorFormatting.swift	91	FormattingContext.canAutoFillFromZotero.getter	dead	Zotero: chips, attach, auto-fill sheet	
+Editor/EditorFormatting.swift	120	FormattingContext.toggleItalic()	untested	Editor: formatting toolbar, menu commands and link insert	(feature-level) UnderlineHighlightTests (chunk4 unit); VisualPolishUITests (UI); InspectorPanelUITests (UI)
+Editor/EditorFormatting.swift	126	FormattingContext.toggleUnderline()	untested	Editor: formatting toolbar, menu commands and link insert	(feature-level) UnderlineHighlightTests (chunk4 unit); VisualPolishUITests (UI); InspectorPanelUITests (UI)
+Editor/EditorFormatting.swift	132	FormattingContext.toggleHighlight()	untested	Editor: formatting toolbar, menu commands and link insert	(feature-level) UnderlineHighlightTests (chunk4 unit); VisualPolishUITests (UI); InspectorPanelUITests (UI)
+Editor/EditorFormatting.swift	156	FormattingContext.setPlain()	untested	Editor: formatting toolbar, menu commands and link insert	(feature-level) UnderlineHighlightTests (chunk4 unit); VisualPolishUITests (UI); InspectorPanelUITests (UI)
+Editor/EditorFormatting.swift	168	FormattingContext.toggleOrderedList()	untested	Editor: formatting toolbar, menu commands and link insert	(feature-level) UnderlineHighlightTests (chunk4 unit); VisualPolishUITests (UI); InspectorPanelUITests (UI)
+Editor/EditorFormatting.swift	174	FormattingContext.toggleBlockquote()	untested	Editor: formatting toolbar, menu commands and link insert	(feature-level) UnderlineHighlightTests (chunk4 unit); VisualPolishUITests (UI); InspectorPanelUITests (UI)
+Editor/EditorFormatting.swift	180	FormattingContext.toggleCodeBlock()	untested	Editor: formatting toolbar, menu commands and link insert	(feature-level) UnderlineHighlightTests (chunk4 unit); VisualPolishUITests (UI); InspectorPanelUITests (UI)
+Editor/EditorFormatting.swift	195	FormattingContext.insertTestBlock()	unreachable	DEBUG-only test seams, probes and harness gates	
+Editor/EditorFormatting.swift	340	FormattingContext.dismissZoteroAutoFillError()	untested	Zotero: chips, attach, auto-fill sheet	(feature-level) NotesGUITests (UI); IntegrationJourneyUITests (UI); ZoteroPasteTests (chunk4 unit)
+Editor/EditorScrollView.swift	92	EditorScrollView.lineTop(ofCharacter:in:)	untested	Editor: layout, scrolling, key handling and write-back	(feature-level) NotesGUITests (UI); StackedLayoutVerifyUITests (UI); ChipsOverdrawnUITests (UI)
+Editor/EditorTextView.swift	310	EditorTextView.chipMenuItemChosen(_:)	untested	Editor: layout, scrolling, key handling and write-back	(feature-level) NotesGUITests (UI); StackedLayoutVerifyUITests (UI); ChipsOverdrawnUITests (UI)
+Editor/EditorTextView.swift	990	EditorTextView.insertBacktab(_:)	untested	Editor: layout, scrolling, key handling and write-back	(feature-level) NotesGUITests (UI); StackedLayoutVerifyUITests (UI); ChipsOverdrawnUITests (UI)
+Editor/EditorTextView.swift	1131	EditorTextView.copy(_:)	untested	Editor: layout, scrolling, key handling and write-back	(feature-level) NotesGUITests (UI); StackedLayoutVerifyUITests (UI); ChipsOverdrawnUITests (UI)
+Editor/EditorTextView.swift	1202	EditorTextView.performDragOperation(_:)	untested	Editor: inline images and stray-image adoption	(feature-level) StrayImageAdoptionTests (chunk4 unit)
+Editor/EditorTextView.swift	1317	static EditorTextView.isImageURL(_:)	untested	Editor: inline images and stray-image adoption	(feature-level) StrayImageAdoptionTests (chunk4 unit)
+Editor/EditorTextView.swift	1322	static EditorTextView.tiffToPNG(_:)	untested	Editor: inline images and stray-image adoption	(feature-level) StrayImageAdoptionTests (chunk4 unit)
+Editor/EditorTextView.swift	1327	static EditorTextView.ensurePNG(_:)	untested	Editor: inline images and stray-image adoption	(feature-level) StrayImageAdoptionTests (chunk4 unit)
+Editor/EditorTextView.swift	1553	ListMarkerProbe.isAccessibilityElement()	unreachable	DEBUG-only test seams, probes and harness gates	
+Editor/EditorTextView.swift	1569	ChipGeometryProbe.isAccessibilityElement()	unreachable	DEBUG-only test seams, probes and harness gates	
+Editor/EditorTextView.swift	1593	PassageChipStateProbe.isAccessibilityElement()	unreachable	DEBUG-only test seams, probes and harness gates	
+Editor/MarkdownEditorView.swift	1131	MarkdownEditorView.Coordinator.uiTestReplaceMarkdown(_:)	unreachable	DEBUG-only test seams, probes and harness gates	
+Editor/MarkdownEditorView.swift	1138	MarkdownEditorView.Coordinator.uiTestInsertMarkdown(_:)	unreachable	DEBUG-only test seams, probes and harness gates	
+Editor/MarkdownEditorView.swift	1288	MarkdownEditorView.Coordinator.attributedForTest(_:)	unreachable	DEBUG-only test seams, probes and harness gates	
+Index/NotesIndexer.swift	75	NotesIndexer.__allocating_init()	dead	Index and organization store	
+Links/ReaderRootChooser.swift	121	static ReaderRootChooser.runOpenPanel()	untested	Store folder chooser and remembering the root	(feature-level) StoreFolderChooserTests (chunk4 unit)
+Links/ReaderRootChooser.swift	133	static ReaderRootChooser.runTopFolderQuestion(folder:)	untested	Store folder chooser and remembering the root	(feature-level) StoreFolderChooserTests (chunk4 unit)
+Models/NotesAdvancedSearch.swift	39	NotesRuleField.textKind.getter	untested	Search, filter bar, Advanced Search, smart folders	(feature-level) NotesAdvancedSearchUITests (UI); NotesGUITests (UI); LibraryUXUITests (UI)
+Models/NotesFilter.swift	68	NotesFilter.isActive.getter	untested	Search, filter bar, Advanced Search, smart folders	NotesAdvancedSearchTests (unit, ran)
+Store/RecentLibraries.swift	21	RecentLibraries.Entry.id.getter	untested	Store folder chooser and remembering the root	(feature-level) StoreFolderChooserTests (chunk4 unit)
+Store/StoreFolderChooser.swift	55	StoreFolderChooser.Refusal.message.getter	untested	Store folder chooser and remembering the root	(feature-level) StoreFolderChooserTests (chunk4 unit)
+Store/StoreFolderChooser.swift	303	static StoreFolderChooser.onMainRunLoop(_:)	untested	Store folder chooser and remembering the root	(feature-level) StoreFolderChooserTests (chunk4 unit)
+Store/StoreFolderChooser.swift	321	static StoreFolderChooser.runOpenPanel()	untested	Store folder chooser and remembering the root	(feature-level) StoreFolderChooserTests (chunk4 unit)
+Store/StoreFolderChooser.swift	337	static StoreFolderChooser.documentsFolder.getter	untested	Store folder chooser and remembering the root	(feature-level) StoreFolderChooserTests (chunk4 unit)
+Store/StoreFolderChooser.swift	343	static StoreFolderChooser.runSavePanel(firstLaunch:)	untested	Store folder chooser and remembering the root	(feature-level) StoreFolderChooserTests (chunk4 unit)
+Store/StoreFolderChooser.swift	358	static StoreFolderChooser.runInsideArchiveQuestion(folder:)	untested	Store folder chooser and remembering the root	(feature-level) StoreFolderChooserTests (chunk4 unit)
+Store/StoreFolderChooser.swift	392	static StoreFolderChooser.relaunchApp()	untested	Store folder chooser and remembering the root	(feature-level) StoreFolderChooserTests (chunk4 unit)
+Store/StoreFolderChooser.swift	407	static StoreFolderChooser.presentAlert(for:)	untested	Store folder chooser and remembering the root	(feature-level) StoreFolderChooserTests (chunk4 unit)
+Views/NoteEditorPane.swift	643	NoteEditorPane.pickImageBar(_:)	untested	Editor: inline images and stray-image adoption	(feature-level) StrayImageAdoptionTests (chunk4 unit)
+Views/NoteEditorPane.swift	662	NoteEditorPane.pickStrayImage(_:)	untested	Editor: inline images and stray-image adoption	(feature-level) StrayImageAdoptionTests (chunk4 unit)
+Views/NoteEditorPane.swift	681	NoteEditorPane.chooseImageFile(for:)	untested	Editor: inline images and stray-image adoption	(feature-level) StrayImageAdoptionTests (chunk4 unit)
+Views/NoteExportFlow.swift	111	static NoteExportFlow.alert(_:detail:window:)	untested	Export and Print	
+Views/NoteMetadataInspector.swift	256	NoteMetadataInspector.collectionRecordsSection.getter	untested	Inspector: info, extract sources, roundup, collection records	(feature-level) NotesGUITests (UI); InspectorPanelUITests (UI); NotesW7ChecksUITests (UI)
+Views/NoteMetadataInspector.swift	335	NoteMetadataInspector.calendarSection.getter	untested	Inspector: dates, sent-with and calendar	(feature-level) InspectorPanelUITests (UI); NotesGUITests (UI); NotesE2NoteLifecycleTests (UI)
+Views/NoteMetadataInspector.swift	355	NoteMetadataInspector.calendarNote.getter	untested	Inspector: dates, sent-with and calendar	(feature-level) InspectorPanelUITests (UI); NotesGUITests (UI); NotesE2NoteLifecycleTests (UI)
+Views/NoteMetadataInspector.swift	496	NoteMetadataInspector.displayCalendarBinding.getter	untested	Inspector: dates, sent-with and calendar	(feature-level) InspectorPanelUITests (UI); NotesGUITests (UI); NotesE2NoteLifecycleTests (UI)
+Views/NoteTagBar.swift	30	NoteTagBar.Edit.tag.getter	untested	Inspector: quality, tags and the multi-select inspector	(feature-level) MultiSelectActionsUITests (UI); NotesAdvancedSearchUITests (UI); NotesGUITests (UI)
+Views/NotesAdvancedSearchSheet.swift	94	NotesAdvancedSearchSheet.trimmedName.getter	untested	Search, filter bar, Advanced Search, smart folders	(feature-level) NotesAdvancedSearchUITests (UI); NotesGUITests (UI); LibraryUXUITests (UI)
+Views/NotesAdvancedSearchSheet.swift	114	NotesAdvancedSearchSheet.commit()	untested	Search, filter bar, Advanced Search, smart folders	(feature-level) NotesAdvancedSearchUITests (UI); NotesGUITests (UI); LibraryUXUITests (UI)
+Views/NotesAdvancedSearchSheet.swift	124	NotesAdvancedSearchSheet.saveAsSmartFolder()	untested	Search, filter bar, Advanced Search, smart folders	(feature-level) NotesAdvancedSearchUITests (UI); NotesGUITests (UI); LibraryUXUITests (UI)
+Views/NotesAdvancedSearchSheet.swift	156	NotesRuleListView.add(after:group:)	untested	Search, filter bar, Advanced Search, smart folders	(feature-level) NotesAdvancedSearchUITests (UI); NotesGUITests (UI); LibraryUXUITests (UI)
+Views/NotesFilterBar.swift	156	NotesFilterBar.dateFilterPopover.getter	untested	Search, filter bar, Advanced Search, smart folders	NotesE2SearchTests (UI)
+Views/NotesFilterBar.swift	260	NotesFilterBar.fromYearText.getter	untested	Search, filter bar, Advanced Search, smart folders	(feature-level) NotesAdvancedSearchUITests (UI); NotesGUITests (UI); LibraryUXUITests (UI)
+Views/NotesFilterBar.swift	274	NotesFilterBar.toYearText.getter	untested	Search, filter bar, Advanced Search, smart folders	(feature-level) NotesAdvancedSearchUITests (UI); NotesGUITests (UI); LibraryUXUITests (UI)
+Views/NotesFolderTreeView.swift	430	NotesFolderTreeView.showTemplates()	untested	Folder tree: drag, drop, reorder, menus	(feature-level) NotesGUITests (UI); LibraryUXUITests (UI); NotesE2FolderTests (UI)
+Views/NotesTableView.swift	634	NotesTableView.Coordinator.cannotEdit(_:)	untested	Item list table: columns, sort, rename and cell editing	(feature-level) ListRenameUITests (UI); InspectorPanelUITests (UI)
+Views/NotesTableView.swift	711	ColumnPickerHeaderView.menu(for:)	untested	Item list table: columns, sort, rename and cell editing	(feature-level) ListRenameUITests (UI); InspectorPanelUITests (UI)
+Views/NotesTableView.swift	765	ColumnPickerHeaderView.toggleColumn(_:)	untested	Item list table: columns, sort, rename and cell editing	(feature-level) ListRenameUITests (UI); InspectorPanelUITests (UI)
+Views/NotesTableView.swift	786	ColumnPickerHeaderView.setSecondaryAsc(_:)	untested	Item list table: columns, sort, rename and cell editing	(feature-level) ListRenameUITests (UI); InspectorPanelUITests (UI)
+Views/NotesTableView.swift	790	ColumnPickerHeaderView.setSecondaryDesc(_:)	untested	Item list table: columns, sort, rename and cell editing	(feature-level) ListRenameUITests (UI); InspectorPanelUITests (UI)
+Views/NotesTableView.swift	794	ColumnPickerHeaderView.removeSecondary(_:)	untested	Item list table: columns, sort, rename and cell editing	(feature-level) ListRenameUITests (UI); InspectorPanelUITests (UI)
+Views/NotesTableView.swift	795	ColumnPickerHeaderView.resetSort(_:)	untested	Item list table: columns, sort, rename and cell editing	(feature-level) ListRenameUITests (UI); InspectorPanelUITests (UI)
+Views/PanelDivider.swift	85	PanelDividerView.init(coder:)	unreachable	Windows, panes, stacked layout and window state	
+Views/ReaderPreviewPopover.swift	214	ReaderPreviewPopover.downloadAction(fileURL:page:relativeTo:)	untested	Source blocks: chips, preview popover, Reveal and Jump	
+Zotero/ZoteroCacheStore.swift	51	ZoteroCacheStore.removeAll()	dead	Zotero: cache store (no production caller)	test-only caller
+Zotero/ZoteroRef.swift	56	ZoteroRef.id.getter	untested	Zotero: local API / Better BibTeX client	(feature-level) ZoteroClientTests (chunk4 unit); ZoteroLocalServerTests (chunk4 unit)
