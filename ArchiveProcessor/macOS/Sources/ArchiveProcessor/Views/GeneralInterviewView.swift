@@ -18,9 +18,6 @@ struct GeneralInterviewView: View {
     @State private var claudeMessage: String?
     @State private var showKeyWizard = false
     @State private var problem: String?
-    /// The last question (W47.settings-level-switch): how much of Settings to show. Saved with the answers; a skip
-    /// keeps Basic.
-    @State private var level = SettingsLevel.current()
 
     static func readMac() -> MacInventory {
         let d = UserDefaults.standard
@@ -50,9 +47,6 @@ struct GeneralInterviewView: View {
                 foundSection
                 startingPointSection
                 questionsSection
-                Section {
-                    SettingsLevelPicker(level: $level)
-                } header: { Text("How much do you want to adjust?") }
                 if let problem { Text(problem).foregroundStyle(.red).font(.caption) }
             }
             .formStyle(.grouped)
@@ -309,18 +303,17 @@ struct GeneralInterviewView: View {
     private func save() {
         var layer = store.general
         answers.apply(to: &layer, inventory: inventory)
-        write(layer, level: level)
+        write(layer)
     }
 
     private func skip() {
         var layer = store.general
         GeneralInterviewAnswers.skip(inventory, layer: &layer)
-        write(layer, level: .defaultLevel)   // levels.md §5: a skipped interview starts at Basic
+        write(layer)
     }
 
-    private func write(_ layer: SettingsLayer, level: SettingsLevel) {
+    private func write(_ layer: SettingsLayer) {
         if store.replaceGeneral(layer) {
-            UserDefaults.standard.set(level.rawValue, forKey: DefaultsKeys.settingsLevel)
             onDone()
         } else {
             problem = store.lastProblem ?? "Your answers could not be saved."

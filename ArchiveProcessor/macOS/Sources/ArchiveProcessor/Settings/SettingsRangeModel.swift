@@ -176,7 +176,7 @@ extension SettingsSheetModel {
             let ownHours: Double
         }
         // A lower-scoring row is drawn from the Advanced level up, or while it is the card's choice (owner call 15).
-        let advanced = SettingsLevel.current() >= .advanced
+        let advanced = RouteTier.current() >= .advanced
         let built: [Built] = stage.routes.filter { !$0.afterTraining && (!$0.lowerScoring || advanced || $0.id == card.routeID) }.map { r in
             let v = cmp.of(r)
             let c = solver.cand(r, stage: stage.id, value: v ?? 0, units: units)
@@ -273,7 +273,7 @@ extension SettingsSheetModel {
                         : words.family(r.family).replacingOccurrences(of: " (shared research computers)", with: ""),
                     figures: Self.rangeFigures(stage, r, y: b.y.map { $0 / scale }, words: words),
                     publicFigure: stage.id == "reading" ? Self.rangePublic(r, picks: s.picks, answers: a, words: words) : nil,
-                    advancedReason: advanced && r.lowerScoring ? SettingsLevels.why(r) : nil,
+                    advancedReason: advanced && r.lowerScoring ? SettingsAdvanced.why(r) : nil,
                     listPrice: priceText(r, b.x),
                     batchCost: priceText(r, b.x) == "no price listed" ? "its cost for this batch is not known"
                         : batch < 0.005 ? "nothing to pay for this batch" : "about \(words.money(batch)) for this batch",

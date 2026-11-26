@@ -57,7 +57,7 @@ enum ReOCRRankingTestDriver {
 
         func rank(_ kind: OCRPageKind, pages: Int = 10, resources: SettingsResources = keyed, staysOnMac: Bool = false,
                   current: PDFReaderProvenance? = nil, in t: SettingsRouteTable = table,
-                  level: SettingsLevel = .standard) -> ReOCRRanking {
+                  level: RouteTier = .standard) -> ReOCRRanking {
             ReOCRRanking.rank(kind: kind, pages: pages, table: t, pairs: pairs, resources: resources,
                               staysOnMac: staysOnMac, current: current, level: level)
         }

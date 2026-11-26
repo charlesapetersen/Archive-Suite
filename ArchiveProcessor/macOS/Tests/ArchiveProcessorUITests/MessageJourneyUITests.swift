@@ -45,7 +45,7 @@ final class MessageJourneyUITests: XCTestCase {
 
         XCTAssertTrue(text("Save failed").waitForExistence(timeout: 5))
         XCTAssertFalse(text("Validated").exists)
-        XCTAssertTrue(app.showSettingsPanel("General"))
+        XCTAssertTrue(app.showSettingsPanel("Processing"))
         XCTAssertTrue(app.showSettingsPanel("Accounts"))
         let account = settings.secureTextFields["OpenAI API key"].firstMatch
         XCTAssertTrue(account.exists, settings.debugDescription)
@@ -64,11 +64,12 @@ final class MessageJourneyUITests: XCTestCase {
         try makePhoto("in/one.jpg")
         launch("preset")
         let settings = app.showSettingsWindow()
-        XCTAssertTrue(app.showSettingsPanel("Reading"))
-        let backend = element("ap.settings.backendPicker")
-        reveal(backend, in: settings.scrollViews.firstMatch)
-        backend.click()
-        app.menuItems["API Gateway"].firstMatch.click()
+        XCTAssertTrue(app.showSettingsPanel("Processing"))
+        let reader = element("ap.settings.readerPicker")
+        reveal(reader, in: settings.scrollViews.firstMatch)
+        reader.click()
+        app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", "Gateway")).firstMatch.click()
+        XCTAssertTrue(app.showSettingsPanel("Advanced"))
         let preset = settings.buttons["Fill in OpenAI preset"]
         reveal(preset, in: settings.scrollViews.firstMatch)
         preset.click()
@@ -379,7 +380,7 @@ final class MessageJourneyUITests: XCTestCase {
         let output = root.appendingPathComponent("out").path
         app.launchArguments = UITestLaunch.arguments([
             "-APUITestMode", "-APUITestStandInGateway", "-APUITestOutputDirectory", output, "-outputDirectory", output,
-            "-settingsLevel", "advanced", "-selectedProvider", "OpenAI", "-batchMode", "NO", "-taggingModeRaw", "none",
+            "-offerExperimentalRoutes", "YES", "-selectedProvider", "OpenAI", "-batchMode", "NO", "-taggingModeRaw", "none",
             "-enableCollectionSegmentation", "NO", "-reviewRotation", "NO", "-reviewDocumentSegmentation", "NO",
             "-outputImageFile", "NO", "-mergeDocuments", "NO", "-sendPreviousImage", "NO", "-skipAlreadyProcessed", "NO",
             "-preOCRedInput", "NO", "-useAppleVision", "NO", "-writeLogFile", "YES", "-ocrPageKindRouting", "NO"

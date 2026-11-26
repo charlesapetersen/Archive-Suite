@@ -90,7 +90,7 @@ struct ReOCRRanking: Sendable {
     /// collection's switches (W46.training-optout-run).
     static func rank(kind: OCRPageKind, pages: Int, table: SettingsRouteTable, pairs: OCRPairMatrix?,
                      resources: SettingsResources, staysOnMac: Bool, noTraining: Bool = false, readingFallback: Bool = true,
-                     current: PDFReaderProvenance? = nil, level: SettingsLevel = .current(),
+                     current: PDFReaderProvenance? = nil, level: RouteTier = .current(),
                      builtInModels: [LLMModel] = OCRCascade.candidates + LLMModel.appleVisionModels) -> ReOCRRanking {
         let metric = metric(for: kind, table: table, readingFallback: readingFallback, builtInModels: builtInModels)
         var answers = SettingsAnswers()

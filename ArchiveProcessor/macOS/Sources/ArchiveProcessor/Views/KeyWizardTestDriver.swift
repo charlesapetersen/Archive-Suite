@@ -3,7 +3,7 @@ import Foundation
 
 /// W49.proc-suspects-messages (S-024): what the key row in Settings shows after the guided wizard's live check
 /// passes and the Keychain refuses the key. Runs the wizard's own `recordUsableKey` and the row's own `keyChip`, with
-/// the row's `hasKey` read from Keychain, as in `SettingsAccountsPanel.reloadKeys`.
+/// the row's `hasKey` read from Keychain, as in `SettingsAccountsTab.reloadKeys`.
 /// Headless mode is required: `KeychainHelper.save` then refuses every write, as a locked or denying Keychain does,
 /// and nothing reads or writes the real Keychain. The flags go to a scratch defaults suite, never the app's own.
 ///
@@ -23,7 +23,7 @@ enum KeyWizardTestDriver {
             let saved = ProviderKeyWizard.recordUsableKey(account: account, key: "stand-in-key-\(account)", defaults: defaults)
             let field = KeychainHelper.load(account: account) ?? ""
             let validated = defaults.bool(forKey: "keyValidated_\(account)")
-            let chip = SettingsAccountsPanel.keyChip(hasKey: !field.isEmpty, validated: validated,
+            let chip = SettingsAccountsTab.keyChip(hasKey: !field.isEmpty, validated: validated,
                                                     saveFailed: defaults.bool(forKey: "keySaveFailed_\(account)"))
             lines.append("account=\(account)\tsave_returned=\(saved)\tfield_after_reload=\(field.isEmpty ? "empty" : "set")"
                          + "\tkeyValidated=\(validated)\tchip=\(chip.rawValue)")

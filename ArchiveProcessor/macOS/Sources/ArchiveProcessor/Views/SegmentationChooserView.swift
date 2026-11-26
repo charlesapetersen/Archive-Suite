@@ -94,8 +94,10 @@ struct SegmentationChooserView: View {
             }
 
             if SegmentationRow.providers(approach, options: options).contains(.local) {
-                LocalSegmenterControls()
                 LocalPartnerControls(routes: $routes, options: options)
+                Text("The local server and model are set in Settings › Advanced; the app's defaults are the measured ones.")
+                    .font(.caption2).foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if let row = rows.first(where: { $0.approach == approach }) {
@@ -189,58 +191,6 @@ struct LocalPartnerControls: View {
                 routes.localPartner = SegmentationApproach(rawValue: raw)
                     .flatMap { SegmentationOptions.partnerApproaches.contains($0) ? $0 : nil }
             }
-            .settingsLevel(.localSegmenter)   // W47.settings-level-switch: an option, never a default
-        }
-    }
-}
-
-/// The `local` approach's server and model (W41.app-local-seg), with a check that the server answers.
-struct LocalSegmenterControls: View {
-    @AppStorage(DefaultsKeys.localSegmenterBaseURL) private var baseURL = LocalSegmenter.defaultBaseURL
-    @AppStorage(DefaultsKeys.localSegmenterModelID) private var modelID = LocalSegmenter.defaultModelID
-    @State private var checkResult: String?
-    @State private var checking = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            TextField("Server", text: $baseURL, prompt: Text(LocalSegmenter.defaultBaseURL))
-                .textFieldStyle(.roundedBorder).controlSize(.small)
-                .accessibilityIdentifier("ap.segmentation.local.server")
-            TextField("Model", text: $modelID, prompt: Text(LocalSegmenter.defaultModelID))
-                .textFieldStyle(.roundedBorder).controlSize(.small)
-                .accessibilityIdentifier("ap.segmentation.local.model")
-            HStack {
-                Button(checking ? "Checking…" : "Check server") { check() }
-                    .controlSize(.small).disabled(checking)
-                    .accessibilityIdentifier("ap.segmentation.local.check")
-                if let checkResult {
-                    Text(checkResult).font(.caption2).foregroundStyle(.primary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Text(LocalSegmenter.startHint).font(.caption2).foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .settingsLevel(.localSegmenter)   // W47.settings-level-switch: raw fields; the defaults are the measured ones
-    }
-
-    private func check() {
-        checking = true
-        // What a run would use: the same trimming and defaults.
-        let url = LocalSegmenter.baseURL(), model = LocalSegmenter.modelID()
-        Task {
-            let text: String
-            do {
-                let models = try await LocalModelRoute.listModels(baseURL: url)
-                // mlx-vlm downloads a model it does not list yet on its first request, so an unlisted one is no fault
-                // yet; the run loads it before the first window and stops with the server's reason if it cannot.
-                text = models.contains(model) ? "The server answers and has \(model). Ready."
-                    : "The server answers but does not list \(model). A run first tries to load it (downloading about "
-                        + "2.5 GB if needed) and stops with the reason if it cannot."
-            } catch {
-                text = "No server answers at \(url): \(error.localizedDescription)"
-            }
-            await MainActor.run { checkResult = text; checking = false }
         }
     }
 }

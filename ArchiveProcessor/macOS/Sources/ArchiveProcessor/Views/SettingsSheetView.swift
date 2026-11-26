@@ -298,7 +298,7 @@ struct SettingsSheetPage: View {
     var setStrings: (SettingsKey, [String]) -> Void = { _, _ in }
     /// Each card's "See the range" link; nil draws none.
     var seeRange: (() -> Void)? = nil
-    /// Each card and rule names the Settings panel it is set in (the modal sheet; W47.settings-panels).
+    /// Each card and rule names the Settings tab it is set in (the modal sheet).
     var showsHomes = false
 
     var body: some View {
@@ -321,7 +321,7 @@ struct SettingsSheetPage: View {
         ForEach(m.cards) { card in
             StageCardView(card: card, choose: { choose(card.id, $0) }, backToApp: { choose(card.id, nil) },
                           apply: apply, seeRange: seeRange,
-                          homeNote: showsHomes ? SettingsPanelOwnership.stageNote(card.id) : nil)
+                          homeNote: showsHomes ? Self.stageNote(card.id) : nil)
             ForEach(m.stageSwitches[card.id] ?? []) { sw in
                 SheetSwitchRow(row: sw, setSwitch: setSwitch)
             }
@@ -337,8 +337,20 @@ struct SettingsSheetPage: View {
             .fixedSize(horizontal: false, vertical: true)
         ForEach(m.ruleStages) { stage in
             RuleStageBox(stage: stage, setSwitch: setSwitch, setStrings: setStrings,
-                         homeNote: showsHomes ? SettingsPanelOwnership.stageNote(stage.id) : nil)
+                         homeNote: showsHomes ? Self.stageNote(stage.id) : nil)
         }
+    }
+
+    /// Which Settings tab holds each stage the sheet shows (W49.proc-settings-redesign-core).
+    static let stageTabs: [String: SettingsTab] = [
+        "reading": .processing, "segmentation": .processing, "dating": .processing, "entities": .advanced,
+        "reading-copy": .output, "ocr-input": .advanced, "layout": .advanced, "placement": .advanced,
+        "marks": .output, "capture": .capture,
+    ]
+
+    /// The line a sheet card or rule box shows: where its stage is set.
+    static func stageNote(_ stage: String) -> String? {
+        stageTabs[stage].map { "Set in \($0.home) too; a change in either place is the same setting." }
     }
 }
 
@@ -408,17 +420,9 @@ struct SheetSwitchRow: View {
 
     var body: some View {
         let sw = row
-        // W47.settings-level-switch: the switch is shown from its key's level up, and below it while it is not its
-        // default (judged on the value the layers resolve, wherever it was set).
-        let builtIn: Bool? = { if case .bool(let b) = sw.key.defaultValue { return b } else { return nil } }()
-        let changed = builtIn.map { $0 != sw.isOn } ?? false
-        if let levelRow = SettingsLevels.rows.first(where: { $0.keys.contains(sw.key.rawValue) }) {
-            SettingsLevelRows(levelRow, changed: changed, reset: builtIn.map { b in { setSwitch(sw.key, b) } }) { toggle(sw) }
-        } else {
-            toggle(sw)
-        }
-        if sw.offersHandDownload { HandPlacerDownloadRow().settingsLevel(.downloads) }
-        if sw.offersScanLayoutDownload { ScanNewspaperLayoutDownloadRow().settingsLevel(.downloads) }
+        toggle(sw)
+        if sw.offersHandDownload { HandPlacerDownloadRow() }
+        if sw.offersScanLayoutDownload { ScanNewspaperLayoutDownloadRow() }
     }
 
     private func toggle(_ sw: SettingsSheetModel.SwitchRow) -> some View {
@@ -456,10 +460,9 @@ struct RuleStageBox: View {
                         .accessibilityIdentifier("ap.sheet.home.\(stage.id)")
                 }
                 ForEach(stage.switches) { sw in SheetSwitchRow(row: sw, setSwitch: setSwitch) }
-                if stage.id == "layout" { NewspaperLayoutDownloadRow().settingsLevel(.downloads) }
+                if stage.id == "layout" { NewspaperLayoutDownloadRow() }
                 if let forms = stage.forms {
-                    SettingsLevelRows(.searchable, changed: !forms.entries.isEmpty,
-                                      reset: { setStrings(.searchableFor, []) }) { formsRow(forms) }
+                    formsRow(forms)
                 }
                 SheetDisclosure("The rules in detail") {
                     VStack(alignment: .leading, spacing: 3) {
@@ -488,7 +491,7 @@ struct RuleStageBox: View {
     }
 }
 
-private struct SearchableFormatControls: View {
+struct SearchableFormatControls: View {
     let forms: SettingsSheetModel.FormsRow
     let setEntries: ([String]) -> Void
     @State private var format = "*"
@@ -599,10 +602,10 @@ struct StageCardView: View {
     var homeNote: String? = nil
     /// The Reading panel leads with the live reader and keeps the measured pick beneath it.
     var activeReader: String? = nil
-    /// W47.settings-level-switch: at Basic the card is the app's pick with its figures; choosing another route starts
-    /// at Standard. A card already set by hand keeps its "Back to the app's pick" at every level.
-    @AppStorage(DefaultsKeys.settingsLevel) private var levelRaw = SettingsLevel.defaultLevel.rawValue
-    private var level: SettingsLevel { SettingsLevel(rawValue: levelRaw) ?? .defaultLevel }
+    /// The Advanced route rows are listed while Settings › Advanced offers them (W49.proc-settings-redesign-core), and
+    /// a card's own choice always.
+    @AppStorage(DefaultsKeys.offerExperimentalRoutes) private var offerExperimental = false
+    private var tier: RouteTier { offerExperimental ? .advanced : .standard }
 
     var body: some View {
         SheetBox {
@@ -758,7 +761,7 @@ struct StageCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.08)))
 
-        if !card.alternatives.isEmpty && level >= SettingsLevels.Row.overrides.level {
+        if !card.alternatives.isEmpty {
             VStack(alignment: .leading, spacing: 2) {
                 Text("Nearest alternatives you could use").font(.caption.weight(.semibold))
                 ForEach(card.alternatives) { a in
@@ -772,16 +775,14 @@ struct StageCardView: View {
     private var routeControls: some View {
         HStack {
             if activeReader != nil, let action = card.apply { applyButton(action) }
-            if level >= SettingsLevels.Row.overrides.level {
-                Menu("Use instead…") {
-                    ForEach(card.options.filter { $0.level <= level || $0.id == card.routeID }) { o in
-                        Button(o.blocked.map { "\(o.name) (\($0))" } ?? o.name) { choose(o.id) }
-                            .disabled(o.blocked != nil || o.id == card.routeID)
-                    }
+            Menu("Use instead…") {
+                ForEach(card.options.filter { $0.tier <= tier || $0.id == card.routeID }) { o in
+                    Button(o.blocked.map { "\(o.name) (\($0))" } ?? o.name) { choose(o.id) }
+                        .disabled(o.blocked != nil || o.id == card.routeID)
                 }
-                .fixedSize()
-                .accessibilityIdentifier("ap.sheet.override.\(card.id)")
             }
+            .fixedSize()
+            .accessibilityIdentifier("ap.sheet.override.\(card.id)")
             if let seeRange {
                 Button("See the range") { seeRange() }
                     .buttonStyle(.link)

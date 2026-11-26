@@ -468,8 +468,8 @@ final class ReviewDialogsJourneyUITests: XCTestCase {
 
     private func documentReviewSetting() throws -> (XCUIElement, XCUIElement, XCUIElement) {
         let settings = app.showSettingsWindow()
-        XCTAssertTrue(app.showSettingsPanel("Documents"))
-        let title = "Review document segmentation"
+        XCTAssertTrue(app.showSettingsPanel("Processing"))
+        let title = "Review document breaks before filing"
         let label = settings.staticTexts.matching(NSPredicate(format: "label == %@ OR value == %@", title, title))
             .firstMatch
         let scroll = settings.scrollViews.firstMatch

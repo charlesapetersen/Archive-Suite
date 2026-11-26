@@ -147,26 +147,22 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertFalse(element("ap.ocr.start").isEnabled)
         attachScreenshot("processor-openrouter-unavailable-estimate")
 
-        openSettings("Collection")
+        openSettings("Processing")
         let settingsEstimate = element("ap.settings.costPane")
         XCTAssertTrue(settingsEstimate.waitForExistence(timeout: 10))
         XCTAssertTrue(renderedText(of: settingsEstimate).contains(removedID))
 
-        XCTAssertTrue(app.showSettingsPanel("Reading"))
-        let currentReader = element("ap.sheet.current.reading")
-        XCTAssertTrue(currentReader.waitForExistence(timeout: 5))
-        XCTAssertTrue(renderedText(of: currentReader).contains(removedID), "the reading card names the unavailable model")
         let warning = element("ap.settings.openRouterUnavailable")
         XCTAssertTrue(warning.waitForExistence(timeout: 10))
         XCTAssertTrue(renderedText(of: warning).contains(removedID))
-        let picker = element("ap.settings.modelPicker")
+        let picker = element("ap.settings.readerPicker")
         XCTAssertTrue(picker.exists)
         XCTAssertTrue(renderedText(of: picker).contains(removedID), picker.debugDescription)
         picker.click()
         app.typeKey(.escape, modifierFlags: [])
         attachScreenshot("processor-openrouter-unavailable-picker")
         picker.click()
-        let replacement = app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", "Gemini 3.8 Flash")).firstMatch
+        let replacement = app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", "OpenRouter · Gemini 3.8 Flash")).firstMatch
         XCTAssertTrue(replacement.waitForExistence(timeout: 5), "the picker offers a pinned replacement")
         replacement.click()
         XCTAssertTrue(waitUntil { !warning.exists }, "an explicit replacement clears the saved-model warning")
@@ -182,18 +178,18 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertFalse(element("ap.ocr.pdfPageCost").exists)
         attachScreenshot("processor-openrouter-image-charge-estimate")
 
-        openSettings("Collection")
+        openSettings("Processing")
         let settingsEstimate = element("ap.settings.costPane")
         XCTAssertTrue(settingsEstimate.waitForExistence(timeout: 10))
         XCTAssertTrue(renderedText(of: settingsEstimate).contains("Price not estimated"))
 
-        XCTAssertTrue(app.showSettingsPanel("Reading"))
-        let picker = element("ap.settings.modelPicker")
+        let picker = element("ap.settings.readerPicker")
         XCTAssertTrue(picker.waitForExistence(timeout: 5))
         let label = "Fixture Image Reader (not measured, price not estimated)"
         XCTAssertTrue(renderedText(of: picker).contains(label), picker.debugDescription)
         picker.click()
-        XCTAssertTrue(app.menuItems[label].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.menuItems.matching(NSPredicate(format: "title CONTAINS %@", label)).firstMatch
+            .waitForExistence(timeout: 5))
         attachScreenshot("processor-openrouter-image-charge-picker")
         app.typeKey(.escape, modifierFlags: [])
     }
@@ -594,7 +590,7 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(waitUntil(10) { self.renderedText(of: filesCost).contains("Claude Code bills its API key") },
                       "Process Files cost display: \(renderedText(of: filesCost))")
         XCTAssertTrue(renderedText(of: element("ap.ocr.localAgentPacing")).contains("cost Claude Code reports"))
-        openSettings("Collection")
+        openSettings("Processing")
         XCTAssertTrue(waitUntil(10) { self.renderedText(of: self.element("ap.settings.costPane"))
             .contains("Claude Code bills its API key") })
         attachScreenshot("processor-local-agent-key-cost")
@@ -615,8 +611,8 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertFalse(element("ap.ocr.startBlockedReason").exists,
                        "no reason line while Start is enabled: \(renderedText(of: element("ap.ocr.startBlockedReason")))")
 
-        // W47.settings-panels: the estimate is a strip in Collection, the CLI's setup is in Accounts.
-        openSettings("Collection")
+        // W49.proc-settings-redesign-core: the estimate is the Processing tab's footer, the CLI's setup is in Accounts.
+        openSettings("Processing")
         let settingsCost = element("ap.settings.costPane")
         XCTAssertTrue(settingsCost.waitForExistence(timeout: 10),
                       "the Settings estimate needs a stable UI-test identity")
@@ -660,6 +656,7 @@ final class ProcessorUITests: XCTestCase {
                        "an empty key field must say it is empty, not read like a stored key")
 
         chooseBackend("API Gateway", in: settings)
+        XCTAssertTrue(app.showSettingsPanel("Advanced"))
         let gatewayFields = ["Gateway URL": "https://…/v1",
                              "Model ID": "The model name the gateway expects",
                              "Display name": "Shown in PDF headers",
@@ -675,15 +672,15 @@ final class ProcessorUITests: XCTestCase {
         attachScreenshot("processor-settings-gateway-fields")
 
         chooseBackend("Local CLI Agent", in: settings)
-        XCTAssertTrue(app.showSettingsPanel("Accounts"))
-        for label in ["CLI path", "Model"] {
+        XCTAssertTrue(app.showSettingsPanel("Advanced"))
+        for label in ["CLI path", "CLI model"] {
             let field = settings.textFields[label]
             XCTAssertTrue(field.waitForExistence(timeout: 5), "the Local CLI \(label) row needs its field")
             XCTAssertTrue((field.placeholderValue ?? "").hasPrefix("Optional"),
                           "the Local CLI \(label) must say it is optional inside the field")
         }
         attachScreenshot("processor-settings-local-cli-fields")
-        XCTAssertTrue(app.showSettingsPanel("Pages and output"))
+        XCTAssertTrue(app.showSettingsPanel("Output"))
         settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -2000)   // down to the image-size fields
         attachScreenshot("processor-settings-size-fields")
 
@@ -713,8 +710,8 @@ final class ProcessorUITests: XCTestCase {
         languages.typeKey(.delete, modifierFlags: [])
         languages.typeKey(.return, modifierFlags: [])
 
-        XCTAssertTrue(app.showSettingsPanel("General"))
-        XCTAssertTrue(app.showSettingsPanel("Reading"))
+        XCTAssertTrue(app.showSettingsPanel("Output"))
+        XCTAssertTrue(app.showSettingsPanel("Processing"))
         XCTAssertTrue(languages.waitForExistence(timeout: 5))
         scrollUntilHittable(languages, in: settings)
         XCTAssertEqual(languages.value as? String, "")
@@ -733,7 +730,7 @@ final class ProcessorUITests: XCTestCase {
         defer { chooseBackend("Direct API", in: settings) }
 
         chooseBackend("Apple Vision (on this Mac)", in: settings)
-        let reader = element("ap.settings.activeReader")
+        let reader = element("ap.settings.readerPicker")
         XCTAssertTrue(waitUntil { renderedText(of: reader).contains("Apple Vision") })
         let languages = element("ap.settings.visionLanguages")
         XCTAssertTrue(languages.exists)
@@ -749,29 +746,29 @@ final class ProcessorUITests: XCTestCase {
         useNoTagging.click()
         XCTAssertTrue(waitUntil { !conflict.exists }, "No tagging must clear the conflict line")
 
-        XCTAssertTrue(app.showSettingsPanel("Pages and output"))
         let batchReason = element("ap.settings.batchModeUnavailable")
         XCTAssertTrue(batchReason.waitForExistence(timeout: 5), "Apple Vision must say batch mode is not used")
         XCTAssertTrue(renderedText(of: batchReason).contains("Apple Vision"), renderedText(of: batchReason))
         XCTAssertFalse(element("ap.settings.batchMode").isEnabled, "Apple Vision must not offer batch mode")
+        XCTAssertTrue(app.showSettingsPanel("Advanced"))
         XCTAssertTrue(renderedText(of: element("ap.settings.ocrWorkersFixed")).contains("performance core"),
                       "Apple Vision's worker row must show the count it uses, not a stepper it ignores")
 
         chooseBackend("Local CLI Agent", in: settings)
-        XCTAssertTrue(app.showSettingsPanel("Pages and output"))
         XCTAssertTrue(waitUntil { renderedText(of: batchReason).contains("subscription") },
                       "the Local CLI Agent must say batch mode is not used: \(renderedText(of: batchReason))")
         XCTAssertFalse(element("ap.settings.batchMode").isEnabled, "the Local CLI Agent must not offer batch mode")
+        XCTAssertTrue(app.showSettingsPanel("Advanced"))
         XCTAssertTrue(renderedText(of: element("ap.settings.ocrWorkersFixed")).contains("At most 2"),
                       "the Local CLI Agent's worker row must match its cap")
         scrollUntilHittable(element("ap.settings.ocrWorkersFixed"), in: settings)
         attachScreenshot("processor-settings-local-cli-backend-match")
-        XCTAssertTrue(app.showSettingsPanel("Collection"))
+        XCTAssertTrue(app.showSettingsPanel("Processing"))
         XCTAssertTrue(renderedText(of: element("ap.settings.costPane")).contains("at most two pages at a time"),
                       "the pacing pane must state the same cap")
 
         chooseBackend("Direct API", in: settings)
-        XCTAssertTrue(app.showSettingsPanel("Pages and output"))
+        XCTAssertTrue(app.showSettingsPanel("Advanced"))
         XCTAssertTrue(waitUntil { !element("ap.settings.ocrWorkersFixed").exists },
                       "the direct route keeps its worker stepper")
     }
@@ -791,14 +788,23 @@ final class ProcessorUITests: XCTestCase {
         }
     }
 
+    /// Chooses a reader in the Processing tab's Reader menu by the backend it stands for (W49.proc-settings-redesign-core:
+    /// one menu replaced the backend, provider and model pickers). "Direct API" is Gemini's first model.
     private func chooseBackend(_ title: String, in settings: XCUIElement) {
-        app.showSettingsPanel("Reading")
-        let picker = element("ap.settings.backendPicker")
+        app.showSettingsPanel("Processing")
+        let picker = element("ap.settings.readerPicker")
+        guard picker.waitForExistence(timeout: 5) else { return XCTFail("Settings needs its Reader menu") }
         if !picker.isHittable { settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: 8000) }
-        guard picker.waitForExistence(timeout: 5) else { return XCTFail("Settings needs its backend picker") }
         picker.click()
-        let item = app.menuItems[title]
-        guard item.waitForExistence(timeout: 3) else { return XCTFail("the backend picker must offer \(title)") }
+        let predicate: NSPredicate
+        switch title {
+        case "Direct API": predicate = NSPredicate(format: "title BEGINSWITH %@", "Gemini · ")
+        case "API Gateway": predicate = NSPredicate(format: "title BEGINSWITH %@", "Gateway")
+        case "Local CLI Agent": predicate = NSPredicate(format: "title ENDSWITH %@", "on its own sign-in")
+        default: predicate = NSPredicate(format: "title == %@", title)
+        }
+        let item = app.menuItems.matching(predicate).firstMatch
+        guard item.waitForExistence(timeout: 3) else { return XCTFail("the Reader menu must offer \(title)") }
         item.click()
     }
 
@@ -975,7 +981,7 @@ final class ProcessorUITests: XCTestCase {
     /// W40.fix-processor-visual-polish: the name prompt takes typing at once (as an alert it opened with the focus on
     /// Cancel and no caret in the field). Since W46.settings-layers the prompt is New Project's; Escape writes nothing.
     func testNewProjectTakesTheNameWithoutAClick() throws {
-        openSettings("Collection")
+        openSettings("Processing")
         let save = app.buttons["New project…"]
         XCTAssertTrue(save.waitForExistence(timeout: 10), "Settings must offer New project")
         save.click()
@@ -1080,7 +1086,7 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(element("ap.ocr.reOCRExplanation").waitForExistence(timeout: 10))
         XCTAssertFalse(save.exists, "A later intake must keep the saved answers and suppress the automatic sheet.")
         XCTAssertEqual(try Data(contentsOf: settings), saved)
-        openSettings("Collection")
+        openSettings("Processing")
         let answer = app.buttons["Answer again…"]
         XCTAssertTrue(answer.waitForExistence(timeout: 5))
         answer.click()
@@ -1121,7 +1127,7 @@ final class ProcessorUITests: XCTestCase {
 
     /// W46.settings-interviews: Settings' collection section opens the collection interview, and Skip saves nothing.
     func testCollectionInterviewOpensFromSettings() throws {
-        openSettings("Collection")
+        openSettings("Processing")
         let answer = app.buttons["Answer…"]
         XCTAssertTrue(answer.waitForExistence(timeout: 10), "a collection with no answers must offer the interview")
         answer.click()
@@ -1147,7 +1153,7 @@ final class ProcessorUITests: XCTestCase {
 
     /// W46.settings-interviews: a new project is asked about its material as soon as it is named.
     func testNewProjectAsksAboutItsMaterial() throws {
-        openSettings("Collection")
+        openSettings("Processing")
         let newProject = app.buttons["New project…"]
         XCTAssertTrue(newProject.waitForExistence(timeout: 10), "Settings must offer New project")
         newProject.click()
@@ -1364,7 +1370,7 @@ final class ProcessorUITests: XCTestCase {
         }
     }
 
-    /// Brings up Settings and, when `panel` is given, shows that panel (W47.settings-panels).
+    /// Brings up Settings and, when `panel` is given, shows that tab (W49.proc-settings-redesign-core).
     private func openSettings(_ panel: String? = nil) {
         app.showSettingsWindow()
         if let panel { XCTAssertTrue(app.showSettingsPanel(panel), "Settings must have a \(panel) panel") }
@@ -1418,12 +1424,12 @@ enum UITestLaunch {
     /// open-file requests and starts this `WindowGroup` with no Process Files window at all.
     static let deterministicWindowState = ["-NSTreatUnknownArgumentsAsOpen", "NO"]
 
-    /// W47.settings-level-switch: Settings shows every row unless a test asks for a level itself, so the suites that
-    /// drive a Standard or Advanced control find it. What each level shows is `SettingsLevelsUITests`' subject.
-    static let allSettingsShown = ["-settingsLevel", "advanced"]
+    /// W49.proc-settings-redesign-core: the lower-scoring and experimental choices are offered unless a test sets the
+    /// switch itself, so the suites that drive such a route find it.
+    static let allSettingsShown = ["-offerExperimentalRoutes", "YES"]
 
     static func arguments(_ extra: [String]) -> [String] {
-        deterministicWindowState + (extra.contains("-settingsLevel") ? [] : allSettingsShown) + extra
+        deterministicWindowState + (extra.contains("-offerExperimentalRoutes") ? [] : allSettingsShown) + extra
     }
 }
 

@@ -1,13 +1,12 @@
 import XCTest
 
-/// The Settings window's eight panels (W47.settings-panels) for the UI suite: the window is found by any panel's
-/// identifier, and a panel is shown by its toolbar button.
+/// The Settings window's five tabs (W49.proc-settings-redesign-core) for the UI suite: the window is found by any tab's
+/// identifier, and a tab is shown by its toolbar button.
 extension XCUIApplication {
-    /// The design's panels, in the toolbar's order.
-    static let settingsPanels = ["General", "Collection", "Reading", "Documents", "Dates and names",
-                                 "Pages and output", "Capture", "Accounts"]
+    /// The design's tabs, in the toolbar's order.
+    static let settingsPanels = ["Processing", "Output", "Capture", "Accounts", "Advanced"]
 
-    /// The Settings window, whichever panel it shows.
+    /// The Settings window, whichever tab it shows.
     var settingsWindow: XCUIElement {
         windows.containing(NSPredicate(format: "identifier BEGINSWITH %@", "ap.settings.panel.")).firstMatch
     }
@@ -22,13 +21,13 @@ extension XCUIApplication {
         return window
     }
 
-    /// The toolbar button of the Settings panel titled `title`.
+    /// The toolbar button of the Settings tab titled `title`.
     func settingsPanelButton(_ title: String) -> XCUIElement {
         settingsWindow.toolbars.descendants(matching: .any)
             .matching(NSPredicate(format: "label == %@ OR title == %@", title, title)).firstMatch
     }
 
-    /// Shows the Settings panel titled `title` by its toolbar button; false when there is no such button.
+    /// Shows the Settings tab titled `title` by its toolbar button; false when there is no such button.
     @discardableResult
     func showSettingsPanel(_ title: String) -> Bool {
         let window = settingsWindow
@@ -40,10 +39,16 @@ extension XCUIApplication {
         return window.descendants(matching: .any)[id].firstMatch.waitForExistence(timeout: 5)
     }
 
-    /// A panel's identifier suffix (`SettingsPanel.rawValue`).
-    static func settingsPanelID(_ title: String) -> String {
-        ["General": "general", "Collection": "collection", "Reading": "reading", "Documents": "documents",
-         "Dates and names": "datesAndNames", "Pages and output": "pagesAndOutput", "Capture": "capture",
-         "Accounts": "accounts"][title] ?? title
+    /// A tab's identifier suffix (`SettingsTab.rawValue`).
+    static func settingsPanelID(_ title: String) -> String { title.lowercased() }
+
+    /// Chooses `title` in the Processing tab's Reader menu (the tab must be showing).
+    func chooseReader(_ title: String, file: StaticString = #filePath, line: UInt = #line) {
+        let picker = settingsWindow.descendants(matching: .any)["ap.settings.readerPicker"].firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 10), "the Reader menu", file: file, line: line)
+        picker.click()
+        let item = menuItems[title].firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 5), "the Reader menu offers \(title)", file: file, line: line)
+        item.click()
     }
 }

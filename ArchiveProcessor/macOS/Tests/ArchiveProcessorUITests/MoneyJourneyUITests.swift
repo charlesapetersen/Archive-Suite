@@ -196,7 +196,7 @@ final class MoneyJourneyUITests: XCTestCase {
 
             if storedBatch {
                 let settings = app.showSettingsWindow()
-                XCTAssertTrue(app.showSettingsPanel("Pages and output"))
+                XCTAssertTrue(app.showSettingsPanel("Processing"))
                 let toggle = settings.descendants(matching: .any)["ap.settings.batchMode"].firstMatch
                 XCTAssertTrue(toggle.waitForExistence(timeout: 5))
                 reveal(toggle, in: settings.scrollViews.firstMatch)
@@ -273,8 +273,10 @@ final class MoneyJourneyUITests: XCTestCase {
         XCTAssertEqual(Set(final.map(\.digest)).count, 5)
 
         let settings = app.showSettingsWindow()
-        XCTAssertTrue(app.showSettingsPanel("General"))
-        settings.buttons["Answer the setup questions…"].click()
+        XCTAssertTrue(app.showSettingsPanel("Processing"))
+        let setup = settings.buttons["Answer the setup questions…"]
+        reveal(setup, in: settings.scrollViews.firstMatch)
+        setup.click()
         let sheet = settings.sheets.firstMatch
         XCTAssertTrue(sheet.waitForExistence(timeout: 10))
         let ledger = text(containing: "Process Files and Live Capture count requests as they are sent.")

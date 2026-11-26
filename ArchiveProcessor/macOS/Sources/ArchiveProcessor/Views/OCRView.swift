@@ -795,7 +795,7 @@ struct OCRView: View {
                             .font(.caption2).foregroundStyle(.primary)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("ap.ocr.reOCRExplanation")
-                        if let home = SettingsPanelOwnership.shortcutNote(DefaultsKeys.taggingModeRaw) {
+                        if let home = SettingsTabOwnership.shortcutNote(DefaultsKeys.taggingModeRaw) {
                             Text(home).font(.caption2).foregroundStyle(.primary)
                                 .fixedSize(horizontal: false, vertical: true)
                                 .accessibilityIdentifier("ap.ocr.taggingHome")
@@ -820,7 +820,7 @@ struct OCRView: View {
                                     ? "for the \(segmentationPageCount) page\(segmentationPageCount == 1 ? "" : "s") dropped"
                                     : "per 100 pages",
                                 routes: $segmentationRoutes,
-                                shortcutNote: SettingsPanelOwnership.shortcutNote(DefaultsKeys.segmentationApproach))
+                                shortcutNote: SettingsTabOwnership.shortcutNote(DefaultsKeys.segmentationApproach))
                                 .disabled(isPDFOnlyReOCR)
                             // A greyed chooser says why, as Tagging does (W40.fix-processor-start-why).
                             if isPDFOnlyReOCR {

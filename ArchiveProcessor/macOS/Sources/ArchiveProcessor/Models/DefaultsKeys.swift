@@ -128,8 +128,9 @@ enum DefaultsKeys {
     static let keychainExplained = "keychainExplained"
     /// The general interview (W46.settings-interviews) has been shown once, answered or skipped.
     static let hasSeenGeneralInterview = "hasSeenGeneralInterview"
-    /// W47.settings-level-switch: which rows the Settings window shows (`SettingsLevel`). Absent ⇒ Basic.
-    static let settingsLevel = "settingsLevel"
+    /// W49.proc-settings-redesign-core: Settings › Advanced › "Offer lower-scoring and experimental choices" — the
+    /// Advanced route rows (`RouteTier`) are offered in the pickers and the settings sheet. Absent ⇒ off.
+    static let offerExperimentalRoutes = "offerExperimentalRoutes"
     /// The segmentation approach `SegmentationApproach.preselect` saved for the user: the app's pick, not their change.
     static let segmentationApproachPreselected = "segmentationApproachPreselected"
 

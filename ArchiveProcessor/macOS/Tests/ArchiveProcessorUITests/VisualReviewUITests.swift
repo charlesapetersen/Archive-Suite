@@ -146,7 +146,7 @@ final class VisualReviewUITests: XCTestCase {
     private func settingsWindow() {
         let settings = openSettings()
         guard let settings else { missing.append("Settings window"); return }
-        // W47.settings-panels: each of the eight panels, scrolled through.
+        // W49.proc-settings-redesign-core: each of the five tabs, scrolled through.
         for panel in XCUIApplication.settingsPanels {
             guard app.showSettingsPanel(panel) else { missing.append("Settings panel \(panel)"); continue }
             pause(0.5)
@@ -154,7 +154,7 @@ final class VisualReviewUITests: XCTestCase {
             shoot(slug)
             scrollSettings(settings, name: slug)
         }
-        app.showSettingsPanel("Reading")
+        app.showSettingsPanel("Processing")
         pause(0.5)
 
         // A help popover (one is enough: they share one view).
@@ -166,15 +166,15 @@ final class VisualReviewUITests: XCTestCase {
             escape()
         } else { missing.append("help button") }
 
-        app.showSettingsPanel("Collection")
+        app.showSettingsPanel("Processing")
         if clickButton("New project…") {
             pause(0.8)
             shoot("settings-new-project-sheet")
             cancel()
         }
 
-        app.showSettingsPanel("Reading")
-        scrollSettings(settings, name: "settings-reading-to-models")
+        app.showSettingsPanel("Advanced")
+        scrollSettings(settings, name: "settings-advanced-to-models")
         if clickButton("Manage custom models…") {
             if waitForSheet() {
                 shoot("settings-manage-models")
@@ -370,34 +370,35 @@ final class VisualReviewUITests: XCTestCase {
     }
 
     private func chooseBackend(_ title: String) -> Bool {
-        app.showSettingsPanel("Reading")
-        let picker = element("ap.settings.backendPicker")
-        guard picker.waitForExistence(timeout: 3) else { missing.append("backend picker"); return false }
+        app.showSettingsPanel("Processing")
+        let picker = element("ap.settings.readerPicker")
+        guard picker.waitForExistence(timeout: 3) else { missing.append("Reader menu"); return false }
         for _ in 0..<8 where !picker.isHittable {
             app.settingsWindow.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -300)
             pause(0.4)
         }
         picker.click()
-        let item = app.menuItems[title]
+        // One Reader menu stands for the old backend picker (W49.proc-settings-redesign-core).
+        let predicate: NSPredicate
+        switch title {
+        case "API Gateway": predicate = NSPredicate(format: "title BEGINSWITH %@", "Gateway")
+        case "Local CLI Agent": predicate = NSPredicate(format: "title ENDSWITH %@", "on its own sign-in")
+        default: predicate = NSPredicate(format: "title == %@", title)
+        }
+        let item = app.menuItems.matching(predicate).firstMatch
         guard item.waitForExistence(timeout: 3) else { missing.append("backend \(title)"); escape(); return false }
         item.click()
         pause(1)
         return true
     }
 
-    /// W46.settings-sheet: the settings sheet from Settings (the reading card's See the range, W47.settings-panels),
-    /// its three tabs, each scrolled through.
+    /// W46.settings-sheet: the settings sheet from Settings (the Processing tab's "Compare routes & trade-offs…",
+    /// W49.proc-settings-redesign-core), its three tabs, each scrolled through.
     private func settingsSheet(_ settings: XCUIElement) {
-        app.showSettingsPanel("Reading")
-        let button = element("ap.sheet.seeRange.reading")
-        guard button.waitForExistence(timeout: 3) else { missing.append("See the range link"); return }
-        let form = settings.scrollViews.firstMatch
-        form.scroll(byDeltaX: 0, deltaY: 4000)
-        for _ in 0..<10 where !button.isHittable {
-            form.scroll(byDeltaX: 0, deltaY: -200)
-            pause(0.4)
-        }
-        guard button.isHittable else { missing.append("See the range link (not reachable)"); return }
+        app.showSettingsPanel("Processing")
+        let button = element("ap.settings.compareRoutes")
+        guard button.waitForExistence(timeout: 3) else { missing.append("Compare routes button"); return }
+        guard button.isHittable else { missing.append("Compare routes button (not reachable)"); return }
         button.click()
         if waitForSheet(), element("ap.sheet").waitForExistence(timeout: 5) {
             // The link opens the Range tab; the tour starts from Choices.
@@ -422,8 +423,6 @@ final class VisualReviewUITests: XCTestCase {
         } else { missing.append("settings sheet") }
         if !clickButton("Done") { escape() }
         pause(0.5)
-        form.scroll(byDeltaX: 0, deltaY: 4000)
-        pause(0.3)
     }
 
     /// The sheet's page scrolled a screenful at a time, one shot each, until it stops moving.

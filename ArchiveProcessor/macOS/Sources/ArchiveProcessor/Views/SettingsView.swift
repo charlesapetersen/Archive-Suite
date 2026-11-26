@@ -30,48 +30,41 @@ struct HelpButton: View {
     }
 }
 
-/// The app's durable settings, in the native Settings window (⌘,) as eight panels in the standard toolbar
-/// (W47.settings-panels; `execution-plans/processing-review/settings-design/levels.md` §2). Each panel is one form and
-/// owns its settings (`SettingsPanelOwnership`); Process Files' Tagging picker and segmentation chooser and the settings
-/// sheet write the same `@AppStorage`/UserDefaults keys and layers as shortcuts, and say where the setting lives.
+/// The app's durable settings, in the native Settings window (⌘,) as five tabs in the standard toolbar
+/// (W49.proc-settings-redesign-core; `execution-plans/processor-settings-redesign.md` §5, Option B, approved by the owner
+/// 2026-11-25). Every tab is one form at one window size, so the window never jumps; the tabs share one scope (general
+/// defaults or the output folder's collection, `SettingsScopeModel`). Process Files' Tagging picker and segmentation
+/// chooser write the same keys as shortcuts and say where the setting lives.
 struct SettingsView: View {
-    @State private var panel: SettingsPanel = .general
+    @State private var tab: SettingsTab = .processing
+    @StateObject private var scope = SettingsScopeModel()
+    @ObservedObject private var store = SettingsLayerStore.shared
+    @AppStorage(DefaultsKeys.outputDirectory) private var outputPath: String = ""
+
+    static let size = CGSize(width: 660, height: 620)
 
     var body: some View {
-        TabView(selection: $panel) {
-            ForEach(SettingsPanel.allCases) { p in
-                content(p)
-                    .frame(width: 720, height: p.height)
-                    .accessibilityIdentifier("ap.settings.panel.\(p.rawValue)")
-                    .tabItem { Label(p.title, systemImage: p.symbol) }
-                    .tag(p)
+        TabView(selection: $tab) {
+            ForEach(SettingsTab.allCases) { t in
+                content(t)
+                    .frame(width: Self.size.width, height: Self.size.height)
+                    .accessibilityIdentifier("ap.settings.panel.\(t.rawValue)")
+                    .tabItem { Label(t.title, systemImage: t.symbol) }
+                    .tag(t)
             }
         }
+        .environmentObject(scope)
+        .onChange(of: outputPath) { _, _ in scope.reload() }
+        .onChange(of: store.collectionRevision) { _, _ in scope.reload() }
     }
 
-    @ViewBuilder private func content(_ p: SettingsPanel) -> some View {
-        switch p {
-        case .general: SettingsGeneralPanel()
-        case .collection: SettingsCollectionPanel()
-        case .reading: SettingsReadingPanel()
-        case .documents: SettingsDocumentsPanel()
-        case .datesAndNames: SettingsDatesNamesPanel()
-        case .pagesAndOutput: SettingsPagesOutputPanel()
-        case .capture: SettingsCapturePanel()
-        case .accounts: SettingsAccountsPanel()
-        }
-    }
-}
-
-private extension SettingsPanel {
-    /// Each panel's height: General's few rows sit in a short window, the panels with a stage card get room for it.
-    var height: CGFloat {
-        switch self {
-        case .general:
-            // Leave room below the longest wrapped Settings shown explanation.
-            return 272
-        case .capture, .accounts: return 560
-        default: return 660
+    @ViewBuilder private func content(_ t: SettingsTab) -> some View {
+        switch t {
+        case .processing: SettingsProcessingTab(showAdvanced: { tab = .advanced })
+        case .output: SettingsOutputTab()
+        case .capture: SettingsCaptureTab()
+        case .accounts: SettingsAccountsTab()
+        case .advanced: SettingsAdvancedTab()
         }
     }
 }

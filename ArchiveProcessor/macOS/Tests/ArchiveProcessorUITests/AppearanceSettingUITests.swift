@@ -104,8 +104,11 @@ final class AppearanceSettingUITests: XCTestCase {
     private func showSettings() throws -> XCUIElement {
         let settings = app.showSettingsWindow()
         XCTAssertTrue(settings.exists, "Settings should come up")
-        XCTAssertTrue(app.showSettingsPanel("General"), "Appearance is in the General panel")
+        XCTAssertTrue(app.showSettingsPanel("Processing"), "Appearance is in the Processing tab")
         XCTAssertTrue(appearancePicker().waitForExistence(timeout: 5), "Settings should offer the Appearance picker")
+        for _ in 0..<15 where !appearancePicker().isHittable {
+            settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -180)
+        }
         LayoutGuard.waitUntilSettled(settings)
         return settings
     }

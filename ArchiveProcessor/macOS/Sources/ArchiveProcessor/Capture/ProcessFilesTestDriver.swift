@@ -197,10 +197,10 @@ enum ProcessFilesTestDriver {
                 outputCostPer1M: env["PROCESSFILES_GATEWAY_OUT_PER_1M"].flatMap(Double.init))
         }
         // W49.proc-suspects-messages (S-025): PROCESSFILES_GATEWAY_PRESET=openai fills the gateway's fields as Settings'
-        // "Fill in OpenAI preset" does (`SettingsReadingPanel.applyOpenAIGatewayPreset`); send it to the stand-in with
+        // "Fill in OpenAI preset" does (`SettingsAdvancedTab.applyOpenAIGatewayPreset`); send it to the stand-in with
         // PROCESSFILES_REDIRECT_URL.
         if env["PROCESSFILES_GATEWAY_PRESET"] == "openai" {
-            let m = SettingsReadingPanel.openAIGatewayPresetModel
+            let m = SettingsAdvancedTab.openAIGatewayPresetModel
             gateway = GatewayConfig(baseURL: OpenAICompatibleClient.openAIBaseURL, modelID: m.id,
                                     displayName: "OpenAI", inputCostPer1M: m.inputCostPer1M, outputCostPer1M: m.outputCostPer1M)
         }

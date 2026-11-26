@@ -47,7 +47,7 @@ final class NamesEstimateJourneyUITests: XCTestCase {
         // Enter numeric prices through their real fields. Launch arguments are strings, while
         // GatewayConfig reads stored numeric values; the earlier driver bypasses that distinction.
         app.showSettingsWindow()
-        XCTAssertTrue(app.showSettingsPanel("Reading"))
+        XCTAssertTrue(app.showSettingsPanel("Advanced"))
         for (label, price) in [("Input $/1M tokens", "2"), ("Output $/1M tokens", "10")] {
             let field = app.settingsWindow.textFields[label]
             XCTAssertTrue(field.waitForExistence(timeout: 5))
@@ -67,7 +67,7 @@ final class NamesEstimateJourneyUITests: XCTestCase {
         XCTAssertTrue(before.contains("$0.0310"))
         shot("s044-before-names")
         app.showSettingsWindow()
-        XCTAssertTrue(app.showSettingsPanel("Collection"))
+        XCTAssertTrue(app.showSettingsPanel("Processing"))
         let answer = app.buttons["Answer…"]
         XCTAssertTrue(answer.waitForExistence(timeout: 10)); answer.click()
         let save = app.descendants(matching: .any)["ap.collectionInterview.save"]
