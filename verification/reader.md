@@ -1158,3 +1158,42 @@ bundles are `ArchiveReaderTests` (unit, app-hosted), `ArchiveReaderUITests` (XCU
   - 2026-10-31 W48.appearance-reader — row written, `unproven`. The builder's VM runs:
     [`evidence/reader/W48.appearance-reader.md`](evidence/reader/W48.appearance-reader.md).
   - 2026-11-04 W48.appearance-verify — re-checked at HEAD in the VM by a session that did not build it: every promise holds, Light and Dark, by setting, with System seen under a Light and a Dark guest; the uncovered sheet, the viewer, the relaunch and the argument; audits and both tours pass. The check made two test fixes on the way (the tour's row click, the covered sheet). `works`: [`evidence/reader/W48.appearance-verify.md`](evidence/reader/W48.appearance-verify.md).
+
+---
+
+## Never-executed code (W40.e4)
+
+`W40.e4` ran the Reader's unit and UI tests in the VM with code coverage, plus ArchiveCore's unit tests, and listed
+every Reader function no run executed: **139 of 2,092** (1,061 of 22,658 executable lines). Each group below is
+a question for this ledger, not a status change: **dead** (no caller: delete it?), **unreachable** (callers, but
+no path a user takes: wire it or drop it?), **untested** (a user reaches it, no test does: which test should?).
+Function lists, callers and the full question for each group:
+[`evidence/reader/W40.e4-never-reached.md`](evidence/reader/W40.e4-never-reached.md) (`.tsv` beside it); the
+run table: [`evidence/core/W40.e4-coverage.md`](evidence/core/W40.e4-coverage.md).
+
+Caveat: 11 UI tests failed in the coverage run (AccessibilityAudit ×4, Container ×2, DocumentPaneKeys ×2,
+Rotation ×2, Navigation ×1). Four Container functions are listed only because their tests failed early; rerun
+those green before acting on the Container rows. The Reader journeys (`processed`, `rehearsal`) are not in the union.
+
+| Group | Class | Rows |
+|---|---|---|
+| Catalogue-backed library: edits, columns, filters (20 functions) | untested | no row: none of the catalogue edit paths has one |
+| Container Inspector editing; Container Levels sheet; container warnings in Library health | untested | no row; R-40 |
+| Item fields for a selection, live sidecar refresh | untested | no row |
+| Zotero export and Add to Zotero | untested | no row |
+| Row right-click menu: all 16 action trampolines | untested | R-19, R-30, R-31, R-32, R-33, R-42 |
+| Reveal in Finder / Open in Default App / reveal shown image | untested | R-32, R-43 |
+| Improve OCR errors and receipt reload; Tags menu with a document window in front | untested | no row; R-35 |
+| Inspector Read/Unread and Toggle flag; Next/Previous Unread; Select Document Run | untested | R-22, R-30, R-20, R-33 |
+| Tag cloud "Select files"; subject token field and ⌘L; Sort menu and secondary sort | untested | R-18, R-08, R-06 |
+| List cells (quality pop-up press, Read-cell drag); choosing the archive folder; Excluded folders ▸ Add | untested | R-24, R-25, R-01, R-41 |
+| Advanced Search folder rule and date validation; year-range date popover | untested | no row (R-16 mentions Advanced Search) |
+| Document window splitter and swipe; HTML Copy Link; archive link while the JPEG index scans | untested | R-35, R-31, R-44 |
+| FSEvents full rescan merged into pending paths; content index SQLite errors | untested | R-03, R-12 |
+| Ten production functions with no caller (`AuditLedger.lastError`, both `snippets(expression:…)`, `NavigationModel.groupSummary`, …) | dead | no row |
+| DEBUG test seams for the at-size lane | dead (test-only) | R-11 |
+| `ViewerSwitchProbe` (DEBUG perf probe, `-ARSwitchProbe`) | unreachable | no row |
+| AppKit/Swift conformance stubs never invoked | unreachable | no row |
+
+Four features in the code have no row here: catalogue-backed editing, Zotero export, item fields, and Advanced
+Search with its date popover. Whether a guide promises each (a row) or none does (a doc gap) is a `W40.b5` question.
