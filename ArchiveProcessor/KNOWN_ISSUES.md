@@ -484,7 +484,7 @@ When label reading needs Gemma, the Processor checks the existing local servers 
   pages costs about 9.5 s of switching on top of Gemma's 12–14 s read, and the peak stays at Gemma's 9.8 GiB
   ([`segbench-results/ct-gemma-swap.md`](segbench-results/ct-gemma-swap.md), which also weighs batching labels and
   Vision + parser alone). On a server the user runs the app cannot restart it; LM Studio and Ollama are unmeasured.
-  (asked: W49.proc-gemma-external-switch-owner-ok).
+  (queued: W49.proc-gemma-external-switch).
 - **A local address is trusted.** Only a loopback address is asked, but a proxy there that forwards to a cloud model,
   or redirects, cannot be told apart from a local server; Ollama's `-cloud` tags are refused by name. (accepted: a loopback server is the user's own; a forwarding proxy there is their choice).
 - **Process Files has no card.** Its labels are written as proposals (source `label`), to confirm in the Reader's
@@ -1198,7 +1198,7 @@ included, at a 7.71 GB peak. Open:
 - **Live Capture labels with a managed page reader** go to the Gemma label reader, so the supervisor stops the page
   model and loads Gemma for each label and back (about 9.5 s of switching a label, `segbench-results/ct-gemma-swap.md`);
   never both in memory. Whether to keep that, read labels with Vision and the parser during such a session, or batch
-  them is the question already asked for a user's own server. (asked: W49.proc-gemma-external-switch-owner-ok)
+  them is decided (owner, 2026-11-26 walkthrough: batch labels to Finish). (queued: W49.proc-gemma-external-switch)
 
 ## ⚠️ LIMITATION (W41.app-page-kind, 2026-10-16): what choosing each page's reader by its kind does not yet cover
 
