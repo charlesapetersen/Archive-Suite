@@ -1304,7 +1304,8 @@ is active:
 **Answered HOLD gates (doc-fix, 2026-11-08).** The three passes deliberately never touch HOLD. When its
 answered detail grows the plan over budget, an assigned doc-fix session can run
 `bash ops/autonomous/plan-edit.sh "$PLAN" archive-answered`. Under the same stable plan lock, this appends
-eligible completed answers verbatim to `.maintenance/AUTONOMOUS_HOLD_QUEUE_ARCHIVE.md`, flushes them to disk,
+eligible completed answers (a ticked gate whose text records an answer: `OWNER ANSWERED`, or the older hand-written
+`ANSWERED by the owner`, `AUTHORIZED by the owner`, `AUTHORIZED AND SHIPPED`, `ANSWERED <date>`) verbatim to `.maintenance/AUTONOMOUS_HOLD_QUEUE_ARCHIVE.md`, flushes them to disk,
 then replaces each with a completed tag and a mandatory read-before-dependent-work link. Every answer and
 constraint still binds. Open gates, ambiguous separated continuations, section narrative and the unwalked
 Daemon Report stay inline. A stub stays while any line of the plan or `SUITE_TODO.md` names its gate, so the tag

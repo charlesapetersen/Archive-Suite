@@ -65,6 +65,14 @@ def pending_entries(body):
     return entries
 
 
+# An answered gate's marker. `approve` writes "OWNER ANSWERED"; gates answered by hand before it existed say
+# "ANSWERED by the owner", "AUTHORIZED by the owner", "AUTHORIZED AND SHIPPED" or "ANSWERED <date>". Matching
+# only the first left 17 such gates (10 KB) inline for good and put the plan over budget (gate-fix, 2026-11-25).
+# A ticked gate with none of these (no answer written in it) stays inline.
+ANSWERED = re.compile(r"OWNER ANSWERED|ANSWERED by the owner|AUTHORIZED by the owner|AUTHORIZED AND SHIPPED"
+                      r"|ANSWERED \d{4}-\d\d-\d\d")
+
+
 def entries(body):
     """(tag, start, end-of-item-span) for every checkbox entry, any state, by the resolver's span rule:
     an item runs to the next checkbox, blank line or heading."""
@@ -176,7 +184,7 @@ def edit(plan, action, values):
             moves = []
             for tag, lo, hi in entries(body):
                 original = body[lo:hi]
-                if not re.match(r"^[-*]\s+\[[xX]\]", original) or "OWNER ANSWERED" not in original:
+                if not re.match(r"^[-*]\s+\[[xX]\]", original) or not ANSWERED.search(original):
                     continue
                 if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", tag) or tag == "?":
                     raise ValueError("invalid answered gate tag")

@@ -36,9 +36,14 @@ with tempfile.TemporaryDirectory(prefix="plan archive with space ") as scratch:
                  + "\n\n  A separated paragraph may belong to this answer.\n\n")
     fenced = ("```md\n- [x] **W1.fake — quoted** — OWNER ANSWERED: " + "quoted only. " * 25
               + "\n```\n")
+    legacy = ("- [x] **W1.legacy-ok — OWNER GATE for W1.legacy. ✅ AUTHORIZED by the owner 2026-08-01** "
+              + "direction (a) binds; (b) was declined. " * 8 + "\n")
+    dated = ("- [x] **W1.dated-ok — OWNER GATE: publish?** ANSWERED 2026-10-11 (walkthrough): yes. "
+             + "pushed as abc1234. " * 10 + "\n")
+    unmarked = "- [x] **W1.unmarked-ok — OWNER GATE: publish the weights? " + "no answer written here. " * 10 + "**\n"
     prose = "### Historical context\nThis is not an answered gate.\n\n"
     suffix = "## RECURRING\n- [x] **W1.due**\n## Session Log\nkeep log\n## Daemon Report\nkeep question\n"
-    original = prefix + answered + "\n" + open_gate + "\n" + ambiguous + prose + fenced + suffix
+    original = prefix + answered + "\n" + legacy + dated + unmarked + "\n" + open_gate + "\n" + ambiguous + prose + fenced + suffix
     plan.write_text(original)
     command = ["bash", str(HERE / "plan-edit.sh"), str(plan), "archive-answered"]
 
@@ -73,6 +78,11 @@ with tempfile.TemporaryDirectory(prefix="plan archive with space ") as scratch:
 
     after = plan.read_text()
     check(answered in archive.read_text(), "full Unicode answer and contiguous constraints preserved verbatim")
+    check(legacy in archive.read_text() and dated in archive.read_text()
+          and legacy not in after and dated not in after,
+          "gates answered before the OWNER ANSWERED marker existed are archived verbatim too (their uncited stubs drop)")
+    check(unmarked in after and "W1.unmarked-ok" not in archive.read_text(),
+          "a ticked gate with no answer written in it stays inline")
     check(after.startswith(prefix) and after.endswith(suffix), "all sections outside HOLD stay byte-identical")
     check(open_gate in after and ambiguous in after and prose in after and fenced in after,
           "open gates, ambiguous continuations, narrative and fenced examples stay unchanged")
