@@ -233,16 +233,24 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
         // changes; otherwise it could fire mid-load and put the old graph in the new store's mirror.
         await flushPendingMirror()
         self.storeRoot = storeRoot
+        isLoadingGraph = true
         do {
             try await loadGraph(storeRoot: storeRoot)
         } catch {
+            isLoadingGraph = false
             didLoadGraph = false
+            // Nothing from the half-built graph may reach the mirror.
+            cancelPendingDebounce()
+            mirrorDirty = false
             showMirrorReadOnly(storeRoot: storeRoot)
             throw error
         }
+        isLoadingGraph = false
         didLoadGraph = true
         isReadOnlyMirror = false
         readOnlyMirrorRoot = nil
+        // A debounce that fired mid-load left its write pending; start it now the graph is whole.
+        if mirrorDirty, pendingDebounce == nil { startMirrorWrite() }
     }
 
     private func loadGraph(storeRoot: URL) async throws {
@@ -297,7 +305,23 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
             }
             memberships = try await index.allMemberships()
         }
+        // A quit that skipped `willTerminate` (a crash, a force quit) can end inside a write's debounce:
+        // SQLite has the change and the mirror does not. Catch the mirror up on the next launch, and
+        // leave a file that already matches alone (W49.notes-org-export-async).
+        if !shouldExportOrganization, !mirrorMatchesGraph(at: storeRoot) { shouldExportOrganization = true }
         if shouldExportOrganization { exportOrganization() }
+    }
+
+    /// Whether `organization.json` at `storeRoot` holds the graph now in memory. Dates are left out:
+    /// they round-trip through the file's seconds-since-1970 encoding and need not compare equal.
+    private func mirrorMatchesGraph(at storeRoot: URL) -> Bool {
+        guard let file = OrganizationFile.load(from: storeRoot) else { return false }
+        func byId(_ f: [VFolder]) -> [VFolder] { f.sorted { $0.id.uuidString < $1.id.uuidString } }
+        func edges(_ m: [Membership]) -> [String] { m.map { "\($0.folderId)/\($0.itemId)" }.sorted() }
+        func links(_ a: [TemplateAssignment]) -> [String] { a.map { "\($0.folderId)/\($0.templateId)" }.sorted() }
+        return byId(file.folders) == byId(folders)
+            && edges(file.memberships) == edges(memberships)
+            && links(file.assignments) == links(assignments)
     }
 
     /// Show the folders while the index cannot be opened (W40.fix-notes-index-failure-empty). Reads
@@ -922,6 +946,19 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     private(set) var mirrorWriteCount = 0
     /// Where every mirror encode and write runs, one at a time, in order.
     private let mirrorQueue = DispatchQueue(label: "ArchiveNotes.OrganizationStore.mirror", qos: .utility)
+    private let mirrorGate = MirrorWriteGate()
+    /// `true` while `load` is building the graph; writes wait for it to finish.
+    private var isLoadingGraph = false
+
+    #if DEBUG
+    /// A change not yet snapshotted into a write (dirty, or waiting for its debounce). Tests only.
+    var hasUnsnapshottedMirrorChange: Bool { mirrorDirty || pendingDebounce != nil }
+
+    /// Park the write queue until `release` is signalled, so a test can line writes up behind it.
+    func holdMirrorQueue(until release: DispatchSemaphore) {
+        mirrorQueue.async { release.wait() }
+    }
+    #endif
 
     /// `true` from a mutation until the write that carries it has landed on `mirrorFailure`.
     var isMirrorWritePending: Bool {
@@ -949,22 +986,28 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
     /// Snapshot the graph now and queue its write after any write already running.
     private func startMirrorWrite() {
         guard mirrorDirty else { return }
+        // Mid-`load` the graph in memory may be half built: keep the change pending until it is whole.
+        guard !isLoadingGraph else { return }
         mirrorDirty = false
         guard let root = storeRoot else { return }
-        let snapshot = MirrorSnapshot(folders: folders, memberships: memberships,
-                                      assignments: assignments, root: root)
-        mirrorWriteSeq += 1
-        mirrorWriteCount += 1
-        let seq = mirrorWriteSeq
-        let queue = mirrorQueue
+        let (snapshot, seq) = takeMirrorSnapshot(root: root)
+        let queue = mirrorQueue, gate = mirrorGate
         let previous = mirrorWriteChain
         mirrorWriteChain = Task { [weak self] in
             await previous?.value
-            let outcome: OrganizationMirrorFailure? = await withCheckedContinuation { done in
-                queue.async { done.resume(returning: snapshot.write()) }
+            let outcome: OrganizationMirrorFailure?? = await withCheckedContinuation { done in
+                queue.async { done.resume(returning: gate.write(snapshot, seq: seq)) }
             }
-            self?.applyMirrorOutcome(outcome, seq: seq)
+            // A write skipped because a newer one already landed reports nothing; the newer did.
+            if case .some(let failure) = outcome { self?.applyMirrorOutcome(failure, seq: seq) }
         }
+    }
+
+    private func takeMirrorSnapshot(root: URL) -> (MirrorSnapshot, Int) {
+        mirrorWriteSeq += 1
+        mirrorWriteCount += 1
+        return (MirrorSnapshot(folders: folders, memberships: memberships,
+                               assignments: assignments, root: root), mirrorWriteSeq)
     }
 
     private func applyMirrorOutcome(_ outcome: OrganizationMirrorFailure?, seq: Int) {
@@ -976,34 +1019,53 @@ enum OrganizationMirrorFailure: Sendable, Equatable {
 
     /// Write anything pending now and wait until every write so far has finished and its outcome is on
     /// `mirrorFailure`. For a caller that must read the result, or must not race a later root change.
+    /// A mutation that lands while this waits is written and waited for too.
     func flushPendingMirror() async {
-        cancelPendingDebounce()
-        startMirrorWrite()
-        while let chain = mirrorWriteChain {
+        while isMirrorWritePending, !isLoadingGraph {
+            cancelPendingDebounce()
+            startMirrorWrite()
+            guard let chain = mirrorWriteChain else { break }
             await chain.value
-            // A write started while this one ran (a reentrant mutation) is waited for as well.
-            if mirrorWriteChain == chain { mirrorWriteChain = nil }
+            if mirrorWriteChain == chain, !mirrorDirty, pendingDebounce == nil {
+                mirrorWriteChain = nil
+                break
+            }
         }
     }
 
-    /// The quit path: block until any running write is done and write what is still pending, so the
-    /// file the next launch inherits holds every committed change. A mirror known to be stale is
-    /// retried here too: after quitting, nothing else would write it (W23.m10-fu).
+    /// The quit path: write the graph as it is now, synchronously, after any write already running, so
+    /// the file the next launch inherits holds every committed change. That includes a snapshot already
+    /// handed to a queued write: its task needs the main actor to run, and the main actor is blocked
+    /// here until the process ends. A mirror known to be stale is retried too (W23.m10-fu). Bounded by
+    /// one write in progress plus this one.
     func flushMirrorSynchronously() {
         cancelPendingDebounce()
         if isMirrorStale, didLoadGraph { mirrorDirty = true }
-        guard mirrorDirty, let root = storeRoot else {
+        let pending = mirrorDirty || appliedMirrorSeq < mirrorWriteSeq
+        mirrorDirty = false
+        guard pending, let root = storeRoot, !isLoadingGraph else {
             mirrorQueue.sync {}
             return
         }
-        mirrorDirty = false
-        let snapshot = MirrorSnapshot(folders: folders, memberships: memberships,
-                                      assignments: assignments, root: root)
-        mirrorWriteSeq += 1
-        mirrorWriteCount += 1
-        let seq = mirrorWriteSeq
-        let outcome = mirrorQueue.sync { snapshot.write() }
-        applyMirrorOutcome(outcome, seq: seq)
+        let (snapshot, seq) = takeMirrorSnapshot(root: root)
+        let gate = mirrorGate
+        if case .some(let failure) = mirrorQueue.sync(execute: { gate.write(snapshot, seq: seq) }) {
+            applyMirrorOutcome(failure, seq: seq)
+        }
+    }
+}
+
+/// Lets a queued write stand down when a newer snapshot has already been written, so a synchronous
+/// quit flush that overtakes queued writes is never renamed over by an older graph. Touched only on
+/// `mirrorQueue`, which is serial, hence `@unchecked Sendable` (W49.notes-org-export-async).
+private final class MirrorWriteGate: @unchecked Sendable {
+    private var newestWritten = 0
+
+    /// The write's outcome (`.some(nil)` on success), or `nil` when a newer snapshot already landed.
+    func write(_ snapshot: MirrorSnapshot, seq: Int) -> OrganizationMirrorFailure?? {
+        guard seq > newestWritten else { return nil }
+        newestWritten = seq
+        return .some(snapshot.write())
     }
 }
 

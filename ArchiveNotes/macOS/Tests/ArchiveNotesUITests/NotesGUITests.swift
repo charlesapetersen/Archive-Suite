@@ -1629,8 +1629,10 @@ final class NotesGUITests: NotesFixtureUITestCase {
         let trashed = pollUntil(timeout: 15) { !itemDirs().contains(Self.idZotero) }
         XCTAssertTrue(trashed,
                       "Delete Note must move the item out of items/ (to the Trash); items = \(itemDirs())")
-        XCTAssertFalse((organizationMemberships() ?? []).contains([Self.folderIdeas, Self.idZotero]),
-                       "Delete Note must drop the last membership from organization.json")
+        // The mirror is written shortly after the change (W49.notes-org-export-async), so poll for it.
+        XCTAssertTrue(pollUntil(timeout: 8) {
+            !(organizationMemberships() ?? []).contains([Self.folderIdeas, Self.idZotero])
+        }, "Delete Note must drop the last membership from organization.json")
     }
 
     /// W21.vmgui-c-fu — a note-passage chip in the Extracts window must react when its cited note is
@@ -2395,8 +2397,8 @@ final class NotesGUITests: NotesFixtureUITestCase {
         confirmDialog.click()
         XCTAssertTrue(pollUntil(timeout: 15) { !itemDirs().contains(id) },
                       "confirmed Delete should move the note out of items/ and into Trash")
-        XCTAssertFalse((organizationMemberships() ?? []).contains { $0[1] == id },
-                       "confirmed Delete should remove every folder placement")
+        XCTAssertTrue(pollUntil(timeout: 8) { !(organizationMemberships() ?? []).contains { $0[1] == id } },
+                      "confirmed Delete should remove every folder placement")
     }
 
     /// W40.fix-notes-delete-undo (notes-1 rows 34, 40) — Edit ▸ Undo brings a deleted note back with
@@ -2501,8 +2503,8 @@ final class NotesGUITests: NotesFixtureUITestCase {
         editMenuItem("Redo").click()
         XCTAssertTrue(pollUntil(timeout: 15) { !itemDirs().contains(id) }, "Redo should delete the note again")
         XCTAssertTrue(FileManager.default.fileExists(atPath: trashDir), "into the store's Trash")
-        XCTAssertFalse((organizationMemberships() ?? []).contains { $0[1] == id },
-                       "Redo should leave no folder placement on the trashed note")
+        XCTAssertTrue(pollUntil(timeout: 8) { !(organizationMemberships() ?? []).contains { $0[1] == id } },
+                      "Redo should leave no folder placement on the trashed note")
 
         editMenuItem("Undo").click()
         XCTAssertTrue(pollUntil(timeout: 15) { itemDirs().contains(id) }, "a second Undo should bring it back")

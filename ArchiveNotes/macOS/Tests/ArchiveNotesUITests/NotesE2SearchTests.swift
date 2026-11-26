@@ -119,6 +119,8 @@ final class NotesE2SearchTests: NotesFixtureUITestCase {
             let intelQuery = try XCTUnwrap(smartQueryJSON(named: "E2 Intel"),
                                            "Save should persist E2 Intel as a smart folder")
             XCTAssertTrue(intelQuery.contains("\"Intel\""), "the saved query should carry the submitted spelling: \(intelQuery)")
+            // The mirror is written shortly after the save (W49.notes-org-export-async).
+            _ = pollUntil(timeout: 8) { self.smartQueryJSON(named: "E2 Lovelace") != nil }
             let keywordQuery = try XCTUnwrap(smartQueryJSON(named: "E2 Lovelace"),
                                              "Save should persist E2 Lovelace as a smart folder")
             XCTAssertTrue(keywordQuery.contains("Lovelace"),

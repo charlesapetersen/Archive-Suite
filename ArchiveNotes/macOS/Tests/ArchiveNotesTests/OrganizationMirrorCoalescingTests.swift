@@ -180,6 +180,64 @@ struct OrganizationMirrorCoalescingTests {
         expectMirrorMatchesMemory(store, root)
     }
 
+    @Test("quitting while writes are queued leaves the newest graph on disk, and no older one after it")
+    func terminateWithQueuedWritesKeepsTheNewestGraph() async throws {
+        let (store, index, root, scratch) = try await makeEnv(debounce: .zero)
+        defer { Task { await cleanup(scratch, index) } }
+
+        for round in 0..<8 {
+            // Back-to-back changes with no debounce: snapshots are already handed to queued writes,
+            // whose tasks need the main actor that the quit flush is about to block.
+            for n in 0..<25 {
+                let f = try await store.createFolder(name: "R\(round)-\(n)")
+                try await store.addMembership(item: UUID(), folder: f.id)
+            }
+            store.flushMirrorSynchronously()
+            expectMirrorMatchesMemory(store, root)
+            // The writes that were queued behind the flush now run; none may put an older graph back.
+            await store.flushPendingMirror()
+            expectMirrorMatchesMemory(store, root)
+            #expect(store.isMirrorWritePending == false)
+            #expect(store.mirrorFailure == nil)
+        }
+    }
+
+    /// Yield until the debounce has fired and the change is snapshotted into a queued write.
+    private func waitUntilSnapshotted(_ store: OrganizationStore) async throws {
+        let deadline = ContinuousClock.now + .seconds(10)
+        while store.hasUnsnapshottedMirrorChange, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(2))
+        }
+        #expect(!store.hasUnsnapshottedMirrorChange, "fixture: the debounce fired")
+    }
+
+    @Test("quitting writes a snapshot that is still queued behind a running write")
+    func terminateWritesASnapshotStillQueued() async throws {
+        let (store, index, root, scratch) = try await makeEnv(debounce: .milliseconds(1))
+        defer { Task { await cleanup(scratch, index) } }
+
+        // The reviewer's interleaving: write 1 is running (here, parked on the queue); write 2's
+        // snapshot is taken and its task waits on write 1. Then the app quits. Write 2's task needs
+        // the main actor, which the quit flush blocks, so the flush itself must write that graph.
+        let release = DispatchSemaphore(value: 0)
+        store.holdMirrorQueue(until: release)
+        try await store.createFolder(name: "First")
+        try await waitUntilSnapshotted(store)
+        try await Task.sleep(for: .milliseconds(20))       // let write 1 reach the parked queue
+        try await store.createFolder(name: "Second")
+        try await waitUntilSnapshotted(store)
+
+        release.signal()
+        store.flushMirrorSynchronously()
+        #expect(mirrored(root)?.folders.contains { $0.name == "Second" } == true,
+                "a change already snapshotted must not be lost because its task could not run")
+        expectMirrorMatchesMemory(store, root)
+
+        await store.flushPendingMirror()
+        expectMirrorMatchesMemory(store, root)          // and the queued older writes stood down
+        #expect(store.isMirrorWritePending == false)
+    }
+
     @Test("the outcome of a later write is never overwritten by an earlier one's")
     func newestOutcomeWins() async throws {
         let (store, index, root, scratch) = try await makeEnv(debounce: .seconds(30))
@@ -203,6 +261,41 @@ struct OrganizationMirrorCoalescingTests {
         expectMirrorMatchesMemory(store, root)
     }
 
+    @Test("a change that missed the mirror in a crash is written on the next launch")
+    func nextLaunchCatchesUpAMirrorLeftBehind() async throws {
+        let (store, index, root, scratch) = try await makeEnv(debounce: .seconds(30))
+        defer { Task { await cleanup(scratch, index) } }
+
+        try await store.createFolder(name: "Committed, not mirrored")
+        // The app dies here: SQLite has the folder, the debounce never fired, no willTerminate.
+        #expect(mirrored(root)?.folders.contains { $0.name == "Committed, not mirrored" } != true)
+
+        let relaunched = OrganizationStore(index: index, mirrorDebounce: .seconds(30))
+        try await relaunched.load(storeRoot: root)
+        await relaunched.flushPendingMirror()
+        #expect(relaunched.mirrorWriteCount == 1, "the launch re-exported the mirror")
+        #expect(mirrored(root)?.folders.contains { $0.name == "Committed, not mirrored" } == true)
+        expectMirrorMatchesMemory(relaunched, root)
+    }
+
+    @Test("a launch leaves a mirror that already matches the database alone")
+    func launchDoesNotRewriteAMatchingMirror() async throws {
+        let (store, index, root, scratch) = try await makeEnv(debounce: .seconds(30))
+        defer { Task { await cleanup(scratch, index) } }
+
+        let folder = try await store.createFolder(name: "Synced").id
+        try await store.addMembership(item: UUID(), folder: folder)
+        try await store.assignTemplate(UUID(), to: folder)
+        await store.flushPendingMirror()
+        let bytes = try Data(contentsOf: root.appendingPathComponent("organization.json"))
+
+        let relaunched = OrganizationStore(index: index, mirrorDebounce: .seconds(30))
+        try await relaunched.load(storeRoot: root)
+        await relaunched.flushPendingMirror()
+        #expect(relaunched.mirrorWriteCount == 0, "nothing to catch up, so nothing is written")
+        #expect(try Data(contentsOf: root.appendingPathComponent("organization.json")) == bytes)
+    }
+
     @Test("a write still pending for one store root lands there before the store loads another")
     func loadFlushesThePreviousRoot() async throws {
         let (store, index, root, scratch) = try await makeEnv(debounce: .seconds(30))
@@ -212,11 +305,10 @@ struct OrganizationMirrorCoalescingTests {
         let other = scratch.appendingPathComponent("other-store")
         try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
         try await store.load(storeRoot: other)
-        await store.flushPendingMirror()
 
+        // Without the flush in `load`, the debounce would fire after the root changed and the write
+        // would land in `other` instead, leaving this store's mirror behind.
         #expect(mirrored(root)?.folders.contains { $0.name == "Belongs to the first store" } == true,
-                "the pending write went to the root it was made under")
-        #expect(mirrored(other)?.folders.contains { $0.name == "Belongs to the first store" } != true,
-                "and never into the next store's mirror")
+                "the pending write went to the root it was made under, before the load")
     }
 }
