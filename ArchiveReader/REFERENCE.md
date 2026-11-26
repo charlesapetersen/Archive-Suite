@@ -493,6 +493,9 @@ Core/                         UI-free Reader-local domain (shared tag/PDF facets
   AuditLedger.swift           Safety §12 append-only JSON-lines record of every tag write (container,
                               never the archive); @TaskLocal group per action, `undoes` on undo;
                               reconstructs the latest 100 groups for durable inverse-delta undo.
+  TagBatch.swift              W49.reader-batch-writes-async: a bulk Mark/edit/rename/undo/redo of more than 8 files runs
+                              off the main actor — per-file lanes (one path or inode = one lane, in order), at most
+                              4 at a time, the ledger context a task-local, Cancel before each lane's next file.
   PoorOCRFlagGuard.swift      W44.reocr-reader: a TagWriter write whose delta names `OCR Poor` runs the shared flag
                               protocol (lock before coordination, begin, write, commit what reads back;
                               `SPEC/improve-ocr.md` §3); the ledger line carries the record (`Entry.flag`).
@@ -594,6 +597,8 @@ Views/
   ContainerSection.swift      The Inspector's Container section (FieldStatusRow per value with its Edit menu,
                               disagreements, the folder's warnings), ContainerSelectionSection (set for selection)
                               and ContainerLevelsSheet.
+  NavigationModel+TagBatch.swift  W49.reader-batch-writes-async: `runTagBatch` (inline up to 8 files, else `TagBatch` with
+                              the status bar's count and Cancel); other tag writes and Undo wait while one runs.
   NavigationModel+ImproveOCR.swift  W44.reocr-reader: Flag as Poor OCR (off the main thread, one ledger group;
                               a stale batch result never overwrites a newer row), Connect Improve OCR Folder…,
                               Improve OCR… (ImproveOCROpener: Launch Services, or the DEBUG recorder), receipts →

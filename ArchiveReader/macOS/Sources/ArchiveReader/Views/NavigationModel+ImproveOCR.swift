@@ -43,6 +43,7 @@ extension NavigationModel {
     /// The flag write itself, awaited by tests. Returns the verified results.
     @discardableResult
     func setPoorOCR(_ flag: Bool, on targets: [ArchiveFile]) async -> [TagWriteResult] {
+        if refuseWhileTagBatchRuns() { return [] }
         if library.usesCatalogue {
             applyCatalogueFileField(.ocrPoor, .set(.flag(flag)), paths: targets.map(\.path))
             return []

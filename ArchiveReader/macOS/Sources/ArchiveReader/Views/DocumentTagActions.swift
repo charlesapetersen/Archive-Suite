@@ -109,13 +109,14 @@ struct DocumentTagActions {
 
     func undo() {
         guard let navigation, canUndo else { return }
-        navigation.undoLast()
+        // A large undo runs off the main actor; the status is set again once it has reported.
+        navigation.undoLast { viewer.tagStatus = navigation.statusMessage }
         viewer.tagStatus = navigation.statusMessage
     }
 
     func redo() {
         guard let navigation, canRedo else { return }
-        navigation.redoLast()
+        navigation.redoLast { viewer.tagStatus = navigation.statusMessage }
         viewer.tagStatus = navigation.statusMessage
     }
 }

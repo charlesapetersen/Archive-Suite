@@ -747,6 +747,33 @@ final class NavigationUITests: FixtureUITestCase {
         captureScreenshot("w21-vmgui-e-matched-identity-writes")
     }
 
+    /// W49.reader-batch-writes-async: a Mark Read of more than 8 files runs off the main actor and still reports,
+    /// and its undo (also off the main actor) puts every file back. Scratch fixture only.
+    func testABulkMarkReadAndItsUndoRunOffTheMainActor() throws {
+        try requireGeneratedScratchFixtureForTagWrites()
+        clickRow(0)
+        pressKey("a", modifiers: .command)
+        let selected = rowCount
+        XCTAssertGreaterThan(selected, 8, "enough rows for the batch to leave the main actor")
+        let status = app.staticTexts["ar.status.message"]
+        func waitForStatus(_ text: String) -> Bool {
+            let deadline = Date().addingTimeInterval(30)
+            repeat {
+                if status.exists && status.accessibilityText.contains(text) { return true }
+                RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+            } while Date() < deadline
+            return false
+        }
+        pressKey("r", modifiers: .command)   // Selection ▸ Mark Read
+        XCTAssertTrue(waitForStatus("Marked"), "the batch reports when it ends: \(status.accessibilityText)")
+        XCTAssertFalse(app.buttons["ar.status.tagBatchCancel"].exists, "the progress and Cancel are gone")
+        XCTAssertTrue(waitForTags(on: "00002 IMG — Brown.pdf", containing: ["Read"], excluding: ["Unread"]))
+        captureScreenshot("w49-batch-writes-marked")
+        pressKey("z", modifiers: .command)   // Edit ▸ Undo Tag Change
+        XCTAssertTrue(waitForStatus("Undid"), "the undo reports when it ends: \(status.accessibilityText)")
+        XCTAssertTrue(waitForTags(on: "00002 IMG — Brown.pdf", containing: ["Unread"], excluding: ["Read"]))
+    }
+
     /// W40.audit-ledger-undo: the toolbar reads the ledger-backed history and reports the verified
     /// inverse. Relaunch, recovery and identity refusal are exercised more deeply by scratch unit tests.
     func testLedgerUndoShowsVerifiedResultOnScratchFixture() throws {

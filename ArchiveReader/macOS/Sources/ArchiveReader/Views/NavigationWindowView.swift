@@ -918,7 +918,26 @@ struct NavigationWindowView: View {
             // Identified because this is where a REFUSED write reports itself ("Could not verify …"),
             // which is the only on-screen evidence that a cache row was re-verified rather than
             // written blind (`W26.verify-fu2`).
-            if !model.statusMessage.isEmpty {
+            if let batch = model.tagBatch {
+                // A bulk tag change running off the main actor (W49.reader-batch-writes-async).
+                ProgressView(value: Double(batch.done), total: Double(max(batch.total, 1)))
+                    .frame(width: 120)
+                    .accessibilityLabel(batch.title)
+                    .accessibilityIdentifier("ar.status.tagBatchProgress")
+                Text(batch.cancelling ? "Cancelling…" : "\(batch.title): \(batch.done) of \(batch.total)")
+                    .foregroundStyle(.primary).monospacedDigit()
+                    .accessibilityIdentifier("ar.status.tagBatch")
+                Button("Cancel") { model.cancelTagBatch() }
+                    .disabled(batch.cancelling)
+                    .help("Stop before the next file; the files already changed stay changed, as one undo step")
+                    .accessibilityIdentifier("ar.status.tagBatchCancel")
+                // A change refused while the batch runs says why here.
+                if !model.statusMessage.isEmpty, model.statusMessage != "\(batch.title)…" {
+                    Text(model.statusMessage).foregroundStyle(.primary)
+                        .help(model.statusMessage)
+                        .accessibilityIdentifier("ar.status.message")
+                }
+            } else if !model.statusMessage.isEmpty {
                 Text(model.statusMessage).foregroundStyle(.primary)
                     .help(model.statusMessage)   // the whole line when a narrow window truncates it
                     .accessibilityIdentifier("ar.status.message")

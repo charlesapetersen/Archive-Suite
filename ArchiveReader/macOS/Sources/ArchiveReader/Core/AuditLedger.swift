@@ -74,6 +74,17 @@ final class AuditLedger: @unchecked Sendable {
                                       operation: body)
     }
 
+    /// `withContext` for a batch whose writes run in child tasks (`TagBatch`, W49.reader-batch-writes-async):
+    /// every child inherits the context, and the journal closes only once `body`, and so every child, has returned.
+    static func withBatchContext<T: Sendable>(group: UUID, undoes: UUID? = nil, redoes: UUID? = nil, files: [URL] = [],
+                                              _ body: @Sendable () async -> T) async -> T {
+        let journal = undoes == nil ? ActionJournal(group: group, declared: files) : nil
+        defer { journal?.close() }
+        return await $context.withValue(Context(group: group, undoes: undoes, redoes: redoes, journal: journal)) {
+            await body()
+        }
+    }
+
     /// The write-ahead state of one forward action: whether its intent is durable, and whether any of
     /// its records failed (then the action is never closed, and its intent stays open), and which files its
     /// intents have listed.
@@ -200,8 +211,8 @@ final class AuditLedger: @unchecked Sendable {
         /// Set when the write failed its post-write verification: the tags may or may not have changed,
         /// `before`/`after`/`delta`/`inverse` are empty, and the entry is never an undo source.
         var unverified: String?
-        /// Set on a forward entry re-recorded by `keepForRetry`: the group whose undo failed for this
-        /// file, and which attempt the next undo of it will be (the original undo was attempt 1).
+        /// Set on a forward entry re-recorded by `keepForRetry`: the group whose undo first failed (or was
+        /// cancelled) for this file, kept through later retries, and which attempt the next undo of it will be (the original undo was attempt 1).
         var retryOf: UUID?
         var attempt: Int?
         /// Set on a redo's lines and its `redoAttempt` marker: the undo group the redo reverses.
@@ -695,16 +706,22 @@ final class AuditLedger: @unchecked Sendable {
     /// For a partly failed redo (`redo`), `failed` are the undo's lines and stay undo lines, keeping their
     /// `undoes`, so the next redo offers exactly those files.
     func keepForRetry(_ failed: [Entry], of group: UUID, redo: Bool = false) -> Bool {
-        guard !failed.isEmpty else { return true }
+        keepForRetry(failed.map { ($0, true) }, of: group, redo: redo)
+    }
+
+    /// `attempted` false: a member a cancelled undo never reached (W49.reader-batch-writes-async). It comes back in
+    /// the same retry group, but its attempt count stays, since nothing was tried on it.
+    func keepForRetry(_ members: [(entry: Entry, attempted: Bool)], of group: UUID, redo: Bool = false) -> Bool {
+        guard !members.isEmpty else { return true }
         let retryGroup = UUID()
         var lines = Data()
         do {
-            for var entry in failed {
+            for (var entry, attempted) in members {
                 entry.timestamp = Date()
                 entry.group = retryGroup
                 if !redo { entry.undoes = nil }
-                entry.retryOf = group
-                entry.attempt = (entry.attempt ?? 1) + 1
+                entry.retryOf = entry.retryOf ?? group   // the group first undone, through any chain of retries
+                entry.attempt = (entry.attempt ?? 1) + (attempted ? 1 : 0)
                 lines.append(try Self.encoder.encode(entry))
                 lines.append(0x0A)
             }

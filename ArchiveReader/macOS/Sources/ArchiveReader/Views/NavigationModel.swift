@@ -302,6 +302,17 @@ final class NavigationModel: ObservableObject {
     /// and weigh it against the tag ledger (W49.reader-undo-menu-names; `NavigationModel+ContainerEdits`).
     @Published var containerHistory: [ContainerHistory] = []
     @Published var statusMessage = ""
+    /// A bulk tag change running off the main actor, for the status bar's count and Cancel button
+    /// (W49.reader-batch-writes-async; `NavigationModel+TagBatch`). Nil when none is running.
+    @Published var tagBatch: TagBatchStatus?
+    var tagBatchControl: TagBatch.Control?
+    var tagBatchTask: Task<Void, Never>?
+    /// A batch of more files than this runs off the main actor; tests lower it to drive that path.
+    var tagBatchInlineLimit = 8
+    /// Tests: a batch off the main actor cancels itself once this many files are done.
+    var tagBatchStopAfter: Int?
+    /// At quit: cancel the running batch, wait for its lanes' current files, and report it there and then.
+    var tagBatchQuitFlush: (() -> Void)?
     // G4 keyboard triage: bumped whenever a triage action wants the newly-selected row scrolled into
     // view. The window observes the counter (so scrolling to the *same* id twice still fires) and asks
     // its ScrollViewReader to reveal `scrollTargetID`. Pure UI hint — never a file operation.
@@ -424,7 +435,10 @@ final class NavigationModel: ObservableObject {
             .store(in: &cancellables)
         // A quit straight after a scroll still saves the place (W40.fix-reader-restore-scroll).
         NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
-            .sink { [weak self] _ in MainActor.assumeIsolated { self?.topRowWrite?.perform(); self?.flushSelectionWrite() } }
+            .sink { [weak self] _ in MainActor.assumeIsolated {
+                self?.topRowWrite?.perform(); self?.flushSelectionWrite()
+                self?.tagBatchQuitFlush?()   // a running tag batch stops and reports before the process ends
+            } }
             .store(in: &cancellables)
         // Republish when flags change so the table's flag column refreshes.
         flags.objectWillChange
@@ -2599,6 +2613,7 @@ final class NavigationModel: ObservableObject {
 
     /// `paths` nil acts on the list's selection; the document window passes its open file.
     func mark(_ target: ReadState, paths: [String]? = nil) {
+        if refuseWhileTagBatchRuns() { return }
         if library.usesCatalogue { markCatalogue(target, paths: paths); return }
         let targets = tagTargets(paths)
         if paths != nil, targets.isEmpty { reportNotInLibrary(); return }
@@ -2606,7 +2621,7 @@ final class NavigationModel: ObservableObject {
             reverifyCacheRows(targets, readState: true)
         }
         let files = reverified.files
-        var counts = MarkCounts(outside: reverified.outside, failed: reverified.rejected - reverified.outside)
+        let counts = MarkCounts(outside: reverified.outside, failed: reverified.rejected - reverified.outside)
         guard !files.isEmpty else {
             if reverified.rejected > 0 {
                 statusMessage = reverified.outside == 0
@@ -2616,35 +2631,45 @@ final class NavigationModel: ObservableObject {
             }
             return
         }
-        var verified: [TagWriteResult] = []
         let group = UUID()                       // §12: the whole action is one ledger group, as it is one undo
         // The intent lists the files expected to change, so a crash leaves only those in doubt.
         let expected = files.filter { $0.readState.map { $0 != target } == true }.map(\.url)
-        ReaderStages.measure("tagWriter.writes") { AuditLedger.withContext(group: group, files: expected) {
-            for f in files {
-                let identity = f.liveIdentity()   // §6: capture lazily at edit time, per selected file
-                do {
-                    // No `addIfMissing`: "Mark Read" never adds a read-state tag to a marker/neither file
-                    // (Safety §10, hard-coded); the status line says how many it left alone.
-                    let r = try TagWriter.setReadState(target, on: f.url, expecting: identity)
+        runTagBatch("Marking \(target.rawValue)", count: files.count,
+                    keys: { TagBatch.keys(path: files[$0].url.path, file: AuditLedger.fileNumber(files[$0].url)) },
+                    group: group, files: expected, written: { $0.result },
+                    lane: TagBatch.each { i -> TagBatchWrite in
+            let f = files[i]
+            let identity = f.liveIdentity()   // §6: capture lazily at edit time, per selected file
+            // No `addIfMissing`: "Mark Read" never adds a read-state tag to a marker/neither file
+            // (Safety §10, hard-coded); the status line says how many it left alone.
+            do { return .wrote(try TagWriter.setReadState(target, on: f.url, expecting: identity)) }
+            catch { return .failed }
+        }) { [self] outcomes, stale in
+            var counts = counts
+            var verified: [TagWriteResult] = []
+            for i in files.indices {
+                switch outcomes[i] {
+                case .wrote(let r):
                     verified.append(r)               // verified ground truth (incl. no-op) — safe to display
                     if !r.isNoOp { counts.changed += 1 }  // real changes → undo
                     else if r.after.contains(where: isReadStateWord) { counts.already += 1 }
                     else { counts.noReadState += 1 }
-                } catch { counts.failed += 1 }
+                case .failed: counts.failed += 1
+                case nil: counts.stopped += 1
+                }
             }
-        } }
-        // Only verified (non-throwing) writes move a row — a failed write keeps the last-discovered value and
-        // must NOT vanish from a filtered view (Safety §11). The row shows TagWriter's re-read `.after`.
-        library.applyVerifiedWrites(verified)
-        refreshUndoHistory()
-        statusMessage = Self.markStatus(target, counts)
-        announce(statusMessage)
+            // Only verified (non-throwing) writes move a row — a failed write keeps the last-discovered value and
+            // must NOT vanish from a filtered view (Safety §11). The row shows TagWriter's re-read `.after`.
+            library.applyVerifiedWrites(verified.filter { !stale.contains($0.url) })
+            refreshUndoHistory()
+            statusMessage = Self.markStatus(target, counts)
+            announce(statusMessage)
+        }
     }
 
-    /// What one Mark Read / Mark Unread did, file by file.
+    /// What one Mark Read / Mark Unread did, file by file. `stopped`: not reached before a cancel.
     struct MarkCounts: Equatable {
-        var changed = 0, already = 0, noReadState = 0, outside = 0, failed = 0
+        var changed = 0, already = 0, noReadState = 0, outside = 0, failed = 0, stopped = 0
     }
 
     /// The status line for a mark: what changed, and why each file that did not change was left alone
@@ -2668,13 +2693,16 @@ final class NavigationModel: ObservableObject {
             parts.append("\(c.outside) \(isAre(c.outside, "is", "are")) outside the folders whose tags Reader "
                 + "changes, so \(isAre(c.outside, "it was", "they were")) not changed.")
         }
-        return parts.joined(separator: " ")
+        return parts.joined(separator: " ") + cancelledNote(c.stopped)
     }
 
     func refreshUndoHistory() { ReaderStages.measure("model.refreshUndoHistory") { refreshUndoHistoryStage() } }
 
     private func refreshUndoHistoryStage() {
-        if let root = rootStore.root {
+        // While a batch runs, its own step is not offered yet and an older one must not be undone under it.
+        if tagBatch != nil {
+            undoGroups = []; redoGroups = []
+        } else if let root = rootStore.root {
             // MAIN, and the JPEGS tree whose read state Reader also changes (W40.reader-jpeg-read).
             let readStateRoots = readStateRoots()
             let roots = readStateRoots.isEmpty ? [ReaderArchiveLayout(grantedRoot: root).mainRoot] : readStateRoots
@@ -2711,48 +2739,69 @@ final class NavigationModel: ObservableObject {
         return batch.map { URL(fileURLWithPath: $0.path).lastPathComponent }.filter { seen.insert($0).inserted }
     }
 
-    func undoLast() {
+    /// `then` runs once the undo has reported, which for a large batch is after it has run off the main actor.
+    func undoLast(then: (@MainActor () -> Void)? = nil) {
+        if refuseWhileTagBatchRuns() { then?(); return }
         refreshUndoHistory()
-        guard let batch = undoGroups.last else { return }
-        reverse(batch, redo: false)
+        guard let batch = undoGroups.last else { then?(); return }
+        reverse(batch, redo: false, then: then)
     }
 
     /// Redo Tag Change (⇧⌘Z; W40.fix-reader-redo): reverse the newest undo that no new change has followed.
     /// The undo's own lines are applied the way undo applies a forward line, so redo carries every guard
     /// undo does: identity, the main archive, the fresh read, no token past its count before the undo.
-    func redoLast() {
+    func redoLast(then: (@MainActor () -> Void)? = nil) {
+        if refuseWhileTagBatchRuns() { then?(); return }
         refreshUndoHistory()
-        guard let batch = redoGroups.last else { return }
-        reverse(batch, redo: true)
+        guard let batch = redoGroups.last else { then?(); return }
+        reverse(batch, redo: true, then: then)
+    }
+
+    /// What one line of an undo or redo did. A line a cancel stopped has no outcome.
+    private enum Reversal: Sendable {
+        case reversed(TagWriteResult)
+        /// `retry`: the line comes back as its own undo step.
+        case failed(retry: Bool)
+
+        var result: TagWriteResult? { if case .reversed(let r) = self { r } else { nil } }
     }
 
     /// Apply the inverse of every line of `batch` (one ledger group): an undo of a forward action or a redo,
     /// or (`redo`) a redo of an undo.
-    private func reverse(_ batch: [AuditLedger.Entry], redo: Bool) {
-        guard let group = batch.first?.group else { return }
+    private func reverse(_ batch: [AuditLedger.Entry], redo: Bool, then: (@MainActor () -> Void)?) {
+        guard let group = batch.first?.group else { then?(); return }
         let verb = redo ? "redo" : "undo", undone = redo ? "redone" : "undone"
         // Reserve durably before the first inverse. An append failure must never allow a later
         // relaunch to replay a non-idempotent occurrence addition.
         guard redo ? AuditLedger.shared.beginRedo(group) : AuditLedger.shared.beginUndo(group) else {
             statusMessage = "Could not record \(verb) safely; no files were changed."
             announce(statusMessage)
+            then?()
             return
         }
-        var verified: [TagWriteResult] = []
-        var failures: [String] = []
-        var retryable: [AuditLedger.Entry] = []
-        // A batch lists one file's writes newest first. Once one of them fails, its older writes are left
-        // alone too: undoing an older write under a newer one that is still on disk, and then retrying the
-        // newer one, could put back a tag the step removed. They share the first failure's fate.
-        var failedFiles: [AuditLedger.FileNumber: Bool] = [:]
+        let bounds = tagWriteBounds()
         let reversal = UUID()
-        AuditLedger.withContext(group: reversal, undoes: redo ? nil : group, redoes: redo ? group : nil) {
-            for entry in batch {
+        // A lane holds every line of one file (`TagBatch.lanes`), so this per-lane order is the batch's order
+        // for that file. A batch lists one file's writes newest first. Once one of them fails, its older
+        // writes are left alone too: undoing an older write under a newer one that is still on disk, and then
+        // retrying the newer one, could put back a tag the step removed. They share the first failure's fate.
+        // A cancel stops a lane between lines, so an older line is never reversed under an unreversed newer one,
+        // and the lines it leaves are kept to undo later, unless they share an earlier line's failure.
+        let lane: @Sendable ([Int], TagBatch.Control) -> [(Int, Reversal)] = { members, control in
+            var failedFiles: [AuditLedger.FileNumber: Bool] = [:]
+            var out: [(Int, Reversal)] = []
+            var stopped = false
+            for i in members {
+                let entry = batch[i]
+                // Before the cancel check: a line that shares a failure's fate writes nothing, and one a cancel
+                // left unreached would come back as an undo step of its own, under the newer line that failed.
                 if let file = entry.file, let mayRetry = failedFiles[file] {
-                    if mayRetry, (entry.attempt ?? 1) < AuditLedger.undoAttemptLimit { retryable.append(entry) }
-                    failures.append(URL(fileURLWithPath: entry.path).lastPathComponent)
+                    out.append((i, .failed(retry: mayRetry && (entry.attempt ?? 1) < AuditLedger.undoAttemptLimit)))
+                    control.step()
                     continue
                 }
+                if stopped || control.isCancelled { stopped = true; continue }
+                defer { control.step() }
                 do {
                     let target = try AuditLedger.undoTarget(entry)
                     // A line that changes only Read/Unread may be reversed in the JPEGS tree too; any other
@@ -2760,38 +2809,69 @@ final class NavigationModel: ObservableObject {
                     // inverse, not the op: a redo line's op is `.undo` whatever it changed.
                     let readStateOnly = entry.inverse.label == nil
                         && (entry.inverse.add + entry.inverse.remove).allSatisfy(isReadStateWord)
-                    guard readStateOnly ? isInsideReadStateTree(target.url) : isInsideMainArchive(target.url) else {
+                    guard bounds.allows(target.url, readStateOnly: readStateOnly) else {
                         throw TagWriteError.identityMismatch("file is outside the current archive")
                     }
                     let inverse = TagOccurrenceDelta(add: entry.inverse.add, remove: entry.inverse.remove,
                         color: entry.inverse.label.map { .restoreLabel($0) })
-                    verified.append(try TagWriter.applyOccurrence(inverse, to: target.url, expecting: target.identity,
-                        undoing: .init(before: entry.before, afterLabel: entry.afterLabel), op: redo ? .redo : .undo))
+                    out.append((i, .reversed(try TagWriter.applyOccurrence(inverse, to: target.url,
+                        expecting: target.identity,
+                        undoing: .init(before: entry.before, afterLabel: entry.afterLabel), op: redo ? .redo : .undo))))
                 } catch {
-                    failures.append(URL(fileURLWithPath: entry.path).lastPathComponent)
                     let mayRetry = AuditLedger.undoMayBeRetried(after: error, attempt: entry.attempt ?? 1)
-                    if mayRetry { retryable.append(entry) }
+                    out.append((i, .failed(retry: mayRetry)))
                     if let file = entry.file { failedFiles[file] = mayRetry }
                 }
             }
+            return out
         }
-        // The batch is already consumed; only the members that failed for a cause that may pass come
-        // back, as their own undo step (W40.fix-reader-undo-partial). Re-recorded oldest first, as they
-        // were written, so the history reads them back newest first again.
-        let kept = AuditLedger.shared.keepForRetry(retryable.reversed(), of: group, redo: redo) ? retryable.count : 0
-        library.applyVerifiedWrites(verified)
-        folderDateRecordsFollow(verified, reversed: group, reversal: reversal)   // W49.reader-folder-date-undo-fu
-        refreshUndoHistory()
-        var message = TagChangeStatus.reversal(verified, redo: redo)
-        if !failures.isEmpty {
-            message += "; \(failures.count) could not be \(undone) (\(failures.prefix(3).joined(separator: ", ")))."
-            if kept > 0 {
-                let again = redo ? "Redo" : "Undo"
-                message += kept == failures.count ? " \(again) again to retry." : " \(again) again to retry \(kept)."
+        runTagBatch(redo ? "Redoing" : "Undoing", count: batch.count,
+                    keys: { TagBatch.keys(path: batch[$0].path, file: batch[$0].file) },
+                    group: reversal, undoes: redo ? nil : group, redoes: redo ? group : nil,
+                    written: { $0.result }, lane: lane) { [self] outcomes, stale in
+            var verified: [TagWriteResult] = []
+            var failures: [String] = []
+            // Read back in the batch's order, whatever order the lanes finished in.
+            var kept: [(entry: AuditLedger.Entry, attempted: Bool)] = []
+            var retried = 0, stopped = 0
+            for (i, entry) in batch.enumerated() {
+                switch outcomes[i] {
+                case .reversed(let r): verified.append(r)
+                case .failed(let retry):
+                    failures.append(URL(fileURLWithPath: entry.path).lastPathComponent)
+                    if retry { kept.append((entry, true)); retried += 1 }
+                case nil:
+                    kept.append((entry, false)); stopped += 1
+                }
             }
-        } else { message += "." }
-        statusMessage = message
-        announce(statusMessage)
+            // The batch is already consumed; only the members that failed for a cause that may pass come
+            // back, as their own undo step (W40.fix-reader-undo-partial), with any a cancel never reached.
+            // Re-recorded oldest first, as they were written, so the history reads them back newest first again.
+            let keptOK = AuditLedger.shared.keepForRetry(kept.reversed(), of: group, redo: redo)
+            let keptRetries = keptOK ? retried : 0
+            library.applyVerifiedWrites(verified.filter { !stale.contains($0.url) })
+            // A retry step (a failure's, or what a cancel left) reverses the group its lines were first part of.
+            folderDateRecordsFollow(verified, reversed: batch.first?.retryOf ?? group,
+                                    reversal: reversal)   // W49.reader-folder-date-undo-fu
+            refreshUndoHistory()
+            let again = redo ? "Redo" : "Undo"
+            var message = TagChangeStatus.reversal(verified, redo: redo)
+            if !failures.isEmpty {
+                message += "; \(failures.count) could not be \(undone) (\(failures.prefix(3).joined(separator: ", ")))."
+                if keptRetries > 0 {
+                    message += keptRetries == failures.count
+                        ? " \(again) again to retry." : " \(again) again to retry \(keptRetries)."
+                }
+            } else { message += "." }
+            if stopped > 0 {
+                message += keptOK
+                    ? " Cancelled; \(stopped) change\(stopped == 1 ? " was" : "s were") not \(undone). \(again) again to finish."
+                    : " Cancelled; \(stopped) change\(stopped == 1 ? "" : "s") could not be kept to \(verb) later."
+            }
+            statusMessage = message
+            announce(statusMessage)
+            then?()
+        }
     }
 
     // MARK: Keyboard triage (G4) — fast next/previous-unread navigation + mark-read-and-advance.
@@ -2843,6 +2923,7 @@ final class NavigationModel: ObservableObject {
     /// leave a read-state-filtered view — and excludes the current selection so we never re-land on a row
     /// we just marked. If nothing unread remains, the selection stays and `mark`'s status stands.
     func markReadAndAdvance() {
+        if refuseWhileTagBatchRuns() { return }
         let sel = selection
         guard !sel.isEmpty else { return }
         var target: ArchiveFile.ID?
@@ -2878,6 +2959,7 @@ final class NavigationModel: ObservableObject {
     /// Apply one edit operation to every selected file (per-file delta), with grouped undo.
     /// `paths` nil acts on the list's selection; the tag editor opened from the document window passes its file.
     func applyEdit(_ op: TagEditOp, paths: [String]? = nil, physicalPageIndex: Int? = nil) {
+        if refuseWhileTagBatchRuns() { return }
         let op = inLibrarySpelling(op)
         if library.usesCatalogue {
             applyCatalogueTagEdit(op, paths: paths, physicalPageIndex: physicalPageIndex)
@@ -2895,31 +2977,41 @@ final class NavigationModel: ObservableObject {
             }
             return
         }
-        var changed = 0
-        var verified: [TagWriteResult] = []
-        var failures = reverified.rejected
+        let rejected = reverified.rejected
         let group = UUID()                       // §12: one ledger group, as it is one undo
         let planned = files.map { (f: $0, delta: TagEditing.userDelta(for: op, given: $0.tags)) }   // a date edit is its check too
             .filter { !$0.delta.isEmpty }
-        AuditLedger.withContext(group: group, files: planned.map(\.f.url)) {
-            for (f, delta) in planned {
-                let identity = f.liveIdentity()   // §6: capture lazily at edit time, per selected file
-                do {
-                    let r = try TagWriter.apply(delta, to: f.url, expecting: identity)
+        runTagBatch("Editing tags", count: planned.count,
+                    keys: { TagBatch.keys(path: planned[$0].f.url.path, file: AuditLedger.fileNumber(planned[$0].f.url)) },
+                    group: group, files: planned.map(\.f.url), written: { $0.result },
+                    lane: TagBatch.each { i -> TagBatchWrite in
+            let (f, delta) = planned[i]
+            let identity = f.liveIdentity()   // §6: capture lazily at edit time, per selected file
+            do { return .wrote(try TagWriter.apply(delta, to: f.url, expecting: identity)) }
+            catch { return .failed }
+        }) { [self] outcomes, stale in
+            var changed = 0, failures = rejected, stopped = 0
+            var verified: [TagWriteResult] = []
+            for i in planned.indices {
+                switch outcomes[i] {
+                case .wrote(let r):
                     verified.append(r)
                     if !r.isNoOp { changed += 1 }
-                } catch { failures += 1 }
+                case .failed: failures += 1
+                case nil: stopped += 1
+                }
             }
+            // one O(N+M) overlay pass (was per-file O(N*M))
+            library.applyVerifiedWrites(verified.filter { !stale.contains($0.url) })
+            if case .addSubject(let subject) = op, verified.contains(where: { DocumentTags.parse(raw: $0.after, labelNumber: $0.afterLabel).subjects.contains(subject) }) {
+                // The next Return may precede the background autocomplete refresh.
+                subjectSpellingByKey[tagKey(subject)] = subject
+            }
+            refreshUndoHistory()
+            statusMessage = "Edited \(changed) file\(changed == 1 ? "" : "s")"
+                + (failures > 0 ? "; \(failures) could not update." : ".") + Self.cancelledNote(stopped)
+            announce(statusMessage)
         }
-        library.applyVerifiedWrites(verified)   // one O(N+M) overlay pass (was per-file O(N*M))
-        if case .addSubject(let subject) = op, verified.contains(where: { DocumentTags.parse(raw: $0.after, labelNumber: $0.afterLabel).subjects.contains(subject) }) {
-            // The next Return may precede the background autocomplete refresh.
-            subjectSpellingByKey[tagKey(subject)] = subject
-        }
-        refreshUndoHistory()
-        statusMessage = "Edited \(changed) file\(changed == 1 ? "" : "s")"
-            + (failures > 0 ? "; \(failures) could not update." : ".")
-        announce(statusMessage)
     }
 
     // MARK: Corpus-wide tag rename (D1, Tier-2). Every file carrying `old` gets `old` removed + `new`
@@ -2946,6 +3038,7 @@ final class NavigationModel: ObservableObject {
     }
 
     func renameTag(from oldTag: String, to newTag: String) {
+        if refuseWhileTagBatchRuns() { return }
         let old = oldTag                                    // tag identity — must match the sheet's
         let typed = newTag.trimmingCharacters(in: .whitespaces)  // affectedFileCount(forTag: oldTag)
         // Renaming into another existing tag merges into it in its spelling; a case-only rename of the
@@ -2973,40 +3066,46 @@ final class NavigationModel: ObservableObject {
             announce(statusMessage)
             return
         }
-        var changed = 0
-        var verified: [TagWriteResult] = []
-        var failures = reverified.rejected
-        // Capture each affected file's identity lazily (§6), then run the conditional fresh-read rename
-        // independently. A file replaced under its path or no longer carrying `old` is never retagged;
-        // one failure does not stop its neighbours.
-        let items = affected.map { (url: $0.url, identity: $0.liveIdentity()) }
+        let rejected = reverified.rejected
+        // Capture each affected file's identity now (§6), when the rename is confirmed, then run the conditional
+        // fresh-read rename independently. A file replaced under its path while the batch runs, or no longer
+        // carrying `old`, is never retagged; one failure does not stop its neighbours.
+        let urls = affected.map(\.url)
+        let identities = affected.map { $0.liveIdentity() }
         let group = UUID()                                  // §12: one ledger group, as it is one undo
-        AuditLedger.withContext(group: group, files: items.map(\.url)) {
-            for item in items {
-                switch Result(catching: {
-                    try TagWriter.renameToken(from: old, to: new, on: item.url,
-                                              expecting: item.identity)
-                }) {
-                case .success(let r):
+        runTagBatch("Renaming “\(old)”", count: urls.count,
+                    keys: { TagBatch.keys(path: urls[$0].path, file: AuditLedger.fileNumber(urls[$0])) },
+                    group: group, files: urls, written: { $0.result },
+                    lane: TagBatch.each { i -> TagBatchWrite in
+            let url = urls[i]
+            do { return .wrote(try TagWriter.renameToken(from: old, to: new, on: url, expecting: identities[i])) }
+            catch { return .failed }
+        }) { [self] outcomes, stale in
+            var changed = 0, failures = rejected, stopped = 0
+            var verified: [TagWriteResult] = []
+            for i in urls.indices {
+                switch outcomes[i] {
+                case .wrote(let r):
                     verified.append(r)
                     if !r.isNoOp { changed += 1 }
-                case .failure:
-                    failures += 1
+                case .failed: failures += 1
+                case nil: stopped += 1
                 }
             }
+            library.applyVerifiedWrites(verified.filter { !stale.contains($0.url) })
+            refreshUndoHistory()   // ONE grouped undo
+            statusMessage = (failures == 0
+                ? "Renamed “\(old)” → “\(new)” on \(changed) file\(changed == 1 ? "" : "s")."
+                : "Renamed \(changed); \(failures) could not update.") + Self.cancelledNote(stopped)
+            announce(statusMessage)
         }
-        library.applyVerifiedWrites(verified)
-        refreshUndoHistory()   // ONE grouped undo
-        statusMessage = failures == 0
-            ? "Renamed “\(old)” → “\(new)” on \(changed) file\(changed == 1 ? "" : "s")."
-            : "Renamed \(changed); \(failures) could not update."
-        announce(statusMessage)
     }
 
     // MARK: Inline single-file edits (from the list cells). Editing MULTIPLE files uses the ⌥⌘I
     // group editor; these act on exactly one file, still via the audited TagWriter + grouped undo.
 
     func applyEdit(_ op: TagEditOp, to file: ArchiveFile) {
+        if refuseWhileTagBatchRuns() { return }
         if library.usesCatalogue { applyEdit(op, paths: [file.path]); return }
         guard let file = reverifyCacheRow(file) else { return }
         applyDelta(TagEditing.userDelta(for: inLibrarySpelling(op), given: file.tags), to: file)
@@ -3028,6 +3127,7 @@ final class NavigationModel: ObservableObject {
     /// Returns whether the file now has the edit: false when it could not be verified or written.
     @discardableResult
     func commitSubjectEdit(from base: [String], to edited: [String], for file: ArchiveFile) -> Bool {
+        if refuseWhileTagBatchRuns() { return false }
         if library.usesCatalogue {
             let delta = TagEditing.subjectDelta(from: base, to: edited.map(spellingForNewTag))
             guard !delta.isEmpty else { return true }
@@ -3041,6 +3141,7 @@ final class NavigationModel: ObservableObject {
     }
 
     func setReadStateInline(_ target: ReadState, for file: ArchiveFile) {
+        if refuseWhileTagBatchRuns() { return }
         if library.usesCatalogue { markCatalogue(target, paths: [file.path]); return }
         guard let file = reverifyCacheRow(file, readState: true) else { return }
         let identity = file.liveIdentity()   // §6: capture lazily at edit time
@@ -3067,6 +3168,7 @@ final class NavigationModel: ObservableObject {
     /// The Read cell's Clear Read State. Both tokens are named, not the row's: `TagWriter` re-reads the file and
     /// matches Read/Unread in any case, so a row that is behind the file still clears whatever the file holds.
     func clearReadState(for file: ArchiveFile) {
+        if refuseWhileTagBatchRuns() { return }
         if library.usesCatalogue {
             applyCatalogueFileField(.readState, .clear, paths: [file.path])
             return

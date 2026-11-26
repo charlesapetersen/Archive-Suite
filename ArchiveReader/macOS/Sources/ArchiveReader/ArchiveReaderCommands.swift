@@ -65,9 +65,11 @@ struct ArchiveReaderCommands: Commands {
     /// The container and item-field edits made in the window in front (`ContainerHistory`).
     private var containerUndoStep: ContainerHistory.Step? { tagModel?.containerUndo(on: windowUndo) }
     private var containerRedoStep: ContainerHistory.Step? { tagModel?.containerUndo(on: windowUndo, redo: true) }
+    /// A catalogue save, or a bulk tag change running off the main actor (W49.reader-batch-writes-async): Undo
+    /// and Redo wait for it rather than reversing an older step of another kind under it.
     private var catalogueChangeInProgress: Bool {
         guard let model = tagModel else { return false }
-        return model.library.usesCatalogue && model.catalogueEditSaving
+        return model.tagBatch != nil || (model.library.usesCatalogue && model.catalogueEditSaving)
     }
     private var catalogueUndoStep: CatalogueEditJournal.Step? { catalogueHistory?.undo }
     private var catalogueRedoStep: CatalogueEditJournal.Step? { catalogueHistory?.redo }

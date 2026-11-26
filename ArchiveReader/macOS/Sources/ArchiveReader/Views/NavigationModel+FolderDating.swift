@@ -279,6 +279,7 @@ extension NavigationModel {
     /// that no longer gives a date writes no record: its records are retired after the tags (`writeFolderDates`), and
     /// Undo Tag Change revives them as it puts the folder's date back (`folderDateRecordsFollow`).
     func applyFolderDating(_ offer: FolderDatingOffer) {
+        if refuseWhileTagBatchRuns() { return }   // the offer stays, to accept once the batch ends
         folderDatingOffer = nil
         itemFieldEditPath = nil   // a refusal is shown in the Checks whatever is selected
         guard !library.usesCatalogue, let tree = containerTree, tree.path == offer.treePath else { return }
