@@ -471,11 +471,15 @@ with tempfile.TemporaryDirectory(prefix="worker claims [scratch] ") as scratch:
               "new report lands before the settled walkthrough anchor")
         plan_run("report", "✅ 2026-11-04 21:16 PST — walkthrough done (owner): bare")
         plan_run("report", "## ✅ 2026-11-04 21:17 PST — walkthrough done (owner): wrong level")
+        plan_run("report", "2026-11-25 — walkthrough done (owner): missing heading and check")
+        plan_run("report", "### 2026-11-25 — walkthrough done (owner): missing check")
         lines = plan.read_text().splitlines()
         check("### ✅ 2026-11-04 21:16 PST — walkthrough done (owner): bare" in lines
               and "### ✅ 2026-11-04 21:17 PST — walkthrough done (owner): wrong level" in lines
-              and not any(l.startswith(("✅", "## ✅")) for l in lines),
-              "a walkthrough-done report line is always written as a ### heading, the stop line readers need")
+              and "### ✅ 2026-11-25 — walkthrough done (owner): missing heading and check" in lines
+              and "### ✅ 2026-11-25 — walkthrough done (owner): missing check" in lines
+              and not any(l.startswith(("✅", "## ✅", "2026-11-25 — walkthrough", "### 2026-11-25 — walkthrough")) for l in lines),
+              "a walkthrough-done report line is always written as a ### ✅ heading, the stop line readers need")
         p = subprocess.run(["bash", str(HERE / "plan-edit.sh"), str(plan), "complete", "Owner", "abcdef0", "bad"],
                            env=env, capture_output=True)
         check(p.returncode == 2, "a HOLD entry cannot be ticked as queued work")
