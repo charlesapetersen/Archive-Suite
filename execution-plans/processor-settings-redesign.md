@@ -417,7 +417,7 @@ W49.proc-settings-design-ok (OWNER GATE)
        │  Build approved 5-tab Settings UI (or Option A if chosen), delete 8 legacy panels,
        │  level gate, dual estimator, and stacked pickers; wire Process Files & Live Capture
        ▼
-3. W49.proc-settings-advisor-advanced [M]
+3. W49.proc-settings-advisor-advanced [M] — SHIPPED 2026-11-26 (SUITE_TODO_DONE.md)
        │  Build optional "Compare routes…" Advisor sheet over pruned settings-routes.json,
        │  finish Advanced tab (Call 15 routes + W47.settings-trained-label + hand-blla-ctc OFF),
        │  add "N Advanced overrides active" banner on Processing

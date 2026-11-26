@@ -10,7 +10,7 @@ struct SettingsRangeTab: View {
 
     var body: some View {
         Text("Every measured choice for each step, set out by price and figure, so you can see the whole range and pick "
-             + "another. The figures are the same ones the cards use.")
+             + "another. The figures are the same ones the Advisor's rows use; a choice here is saved when you Apply.")
             .font(.callout)
             .fixedSize(horizontal: false, vertical: true)
         RangeLegend(kit: model.ranges.contains { $0.kit.contains { $0.y != nil } })
@@ -18,7 +18,7 @@ struct SettingsRangeTab: View {
             SheetBox {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(chart.title).font(.headline)
-                    Text("Now: \(chart.pickName)").font(.caption).foregroundStyle(.secondary)
+                    Text("Now: \(chart.pickName)").font(.caption).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             } content: {
@@ -75,7 +75,7 @@ private struct RangeLegend: View {
             }
         }
         }
-        .foregroundStyle(.secondary)
+        .foregroundStyle(.primary)
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("ap.sheet.range.legend")
     }
@@ -157,22 +157,22 @@ private struct RangeChartBlock: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(chart.caption).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text(chart.caption).font(.caption).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
             RangePlot(chart: chart, choose: choose)
                 .frame(height: 280)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("ap.sheet.range.\(chart.id).chart")
             if let t = chart.together {
-                Text("Orange dashed ring: \(t.text)").font(.caption).foregroundStyle(.orange)
+                Text("Orange dashed ring: \(t.text)").font(.caption).foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let c = chart.ceilingText {
-                Text(c).font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                Text(c).font(.caption).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
             }
             if !chart.offChart.isEmpty {
                 Text("In the table but not on the chart (they find nothing by themselves, or were measured another way): "
                      + chart.offChart.joined(separator: "; ") + ".")
-                    .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    .font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
             }
             if !chart.kit.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
@@ -184,10 +184,10 @@ private struct RangeChartBlock: View {
                                 Text("Measured: \(m)." + (k.y != nil ? " Drawn as a star on the chart." : ""))
                                     .font(.caption).fixedSize(horizontal: false, vertical: true)
                             }
-                            Text(k.condition).font(.caption).foregroundStyle(.secondary)
+                            Text(k.condition).font(.caption).foregroundStyle(.primary)
                                 .fixedSize(horizontal: false, vertical: true)
                             if let l = k.licence {
-                                Text("Licence: \(l).").font(.caption).foregroundStyle(.secondary)
+                                Text("Licence: \(l).").font(.caption).foregroundStyle(.primary)
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
@@ -234,24 +234,24 @@ private struct RangeRow: View {
                     Text(row.name).font(.caption.weight(row.picked ? .bold : .regular))
                         .fixedSize(horizontal: false, vertical: true)
                     if !row.familyWord.isEmpty {
-                        Text("(\(row.familyWord))").font(.caption2).foregroundStyle(.secondary)
+                        Text("(\(row.familyWord))").font(.caption2).foregroundStyle(.primary)
                     }
-                    if row.appPick { Text("the app's own pick").font(.caption2.weight(.semibold)).foregroundStyle(.secondary) }
+                    if row.appPick { Text("the app's own pick").font(.caption2.weight(.semibold)).foregroundStyle(.primary) }
                     if row.picked {
                         Text(row.pickedPart ? "now chosen for part of this step" : "now chosen")
-                            .font(.caption2.weight(.semibold)).foregroundStyle(.orange)
+                            .font(.caption2.weight(.semibold)).foregroundStyle(.primary)
                     }
                 }
                 Text(row.figures).font(.caption2).fixedSize(horizontal: false, vertical: true)
-                if let p = row.publicFigure { Text(p).font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true) }
+                if let p = row.publicFigure { Text(p).font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true) }
                 if let reason = row.advancedReason {
-                    Text(reason).font(.caption2).foregroundStyle(.secondary)
+                    Text(reason).font(.caption2).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("ap.sheet.range.\(stage).comparison.\(row.id)")
                 }
                 Text("\(row.listPrice); \(row.batchCost); \(row.time); \(row.canUse).")
                     .font(.caption2)
-                    .foregroundStyle(row.state == .usable ? Color.secondary : row.state == .outsideLimits ? Color.orange : Color.red.opacity(0.8))
+                    .foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 4)
@@ -282,7 +282,7 @@ private struct RangePlot: View {
                 Rectangle().fill(Color.green.opacity(0.10))
                     .frame(width: band, height: g.plot.height)
                     .position(x: g.plot.minX + band / 2, y: g.plot.midY)
-                Text("free").font(.caption2).foregroundStyle(.secondary)
+                Text("free").font(.caption2).foregroundStyle(.primary)
                     .position(x: g.plot.minX + band / 2, y: g.plot.maxY + 10)
                 // Axes and grid.
                 Path { p in
@@ -297,7 +297,7 @@ private struct RangePlot: View {
                         p.addLine(to: CGPoint(x: g.plot.maxX, y: g.y(t)))
                     }
                     .stroke(Color.secondary.opacity(0.15), lineWidth: 0.5)
-                    Text(SettingsSolver.num(t)).font(.caption2).foregroundStyle(.secondary)
+                    Text(SettingsSolver.num(t)).font(.caption2).foregroundStyle(.primary)
                         .position(x: g.plot.minX - 16, y: g.y(t))
                 }
                 ForEach(g.xTicks, id: \.self) { t in
@@ -306,14 +306,14 @@ private struct RangePlot: View {
                         p.addLine(to: CGPoint(x: g.x(t), y: g.plot.maxY))
                     }
                     .stroke(Color.secondary.opacity(0.15), lineWidth: 0.5)
-                    Text(Self.money(t)).font(.caption2).foregroundStyle(.secondary)
+                    Text(Self.money(t)).font(.caption2).foregroundStyle(.primary)
                         .position(x: g.x(t), y: g.plot.maxY + 10)
                 }
-                Text(chart.xLabel).font(.caption2).foregroundStyle(.secondary)
+                Text(chart.xLabel).font(.caption2).foregroundStyle(.primary)
                     .position(x: (g.plot.minX + band + g.plot.maxX) / 2, y: g.plot.maxY + 23)
                 if g.pinned {
                     Text("marks on the bottom edge score lower than \(SettingsSolver.num(g.yLo))")
-                        .font(.caption2).italic().foregroundStyle(.secondary)
+                        .font(.caption2).italic().foregroundStyle(.primary)
                         .fixedSize()
                         .position(x: g.plot.maxX - 110, y: g.plot.maxY - 8)
                 }
@@ -342,7 +342,7 @@ private struct RangePlot: View {
                     }
                     .stroke(Color.red.opacity(0.8), style: StrokeStyle(lineWidth: 1.5, dash: [6, 3]))
                     Text(beyond ? "your limit: \(Self.money(c)), off the chart →" : "your limit")
-                        .font(.caption2).foregroundStyle(.red)
+                        .font(.caption2.weight(.semibold)).foregroundStyle(.primary)
                         .fixedSize()
                         .position(x: beyond ? x - 70 : min(x + 30, g.plot.maxX - 30), y: g.plot.minY + 6)
                 }
@@ -375,7 +375,7 @@ private struct RangePlot: View {
                         .accessibilityLabel(t.text)
                         .accessibilityIdentifier("ap.sheet.range.\(chart.id).together")
                         .position(c)
-                    Text("together").font(.caption2.weight(.semibold)).foregroundStyle(.orange)
+                    Text("together").font(.caption2.weight(.semibold)).foregroundStyle(.primary)
                         .fixedSize()
                         .position(x: c.x, y: c.y + 14)
                 }

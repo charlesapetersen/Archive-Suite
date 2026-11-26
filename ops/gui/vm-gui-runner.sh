@@ -29,7 +29,7 @@
 #                PROCESSOR_JOURNEY=reviews (W40.d2: the review dialogs answered by hand in the real Process Files
 #                  window, on six photos of a rehearsal box, read by the stand-in CLI scripts/fake_local_agent.py;
 #                  run it through ArchiveProcessor/scripts/journey-review-dialogs.sh).
-#                PROCESSOR_JOURNEY=namesestimate (W49.proc-s044-check: rank names in the collection interview,
+#                PROCESSOR_JOURNEY=namesestimate (W49.proc-s044-check: rank names in the Advisor sheet,
 #                  compare the Cost Estimate and count the independent loopback stand-in gateway requests; $0).
 #                VISUAL_REVIEW=1 (W40.e10/e11 screenshot tour; pair with ONLY_TESTING=<App>UITests/VisualReviewUITests).
 #                TRANSIENT_VIDEO=1 (W40.e13: record the guest screen across the run; scan with transient-frames.py).
