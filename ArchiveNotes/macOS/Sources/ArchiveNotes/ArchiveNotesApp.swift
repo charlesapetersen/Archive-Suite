@@ -23,6 +23,8 @@ struct ArchiveNotesApp: App {
         MainActor.assumeIsolated {
             ArchiveTestHost.suppressWindowsIfUnitTestHost()
 #if DEBUG
+            // Before anything reads a harness argument: Restart and Switch's relaunch arrives with none (W49.notes-relaunch-args-flake).
+            UITestRelaunchArguments.adoptIfHandedOver()
             let appearanceForced = UITestAppearance.applyIfRequested()   // the layout guard's light/dark passes (W40.e9)
             TransientRecorder.startIfRequested()  // the transient-state check (W40.e13)
             NotesAppearanceUITestDefaults.clearStoredChoiceIfUITest()

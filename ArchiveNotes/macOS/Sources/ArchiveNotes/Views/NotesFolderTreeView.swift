@@ -163,7 +163,7 @@ struct NotesFolderTreeView: View {
         let ids = payloads.flatMap { NotesItemDrag.decode(string: $0) }
         guard !ids.isEmpty else { return false }
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-ANUITestStorePath") {
+        if !(UserDefaults.standard.string(forKey: "ANUITestStorePath") ?? "").isEmpty {
             model.statusMessage = "Drop \(replicate ? "copy" : "move") from \(source?.uuidString ?? "all") to \(folderId.uuidString)"
         }
         #endif
@@ -477,7 +477,7 @@ struct NotesFolderTreeView: View {
                 // Left out for the accessibility audit: on macOS 27 Xcode's contrast audit never finishes on
                 // this 2 pt, nearly transparent text once a note is open (W40.vm-macos27-notes, measured in
                 // the 27.2 guest: a 15 s timeout with it, 0.6 s without), the editor probes' failure again.
-                if ProcessInfo.processInfo.arguments.contains("-ANUITestStorePath"),
+                if !(UserDefaults.standard.string(forKey: "ANUITestStorePath") ?? "").isEmpty,
                    !UserDefaults.standard.bool(forKey: "ANUITestNoHiddenProbes") {
                     Text(dropTarget.map { "\($0.zone) \($0.folder.uuidString)" } ?? "none")
                         .font(.system(size: 2)).opacity(0.05)

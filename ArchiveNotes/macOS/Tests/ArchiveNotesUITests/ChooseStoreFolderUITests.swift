@@ -15,15 +15,19 @@ import AppKit
 final class ChooseStoreFolderUITests: NotesFixtureUITestCase {
 
     private static let adoptedNoteID = "55555555-5555-5555-5555-555555555555"
-    private static let bookmarkSuite = "com.archivenotes.app.uitest-store-bookmark.\(UUID().uuidString)"
+    /// One per test, not per process: a repeated run (`-test-iterations`) would otherwise start in the store the
+    /// previous iteration picked.
+    private let bookmarkSuite = "com.archivenotes.app.uitest-store-bookmark.\(UUID().uuidString)"
     private static var adoptedStorePath: String { canonicalFixturePath + " Adopted Store.archivenotes" }
 
     override var extraLaunchArguments: [String] {
-        ["-ANUITestStorePickPath", Self.adoptedStorePath, "-ANUITestStoreBookmarkSuite", Self.bookmarkSuite]
+        ["-ANUITestStorePickPath", Self.adoptedStorePath, "-ANUITestStoreBookmarkSuite", bookmarkSuite]
     }
 
     func testChooseStoreFolderAdoptsAStoreThatSurvivesRelaunch() throws {
         terminateStrayNotesInstances()
+        // The relaunched instance is not the one XCUITest launched, so its tearDown would leave it running.
+        addTeardownBlock { @MainActor in terminateStrayNotesInstances() }
         try withFixture {
             try requireCanonicalScratchFixtureForStoreWrites()
             let markerPath = Self.adoptedStorePath + "/.archive-suite-root.json"
@@ -44,15 +48,29 @@ final class ChooseStoreFolderUITests: NotesFixtureUITestCase {
             confirm.click()
 
             // Restart and Switch (owner, notes-2 row 1): Notes quits and starts itself again, with no relaunch
-            // from the test. The new process carries this run's arguments, so it opens the scratch stores.
+            // from the test. The new process carries this run's arguments, handed over through the app's defaults
+            // since a sandboxed relaunch is given none (W49.notes-relaunch-args-flake), so it opens the scratch stores.
+            var relaunched: pid_t = 0
             XCTAssertTrue(pollUntil(timeout: 30) {
-                NSRunningApplication.runningApplications(withBundleIdentifier: "com.archivenotes.app")
-                    .contains { $0.processIdentifier != pid && !$0.isTerminated }
+                guard let new = NSRunningApplication.runningApplications(withBundleIdentifier: "com.archivenotes.app")
+                    .first(where: { $0.processIdentifier != pid && !$0.isTerminated }) else { return false }
+                relaunched = new.processIdentifier
+                return true
             }, "confirming should restart the app")
             XCTAssertTrue(pollUntil(timeout: 30) { NSRunningApplication(processIdentifier: pid) == nil },
                           "the old instance should have quit")
-            app.activate()
+            // `app` launched the old instance, and until XCUITest has registered the new one it reports the app not
+            // running, so an `activate()` then starts an instance of its own (measured: a second instance, beside the
+            // relaunch). Waiting for the running state attaches to the relaunched instance instead.
+            let restarted = XCUIApplication(bundleIdentifier: "com.archivenotes.app")
+            XCTAssertTrue(pollUntil(timeout: 20) { restarted.state != .notRunning },
+                          "XCUITest should see the relaunched instance running")
+            restarted.activate()
+            let mainWindow = restarted.windows["Archive Notes"]
             XCTAssertTrue(mainWindow.waitForExistence(timeout: 15), "the window should come back after the restart")
+            let instances = { NSRunningApplication.runningApplications(withBundleIdentifier: "com.archivenotes.app")
+                .filter { !$0.isTerminated }.map(\.processIdentifier) }
+            XCTAssertEqual(instances(), [relaunched], "the instance checked should be the one Notes started")
             let adopted = mainWindow.descendants(matching: .any)["an.cell.title.\(Self.adoptedNoteID)"]
             XCTAssertTrue(adopted.waitForExistence(timeout: 25),
                           "after the relaunch the list should show the note from the picked store")

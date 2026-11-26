@@ -30,8 +30,9 @@ suite therefore routes through the projector against **scratch copies only**.
    the bookmark-untouched invariant green. The one exception is `ChooseStoreFolderUITests` (VM), which
    drives it with `-ANUITestStoreBookmarkSuite <suite>` so the pick lands in a throwaway defaults suite,
    never `notesStoreRootBookmark`, and `-ANUITestStorePickPath` in place of the panel
-   (W40.fix-notes-choose-store; `-ANUITestNewLibraryPath` does the same for New Library…'s Save panel). Without that argument the rule stands. Its restart passes the launch
-   arguments on (`StoreFolderChooser.relaunchApp`), so the relaunched app opens the same scratch stores.
+   (W40.fix-notes-choose-store; `-ANUITestNewLibraryPath` does the same for New Library…'s Save panel). Without that argument the rule stands. Its restart hands the launch
+   arguments over through the app's defaults (`StoreFolderChooser.relaunchApp`, `UITestRelaunchArguments`: a
+   sandboxed relaunch is given none), so the relaunched app opens the same scratch stores.
    Likewise the note a window had open is remembered only under `-ANUITestLastOpenSuite <suite>`
    (`ReopenLastNoteUITests`); any other UITest launch neither reads nor writes it (W40.fix-notes-small-wins).
    File ▸ Open Recent's list is kept in the bookmark suite under `-ANUITestStoreBookmarkSuite` and in memory

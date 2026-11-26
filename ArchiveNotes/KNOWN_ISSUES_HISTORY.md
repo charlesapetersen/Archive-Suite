@@ -4,6 +4,15 @@ Archived from [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) on 2026-11-25 (W49.notes-docs
 and verified entries and the 2026-07 build-out logs, newest first as they stood. History only; the open limits
 stay in `KNOWN_ISSUES.md`. A new fixed entry may still be written there and moved here later.
 
+## ✅ FIXED (W49.notes-relaunch-args-flake, 2026-11-25) — the UITest relaunch after Restart and Switch keeps its arguments
+
+A sandboxed app's `NSWorkspace.openApplication` relaunch is given no arguments (measured in the VM: argc 1 every
+time), so the relaunch always came up bare. `ChooseStoreFolderUITests` passed only when XCUITest's `activate()`,
+seeing no instance it had launched, started one of its own with the test's arguments. A harness launch now hands
+its arguments over through the app's defaults (`UITestRelaunchArguments`, DEBUG-only, taken once within 60 s), and
+the test waits for XCUITest to see the relaunched instance and checks it is the only one. 6 of 6 VM runs pass
+(accepted: fixed, W49.notes-relaunch-args-flake).
+
 ## ✅ FIXED (W49.fix-notes-header-sort, 2026-11-21) — sortable column headers reorder notes
 
 Clicking a sortable header now reorders the rows with the arrow. Clicking the same header again reverses the

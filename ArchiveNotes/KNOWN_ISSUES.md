@@ -22,15 +22,6 @@ it. When a parent cannot be looked at at all (`stat` fails other than "not found
 archive?" and offers Choose Archive Folder… first (accepted: owner, 2026-11-20, call 24, chose this question as
 the remedy; a folder with no marker anywhere above it carries no sign to detect).
 
-## ⚠️ FLAKY (W49.notes-library-ux, 2026-11-25) — the UITest relaunch after Restart and Switch can lose its arguments
-
-`ChooseStoreFolderUITests` confirms Restart and Switch and expects the relaunched app to open the picked scratch
-library. In about half the VM runs, on main as well (2 of 4 runs of c49cf683), the relaunched process is the same
-Debug binary but starts as a bare first launch: no `-ANUITestStorePath`, so it asks for a library with the Save
-panel, and the test fails at "after the relaunch the list should show the note from the picked store".
-`StoreFolderChooser.relaunchApp` passed the full argument list; the relaunched process never ran with it. A real
-user's relaunch needs no arguments, so only the harness is affected, inside the VM (queued: W49.notes-relaunch-args-flake).
-
 ## ⚠️ LIMIT (W40.root-marker-auto, 2026-11-06) — Choose Archive Folder… gives a plain folder an archive identity
 
 File ▸ Choose Archive Folder… now writes `.archive-suite-root.json` (kind `reader`) into a folder that has none,

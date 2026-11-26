@@ -12,7 +12,7 @@ import Foundation
 enum NotesAppearanceUITestDefaults {
     static let keepArgument = "-ANUITestKeepAppearance"
 
-    static func clearStoredChoiceIfUITest(arguments: [String] = ProcessInfo.processInfo.arguments,
+    static func clearStoredChoiceIfUITest(arguments: [String] = UITestRelaunchArguments.arguments,
                                           defaults: UserDefaults = .standard) {
         guard arguments.contains("-ANUITestStorePath"), !arguments.contains(keepArgument) else { return }
         defaults.removeObject(forKey: AppAppearance.defaultsKey)

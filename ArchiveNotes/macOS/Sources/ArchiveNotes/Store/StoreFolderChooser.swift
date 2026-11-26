@@ -386,13 +386,16 @@ final class StoreFolderChooser {
 
     /// Start a new instance of Notes as this one terminates. It is asked for while this process still runs (the
     /// old one is past saving, and the two never open the same store), so the launch is waited for briefly:
-    /// returning from `willTerminate` ends the process, and with it a request not yet delivered. The arguments
-    /// are passed on, so a UITest's relaunch uses its scratch store and never the owner's.
+    /// returning from `willTerminate` ends the process, and with it a request not yet delivered. A sandboxed
+    /// relaunch is given no arguments (the configuration's are dropped), so a UITest's are handed over through
+    /// the app's defaults instead, and its relaunch uses its scratch store, never the owner's.
     static func relaunchApp() {
         guard !ArchiveTestHost.isUnitTestHost else { return }
+#if DEBUG
+        UITestRelaunchArguments.saveForRelaunch()
+#endif
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.createsNewApplicationInstance = true
-        configuration.arguments = Array(CommandLine.arguments.dropFirst())
         let launched = DispatchSemaphore(value: 0)
         NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) { _, error in
             if let error { NSLog("StoreFolderChooser: could not restart Archive Notes: \(error)") }
