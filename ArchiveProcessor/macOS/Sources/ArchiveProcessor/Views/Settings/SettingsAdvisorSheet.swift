@@ -763,8 +763,21 @@ struct AdvisorStageRow: View {
             ForEach(card.caveats, id: \.self) { Text("• \($0)").font(.caption2).fixedSize(horizontal: false, vertical: true) }
             Text("Figures from: " + card.sources.joined(separator: ", ")).font(.caption2)
                 .fixedSize(horizontal: false, vertical: true)
+            Link("How this was measured", destination: handbook.url)
+                .font(.caption)
+                .accessibilityIdentifier("ap.advisor.handbook.\(card.id)")
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// The Settings Handbook section that writes out how this stage's figures were measured.
+    private var handbook: Handbook.Section {
+        switch card.id {
+        case "reading": return .reading
+        case "segmentation": return .documentBreaks
+        case "dating", "entities": return .datesAndNames
+        default: return .handbook
+        }
     }
 
     private func chip(_ text: String, highlight: Bool = false) -> some View {

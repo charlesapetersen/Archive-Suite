@@ -22,7 +22,8 @@ emulator's launcher at two densities. (accepted: fixed history, W40.fix-android-
 
 - Process Files opens About the collection after it accepts files for a new output folder. Changing the
   destination with files already queued offers the interview for the new collection. Saved answers stay
-  in place, and Settings › Processing (scope: this collection) can open the interview at any time.
+  in place, and Settings › Processing › "Compare routes & trade-offs…" (the Advisor, which replaced the interview in
+  W49.proc-settings-advisor-advanced) holds the same questions at any time.
   [Owner walkthrough evidence](../verification/evidence/processor/W40.g3-owner-walkthrough-20261123.md).
   (accepted: fixed by W40.fix-processor-collection-prompt-intake)
 
@@ -336,7 +337,7 @@ on the standard route and the mixed-PDF route (W49.proc-stop-saves-inflight), an
 ## ⚠️ LIMITATION (W47.wh-readers-lost, 2026-11-20): lower-scoring readers the Processor does not offer yet
 
 `Settings/SettingsRouteTable.swift` (`Route.lowerScoring`), `Settings/SettingsTabs.swift` (`RouteTier`); the rows are in
-`segbench-results/settings-routes.json`, offered in the Reader menu and the settings sheet while Settings › Advanced › "Offer
+`segbench-results/settings-routes.json`, offered in the Reader menu and the Advisor while Settings › Advanced › "Offer
 lower-scoring and experimental choices" is on, and in Improve OCR. Every
 lower-scoring row runs since W47.wh-readers-lost-clients (the on-device model through `OCR/OnDeviceModelClient.swift`).
 - **Azure Document Intelligence and AWS Textract are rows but not offered.** Both read all 96 since
@@ -348,8 +349,8 @@ lower-scoring row runs since W47.wh-readers-lost-clients (the on-device model th
 
 ## ⚠️ LIMITATION (W47.wh-yolo-scans, 2026-11-20): what the scanned-newspaper detector does not yet do
 
-`OCR/NewspaperPageReader.swift` (`NewspaperDetector`), VisionOCRKit `ScanNewspaperLayout`; the switch is in Settings →
-Rules → Columns and reading order, off by default.
+`OCR/NewspaperPageReader.swift` (`NewspaperDetector`), VisionOCRKit `ScanNewspaperLayout`; the switch is in Settings ›
+Advanced › Lower-scoring and experimental choices, off by default.
 - **The 4.6-point lead used raw crops.** GLM-OCR, PaddleOCR-VL 1.5, LightOnOCR-3 4B and Qwen3.6 27B read them
   on 15 L9 scans, 14 from one Library of Congress collection. Processor uses masked regions and outside crops
   (W46.layout-partition-fix), and Qwen3.6 27B now reads the whole page. The app's accuracy gain is unmeasured.
@@ -599,7 +600,7 @@ loop does not. Ink outside every region that Vision does not see as a line is no
 every reader but Qwen3.6 27B, which reads newspapers whole: the entry at the top); the independent
 Vision disagreement baseline and a failed page's whole-page fallback bypass layout deliberately. Only confirmed
 newspaper kinds run PP-DocLayoutV3, in native order, with pictures retained. Download its checked 134 MB weights
-(and the shared runtime if missing) in Settings → Rules → Columns and reading order; without it newspapers read
+(and the shared runtime if missing) in Settings › Accounts › Local models on this Mac; without it newspapers read
 whole and say why in the file row. Typed single-column pages, clippings, tables, handwriting, registers, mixed and
 uncertain kinds stay whole. Photographs get perspective correction before detection; failure reads whole.
 
@@ -858,7 +859,7 @@ collection settings file leaves the General settings in effect.
   plan access requires a sign-in check, and the test sets are chosen from the interview answers)
 - **The run still reads the app's processing settings, not the solver's picks.** The frozen record carries both: the
   resolved layers and the `UserDefaults` processing settings the run actually used. Running a batch from the
-  solver's picks is the sheet's job. (accepted: the run reads the processing settings by design; the settings sheet's apply button carries a pick into them, W46.settings-sheet)
+  solver's picks is the Advisor's job. (accepted: the run reads the processing settings by design; the Advisor's Apply carries a pick into them, W46.settings-sheet, W49.proc-settings-advisor-advanced)
 - **A Live Capture session's layers resolve at Finalize.** The session cannot know its collection folders before
   then, so each folder's record uses that folder's layers as they are at Finalize. The processing settings are the
   ones the session took when it started. (accepted: a session cannot know its collection folders before Finalize)
@@ -1140,7 +1141,8 @@ of these added pages has run, and the original 440 frozen pages and their scores
 
 ## ⚠️ LIMITATION (W41.app-local-models, 2026-10-16): what the local open-weight model route does not yet cover
 
-Settings → API Gateway → **A model on this Mac** (`LocalModelRoute`). Open: **only Qwen3-VL 8B at 4-bit is measured on
+Settings › Advanced › Custom endpoints, local servers and the CLI › **The gateway is a model on this Mac** (`LocalModelRoute`; the
+Local HD preset on Processing fills it). Open: **only Qwen3-VL 8B at 4-bit is measured on
 a Mac** (`segbench-results/ocr-mac-local.md`); every Qwen3.6 figure shown is a hosted fp8 score or a bandwidth
 estimate, and labelled so. The **model names** filled for Ollama and LM Studio, and every Qwen3.6 MLX name, are those
 servers' usual naming, not checked against a live server; **Check server** shows the real list. Since W41.app-local-models-fu1 the reply is **streamed and
@@ -1173,7 +1175,7 @@ local run's escalated pages are priced in the pre-run cascade line, but the esti
 
 ## ⚠️ LIMITATION (W41.app-page-kind, 2026-10-16): what choosing each page's reader by its kind does not yet cover
 
-Settings → **Send handwritten pages to a handwriting reader** (off by default; `PageKindRouting`) classifies dropped
+Settings › Processing › Reading › **Send handwritten pages to a handwriting reader** (off by default; `PageKindRouting`) classifies dropped
 photos before a run and splits them two ways (owner, 2026-11-24, `W49.proc-pipeline-prune-ok` 2): typed, printed and
 form pages keep the run's model, handwritten and mixed pages take the guide's first runnable handwriting pick. Open: the **0.8 confidence floor is a choice, not a measurement** — the
 bench's probabilities come from weights fitted on the pages they were scored on, so there is no held-out calibration

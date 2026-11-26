@@ -41,9 +41,6 @@ struct SettingsSheetModel {
         /// The route reading this part, or nil when none does.
         let routeName: String?
         let figure: String
-        let sample: String?
-        /// A label the stage note asks for ("conditional on the truth", "ranks nothing yet", "unmeasured").
-        let label2: String?
         let warning: Bool
     }
 
@@ -133,12 +130,6 @@ struct SettingsSheetModel {
         return String(ar.dropFirst("anthropic|".count))
     }
 
-    struct RuleRow: Identifiable {
-        let id: String
-        let text: String
-        let source: String?
-    }
-
     struct SwitchRow: Identifiable {
         let id: String
         let key: SettingsKey
@@ -151,17 +142,6 @@ struct SettingsSheetModel {
         var offersHandDownload = false
         /// The scanned-newspaper detector switch, while its detector is not downloaded (W47.wh-yolo-scans).
         var offersScanLayoutDownload = false
-    }
-
-    struct RuleStage: Identifiable {
-        let id: String
-        let title: String
-        let text: String
-        let switches: [SwitchRow]
-        let rules: [RuleRow]
-        let source: String?
-        /// W42.int-s5-compress: the searchable form's choice, on the placement stage only.
-        var forms: FormsRow? = nil
     }
 
     /// Which source formats and page kinds request the one-page searchable form.
@@ -233,7 +213,6 @@ struct SettingsSheetModel {
     let cards: [Card]
     /// The range tab: one chart per card stage (W46.settings-range-view).
     let ranges: [SettingsRangeChart]
-    let ruleStages: [RuleStage]
     /// A card stage's own switches (dating's image pass on every document), by stage (W47.settings-panels).
     let stageSwitches: [String: [SwitchRow]]
 
@@ -241,8 +220,6 @@ struct SettingsSheetModel {
     static func overrideKey(_ stage: String) -> SettingsKey { .override(stage: stage, part: "all") }
 
     static let cardStages = SettingsSolver.stageOrder
-    /// The no-choice stages the rules tab shows (`13-stage-rules` notes 01, 02, 03, 05, 06, 11).
-    static let ruleStageIDs = ["reading-copy", "ocr-input", "layout", "placement", "marks", "capture"]
 
     init(table: SettingsRouteTable, pairs: OCRPairMatrix?, resolver: SettingsResolver, macMemoryGB: Double,
          pages: Int, month: SettingsMonthSpend = .init(), running: Running, claudeBilling: ClaudeCLIBilling) {
@@ -286,7 +263,6 @@ struct SettingsSheetModel {
         notInUse = off.isEmpty ? nil
             : "These totals assume every pick is switched on. Process Files does not use the app's picks yet for "
                 + off.joined(separator: " and ") + "; each step below says what it uses now, and Apply switches them on."
-        ruleStages = Self.ruleStageIDs.compactMap { id in table.stage(id).map { Self.ruleStage($0, resolver: resolver) } }
         var stageSwitches: [String: [SwitchRow]] = [:]
         for stage in Self.cardStages {
             if let st = table.stage(stage) {
@@ -853,64 +829,32 @@ struct SettingsSheetModel {
             var rows: [PartRow] = []
             // The pick on the user's own mix of pages: the figure "better" and the alternatives are read against.
             if let v = cmpBase {
-                let unread = picks.contains { $0.part != "all" && $0.flag != nil }
-                // Shares of the whole mix, so the kinds shown and the rest add to 100.
-                let whole = max(1e-9, a.mix.values.filter { $0 > 0 }.reduce(0, +))
-                let mix = ["typewritten", "printed", "handwritten"].compactMap { k -> String? in
-                    guard let x = a.mix[k], x > 0 else { return nil }
-                    return String(format: "%.0f%% \(k)", x / whole * 100)
-                }.joined(separator: ", ")
-                    + {
-                        let rest = a.mix.filter { !["typewritten", "printed", "handwritten"].contains($0.key) && $0.value > 0 }
-                            .sorted { $0.value > $1.value }
-                            .map { k in String(format: "%.0f%% ", k.value / whole * 100) + (CollectionInterviewAnswers.measuredKinds.contains(k.key)
-                                ? PageKindName.label(k.key).lowercased() : CollectionInterviewAnswers.unmeasuredLabel(k.key).lowercased()) }
-                        return rest.isEmpty ? "" : ", " + rest.joined(separator: ", ")
-                    }()
                 rows.append(PartRow(id: "all", label: "On your mix of pages", routeName: nil,
-                                    figure: words.figure("reading", v),
-                                    sample: mix.isEmpty ? "on 96 test pages whose text was checked by hand"
-                                        : "\(mix), from the figures below",
-                                    label2: unread ? "pages your reading choice cannot read count as 0" : nil, warning: false))
+                                    figure: words.figure("reading", v), warning: false))
             }
             rows += picks.filter { $0.part != "all" }.map { p in
-                let isHands = p.part == "handwritten"
-                return PartRow(
+                PartRow(
                     id: p.part, label: words.readingPart(p.part), routeName: p.flag == nil ? name(p.route) : nil,
                     figure: p.flag.map { words.flag($0, part: p.part) } ?? p.figure.map { words.figure("reading", $0) } ?? "not read",
-                    sample: p.flag == nil ? p.route.flatMap { words.readingSample($0, part: p.part) } : nil,
-                    label2: isHands && p.flag == nil
-                        ? "conditional on the truth: the correct text of these pages was first drafted by AI models (Claude and Gemini), so every figure here may read a little high, and Claude's and Gemini's own figures most of all"
-                        : nil,
                     warning: p.flag != nil)
             }
             for kind in CollectionInterviewAnswers.unmeasuredKinds where (a.mix[kind] ?? 0) > 0
                 && stage.kindStrata[kind] == nil && kind != "registers" {
                 rows.append(PartRow(id: kind, label: CollectionInterviewAnswers.unmeasuredLabel(kind),
-                                    routeName: name(main?.route), figure: "unmeasured",
-                                    sample: nil, label2: "no reading program was measured on this kind of page; the main one reads it",
-                                    warning: false))
+                                    routeName: name(main?.route), figure: "unmeasured", warning: false))
             }
             return rows
         case "segmentation":
             guard let p = picks.first else { return [] }
             guard let r = p.route else {
-                return [PartRow(id: "all", label: "All pages", routeName: nil, figure: words.flag(p.flag ?? ""),
-                                sample: nil, label2: nil, warning: true)]
+                return [PartRow(id: "all", label: "All pages", routeName: nil, figure: words.flag(p.flag ?? ""), warning: true)]
             }
             let before = a.checkingMinutes > 0
                 ? "With the \(SettingsSolver.num(a.checkingMinutes)) minutes you will spend checking" : "Before you check anything"
             let per100 = r.figure("test-boxes.checks_per_100")
-            // A route with no test-box figure says nothing about pages rather than "0 settled document pages".
-            let test = r.figures["test-boxes"]
-            let sample = test?["n"]?.double.flatMap { n in test?["photographed_pages"]?.double.map { p in
-                "on the same \(Int(n)) settled document pages in two test boxes (\(Int(p)) photographed pages)" } }
-                ?? "on two test boxes checked by hand"
             var rows = [PartRow(id: "all", label: before, routeName: name(r),
                                 figure: r.family == .manual ? "nothing is proposed: you check every place yourself"
                                     : p.figure.map { String(format: "%.0f%% of pages in the right document", $0) } ?? "no figure",
-                                sample: r.family == .manual ? nil : sample,
-                                label2: r.family == .manual ? nil : "the boxes below are separate tests: on other material it varies",
                                 warning: false)]
             if let per100 {
                 let places = per100 * Double(a.pages) / 100
@@ -920,23 +864,15 @@ struct SettingsSheetModel {
                                             + (stage.route("manual")?.figure("test-boxes.checks_per_100").map {
                                                 String(format: " (by hand with no model: about %.0f; places next to box or folder labels need no check)", $0)
                                             } ?? ""),
-                                    sample: nil, label2: nil, warning: false))
+                                    warning: false))
                 rows.append(PartRow(id: "checking", label: "Your own checking time", routeName: nil,
                                     figure: "about \(SettingsSheetModel.count(Int(places.rounded()), "place")), roughly "
                                         + words.hours(places * SettingsSolver.checkSeconds / 3600),
-                                    sample: "at about 3 seconds a place, timed on one person checking 92 places; not in the times above",
-                                    label2: nil, warning: false))
+                                    warning: false))
             }
             if let after = r.figure("test-boxes.after_checking") {
-                let hidden = r.figure("test-boxes.unflagged_per_500")
                 rows.append(PartRow(id: "after", label: "After you check them all", routeName: nil,
                                     figure: String(format: "%.0f%% of pages in the right document", after),
-                                    sample: nil,
-                                    label2: after < 99.95 && r.family != .manual
-                                        ? "places the model is sure of are not shown to you, and a few of them are wrong"
-                                            + (hidden.map { String(format: " (about %.0f in every 500 pages)", $0) } ?? "")
-                                            + "; to be fully certain, check every place yourself"
-                                        : nil,
                                     warning: false))
             }
             let boxes: [(String, String)] = [("letters", "A box of typed and handwritten letters"), ("magazine", "A magazine, articles within issues"),
@@ -951,19 +887,15 @@ struct SettingsSheetModel {
                 guard let v else {
                     if r.family != .manual, ["letters", "manuscripts-public"].contains(key), measuredElsewhere(key) {
                         rows.append(PartRow(id: key, label: label, routeName: nil, figure: "not measured for this model",
-                                            sample: nil, label2: nil, warning: false))
+                                            warning: false))
                     }
                     continue
                 }
                 let pagesFigure = r.figures[key] != nil
-                let n = (r.figures[key] ?? r.figures["\(key).gap_acc"] ?? r.figures["\(key).owner_weighted"])?["n"]?.double
-                let ranks = key != "magazine" || r.id == "gemini3.8-flash"
                 rows.append(PartRow(id: key, label: label, routeName: nil,
                                     figure: String(format: "%.0f%%", v)
                                         + (pagesFigure ? " of pages in the right document"
                                             : " of the places between pages judged right (a new document or not; a different measure from the rows above)"),
-                                    sample: n.map { "on \(Int($0)) \(pagesFigure ? "pages" : "places between pages"), before checking" },
-                                    label2: ranks ? nil : "ranks nothing yet: not used to choose, because this model was not told that each magazine article is a document of its own",
                                     warning: false))
             }
             return rows
@@ -976,29 +908,25 @@ struct SettingsSheetModel {
                              "step 4": "When no year is found anywhere: estimated from the folder or nearby documents"][p.part] ?? p.part
                 guard let r = p.route, p.flag == nil else {
                     rows.append(PartRow(id: p.part, label: label, routeName: nil, figure: words.flag(p.flag ?? ""),
-                                        sample: nil, label2: nil, warning: false))
+                                        warning: false))
                     continue
                 }
-                func row(_ id: String, _ label: String, _ key: String, _ sample: String, _ note: String? = nil) {
+                func row(_ id: String, _ label: String, _ key: String) {
                     guard let v = r.figure(key) else { return }
-                    let n = r.figures[key]?["n"]?.double
                     rows.append(PartRow(id: id, label: label, routeName: name(r),
-                                        figure: String(format: "%.0f%% get the exact year", v),
-                                        sample: n.map { "on \(Int($0)) \(sample)" }, label2: note, warning: false))
+                                        figure: String(format: "%.0f%% get the exact year", v), warning: false))
                 }
                 switch p.part {
                 case "step 1":
-                    row("step 1", label, "in_text", "documents whose year is in the text")
-                    row("step 1b", "When the year is not written out in the text: inferred from other clues (people, events, a weekday)", "not_in_text",
-                        "test documents whose year is not in their text")
+                    row("step 1", label, "in_text")
+                    row("step 1b", "When the year is not written out in the text: inferred from other clues (people, events, a weekday)", "not_in_text")
                 case "step 2":
-                    row("step 2", label, "unprinted_122_doc_year",
-                        "other test documents, with no year anywhere in their text")
+                    row("step 2", label, "unprinted_122_doc_year")
                 case "step 4":
                     rows.append(PartRow(id: "step 4", label: label, routeName: r.id == first ? nil : name(r),
                                         figure: r.id == first ? "done by the program above; not measured on its own"
                                             : "not measured on its own",
-                                        sample: nil, label2: "always marked Date Uncertain", warning: false))
+                                        warning: false))
                 default: break
                 }
             }
@@ -1006,8 +934,7 @@ struct SettingsSheetModel {
         case "entities":
             if picks.first?.route?.id == "nltagger" {
                 return [PartRow(id: "local-names", label: "Names found in OCR text", routeName: nil,
-                                figure: "Every result is marked low confidence",
-                                sample: nil, label2: "Records mentions when the sender and recipient cannot be assigned", warning: true)]
+                                figure: "Every result is marked low confidence", warning: true)]
             }
             var extra: [PartRow] = []
             if let p = picks.first(where: { $0.part == "correspondence-typed" }), p.flag == nil, let r = p.route {
@@ -1015,7 +942,7 @@ struct SettingsSheetModel {
                     guard let v = r.figure(key) else { continue }
                     extra.append(PartRow(id: key, label: "Letters: \(label)", routeName: nil,
                                          figure: String(format: "finds \(label) right about %.0f times in 100", v * 100),
-                                         sample: r.figures[key]?["n"]?.double.map { "on \(Int($0)) letters" }, label2: nil, warning: false))
+                                         warning: false))
                 }
             }
             // One row for all letters when handwriting was not measured apart and is read.
@@ -1030,23 +957,16 @@ struct SettingsSheetModel {
                        "non-correspondence": "Everything that is not a letter"][p.part] ?? p.part
                 if p.part == "correspondence-handwritten", handsUnread, p.flag == nil {
                     return PartRow(id: p.part, label: label, routeName: nil,
-                                   figure: "none found: your reading choice cannot read handwriting",
-                                   sample: nil, label2: nil, warning: true)
+                                   figure: "none found: your reading choice cannot read handwriting", warning: true)
                 }
                 let r = p.route
                 // Handwriting apart only where the bench scored it apart; else the figure is all 138 letters together.
                 let hands = p.part == "correspondence-handwritten" ? r?.figure("handwritten_or_mixed") : nil
                 let figure = hands ?? p.figure
-                let n = (hands != nil ? r?.figures["handwritten_or_mixed"] : r?.figures["sender"])?["n"]?.double
                 return PartRow(id: p.part, label: label, routeName: p.flag == nil ? name(r) : nil,
                                figure: p.flag == "none" ? (p.part == "non-correspondence" ? "not looked for: names are found in letters only" : "not looked for")
                                    : figure.map { String(format: "finds the sender right about %.0f times in 100", $0 * 100) } ?? "no figure",
-                               sample: p.flag == nil ? n.map {
-                                   p.part == "correspondence-handwritten" && hands == nil
-                                       ? "on \(Int($0)) letters, typed and handwritten together; not measured apart"
-                                       : "on \(Int($0)) letters, typed and handwritten together"
-                               } : nil,
-                               label2: nil, warning: false)
+                               warning: false)
             }
             return senders + extra
         default:
@@ -1071,23 +991,6 @@ struct SettingsSheetModel {
                              offersHandDownload: key == .placeHandOnImage && !HandPlacer.isInstalled(),
                              offersScanLayoutDownload: key == .scanNewspapersDocLayoutYOLO && !ScanNewspaperLayout.isInstalled())
         }
-    }
-
-    private static func ruleStage(_ stage: SettingsRouteTable.Stage, resolver: SettingsResolver) -> RuleStage {
-        let switches = Self.switches(stage, resolver: resolver)
-        var forms: FormsRow?
-        if stage.id == "placement" {
-            let resolved = resolver.resolve(.searchableFor)
-            if case .strings(let list) = resolved.value {
-                forms = FormsRow(entries: list, source: Self.sourceWords(resolved))
-            } else {
-                forms = FormsRow(entries: [], source: Self.sourceWords(resolved))
-            }
-        }
-        return RuleStage(id: stage.id, title: Words.ruleTitle(stage.id), text: Words.ruleText(stage.id),
-                         switches: switches,
-                         rules: stage.rules.map { RuleRow(id: $0.id, text: $0.text, source: $0.source) },
-                         source: stage.note, forms: forms)
     }
 
     /// Switches the run does not read yet: none. Straightening (W42.int-s5) and hand placement (W42.int-s5-hands) are
@@ -1215,10 +1118,8 @@ struct SettingsSheetWords {
         case "segmentation":
             return "Pages are grouped into documents by a model reading seven pages at a time. The figure is pages in "
                 + "exactly the right document, measured on boxes of real papers checked by hand; it is not a forecast for your "
-                + "collection. All routes use the same documents whose boundaries could be settled; unknown documents "
-                + "are excluded from that figure, while checking still counts every flagged place. After checking "
-                + "assumes perfect correction of known boundaries. Places the model is unsure of are shown to you to check, and checking every one is "
-                + "always possible."
+                + "collection. Places the model is unsure of are shown to you to check, and checking every one is always "
+                + "possible; places it is sure of are not shown, and a few of them are wrong."
         case "dating":
             return "The year each document was written: from its text first, then from the page image where the text "
                 + "has none, then from its folder or its neighbours. A year that is estimated is always marked Date "
@@ -1227,55 +1128,6 @@ struct SettingsSheetWords {
             return "Who sent each letter, to whom, and from where. Each name is shown with the words it was read from, or "
                 + "marked inferred. Looked for only when names are among what matters most. With an online reading program it is one more request a letter; on this Mac it needs a downloaded "
                 + "model and typed pages."
-        default: return ""
-        }
-    }
-
-    static func ruleTitle(_ s: String) -> String {
-        ["reading-copy": "The copy you read: turning and straightening",
-         "ocr-input": "Cleaning the image before it is read",
-         "layout": "Columns and reading order",
-         "placement": "Where the text sits on the page image",
-         "marks": "Stamps, signatures and notes in the margin",
-         "capture": "Taking photos with the phone"][s] ?? s
-    }
-
-    /// The stage notes' "Sheet text" (01, 02, 03, 05 in plain words, 06, 11).
-    static func ruleText(_ s: String) -> String {
-        switch s {
-        case "reading-copy":
-            return "Pages are turned upright before reading. Once a page's text has been read, the copy you see is turned "
-                + "level if its lines slope by 1 degree or more, unless you switch straightening off; nothing is cropped or cut, and marks stay. Curved "
-                + "pages are not flattened, and nothing is cropped or evened out on the page you see."
-        case "ocr-input":
-            return "Pages are read from the image as captured. No cleaning, conversion to black and white, or removal of "
-                + "marks is applied to the image a reading program reads: none of these helped any program tested."
-        case "layout":
-            return "Newspapers are read in regions in the detector’s reading order, pictures included, with every reader "
-                + "but Qwen3.6 27B, which read newspapers as well whole as in regions in the tests and so reads them whole, "
-                + "faster and more cheaply. "
-                + "Photographs are corrected for perspective first. Each line is read once, by the region holding most of it; "
-                + "text outside every region is read in small pieces of its own. An unsuccessful layout or region "
-                + "reading uses the whole page. "
-                + "Download the helper below to use regions; until then, newspapers read whole. "
-                + "Scanned newspapers can instead have their columns found by DocLayout-YOLO, newspaper-ocr's route, "
-                + "which leaves pictures out: switch it on below; it is a separate download. Photographs always use "
-                + "the default helper. "
-                + "Everything else reads whole. Handwriting, registers, ledgers and uncertain kinds are never split."
-        case "placement":
-            return "On typed and printed pages the text is laid over the page image line by line, so you can select and "
-                + "search it where it sits; this is free. Every handwritten page gets a separate text page. The lines are "
-                + "also found on the page and the text fitted to them; that layer stays on the image only where the fit "
-                + "is close (an alignment of 0.9 or more), and is left off where the fit is unsure or the program cannot "
-                + "say where each line is."
-        case "marks":
-            return "Finding and listing marks (stamps, signatures, handwritten notes) is not offered yet. Your page images are never altered to "
-                + "hide them, and the page's text includes them where the reading program can read them."
-        case "capture":
-            return "The capture app photographs each page at the camera's full quality with the flash off, keeps the original "
-                + "JPEG untouched, and tells you when the frame is likely to read badly. Hold the phone still, avoid "
-                + "reflections, keep the page edges and only that page in the frame. The Mac sends the reading programs a copy "
-                + "2,048 pixels on its long side; larger copies read no better in the tests."
         default: return ""
         }
     }
@@ -1360,20 +1212,6 @@ struct SettingsSheetWords {
         default:
             let label = PublicStratum.label(part)
             return label == part ? part : label.prefix(1).uppercased() + label.dropFirst()
-        }
-    }
-
-    func readingSample(_ r: SettingsRouteTable.Route, part: String) -> String? {
-        switch part {
-        case "typewritten", "printed":
-            return r.figures[part]?["n"]?.double.map { "on \(Int($0)) \(part) test pages" }
-        case "handwritten":
-            return r.figures["hands16"]?["n"]?.double.map { "on \(Int($0)) handwritten test pages" }
-        default:
-            if case .string(let s)? = r.figures["public"]?[part]?.array?.last, let n = s.split(separator: "/").last {
-                return "on \(n) public test pages, whose text was checked independently"
-            }
-            return nil
         }
     }
 

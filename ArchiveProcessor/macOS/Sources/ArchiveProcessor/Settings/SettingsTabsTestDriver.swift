@@ -6,7 +6,7 @@ import ArchiveCore
 /// `SETTINGS_TABS_TEST=1` (does nothing in normal use). Checks that every setting the window sets has exactly one home
 /// tab (`SettingsTabOwnership`), that the Advanced groups know their defaults and count and reset as the Processing tab
 /// says, that every measured route row has a tier, and that the reader and the presets read the stored flags as a run
-/// does. No model call, no network, no Keychain read, no window; scratch defaults domains only. Writes the table as
+/// does, and that what the tabs store reaches a run's `ResolvedRunConfig` and survives its JSON round trip. No model call, no network, no Keychain read, no window; scratch defaults domains only. Writes the table as
 /// `OWNER <key> <tab>` lines, which `scripts/test-settings-tabs.sh` holds each tab's source file to.
 @MainActor
 enum SettingsTabsTestDriver {
@@ -33,6 +33,7 @@ enum SettingsTabsTestDriver {
         advanced()
         routeTiers()
         readerAndPresets()
+        runConfigRoundTrip()
     }
 
     // 1-3. Five tabs in the design's order; every key one home; the shortcuts name it.
@@ -268,6 +269,42 @@ enum SettingsTabsTestDriver {
               && !WorkflowPreset.fastFree.matches(d, cluster: false))
         check("6 the Cluster preset follows the cluster answer", WorkflowPreset.cluster.matches(d, cluster: true)
               && !WorkflowPreset.cluster.matches(d, cluster: false))
+    }
+
+    // 7. What the tabs store is what a run reads (W49.proc-settings-docs-tests-cleanup): a value set on Processing,
+    // Output or Advanced reaches `ResolvedRunConfig`, a second read gives the same value, and the config a pending run
+    // carries comes back from JSON unchanged.
+    private static func runConfigRoundTrip() {
+        let suite = "settings-runconfig-test-\(UUID().uuidString)"
+        guard let d = UserDefaults(suiteName: suite) else { return check("7 a scratch defaults domain", false) }
+        defer { d.removePersistentDomain(forName: suite) }
+        d.set(LLMProvider.anthropic.rawValue, forKey: DefaultsKeys.selectedProvider)
+        d.set(TaggingMode.autoDate.rawValue, forKey: DefaultsKeys.taggingModeRaw)
+        d.set(SegmentationApproach.gemini.rawValue, forKey: DefaultsKeys.segmentationApproach)
+        d.set(true, forKey: DefaultsKeys.mergeDocuments)
+        d.set("Letters\n  Budget \n\n", forKey: DefaultsKeys.tagVocabulary)
+        d.set(false, forKey: DefaultsKeys.macItemFields)
+        d.set(RotationMode.localVision.rawValue, forKey: DefaultsKeys.rotationModeRaw)
+        d.set(false, forKey: DefaultsKeys.outputImageFile)
+        d.set(2, forKey: DefaultsKeys.textColumns)
+        d.set("Read the dates as day first.", forKey: DefaultsKeys.customOCRPrompt)
+        let config = ResolvedRunConfig.fromDefaults(d)
+        check("7 the reader set on Processing reaches the run", config.provider == .anthropic && config.gateway == nil
+              && config.localAgent == nil, "\(config.provider)")
+        check("7 the tagging, document-break and merge choices reach the run",
+              config.taggingMode == .autoDate && config.segmentationApproach == .gemini && config.mergeDocuments,
+              "\(config.taggingMode) \(config.segmentationApproach) \(config.mergeDocuments)")
+        check("7 the vocabulary reaches the run one trimmed term a line", config.tagVocabulary == ["Letters", "Budget"],
+              "\(config.tagVocabulary)")
+        check("7 the Output choices reach the run", config.rotationMode == .localVision && !config.outputImageFile
+              && config.textColumns == 2 && !config.macItemFields,
+              "\(config.rotationMode) \(config.outputImageFile) \(config.textColumns) \(config.macItemFields)")
+        check("7 the Advanced prompt reaches the run", config.customOCRPrompt == "Read the dates as day first.")
+        check("7 a second read gives the same config", ResolvedRunConfig.fromDefaults(d) == config)
+        let back = (try? JSONEncoder().encode(config)).flatMap { try? JSONDecoder().decode(ResolvedRunConfig.self, from: $0) }
+        check("7 the config comes back from JSON unchanged", back == config)
+        check("7 and so does its record copy", back?.forRecord == config.forRecord
+              && config.forRecord.forRecord == config.forRecord)
     }
 
     private static func finish() {

@@ -237,6 +237,73 @@ Photograph documents with a phone companion — **Android** (`ArchiveCapture/`, 
 
 ---
 
+## Settings Handbook
+
+How the figures in Settings and the Advisor ("Compare routes & trade-offs…") were measured, and what each processing
+stage does to a page. The Settings window says each of these in a sentence and links here from its `?` popovers
+(`Handbook` in `Views/SettingsView.swift`); this is the long form the redesign moved out of the window
+(W49.proc-settings-docs-tests-cleanup, `execution-plans/processor-settings-redesign.md` §6.4). Every route the bench
+measured, including those the app does not run, is in [ArchiveOCRBench](../ArchiveOCRBench/README.md) (its "How to
+read the page" and "Limits" sections).
+
+### Reading figures
+
+Each reading program's accuracy is measured on 96 of the owner's pages whose text was checked by hand (typewritten,
+printed and handwritten) and, where it was run, on published test pages of the same kind. Figures closer than the
+measurements can tell apart count as ties. The checked text was first drafted with Claude and Gemini, so every
+handwriting figure is conditional on that truth: it may read a little high, and Claude's and Gemini's own figures most
+of all. "Escalate failed pages" (a page the reader fails on is read again by a stronger model) beat one model alone at
+every budget up to $5 per 1,000 pages on those 96 pages.
+
+### Document-break figures
+
+Pages are grouped into documents by a model reading seven pages at a time. The figure is pages in exactly the right
+document, measured on boxes of real papers checked by hand; it is not a forecast for any other collection. All routes
+are scored on the same documents, those whose boundaries could be settled; unknown documents are left out of that
+figure, while the checking count still counts every flagged place. "After checking" assumes every known boundary you
+are shown is corrected. Places the model is unsure of are shown to you to check, and checking every one is always
+possible; places it is sure of are not shown, and a few of them are wrong.
+
+### Checking time
+
+Your own checking time is counted at about 3 seconds a place (`SettingsSolver.checkSeconds`, 3.2), timed on one
+person checking 92 places. It is shown
+beside the machine time and is not part of it.
+
+### Dates and names
+
+The year each document was written comes from its text first, then from the page image where the text has none, then
+from its folder or its neighbours. An estimated year is always marked Date Uncertain, and no year is written without
+the words it came from. Senders, recipients and places are looked for only when names are among what matters most;
+each name is shown with the words it was read from, or marked inferred.
+
+### What each processing stage does
+
+- **The copy you read: turning and straightening.** Pages are turned upright before reading. Once a page's text has
+  been read, the copy you see is turned level if its lines slope by 1 degree or more, unless straightening is switched
+  off. Nothing is cropped, cut or evened out, marks stay, and curved pages are not flattened.
+- **Cleaning the image before it is read.** None: pages are read from the image as captured. Cleaning, conversion to
+  black and white and removal of marks helped no program tested.
+- **Columns and reading order.** Newspapers are read in regions in the layout helper's reading order, pictures
+  included, by every reader but Qwen3.6 27B, which read newspapers as well whole as in regions and so reads them whole,
+  faster and more cheaply. Photographs are corrected for perspective first. Each line is read once, by the region
+  holding most of it; text outside every region is read in small pieces of its own; an unsuccessful layout or region
+  reading falls back to the whole page. Until the helper is downloaded, newspapers read whole. Scanned newspapers can
+  instead have their columns found by DocLayout-YOLO (newspaper-ocr's route, a separate download), which leaves
+  pictures out; photographs always use the default helper. Everything else reads whole, and handwriting, registers,
+  ledgers and uncertain kinds are never split.
+- **Where the text sits on the page image.** On typed and printed pages the text is laid over the image line by line,
+  free, so it can be selected and searched where it sits. Every handwritten page gets a separate text page; its lines
+  are also found and the text fitted to them, and that layer stays on the image only where the fit is close (an
+  alignment of 0.9 or more).
+- **Stamps, signatures and notes in the margin.** Finding and listing marks is not offered yet. Page images are never
+  altered to hide them, and the page's text includes them where the reader can read them.
+- **Taking photos with the phone.** The capture app photographs each page at the camera's full quality with the flash
+  off, keeps the original JPEG untouched, and warns when a frame is likely to read badly. The Mac sends readers a copy
+  2,048 pixels on its long side; larger copies read no better in the tests.
+
+---
+
 ## Keyboard map (the menu bar — `Views/ProcessingCommands.swift`)
 
 Audited across the suite by `W40.fix-suite-shortcuts` (2026-11-06); the shared table is in
@@ -451,13 +518,14 @@ Settings/                      W46.settings-solver: the settings layer's solver;
                                estimate footer, the Processing tab's collection and project questions, the
                                segmentation chooser and after a new collection's first files. Self-test: section 9 of
                                `SettingsSheetTestDriver`.
-  SettingsSheetModel.swift     The settings sheet's content (`12-settings-design.md` §3.3, shape A), from the table,
+  SettingsSheetModel.swift     The Advisor's content (`12-settings-design.md` §3.3, shape A), from the table,
                                the solver and the resolved layers: the limits and their sources, the batch totals,
-                               one card per stage (the pick and its family, per-kind figures with sample and the
-                               notes' labels, cost, time, memory, what a better figure would need, the nearest
+                               one card per stage (the pick and its family, per-kind figures, cost, time, memory,
+                               what a better figure would need, the nearest
                                alternatives, the override menu with the app's pick for the way back, what Process
-                               Files runs and whether the pick can be applied to it), and the rule stages (notes 01,
-                               02, 03, 05, 06, 11; no view since the Advisor: their switches are in the Settings tabs).
+                               Files runs and whether the pick can be applied to it). The rule stages' texts (notes
+                               01, 02, 03, 05, 06, 11) are REFERENCE.md §"Settings Handbook"; their switches are in the
+                               Settings tabs (W49.proc-settings-docs-tests-cleanup).
                                An override is `override.<stage>.all` in the nearest layer, read as the solver's
                                `onlyRoutes`. Drawn by the Advisor's stage rows and Range tab (`SettingsAdvisorPage`).
                                Self-test: `SettingsSheetTestDriver`, `scripts/test-settings-sheet.sh` (words, labels, a
@@ -529,7 +597,7 @@ Segmentation/                  W36 window segmenter (not Tier-2: proposes bounda
                                of a recorded box (`scripts/segbench/engine-fixture-deaver.json`, from
                                `export_engine_fixture.py`), plus rules, failure, usage limit and transports.
   SegmentationChooser.swift    The chooser's row text + cost (Part 3 §3-4); UI in `Views/SegmentationChooserView.swift`
-                               (the choice and its run controls; the figures are on the settings sheet).
+                               (the choice and its run controls; the figures are on the Advisor).
                                Self-test: `SegmentationChooserTestDriver`, `scripts/test-segmentation-chooser.sh`.
   PlanUsage.swift              The Claude plan route (W36.seg-opt-subscription, `segbench-results/usage.md`): the
                                `stream-json` meter (`rate_limit_event`), `PlanCalibration` (points per notional
@@ -599,7 +667,7 @@ Views/                         SwiftUI (+ AppKit where needed):
   LiveCaptureView.swift        Live Capture tab: pairing QR, session status, tag cards, Backup Folder reveal.
   SettingsView.swift           The ⌘, Settings scene: the five-tab toolbar; each tab in Settings/.
                                The page-kind guidance (`OCR/OCRPageGuidance.swift`, W41.app-ocr-hierarchy) now only
-                               feeds page-kind routing; what reads which pages best is the settings sheet's reading card.
+                               feeds page-kind routing; what reads which pages best is the Advisor's reading card.
   ToolsView.swift              Tools tab: Compare Models + Test Resolution + Processing History.
   CollectionFinalizeSheet.swift  End-of-session: name each collection or append to an existing folder.
   BoxFolderConfirmSheet.swift  Confirm/reclassify every box/folder identification.

@@ -313,7 +313,7 @@ pairs before releasing the saved source photos.
 ### Preservation copies
 
 The initial setup interview keeps full-resolution originals by default. You can turn this off in
-**Settings → General → Answer the setup questions**. Keeping them adds the size of the intake files
+**Settings › Processing › Answer the setup questions…**. Keeping them adds the size of the intake files
 to your archive. Processor shows the known size before filing. Live Capture keeps the exact bytes
 the Mac received from the phone, and Process Files keeps the native files you admitted.
 In Finder, each new copy takes the filed PDF's base name and keeps its original extension.
@@ -480,7 +480,7 @@ ArchiveProcessor/macOS/Sources/ArchiveProcessor/
 └── Views/
     ├── OCRView.swift                  # Process Files UI — main view (controlPanel + filePanel)
     ├── OCRView+*.swift                # extracted sheets/rows/diff: FileRowView, OCRRetrySheet, Segmentation/DocumentSegment/Collection review sheets, ModelSelection/ModelTestResults/ModelTestTypes, Resolution drop/test sheets, WordDiff
-    ├── SettingsView.swift             # Settings window (⌘,) + live cost pane
+    ├── SettingsView.swift             # Settings window (⌘,): five tabs in Views/Settings/ + the `?` help popover and Handbook links
     ├── ManageModelsView.swift         # Add/remove custom model IDs
     ├── ProviderKeyWizard.swift        # Guided first-run BYO-key setup
     ├── ToolsView.swift                # Compare Models + Test Resolution + Processing History

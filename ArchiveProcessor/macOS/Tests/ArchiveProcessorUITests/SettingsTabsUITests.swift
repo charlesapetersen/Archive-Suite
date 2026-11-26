@@ -85,6 +85,11 @@ final class SettingsTabsUITests: XCTestCase {
                 XCTAssertTrue(settings.descendants(matching: .any)[id].firstMatch.waitForExistence(timeout: 5),
                               "\(title) must hold \(id)")
             }
+            // One picker per choice: the reader and the document-break approach are chosen once, on Processing.
+            for id in ["ap.settings.readerPicker", "ap.segmentation.picker"] {
+                XCTAssertEqual(settings.descendants(matching: .any).matching(identifier: id).count,
+                               title == "Processing" ? 1 : 0, "\(title) must hold \(title == "Processing" ? "one" : "no") \(id)")
+            }
             LayoutGuard.waitUntilSettled(settings)
             sizes.insert("\(Int(settings.frame.width))x\(Int(settings.frame.height))")
             shoot(settings, "settings-tab-\(XCUIApplication.settingsPanelID(title))-\(appearance)")

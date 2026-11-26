@@ -175,16 +175,18 @@ extension LayeredToggle where Label == Text {
 struct HelpLabel: View {
     let title: String
     let help: String
+    let handbook: Handbook.Section?
 
-    init(_ title: String, help: String) {
+    init(_ title: String, help: String, handbook: Handbook.Section? = nil) {
         self.title = title
         self.help = help
+        self.handbook = handbook
     }
 
     var body: some View {
         HStack {
             Text(title)
-            HelpButton(text: help)
+            HelpButton(text: help, handbook: handbook)
         }
     }
 }

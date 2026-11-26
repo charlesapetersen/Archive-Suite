@@ -5,9 +5,11 @@
 # a tier, and that the reader menu and presets read the backend flags as a run does. Then holds each tab's source to the
 # owner table: a stored setting a tab's file writes (a `$binding`, an assignment or a toggle) must be one the table gives
 # that tab, unless the line says `// side effect`; holds the Advanced defaults to every `@AppStorage` declaration of the
-# same key with a literal default; and checks that none of the eight retired panels, the level gate or the stage cards
-# is back, and that the window shows no "Not switched on yet" / "Read with this" split. No model call, no network, no
-# Keychain read, no window, never the corpus.
+# same key with a literal default; and checks that none of the eight retired panels, the level gate, the stage cards,
+# the old settings sheet or interview or their tests is back, that the reader and document-break choices each have one
+# picker in the window, that the long methodology is in REFERENCE.md's Handbook (whose headings the `?` links land
+# on) rather than the window, and that the window shows no "Not switched on yet" / "Read with this" split. No model
+# call, no network, no Keychain read, no window, never the corpus.
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-unsandboxed.sh"   # no app launch inside the Codex sandbox
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -134,8 +136,11 @@ print(f'PASS defaults: the {compared} literal @AppStorage defaults of Advanced s
 # The retired window is gone, and the window draws no solver-against-run split.
 import os
 retired = ['Views/SettingsPanels', 'Views/SettingsStageCards.swift', 'Settings/SettingsLevels.swift',
-           'Settings/SettingsPanels.swift', 'Views/CollectionSettingsSection.swift', 'Views/LocalModelSettingsView.swift']
-back = [r for r in retired if os.path.exists(f'{src}/{r}')]
+           'Settings/SettingsPanels.swift', 'Views/CollectionSettingsSection.swift', 'Views/LocalModelSettingsView.swift',
+           'Views/CollectionInterviewView.swift', 'Views/SettingsSheetView.swift',
+           'Settings/SettingsPanelsTestDriver.swift', '../../Tests/ArchiveProcessorUITests/SettingsPanelsUITests.swift',
+           '../../Tests/ArchiveProcessorUITests/SettingsLevelsUITests.swift', '../../../scripts/test-settings-panels.sh']
+back = [os.path.normpath(r) for r in retired if os.path.exists(f'{src}/{r}')]
 if back:
     sys.exit('FAIL retired: ' + ', '.join(back) + ' came back')
 split = []
@@ -146,5 +151,39 @@ for path in glob.glob(f'{src}/Views/Settings/*.swift') + [f'{src}/Views/Settings
             split.append(f'{path[len(src)+1:]}: {phrase}')
 if split:
     print('FAIL split: the Settings window still says'); print('\n'.join(split)); sys.exit(1)
-print('PASS retired: no legacy panel, level gate or stage card, and no split wording in the window')
+print('PASS retired: no legacy panel, level gate, stage card, old sheet or old test, and no split wording in the window')
+
+# No stacked pickers: the reader and the document-break approach each have one picker in the Settings window, on
+# Processing (the old window stacked a stage card's menu, a panel's pickers and the chooser for the same choice).
+pickers = {'ap.settings.readerPicker': 'SettingsReaderPicker(', 'ap.segmentation.picker': 'SegmentationChooserView('}
+window = glob.glob(f'{src}/Views/Settings/*.swift') + [f'{src}/Views/SettingsView.swift']
+stacked = []
+for ident, view in pickers.items():
+    homes = [p for p in glob.glob(f'{src}/**/*.swift', recursive=True)
+             if f'"{ident}"' in open(p).read() and 'TestDriver' not in p]
+    uses = sum(open(p).read().count(view) for p in window)
+    if len(homes) != 1 or uses != 1:
+        stacked.append(f'{ident}: declared in {len(homes)} files, {view[:-1]} placed {uses} times in the window')
+if stacked:
+    print('FAIL stacked: a choice has more than one picker'); print('\n'.join(stacked)); sys.exit(1)
+print('PASS stacked: one reader picker and one document-break picker in the Settings window')
+
+# The long methodology lives in REFERENCE.md §"Settings Handbook", not in the window, and every `?` link lands on a
+# heading there (GitHub's anchor: lower case, punctuation dropped, spaces to hyphens).
+reference = open(f'{src}/../../../REFERENCE.md').read()
+anchors = {re.sub(r'\s', '-', re.sub(r'[^\w\s-]', '', h.strip().lower()))
+           for h in re.findall(r'^#{2,4} (.+)$', reference, re.M)}
+handbook = re.search(r'enum Section: String, CaseIterable \{(.*?)\n    \}', open(f'{src}/Views/SettingsView.swift').read(), re.S)
+sections = re.findall(r'case \w+ = "([^"]+)"', handbook.group(1)) if handbook else []
+missing = [a for a in sections if a not in anchors]
+if not sections or missing:
+    sys.exit(f'FAIL handbook: no Handbook sections found' if not sections else f'FAIL handbook: no REFERENCE.md heading for {missing}')
+moved = ['All routes use the same documents', 'conditional on the truth', 'at about 3 seconds a place',
+         'Stamps, signatures and notes in the margin', 'What a better figure would need', 'is not offered yet']
+prose = [f'{p[len(src)+1:]}: {m}' for p in window + [f'{src}/Views/SegmentationChooserView.swift',
+         f'{src}/Views/SettingsRangeView.swift', f'{src}/Settings/SettingsSheetModel.swift', f'{src}/Settings/SettingsAdvisor.swift']
+         for m in moved if m in open(p).read()]
+if prose:
+    print('FAIL prose: methodology the Handbook holds is back in the window'); print('\n'.join(prose)); sys.exit(1)
+print(f'PASS handbook: the {len(sections)} Handbook links land on REFERENCE.md headings, and the long methodology is out of the window')
 PY

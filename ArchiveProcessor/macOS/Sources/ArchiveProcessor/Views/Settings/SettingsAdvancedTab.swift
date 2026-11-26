@@ -341,7 +341,7 @@ struct SettingsAdvancedTab: View {
                 Text("\(m.provider.rawValue) · \(m.displayName)").tag(routeID)
             }
         } label: {
-            HelpLabel("Escalate failed pages to", help: "A page the Reader fails on (a refusal, a reply cut off, an unparsable reply, a server error) is read again by this stronger model. On the bench's 96 pages this beat one model alone at every budget up to $5 per 1,000 pages. Uses that provider's API key.")
+            HelpLabel("Escalate failed pages to", help: "A page the Reader fails on (a refusal, a reply cut off, an unparsable reply, a server error) is read again by this stronger model. On the bench's 96 pages this beat one model alone at every budget up to $5 per 1,000 pages. Uses that provider's API key.", handbook: .reading)
         }
         .accessibilityIdentifier("ap.settings.cascadeRoute")
         if let target = OCRCascade(routeID: ocrCascadeRoute).escalationModel {

@@ -9,9 +9,11 @@ extension Notification.Name {
 }
 
 /// A small clickable "?" that reveals an explanation in a popover (also shown on hover), so the
-/// settings rows stay uncluttered.
+/// settings rows stay uncluttered. With a `handbook` section, the popover links to the long form of how a figure was
+/// measured, which the redesign moved out of the window (W49.proc-settings-docs-tests-cleanup).
 struct HelpButton: View {
     let text: String
+    var handbook: Handbook.Section? = nil
     @State private var show = false
     var body: some View {
         Button { show.toggle() } label: {
@@ -21,12 +23,37 @@ struct HelpButton: View {
         .help(text)
         .accessibilityLabel("Help")   // otherwise VoiceOver reads the symbol name (W40.fix-processor-a11y-labels)
         .popover(isPresented: $show, arrowEdge: .bottom) {
-            Text(text)
-                .font(.callout)
-                .frame(width: 300, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(14)
+            VStack(alignment: .leading, spacing: 8) {
+                Text(text)
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let handbook {
+                    Link("How this was measured", destination: handbook.url)
+                        .font(.callout)
+                        .accessibilityIdentifier("ap.help.handbook.\(handbook.rawValue)")
+                }
+            }
+            .frame(width: 300, alignment: .leading)
+            .padding(14)
         }
+    }
+}
+
+/// The Settings Handbook: `ArchiveProcessor/REFERENCE.md` §"Settings Handbook" in the public repository, where the
+/// measurements behind the Settings and Advisor figures are written out in full.
+enum Handbook {
+    static let base = "https://github.com/charlesapetersen/Archive-Suite/blob/main/ArchiveProcessor/REFERENCE.md"
+
+    /// Each value is the section heading's anchor; `scripts/test-settings-tabs.sh` holds them to REFERENCE.md.
+    enum Section: String, CaseIterable {
+        case handbook = "settings-handbook"
+        case reading = "reading-figures"
+        case documentBreaks = "document-break-figures"
+        case checking = "checking-time"
+        case datesAndNames = "dates-and-names"
+        case stages = "what-each-processing-stage-does"
+
+        var url: URL { URL(string: "\(Handbook.base)#\(rawValue)")! }
     }
 }
 

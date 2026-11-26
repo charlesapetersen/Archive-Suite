@@ -59,44 +59,44 @@ enum SettingsSheetTestDriver {
         }
         func card(_ m: SettingsSheetModel, _ id: String) -> SettingsSheetModel.Card? { m.cards.first { $0.id == id } }
 
-        // 1. The rules tab: the six no-choice stages, in words, with their switches.
-        check("1 the rules tab table carries rules for every rule stage",
-              SettingsSheetModel.ruleStageIDs.allSatisfy { !(table.stage($0)?.rules.isEmpty ?? true) },
-              SettingsSheetModel.ruleStageIDs.filter { table.stage($0)?.rules.isEmpty ?? true }.joined(separator: ","))
+        // 1. The no-choice stages' rules in the table, and their switches as the Settings tabs resolve them.
+        let ruleStageIDs = ["reading-copy", "ocr-input", "layout", "placement", "marks", "capture"]
+        check("1 the table carries rules for every rule stage",
+              ruleStageIDs.allSatisfy { !(table.stage($0)?.rules.isEmpty ?? true) },
+              ruleStageIDs.filter { table.stage($0)?.rules.isEmpty ?? true }.joined(separator: ","))
         let free = sheet("free", general: SettingsLayer(kind: .general, name: "General"))
-        check("1 six rule stages shown", free.ruleStages.map(\.id) == SettingsSheetModel.ruleStageIDs,
-              free.ruleStages.map(\.id).joined(separator: ","))
-        check("1 every rule stage has its sheet text", free.ruleStages.allSatisfy { !$0.text.isEmpty && !$0.title.isEmpty })
         // B1 (13-profile-tests.md): layout regions on newspapers only, never on handwriting or registers.
-        let layout = free.ruleStages.first { $0.id == "layout" }
+        let layoutRules = table.stage("layout")?.rules ?? []
         check("B1 layout: regions on newspapers only, never on handwriting or registers",
-              layout?.text.contains("Newspapers") == true && layout?.text.contains("never split") == true
-              && layout?.rules.contains { $0.id == "layout-never-hands-registers" } == true)
-        let scanRule = layout?.rules.first { $0.id == "layout-scans-doclayout-yolo" }?.text ?? ""
-        let scanNote = layout?.switches.first { $0.key == .scanNewspapersDocLayoutYOLO }?.note ?? ""
+              layoutRules.contains { $0.id == "layout-never-hands-registers" })
+        let scanRule = layoutRules.first { $0.id == "layout-scans-doclayout-yolo" }?.text ?? ""
         let scanEvidence = ["raw crops", "4.6", "+1.1 to +8.0", "GLM-OCR", "PaddleOCR-VL 1.5", "LightOnOCR-3 4B",
                             "Qwen3.6 27B", "masked regions", "whole page"]
         check("layout detector evidence describes the benchmark and current app in both places",
-              [scanRule, scanNote].allSatisfy { note in scanEvidence.allSatisfy { note.contains($0) } })
+              [scanRule, SettingsSheetModel.scanLayoutNote].allSatisfy { note in scanEvidence.allSatisfy { note.contains($0) } })
         let readingRoutes = table.stage("reading")?.routes ?? []
         // Owner, 2026-11-24 (W49.proc-pipeline-prune-ok 3): the vendor measurements stay on the bench (settings-routes.json
         // and ArchiveOCRBench), not in the app's table, so they are never Processor choices.
         check("vendor measurements remain in the benchmark without Processor choices",
               !readingRoutes.contains { ["azure-di-layout", "textract-layout"].contains($0.id) || $0.id.contains("transkribus") })
-        // E: placement's hand line setting visible.
-        let place = free.ruleStages.first { $0.id == "placement" }
-        check("E placement: the handwriting placement switch is visible, off by default (owner, 2026-11-24)",
-              place?.switches.first?.key == .placeHandOnImage && place?.switches.first?.isOn == false)
-        check("1 straighten switch on by default", free.ruleStages.first { $0.id == "reading-copy" }?.switches.first?.isOn == true)
-        let off = sheet("straighten-off", general: SettingsLayer(kind: .general, name: "General"),
-                        collection: layer(.collection, [(.straightenReadingCopy, .bool(false))]))
+        // E: placement's hand line setting, read as the Settings tabs' toggles read it (nil is off).
+        let defaults = SettingsResolver(general: SettingsLayer(kind: .general, name: "General"), project: nil, collection: nil)
+        check("E placement: the handwriting placement switch is in the table, off by default (owner, 2026-11-24)",
+              table.stage("placement")?.rules.compactMap { $0.switchSetting.flatMap { SettingsSheetModel.switchKey($0.id) } }.first
+                  == .placeHandOnImage
+              && defaults.resolve(.placeHandOnImage).value.bool != true)
+        check("1 straighten switch on by default", defaults.resolve(.straightenReadingCopy).value.bool == true)
+        let off = SettingsResolver(general: SettingsLayer(kind: .general, name: "General"), project: nil,
+                                   collection: layer(.collection, [(.straightenReadingCopy, .bool(false))]))
+            .resolve(.straightenReadingCopy)
         check("1 a collection's switch is read back with its source",
-              off.ruleStages.first { $0.id == "reading-copy" }?.switches.first.map { !$0.isOn && $0.source.hasPrefix("set for this collection") } == true)
+              off.value.bool == false && SettingsSheetModel.sourceWords(off).hasPrefix("set for this collection"),
+              SettingsSheetModel.sourceWords(off))
         check("1 the placement switch may be held by a collection", SettingsKey.placeHandOnImage.allowed(in: .collection))
-        // W42.int-s5-compress: the searchable form's control, on the placement stage only.
+        // W42.int-s5-compress: the searchable form's control, as Settings › Advanced builds it.
+        let defaultForms = SettingsSheetModel.FormsRow(entries: defaults.resolve(.searchableFor).value.strings ?? [], source: "")
         check("E placement: the searchable form's control, off by default",
-              place?.forms.map { f in !f.all && PageKindName.allCases.allSatisfy { !f.isOn($0) } } == true
-              && free.ruleStages.filter { $0.forms != nil }.map(\.id) == ["placement"])
+              !defaultForms.all && PageKindName.allCases.allSatisfy { !defaultForms.isOn($0) })
         let forms = SettingsSheetModel.FormsRow(entries: ["jpeg/printed", "*/handwritten"], source: "")
         check("E forms: a kind switched on is added for any format, a format's own entry kept",
               forms.setting(.typewritten, true) == ["jpeg/printed", "*/typewritten"]
@@ -113,14 +113,15 @@ enum SettingsSheetTestDriver {
               && formats.settingAll(false, format: "jpeg") == ["*/printed", "pdf/forms", "other/printed"]
               && formats.setting(.typewritten, true, format: "pdf") == ["*/printed", "jpeg/*", "other/printed", "pdf/typewritten", "pdf/forms"]
               && formats.others == ["other/printed"])
-        let chosen = sheet("searchable-on", general: SettingsLayer(kind: .general, name: "General"),
-                           collection: layer(.collection, [(.searchableFor, .strings(["*/printed"]))]))
+        let chosen = SettingsResolver(general: SettingsLayer(kind: .general, name: "General"), project: nil,
+                                      collection: layer(.collection, [(.searchableFor, .strings(["*/printed"]))]))
+            .resolve(.searchableFor)
+        let chosenForms = SettingsSheetModel.FormsRow(entries: chosen.value.strings ?? [], source: SettingsSheetModel.sourceWords(chosen))
         check("E forms: a collection's choice is read back with its source",
-              chosen.ruleStages.first { $0.id == "placement" }?.forms.map {
-                  $0.isOn(.printed) && !$0.isOn(.handwritten) && $0.source.hasPrefix("set for this collection")
-              } == true)
+              chosenForms.isOn(.printed) && !chosenForms.isOn(.handwritten) && chosenForms.source.hasPrefix("set for this collection"),
+              chosenForms.source)
         check("1 every table switch of a rule stage is stored somewhere",
-              SettingsSheetModel.ruleStageIDs.compactMap { table.stage($0) }.flatMap(\.rules)
+              ruleStageIDs.compactMap { table.stage($0) }.flatMap(\.rules)
                 .compactMap(\.switchSetting).allSatisfy { SettingsSheetModel.switchKey($0.id) != nil })
 
         // 2. Free, on this Mac (the skipped interview, B1).
@@ -133,16 +134,11 @@ enum SettingsSheetTestDriver {
         check("2 limits: nothing to spend", free.limits.first { $0.id == "ceiling" }?.value.hasPrefix("Nothing") == true)
         if let r = card(free, "reading") {
             check("2 reading on this Mac, free", r.family.contains("this Mac") && r.cost == "free", "\(r.family) \(r.cost)")
-            check("2 handwritten figures labelled conditional on the truth",
-                  r.parts.first { $0.id == "handwritten" }?.label2?.hasPrefix("conditional on the truth") == true)
-            check("2 every figure names its sample", r.parts.allSatisfy { $0.sample != nil || $0.warning || $0.figure == "unmeasured" })
         } else { check("2 reading card", false) }
         if let s = card(free, "segmentation") {
-            check("2 a magazine figure off the article rule ranks nothing yet",
-                  s.routeID != "gemini3.8-flash" && s.parts.contains { $0.id == "magazine" && $0.label2?.hasPrefix("ranks nothing yet") == true },
-                  s.routeID ?? "nil")
-            check("2 the user's own checking time shown, at the measured 3 s a place",
-                  s.parts.contains { $0.id == "checking" && $0.sample?.contains("3 seconds a place, timed") == true })
+            check("2 the user's own checking time shown, at the measured 3.2 s a place",
+                  SettingsSolver.checkSeconds == 3.2 && s.parts.contains { $0.id == "checking" && $0.figure.contains("place") },
+                  s.parts.map(\.id).joined(separator: ","))
             check("2 a segmentation pick Process Files can run is offered to it",
                   s.routeID == "seg-qwen3.5-2b-8bit" ? s.apply == .segmentation(.local) : true, "\(s.apply as Any)")
             // W46.seg-review-rule: the 2B's card says it is zero-shot, carries the manuscript warning, and offers a partner.
@@ -252,7 +248,6 @@ enum SettingsSheetTestDriver {
         if let s = card(paidImage, "segmentation") {
             if s.routeID == "gemini3.8-flash" {
                 check("3 Gemini 3.8's segmentation card labels its figures as 3.7's", s.labels.contains { $0.contains("Gemini 3.7") })
-                check("3 Gemini 3.8's magazine figure ranks", s.parts.first { $0.id == "magazine" }?.label2 == nil)
                 check("3 Gemini 3.8's segmentation card gives the range over three offsets (W46.seg-g2-offsets)",
                       s.labels.contains { $0.contains("84.6% to 89.8%") }, s.labels.joined(separator: " | "))
                 check("3 the range is labelled as Gemini 3.7's runs, the 3.8 run a single one (owner's call 8)",
@@ -636,8 +631,9 @@ enum SettingsSheetTestDriver {
               out.ok && out.doc?.collection.entry(key) == nil && store.general.entry(key) == nil)
         check("4b the card is the app's pick again", model(out.doc).cards.first { $0.id == "reading" }.map { !$0.isCustom && !$0.hasOverride } == true)
         out = w.set(.placeHandOnImage, .bool(false), doc: out.doc)
+        let written = store.resolver(for: out.doc).resolve(.placeHandOnImage)
         check("4b a switch is written into the collection",
-              model(out.doc).ruleStages.first { $0.id == "placement" }?.switches.first?.isOn == false)
+              out.ok && written.layer == .collection && written.value.bool == false)
         let g = SettingsSheetWriter(store: store, folder: nil)
         let none = g.set(SettingsSheetModel.overrideKey("dating"), .string("vision-rules-t3"), doc: nil)
         check("4b with no folder the general settings take it", none.ok && store.general.entry(SettingsSheetModel.overrideKey("dating")) != nil)
@@ -862,12 +858,11 @@ enum SettingsSheetTestDriver {
             + [m.notInUse ?? ""]
         for c in m.cards {
             out += [c.title, c.about, c.weight, c.family, c.why, c.cost, c.time, c.memory, c.runsNow ?? ""] + c.labels
-            out += c.parts.flatMap { [$0.label, $0.figure, $0.sample ?? "", $0.label2 ?? ""] }
+            out += c.parts.flatMap { [$0.label, $0.figure] }
             out += c.better.flatMap { [$0.gain, $0.reason] }
             out += c.alternatives.flatMap { [$0.family, $0.figure, $0.cost] }
             out += c.options.compactMap(\.blocked)
         }
-        out += m.ruleStages.flatMap { [$0.title, $0.text] + $0.switches.flatMap { [$0.label, $0.note ?? ""] } }
         return out.filter { !$0.isEmpty }
     }
 
@@ -881,7 +876,7 @@ enum SettingsSheetTestDriver {
             dump.append("CARD \(c.title) | \(c.routeName) | \(c.family) | custom \(c.isCustom) | \(c.weight)")
             dump.append("  why: \(c.why)")
             if let t = c.trainingCost { dump.append("  training: \(t)") }
-            for p in c.parts { dump.append("  part \(p.label): \(p.figure) \(p.routeName.map { "— \($0)" } ?? "") (\(p.sample ?? "-")) \(p.label2 ?? "")") }
+            for p in c.parts { dump.append("  part \(p.label): \(p.figure) \(p.routeName.map { "— \($0)" } ?? "")") }
             dump.append("  cost: \(c.cost) | time: \(c.time) | memory: \(c.memory)")
             for l in c.labels { dump.append("  label: \(l)") }
             if let n = c.runsNow { dump.append("  now: \(n) apply \(c.apply.map { "\($0)" } ?? "-")") }
@@ -889,10 +884,6 @@ enum SettingsSheetTestDriver {
             for a in c.alternatives { dump.append("  alt: \(a.name) (\(a.family)): \(a.figure), \(a.cost)") }
             dump.append("  options: " + c.options.map { $0.name + ($0.blocked.map { " (\($0))" } ?? "") }.joined(separator: "; "))
             dump.append("  evidence: \(c.evidence)")
-        }
-        for s in m.ruleStages {
-            dump.append("RULES \(s.title): \(s.text)")
-            for w in s.switches { dump.append("  switch \(w.label): \(w.isOn) [\(w.source)]") }
         }
     }
 
