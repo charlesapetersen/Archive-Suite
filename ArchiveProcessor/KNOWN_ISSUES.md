@@ -2337,7 +2337,8 @@ gaps. Only cfg6 remains: remove the now-production-unused fallback statics and c
   made `stampUnread:` a required parameter at all 13 sites, so no site takes an implicit default), and was
   deleted outright by **W16.cfg6-fu** on 2026-08-01. `MacOSTagger` now holds no state. (accepted: a corrected stale claim, kept as the record of what is already shipped)
 - *"let persisted recovery records own a versioned copy"* — **already shipped.** `PendingRunRuntimeConfig`
-  (`OCRProcessor.swift:403`) is schema-versioned, manifest-attached, structurally validated independent of the
+  (now `PendingRunSnapshot`, holding the run's whole `ResolvedRunConfig` since W49.proc-settings-config-unify;
+  `OCRProcessor.swift:403` at the time) is schema-versioned, manifest-attached, structurally validated independent of the
   fingerprint (`+Pipeline.swift:204-233`), and round-trip tested (`BatchResumeTestDriver.swift:304-426`). (accepted: a corrected stale claim, kept as the record of what is already shipped)
 
 **Why it is not HIGH:** the headline scenario — a Process Files run mutating an in-flight Live Capture's

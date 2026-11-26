@@ -27,14 +27,16 @@ import Testing
     "createdAt":"2026-11-04T09:59:00Z","projectID":"6F1C2E9A-0000-4000-8000-000000000002","projectName":"Correspondence","schemaVersion":1}
     """
 
-    private func run(_ id: String, at date: String, kind: String = "processFiles", version: Int = 1) -> String {
+    private static let geminiRun = #"{"provider":"Gemini","model":{"id":"gemini-3.7-flash","displayName":"Gemini 3.7 Flash"},"#
+        + #""taggingMode":"automatic","ocrWorkerCount":4,"tagVocabulary":["Letters","Bills"],"odd":[{"a":1}]}"#
+
+    private func run(_ id: String, at date: String, kind: String = "processFiles", version: Int = 1,
+                     config: String = geminiRun) -> String {
         """
         {"fileCount":12,"id":"\(id)","kind":"\(kind)","schemaVersion":\(version),"startedAt":"\(date)",\
         "settings":{"collectionID":"6F1C2E9A-0000-4000-8000-000000000001","macMemoryGB":16,\
-        "processing":{"selectedProvider":{"type":"string","value":"Gemini"},\
-        "selectedModelId_Gemini":{"type":"string","value":"gemini-3.7-flash"},"useGateway":{"type":"bool","value":false},\
-        "useAppleVision":{"type":"bool","value":false},"odd":{"type":"tensor","value":0}},\
-        "projectName":"Correspondence","resolvedAt":"\(date)","runID":"\(id)","schemaVersion":1,\
+        "run":\(config),\
+        "projectName":"Correspondence","resolvedAt":"\(date)","runID":"\(id)","schemaVersion":2,\
         "values":{"hours":{"layer":"collection","source":{"setByUser":{"_0":"2026-11-04T10:00:00Z"}},"value":{"type":"double","value":8}},\
         "moneyHabit":{"value":{"type":"string","value":"none"}},\
         "priorities":{"layer":"project","layerName":"Correspondence","source":{"startingPoint":{"_0":"Letters","_1":"2026-11-03T08:00:00.250Z"}},\
@@ -65,14 +67,37 @@ import Testing
         #expect(latest.kindLabel == "Live Capture")
         #expect(latest.fileCount == 12 && latest.macMemoryGB == 16)
         #expect(latest.reader == "Gemini, gemini-3.7-flash")
-        #expect(latest.processing.map(\.key) == ["selectedModelId_Gemini", "selectedProvider", "useAppleVision",
-                                                  "useGateway"])
+        // The run's settings by dotted name; a list of objects is left out.
+        #expect(latest.processing.map(\.key) == ["model.displayName", "model.id", "ocrWorkerCount", "provider",
+                                                  "tagVocabulary", "taggingMode"])
+        #expect(latest.processing.first { $0.key == "tagVocabulary" }?.value == "Letters, Bills")
         let byKey = Dictionary(uniqueKeysWithValues: latest.settings.map { ($0.key, $0) })
         #expect(byKey["hours"]?.value == "8 hours")
         #expect(byKey["moneyHabit"]?.source == "built in: Free, on this Mac")
         #expect(byKey["moneyHabit"]?.value == "Nothing is spent")
         #expect(byKey["priorities"]?.value == "dates, then finding documents")
         #expect(byKey["priorities"]?.source == "from the project “Correspondence”, filled by “Letters” on 2026-11-03")
+    }
+
+    /// W49.proc-settings-config-unify: the route in words, from the run's own config.
+    @Test func readerNamesTheRunsRoute() throws {
+        let root = try scratch()
+        let dir = root.appendingPathComponent(".archivesuite")
+        try write(document, to: dir.appendingPathComponent("collection-settings.json"))
+        let routes = [
+            ("V", #"{"provider":"Apple Vision","model":{"id":"macos-vision"}}"#),
+            ("G", #"{"provider":"Anthropic","model":{"id":"x"},"gateway":{"modelID":"gemini-3.7-flash","displayName":"Stanford"}}"#),
+            ("C", #"{"provider":"Anthropic","model":{"id":"claude-sonnet-5"},"gateway":null}"#),
+        ]
+        for (i, (id, config)) in routes.enumerated() {
+            try write(run(id, at: "2026-11-0\(i + 4)T10:00:00Z", config: config),
+                      to: dir.appendingPathComponent("runs/2026110\(i + 4)-100000-\(id).json"))
+        }
+        let r = try #require(CollectionSettingsRecord.load(collectionFolder: root))
+        let readers = Dictionary(uniqueKeysWithValues: r.runs.map { ($0.id, $0.reader) })
+        #expect(readers["V"] == "Apple Vision (on this Mac)")
+        #expect(readers["G"] == "A gateway, Stanford")
+        #expect(readers["C"] == "Claude, claude-sonnet-5")
     }
 
     @Test func newerSchemaIsNotInterpreted() throws {

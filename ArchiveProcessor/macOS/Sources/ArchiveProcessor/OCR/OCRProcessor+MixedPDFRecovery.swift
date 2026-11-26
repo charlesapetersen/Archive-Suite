@@ -23,7 +23,7 @@ extension OCRProcessor {
         let imageScale: Double
         let gatewayConfig: GatewayConfig?
         let localAgent: LocalAgentConfig?
-        let runtimeConfig: PendingRunRuntimeConfig
+        let runtimeConfig: PendingRunSnapshot
         let startedAt: Date
         /// Indexed by original job index. A changed source must not be paired with saved page OCR.
         let sourceDigests: [String: String]
@@ -85,9 +85,9 @@ extension OCRProcessor {
               (0.01...1).contains(pending.imageScale), pending.imageScale.isFinite,
               (0...20_000).contains(pending.previousTextCharCount),
               pending.gatewayConfig == nil || pending.localAgent == nil,
-              pending.runtimeConfig.dateLocalImage != true || (pending.provider == .appleVision
+              !pending.runtimeConfig.dateLocalImage || (pending.provider == .appleVision
                 && pending.localAgent == nil && !pending.enableCollectionSegmentation && !pending.batchMode),
-              pendingRunRuntimeConfigIsValid(
+              pendingRunSnapshotIsValid(
                 pending.runtimeConfig, fileCount: count,
                 enableTagging: pending.enableTagging,
                 hasGateway: pending.gatewayConfig != nil),
@@ -209,7 +209,7 @@ extension OCRProcessor {
             customPrompt: segmentationContext.customPrompt,
             imageScale: segmentationContext.imageScale,
             gatewayConfig: gatewayConfig, localAgent: localAgent,
-            runtimeConfig: makePendingRunRuntimeConfig(
+            runtimeConfig: makePendingRunSnapshot(
                 imageScale: segmentationContext.imageScale,
                 gatewayConfig: gatewayConfig, runConfig: runConfig),
             startedAt: Date(), sourceDigests: digests, ledgerRunID: ledgerRunID, reviewWholeRun: reviewWholeRun)
@@ -225,33 +225,19 @@ extension OCRProcessor {
     /// `reloadedImport`: the run's cluster import as `resumeMixedPDF` read it when it checked the folder, so the run
     /// uses exactly what was checked and the folder is walked once.
     func applyMixedPDFRuntimeConfig(
-        _ runtime: PendingRunRuntimeConfig, to config: inout SessionProcessingConfig, apiKey: String,
+        _ runtime: PendingRunSnapshot, to config: inout SessionProcessingConfig, apiKey: String,
         reloadedImport: InstitutionalComputeImport?
     ) {
-        config.taggingMode = runtime.taggingMode
-        config.rotationMode = runtime.rotationMode
-        config.mergeDocuments = runtime.mergeDocuments
-        config.tagVocabulary = runtime.tagVocabulary
-        config.imageScale = runtime.imageScale
-        config.standardImageMB = runtime.standardImageMB
-        config.ocrWorkerCount = runtime.ocrWorkerCount
-        config.outputImageFile = runtime.exportOriginals
-        config.pdfImageMB = runtime.pdfImageMB
-        config.exportedImageMB = runtime.exportedImageMB
-        config.textColumns = runtime.textColumns
-        config.visionSettings = runtime.visionSettings
-        config.dateLocalImage = runtime.dateLocalImage == true
-        config.macItemFields = runtime.macItemFields ?? true
-        if config.dateLocalImage { config.visionTextLLM = nil }
-        config.cascade = runtime.cascade ?? .off
+        // The frozen config whole (its segmentation approach included, so a paid segmenter chosen between quit and
+        // resume does not take over the rest of the run), with the backend and destination the resume set from the
+        // pending record.
+        config.config = runtime.config.resumed(identity: config.config)
         config.pageReaders = runtime.pageReaders ?? .empty
         config.institutionalComputeImport = runtime.institutionalComputeFolder == nil ? nil : reloadedImport
-        if let provider = runtime.visionTextProvider, let model = runtime.visionTextModel {
-            config.visionTextLLM = LLMTextConfiguration(
-                provider: provider, model: model,
-                thinkingLevel: runtime.visionTextThinkingLevel,
-                apiKey: KeychainHelper.load(account: provider.rawValue) ?? apiKey)
-        }
+        // The text model's own key, never the OCR backend's: `resumeMixedPDF` refuses first when it is missing.
+        config.credentials.visionTextAPIKey = config.visionText.map {
+            KeychainHelper.load(account: $0.provider.rawValue) ?? ""
+        } ?? ""
     }
 
     /// `readWithoutClusterText`: as `resumeRun`'s, for the run's images (a PDF's pages never match the cluster).
@@ -314,7 +300,7 @@ extension OCRProcessor {
             return
         }
         institutionalComputeResumePrompt = nil
-        applyPendingRunRuntimeConfig(pending.runtimeConfig)
+        applyPendingRunSnapshot(pending.runtimeConfig)
         let context = SegmentationContext(
             previousTextCharCount: pending.previousTextCharCount,
             sendPreviousImage: pending.sendPreviousImage,

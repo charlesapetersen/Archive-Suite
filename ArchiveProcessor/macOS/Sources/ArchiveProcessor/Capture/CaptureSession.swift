@@ -358,7 +358,7 @@ final class CaptureSession: ObservableObject {
             processingMode = .live
             // W46.settings-layers: the processing settings as this session took them, for the record finalize writes
             // into each collection folder it files into.
-            liveProcessor.sessionProcessingSettings = ProcessingSettingsCapture.capture()
+            liveProcessor.sessionRunConfig = cfg.config
             liveProcessor.activate(config: cfg)
         } else {
             processingMode = .stageForLater
@@ -430,7 +430,7 @@ final class CaptureSession: ObservableObject {
         config = cfg
         liveProcessor.adoptSettingsSnapshot(cfg)
         if recoveryTestSettings == nil {
-            liveProcessor.sessionProcessingSettings = ProcessingSettingsCapture.capture()
+            liveProcessor.sessionRunConfig = cfg.config
         }
         return cfg
     }

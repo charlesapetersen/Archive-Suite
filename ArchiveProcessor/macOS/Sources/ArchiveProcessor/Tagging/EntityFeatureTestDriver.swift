@@ -378,8 +378,7 @@ enum EntityFeatureTestDriver {
                             value: .strings(ranked ? ["reading", "names"] : ["reading", "dates"])),
                          SettingsKey.lowConfidenceNames.rawValue: ResolvedSetting(value: .bool(lowConfidence)),
                          SettingsSheetModel.overrideKey("entities").rawValue: ResolvedSetting(
-                            value: .string(noNames ? "none" : ""))],
-                processing: [:])
+                            value: .string(noNames ? "none" : ""))])
             return (p, outputs)
         }
         func json(_ u: URL?) -> [String: Any] {

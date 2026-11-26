@@ -18791,3 +18791,35 @@ the same three lines and landing them separately would silently revert part of t
   - **Tests.** Unit: `UITestRelaunchArgumentsTests` (6: handover taken once, a normal launch saves nothing, a stale handover dropped, own arguments win, command-line parsing, the argument domain beats a stored value); whole `ArchiveNotesTests` bundle green (1285). VM (macOS 27.2): `ChooseStoreFolderUITests` 6 of 6 iterations pass (`TEST_ITERATIONS=6`); before the fix the instrumented run showed the bare relaunch every time.
   - Bench cache: none used.
   <!-- /W49.notes-relaunch-args-flake -->
+- [x] **W49.proc-settings-config-unify — Unify Processor runtime settings into one `ResolvedRunConfig` and retire legacy `@AppStorage` duplication [M · Tier-2]** · §Processor settings and interface design review (lane: processor) — SHIPPED 2026-11-25.
+  Owner-approved Option B foundation (`W49.proc-settings-design-ok`; `execution-plans/processor-settings-redesign.md` §3).
+  One `ResolvedRunConfig` (`Settings/ResolvedRunConfig.swift`, Codable, every processing setting, Keychain-free
+  `fromDefaults`) and `RunCredentials` (never Codable). `SessionProcessingConfig` is now that config + the keys + the page
+  plan, reaching the config through `@dynamicMemberLookup`, so it keeps no copy of a setting. `PendingRunRuntimeConfig`
+  is gone: `PendingRunSnapshot` (schema 2) holds the run's whole config plus the file list's handoff arrays, and a resume
+  (standard and mixed PDF) runs on the frozen config whole (`ResolvedRunConfig.resumed(identity:)`, backend and destination
+  from the pending record's own fields) instead of hand-overlaying ~18 fields onto a fresh defaults read. Fixed on the
+  way: a resume no longer picks up a vision-text model, a review-rotation switch or a paid segmenter (mixed PDF) chosen
+  after the run began, and never falls back to another provider's key for the text model.
+  `ResolvedSettingsSnapshot.processing` (a UserDefaults map) is replaced by the typed `run` config, set at the point the
+  run's config is final (Process Files) or the session's (Live Capture); `forRecord`, enforced on every assignment, cuts
+  the gateway address to scheme/host/port/path, leaves the Local Agent program path empty and keeps only the output
+  folder's name. ArchiveCore's `CollectionSettingsRecord` reads `run` generically (`RecordJSON`, dotted names) and names
+  the route from it; `SPEC/collection-settings.md` documents `run`, schema 2, and the three drifted keys
+  (`lowConfidenceNames`, `dateLocalImage`, general-only `keepPreservationCopies`). The catalogue's original-copy intake
+  takes the run's own `keepPreservationCopies` (frozen on resume) instead of a live read. Deleted dead keys
+  `contextCharCount`, `contextRemovedMigratedV1`, `rotationDefaultMigratedV1` and their start-up migrations (no migration:
+  nothing to migrate, owner 2026-08-01). Left for `W49.proc-settings-redesign-core`: `settingsLevel` and
+  `segmentationApproachPreselected`, which today's Settings window still uses; the layered switches (straighten,
+  placement, dating) are still read from the run's frozen `values`, the same record.
+  Tier-2: two independent read-only reviews (Opus) found nothing serious; their low findings were applied. Verified: clean
+  Debug builds of Processor, Reader and Notes with no new warnings; ArchiveCore `swift test` 208/208; Reader
+  `CollectionRecordRenderTests` (light and dark render guard); `lint-write-surface.sh` clean; headless drivers green:
+  settings-layers, manifest-persistence, segmentation-review, deferred-output, page-reader, institutional-compute-import,
+  ocr-cascade, recovery (Live Capture), vision-hybrid, retry-backend, processing-history, review-corrections, date-route,
+  openrouter, processfiles-tagwarn, text-layer, multipage-reocr, settings-panels/routes, local-models. Failing exactly as
+  on pristine main (queued elsewhere): batch-resume's Gemini reader flag and collection-organize's two label checks
+  (W49.proc-fix-red-checks-1125), run-quit-resume's two batch-Stop checks (W40.fix-processor-batch-stop-contract),
+  entity-feature's Live sidecars check, settings-solver B1 (W49.proc-fix-solver-b1-image-pass), and
+  `check-pipeline-seam.sh` inside test-tagging-failure (its driver passes). No bench cache used. No money spent.
+  <!-- /W49.proc-settings-config-unify -->

@@ -279,13 +279,13 @@ enum PageReaderTestDriver {
                 && OCRPostCorrection.policyReason([SettingsKey.excludedModelFamilies.rawValue: excludes]) != nil)
 
         let processor = OCRProcessor()
-        let configOff = processor.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil)
+        let configOff = processor.makePendingRunSnapshot(imageScale: 1, gatewayConfig: nil)
         processor.activePostCorrection = correction
-        let configOn = processor.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil)
+        let configOn = processor.makePendingRunSnapshot(imageScale: 1, gatewayConfig: nil)
         let encoded = try? JSONEncoder().encode(configOn)
-        let decoded = encoded.flatMap { try? JSONDecoder().decode(OCRProcessor.PendingRunRuntimeConfig.self, from: $0) }
+        let decoded = encoded.flatMap { try? JSONDecoder().decode(OCRProcessor.PendingRunSnapshot.self, from: $0) }
         check("4 the standard and mixed resume snapshot stores only the effective switch",
-              configOff.postCorrection == nil && decoded?.postCorrection == true
+              !configOff.postCorrection && decoded?.postCorrection == true
                 && encoded.flatMap { String(data: $0, encoding: .utf8) }?.contains("test-key") == false)
         // An abandoned newspaper's estimated first request still has a base allowance if a paid correction for
         // the same input was recorded earlier (for example, before a subsequent rotation pass).

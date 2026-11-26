@@ -67,7 +67,6 @@ enum DefaultsKeys {
     static let textColumns = "textColumns"
     static let exportedImageSizeMB = "exportedImageSizeMB"
     static let outputImageFile = "outputImageFile"
-    static let contextCharCount = "contextCharCount"
     static let sendPreviousImage = "sendPreviousImage"
     static let customOCRPrompt = "customOCRPrompt"
     static let mergeDocuments = "mergeDocuments"
@@ -140,8 +139,4 @@ enum DefaultsKeys {
 
     // Processing history (bounded log of completed Process-Files runs; JSON-encoded [ProcessingRun])
     static let processingHistory = "processingHistory"
-
-    // One-time migration flags
-    static let contextRemovedMigratedV1 = "contextRemovedMigratedV1"
-    static let rotationDefaultMigratedV1 = "rotationDefaultMigratedV1"
 }

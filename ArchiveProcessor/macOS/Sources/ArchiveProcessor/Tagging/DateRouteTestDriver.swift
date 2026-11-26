@@ -872,8 +872,7 @@ enum DateRouteTestDriver {
             p.rebuildSegments(files: files)
             p.activeResolvedSettings = ResolvedSettingsSnapshot(
                 runID: UUID(), resolvedAt: Date(), collectionID: nil, projectID: nil, projectName: nil, macMemoryGB: 16,
-                values: [SettingsKey.dateImageEveryDocument.rawValue: ResolvedSetting(value: .bool(imageEvery))],
-                processing: [:])
+                values: [SettingsKey.dateImageEveryDocument.rawValue: ResolvedSetting(value: .bool(imageEvery))])
             return (p, files, outputs)
         }
         func json(_ u: URL?) -> [String: Any] {

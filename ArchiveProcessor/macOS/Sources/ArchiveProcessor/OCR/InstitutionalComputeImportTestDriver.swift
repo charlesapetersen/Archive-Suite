@@ -276,16 +276,16 @@ enum InstitutionalComputeImportTestDriver {
         defer { defaults.removePersistentDomain(forName: suite) }
         var config = SessionProcessingConfig.fromProcessFilesRunStart(defaults)
         config.institutionalComputeImport = imported
-        let runtime = processor.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil, runConfig: config)
+        let runtime = processor.makePendingRunSnapshot(imageScale: 1, gatewayConfig: nil, runConfig: config)
         let back = (try? JSONEncoder().encode(runtime)).flatMap {
-            try? JSONDecoder().decode(OCRProcessor.PendingRunRuntimeConfig.self, from: $0) }
+            try? JSONDecoder().decode(OCRProcessor.PendingRunSnapshot.self, from: $0) }
         check("the run snapshot records the folder", back?.institutionalComputeFolder == bulk.path)
         let reloaded = try? await processor.reloadInstitutionalComputeImport(bulk.path)
         check("a resumed run reloads the folder", reloaded?.count == 2 && !processor.isProcessing)
         let missing = try? await processor.reloadInstitutionalComputeImport(root.appendingPathComponent("gone").path)
         check("a folder gone since gives no import", missing == nil && !processor.isProcessing)
         check("a run without an import records none and its call values carry none",
-              processor.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil).institutionalComputeFolder == nil
+              processor.makePendingRunSnapshot(imageScale: 1, gatewayConfig: nil).institutionalComputeFolder == nil
               && OCRProcessor.ocrCallValues(for: nil).imported == nil
               && OCRProcessor.ocrCallValues(for: config).imported?.count == 2)
 
@@ -333,7 +333,7 @@ enum InstitutionalComputeImportTestDriver {
     }
 
     /// Drive Process Files with the cluster folder present, then verify that interrupted runs ask when it disappears.
-    private static func checkProcessFiles(_ runtime: OCRProcessor.PendingRunRuntimeConfig,
+    private static func checkProcessFiles(_ runtime: OCRProcessor.PendingRunSnapshot,
                                           imported: InstitutionalComputeImport, files: [URL], pdf: URL, root: URL,
                                           script: Script, check: (String, Bool, String) -> Void) async {
         let fm = FileManager.default

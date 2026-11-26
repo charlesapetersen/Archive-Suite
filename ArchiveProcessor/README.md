@@ -470,7 +470,7 @@ ArchiveProcessor/macOS/Sources/ArchiveProcessor/
 ├── Capture/                           # Live Capture
 │   ├── CaptureModels.swift            # CapturedPhoto, CaptureGroup, MacSegmentTags
 │   ├── CaptureSession.swift           # Session state, durable manifest, pairing, mode
-│   ├── SessionProcessingConfig.swift  # Snapshot of settings for a live session
+│   ├── SessionProcessingConfig.swift  # A run's ResolvedRunConfig + its keys (Settings/ResolvedRunConfig.swift)
 │   ├── LiveCaptureProcessor.swift     # Streaming coordinator (OCR→tag→PDF→stage→finalize)
 │   └── LiveCaptureTestDriver.swift    # Test harness driving the live-staging pipeline
 ├── Net/

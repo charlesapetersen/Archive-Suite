@@ -1642,8 +1642,7 @@ final class LiveCaptureProcessor: ObservableObject {
     /// The resolved settings the names policy and the dating route read, loaded once per session config.
     private func liveSettings(_ config: SessionProcessingConfig) -> [String: ResolvedSetting] {
         if entitySettings == nil {
-            entitySettings = SettingsLayerStore.shared.snapshot(outputDirectory: config.outputDirectory, runID: UUID(),
-                                                                processing: [:]).values
+            entitySettings = SettingsLayerStore.shared.snapshot(outputDirectory: config.outputDirectory, runID: UUID()).values
         }
         return entitySettings ?? [:]
     }
@@ -2705,15 +2704,15 @@ final class LiveCaptureProcessor: ObservableObject {
             ?? FileManager.default.homeDirectoryForCurrentUser
     }
 
-    /// The app's processing settings as this live session took them (W46.settings-layers), for the run record finalize
-    /// writes into each collection folder; nil reads them as they are at finalize.
-    var sessionProcessingSettings: [String: SettingsValue]?
+    /// The run config this live session took (W46.settings-layers, W49.proc-settings-config-unify), for the run record
+    /// finalize writes into each collection folder; nil records the session's current config.
+    var sessionRunConfig: ResolvedRunConfig?
 
     /// W46.settings-layers: record this session in every collection folder finalize actually filed into, with the
     /// layers as that folder resolves them and the session's processing settings. A record never blocks finalize.
     /// W47.ct-label-cost: returns the summary's line for the filed markers' label reads through the gateway, else nil.
     private func recordSessionInCollections(_ plans: [MovePlan], filed: Set<String>) -> String? {
-        let processing = sessionProcessingSettings ?? ProcessingSettingsCapture.capture()
+        let runConfig = sessionRunConfig ?? config?.config
         // Two drafts may file into one existing folder: one record per folder, counting every filed document in it.
         var order: [URL] = []
         var counts: [String: Int] = [:]
@@ -2739,7 +2738,7 @@ final class LiveCaptureProcessor: ObservableObject {
         for folder in order {
             let key = folder.standardizedFileURL.path
             guard let count = counts[key], count > 0 else { continue }
-            let snapshot = store.snapshot(outputDirectory: folder, runID: UUID(), processing: processing)
+            let snapshot = store.snapshot(outputDirectory: folder, runID: UUID(), run: runConfig)
             var notes = layerNotes[key] ?? []
             if let unread = unreadImageOnlyPages[key], unread > 0 {
                 // Put the count first so it survives the run log's per-page detail limit.

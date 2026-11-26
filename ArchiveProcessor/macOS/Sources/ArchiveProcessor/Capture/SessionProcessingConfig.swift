@@ -92,7 +92,7 @@ struct SessionProcessingConfig: Sendable {
     ///
     /// Before W16.cfg6-fu3 these three ranges were literals repeated across the reader (`normalizedImageMB`,
     /// `ocrWorkerCount(from:)`, `runSizing`), the Settings `Stepper`s, and
-    /// `OCRProcessor.pendingRunRuntimeConfigIsValid`. Widening the ceiling meant finding all of them.
+    /// `OCRProcessor.pendingRunSnapshotIsValid`. Widening the ceiling meant finding all of them.
     enum Bounds {
         static let imageMB: ClosedRange<Double> = 0.5...20
         static let ocrWorkers: ClosedRange<Int> = 1...12
@@ -146,7 +146,7 @@ struct SessionProcessingConfig: Sendable {
     /// `PDFGenerator` the column count); those are idempotent belt-and-braces over an *injected* config,
     /// which need not have come from a defaults read. Two paths bypass this type: a resumed Process Files
     /// run, which fail-closed *validates* its persisted runtime config against `Bounds` rather than
-    /// clamping it (`OCRProcessor.pendingRunRuntimeConfigIsValid`), and `StagedSegment`'s decoder, which
+    /// clamping it (`OCRProcessor.pendingRunSnapshotIsValid`), and `StagedSegment`'s decoder, which
     /// restores a staged live segment's sizes verbatim (harmless — the build that wrote the segment is the
     /// build that reads it back).
     ///

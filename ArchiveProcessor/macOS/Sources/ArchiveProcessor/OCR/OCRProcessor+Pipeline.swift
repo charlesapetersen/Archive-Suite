@@ -55,12 +55,12 @@ extension OCRProcessor {
         let gatewayConfig: GatewayConfig?
         let localAgent: LocalAgentConfig?
         let legacyExportOriginals: Bool?
-        let runtimeConfig: PendingRunRuntimeConfig
+        let runtimeConfig: PendingRunSnapshot
         let completedResults: [String: OCRResult]
         let completedOutputPaths: [String: String]?
         let mixedPDFOutcomes: [MixedPDFOutcome]?
 
-        init(run: PendingRun, runtimeConfig: PendingRunRuntimeConfig) {
+        init(run: PendingRun, runtimeConfig: PendingRunSnapshot) {
             provider = run.provider
             model = run.model
             thinkingLevel = run.thinkingLevel
@@ -251,15 +251,14 @@ extension OCRProcessor {
     /// Structural validation is separate from the fingerprint. A locally-edited manifest could carry a
     /// freshly recomputed hash, so bound every value before it can control concurrency/sizing and require
     /// all Live Capture parallel arrays to be either absent or aligned with the ordered input list.
-    nonisolated static func pendingRunRuntimeConfigIsValid(
-        _ config: PendingRunRuntimeConfig,
+    nonisolated static func pendingRunSnapshotIsValid(
+        _ config: PendingRunSnapshot,
         fileCount: Int,
         enableTagging: Bool,
         hasGateway: Bool
     ) -> Bool {
-        guard config.schemaVersion == PendingRunRuntimeConfig.currentSchemaVersion,
+        guard config.schemaVersion == PendingRunSnapshot.currentSchemaVersion,
               enableTagging == config.taggingMode.enablesTagging,
-              config.passSourceTags == (config.taggingMode == .copySource),
               config.imageScale.isFinite, (0.01...1.0).contains(config.imageScale),
               // W16.cfg6-fu3: the same `Bounds` the clamps and the Settings steppers use, so this
               // fail-closed validator cannot drift *stricter* than what a builder can produce — which is
@@ -280,17 +279,12 @@ extension OCRProcessor {
         // The three hybrid fields are an all-or-none direct provider snapshot. A Vision OCR run must
         // never resume halfway configured and quietly fall back to sending an image through another
         // backend; the only permitted fallback is no hybrid at all.
-        let hybridFieldsPresent = config.visionTextProvider != nil
-            || config.visionTextModel != nil || config.visionTextThinkingLevel != nil
-        if config.dateLocalImage == true {
+        if config.dateLocalImage {
             guard config.taggingMode == .autoDate, config.segmentationApproach == .manual,
-                  !hybridFieldsPresent, !hasGateway, config.postCorrection != true else { return false }
+                  config.visionText == nil, !hasGateway, !config.postCorrection else { return false }
         }
-        if hybridFieldsPresent {
-            guard let textProvider = config.visionTextProvider,
-                  let textModel = config.visionTextModel,
-                  textProvider != .appleVision,
-                  textModel.provider == textProvider else { return false }
+        if let text = config.visionText {
+            guard text.provider != .appleVision, text.model.provider == text.provider else { return false }
         }
 
         let optionalParallelCounts = [
@@ -307,56 +301,49 @@ extension OCRProcessor {
             && optionalParallelCounts.allSatisfy { $0 == 0 || $0 == fileCount }
     }
 
-    /// Capture the effective runtime values used by this run. Production callers supply their immutable
-    /// config; with none, W16.cfg6 persists a fresh `runSizing()` read rather than the deleted statics —
-    /// so a manifest can never record sizing values inherited from an unrelated earlier run.
-    func makePendingRunRuntimeConfig(
+    /// Capture the effective runtime values used by this run: the run's own `ResolvedRunConfig`, with the values the
+    /// controller holds for it (tagging, rotation, merge, vocabulary, the second image file) and the scale the run
+    /// priced. With no config, W16.cfg6 persists a fresh defaults read rather than the deleted statics, so a manifest
+    /// can never record sizing values inherited from an unrelated earlier run.
+    func makePendingRunSnapshot(
         imageScale: Double,
         gatewayConfig: GatewayConfig?,
         runConfig: SessionProcessingConfig? = nil
-    ) -> PendingRunRuntimeConfig {
-        let effectiveScale = imageScale.isFinite ? max(0.01, min(1.0, imageScale)) : 1.0
-        let sizing = runConfig?.runSizing ?? SessionProcessingConfig.runSizing()
-        return PendingRunRuntimeConfig(
-            schemaVersion: PendingRunRuntimeConfig.currentSchemaVersion,
-            taggingMode: taggingMode,
-            passSourceTags: passSourceTags,
-            rotationMode: rotationMode,
-            reviewRotation: reviewRotation,
-            mergeDocuments: mergeDocuments,
-            tagVocabulary: tagVocabulary,
-            imageScale: effectiveScale,
-            exportOriginals: exportOriginals,
+    ) -> PendingRunSnapshot {
+        var config = runConfig?.config ?? {
+            var read = ResolvedRunConfig.fromDefaults()
+            // Without a run's own config there is no text model or local date pass to record.
+            read.visionText = nil
+            read.dateLocalImage = false
+            return read
+        }()
+        config.taggingMode = taggingMode
+        config.rotationMode = rotationMode
+        config.reviewRotation = reviewRotation
+        config.mergeDocuments = mergeDocuments
+        config.tagVocabulary = tagVocabulary
+        config.imageScale = imageScale.isFinite ? max(0.01, min(1.0, imageScale)) : 1.0
+        config.outputImageFile = exportOriginals
+        config.gatewayUpstreamProvider = gatewayConfig == nil ? nil : Self.gatewayUpstreamProviderFromDefaults()
+        config.postCorrection = activePostCorrection != nil
+        return PendingRunSnapshot(
+            schemaVersion: PendingRunSnapshot.currentSchemaVersion,
+            config: config,
             preGroupedBoundaries: preGroupedBoundaries,
             preGroupedTypes: preGroupedTypes,
             preGroupedQualities: preGroupedQualities,
             preGroupedYears: preGroupedYears,
             preGroupedMonths: preGroupedMonths,
             preGroupedSubjects: preGroupedSubjects,
-            standardImageMB: sizing.standardImageMB,
-            ocrWorkerCount: sizing.ocrWorkerCount,
-            pdfImageMB: sizing.pdfImageMB,
-            textColumns: sizing.textColumns,
-            exportedImageMB: sizing.exportedImageMB,
-            visionSettings: runConfig?.visionSettings ?? VisionOCRSettings.fromDefaults(),
-            visionTextProvider: runConfig?.visionTextLLM?.provider,
-            visionTextModel: runConfig?.visionTextLLM?.model,
-            visionTextThinkingLevel: runConfig?.visionTextLLM?.thinkingLevel,
-            gatewayUpstreamProvider: gatewayConfig == nil ? nil : Self.gatewayUpstreamProviderFromDefaults(),
-            segmentationApproach: runConfig?.segmentationApproach ?? SegmentationApproach.stored(),
-            cascade: runConfig?.cascade ?? OCRCascade.fromDefaults(),
-            postCorrection: activePostCorrection == nil ? nil : true,
-            dateLocalImage: runConfig?.dateLocalImage == true ? true : nil,
-            macItemFields: runConfig?.macItemFields,
             pageReaders: runConfig.map { $0.pageReaders.isEmpty ? nil : $0.pageReaders } ?? nil,
             institutionalComputeFolder: runConfig?.institutionalComputeImport?.folder.path,
             outputSubfolders: outputSubfolders.isEmpty ? nil : outputSubfolders
         )
     }
 
-    /// Build the single run config used by a resumed non-batch run. A v2 manifest overlays every persisted
-    /// runtime value onto the current builder; a legacy manifest has no such snapshot, so it intentionally
-    /// keeps the historical current-default fallback while restoring the identity fields it did persist.
+    /// Build the single run config used by a resumed non-batch run. A v2 manifest runs on its frozen config whole,
+    /// with the backend and destination of the pending record; a legacy manifest has no such snapshot, so it
+    /// intentionally keeps the historical current-default fallback while restoring the identity fields it did persist.
     func makePendingRunResumeConfig(
         _ pending: PendingRun,
         apiKey: String,
@@ -374,32 +361,13 @@ extension OCRProcessor {
         runConfig.localAgent = pending.localAgent
 
         if let runtime = pending.runtimeConfig {
-            runConfig.taggingMode = runtime.taggingMode
-            runConfig.rotationMode = runtime.rotationMode
-            runConfig.mergeDocuments = runtime.mergeDocuments
-            runConfig.tagVocabulary = runtime.tagVocabulary
-            runConfig.imageScale = runtime.imageScale
-            runConfig.standardImageMB = runtime.standardImageMB
-            runConfig.ocrWorkerCount = runtime.ocrWorkerCount
-            runConfig.outputImageFile = runtime.exportOriginals
-            runConfig.pdfImageMB = runtime.pdfImageMB
-            runConfig.exportedImageMB = runtime.exportedImageMB
-            runConfig.textColumns = runtime.textColumns
-            runConfig.visionSettings = runtime.visionSettings
-            runConfig.cascade = runtime.cascade ?? .off
+            runConfig.config = runtime.config.resumed(identity: runConfig.config)
             runConfig.pageReaders = runtime.pageReaders ?? .empty
-            runConfig.segmentationApproach = runtime.segmentationApproach ?? .manual
-            runConfig.dateLocalImage = runtime.dateLocalImage == true
-            runConfig.macItemFields = runtime.macItemFields ?? true
-            if runConfig.dateLocalImage { runConfig.visionTextLLM = nil }
-            if let provider = runtime.visionTextProvider, let model = runtime.visionTextModel {
-                runConfig.visionTextLLM = LLMTextConfiguration(
-                    provider: provider, model: model,
-                    thinkingLevel: runtime.visionTextThinkingLevel,
-                    // Credentials never enter the pending-run manifest. Resume with the key for the
-                    // snapshotted text backend, not whichever backend happens to be selected now.
-                    apiKey: KeychainHelper.load(account: provider.rawValue) ?? apiKey)
-            }
+            // Credentials never enter the pending-run manifest. Resume with the key for the snapshotted text
+            // backend, not whichever backend happens to be selected now, and never another provider's key.
+            runConfig.credentials.visionTextAPIKey = runConfig.visionText.map {
+                KeychainHelper.load(account: $0.provider.rawValue) ?? ""
+            } ?? ""
         } else {
             runConfig.imageScale = Self.liveImageScaleFraction(defaults)
             if let exportOriginals = pending.exportOriginals {
@@ -451,7 +419,7 @@ extension OCRProcessor {
     /// Apply exactly the instance/runtime-only values captured above. `pendingRunIsSelfConsistent`
     /// validates the snapshot before this is called; sizing, scheduling, and rotation now travel through
     /// `SessionProcessingConfig` instead of being fanned back out to process-global statics.
-    func applyPendingRunRuntimeConfig(_ config: PendingRunRuntimeConfig) {
+    func applyPendingRunSnapshot(_ config: PendingRunSnapshot) {
         taggingMode = config.taggingMode
         passSourceTags = config.passSourceTags
         rotationMode = config.rotationMode
@@ -641,7 +609,7 @@ extension OCRProcessor {
                     && (url.deletingLastPathComponent().path == run.outputDirectory.standardizedFileURL.path
                         || working?.contains(url) == true)
             }
-            guard pendingRunRuntimeConfigIsValid(
+            guard pendingRunSnapshotIsValid(
                 config, fileCount: run.fileURLs.count, enableTagging: run.enableTagging,
                 hasGateway: run.gatewayConfig != nil),
                   !run.fileURLs.isEmpty,
@@ -1900,7 +1868,8 @@ extension OCRProcessor {
         guard SearchableArchival.isAvailable,
               await beginCatalogueRun(outputRoot: pending.outputDirectory,
                                 sources: Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes) ?? pending.fileURLs,
-                                resuming: true, confirmResume: {
+                                resuming: true, keepPreservationCopies: pending.resolvedSettings?.run?.keepPreservationCopies,
+                                confirmResume: {
             guard let current = Self.loadPendingBatch(), Self.pendingBatchIsSelfConsistent(current) else { return false }
             if let savedFingerprint = savedBatch.lifecycleFingerprint {
                 return current.lifecycleFingerprint == savedFingerprint
@@ -2171,7 +2140,8 @@ extension OCRProcessor {
         guard SearchableArchival.isAvailable,
               await beginCatalogueRun(outputRoot: pending.outputDirectory,
                                 sources: Self.mixedInputURLs(images: pending.fileURLs, pdfs: pending.mixedPDFOutcomes) ?? pending.fileURLs,
-                                resuming: true, confirmResume: {
+                                resuming: true, keepPreservationCopies: pending.runtimeConfig?.keepPreservationCopies,
+                                confirmResume: {
             guard let current = Self.loadPendingRun(), Self.pendingRunIsSelfConsistent(current) else { return false }
             if pending.runtimeConfig != nil && pending.runFingerprint != nil { return current.runFingerprint == pending.runFingerprint }
             return Self.sameJournalPayload(current, pending)
@@ -2209,7 +2179,7 @@ extension OCRProcessor {
         if let config = pending.runtimeConfig {
             // V2: replay the immutable start-time snapshot. Self-consistency above has already validated
             // its version, ranges, parallel-array alignment, and identity fingerprint.
-            applyPendingRunRuntimeConfig(config)
+            applyPendingRunSnapshot(config)
             resumeGatewayUpstream = config.gatewayUpstreamProvider ?? .anthropic
         } else {
             // Legacy manifests did not record these settings, so preserve their historical live-setting
@@ -3413,7 +3383,11 @@ extension OCRProcessor {
             statusMessage = "Process Files needs the PDF preparation tool. The original files are intact."
             return
         }
-        guard await beginCatalogueRun(outputRoot: outputDirectory, sources: files, resuming: resumingMixedPDF != nil, confirmResume: {
+        // W49.proc-settings-config-unify: one answer for the intake and the run's config, the frozen one on a resume.
+        let keepsPreservationCopies = resumingMixedPDF?.runtimeConfig.keepPreservationCopies
+            ?? SettingsLayerStore.shared.keepsPreservationCopies
+        guard await beginCatalogueRun(outputRoot: outputDirectory, sources: files, resuming: resumingMixedPDF != nil,
+                                      keepPreservationCopies: keepsPreservationCopies, confirmResume: {
             guard let resumingMixedPDF else { return true }
             return Self.loadPendingMixedPDF()?.integrity == resumingMixedPDF.integrity
         }) else { return }
@@ -3436,6 +3410,7 @@ extension OCRProcessor {
         outputSubfolders = resumingMixedPDF.map { $0.runtimeConfig.outputSubfolders ?? [:] }
             ?? (preOCRedInput ? [:] : Self.keyedSubfolders(plannedSubfolders))
         var runConfig = SessionProcessingConfig.fromProcessFilesRunStart(primaryAPIKey: apiKey, visionTextAPIKey: visionTextAPIKey)
+        runConfig.keepPreservationCopies = keepsPreservationCopies
         // The Process Files controller/arguments are the authoritative run input (headless drivers
         // intentionally configure them without mutating UserDefaults), so every explicitly-threaded
         // consumer observes this exact start-time snapshot.
@@ -3487,8 +3462,7 @@ extension OCRProcessor {
         // W46.settings-layers: resolve the general, project and collection layers once and freeze them for this run's
         // pending record. The run is recorded in the collection's folder only once it is committed to start
         // (`recordActiveRunInCollection`), and a resumed mixed-PDF run was recorded when it first started.
-        let frozen = SettingsLayerStore.shared.snapshot(
-            outputDirectory: outputDirectory, runID: runID, processing: ProcessingSettingsCapture.capture())
+        var frozen = SettingsLayerStore.shared.snapshot(outputDirectory: outputDirectory, runID: runID)
         activeResolvedSettings = frozen
         if resumingMixedPDF == nil {
             runConfig.dateLocalImage = provider == .appleVision && runConfig.visionTextLLM == nil
@@ -3507,6 +3481,12 @@ extension OCRProcessor {
                 && !useBatch
                 && segmentationContext.customPrompt?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false,
             gateway: gatewayConfig, localAgent: localAgent, outputDirectory: outputDirectory, frozen: frozen.values)
+        // W49.proc-settings-config-unify: the record keeps the config the run goes on with, now that it is final.
+        var recordedConfig = runConfig.config
+        recordedConfig.reviewRotation = reviewRotation
+        recordedConfig.postCorrection = activePostCorrection != nil
+        frozen.run = recordedConfig.forRecord
+        activeResolvedSettings = frozen
         if let resumingMixedPDF {
             guard autoReOCR && pdfIndices == resumingMixedPDF.pdfIndices else {
                 isProcessing = false
@@ -3750,7 +3730,7 @@ extension OCRProcessor {
                     // Create a complete, versioned snapshot before the first non-batch OCR request. The v2
                     // fingerprint covers ordered inputs + every run/backend/runtime setting and is recomputed
                     // with each incrementally-persisted result/output association.
-                    let runtimeConfig = makePendingRunRuntimeConfig(
+                    let runtimeConfig = makePendingRunSnapshot(
                         imageScale: segmentationContext.imageScale,
                         gatewayConfig: gatewayConfig,
                         runConfig: runConfig)

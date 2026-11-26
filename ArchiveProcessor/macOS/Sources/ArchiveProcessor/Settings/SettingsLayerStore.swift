@@ -495,7 +495,7 @@ final class SettingsLayerStore: ObservableObject {
 
     /// Resolve the layers for a run about to write into `outputDirectory`, without writing anything: the snapshot the
     /// run's pending record carries. `runID` joins it to the run record `record` later writes.
-    func snapshot(outputDirectory: URL, runID: UUID, processing: [String: SettingsValue],
+    func snapshot(outputDirectory: URL, runID: UUID, run: ResolvedRunConfig? = nil,
                   macMemoryGB: Double = SettingsLayerStore.thisMacMemoryGB,
                   now: Date = Date()) -> ResolvedSettingsSnapshot {
         var doc: CollectionSettingsDocument?
@@ -504,7 +504,7 @@ final class SettingsLayerStore: ObservableObject {
         return ResolvedSettingsSnapshot(
             runID: runID, resolvedAt: now, collectionID: doc?.collection.id, projectID: resolver.project?.id,
             projectName: resolver.project?.name ?? doc?.projectName,
-            macMemoryGB: macMemoryGB, values: resolver.resolveAll(), processing: processing)
+            macMemoryGB: macMemoryGB, values: resolver.resolveAll(), run: run)
     }
 
     /// Record a run in the collection: the document (created if there is none, so the collection has an id) and one
@@ -742,88 +742,9 @@ final class SettingsLayerStore: ObservableObject {
     }
 }
 
-// MARK: - The app's processing settings, as a run reads them
+// MARK: - A gateway address as a record keeps it
 
-/// The durable processing settings a run reads from `UserDefaults`, captured for the frozen record. Formerly the
-/// capture half of the old named processing profiles (removed by W46.settings-layers): the effective value of each key,
-/// stored or defaulted as the views default it, and every provider's selected model. Never an API key.
 enum ProcessingSettingsCapture {
-    private struct Descriptor { let key: String; let def: SettingsValue }
-
-    private static let descriptors: [Descriptor] = [
-        .init(key: DefaultsKeys.selectedProvider, def: .string(LLMProvider.gemini.rawValue)),
-        .init(key: DefaultsKeys.selectedThinking, def: .string(ThinkingLevel.low.rawValue)),
-
-        .init(key: DefaultsKeys.useGateway, def: .bool(false)),
-        .init(key: DefaultsKeys.useAppleVision, def: .bool(false)),
-        .init(key: DefaultsKeys.visionUseLLMJudgment, def: .bool(false)),
-        .init(key: DefaultsKeys.visionLanguages, def: .string("en-US")),
-        .init(key: DefaultsKeys.visionFastRecognition, def: .bool(false)),
-        .init(key: DefaultsKeys.visionMinimumConfidence, def: .double(0)),
-        .init(key: DefaultsKeys.visionCustomVocabulary, def: .string("")),
-        .init(key: DefaultsKeys.gatewayBaseURL, def: .string("")),
-        .init(key: DefaultsKeys.gatewayModelID, def: .string("")),
-        .init(key: DefaultsKeys.gatewayDisplayName, def: .string("")),
-        .init(key: DefaultsKeys.gatewayInputCost, def: .double(-1)),
-        .init(key: DefaultsKeys.gatewayOutputCost, def: .double(-1)),
-        .init(key: DefaultsKeys.gatewayUpstreamProvider, def: .string(LLMProvider.anthropic.rawValue)),
-        .init(key: DefaultsKeys.gatewayLocalModel, def: .bool(false)),
-        .init(key: DefaultsKeys.gatewayLocalEscalates, def: .bool(false)),
-
-        .init(key: DefaultsKeys.ocrPostCorrection, def: .bool(false)),
-        .init(key: DefaultsKeys.batchMode, def: .bool(false)),
-        .init(key: DefaultsKeys.preOCRedInput, def: .bool(false)),
-        .init(key: DefaultsKeys.skipAlreadyProcessed, def: .bool(false)),
-        .init(key: DefaultsKeys.ocrWorkerCount, def: .int(4)),
-        .init(key: DefaultsKeys.imageResolutionPercent, def: .double(100)),
-        .init(key: DefaultsKeys.standardImageSizeMB, def: .double(3.0)),
-        .init(key: DefaultsKeys.pdfImageSizeMB, def: .double(SessionProcessingConfig.defaultPDFImageMB)),
-        .init(key: DefaultsKeys.textColumns, def: .int(1)),
-        .init(key: DefaultsKeys.exportedImageSizeMB, def: .double(3.0)),
-        .init(key: DefaultsKeys.outputImageFile, def: .bool(true)),
-        .init(key: DefaultsKeys.contextCharCount, def: .double(0)),
-        .init(key: DefaultsKeys.sendPreviousImage, def: .bool(false)),
-        .init(key: DefaultsKeys.customOCRPrompt, def: .string("")),
-        .init(key: DefaultsKeys.mergeDocuments, def: .bool(false)),
-        .init(key: DefaultsKeys.writeLogFile, def: .bool(false)),
-
-        .init(key: DefaultsKeys.rotationModeRaw, def: .string(RotationMode.standard.rawValue)),
-        .init(key: DefaultsKeys.reviewRotation, def: .bool(false)),
-
-        .init(key: DefaultsKeys.taggingModeRaw, def: .string(TaggingMode.automatic.rawValue)),
-        .init(key: DefaultsKeys.segmentationApproach, def: .string(SegmentationApproach.defaultApproach.rawValue)),
-        .init(key: DefaultsKeys.enableCollectionSegmentation, def: .bool(false)),
-        .init(key: DefaultsKeys.confirmCollectionIDs, def: .bool(false)),
-        .init(key: DefaultsKeys.reviewDocumentSegmentation, def: .bool(true)),
-        .init(key: DefaultsKeys.enableSegmentJSON, def: .bool(false)),
-        .init(key: DefaultsKeys.tagVocabulary, def: .string("")),
-
-        .init(key: DefaultsKeys.liveProcessingMode, def: .string(LiveProcessingMode.stage.rawValue)),
-    ]
-
-    static func capture(_ d: UserDefaults = .standard) -> [String: SettingsValue] {
-        var values: [String: SettingsValue] = [:]
-        for desc in descriptors {
-            guard d.object(forKey: desc.key) != nil else { values[desc.key] = desc.def; continue }
-            switch desc.def {
-            case .bool: values[desc.key] = .bool(d.bool(forKey: desc.key))
-            case .int: values[desc.key] = .int(d.integer(forKey: desc.key))
-            case .double:
-                // JSON has no infinity or NaN: one would make the pending record unwritable and stop the run.
-                let x = d.double(forKey: desc.key)
-                values[desc.key] = x.isFinite ? .double(x) : desc.def
-            default:
-                let text = d.string(forKey: desc.key) ?? ""
-                values[desc.key] = .string(desc.key == DefaultsKeys.gatewayBaseURL ? Self.withoutCredentials(text) : text)
-            }
-        }
-        for provider in LLMProvider.allCases {
-            let key = ModelSelectionStore.modelKey(for: provider)
-            if let id = d.string(forKey: key) { values[key] = .string(id) }
-        }
-        return values
-    }
-
     /// A gateway address as recorded beside the output: scheme, host, port and path only, so a user name, password or
     /// token written into the address never reaches the collection's folder.
     static func withoutCredentials(_ address: String) -> String {

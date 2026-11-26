@@ -564,11 +564,11 @@ enum CollectionOrganizeTestDriver {
                   partition.skipped == [c, loose] && partition.toProcess == [a])
 
             // A resume keeps the tree: the snapshot carries it, and a run without one records nothing new.
-            let config = processor.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil)
+            let config = processor.makePendingRunSnapshot(imageScale: 1, gatewayConfig: nil)
             let encoded = try? JSONEncoder().encode(config)
-            let decoded = encoded.flatMap { try? JSONDecoder().decode(OCRProcessor.PendingRunRuntimeConfig.self, from: $0) }
+            let decoded = encoded.flatMap { try? JSONDecoder().decode(OCRProcessor.PendingRunSnapshot.self, from: $0) }
             check("tree: the resume snapshot carries the tree", decoded?.outputSubfolders == processor.outputSubfolders)
-            let plain = OCRProcessor().makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil)
+            let plain = OCRProcessor().makePendingRunSnapshot(imageScale: 1, gatewayConfig: nil)
             let plainJSON = (try? JSONEncoder().encode(plain)).flatMap { String(data: $0, encoding: .utf8) } ?? "outputSubfolders"
             check("tree: a run with no tree writes the snapshot as before", !plainJSON.contains("outputSubfolders"))
 

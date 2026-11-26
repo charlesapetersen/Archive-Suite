@@ -101,7 +101,7 @@ enum RunQuitResumeContract {
         let builder = OCRProcessor()
         builder.taggingMode = .none
         builder.rotationMode = .off
-        let runtime = builder.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil, runConfig: config)
+        let runtime = builder.makePendingRunSnapshot(imageScale: 1, gatewayConfig: nil, runConfig: config)
         var run = OCRProcessor.PendingRun(
             provider: .gemini, model: model, thinkingLevel: nil, fileURLs: pages, outputDirectory: output,
             enableTagging: false, enableSegmentJSON: false, enableCollectionSegmentation: false,

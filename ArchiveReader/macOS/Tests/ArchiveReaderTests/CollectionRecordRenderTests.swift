@@ -15,7 +15,7 @@ final class CollectionRecordRenderTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: folder) }
         let doc = #"{"schemaVersion":1,"createdAt":"2026-11-04T09:59:00Z","projectName":"Correspondence","collection":{"id":"A","kind":"collection","name":"Letters 1952","entries":{"hours":{"source":{"setByUser":{"_0":"2026-11-04T10:00:00Z"}},"value":{"type":"double","value":8}}}}}"#
         try Data(doc.utf8).write(to: folder.appendingPathComponent(".archivesuite/collection-settings.json"))
-        let run = #"{"schemaVersion":1,"id":"R1","kind":"processFiles","fileCount":12,"startedAt":"2026-11-05T10:00:00Z","settings":{"schemaVersion":1,"runID":"R1","resolvedAt":"2026-11-05T10:00:00Z","macMemoryGB":16,"processing":{"selectedProvider":{"type":"string","value":"Gemini"},"selectedModelId_Gemini":{"type":"string","value":"gemini-3.7-flash"}},"values":{"moneyHabit":{"value":{"type":"string","value":"none"}}}}}"#
+        let run = #"{"schemaVersion":1,"id":"R1","kind":"processFiles","fileCount":12,"startedAt":"2026-11-05T10:00:00Z","settings":{"schemaVersion":2,"runID":"R1","resolvedAt":"2026-11-05T10:00:00Z","macMemoryGB":16,"run":{"provider":"Gemini","model":{"id":"gemini-3.7-flash","displayName":"Gemini 3.7 Flash"},"taggingMode":"automatic","ocrWorkerCount":4},"values":{"moneyHabit":{"value":{"type":"string","value":"none"}}}}}"#
         try Data(run.utf8).write(to: suite.appendingPathComponent("20261105-100000-R1.json"))
         try Data().write(to: folder.appendingPathComponent("letter.pdf"))
 

@@ -531,10 +531,10 @@ enum OCRCascadeTestDriver {
                   resumed.cascade == withCheck && legacy.cascade == .off && back?.cascade == withCheck)
             d.removePersistentDomain(forName: suite + "-batch")
         }
-        var runtime = OCRProcessor().makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil)
+        var runtime = OCRProcessor().makePendingRunSnapshot(imageScale: 1, gatewayConfig: nil)
         runtime.cascade = withCheck
         if let data = try? JSONEncoder().encode(runtime),
-           let back = try? JSONDecoder().decode(OCRProcessor.PendingRunRuntimeConfig.self, from: data) {
+           let back = try? JSONDecoder().decode(OCRProcessor.PendingRunSnapshot.self, from: data) {
             check("a resumed run keeps the cascade it began with", back.cascade == withCheck)
         } else {
             check("a resumed run keeps the cascade it began with", false)

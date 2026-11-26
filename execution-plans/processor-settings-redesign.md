@@ -409,7 +409,7 @@ W49.proc-settings-design-ok (OWNER GATE)
        │
        ├── (+ W49.proc-pipeline-prune-apply)
        ▼
-1. W49.proc-settings-config-unify [M · Tier-2]
+1. W49.proc-settings-config-unify [M · Tier-2] — SHIPPED 2026-11-25 (SUITE_TODO_DONE.md)
        │  One ResolvedRunConfig + RunCredentials; retire 3 overlapping config surfaces;
        │  update SPEC/collection-settings.md + ArchiveCore CollectionSettingsVocabulary
        ▼

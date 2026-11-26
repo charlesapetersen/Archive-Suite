@@ -138,7 +138,7 @@ enum ReviewCorrectionsTestDriver {
         try? CollectionSettingsFile.write(doc, in: out, now: day)
         let runID = UUID()
         let snapshot = ResolvedSettingsSnapshot(runID: runID, resolvedAt: day, collectionID: nil, projectID: nil,
-                                                projectName: "Lincoln", macMemoryGB: 16, values: [:], processing: [:])
+                                                projectName: "Lincoln", macMemoryGB: 16, values: [:])
 
         eq("write: recorded", ReviewCorrections.recordGaps(request(out, urls: urls, runID: runID, settings: snapshot)), nil)
         let read = ReviewCorrections.gapRecords(in: out)

@@ -63,15 +63,35 @@ struct ResolvedRunConfig: Codable, Equatable, Sendable {
               pdfImageMB: pdfImageMB, textColumns: textColumns, exportedImageMB: exportedImageMB)
     }
 
-    /// The JSON a run record keeps beside the output: this value with a gateway address cut to scheme, host, port and
-    /// path (`ProcessingSettingsCapture.withoutCredentials`), so nothing typed into the address leaves this Mac's store.
+    /// The value a run record keeps beside the output, in a folder the user may share: a gateway address cut to scheme,
+    /// host, port and path (`ProcessingSettingsCapture.withoutCredentials`), so nothing typed into the address leaves
+    /// this Mac's store; the output folder as `/<its name>` and no Local Agent program path, so no path of this Mac's
+    /// (a user name) goes with it. The same value again when applied twice.
     var forRecord: ResolvedRunConfig {
         var copy = self
         if var gateway = copy.gateway {
             gateway.baseURL = ProcessingSettingsCapture.withoutCredentials(gateway.baseURL)
             copy.gateway = gateway
         }
+        copy.localAgent?.binaryPath = ""
+        copy.outputDirectory = URL(fileURLWithPath: "/").appendingPathComponent(outputDirectory.lastPathComponent)
         return copy
+    }
+
+    /// A resumed run's config: this frozen one, with the backend, destination and prompt of `identity`, which the
+    /// resume took from the pending record it checks the key against. A local date pass reads without a text model.
+    func resumed(identity: ResolvedRunConfig) -> ResolvedRunConfig {
+        var c = self
+        c.provider = identity.provider
+        c.model = identity.model
+        c.thinkingLevel = identity.thinkingLevel
+        c.gateway = identity.gateway
+        c.localAgent = identity.localAgent
+        c.outputDirectory = identity.outputDirectory
+        c.customOCRPrompt = identity.customOCRPrompt
+        c.enableSegmentJSON = identity.enableSegmentJSON
+        if c.dateLocalImage { c.visionText = nil }
+        return c
     }
 
     /// Read every processing setting from `UserDefaults` and the general settings layer, without the Keychain. The

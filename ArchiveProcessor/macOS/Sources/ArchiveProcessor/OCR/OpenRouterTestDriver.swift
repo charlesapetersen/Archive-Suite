@@ -214,8 +214,7 @@ enum OpenRouterTestDriver {
         processor.activeResolvedSettings = ResolvedSettingsSnapshot(
             runID: UUID(), resolvedAt: Date(), collectionID: nil, projectID: nil, projectName: nil, macMemoryGB: 16,
             values: [SettingsKey.noTraining.rawValue: ResolvedSetting(
-                value: .bool(true), layer: .collection, source: nil, layerName: nil)],
-            processing: [:])
+                value: .bool(true), layer: .collection, source: nil, layerName: nil)])
         var job = OCRJob(sourceURL: image)
         job.result = OCRResult(text: "March 3, 1947", classification: nil, errorMessage: nil, errorCode: nil)
         processor.jobs = [job]

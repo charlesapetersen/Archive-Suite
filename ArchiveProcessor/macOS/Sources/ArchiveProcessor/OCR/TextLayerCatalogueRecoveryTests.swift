@@ -209,7 +209,7 @@ extension TextLayerTestDriver {
             preOCRedInput: false, previousTextCharCount: 0, sendPreviousImage: false, customPrompt: nil,
             startedAt: Date(), gatewayConfig: nil, completedResults: ["0": cached], runFingerprint: nil,
             exportOriginals: false, localAgent: nil,
-            runtimeConfig: builder.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil, runConfig: config))
+            runtimeConfig: builder.makePendingRunSnapshot(imageScale: 1, gatewayConfig: nil, runConfig: config))
         run.completedOutputPaths = ["0": missing.path]
         run.runFingerprint = OCRProcessor.pendingRunFingerprintV2(run)
         guard OCRProcessor.pendingRunIsSelfConsistent(run), OCRProcessor._testWritePendingRun(run, to: OCRProcessor.pendingRunURL) else {

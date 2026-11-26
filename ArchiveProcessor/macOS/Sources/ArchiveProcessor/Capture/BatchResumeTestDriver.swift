@@ -396,35 +396,28 @@ enum BatchResumeTestDriver {
 
         // --- 10: B11 — complete, versioned, order-sensitive non-batch resume configuration. ---
         func runtimeConfig(
-            schemaVersion: Int = OCRProcessor.PendingRunRuntimeConfig.currentSchemaVersion,
+            schemaVersion: Int = OCRProcessor.PendingRunSnapshot.currentSchemaVersion,
             mergeDocuments: Bool = true,
             imageScale: Double = 0.37,
             boundaries: [Bool] = [true, false]
-        ) -> OCRProcessor.PendingRunRuntimeConfig {
-            OCRProcessor.PendingRunRuntimeConfig(
+        ) -> OCRProcessor.PendingRunSnapshot {
+            OCRProcessor.PendingRunSnapshot(
                 schemaVersion: schemaVersion,
-                taggingMode: .copySource,
-                passSourceTags: true,
-                rotationMode: .off,
-                reviewRotation: true,
-                mergeDocuments: mergeDocuments,
-                tagVocabulary: ["Correspondence", "Receipts"],
-                imageScale: imageScale,
-                exportOriginals: false,
+                config: ResolvedRunConfig(
+                    provider: .gemini, model: LLMProvider.gemini.models[0], thinkingLevel: .low, gateway: nil,
+                    customOCRPrompt: "v2 prompt", imageScale: imageScale, standardImageMB: 4.5, ocrWorkerCount: 2,
+                    taggingMode: .copySource, mergeDocuments: mergeDocuments,
+                    tagVocabulary: ["Correspondence", "Receipts"], reviewRotation: true, outputDirectory: outDir,
+                    rotationMode: .off, enableSegmentJSON: false, outputImageFile: false, pdfImageMB: 1.5,
+                    exportedImageMB: 2.5, textColumns: 3),
                 preGroupedBoundaries: boundaries,
                 preGroupedTypes: [.box, .document],
                 preGroupedQualities: ["Q3", nil],
                 preGroupedYears: [1944, 1944],
                 preGroupedMonths: [6, 6],
-                preGroupedSubjects: [["Correspondence"], []],
-                standardImageMB: 4.5,
-                ocrWorkerCount: 2,
-                pdfImageMB: 1.5,
-                textColumns: 3,
-                exportedImageMB: 2.5,
-                gatewayUpstreamProvider: nil)
+                preGroupedSubjects: [["Correspondence"], []])
         }
-        func makeV2Run(files orderedFiles: [URL], config: OCRProcessor.PendingRunRuntimeConfig)
+        func makeV2Run(files orderedFiles: [URL], config: OCRProcessor.PendingRunSnapshot)
             -> OCRProcessor.PendingRun {
             var value = OCRProcessor.PendingRun(
                 provider: .gemini, model: LLMProvider.gemini.models[0], thinkingLevel: nil,
@@ -630,7 +623,7 @@ enum BatchResumeTestDriver {
         // was really protecting — is that a SECOND processor is completely unaffected by the first one's
         // resume. Below, `bystander` shares nothing but the process.
         let bystander = OCRProcessor()
-        processor.applyPendingRunRuntimeConfig(runtimeConfig())
+        processor.applyPendingRunSnapshot(runtimeConfig())
         check("resume applies instance runtime settings instead of contradictory live UI values",
               processor.taggingMode == .copySource && processor.passSourceTags
               && processor.rotationMode == .off && processor.reviewRotation
@@ -645,7 +638,7 @@ enum BatchResumeTestDriver {
               && !bystander.passSourceTags && !bystander.reviewRotation
               && !bystander.mergeDocuments && bystander.tagVocabulary.isEmpty
               && bystander.preGroupedBoundaries.isEmpty && bystander.preGroupedTypes.isEmpty)
-        let recaptured = processor.makePendingRunRuntimeConfig(
+        let recaptured = processor.makePendingRunSnapshot(
             imageScale: 0.37, gatewayConfig: nil, runConfig: resumedV2Config)
         check("run config recaptures every applied instance/injected setting into one immutable snapshot",
               recaptured.taggingMode == .copySource && recaptured.passSourceTags

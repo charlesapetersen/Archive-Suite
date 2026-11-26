@@ -374,7 +374,7 @@ enum SegmentationReviewTestDriver {
            [false, true, true, true, true])
 
         // 4. The manifest.
-        var runtime = OCRProcessor().makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil)
+        var runtime = OCRProcessor().makePendingRunSnapshot(imageScale: 1, gatewayConfig: nil)
         runtime.segmentationApproach = .claude
         var pending = OCRProcessor.PendingRun(
             provider: .gemini, model: LLMProvider.gemini.models[0], thinkingLevel: nil,
@@ -394,10 +394,12 @@ enum SegmentationReviewTestDriver {
         eq("4 the gap answers survive JSON", decoded?.segmentationAnswers, pending.segmentationAnswers)
         if let data = try? JSONEncoder().encode(runtime),
            var obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
-            obj.removeValue(forKey: "segmentationApproach")
+            // W49.proc-settings-config-unify: the approach is in the run's whole config. A snapshot written before
+            // it (no `config`) is not read at all, so a resume fails closed rather than guess an approach.
+            obj.removeValue(forKey: "config")
             let old = (try? JSONSerialization.data(withJSONObject: obj))
-                .flatMap { try? JSONDecoder().decode(OCRProcessor.PendingRunRuntimeConfig.self, from: $0) }
-            check("4 a snapshot without the approach decodes, as manual", old != nil && old?.segmentationApproach == nil)
+                .flatMap { try? JSONDecoder().decode(OCRProcessor.PendingRunSnapshot.self, from: $0) }
+            check("4 a snapshot without the run's config is not read", old == nil)
         }
 
         // 5. The stage, end to end.
@@ -415,8 +417,7 @@ enum SegmentationReviewTestDriver {
         let outcome = Box<WindowStageOutcome>()
         let reviewRun = UUID()
         let reviewSettings = ResolvedSettingsSnapshot(runID: reviewRun, resolvedAt: Date(), collectionID: nil,
-                                                      projectID: nil, projectName: nil, macMemoryGB: 16, values: [:],
-                                                      processing: [:])
+                                                      projectID: nil, projectName: nil, macMemoryGB: 16, values: [:])
         Task {
             outcome.value = await p.runWindowSegmentationStage(files: urls, approach: .claude, runConfig: nil,
                                                                outputDirectory: dir, settings: reviewSettings)
@@ -466,8 +467,7 @@ enum SegmentationReviewTestDriver {
         let skippedOutcome = Box<WindowStageOutcome>()
         let skippedRun = UUID()
         let skippedSettings = ResolvedSettingsSnapshot(runID: skippedRun, resolvedAt: Date(), collectionID: nil,
-                                                       projectID: nil, projectName: nil, macMemoryGB: 16, values: [:],
-                                                       processing: [:])
+                                                       projectID: nil, projectName: nil, macMemoryGB: 16, values: [:])
         Task {
             skippedOutcome.value = await withoutSkim.runWindowSegmentationStage(
                 files: urls, approach: .claude, runConfig: nil, outputDirectory: dir,

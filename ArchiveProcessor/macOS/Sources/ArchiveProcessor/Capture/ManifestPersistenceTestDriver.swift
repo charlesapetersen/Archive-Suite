@@ -281,7 +281,7 @@ enum ManifestPersistenceTestDriver {
         let fu3Defaults = UserDefaults(suiteName: fu3Suite)!
         defer { fu3Defaults.removePersistentDomain(forName: fu3Suite) }
 
-        // Pinned as VALUES, not as "the clamps agree with themselves": `pendingRunRuntimeConfigIsValid`
+        // Pinned as VALUES, not as "the clamps agree with themselves": `pendingRunSnapshotIsValid`
         // spelled these ranges out as its own literals until fu3 and now reads `Bounds`. If `Bounds` ever
         // widened, that fail-closed resume validator would silently start admitting a config that no
         // builder in the app can produce — this check is what makes the shared declaration safe.
@@ -399,7 +399,7 @@ enum ManifestPersistenceTestDriver {
               OCRProcessor.schedulingWorkerCount(for: injectedConfig) == 9
               && injectedPDF.imageMB == 8
               && injectedPDF.textColumns == 3)
-        let persistedConfig = OCRProcessor().makePendingRunRuntimeConfig(
+        let persistedConfig = OCRProcessor().makePendingRunSnapshot(
             imageScale: 0.75, gatewayConfig: nil, runConfig: injectedConfig)
         check("W16.cfg2: resume snapshot records the exact injected sizing/scheduling values",
               persistedConfig.standardImageMB == 7

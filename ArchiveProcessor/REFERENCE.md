@@ -408,7 +408,12 @@ Settings/                      W46.settings-solver: the settings layer's solver;
   SettingsLayers.swift         The general, project and collection layers: each holds only the values it answered
                                (`SettingsKey`, with source and reset); `SettingsResolver` reads them live, nearest
                                first, into the solver's resources and answers; `ResolvedSettingsSnapshot` is the
-                               frozen record. Replaced the UserDefaults processing profiles (no migration).
+                               frozen record (the layers' `values` and the run's typed `run` config). Replaced the
+                               UserDefaults processing profiles (no migration).
+  ResolvedRunConfig.swift      W49.proc-settings-config-unify: the one Codable value every run reads (reading, documents,
+                               dates, output), resolved from UserDefaults and the general layer; `RunCredentials` (never
+                               Codable) holds the keys. Process Files, resume (`PendingRunSnapshot.config`), paid
+                               batch, mixed PDF and Live Capture all run on it; `forRecord` strips address credentials.
   SettingsLayerStore.swift     Tier-2 (writes beside the output). General, project and older spend rows in
                                Application Support `settings-general.json`; paid request attempts in
                                `paid-requests.sqlite` (PaidRequestJournal.swift). The collection's document in
@@ -535,7 +540,8 @@ Capture/                       Live Capture core (Tier-2):
                                lifecycle, ingest(...) (durable-manifest-before-ack, idempotent (group,seq)),
                                backup folder, segment-complete / drain-gate state.
   CaptureModels.swift          CaptureGroupType + captured-photo/group types (mirrors the phone).
-  SessionProcessingConfig.swift  Locked snapshot of all processing settings for the session.
+  SessionProcessingConfig.swift  A run's `ResolvedRunConfig` + `RunCredentials` + page plan (dynamic member lookup onto
+                               the config; holds no copy of a setting). Locked at session or run start.
   LiveCaptureProcessor.swift   Streams OCR/tag/PDF per segment as it arrives; end-of-session finalize.
                                Stages into the VISIBLE backup folder (`<session>/_processed/`); finalize
                                deletes a source only after its output is confirmed at the destination

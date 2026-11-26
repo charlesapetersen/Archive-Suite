@@ -330,12 +330,15 @@ enum SettingsLayersTestDriver {
         }
         check("a collection's layer is written into its folder with its project", made?.projectName == "Letters")
 
-        let processing = ["selectedProvider": SettingsValue.string("gemini")]
+        let scratchSuite = "APSettingsLayersFreeze-\(UUID().uuidString)"
+        let scratchDefaults = UserDefaults(suiteName: scratchSuite) ?? .standard
+        defer { scratchDefaults.removePersistentDomain(forName: scratchSuite) }
+        let processing = ResolvedRunConfig.fromDefaults(scratchDefaults)
         let run1 = UUID(), run2 = UUID()
-        let s1 = store.snapshot(outputDirectory: out, runID: run1, processing: processing, macMemoryGB: 16, now: day)
+        let s1 = store.snapshot(outputDirectory: out, runID: run1, run: processing, macMemoryGB: 16, now: day)
         check("resolving a run writes nothing", CollectionSettingsFile.runs(in: out).isEmpty)
         store.setGeneral(.hours, .double(6), source: .setByUser(day))
-        let s2 = store.snapshot(outputDirectory: out, runID: run2, processing: processing, macMemoryGB: 16,
+        let s2 = store.snapshot(outputDirectory: out, runID: run2, run: processing, macMemoryGB: 16,
                                 now: day.addingTimeInterval(60))
         let p1 = store.record(s1, kind: "processFiles", fileCount: 3, in: out)
         let p2 = store.record(s2, kind: "batch", fileCount: 5, in: out)
@@ -344,7 +347,7 @@ enum SettingsLayersTestDriver {
               s1.values["hours"]?.value == .double(10) && s1.values["hours"]?.layer == .general
               && s1.values["staysOnMac"]?.layer == .project && s1.values["languages"]?.layer == .collection
               && s1.values["cluster"]?.layer == nil && s1.projectName == "Letters" && s1.macMemoryGB == 16
-              && s1.processing == processing && s1.collectionID == made?.collection.id && s1.runID == run1)
+              && s1.run == processing.forRecord && s1.collectionID == made?.collection.id && s1.runID == run1)
         let runs = CollectionSettingsFile.runs(in: out)
         check("each run is its own record in the collection, oldest first, frozen as it started",
               runs.map(\.id) == [run1, run2] && runs.map(\.kind) == ["processFiles", "batch"]
@@ -363,7 +366,7 @@ enum SettingsLayersTestDriver {
         readByReaderAndNotes(out, runs: [run1, run2])
 
         let fresh = folder(root, "freeze-fresh")
-        let s3 = store.snapshot(outputDirectory: fresh, runID: UUID(), processing: [:], macMemoryGB: 16, now: day)
+        let s3 = store.snapshot(outputDirectory: fresh, runID: UUID(), macMemoryGB: 16, now: day)
         store.record(s3, kind: "processFiles", fileCount: 1, in: fresh)
         if case .document(let d) = CollectionSettingsFile.read(in: fresh) {
             check("a first run creates the collection, and its record names it",
@@ -373,7 +376,7 @@ enum SettingsLayersTestDriver {
         }
 
         let crowded = folder(root, "freeze-layer-note-limit")
-        let crowdedSnapshot = store.snapshot(outputDirectory: crowded, runID: UUID(), processing: [:], now: day)
+        let crowdedSnapshot = store.snapshot(outputDirectory: crowded, runID: UUID(), now: day)
         let layerNotes = ["Photo 1: no searchable text on the image"] + Array(
             repeating: String(repeating: "layer note ", count: 50), count: 2_000)
         let crowdedError = store.record(crowdedSnapshot, kind: "liveCapture", fileCount: 1, in: crowded,
@@ -385,7 +388,7 @@ enum SettingsLayersTestDriver {
               && crowdedRun?.pdfLayerLogNotes?.last?.hasPrefix("Additional captured pages with layer notes:") == true)
 
         if let project { store.deleteProject(project.id) }
-        let s4 = store.snapshot(outputDirectory: out, runID: UUID(), processing: [:], macMemoryGB: 16, now: day)
+        let s4 = store.snapshot(outputDirectory: out, runID: UUID(), macMemoryGB: 16, now: day)
         check("a deleted project falls back to the general layer and keeps its name on record",
               s4.values["staysOnMac"]?.layer == nil && s4.projectName == "Letters")
 
@@ -393,7 +396,7 @@ enum SettingsLayersTestDriver {
         _ = folder(newer, ".archivesuite")
         let future = Data(#"{"schemaVersion": 7}"#.utf8)
         try? future.write(to: CollectionSettingsDocument.url(in: newer))
-        let s5 = store.snapshot(outputDirectory: newer, runID: UUID(), processing: [:], macMemoryGB: 16, now: day)
+        let s5 = store.snapshot(outputDirectory: newer, runID: UUID(), macMemoryGB: 16, now: day)
         let p5 = store.record(s5, kind: "processFiles", fileCount: 1, in: newer)
         check("a collection that cannot be written still yields the snapshot, with the problem named",
               p5 != nil && s5.values["hours"]?.value == .double(6)
@@ -684,25 +687,38 @@ enum SettingsLayersTestDriver {
     // MARK: Processing capture
 
     private static func processingCapture() {
+        // W49.proc-settings-config-unify: the run record keeps the run's own `ResolvedRunConfig`.
         let suite = "APSettingsLayersTest-\(UUID().uuidString)"
         guard let d = UserDefaults(suiteName: suite) else { check("a scratch defaults suite", false); return }
         defer { d.removePersistentDomain(forName: suite) }
-        d.set("openai", forKey: DefaultsKeys.selectedProvider)
+        d.set(LLMProvider.openai.rawValue, forKey: DefaultsKeys.selectedProvider)
         d.set(7, forKey: DefaultsKeys.ocrWorkerCount)
-        d.set("gpt-x", forKey: ModelSelectionStore.modelKey(for: .openai))
-        let v = ProcessingSettingsCapture.capture(d)
-        check("the run's processing settings are captured, stored or defaulted",
-              v[DefaultsKeys.selectedProvider] == .string("openai") && v[DefaultsKeys.ocrWorkerCount] == .int(7)
-              && v[DefaultsKeys.textColumns] == .int(1)
-              && v[ModelSelectionStore.modelKey(for: .openai)] == .string("gpt-x"))
-        check("no API key is ever captured", !v.keys.contains { $0.lowercased().contains("apikey") })
-        d.set(Double.infinity, forKey: DefaultsKeys.contextCharCount)
+        d.set(true, forKey: DefaultsKeys.useGateway)
         d.set("https://user:secret@gateway.example.edu/v1?token=abc", forKey: DefaultsKeys.gatewayBaseURL)
-        let w = ProcessingSettingsCapture.capture(d)
-        check("a stored value that is not a finite number is captured as its default",
-              w[DefaultsKeys.contextCharCount] == .double(0))
-        eq("a gateway address is recorded without its credentials or query", w[DefaultsKeys.gatewayBaseURL],
-           .string("https://gateway.example.edu/v1"))
+        d.set("gemini-3.7-flash", forKey: DefaultsKeys.gatewayModelID)
+        let run = SessionProcessingConfig.fromDefaults(d, allowCredentialInteraction: false,
+                                                       primaryAPIKey: "sk-key-never-written",
+                                                       visionTextAPIKey: "vt-key-never-written")
+        check("the run's settings are read, stored or defaulted",
+              run.config.provider == .openai && run.config.ocrWorkerCount == 7 && run.config.textColumns == 1
+              && run.config.gateway?.modelID == "gemini-3.7-flash")
+        check("the keys travel beside the config, not in it", run.apiKey == "sk-key-never-written")
+        let snapshot = ResolvedSettingsSnapshot(runID: UUID(), resolvedAt: Date(), collectionID: nil, projectID: nil,
+                                                projectName: nil, macMemoryGB: 16, values: [:], run: run.config)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let json = (try? encoder.encode(snapshot)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+        check("no API key and no address credential reaches the record",
+              !json.isEmpty && !json.contains("never-written") && !json.contains("secret") && !json.contains("token"))
+        eq("a gateway address is recorded without its credentials or query", snapshot.run?.gateway?.baseURL,
+           "https://gateway.example.edu/v1")
+        var withAgent = snapshot
+        withAgent.run?.localAgent = LocalAgentConfig(tool: .claude, binaryPath: "/Users/someone/bin/claude")
+        check("no path of this Mac goes into the record, however the config is set",
+              snapshot.run?.outputDirectory.path == "/" + run.config.outputDirectory.lastPathComponent
+              && withAgent.run?.localAgent?.binaryPath == "" && withAgent.run?.localAgent?.tool == .claude)
+        let back = json.data(using: .utf8).flatMap { try? JSONDecoder().decode(ResolvedSettingsSnapshot.self, from: $0) }
+        check("the record reads back as written", back == snapshot && back?.run?.ocrWorkerCount == 7)
     }
 
     private static func finish() {

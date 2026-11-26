@@ -71,6 +71,8 @@ above), so a collection's mix is never read beside a project's `strata`.
 | `batchCeilingUSD` | `double` | The batch spending cap in dollars. Omit to inherit. A project or collection stores `-1` for No limit on the batch. The general no-spending rule and monthly cap still apply. |
 | `hours`, `checkingMinutes` | `double` | This collection's time limits. |
 | `preference` | `string` | `bestMeasured`, `cheapestWithinPoint` or `fastestWithinPoint`. |
+| `lowConfidenceNames` | `bool` | Find names on this Mac (low confidence): Apple's built-in English name finder replaces the regular names route for the selection. Off by default. |
+| `dateLocalImage` | `bool` | Search page images for dates on this Mac (no measured gain): Vision Auto Date's local image pass. Off by default; a run that takes it stays on this Mac and reads without a text model. |
 | `staysOnMac`, `straightenReadingCopy`, `placeHandOnImage`, `dateImageEveryDocument` | `bool` | The switches: pages stay on this Mac, straighten the copy you read (note 01), place handwritten text on the page image (note 05; the settings sheet's rules tab), search the page image for dates on every document, not only those whose text has no year (note 08; off by default, owner 2026-11-12). |
 | `numericDatesDayFirst` | `bool` | The collection's numeric date order (owner, 2026-11-24, `W49.proc-pipeline-prune-ok` 5): off, the default, a numeric date reads month first (US: `04/07/1962` is 7 April); on, day first (International: 4 July). The Processor's dating rule, its OCR-damaged forms, its image-pass prompt and its folder-label dates (`ContainerFolderDate`) follow it; a first part over 12 is a day either way. So does the Reader's folder-date confirmation (`W49.reader-folder-date-day-first`), which reads the collection's own value, else the newest readable run's (which saw the general and project layers), else month first. |
 | `scanNewspapersDocLayoutYOLO` | `bool` | Scanned newspapers' regions from DocLayout-YOLO through newspaper-ocr's route instead of PP-DocLayoutV3 (note 03; owner's call 15, 2026-11-19; W47.wh-yolo-scans). Off by default; photographed newspapers keep PP-DocLayoutV3 either way, and a scan falls back to it (or, without that helper either, to the whole page) while the detector is not downloaded. Resumed runs, retries and second readers follow the run's frozen value; Re-OCR of existing PDFs uses the default. |
@@ -85,17 +87,21 @@ above), so a collection's mix is never read beside a project's `strata`.
 (`_0`: the starting point's name, `_1`: the date), `detected` (`_0`: the date) or `follows` (`_0`: the label of the
 answer it follows, `_1`: the date; the general layer's `staysOnMac` follows "Spending" until the user sets it).
 
+The general layer alone holds `keys`, `plans`, `cluster`, `gpusPerJob`, `downloadsAllowed`, `moneyHabit`,
+`monthCeilingUSD`, `fineTuning`, `trainingOff` and `keepPreservationCopies` (`bool`, on by default: keep the
+full-resolution originals). A collection's or project's copy of one of these is ignored on reading.
+
 `settings` in a run record is the resolution frozen when the run started (`ResolvedSettingsSnapshot`):
 
 | key | meaning |
 |---|---|
-| `schemaVersion` | `1`. |
+| `schemaVersion` | `2`. A reader decides whether it can read a run record by the record's own `schemaVersion` (`1`), not by this one. |
 | `runID` | The run's id. |
 | `resolvedAt` | When the run started. |
 | `collectionID`, `projectID`, `projectName` | Whose layers were read. |
 | `macMemoryGB` | The Mac's memory. |
 | `values` | Every setting with its resolved `value`, the `layer` that answered (`general`, `project`, `collection`, or absent for the built-in default), its `source`, and `layerName` (the project's name). |
-| `processing` | The app's processing settings as the run read them, by their `UserDefaults` names (provider, per-provider model ids, tagging, sizing, rotation…). Never an API key, and a gateway address only as scheme, host, port and path. |
+| `run` | The run's own settings, the one value it ran on (the Processor's `ResolvedRunConfig`, W49.proc-settings-config-unify): `provider` (`LLMProvider` raw value: `Gemini`, `Anthropic`, `Mistral`, `OpenAI`, `OpenRouter`, `Apple Vision`), `model` (`id`, `displayName`, prices), `thinkingLevel`, `gateway` (absent off the gateway; `baseURL` only as scheme, host, port and path, `modelID`, `displayName`, `inputCostPer1M`, `outputCostPer1M`, `localModel`, `localEscalates`), `gatewayUpstreamProvider` (a gateway run's cost attribution), `localAgent` (`tool`, `modelOverride`, `concurrencyCap`; its program path is left empty), `visionSettings`, `visionText` (an Apple Vision run's text model), `cascade`, `customOCRPrompt`, `postCorrection`, `imageScale`, `standardImageMB`, `ocrWorkerCount`, `taggingMode`, `segmentationApproach`, `mergeDocuments`, `tagVocabulary`, `reviewRotation`, `dateLocalImage`, `macItemFields`, `outputDirectory` (only the output folder's name, as `/<name>`: no path of the Mac goes into the record), `rotationMode`, `enableSegmentJSON`, `outputImageFile`, `pdfImageMB`, `exportedImageMB`, `textColumns`, `keepPreservationCopies`. A field absent is not set for the run. Never an API key: the type holds none. The Reader and Notes show it flattened to dotted names (`model.id`, `gateway.displayName`), and name the reading route from `provider`, `gateway` and `model.id`. Absent from a record that only read the layers. |
 
 The same snapshot is kept in the run's pending record (`pending_run.json` / `pending_batch.json`,
 `resolvedSettings`), outside its fingerprint. It is a record. Nothing reads it to decide how a run goes. The pending

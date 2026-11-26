@@ -82,7 +82,6 @@ struct OCRView: View {
     @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = false
     @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
     @AppStorage(DefaultsKeys.tagVocabulary) private var tagVocabulary: String = ""
-    @AppStorage(DefaultsKeys.contextCharCount) private var contextCharCount: Double = 0   // context slider removed; kept 0 (parallel OCR)
     @AppStorage(DefaultsKeys.customOCRPrompt) private var customOCRPrompt: String = ""
     @AppStorage(DefaultsKeys.mergeDocuments) private var mergeDocuments: Bool = false
     @AppStorage(DefaultsKeys.imageResolutionPercent) private var imageScale: Double = 100
@@ -346,7 +345,7 @@ struct OCRView: View {
         let readersDelta = pageKindsActive
             ? pageReaderPlan.ocrCostDelta(runModel: effectiveModel, imageScale: imageScale / 100.0,
                                           sendPreviousImage: sendPreviousImage && segmentationPlan.usesPerPageClassifier,
-                                          contextCharCount: Int(contextCharCount)) : 0
+                                          contextCharCount: 0) : 0
         let settings = settingsStore.resolver(at: outputDirectory)
         let namesCallShare = EntityRunPolicy.estimatedCallShare(
             taggingMode: taggingMode, gateway: currentGatewayConfig, usesLocalAgent: useLocalAgent,
@@ -358,7 +357,7 @@ struct OCRView: View {
             enableCollectionSegmentation: enableCollectionSegmentation,
             preOCRedInput: preOCRedInput,
             sendPreviousImage: sendPreviousImage && segmentationPlan.usesPerPageClassifier,
-            contextCharCount: Int(contextCharCount),
+            contextCharCount: 0,
             imageScale: imageScale / 100.0,
             rotationMode: rotationMode,
             useGateway: useGateway || useAppleVision,
@@ -428,7 +427,7 @@ struct OCRView: View {
         let model = effectiveModel
         return TimeEstimator.estimate(
             fileCount: droppedFiles.count, model: model, rotationMode: rotationMode,
-            sequentialOCR: contextCharCount > 0, enableTagging: taggingMode.llmTags,
+            sequentialOCR: false, enableTagging: taggingMode.llmTags,
             enableCollectionSegmentation: enableCollectionSegmentation,
             preOCRedInput: preOCRedInput, useGateway: useGateway || useAppleVision, ocrWorkers: ocrWorkerCount,
             localSecondsPerPage: currentGatewayConfig.flatMap {
@@ -2027,7 +2026,7 @@ struct OCRView: View {
         readingTree = false
         let trimmedPrompt = customOCRPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let context = SegmentationContext(
-            previousTextCharCount: Int(contextCharCount),
+            previousTextCharCount: 0,
             sendPreviousImage: !useAppleVision && sendPreviousImage && segmentationPlan.usesPerPageClassifier,
             customPrompt: trimmedPrompt.isEmpty ? nil : trimmedPrompt,
             imageScale: imageScale / 100.0

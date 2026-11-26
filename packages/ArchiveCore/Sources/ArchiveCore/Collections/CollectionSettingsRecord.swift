@@ -40,7 +40,8 @@ public struct CollectionSettingsRecord: Equatable, Sendable {
         public let macMemoryGB: Double?
         /// Every layered value, by label.
         public let settings: [Setting]
-        /// The app's processing settings by their `UserDefaults` names, the value in words, sorted by name.
+        /// The Processor's own settings for the run (its `ResolvedRunConfig`, `run` in the record), by dotted name
+        /// (`model.id`, `gateway.displayName`), the value in words, sorted by name.
         public let processing: [Setting]
         /// The run is of a newer `schemaVersion` than this build reads; only its date and kind are shown.
         public let isNewer: Bool
@@ -49,16 +50,16 @@ public struct CollectionSettingsRecord: Equatable, Sendable {
 
         public var kindLabel: String { CollectionSettingsVocabulary.runKindLabel(kind) }
 
-        /// The reading route in words, from the processing settings: "Gemini, gemini-3.7-flash", "Apple Vision".
+        /// The reading route in words, from the run's settings: "Gemini, gemini-3.7-flash", "Apple Vision".
         public var reader: String? {
             let byKey = Dictionary(processing.map { ($0.key, $0.value) }, uniquingKeysWith: { a, _ in a })
-            if byKey["useAppleVision"] == "On" { return "Apple Vision (on this Mac)" }
-            if byKey["useGateway"] == "On" {
-                let name = byKey["gatewayDisplayName"].flatMap { $0.isEmpty ? nil : $0 } ?? byKey["gatewayModelID"]
-                return ["A gateway", name].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: ", ")
+            guard let provider = byKey["provider"], !provider.isEmpty else { return nil }
+            if provider == "Apple Vision" { return "Apple Vision (on this Mac)" }
+            if let modelID = byKey["gateway.modelID"] {
+                let name = byKey["gateway.displayName"].flatMap { $0.isEmpty ? nil : $0 } ?? modelID
+                return ["A gateway", name].filter { !$0.isEmpty }.joined(separator: ", ")
             }
-            guard let provider = byKey["selectedProvider"], !provider.isEmpty else { return nil }
-            let model = byKey["selectedModelId_\(provider)"].flatMap { $0.isEmpty ? nil : $0 }
+            let model = byKey["model.id"].flatMap { $0.isEmpty ? nil : $0 }
             return [CollectionSettingsVocabulary.providerLabel(provider), model].compactMap { $0 }.joined(separator: ", ")
         }
     }
@@ -400,16 +401,63 @@ private struct SnapshotDTO: Decodable {
     let projectName: String?
     let macMemoryGB: Double?
     let values: [String: ResolvedDTO]
-    let processing: [String: CollectionSettingValue]
-    private enum CodingKeys: String, CodingKey { case projectName, macMemoryGB, values, processing }
+    /// The run's settings (`run`, the Processor's `ResolvedRunConfig`) flattened to dotted names and words.
+    let processing: [String: String]
+    private enum CodingKeys: String, CodingKey { case projectName, macMemoryGB, values, run }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         projectName = try? c.decodeIfPresent(String.self, forKey: .projectName)
         macMemoryGB = try? c.decodeIfPresent(Double.self, forKey: .macMemoryGB)
         values = ((try? c.decodeIfPresent([String: Lenient<ResolvedDTO>].self, forKey: .values)) ?? [:])
             .compactMapValues(\.value)
-        processing = ((try? c.decodeIfPresent([String: Lenient<CollectionSettingValue>].self, forKey: .processing))
-            ?? [:]).compactMapValues(\.value)
+        processing = ((try? c.decodeIfPresent(RecordJSON.self, forKey: .run)) ?? nil)?.flattened() ?? [:]
+    }
+}
+
+/// Any JSON value, for reading the Processor's run settings without this package knowing each field: a field the
+/// Processor adds later is shown as it is, and one this build cannot read is left out.
+private indirect enum RecordJSON: Decodable {
+    case null, bool(Bool), number(Double), string(String), array([RecordJSON]), object([String: RecordJSON])
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if c.decodeNil() { self = .null }
+        else if let b = try? c.decode(Bool.self) { self = .bool(b) }
+        else if let n = try? c.decode(Double.self) { self = .number(n) }
+        else if let s = try? c.decode(String.self) { self = .string(s) }
+        else if let a = try? c.decode([RecordJSON].self) { self = .array(a) }
+        else { self = .object(try c.decode([String: RecordJSON].self)) }
+    }
+
+    /// Scalars in words by dotted name; a list of scalars joined; absent values and lists of objects left out.
+    func flattened(prefix: String = "") -> [String: String] {
+        switch self {
+        case .object(let fields):
+            var out: [String: String] = [:]
+            for (key, value) in fields {
+                out.merge(value.flattened(prefix: prefix.isEmpty ? key : "\(prefix).\(key)")) { a, _ in a }
+            }
+            return out
+        case .array(let items):
+            let words = items.compactMap(\.word)
+            return words.count == items.count && !prefix.isEmpty ? [prefix: words.isEmpty ? "none" : words.joined(separator: ", ")] : [:]
+        default:
+            return word.map { prefix.isEmpty ? [:] : [prefix: $0] } ?? [:]
+        }
+    }
+
+    private var word: String? {
+        switch self {
+        case .bool(let b): return b ? "On" : "Off"
+        case .number(let n):
+            // A whole number as one (4, 1800000000), anything else without an exponent (0.0000375, not 3.75e-05).
+            if n == n.rounded(), abs(n) < 1e15 { return String(Int64(n)) }
+            var text = String(format: "%.10f", n)
+            while text.hasSuffix("0") { text.removeLast() }
+            return text.hasSuffix(".") ? String(text.dropLast()) : text
+        case .string(let s): return s
+        default: return nil
+        }
     }
 }
 
@@ -437,9 +485,8 @@ private struct RunDTO: Decodable {
                                              value: CollectionSettingsVocabulary.describe(key, v.value),
                                              source: v.sourceText)
         }.sorted { $0.label < $1.label }
-        let processing = (self.settings?.processing ?? [:]).map { key, v in
-            CollectionSettingsRecord.Setting(key: key, label: key, value: CollectionSettingsVocabulary.plain(v),
-                                             source: "")
+        let processing = (self.settings?.processing ?? [:]).map { key, words in
+            CollectionSettingsRecord.Setting(key: key, label: key, value: words, source: "")
         }.sorted { $0.key < $1.key }
         return .init(id: id, startedAt: startedAt, kind: kind, fileCount: fileCount,
                      projectName: self.settings?.projectName, macMemoryGB: self.settings?.macMemoryGB,

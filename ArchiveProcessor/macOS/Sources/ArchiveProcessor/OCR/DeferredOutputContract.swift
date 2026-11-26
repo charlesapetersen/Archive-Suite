@@ -68,7 +68,7 @@ enum DeferredOutputContract {
                 previousTextCharCount: 0, sendPreviousImage: false, customPrompt: nil, startedAt: Date(),
                 gatewayConfig: nil, completedResults: completed, runFingerprint: nil, exportOriginals: false,
                 localAgent: nil,
-                runtimeConfig: processor.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil, runConfig: config))
+                runtimeConfig: processor.makePendingRunSnapshot(imageScale: 1, gatewayConfig: nil, runConfig: config))
             run.completedOutputPaths = paths
             run.runFingerprint = OCRProcessor.pendingRunFingerprintV2(run)
             guard OCRProcessor.pendingRunIsSelfConsistent(run),

@@ -11,7 +11,10 @@ extension OCRProcessor {
         try? ProcessorCatalogueRun.load(from: pendingCatalogueURL)
     }
 
+    /// `keepPreservationCopies`: the run's own answer (`ResolvedRunConfig.keepPreservationCopies`); nil reads the
+    /// general layer now, for a run that has no config of its own yet.
     func beginCatalogueRun(outputRoot: URL, sources: [URL], resuming: Bool = false,
+                           keepPreservationCopies: Bool? = nil,
                            confirmResume: () -> Bool = { true }) async -> Bool {
         do {
             let lease = try ProcessorCatalogueRun.Lease(journal: Self.pendingCatalogueURL)
@@ -44,7 +47,7 @@ extension OCRProcessor {
                 return false
             }
             let captureHandoff = captureSession?.handoffPhotoSnapshot(for: sources) ?? [:]
-            let intake = SettingsLayerStore.shared.keepsPreservationCopies
+            let intake = keepPreservationCopies ?? SettingsLayerStore.shared.keepsPreservationCopies
                 ? try await PDFGenerator.runWorker(priority: .utility) {
                     var verified: [URL: ProcessorPreservationFiling.Intake] = [:]
                     for source in Set(sources) {

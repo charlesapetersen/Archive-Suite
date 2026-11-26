@@ -668,27 +668,19 @@ class OCRProcessor: ObservableObject {
         var pdfLayerLogNotes: [String]? = nil
     }
 
-    /// Versioned, immutable snapshot of every mutable/runtime knob that the standard Process Files
-    /// pipeline reads after its `startProcessing` arguments have been captured. A resumed v2 run applies
-    /// this snapshot before rebuilding output or making another OCR call, so relaunch-time UserDefaults
-    /// and UI state cannot silently change the rest of an in-flight job.
+    /// What a standard Process Files run froze at Start, so a resumed run applies it before rebuilding output or making
+    /// another OCR call and relaunch-time UserDefaults and UI state cannot change the rest of an in-flight job: every
+    /// setting, as the run's one `ResolvedRunConfig` (W49.proc-settings-config-unify), and what its file list gave it.
+    /// Settings fields read and write `config` through the dynamic member lookup; nothing here keeps a second copy.
     ///
-    /// `PendingRun` retains its original flat fields for legacy manifests. This additive carrier is
-    /// optional solely for backward compatibility; every newly-created standard run must include it and
-    /// an identity fingerprint computed over it. Unknown future schema versions fail closed (the manifest
-    /// is preserved but not resumed by an older build).
-    struct PendingRunRuntimeConfig: Codable {
-        static let currentSchemaVersion = 1
+    /// The backend and destination a resume uses are the `PendingRun`'s own fields, the ones it checks the key against
+    /// (`ResolvedRunConfig.resumed(identity:)`). An unknown schema version fails closed (the manifest is kept, not resumed).
+    @dynamicMemberLookup
+    struct PendingRunSnapshot: Codable {
+        static let currentSchemaVersion = 2
 
         let schemaVersion: Int
-        let taggingMode: TaggingMode
-        let passSourceTags: Bool
-        let rotationMode: RotationMode
-        let reviewRotation: Bool
-        let mergeDocuments: Bool
-        let tagVocabulary: [String]
-        let imageScale: Double
-        let exportOriginals: Bool
+        var config: ResolvedRunConfig
 
         /// Live Capture handoff metadata, parallel to `PendingRun.fileURLs` when populated.
         let preGroupedBoundaries: [Bool]
@@ -697,45 +689,6 @@ class OCRProcessor: ObservableObject {
         let preGroupedYears: [Int?]
         let preGroupedMonths: [Int?]
         let preGroupedSubjects: [[String]]
-
-        /// UserDefaults-backed sizing/concurrency values, normalized by
-        /// `SessionProcessingConfig.runSizing()`. These affect request cost, generated PDFs/images, and
-        /// scheduling, so resume must not reload potentially-changed defaults.
-        let standardImageMB: Double
-        let ocrWorkerCount: Int
-        let pdfImageMB: Double
-        let textColumns: Int
-        let exportedImageMB: Double
-
-        /// Apple Vision's local recognition choices. They affect output text, so a resumed Vision run
-        /// replays the exact language/quality/vocabulary configuration that produced its first pages.
-        var visionSettings: VisionOCRSettings = .default
-
-        /// The text-only LLM selected for a Vision hybrid run. The API key stays in the Keychain and is
-        /// supplied at resume time; provider/model/thinking are in the signed runtime snapshot so a
-        /// mid-run settings change cannot silently redirect later classifications or tags.
-        var visionTextProvider: LLMProvider? = nil
-        var visionTextModel: LLMModel? = nil
-        var visionTextThinkingLevel: ThinkingLevel? = nil
-
-        /// Cost-history attribution for a gateway run. It does not affect requests, but persisting it
-        /// keeps the resumed run's history consistent with the estimate shown when the run began.
-        let gatewayUpstreamProvider: LLMProvider?
-
-        /// Who proposes this run's boundaries (W36.seg-opt-review), so a resumed run keeps its approach. Nil
-        /// reads as `manual`.
-        var segmentationApproach: SegmentationApproach? = nil
-
-        /// The run's OCR cascade (W41.app-ocr-cascade), so a resumed run escalates to the route it began with.
-        /// Nil reads as off.
-        var cascade: OCRCascade? = nil
-
-        /// Only runs which actually enabled correction store this. Absence keeps older fingerprints valid.
-        var postCorrection: Bool? = nil
-
-        /// Vision Auto Date's optional local image pass. Absence means off.
-        var dateLocalImage: Bool? = nil
-        var macItemFields: Bool? = nil
 
         /// The run's per-page readers (W41.app-page-kind), so a resumed run reads each page with the reader it was
         /// planned for. Nil reads as none.
@@ -748,6 +701,17 @@ class OCRProcessor: ObservableObject {
         /// The run's tree (W47.ct-processor-intake, `OCRProcessor.outputSubfolders`), so a resumed run files each output
         /// in the folder it began to. Nil reads as none: every output in the output folder.
         var outputSubfolders: [String: String]? = nil
+
+        subscript<T>(dynamicMember keyPath: WritableKeyPath<ResolvedRunConfig, T>) -> T {
+            get { config[keyPath: keyPath] }
+            set { config[keyPath: keyPath] = newValue }
+        }
+
+        var passSourceTags: Bool { config.taggingMode == .copySource }
+        var exportOriginals: Bool { config.outputImageFile }
+        var visionTextProvider: LLMProvider? { config.visionText?.provider }
+        var visionTextModel: LLMModel? { config.visionText?.model }
+        var visionTextThinkingLevel: ThinkingLevel? { config.visionText?.thinkingLevel }
     }
 
     struct PendingRun: Codable {
@@ -801,7 +765,7 @@ class OCRProcessor: ObservableObject {
         /// Complete v2 runtime snapshot. Nil only for a manifest written by an older build; legacy resumes
         /// intentionally retain the historical live-setting fallback because the original values were
         /// never recorded and cannot be reconstructed.
-        var runtimeConfig: PendingRunRuntimeConfig? = nil
+        var runtimeConfig: PendingRunSnapshot? = nil
         var mixedPDFOutcomes: [MixedPDFOutcome]? = nil
         /// W36.seg-opt-review: the window answers and the flagged-gap answers (keyed by the path of the page
         /// after the gap) so far, so a resume asks neither the model nor the user again. Outside the

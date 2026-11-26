@@ -627,7 +627,7 @@ struct SettingsResolver: Sendable {
 /// The resolved settings frozen into a run's record when a batch starts, so a result can always say what produced
 /// it. Written into the pending run and appended to the collection's settings document.
 struct ResolvedSettingsSnapshot: Codable, Equatable, Sendable {
-    static let currentSchemaVersion = 1
+    static let currentSchemaVersion = 2
 
     var schemaVersion = Self.currentSchemaVersion
     /// The run this was frozen for; the collection's run record of the same id holds the same snapshot.
@@ -640,12 +640,17 @@ struct ResolvedSettingsSnapshot: Codable, Equatable, Sendable {
     var macMemoryGB: Double
     /// Every layered value with its source.
     var values: [String: ResolvedSetting]
-    /// The app's processing settings as the run read them (provider, model, tagging, sizing…), by `DefaultsKeys`
-    /// name; the per-provider model ids are under `selectedModelId_<provider>`. Never an API key.
-    var processing: [String: SettingsValue]
+    /// The run's own settings (W49.proc-settings-config-unify): the `ResolvedRunConfig` it ran on, as
+    /// `ResolvedRunConfig.forRecord` gives it (a gateway address without credentials). Never an API key, which that type
+    /// cannot hold. Nil until the run's config is final, and for a record that only reads the layers.
+    var run: ResolvedRunConfig? {
+        // Whoever sets it, the record holds only what may leave this Mac (an assignment inside its own observer does
+        // not call the observer again).
+        didSet { if let value = run, value != value.forRecord { run = value.forRecord } }
+    }
 
     init(runID: UUID, resolvedAt: Date, collectionID: UUID?, projectID: UUID?, projectName: String?,
-         macMemoryGB: Double, values: [String: ResolvedSetting], processing: [String: SettingsValue]) {
+         macMemoryGB: Double, values: [String: ResolvedSetting], run: ResolvedRunConfig? = nil) {
         self.runID = runID
         self.resolvedAt = resolvedAt
         self.collectionID = collectionID
@@ -653,7 +658,7 @@ struct ResolvedSettingsSnapshot: Codable, Equatable, Sendable {
         self.projectName = projectName
         self.macMemoryGB = macMemoryGB
         self.values = values
-        self.processing = processing
+        self.run = run?.forRecord
     }
 
     private struct Lenient<T: Decodable>: Decodable {
@@ -662,7 +667,7 @@ struct ResolvedSettingsSnapshot: Codable, Equatable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, runID, resolvedAt, collectionID, projectID, projectName, macMemoryGB, values, processing
+        case schemaVersion, runID, resolvedAt, collectionID, projectID, projectName, macMemoryGB, values, run
     }
 
     /// A value of a kind this build does not know is dropped rather than failing the whole record (it rides in the
@@ -678,7 +683,6 @@ struct ResolvedSettingsSnapshot: Codable, Equatable, Sendable {
         macMemoryGB = try c.decode(Double.self, forKey: .macMemoryGB)
         values = (try c.decodeIfPresent([String: Lenient<ResolvedSetting>].self, forKey: .values) ?? [:])
             .compactMapValues(\.value)
-        processing = (try c.decodeIfPresent([String: Lenient<SettingsValue>].self, forKey: .processing) ?? [:])
-            .compactMapValues(\.value)
+        run = (try? c.decodeIfPresent(ResolvedRunConfig.self, forKey: .run)) ?? nil
     }
 }

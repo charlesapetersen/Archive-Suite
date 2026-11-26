@@ -209,7 +209,7 @@ enum TaggingFailureTestDriver {
 
         // 6. W49.proc-unified-pipeline-1: a run's tagging answers are kept in its pending run as they land, and a
         //    resume reuses them, asking only the calls that failed.
-        let runtime = p.makePendingRunRuntimeConfig(imageScale: 1, gatewayConfig: nil)
+        let runtime = p.makePendingRunSnapshot(imageScale: 1, gatewayConfig: nil)
         let pending = OCRProcessor.PendingRun(
             provider: .gemini, model: route.model, thinkingLevel: nil, fileURLs: files, outputDirectory: outDir,
             enableTagging: true, enableSegmentJSON: false, enableCollectionSegmentation: false,

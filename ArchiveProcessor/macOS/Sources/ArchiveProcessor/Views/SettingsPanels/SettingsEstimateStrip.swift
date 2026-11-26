@@ -32,7 +32,6 @@ struct SettingsEstimateStrip: View {
     @AppStorage(DefaultsKeys.enableCollectionSegmentation) private var enableCollectionSegmentation: Bool = false
     @AppStorage(DefaultsKeys.sendPreviousImage) private var sendPreviousImage: Bool = false
     @AppStorage(DefaultsKeys.enableSegmentJSON) private var enableSegmentJSON: Bool = false
-    @AppStorage(DefaultsKeys.contextCharCount) private var contextCharCount: Double = 0   // context slider removed; kept 0 (parallel OCR)
     @AppStorage(DefaultsKeys.outputDirectory) private var outputPath: String = ""
     @ObservedObject private var modelStore = ModelSelectionStore.shared
     @ObservedObject private var settingsStore = SettingsLayerStore.shared
@@ -154,7 +153,7 @@ struct SettingsEstimateStrip: View {
                     fileCount: 1000, model: model, enableTagging: tagging,
                     enableCollectionSegmentation: enableCollectionSegmentation,
                     preOCRedInput: preOCRedInput, sendPreviousImage: sendPreviousImage && segmentationPlan.usesPerPageClassifier,
-                    contextCharCount: Int(contextCharCount), imageScale: imageScale / 100.0,
+                    contextCharCount: 0, imageScale: imageScale / 100.0,
                     rotationMode: rotationMode, useGateway: useGateway,
                     imageTokenProvider: useGateway ? gatewayUpstreamProvider : nil, gatewayRotation: gatewayRotation,
                     measuredRoute: DateRoute.measuredRoute(gateway: gateway, usesLocalAgent: false),
@@ -162,7 +161,7 @@ struct SettingsEstimateStrip: View {
                     sidecars: enableSegmentJSON || !preOCRedInput, namesCallShare: namesCallShare)
                 let time = TimeEstimator.estimate(
                     fileCount: 1000, model: model, rotationMode: rotationMode,
-                    sequentialOCR: contextCharCount > 0, enableTagging: tagging,
+                    sequentialOCR: false, enableTagging: tagging,
                     enableCollectionSegmentation: enableCollectionSegmentation,
                     preOCRedInput: preOCRedInput, useGateway: useGateway, ocrWorkers: ocrWorkerCount,
                     gatewayRotation: gatewayRotation, usesLocalAgent: useLocalAgent)
