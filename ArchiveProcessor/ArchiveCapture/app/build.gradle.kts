@@ -29,6 +29,14 @@ val driveOAuthRedirectScheme: String =
     if (driveOAuthClientId.isEmpty()) "com.googleusercontent.apps.invalid-unconfigured"
     else "com.googleusercontent.apps." + driveOAuthClientId.removeSuffix(".apps.googleusercontent.com")
 
+// Release signing for tester APKs (W49.suite-companions-readiness). The keystore and its passwords stay out of
+// git: `keystore.properties` beside `local.properties` names storeFile, storePassword, keyAlias, keyPassword.
+// Without it a release build is unsigned and debug builds are unaffected. Setup: ArchiveCapture/README.md.
+val releaseSigning: Properties? =
+    rootProject.file("keystore.properties").takeIf { it.exists() }?.let { f ->
+        Properties().apply { f.inputStream().use { load(it) } }
+    }
+
 android {
     namespace = "com.archiveprocessor.capture"
     compileSdk = 36
@@ -37,8 +45,9 @@ android {
         applicationId = "com.archiveprocessor.capture"
         minSdk = 26
         targetSdk = 36
+        // Kept equal to the iPhone companion's MARKETING_VERSION / CURRENT_PROJECT_VERSION (W49.suite-companions-readiness).
         versionCode = 1
-        versionName = "0.1"
+        versionName = "1.0"
 
         // AppAuth redirect: the reversed-client-ID custom scheme for the Android OAuth client. AppAuth's
         // library manifest binds its RedirectUriReceiverActivity to this scheme via the placeholder.
@@ -48,9 +57,21 @@ android {
         buildConfigField("String", "DRIVE_OAUTH_REDIRECT_URI", "\"$driveOAuthRedirectScheme:/oauth2redirect\"")
     }
 
+    signingConfigs {
+        if (releaseSigning != null) {
+            create("release") {
+                storeFile = rootProject.file(releaseSigning.getProperty("storeFile").trim())
+                storePassword = releaseSigning.getProperty("storePassword")
+                keyAlias = releaseSigning.getProperty("keyAlias").trim()
+                keyPassword = releaseSigning.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (releaseSigning != null) signingConfig = signingConfigs.getByName("release")
         }
     }
 

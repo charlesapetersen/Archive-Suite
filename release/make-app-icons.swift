@@ -4,6 +4,7 @@
 //   swift release/make-app-icons.swift sheet <out.png>          candidate sheet: every set, big and at Dock size
 //   swift release/make-app-icons.swift install <A|B|C> [repo]   write the chosen set into all three AppIcon.appiconsets
 //   swift release/make-app-icons.swift android [repo]           write set B's Processor icon into Android Capture's mipmaps
+//   swift release/make-app-icons.swift ios [repo]               write set B's Processor icon into iPhone Capture's AppIcon
 // Offscreen CoreGraphics + ImageIO only: it opens no window, so it is safe unattended.
 // Each set is one family (same tile, same cream archival paper) told apart by hue and one glyph:
 // Processor = capture/OCR/tag (blue), Reader = find/read (amber), Notes = write from a source (green).
@@ -355,6 +356,28 @@ func installAndroid(_ repo: URL) {
     print("wrote the Processor launcher icon into \(res.path)")
 }
 
+// MARK: iPhone app icon (W49.suite-companions-readiness)
+// iOS takes one 1024 px square, opaque and full bleed, and applies its own rounded mask. It is the Android
+// adaptive icon's two layers with the visible 72 dp blown up to the whole square and no clip, so both phones
+// show the same tile.
+
+func iosIcon() -> CGImage {
+    let c = CGContext(data: nil, width: 1024, height: 1024, bitsPerComponent: 8, bytesPerRow: 0,
+                      space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+    c.translateBy(x: 0, y: 1024); c.scaleBy(x: 1, y: -1)
+    let z = S / androidVisible
+    c.translateBy(x: S / 2, y: S / 2); c.scaleBy(x: z, y: z); c.translateBy(x: -S / 2, y: -S / 2)
+    androidBackground(c); androidForeground(c)
+    return c.makeImage()!
+}
+
+func installIOS(_ repo: URL) {
+    let dir = repo.appendingPathComponent("ArchiveProcessor/ArchiveCaptureiOS/Sources/ArchiveCaptureiOS/Assets.xcassets/AppIcon.appiconset")
+    guard FileManager.default.fileExists(atPath: dir.path) else { fatalError("no icon set at \(dir.path)") }
+    writePNG(iosIcon(), dir.appendingPathComponent("icon_1024.png"))
+    print("wrote the Processor app icon into \(dir.path)")
+}
+
 func writePNG(_ img: CGImage, _ url: URL) {
     let d = CGImageDestinationCreateWithURL(url as CFURL, UTType.png.identifier as CFString, 1, nil)!
     CGImageDestinationAddImage(d, img, nil)
@@ -414,7 +437,9 @@ case "install" where args.count >= 3 && sets[args[2]] != nil:
     }
 case "android" where args.count <= 3:
     installAndroid(URL(fileURLWithPath: args.count > 2 ? args[2] : FileManager.default.currentDirectoryPath))
+case "ios" where args.count <= 3:
+    installIOS(URL(fileURLWithPath: args.count > 2 ? args[2] : FileManager.default.currentDirectoryPath))
 default:
-    FileHandle.standardError.write("usage: make-app-icons.swift sheet <out.png> | install <A|B|C> [repo] | android [repo]\n".data(using: .utf8)!)
+    FileHandle.standardError.write("usage: make-app-icons.swift sheet <out.png> | install <A|B|C> [repo] | android [repo] | ios [repo]\n".data(using: .utf8)!)
     exit(2)
 }

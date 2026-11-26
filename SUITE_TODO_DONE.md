@@ -18761,3 +18761,19 @@ the same three lines and landing them separately would silently revert part of t
   Session 1's memory stop (11.7 GB) was the cold Processor build before W49.proc-build-memory; this session built
   once at a time through the heavy lock. No bench cache was used.
   <!-- /W49.proc-item-fields-rerun -->
+- [x] **W49.suite-companions-readiness — Align Capture companion versions, update iOS `AppIcon`, add companion READMEs, and document tester distribution [S-M]** · §ArchiveCore, Shared Packages & Suite Infrastructure — holistic pre-user-testing review (lane: processor) — SHIPPED 2026-11-25.
+  Filed by the owner's 2026-11-25 pre-user-testing review. Both phones are now version 1.0, build 1: Android's
+  `versionName` went from 0.1 to 1.0 (`versionCode` 1), iOS stays `MARKETING_VERSION` 1.0 / build 1, and each file
+  says to bump the other with it. No code reads either version, so nothing else changes. `release/make-app-icons.swift
+  ios` draws the iPhone icon from the Android adaptive icon's two layers, full bleed and opaque (1024 px, no alpha),
+  replacing the July `icon_1024.png`, so both phones show the same blue capture tile. New `ArchiveCapture/README.md`
+  and `ArchiveCaptureiOS/README.md`: build, sideload (adb; free Apple ID with devicectl), pairing (the connection
+  choice, then the Live Capture QR), and builds for other testers. Android release signing is configured from a
+  gitignored `ArchiveCapture/keystore.properties` (`*.jks`/`*.keystore` ignored too); without it a release build
+  stays unsigned and debug is untouched. The README warns that a release key's SHA-1 needs its own Drive OAuth
+  client. iOS TestFlight and ad hoc are documented, not configured: both need the owner's paid Apple Developer
+  membership. Verified: `assembleRelease` unsigned (`app-release-unsigned.apk`) and with a scratch keystore
+  (`apksigner` shows the scratch signer; `aapt2` badging versionName 1.0); `assembleDebug testDebugUnitTest` green;
+  the iOS Simulator build succeeds with no new warnings. A first release build fetches lint-gradle online once. No
+  bench cache was used.
+  <!-- /W49.suite-companions-readiness -->
