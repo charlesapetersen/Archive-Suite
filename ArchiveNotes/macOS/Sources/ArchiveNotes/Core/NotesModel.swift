@@ -253,12 +253,36 @@ final class NotesModel: ObservableObject {
         return chooser
     }()
 
+    // MARK: The open library (W49.notes-library-ux)
+
+    /// The library this launch opened, or nil when none is (or for an injected test store). A switch restarts the
+    /// app (`StoreFolderChooser`), so this never changes while it runs.
+    var libraryURL: URL? { rootStore?.root }
+
+    /// Whether there is a library to make notes in. An injected (test) store always counts as one.
+    var isLibraryOpen: Bool { ownsDataLayer ? rootStore?.root != nil : true }
+
+    /// The library's name as Finder shows it, for the window's subtitle and the sidebar.
+    var libraryName: String? { libraryURL?.deletingPathExtension().lastPathComponent }
+
+    /// File ▸ Open Recent; nil for an injected (test) store.
+    var recentLibraries: RecentLibraries? { rootStore?.recentLibraries }
+
+    /// File ▸ Reveal Library in Finder: Finder selects the library package; nothing is written.
+    func revealLibraryInFinder() {
+        guard let libraryURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([libraryURL])
+    }
+
     /// The first launch has no library (there is no hidden default store; owner, 2026-11-20, call 24), so it
     /// offers the Save panel at once, with `~/Documents` proposed. Cancelling leaves the app with no library and
     /// the status line saying how to make or open one. Never under a test host: a panel there has nobody to
     /// answer it.
     private func askForFirstLibrary() {
         guard !ArchiveTestHost.isUnitTestHost, let chooser = storeFolderChooser else { return }
+#if DEBUG
+        if RootFolderStore.uiTestNoLibrary { return }
+#endif
         // From the run loop, not a `Task`: Make Library ends in Restart and Switch, whose quit hung inside a
         // main-queue job (`StoreFolderChooser.onMainRunLoop`).
         StoreFolderChooser.onMainRunLoop {

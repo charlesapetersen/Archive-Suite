@@ -432,6 +432,20 @@ struct NotesFolderTreeView: View {
         selection = Self.templatesTag
     }
 
+    /// The open library's name, beside New Folder (W49.notes-library-ux); its menu reveals it in Finder.
+    @ViewBuilder private var libraryLabel: some View {
+        if let name = model.libraryName {
+            Label(name, systemImage: "books.vertical")
+                .font(.caption).foregroundStyle(.secondary)
+                .lineLimit(1).truncationMode(.middle)
+                .help(model.libraryURL?.path ?? name)
+                .contextMenu { Button("Reveal Library in Finder") { model.revealLibraryInFinder() } }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Library: \(name)")
+                .accessibilityIdentifier("an.sidebar.library")
+        }
+    }
+
     private var bottomBar: some View {
         VStack(spacing: 0) {
             if let msg = model.statusMessage {
@@ -453,8 +467,10 @@ struct NotesFolderTreeView: View {
                     Image(systemName: "plus")
                 }
                 .buttonStyle(.borderless).help("New Folder")
+                .disabled(!model.isLibraryOpen)
                 .accessibilityIdentifier("an.sidebar.newFolder")
-                Spacer()
+                libraryLabel
+                Spacer(minLength: 0)
                 #if DEBUG
                 // UI-test seam: the drop highlight's state, so a test can see none is left after a drop.
                 // Left out for the accessibility audit: on macOS 27 Xcode's contrast audit never finishes on

@@ -73,23 +73,20 @@ struct FormatCommands: Commands {
 /// by double-click opens no window by itself (the app is launched to open a document, and nothing is restored on
 /// a first launch), so a window's `onAppear` never ran and the library waited unasked (measured with the Release
 /// build in the VM, W49.notes-finder-open-check). The menu bar is built at launch whether or not a window is.
+///
+/// Open Recent and Reveal Library in Finder (W49.notes-library-ux) sit with them.
 struct ReaderRootCommands: Commands {
     let previewState: SourceBlockPreviewState
     let notesModel: NotesModel
     let appDelegate: NotesAppDelegate
     @Environment(\.openWindow) private var openWindow
 
-    /// "Is it inside an archive?" answered with Choose Archive Folder…: grant the archive first.
-    private func grantArchiveIfAsked(_ outcome: StoreFolderChooser.Outcome?) {
-        if case .chooseArchiveFirst = outcome { previewState.chooseArchiveFolder() }
-    }
-
     /// Opens a library from Finder: the main window first, so the app is there behind the question and after a
     /// Cancel, then Open Library…'s checks and confirmation.
     private func openLibraryFromFinder(_ url: URL) {
         openWindow(id: NotesWindowID.notes)
         NSApp.activate(ignoringOtherApps: true)
-        grantArchiveIfAsked(notesModel.storeFolderChooser?.use(url, readerRoots: previewState.grantedArchiveFolders))
+        LibraryActions.open(url, model: notesModel, previewState: previewState)
     }
 
     var body: some Commands {
@@ -99,15 +96,84 @@ struct ReaderRootCommands: Commands {
             // ⇧⌘O, as in the Reader (W40.fix-suite-shortcuts).
             Button("Choose Archive Folder\u{2026}") { previewState.chooseArchiveFolder() }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
-            Button("New Library\u{2026}") {
-                grantArchiveIfAsked(notesModel.storeFolderChooser?
-                    .newLibrary(readerRoots: previewState.grantedArchiveFolders))
+            Button("New Library\u{2026}") { LibraryActions.newLibrary(model: notesModel, previewState: previewState) }
+            Button("Open Library\u{2026}") { LibraryActions.openLibrary(model: notesModel, previewState: previewState) }
+            if let recents = notesModel.recentLibraries {
+                Menu("Open Recent") {
+                    OpenRecentMenuItems(recents: recents, model: notesModel, previewState: previewState)
+                }
             }
-            Button("Open Library\u{2026}") {
-                grantArchiveIfAsked(notesModel.storeFolderChooser?
-                    .choose(readerRoots: previewState.grantedArchiveFolders))
-            }
+            Button("Reveal Library in Finder") { notesModel.revealLibraryInFinder() }
+                .disabled(notesModel.libraryURL == nil)
         }
+    }
+}
+
+/// File ▸ Open Recent's items: the libraries opened before, newest first, then Clear Menu. The open library is
+/// listed but greyed, as there is nothing to switch to.
+struct OpenRecentMenuItems: View {
+    @ObservedObject var recents: RecentLibraries
+    let model: NotesModel
+    let previewState: SourceBlockPreviewState
+
+    var body: some View {
+        let current = model.libraryURL.map(RecentLibraries.canonicalPath)
+        ForEach(recents.entries) { entry in
+            Button(recents.title(for: entry)) {
+                LibraryActions.openRecent(entry, recents: recents, model: model, previewState: previewState)
+            }
+            .disabled(entry.path == current)
+        }
+        if !recents.entries.isEmpty { Divider() }
+        Button("Clear Menu") { recents.clear() }
+            .disabled(recents.entries.isEmpty)
+    }
+}
+
+/// The library commands, shared by the File menu and the No Library Open state's buttons
+/// (W49.notes-library-ux). Each runs from a menu or button action, never a `Task`: it may end in Restart and
+/// Switch, whose quit needs the main run loop (`StoreFolderChooser.onMainRunLoop`).
+@MainActor
+enum LibraryActions {
+    static func newLibrary(model: NotesModel, previewState: SourceBlockPreviewState) {
+        grantArchiveIfAsked(model.storeFolderChooser?.newLibrary(readerRoots: previewState.grantedArchiveFolders),
+                            previewState)
+    }
+
+    static func openLibrary(model: NotesModel, previewState: SourceBlockPreviewState) {
+        grantArchiveIfAsked(model.storeFolderChooser?.choose(readerRoots: previewState.grantedArchiveFolders),
+                            previewState)
+    }
+
+    /// A library given by URL (from Finder, or Open Recent): Open Library…'s checks and confirmation.
+    static func open(_ url: URL, model: NotesModel, previewState: SourceBlockPreviewState) {
+        grantArchiveIfAsked(model.storeFolderChooser?.use(url, readerRoots: previewState.grantedArchiveFolders),
+                            previewState)
+    }
+
+    /// Open Recent: a library that can no longer be found is said so and taken off the list. The scope its
+    /// bookmark started is held only while the choice is made; a switch quits first.
+    static func openRecent(_ entry: RecentLibraries.Entry, recents: RecentLibraries,
+                           model: NotesModel, previewState: SourceBlockPreviewState) {
+        guard let url = recents.resolve(entry) else {
+            recents.remove(entry)
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "“\(entry.name)” can't be found."
+            alert.informativeText = "It may have been moved, renamed or deleted, or be on a disk that is not "
+                + "connected. It has been taken off the Open Recent list. To use it, choose File ▸ Open Library… "
+                + "and find it."
+            alert.runModal()
+            return
+        }
+        defer { url.stopAccessingSecurityScopedResource() }
+        open(url, model: model, previewState: previewState)
+    }
+
+    /// "Is it inside an archive?" answered with Choose Archive Folder…: grant the archive first.
+    private static func grantArchiveIfAsked(_ outcome: StoreFolderChooser.Outcome?,
+                                            _ previewState: SourceBlockPreviewState) {
+        if case .chooseArchiveFirst = outcome { previewState.chooseArchiveFolder() }
     }
 }
 
@@ -127,11 +193,16 @@ struct NewItemCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Note") { create(.note) }
-                .keyboardShortcut("n", modifiers: .command)
-            Button("New Extract") { create(.extract) }
-                .keyboardShortcut("n", modifiers: [.command, .option])
-            Button("New Template\u{2026}") { newTemplate() }
+            // Nothing to make an item in with no library open (W49.notes-library-ux). A switch restarts the app,
+            // so whether one is open never changes while it runs.
+            Group {
+                Button("New Note") { create(.note) }
+                    .keyboardShortcut("n", modifiers: .command)
+                Button("New Extract") { create(.extract) }
+                    .keyboardShortcut("n", modifiers: [.command, .option])
+                Button("New Template\u{2026}") { newTemplate() }
+            }
+            .disabled(!notesModel.isLibraryOpen)
         }
     }
 

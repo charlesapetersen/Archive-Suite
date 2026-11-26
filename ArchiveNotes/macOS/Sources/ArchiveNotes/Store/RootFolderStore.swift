@@ -25,6 +25,8 @@ final class RootFolderStore: ObservableObject {
     private(set) var savedRootUnavailable = false
     /// No library was ever made or opened: the first launch, which asks for one.
     var needsLibrary: Bool { root == nil && !savedRootUnavailable }
+    /// File ▸ Open Recent: every library a launch has opened, kept in the same defaults as the bookmark.
+    let recentLibraries: RecentLibraries
 
     private let key = "notesStoreRootBookmark"
     private var defaults: UserDefaults
@@ -74,19 +76,30 @@ final class RootFolderStore: ObservableObject {
         // `notesStoreRootBookmark` — the real store root is never touched (the override returns
         // before resolveSaved()).
         if let path = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !path.isEmpty {
+            // `-ANUITestNoLibrary YES` starts with no library open, as a first launch does, so a UITest can
+            // see the No Library Open state (W49.notes-library-ux). The first-launch Save panel is not shown.
+            if Self.uiTestNoLibrary {
+                recentLibraries = RecentLibraries(defaults: nil)
+                return
+            }
             // `-ANUITestStoreBookmarkSuite <suite>` lets a UITest drive Open Library… and the
             // relaunch after it: the pick persists into that throwaway suite, never the real key, and
             // the fixture stands in for the store until something has been picked.
             if let suite = UserDefaults.standard.string(forKey: "ANUITestStoreBookmarkSuite"), !suite.isEmpty,
                let scratch = UserDefaults(suiteName: suite) {
                 self.defaults = scratch
+                recentLibraries = RecentLibraries(defaults: scratch)
                 resolveSaved()
                 if root != nil || savedRootUnavailable { return }
+            } else {
+                // The fixture is never put on the app's own Open Recent list.
+                recentLibraries = RecentLibraries(defaults: nil)
             }
             adoptTestStore(URL(fileURLWithPath: path, isDirectory: true))
             return
         }
 #endif
+        recentLibraries = RecentLibraries(defaults: defaults)
         resolveSaved()
     }
 
@@ -151,6 +164,7 @@ final class RootFolderStore: ObservableObject {
             }
             // The scope is held for the life of the process: the store is in use until it quits.
             root = url
+            recentLibraries.note(url)
             // Refresh a stale bookmark while access is still held.
             if stale, let fresh = try? url.bookmarkData(options: .withSecurityScope,
                                                         includingResourceValuesForKeys: nil,
@@ -175,6 +189,12 @@ final class RootFolderStore: ObservableObject {
     }
 
 #if DEBUG
+    /// `-ANUITestNoLibrary` under the UITest harness (see `init`).
+    static var uiTestNoLibrary: Bool {
+        guard let p = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !p.isEmpty else { return false }
+        return UserDefaults.standard.bool(forKey: "ANUITestNoLibrary")
+    }
+
     /// Set the store root for UI testing without persisting a bookmark or starting a security
     /// scope. The fixture path is accessible via the UITest-only temporary-exception entitlement,
     /// so no security-scoped resource dance is needed. This method does NOT read or write
