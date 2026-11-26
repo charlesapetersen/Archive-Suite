@@ -91,6 +91,13 @@ final class ArchiveLibrary: ObservableObject {
     var usesCatalogue: Bool { catalogueInstance != nil }
     private(set) var catalogueReader: CatalogueReader?
     private(set) var catalogueSnapshot: CatalogueReader.Snapshot?
+    /// The last published catalogue pass, which an event batch revises instead of walking the root again, and
+    /// a counter bumped on each publish so a revision begun on an older pass is never applied over a newer one
+    /// (W49.reader-catalogue-scale).
+    private var cataloguePass: ReaderCatalogueScan?
+    private var cataloguePublishes: UInt64 = 0
+    /// Where the catalogue list is saved for the next launch's warm start. Nil keeps every catalogue launch cold.
+    private let catalogueCacheWriter: ReaderCatalogueCacheWriter?
 
     /// `root` spelled the way the walker reports paths under it — the only spelling a *discovered*
     /// path may be compared against. Derived from `root` here rather than read off `RootFolderStore`
@@ -176,6 +183,7 @@ final class ArchiveLibrary: ObservableObject {
     /// `ReaderRootStore`. Production passes `.standard`; only tests pass a throwaway suite.
     init(minimumRootRescanInterval: TimeInterval = 1.0,
          libraryIndexURL: URL? = ArchiveLibrary.defaultLibraryIndexURL,
+         catalogueCacheDirectory: URL? = ArchiveLibrary.defaultCatalogueCacheDirectory,
          watcherStartTimeout: TimeInterval = 2.0,
          scanStallTimeout: TimeInterval = 5.0,
          defaults: UserDefaults = .standard,
@@ -200,8 +208,15 @@ final class ArchiveLibrary: ObservableObject {
         self.fixtureIndexOverride = scratchIndexPath != nil
         let resolvedIndexURL = scratchIndexPath.map { URL(fileURLWithPath: $0) } ?? libraryIndexURL
         self.libraryIndex = resolvedIndexURL.map { LibraryIndex(url: $0) }
+        // The scratch database's lane keeps its catalogue cache beside it, and any other fixture root keeps none,
+        // so a fixture can never read or write the real Application Support cache either.
+        let catalogueDirectory = scratchIndexPath.map {
+            URL(fileURLWithPath: $0).deletingLastPathComponent().appendingPathComponent("catalogue-cache-v1", isDirectory: true)
+        } ?? (defaults.string(forKey: Self.fixtureRootKey) != nil ? nil : catalogueCacheDirectory)
+        self.catalogueCacheWriter = catalogueDirectory.map { ReaderCatalogueCacheWriter(directory: $0) }
 #else
         self.libraryIndex = libraryIndexURL.map { LibraryIndex(url: $0) }
+        self.catalogueCacheWriter = catalogueCacheDirectory.map { ReaderCatalogueCacheWriter(directory: $0) }
 #endif
         self.watcherStartTimeout = max(0, watcherStartTimeout)
         self.scanStallTimeout = max(0, scanStallTimeout)
@@ -215,6 +230,20 @@ final class ArchiveLibrary: ObservableObject {
             .appendingPathComponent("ArchiveReader", isDirectory: true)
             .appendingPathComponent("library-index-v1.sqlite3")
     }
+
+    /// Beside the library index. Nil in the unit-test host, which is the Reader app itself: a test that wants a
+    /// catalogue cache names a scratch directory, so none can read or write the owner's.
+    nonisolated static var defaultCatalogueCacheDirectory: URL? {
+        guard !ArchiveTestHost.isUnitTestHost else { return nil }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("ArchiveReader", isDirectory: true)
+            .appendingPathComponent("catalogue-cache-v1", isDirectory: true)
+    }
+
+#if DEBUG
+    /// Blocks until every catalogue cache this library has handed to its writer is on disk.
+    func flushCatalogueCacheForTesting() { catalogueCacheWriter?.flush() }
+#endif
 
     // MARK: - The write-vs-walk ordering guard (replaced ~80 lines of TTL/convergence overlay)
     //
@@ -312,6 +341,8 @@ final class ArchiveLibrary: ObservableObject {
         self.catalogueInstance = scope == nil ? nil : catalogueInstance
         catalogueReader = nil
         catalogueSnapshot = nil
+        cataloguePass = nil
+        cataloguePublishes &+= 1
         replaceFiles([])
         verifiedWrites.removeAll()      // no override may leak across roots
         lastSettled = nil
@@ -687,14 +718,27 @@ final class ArchiveLibrary: ObservableObject {
     private func beginCatalogueScan(root: URL, instance: UUID, generation: UInt64,
                                     rootGeneration: UInt64, token: ScanCancellation) {
         armScanStallDeadline(generation: generation)
+        // The previous pass's reads make each unchanged PDF and companion cheap to check again. The first pass
+        // of a root has none, so it starts from the saved cache, whose rows it also shows at once.
+        let memory = cataloguePass?.snapshot?.memory
+        let writer = catalogueCacheWriter
+        let loadsWarm = cataloguePass == nil && files.isEmpty
         let thread = Thread { [weak self] in
-            let pass = ReaderCatalogueScan.run(root: root, instance: instance,
+            let warm = loadsWarm ? writer.flatMap { ReaderCatalogueCache.load(from: $0.directory, instance: instance) } : nil
+            let pass = ReaderCatalogueScan.run(root: root, instance: instance, memory: memory, warm: warm,
                                                isCancelled: { token.isCancelled },
-                                               onProgress: { [weak self] seen in
+                                               onWarm: { [weak self] rows, asOf in
+                DispatchQueue.main.async { [weak self] in
+                    MainActor.assumeIsolated {
+                        self?.publishWarmCatalogue(rows, asOf: asOf, generation: generation, rootGeneration: rootGeneration)
+                    }
+                }
+            }, onProgress: { [weak self] seen in
                 DispatchQueue.main.async { [weak self] in
                     self?.reportProgress(generation: generation, found: 0, seen: seen)
                 }
             })
+            let cache = writer == nil || token.isCancelled ? nil : pass.cache(instance: instance)
             Task { @MainActor [weak self] in
                 guard let self, !token.isCancelled,
                       self.rootGeneration == rootGeneration, self.currentScan == generation else { return }
@@ -704,8 +748,7 @@ final class ArchiveLibrary: ObservableObject {
                 }
                 guard !token.isCancelled,
                       self.rootGeneration == rootGeneration, self.currentScan == generation else { return }
-                self.catalogueReader = pass.reader
-                self.catalogueSnapshot = pass.snapshot
+                self.adoptCataloguePass(pass, cache: cache)
                 let phase = DiscoveryHealth.phase(after: pass.health, root: pass.rootStability,
                                                   finishedAt: Date(), lastSettled: self.lastSettled)
                 self.publishFinishedPass(pass.rows, next: phase, generation: generation)
@@ -714,6 +757,75 @@ final class ArchiveLibrary: ObservableObject {
         thread.name = "ArchiveReader.CatalogueScan"
         thread.qualityOfService = .utility
         thread.start()
+    }
+
+    /// The saved list, shown while the first pass of a launch revalidates it: the catalogue counterpart of
+    /// `publishWarmSnapshot`. Its rows are as of the cache and carry `.cache` provenance; the reader and snapshot
+    /// stay unset, so nothing can be edited from them until the disk pass lands.
+    private func publishWarmCatalogue(_ rows: [ArchiveFile], asOf: Date, generation: UInt64, rootGeneration: UInt64) {
+        guard rootGeneration == self.rootGeneration, generation == currentScan, inFlight != nil,
+              cataloguePass == nil, files.isEmpty, !rows.isEmpty else { return }
+        replaceFiles(rows)
+        lastSettled = asOf
+        if stalledScan == nil { phase = .revalidating(asOf: asOf) }
+    }
+
+    private func adoptCataloguePass(_ pass: ReaderCatalogueScan, cache: ReaderCatalogueCache?,
+                                    savingAfter delay: TimeInterval = 0) {
+        catalogueReader = pass.reader
+        catalogueSnapshot = pass.snapshot
+        cataloguePass = pass
+        cataloguePublishes &+= 1
+        if let cache { catalogueCacheWriter?.save(cache, after: delay) }
+    }
+
+    /// Revise the last catalogue pass for one event batch, off the main thread. Falls back to a full pass when
+    /// there is no pass to revise or the revision declines (`ReaderCatalogueScan.revise`).
+    private func startCatalogueRevision(root: URL, request: CorpusWatchRequest) {
+        guard let pass = cataloguePass, let instance = catalogueInstance, pass.snapshot != nil else {
+            requestRootRescan(urgent: false)
+            return
+        }
+        watchWorkInFlight = true
+        let rootGeneration = self.rootGeneration
+        let publishes = cataloguePublishes
+        let cancellation = CorpusWatchCancellation()
+        watchCancellation = cancellation
+        let writes = catalogueCacheWriter != nil
+        let paths = Array(request.paths), subtrees = Array(request.subtrees)
+        let thread = Thread { [weak self] in
+            let holdsScope = root.startAccessingSecurityScopedResource()
+            defer { if holdsScope { root.stopAccessingSecurityScopedResource() } }
+            let revised = cancellation.isCancelled ? nil
+                : ReaderCatalogueScan.revise(pass, root: root, paths: paths, subtrees: subtrees,
+                                             isCancelled: { cancellation.isCancelled })
+            let cache = writes ? revised?.cache(instance: instance) : nil
+            Task { @MainActor [weak self] in
+                // Only what the revision read again: every other pair is as the last pass remembered it.
+                if let revised, let snapshot = revised.snapshot, !cancellation.isCancelled {
+                    await ReaderCataloguePairMemory.shared.remember(snapshot.rememberablePairs(at: revised.rereadPaths),
+                                                                    instance: snapshot.rootInstanceID)
+                }
+                self?.finishCatalogueRevision(revised, cache: cache, rootGeneration: rootGeneration, publishes: publishes)
+            }
+        }
+        thread.name = "ArchiveReader.CatalogueRevision"
+        thread.qualityOfService = .utility
+        thread.start()
+    }
+
+    private func finishCatalogueRevision(_ revised: ReaderCatalogueScan?, cache: ReaderCatalogueCache?,
+                                         rootGeneration: UInt64, publishes: UInt64) {
+        guard rootGeneration == self.rootGeneration else { return }
+        watchWorkInFlight = false
+        watchCancellation = nil
+        if let revised, publishes == cataloguePublishes, inFlight == nil {
+            adoptCataloguePass(revised, cache: cache, savingAfter: 30)
+            ReaderStages.measure("library.apply (catalogue batch)") { replaceFiles(revised.rows) }
+        } else {
+            requestRootRescan(urgent: false)
+        }
+        drainWatchWork()
     }
 
     /// Hand a pass to another thread. Split out of `beginScan` so the DEBUG stall hook above can defer
@@ -1103,9 +1215,16 @@ final class ArchiveLibrary: ObservableObject {
             if let root, requestTouchesJPEGPartnerTree(request, root: root) {
                 refreshJPEGPartnerIndex(scope: root)
             }
-            // A companion may supply fields to other rows in different folders. Refresh against
-            // the entire owner inventory so that moving or removing an owner invalidates its members.
-            if !request.isEmpty { requestRootRescan(urgent: false) }
+            // A companion may supply fields to other rows in different folders, so a revision resolves owners
+            // again across the whole inventory; it reads again only what the batch names
+            // (`startCatalogueRevision`). Dropped events still need the full pass.
+            if request.fullRescan {
+                pendingWatchRequest = CorpusWatchRequest()
+                requestRootRescan(urgent: false)
+            } else if !request.isEmpty {
+                pendingWatchRequest.merge(request)
+                drainWatchWork()
+            }
             return
         }
         if let root, requestTouchesJPEGPartnerTree(request, root: root) {
@@ -1211,6 +1330,10 @@ final class ArchiveLibrary: ObservableObject {
         guard !pendingWatchRequest.isEmpty else { return }
         let request = pendingWatchRequest
         pendingWatchRequest = CorpusWatchRequest()
+        if usesCatalogue {
+            startCatalogueRevision(root: root, request: request)
+            return
+        }
         watchWorkInFlight = true
         let rootGeneration = self.rootGeneration
         clock += 1

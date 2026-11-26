@@ -9,23 +9,46 @@ extension CatalogueReader {
         private let mode: Mode
         public let inventory: Inventory
         private let rootFailure: ItemFacts.Unavailable?
-        private let files: [Data: FileResult]
+        /// The root directory the files were read under; nil when the root could not be read.
+        let rootIdentity: CatalogueReadDirectory.Identity?
+        let files: [Data: FileResult]
         private let owners: [UUID: [FileResult]]
+        let reads: [Data: RememberedRead]
 
         init(rootInstanceID: UUID, mode: Mode, inventory: Inventory, rootFailure: ItemFacts.Unavailable? = nil,
-             files: [Data: FileResult] = [:], owners: [UUID: [FileResult]] = [:]) {
+             rootIdentity: CatalogueReadDirectory.Identity? = nil,
+             files: [Data: FileResult] = [:], owners: [UUID: [FileResult]] = [:], reads: [Data: RememberedRead] = [:]) {
             self.rootInstanceID = rootInstanceID
             self.mode = mode
             self.inventory = inventory
             self.rootFailure = rootFailure
+            self.rootIdentity = rootFailure == nil ? rootIdentity : nil
             self.files = files
             self.owners = owners
+            self.reads = reads
+        }
+
+        var isAdopted: Bool { mode == .adopted && rootFailure == nil && rootIdentity != nil }
+
+        /// What this snapshot's reads proved, for `snapshot(_:remembering:)` or a launch's
+        /// `rememberedSnapshot(_:)`. Nil when the root could not be read.
+        public var memory: ReadMemory? {
+            guard isAdopted, let rootIdentity else { return nil }
+            return ReadMemory(rootInstanceID: rootInstanceID, rootIdentity: rootIdentity,
+                              inventoryPaths: inventory.relativePDFPaths, isComplete: inventory.isComplete, reads: reads)
         }
 
         /// Only pairs whose PDF identity and adjacent companion both verified in this scan.
         public var rememberablePairs: [CatalogueReader.RememberedPair] {
             files.values.compactMap { result in
                 (try? result.get()).map { CatalogueReader.RememberedPair($0) }
+            }
+        }
+
+        /// `rememberablePairs` for the named paths only: what a revision read again.
+        public func rememberablePairs(at relativePaths: some Sequence<String>) -> [CatalogueReader.RememberedPair] {
+            relativePaths.compactMap { path in
+                files[Data(path.utf8)].flatMap { try? $0.get() }.map { CatalogueReader.RememberedPair($0) }
             }
         }
 

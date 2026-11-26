@@ -113,7 +113,7 @@ fi
 if [ "$ONLY" != sample ] && [ "$ONLY" != chain ]; then
   [ -d "$SYNTHETIC" ] || { echo "no synthetic tree at $SYNTHETIC — run ops/scale/run-scale-verify.sh --keep" >&2; exit 2; }
   printf 'synthetic=%s\n' "$SYNTHETIC" >> "$HANDSHAKE.tmp"
-  only_filter="$only_filter -only-testing:ArchiveReaderTests/ReaderAtSizeTests/testListAtOneHundredFiftyThousandFiles"
+  only_filter="$only_filter -only-testing:ArchiveReaderTests/ReaderAtSizeTests/testListAtOneHundredFiftyThousandFiles -only-testing:ArchiveReaderTests/ReaderAtSizeTests/testCatalogueAtOneHundredFiftyThousandFiles"
 fi
 [ -z "$ONLY" ] && only_filter="-only-testing:ArchiveReaderTests/ReaderAtSizeTests"
 # Which build the time budgets in ReaderAtSizeTests apply to (W40.fix-reader-list-recompute-at-size).

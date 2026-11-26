@@ -377,6 +377,49 @@ final class ReaderAtSizeTests: XCTestCase {
 
     // MARK: - The 150k synthetic tree: list length
 
+    /// W49.reader-catalogue-scale: Catalogue Mode on the 150k tree. Its PDFs carry no catalogue identity and no
+    /// companions, so each cold read is the identity parse the read memory exists to skip. Read-only: a
+    /// catalogue read opens every file `O_RDONLY` and writes nothing, and the cache here is encoded in memory.
+    func testCatalogueAtOneHundredFiftyThousandFiles() throws {
+        let root = try root("synthetic")
+        let instance = UUID()
+        func pass(_ memory: CatalogueReader.ReadMemory?) -> ReaderCatalogueScan {
+            ReaderCatalogueScan.run(root: root, instance: instance, memory: memory, isCancelled: { false },
+                                    onProgress: { _ in })
+        }
+        let (cold, coldSeconds) = time { pass(nil) }
+        print("D7 catalogue cold pass rows=\(cold.rows.count) \(s(coldSeconds)) (walk + every PDF's identity parse)")
+        XCTAssertGreaterThanOrEqual(cold.rows.count, 100_000, "the catalogue lane needs the 150k tree")
+        let memory = try XCTUnwrap(cold.snapshot?.memory)
+        let (again, againSeconds) = time { pass(memory) }
+        print("D7 catalogue pass with read memory rows=\(again.rows.count) \(s(againSeconds))")
+
+        let cache = try XCTUnwrap(cold.cache(instance: instance))
+        let encoder = PropertyListEncoder()
+        encoder.outputFormat = .binary
+        let (bytes, encodeSeconds) = try time { try encoder.encode(cache) }
+        let (decoded, decodeSeconds) = try time { try PropertyListDecoder().decode(ReaderCatalogueCache.self, from: bytes) }
+        let (warmRows, warmSeconds) = try time { () -> [ArchiveFile] in
+            let reader = try CatalogueReader(grantedRoot: root, rootInstanceID: instance, mode: .adopted,
+                                             identifyPDF: CataloguePDFIdentity.identify)
+            let snapshot = try XCTUnwrap(reader.rememberedSnapshot(decoded.memory))
+            return ReaderCatalogueScan.rows(decoded.candidates(), snapshot: snapshot, provenance: .cache(asOf: decoded.savedAt))
+        }
+        print("D7 catalogue cache \(bytes.count / 1024) KiB, encode \(ms(encodeSeconds)), decode \(ms(decodeSeconds)), "
+              + "warm rows=\(warmRows.count) \(ms(warmSeconds))")
+        XCTAssertEqual(warmRows.count, cold.rows.count)
+
+        let changed = try XCTUnwrap(cold.rows.dropFirst(cold.rows.count / 2).first)
+        let (revised, reviseSeconds) = time {
+            ReaderCatalogueScan.revise(cold, root: root, paths: [changed.url.path], subtrees: [],
+                                       isCancelled: { false })
+        }
+        print("D7 catalogue revision of one path rows=\(revised?.rows.count ?? -1) \(ms(reviseSeconds))")
+        XCTAssertEqual(revised?.rows.count, cold.rows.count)
+        XCTAssertLessThan(reviseSeconds, coldSeconds / 5, "one event is not a full read")
+        XCTAssertLessThan(againSeconds, coldSeconds, "unchanged PDFs are not parsed again")
+    }
+
     func testListAtOneHundredFiftyThousandFiles() async throws {
         let root = try root("synthetic")
         let footprintStart = footprintMiB()

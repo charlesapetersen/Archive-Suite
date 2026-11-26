@@ -6,7 +6,7 @@ import Foundation
 public struct CatalogueReader: Sendable {
     public enum Mode: Sendable { case legacy, adopted }
 
-    public struct PDFIdentity: Sendable {
+    public struct PDFIdentity: Codable, Sendable {
         public let fileID: UUID
         public let contentRevision: UUID
         public let pageCount: Int
@@ -37,8 +37,8 @@ public struct CatalogueReader: Sendable {
 
     private let root: URL
     public let rootInstanceID: UUID
-    private let mode: Mode
-    private let rootIdentity: CatalogueReadDirectory.Identity
+    let mode: Mode
+    let rootIdentity: CatalogueReadDirectory.Identity
     private let identifyPDF: IdentifyPDF
     let directory: CatalogueReadDirectory
 
@@ -86,11 +86,28 @@ public struct CatalogueReader: Sendable {
     /// Refresh from the current filesystem. Path and PDF timestamps alone never key catalogue facts.
     /// Supply a fresh complete inventory to resolve foreign owners. Explicit selections may be absent
     /// from that inventory (for example a stale Notes link) and are still checked within the root.
-    public func snapshot(_ inventory: Inventory, including selectedPaths: [String] = []) -> Snapshot {
-        snapshot(including: selectedPaths) { _ in inventory }
+    /// `memory` lets a file whose PDF and companion versions are unchanged skip the PDF identity parse
+    /// and the companion decode; every file is still opened and checked (`RememberedRead`).
+    public func snapshot(_ inventory: Inventory, including selectedPaths: [String] = [],
+                         remembering memory: ReadMemory? = nil) -> Snapshot {
+        snapshot(including: selectedPaths, remembered: usable(memory), carrying: nil, rereading: []) { _ in inventory }
     }
 
-    private func snapshot(including selectedPaths: [String],
+    /// A snapshot that carries every file of `previous` not named in `rereading` without opening it, and
+    /// reads the named ones, and any path `previous` did not hold, from the filesystem. For a caller
+    /// with a file-system event stream: it names every path that changed, and a missed event is its
+    /// cue for a full `snapshot(_:)`. Owners are resolved again across the whole inventory, so a moved
+    /// or removed owner still updates the documents that depend on it. A `previous` from another
+    /// instance or root directory, or one that could not read the root, is not carried.
+    public func snapshot(revising previous: Snapshot, inventory: Inventory, rereading: Set<String>) -> Snapshot {
+        let carried = previous.rootInstanceID == rootInstanceID && previous.rootIdentity == rootIdentity
+            && previous.isAdopted ? previous : nil
+        return snapshot(including: [], remembered: carried?.reads ?? [:], carrying: carried,
+                        rereading: Set(rereading.map { Data($0.utf8) })) { _ in inventory }
+    }
+
+    private func snapshot(including selectedPaths: [String], remembered: [Data: RememberedRead] = [:],
+                          carrying previous: Snapshot? = nil, rereading: Set<Data> = [],
                           inventory readInventory: (CatalogueReadDirectory.Entry) -> Inventory) -> Snapshot {
         let unavailable = Inventory(relativePDFPaths: [], isComplete: false)
         guard mode == .adopted else {
@@ -102,23 +119,32 @@ public struct CatalogueReader: Sendable {
                     let inventory = readInventory(root)
                     let discovered = Set(inventory.relativePDFPaths.map { Data($0.utf8) })
                     var files: [Data: Snapshot.FileResult] = [:]
+                    var reads: [Data: RememberedRead] = [:]
                     var owners: [UUID: [Snapshot.FileResult]] = [:]
                     var isComplete = inventory.isComplete
                     // Swift String equality folds Unicode spellings. Retain filesystem byte spelling.
                     for path in inventory.relativePDFPaths + selectedPaths {
                         let key = Data(path.utf8)
                         guard files[key] == nil else { continue }
-                        let read = readFile(path: path, in: root)
-                        files[key] = read.result
-                        if let fileID = read.provenFileID {
-                            owners[fileID, default: []].append(read.result)
-                        } else if case .failure(.missing(.pdf)) = read.result, discovered.contains(key) {
+                        let result: Snapshot.FileResult
+                        let read: RememberedRead?
+                        if let previous, !rereading.contains(key), let prior = previous.files[key] {
+                            result = prior
+                            read = previous.reads[key]
+                        } else {
+                            (result, read) = readFile(path: path, in: root, remembered: remembered[key])
+                        }
+                        files[key] = result
+                        if let read { reads[key] = read }
+                        if let fileID = read?.identity?.fileID {
+                            owners[fileID, default: []].append(result)
+                        } else if case .failure(.missing(.pdf)) = result, discovered.contains(key) {
                             isComplete = false
                         }
                     }
                     return Snapshot(rootInstanceID: rootInstanceID, mode: mode,
                                     inventory: Inventory(relativePDFPaths: inventory.relativePDFPaths, isComplete: isComplete),
-                                    files: files, owners: owners)
+                                    rootIdentity: rootIdentity, files: files, owners: owners, reads: reads)
                 }
             }
         } catch {
@@ -127,20 +153,39 @@ public struct CatalogueReader: Sendable {
         }
     }
 
-    private func readFile(path: String, in root: CatalogueReadDirectory.Entry)
-        -> (result: Result<ItemFacts.FileFacts, ItemFacts.Unavailable>, provenFileID: UUID?) {
+    /// One file's facts and what the read proved. The PDF identity is reused when the opened PDF's
+    /// version equals the remembered one, and the companion record when the opened companion's does.
+    private func readFile(path: String, in root: CatalogueReadDirectory.Entry, remembered: RememberedRead?)
+        -> (result: Result<ItemFacts.FileFacts, ItemFacts.Unavailable>, read: RememberedRead?) {
         guard let parts = Self.pathComponents(path), let filename = parts.last else {
-            return (.failure(.invalid(.pdf)), nil)
+            return (.failure(.invalid(.pdf)), RememberedRead(pdfVersion: nil, identity: nil, companionVersion: nil,
+                                                             record: nil, failure: .invalid(.pdf)))
         }
         let occurrence = CatalogueAssociation.Occurrence(rootInstanceID: rootInstanceID, relativePath: path)
         do {
             return try directory.withParent(parts.dropLast(), in: root) { parent in
                 try directory.withFile(filename, in: parent, artifact: .pdf) { pdf in
-                    let observed = try identifyPDF(pdf.descriptor, occurrence)
+                    let pdfVersion = CatalogueReadDirectory.FileVersion(pdf.info)
+                    let observed: PDFIdentity?
+                    if let remembered, remembered.pdfVersion == pdfVersion {
+                        observed = remembered.identity
+                    } else {
+                        observed = try identifyPDF(pdf.descriptor, occurrence)
+                    }
                     let companionName = CatalogueRecord.companionFilename(forPDFFilename: filename)
+                    var companionVersion: CatalogueReadDirectory.FileVersion?
+                    var companionRecord: CatalogueRecord?
                     do {
                         let facts = try directory.withFile(companionName, in: parent, artifact: .companion) { companion in
-                            let record = try Self.record(in: companion)
+                            let version = CatalogueReadDirectory.FileVersion(companion.info)
+                            let record: CatalogueRecord
+                            if let remembered, remembered.companionVersion == version, let kept = remembered.record {
+                                record = kept
+                            } else {
+                                record = try Self.record(in: companion)
+                            }
+                            companionVersion = version
+                            companionRecord = record
                             let proof = observed.map {
                                 CatalogueAssociation.VerifiedPDF(occurrence: occurrence, fileID: $0.fileID,
                                                                  contentRevision: $0.contentRevision, pageCount: $0.pageCount)
@@ -148,25 +193,37 @@ public struct CatalogueReader: Sendable {
                             return try fileFacts(record, at: occurrence, proof: proof, pdf: pdf,
                                                  companionVersion: .init(companion.info))
                         }
-                        return (.success(facts), observed?.fileID)
+                        return (.success(facts), RememberedRead(pdfVersion: pdfVersion, identity: observed,
+                                                                companionVersion: companionVersion, record: companionRecord,
+                                                                failure: nil))
                     } catch {
-                        return (.failure(Self.companionStatus(error)), observed?.fileID)
+                        let status = Self.companionStatus(error)
+                        return (.failure(status), RememberedRead(pdfVersion: pdfVersion, identity: observed,
+                                                                 companionVersion: nil, record: nil, failure: status))
                     }
                 }
             }
         } catch {
-            return (.failure(error as? ItemFacts.Unavailable ?? .invalid(.pdf)), nil)
+            let status = error as? ItemFacts.Unavailable ?? .invalid(.pdf)
+            return (.failure(status), RememberedRead(pdfVersion: nil, identity: nil, companionVersion: nil,
+                                                     record: nil, failure: status))
         }
     }
 
     func fileFacts(_ record: CatalogueRecord, at occurrence: CatalogueAssociation.Occurrence,
                    proof: CatalogueAssociation.VerifiedPDF?, pdf: CatalogueReadDirectory.Entry,
                    companionVersion: CatalogueReadDirectory.FileVersion) throws -> ItemFacts.FileFacts {
+        try fileFacts(record, at: occurrence, proof: proof, pdfVersion: .init(pdf.info), companionVersion: companionVersion)
+    }
+
+    func fileFacts(_ record: CatalogueRecord, at occurrence: CatalogueAssociation.Occurrence,
+                   proof: CatalogueAssociation.VerifiedPDF?, pdfVersion: CatalogueReadDirectory.FileVersion,
+                   companionVersion: CatalogueReadDirectory.FileVersion) throws -> ItemFacts.FileFacts {
         let pair = try CatalogueAssociation.pair(record, at: occurrence, verifiedBy: proof)
         let revision = ItemFacts.Revision(occurrence: occurrence, fileID: record.fileID, content: record.contentRevision,
                                           facts: record.revision, companionSHA256: Data(SHA256.hash(data: record.originalJSON)))
         return ItemFacts.FileFacts(pair: pair, revision: revision, rootIdentity: rootIdentity,
-                                   pdfVersion: .init(pdf.info), companionVersion: companionVersion)
+                                   pdfVersion: pdfVersion, companionVersion: companionVersion)
     }
 
     static func companionStatus(_ error: any Error) -> ItemFacts.Unavailable {

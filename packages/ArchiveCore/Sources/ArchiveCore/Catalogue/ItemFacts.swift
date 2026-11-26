@@ -3,9 +3,9 @@ import Foundation
 /// Shared read result for one PDF selection. File facts remain available if the selected
 /// document or its enclosure cannot be resolved.
 public struct ItemFacts: Sendable {
-    public enum Artifact: Hashable, Sendable { case root, pdf, companion, document, owner }
+    public enum Artifact: Codable, Hashable, Sendable { case root, pdf, companion, document, owner }
 
-    public enum Unavailable: Error, Hashable, Sendable {
+    public enum Unavailable: Error, Codable, Hashable, Sendable {
         case legacy
         case offline(Artifact)
         case missing(Artifact)
