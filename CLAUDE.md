@@ -434,14 +434,12 @@ this repo:
 
 All 1,017 earlier commits were rewritten with `git-filter-repo` (`W29.pub1`–`pub3`). **A commit hash cited in an
 older doc will not resolve**: it is historically accurate and deliberately left alone, so don't "fix" it and don't
-treat a failed `git show <old-sha>` as corruption; find the commit by its message or `git log -S`. `git log`
-blames one identity for everything: the rewrite merged two spellings of one author, it did not squash history. Any old clone or
-worktree is on an unrelated history: re‑clone rather than merge.
+treat a failed `git show <old-sha>` as corruption; find the commit by its message or `git log -S`. One identity in
+`git log` is a merged author spelling, not a squash. Any old clone or worktree is on an unrelated history: re‑clone.
 
 The pre‑rewrite history is a local bundle **outside the repo**:
-`~/Claude/Long term storage/Preserved Bundles/archive-suite-full-backup-2026-08-11.bundle` (**quote the path** — it has
-spaces; older docs quote its pre-2026-08-13 path in `~/Claude/`). **⛔ Never push it, commit it, or merge from it**: it is the un‑scrubbed history and is treated as
-credential‑bearing: it held an OAuth client secret (since deactivated), and the next thing to land in a planning
-doc might not be dead. `.gitignore` refuses `*.bundle` only inside this checkout; its real protection is living
-outside it. It is a read‑only archive, not a remote. What changed in the rewrite, the bundle's reference facts
-and how to read it: [`REFERENCE.md`](REFERENCE.md) §"The history rewrite — the full record".
+`~/Claude/Long term storage/Preserved Bundles/archive-suite-full-backup-2026-08-11.bundle` (**quote the path**).
+**⛔ Never push it, commit it, or merge from it**: it is the un‑scrubbed history and is treated as
+credential‑bearing (it held an OAuth client secret, since deactivated). It is a read‑only archive, not a remote.
+Its older path, the `.gitignore` guard, what changed and how to read it: [`REFERENCE.md`](REFERENCE.md) §"The history
+rewrite — the full record".

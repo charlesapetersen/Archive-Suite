@@ -900,3 +900,37 @@ the real corpus; its inject seam (`files/test_inject.jpg`) is debug-only, stripp
 - **Typing a date (W40.processor-date-field):** each card has one Date field (`Views/TypedDateField.swift`, read by
   ArchiveCore `DateFieldEntry.archiveDate`, the suite's one date field), stored as the same Year/Month/Day strings
   (`Tagging/TypedDateTags.swift`); Sent with is folded below it. Unreadable text disables Save. Live Capture keeps a year and month.
+
+## Bullets compacted in CLAUDE.md (doc-fix, 2026-11-25)
+
+Verbatim as they stood in `CLAUDE.md` before the 2026-11-25 budget pass; `CLAUDE.md` keeps each rule, this keeps the detail.
+
+- **Gateways and the Local Agent skip batch. Remote gateways support LLM rotation.** Local Agent (`OCR/LocalAgentClient.swift`): no shell,
+  prompt on stdin not argv, absolute-path binary, per-call timeout, friendly errors (never raw stderr), **CLI-owned login**,
+  with API charges reported for a key-backed Claude sign-in; only `claude` is validated (`gemini`/`codex` are `VERIFY`
+  placeholders); `runAsync` signals exit via `terminationHandler` (`waitUntilExit()` on GCD missed exits) and kills
+  its child on cancel. Precedence localAgent > gateway > direct; concurrency 1–2
+  + usage-window pacing; the header/history keep the model override or `CLI default` and never price the
+  direct-provider fallback. At 90% of the five-hour meter or at a hard usage limit, new Claude subscription reads wait
+  for the reset and resume on the plan. $0 harness: `scripts/test-localagent.sh`.
+- **Read-poorly flag** (`OCR/ReadQualityFlag.swift`, `ReadQualityDisagreement.swift`) is UI only, never written to a
+  file. Vision's own reading: character-weighted line confidence under 0.9815, only under the default Vision settings it was fitted with.
+  Another reader: its text disagrees with Vision's reading of the image past that reader's own cut (`post_read_flag.py`
+  `app_readers`, which checks the Swift table); a route the bench has not read has no rule. The run summary names the
+  files and what each cut was measured on, the history counts them, rebuilds pass it on. Contract:
+  `scripts/test-read-quality-flag.sh` (and section 4b of `scripts/test-local-models.sh`).
+- A move-only refactor: run the move-proof **tty-independently** (piped, it passes for any commit), census-diff
+  private members, gate on a warnings delta (beware a cached "0 warnings"). `LiveCaptureTestDriver` does **not** exercise the batch GUI path.
+- **Institutional computing import** matches only on the image's SHA-256 with model and nonblank `cluster`
+  recorded (never filenames or institution; missing provenance matches nothing), rechecked at use; Retry/Rotate always
+  reads fresh; read-only on the bulk folder and inputs; direct non-batch path only (never gateway, Local Agent,
+  Vision or pre-OCRed input); header labels sanitised (separator, one line); estimates count every page.
+  Contract: `scripts/test-institutional-compute-import.sh`.
+- **Drive relay** ([`ArchiveCapture/README-oauth.md`](ArchiveCapture/README-oauth.md)): ⚠️ the Android OAuth client
+  ID is **NOT in git** (gitignored `ArchiveCapture/local.properties`; iOS: gitignored
+  `ArchiveCaptureiOS/Config/DriveLocal.xcconfig`); the Android ID is bound to package + signing SHA-1 and needs
+  **"Custom URI scheme" enabled**; an unconfigured build still compiles, LAN/USB unaffected. Scope
+  `drive.file`; Drive/ChatGPT tokens and the Mac's `DriveClientSecret` live in the Keychain (iOS: this device only);
+  the phone has no secret. The ChatGPT plan route sends `store: false`; only a completed response answers.
+  **Mac and phone sign in to the same Google account**, the Mac before Start (a mid-session sign-in waits for the
+  next session; owner-accepted, A5). The iPhone uses the relay only by an explicit Cloud choice, never on its own.

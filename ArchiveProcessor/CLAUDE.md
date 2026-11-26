@@ -66,29 +66,22 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 - **Cascade** (`OCR/OCRCascade.swift`, off by default) never escalates transport errors, timeouts, 429/503/529,
   key/quota/request errors, a remote gateway, the Local Agent or Apple Vision as first reader; a per-run breaker
   bounds spend. Contract: `scripts/test-ocr-cascade.sh`.
-- **Institutional computing import** matches only on the image's SHA-256 with model and nonblank `cluster`
-  recorded (never filenames or institution; missing provenance matches nothing), rechecked at use; Retry/Rotate always
-  reads fresh; read-only on the bulk folder and inputs; direct non-batch path only (never gateway, Local Agent,
-  Vision or pre-OCRed input); header labels sanitised (separator, one line); estimates count every page.
-  Contract: `scripts/test-institutional-compute-import.sh`.
+- **Institutional computing import** matches only on the image's SHA-256 with model and nonblank `cluster` recorded
+  (never filenames; missing provenance matches nothing), rechecked at use; read-only on its inputs; direct non-batch
+  path only. Contract: `scripts/test-institutional-compute-import.sh`; detail: REFERENCE.md §"Bullets compacted in CLAUDE.md (doc-fix, 2026-11-25)".
 - **Page-kind routing** is off by default. Contract: `scripts/test-ocr-page-kind.sh`.
 - **Read-poorly flag** (`OCR/ReadQualityFlag.swift`, `ReadQualityDisagreement.swift`) is UI only, never written to a
-  file. Vision's own reading: character-weighted line confidence under 0.9815, only under the default Vision settings it was fitted with.
-  Another reader: its text disagrees with Vision's reading of the image past that reader's own cut (`post_read_flag.py`
-  `app_readers`, which checks the Swift table); a route the bench has not read has no rule. The run summary names the
-  files and what each cut was measured on, the history counts them, rebuilds pass it on. Contract:
-  `scripts/test-read-quality-flag.sh` (and section 4b of `scripts/test-local-models.sh`).
+  file. Vision's own reading is flagged under its fitted confidence cut (default Vision settings only); another reader
+  when it disagrees with Vision past its own cut (`post_read_flag.py` `app_readers`); an unbenched route has no rule.
+  Contract: `scripts/test-read-quality-flag.sh` (and section 4b of `scripts/test-local-models.sh`).
 - **A model on this Mac** always sends the stand-in bearer `local`, never a saved key; escalating its failed pages
   is off by default (pages may be meant to stay on the Mac). Its measured limits (4,096-token cap, streamed
   repetition check + one re-read with a repetition penalty, 600 s → `length`, temp 0, one page at a time) are required. Contract: `scripts/test-local-models.sh`.
-- **Gateways and the Local Agent skip batch. Remote gateways support LLM rotation.** Local Agent (`OCR/LocalAgentClient.swift`): no shell,
-  prompt on stdin not argv, absolute-path binary, per-call timeout, friendly errors (never raw stderr), **CLI-owned login**,
-  with API charges reported for a key-backed Claude sign-in; only `claude` is validated (`gemini`/`codex` are `VERIFY`
-  placeholders); `runAsync` signals exit via `terminationHandler` (`waitUntilExit()` on GCD missed exits) and kills
-  its child on cancel. Precedence localAgent > gateway > direct; concurrency 1–2
-  + usage-window pacing; the header/history keep the model override or `CLI default` and never price the
-  direct-provider fallback. At 90% of the five-hour meter or at a hard usage limit, new Claude subscription reads wait
-  for the reset and resume on the plan. $0 harness: `scripts/test-localagent.sh`.
+- **Gateways and the Local Agent skip batch. Remote gateways support LLM rotation.** Local Agent
+  (`OCR/LocalAgentClient.swift`): no shell, prompt on stdin not argv, absolute-path binary, per-call timeout, friendly
+  errors (never raw stderr), **CLI-owned login**; only `claude` is validated. Precedence localAgent > gateway > direct;
+  concurrency 1–2 + usage-window pacing; at 90% of the five-hour meter or a hard limit, new Claude plan reads wait for
+  the reset. $0 harness: `scripts/test-localagent.sh`. Detail: REFERENCE.md §"Bullets compacted in CLAUDE.md (doc-fix, 2026-11-25)".
 - **Requirements:** Low/High thinking where supported; a live cost estimate before processing, standard vs batch
   side by side, **reflecting the batch discount** (batch totals require batch mode, a direct provider, and
   fresh OCR). Vision, Local Agent and unpriced gateways show a billing note. Batch toggle; parallel workers.
@@ -132,14 +125,11 @@ and "recoverable" seem to conflict, ship both — err toward keeping data.
 - **"End segment" is the phone's only "done" action** — grouping and tags, never a gate on byte transfer. Tag
   cards appear only for *completed* segments; **Finish is drain-gated** on the phone's heartbeat.
 - **The protocol and [`../SPEC/relay-object-format.md`](../SPEC/relay-object-format.md) change on all sides together.**
-- **Drive relay** ([`ArchiveCapture/README-oauth.md`](ArchiveCapture/README-oauth.md)): ⚠️ the Android OAuth client
-  ID is **NOT in git** (gitignored `ArchiveCapture/local.properties`; iOS: gitignored
-  `ArchiveCaptureiOS/Config/DriveLocal.xcconfig`); the Android ID is bound to package + signing SHA-1 and needs
-  **"Custom URI scheme" enabled**; an unconfigured build still compiles, LAN/USB unaffected. Scope
-  `drive.file`; Drive/ChatGPT tokens and the Mac's `DriveClientSecret` live in the Keychain (iOS: this device only);
-  the phone has no secret. The ChatGPT plan route sends `store: false`; only a completed response answers.
-  **Mac and phone sign in to the same Google account**, the Mac before Start (a mid-session sign-in waits for the
-  next session; owner-accepted, A5). The iPhone uses the relay only by an explicit Cloud choice, never on its own.
+- **Drive relay** ([`ArchiveCapture/README-oauth.md`](ArchiveCapture/README-oauth.md)): ⚠️ the OAuth client IDs are
+  **NOT in git** (gitignored `ArchiveCapture/local.properties`, `ArchiveCaptureiOS/Config/DriveLocal.xcconfig`); an
+  unconfigured build still compiles. Scope `drive.file`; tokens and the Mac's `DriveClientSecret` live in the Keychain;
+  the phone has no secret. **Mac and phone sign in to the same Google account**, the Mac before Start (A5). The iPhone
+  uses the relay only by an explicit Cloud choice. Detail: REFERENCE.md §"Bullets compacted in CLAUDE.md (doc-fix, 2026-11-25)".
 - **Rejected transports (don't re-open):** personal hotspot, MultipeerConnectivity/AWDL, Bluetooth, AirDrop /
   Quick Share. No Mac-side transport picker (A5, removed as a footgun).
 - **LAN security — accepted risk (owner, 2026-07-18):** plaintext HTTP + persistent bearer token; no TLS/AEAD, no
@@ -212,8 +202,7 @@ files, including in `ArchiveCaptureiOS/`); keep commits small and rebase often; 
 - `OCRProcessor` methods go in the matching per-area `OCRProcessor+<Area>.swift` extension (Pipeline, OCR, Tagging,
   ReviewFlows, WindowSegmentation, MixedPDFRecovery; types in `+Types.swift`). Keep them coarse: a new file only for a
   new pipeline area. **All stored properties stay in `OCRProcessor.swift`**.
-- A move-only refactor: run the move-proof **tty-independently** (piped, it passes for any commit), census-diff
-  private members, gate on a warnings delta (beware a cached "0 warnings"). `LiveCaptureTestDriver` does **not** exercise the batch GUI path.
+- A move-only refactor follows REFERENCE.md §"Bullets compacted in CLAUDE.md (doc-fix, 2026-11-25)".
 - `Tagging/` is Tier-2; `Segmentation/` is not (writes nothing). `WindowPrompts.swift` is verbatim from the bench
   (a test compares byte for byte). `enclosureOf` uses the OCR `[enclosure]` marker, never adjacency. `PlanUsage`
   reads its meter from the CLI stream; `PlanRunGate` pauses at a 90% five-hour meter; Claude/ChatGPT routes ask "key or

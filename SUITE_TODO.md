@@ -52,6 +52,12 @@ the head of the plan's `## WORK QUEUE` — read it there before re-ordering anyt
 
 
 ## Autonomous daemon — document budgets (owner, 2026-08-12)
+- [ ] **W49.plan-e2e-archive — the plan's E2E findings section is never compacted [S · ops]** (lane: suite) (uses: light)
+  Found by doc-fix 2026-11-25: `## E2E findings` in `.maintenance/AUTONOMOUS_PLAN.md` is 15.5 KB of eight raw PASS
+  reports, about 2 KB more each Live-Capture E2E, and `compact-plan.sh` never touches that region, so the
+  orientation total keeps climbing back over its budget. Add a compactor pass that moves all but the newest two
+  PASS reports verbatim to a gitignored `AUTONOMOUS_E2E_ARCHIVE.md` (a FAIL report and its derived fix items
+  stay until that item ships), with `prove-compact` checks; autonomous-setup changes are Tier-2.
 
 ## 🎯 Project focus & ON-HOLD areas (owner, 2026-07-09)
 
@@ -172,69 +178,11 @@ dataless files.
 
 ## Known-issues work — Wave 23 (Codex full-suite review; owner-commissioned 2026-07-29)
 
-⚠️ **This section carried "TOP OF THE DRAIN" until the 2026-08-16 priority reset — it no longer drains
-first, and that is not a demotion of the review.** All 34 original findings shipped; the 7 left are `-fu`
-follow-ups, every one of them LOW. The root `CLAUDE.md` already records the "drain Wave 23 first" condition as
-MET on 2026-08-01. Two of the seven were promoted out of the LOW tail on their own merits — `W26.oracle-fu1`
-to TIER 0 (a tag oracle that reports PASS for tags it could not read devalues every Tier-2 tag assertion made
-since) and `W23.m14-fu` to TIER 5 (on first Reader use against an unmounted external volume it reports the
-owner's irreplaceable corpus as missing files). The rest sit in TIER 6: real, cheap, and nothing depends on
-them. ⛔ Do NOT restore a "drains first" marker here without a fresh owner decision — the argument that Wave 23
-is drained has already been made to him and he kept the review pause anyway.
-
-**Source.** An owner-commissioned static full-suite review by Codex, 2026-07-29, against remote `main`
-`bfcb38e`. Read-only: nothing was fixed, built, or run. Scope = Processor (macOS + Android; iOS only for severe
-parity), Reader, Notes, `packages/ArchiveCore`, suite scripts/release tooling. 24 findings survived its own
-refute pass: **5 HIGH · 15 MEDIUM · 4 LOW**. The report itself is archived (gitignored) at
-`old/Codex_Review_July_29.md`; **every finding is transcribed below in full, so this queue is self-sufficient —
-you do not need the report.**
-
-**Owner routing decisions (2026-07-29).** (a) **W23 drains FIRST**, ahead of the remaining W16/W3.cap/W17–W22
-work — these are confirmed bugs, several with silent data loss. (b) All **5 HIGH findings are daemon-AUTHORIZED
-per item** via named entries in [`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md), rather than parked in the hold queue —
-they are the most valuable findings and the authorization text carries each one's hard constraints. The normal
-Tier-2 gate is unchanged, and **scratch-copy-only** still binds absolutely (Reader Core Directive).
-
-**⚠️ LINE NUMBERS ARE STALE — RE-LOCATE BY SYMBOL, NOT LINE.** The review baseline `bfcb38e` is five commits
-behind current `main` (`62a10d1`), and W16.cfg1/cfg2/cfg3/cfg5 **substantially rewrote**
-`OCR/OCRProcessor+{OCR,Pipeline}.swift`, `OCR/OCRProcessor.swift`, `Capture/SessionProcessingConfig.swift` and
-`Views/ToolsView.swift`. Cites in those files have drifted by tens of lines. Every item below names the
-**function/symbol**; find that, and treat the line number as a hint only. Re-confirm each premise before fixing
-it (Tier-2 requires this anyway).
-
-**Independently re-verified while queueing (2026-07-29, against `62a10d1`)** — so these three are not
-taken on trust: **W23.h1** (confirmed, and *worse* than reported — see the item), **W23.h5** (confirmed
-verbatim), **W23.m5** (confirmed; 9 `_ = try? MacOSTagger.applyTags` sites, not 3). The other 21 carry Codex's
-refute-verified confidence and must be re-confirmed by the fixing session.
-
-**Codex deduped against** `SUITE_TODO.md`, all three `KNOWN_ISSUES.md`/`CLAUDE.md`/`AGENTS.md`, the Notes
-`00-overview.md` + `09-gap-closure.md` plans, `devonthink-import.md`, and the gitignored maintenance material.
-It deliberately did **not** re-report: W3.cap-r1…r6, W3.net-r1, W16/W17/W19/W20/W21/W22, the owner-closed
-immutable-staging-generation proposal, Notes W9 gap-closure, DEVONthink import, the fixed ArchiveCore
-lost-update/duplicate-tag work, known Notes asset-write failures, or the parked iOS backlog. It also explicitly
-**refuted and dropped** five candidates: the non-ASCII/APFS filename-cap claim, Processor receiver
-stale-callback ordering, ArchiveCore partial Finder-tag mutation (already documented), and Reader header
-stripping / case-only tag convergence / smart-folder flattening (all intentional, tested behaviour). Do **not**
-re-promote those.
-
-**iOS parity** (§Project focus): where a finding has an iOS twin (`W23.m1`), fix **Android only** and
-record the iOS twin; `W40.i2` collects those twins into the parity comparison.
-
-**Prior-art audit — CLOSED 2026-07-29. Do not go re-mining the archive.** A removed Codex worktree (work dated
-2026-07-17, preserved as branch `wt/codex-processor-bugfixes-20260712` + patches in
-`old/codex-processor-fixes-20260717/`, ~2,900 uncommitted lines over 8 unpushed commits, **76 commits behind
-`main`**) was audited against every W23 defect symbol. **This is the complete list of overlaps — the rest is
-superseded** (its run-config work was re-implemented on `main` as `W16.cfg1`–`cfg5`):
-- **`W23.h5` — prior art EXISTS** (`PDFGenerator.generateRequiringEmbeddedImage()` + `PDFError.imageEmbeddingFailed`). See the item.
-- **`W23.m7` — prior art EXISTS** (`3ea3221`: checked `writeManifest()` + memory rollback). See the item.
-- **`W23.h1` — NONE.** Only the `pruneEmptySessions(under: root)` *call site* moved; the function's
-  delete-unknown-content logic is untouched. The most severe finding has no head start.
-- **`W23.m5` — NONE, and worse than none:** its new call sites are themselves written
-  `_ = try? MacOSTagger.applyTags(…)`, i.e. they *repeat* the swallowing bug. Don't copy that code.
-- Everything else queued in W23 (all Notes, Reader, ArchiveCore and Android items): **no overlap at all** — that
-  branch is Processor-macOS only.
-In both "EXISTS" cases: **re-derive against current `main`, never cherry-pick.** Neither was ever build-verified
-in this repo, and both predate the W16.cfg* rewrite of the same files.
+All 34 findings of the owner-commissioned Codex review (2026-07-29, baseline `bfcb38e`) shipped; one owner-held
+follow-up remains below. ⛔ Do NOT restore a "drains first" marker without a fresh owner decision (he kept the
+review pause). ⛔ Do NOT re-promote the candidates Codex refuted or deliberately did not re-report, and do not
+re-mine the prior-art branch `wt/codex-processor-bugfixes-20260712`. The section's background (source, routing,
+refuted list, prior-art audit) moved verbatim to `SUITE_TODO_DONE.md` §"History moved from SUITE_TODO.md (doc-fix, 2026-11-25)".
 
 ### HIGH — all five daemon-AUTHORIZED per item ([`OWNER_AUTHORIZATIONS.md`](OWNER_AUTHORIZATIONS.md)); Tier-2, scratch copies only
 
@@ -406,55 +354,12 @@ still exists but is now a **derived, no-comma-validated, provably-lossless mirro
 `BatchProvider` protocol rewrite** — it would touch the only code path that spends real money in order to remove
 risks that are already gone. Revisit only when OpenAI batch (Phase 4) is actually built.
 ## Known-issues work — Wave 17 (Live Capture durability; owner-reviewed 2026-07-18)
-Outcome of the code-grounded review of the last two deferred `ArchiveProcessor/KNOWN_ISSUES.md` architecture
-entries: **"one recoverable filesystem-transaction service + operator recovery UI"** and **"immutable, versioned
-Live Capture inputs."** **Both headline proposals are CLOSED by owner decision.** Two small units are promoted,
-one fix was folded into the already-queued `W3.cap-r1`, and both KNOWN_ISSUES entries were rewritten because
-they described machinery that **was never built**.
-
-### ⚠️ The finding that drove the decision: both entries were written in past tense about code that doesn't exist
-- RAT claimed Live Capture "freezes exact content hashes" and commits a "receipt." **`grep -rn "sha256|SHA256|CryptoKit"`
-  across `Capture/` returns ZERO hits.** There is no receipt anywhere in the finalize path.
-- IMMCAP claimed "the narrow safety fix preserves a changed re-upload instead of overwriting." `CaptureSession.ingest`
-  still does `try? FileManager.default.removeItem(at: finalURL)` then `moveItem` (`CaptureSession.swift:505-507`).
-
-That is not staleness — it is **fictional shipped work sitting in the data-safety register**, and it would
-mislead every cold-start reader (human or daemon) into believing guarantees that do not exist. Both entries are
-now corrected in place.
-
-### CLOSED by owner decision 2026-07-18 — do NOT re-promote any of these
-The shared **`RecoverableArtifactTransaction` engine**; the bundled **Recovery screen** (Validate/Retry/Export/
-**Abandon**); the **companion-persisted photo UUID** wire migration; and the **conflict/reconciliation UI**.
-Reasons, recorded so they aren't relitigated:
-1. **The guarantees are already delivered by other means.** The finalize deletion gate keys off
-   `outcome.filedGroupIds` — an **on-disk fact**, not a promise (`LiveCaptureProcessor.swift:983-986`); every
-   deletion is a Trash move; staging is co-located in the **visible** backup folder; `OutputFileSafety.relocateArtifactSet`
-   already **is** a copy-verify-install-then-delete transaction; `PendingBatch` v1 already **is** a versioned
-   SHA-256-fingerprinted journal. RAT's own stated blocker — the trustworthy tri-state tag reader — **shipped**
-   as `ArchiveCore/Tags/TagReading.swift`.
-2. **Consolidation would be a net risk increase.** Three understood, separately-regression-tested mechanisms
-   beat one general engine with unknown failure modes — in the one subsystem that has already caused real data
-   loss. The entry's own verification plan concedes it needs contract tests proving each path's existing
-   guarantees survive, i.e. *the same guarantees, differently spelled.*
-3. **Finder is already the recovery surface**, via the one-click Backup Folder button (`LiveCaptureView.swift:139-148`),
-   and it works in the one case a bundled screen cannot — when the app won't launch. **`Abandon` would also add a
-   destructive affordance to a subsystem whose entire design is that no destructive affordance exists.**
-4. **IMMCAP's central hazard is unreachable from our own companions.** It needs two byte-distinct uploads on one
-   `(groupId, seq)`; but `groupId` is a fresh random `"g" + UUID().prefix(8)` per segment
-   (`CaptureViewModel.swift:97`), `seq` is a durably-persisted monotonic counter, retries re-POST the same
-   immutable file, and reclassify mints a new groupId. **No such incident has ever been recorded** — the conflict
-   UI was speculative.
-5. **The queued items retire them.** `W3.cap-r6` is the concrete ~10-line instance of the recoverability hole RAT
-   wanted a hundred-times-larger engine for; `W3.cap-r2` delivers IMMCAP's stable-identity pillar with **no**
-   persisted generation record, **no** manifest migration, and **no** three-app protocol review. The obsolescence
-   runs the *opposite* direction from what the entries assumed — nothing in RAT/IMMCAP makes any queued item
-   obsolete (a transaction engine that faithfully commits the wrong destination is exactly as broken).
-
-### Folded into an existing item (NOT a separate task)
-The **silently-swallowed tag-write failures** (`_ = try? MacOSTagger.applyTags(...)` at
-`LiveCaptureProcessor.swift:640/647/673`) — a real finding that appeared in **neither** KNOWN_ISSUES entry — is
-folded into **`W3.cap-r1`** above and **must ship in the same commit as r1's overload fix**, because both rewrite
-the same three lines and landing them separately would silently revert part of the first. See that entry.
+⛔ **CLOSED by owner decision 2026-07-18 — do NOT re-promote any of these:** the shared
+**`RecoverableArtifactTransaction` engine**; the bundled **Recovery screen** (Validate/Retry/Export/**Abandon**); the
+**companion-persisted photo UUID** wire migration; and the **conflict/reconciliation UI**. The guarantees are delivered
+by other means, consolidation would raise risk, Finder is the recovery surface, and `Abandon` would add a destructive
+affordance. The promoted units (`W3.cap-r1`, `-r2`, `-r6`) have shipped. The full review, its five reasons and the
+finding that drove it moved verbatim to `SUITE_TODO_DONE.md` §"History moved from SUITE_TODO.md (doc-fix, 2026-11-25)".
 
 ## Wave 19 — Notes date-mirror + Quality facet (MERGES/replaces Priority) (owner-reviewed 2026-07-18)
 Owner decision from the wishlist review, refined: (a) Notes mirrors its front-matter **date** into Finder tags
@@ -921,76 +826,7 @@ as **Waves 7–10** for the next daemon run (relaunch the daemon to start it —
 - ~~Processor App-Store / Play submission (Phase 4)~~ — **DROPPED (owner 2026-07-16: "we're not doing this any
   time soon").** Off the list entirely; don't re-surface it as an owner action item.
 
-## Processor/Capture — WS11 paced re-review findings (2026-07-18, autonomous)
-Lean-review re-pass of `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/` (18 commits since the
-2026-07-08 original review). 6 finder-level findings, **4 MED / 2 LOW, no HIGH** → none routed to the owner
-HOLD queue. Every fix is **Tier-2** (Capture/ no-undo path): a fix session must adversarially re-confirm +
-run a scratch-copy functional test before shipping. ⚠️ The Opus-max **refute-verify was budget-truncated**
-(verifiers stopped to protect the session usage window — see memory `workflow-pacing-usage-window`); these are
-finder-level candidates (only #1's premise manually confirmed). Report: `.maintenance/review/Processor-Capture.md`.
-
-> **SHIP ORDER (set by the 2026-07-18 Live-Capture architecture review — see Wave 17 below).** Recommended:
-> ~~r6~~ → ~~r2~~ → ~~r5~~ → ~~r4~~ → **r3** (`r1` shipped earlier). `r6` — the subsystem's one genuine
-> recoverability hole, a straggler's processed output discarded — **shipped 2026-08-02 `905722d`**; `r2` —
-> the duplicate paid OCR on a phone retry — **shipped 2026-08-02 `96f223b`**; `r5` — the in-flight document
-> no Box could re-pin — **shipped 2026-08-02 `d67b9cb`**; `r4` — the correction the rotation review reverted
-> — **shipped 2026-08-02 `d719e3f`**. All four entries are in `SUITE_TODO_DONE.md`, and between them they
-> retire most of the two now-closed deferred architecture entries. **The collection-correction path is closed
-> end to end**: `r5` fixed the record being written, `r4` the record already written — by DELETING the
-> retained second copy of the key rather than syncing it, so there is one reader and nothing left to drift.
-> That also **unblocks `W17.stg1`**, which touches the same `RetainedSegment` (its `(blocked-on: W3.cap-r4)`
-> now resolves). `r3` — the page deleted mid-OCR whose paid call kept running — **shipped 2026-08-03
-> `5c3938e`/`c510af2`/`1ddc083`/`72b2e1c`**, so **ALL SIX WS11 Capture findings are now closed**, and two of
-> its three residuals with them — **`-fu1`, the started-once guard that outlived its call, shipped 2026-08-03
-> `1a84d1c`/`54981e0`**, and **`-fu2`, the retry that dropped a page's call without cancelling it, shipped
-> 2026-08-03 `3fdeb00`/`71cc4e6`** (both entries in `SUITE_TODO_DONE.md`). Between them the invariant is now
-> whole: **no `pageTasks` entry leaves the map with a RUNNING call behind it**, on every path that frees one
-> (`finalizeSegment`'s own clear drops without cancelling, correctly — it runs after every one of those pages
-> was awaited). Still open: **`-fu3`** and **`-fu4`**, both behaviour decisions rather than bug fixes, plus
-> **`-fu8`** (the resume path's third label, which `-fu6`'s pass found) and **one of the three `-fu7`
-> produced**: **`-fu9`** (a SUSPECTED sheet suppression). The other two are closed — **`-fu10`** (does the
-> finishing throbber's scrim block input? — decided: it is MEANT to, `0ee6179`) and **`-fu11` — Clear, ungated
-> in the same window and more destructive than the retry — shipped 2026-08-04 `fb833ea`/`c903bb8`** (entry in
-> `SUITE_TODO_DONE.md`): the button's two calls are now one `clearSession()` behind one `guard !isFinalizing`,
-> with `clearSessionState` made `private` so that is the only door. **With it the `staged`-implies-`finalized`
-> enumeration at `applyRotationReviewAndFinalize` is CLOSED** — all three entrants refuse, where the argument
-> previously rested on MainActor synchronicity alone. **`-fu7` — the
-> retry that was still live while the rotation review regenerated — shipped 2026-08-04
-> `765897b`/`68160b0`** (entry in `SUITE_TODO_DONE.md`): `retryFailed` refuses while `isFinalizing`, and the
-> bulk button + the per-item menu stop offering what it would refuse. The refusal is deliberately narrow (that
-> window only, not the two sheet states), and mutant P5 — widening it to `requestFinish`'s triple — is RED, so
-> the *scope* is tested and not merely preferred. ⚠️ **Read fu7 with `-fu10` beside it.** Its independent
-> adversarial pass established that the throbber fu7 cited as evidence the panel was CLICKABLE is a
-> hit-testable full-bleed scrim, so the two view-layer gates are most likely defence-in-depth over a hazard the
-> scrim already blocks, and the guard's live production value is the deferred model-sheet Apply (whose
-> reachability rides on `-fu9`). The guard is right either way and cost nothing; what fu10 decides is whether
-> this closed a live money leak or documented an unreachable one. Two of fu7's three edits are unmeasured above
-> the pure-function line (mutants P6/P7, both 0 RED — a SwiftUI modifier is invisible to a headless driver);
-> **one VM-lane session can close fu9, fu10 and both of those at once.**
-> **`-fu5` — the unenforced
-> `failedGroupIds ⊆ finalizedGroups` invariant several of these latency arguments lean on — shipped 2026-08-03
-> `2d15fae`/`f091ea2`** (entry in `SUITE_TODO_DONE.md`): `finalizedGroups` now has exactly two exits —
-> `releaseFinalizedGroup` per group and `releaseAllFinalizedGroups` for Clear — and both clear
-> `failedGroupIds` with it, so the subset rests on that rather than on memory. That made the *sets*
-> consistent; the stale **label** on a regenerated record was `-fu6`, and **`-fu6` shipped 2026-08-04
-> `61fc680`/`b2ff7d1`** (entry in `SUITE_TODO_DONE.md`): the A1 taxonomy is now one extracted
-> `labelStagedRecord`, and BOTH writers of a staged record go through it, so a wholesale replace cannot keep
-> the old label in either direction. ⚠️ It also **re-measured a fu5 mutant**: M1 (the finalize call site back
-> to a bare `finalizedGroups.remove`) now reads 0 RED, because fu6 removed the reachability it needed — read
-> as "fu5's defect can no longer be constructed", not "fu5 was unnecessary"; the pairing's live coverage is
-> fu5's M2 in Test 17. Between them a regenerated segment's label/record and set/set consistency is whole,
-> except on the resume path (`-fu8`). All in PRE-EXISTING code rather than in any of the fixes.
-## Processor/Net — WS11 paced re-review findings (2026-07-18, autonomous)
-Lean **delta** re-review of the **LAN/USB surface** of `ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/`
-(owner carve-out, REVIEW.md L63–67: review CaptureServer/CaptureReceiver/CaptureValidation/USBBridge/
-RelayObjectFormat + FileRelayReceiver's LAN path; **skip the cloud/Drive relay**). The 2026-07-09 findings
-(W3.n1–n5) all hold, and the two deltas since — `53d04cc` (bound LAN request memory) + `1f58575` (persist
-completion before ack) — are **clean** (serial-queue discipline intact, `close()` double-close-safe,
-auth-before-disclosure, acks gated on durable returns). **1 finding, LOW, no HIGH/MED** → nothing routed to
-the owner HOLD queue. Report: `.maintenance/review/Processor-Net.md`. ⚠️ The `lean-review` Opus/max fan-out
-was budget-stopped before it emitted a single finding (~$4.5/min while still only reading — same failure as
-the Capture re-pass); this unit was verified **INLINE** by the main-loop model. See the report.
-
+> WS11 paced re-review findings for Processor Capture/ and Net/ (2026-07-18): all closed; the record moved to `SUITE_TODO_DONE.md` §"History moved from SUITE_TODO.md (doc-fix, 2026-11-25)".
 
 ## Owner ideas — deferred, NOT for the daemon queue (do not start unprompted)
 Design-level ideas the owner wants recorded but explicitly de-prioritised. An autonomous session must
