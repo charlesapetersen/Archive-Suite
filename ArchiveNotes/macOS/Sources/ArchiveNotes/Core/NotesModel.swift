@@ -262,7 +262,8 @@ final class NotesModel: ObservableObject {
     /// Whether there is a library to make notes in. An injected (test) store always counts as one.
     var isLibraryOpen: Bool { ownsDataLayer ? rootStore?.root != nil : true }
 
-    /// The library's name as Finder shows it, for the window's subtitle and the sidebar.
+    /// The library's name as Finder shows it, for the sidebar. Not the window's subtitle: that joins the window's
+    /// accessibility title ("Archive Notes – <name>"), which every UITest finds the window by.
     var libraryName: String? { libraryURL?.deletingPathExtension().lastPathComponent }
 
     /// File ▸ Open Recent; nil for an injected (test) store.

@@ -438,6 +438,7 @@ struct NotesFolderTreeView: View {
             Label(name, systemImage: "books.vertical")
                 .font(.caption).foregroundStyle(.secondary)
                 .lineLimit(1).truncationMode(.middle)
+                .layoutPriority(1)
                 .help(model.libraryURL?.path ?? name)
                 .contextMenu { Button("Reveal Library in Finder") { model.revealLibraryInFinder() } }
                 .accessibilityElement(children: .combine)

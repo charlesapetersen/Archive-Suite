@@ -59,6 +59,10 @@ class NotesFixtureUITestCase: XCTestCase {
     /// Launch arguments a subclass adds to every launch of its tests (W9.e2-paste's folder-pick stand-in).
     var extraLaunchArguments: [String] { [] }
 
+    /// Whether setUp waits for the fixture's notes to be listed. Off for a launch with no library open
+    /// (`NoLibraryOpenUITests`), which lists none.
+    var waitsForSeededList: Bool { true }
+
     /// The browser layout of every launch (W48.notes-stacked-layout). The choice persists in the app's defaults,
     /// which the fixture restore does not reach, so it is pinned like the kind filters: side by side unless a
     /// subclass runs its checks stacked. A test that switches layouts through the View menu returns `[]`, because
@@ -293,6 +297,7 @@ class NotesFixtureUITestCase: XCTestCase {
         // `waitForIndexReady` (its 1×1 clear-color queryability was flagged UNVERIFIED at W8-S7).
         // Scoped to the main window like every other lookup — through the LOCAL `window` above, which keeps
         // this readiness gate bound to the primary window captured immediately after launch.
+        guard waitsForSeededList else { return }
         let seed = window.descendants(matching: .any)["an.cell.title.\(Self.idPlain)"]
         XCTAssertTrue(seed.waitForExistence(timeout: 25), "a seeded note row should populate the list")
     }

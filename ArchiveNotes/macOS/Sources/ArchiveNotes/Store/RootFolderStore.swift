@@ -76,12 +76,6 @@ final class RootFolderStore: ObservableObject {
         // `notesStoreRootBookmark` — the real store root is never touched (the override returns
         // before resolveSaved()).
         if let path = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !path.isEmpty {
-            // `-ANUITestNoLibrary YES` starts with no library open, as a first launch does, so a UITest can
-            // see the No Library Open state (W49.notes-library-ux). The first-launch Save panel is not shown.
-            if Self.uiTestNoLibrary {
-                recentLibraries = RecentLibraries(defaults: nil)
-                return
-            }
             // `-ANUITestStoreBookmarkSuite <suite>` lets a UITest drive Open Library… and the
             // relaunch after it: the pick persists into that throwaway suite, never the real key, and
             // the fixture stands in for the store until something has been picked.
@@ -89,6 +83,10 @@ final class RootFolderStore: ObservableObject {
                let scratch = UserDefaults(suiteName: suite) {
                 self.defaults = scratch
                 recentLibraries = RecentLibraries(defaults: scratch)
+                // `-ANUITestNoLibrary YES` starts with no library open, as a first launch does, so a UITest can
+                // see the No Library Open state (W49.notes-library-ux); the first-launch Save panel is not
+                // shown. Only with a bookmark suite, so a pick made from that state never reaches the real key.
+                if Self.uiTestNoLibrary { return }
                 resolveSaved()
                 if root != nil || savedRootUnavailable { return }
             } else {
@@ -189,9 +187,11 @@ final class RootFolderStore: ObservableObject {
     }
 
 #if DEBUG
-    /// `-ANUITestNoLibrary` under the UITest harness (see `init`).
+    /// `-ANUITestNoLibrary` under the UITest harness with a bookmark suite (see `init`).
     static var uiTestNoLibrary: Bool {
-        guard let p = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !p.isEmpty else { return false }
+        guard let p = UserDefaults.standard.string(forKey: "ANUITestStorePath"), !p.isEmpty,
+              let s = UserDefaults.standard.string(forKey: "ANUITestStoreBookmarkSuite"), !s.isEmpty
+        else { return false }
         return UserDefaults.standard.bool(forKey: "ANUITestNoLibrary")
     }
 

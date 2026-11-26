@@ -54,7 +54,11 @@ macOS/Sources/ArchiveNotes/
                                    component-boundary) + nonisolated static path helpers + rootURL (W7-S5);
                                    allItemRefs() read-only enumeration for the full index (re)build (W8-S7)
     RootFolderStore.swift          Security-scoped bookmark to the Notes library; none chosen (first launch,
-                                   needsLibrary) or one that no longer opens leaves no store: no hidden default
+                                   needsLibrary) or one that no longer opens leaves no store: no hidden default;
+                                   records each library a launch opens on Open Recent (W49.notes-library-ux)
+    RecentLibraries.swift          File ▸ Open Recent: bookmark + path per library, newest first, 10 at most;
+                                   in memory only under the UITest fixture; choosing one runs
+                                   StoreFolderChooser.use (LibraryActions, ArchiveNotesCommands.swift)
     StoreFolderChooser.swift       File ▸ New Library… / Open Library… and a library opened from Finder: the
                                    `.archivenotes` package (com.archivenotes.library, Info.plist); adopts a
                                    library in place or makes an empty one, never replaces, refuses anything

@@ -131,8 +131,6 @@ struct NotesBrowserView: View {
             await flushRegistry.sweepSavedCopies(noteIDs: model.allItems.map(\.id)) { await model.loadBody(for: $0) }
         }
         .toolbar { toolbar }
-        // Which library this is (W49.notes-library-ux): there is no hidden default, so the window says.
-        .navigationSubtitle(model.libraryName ?? "No Library Open")
         .focusedSceneValue(\.newItemAction, NewItemAction(perform: { newItem(kind: $0, from: .folderDefault) },
                                                            newTemplate: { showNewTemplate() }))
         .focusedSceneValue(\.advancedSearchAction, AdvancedSearchAction(open: { openAdvancedSearch() }))
@@ -579,6 +577,7 @@ private struct ItemListPane: View {
     private var noLibraryState: some View {
         ContentUnavailableView {
             Label("No Library Open", systemImage: "books.vertical")
+                .accessibilityIdentifier("an.list.empty.noLibrary")
         } description: {
             Text("Archive Notes keeps your notes in a library, a single item you can see in Finder, back up "
                  + "and move. Make a new one, or open one you already have.")
@@ -590,7 +589,6 @@ private struct ItemListPane: View {
                     .accessibilityIdentifier("an.list.noLibrary.open")
             }
         }
-        .accessibilityIdentifier("an.list.empty.noLibrary")
     }
 
     private var selectedNormalFolder: NotesFolderNode? {
