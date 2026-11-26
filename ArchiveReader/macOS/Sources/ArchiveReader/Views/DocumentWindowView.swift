@@ -31,6 +31,7 @@ struct DocumentWindowView: View {
     @Environment(\.controlActiveState) private var activeState
     /// The window's undo manager, which its Inspector's container edits are registered on; published for Edit ▸ Undo.
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
 
     private var defaultFraction: CGFloat { CGFloat(AppSettings.viewerSplitFraction) }
     private let handleWidth: CGFloat = 10
@@ -360,6 +361,14 @@ struct DocumentWindowView: View {
                       ? "Both pages already fit their panes, with the text at its normal size"
                       : ReaderCommand.resetZoom.help)
             }
+
+            Divider()
+
+            // W49.reader-doc-window-parity: the navigation window's Inspector button, here too. View ▸ Show
+            // Inspector (⌥⌘I) does the same.
+            Button { model.showingTagEditor.toggle() } label: { Label("Inspector", systemImage: "sidebar.right") }
+                .help(ReaderCommand.showInspector.help)
+                .accessibilityIdentifier("ar.doc.inspector")
         }
     }
 
@@ -415,8 +424,12 @@ struct DocumentWindowView: View {
             }
             .equatable()
         } else {
+            // W49.reader-doc-window-parity: the way back to the navigation window, whose model the Inspector edits through.
             VStack(spacing: 12) {
                 Text("Tags can be edited while the Archive Reader window is open.")
+                    .multilineTextAlignment(.center)
+                Button("Open Archive Reader Window") { openWindow(id: WindowID.navigation) }
+                    .accessibilityIdentifier("ar.doc.reopenNavigation")
                 Button("Close") { model.showingTagEditor = false }
             }
             .padding()

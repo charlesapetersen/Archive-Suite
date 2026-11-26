@@ -23,21 +23,23 @@ extension NavigationModel {
 
     /// Flags the targets, or removes the flag when every one already carries it. A file that already has the value
     /// is still recorded, since the action is the person's verdict on it. Runs off the main thread: each file's flag
-    /// record is synchronized to disk.
-    func togglePoorOCR(paths: [String]? = nil) {
+    /// record is synchronized to disk. Returns false, with the reason in `statusMessage`, when nothing started; in
+    /// Catalogue Mode `completed` runs once the save has reported (W49.reader-doc-window-parity).
+    @discardableResult
+    func togglePoorOCR(paths: [String]? = nil, completed: ((Set<String>) -> Void)? = nil) -> Bool {
         let targets = tagTargets(paths)
         guard !targets.isEmpty else {
             statusMessage = paths == nil ? "Select the files to flag." : "This file is not in the archive's library, so it cannot be flagged here."
             announce(statusMessage)
-            return
+            return false
         }
         let flag = !targets.allSatisfy(\.tags.hasPoorOCR)
         if library.usesCatalogue {
-            applyCatalogueFileField(.ocrPoor, .set(.flag(flag)), paths: targets.map(\.path))
-            return
+            return applyCatalogueFileField(.ocrPoor, .set(.flag(flag)), paths: targets.map(\.path), completed: completed)
         }
-        guard connectImproveOCRFolderIfNeeded() else { return }
+        guard connectImproveOCRFolderIfNeeded() else { return false }
         Task { await setPoorOCR(flag, on: targets) }
+        return true
     }
 
     /// The flag write itself, awaited by tests. Returns the verified results.

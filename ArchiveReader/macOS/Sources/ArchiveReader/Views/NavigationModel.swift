@@ -1009,8 +1009,9 @@ final class NavigationModel: ObservableObject {
     }
 
     /// The document window's Toggle Flag (W40.fix-reader-menus-follow-window): the open file, not the list's selection.
-    /// Returns false, with the reason in `statusMessage`, when none of the paths is in the library.
-    @discardableResult func toggleFlag(paths: [String]) -> Bool {
+    /// Returns false, with the reason in `statusMessage`, when none of the paths is in the library or a catalogue
+    /// save could not start. In Catalogue Mode `completed` runs once the save has reported (W49.reader-doc-window-parity).
+    @discardableResult func toggleFlag(paths: [String], completed: ((Set<String>) -> Void)? = nil) -> Bool {
         let files = libraryFiles(atPaths: paths)
         guard !files.isEmpty else { reportNotInLibrary(); return false }
         if library.usesCatalogue {
@@ -1019,8 +1020,7 @@ final class NavigationModel: ObservableObject {
                       case .value(let value) = file.pair.record.fileFields.flagged?.current else { return true }
                 return !value
             }
-            applyCatalogueFileField(.flagged, .set(.flag(on)), paths: paths)
-            return true
+            return applyCatalogueFileField(.flagged, .set(.flag(on)), paths: paths, completed: completed)
         }
         flags.toggleFlag(files.map(\.path))
         resortAfterFlagChange()
@@ -3252,10 +3252,15 @@ final class NavigationModel: ObservableObject {
     func copyLinks() {
         let urls = selectedFiles.map(\.url)
         guard !urls.isEmpty else { return }
+        statusMessage = Self.copyLinks(urls)
+    }
+
+    /// Puts the links on the clipboard and returns the status line; the document window copies its own file's.
+    static func copyLinks(_ urls: [URL]) -> String {
         let text = AppSettings.linkFormatter.clipboardString(for: urls)
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
-        statusMessage = "Copied \(urls.count) link\(urls.count == 1 ? "" : "s")."
+        return "Copied \(urls.count) link\(urls.count == 1 ? "" : "s")."
     }
 
     /// Keep the status line to the copy confirmation (owner, reader-2 row 25).
@@ -3263,13 +3268,14 @@ final class NavigationModel: ObservableObject {
         "Copied \(count) archive link\(count == 1 ? "" : "s")."
     }
 
-    func copyArchiveLinks() {
-        let files = selectedFiles
+    /// `paths` nil copies the list's selection; the document window passes its open file.
+    func copyArchiveLinks(paths: [String]? = nil) {
+        let files = tagTargets(paths)
         guard !files.isEmpty, let rootPath = rootStore.discoveredPathPrefix else {
             statusMessage = "Choose an archive folder first."
             return
         }
-        guard let target = prepareArchiveLinkCopy(), let marker = target.marker,
+        guard let target = prepareArchiveLinkCopy(for: paths == nil ? nil : files.first?.url), let marker = target.marker,
               let jpegPartnerIndex = library.jpegPartnerIndex else { return }
         let mainRootPath = target.mainRootPath
         // Durable links are the primary copy result. Put them on the clipboard before optional page

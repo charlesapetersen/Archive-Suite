@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import ArchiveCore
 
 /// The Tags menu with a document window in front (W40.fix-reader-menus-follow-window; owner session reader-1,
@@ -79,7 +80,11 @@ struct DocumentTagActions {
 
     func toggleFlag() {
         guard let navigation, let paths else { return }
-        guard navigation.toggleFlag(paths: paths) else { viewer.tagStatus = navigation.statusMessage; return }
+        // In Catalogue Mode the flag is a companion save, whose result arrives once it has been written.
+        guard navigation.toggleFlag(paths: paths, completed: { _ in viewer.tagStatus = navigation.statusMessage }) else {
+            viewer.tagStatus = navigation.statusMessage
+            return
+        }
         if !navigation.library.usesCatalogue {
             viewer.tagStatus = paths.allSatisfy(navigation.flags.isFlagged) ? "Flagged." : "Flag removed."
         }
@@ -90,7 +95,12 @@ struct DocumentTagActions {
 
     func togglePoorOCR() {
         guard let navigation, let paths else { return }
-        if navigation.library.usesCatalogue { navigation.togglePoorOCR(paths: paths); return }
+        if navigation.library.usesCatalogue {
+            if !navigation.togglePoorOCR(paths: paths, completed: { _ in viewer.tagStatus = navigation.statusMessage }) {
+                viewer.tagStatus = navigation.statusMessage
+            }
+            return
+        }
         let flag = !navigation.poorOCRWouldClear(paths: paths)
         let targets = navigation.libraryFiles(atPaths: paths)
         guard !targets.isEmpty else { navigation.togglePoorOCR(paths: paths); viewer.tagStatus = navigation.statusMessage; return }
@@ -105,6 +115,49 @@ struct DocumentTagActions {
         guard let navigation, let paths else { return }
         navigation.improveOCR(paths: paths)
         viewer.tagStatus = navigation.statusMessage
+    }
+
+    // MARK: Selection menu (W49.reader-doc-window-parity)
+    //
+    // Selection's file commands act on the open file, as the Tags menu does. Reveal in Finder and Copy Link(s) need
+    // only the file; the archive link and Zotero need its library row, so the navigation window's model.
+
+    var canActOnFile: Bool { viewer.currentURL != nil }
+
+    /// Read-only: Finder is pointed at the file, which is never moved or changed.
+    func revealInFinder() {
+        guard let url = viewer.currentURL else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    func copyLinks() {
+        guard let url = viewer.currentURL else { return }
+        viewer.tagStatus = NavigationModel.copyLinks([url])
+    }
+
+    func copyArchiveLinks() {
+        guard let navigation, let paths = libraryPaths(navigation) else { return }
+        navigation.copyArchiveLinks(paths: paths)
+        viewer.tagStatus = navigation.statusMessage
+    }
+
+    func exportToZotero() {
+        guard let navigation, let paths = libraryPaths(navigation) else { return }
+        navigation.exportToZotero(paths: paths) { viewer.tagStatus = $0 }
+    }
+
+    func addToZotero() {
+        guard let navigation, let paths = libraryPaths(navigation) else { return }
+        navigation.addToZotero(paths: paths) { viewer.tagStatus = $0 }
+    }
+
+    /// The open file's path when the library holds it; otherwise the status line says why nothing happens.
+    private func libraryPaths(_ navigation: NavigationModel) -> [String]? {
+        guard let paths, !navigation.libraryFiles(atPaths: paths).isEmpty else {
+            viewer.tagStatus = "This file is not in the archive's library, so it has no archive link or Zotero entry here."
+            return nil
+        }
+        return paths
     }
 
     func undo() {

@@ -244,4 +244,119 @@ final class DocumentWindowTagTests: XCTestCase {
         doc.mark(.read)
         XCTAssertNil(viewer.tagStatus)
     }
+
+    // MARK: W49.reader-doc-window-parity
+
+    /// Selection ▸ Copy Link(s) and Copy Archive Link(s) copy the open file, never the list's selection, and say so in
+    /// the window's own status line. Reveal in Finder reads the same `currentURL`, so Finder is left alone here.
+    func testSelectionCopiesActOnTheOpenFileNotTheListSelection() throws {
+        let saved = NSPasteboard.general.string(forType: .string)
+        defer {
+            NSPasteboard.general.clearContents()
+            if let saved { NSPasteboard.general.setString(saved, forType: .string) }
+        }
+        let fixture = try makeRoot([("alpha.pdf", ["Unread"]), ("beta.pdf", ["Unread"])])
+        let model = fixtureNavigationModel(pinnedTo: fixture.root)
+        model.selection = [try XCTUnwrap(model.displayed.first { $0.url.lastPathComponent == "alpha.pdf" }).id]
+        let doc = documentWindow(model, paths: [try libraryPath(model, fixture.files[1])])
+        XCTAssertTrue(doc.canActOnFile)
+
+        doc.copyLinks()
+        let copied = try XCTUnwrap(NSPasteboard.general.string(forType: .string))
+        XCTAssertTrue(copied.contains("beta.pdf"), "the open file's link: \(copied)")
+        XCTAssertFalse(copied.contains("alpha.pdf"), "not the list's selection")
+        XCTAssertEqual(doc.viewer.tagStatus, "Copied 1 link.")
+
+        doc.viewer.tagStatus = nil
+        doc.copyArchiveLinks()
+        XCTAssertNotNil(doc.viewer.tagStatus, "the archive link's result, or why it could not be made, is shown")
+    }
+
+    /// A file the library does not hold has no archive link or Zotero entry; the window says why and sends nothing.
+    func testArchiveLinkAndZoteroRefuseAFileOutsideTheLibrary() throws {
+        let fixture = try makeRoot([("alpha.pdf", ["Unread"])])
+        let outside = try makeRoot([("stray.pdf", ["Unread"])])
+        let model = fixtureNavigationModel(pinnedTo: fixture.root)
+        let doc = documentWindow(model, paths: [outside.files[0].path])
+        let refusal = "This file is not in the archive's library, so it has no archive link or Zotero entry here."
+        XCTAssertTrue(doc.canActOnFile, "Reveal in Finder and Copy Link(s) still work on any shown file")
+        for action in [doc.copyArchiveLinks, doc.addToZotero, doc.exportToZotero] {
+            doc.viewer.tagStatus = nil
+            action()
+            XCTAssertEqual(doc.viewer.tagStatus, refusal)
+        }
+    }
+
+    func testFileCommandsNeedAFileButNotTheNavigationWindow() {
+        let viewer = DocumentViewerModel(persists: false, thumbnailer: nil)
+        let doc = DocumentTagActions(router: DeepLinkRouter(), viewer: viewer)
+        XCTAssertFalse(doc.canActOnFile, "no file shown")
+        viewer.load(DocumentSelection(filePaths: ["/nonexistent/a.pdf"]))
+        XCTAssertTrue(doc.canActOnFile)
+        XCTAssertFalse(doc.canTag, "the archive link and Zotero still need the library")
+        doc.copyArchiveLinks()
+        doc.addToZotero()
+        XCTAssertNil(viewer.tagStatus)
+    }
+
+    /// In Catalogue Mode the flag and the poor-OCR flag are companion saves; the window's status line reports each
+    /// once it has been written, as Mark Read already did (W49.reader-doc-window-parity).
+    func testCatalogueFlagAndPoorOCRReportInTheWindowsStatusLine() async throws {
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("DocumentWindowTagTests-catalogue-\(UUID())", isDirectory: true).resolvingSymlinksInPath()
+        let root = folder.appendingPathComponent("Archive", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
+        let identity = CataloguePDFIdentity(fileID: UUID(), contentRevision: UUID())
+        let page = UUID(), document = UUID()
+        let packet = Data("""
+            <x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+            </rdf:RDF></x:xmpmeta>
+            """.utf8)
+        try writePDF(at: root.appendingPathComponent("Letter.pdf"), metadata: XCTUnwrap(identity.adding(to: packet)))
+        try Data("""
+            {"schema":1,"fileID":"\(identity.fileID)","contentRevision":"\(identity.contentRevision)",
+             "revision":"\(UUID())","parents":[],
+             "pages":[{"id":"\(page)","physicalIndex":0,"documentID":"\(document)","role":"searchable"}],
+             "documents":[{"id":"\(document)","ownerFileID":"\(identity.fileID)","fields":{}}],"fileFields":{}}
+            """.utf8).write(to: root.appendingPathComponent("Letter.pdf.archivesuite.json"))
+
+        let defaults = fixtureDefaults()
+        let indexer = ContentIndexer(url: folder.appendingPathComponent("index.sqlite"))
+        let model = NavigationModel(defaults: defaults, indexer: indexer, thumbnailer: nil)
+        XCTAssertNil(model.rootStore.setRoot(root))
+        let key = try XCTUnwrap(ReaderRootIdentity.legacyCatalogueKey(for: root))
+        defaults.set(UUID().uuidString, forKey: key)
+        defaults.set(true, forKey: key + ".enabled")
+        model.startLibrary(root)
+        try await waitUntil {
+            model.library.usesCatalogue && model.catalogueReader != nil && model.library.files.first?.isCatalogue == true
+        }
+        let path = try XCTUnwrap(model.library.files.first).path
+        let doc = documentWindow(model, paths: [path])
+        XCTAssertTrue(doc.canTag)
+
+        doc.toggleFlag()
+        try await waitUntil { !model.catalogueEditSaving && doc.viewer.tagStatus != nil }
+        XCTAssertEqual(doc.viewer.tagStatus, "Saved 1 catalogue record.")
+        try await waitUntil { model.library.files.first?.catalogueFlag == true }   // the flag reached the companion
+
+        doc.viewer.tagStatus = nil
+        doc.togglePoorOCR()
+        try await waitUntil { !model.catalogueEditSaving && doc.viewer.tagStatus != nil }
+        XCTAssertEqual(doc.viewer.tagStatus, "Saved 1 catalogue record.")
+
+        model.library.start(scope: nil)
+        await indexer.closeForTesting()
+    }
+
+    private func writePDF(at url: URL, metadata: Data?) throws {
+        var bounds = CGRect(x: 0, y: 0, width: 60, height: 60)
+        let pdf = try XCTUnwrap(CGContext(url as CFURL, mediaBox: &bounds, nil))
+        if let metadata { pdf.addDocumentMetadata(metadata as CFData) }
+        pdf.beginPDFPage(nil)
+        pdf.fill(bounds.insetBy(dx: 10, dy: 10))
+        pdf.endPDFPage()
+        pdf.closePDF()
+    }
 }

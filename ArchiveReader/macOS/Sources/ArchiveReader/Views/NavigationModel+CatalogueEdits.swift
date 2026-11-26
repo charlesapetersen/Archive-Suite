@@ -13,9 +13,12 @@ extension NavigationModel {
         }
     }
 
+    /// Returns false, with any reason in `statusMessage`, when no save started; `completed` follows a save's report.
+    @discardableResult
     func applyCatalogueFileField(_ field: CatalogueEdit.FileField, _ change: CatalogueEdit.Change,
-                                 paths: [String]? = nil, observed: [ItemFacts]? = nil) {
-        editCatalogue(title: "Catalogue Change", paths: paths, observed: observed) { facts in
+                                 paths: [String]? = nil, observed: [ItemFacts]? = nil,
+                                 completed: ((Set<String>) -> Void)? = nil) -> Bool {
+        editCatalogue(title: "Catalogue Change", paths: paths, observed: observed, completed: completed) { facts in
             (try? facts.file.get()).map { ($0, CatalogueEdit(.file(field), change)) }
         }
     }

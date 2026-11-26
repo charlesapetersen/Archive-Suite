@@ -11,8 +11,10 @@ import UniformTypeIdentifiers
 // same items, with the subjects as tags, to the Zotero open on this Mac (W47.ct-zotero-tags).
 
 extension NavigationModel {
-    func exportToZotero() {
-        let files = selectedFiles
+    /// `paths` nil exports the list's selection; the document window passes its open file, and `report` receives each
+    /// status line so its own status bar can show it (W49.reader-doc-window-parity).
+    func exportToZotero(paths: [String]? = nil, report: ((String) -> Void)? = nil) {
+        let files = tagTargets(paths)
         guard !files.isEmpty else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
@@ -24,10 +26,12 @@ extension NavigationModel {
         if let refusal = Self.zoteroDestinationRefusal(destination, protecting: zoteroProtectedFolders(files)) {
             statusMessage = refusal
             announce(refusal)
+            report?(refusal)
             return
         }
         let gather = zoteroGatherer(files)
         statusMessage = "Exporting \(files.count) document\(files.count == 1 ? "" : "s") for Zotero…"
+        report?(statusMessage)
         Task { [weak self] in
             let written: Result<Void, Error> = await Task.detached(priority: .userInitiated) {
                 Result { try ZoteroExport.export(gather()).write(to: destination, options: .atomic) }
@@ -40,17 +44,19 @@ extension NavigationModel {
                 self.statusMessage = "Could not save \(destination.lastPathComponent): \(error.localizedDescription)"
             }
             self.announce(self.statusMessage)
+            report?(self.statusMessage)
         }
     }
 
     /// Selection ▸ Add to Zotero (W47.ct-zotero-tags): the same items straight into the Zotero open on this Mac, through
     /// its connector (`ZoteroConnector`), with the subjects as tags, which the CSL-JSON file cannot carry. Zotero saves
     /// them into the library or collection selected in it. Nothing is written on this Mac.
-    func addToZotero() {
-        let files = selectedFiles
+    func addToZotero(paths: [String]? = nil, report: ((String) -> Void)? = nil) {
+        let files = tagTargets(paths)
         guard !files.isEmpty else { return }
         let gather = zoteroGatherer(files)
         statusMessage = "Adding \(files.count) document\(files.count == 1 ? "" : "s") to Zotero…"
+        report?(statusMessage)
         Task { [weak self] in
             let sources = await Task.detached(priority: .userInitiated) { gather() }.value
             let failure: ZoteroConnector.Failure?
@@ -60,6 +66,7 @@ extension NavigationModel {
             guard let self else { return }
             self.statusMessage = Self.zoteroAddedMessage(count: files.count, failure: failure)
             self.announce(self.statusMessage)
+            report?(self.statusMessage)
         }
     }
 

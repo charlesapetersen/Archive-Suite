@@ -48,6 +48,8 @@ struct ArchiveReaderCommands: Commands {
     /// in front, which publishes no `NavigationModel`, on the file that window shows.
     private var docTags: DocumentTagActions? { nav == nil ? documentTags : nil }
     private var noTagTarget: Bool { nav != nil ? noSelection : !(docTags?.canTag ?? false) }
+    /// Reveal in Finder and Copy Link(s) need only a file, so a document window offers them without the library.
+    private var noFileTarget: Bool { nav != nil ? noSelection : !(docTags?.canActOnFile ?? false) }
     /// The model the corpus-wide tag sheets (Rename, Find Similar) open in; from a document window they open
     /// over the navigation window, which is brought forward.
     private var tagSheetNav: NavigationModel? { nav ?? docTags?.navigation }
@@ -272,7 +274,7 @@ struct ArchiveReaderCommands: Commands {
                 .disabled(!(doc.map(\.canGoForward) ?? nav?.canGoForward ?? false))
         }
 
-        // Selection (nav window)
+        // Selection — the list's selection; its file commands also act on a document window's open file
         CommandMenu("Selection") {
             Button(ReaderCommand.open.title) { openSelection?() }
                 .keyboardShortcut(.open)
@@ -280,19 +282,22 @@ struct ArchiveReaderCommands: Commands {
             Button(ReaderCommand.preview.title) { nav?.showingPreview = true }
                 .keyboardShortcut(.preview)
                 .disabled(noSelection)
-            Button(ReaderCommand.revealInFinder.title) { nav?.revealInFinder() }
+            // These five follow the window in front too (W49.reader-doc-window-parity): a document window's open file.
+            Button(ReaderCommand.revealInFinder.title) { if let nav { nav.revealInFinder() } else { docTags?.revealInFinder() } }
                 .keyboardShortcut(.revealInFinder)
-                .disabled(noSelection)
-            Button(ReaderCommand.copyLinks.title) { nav?.copyLinks() }
+                .disabled(noFileTarget)
+            Button(ReaderCommand.copyLinks.title) { if let nav { nav.copyLinks() } else { docTags?.copyLinks() } }
                 .keyboardShortcut(.copyLinks)
-                .disabled(noSelection)
-            Button(ReaderCommand.copyArchiveLinks.title) { nav?.copyArchiveLinks() }
-                .keyboardShortcut(.copyArchiveLinks)
-                .disabled(noSelection)
-            Button(ReaderCommand.exportToZotero.title) { nav?.exportToZotero() }
-                .disabled(noSelection)
-            Button(ReaderCommand.addToZotero.title) { nav?.addToZotero() }
-                .disabled(noSelection)
+                .disabled(noFileTarget)
+            Button(ReaderCommand.copyArchiveLinks.title) {
+                if let nav { nav.copyArchiveLinks() } else { docTags?.copyArchiveLinks() }
+            }
+            .keyboardShortcut(.copyArchiveLinks)
+            .disabled(noTagTarget)
+            Button(ReaderCommand.exportToZotero.title) { if let nav { nav.exportToZotero() } else { docTags?.exportToZotero() } }
+                .disabled(noTagTarget)
+            Button(ReaderCommand.addToZotero.title) { if let nav { nav.addToZotero() } else { docTags?.addToZotero() } }
+                .disabled(noTagTarget)
             Divider()
             Button(ReaderCommand.selectRun.title) { nav?.extendSelectionToDocumentRun() }
                 .disabled(noSelection)
