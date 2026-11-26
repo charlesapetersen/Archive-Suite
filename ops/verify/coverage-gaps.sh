@@ -11,8 +11,8 @@
 #
 # HOW, per run — each writes $COV_OUT/<run>.json, the normalised function list coverage_gaps.py unions:
 #   core       `xcodebuild test -scheme ArchiveCore-Package -enableCodeCoverage YES` on the package → xcresult.
-#   processor  it has no unit bundle: its tests are the headless drivers. The app is built with coverage
-#              mapping into macOS/build/DD (the path the drivers hardcode), each driver below runs with
+#   processor  it has no unit bundle: its tests are the headless drivers. The app is built for testing with
+#              coverage into macOS/build/DD (the path the drivers hardcode), each driver below runs with
 #              LLVM_PROFILE_FILE pointing into $COV_OUT, and llvm-cov exports the merged profile.
 #              A plain build in this checkout afterwards replaces the instrumented one.
 #   vm-<app>   the app's unit bundle AND UITests in the VM, `VM_COVERAGE=1 VM_SPLIT=4 vm-gui-runner.sh <app>
@@ -63,8 +63,10 @@ run_processor() {
   rm -rf "$pdir"; mkdir -p "$pdir"
   (cd "$dir/macOS" && xcodegen generate >/dev/null 2>&1) || { log "processor: xcodegen failed"; worst=2; return; }
   log "processor: Debug build with coverage into macOS/build/DD…"
-  (cd "$dir/macOS" && xcodebuild -scheme ArchiveProcessor -configuration Debug -derivedDataPath ./build/DD \
-      CLANG_COVERAGE_MAPPING=YES CLANG_COVERAGE_MAPPING_LINKER_ARGS=YES build) >"$OUT/processor-build.log" 2>&1 \
+  # build-for-testing, because -enableCodeCoverage is accepted only by test actions; a plain `build` with
+  # CLANG_COVERAGE_MAPPING=YES ran but wrote profiles llvm-profdata refused ("number of counters is zero").
+  (cd "$dir/macOS" && xcodebuild build-for-testing -scheme ArchiveProcessor -configuration Debug \
+      -destination 'platform=macOS' -enableCodeCoverage YES -derivedDataPath ./build/DD) >"$OUT/processor-build.log" 2>&1 \
     || { log "processor: build FAILED ($OUT/processor-build.log)"; worst=2; return; }
   for d in ${DRIVERS:-$DEFAULT_DRIVERS}; do
     LLVM_PROFILE_FILE="$pdir/${d%.sh}-%p.profraw" bash "$dir/scripts/$d" >"$pdir/${d%.sh}.out" 2>&1
@@ -75,8 +77,6 @@ run_processor() {
   log "processor: failed drivers: ${failed[*]:-none}"
   local bin="$dir/macOS/build/DD/Build/Products/Debug/ArchiveProcessor.app/Contents/MacOS/ArchiveProcessor"
   # A driver that kills the app leaves an empty profile; merge only the written ones.
-  # OPEN (2026-11-26): every written profile here was refused as "malformed … number of counters is zero",
-  # while the same tool reads the ArchiveCore test run's — see execution-plans/items/W40.e4.md.
   local raws=(); while IFS= read -r -d '' f; do raws+=("$f"); done < <(find "$pdir" -name '*.profraw' -size +0 -print0)
   if [ ${#raws[@]} -gt 0 ] \
      && xcrun llvm-profdata merge -sparse --failure-mode=all "${raws[@]}" -o "$pdir/merged.profdata" \
