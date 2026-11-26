@@ -732,7 +732,7 @@ struct NavigationWindowView: View {
             // Selected tag filters are TOKENS INSIDE this field (not chips beside it). Besides matching the
             // way the control reads, this is the BUG-3 fix: a bounded, compressible token field means adding
             // filters adds no width to the filter bar, so the content column can't be pushed past the window
-            // and the file table no longer shifts left. See SubjectFilterTokenField + KNOWN_ISSUES.md.
+            // and the file table no longer shifts left. See SubjectFilterTokenField + KNOWN_ISSUES_HISTORY.md.
             SubjectFilterTokenField(
                 subjects: $model.filter.subjects,
                 suggestions: tagSuggestions,

@@ -2,14 +2,19 @@
 
 Durable record of the manual/driven GUI smoke test. **Resumable:** if interrupted, re-run
 `./scripts/smoke-setup.sh`, relaunch the app pointed at `~/Library/Application Support/ArchiveReader/AR-Smoke`, and continue at the
-first unchecked step. Driven with `screencapture` (see) + `osascript`/System Events + `cliclick`
-(interact). Screenshots land in `.maintenance/smoke/` (gitignored); results are recorded here.
+first unchecked step. The July 2026 passes below were driven on the host screen with `screencapture` +
+`osascript`/System Events + `cliclick`; that host loop is now for interactive sessions with the owner's
+agreement only. An unattended check runs off-screen in the Tart VM (`ops/gui/vm-gui-runner.sh reader
+xcuitest`; root `AGENTS.md` §*GUI verification*). Screenshots land in `.maintenance/smoke/` (gitignored);
+results are recorded here.
 
 **Safety:** the test runs against a SCRATCH corpus of COPIES (`~/Library/Application Support/ArchiveReader/AR-Smoke`, 30 tagged PDFs),
-never the real `Test files/` corpus. Mark-Read / tag edits therefore never touch the corpus.
+never the real corpus. Mark-Read / tag edits therefore never touch the corpus.
 
 - **Environment:** Screen Recording + Accessibility granted; `cliclick 5.1`; app built Debug at
-  `ArchiveReader/build/DD/Build/Products/Debug/ArchiveReader.app`.
+  `ArchiveReader/macOS/build/DD/Build/Products/Debug/ArchiveReader.app` (`./launch.sh --debug`).
+- **Since these passes:** tag editing moved from the ⌘I sheet to the Inspector (⌥⌘I), Priority became
+  Quality (Q1–Q3), and the list became an AppKit table; steps that name the old UI are marked historical.
 - **Legend:** [ ] pending · [x] PASS · [!] FAIL (see note) · [~] partial/NA
 
 ## Steps
@@ -99,7 +104,7 @@ incomplete:
    > gone: `W26.walk2` removed Spotlight discovery, so nothing re-emits a stale tag array, and the
    > `PendingWrite` TTL/convergence subsystem was deleted with it. A smaller monotonic ordering guard now
    > covers the one race that survives — a walk that *started* before a verified write cannot replace the
-   > fresh `.after`. See `KNOWN_ISSUES.md` §"Spotlight tag-index lag clobber". Kept here because the
+   > fresh `.after`. See `KNOWN_ISSUES_HISTORY.md` §"Spotlight tag-index lag clobber". Kept here because the
    > two-bugs-stacked lesson (#1 hid #2) is the reason this smoke test exists.
 
 Both were needed: #1 hid #2 (we never saw "Read" to watch it revert). Verified live on the fresh

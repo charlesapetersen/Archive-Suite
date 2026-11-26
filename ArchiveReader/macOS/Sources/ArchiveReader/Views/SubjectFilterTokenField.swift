@@ -16,7 +16,7 @@ import AppKit
 /// horizontal compression resistance — so it yields width rather than forcing its parent wider, and
 /// adding filters adds **zero** width to the bar. The shift is fixed by construction instead of by
 /// tuning a container's width (two container attempts — a capped `ScrollView` and a wrapping
-/// `FlowLayout` — each traded one glitch for another; see ArchiveReader/KNOWN_ISSUES.md).
+/// `FlowLayout` — each traded one glitch for another; see ArchiveReader/KNOWN_ISSUES_HISTORY.md).
 struct SubjectFilterTokenField: NSViewRepresentable {
     @Binding var subjects: Set<String>
     var suggestions: [String]

@@ -7,7 +7,7 @@ historians and archivists working through thousands of scanned documents.
 Archive Reader is the *reading & triage* companion to Archive Processor's *capture & tagging*: find
 tagged PDFs, list them in chronological order, filter by tag / quality / read-state, search the
 OCR text, read them two-up (image + OCR text), copy text and file links, edit tags, and mark
-documents Read as you go. The two apps ship together as **Archive Suite** (this monorepo).
+documents Read as you go. It ships with Archive Processor and Archive Notes as **Archive Suite** (this monorepo).
 
 ## Prime directive — the files are irreplaceable
 
@@ -27,10 +27,8 @@ folder that macOS identifies as cloud-managed.
 
 ## What it does
 
-> **Status (2026-07-07):** shipped — v1 plus a full P2 pass (non-standard-PDF detection, near-duplicate
-> tag finder, document-viewer refinements, duplicate-filename disambiguation); the test suite passes; the
-> document-viewer flows are owner-verified. `CLAUDE.md` is the authoritative record.
-
+> **Status:** in active development ahead of user testing; `CLAUDE.md` is the authoritative record and
+> `KNOWN_ISSUES.md` lists the open limits.
 
 - **Find** every PDF tagged `Read`/`Unread` under your archive root by walking the folder itself — no
   Spotlight, so a stale or dead index can never hide your files. ~102k PDFs walk in ~10 s, a warm start
@@ -71,11 +69,15 @@ committed — run bootstrap first:
 open macOS/ArchiveReader.xcodeproj
 ```
 
+Or run the launcher here (or `reader` through the suite root's launcher): it builds Release if the build
+is missing or older than the Reader's sources or the shared packages it compiles in, then opens the app.
+`--debug` uses the Debug build.
+
 Headless build / CI check:
 
 ```bash
 cd macOS && xcodegen generate && \
-  xcodebuild -scheme ArchiveReader -configuration Debug build
+  xcodebuild -scheme ArchiveReader -configuration Debug -derivedDataPath ./build/DD build
 ```
 
 Regenerate with `xcodegen generate` whenever files are added — `project.yml` is authoritative;
@@ -96,5 +98,5 @@ filesystem walk — **no Spotlight**), `CorpusWatcher` (FSEvents) for live updat
 metadata-only writes · system SQLite FTS5 (no third-party deps) for the disposable content/full-text
 index. XcodeGen build. v1 sandboxed to a user-granted archive root; non-sandboxed whole-Mac search is a
 long-term maybe and is **not** the mere entitlement flip this file used to claim (see
-`POTENTIAL_FEATURES.md`). Domain logic lives UI-free in `Core/` so it can become the shared `ArchiveCore`
-package when the suite converges.
+`POTENTIAL_FEATURES.md`). Domain logic lives UI-free in `Core/`; what the apps share (tags, PDF reading,
+durable links, the suite marker, the tag writer) is in the suite's `packages/ArchiveCore`.

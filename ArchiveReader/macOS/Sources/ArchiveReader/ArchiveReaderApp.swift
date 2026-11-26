@@ -4,12 +4,12 @@ import ArchiveCore
 
 /// Archive Reader — a native macOS app for reading & triaging tagged historical-document PDFs.
 ///
-/// Two windows (see PLAN.md): a single **navigation** window (Finder-Smart-Folder-like browser) and
+/// Two kinds of window: a single **navigation** window (Finder-Smart-Folder-like browser) and
 /// **document** windows opened with a user-chosen selection of files. Settings via ⌘,.
 ///
-/// SAFETY: this app never deletes, moves, renames, or alters any file's bytes/location. The only
-/// mutation it performs is editing macOS Finder tags, exclusively through `TagWriter` (see CLAUDE.md
-/// → Safety Protocol). The write path is not yet present — this is the read-only foundation.
+/// SAFETY: this app never deletes, moves, renames, or alters any archive file's bytes/location. It edits
+/// macOS Finder tags only through `TagWriter` (routed to `ArchiveCore.CoordinatedTagWriter`; see CLAUDE.md
+/// → Safety Protocol), and writes the archive root's `.archive-suite-root.json` identity marker once if absent.
 @main
 struct ArchiveReaderApp: App {
     // Observed so a size change (persisted on window close) re-evaluates `documentDefaultSize`, and the

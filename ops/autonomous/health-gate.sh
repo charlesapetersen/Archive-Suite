@@ -389,7 +389,7 @@ collect_fixture_checks script script_fixture_pid || exit 2
 # DeepLinkTests.testRevealAndSelectNoRoot is deliberately INCLUDED: W26.fixturehang made the defaults
 # injectable and the test now passes an unpinned `fixtureDefaults()` suite to NavigationModel. It cannot
 # resolve the owner's `archiveRootBookmark`, so a regression in the no-root path must RED rather than hide
-# behind an environmental skip. See ArchiveReader/KNOWN_ISSUES.md (W20.deeplink-isolation).
+# behind an environmental skip. See ArchiveReader/KNOWN_ISSUES_HISTORY.md (W20.deeplink-isolation).
 # Pixel-truth runs here too: DocumentRenderGuardTests (RenderProbe) lives INSIDE ArchiveReaderTests and renders a
 # PDF page / SwiftUI view to a bitmap headlessly (no "Enable UI Automation"/TCC prompt) — so "did it actually
 # draw" (blank PDF pane, blank thumbnail) is caught in this gate without the UITest hang. See ops/gui/README.md.
