@@ -1,391 +1,509 @@
-file	line	function	class	group
-Capture/CaptureModels.swift	21	CaptureGroupType.colorTag.getter	untested	Live processing: page OCR, training warning, tag card, Finish
-Capture/CaptureModels.swift	52	static CapturedPhoto.== infix(_:_:)	unreachable	Required protocol stubs
-Capture/CaptureModels.swift	66	CaptureGroup.quality.getter	untested	Live processing: page OCR, training warning, tag card, Finish
-Capture/CaptureSession.swift	205	CaptureSession.runHeadlessFinalize()	unreachable	Live Capture headless finish autopilot
-Capture/CaptureSession.swift	245	CaptureSession.writeHeadlessDone(summary:)	unreachable	Live Capture headless finish autopilot
-Capture/CaptureSession.swift	319	CaptureSession.refreshPhoneConnected()	untested	Live Capture session: start, stop, phone connection
-Capture/CaptureSession.swift	324	CaptureSession.startConnectionTimer()	untested	Live Capture session: start, stop, phone connection
-Capture/CaptureSession.swift	332	CaptureSession.stopConnectionTimer()	untested	Live Capture session: start, stop, phone connection
-Capture/CaptureSession.swift	441	CaptureSession.unpairDisplay()	untested	Live Capture session: start, stop, phone connection
-Capture/CaptureSession.swift	450	CaptureSession.phoneDidDisconnect()	untested	Live Capture session: start, stop, phone connection
-Capture/CaptureSession.swift	609	CaptureSession.server.getter	untested	Live Capture session: start, stop, phone connection
-Capture/CaptureSession.swift	613	CaptureSession.fileRelay.getter	unreachable	Offline file relay (CI transport)
-Capture/CaptureSession.swift	623	CaptureSession.startCloudRelay(clientID:force:)	untested	Google Drive relay, Mac side
-Capture/CaptureSession.swift	651	CaptureSession.forcedTestTransport.getter	unreachable	Offline file relay (CI transport)
-Capture/CaptureSession.swift	657	static CaptureSession.relayDir(token:)	unreachable	Offline file relay (CI transport)
-Capture/CaptureSession.swift	729	CaptureSession.receiverActive.getter	untested	Live Capture session: start, stop, phone connection
-Capture/CaptureSession.swift	731	CaptureSession.driveWatching.getter	untested	Live Capture session: start, stop, phone connection
-Capture/CaptureSession.swift	737	CaptureSession.start()	untested	Live Capture session: start, stop, phone connection
-Capture/CaptureSession.swift	754	CaptureSession.stop()	untested	Live Capture session: start, stop, phone connection
-Capture/CaptureSession.swift	767	CaptureSession.relayReceiverDidStart(relayDir:)	untested	Google Drive relay, Mac side
-Capture/CaptureSession.swift	780	CaptureSession.modelWiredReceiverWithDriveStartingForUITest()	unreachable	UI-test and journey fixtures in the app
-Capture/CaptureSession.swift	787	CaptureSession.relayReceiverDidStop()	untested	Google Drive relay, Mac side
-Capture/CaptureSession.swift	788	CaptureSession.relayReceiverDidFail(_:)	untested	Google Drive relay, Mac side
-Capture/CaptureSession.swift	821	CaptureSession.serverDidStop()	untested	Live Capture session: start, stop, phone connection
-Capture/CaptureSession.swift	853	CaptureSession.cableListenerDidStop()	untested	Live Capture session: start, stop, phone connection
-Capture/CaptureSession.swift	861	CaptureSession.serverDidFail(_:)	untested	Live Capture session: start, stop, phone connection
-Capture/CaptureSession.swift	1109	CaptureSession.revealBackupFolder()	untested	Stage for later hand-off and the backup folder
-Capture/CaptureSession.swift	1121	CaptureSession.backupFingerprint(at:)	untested	Stage for later hand-off and the backup folder
-Capture/CaptureSession.swift	1125	CaptureSession.registerHandoff(_:)	untested	Stage for later hand-off and the backup folder
-Capture/CaptureSession.swift	1129	CaptureSession.handoffPhotoSnapshot(for:)	untested	Stage for later hand-off and the backup folder
-Capture/CaptureSession.swift	1139	CaptureSession.hasCompletedHandoff(in:)	untested	Stage for later hand-off and the backup folder
-Capture/CaptureSession.swift	1148	CaptureSession.recordCompletedHandoff(_:)	untested	Stage for later hand-off and the backup folder
-Capture/ContainerBackfillModel.swift	31	ContainerBackfillModel.Row.id.getter	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	72	ContainerBackfillModel.init(cache:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	76	ContainerBackfillModel.gateway.getter	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	79	ContainerBackfillModel.modelRoute.getter	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	84	ContainerBackfillModel.requestedRoute.getter	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	86	ContainerBackfillModel.markers.getter	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	88	ContainerBackfillModel.key(_:_:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	93	ContainerBackfillModel.markersToRead.getter	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	99	ContainerBackfillModel.estimatedDollars.getter	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	103	ContainerBackfillModel.needsCostConfirmation.getter	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	107	ContainerBackfillModel.isBusy.getter	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	116	ContainerBackfillModel.choose(_:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	121	ContainerBackfillModel.rescan()	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	166	static ContainerBackfillModel.hasLevelMap(atOrAbove:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	178	ContainerBackfillModel.startReading()	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	284	static ContainerBackfillModel.read(_:gateway:route:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	293	ContainerBackfillModel.containerMarkers(_:route:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	301	ContainerBackfillModel.propose(_:generation:fallbackCount:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	318	ContainerBackfillModel.cancel()	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	333	ContainerBackfillModel.stopTask()	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	340	ContainerBackfillModel.saveCache()	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	346	ContainerBackfillModel.accept(_:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	377	ContainerBackfillModel.skip(_:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	382	ContainerBackfillModel.setStatus(_:_:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	388	ContainerBackfillModel.saveLevels(_:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	399	CancelFlag.isSet.getter	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	400	CancelFlag.set()	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	418	static ContainerBackfillCache.standard.getter	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	430	static ContainerBackfillCache.stamp(of:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	436	ContainerBackfillCache.key(path:stamp:route:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	439	ContainerBackfillCache.merge(_:)	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	450	ContainerBackfillCache.load()	untested	Container label backfill (Tools)
-Capture/ContainerBackfillModel.swift	457	ContainerBackfillCache.save(_:)	untested	Container label backfill (Tools)
-Capture/ContainerLabelCapture.swift	28	ContainerLabelCapture.Fallback.cardNote.getter	untested	Live processing: page OCR, training warning, tag card, Finish
-Capture/LiveCaptureProcessor.swift	45	LiveCaptureProcessor.preservationBytesForFinish.getter	untested	Live processing: page OCR, training warning, tag card, Finish
-Capture/LiveCaptureProcessor.swift	244	LiveCaptureProcessor._uiTestShowFinishingScrim()	unreachable	UI-test and journey fixtures in the app
-Capture/LiveCaptureProcessor.swift	253	LiveCaptureProcessor._uiTestShowEmptyPaneClear()	unreachable	UI-test and journey fixtures in the app
-Capture/LiveCaptureProcessor.swift	275	static LiveCaptureProcessor.summaryReportsProblem(_:)	untested	Live processing: page OCR, training warning, tag card, Finish
-Capture/LiveCaptureProcessor.swift	284	LiveCaptureProcessor.RotationRetryTarget.id.getter	untested	Live processing: page OCR, training warning, tag card, Finish
-Capture/LiveCaptureProcessor.swift	452	LiveCaptureProcessor.canResumeTrainingWork.getter	untested	Live processing: page OCR, training warning, tag card, Finish
-Capture/LiveCaptureProcessor.swift	461	LiveCaptureProcessor.approveTrainingWarning()	untested	Live processing: page OCR, training warning, tag card, Finish
-Capture/LiveCaptureProcessor.swift	468	LiveCaptureProcessor.recheckTrainingWarning()	untested	Live processing: page OCR, training warning, tag card, Finish
-Capture/LiveCaptureProcessor.swift	476	LiveCaptureProcessor.resumeTrainingWork()	untested	Live processing: page OCR, training warning, tag card, Finish
-Capture/LiveCaptureProcessor.swift	1114	LiveCaptureProcessor.stagedURLs(for:)	untested	Live processing: page OCR, training warning, tag card, Finish
-Capture/LiveCaptureProcessor.swift	2187	static LiveCaptureProcessor.ocrTask(imageURL:provider:model:thinkingLevel:apiKey:customPrompt:imageScale:gateway:localAgent:rotationMode:standardImageMB:visionSettings:cascade:refusalRoutes:visionTextLLM:scanDetector:denyDataCollection:paidRequests:)	untested	Live processing: page OCR, training warning, tag card, Finish
-Capture/LiveCaptureProcessor.swift	2687	LiveCaptureProcessor.containerNames.getter	untested	Live processing: page OCR, training warning, tag card, Finish
-Capture/ManagedGemma.swift	46	ManagedGemma.showOfferForUITest()	unreachable	UI-test and journey fixtures in the app
-Capture/ManagedGemma.swift	51	ManagedGemma.dismissOffer()	untested	Label reader download and local model supervisor
-Capture/ManagedGemma.swift	56	ManagedGemma.download()	untested	Label reader download and local model supervisor
-Capture/ManagedGemma.swift	84	ManagedGemma.dismissStatus()	untested	Label reader download and local model supervisor
-Capture/ManagedGemma.swift	88	ManagedGemma.pauseDownload()	untested	Label reader download and local model supervisor
-Capture/ManagedGemma.swift	91	ManagedGemma.stop()	untested	Label reader download and local model supervisor
-Capture/ManagedGemma.swift	99	static ManagedGemma.installFailure(_:)	untested	Label reader download and local model supervisor
-LocalModels/LocalModelSupervisor.swift	90	LocalModelSupervisor.NoRedirects.urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)	untested	HTTP redirect refusal
-LocalModels/LocalModelSupervisor.swift	137	LocalModelSupervisor.install(_:step:)	untested	Label reader download and local model supervisor
-LocalModels/LocalModelSupervisor.swift	172	LocalModelSupervisor.run(_:_:model:timeout:failure:)	untested	Label reader download and local model supervisor
-LocalModels/LocalModelSupervisor.swift	475	LocalModelSupervisor.residentPID.getter	dead	Dead code
-LocalModels/LocalModelSupervisorContract.swift	52	static LocalModelSupervisorContract.realRead(jpeg:scratch:)	unreachable	Probe and proof drivers outside the coverage set
-Models/CostEstimator.swift	27	CostEstimate.classificationFormatted.getter	untested	Cost and time estimate labels
-Models/CostEstimator.swift	29	CostEstimate.collectionFormatted.getter	untested	Cost and time estimate labels
-Models/CostEstimator.swift	30	CostEstimate.rotationFormatted.getter	untested	Cost and time estimate labels
-Models/CostEstimator.swift	33	CostEstimate.namesFormatted.getter	untested	Cost and time estimate labels
-Models/KeychainHelper.swift	30	static KeychainHelper.save(account:password:)	untested	Keychain storage
-Models/KeychainHelper.swift	66	static KeychainHelper.read(account:allowInteraction:)	untested	Keychain storage
-Models/KeychainHelper.swift	106	static KeychainHelper.quietContext()	untested	Keychain storage
-Models/KeychainHelper.swift	112	static KeychainHelper.delete(account:)	untested	Keychain storage
-Models/LocalAgentConfig.swift	75	LocalAgentConfig.effectiveConcurrencyCap.getter	untested	Local Agent CLI: Detect & Verify, plan usage
-Models/LocalAgentSpec.swift	14	LocalAgentSpec.id.getter	untested	Picker labels and Identifiable ids
-Models/LocalAgentSpec.swift	16	LocalAgentSpec.displayName.getter	untested	Picker labels and Identifiable ids
-Models/LocalModelRoute.swift	35	LocalModelRoute.Server.id.getter	untested	Picker labels and Identifiable ids
-Models/LocalModelRoute.swift	59	LocalModelRoute.Pick.displayName.getter	untested	Picker labels and Identifiable ids
-Models/ModelSelectionStore.swift	59	ModelSelectionStore.setModel(_:for:)	untested	Model choice and custom models
-Models/ModelSelectionStore.swift	73	ModelSelectionStore.healUnresolvableSelections(afterRemoving:)	untested	Model choice and custom models
-Models/ModelSelectionStore.swift	93	ModelSelectionStore.publish(_:)	untested	Model choice and custom models
-Models/ModelSelectionStore.swift	102	static ModelSelectionStore.savedModel(for:)	dead	Dead code
-Models/ModelSelectionStore.swift	107	static ModelSelectionStore.saveModel(_:for:)	untested	Model choice and custom models
-Models/ModelSelectionStore.swift	124	static ModelSelectionStore.saveOutputDirectory(_:)	untested	Model choice and custom models
-Models/ProcessorUITestConfiguration.swift	18	static ProcessorUITestConfiguration.offersCollectionInterview.getter	unreachable	UI-test and journey fixtures in the app
-Models/ProcessorUITestConfiguration.swift	20	static ProcessorUITestConfiguration.inputDirectory.getter	dead	Dead code
-Models/ProcessorUITestConfiguration.swift	169	static ProcessorUITestConfiguration.backfillFolder.getter	unreachable	UI-test and journey fixtures in the app
-Models/ProcessorUITestConfiguration.swift	170	static ProcessorUITestConfiguration.backfillFakeReads.getter	unreachable	UI-test and journey fixtures in the app
-Models/ProcessorUITestConfiguration.swift	226	static ProcessorUITestConfiguration.claudeAuthFixture()	unreachable	UI-test and journey fixtures in the app
-Models/ProcessorUITestConfiguration.swift	328	static ProcessorUITestConfiguration.improveOCRFakeReader.getter	unreachable	UI-test and journey fixtures in the app
-Models/ProcessorUITestConfiguration.swift	332	static ProcessorUITestConfiguration.syntheticSuitePair(mixed:)	unreachable	UI-test and journey fixtures in the app
-Models/ProcessorUITestConfiguration.swift	371	static ProcessorUITestConfiguration.syntheticMultiPagePDF()	unreachable	UI-test and journey fixtures in the app
-Models/ProviderKeySpec.swift	8	ProviderKeySpec.id.getter	untested	Picker labels and Identifiable ids
-Models/ProviderKeySpec.swift	12	ProviderKeySpec.displayName.getter	untested	Picker labels and Identifiable ids
-Models/ProviderModels.swift	19	LLMProvider.id.getter	untested	Picker labels and Identifiable ids
-Models/ProviderModels.swift	55	ThinkingLevel.id.getter	untested	Picker labels and Identifiable ids
-Models/ProviderModels.swift	112	TaggingMode.detail.getter	untested	Picker labels and Identifiable ids
-Models/ProviderModels.swift	152	RotationMode.id.getter	untested	Picker labels and Identifiable ids
-Models/ProviderModels.swift	154	RotationMode.displayName.getter	untested	Picker labels and Identifiable ids
-Models/ProviderModels.swift	164	RotationMode.detail.getter	untested	Picker labels and Identifiable ids
-Models/ProviderModels.swift	655	static OpenRouterRoute.through(_:)	untested	OpenRouter models, prices and listing
-Models/ProviderModels.swift	691	static OpenRouterRoute.unavailableSelection(_:)	untested	OpenRouter models, prices and listing
-Models/ProviderModels.swift	705	static OpenRouterRoute.unpinned(_:)	untested	OpenRouter models, prices and listing
-Models/ProviderModels.swift	719	static OpenRouterRoute.unmeasuredNote(_:)	untested	OpenRouter models, prices and listing
-Models/ProviderModels.swift	748	OpenRouterRoute.with(reasoning:)	untested	OpenRouter models, prices and listing
-Models/ProviderModels.swift	754	OpenRouterRoute.settingsNote.getter	untested	OpenRouter models, prices and listing
-Models/ProviderModels.swift	785	static OpenRouterRoute.price(_:)	untested	OpenRouter models, prices and listing
-Models/ProviderModels.swift	1090	CustomModelStore.add(_:)	untested	Model choice and custom models
-Models/ProviderModels.swift	1095	CustomModelStore.removeById(_:)	untested	Model choice and custom models
-Models/ProviderModels.swift	1104	CustomModelStore.isCustom(_:)	untested	Model choice and custom models
-Models/ProviderModels.swift	1108	CustomModelStore.save()	untested	Model choice and custom models
-Models/TimeEstimator.swift	19	static TimeEstimate.fmt(_:)	untested	Cost and time estimate labels
-Models/TimeEstimator.swift	26	TimeEstimate.ocrFormatted.getter	untested	Cost and time estimate labels
-Models/TimeEstimator.swift	27	TimeEstimate.rotationFormatted.getter	untested	Cost and time estimate labels
-Models/TimeEstimator.swift	28	TimeEstimate.taggingFormatted.getter	untested	Cost and time estimate labels
-Models/TimeEstimator.swift	29	TimeEstimate.collectionFormatted.getter	untested	Cost and time estimate labels
-Models/TimeEstimator.swift	30	TimeEstimate.totalFormatted.getter	untested	Cost and time estimate labels
-Net/CaptureServer.swift	39	CaptureServer.BodyAccumulator.init(_:)	untested	LAN receiver: request bodies and port fallback
-Net/CaptureServer.swift	112	CaptureServer.retryWithSystemPort()	untested	LAN receiver: request bodies and port fallback
-Net/CaptureServer.swift	288	CaptureServer.readBody(_:head:accumulator:timeout:)	untested	LAN receiver: request bodies and port fallback
-Net/ChatGPTAuth.swift	58	KeychainChatGPTCredentialStore.save(_:)	untested	Keychain storage
-Net/ChatGPTAuth.swift	63	KeychainChatGPTCredentialStore.delete()	untested	Keychain storage
-Net/ChatGPTAuth.swift	88	ChatGPTAuthError.description.getter	untested	ChatGPT sign-in and segmentation transports
-Net/ChatGPTAuth.swift	145	ChatGPTAuth.isSignedIn.getter	untested	ChatGPT sign-in and segmentation transports
-Net/DriveAuth.swift	28	static DriveAuth.RelayCredentials.read(clientID:load:)	untested	Google Drive relay, Mac side
-Net/DriveAuth.swift	46	DriveAuth.init(clientId:clientSecret:initialRefreshToken:http:)	untested	Google Drive relay, Mac side
-Net/DriveAuth.swift	56	DriveAuth.signOut()	untested	Google Drive relay, Mac side
-Net/DriveAuth.swift	65	DriveAuth.accessToken()	untested	Google Drive relay, Mac side
-Net/DriveAuth.swift	78	DriveAuth.refreshedToken(using:)	untested	Google Drive relay, Mac side
-Net/DriveAuth.swift	95	DriveAuth.signIn(completion:)	untested	Google Drive relay, Mac side
-Net/DriveAuth.swift	133	DriveAuth.exchange(code:verifier:redirect:)	untested	Google Drive relay, Mac side
-Net/DriveAuth.swift	145	static DriveAuth.formEncode(_:)	untested	Google Drive relay, Mac side
-Net/DriveAuth.swift	149	static DriveAuth.randomBytes(_:)	untested	Google Drive relay, Mac side
-Net/DriveAuth.swift	150	static DriveAuth.b64url(_:)	untested	Google Drive relay, Mac side
-Net/DriveAuth.swift	162	LoopbackRedirectServer.start(onCode:)	untested	Google Drive relay, Mac side
-Net/DriveAuth.swift	194	LoopbackRedirectServer.stop()	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	15	URLSessionHTTP.execute(method:url:headers:body:)	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	56	DriveError.description.getter	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	69	DriveError.errorDescription.getter	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	81	DriveClient.init(http:token:)	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	90	DriveClient.send(_:_:headers:body:)	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	98	DriveClient.decode<A>(_:_:)	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	104	DriveClient.listFiles(query:)	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	118	DriveClient.createMetadata(name:parents:appProperties:mimeType:)	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	128	DriveClient.createFile(name:parents:appProperties:media:mimeType:)	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	134	add #1 (_:) in DriveClient.createFile(name:parents:appProperties:media:mimeType:)	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	145	DriveClient.updateMedia(fileId:media:mimeType:)	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	151	DriveClient.updateAppProperties(fileId:appProperties:)	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	156	DriveClient.getMedia(fileId:)	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	158	DriveClient.delete(fileId:)	untested	Google Drive relay, Mac side
-Net/DriveClient.swift	166	DriveClient.enc(_:)	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	21	DriveObjectStore.init(client:token:)	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	29	DriveObjectStore.ensureSessionFolder()	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	39	DriveObjectStore.publishEpoch(_:)	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	41	DriveObjectStore.listNames()	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	47	DriveObjectStore.readData(_:)	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	53	DriveObjectStore.exists(_:)	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	57	DriveObjectStore.modificationDate(_:)	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	69	DriveObjectStore.writeAtomic(_:_:)	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	92	DriveObjectStore.delete(_:)	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	98	DriveObjectStore.quarantine(_:)	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	110	DriveObjectStore._resolveLocked(_:)	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	124	DriveObjectStore._ensureFolderUnlocked()	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	144	DriveObjectStore._refreshCacheUnlocked()	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	169	DriveObjectStore.esc(_:)	untested	Google Drive relay, Mac side
-Net/DriveObjectStore.swift	171	DriveObjectStore.parseTime(_:)	untested	Google Drive relay, Mac side
-Net/FileRelayReceiver.swift	71	FileRelayReceiver.start()	untested	Google Drive relay, Mac side
-Net/FileRelayReceiver.swift	73	FileRelayReceiver.stop()	untested	Google Drive relay, Mac side
-Net/FileRelayReceiver.swift	81	FileRelayReceiver.startOnQueue()	untested	Google Drive relay, Mac side
-Net/FileRelayReceiver.swift	101	FileRelayReceiver.tick()	untested	Google Drive relay, Mac side
-Net/FileRelayReceiver.swift	323	FileRelayReceiver.sweep()	untested	Google Drive relay, Mac side
-Net/FileRelayReceiver.swift	396	LocalDirectoryStore.modificationDate(_:)	unreachable	Offline file relay (CI transport)
-Net/USBBridge.swift	36	static USBBridge.reassertNow()	untested	USB tunnel: production socket and re-pair
-Net/USBMuxBridge.swift	39	static USBMuxBridge.Config.production.getter	untested	USB tunnel: production socket and re-pair
-Net/USBMuxBridge.swift	56	static USBMuxBridge.defaultSocketPath.getter	untested	USB tunnel: production socket and re-pair
-OCR/AnthropicTextRequest.swift	8	static AnthropicTextRequest.body(prompt:modelID:thinkingLevel:maxTokens:)	untested	LLM classification and collection naming per provider
-OCR/BatchOCR.swift	176	AnthropicBatchClient.submitBatch(fileURLs:sendPreviousImage:customPrompt:imageScale:standardImageMB:preparedRequests:)	untested	Paid batch OCR clients
-OCR/BatchOCR.swift	437	AnthropicBatchClient.cancelBatch(batchId:)	untested	Paid batch OCR clients
-OCR/BatchOCR.swift	630	GeminiBatchClient.submitFileBatch(jsonlLines:imageScale:sendPreviousImage:)	untested	Paid batch OCR clients
-OCR/BatchOCR.swift	680	GeminiBatchClient.uploadFile(data:)	untested	Paid batch OCR clients
-OCR/BatchOCR.swift	968	GeminiBatchClient.retrieveResults(resultFileName:jobID:confirmedNoCharge:)	untested	Paid batch OCR clients
-OCR/BatchOCR.swift	1055	MistralBatchClient.submitBatch(fileURLs:imageScale:standardImageMB:preparedRequests:)	untested	Paid batch OCR clients
-OCR/BatchOCR.swift	1129	MistralBatchClient.uploadFile(data:)	untested	Paid batch OCR clients
-OCR/BatchOCR.swift	1280	MistralBatchClient.cancelBatch(batchId:)	untested	Paid batch OCR clients
-OCR/BatchOCR.swift	1292	MistralBatchClient.confirmCancellation(batchId:)	untested	Paid batch OCR clients
-OCR/ClaudeCLIUsage.swift	59	ClaudeCLIUsage.refresh(config:)	untested	Local Agent CLI: Detect & Verify, plan usage
-OCR/InstitutionalComputeImport.swift	47	InstitutionalComputeImport.LoadError.errorDescription.getter	untested	Institutional computing import messages
-OCR/InstitutionalComputeImport.swift	203	InstitutionalComputeResumePrompt.title.getter	untested	Institutional computing import messages
-OCR/KeyValidator.swift	19	KeyValidator.KeyStatus.isUsable.getter	untested	Guided key setup and key checks
-OCR/KeyValidator.swift	22	KeyValidator.KeyStatus.message(provider:)	untested	Guided key setup and key checks
-OCR/KeyValidator.swift	49	static KeyValidator.validateGemini(key:)	untested	Guided key setup and key checks
-OCR/KeyValidator.swift	86	static KeyValidator.validateMistral(key:)	untested	Guided key setup and key checks
-OCR/KeyValidator.swift	116	static KeyValidator.validateOpenAI(key:)	untested	Guided key setup and key checks
-OCR/KeyValidator.swift	151	static KeyValidator.validateOpenRouter(key:)	untested	Guided key setup and key checks
-OCR/KeyValidator.swift	182	static KeyValidator.validateAnthropic(key:)	untested	Guided key setup and key checks
-OCR/KeyValidator.swift	207	static KeyValidator.classifySampleOCR(errorCode:errorMessage:)	untested	Guided key setup and key checks
-OCR/LLMTextClient.swift	62	static LLMTextClient.callAnthropic(prompt:model:thinkingLevel:apiKey:maxTokens:timeout:)	untested	LLM classification and collection naming per provider
-OCR/LLMTextClient.swift	101	static LLMTextClient.callMistralChat(prompt:apiKey:maxTokens:timeout:)	untested	LLM classification and collection naming per provider
-OCR/LocalAgentClient.swift	157	LocalAgentClient.probe()	untested	Local Agent CLI: Detect & Verify, plan usage
-OCR/LocalAgentValidator.swift	29	LocalAgentValidator.Status.isUsable.getter	untested	Local Agent CLI: Detect & Verify, plan usage
-OCR/LocalAgentValidator.swift	32	LocalAgentValidator.Status.message(tool:)	untested	Local Agent CLI: Detect & Verify, plan usage
-OCR/LocalAgentValidator.swift	61	static LocalAgentValidator.detectAndVerify(config:)	untested	Local Agent CLI: Detect & Verify, plan usage
-OCR/LocalAgentValidator.swift	79	static LocalAgentValidator.classify(_:)	untested	Local Agent CLI: Detect & Verify, plan usage
-OCR/MessageJourneyFixture.swift	28	static MessageJourneyFixture.reply(to:)	unreachable	UI-test and journey fixtures in the app
-OCR/MoneyJourneyFixture.swift	14	static MoneyJourneyFixture.directory.getter	unreachable	UI-test and journey fixtures in the app
-OCR/MoneyJourneyFixture.swift	35	static MoneyJourneyFixture.refusesGeminiReading.getter	unreachable	UI-test and journey fixtures in the app
-OCR/MoneyJourneyFixture.swift	159	static MoneyJourneyFixture.geminiImages(in:)	unreachable	UI-test and journey fixtures in the app
-OCR/NetworkSession.swift	234	NetworkSession.NoRedirects.urlSession(_:task:willPerformHTTPRedirection:newRequest:)	untested	HTTP redirect refusal
-OCR/NewspaperPageReader.swift	28	NewspaperDetector.isInstalled()	untested	Newspaper layout reading
-OCR/NewspaperPageReader.swift	35	NewspaperDetector.detect(_:isCancelled:)	untested	Newspaper layout reading
-OCR/NewspaperPageReader.swift	204	NewspaperPageReader.CancellationFlag.isCancelled.getter	untested	Newspaper layout reading
-OCR/NewspaperPageReader.swift	234	NewspaperLayoutRecord.summary.getter	untested	Newspaper layout reading
-OCR/NewspaperPageReader.swift	246	NewspaperReadingSpend.hasMonthlyLimit.getter	untested	Monthly spending limit
-OCR/NewspaperPageReader.swift	320	NewspaperPagePlan.removeScratch()	untested	Newspaper layout reading
-OCR/NewspaperPageReader.swift	325	static NewspaperPagePlan.prepare(_:photographed:detector:isCancelled:)	untested	Newspaper layout reading
-OCR/NewspaperPageReader.swift	506	static NewspaperPagePlan.pixelBox(_:width:height:)	untested	Newspaper layout reading
-OCR/NewspaperPageReader.swift	572	static NewspaperPagePlan.quad(_:)	untested	Newspaper layout reading
-OCR/NewspaperPageReader.swift	577	point #1 (_:) in static NewspaperPagePlan.quad(_:)	untested	Newspaper layout reading
-OCR/OCRPostCorrection.swift	16	static OCRPostCorrection.policyReason(at:store:)	untested	Settings, dates and post-correction helpers
-OCR/OCRProcessor+Catalogue.swift	80	OCRProcessor.PreservationIntakeFailure.errorDescription.getter	untested	Catalogue filing and copied source tags
-OCR/OCRProcessor+Catalogue.swift	176	OCRProcessor.CaptureHandoffSaveFailure.errorDescription.getter	untested	Stage for later hand-off and the backup folder
-OCR/OCRProcessor+MixedPDFRecovery.swift	230	OCRProcessor.applyMixedPDFRuntimeConfig(_:to:apiKey:reloadedImport:)	untested	Resuming an interrupted run
-OCR/OCRProcessor+MixedPDFRecovery.swift	335	OCRProcessor.pendingMixedPDFFileURLs.getter	untested	Resuming an interrupted run
-OCR/OCRProcessor+MonthlySpend.swift	10	ProcessFilesMonthlySpend.ReadingDeclined.errorDescription.getter	untested	Monthly spending limit
-OCR/OCRProcessor+MonthlySpend.swift	20	static ProcessFilesMonthlySpend.hasPrice(model:gateway:localAgent:claudeBilling:)	untested	Monthly spending limit
-OCR/OCRProcessor+MonthlySpend.swift	73	OCRProcessor.noteMonthlySpendDecline(_:for:remaining:)	untested	Monthly spending limit
-OCR/OCRProcessor+OCR.swift	226	OCRProcessor.copySourceTagsFromInputPDFs(_:)	untested	Catalogue filing and copied source tags
-OCR/OCRProcessor+OCR.swift	647	OCRProcessor.classifyViaLLM(prompt:provider:model:thinkingLevel:apiKey:)	untested	LLM classification and collection naming per provider
-OCR/OCRProcessor+OCR.swift	679	OCRProcessor.classifyCallGateway(prompt:gateway:)	untested	LLM classification and collection naming per provider
-OCR/OCRProcessor+OCR.swift	683	OCRProcessor.classifyCallLocalAgent(prompt:config:)	untested	LLM classification and collection naming per provider
-OCR/OCRProcessor+OCR.swift	686	OCRProcessor.classifyCallAnthropic(prompt:model:thinkingLevel:apiKey:)	untested	LLM classification and collection naming per provider
-OCR/OCRProcessor+OCR.swift	708	OCRProcessor.classifyCallGemini(prompt:model:thinkingLevel:apiKey:)	untested	LLM classification and collection naming per provider
-OCR/OCRProcessor+OCR.swift	726	OCRProcessor.classifyCallMistral(prompt:apiKey:)	untested	LLM classification and collection naming per provider
-OCR/OCRProcessor+OCR.swift	745	OCRProcessor.classifyCallOpenAI(prompt:model:apiKey:)	untested	LLM classification and collection naming per provider
-OCR/OCRProcessor+OCR.swift	1582	OCRProcessor.performOCRSequential(fileURLs:provider:model:thinkingLevel:apiKey:outputDirectory:segmentationContext:runConfig:)	untested	Sequential OCR with the previous page
-OCR/OCRProcessor+OCR.swift	1979	OCRProcessor.markBatchJobsWithoutResults(reason:)	untested	Paid batch OCR clients
-OCR/OCRProcessor+Pipeline.swift	1434	OCRProcessor.persistNewspaperFallback(_:index:address:)	untested	Newspaper layout reading
-OCR/OCRProcessor+Pipeline.swift	1552	OCRProcessor.pendingRunFileURLs.getter	untested	Resuming an interrupted run
-OCR/OCRProcessor+Pipeline.swift	1584	OCRProcessor.pendingRunResumeBlockReason(hasKey:fieldProvider:)	untested	Resuming an interrupted run
-OCR/OCRProcessor+Pipeline.swift	1595	OCRProcessor.pendingRunResumeKey(fieldKey:)	untested	Resuming an interrupted run
-OCR/OCRProcessor+Pipeline.swift	1604	static OCRProcessor.sameJournalPayload<A>(_:_:)	untested	Resuming an interrupted run
-OCR/OCRProcessor+Pipeline.swift	3521	restoredQualities #1 () in OCRProcessor.startProcessing(files:provider:model:thinkingLevel:apiKey:visionTextAPIKey:outputDirectory:batchMode:enableTagging:enableSegmentJSON:enableCollectionSegmentation:confirmCollectionIDs:reviewDocumentSegmentation:reviewFreshDocumentSegmentation:preOCRedInput:skipAlreadyProcessed:segmentationContext:gatewayConfig:localAgent:resumingMixedPDF:postCorrectionRequested:)	untested	Resuming an interrupted run
-OCR/OCRProcessor+Pipeline.swift	3862	OCRProcessor.retryFailedFiles()	untested	Retry dialog
-OCR/OCRProcessor+Pipeline.swift	3868	OCRProcessor.continueWithoutRetry()	untested	Retry dialog
-OCR/OCRProcessor+Pipeline.swift	3874	OCRProcessor.promptRetryForFailedFiles()	untested	Retry dialog
-OCR/OCRProcessor+Pipeline.swift	3934	OCRProcessor.retryBackendDescription.getter	untested	Retry dialog
-OCR/OCRProcessor+ReviewFlows.swift	75	OCRProcessor.performCollectionSegmentation(files:provider:model:thinkingLevel:apiKey:outputDirectory:confirmBeforeOrganizing:reviewDocumentSegmentation:runConfig:)	untested	Review dialogs: collections, segmentation, rotation, tagging
-OCR/OCRProcessor+ReviewFlows.swift	136	OCRProcessor.buildReviewItems(files:classifications:)	untested	Review dialogs: collections, segmentation, rotation, tagging
-OCR/OCRProcessor+ReviewFlows.swift	237	OCRProcessor.canConfirmCollectionReview.getter	untested	Review dialogs: collections, segmentation, rotation, tagging
-OCR/OCRProcessor+ReviewFlows.swift	247	OCRProcessor.confirmCollectionReview()	untested	Review dialogs: collections, segmentation, rotation, tagging
-OCR/OCRProcessor+ReviewFlows.swift	266	OCRProcessor.performDocumentSegmentationReview(files:outputDirectory:runConfig:)	untested	Review dialogs: collections, segmentation, rotation, tagging
-OCR/OCRProcessor+ReviewFlows.swift	323	OCRProcessor.confirmFinalReview()	untested	Review dialogs: collections, segmentation, rotation, tagging
-OCR/OCRProcessor+ReviewFlows.swift	329	OCRProcessor.redoTagging()	untested	Review dialogs: collections, segmentation, rotation, tagging
-OCR/OCRProcessor+ReviewFlows.swift	392	OCRProcessor.showRotationReview(files:runConfig:)	untested	Review dialogs: collections, segmentation, rotation, tagging
-OCR/OCRProcessor+ReviewFlows.swift	605	OCRProcessor.rebuildCollectionSegments(files:)	untested	Review dialogs: collections, segmentation, rotation, tagging
-OCR/OCRProcessor+Tagging.swift	505	OCRProcessor.performAutomaticTaggingWithReview(provider:model:thinkingLevel:apiKey:outputDirectory:enableSegmentJSON:files:runConfig:)	untested	Review dialogs: collections, segmentation, rotation, tagging
-OCR/OCRProcessor+Tagging.swift	815	OCRProcessor.previousManualSegment()	untested	Manual per-segment tagging and tag autocomplete
-OCR/OCRProcessor+Tagging.swift	843	OCRProcessor.performManualSegmentAndTag(autoDate:provider:model:thinkingLevel:apiKey:outputDirectory:enableSegmentJSON:preOCRed:files:runConfig:)	untested	Manual per-segment tagging and tag autocomplete
-OCR/OCRProcessor+Tagging.swift	1083	OCRProcessor.manualSegRemainingDocCount.getter	untested	Manual per-segment tagging and tag autocomplete
-OCR/OCRProcessor+Tagging.swift	1089	OCRProcessor.manualSegAdvanceFocus(_:)	untested	Manual per-segment tagging and tag autocomplete
-OCR/OCRProcessor+Tagging.swift	1098	OCRProcessor.manualSegSetKind(_:at:)	untested	Manual per-segment tagging and tag autocomplete
-OCR/OCRProcessor+Tagging.swift	1103	OCRProcessor.manualSegToggleRemoved(at:)	untested	Manual per-segment tagging and tag autocomplete
-OCR/OCRProcessor+Tagging.swift	1108	OCRProcessor.manualSegEndAndTag()	untested	Manual per-segment tagging and tag autocomplete
-OCR/OCRProcessor+Tagging.swift	1119	OCRProcessor.manualSegCancelTagging()	untested	Manual per-segment tagging and tag autocomplete
-OCR/OCRProcessor+Tagging.swift	1124	OCRProcessor.manualSegCommitPendingSegment()	untested	Manual per-segment tagging and tag autocomplete
-OCR/OCRProcessor+Tagging.swift	1146	OCRProcessor.confirmManualSegTag()	untested	Manual per-segment tagging and tag autocomplete
-OCR/OCRProcessor+Tagging.swift	1655	OCRProcessor.updateReviewedClassification(at:to:runConfig:)	untested	Review dialogs: collections, segmentation, rotation, tagging
-OCR/OCRProcessor+Tree.swift	151	static ProcessFilesTree.withoutRepeats(_:listed:)	untested	Adding files: folder tree checks
-OCR/OCRProcessor+Tree.swift	165	static ProcessFilesTree.depthWarning(_:)	untested	Adding files: folder tree checks
-OCR/OCRProcessor+Tree.swift	173	static ProcessFilesTree.isInput(_:preOCRed:)	untested	Adding files: folder tree checks
-OCR/OCRProcessor+Tree.swift	265	static ProcessFilesTree.overlapMessage(_:)	untested	Adding files: folder tree checks
-OCR/OCRProcessor+Types.swift	269	ManualTagSegment.ownDate.getter	untested	Manual per-segment tagging and tag autocomplete
-OCR/OCRProcessor.swift	714	OCRProcessor.PendingRunSnapshot.visionTextThinkingLevel.getter	dead	Dead code
-OCR/OCRProcessor.swift	900	OCRProcessor.manualSegCanFinish.getter	untested	Manual per-segment tagging and tag autocomplete
-OCR/OnDeviceModelClient.swift	31	static OnDeviceModelClient.isAvailable.getter	untested	macOS on-device model reader
-OCR/OnDeviceModelClient.swift	34	static OnDeviceModelClient.unavailableReason.getter	untested	macOS on-device model reader
-OCR/OnDeviceModelClient.swift	47	OnDeviceModelClient.ocr(imageURL:)	untested	macOS on-device model reader
-OCR/OnDeviceModelClient.swift	58	static OnDeviceModelClient.unavailable(_:)	untested	macOS on-device model reader
-OCR/OnDeviceModelClient.swift	64	static OnDeviceModelClient.read(imageURL:)	untested	macOS on-device model reader
-OCR/OnDeviceModelClient.swift	99	static OnDeviceModelClient.failure(_:)	untested	macOS on-device model reader
-OCR/OpenRouterListing.swift	43	static OpenRouterListing.parse(_:)	untested	OpenRouter models, prices and listing
-OCR/OpenRouterListing.swift	71	static OpenRouterListing.perMillion(_:)	untested	OpenRouter models, prices and listing
-OCR/OpenRouterListing.swift	77	static OpenRouterListing.unitPrice(_:)	untested	OpenRouter models, prices and listing
-OCR/OpenRouterListing.swift	108	static OpenRouterListing.store(_:_:)	untested	OpenRouter models, prices and listing
-OCR/OpenRouterListing.swift	135	static OpenRouterListing.typed(_:_:)	untested	OpenRouter models, prices and listing
-OCR/OpenRouterListing.swift	152	static OpenRouterListing.refreshIfStale(force:defaults:)	untested	OpenRouter models, prices and listing
-OCR/OpenRouterListing.swift	179	static OpenRouterListing.refreshAllIfStale()	untested	OpenRouter models, prices and listing
-OCR/OpenRouterPrices.swift	87	static OpenRouterPrices.source(_:_:)	untested	OpenRouter models, prices and listing
-OCR/OutputFileSafety.swift	215	fail #1 () in static OutputFileSafety.copyExtendedAttributes(from:to:)	untested	Catalogue filing and copied source tags
-OCR/PageReaderLiveDriver.swift	24	static PageReaderLiveDriver.run(key:dir:)	unreachable	Probe and proof drivers outside the coverage set
-OCR/PageReaderLiveDriver.swift	74	static PageReaderLiveDriver.keyUsage(_:)	unreachable	Probe and proof drivers outside the coverage set
-OCR/PageReaders.swift	158	OpenAICompatibleClient.route.getter	untested	OpenRouter models, prices and listing
-OCR/PageReaders.swift	178	OnDeviceModelClient.read(_:)	untested	macOS on-device model reader
-OCR/PaidBatchUITestFixture.swift	12	static PaidBatchUITestFixture.stateDirectory.getter	unreachable	UI-test and journey fixtures in the app
-OCR/PaidBatchUITestFixture.swift	14	static PaidBatchUITestFixture.scratchLocations.getter	unreachable	UI-test and journey fixtures in the app
-OCR/PaidRequests.swift	171	PaidRequests.BatchLinkFailure.errorDescription.getter	untested	Paid batch OCR clients
-OCR/ProcessorCatalogueFiling.swift	59	static ProcessorCatalogueFiling.prepareDirectory(_:in:)	untested	Catalogue filing and copied source tags
-OCR/ProcessorCatalogueFiling.swift	105	static ProcessorCatalogueFiling.copyExport(_:to:in:)	untested	Catalogue filing and copied source tags
-OCR/ProcessorCatalogueRecord.swift	184	static ProcessorCatalogueRecord.applySourceTags(_:document:file:)	untested	Catalogue filing and copied source tags
-OCR/ProcessorCatalogueRun.swift	183	ProcessorCatalogueRun.PreservationFilingError.errorDescription.getter	untested	Catalogue filing and copied source tags
-OCR/ResumeReviewGatesProbe.swift	31	ResumeReviewGatesProbe.Requests.add(_:)	unreachable	Probe and proof drivers outside the coverage set
-OCR/ResumeReviewGatesProbe.swift	32	ResumeReviewGatesProbe.Requests.urls.getter	unreachable	Probe and proof drivers outside the coverage set
-OCR/ResumeReviewGatesProbe.swift	35	static ResumeReviewGatesProbe.run()	unreachable	Probe and proof drivers outside the coverage set
-OCR/ResumeReviewGatesProbe.swift	52	static ResumeReviewGatesProbe.runCase(reviewWholeRun:)	unreachable	Probe and proof drivers outside the coverage set
-OCR/ResumeReviewGatesProbe.swift	164	static ResumeReviewGatesProbe.writeJPEG(_:shade:)	unreachable	Probe and proof drivers outside the coverage set
-OCR/ResumeReviewGatesProbe.swift	174	static ResumeReviewGatesProbe.writeFixturePDF(_:)	unreachable	Probe and proof drivers outside the coverage set
-OCR/ResumeReviewGatesProbe.swift	186	static ResumeReviewGatesProbe.finish(_:)	unreachable	Probe and proof drivers outside the coverage set
-OCR/SampleOCRTester.swift	15	static SampleOCRTester.run(account:key:)	untested	Guided key setup and key checks
-OCR/SampleOCRTester.swift	42	static SampleOCRTester.writeSampleImage()	untested	Guided key setup and key checks
-ProcessorAppDelegate.swift	11	ProcessorAppDelegate.applicationWillTerminate(_:)	untested	Quitting the app
-ProcessorAppDelegate.swift	16	ProcessorAppDelegate.applicationShouldTerminate(_:)	untested	Quitting the app
-ReOCR/ImproveOCRHandoff.swift	107	static ImproveOCRHandoff.askForRoot(_:)	untested	Improve OCR: failures and the dialog
-ReOCR/ReOCRCatalogue.swift	58	ReOCRCatalogue.Outcome.problem.getter	untested	Improve OCR: failures and the dialog
-ReOCR/ReOCRDialogModel.swift	161	ReOCRDialogModel.choose(_:for:)	untested	Improve OCR: failures and the dialog
-ReOCR/ReOCRFileWriter.swift	91	ReOCRFileWriter.Failure.description.getter	untested	Improve OCR: failures and the dialog
-ReOCR/ReOCRHistory.swift	52	ReOCRHistory.Failure.description.getter	untested	Improve OCR: failures and the dialog
-ReOCR/ReOCRIncrementalWriter.swift	34	ReOCRIncrementalWriter.Failure.description.getter	untested	Improve OCR: failures and the dialog
-ReOCR/ReOCRIncrementalWriter.swift	299	failure #1 (_:) in static ReOCRIncrementalWriter.editLayer(_:in:index:)	untested	Improve OCR: failures and the dialog
-ReOCR/ReOCRJob.swift	86	ReOCRJob.Failure.description.getter	untested	Improve OCR: failures and the dialog
-ReOCR/ReOCRPairs.swift	27	ReOCRPairs.Refusal.description.getter	untested	Improve OCR: failures and the dialog
-Segmentation/LocalSegmenter.swift	48	static LocalSegmenter.baseURL(_:)	untested	ChatGPT sign-in and segmentation transports
-Segmentation/LocalSegmenter.swift	53	static LocalSegmenter.modelID(_:)	untested	ChatGPT sign-in and segmentation transports
-Segmentation/PlanUsage.swift	43	ClaudeStreamOutput.hasPlanEvidence.getter	untested	Local Agent CLI: Detect & Verify, plan usage
-Segmentation/RunSegmentation.swift	53	SegmentationPlan.reviewShowsDocumentClasses.getter	untested	ChatGPT sign-in and segmentation transports
-Segmentation/RunSegmentation.swift	243	static WindowStageTransport.credentialIssue(_:routes:)	untested	ChatGPT sign-in and segmentation transports
-Segmentation/RunSegmentation.swift	303	static WindowStageTransport.current(_:defaults:claudeBinary:claudeBilling:claudeRoute:gate:checkClaudeBilling:)	untested	ChatGPT sign-in and segmentation transports
-Segmentation/SegmentationApproach.swift	22	SegmentationApproach.id.getter	untested	Picker labels and Identifiable ids
-Segmentation/SegmentationApproach.swift	190	SegmentationOptions.ModelCost.AnyKey.intValue.getter	unreachable	Required protocol stubs
-Segmentation/SegmentationApproach.swift	192	SegmentationOptions.ModelCost.AnyKey.init(intValue:)	unreachable	Required protocol stubs
-Segmentation/SegmentationApproach.swift	442	SegmentationOptionsError.errorDescription.getter	untested	ChatGPT sign-in and segmentation transports
-Segmentation/SegmentationProofDriver.swift	60	static SegmentationProofDriver.truthNew(_:gap:)	unreachable	Probe and proof drivers outside the coverage set
-Segmentation/SegmentationProofDriver.swift	63	static SegmentationProofDriver.exactPages(predicted:truth:)	unreachable	Probe and proof drivers outside the coverage set
-Segmentation/SegmentationProofDriver.swift	64	spans #1 (_:) in static SegmentationProofDriver.exactPages(predicted:truth:)	unreachable	Probe and proof drivers outside the coverage set
-Segmentation/SegmentationProofDriver.swift	85	SegmentationProofDriver.Meter.add(_:input:output:)	unreachable	Probe and proof drivers outside the coverage set
-Segmentation/SegmentationProofDriver.swift	92	SegmentationProofDriver.Meter.snapshot.getter	unreachable	Probe and proof drivers outside the coverage set
-Segmentation/SegmentationProofDriver.swift	104	SegmentationProofDriver.Meter.addProvider(_:)	unreachable	Probe and proof drivers outside the coverage set
-Segmentation/SegmentationProofDriver.swift	106	SegmentationProofDriver.Meter.servedProviders.getter	unreachable	Probe and proof drivers outside the coverage set
-Segmentation/SegmentationProofDriver.swift	108	SegmentationProofDriver.Meter.http.getter	unreachable	Probe and proof drivers outside the coverage set
-Segmentation/SegmentationProofDriver.swift	152	static SegmentationProofDriver.run()	unreachable	Probe and proof drivers outside the coverage set
-Segmentation/SegmentationProofDriver.swift	188	static SegmentationProofDriver.prove(manifest:approach:route:name:keys:claude:)	unreachable	Probe and proof drivers outside the coverage set
-Segmentation/SegmentationProofDriver.swift	353	static SegmentationProofDriver.finish()	unreachable	Probe and proof drivers outside the coverage set
-Settings/PaidRequestJournal.swift	151	PaidRequestJournal.failure()	untested	Paid batch OCR clients
-Settings/SettingsAdvisor.swift	16	SettingsAdvisor.Target.id.getter	untested	Picker labels and Identifiable ids
-Settings/SettingsInterviews.swift	59	static MacInventory.keyLabel(_:)	untested	Settings, dates and post-correction helpers
-Settings/SettingsInterviews.swift	61	static MacInventory.thisChip.getter	untested	Settings, dates and post-correction helpers
-Settings/SettingsInterviews.swift	279	KindMeasurement.Page.classify()	untested	Settings, dates and post-correction helpers
-Settings/SettingsLayerStore.swift	360	SettingsLayerStore.projects.getter	untested	Settings, dates and post-correction helpers
-Settings/SettingsSheetModel.swift	1000	static SettingsSheetModel.handDownloadNote.getter	untested	Settings, dates and post-correction helpers
-Settings/SettingsSheetModel.swift	1235	SettingsSheetWords.pace(_:unit:)	untested	Settings, dates and post-correction helpers
-Settings/SettingsTabs.swift	10	SettingsTab.id.getter	untested	Picker labels and Identifiable ids
-Settings/SettingsTabs.swift	22	SettingsTab.symbol.getter	untested	Picker labels and Identifiable ids
-Tagging/CollectionSegmenter.swift	32	CollectionSegmenter.segment(files:classifications:texts:provider:model:thinkingLevel:apiKey:gatewayConfig:localAgent:onStatus:)	untested	LLM classification and collection naming per provider
-Tagging/CollectionSegmenter.swift	122	CollectionSegmenter.extractCollectionName(from:provider:model:thinkingLevel:apiKey:gatewayConfig:localAgent:)	untested	LLM classification and collection naming per provider
-Tagging/CollectionSegmenter.swift	175	CollectionSegmenter.clusterCollectionNames(_:provider:model:thinkingLevel:apiKey:gatewayConfig:localAgent:)	untested	LLM classification and collection naming per provider
-Tagging/CollectionSegmenter.swift	212	CollectionSegmenter.parseClusterResponse(_:names:)	untested	LLM classification and collection naming per provider
-Tagging/CollectionSegmenter.swift	239	CollectionSegmenter.fallbackCluster(_:)	untested	LLM classification and collection naming per provider
-Tagging/CollectionSegmenter.swift	259	static CollectionSegmenter.normalizeCollectionName(_:)	untested	LLM classification and collection naming per provider
-Tagging/CollectionSegmenter.swift	519	CollectionSegmenter.callLLM(prompt:provider:model:thinkingLevel:apiKey:gatewayConfig:localAgent:)	untested	LLM classification and collection naming per provider
-Tagging/DateRoute+Run.swift	36	static DateRoute.imageEveryDocument(_:)	untested	Settings, dates and post-correction helpers
-Tagging/DateRoute.swift	148	static DateRoute.dayFirstSetting(_:)	untested	Settings, dates and post-correction helpers
-Tagging/MacOSTagger.swift	180	static MacOSTagger.applyTags(_:to:stampUnread:)	dead	Dead code
-Tagging/SystemTagsProvider.swift	145	SystemTagsProvider.suggestions(prefix:excluding:limit:)	untested	Manual per-segment tagging and tag autocomplete
-Tagging/SystemTagsProvider.swift	150	SystemTagsProvider.spelling(of:)	untested	Manual per-segment tagging and tag autocomplete
-Tagging/SystemTagsProvider.swift	157	SystemTagsProvider.register(_:)	untested	Manual per-segment tagging and tag autocomplete
-Tagging/SystemTagsProvider.swift	186	SystemTagsProvider.harvest(_:index:)	untested	Manual per-segment tagging and tag autocomplete
+file	line	function	class	group	tested-by
+Capture/CaptureModels.swift	21	CaptureGroupType.colorTag.getter	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Capture/CaptureSession.swift	205	CaptureSession.runHeadlessFinalize()	unreachable	Live Capture headless finish autopilot	-
+Capture/CaptureSession.swift	245	CaptureSession.writeHeadlessDone(summary:)	unreachable	Live Capture headless finish autopilot	-
+Capture/CaptureSession.swift	319	CaptureSession.refreshPhoneConnected()	untested	Live Capture session: phone connection, unpair and listener failure	-
+Capture/CaptureSession.swift	441	CaptureSession.unpairDisplay()	untested	Live Capture session: phone connection, unpair and listener failure	-
+Capture/CaptureSession.swift	450	CaptureSession.phoneDidDisconnect()	untested	Live Capture session: phone connection, unpair and listener failure	-
+Capture/CaptureSession.swift	613	CaptureSession.fileRelay.getter	unreachable	Offline file relay (CI transport)	-
+Capture/CaptureSession.swift	657	static CaptureSession.relayDir(token:)	unreachable	Offline file relay (CI transport)	-
+Capture/CaptureSession.swift	767	CaptureSession.relayReceiverDidStart(relayDir:)	untested	Google Drive relay and sign-in, Mac side	-
+Capture/CaptureSession.swift	787	CaptureSession.relayReceiverDidStop()	untested	Google Drive relay and sign-in, Mac side	-
+Capture/CaptureSession.swift	861	CaptureSession.serverDidFail(_:)	untested	Live Capture session: phone connection, unpair and listener failure	-
+Capture/CaptureSession.swift	1109	CaptureSession.revealBackupFolder()	untested	Live Capture control panel: backup folder and output folder	-
+Capture/ContainerBackfillModel.swift	76	ContainerBackfillModel.gateway.getter	untested	Container label backfill (Tools)	-
+Capture/ContainerBackfillModel.swift	79	ContainerBackfillModel.modelRoute.getter	untested	Container label backfill (Tools)	-
+Capture/ContainerBackfillModel.swift	284	static ContainerBackfillModel.read(_:gateway:route:)	untested	Container label backfill (Tools)	-
+Capture/ContainerBackfillModel.swift	318	ContainerBackfillModel.cancel()	untested	Container label backfill (Tools)	-
+Capture/ContainerBackfillModel.swift	346	ContainerBackfillModel.accept(_:)	untested	Container label backfill (Tools)	-
+Capture/ContainerBackfillModel.swift	377	ContainerBackfillModel.skip(_:)	untested	Container label backfill (Tools)	-
+Capture/ContainerBackfillModel.swift	382	ContainerBackfillModel.setStatus(_:_:)	untested	Container label backfill (Tools)	-
+Capture/ContainerBackfillModel.swift	388	ContainerBackfillModel.saveLevels(_:)	untested	Container label backfill (Tools)	-
+Capture/ContainerBackfillModel.swift	400	CancelFlag.set()	untested	Container label backfill (Tools)	-
+Capture/ContainerBackfillModel.swift	439	ContainerBackfillCache.merge(_:)	untested	Container label backfill (Tools)	-
+Capture/FileRelayTestDriver.swift	28	static FileRelayTestDriver.emitGolden(to:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/FileRelayTestDriver.swift	31	w #1 (_:_:) in static FileRelayTestDriver.emitGolden(to:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/LabelGemmaVerifyTestDriver.swift	50	static LabelGemmaVerifyTestDriver.processFiles(manifest:out:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/LabelGemmaVerifyTestDriver.swift	77	static LabelGemmaVerifyTestDriver.sha(_:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/LabelGemmaVerifyTestDriver.swift	82	static LabelGemmaVerifyTestDriver.run(manifest:out:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/LiveCaptureProcessor.swift	284	LiveCaptureProcessor.RotationRetryTarget.id.getter	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Capture/LiveCaptureProcessor.swift	1114	LiveCaptureProcessor.stagedURLs(for:)	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Capture/LiveCaptureProcessor.swift	2187	static LiveCaptureProcessor.ocrTask(imageURL:provider:model:thinkingLevel:apiKey:customPrompt:imageScale:gateway:localAgent:rotationMode:standardImageMB:visionSettings:cascade:refusalRoutes:visionTextLLM:scanDetector:denyDataCollection:paidRequests:)	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Capture/LiveCaptureTaggingFailureTestDriver.swift	19	LiveCaptureTaggingFailureTestDriver.Gateway.respond(to:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/LiveCaptureTaggingFailureTestDriver.swift	88	static LiveCaptureTaggingFailureTestDriver.run(env:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/LiveCaptureTaggingFailureTestDriver.swift	240	static LiveCaptureTaggingFailureTestDriver.wait(for:until:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/LiveCaptureTaggingFailureTestDriver.swift	250	LiveCaptureTaggingFailureTestDriver.ProbeError.init(_:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/LiveCaptureTestDriver.swift	21	static LiveCaptureTestDriver.run(session:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/ManagedGemma.swift	56	ManagedGemma.download()	untested	Label reader download and local model supervisor	-
+Capture/ManagedGemma.swift	84	ManagedGemma.dismissStatus()	untested	Label reader download and local model supervisor	-
+Capture/ManagedGemma.swift	88	ManagedGemma.pauseDownload()	untested	Label reader download and local model supervisor	-
+Capture/ManagedGemma.swift	91	ManagedGemma.stop()	untested	Label reader download and local model supervisor	-
+Capture/ManagedGemma.swift	99	static ManagedGemma.installFailure(_:)	untested	Label reader download and local model supervisor	-
+Capture/ProcessFilesTestDriver.swift	58	static ProcessFilesTestDriver.safeFallbackMarker.getter	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/ProcessFilesTestDriver.swift	61	static ProcessFilesTestDriver.writeMarker(_:_:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/ProcessFilesTestDriver.swift	64	static ProcessFilesTestDriver.inTestFiles(_:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/ProcessFilesTestDriver.swift	68	static ProcessFilesTestDriver.run(processor:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/ProcessFilesTestDriver.swift	70	fail #1 (_:marker:) in static ProcessFilesTestDriver.run(processor:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/ProcessFilesTestDriver.swift	516	RequestLog.record(_:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/ProcessFilesTestDriver.swift	544	RequestLog.summary.getter	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/ProcessFilesTestDriver.swift	559	SpendMeter.init(inPer1M:outPer1M:cap:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/ProcessFilesTestDriver.swift	563	SpendMeter.cost(_:_:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/ProcessFilesTestDriver.swift	567	SpendMeter.admit()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/ProcessFilesTestDriver.swift	577	SpendMeter.record(_:status:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+Capture/ProcessFilesTestDriver.swift	594	SpendMeter.summary.getter	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+LocalModels/LocalModelSupervisor.swift	90	LocalModelSupervisor.NoRedirects.urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)	untested	HTTP redirect refusal	-
+LocalModels/LocalModelSupervisor.swift	137	LocalModelSupervisor.install(_:step:)	untested	Label reader download and local model supervisor	-
+LocalModels/LocalModelSupervisor.swift	172	LocalModelSupervisor.run(_:_:model:timeout:failure:)	untested	Label reader download and local model supervisor	-
+LocalModels/LocalModelSupervisor.swift	475	LocalModelSupervisor.residentPID.getter	dead	Dead code	-
+LocalModels/LocalModelSupervisorContract.swift	52	static LocalModelSupervisorContract.realRead(jpeg:scratch:)	unreachable	Probe and proof drivers outside the coverage set	-
+Models/CostEstimator.swift	27	CostEstimate.classificationFormatted.getter	untested	Cost and time estimate labels	-
+Models/CostEstimator.swift	29	CostEstimate.collectionFormatted.getter	untested	Cost and time estimate labels	-
+Models/CostEstimator.swift	33	CostEstimate.namesFormatted.getter	untested	Cost and time estimate labels	-
+Models/KeychainHelper.swift	66	static KeychainHelper.read(account:allowInteraction:)	untested	Keychain storage	-
+Models/KeychainHelper.swift	106	static KeychainHelper.quietContext()	untested	Keychain storage	-
+Models/KeychainHelper.swift	112	static KeychainHelper.delete(account:)	untested	Keychain storage	-
+Models/LocalAgentConfig.swift	75	LocalAgentConfig.effectiveConcurrencyCap.getter	untested	Local Agent CLI: Detect & Verify, plan usage	-
+Models/LocalAgentSpec.swift	14	LocalAgentSpec.id.getter	untested	Picker labels and Identifiable ids	-
+Models/LocalAgentSpec.swift	16	LocalAgentSpec.displayName.getter	untested	Picker labels and Identifiable ids	-
+Models/LocalModelRoute.swift	35	LocalModelRoute.Server.id.getter	untested	Picker labels and Identifiable ids	-
+Models/LocalModelRoute.swift	59	LocalModelRoute.Pick.displayName.getter	untested	Picker labels and Identifiable ids	-
+Models/ModelSelectionStore.swift	73	ModelSelectionStore.healUnresolvableSelections(afterRemoving:)	untested	OCR: models, custom models, gateway and the Local Agent wizard	-
+Models/ModelSelectionStore.swift	102	static ModelSelectionStore.savedModel(for:)	dead	Dead code	-
+Models/ModelSelectionStore.swift	107	static ModelSelectionStore.saveModel(_:for:)	untested	OCR: models, custom models, gateway and the Local Agent wizard	-
+Models/ProcessorUITestConfiguration.swift	20	static ProcessorUITestConfiguration.inputDirectory.getter	dead	Dead code	-
+Models/ProviderModels.swift	655	static OpenRouterRoute.through(_:)	untested	OpenRouter routes and listing refresh	-
+Models/ProviderModels.swift	705	static OpenRouterRoute.unpinned(_:)	untested	OpenRouter routes and listing refresh	-
+Models/ProviderModels.swift	748	OpenRouterRoute.with(reasoning:)	untested	OpenRouter routes and listing refresh	-
+Models/ProviderModels.swift	1090	CustomModelStore.add(_:)	untested	OCR: models, custom models, gateway and the Local Agent wizard	-
+Models/ProviderModels.swift	1095	CustomModelStore.removeById(_:)	untested	OCR: models, custom models, gateway and the Local Agent wizard	-
+Models/ProviderModels.swift	1108	CustomModelStore.save()	untested	OCR: models, custom models, gateway and the Local Agent wizard	-
+Models/TimeEstimator.swift	29	TimeEstimate.collectionFormatted.getter	untested	Cost and time estimate labels	-
+Net/CaptureServer.swift	39	CaptureServer.BodyAccumulator.init(_:)	untested	LAN receiver: request bodies and port fallback	-
+Net/CaptureServer.swift	112	CaptureServer.retryWithSystemPort()	untested	LAN receiver: request bodies and port fallback	-
+Net/CaptureServer.swift	288	CaptureServer.readBody(_:head:accumulator:timeout:)	untested	LAN receiver: request bodies and port fallback	-
+Net/ChatGPTAuth.swift	58	KeychainChatGPTCredentialStore.save(_:)	untested	Keychain storage	-
+Net/ChatGPTAuth.swift	63	KeychainChatGPTCredentialStore.delete()	untested	Keychain storage	-
+Net/ChatGPTAuth.swift	88	ChatGPTAuthError.description.getter	untested	Segmentation: approach, transports, ChatGPT sign-in and plan check	-
+Net/ChatGPTAuth.swift	145	ChatGPTAuth.isSignedIn.getter	untested	Segmentation: approach, transports, ChatGPT sign-in and plan check	-
+Net/DriveAuth.swift	46	DriveAuth.init(clientId:clientSecret:initialRefreshToken:http:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveAuth.swift	56	DriveAuth.signOut()	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveAuth.swift	65	DriveAuth.accessToken()	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveAuth.swift	78	DriveAuth.refreshedToken(using:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveAuth.swift	95	DriveAuth.signIn(completion:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveAuth.swift	133	DriveAuth.exchange(code:verifier:redirect:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveAuth.swift	145	static DriveAuth.formEncode(_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveAuth.swift	149	static DriveAuth.randomBytes(_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveAuth.swift	150	static DriveAuth.b64url(_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveAuth.swift	162	LoopbackRedirectServer.start(onCode:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveAuth.swift	194	LoopbackRedirectServer.stop()	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	15	URLSessionHTTP.execute(method:url:headers:body:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	56	DriveError.description.getter	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	69	DriveError.errorDescription.getter	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	81	DriveClient.init(http:token:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	90	DriveClient.send(_:_:headers:body:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	98	DriveClient.decode<A>(_:_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	104	DriveClient.listFiles(query:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	118	DriveClient.createMetadata(name:parents:appProperties:mimeType:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	128	DriveClient.createFile(name:parents:appProperties:media:mimeType:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	134	add #1 (_:) in DriveClient.createFile(name:parents:appProperties:media:mimeType:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	145	DriveClient.updateMedia(fileId:media:mimeType:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	151	DriveClient.updateAppProperties(fileId:appProperties:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	156	DriveClient.getMedia(fileId:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	158	DriveClient.delete(fileId:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveClient.swift	166	DriveClient.enc(_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	21	DriveObjectStore.init(client:token:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	29	DriveObjectStore.ensureSessionFolder()	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	39	DriveObjectStore.publishEpoch(_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	41	DriveObjectStore.listNames()	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	47	DriveObjectStore.readData(_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	53	DriveObjectStore.exists(_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	57	DriveObjectStore.modificationDate(_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	69	DriveObjectStore.writeAtomic(_:_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	92	DriveObjectStore.delete(_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	98	DriveObjectStore.quarantine(_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	110	DriveObjectStore._resolveLocked(_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	124	DriveObjectStore._ensureFolderUnlocked()	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	144	DriveObjectStore._refreshCacheUnlocked()	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	169	DriveObjectStore.esc(_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/DriveObjectStore.swift	171	DriveObjectStore.parseTime(_:)	untested	Google Drive relay and sign-in, Mac side	-
+Net/FileRelayReceiver.swift	71	FileRelayReceiver.start()	untested	Google Drive relay and sign-in, Mac side	-
+Net/FileRelayReceiver.swift	73	FileRelayReceiver.stop()	untested	Google Drive relay and sign-in, Mac side	-
+Net/FileRelayReceiver.swift	81	FileRelayReceiver.startOnQueue()	untested	Google Drive relay and sign-in, Mac side	-
+Net/FileRelayReceiver.swift	101	FileRelayReceiver.tick()	untested	Google Drive relay and sign-in, Mac side	-
+Net/FileRelayReceiver.swift	323	FileRelayReceiver.sweep()	untested	Google Drive relay and sign-in, Mac side	-
+Net/FileRelayReceiver.swift	396	LocalDirectoryStore.modificationDate(_:)	unreachable	Offline file relay (CI transport)	-
+Net/USBBridge.swift	36	static USBBridge.reassertNow()	untested	USB tunnel: re-pair	-
+OCR/AnthropicTextRequest.swift	8	static AnthropicTextRequest.body(prompt:modelID:thinkingLevel:maxTokens:)	untested	LLM classification and collection naming per provider	-
+OCR/BatchOCR.swift	176	AnthropicBatchClient.submitBatch(fileURLs:sendPreviousImage:customPrompt:imageScale:standardImageMB:preparedRequests:)	untested	Paid batch OCR clients	-
+OCR/BatchOCR.swift	437	AnthropicBatchClient.cancelBatch(batchId:)	untested	Paid batch OCR clients	-
+OCR/BatchOCR.swift	630	GeminiBatchClient.submitFileBatch(jsonlLines:imageScale:sendPreviousImage:)	untested	Paid batch OCR clients	-
+OCR/BatchOCR.swift	680	GeminiBatchClient.uploadFile(data:)	untested	Paid batch OCR clients	-
+OCR/BatchOCR.swift	968	GeminiBatchClient.retrieveResults(resultFileName:jobID:confirmedNoCharge:)	untested	Paid batch OCR clients	-
+OCR/BatchOCR.swift	1055	MistralBatchClient.submitBatch(fileURLs:imageScale:standardImageMB:preparedRequests:)	untested	Paid batch OCR clients	-
+OCR/BatchOCR.swift	1129	MistralBatchClient.uploadFile(data:)	untested	Paid batch OCR clients	-
+OCR/BatchOCR.swift	1280	MistralBatchClient.cancelBatch(batchId:)	untested	Paid batch OCR clients	-
+OCR/BatchOCR.swift	1292	MistralBatchClient.confirmCancellation(batchId:)	untested	Paid batch OCR clients	-
+OCR/HandLayerMeasureTestDriver.swift	21	static HandLayerMeasureTestDriver.onInk(_:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/HandLayerMeasureTestDriver.swift	60	static HandLayerMeasureTestDriver.run(input:output:install:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/HandLayerMeasureTestDriver.swift	109	words #1 (_:) in static HandLayerMeasureTestDriver.run(input:output:install:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/InstitutionalComputeImport.swift	47	InstitutionalComputeImport.LoadError.errorDescription.getter	untested	OCR: institutional computing import, retry dialog and rotation retry	-
+OCR/InstitutionalComputeImport.swift	203	InstitutionalComputeResumePrompt.title.getter	untested	OCR: institutional computing import, retry dialog and rotation retry	-
+OCR/KeyValidator.swift	49	static KeyValidator.validateGemini(key:)	untested	API keys: key checks, sample OCR and the Keychain explanation	-
+OCR/KeyValidator.swift	86	static KeyValidator.validateMistral(key:)	untested	API keys: key checks, sample OCR and the Keychain explanation	-
+OCR/KeyValidator.swift	151	static KeyValidator.validateOpenRouter(key:)	untested	API keys: key checks, sample OCR and the Keychain explanation	-
+OCR/KeyValidator.swift	182	static KeyValidator.validateAnthropic(key:)	untested	API keys: key checks, sample OCR and the Keychain explanation	-
+OCR/KeyValidator.swift	207	static KeyValidator.classifySampleOCR(errorCode:errorMessage:)	untested	API keys: key checks, sample OCR and the Keychain explanation	-
+OCR/LLMTextClient.swift	62	static LLMTextClient.callAnthropic(prompt:model:thinkingLevel:apiKey:maxTokens:timeout:)	untested	LLM classification and collection naming per provider	-
+OCR/LLMTextClient.swift	101	static LLMTextClient.callMistralChat(prompt:apiKey:maxTokens:timeout:)	untested	LLM classification and collection naming per provider	-
+OCR/LocalAgentClient.swift	157	LocalAgentClient.probe()	untested	Local Agent CLI: Detect & Verify, plan usage	-
+OCR/LocalAgentTestDriver.swift	34	note #1 (_:) in static LocalAgentTestDriver.run()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/LocalAgentTestDriver.swift	338	read #1 (_:) in static LocalAgentTestDriver.run()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/LocalAgentTestDriver.swift	343	report #1 (_:_:wall:) in static LocalAgentTestDriver.run()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/LocalAgentValidator.swift	29	LocalAgentValidator.Status.isUsable.getter	untested	Local Agent CLI: Detect & Verify, plan usage	-
+OCR/LocalAgentValidator.swift	32	LocalAgentValidator.Status.message(tool:)	untested	Local Agent CLI: Detect & Verify, plan usage	-
+OCR/LocalAgentValidator.swift	61	static LocalAgentValidator.detectAndVerify(config:)	untested	Local Agent CLI: Detect & Verify, plan usage	-
+OCR/LocalAgentValidator.swift	79	static LocalAgentValidator.classify(_:)	untested	Local Agent CLI: Detect & Verify, plan usage	-
+OCR/LocalModelsTestDriver.swift	848	first #1 (_:) in static LocalModelsTestDriver.memoryChecks()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/NetworkSession.swift	234	NetworkSession.NoRedirects.urlSession(_:task:willPerformHTTPRedirection:newRequest:)	untested	HTTP redirect refusal	-
+OCR/NewspaperLayoutTestDriver.swift	30	static NewspaperLayoutTestDriver.dumpPlans(list:out:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/NewspaperLayoutTestDriver.swift	107	static NewspaperLayoutTestDriver.peakFootprintMB()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/NewspaperLayoutTestDriver.swift	118	static NewspaperLayoutTestDriver.dumpScanLayout(list:out:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/NewspaperLayoutTestDriver.swift	480	draw #1 (_:x:y:size:) in static NewspaperLayoutTestDriver.run()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/NewspaperPageReader.swift	28	NewspaperDetector.isInstalled()	untested	Newspaper layout reading	-
+OCR/NewspaperPageReader.swift	35	NewspaperDetector.detect(_:isCancelled:)	untested	Newspaper layout reading	-
+OCR/NewspaperPageReader.swift	204	NewspaperPageReader.CancellationFlag.isCancelled.getter	untested	Newspaper layout reading	-
+OCR/NewspaperPageReader.swift	234	NewspaperLayoutRecord.summary.getter	untested	Newspaper layout reading	-
+OCR/NewspaperPageReader.swift	320	NewspaperPagePlan.removeScratch()	untested	Newspaper layout reading	-
+OCR/NewspaperPageReader.swift	325	static NewspaperPagePlan.prepare(_:photographed:detector:isCancelled:)	untested	Newspaper layout reading	-
+OCR/NewspaperPageReader.swift	506	static NewspaperPagePlan.pixelBox(_:width:height:)	untested	Newspaper layout reading	-
+OCR/NewspaperPageReader.swift	572	static NewspaperPagePlan.quad(_:)	untested	Newspaper layout reading	-
+OCR/NewspaperPageReader.swift	577	point #1 (_:) in static NewspaperPagePlan.quad(_:)	untested	Newspaper layout reading	-
+OCR/OCRPostCorrection.swift	16	static OCRPostCorrection.policyReason(at:store:)	untested	Settings, dates and post-correction helpers	-
+OCR/OCRProcessor+Catalogue.swift	80	OCRProcessor.PreservationIntakeFailure.errorDescription.getter	untested	Catalogue filing and copied source tags	-
+OCR/OCRProcessor+MixedPDFRecovery.swift	230	OCRProcessor.applyMixedPDFRuntimeConfig(_:to:apiKey:reloadedImport:)	untested	Resuming an interrupted run: batch and mixed PDF	-
+OCR/OCRProcessor+MixedPDFRecovery.swift	335	OCRProcessor.pendingMixedPDFFileURLs.getter	untested	Resuming an interrupted run: batch and mixed PDF	-
+OCR/OCRProcessor+OCR.swift	226	OCRProcessor.copySourceTagsFromInputPDFs(_:)	untested	Catalogue filing and copied source tags	-
+OCR/OCRProcessor+OCR.swift	647	OCRProcessor.classifyViaLLM(prompt:provider:model:thinkingLevel:apiKey:)	untested	LLM classification and collection naming per provider	-
+OCR/OCRProcessor+OCR.swift	679	OCRProcessor.classifyCallGateway(prompt:gateway:)	untested	LLM classification and collection naming per provider	-
+OCR/OCRProcessor+OCR.swift	683	OCRProcessor.classifyCallLocalAgent(prompt:config:)	untested	LLM classification and collection naming per provider	-
+OCR/OCRProcessor+OCR.swift	686	OCRProcessor.classifyCallAnthropic(prompt:model:thinkingLevel:apiKey:)	untested	LLM classification and collection naming per provider	-
+OCR/OCRProcessor+OCR.swift	708	OCRProcessor.classifyCallGemini(prompt:model:thinkingLevel:apiKey:)	untested	LLM classification and collection naming per provider	-
+OCR/OCRProcessor+OCR.swift	726	OCRProcessor.classifyCallMistral(prompt:apiKey:)	untested	LLM classification and collection naming per provider	-
+OCR/OCRProcessor+OCR.swift	745	OCRProcessor.classifyCallOpenAI(prompt:model:apiKey:)	untested	LLM classification and collection naming per provider	-
+OCR/OCRProcessor+OCR.swift	1582	OCRProcessor.performOCRSequential(fileURLs:provider:model:thinkingLevel:apiKey:outputDirectory:segmentationContext:runConfig:)	untested	Sequential OCR with the previous page	-
+OCR/OCRProcessor+OCR.swift	1979	OCRProcessor.markBatchJobsWithoutResults(reason:)	untested	Paid batch OCR clients	-
+OCR/OCRProcessor+Pipeline.swift	1434	OCRProcessor.persistNewspaperFallback(_:index:address:)	untested	Newspaper layout reading	-
+OCR/OCRProcessor+Pipeline.swift	1604	static OCRProcessor.sameJournalPayload<A>(_:_:)	untested	Resuming an interrupted run: batch and mixed PDF	-
+OCR/OCRProcessor+Pipeline.swift	3521	restoredQualities #1 () in OCRProcessor.startProcessing(files:provider:model:thinkingLevel:apiKey:visionTextAPIKey:outputDirectory:batchMode:enableTagging:enableSegmentJSON:enableCollectionSegmentation:confirmCollectionIDs:reviewDocumentSegmentation:reviewFreshDocumentSegmentation:preOCRedInput:skipAlreadyProcessed:segmentationContext:gatewayConfig:localAgent:resumingMixedPDF:postCorrectionRequested:)	untested	Resuming an interrupted run: batch and mixed PDF	-
+OCR/OCRProcessor+Pipeline.swift	3862	OCRProcessor.retryFailedFiles()	untested	OCR: institutional computing import, retry dialog and rotation retry	-
+OCR/OCRProcessor+ReviewFlows.swift	75	OCRProcessor.performCollectionSegmentation(files:provider:model:thinkingLevel:apiKey:outputDirectory:confirmBeforeOrganizing:reviewDocumentSegmentation:runConfig:)	untested	Review steps in the processor: collections, document review, rotation, tagging	-
+OCR/OCRProcessor+ReviewFlows.swift	136	OCRProcessor.buildReviewItems(files:classifications:)	untested	Review steps in the processor: collections, document review, rotation, tagging	-
+OCR/OCRProcessor+ReviewFlows.swift	237	OCRProcessor.canConfirmCollectionReview.getter	untested	Review steps in the processor: collections, document review, rotation, tagging	-
+OCR/OCRProcessor+ReviewFlows.swift	247	OCRProcessor.confirmCollectionReview()	untested	Review steps in the processor: collections, document review, rotation, tagging	-
+OCR/OCRProcessor+ReviewFlows.swift	266	OCRProcessor.performDocumentSegmentationReview(files:outputDirectory:runConfig:)	untested	Review steps in the processor: collections, document review, rotation, tagging	-
+OCR/OCRProcessor+ReviewFlows.swift	323	OCRProcessor.confirmFinalReview()	untested	Review steps in the processor: collections, document review, rotation, tagging	-
+OCR/OCRProcessor+ReviewFlows.swift	329	OCRProcessor.redoTagging()	untested	Review steps in the processor: collections, document review, rotation, tagging	-
+OCR/OCRProcessor+ReviewFlows.swift	392	OCRProcessor.showRotationReview(files:runConfig:)	untested	Review steps in the processor: collections, document review, rotation, tagging	-
+OCR/OCRProcessor+ReviewFlows.swift	605	OCRProcessor.rebuildCollectionSegments(files:)	untested	Review steps in the processor: collections, document review, rotation, tagging	-
+OCR/OCRProcessor+Tagging.swift	505	OCRProcessor.performAutomaticTaggingWithReview(provider:model:thinkingLevel:apiKey:outputDirectory:enableSegmentJSON:files:runConfig:)	untested	Review steps in the processor: collections, document review, rotation, tagging	-
+OCR/OCRProcessor+Tagging.swift	815	OCRProcessor.previousManualSegment()	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+OCR/OCRProcessor+Tagging.swift	843	OCRProcessor.performManualSegmentAndTag(autoDate:provider:model:thinkingLevel:apiKey:outputDirectory:enableSegmentJSON:preOCRed:files:runConfig:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+OCR/OCRProcessor+Tagging.swift	1089	OCRProcessor.manualSegAdvanceFocus(_:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+OCR/OCRProcessor+Tagging.swift	1098	OCRProcessor.manualSegSetKind(_:at:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+OCR/OCRProcessor+Tagging.swift	1103	OCRProcessor.manualSegToggleRemoved(at:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+OCR/OCRProcessor+Tagging.swift	1119	OCRProcessor.manualSegCancelTagging()	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+OCR/OCRProcessor+Tagging.swift	1146	OCRProcessor.confirmManualSegTag()	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+OCR/OCRProcessor+Tagging.swift	1655	OCRProcessor.updateReviewedClassification(at:to:runConfig:)	untested	Review steps in the processor: collections, document review, rotation, tagging	-
+OCR/OCRProcessor+Tree.swift	265	static ProcessFilesTree.overlapMessage(_:)	untested	Adding files: real drops, repeated intake and folder checks	-
+OCR/OCRProcessor+Types.swift	269	ManualTagSegment.ownDate.getter	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+OCR/OCRProcessor+WindowSegmentation.swift	363	OCRProcessor.askPlanCheck(_:)	untested	Segmentation: approach, transports, ChatGPT sign-in and plan check	-
+OCR/OCRProcessor+WindowSegmentation.swift	379	OCRProcessor.answerPlanCheck(goOn:)	untested	Segmentation: approach, transports, ChatGPT sign-in and plan check	-
+OCR/OCRProcessor.swift	714	OCRProcessor.PendingRunSnapshot.visionTextThinkingLevel.getter	dead	Dead code	-
+OCR/OnDeviceModelClient.swift	31	static OnDeviceModelClient.isAvailable.getter	untested	macOS on-device model reader	-
+OCR/OnDeviceModelClient.swift	34	static OnDeviceModelClient.unavailableReason.getter	untested	macOS on-device model reader	-
+OCR/OnDeviceModelClient.swift	47	OnDeviceModelClient.ocr(imageURL:)	untested	macOS on-device model reader	-
+OCR/OnDeviceModelClient.swift	58	static OnDeviceModelClient.unavailable(_:)	untested	macOS on-device model reader	-
+OCR/OnDeviceModelClient.swift	64	static OnDeviceModelClient.read(imageURL:)	untested	macOS on-device model reader	-
+OCR/OnDeviceModelClient.swift	99	static OnDeviceModelClient.failure(_:)	untested	macOS on-device model reader	-
+OCR/OpenRouterListing.swift	108	static OpenRouterListing.store(_:_:)	untested	OpenRouter routes and listing refresh	-
+OCR/OpenRouterListing.swift	135	static OpenRouterListing.typed(_:_:)	untested	OpenRouter routes and listing refresh	-
+OCR/OpenRouterListing.swift	152	static OpenRouterListing.refreshIfStale(force:defaults:)	untested	OpenRouter routes and listing refresh	-
+OCR/OpenRouterTestDriver.swift	43	static OpenRouterTestDriver.eq<A>(_:_:_:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	54	static OpenRouterTestDriver.run()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	156	static OpenRouterTestDriver.dataCollection(_:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	167	OpenRouterTestDriver.TrainingRequests.record(_:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	179	static OpenRouterTestDriver.concurrentTrainingChecks(image:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	233	static OpenRouterTestDriver.claudeChecks(wire:image:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	261	row #1 (_:) in static OpenRouterTestDriver.claudeChecks(wire:image:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	361	static OpenRouterTestDriver.unmeasuredChecks(wire:image:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	366	row #1 (_:_:_:_:_:_:image:request:) in static OpenRouterTestDriver.unmeasuredChecks(wire:image:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	423	sent #1 (_:_:) in static OpenRouterTestDriver.unmeasuredChecks(wire:image:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	470	typed #1 (_:) in static OpenRouterTestDriver.unmeasuredChecks(wire:image:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	522	static OpenRouterTestDriver.disappearanceDuringOCR(model:image:listed:shorter:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	583	static OpenRouterTestDriver.segmentationChecks()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	642	kind #1 (_:_:) in static OpenRouterTestDriver.segmentationChecks()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	664	static OpenRouterTestDriver.makerChecks()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	771	static OpenRouterTestDriver.makerRequestChecks(wire:image:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	773	body #1 (_:_:) in static OpenRouterTestDriver.makerRequestChecks(wire:image:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	795	read #1 (_:_:status:) in static OpenRouterTestDriver.makerRequestChecks(wire:image:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	827	resolve #1 (_:) in static OpenRouterTestDriver.makerRequestChecks(wire:image:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	840	static OpenRouterTestDriver.catalogChecks()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	887	static OpenRouterTestDriver.requestChecks(_:route:ocr:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	938	static OpenRouterTestDriver.costChecks()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	967	static OpenRouterTestDriver.rotationVoteChecks()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	976	static OpenRouterTestDriver.makeImage()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OpenRouterTestDriver.swift	987	static OpenRouterTestDriver.finish()	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OutputFileSafety.swift	215	fail #1 () in static OutputFileSafety.copyExtendedAttributes(from:to:)	untested	Catalogue filing and copied source tags	-
+OCR/OutputMeasureTestDriver.swift	37	static OutputMeasureTestDriver.size(_:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/OutputMeasureTestDriver.swift	41	static OutputMeasureTestDriver.run(input:output:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+OCR/PageReaderLiveDriver.swift	24	static PageReaderLiveDriver.run(key:dir:)	unreachable	Probe and proof drivers outside the coverage set	-
+OCR/PageReaderLiveDriver.swift	74	static PageReaderLiveDriver.keyUsage(_:)	unreachable	Probe and proof drivers outside the coverage set	-
+OCR/PageReaders.swift	158	OpenAICompatibleClient.route.getter	untested	OpenRouter routes and listing refresh	-
+OCR/PageReaders.swift	178	OnDeviceModelClient.read(_:)	untested	macOS on-device model reader	-
+OCR/PaidBatchUITestFixture.swift	12	static PaidBatchUITestFixture.stateDirectory.getter	unreachable	UI-test fixtures in the app	-
+OCR/PaidBatchUITestFixture.swift	14	static PaidBatchUITestFixture.scratchLocations.getter	unreachable	UI-test fixtures in the app	-
+OCR/PaidRequests.swift	171	PaidRequests.BatchLinkFailure.errorDescription.getter	untested	Paid batch OCR clients	-
+OCR/ProcessorCatalogueFiling.swift	105	static ProcessorCatalogueFiling.copyExport(_:to:in:)	untested	Catalogue filing and copied source tags	-
+OCR/ProcessorCatalogueRecord.swift	184	static ProcessorCatalogueRecord.applySourceTags(_:document:file:)	untested	Catalogue filing and copied source tags	-
+OCR/ProcessorCatalogueRun.swift	183	ProcessorCatalogueRun.PreservationFilingError.errorDescription.getter	untested	Catalogue filing and copied source tags	-
+OCR/ResumeReviewGatesProbe.swift	31	ResumeReviewGatesProbe.Requests.add(_:)	unreachable	Probe and proof drivers outside the coverage set	-
+OCR/ResumeReviewGatesProbe.swift	32	ResumeReviewGatesProbe.Requests.urls.getter	unreachable	Probe and proof drivers outside the coverage set	-
+OCR/ResumeReviewGatesProbe.swift	35	static ResumeReviewGatesProbe.run()	unreachable	Probe and proof drivers outside the coverage set	-
+OCR/ResumeReviewGatesProbe.swift	52	static ResumeReviewGatesProbe.runCase(reviewWholeRun:)	unreachable	Probe and proof drivers outside the coverage set	-
+OCR/ResumeReviewGatesProbe.swift	164	static ResumeReviewGatesProbe.writeJPEG(_:shade:)	unreachable	Probe and proof drivers outside the coverage set	-
+OCR/ResumeReviewGatesProbe.swift	174	static ResumeReviewGatesProbe.writeFixturePDF(_:)	unreachable	Probe and proof drivers outside the coverage set	-
+OCR/ResumeReviewGatesProbe.swift	186	static ResumeReviewGatesProbe.finish(_:)	unreachable	Probe and proof drivers outside the coverage set	-
+OCR/SampleOCRTester.swift	15	static SampleOCRTester.run(account:key:)	untested	API keys: key checks, sample OCR and the Keychain explanation	-
+OCR/SampleOCRTester.swift	42	static SampleOCRTester.writeSampleImage()	untested	API keys: key checks, sample OCR and the Keychain explanation	-
+OCR/TextLayerTestDriver.swift	457	static TextLayerTestDriver.freshCatalogueChecks(dir:inputs:)	dead	Test drivers no run started (not a user feature)	n/a (this is test code; entered by env var from a script)
+ProcessorAppDelegate.swift	11	ProcessorAppDelegate.applicationWillTerminate(_:)	untested	Quitting the app	-
+ProcessorAppDelegate.swift	16	ProcessorAppDelegate.applicationShouldTerminate(_:)	untested	Quitting the app	-
+ReOCR/ImproveOCRHandoff.swift	107	static ImproveOCRHandoff.askForRoot(_:)	untested	Improve OCR: failures, reader choice and history	-
+ReOCR/ReOCRCatalogue.swift	58	ReOCRCatalogue.Outcome.problem.getter	untested	Improve OCR: failures, reader choice and history	-
+ReOCR/ReOCRDialogModel.swift	161	ReOCRDialogModel.choose(_:for:)	untested	Improve OCR: failures, reader choice and history	-
+ReOCR/ReOCRFileWriter.swift	91	ReOCRFileWriter.Failure.description.getter	untested	Improve OCR: failures, reader choice and history	-
+ReOCR/ReOCRHistory.swift	52	ReOCRHistory.Failure.description.getter	untested	Improve OCR: failures, reader choice and history	-
+ReOCR/ReOCRIncrementalWriter.swift	34	ReOCRIncrementalWriter.Failure.description.getter	untested	Improve OCR: failures, reader choice and history	-
+ReOCR/ReOCRIncrementalWriter.swift	299	failure #1 (_:) in static ReOCRIncrementalWriter.editLayer(_:in:index:)	untested	Improve OCR: failures, reader choice and history	-
+ReOCR/ReOCRJob.swift	86	ReOCRJob.Failure.description.getter	untested	Improve OCR: failures, reader choice and history	-
+ReOCR/ReOCRPairs.swift	27	ReOCRPairs.Refusal.description.getter	untested	Improve OCR: failures, reader choice and history	-
+Segmentation/LocalSegmenter.swift	48	static LocalSegmenter.baseURL(_:)	untested	Segmentation: approach, transports, ChatGPT sign-in and plan check	-
+Segmentation/LocalSegmenter.swift	53	static LocalSegmenter.modelID(_:)	untested	Segmentation: approach, transports, ChatGPT sign-in and plan check	-
+Segmentation/PlanUsage.swift	43	ClaudeStreamOutput.hasPlanEvidence.getter	untested	Local Agent CLI: Detect & Verify, plan usage	-
+Segmentation/RunSegmentation.swift	303	static WindowStageTransport.current(_:defaults:claudeBinary:claudeBilling:claudeRoute:gate:checkClaudeBilling:)	untested	Segmentation: approach, transports, ChatGPT sign-in and plan check	-
+Segmentation/SegmentationApproach.swift	22	SegmentationApproach.id.getter	untested	Picker labels and Identifiable ids	-
+Segmentation/SegmentationApproach.swift	190	SegmentationOptions.ModelCost.AnyKey.intValue.getter	unreachable	Required protocol stubs	-
+Segmentation/SegmentationApproach.swift	192	SegmentationOptions.ModelCost.AnyKey.init(intValue:)	unreachable	Required protocol stubs	-
+Segmentation/SegmentationApproach.swift	442	SegmentationOptionsError.errorDescription.getter	untested	Segmentation: approach, transports, ChatGPT sign-in and plan check	-
+Segmentation/SegmentationProofDriver.swift	60	static SegmentationProofDriver.truthNew(_:gap:)	unreachable	Probe and proof drivers outside the coverage set	-
+Segmentation/SegmentationProofDriver.swift	63	static SegmentationProofDriver.exactPages(predicted:truth:)	unreachable	Probe and proof drivers outside the coverage set	-
+Segmentation/SegmentationProofDriver.swift	64	spans #1 (_:) in static SegmentationProofDriver.exactPages(predicted:truth:)	unreachable	Probe and proof drivers outside the coverage set	-
+Segmentation/SegmentationProofDriver.swift	85	SegmentationProofDriver.Meter.add(_:input:output:)	unreachable	Probe and proof drivers outside the coverage set	-
+Segmentation/SegmentationProofDriver.swift	92	SegmentationProofDriver.Meter.snapshot.getter	unreachable	Probe and proof drivers outside the coverage set	-
+Segmentation/SegmentationProofDriver.swift	104	SegmentationProofDriver.Meter.addProvider(_:)	unreachable	Probe and proof drivers outside the coverage set	-
+Segmentation/SegmentationProofDriver.swift	106	SegmentationProofDriver.Meter.servedProviders.getter	unreachable	Probe and proof drivers outside the coverage set	-
+Segmentation/SegmentationProofDriver.swift	108	SegmentationProofDriver.Meter.http.getter	unreachable	Probe and proof drivers outside the coverage set	-
+Segmentation/SegmentationProofDriver.swift	152	static SegmentationProofDriver.run()	unreachable	Probe and proof drivers outside the coverage set	-
+Segmentation/SegmentationProofDriver.swift	188	static SegmentationProofDriver.prove(manifest:approach:route:name:keys:claude:)	unreachable	Probe and proof drivers outside the coverage set	-
+Segmentation/SegmentationProofDriver.swift	353	static SegmentationProofDriver.finish()	unreachable	Probe and proof drivers outside the coverage set	-
+Segmentation/WindowTransports.swift	103	image #1 (_:) in static APIWindowTransport.request(_:key:)	untested	Segmentation: approach, transports, ChatGPT sign-in and plan check	-
+Segmentation/WindowTransports.swift	339	OpenRouterClaudeWindowTransport.send(_:)	untested	Segmentation: approach, transports, ChatGPT sign-in and plan check	-
+Settings/PaidRequestJournal.swift	151	PaidRequestJournal.failure()	untested	Paid batch OCR clients	-
+Settings/SettingsInterviews.swift	59	static MacInventory.keyLabel(_:)	untested	Settings, dates and post-correction helpers	-
+Settings/SettingsSheetModel.swift	1000	static SettingsSheetModel.handDownloadNote.getter	untested	Settings, dates and post-correction helpers	-
+Settings/SettingsSheetModel.swift	1235	SettingsSheetWords.pace(_:unit:)	untested	Settings, dates and post-correction helpers	-
+Tagging/CollectionSegmenter.swift	32	CollectionSegmenter.segment(files:classifications:texts:provider:model:thinkingLevel:apiKey:gatewayConfig:localAgent:onStatus:)	untested	LLM classification and collection naming per provider	-
+Tagging/CollectionSegmenter.swift	122	CollectionSegmenter.extractCollectionName(from:provider:model:thinkingLevel:apiKey:gatewayConfig:localAgent:)	untested	LLM classification and collection naming per provider	-
+Tagging/CollectionSegmenter.swift	175	CollectionSegmenter.clusterCollectionNames(_:provider:model:thinkingLevel:apiKey:gatewayConfig:localAgent:)	untested	LLM classification and collection naming per provider	-
+Tagging/CollectionSegmenter.swift	212	CollectionSegmenter.parseClusterResponse(_:names:)	untested	LLM classification and collection naming per provider	-
+Tagging/CollectionSegmenter.swift	239	CollectionSegmenter.fallbackCluster(_:)	untested	LLM classification and collection naming per provider	-
+Tagging/CollectionSegmenter.swift	259	static CollectionSegmenter.normalizeCollectionName(_:)	untested	LLM classification and collection naming per provider	-
+Tagging/CollectionSegmenter.swift	519	CollectionSegmenter.callLLM(prompt:provider:model:thinkingLevel:apiKey:gatewayConfig:localAgent:)	untested	LLM classification and collection naming per provider	-
+Tagging/DateRoute.swift	148	static DateRoute.dayFirstSetting(_:)	untested	Settings, dates and post-correction helpers	-
+Tagging/MacOSTagger.swift	180	static MacOSTagger.applyTags(_:to:stampUnread:)	dead	Dead code	-
+Tagging/SystemTagsProvider.swift	145	SystemTagsProvider.suggestions(prefix:excluding:limit:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Tagging/SystemTagsProvider.swift	150	SystemTagsProvider.spelling(of:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Tagging/SystemTagsProvider.swift	157	SystemTagsProvider.register(_:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/BoxFolderConfirmSheet.swift	10	BoxFolderConfirmSheet.boxCount.getter	untested	Segmentation and tagging: collection names and box and folder confirmation	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/BoxFolderConfirmSheet.swift	13	BoxFolderConfirmSheet.folderCount.getter	untested	Segmentation and tagging: collection names and box and folder confirmation	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/BoxFolderConfirmSheet.swift	17	BoxFolderConfirmSheet.body.getter	untested	Segmentation and tagging: collection names and box and folder confirmation	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/BoxFolderConfirmSheet.swift	71	BoxFolderConfirmRow.rowBackground.getter	untested	Segmentation and tagging: collection names and box and folder confirmation	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/BoxFolderConfirmSheet.swift	79	BoxFolderConfirmRow.body.getter	untested	Segmentation and tagging: collection names and box and folder confirmation	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/ChatGPTPlanControls.swift	89	ChatGPTPlanControls.refreshAccountState()	untested	Segmentation: approach, transports, ChatGPT sign-in and plan check	ProcessorUITests.testSegmentationChooserOffersEachApproachAndTheSheetShowsTheFigures
+Views/ChatGPTPlanControls.swift	94	ChatGPTPlanControls.signIn()	untested	Segmentation: approach, transports, ChatGPT sign-in and plan check	-
+Views/ContainerBackfillSheet.swift	236	ContainerBackfillSheet.warningLine(_:)	untested	Container label backfill (Tools)	ProcessorUITests.testBackfillWritesOnlyTheAcceptedFolder
+Views/ContainerBackfillSheet.swift	264	ContainerBackfillSheet.chooseFolder()	untested	Container label backfill (Tools)	-
+Views/ContainerLabelCard.swift	127	ContainerLabelCard.save()	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/ContainerLevelsSheet.swift	91	ContainerLevelsSheet.skippedRows.getter	untested	Adding files: real drops, repeated intake and folder checks	MessageJourneyUITests.testTreeLevelsCanBeEditedAndSavedBeforeFiling
+Views/DropReceiver.swift	27	DropReceiverView.draggingEntered(_:)	untested	Adding files: real drops, repeated intake and folder checks	-
+Views/DropReceiver.swift	32	DropReceiverView.draggingExited(_:)	untested	Adding files: real drops, repeated intake and folder checks	-
+Views/DropReceiver.swift	36	DropReceiverView.prepareForDragOperation(_:)	untested	Adding files: real drops, repeated intake and folder checks	-
+Views/DropReceiver.swift	40	DropReceiverView.performDragOperation(_:)	untested	Adding files: real drops, repeated intake and folder checks	-
+Views/GeneralInterviewView.swift	284	GeneralInterviewView.checkClaude()	untested	First-start and collection interviews, presets, folder scope	-
+Views/GeneralInterviewView.swift	303	GeneralInterviewView.save()	untested	First-start and collection interviews, presets, folder scope	-
+Views/GeneralInterviewView.swift	326	MacInventory.keepingClaudeCheck(of:)	untested	First-start and collection interviews, presets, folder scope	-
+Views/HandPlacerDownloadRow.swift	23	HandPlacerDownload.start()	untested	OCR: newspaper and hand-placer helper downloads	-
+Views/HandPlacerDownloadRow.swift	44	HandPlacerDownload.cancel()	untested	OCR: newspaper and hand-placer helper downloads	-
+Views/HandPlacerDownloadRow.swift	46	HandPlacerDownload.finish(_:)	untested	OCR: newspaper and hand-placer helper downloads	-
+Views/ImproveOCRView.swift	221	ImproveOCRController.connectSupport()	untested	Improve OCR: failures, reader choice and history	ProcessorUITests.testImproveOCRRunsAndAccepts
+Views/ImproveOCRView.swift	241	ImproveOCRController.choose(_:for:)	untested	Improve OCR: failures, reader choice and history	ProcessorUITests.testImproveOCRRunsAndAccepts
+Views/ImproveOCRView.swift	544	ImproveOCRHistoryView.remove(_:)	untested	Improve OCR: failures, reader choice and history	-
+Views/ImproveOCRView.swift	794	Result<>.failureDescription.getter	untested	Improve OCR: failures, reader choice and history	ProcessorUITests.testImproveOCRRunsAndAccepts
+Views/KeyboardTokenField.swift	58	KeyboardTokenField.Coordinator.controlTextDidChange(_:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/KeyboardTokenField.swift	63	KeyboardTokenField.Coordinator.control(_:textView:doCommandBy:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/LiveCaptureView.swift	189	LiveCaptureView.performSegmentAction(_:on:)	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	802	static LiveCaptureView.swatch(_:)	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	ProcessorUITests.testFinishingScrimBlocksLiveCaptureKeyboardAndAccessibilityRoutes
+Views/LiveCaptureView.swift	851	LiveCaptureView.chooseOutputFolder()	untested	Live Capture control panel: backup folder and output folder	-
+Views/LiveCaptureView.swift	1237	SegmentTagCard.recompute()	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	1243	SegmentTagCard.moveHighlight(_:)	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	1252	SegmentTagCard.commit(_:)	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	1261	SegmentTagCard.returnCandidate()	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	1268	SegmentTagCard.tabCandidate()	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	1275	SegmentTagCard.onReturn()	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	1280	SegmentTagCard.onTab()	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	1285	SegmentTagCard.deletePrevious()	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	1291	SegmentTagCard.onEscape()	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	1308	SegmentTagCard.skip()	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	1364	LiveRotationReviewSheet.body.getter	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	1432	LiveRotationReviewSheet.rotate(_:)	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	1444	LiveRotationRow.body.getter	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LiveCaptureView.swift	1590	SegmentTextViewerSheet.body.getter	untested	Live Capture processing: page OCR, tag card, rotation review, text viewer	-
+Views/LocalAgentWizard.swift	24	LocalAgentWizard.selected.getter	untested	OCR: models, custom models, gateway and the Local Agent wizard	ProcessorUITests.testLocalAgentSettingsAndFilesShowSubscriptionCostAndGuidedSetup
+Views/LocalAgentWizard.swift	26	LocalAgentWizard.body.getter	untested	OCR: models, custom models, gateway and the Local Agent wizard	ProcessorUITests.testLocalAgentSettingsAndFilesShowSubscriptionCostAndGuidedSetup
+Views/LocalAgentWizard.swift	67	LocalAgentStep.body.getter	untested	OCR: models, custom models, gateway and the Local Agent wizard	ProcessorUITests.testLocalAgentSettingsAndFilesShowSubscriptionCostAndGuidedSetup
+Views/LocalAgentWizard.swift	127	LocalAgentStep.noteRow(_:_:identifier:)	untested	OCR: models, custom models, gateway and the Local Agent wizard	ProcessorUITests.testLocalAgentSettingsAndFilesShowSubscriptionCostAndGuidedSetup
+Views/LocalAgentWizard.swift	136	LocalAgentStep.detectAndVerify()	untested	Local Agent CLI: Detect & Verify, plan usage	-
+Views/LocalAgentWizard.swift	156	LocalAgentStep.statusView(_:)	untested	OCR: models, custom models, gateway and the Local Agent wizard	ProcessorUITests.testLocalAgentSettingsAndFilesShowSubscriptionCostAndGuidedSetup
+Views/ManageModelsView.swift	8	ManageModelsView.body.getter	untested	OCR: models, custom models, gateway and the Local Agent wizard	VisualReviewUITests [gated: flag file]
+Views/ManageModelsView.swift	92	ManageModelsView.groupedByProvider.getter	untested	OCR: models, custom models, gateway and the Local Agent wizard	VisualReviewUITests [gated: flag file]
+Views/ManageModelsView.swift	113	AddModelView.availableProviders.getter	untested	OCR: models, custom models, gateway and the Local Agent wizard	VisualReviewUITests [gated: flag file]
+Views/ManageModelsView.swift	115	AddModelView.body.getter	untested	OCR: models, custom models, gateway and the Local Agent wizard	VisualReviewUITests [gated: flag file]
+Views/ManageModelsView.swift	172	AddModelView.addModel()	untested	OCR: models, custom models, gateway and the Local Agent wizard	-
+Views/ManualSegmentTagView.swift	8	confirmDiscardRun(_:discard:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualSegmentTagView.swift	253	ManualSegmentTagView.glyph(_:_:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	ProcessorUITests.testManualSegmentCardTypesOneDateWithSentWithBelow; ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/ManualSegmentTagView.swift	297	ManualSegmentTagView.quickLookOverlay(_:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualSegmentTagView.swift	452	ManualSegTagCard.recompute()	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualSegmentTagView.swift	458	ManualSegTagCard.moveHighlight(_:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualSegmentTagView.swift	464	ManualSegTagCard.commit(_:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualSegmentTagView.swift	472	ManualSegTagCard.returnCandidate()	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualSegmentTagView.swift	478	ManualSegTagCard.tabCandidate()	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualSegmentTagView.swift	485	ManualSegTagCard.onReturn()	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualSegmentTagView.swift	490	ManualSegTagCard.onTab()	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualSegmentTagView.swift	495	ManualSegTagCard.deletePrevious()	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualSegmentTagView.swift	501	ManualSegTagCard.onEscape()	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualTaggingSheet.swift	17	ManualTaggingSheet.count.getter	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualTaggingSheet.swift	18	ManualTaggingSheet.isLast.getter	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualTaggingSheet.swift	21	ManualTaggingSheet.currentDatesValid.getter	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualTaggingSheet.swift	25	ManualTaggingSheet.currentImages.getter	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualTaggingSheet.swift	30	ManualTaggingSheet.body.getter	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualTaggingSheet.swift	101	ManualTaggingSheet.moveFocusedImage(_:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualTaggingSheet.swift	107	ManualTaggingSheet.quickLookOverlay.getter	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualTaggingSheet.swift	130	ManualTagSegmentView.body.getter	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ManualTaggingSheet.swift	233	ManualTagSegmentView.imageBorder(img:focused:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/NewspaperLayoutDownloadRow.swift	37	NewspaperLayoutDownload.start()	untested	OCR: newspaper and hand-placer helper downloads	-
+Views/NewspaperLayoutDownloadRow.swift	58	NewspaperLayoutDownload.cancel()	untested	OCR: newspaper and hand-placer helper downloads	-
+Views/NewspaperLayoutDownloadRow.swift	60	NewspaperLayoutDownload.finish(_:)	untested	OCR: newspaper and hand-placer helper downloads	-
+Views/OCRView+CollectionReviewSheet.swift	11	CollectionReviewSheet.hasBoxes.getter	untested	Segmentation and tagging: collection names and box and folder confirmation	ReviewDialogsJourneyUITests.testCollectionNameConfirmedByClick [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+CollectionReviewSheet.swift	15	CollectionReviewSheet.body.getter	untested	Segmentation and tagging: collection names and box and folder confirmation	ReviewDialogsJourneyUITests.testCollectionNameConfirmedByClick [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+CollectionReviewSheet.swift	99	CollectionNameField.body.getter	untested	Segmentation and tagging: collection names and box and folder confirmation	ReviewDialogsJourneyUITests.testCollectionNameConfirmedByClick [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+CollectionReviewSheet.swift	122	CollectionReviewRow.body.getter	untested	Segmentation and tagging: collection names and box and folder confirmation	ReviewDialogsJourneyUITests.testCollectionNameConfirmedByClick [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+CollectionReviewSheet.swift	158	CollectionReviewRow.thumbnail.getter	untested	Segmentation and tagging: collection names and box and folder confirmation	ReviewDialogsJourneyUITests.testCollectionNameConfirmedByClick [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+CollectionReviewSheet.swift	181	static CollectionReviewRow.loadThumbnailAsync(url:maxSize:rotationDegrees:)	untested	Segmentation and tagging: collection names and box and folder confirmation	ReviewDialogsJourneyUITests.testCollectionNameConfirmedByClick [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+DocumentSegmentReviewSheet.swift	17	DocumentSegmentReviewSheet.showDocClasses.getter	untested	Segmentation and tagging: page review and the Reclassify sheet	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+DocumentSegmentReviewSheet.swift	19	DocumentSegmentReviewSheet.rotationOnly.getter	untested	Segmentation and tagging: page review and the Reclassify sheet	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+DocumentSegmentReviewSheet.swift	21	DocumentSegmentReviewSheet.removedCount.getter	untested	Segmentation and tagging: page review and the Reclassify sheet	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+DocumentSegmentReviewSheet.swift	25	DocumentSegmentReviewSheet.footerSummary.getter	untested	Segmentation and tagging: page review and the Reclassify sheet	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+DocumentSegmentReviewSheet.swift	50	DocumentSegmentReviewSheet.body.getter	untested	Segmentation and tagging: page review and the Reclassify sheet	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+DocumentSegmentReviewSheet.swift	241	DocumentReviewRow.rowBackground.getter	untested	Segmentation and tagging: page review and the Reclassify sheet	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+DocumentSegmentReviewSheet.swift	255	DocumentReviewRow.body.getter	untested	Segmentation and tagging: page review and the Reclassify sheet	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+DocumentSegmentReviewSheet.swift	344	DocumentReviewRow.rotationRadio(label:degrees:)	untested	Segmentation and tagging: page review and the Reclassify sheet	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+DocumentSegmentReviewSheet.swift	361	DocumentReviewRow.thumbnail.getter	untested	Segmentation and tagging: page review and the Reclassify sheet	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+DocumentSegmentReviewSheet.swift	387	static DocumentReviewRow.loadThumbnailAsync(url:maxSize:)	untested	Segmentation and tagging: page review and the Reclassify sheet	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+DocumentSegmentReviewSheet.swift	395	DocumentReviewRow.radioButton(label:selected:color:action:)	untested	Segmentation and tagging: page review and the Reclassify sheet	ReviewDialogsJourneyUITests.testReviewDialogsByHand [gated: PROCESSOR_JOURNEY=reviews]
+Views/OCRView+FileRowView.swift	134	FileTextViewerSheet.body.getter	untested	Output: Files-pane row actions and the text viewer	-
+Views/OCRView+InstitutionalCompute.swift	59	static InstitutionalComputeImportControl.models(_:)	untested	OCR: institutional computing import, retry dialog and rotation retry	ProcessorUITests.testInstitutionalComputingImportOffersNeutralFolderChooser
+Views/OCRView+InstitutionalCompute.swift	68	InstitutionalComputeImportControl.choose()	untested	OCR: institutional computing import, retry dialog and rotation retry	ProcessorUITests.testInstitutionalComputingImportOffersNeutralFolderChooser
+Views/OCRView+ModelTestResultsSheet.swift	19	ModelTestResultsSheet.baselineResult.getter	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+ModelTestResultsSheet.swift	25	ModelTestResultsSheet.body.getter	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+ModelTestResultsSheet.swift	93	ModelTestResultsSheet.modelResultColumn(entry:index:)	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+ModelTestResultsSheet.swift	196	ModelTestResultsSheet.similarityBadge(_:)	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+ModelTestResultsSheet.swift	211	ModelTestResultsSheet.formatCost(_:)	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+ResolutionDropSheet.swift	16	ResolutionDropSheet.body.getter	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+ResolutionTestSheet.swift	18	ResolutionTestSheet.baselineText.getter	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+ResolutionTestSheet.swift	22	ResolutionTestSheet.body.getter	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+ResolutionTestSheet.swift	91	ResolutionTestSheet.resolutionColumn(scale:text:index:)	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+ResolutionTestSheet.swift	162	ResolutionTestSheet.similarityBadge(_:)	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+ResolutionTestSheet.swift	177	ResolutionTestSheet.diffHighlightedText(_:)	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+SegmentationEditSheet.swift	16	SegmentationEditSheet.body.getter	untested	Segmentation and tagging: page review and the Reclassify sheet	-
+Views/OCRView+WordDiff.swift	26	static WordDiff.tokenize(_:)	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+WordDiff.swift	47	static WordDiff.words(from:)	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+WordDiff.swift	52	static WordDiff.lcs(_:_:)	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+WordDiff.swift	86	static WordDiff.diff(baseline:candidate:)	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView+WordDiff.swift	186	static WordDiff.buildAttributedString(from:)	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/OCRView.swift	201	OCRView.FileRotationRetryTarget.id.getter	untested	Output: Files-pane row actions and the text viewer	-
+Views/OCRView.swift	205	OCRView.FileTextViewerTarget.id.getter	untested	Output: Files-pane row actions and the text viewer	-
+Views/OCRView.swift	331	OCRView.reportUnreadableAPIKey()	untested	API keys: key checks, sample OCR and the Keychain explanation	-
+Views/OCRView.swift	1427	OCRView.reviewJobIndex(for:)	untested	Output: Files-pane row actions and the text viewer	-
+Views/OCRView.swift	1540	OCRView.performFileAction(_:on:)	untested	Output: Files-pane row actions and the text viewer	-
+Views/OCRView.swift	1595	OCRView.collectionSummary.getter	untested	Segmentation and tagging: collection names and box and folder confirmation	-
+Views/OCRView.swift	1619	OCRView.keychainExplanationSheet.getter	untested	API keys: key checks, sample OCR and the Keychain explanation	-
+Views/OCRView.swift	1672	OCRView.keychainInfoRow(icon:title:detail:)	untested	API keys: key checks, sample OCR and the Keychain explanation	-
+Views/OCRView.swift	1731	static OCRView.repeatedIntakeNote(_:)	untested	Adding files: real drops, repeated intake and folder checks	NamesEstimateJourneyUITests.testRepeatedAddListsThePhotoOnce [gated: PROCESSOR_JOURNEY=namesestimate]
+Views/OCRView.swift	1821	OCRView.resumePendingBatch()	untested	Resuming an interrupted run: batch and mixed PDF	MoneyJourneyUITests.testStageForLaterResumesAnIncompleteRunWithoutReadingCompletedPagesAgain; ReviewDialogsJourneyUITests.testOrdinaryResumeReviewGates [gated]
+Views/OCRView.swift	1870	OCRView.resumePendingMixedPDF(readWithoutClusterText:)	untested	Resuming an interrupted run: batch and mixed PDF	MoneyJourneyUITests.testStageForLaterResumesAnIncompleteRunWithoutReadingCompletedPagesAgain; ReviewDialogsJourneyUITests.testOrdinaryResumeReviewGates [gated]
+Views/ProcessingCommands.swift	64	static ProviderCycler.advance()	untested	Menu commands and shortcuts	-
+Views/ProcessingHistoryView.swift	51	ProcessingHistoryView.emptyState.getter	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/ProviderKeyWizard.swift	236	ProviderKeyStep.testOCR()	untested	API keys: key checks, sample OCR and the Keychain explanation	-
+Views/SegmentationChooserView.swift	144	static SegmentationChooserView.keySpec(_:)	untested	Segmentation: approach, transports, ChatGPT sign-in and plan check	ProcessorUITests.testSegmentationChooserOffersEachApproachAndTheSheetShowsTheFigures
+Views/Settings/SettingsAccountsTab.swift	146	SettingsAccountsTab.runLocalAgentDetectVerify()	untested	Local Agent CLI: Detect & Verify, plan usage	-
+Views/Settings/SettingsAdvancedTab.swift	51	SettingsAdvancedTab.picks.getter	untested	Settings window and its tabs	SettingsTabsUITests.testFiveTabsInTheDesignsOrderEachWithItsControls
+Views/Settings/SettingsAdvancedTab.swift	52	SettingsAdvancedTab.pick.getter	untested	Settings window and its tabs	SettingsTabsUITests.testFiveTabsInTheDesignsOrderEachWithItsControls
+Views/Settings/SettingsAdvancedTab.swift	214	SettingsAdvancedTab.localServerRows.getter	untested	OCR: models, custom models, gateway and the Local Agent wizard	SettingsTabsUITests.testFiveTabsInTheDesignsOrderEachWithItsControls
+Views/Settings/SettingsAdvancedTab.swift	383	SettingsAdvancedTab.fillLocalServer()	untested	OCR: models, custom models, gateway and the Local Agent wizard	-
+Views/Settings/SettingsAdvancedTab.swift	393	SettingsAdvancedTab.checkLocalServer()	untested	OCR: models, custom models, gateway and the Local Agent wizard	-
+Views/Settings/SettingsAdvancedTab.swift	464	LocalSegmenterControls.check()	untested	OCR: models, custom models, gateway and the Local Agent wizard	-
+Views/Settings/SettingsAdvisorSheet.swift	208	SettingsAdvisorSheet.inheritedResolver.getter	untested	First-start and collection interviews, presets, folder scope	ProcessorUITests.testCollectionInterviewOpensFromSettings
+Views/Settings/SettingsAdvisorSheet.swift	238	SettingsAdvisorSheet.derives<A>(_:_:)	untested	First-start and collection interviews, presets, folder scope	ProcessorUITests.testCollectionInterviewOpensFromSettings
+Views/Settings/SettingsAdvisorSheet.swift	321	SettingsAdvisorSheet.generalLimitWords.getter	untested	First-start and collection interviews, presets, folder scope	ProcessorUITests.testCollectionInterviewOpensFromSettings
+Views/Settings/SettingsAdvisorSheet.swift	382	SettingsAdvisorSheet.sharesRows.getter	untested	First-start and collection interviews, presets, folder scope	ProcessorUITests.testCollectionInterviewOpensFromSettings
+Views/Settings/SettingsAdvisorSheet.swift	399	SettingsAdvisorSheet.percentRow(_:id:note:value:)	untested	First-start and collection interviews, presets, folder scope	ProcessorUITests.testCollectionInterviewOpensFromSettings
+Views/Settings/SettingsAdvisorSheet.swift	412	SettingsAdvisorSheet.moreRows.getter	untested	First-start and collection interviews, presets, folder scope	ProcessorUITests.testCollectionInterviewOpensFromSettings
+Views/Settings/SettingsAdvisorSheet.swift	498	SettingsAdvisorSheet.languageSummary.getter	untested	First-start and collection interviews, presets, folder scope	ProcessorUITests.testCollectionInterviewOpensFromSettings
+Views/Settings/SettingsAdvisorSheet.swift	503	SettingsAdvisorSheet.scriptSummary.getter	untested	First-start and collection interviews, presets, folder scope	ProcessorUITests.testCollectionInterviewOpensFromSettings
+Views/Settings/SettingsAdvisorSheet.swift	511	SettingsAdvisorSheet.judgedOnText.getter	untested	First-start and collection interviews, presets, folder scope	ProcessorUITests.testCollectionInterviewOpensFromSettings
+Views/Settings/SettingsAdvisorSheet.swift	561	SettingsAdvisorSheet.chooseFiles()	untested	First-start and collection interviews, presets, folder scope	-
+Views/Settings/SettingsAdvisorSheet.swift	746	AdvisorStageRow.details.getter	untested	First-start and collection interviews, presets, folder scope	ProcessorUITests.testCollectionInterviewOpensFromSettings
+Views/Settings/SettingsAdvisorSheet.swift	774	AdvisorStageRow.handbook.getter	untested	First-start and collection interviews, presets, folder scope	ProcessorUITests.testCollectionInterviewOpensFromSettings
+Views/Settings/SettingsCaptureTab.swift	102	SettingsCaptureTab.signInToDrive()	untested	Google Drive relay and sign-in, Mac side	-
+Views/Settings/SettingsCaptureTab.swift	124	SettingsCaptureTab.signOutDrive()	untested	Google Drive relay and sign-in, Mac side	-
+Views/Settings/SettingsEstimateFooter.swift	45	SettingsEstimateFooter.segmentationPlan.getter	untested	Settings window and its tabs	ProcessorUITests.testLocalAgentSettingsAndFilesShowAPIKeyCost; SettingsTabsUITests.testFiveTabsInTheDesignsOrderEachWithItsControls
+Views/Settings/SettingsEstimateFooter.swift	178	SettingsEstimateFooter.details.getter	untested	Settings window and its tabs	ProcessorUITests.testLocalAgentSettingsAndFilesShowAPIKeyCost; SettingsTabsUITests.testFiveTabsInTheDesignsOrderEachWithItsControls
+Views/Settings/SettingsEstimateFooter.swift	210	SettingsEstimateFooter.costRow(_:_:)	untested	Settings window and its tabs	ProcessorUITests.testLocalAgentSettingsAndFilesShowAPIKeyCost; SettingsTabsUITests.testFiveTabsInTheDesignsOrderEachWithItsControls
+Views/Settings/SettingsOutputTab.swift	223	TagVocabularySheet.body.getter	untested	Output: Tag Vocabulary sheet	-
+Views/Settings/SettingsOutputTab.swift	244	TagVocabularySheet.importCSV()	untested	Output: Tag Vocabulary sheet	-
+Views/Settings/SettingsOutputTab.swift	254	TagVocabularySheet.loadFromDrop(_:)	untested	Output: Tag Vocabulary sheet	-
+Views/Settings/SettingsOutputTab.swift	264	TagVocabularySheet.load(from:)	untested	Output: Tag Vocabulary sheet	-
+Views/Settings/SettingsPresets.swift	73	static WorkflowPreset.remoteGateway(_:)	untested	First-start and collection interviews, presets, folder scope	SettingsTabsUITests.testFastAndFreePresetChoosesAppleVision
+Views/Settings/SettingsProcessingTab.swift	315	SettingsProcessingTab.batchCeiling.getter	untested	Settings window and its tabs	MoneyJourneyUITests.testMonthlyLimitRefusesProviderBatchBeforeSubmission
+Views/SettingsView.swift	56	Handbook.Section.url.getter	untested	Settings window and its tabs	SettingsTabsUITests.testAdvancedSettingInUseIsNamedOnProcessing
+Views/Shared/ModelChoiceView.swift	17	RotationRetrySheet.init(title:subtitle:backendDescription:initialRotation:onApply:onCancel:)	untested	OCR: institutional computing import, retry dialog and rotation retry	-
+Views/Shared/ModelChoiceView.swift	26	RotationRetrySheet.body.getter	untested	OCR: institutional computing import, retry dialog and rotation retry	-
+Views/Shared/ProcessableItem.swift	39	FailureKind.label.getter	untested	Output: Files-pane row actions and the text viewer	ProcessorUITests.testFilesHeaderStaysAboveTheScrolledList; ProcessorUITests.testLiveFinishWithDriveReceiverUnavailable
+Views/Shared/ProcessableItem.swift	59	ItemAction.label.getter	untested	Output: Files-pane row actions and the text viewer	ProcessorUITests.testFilesHeaderStaysAboveTheScrolledList; ProcessorUITests.testLiveFinishWithDriveReceiverUnavailable
+Views/Shared/ProcessableItem.swift	70	ItemAction.systemImage.getter	untested	Output: Files-pane row actions and the text viewer	ProcessorUITests.testFilesHeaderStaysAboveTheScrolledList; ProcessorUITests.testLiveFinishWithDriveReceiverUnavailable
+Views/Shared/ProcessableItem.swift	102	ProcessableItem.id.getter	untested	Output: Files-pane row actions and the text viewer	ProcessorUITests.testFilesHeaderStaysAboveTheScrolledList; ProcessorUITests.testLiveFinishWithDriveReceiverUnavailable
+Views/Shared/ProcessableItemRow.swift	60	ItemActionHandler.perform(_:on:)	untested	Output: Files-pane row actions and the text viewer	-
+Views/Shared/ProcessableItemRow.swift	176	ProcessableItemRow.expandedDetail.getter	untested	Output: Files-pane row actions and the text viewer	ProcessorUITests.testFilesHeaderStaysAboveTheScrolledList; ProcessorUITests.testLiveFinishWithDriveReceiverUnavailable
+Views/TagInputField.swift	14	TagInputField.suggestions.getter	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/TagInputField.swift	19	TagInputField.body.getter	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/TagInputField.swift	69	TagInputField.commit(_:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/TagInputField.swift	77	TagInputField.remove(_:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/TagInputField.swift	86	TagChip.body.getter	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ToolsView.swift	29	ToolsView.selectedModel.getter	untested	Tools: Compare Models results, Test Resolution, Processing History	ProcessorUITests.testCompareModelsCountsTickedModelsWithoutKeys
+Views/ToolsView.swift	56	ToolsView.currentLocalAgentConfig.getter	untested	Tools: Compare Models results, Test Resolution, Processing History	ProcessorUITests.testCompareModelsCountsTickedModelsWithoutKeys
+Views/ToolsView.swift	225	ToolsView.runResolutionTest(imageURL:)	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/ToolsView.swift	254	ToolsView.runModelTest(imageURL:)	untested	Tools: Compare Models results, Test Resolution, Processing History	-
+Views/ZoomableImageView.swift	99	ZoomableImageView.stopMonitor()	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ZoomableImageView.swift	147	PanState.reclamp(zoom:fit:viewport:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	ProcessorUITests.testManualSegmentCardTypesOneDateWithSentWithBelow
+Views/ZoomableImageView.swift	154	PanState.setOffset(width:height:)	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-
+Views/ZoomableImageView.swift	155	PanState.commit()	untested	Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete	-

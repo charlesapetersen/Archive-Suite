@@ -1266,6 +1266,64 @@ cover the Mac: the receiver, the tag card, the drain gate, staging, finalize and
   - 2026-10-30 W48.appearance-processor — builder's VM runs green (AppearanceSettingUITests 2/2, whole suite 0 failures, the BySetting audit and tours); still `unproven` until W48.appearance-verify.
   - 2026-11-04 W48.appearance-verify — re-checked at HEAD in the VM by a session that did not build it: every promise holds, Light and Dark, by setting, with System seen under a Light and a Dark guest; the History sheet, the relaunch and the argument; audits and both tours pass. `works`: [`evidence/processor/W48.appearance-verify.md`](evidence/processor/W48.appearance-verify.md).
 
+## Never-executed code (W40.e4)
+
+`W40.e4` ran the Processor's 55 key-free drivers and its UI tests in the VM with code coverage, plus ArchiveCore's unit tests and the Reader and Notes runs, and listed every Processor function no run executed: **508 of 4,598** (9,195 of 87,534 executable lines). Each group below is a question for this ledger, not a status change: **dead** (no caller: delete it?), **unreachable** (callers, but no path a user takes: wire it or drop it?), **untested** (a user reaches it, no test does: which test should?). Function lists, callers and the full question for each group: [`evidence/processor/W40.e4-never-reached.md`](evidence/processor/W40.e4-never-reached.md) (`.tsv` beside it); the run table: [`evidence/core/W40.e4-coverage.md`](evidence/core/W40.e4-coverage.md).
+
+Caveat: the gated journeys (`PROCESSOR_JOURNEY=reviews`, `livecapture`, `bulkocr`) and `VisualReviewUITests` were skipped, so their rows stay listed. Seven drivers failed partway on known main defects, and ten UI tests failed under coverage (four `ProcessorUITests` in the last run, the four accessibility audits, `testBackfillWritesOnlyTheAcceptedFolder` and `testCollectionInterviewWaitsForPickerIntake`); rows after a failure point may be unreached for that reason, chiefly in the backfill, institutional import, Settings tabs, interview and Local Agent wizard groups. "Untested" means no run in the union executed the function, not that no test exists. 66 dead (61 of them inside test drivers no run started), 30 unreachable (DEBUG fixtures, CI transports, env-gated probes and required stubs), 412 untested.
+
+| Group | Class | Rows | Ledger row |
+|---|---|---|---|
+| Live Capture session: phone connection, unpair and listener failure | untested | 4 | P-43, P-44, P-51 |
+| LAN receiver: request bodies and port fallback | untested | 3 | P-44 |
+| USB tunnel: re-pair | untested | 1 | P-45 |
+| Google Drive relay and sign-in, Mac side | untested | 50 | P-46 |
+| Offline file relay (CI transport) | unreachable | 3 | P-46 |
+| Live Capture headless finish autopilot | unreachable | 2 | P-48 |
+| Live Capture control panel: backup folder and output folder | untested | 2 | P-49, P-50 |
+| Live Capture processing: page OCR, tag card, rotation review, text viewer | untested | 21 | P-47, P-48, P-51 |
+| Container label backfill (Tools) | untested | 12 | no row |
+| Label reader download and local model supervisor | untested | 7 | no row |
+| HTTP redirect refusal | untested | 2 | no row |
+| Keychain storage | untested | 5 | P-05 |
+| API keys: key checks, sample OCR and the Keychain explanation | untested | 11 | P-04, P-05 |
+| Local Agent CLI: Detect & Verify, plan usage | untested | 9 | P-10 |
+| Segmentation: approach, transports, ChatGPT sign-in and plan check | untested | 13 | P-30, P-32 |
+| Paid batch OCR clients | untested | 12 | P-19 |
+| LLM classification and collection naming per provider | untested | 17 | P-29, P-39 |
+| Sequential OCR with the previous page | untested | 1 | P-18 |
+| Review steps in the processor: collections, document review, rotation, tagging | untested | 11 | P-25, P-32, P-37, P-40 |
+| Segmentation and tagging: collection names and box and folder confirmation | untested | 12 | P-39, P-40 |
+| Segmentation and tagging: page review and the Reclassify sheet | untested | 12 | P-32 |
+| Segmentation and tagging: manual tagging, Segment & Tag, tag autocomplete | untested | 43 | P-38, P-47 |
+| OCR: institutional computing import, retry dialog and rotation retry | untested | 7 | P-15, P-20 |
+| Resuming an interrupted run: batch and mixed PDF | untested | 6 | P-19 |
+| Newspaper layout reading | untested | 10 | no row |
+| OCR: newspaper and hand-placer helper downloads | untested | 6 | no row |
+| macOS on-device model reader | untested | 7 | P-11 |
+| OpenRouter routes and listing refresh | untested | 7 | P-04, P-06, P-08 |
+| OCR: models, custom models, gateway and the Local Agent wizard | untested | 19 | P-06 to P-10 |
+| Cost and time estimate labels | untested | 4 | P-02, P-03 |
+| Settings window and its tabs | untested | 7 | P-01, P-02 |
+| First-start and collection interviews, presets, folder scope | untested | 16 | no row |
+| Settings, dates and post-correction helpers | untested | 5 | P-01, P-28 |
+| Menu commands and shortcuts | untested | 1 | no row |
+| Adding files: real drops, repeated intake and folder checks | untested | 7 | P-22 |
+| Catalogue filing and copied source tags | untested | 6 | P-23, P-35 |
+| Improve OCR: failures, reader choice and history | untested | 13 | no row |
+| Output: Files-pane row actions and the text viewer | untested | 11 | P-26 |
+| Output: Tag Vocabulary sheet | untested | 4 | P-36 |
+| Tools: Compare Models results, Test Resolution, Processing History | untested | 21 | P-41, P-42 |
+| Picker labels and Identifiable ids | untested | 5 | P-01, P-10, P-30 |
+| Quitting the app | untested | 2 | no row |
+| UI-test fixtures in the app | unreachable | 2 | no row |
+| Probe and proof drivers outside the coverage set | unreachable | 21 | P-30 (proof driver); others no row |
+| Required protocol stubs | unreachable | 2 | no row |
+| Dead code | dead | 5 | no row |
+| Test drivers no run started (not a user feature) | dead | 61 | not a feature |
+
+These groups have no ledger row: Container label backfill (Tools); Label reader download and local model supervisor; HTTP redirect refusal; Newspaper layout reading; OCR: newspaper and hand-placer helper downloads; First-start and collection interviews, presets, folder scope; Menu commands and shortcuts; Improve OCR: failures, reader choice and history; Quitting the app; UI-test fixtures in the app; Required protocol stubs; Dead code. The test-driver group is not a feature. Processing History has no row either; the ledger's drift list already notes its card (processor.md:1285).
+
 ## Source drift — doc against doc, for `W40.b5`
 
 - `TESTING.md` Tier 2D says the Processor has "no test target at all"; `project.yml` has the
