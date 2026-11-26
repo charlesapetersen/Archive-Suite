@@ -1,0 +1,1264 @@
+area	file	line	function	executable_lines
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/ArchiveNotesApp.swift	157	NotesAppDelegate.handleOpenDocuments(_:withReply:)	11
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/ArchiveNotesApp.swift	176	NotesAppDelegate.deliverPendingLibrary()	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/ArchiveNotesCommands.swift	87	ReaderRootCommands.openLibraryFromFinder(_:)	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/ArchiveNotesCommands.swift	142	static LibraryActions.newLibrary(model:previewState:)	4
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/ArchiveNotesCommands.swift	153	static LibraryActions.open(_:model:previewState:)	4
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/ArchiveNotesCommands.swift	161	static LibraryActions.openRecent(_:recents:model:previewState:)	15
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/DisplayCalendarSettings.swift	20	static DisplayCalendarSettings.choices.getter	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NoteExport.swift	27	NoteExportFormat.id.getter	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NoteExport.swift	52	static NoteExportFormat.remembered(_:)	3
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NoteExport.swift	115	static NoteExportComposer.kindLabel(_:)	8
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NoteExport.swift	408	NoteExportWriter.ExportError.errorDescription.getter	6
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesModel.swift	121	NotesModel.revealInFinder(_:)	7
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesModel.swift	273	NotesModel.revealLibraryInFinder()	4
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesModel.swift	345	static NotesModel.isGeneratedNotesFixture(_:)	10
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesModel.swift	952	NotesModel.duplicateTemplate(_:)	12
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesModel.swift	1775	NotesModel.ZoteroAutoFillSaveError.errorDescription.getter	8
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesNavigationModel.swift	340	NotesNavigationModel.setDateUncertain(_:for:)	3
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesNavigationModel.swift	345	NotesNavigationModel.setDisplayCalendar(_:for:)	3
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesNavigationModel.swift	350	NotesNavigationModel.setSentWith(_:precision:for:)	3
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesNavigationModel.swift	355	NotesNavigationModel.setSentWithUncertain(_:for:)	3
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesNavigationModel.swift	517	NotesNavigationModel.currentUserFilter.getter	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/NotesNavigationModel.swift	815	NotesNavigationModel.exportableListed.getter	4
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Core/UITestRelaunchArguments.swift	27	static UITestRelaunchArguments.isHarnessLaunch.getter	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/BlockHeaderAttachment.swift	158	BlockHeaderViewProvider.attachmentBounds(for:location:textContainer:proposedLineFragment:position:)	3
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/BlockHeaderAttachment.swift	289	BlockHeaderChipView.__allocating_init(attachment:)	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/BlockHeaderAttachment.swift	457	BlockHeaderChipView.alertWindow.getter	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/BlockHeaderAttachment.swift	469	BlockHeaderChipView.copyForZotero()	12
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/BlockHeaderAttachment.swift	484	BlockHeaderChipView.addToZotero()	15
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/BlockHeaderAttachment.swift	500	BlockHeaderChipView.reportZoteroFailure(_:)	13
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/BlockHeaderAttachment.swift	514	BlockHeaderChipView.reportCopyFailure(action:)	7
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/BlockHeaderAttachment.swift	524	BlockHeaderChipView.openInZotero()	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorFormatting.swift	91	FormattingContext.canAutoFillFromZotero.getter	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorFormatting.swift	120	FormattingContext.toggleItalic()	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorFormatting.swift	126	FormattingContext.toggleUnderline()	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorFormatting.swift	132	FormattingContext.toggleHighlight()	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorFormatting.swift	156	FormattingContext.setPlain()	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorFormatting.swift	168	FormattingContext.toggleOrderedList()	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorFormatting.swift	174	FormattingContext.toggleBlockquote()	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorFormatting.swift	180	FormattingContext.toggleCodeBlock()	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorFormatting.swift	195	FormattingContext.insertTestBlock()	8
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorFormatting.swift	340	FormattingContext.dismissZoteroAutoFillError()	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorScrollView.swift	92	EditorScrollView.lineTop(ofCharacter:in:)	11
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorTextView.swift	310	EditorTextView.chipMenuItemChosen(_:)	6
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorTextView.swift	990	EditorTextView.insertBacktab(_:)	10
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorTextView.swift	1131	EditorTextView.copy(_:)	6
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorTextView.swift	1202	EditorTextView.performDragOperation(_:)	12
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorTextView.swift	1317	static EditorTextView.isImageURL(_:)	4
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorTextView.swift	1322	static EditorTextView.tiffToPNG(_:)	4
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorTextView.swift	1327	static EditorTextView.ensurePNG(_:)	9
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorTextView.swift	1553	ListMarkerProbe.isAccessibilityElement()	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorTextView.swift	1569	ChipGeometryProbe.isAccessibilityElement()	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/EditorTextView.swift	1593	PassageChipStateProbe.isAccessibilityElement()	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/MarkdownEditorView.swift	1131	MarkdownEditorView.Coordinator.uiTestReplaceMarkdown(_:)	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/MarkdownEditorView.swift	1138	MarkdownEditorView.Coordinator.uiTestInsertMarkdown(_:)	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Editor/MarkdownEditorView.swift	1288	MarkdownEditorView.Coordinator.attributedForTest(_:)	12
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Index/NotesIndexer.swift	75	NotesIndexer.__allocating_init()	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Links/ReaderRootChooser.swift	121	static ReaderRootChooser.runOpenPanel()	11
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Links/ReaderRootChooser.swift	133	static ReaderRootChooser.runTopFolderQuestion(folder:)	9
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Models/NotesAdvancedSearch.swift	39	NotesRuleField.textKind.getter	8
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Models/NotesFilter.swift	68	NotesFilter.isActive.getter	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Store/RecentLibraries.swift	21	RecentLibraries.Entry.id.getter	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Store/StoreFolderChooser.swift	55	StoreFolderChooser.Refusal.message.getter	25
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Store/StoreFolderChooser.swift	303	static StoreFolderChooser.onMainRunLoop(_:)	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Store/StoreFolderChooser.swift	321	static StoreFolderChooser.runOpenPanel()	13
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Store/StoreFolderChooser.swift	337	static StoreFolderChooser.documentsFolder.getter	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Store/StoreFolderChooser.swift	343	static StoreFolderChooser.runSavePanel(firstLaunch:)	14
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Store/StoreFolderChooser.swift	358	static StoreFolderChooser.runInsideArchiveQuestion(folder:)	15
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Store/StoreFolderChooser.swift	392	static StoreFolderChooser.relaunchApp()	12
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Store/StoreFolderChooser.swift	407	static StoreFolderChooser.presentAlert(for:)	18
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NoteEditorPane.swift	643	NoteEditorPane.pickImageBar(_:)	18
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NoteEditorPane.swift	662	NoteEditorPane.pickStrayImage(_:)	16
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NoteEditorPane.swift	681	NoteEditorPane.chooseImageFile(for:)	17
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NoteExportFlow.swift	111	static NoteExportFlow.alert(_:detail:window:)	11
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NoteMetadataInspector.swift	256	NoteMetadataInspector.collectionRecordsSection.getter	7
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NoteMetadataInspector.swift	335	NoteMetadataInspector.calendarSection.getter	18
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NoteMetadataInspector.swift	355	NoteMetadataInspector.calendarNote.getter	9
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NoteMetadataInspector.swift	496	NoteMetadataInspector.displayCalendarBinding.getter	4
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NoteTagBar.swift	30	NoteTagBar.Edit.tag.getter	3
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesAdvancedSearchSheet.swift	94	NotesAdvancedSearchSheet.trimmedName.getter	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesAdvancedSearchSheet.swift	114	NotesAdvancedSearchSheet.commit()	9
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesAdvancedSearchSheet.swift	124	NotesAdvancedSearchSheet.saveAsSmartFolder()	6
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesAdvancedSearchSheet.swift	156	NotesRuleListView.add(after:group:)	5
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesFilterBar.swift	156	NotesFilterBar.dateFilterPopover.getter	34
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesFilterBar.swift	260	NotesFilterBar.fromYearText.getter	12
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesFilterBar.swift	274	NotesFilterBar.toYearText.getter	12
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesFolderTreeView.swift	430	NotesFolderTreeView.showTemplates()	4
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesTableView.swift	634	NotesTableView.Coordinator.cannotEdit(_:)	4
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesTableView.swift	711	ColumnPickerHeaderView.menu(for:)	53
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesTableView.swift	765	ColumnPickerHeaderView.toggleColumn(_:)	20
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesTableView.swift	786	ColumnPickerHeaderView.setSecondaryAsc(_:)	4
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesTableView.swift	790	ColumnPickerHeaderView.setSecondaryDesc(_:)	4
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesTableView.swift	794	ColumnPickerHeaderView.removeSecondary(_:)	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/NotesTableView.swift	795	ColumnPickerHeaderView.resetSort(_:)	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/PanelDivider.swift	85	PanelDividerView.init(coder:)	1
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Views/ReaderPreviewPopover.swift	214	ReaderPreviewPopover.downloadAction(fileURL:page:relativeTo:)	23
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Zotero/ZoteroCacheStore.swift	51	ZoteroCacheStore.removeAll()	3
+ArchiveNotes	ArchiveNotes/macOS/Sources/ArchiveNotes/Zotero/ZoteroRef.swift	56	ZoteroRef.id.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureModels.swift	21	CaptureGroupType.colorTag.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift	205	CaptureSession.runHeadlessFinalize()	34
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift	245	CaptureSession.writeHeadlessDone(summary:)	17
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift	319	CaptureSession.refreshPhoneConnected()	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift	441	CaptureSession.unpairDisplay()	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift	450	CaptureSession.phoneDidDisconnect()	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift	613	CaptureSession.fileRelay.getter	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift	657	static CaptureSession.relayDir(token:)	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift	767	CaptureSession.relayReceiverDidStart(relayDir:)	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift	787	CaptureSession.relayReceiverDidStop()	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift	861	CaptureSession.serverDidFail(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/CaptureSession.swift	1109	CaptureSession.revealBackupFolder()	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ContainerBackfillModel.swift	76	ContainerBackfillModel.gateway.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ContainerBackfillModel.swift	79	ContainerBackfillModel.modelRoute.getter	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ContainerBackfillModel.swift	284	static ContainerBackfillModel.read(_:gateway:route:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ContainerBackfillModel.swift	318	ContainerBackfillModel.cancel()	14
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ContainerBackfillModel.swift	346	ContainerBackfillModel.accept(_:)	30
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ContainerBackfillModel.swift	377	ContainerBackfillModel.skip(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ContainerBackfillModel.swift	382	ContainerBackfillModel.setStatus(_:_:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ContainerBackfillModel.swift	388	ContainerBackfillModel.saveLevels(_:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ContainerBackfillModel.swift	400	CancelFlag.set()	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ContainerBackfillModel.swift	439	ContainerBackfillCache.merge(_:)	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/FileRelayTestDriver.swift	28	static FileRelayTestDriver.emitGolden(to:)	23
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/FileRelayTestDriver.swift	31	w #1 (_:_:) in static FileRelayTestDriver.emitGolden(to:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/LabelGemmaVerifyTestDriver.swift	50	static LabelGemmaVerifyTestDriver.processFiles(manifest:out:)	26
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/LabelGemmaVerifyTestDriver.swift	77	static LabelGemmaVerifyTestDriver.sha(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/LabelGemmaVerifyTestDriver.swift	82	static LabelGemmaVerifyTestDriver.run(manifest:out:)	54
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/LiveCaptureProcessor.swift	284	LiveCaptureProcessor.RotationRetryTarget.id.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/LiveCaptureProcessor.swift	1114	LiveCaptureProcessor.stagedURLs(for:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/LiveCaptureProcessor.swift	2187	static LiveCaptureProcessor.ocrTask(imageURL:provider:model:thinkingLevel:apiKey:customPrompt:imageScale:gateway:localAgent:rotationMode:standardImageMB:visionSettings:cascade:refusalRoutes:visionTextLLM:scanDetector:denyDataCollection:paidRequests:)	17
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/LiveCaptureTaggingFailureTestDriver.swift	19	LiveCaptureTaggingFailureTestDriver.Gateway.respond(to:)	51
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/LiveCaptureTaggingFailureTestDriver.swift	88	static LiveCaptureTaggingFailureTestDriver.run(env:)	151
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/LiveCaptureTaggingFailureTestDriver.swift	240	static LiveCaptureTaggingFailureTestDriver.wait(for:until:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/LiveCaptureTaggingFailureTestDriver.swift	250	LiveCaptureTaggingFailureTestDriver.ProbeError.init(_:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/LiveCaptureTestDriver.swift	21	static LiveCaptureTestDriver.run(session:)	83
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ManagedGemma.swift	56	ManagedGemma.download()	27
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ManagedGemma.swift	84	ManagedGemma.dismissStatus()	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ManagedGemma.swift	88	ManagedGemma.pauseDownload()	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ManagedGemma.swift	91	ManagedGemma.stop()	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ManagedGemma.swift	99	static ManagedGemma.installFailure(_:)	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ProcessFilesTestDriver.swift	58	static ProcessFilesTestDriver.safeFallbackMarker.getter	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ProcessFilesTestDriver.swift	61	static ProcessFilesTestDriver.writeMarker(_:_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ProcessFilesTestDriver.swift	64	static ProcessFilesTestDriver.inTestFiles(_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ProcessFilesTestDriver.swift	68	static ProcessFilesTestDriver.run(processor:)	438
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ProcessFilesTestDriver.swift	70	fail #1 (_:marker:) in static ProcessFilesTestDriver.run(processor:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ProcessFilesTestDriver.swift	516	RequestLog.record(_:)	27
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ProcessFilesTestDriver.swift	544	RequestLog.summary.getter	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ProcessFilesTestDriver.swift	559	SpendMeter.init(inPer1M:outPer1M:cap:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ProcessFilesTestDriver.swift	563	SpendMeter.cost(_:_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ProcessFilesTestDriver.swift	567	SpendMeter.admit()	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ProcessFilesTestDriver.swift	577	SpendMeter.record(_:status:)	16
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Capture/ProcessFilesTestDriver.swift	594	SpendMeter.summary.getter	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/LocalModels/LocalModelSupervisor.swift	90	LocalModelSupervisor.NoRedirects.urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/LocalModels/LocalModelSupervisor.swift	137	LocalModelSupervisor.install(_:step:)	33
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/LocalModels/LocalModelSupervisor.swift	172	LocalModelSupervisor.run(_:_:model:timeout:failure:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/LocalModels/LocalModelSupervisor.swift	475	LocalModelSupervisor.residentPID.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/LocalModels/LocalModelSupervisorContract.swift	52	static LocalModelSupervisorContract.realRead(jpeg:scratch:)	12
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/CostEstimator.swift	27	CostEstimate.classificationFormatted.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/CostEstimator.swift	29	CostEstimate.collectionFormatted.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/CostEstimator.swift	33	CostEstimate.namesFormatted.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/KeychainHelper.swift	66	static KeychainHelper.read(account:allowInteraction:)	21
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/KeychainHelper.swift	106	static KeychainHelper.quietContext()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/KeychainHelper.swift	112	static KeychainHelper.delete(account:)	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/LocalAgentConfig.swift	75	LocalAgentConfig.effectiveConcurrencyCap.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/LocalAgentSpec.swift	14	LocalAgentSpec.id.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/LocalAgentSpec.swift	16	LocalAgentSpec.displayName.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/LocalModelRoute.swift	35	LocalModelRoute.Server.id.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/LocalModelRoute.swift	59	LocalModelRoute.Pick.displayName.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ModelSelectionStore.swift	73	ModelSelectionStore.healUnresolvableSelections(afterRemoving:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ModelSelectionStore.swift	102	static ModelSelectionStore.savedModel(for:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ModelSelectionStore.swift	107	static ModelSelectionStore.saveModel(_:for:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ProcessorUITestConfiguration.swift	20	static ProcessorUITestConfiguration.inputDirectory.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ProviderModels.swift	655	static OpenRouterRoute.through(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ProviderModels.swift	705	static OpenRouterRoute.unpinned(_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ProviderModels.swift	748	OpenRouterRoute.with(reasoning:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ProviderModels.swift	1090	CustomModelStore.add(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ProviderModels.swift	1095	CustomModelStore.removeById(_:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/ProviderModels.swift	1108	CustomModelStore.save()	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Models/TimeEstimator.swift	29	TimeEstimate.collectionFormatted.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/CaptureServer.swift	39	CaptureServer.BodyAccumulator.init(_:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/CaptureServer.swift	112	CaptureServer.retryWithSystemPort()	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/CaptureServer.swift	288	CaptureServer.readBody(_:head:accumulator:timeout:)	27
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/ChatGPTAuth.swift	58	KeychainChatGPTCredentialStore.save(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/ChatGPTAuth.swift	63	KeychainChatGPTCredentialStore.delete()	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/ChatGPTAuth.swift	88	ChatGPTAuthError.description.getter	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/ChatGPTAuth.swift	145	ChatGPTAuth.isSignedIn.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveAuth.swift	46	DriveAuth.init(clientId:clientSecret:initialRefreshToken:http:)	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveAuth.swift	56	DriveAuth.signOut()	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveAuth.swift	65	DriveAuth.accessToken()	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveAuth.swift	78	DriveAuth.refreshedToken(using:)	12
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveAuth.swift	95	DriveAuth.signIn(completion:)	37
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveAuth.swift	133	DriveAuth.exchange(code:verifier:redirect:)	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveAuth.swift	145	static DriveAuth.formEncode(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveAuth.swift	149	static DriveAuth.randomBytes(_:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveAuth.swift	150	static DriveAuth.b64url(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveAuth.swift	162	LoopbackRedirectServer.start(onCode:)	32
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveAuth.swift	194	LoopbackRedirectServer.stop()	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	15	URLSessionHTTP.execute(method:url:headers:body:)	28
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	56	DriveError.description.getter	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	69	DriveError.errorDescription.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	81	DriveClient.init(http:token:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	90	DriveClient.send(_:_:headers:body:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	98	DriveClient.decode<A>(_:_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	104	DriveClient.listFiles(query:)	12
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	118	DriveClient.createMetadata(name:parents:appProperties:mimeType:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	128	DriveClient.createFile(name:parents:appProperties:media:mimeType:)	15
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	134	add #1 (_:) in DriveClient.createFile(name:parents:appProperties:media:mimeType:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	145	DriveClient.updateMedia(fileId:media:mimeType:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	151	DriveClient.updateAppProperties(fileId:appProperties:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	156	DriveClient.getMedia(fileId:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	158	DriveClient.delete(fileId:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveClient.swift	166	DriveClient.enc(_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	21	DriveObjectStore.init(client:token:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	29	DriveObjectStore.ensureSessionFolder()	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	39	DriveObjectStore.publishEpoch(_:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	41	DriveObjectStore.listNames()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	47	DriveObjectStore.readData(_:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	53	DriveObjectStore.exists(_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	57	DriveObjectStore.modificationDate(_:)	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	69	DriveObjectStore.writeAtomic(_:_:)	22
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	92	DriveObjectStore.delete(_:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	98	DriveObjectStore.quarantine(_:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	110	DriveObjectStore._resolveLocked(_:)	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	124	DriveObjectStore._ensureFolderUnlocked()	17
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	144	DriveObjectStore._refreshCacheUnlocked()	24
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	169	DriveObjectStore.esc(_:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/DriveObjectStore.swift	171	DriveObjectStore.parseTime(_:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/FileRelayReceiver.swift	71	FileRelayReceiver.start()	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/FileRelayReceiver.swift	73	FileRelayReceiver.stop()	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/FileRelayReceiver.swift	81	FileRelayReceiver.startOnQueue()	19
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/FileRelayReceiver.swift	101	FileRelayReceiver.tick()	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/FileRelayReceiver.swift	323	FileRelayReceiver.sweep()	23
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/FileRelayReceiver.swift	396	LocalDirectoryStore.modificationDate(_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Net/USBBridge.swift	36	static USBBridge.reassertNow()	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/AnthropicTextRequest.swift	8	static AnthropicTextRequest.body(prompt:modelID:thinkingLevel:maxTokens:)	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/BatchOCR.swift	176	AnthropicBatchClient.submitBatch(fileURLs:sendPreviousImage:customPrompt:imageScale:standardImageMB:preparedRequests:)	118
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/BatchOCR.swift	437	AnthropicBatchClient.cancelBatch(batchId:)	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/BatchOCR.swift	630	GeminiBatchClient.submitFileBatch(jsonlLines:imageScale:sendPreviousImage:)	20
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/BatchOCR.swift	680	GeminiBatchClient.uploadFile(data:)	43
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/BatchOCR.swift	968	GeminiBatchClient.retrieveResults(resultFileName:jobID:confirmedNoCharge:)	16
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/BatchOCR.swift	1055	MistralBatchClient.submitBatch(fileURLs:imageScale:standardImageMB:preparedRequests:)	73
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/BatchOCR.swift	1129	MistralBatchClient.uploadFile(data:)	27
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/BatchOCR.swift	1280	MistralBatchClient.cancelBatch(batchId:)	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/BatchOCR.swift	1292	MistralBatchClient.confirmCancellation(batchId:)	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/HandLayerMeasureTestDriver.swift	21	static HandLayerMeasureTestDriver.onInk(_:)	17
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/HandLayerMeasureTestDriver.swift	60	static HandLayerMeasureTestDriver.run(input:output:install:)	84
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/HandLayerMeasureTestDriver.swift	109	words #1 (_:) in static HandLayerMeasureTestDriver.run(input:output:install:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/InstitutionalComputeImport.swift	47	InstitutionalComputeImport.LoadError.errorDescription.getter	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/InstitutionalComputeImport.swift	203	InstitutionalComputeResumePrompt.title.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/KeyValidator.swift	49	static KeyValidator.validateGemini(key:)	32
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/KeyValidator.swift	86	static KeyValidator.validateMistral(key:)	22
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/KeyValidator.swift	151	static KeyValidator.validateOpenRouter(key:)	22
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/KeyValidator.swift	182	static KeyValidator.validateAnthropic(key:)	22
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/KeyValidator.swift	207	static KeyValidator.classifySampleOCR(errorCode:errorMessage:)	13
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/LLMTextClient.swift	62	static LLMTextClient.callAnthropic(prompt:model:thinkingLevel:apiKey:maxTokens:timeout:)	14
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/LLMTextClient.swift	101	static LLMTextClient.callMistralChat(prompt:apiKey:maxTokens:timeout:)	19
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/LocalAgentClient.swift	157	LocalAgentClient.probe()	16
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/LocalAgentTestDriver.swift	34	note #1 (_:) in static LocalAgentTestDriver.run()	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/LocalAgentTestDriver.swift	338	read #1 (_:) in static LocalAgentTestDriver.run()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/LocalAgentTestDriver.swift	343	report #1 (_:_:wall:) in static LocalAgentTestDriver.run()	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/LocalAgentValidator.swift	29	LocalAgentValidator.Status.isUsable.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/LocalAgentValidator.swift	32	LocalAgentValidator.Status.message(tool:)	21
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/LocalAgentValidator.swift	61	static LocalAgentValidator.detectAndVerify(config:)	15
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/LocalAgentValidator.swift	79	static LocalAgentValidator.classify(_:)	13
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/LocalModelsTestDriver.swift	848	first #1 (_:) in static LocalModelsTestDriver.memoryChecks()	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NetworkSession.swift	234	NetworkSession.NoRedirects.urlSession(_:task:willPerformHTTPRedirection:newRequest:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NewspaperLayoutTestDriver.swift	30	static NewspaperLayoutTestDriver.dumpPlans(list:out:)	75
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NewspaperLayoutTestDriver.swift	107	static NewspaperLayoutTestDriver.peakFootprintMB()	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NewspaperLayoutTestDriver.swift	118	static NewspaperLayoutTestDriver.dumpScanLayout(list:out:)	34
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NewspaperLayoutTestDriver.swift	480	draw #1 (_:x:y:size:) in static NewspaperLayoutTestDriver.run()	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NewspaperPageReader.swift	28	NewspaperDetector.isInstalled()	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NewspaperPageReader.swift	35	NewspaperDetector.detect(_:isCancelled:)	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NewspaperPageReader.swift	204	NewspaperPageReader.CancellationFlag.isCancelled.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NewspaperPageReader.swift	234	NewspaperLayoutRecord.summary.getter	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NewspaperPageReader.swift	320	NewspaperPagePlan.removeScratch()	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NewspaperPageReader.swift	325	static NewspaperPagePlan.prepare(_:photographed:detector:isCancelled:)	87
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NewspaperPageReader.swift	506	static NewspaperPagePlan.pixelBox(_:width:height:)	16
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NewspaperPageReader.swift	572	static NewspaperPagePlan.quad(_:)	13
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/NewspaperPageReader.swift	577	point #1 (_:) in static NewspaperPagePlan.quad(_:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRPostCorrection.swift	16	static OCRPostCorrection.policyReason(at:store:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Catalogue.swift	80	OCRProcessor.PreservationIntakeFailure.errorDescription.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+MixedPDFRecovery.swift	230	OCRProcessor.applyMixedPDFRuntimeConfig(_:to:apiKey:reloadedImport:)	12
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+MixedPDFRecovery.swift	335	OCRProcessor.pendingMixedPDFFileURLs.getter	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+OCR.swift	226	OCRProcessor.copySourceTagsFromInputPDFs(_:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+OCR.swift	647	OCRProcessor.classifyViaLLM(prompt:provider:model:thinkingLevel:apiKey:)	32
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+OCR.swift	679	OCRProcessor.classifyCallGateway(prompt:gateway:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+OCR.swift	683	OCRProcessor.classifyCallLocalAgent(prompt:config:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+OCR.swift	686	OCRProcessor.classifyCallAnthropic(prompt:model:thinkingLevel:apiKey:)	22
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+OCR.swift	708	OCRProcessor.classifyCallGemini(prompt:model:thinkingLevel:apiKey:)	18
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+OCR.swift	726	OCRProcessor.classifyCallMistral(prompt:apiKey:)	19
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+OCR.swift	745	OCRProcessor.classifyCallOpenAI(prompt:model:apiKey:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+OCR.swift	1582	OCRProcessor.performOCRSequential(fileURLs:provider:model:thinkingLevel:apiKey:outputDirectory:segmentationContext:runConfig:)	88
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+OCR.swift	1979	OCRProcessor.markBatchJobsWithoutResults(reason:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Pipeline.swift	1434	OCRProcessor.persistNewspaperFallback(_:index:address:)	14
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Pipeline.swift	1604	static OCRProcessor.sameJournalPayload<A>(_:_:)	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Pipeline.swift	3521	restoredQualities #1 () in OCRProcessor.startProcessing(files:provider:model:thinkingLevel:apiKey:visionTextAPIKey:outputDirectory:batchMode:enableTagging:enableSegmentJSON:enableCollectionSegmentation:confirmCollectionIDs:reviewDocumentSegmentation:reviewFreshDocumentSegmentation:preOCRedInput:skipAlreadyProcessed:segmentationContext:gatewayConfig:localAgent:resumingMixedPDF:postCorrectionRequested:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Pipeline.swift	3862	OCRProcessor.retryFailedFiles()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+ReviewFlows.swift	75	OCRProcessor.performCollectionSegmentation(files:provider:model:thinkingLevel:apiKey:outputDirectory:confirmBeforeOrganizing:reviewDocumentSegmentation:runConfig:)	59
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+ReviewFlows.swift	136	OCRProcessor.buildReviewItems(files:classifications:)	24
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+ReviewFlows.swift	237	OCRProcessor.canConfirmCollectionReview.getter	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+ReviewFlows.swift	247	OCRProcessor.confirmCollectionReview()	14
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+ReviewFlows.swift	266	OCRProcessor.performDocumentSegmentationReview(files:outputDirectory:runConfig:)	50
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+ReviewFlows.swift	323	OCRProcessor.confirmFinalReview()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+ReviewFlows.swift	329	OCRProcessor.redoTagging()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+ReviewFlows.swift	392	OCRProcessor.showRotationReview(files:runConfig:)	99
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+ReviewFlows.swift	605	OCRProcessor.rebuildCollectionSegments(files:)	54
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift	505	OCRProcessor.performAutomaticTaggingWithReview(provider:model:thinkingLevel:apiKey:outputDirectory:enableSegmentJSON:files:runConfig:)	45
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift	815	OCRProcessor.previousManualSegment()	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift	843	OCRProcessor.performManualSegmentAndTag(autoDate:provider:model:thinkingLevel:apiKey:outputDirectory:enableSegmentJSON:preOCRed:files:runConfig:)	209
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift	1089	OCRProcessor.manualSegAdvanceFocus(_:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift	1098	OCRProcessor.manualSegSetKind(_:at:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift	1103	OCRProcessor.manualSegToggleRemoved(at:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift	1119	OCRProcessor.manualSegCancelTagging()	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift	1146	OCRProcessor.confirmManualSegTag()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tagging.swift	1655	OCRProcessor.updateReviewedClassification(at:to:runConfig:)	21
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Tree.swift	265	static ProcessFilesTree.overlapMessage(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+Types.swift	269	ManualTagSegment.ownDate.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+WindowSegmentation.swift	363	OCRProcessor.askPlanCheck(_:)	14
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor+WindowSegmentation.swift	379	OCRProcessor.answerPlanCheck(goOn:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OCRProcessor.swift	714	OCRProcessor.PendingRunSnapshot.visionTextThinkingLevel.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OnDeviceModelClient.swift	31	static OnDeviceModelClient.isAvailable.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OnDeviceModelClient.swift	34	static OnDeviceModelClient.unavailableReason.getter	12
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OnDeviceModelClient.swift	47	OnDeviceModelClient.ocr(imageURL:)	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OnDeviceModelClient.swift	58	static OnDeviceModelClient.unavailable(_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OnDeviceModelClient.swift	64	static OnDeviceModelClient.read(imageURL:)	33
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OnDeviceModelClient.swift	99	static OnDeviceModelClient.failure(_:)	15
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterListing.swift	108	static OpenRouterListing.store(_:_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterListing.swift	135	static OpenRouterListing.typed(_:_:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterListing.swift	152	static OpenRouterListing.refreshIfStale(force:defaults:)	25
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	43	static OpenRouterTestDriver.eq<A>(_:_:_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	54	static OpenRouterTestDriver.run()	101
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	156	static OpenRouterTestDriver.dataCollection(_:)	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	167	OpenRouterTestDriver.TrainingRequests.record(_:)	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	179	static OpenRouterTestDriver.concurrentTrainingChecks(image:)	51
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	233	static OpenRouterTestDriver.claudeChecks(wire:image:)	126
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	261	row #1 (_:) in static OpenRouterTestDriver.claudeChecks(wire:image:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	361	static OpenRouterTestDriver.unmeasuredChecks(wire:image:)	158
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	366	row #1 (_:_:_:_:_:_:image:request:) in static OpenRouterTestDriver.unmeasuredChecks(wire:image:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	423	sent #1 (_:_:) in static OpenRouterTestDriver.unmeasuredChecks(wire:image:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	470	typed #1 (_:) in static OpenRouterTestDriver.unmeasuredChecks(wire:image:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	522	static OpenRouterTestDriver.disappearanceDuringOCR(model:image:listed:shorter:)	58
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	583	static OpenRouterTestDriver.segmentationChecks()	79
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	642	kind #1 (_:_:) in static OpenRouterTestDriver.segmentationChecks()	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	664	static OpenRouterTestDriver.makerChecks()	105
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	771	static OpenRouterTestDriver.makerRequestChecks(wire:image:)	68
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	773	body #1 (_:_:) in static OpenRouterTestDriver.makerRequestChecks(wire:image:)	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	795	read #1 (_:_:status:) in static OpenRouterTestDriver.makerRequestChecks(wire:image:)	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	827	resolve #1 (_:) in static OpenRouterTestDriver.makerRequestChecks(wire:image:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	840	static OpenRouterTestDriver.catalogChecks()	46
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	887	static OpenRouterTestDriver.requestChecks(_:route:ocr:)	50
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	938	static OpenRouterTestDriver.costChecks()	26
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	967	static OpenRouterTestDriver.rotationVoteChecks()	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	976	static OpenRouterTestDriver.makeImage()	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OpenRouterTestDriver.swift	987	static OpenRouterTestDriver.finish()	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OutputFileSafety.swift	215	fail #1 () in static OutputFileSafety.copyExtendedAttributes(from:to:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OutputMeasureTestDriver.swift	37	static OutputMeasureTestDriver.size(_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/OutputMeasureTestDriver.swift	41	static OutputMeasureTestDriver.run(input:output:)	96
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/PageReaderLiveDriver.swift	24	static PageReaderLiveDriver.run(key:dir:)	48
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/PageReaderLiveDriver.swift	74	static PageReaderLiveDriver.keyUsage(_:)	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/PageReaders.swift	158	OpenAICompatibleClient.route.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/PageReaders.swift	178	OnDeviceModelClient.read(_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/PaidBatchUITestFixture.swift	12	static PaidBatchUITestFixture.stateDirectory.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/PaidBatchUITestFixture.swift	14	static PaidBatchUITestFixture.scratchLocations.getter	22
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/PaidRequests.swift	171	PaidRequests.BatchLinkFailure.errorDescription.getter	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/ProcessorCatalogueFiling.swift	105	static ProcessorCatalogueFiling.copyExport(_:to:in:)	40
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/ProcessorCatalogueRecord.swift	184	static ProcessorCatalogueRecord.applySourceTags(_:document:file:)	13
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/ProcessorCatalogueRun.swift	183	ProcessorCatalogueRun.PreservationFilingError.errorDescription.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/ResumeReviewGatesProbe.swift	31	ResumeReviewGatesProbe.Requests.add(_:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/ResumeReviewGatesProbe.swift	32	ResumeReviewGatesProbe.Requests.urls.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/ResumeReviewGatesProbe.swift	35	static ResumeReviewGatesProbe.run()	15
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/ResumeReviewGatesProbe.swift	52	static ResumeReviewGatesProbe.runCase(reviewWholeRun:)	111
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/ResumeReviewGatesProbe.swift	164	static ResumeReviewGatesProbe.writeJPEG(_:shade:)	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/ResumeReviewGatesProbe.swift	174	static ResumeReviewGatesProbe.writeFixturePDF(_:)	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/ResumeReviewGatesProbe.swift	186	static ResumeReviewGatesProbe.finish(_:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/SampleOCRTester.swift	15	static SampleOCRTester.run(account:key:)	25
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/SampleOCRTester.swift	42	static SampleOCRTester.writeSampleImage()	19
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/OCR/TextLayerTestDriver.swift	457	static TextLayerTestDriver.freshCatalogueChecks(dir:inputs:)	63
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/ProcessorAppDelegate.swift	11	ProcessorAppDelegate.applicationWillTerminate(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/ProcessorAppDelegate.swift	16	ProcessorAppDelegate.applicationShouldTerminate(_:)	53
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/ReOCR/ImproveOCRHandoff.swift	107	static ImproveOCRHandoff.askForRoot(_:)	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/ReOCR/ReOCRCatalogue.swift	58	ReOCRCatalogue.Outcome.problem.getter	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/ReOCR/ReOCRDialogModel.swift	161	ReOCRDialogModel.choose(_:for:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/ReOCR/ReOCRFileWriter.swift	91	ReOCRFileWriter.Failure.description.getter	18
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/ReOCR/ReOCRHistory.swift	52	ReOCRHistory.Failure.description.getter	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/ReOCR/ReOCRIncrementalWriter.swift	34	ReOCRIncrementalWriter.Failure.description.getter	15
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/ReOCR/ReOCRIncrementalWriter.swift	299	failure #1 (_:) in static ReOCRIncrementalWriter.editLayer(_:in:index:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/ReOCR/ReOCRJob.swift	86	ReOCRJob.Failure.description.getter	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/ReOCR/ReOCRPairs.swift	27	ReOCRPairs.Refusal.description.getter	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/LocalSegmenter.swift	48	static LocalSegmenter.baseURL(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/LocalSegmenter.swift	53	static LocalSegmenter.modelID(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/PlanUsage.swift	43	ClaudeStreamOutput.hasPlanEvidence.getter	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/RunSegmentation.swift	303	static WindowStageTransport.current(_:defaults:claudeBinary:claudeBilling:claudeRoute:gate:checkClaudeBilling:)	21
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationApproach.swift	22	SegmentationApproach.id.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationApproach.swift	190	SegmentationOptions.ModelCost.AnyKey.intValue.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationApproach.swift	192	SegmentationOptions.ModelCost.AnyKey.init(intValue:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationApproach.swift	442	SegmentationOptionsError.errorDescription.getter	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationProofDriver.swift	60	static SegmentationProofDriver.truthNew(_:gap:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationProofDriver.swift	63	static SegmentationProofDriver.exactPages(predicted:truth:)	14
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationProofDriver.swift	64	spans #1 (_:) in static SegmentationProofDriver.exactPages(predicted:truth:)	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationProofDriver.swift	85	SegmentationProofDriver.Meter.add(_:input:output:)	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationProofDriver.swift	92	SegmentationProofDriver.Meter.snapshot.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationProofDriver.swift	104	SegmentationProofDriver.Meter.addProvider(_:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationProofDriver.swift	106	SegmentationProofDriver.Meter.servedProviders.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationProofDriver.swift	108	SegmentationProofDriver.Meter.http.getter	28
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationProofDriver.swift	152	static SegmentationProofDriver.run()	34
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationProofDriver.swift	188	static SegmentationProofDriver.prove(manifest:approach:route:name:keys:claude:)	164
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/SegmentationProofDriver.swift	353	static SegmentationProofDriver.finish()	14
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/WindowTransports.swift	103	image #1 (_:) in static APIWindowTransport.request(_:key:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Segmentation/WindowTransports.swift	339	OpenRouterClaudeWindowTransport.send(_:)	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Settings/PaidRequestJournal.swift	151	PaidRequestJournal.failure()	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Settings/SettingsInterviews.swift	59	static MacInventory.keyLabel(_:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Settings/SettingsSheetModel.swift	1000	static SettingsSheetModel.handDownloadNote.getter	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Settings/SettingsSheetModel.swift	1235	SettingsSheetWords.pace(_:unit:)	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/CollectionSegmenter.swift	32	CollectionSegmenter.segment(files:classifications:texts:provider:model:thinkingLevel:apiKey:gatewayConfig:localAgent:onStatus:)	80
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/CollectionSegmenter.swift	122	CollectionSegmenter.extractCollectionName(from:provider:model:thinkingLevel:apiKey:gatewayConfig:localAgent:)	42
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/CollectionSegmenter.swift	175	CollectionSegmenter.clusterCollectionNames(_:provider:model:thinkingLevel:apiKey:gatewayConfig:localAgent:)	36
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/CollectionSegmenter.swift	212	CollectionSegmenter.parseClusterResponse(_:names:)	25
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/CollectionSegmenter.swift	239	CollectionSegmenter.fallbackCluster(_:)	16
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/CollectionSegmenter.swift	259	static CollectionSegmenter.normalizeCollectionName(_:)	30
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/CollectionSegmenter.swift	519	CollectionSegmenter.callLLM(prompt:provider:model:thinkingLevel:apiKey:gatewayConfig:localAgent:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/DateRoute.swift	148	static DateRoute.dayFirstSetting(_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/MacOSTagger.swift	180	static MacOSTagger.applyTags(_:to:stampUnread:)	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/SystemTagsProvider.swift	145	SystemTagsProvider.suggestions(prefix:excluding:limit:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/SystemTagsProvider.swift	150	SystemTagsProvider.spelling(of:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Tagging/SystemTagsProvider.swift	157	SystemTagsProvider.register(_:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/BoxFolderConfirmSheet.swift	10	BoxFolderConfirmSheet.boxCount.getter	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/BoxFolderConfirmSheet.swift	13	BoxFolderConfirmSheet.folderCount.getter	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/BoxFolderConfirmSheet.swift	17	BoxFolderConfirmSheet.body.getter	49
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/BoxFolderConfirmSheet.swift	71	BoxFolderConfirmRow.rowBackground.getter	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/BoxFolderConfirmSheet.swift	79	BoxFolderConfirmRow.body.getter	30
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ChatGPTPlanControls.swift	89	ChatGPTPlanControls.refreshAccountState()	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ChatGPTPlanControls.swift	94	ChatGPTPlanControls.signIn()	17
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ContainerBackfillSheet.swift	236	ContainerBackfillSheet.warningLine(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ContainerBackfillSheet.swift	264	ContainerBackfillSheet.chooseFolder()	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ContainerLabelCard.swift	127	ContainerLabelCard.save()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ContainerLevelsSheet.swift	91	ContainerLevelsSheet.skippedRows.getter	28
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/DropReceiver.swift	27	DropReceiverView.draggingEntered(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/DropReceiver.swift	32	DropReceiverView.draggingExited(_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/DropReceiver.swift	36	DropReceiverView.prepareForDragOperation(_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/DropReceiver.swift	40	DropReceiverView.performDragOperation(_:)	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/GeneralInterviewView.swift	284	GeneralInterviewView.checkClaude()	18
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/GeneralInterviewView.swift	303	GeneralInterviewView.save()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/GeneralInterviewView.swift	326	MacInventory.keepingClaudeCheck(of:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/HandPlacerDownloadRow.swift	23	HandPlacerDownload.start()	20
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/HandPlacerDownloadRow.swift	44	HandPlacerDownload.cancel()	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/HandPlacerDownloadRow.swift	46	HandPlacerDownload.finish(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ImproveOCRView.swift	221	ImproveOCRController.connectSupport()	14
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ImproveOCRView.swift	241	ImproveOCRController.choose(_:for:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ImproveOCRView.swift	544	ImproveOCRHistoryView.remove(_:)	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ImproveOCRView.swift	794	Result<>.failureDescription.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/KeyboardTokenField.swift	58	KeyboardTokenField.Coordinator.controlTextDidChange(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/KeyboardTokenField.swift	63	KeyboardTokenField.Coordinator.control(_:textView:doCommandBy:)	19
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	189	LiveCaptureView.performSegmentAction(_:on:)	16
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	802	static LiveCaptureView.swatch(_:)	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	851	LiveCaptureView.chooseOutputFolder()	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1237	SegmentTagCard.recompute()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1243	SegmentTagCard.moveHighlight(_:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1252	SegmentTagCard.commit(_:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1261	SegmentTagCard.returnCandidate()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1268	SegmentTagCard.tabCandidate()	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1275	SegmentTagCard.onReturn()	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1280	SegmentTagCard.onTab()	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1285	SegmentTagCard.deletePrevious()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1291	SegmentTagCard.onEscape()	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1308	SegmentTagCard.skip()	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1364	LiveRotationReviewSheet.body.getter	67
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1432	LiveRotationReviewSheet.rotate(_:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1444	LiveRotationRow.body.getter	33
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LiveCaptureView.swift	1590	SegmentTextViewerSheet.body.getter	31
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LocalAgentWizard.swift	24	LocalAgentWizard.selected.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LocalAgentWizard.swift	26	LocalAgentWizard.body.getter	29
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LocalAgentWizard.swift	67	LocalAgentStep.body.getter	59
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LocalAgentWizard.swift	127	LocalAgentStep.noteRow(_:_:identifier:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LocalAgentWizard.swift	136	LocalAgentStep.detectAndVerify()	19
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/LocalAgentWizard.swift	156	LocalAgentStep.statusView(_:)	21
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManageModelsView.swift	8	ManageModelsView.body.getter	83
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManageModelsView.swift	92	ManageModelsView.groupedByProvider.getter	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManageModelsView.swift	113	AddModelView.availableProviders.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManageModelsView.swift	115	AddModelView.body.getter	56
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManageModelsView.swift	172	AddModelView.addModel()	30
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualSegmentTagView.swift	8	confirmDiscardRun(_:discard:)	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualSegmentTagView.swift	253	ManualSegmentTagView.glyph(_:_:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualSegmentTagView.swift	297	ManualSegmentTagView.quickLookOverlay(_:)	14
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualSegmentTagView.swift	452	ManualSegTagCard.recompute()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualSegmentTagView.swift	458	ManualSegTagCard.moveHighlight(_:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualSegmentTagView.swift	464	ManualSegTagCard.commit(_:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualSegmentTagView.swift	472	ManualSegTagCard.returnCandidate()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualSegmentTagView.swift	478	ManualSegTagCard.tabCandidate()	6
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualSegmentTagView.swift	485	ManualSegTagCard.onReturn()	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualSegmentTagView.swift	490	ManualSegTagCard.onTab()	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualSegmentTagView.swift	495	ManualSegTagCard.deletePrevious()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualSegmentTagView.swift	501	ManualSegTagCard.onEscape()	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualTaggingSheet.swift	17	ManualTaggingSheet.count.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualTaggingSheet.swift	18	ManualTaggingSheet.isLast.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualTaggingSheet.swift	21	ManualTaggingSheet.currentDatesValid.getter	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualTaggingSheet.swift	25	ManualTaggingSheet.currentImages.getter	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualTaggingSheet.swift	30	ManualTaggingSheet.body.getter	70
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualTaggingSheet.swift	101	ManualTaggingSheet.moveFocusedImage(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualTaggingSheet.swift	107	ManualTaggingSheet.quickLookOverlay.getter	17
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualTaggingSheet.swift	130	ManualTagSegmentView.body.getter	102
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ManualTaggingSheet.swift	233	ManualTagSegmentView.imageBorder(img:focused:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/NewspaperLayoutDownloadRow.swift	37	NewspaperLayoutDownload.start()	20
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/NewspaperLayoutDownloadRow.swift	58	NewspaperLayoutDownload.cancel()	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/NewspaperLayoutDownloadRow.swift	60	NewspaperLayoutDownload.finish(_:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+CollectionReviewSheet.swift	11	CollectionReviewSheet.hasBoxes.getter	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+CollectionReviewSheet.swift	15	CollectionReviewSheet.body.getter	78
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+CollectionReviewSheet.swift	99	CollectionNameField.body.getter	17
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+CollectionReviewSheet.swift	122	CollectionReviewRow.body.getter	34
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+CollectionReviewSheet.swift	158	CollectionReviewRow.thumbnail.getter	22
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+CollectionReviewSheet.swift	181	static CollectionReviewRow.loadThumbnailAsync(url:maxSize:rotationDegrees:)	15
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+DocumentSegmentReviewSheet.swift	17	DocumentSegmentReviewSheet.showDocClasses.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+DocumentSegmentReviewSheet.swift	19	DocumentSegmentReviewSheet.rotationOnly.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+DocumentSegmentReviewSheet.swift	21	DocumentSegmentReviewSheet.removedCount.getter	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+DocumentSegmentReviewSheet.swift	25	DocumentSegmentReviewSheet.footerSummary.getter	24
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+DocumentSegmentReviewSheet.swift	50	DocumentSegmentReviewSheet.body.getter	178
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+DocumentSegmentReviewSheet.swift	241	DocumentReviewRow.rowBackground.getter	13
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+DocumentSegmentReviewSheet.swift	255	DocumentReviewRow.body.getter	88
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+DocumentSegmentReviewSheet.swift	344	DocumentReviewRow.rotationRadio(label:degrees:)	15
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+DocumentSegmentReviewSheet.swift	361	DocumentReviewRow.thumbnail.getter	23
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+DocumentSegmentReviewSheet.swift	387	static DocumentReviewRow.loadThumbnailAsync(url:maxSize:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+DocumentSegmentReviewSheet.swift	395	DocumentReviewRow.radioButton(label:selected:color:action:)	13
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+FileRowView.swift	134	FileTextViewerSheet.body.getter	31
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+InstitutionalCompute.swift	59	static InstitutionalComputeImportControl.models(_:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+InstitutionalCompute.swift	68	InstitutionalComputeImportControl.choose()	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+ModelTestResultsSheet.swift	19	ModelTestResultsSheet.baselineResult.getter	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+ModelTestResultsSheet.swift	25	ModelTestResultsSheet.body.getter	67
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+ModelTestResultsSheet.swift	93	ModelTestResultsSheet.modelResultColumn(entry:index:)	102
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+ModelTestResultsSheet.swift	196	ModelTestResultsSheet.similarityBadge(_:)	14
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+ModelTestResultsSheet.swift	211	ModelTestResultsSheet.formatCost(_:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+ResolutionDropSheet.swift	16	ResolutionDropSheet.body.getter	56
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+ResolutionTestSheet.swift	18	ResolutionTestSheet.baselineText.getter	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+ResolutionTestSheet.swift	22	ResolutionTestSheet.body.getter	68
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+ResolutionTestSheet.swift	91	ResolutionTestSheet.resolutionColumn(scale:text:index:)	70
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+ResolutionTestSheet.swift	162	ResolutionTestSheet.similarityBadge(_:)	14
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+ResolutionTestSheet.swift	177	ResolutionTestSheet.diffHighlightedText(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+SegmentationEditSheet.swift	16	SegmentationEditSheet.body.getter	58
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+WordDiff.swift	26	static WordDiff.tokenize(_:)	19
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+WordDiff.swift	47	static WordDiff.words(from:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+WordDiff.swift	52	static WordDiff.lcs(_:_:)	33
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+WordDiff.swift	86	static WordDiff.diff(baseline:candidate:)	99
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView+WordDiff.swift	186	static WordDiff.buildAttributedString(from:)	39
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView.swift	201	OCRView.FileRotationRetryTarget.id.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView.swift	205	OCRView.FileTextViewerTarget.id.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView.swift	331	OCRView.reportUnreadableAPIKey()	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView.swift	1427	OCRView.reviewJobIndex(for:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView.swift	1540	OCRView.performFileAction(_:on:)	24
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView.swift	1595	OCRView.collectionSummary.getter	21
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView.swift	1619	OCRView.keychainExplanationSheet.getter	52
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView.swift	1672	OCRView.keychainInfoRow(icon:title:detail:)	17
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView.swift	1731	static OCRView.repeatedIntakeNote(_:)	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView.swift	1821	OCRView.resumePendingBatch()	20
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/OCRView.swift	1870	OCRView.resumePendingMixedPDF(readWithoutClusterText:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ProcessingCommands.swift	64	static ProviderCycler.advance()	13
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ProcessingHistoryView.swift	51	ProcessingHistoryView.emptyState.getter	12
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ProviderKeyWizard.swift	236	ProviderKeyStep.testOCR()	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/SegmentationChooserView.swift	144	static SegmentationChooserView.keySpec(_:)	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAccountsTab.swift	146	SettingsAccountsTab.runLocalAgentDetectVerify()	12
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvancedTab.swift	51	SettingsAdvancedTab.picks.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvancedTab.swift	52	SettingsAdvancedTab.pick.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvancedTab.swift	214	SettingsAdvancedTab.localServerRows.getter	38
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvancedTab.swift	383	SettingsAdvancedTab.fillLocalServer()	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvancedTab.swift	393	SettingsAdvancedTab.checkLocalServer()	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvancedTab.swift	464	LocalSegmenterControls.check()	19
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvisorSheet.swift	208	SettingsAdvisorSheet.inheritedResolver.getter	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvisorSheet.swift	238	SettingsAdvisorSheet.derives<A>(_:_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvisorSheet.swift	321	SettingsAdvisorSheet.generalLimitWords.getter	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvisorSheet.swift	382	SettingsAdvisorSheet.sharesRows.getter	16
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvisorSheet.swift	399	SettingsAdvisorSheet.percentRow(_:id:note:value:)	12
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvisorSheet.swift	412	SettingsAdvisorSheet.moreRows.getter	85
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvisorSheet.swift	498	SettingsAdvisorSheet.languageSummary.getter	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvisorSheet.swift	503	SettingsAdvisorSheet.scriptSummary.getter	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvisorSheet.swift	511	SettingsAdvisorSheet.judgedOnText.getter	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvisorSheet.swift	561	SettingsAdvisorSheet.chooseFiles()	11
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvisorSheet.swift	746	AdvisorStageRow.details.getter	26
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsAdvisorSheet.swift	774	AdvisorStageRow.handbook.getter	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsCaptureTab.swift	102	SettingsCaptureTab.signInToDrive()	21
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsCaptureTab.swift	124	SettingsCaptureTab.signOutDrive()	5
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsEstimateFooter.swift	45	SettingsEstimateFooter.segmentationPlan.getter	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsEstimateFooter.swift	178	SettingsEstimateFooter.details.getter	31
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsEstimateFooter.swift	210	SettingsEstimateFooter.costRow(_:_:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsOutputTab.swift	223	TagVocabularySheet.body.getter	20
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsOutputTab.swift	244	TagVocabularySheet.importCSV()	9
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsOutputTab.swift	254	TagVocabularySheet.loadFromDrop(_:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsOutputTab.swift	264	TagVocabularySheet.load(from:)	12
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsPresets.swift	73	static WorkflowPreset.remoteGateway(_:)	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Settings/SettingsProcessingTab.swift	315	SettingsProcessingTab.batchCeiling.getter	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/SettingsView.swift	56	Handbook.Section.url.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Shared/ModelChoiceView.swift	17	RotationRetrySheet.init(title:subtitle:backendDescription:initialRotation:onApply:onCancel:)	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Shared/ModelChoiceView.swift	26	RotationRetrySheet.body.getter	37
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Shared/ProcessableItem.swift	39	FailureKind.label.getter	8
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Shared/ProcessableItem.swift	59	ItemAction.label.getter	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Shared/ProcessableItem.swift	70	ItemAction.systemImage.getter	10
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Shared/ProcessableItem.swift	102	ProcessableItem.id.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Shared/ProcessableItemRow.swift	60	ItemActionHandler.perform(_:on:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/Shared/ProcessableItemRow.swift	176	ProcessableItemRow.expandedDetail.getter	32
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/TagInputField.swift	14	TagInputField.suggestions.getter	4
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/TagInputField.swift	19	TagInputField.body.getter	49
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/TagInputField.swift	69	TagInputField.commit(_:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/TagInputField.swift	77	TagInputField.remove(_:)	3
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/TagInputField.swift	86	TagChip.body.getter	13
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ToolsView.swift	29	ToolsView.selectedModel.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ToolsView.swift	56	ToolsView.currentLocalAgentConfig.getter	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ToolsView.swift	225	ToolsView.runResolutionTest(imageURL:)	28
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ToolsView.swift	254	ToolsView.runModelTest(imageURL:)	24
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ZoomableImageView.swift	99	ZoomableImageView.stopMonitor()	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ZoomableImageView.swift	147	PanState.reclamp(zoom:fit:viewport:)	7
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ZoomableImageView.swift	154	PanState.setOffset(width:height:)	1
+ArchiveProcessor	ArchiveProcessor/macOS/Sources/ArchiveProcessor/Views/ZoomableImageView.swift	155	PanState.commit()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/ArchiveReaderCommands.swift	419	ArchiveReaderCommands.sortBy(_:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/AdvancedSearch.swift	418	static AdvancedSearch.dateKeys(_:)	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/AppSettings.swift	55	static AppSettings.setViewerSplitFraction(_:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/ArchiveFile.swift	103	ArchiveFile.catalogueFieldLabels.getter	8
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/ArchiveFile.swift	111	ArchiveFile.catalogueItemFieldsText.getter	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/ArchiveFile.swift	204	ArchiveFile.hash(into:)	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/AuditLedger.swift	257	AuditLedger.lastError.getter	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/ContainerCatalog.swift	58	static ContainerRow.== infix(_:_:)	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/ContainerCatalog.swift	109	static ContainerDisagreement.== infix(_:_:)	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/FileLink.swift	44	FileLinkFormatter.htmlEscaped(_:)	6
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/ImproveOCRHandoff.swift	22	ImproveOCRHandoff.Problem.description.getter	10
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/ImproveOCRSupport.swift	66	static ImproveOCRSupport.suggestedPanelLocation()	7
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/ImproveOCRSupport.swift	146	static ImproveOCRSupport.describe(_:)	12
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/NavigationHistory.swift	55	NavigationHistory.clear()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/PoorOCRFlagGuard.swift	44	PoorOCRFlagGuard.Refusal.description.getter	9
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/PoorOCRFlagGuard.swift	63	PoorOCRFlagGuard.Unfinished.note(_:)	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/ReaderCatalogueFacets.swift	10	CatalogueRecord.Field.readerIsCleared.getter	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/ReaderCatalogueFacets.swift	17	static ReaderCatalogueFacets.itemFields(_:)	13
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Core/ReaderCatalogueFacets.swift	48	static ReaderCatalogueFacets.hasAssessedDate(_:roles:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Search/ArchiveLibrary.swift	1270	ArchiveLibrary.takeTouchedSidecarFolders()	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Search/ContentIndex.swift	522	ContentIndex.snippets(expression:for:budget:bodyOnly:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Search/ContentIndex.swift	996	ContentIndex.lastMessage.getter	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Search/ContentIndexer.swift	184	ContentIndexer.forget(_:)	9
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Search/ContentIndexer.swift	559	ContentIndexer.snippets(expression:for:bodyOnly:)	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Search/CorpusWatcher.swift	19	CorpusWatchPathSet.removeAll()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Search/LibraryChangeSet.swift	44	LibraryChangeSet.isEmpty.getter	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Search/LibraryChangeSet.swift	45	LibraryChangeSet.isWhole.getter	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1378	TagTokenCellView.init(coder:)	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1602	IconSortHeaderCell.drawSortIndicator(withFrame:in:ascending:priority:)	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1703	ColumnPickerHeaderView.setSecondaryAsc(_:)	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1707	ColumnPickerHeaderView.setSecondaryDesc(_:)	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1711	ColumnPickerHeaderView.removeSecondary(_:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1714	ColumnPickerHeaderView.resetSort(_:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1810	QualityCellView.Button.accessibilityPerformPress()	5
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1825	QualityCellView.mouseDown(with:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/AppKitTableView.swift	1949	ContextMenuTableView.mouseDragged(with:)	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/CatalogueInspectorView.swift	326	CatalogueInspectorView.fileEdit(_:_:_:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/CatalogueRepairSection.swift	121	NavigationModel.catalogueRepairError(_:operation:)	10
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ContainerSection.swift	111	ContainerSection.editorField(_:)	21
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ContainerSection.swift	133	ContainerSection.warningList(_:)	21
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ContainerSection.swift	158	ContainerSection.begin(_:naming:text:)	5
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ContainerSection.swift	164	ContainerSection.commit(_:)	11
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ContainerSection.swift	220	ContainerSelectionSection.set()	6
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ContainerSection.swift	310	ContainerLevelsSheet.skippedRows.getter	28
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/DocumentTagActions.swift	80	DocumentTagActions.toggleFlag()	7
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/DocumentTagActions.swift	91	DocumentTagActions.togglePoorOCR()	12
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/DocumentTagActions.swift	104	DocumentTagActions.improveOCR()	5
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/DocumentViewerModel.swift	471	DocumentViewerModel.reloadReplaced(paths:)	9
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/DocumentViewerModel.swift	779	DocumentViewerModel.revealShownImageFile()	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/FieldStatusSection.swift	220	ItemFieldSelectionEditor.set()	6
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/FilenameFilterField.swift	38	static FilenameFilterTextField.cellClass.setter	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	17	NavigationModel.applyCatalogueFileField(_:_:paths:observed:)	5
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	27	NavigationModel.updateCatalogueNames(_:paths:physicalPageIndex:observed:update:)	18
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	47	NavigationModel.applyCatalogueRotation(path:pageIndex:turns:observed:completed:)	8
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	56	NavigationModel.applyCatalogueTagEdit(_:paths:physicalPageIndex:)	11
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	69	NavigationModel.applyCatalogueItemEdit(_:_:paths:physicalPageIndex:)	28
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	100	NavigationModel.editCatalogueSubjects(paths:_:)	7
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	110	NavigationModel.markCatalogue(_:paths:completed:)	7
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	287	static NavigationModel.catalogueTagEdit(_:id:fields:)	43
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	288	edit #1 (_:_:) in static NavigationModel.catalogueTagEdit(_:id:fields:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	291	date #1 (_:_:uncertain:) in static NavigationModel.catalogueTagEdit(_:id:fields:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	331	static NavigationModel.catalogueField(_:)	15
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	347	static NavigationModel.value<A>(_:)	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	376	CatalogueEditPlan.Member.stillRefers(to:in:)	11
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+CatalogueEdits.swift	464	static CatalogueActionResult.explain(_:)	12
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ContainerEdits.swift	212	NavigationModel.setContainerStandardName(_:for:field:forPath:undo:)	10
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ContainerEdits.swift	377	NavigationModel.editError(_:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ContainerSetAside.swift	27	ContainerSetAsideNeeded.documentPath.getter	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ContainerSetAside.swift	90	ContainerSetAsideOffer.title.getter	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ContainerSetAside.swift	98	NavigationModel.acceptContainerSetAside(_:)	13
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Containers.swift	283	NavigationModel.dismissContainerLevels()	5
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Containers.swift	291	containerLevelsWriteMessage(_:)	8
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+FolderDating.swift	62	FolderDatingOffer.recorded.getter	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ImproveOCR.swift	114	NavigationModel.chooseImproveOCRFolder()	23
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ImproveOCR.swift	291	static TextPageSummary.summarize(_:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ImproveOCR.swift	308	TextPageSummary.kindLabel.getter	7
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+ItemFieldEdits.swift	149	NavigationModel.syncSidecarNamesToIndex()	17
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift	14	NavigationModel.exportToZotero()	31
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift	49	NavigationModel.addToZotero()	16
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift	79	NavigationModel.zoteroGatherer(_:)	10
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift	119	NavigationModel.zoteroProtectedFolders(_:)	16
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel+Zotero.swift	152	static NavigationModel.zoteroExportedMessage(count:name:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	146	NavigationModel.requestFocusTagFilter()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	561	NavigationModel.askItemTypeColoursIfNeeded()	12
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	708	NavigationModel.relativeFolderName(_:)	5
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	716	NavigationModel.chooseFolderForRule(startingAt:)	12
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	971	NavigationModel.extendSelectionToDocumentRun()	31
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	1032	NavigationModel.selectFiles(withTag:)	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	1585	NavigationModel.setFullTextResultForTesting(query:paths:snippets:)	8
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	1594	NavigationModel.pendingSnippetCountForTesting.getter	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	2439	NavigationModel.adoptChosenRoot(_:)	50
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	2897	NavigationModel.selectNextUnread()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	2899	NavigationModel.selectPreviousUnread()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	2901	NavigationModel.advanceToUnread(forward:)	19
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	2957	NavigationModel.groupSummary.getter	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	3331	NavigationModel.jpegPartnerUnavailableMessage.getter	12
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	3473	NavigationModel.revealInFinder()	5
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationModel.swift	3480	NavigationModel.openInDefaultApp()	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	322	NavigationWindowView.displayCalendarMenu()	12
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	693	NavigationWindowView.dateFilterPopover.getter	31
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1035	DataQualityView.containerWarnings(_:)	34
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1117	ContextMenuActions.openInDocView()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1118	ContextMenuActions.preview()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1120	ContextMenuActions.revealInFinder()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1121	ContextMenuActions.openInDefaultApp()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1122	ContextMenuActions.copyLinks()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1123	ContextMenuActions.copyArchiveLinks()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1124	ContextMenuActions.exportToZotero()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1125	ContextMenuActions.addToZotero()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1126	ContextMenuActions.markRead()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1127	ContextMenuActions.markUnread()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1128	ContextMenuActions.toggleFlag()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1129	ContextMenuActions.togglePoorOCR()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1130	ContextMenuActions.improveOCR()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1131	ContextMenuActions.editTags()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1132	ContextMenuActions.selectDocRun()	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/NavigationWindowView.swift	1133	ContextMenuActions.setDisplayCalendar(_:)	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/OptionsView.swift	117	OptionsView.addExcludedFolder()	21
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/OptionsView.swift	140	OptionsView.resolveArchiveRoot()	6
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/PDFPaneView.swift	537	StandInFindOverlayView.init(coder:)	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/PageTurnInput.swift	173	NSEvent.swipeTurnsToNext.getter	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/PanelDivider.swift	70	PanelDividerView.init(coder:)	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/PreviewImagePrefetcher.swift	259	PlaceholderPageOverlayView.init(coder:)	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/SubjectFilterTokenField.swift	78	SubjectFilterTokenField.Coordinator.tokenField(_:completionsForSubstring:indexOfToken:indexOfSelectedItem:)	4
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/SubjectFilterTokenField.swift	88	SubjectFilterTokenField.Coordinator.tokenField(_:shouldAdd:at:)	11
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/SubjectFilterTokenField.swift	102	SubjectFilterTokenField.Coordinator.controlTextDidChange(_:)	8
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/SubjectFilterTokenField.swift	114	SubjectFilterTokenField.Coordinator.controlTextDidEndEditing(_:)	9
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/SubjectFilterTokenField.swift	126	static SubjectFilterTokenField.Coordinator.union<A>(_:_:)	6
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/TagEditorView.swift	441	TagEditorView.markReadState(_:)	1
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/TagEditorView.swift	442	TagEditorView.toggleFlag()	3
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	34	ViewerSwitchProbe.().init()	9
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	44	ViewerSwitchProbe.observe(_:)	13
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	60	ViewerSwitchProbe.switchStarted(bitmapReady:)	8
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	69	ViewerSwitchProbe.close()	14
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	85	ViewerSwitchProbe.noteFootprint(_:)	5
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	91	ViewerSwitchProbe.publish()	10
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	92	pct #1 (_:_:) in ViewerSwitchProbe.publish()	5
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	102	static ViewerSwitchProbe.footprintMiB()	10
+ArchiveReader	ArchiveReader/macOS/Sources/ArchiveReader/Views/ViewerSwitchProbe.swift	118	ViewerSwitchProbeLabel.body.getter	8
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Calendars/DisplayCalendar.swift	50	DisplayCalendar.displayName.getter	10
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueAssociation.swift	19	CatalogueAssociation.Occurrence.hash(into:)	4
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueAssociation.swift	68	CatalogueAssociation.Pair.owner(of:among:)	3
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueEdit.swift	271	encodeNames #1 (_:) in CatalogueEdit.encodedValue(_:replacing:)	5
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueFactsUpdates.swift	55	CatalogueFactsUpdates.removeSubscription(_:)	3
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueReassociation.swift	11	CatalogueReader.RememberedPair.physicalKey.getter	4
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueReassociation.swift	36	CatalogueReader.ReassociationCandidate.formerPair.getter	1
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueRecord.swift	46	CatalogueRecord.Region.init(from:)	10
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Catalogue/CatalogueSnapshot.swift	49	CatalogueReader.Snapshot.rememberablePairs<A>(at:)	5
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Catalogue/ItemFacts.swift	37	ItemFacts.FileFacts.samePhysicalOccurrence(as:)	5
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Collections/CollectionSettingsRecord.swift	25	CollectionSettingsRecord.Setting.id.getter	1
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Collections/CollectionSettingsRecord.swift	657	static CollectionSettingsVocabulary.plain(_:)	6
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerBackfill.swift	30	ContainerBackfill.Directory.id.getter	1
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerFileStore.swift	447	static ContainerFileStore.asStored<A>(_:)	4
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerLevelMap.swift	17	ContainerLevelRole.field.getter	11
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerLevelsDraft.swift	93	ContainerLevelsDraft.setSkipped(_:_:)	3
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerLevelsDraft.swift	99	ContainerLevelsDraft.setChildren(_:_:)	4
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerLevelsDraft.swift	105	ContainerLevelsDraft.childRoles.getter	3
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerRecord.swift	330	ContainerJSONKey.intValue.getter	1
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Containers/ContainerRecord.swift	333	ContainerJSONKey.init(intValue:)	1
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift	825	static FileStat.describe(_:)	10
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Corpus/CorpusWalker.swift	861	CancellationFlag.set()	1
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Corpus/ScaleLaneCalibration.swift	59	ScaleLaneCalibration.normalised.getter	3
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Corpus/ScaleLaneCalibration.swift	64	ScaleLaneCalibration.line.getter	5
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Corpus/ScaleLaneCalibration.swift	81	static ScaleLaneCalibration.measure(lane:root:warmWalkSeconds:filesSeen:)	16
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Links/ImproveOCRRequest.swift	267	ImproveOCRManifest.stage(in:now:)	9
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Links/ImproveOCRSupportIdentity.swift	13	static ImproveOCRSupportIdentity.suggestedLocation.getter	4
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/PDF/ExtractedContent.swift	173	static PDFPageRole.roles(of:)	4
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Preservation/PreservationCopy.swift	29	static PreservationCopy.isDocumentFolder(_:in:)	3
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Preservation/PreservationCopy.swift	165	PreservationCopy.Failure.errorDescription.getter	8
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Tags/DateFieldEntry.swift	312	static DateFieldEntry.sameDay(_:_:)	7
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Tags/FieldStatus.swift	144	static FieldStatusPolicy.userItemField(pageValue:)	4
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Tags/ItemType.swift	72	ItemTypeColors.isNone.getter	1
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Tags/ItemType.swift	78	ItemTypeColors.setColour(_:for:)	3
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCore/Tags/TagVocabulary.swift	105	TagVocabulary.spelling(of:)	4
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCoreUI/Collections/CollectionRecordView.swift	147	CollectionRecordContent.note(_:)	3
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCoreUI/TagEntry/SubjectEntryField.swift	80	SubjectEntryField.Coordinator.tokenField(_:shouldAdd:at:)	6
+ArchiveCore	packages/ArchiveCore/Sources/ArchiveCoreUI/Tags/TagChip.swift	23	static TagChip.height(for:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	236	static Annotations.pageCarriesMark(surfaced:rawAnnotationCount:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	259	static Annotations.rawAnnotationCount(of:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	342	Annotations.Report.copiedTotal.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	343	Annotations.Report.droppedTotal.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	347	Annotations.Report.summary.getter	18
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	348	list #1 (_:) in Annotations.Report.summary.getter	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	405	Annotations.Failure.errorDescription.getter	47
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	418	tally #1 (_:) in Annotations.Failure.errorDescription.getter	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	471	static Annotations.Document.key(_:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	472	static Annotations.Document.reference(_:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	483	static Annotations.Document.id(ofReference:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	494	static Annotations.Document.isNonZeroGeneration(_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	501	Annotations.Document.body(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	505	Annotations.Document.dictionary(_:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	513	Annotations.Document.array(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	518	Annotations.Document.resolveArray(_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	534	Annotations.Document.rect(of:)	13
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	571	static Annotations.translatedGeometry(_:key:from:dx:dy:)	34
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	572	numbers #1 (_:) in static Annotations.translatedGeometry(_:key:from:dx:dy:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	584	shift #1 (_:) in static Annotations.translatedGeometry(_:key:from:dx:dy:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	613	static Annotations.pageOrder(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	642	static Annotations.pageTree(_:)	46
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	654	number #1 (_:) in static Annotations.pageTree(_:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	661	box #1 (_:) in static Annotations.pageTree(_:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	667	walk #1 (_:rotation:mediaBox:) in static Annotations.pageTree(_:)	18
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	702	static Annotations.resolvesIndirectRectangles.getter	25
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	738	static Annotations.resolvesInheritedPageAttributes.getter	27
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	773	static Annotations.translatesIndirectGeometry.getter	31
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	782	shifted #1 (_:_:) in static Annotations.translatesIndirectGeometry.getter	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	821	static Annotations.run(_:_:stage:adopting:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	838	static Annotations.launch(_:_:stage:register:)	24
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	863	static Annotations.read(_:streamDirectory:)	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	887	static Annotations.transplant(from:into:password:qpdf:scratch:isCancelled:adopting:)	288
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	923	withPassword #1 (_:) in static Annotations.transplant(from:into:password:qpdf:scratch:isCancelled:adopting:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	1195	static Annotations.copy(_:from:into:mapping:nextID:report:stagedPage:sourcePages:dx:dy:failure:)	98
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	1203	rewrite #1 (_:key:) in static Annotations.copy(_:from:into:mapping:nextID:report:stagedPage:sourcePages:dx:dy:failure:)	48
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Annotations.swift	1300	static Annotations.append(_:toAnnotsOf:in:nextID:)	23
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/CompressedPage.swift	24	CompressedPage.Failure.errorDescription.getter	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/DownloadRunner.swift	15	DownloadRunner.init(timing:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/DownloadRunner.swift	31	DownloadRunner.start(_:reader:)	13
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/DownloadRunner.swift	46	DownloadRunner.stop()	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/DownloadRunner.swift	58	DownloadRunner.covers(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/DownloadRunner.swift	62	DownloadRunner.drain(_:)	43
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/DownloadRunner.swift	107	DownloadRunner.failure(_:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/DownloadRunner.swift	113	static DownloadRunner.size(_:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	34	Flattener.Mode.id.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	35	Flattener.Mode.label.getter	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	42	Flattener.Mode.blurb.getter	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	252	static Flattener.spotColourTooDear(colour:bilevel:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	365	static Flattener.colourBoundIsWithinTheGreyOne.getter	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	405	Flattener.Failure.errorDescription.getter	42
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	466	static Flattener.pageIsAnImage(_:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	522	static Flattener.pageHasDigitalText(_:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	542	static Flattener.pageIsMostlyScan(_:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	561	static Flattener.textStandsBesideImages(_:images:box:minimum:)	14
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	580	static Flattener.carriesAnOCRLayer(_:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	677	static Flattener.contentProfile(_:)	181
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	689	init(table:) in State #1 in static Flattener.contentProfile(_:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	690	show() in State #1 in static Flattener.contentProfile(_:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	902	static Flattener.digitalTextPages(in:password:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	958	static Flattener.sampleIndices(count:wanted:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	988	static Flattener.hasDigitalText(_:password:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	1001	static Flattener.hasDigitalText(in:)	17
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	1130	static Flattener.cameraResolution(width:height:properties:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	1834	static Flattener.displayBox(of:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	1976	static Flattener.renderRGB(_:box:scale:width:height:from:)	26
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	2006	static Flattener.photographed(_:box:cameraExposed:)	14
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	2031	static Flattener.drawsAlike(_:_:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	2056	static Flattener.jpegRGB(from:width:height:quality:)	20
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	2384	static Flattener.bitmapDigest(_:)	18
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	2464	static Flattener.sourceImagePlacement(of:)	68
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	2498	scan #1 (_:) in static Flattener.sourceImagePlacement(of:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	2566	margin #1 (_:_:) in static Flattener.placedSourceRebuild(of:box:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	2646	static Flattener.sourceBitmapMatches(_:grey:width:height:threshold:)	24
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	2682	static Flattener.pictureSignals(_:grey:width:height:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	2787	static Flattener.saturation(of:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	2795	static Flattener.colourMeasures(of:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3032	static Flattener.inkApart(_:_:width:height:threshold:)	16
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3054	static Flattener.darkenColourInk(_:page:box:scale:width:height:threshold:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3071	static Flattener.darkenColourInk(_:rgba:width:height:threshold:field:)	32
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3144	static Flattener.saturatedFraction(ofRGBA:width:height:above:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3166	static Flattener.inkCoverage(of:width:height:threshold:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3596	Flattener.ShapeComponent.width.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3597	Flattener.ShapeComponent.height.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3600	Flattener.ShapeComponent.medianRun.getter	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3605	Flattener.ShapeComponent.add(_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3654	find #1 (_:) in static Flattener.shapeComponents(_:width:height:x0:y0:x1:y1:runLimit:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3659	union #1 (_:_:) in static Flattener.shapeComponents(_:width:height:x0:y0:x1:y1:runLimit:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3700	static Flattener.textShaped(_:glyphHeight:glyphRun:)	11
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3725	static Flattener.textLines(_:accepted:glyphHeight:)	51
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3751	flush #1 () in static Flattener.textLines(_:accepted:glyphHeight:)	14
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	3777	static Flattener.medianOf(_:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	4099	Flattener.MarkComponent.fill.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	4443	inkUnder #1 (_:) in static Flattener.paleDrawing(_:dpi:maximumInkInBox:)	11
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	4532	static Flattener.mrcBoundIsWithinTheRenderOne.getter	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	4627	Flattener.MRCLayers.files.getter	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	4723	static Flattener.colourMRCBoundIsWithinTheRenderOne.getter	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	5763	static Flattener.mrcStencil(_:box:boxes:dpi:outsideWords:photographed:)	36
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	5855	static Flattener.rebuildDPI(of:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	6135	static Flattener.nativeDPI(of:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	6194	static Flattener.largestImage(of:)	141
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Flattener.swift	6239	walk #1 (_:depth:) in static Flattener.largestImage(of:)	84
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/HandPlacer.swift	52	HandPlacer.Failure.errorDescription.getter	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	222	static JBIG2.parseSourceImages(_:objects:)	76
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	223	stream #1 (_:) in static JBIG2.parseSourceImages(_:objects:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	230	filters #1 (_:) in static JBIG2.parseSourceImages(_:objects:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	235	dictionary #1 (_:) in static JBIG2.parseSourceImages(_:objects:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	246	formImage #1 (_:) in static JBIG2.parseSourceImages(_:objects:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	336	JBIG2.Failure.errorDescription.getter	26
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	373	static JBIG2.installHint.getter	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	876	static JBIG2.pdfString(_:)	17
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	899	static JBIG2.coordinate(_:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	934	static JBIG2.pageRange(_:)	15
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	965	static JBIG2.spliceArguments(source:password:assembled:passthrough:pageCount:destination:)	35
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	1099	static JBIG2.removingText(from:)	106
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	1100	isSpace #1 (_:) in static JBIG2.removingText(from:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	1103	isDelimiter #1 (_:) in static JBIG2.removingText(from:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	1619	json #1 (_:) in static JBIG2.setCropBoxes(_:in:using:budget:register:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	1633	pageObjects #1 (_:) in static JBIG2.setCropBoxes(_:in:using:budget:register:)	14
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	1650	fingerprint #1 (_:) in static JBIG2.setCropBoxes(_:in:using:budget:register:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	1758	json #1 (_:_:) in static JBIG2.setOutline(_:in:using:budget:register:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	1804	ref #1 (_:) in static JBIG2.setOutline(_:in:using:budget:register:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	1823	number #2 (_:) in static JBIG2.setOutline(_:in:using:budget:register:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	1861	entries #1 (_:) in static JBIG2.setOutline(_:in:using:budget:register:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	1900	static JBIG2.qpdfString(_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	1908	static JBIG2.qpdfText(_:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/JBIG2.swift	2024	written #1 (_:) in static JBIG2.carryDocumentInfo(from:password:into:using:budget:register:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/MixedPagePreflag.swift	29	MixedPagePreflag.Reading.top.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/MixedPagePreflag.swift	31	MixedPagePreflag.Reading.flagged.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/MixedPagePreflag.swift	36	MixedPagePreflag.Failure.errorDescription.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/MixedPagePreflag.swift	45	static MixedPagePreflag.downloadMB.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/MixedPagePreflag.swift	63	static MixedPagePreflag.modelURL(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/MixedPagePreflag.swift	70	static MixedPagePreflag.model(_:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/MixedPagePreflag.swift	84	static MixedPagePreflag.read(url:environment:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/MixedPagePreflag.swift	92	static MixedPagePreflag.read(image:environment:)	42
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	32	resolveDroppedURLs(_:completion:)	22
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	63	collectInputFiles(from:existing:)	32
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	96	filesInFolder(_:)	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	142	static RunControl.liveControls()	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	149	static RunControl.isAnyRunning.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	162	static RunControl.beginPreflight()	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	165	static RunControl.endPreflight()	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	171	static RunControl.isAnyCommitted.getter	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	180	static RunControl.cancelAll()	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	187	RunControl.isFinished.getter	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	193	RunControl.finished()	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	223	RunControl.adopt(_:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	236	RunControl.release(_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	263	RunControl.adoptedCount.getter	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	268	RunControl.cancel()	30
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	307	OCRModel.outputFolder.didset	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	312	OCRModel.besideOriginal.didset	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	315	OCRModel.init()	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	330	OCRModel.reloadDestination()	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	381	OCRModel.FileStatus.isRunning.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	384	OCRModel.status(url:)	11
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	397	OCRModel.statusDescription(url:)	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	410	OCRModel.overallFraction.getter	15
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	433	OCRModel.progressIsIndeterminate.getter	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	503	OCRModel.LogLine.spoken.getter	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	511	OCRModel.LogLine.color.getter	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	536	OCRModel.announce(_:important:)	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	548	OCRModel.destinationReady.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	560	OCRModel.isCommitted.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	562	OCRModel.canStart.getter	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	576	OCRModel.failedFiles.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	587	OCRModel.canRetryFailures.getter	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	600	OCRModel.retryFailures()	48
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	657	OCRModel.abandonRetry()	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	692	OCRModel.add(_:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	709	OCRModel.isImporting.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	728	OCRModel.add(_:then:)	27
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	762	OCRModel.remove(_:)	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	774	OCRModel.logText.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	782	OCRModel.problemCount.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	791	OCRModel.logFailuresFirst.getter	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	808	OCRModel.logAnchor.getter	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	817	OCRModel.clearFiles()	13
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	832	OCRModel.clearLog()	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	871	static OCRModel.writeEmbeddedText(from:to:password:)	47
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	933	OCRModel.Failure.errorDescription.getter	11
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	957	static OCRModel.filesWithDigitalText(in:password:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	994	static OCRModel.hasTrimmedPages(_:password:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	1037	static OCRModel.outcome(for:cancelled:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	1059	static OCRModel.warnsAboutDigitalText(mode:rebuildImages:)	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	1071	static OCRModel.digitalTextWarning(for:of:mode:)	27
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	1104	OCRModel.start(note:)	87
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	1199	OCRModel.askAboutDigitalText(_:of:)	37
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	1244	OCRModel.run(_:readingTextFrom:note:leftOut:)	393
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	1671	static OCRModel.uniqueOutputs(for:besideOriginal:folder:suffix:extension:alsoClaimed:releasing:)	26
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	1672	key #1 (_:) in static OCRModel.uniqueOutputs(for:besideOriginal:folder:suffix:extension:alsoClaimed:releasing:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	1989	keptBytes #1 (_:) in static OCRModel.makeSearchablePDF(file:output:rebuild:rebuildMode:password:settings:control:useHelper:lines:inkBoxes:photographed:progress:fellBack:tookJBIG2Route:shrunkTextPageNote:digitalTextPageNote:unreadLineNote:modelFallbackNote:report:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	2003	keptSourceStream #1 (page:_:) in static OCRModel.makeSearchablePDF(file:output:rebuild:rebuildMode:password:settings:control:useHelper:lines:inkBoxes:photographed:progress:fellBack:tookJBIG2Route:shrunkTextPageNote:digitalTextPageNote:unreadLineNote:modelFallbackNote:report:)	27
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	3165	static OCRModel.textPageSummary(_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	3207	static OCRModel.unplacedSummary(_:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	3309	static OCRModel.digitalTextPageSummary(_:)	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	3335	static OCRModel.passedThroughPageSummary(_:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	3348	static OCRModel.unreadLineSummary(_:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	3421	OCRModel.writeReport(batch:leftOut:settings:rebuildImages:rebuildMode:concurrency:recognitionInHelpers:recognitionFallbacks:jbig2Files:destination:)	40
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	3480	static OCRModel.folderToReveal(destination:inputs:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	3490	OCRModel.finish(_:outcome:message:)	51
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Model.swift	3542	OCRModel.cancel()	26
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	62	ModelDownloads.Item.name.getter	13
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	185	static ModelDownloads.Source.current(_:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	191	ModelDownloads.Source.url(_:_:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	206	ModelDownloads.Failure.errorDescription.getter	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	219	static ModelDownloads.needed(accurateMode:_:_:environment:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	225	static ModelDownloads.sweep(home:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	236	static ModelDownloads.sha256(_:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	310	static ModelDownloads.fetch(_:to:expecting:done:progress:)	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	332	ModelDownloads.Fetcher.init(url:target:progress:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	336	ModelDownloads.Fetcher.run()	18
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	356	ModelDownloads.Fetcher.urlSession(_:downloadTask:didWriteData:totalBytesWritten:totalBytesExpectedToWrite:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	360	ModelDownloads.Fetcher.urlSession(_:downloadTask:didFinishDownloadingTo:)	11
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	372	ModelDownloads.Fetcher.urlSession(_:task:didCompleteWithError:)	18
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	394	ModelDownloads.Plan.isArchive.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	399	Prefs.AccurateReader.needs(_:)	11
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	415	Prefs.AccurateReader.missing(_:environment:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	420	static Prefs.AccurateReader.downloadable.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	424	Prefs.AccurateReader.allNeeds.getter	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	435	Prefs.AccurateReader.toFetch(environment:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	441	Prefs.AccurateReader.diskSpace.getter	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	451	static Prefs.AccurateReader.ready(_:memoryGB:enabled:environment:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	459	Prefs.AccurateReader.state(_:memoryGB:enabled:environment:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	472	static Prefs.AccurateReader.warning(_:_:_:memoryGB:enabled:environment:)	14
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	489	Prefs.AccurateReader.isTimed.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	493	static Prefs.AccurateReader.textPageNote(_:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ModelDownloads.swift	504	static Prefs.AccurateReader.confirmation(_:_:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/NewspaperLayout.swift	33	NewspaperLayout.Failure.errorDescription.getter	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/NewspaperLayout.swift	84	static NewspaperLayout.model(_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/NewspaperLayout.swift	91	static NewspaperLayout.script(_:)	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/NewspaperLayout.swift	109	static NewspaperLayout.command(image:out:environment:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/NewspaperLayout.swift	153	static NewspaperLayout.decode(_:)	23
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/NewspaperLayout.swift	177	static NewspaperLayout.run(_:memoryGB:isCancelled:)	46
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/PageReader.swift	33	PageWord.init(text:box:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	30	Prefs.Mode.id.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	31	Prefs.Mode.label.getter	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	37	Prefs.Mode.blurb.getter	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	61	Prefs.PhotoDetail.id.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	72	Prefs.PhotoDetail.label.getter	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	80	Prefs.PhotoDetail.blurb.getter	24
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	122	Prefs.ImageDetail.id.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	125	Prefs.ImageDetail.label.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	144	Prefs.ImageDetail.exampleKB.getter	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	154	Prefs.ImageDetail.blurb.getter	13
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	189	Prefs.Preset.id.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	191	Prefs.Preset.label.getter	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	212	Prefs.Preset.blurb.getter	16
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	254	Prefs.Preset.apply(to:)	14
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	270	Prefs.Preset.summary(afterChanging:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	292	Prefs.Preset.write(to:)	51
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	355	Prefs.TextFormat.id.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	357	Prefs.TextFormat.fileExtension.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	495	Prefs.AccurateReader.name.getter	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	528	Prefs.AccurateReader.figures(_:)	39
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	570	Prefs.AccurateReader.route(_:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	584	Prefs.AccurateReader.referenceSeconds(_:)	16
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	603	Prefs.AccurateReader.speed(_:timing:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	615	Prefs.AccurateReader.cells(_:timing:)	17
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	634	static Prefs.AccurateReader.offered(_:memoryGB:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	642	static Prefs.AccurateReader.chosen(_:_:memoryGB:enabled:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	649	Prefs.AccurateReader.readsWell.getter	11
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	662	Prefs.AccurateReader.memoryNeedGB.getter	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	667	static Prefs.AccurateReader.enabled(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	671	static Prefs.AccurateReader.enabled(raw:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	677	static Prefs.AccurateReader.setEnabled(_:_:_:)	11
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	707	static Prefs.AccurateTiming.key(_:_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	712	static Prefs.AccurateTiming.thisMachine.getter	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	721	Prefs.AccurateTiming.init(measured:seconds:reference:machine:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	730	Prefs.AccurateTiming.init(_:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	736	Prefs.AccurateTiming.data.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	771	static Prefs.defaultConcurrency.getter	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	779	static Prefs.sysctlInt(_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	858	static Prefs.Snapshot.current(_:)	43
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	906	Prefs.Snapshot.applyAccurateMode(_:)	19
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	961	static Prefs.migrateFromPreviousName()	25
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	1013	static Prefs.register(migrate:into:)	84
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	1107	static Prefs.confidenceReadout(_:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Prefs.swift	1119	static Prefs.confidenceWarning(_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	63	Recogniser.Failure.errorDescription.getter	14
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	92	static Recogniser.supportedLanguages(fast:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	104	static Recogniser.unsupportedLanguages(in:fast:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	150	static Recogniser.recogniseDocument(visible:bitmaps:settings:password:useHelper:isCancelled:onPage:register:onFallback:onModelFallback:)	114
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	292	text.getter in PageOut #1 in static Recogniser.extract(from:to:settings:password:isCancelled:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	323	object #1 (_:) in static Recogniser.extract(from:to:settings:password:isCancelled:)	18
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	386	static Recogniser.exifOrientation(of:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	406	static Recogniser.imageURL(of:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	414	static Recogniser.loadImage(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	419	static Recogniser.loadImage(at:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	433	static Recogniser.render(_:settings:)	31
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	728	static Recogniser.photographed(besides:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	745	static Recogniser.textPageURL(besides:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	750	static Recogniser.textPages(of:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	761	static Recogniser.readingImage(besides:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	787	static Recogniser.greyReading(of:from:aspect:)	33
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	837	static Recogniser.stacked(_:in:of:lineHeight:aspect:)	45
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	843	meets #1 (_:_:) in static Recogniser.stacked(_:in:of:lineHeight:aspect:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	863	letters #1 (_:) in static Recogniser.stacked(_:in:of:lineHeight:aspect:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	865	digits #1 (_:) in static Recogniser.stacked(_:in:of:lineHeight:aspect:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	889	static Recogniser.isGarbledNumber(_:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	911	static Recogniser.dictionaryWords(in:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	915	static Recogniser.isWord(_:)	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	941	static Recogniser.recognitionImage(besides:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	970	static Recogniser.recognisePage(at:settings:modelStopped:isCancelled:onModelFallback:)	101
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	977	read #1 (_:) in static Recogniser.recognisePage(at:settings:modelStopped:isCancelled:onModelFallback:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1015	inked #1 () in static Recogniser.recognisePage(at:settings:modelStopped:isCancelled:onModelFallback:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1076	static Recogniser.modelPass(_:on:shown:settings:newspaper:isCancelled:onTextPage:)	44
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1123	static Recogniser.modelPageTurn(_:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1134	static Recogniser.modelImage(_:uprightBy:)	17
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1155	static Recogniser.modelReadingPass(_:on:shown:settings:cutAtRegions:isCancelled:onTextPage:)	30
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1198	static Recogniser.linesOnlyFiner(_:_:aspect:)	13
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1199	meets #1 (_:_:) in static Recogniser.linesOnlyFiner(_:_:aspect:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1236	static Recogniser.finerReading(of:from:aspect:keepingNumbers:)	134
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1238	turns #1 (_:) in static Recogniser.finerReading(of:from:aspect:keepingNumbers:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1239	reach #1 (_:) in static Recogniser.finerReading(of:from:aspect:keepingNumbers:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1242	same #1 (_:_:turned:) in static Recogniser.finerReading(of:from:aspect:keepingNumbers:)	13
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1257	pieces #1 (of:) in static Recogniser.finerReading(of:from:aspect:keepingNumbers:)	21
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1294	letters #1 (_:) in static Recogniser.finerReading(of:from:aspect:keepingNumbers:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1301	joinsAsHead #1 (_:) in static Recogniser.finerReading(of:from:aspect:keepingNumbers:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1305	joinsAsTail #1 (_:) in static Recogniser.finerReading(of:from:aspect:keepingNumbers:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1327	baseline #1 (_:) in static Recogniser.finerReading(of:from:aspect:keepingNumbers:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1328	mayContinue #1 (_:) in static Recogniser.finerReading(of:from:aspect:keepingNumbers:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1344	words #1 (_:) in static Recogniser.finerReading(of:from:aspect:keepingNumbers:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1377	static Recogniser.numbers(in:)	16
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1410	static Recogniser.likeness(_:_:)	13
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1411	pairs #1 (_:) in static Recogniser.likeness(_:_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1446	static Recogniser.readerSlots(reader:physicalBytes:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1529	static Recogniser.ReaderTicket.isLive(_:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1539	static Recogniser.ReaderTicket.rank(_:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1546	static Recogniser.ReaderTicket.before(_:_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1599	static Recogniser.readingSize(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1607	static Recogniser.modelReading(of:reader:crops:memoryGB:size:slots:alone:pressure:isCancelled:)	70
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1948	static Recogniser.fillTargets(_:inked:pageWidth:pageHeight:inkSpan:)	37
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	1989	static Recogniser.inkSpan(rows:of:level:)	25
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2037	static Recogniser.filled(_:targets:readings:aspect:)	60
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2038	letters #1 (_:) in static Recogniser.filled(_:targets:readings:aspect:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2039	inside #1 (_:_:) in static Recogniser.filled(_:targets:readings:aspect:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2108	static Recogniser.filledReading(of:on:shown:reader:memoryGB:isCancelled:)	45
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2163	static Recogniser.ModelBlock.== infix(_:_:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2174	static Recogniser.modelBlocks(_:)	14
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2202	static Recogniser.blockLines(grey:width:level:inside:)	71
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2282	static Recogniser.distributed(_:over:pieces:)	36
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2322	static Recogniser.printedWidth(_:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2348	static Recogniser.placed(_:pieces:)	57
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2355	fit #1 (_:_:) in static Recogniser.placed(_:pieces:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2366	reach #1 (_:_:_:_:) in static Recogniser.placed(_:pieces:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2408	static Recogniser.visualRows(_:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2444	static Recogniser.replaced(_:blocks:pageWidth:pageHeight:level:lookup:)	78
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2447	holds #1 (_:_:) in static Recogniser.replaced(_:blocks:pageWidth:pageHeight:level:lookup:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2451	upright #1 (_:) in static Recogniser.replaced(_:blocks:pageWidth:pageHeight:level:lookup:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2452	wordCount #1 (_:) in static Recogniser.replaced(_:blocks:pageWidth:pageHeight:level:lookup:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2532	static Recogniser.replacedReading(of:on:shown:reader:memoryGB:isCancelled:)	38
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2592	static Recogniser.regionAligned(_:blocks:aspect:)	15
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2610	static Recogniser.regionHolds(_:_:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2650	static Recogniser.cutAtRegions(_:blocks:of:settings:isCancelled:)	91
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2656	overlap #1 (_:_:_:_:) in static Recogniser.cutAtRegions(_:blocks:of:settings:isCancelled:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2660	gap #1 (_:) in static Recogniser.cutAtRegions(_:blocks:of:settings:isCancelled:)	25
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2695	repeats #1 (_:) in static Recogniser.cutAtRegions(_:blocks:of:settings:isCancelled:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2718	large #1 (_:) in static Recogniser.cutAtRegions(_:blocks:of:settings:isCancelled:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2763	static Recogniser.regionedReading(of:shown:reader:aspect:settings:cutOn:isCancelled:)	31
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2847	static Recogniser.visionRegionText(_:of:settings:isCancelled:)	15
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2867	static Recogniser.regions(besides:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2887	static Recogniser.recognisePage(_:regions:settings:isCancelled:)	49
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2948	static Recogniser.sideBySideLanes(_:)	20
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	2981	static Recogniser.readingOrder(_:)	14
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	4103	static Recogniser.inkedRows(of:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	4122	static Recogniser.inkedStrips(of:strips:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	4996	static Recogniser.helperIsWorthIt(concurrency:files:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5012	static Recogniser.helperPath()	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5037	static Recogniser.helperArguments(_:)	24
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5075	static Recogniser.helperSettings(from:)	58
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5082	flag #1 (_:) in static Recogniser.helperSettings(from:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5089	number #1 (_:) in static Recogniser.helperSettings(from:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5141	Recogniser.HelperPage.init(observations:modelFallback:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5175	Recogniser.HelperFailure.errorDescription.getter	31
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5227	static Recogniser.recogniseViaHelper(images:settings:helper:stallSeconds:isCancelled:onPage:register:onModelFallback:)	185
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5414	static Recogniser.lastLine(of:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5473	static Recogniser.pageKind(of:pasteUp:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5709	static Recogniser.handSignals(of:image:)	60
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5756	median #1 (_:) in static Recogniser.handSignals(of:image:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5774	static Recogniser.baseline(_:trim:)	17
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5775	fit #1 (_:) in static Recogniser.baseline(_:trim:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5806	static Recogniser.isHandwritten(_:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5815	Recogniser.PageKind.pages.getter	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5828	Prefs.Snapshot.modelOn.getter	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5857	Prefs.Snapshot.model(for:)	16
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5917	static ModelRuntime.offered(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5935	static ModelRuntime.script(_:)	14
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	5963	static ModelRuntime.command(reader:image:out:crops:environment:)	32
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6074	static LayoutModel.url(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6083	static LayoutModel.model(_:)	17
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6105	static LayoutModel.areaShrink(_:width:height:to:_:)	34
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6106	table #1 (_:_:) in static LayoutModel.areaShrink(_:width:height:to:_:)	15
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6144	static LayoutModel.areaEnlarge(_:width:height:to:_:)	24
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6145	table #1 (_:_:) in static LayoutModel.areaEnlarge(_:width:height:to:_:)	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6172	static LayoutModel.channels(of:)	24
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6201	static LayoutModel.Letterbox.of(width:height:side:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6215	static LayoutModel.decode(_:width:height:)	22
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6222	at #1 (_:_:) in static LayoutModel.decode(_:width:height:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6244	static LayoutModel.crops(_:pageWidth:pageHeight:)	45
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6269	clip #1 (_:_:) in static LayoutModel.crops(_:pageWidth:pageHeight:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6276	inter #1 (_:_:) in static LayoutModel.crops(_:pageWidth:pageHeight:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6293	static LayoutModel.crops(of:environment:)	50
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Recogniser.swift	6350	static Recogniser.languageLabel(_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/RunReport.swift	69	static RunReport.fileName(for:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/RunReport.swift	77	static RunReport.stamp(_:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/RunReport.swift	87	static RunReport.duration(_:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/RunReport.swift	144	static RunReport.text(_:)	57
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/RunReport.swift	208	static RunReport.settingsRows(_:)	83
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/RunReport.swift	256	pair #1 (_:_:) in static RunReport.settingsRows(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/RunReport.swift	344	static RunReport.unusedPath(in:for:)	13
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/RunReport.swift	364	static RunReport.write(_:to:)	54
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Runner.swift	142	static Runner.forgetToolPaths()	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Runner.swift	173	static Runner.askLoginShell(for:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Runner.swift	209	static Runner.drain(_:deadline:shouldStop:onChunk:)	17
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Runner.swift	248	static Runner.captureBounded(_:_:seconds:)	63
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Runner.swift	312	static Runner.secondsUntil(_:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Runner.swift	423	static Runner.previewLines(file:outputFolder:)	65
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Runner.swift	426	leaf #1 (_:) in static Runner.previewLines(file:outputFolder:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Runner.swift	508	Runner.Result.succeeded.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Runner.swift	524	static Runner.trimNumber(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Runner.swift	528	static Runner.clamp(_:_:_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ScanNewspaperLayout.swift	52	static ScanNewspaperLayout.modelURL(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ScanNewspaperLayout.swift	60	static ScanNewspaperLayout.model(_:)	14
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ScanNewspaperLayout.swift	85	static ScanNewspaperLayout.linearResize(_:width:height:to:_:)	37
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ScanNewspaperLayout.swift	86	coefficient #1 (_:) in static ScanNewspaperLayout.linearResize(_:width:height:to:_:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ScanNewspaperLayout.swift	87	table #1 (_:_:clampFraction:) in static ScanNewspaperLayout.linearResize(_:width:height:to:_:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ScanNewspaperLayout.swift	100	row #1 (_:) in static ScanNewspaperLayout.linearResize(_:width:height:to:_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ScanNewspaperLayout.swift	125	static ScanNewspaperLayout.detections(of:environment:)	52
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/ScanNewspaperLayout.swift	178	static ScanNewspaperLayout.script(_:)	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	181	SearchableWriter.Failure.errorDescription.getter	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	529	convert #1 (_:depth:) in static SearchableWriter.readOutline(from:password:)	64
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	610	static SearchableWriter.mapToOutput(_:on:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	641	static SearchableWriter.mapSingleAxis(_:isVertical:on:)	16
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	724	rebuild #1 (_:depth:) in static SearchableWriter.copyOutline(from:of:to:password:using:register:)	46
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	1202	static SearchableWriter.cleared(_:of:onLeft:line:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	1307	note #1 (_:) in static SearchableWriter.joiningHyphenatedWords(_:in:continuation:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	1441	static SearchableWriter.with(_:_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	1453	static SearchableWriter.wouldSpan(_:over:in:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	1485	static SearchableWriter.sharedWidthFraction(_:_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	1806	span #1 (_:) in static SearchableWriter.gridded(_:in:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	2109	SearchableWriter.Run.advance.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	2113	SearchableWriter.Run.widthShare.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	2115	SearchableWriter.Run.drawnHeight.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	2120	SearchableWriter.Run.heightShare.getter	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	2309	static SearchableWriter.textPageHeader(page:reader:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	2315	static SearchableWriter.textPageContinued(page:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	2322	static SearchableWriter.writeTextPages(_:reader:to:)	66
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	2327	style #1 (_:) in static SearchableWriter.writeTextPages(_:reader:to:)	16
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	2393	static SearchableWriter.textPageArguments(_:counts:file:pageCount:text:to:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/SearchableWriter.swift	2409	static SearchableWriter.searchableLetters(_:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	21	static TimingRun.pages(_:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	26	static TimingRun.legs(memoryGB:environment:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	35	static TimingRun.estimate(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	45	static TimingRun.settings(_:memoryGB:)	10
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	58	TimingRun.Failure.errorDescription.getter	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	72	static TimingRun.run(_:memoryGB:control:now:progress:)	37
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	114	static TimingRun.drawPages(_:to:)	18
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	134	static TimingRun.drawPage(_:size:dpi:words:)	49
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	185	static TimingRun.text(_:_:_:centred:)	13
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	199	static TimingRun.draw(_:in:_:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	208	TimingRun.Words.init(seed:)	1
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	210	TimingRun.Words.next(_:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	215	TimingRun.Words.sentence(_:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRun.swift	220	TimingRun.Words.paragraph()	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRunner.swift	29	TimingRunner.afterDownload(_:)	8
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRunner.swift	38	TimingRunner.start(_:memoryGB:)	9
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRunner.swift	48	TimingRunner.begin()	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRunner.swift	54	TimingRunner.drain()	75
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRunner.swift	131	TimingRunner.stop()	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRunner.swift	139	static TimingRunner.plan(_:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/TimingRunner.swift	147	static TimingRunner.speedNote(_:)	6
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Updater.swift	43	static Updater.currentVersion.getter	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Updater.swift	52	static Updater.isNewer(_:than:)	12
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Updater.swift	53	parts #1 (_:) in static Updater.isNewer(_:than:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Updater.swift	83	static Updater.parse(_:)	28
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Updater.swift	140	static Updater.isOfferableURL(_:)	3
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Updater.swift	145	static Updater.release(from:)	4
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Updater.swift	153	static Updater.isDue(now:last:enabled:)	7
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Updater.swift	165	static Updater.shouldAnnounce(_:current:skipped:)	5
+VisionOCRKit	packages/VisionOCRKit/Sources/VisionOCRKit/Updater.swift	178	static Updater.check(force:session:completion:)	68

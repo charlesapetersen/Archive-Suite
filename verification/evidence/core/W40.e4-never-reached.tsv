@@ -12,15 +12,11 @@ ArchiveCore/Catalogue/ItemFacts.swift	37	ItemFacts.FileFacts.samePhysicalOccurre
 ArchiveCore/Collections/CollectionSettingsRecord.swift	25	CollectionSettingsRecord.Setting.id.getter	untested	Collection record in the Inspector
 ArchiveCore/Collections/CollectionSettingsRecord.swift	657	static CollectionSettingsVocabulary.plain(_:)	dead	Dead code
 ArchiveCore/Containers/ContainerBackfill.swift	30	ContainerBackfill.Directory.id.getter	dead	Dead code
-ArchiveCore/Containers/ContainerBackfill.swift	60	ContainerBackfill.Scan.unreadableTags.getter	untested	Container backfill (Processor)
-ArchiveCore/Containers/ContainerFileStore.swift	77	static ContainerFileStore.levelMapURL(in:)	untested	Container backfill (Processor)
 ArchiveCore/Containers/ContainerFileStore.swift	447	static ContainerFileStore.asStored<A>(_:)	untested	Container file round trip and item-type colours
 ArchiveCore/Containers/ContainerLevelMap.swift	17	ContainerLevelRole.field.getter	dead	Dead code
-ArchiveCore/Containers/ContainerLevelsDraft.swift	35	static ContainerLevelsDraft.roleName(_:)	untested	Container levels editor
 ArchiveCore/Containers/ContainerLevelsDraft.swift	93	ContainerLevelsDraft.setSkipped(_:_:)	untested	Container levels editor
 ArchiveCore/Containers/ContainerLevelsDraft.swift	99	ContainerLevelsDraft.setChildren(_:_:)	untested	Container levels editor
 ArchiveCore/Containers/ContainerLevelsDraft.swift	105	ContainerLevelsDraft.childRoles.getter	untested	Container levels editor
-ArchiveCore/Containers/ContainerLevelsDraft.swift	111	ContainerLevelsDraft.preview(_:)	untested	Container levels editor
 ArchiveCore/Containers/ContainerRecord.swift	330	ContainerJSONKey.intValue.getter	unreachable	CodingKey stubs
 ArchiveCore/Containers/ContainerRecord.swift	333	ContainerJSONKey.init(intValue:)	unreachable	CodingKey stubs
 ArchiveCore/Corpus/CorpusWalker.swift	825	static FileStat.describe(_:)	untested	Corpus walker: errors and cancellation
@@ -30,7 +26,6 @@ ArchiveCore/Corpus/ScaleLaneCalibration.swift	64	ScaleLaneCalibration.line.gette
 ArchiveCore/Corpus/ScaleLaneCalibration.swift	81	static ScaleLaneCalibration.measure(lane:root:warmWalkSeconds:filesSeen:)	unreachable	Scale-lane calibration
 ArchiveCore/Links/ImproveOCRRequest.swift	267	ImproveOCRManifest.stage(in:now:)	untested	Improve OCR handoff
 ArchiveCore/Links/ImproveOCRSupportIdentity.swift	13	static ImproveOCRSupportIdentity.suggestedLocation.getter	untested	Improve OCR handoff
-ArchiveCore/PDF/ExtractedContent.swift	8	OCRPageKind.displayName.getter	untested	Improve OCR handoff
 ArchiveCore/PDF/ExtractedContent.swift	173	static PDFPageRole.roles(of:)	untested	Page roles of a CGPDFDocument
 ArchiveCore/Preservation/PreservationCopy.swift	29	static PreservationCopy.isDocumentFolder(_:in:)	untested	Preservation copy
 ArchiveCore/Preservation/PreservationCopy.swift	165	PreservationCopy.Failure.errorDescription.getter	untested	Preservation copy
