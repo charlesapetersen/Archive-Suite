@@ -55,6 +55,18 @@ private enum CatalogueRepairStep: Sendable {
     case redo(CatalogueReader.ReassociationCandidate)
 }
 
+/// How the list catches up after a repair step. FSEvents drops the Reader's own rename, so a verified repair is
+/// revised for the two companion names it moved between; a failed one may have left either state, so it takes
+/// a full pass (W49.reader-catalogue-edit-revise).
+private enum CatalogueRepairRefresh {
+    case none, full
+    case revise(CatalogueWriter.ReassociationReceipt)
+
+    static func companions(former: String, renamed: String) -> [String] {
+        [former, renamed].map { CatalogueRecord.companionFilename(forPDFFilename: $0) }
+    }
+}
+
 extension NavigationModel {
     fileprivate func repairCatalogueCompanion(_ candidate: CatalogueReader.ReassociationCandidate,
                                                reader: CatalogueReader, root: URL, undo: UndoManager?) {
@@ -70,7 +82,7 @@ extension NavigationModel {
             switch result {
             case .success(let receipt):
                 if let undo { registerCatalogueRepairUndo(.undo(receipt), reader: reader, root: root, on: undo) }
-                finishCatalogueRepair("Catalogue companion repaired.")
+                finishCatalogueRepair("Catalogue companion repaired.", refresh: .revise(receipt))
             case .failure(let error):
                 finishCatalogueRepair(catalogueRepairError(error, operation: "repair the catalogue companion"))
             }
@@ -91,15 +103,18 @@ extension NavigationModel {
                 case .undo(let receipt):
                     let restored = try writer.undoReassociation(receipt)
                     model.registerCatalogueRepairUndo(.redo(restored), reader: reader, root: root, on: undo)
-                    model.finishCatalogueRepair("Catalogue companion repair undone.", refresh: false)
+                    model.finishCatalogueRepair("Catalogue companion repair undone.", refresh: .none)
                     Task {
                         await ReaderCataloguePairMemory.shared.remember([restored.formerPair], instance: reader.rootInstanceID)
-                        if model.hasCatalogueRepairScope(reader, root: root) { model.library.rescan() }
+                        if model.hasCatalogueRepairScope(reader, root: root) {
+                            model.library.reviseCatalogue(relativePaths: CatalogueRepairRefresh.companions(
+                                former: restored.formerRelativePath, renamed: restored.destination.relativePath))
+                        }
                     }
                 case .redo(let candidate):
                     let receipt = try writer.reassociateCompanion(candidate)
                     model.registerCatalogueRepairUndo(.undo(receipt), reader: reader, root: root, on: undo)
-                    model.finishCatalogueRepair("Catalogue companion repair redone.")
+                    model.finishCatalogueRepair("Catalogue companion repair redone.", refresh: .revise(receipt))
                 }
             } catch {
                 model.finishCatalogueRepair(model.catalogueRepairError(error, operation: undo.isRedoing ? "redo the repair" : "undo the repair"))
@@ -111,11 +126,17 @@ extension NavigationModel {
         rootStore.root == root && catalogueReader?.rootInstanceID == reader.rootInstanceID
     }
 
-    private func finishCatalogueRepair(_ message: String, refresh: Bool = true) {
+    private func finishCatalogueRepair(_ message: String, refresh: CatalogueRepairRefresh = .full) {
         catalogueEditFeedback = message
         statusMessage = message
         announce(message)
-        if refresh { library.rescan() }
+        switch refresh {
+        case .none: break
+        case .full: library.rescan()
+        case .revise(let receipt):
+            library.reviseCatalogue(relativePaths: CatalogueRepairRefresh.companions(
+                former: receipt.formerPDF.relativePath, renamed: receipt.current.pair.occurrence.relativePath))
+        }
     }
 
     private func catalogueRepairError(_ error: Error, operation: String) -> String {

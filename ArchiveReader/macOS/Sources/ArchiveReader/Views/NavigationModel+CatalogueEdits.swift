@@ -265,7 +265,15 @@ extension NavigationModel {
             case .success(let (result, heads)):
                 self.catalogueHistoryRootID = reader.rootInstanceID
                 self.catalogueHistory = heads
-                if result.changed > 0 || result.uncertain > 0 { self.library.rescan() }
+                // FSEvents drops the Reader's own writes, so the list is revised for the companions written; a
+                // write whose result is uncertain may have left either state, which only a full pass settles.
+                if result.uncertain > 0 {
+                    self.library.rescan()
+                } else if !result.changedPaths.isEmpty {
+                    self.library.reviseCatalogue(relativePaths: result.changedPaths.map {
+                        CatalogueRecord.companionFilename(forPDFFilename: $0)
+                    })
+                }
                 self.catalogueEditFailures = result.failures
                 self.reportCatalogue(result.message(verb: verb, pending: heads.uncertainCount))
                 completed?(result.verifiedPaths)
@@ -431,6 +439,8 @@ private struct CatalogueActionResult: Sendable {
     var unavailable = 0
     var uncertain = 0
     var verifiedPaths: Set<String> = []
+    /// The PDFs whose companions this action rewrote.
+    var changedPaths: [String] = []
     var failures: [String] = []
 
     mutating func attempt(_ operation: CatalogueEditJournal.Operation, occurrence: CatalogueAssociation.Occurrence,
@@ -442,6 +452,7 @@ private struct CatalogueActionResult: Sendable {
             verifiedPaths.insert(occurrence.relativePath)
             if let inverse = receipt.inverse {
                 changed += 1
+                changedPaths.append(occurrence.relativePath)
                 outcome = .changed(inverse)
             } else {
                 outcome = .unchanged

@@ -433,6 +433,20 @@ final class ArchiveLibrary: ObservableObject {
         requestRootRescan(urgent: true)
     }
 
+    /// Bring the catalogue list up to date after the Reader's own catalogue write, which FSEvents marks
+    /// `OwnEvent` and drops: the written root-relative paths go through the same revision as an event batch
+    /// (`startCatalogueRevision`), which falls back to a full pass whenever it declines. Without a catalogue
+    /// pass to revise, this is `rescan()` (W49.reader-catalogue-edit-revise).
+    func reviseCatalogue(relativePaths: [String]) {
+        guard usesCatalogue, let rootPath = cataloguePass?.rootPath, !relativePaths.isEmpty else {
+            rescan()
+            return
+        }
+        let prefix = rootPath == "/" ? "/" : rootPath + "/"
+        pendingWatchRequest.merge(CorpusWatchRequest(paths: CorpusWatchPathSet(relativePaths.map { prefix + $0 })))
+        drainWatchWork()
+    }
+
     /// The journal-unavailable fallback. There is intentionally no periodic timer competing with the
     /// content indexer: activation retries the stream, and re-walks only when the last clean settle is
     /// older than five minutes. Explicit ⌘⌥R remains available at any age.

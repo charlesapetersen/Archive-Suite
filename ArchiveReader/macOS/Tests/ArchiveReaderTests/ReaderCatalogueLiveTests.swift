@@ -179,6 +179,102 @@ final class ReaderCatalogueLiveTests: XCTestCase {
         XCTAssertEqual(library.files.map(\.name), ["A.pdf", "B.pdf", "C.pdf"])
     }
 
+    /// W49.reader-catalogue-edit-revise: FSEvents drops the Reader's own writes, so after each kind of catalogue
+    /// write the library is revised for the written companions, and must then match a full pass without one.
+    func testTheReadersOwnCatalogueWritesAreRevisedToMatchAFullPass() async throws {
+        try await assertOwnWritesAreRevised(root: makeRoot())
+    }
+
+    /// The same under a root whose name is decomposed non-ASCII: the revision's paths are spelled from the pass's
+    /// own root prefix, so they must still name the rows the walk listed.
+    func testOwnWritesAreRevisedUnderADecomposedNonASCIIRoot() async throws {
+        let root = scratch.appendingPathComponent("Pa\u{0308}pste-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try await assertOwnWritesAreRevised(root: root)
+    }
+
+    private func assertOwnWritesAreRevised(root: URL) async throws {
+        let a = try item("Box/A.pdf", subjects: ["Alpha"], in: root)
+        _ = try item("Box/B.pdf", subjects: ["Beta"], in: root)
+        let owner = try item("Owner/Letter.pdf", subjects: ["Owned"], in: root)
+        try member("Member/Enclosure.pdf", owner: owner, in: root)
+        try plainPDF("Box/Plain.pdf", in: root)
+        let capture = WatcherCapture()
+        let library = ArchiveLibrary(minimumRootRescanInterval: 0, libraryIndexURL: nil, catalogueCacheDirectory: nil,
+                                     defaults: fixtureDefaults()) { _, handler in
+            let watcher = EmittingWatcher(handler: handler)
+            capture.latest = watcher
+            return watcher
+        }
+        library.start(scope: root, markerGUID: UUID(), catalogueInstance: UUID())
+        try await waitUntil { library.phase.isSettled && library.files.count == 5 }
+        let walks = library.rootScanStartsForTesting
+        let reader = try XCTUnwrap(library.catalogueReader)
+        let writer = CatalogueWriter(reader: reader)
+        func facts(_ path: String) throws -> ItemFacts.FileFacts {
+            try XCTUnwrap(library.catalogueSnapshot).facts(at: path).file.get()
+        }
+        func subjects(_ name: String) -> [String]? { library.files.first { $0.name == name }?.subjects }
+        func setSubjects(_ identity: Identity, _ values: [String], at path: String) throws -> CatalogueWriter.Receipt {
+            try writer.save([CatalogueEdit(.document(identity.document, .subjects), .set(.names(values)))],
+                            basedOn: facts(path))
+        }
+        func revise(_ pdfPaths: String...) {
+            library.reviseCatalogue(relativePaths: pdfPaths.map { CatalogueRecord.companionFilename(forPDFFilename: $0) })
+        }
+        func paired(_ rows: [ArchiveFile]) -> [Bool] { rows.map { (try? $0.catalogueFacts?.file.get()) != nil } }
+        func assertMatchesAFullPass(_ step: String, line: UInt = #line) async throws {
+            try await waitUntil { library.phase.isSettled }
+            let full = run(root, reader.rootInstanceID)
+            XCTAssertEqual(library.files.map(\.path), full.rows.map(\.path), step, line: line)
+            XCTAssertEqual(library.files.map(\.subjects), full.rows.map(\.subjects), step, line: line)
+            XCTAssertEqual(library.files.map(\.tags), full.rows.map(\.tags), step, line: line)
+            XCTAssertEqual(library.files.map(\.catalogueDocuments.count), full.rows.map(\.catalogueDocuments.count),
+                           step, line: line)
+            XCTAssertEqual(paired(library.files), paired(full.rows), step, line: line)
+            XCTAssertEqual(library.rootScanStartsForTesting, walks, "\(step): a revision, not a walk", line: line)
+        }
+
+        // A field edit on a stand-alone record.
+        let edit = try setSubjects(a, ["Alpha", "Edited"], at: "Box/A.pdf")
+        revise("Box/A.pdf")
+        try await waitUntil { subjects("A.pdf") == ["Alpha", "Edited"] }
+        try await assertMatchesAFullPass("field edit")
+
+        // An owner's edit reaches its member in another folder.
+        _ = try setSubjects(owner, ["Owned", "Again"], at: "Owner/Letter.pdf")
+        revise("Owner/Letter.pdf")
+        try await waitUntil { subjects("Enclosure.pdf") == ["Owned", "Again"] }
+        try await assertMatchesAFullPass("owner edit")
+
+        // Undo of the first edit.
+        let inverse = try XCTUnwrap(edit.inverse)
+        _ = try writer.reverse(inverse, basedOn: facts("Box/A.pdf"))
+        revise("Box/A.pdf")
+        try await waitUntil { subjects("A.pdf") == ["Alpha"] }
+        try await assertMatchesAFullPass("undo")
+
+        // A companion repair after an outside rename, then its undo.
+        let beforeRename = try facts("Box/B.pdf")
+        try FileManager.default.moveItem(at: root.appendingPathComponent("Box/B.pdf"),
+                                         to: root.appendingPathComponent("Box/B2.pdf"))
+        capture.latest?.emit(CorpusWatchRequest(paths: [root.appendingPathComponent("Box/B.pdf").path,
+                                                        root.appendingPathComponent("Box/B2.pdf").path]))
+        try await waitUntil { library.files.contains { $0.name == "B2.pdf" } }
+        let unrepaired = subjects("B2.pdf")
+        XCTAssertNotEqual(unrepaired, ["Beta"], "precondition: the renamed PDF has lost its companion")
+        let receipt = try writer.reassociateCompanion(
+            from: beforeRename, to: .init(rootInstanceID: reader.rootInstanceID, relativePath: "Box/B2.pdf"))
+        revise("Box/B.pdf", "Box/B2.pdf")
+        try await waitUntil { subjects("B2.pdf") == ["Beta"] }
+        try await assertMatchesAFullPass("companion repair")
+        _ = try writer.undoReassociation(receipt)
+        revise("Box/B.pdf", "Box/B2.pdf")
+        try await waitUntil { subjects("B2.pdf") == unrepaired }
+        try await assertMatchesAFullPass("repair undo")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: companionURL("Box/B.pdf", in: root).path))
+    }
+
     func testTheLibrarySavesItsListAndTheNextStartShowsItWarm() async throws {
         let root = try makeRoot()
         _ = try item("A.pdf", subjects: ["Alpha"], in: root)
