@@ -82,8 +82,10 @@ final class MultiSelectActionsUITests: NotesFixtureUITestCase {
             XCTAssertTrue(pollUntil(timeout: 15) { !self.itemDirs().contains(a) && !self.itemDirs().contains(b) },
                           "both notes should leave items/")
             XCTAssertFalse(confirm.exists, "no second prompt follows")
-            XCTAssertFalse((organizationMemberships() ?? []).contains { $0[1] == a || $0[1] == b },
-                           "no placement is left on either")
+            // The mirror is written shortly after the change (W49.notes-org-export-async), so poll for it.
+            XCTAssertTrue(pollUntil(timeout: 8) {
+                !(self.organizationMemberships() ?? []).contains { $0[1] == a || $0[1] == b }
+            }, "no placement is left on either")
 
             // One Undo brings both back.
             app.activate()
