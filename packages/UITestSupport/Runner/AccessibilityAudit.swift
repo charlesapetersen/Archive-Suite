@@ -216,14 +216,16 @@ final class AccessibilityAudit {
             XCTFail("accessibility audit: \(screen) — the window to audit is not there", file: file, line: line)
             return
         }
-        // Every element in the window, with how many labelled elements it holds and its parent's type.
-        var inWindow: [String: (labelled: Int, parent: XCUIElement.ElementType?)] = [:]
-        @discardableResult func collect(_ s: XCUIElementSnapshot, parent: XCUIElement.ElementType?) -> Int {
-            let inside = s.children.reduce(0) { $0 + collect($1, parent: s.elementType) }
-            inWindow[Self.placeKey(s.elementType, s.identifier, s.frame)] = (inside, parent)
+        // Every element in the window, with how many labelled elements it holds, its parent's type, and the frame of
+        // the scroll view that clips it (nil outside one).
+        var inWindow: [String: (labelled: Int, parent: XCUIElement.ElementType?, clip: CGRect?)] = [:]
+        @discardableResult func collect(_ s: XCUIElementSnapshot, parent: XCUIElement.ElementType?, clip: CGRect?) -> Int {
+            let inner = s.elementType == .scrollView ? s.frame : clip
+            let inside = s.children.reduce(0) { $0 + collect($1, parent: s.elementType, clip: inner) }
+            inWindow[Self.placeKey(s.elementType, s.identifier, s.frame)] = (inside, parent, clip)
             return inside + (s.label.isEmpty ? 0 : 1)
         }
-        collect(tree, parent: nil)
+        collect(tree, parent: nil, clip: nil)
         let visible = tree.frame
         let screenshot = XCUIScreen.main.screenshot()
         let pixels = ScreenPixels(screenshot)
@@ -232,17 +234,22 @@ final class AccessibilityAudit {
         var unexpected: [AuditFinding] = []
         var knownHere: [String: [AuditFinding]] = [:]
         for var f in found {
+            var clip: CGRect?
             // An issue with no element left to name cannot be placed, so it is kept rather than dropped.
             if let type = f.type {
                 guard let n = inWindow[Self.placeKey(type, f.identifier, f.frame)] else { outside += 1; continue }
                 f.labelledDescendants = n.labelled
                 f.parentType = n.parent
                 f.fillsWindow = f.frame.integral == visible.integral
+                clip = n.clip
             }
             // Contrast is measured from the pixels under the element's frame. Where the frame is not wholly on
             // the window — text scrolled below a Settings pane, a field running past the edge — those pixels
             // belong to something else, and the first run failed text the screenshot shows plainly legible.
-            if f.audit == .contrast, f.type != nil, !visible.contains(f.frame) { offWindow += 1; continue }
+            // The same for text a scroll view clips: a row half scrolled under a pinned footer is measured against
+            // the footer's pixels (W49.proc-settings-redesign-core: the Settings estimate footer).
+            if f.audit == .contrast, f.type != nil,
+               !visible.contains(f.frame) || clip.map({ !$0.contains(f.frame) }) == true { offWindow += 1; continue }
             guard reported.insert(f.key).inserted else { repeated += 1; continue }
             if f.audit == .contrast, f.type != nil, let ratio = pixels?.contrast(under: f.frame) {
                 f.measured = ratio

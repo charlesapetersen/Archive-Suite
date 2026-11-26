@@ -381,7 +381,7 @@ final class VisualReviewUITests: XCTestCase {
         // One Reader menu stands for the old backend picker (W49.proc-settings-redesign-core).
         let predicate: NSPredicate
         switch title {
-        case "API Gateway": predicate = NSPredicate(format: "title BEGINSWITH %@", "Gateway")
+        case "API Gateway": predicate = NSPredicate(format: "title BEGINSWITH %@ OR title ENDSWITH %@ OR title ENDSWITH %@", "Gateway", "(gateway)", "(local server on this Mac)")
         case "Local CLI Agent": predicate = NSPredicate(format: "title ENDSWITH %@", "on its own sign-in")
         default: predicate = NSPredicate(format: "title == %@", title)
         }

@@ -68,7 +68,7 @@ final class MessageJourneyUITests: XCTestCase {
         let reader = element("ap.settings.readerPicker")
         reveal(reader, in: settings.scrollViews.firstMatch)
         reader.click()
-        app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@", "Gateway")).firstMatch.click()
+        app.menuItems.matching(NSPredicate(format: "title BEGINSWITH %@ OR title ENDSWITH %@ OR title ENDSWITH %@", "Gateway", "(gateway)", "(local server on this Mac)")).firstMatch.click()
         XCTAssertTrue(app.showSettingsPanel("Advanced"))
         let preset = settings.buttons["Fill in OpenAI preset"]
         reveal(preset, in: settings.scrollViews.firstMatch)

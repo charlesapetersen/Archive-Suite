@@ -225,8 +225,14 @@ private struct KeyStatusChip: View {
     var body: some View {
         switch SettingsAccountsTab.keyChip(hasKey: hasKey, validated: validated, saveFailed: saveFailed) {
         case .saveFailed:
-            Label("Save failed", systemImage: "exclamationmark.triangle.fill")
-                .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.red)
+            // The words in primary, the warning colour on the icon only: red caption text measured 3.33:1 in the
+            // light window's accessibility audit.
+            Label {
+                Text("Save failed").foregroundStyle(.primary)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
+            }
+            .labelStyle(.titleAndIcon).font(.caption)
         case .validated:
             Label("Validated", systemImage: "checkmark.seal.fill")
                 .labelStyle(.titleAndIcon).font(.caption).foregroundStyle(.primary)

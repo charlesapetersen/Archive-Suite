@@ -289,7 +289,8 @@ struct SettingsAdvancedTab: View {
             why("pre-ocred")
             SearchableFormatControls(
                 forms: SettingsSheetModel.FormsRow(entries: scope.resolve(.searchableFor).value.strings ?? [],
-                                                   source: scope.resolve(.searchableFor).sourceText),
+                                                   source: scope.resolve(.searchableFor).layer == nil
+                                                       ? "Default" : scope.resolve(.searchableFor).sourceText),
                 setEntries: { scope.set(.searchableFor, .strings($0)) })   // side effect: the Output PDF form's per-format editor
             why("searchable")
             Toggle(isOn: $sendPreviousImage) {

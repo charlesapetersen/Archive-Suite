@@ -686,6 +686,8 @@ final class ProcessorUITests: XCTestCase {
 
         XCTAssertTrue(app.showSettingsPanel("Capture"))
         let clientID = settings.textFields["Google client ID"]
+        // The relay's fields sit behind Configure… until a client ID or a sign-in exists.
+        if !clientID.waitForExistence(timeout: 2) { element("ap.settings.driveRelay").click() }
         XCTAssertTrue(clientID.waitForExistence(timeout: 5), "the Google client ID needs its field")
         XCTAssertEqual(clientID.placeholderValue, "…apps.googleusercontent.com",
                        "the client-ID placeholder belongs inside its field, not in the label column")
@@ -734,8 +736,11 @@ final class ProcessorUITests: XCTestCase {
         XCTAssertTrue(waitUntil { renderedText(of: reader).contains("Apple Vision") })
         let languages = element("ap.settings.visionLanguages")
         XCTAssertTrue(languages.exists)
-        XCTAssertTrue(settings.scrollViews.firstMatch.frame.contains(languages.frame),
-                      "Apple Vision languages should be visible without scrolling")
+        // The languages sit right under the Reader menu (W49.proc-settings-redesign-core: below the scope and presets).
+        scrollUntilHittable(languages, in: settings)
+        let visible = settings.scrollViews.firstMatch.frame
+        XCTAssertTrue(visible.contains(languages.frame) && visible.contains(reader.frame),
+                      "Apple Vision languages should be visible with the Reader menu")
         let conflict = element("ap.settings.visionTaggingConflict")
         XCTAssertTrue(conflict.waitForExistence(timeout: 5), "an LLM Tagging mode must be named beside transcription-only")
         XCTAssertTrue(renderedText(of: element("ap.ocr.reOCRExplanation")).contains("only transcribes"),
@@ -799,7 +804,7 @@ final class ProcessorUITests: XCTestCase {
         let predicate: NSPredicate
         switch title {
         case "Direct API": predicate = NSPredicate(format: "title BEGINSWITH %@", "Gemini · ")
-        case "API Gateway": predicate = NSPredicate(format: "title BEGINSWITH %@", "Gateway")
+        case "API Gateway": predicate = NSPredicate(format: "title BEGINSWITH %@ OR title ENDSWITH %@ OR title ENDSWITH %@", "Gateway", "(gateway)", "(local server on this Mac)")
         case "Local CLI Agent": predicate = NSPredicate(format: "title ENDSWITH %@", "on its own sign-in")
         default: predicate = NSPredicate(format: "title == %@", title)
         }

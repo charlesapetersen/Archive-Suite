@@ -79,6 +79,10 @@ final class AccessibilityAuditUITests: XCTestCase {
 
     private func checkValidatedBadge(in settings: XCUIElement, appearance: String) throws {
         let badge = settings.staticTexts["Validated"].firstMatch
+        // The keys sit below the local models and subscriptions (W49.proc-settings-redesign-core): scroll to them.
+        for _ in 0..<12 where !(badge.exists && badge.isHittable) {
+            settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -200)
+        }
         XCTAssertTrue(badge.exists, "The Accounts audit should include a Validated badge")
         guard badge.exists else { return }
 

@@ -63,11 +63,11 @@ struct HandPlacerDownloadRow: View {
                 Text("\(Int(share * 100))%").font(.caption).monospacedDigit()
                 Button("Cancel") { download.cancel() }
             case .failed(let why):
-                Text("The download failed: \(why).").font(.caption).foregroundStyle(.secondary)
+                Text("The download failed: \(why).").font(.caption).foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Try Again") { download.start() }
             case .installed:
-                Text("The handwriting placer is downloaded.").font(.caption).foregroundStyle(.secondary)
+                Text("The handwriting placer is downloaded.").font(.caption).foregroundStyle(.primary)
             }
         }
         .accessibilityIdentifier("ap.sheet.handPlacerDownload")

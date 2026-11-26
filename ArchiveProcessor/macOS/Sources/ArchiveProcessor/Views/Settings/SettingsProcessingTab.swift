@@ -174,11 +174,13 @@ struct SettingsProcessingTab: View {
     @ViewBuilder private var readingSection: some View {
         Section("Reading") {
             SettingsReaderPicker(keyed: keyed)
+            // Shown only where it applies: a dimmed switch measured 1.25:1 in the accessibility audit.
+            if isDirect || ocrPageKindRouting {
             Toggle(isOn: $ocrPageKindRouting) {
                 HelpLabel("Use a different reader for handwritten pages", help: "Before a run, this Mac tells each dropped photo's kind with Apple Vision, free (about 0.6 s a page). Typed, printed and form pages keep the reader above; a handwritten page goes to the best measured handwriting reader you have a key or a download for. A page whose kind is unsure keeps the reader above. You can change the reader for one page in the file list, and the estimate follows. Needs macOS 26 and a cloud reader above.")
             }
-            .disabled(!isDirect)
             .accessibilityIdentifier("ap.settings.pageKindRouting")
+            }
             if !isDirect {
                 Text("Handwritten pages go to a second reader only with a cloud reader above.")
                     .font(.caption2).foregroundStyle(.primary)

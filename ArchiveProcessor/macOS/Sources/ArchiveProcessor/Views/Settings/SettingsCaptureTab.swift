@@ -40,12 +40,14 @@ struct SettingsCaptureTab: View {
                 }
             }
             Section {
-                DisclosureGroup(isExpanded: $relayOpen) { relayFields } label: {
-                    LabeledContent("Google Drive relay (optional)") {
+                LabeledContent("Google Drive relay (optional)") {
+                    HStack {
                         Text(driveSignedIn ? "Signed in" : "Not connected").foregroundStyle(.primary)
+                        Button(relayOpen ? "Hide" : "Configure…") { relayOpen.toggle() }
+                            .accessibilityIdentifier("ap.settings.driveRelay")
                     }
                 }
-                .accessibilityIdentifier("ap.settings.driveRelay")
+                if relayOpen { relayFields }
                 Text("Wired and Wi-Fi capture work without Google Drive.")
                     .font(.caption2).foregroundStyle(.primary)
             } header: { Text("Cloud relay") }

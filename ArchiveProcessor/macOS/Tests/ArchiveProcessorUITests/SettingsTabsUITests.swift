@@ -193,7 +193,10 @@ final class SettingsTabsUITests: XCTestCase {
         app.menuItems["JPEG"].click()
         let printed = settings.descendants(matching: .any)["ap.sheet.forms.printed"].firstMatch
         guard printed.waitForExistence(timeout: 5) else { return XCTFail(settings.debugDescription) }
-        for _ in 0..<6 where !printed.isHittable { settings.scrollViews.firstMatch.scroll(byDeltaX: 0, deltaY: -120) }
+        let scroll = settings.scrollViews.firstMatch
+        for _ in 0..<12 where !(printed.isHittable && scroll.frame.insetBy(dx: 0, dy: 20).contains(printed.frame)) {
+            scroll.scroll(byDeltaX: 0, deltaY: -120)
+        }
         XCTAssertEqual(printed.value.map { String(describing: $0) }, "0")
         printed.click()
         XCTAssertEqual(printed.value.map { String(describing: $0) }, "1")

@@ -78,11 +78,11 @@ struct NewspaperLayoutDownloadRow: View {
                 Text("\(Int(share * 100))%").font(.caption).monospacedDigit()
                 Button("Cancel") { download.cancel() }
             case .failed(let why):
-                Text("The download failed: \(why).").font(.caption).foregroundStyle(.secondary)
+                Text("The download failed: \(why).").font(.caption).foregroundStyle(.primary)
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Try Again") { download.start() }
             case .installed:
-                Text("The newspaper layout helper is downloaded.").font(.caption).foregroundStyle(.secondary)
+                Text("The newspaper layout helper is downloaded.").font(.caption).foregroundStyle(.primary)
             }
         }
         .accessibilityIdentifier("ap.sheet.newspaperLayoutDownload")
@@ -105,16 +105,16 @@ struct ScanNewspaperLayoutDownloadRow: View {
                     Text("\(Int(share * 100))%").font(.caption).monospacedDigit()
                     Button("Cancel") { download.cancel() }
                 case .failed(let why):
-                    Text("The download failed: \(why).").font(.caption).foregroundStyle(.secondary)
+                    Text("The download failed: \(why).").font(.caption).foregroundStyle(.primary)
                         .fixedSize(horizontal: false, vertical: true)
                     Button("Try Again") { download.start() }
                 case .installed:
-                    Text("The scanned-newspaper layout helper is downloaded.").font(.caption).foregroundStyle(.secondary)
+                    Text("The scanned-newspaper layout helper is downloaded.").font(.caption).foregroundStyle(.primary)
                 }
             }
             Text("Licence: DocLayout-YOLO's weights (juliozhao/DocLayout-YOLO-DocStructBench-imgsz1280-2501) are "
                  + "\(ScanNewspaperLayout.licence). They are downloaded separately and are not part of the app.")
-                .font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                .font(.caption2).foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityIdentifier("ap.sheet.scanNewspaperLayoutDownload")
     }
