@@ -477,10 +477,14 @@ When label reading needs Gemma, the Processor checks the existing local servers 
   off, or when the app quits. The label card describes the parser fallback
   when no model supplied fields. The field provenance stays `gemma-3-12b` for either local route.
 
-- **Gemma beside a local OCR model swaps models.** With a local model as the gateway, Gemma (about 8 GB) is asked on
-  that same server first; LM Studio and Ollama may unload the OCR model to load it, and load it again for the next
-  page, tens of seconds each way on an 18 GB Mac, inside Live Capture's segment work (Finish waits). Not measured
-  interleaved; `segbench-results/ct-gemma-route.md` times labels alone. (queued: W49.proc-gemma-swap-time).
+- **Gemma beside a local OCR model swaps models.** With a local model as the gateway, Gemma is asked on that same
+  server first. On mlx-vlm 0.7.4 the server's own switch keeps both models in memory while it loads the next, which
+  does not fit an 18 GB Mac (stopped at 13.0 GB with Qwen3-VL 8B, 12.0 GB with Qwen3.5 4B). With one model at a time
+  (stop the server, start it with the next, as `LocalModelSupervisor` does for app-managed models) a label between
+  pages costs about 9.5 s of switching on top of Gemma's 12–14 s read, and the peak stays at Gemma's 9.8 GiB
+  ([`segbench-results/ct-gemma-swap.md`](segbench-results/ct-gemma-swap.md), which also weighs batching labels and
+  Vision + parser alone). On a server the user runs the app cannot restart it; LM Studio and Ollama are unmeasured.
+  (asked: W49.proc-gemma-external-switch-owner-ok).
 - **A local address is trusted.** Only a loopback address is asked, but a proxy there that forwards to a cloud model,
   or redirects, cannot be told apart from a local server; Ollama's `-cloud` tags are refused by name. (accepted: a loopback server is the user's own; a forwarding proxy there is their choice).
 - **Process Files has no card.** Its labels are written as proposals (source `label`), to confirm in the Reader's
